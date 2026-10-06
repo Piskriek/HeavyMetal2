@@ -1,6 +1,6 @@
 # SetMix: the plan from scratch (2026-10-06, evening)
 
-**State: PROPOSED. Nothing is built from this until the owner says yes.** Written by the new planning session from `docs/handoff/NEW_SESSION_PLAN.md`, the owner's words in `docs/OWNER_ASKS.md` (13:40 onwards), `docs/SETMIX_GAME_CONCEPT.md`, the winning Arena design (`arena-gathered/setmix/site/src/data/gdd.ts`), `docs/SETMIX_WORLD.md` and the code on `main`.
+**State: APPROVED (owner, 2026-10-06 evening: "go with that"); the answers are in section 3.** Written by the new planning session from `docs/handoff/NEW_SESSION_PLAN.md`, the owner's words in `docs/OWNER_ASKS.md` (13:40 onwards), `docs/SETMIX_GAME_CONCEPT.md`, the winning Arena design (`arena-gathered/setmix/site/src/data/gdd.ts`), `docs/SETMIX_WORLD.md` and the code on `main`.
 
 ## 1. How this session works
 
@@ -29,23 +29,23 @@
 | Machines | Believable, "not floating butplugs". They spew colourful pixels while they run; it all feels logical and connected. | 20:30, evening |
 | Not wanted | No chimney. One flat texture and some low-poly trees is not good enough. | evening |
 
-## 3. Questions for the owner (now)
+## 3. The owner's answers (2026-10-06 evening)
 
-1. **The centre of a new player's plot, now the chimney is gone.**
-   - a. The planet end of the gate: where you step out, with your machines built round it by you. *(My suggestion: it follows from your 07:30 premise, walking through the gate onto the moon.)*
-   - b. A starter set of machines, already standing and wired.
-   - c. Bare ground: you place everything.
-2. **The last stage: 6 or 8?** The ladder, its tests and the wave are built for 6; your 20:30 note said "stage 8". 8 is a small change if you want more steps. *Default: 6, reading "stage 8" as "the last stage".*
-3. **The SetMix menu.** From your 07:30 note: **Play** (the campaign: sparse lab, gate off the first time) and **Studio** (the full lab) replace the "Resolution Crafter" entry. *Default: Play, Studio, then the rest (My planet, Avatars, Community, Settings); Goblin Racing only in its own version.*
-4. **What the menu's gate shows once you have turned yours on in Play.** *Default: always the finished plot "in all its glory" (18:40); your own plot shows in the gate inside Play.*
+1. **The centre of your plot is the planet end of the gate**: where you step out. You build your machines round it. ("yes, ffs thats what i thought the other guy would do")
+2. **Six stages.** "stage 8" was a typo.
+3. **The SetMix menu: Play, Studio, then the rest.** Goblin Racing only in its own version, top of its list.
+4. **The menu's gate always shows a finished plot**; your own plot shows in the gate inside Play.
+5. **Plots are about 1 km across** (was 112 m).
+6. **The ground is natural and multi-textured at every stage, stage 1 included: "the whole idea is so that it looks natural just low rez."** Stage 1 is a real, natural desolate place (rock, dust, gravel, scree, cracked flats, blended by slope and height) drawn at low resolution: low-poly shapes, low-res textures, simple light. The stages raise the resolution of the same natural world, and terraforming adds water, the coverage layer and the forest. No flat colour palettes, no single texture.
+7. **A new player starts in their own lab.** Their plot goes next to a friend's; with no friend to join, a random free place on the planet.
+8. **The gate dials a friend's gate**: pick a friend, and the gate opens onto their plot.
+9. **Friends can move their plots next to each other** if they want.
+10. **"lets go with logical choices that make the game more comprehensive and fun to play."** My choices under that, for the rest:
+    - Abandoned plots stay for ever, as they were left: the planet only grows, a returning player finds their plot waiting, and old plots are places to explore.
+    - Names: friends' plots carry their names and a beacon you can see from afar; anyone else's name shows when you point at their plot or visit.
+    - Visits are read-only, by walking over or by dialling a friend's gate.
 
-The machines themselves are not a question yet: the art agent draws candidates on design sheets, each with its job, its power and its pixels, and you pick from the sheets.
-
-**Later, before the shared planet is wired (Phase 5); defaults unless you say otherwise** (`SETMIX_WORLD.md` section "Decisions"):
-- plot size: 56 m radius, as built;
-- abandoned plots: kept for ever (nothing ever moves);
-- names: shown when you visit or point at a plot, not from afar;
-- a new player: the next slot out; "next to a friend" once friends exist.
+The machines are picked from the concept-art design sheets (G1).
 
 ## 4. The phases
 
@@ -71,7 +71,7 @@ The owner's yes, and answers to section 3.
   5. the Goblin Racing menu backdrop: the gate shows the goblin planet;
   6. a design sheet of the gate (front, side, back; plinth, cable junction, service hatches; a goblin for scale);
   7. a design sheet of the lab's power and machines: relays, control boxes, the console and lever, cable trays, candidate lab machines;
-  8. the stage ladder: one camera on your plot at every stage, models and textures both climbing;
+  8. the stage ladder: one camera on your plot at every stage, models and textures both climbing; natural and multi-textured at every stage, stage 1 just low-res;
   9. the coverage layer on one patch of ground, step by step, with the last step split into albedo, normal and roughness;
   10. the target: your plot at the last stage, a lush PBR forest;
   11. the desolate horizon from a new plot, other players' plots green in the distance;
@@ -87,7 +87,8 @@ Each brief is self-contained: the contract, tests, and a preview page. I run bot
 |---|---|---|
 | `@hm/treegen` | Real trees: a branching skeleton (space colonisation), bark tubes with UVs, leaf clusters as alpha cards, a detail ladder from low poly (stage 1, flat shaded) to high poly, and impostor data for distance. Replaces the blob trees. | determinism; triangles per level; every branch joined to its parent; the trunk on the ground |
 | `@hm/coverage` | The coverage layer: moss, vines, grass, leaves and dust spreading over a grid like vines, from seeds (water edges, machines, trees), driven by stage and time; one weight map per layer. | determinism; spread stays connected; budgets per tier |
-| Ground shader | The layered ground: the cartridge base plus the coverage layers (albedo, normal, roughness), height-blended, triplanar on slopes, one shader with uniforms so a stage change never recompiles. Replaces the one flat texture. | uniform packing; a preview page per stage |
+| Ground shader | The natural ground: several ground materials (rock, dust, gravel, scree, cracked flats) blended by slope, height and curvature at every stage, at the stage's resolution (low-res at stage 1), plus the coverage layers (albedo, normal, roughness), height-blended, triplanar on slopes; one shader with uniforms so a stage change never recompiles. Replaces the one flat texture. | uniform packing; a preview page per stage |
+| Plot terrain | A 1 km plot's ground in chunks with detail by distance, its shape (hills, old craters, ridges, gullies) from seeded noise, and a stage-dependent smoothness. | determinism; no cracks between chunks; triangle budget per tier |
 | `@hm/rigkit` | Believable machines: cable runs that sag between supports and follow floor covers and trays; relay cabinets, control boxes and consoles; a checker that every prop stands on the floor or a mount and every powered thing has a cable path to a source. | the checker itself: nothing floats, nothing unpowered |
 | Pixel exhaust | Machines spewing coloured pixel motes from their vents while they run (instanced, cheap on Low), and pulses along their cables. Builds on `@hm/particles` if it fits. | rate follows the machine's state; the cost cap on Low |
 
@@ -95,12 +96,12 @@ Small pieces I write myself: picking the model level per stage (SM14; the smooth
 
 ### Phase 4: build to the art (me) → G2 (the lab), G3 (the plot)
 - **The lab** (SM16, SM17, SM18): the free-standing gate, the window, relays, control boxes, cables and the picked machines; the gate shows the finished plot on the menu, your plot in Play, the goblin planet in the Goblin Racing version; first Play starts with the gate off.
-- **The plot** (SM14, SM15): the plot centre as answered; the layered ground and coverage; real trees; models and textures climbing every stage to the lush PBR forest.
+- **The plot** (SM14, SM15): 1 km across with the gate's planet end at its centre; the natural, multi-textured ground and the coverage layer; real trees; models and textures climbing every stage to the lush PBR forest.
 - Every step is judged against the concept art by screenshot, measured on the laptop on Low, and loads behind a bar. The owner sees the lab (G2), then the plot through the stages (G3).
 
 ### Phase 5: the game loop, and the shared planet
-After the look lands: what you mine, which machines you build, research in the lab, cartridges slotted on the planet, Studio against Play. I bring a short proposal drawn from the picked machines and the design document; the owner decides; Arena writes the systems. Then the shared planet (SM8 to SM10) with the defaults in section 3; going live needs the RUN deploy, which needs the owner's login.
+After the look lands: what you mine, which machines you build, research in the lab, cartridges slotted on the planet, Studio against Play. I bring a short proposal drawn from the picked machines and the design document; the owner decides; Arena writes the systems. Then the shared planet (SM8 to SM10) with the answers in section 3: 1 km plots, a new player's plot beside a friend's or at a random free place, dialling a friend's gate, moving next to friends, abandoned plots kept. `crafter/shared-planet.ts` (a spiral of 112 m plots) is redone for these rules. Going live needs the RUN deploy, which needs the owner's login.
 
 ## 5. What stays from what is built
 
-Kept as they are: `@hm/fidelity`, `@hm/vault`, `@hm/texgraph`, `@hm/flora`, `@hm/fauna`, `@hm/smoothvox`; the planet layout and its far horizon (`crafter/planet.ts`); the shared planet's rules (`crafter/shared-planet.ts`); the loading and performance set-up. Replaced after the art: the ground (one cartridge texture per stage), the blob trees, the lab's arch in the wall. Removed now: the chimney.
+Kept as they are: `@hm/fidelity`, `@hm/vault`, `@hm/texgraph`, `@hm/flora`, `@hm/fauna`, `@hm/smoothvox`; the planet and its far horizon (`crafter/planet.ts`, rescaled for 1 km plots in Phase 4); the loading and performance set-up. Redone in Phase 5: the shared planet's placement rules (`crafter/shared-planet.ts`). Replaced after the art: the ground (one cartridge texture per stage), the blob trees, the lab's arch in the wall. Removed now: the chimney.

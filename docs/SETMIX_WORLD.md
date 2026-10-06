@@ -52,14 +52,14 @@ Nothing is shared and writable by everyone, so the shared planet is built from w
 - Nothing already placed ever moves.
 - From the planet you see the games in your own system as planets in the sky.
 
-## Decisions for the owner
+## The owner's decisions (2026-10-06 evening; `docs/SETMIX_PLAN.md` section 3)
 
-1. **Plot size.** 56 m radius today: the stages and the wave are tuned to it.
-   - Bigger plots mean fewer neighbours in view.
-   - More plots per player as you progress is possible: extra slots next to yours.
-2. **Abandoned plots.** Keep them for ever (the planet only grows), or let a plot go dormant after some months, drawn as ruins, so its slot can be reused?
-3. **Names on plots.** Show the player's name over their plot from afar, or only when you visit?
-4. **Where a new player starts.**
-   - The next slot out, as above.
-   - Or next to a friend: a slot claimed near theirs, the spiral's nearest free slot.
-5. **Deploying.** All of this needs the RUN build live. The deploy needs your login; I don't do that.
+These replace the spiral of 112 m plots above; `shared-planet.ts` is redone for them in the plan's Phase 5.
+
+1. **Plots are about 1 km across.** The gate's planet end stands at the centre of each.
+2. **A new player starts in their own lab.** Their plot goes next to a friend's; with no friend to join, a random free place on the planet.
+3. **The gate dials a friend's gate**, opening onto their plot.
+4. **Friends can move their plots next to each other** if they want.
+5. **Abandoned plots stay for ever**, as they were left (the owner: "logical choices that make the game more comprehensive and fun to play").
+6. **Names:** friends' plots show their names and a beacon from afar; anyone else's name shows when you point at their plot or visit.
+7. **Deploying.** All of this needs the RUN build live. The deploy needs the owner's login; I don't do that.

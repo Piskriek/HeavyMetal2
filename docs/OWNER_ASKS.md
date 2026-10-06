@@ -515,3 +515,5 @@ create a example of a all in one 3d/2d/anim/sound studio program where everythin
 - 2026-10-06 evening (laptop, main session, Opus 5.5): rewrite the prompt, i dont want a chimney, ive never said put a chimney in, the macnhines should spew colorfull pixels while they operate, it should feel logical and connected, . ive opened the arena.ai and paste the prompts yourself, use the battle ai to write you code to save usage for reasoning. one flat texture and some low poly trees is not good enough. (Not done: interrupted by the next message. Handed to a new planning session: `docs/handoff/NEW_SESSION_PLAN.md`.)
 
 - 2026-10-06 evening (laptop, main session, Opus 5.5): you need a new session to plan everything from scratch, this has been a nightmare, do what you need so i can give you a ling so you start a new planning session (Wrote `docs/handoff/NEW_SESSION_PLAN.md`.)
+
+- 2026-10-06 evening (laptop, new planning session, Opus 5.5): Read C:\MarbleGp\docs\handoff\NEW_SESSION_PLAN.md in full (In progress: read it and every source it names; the plan is `docs/SETMIX_PLAN.md`, awaiting the owner's yes and four answers in its section 3.)

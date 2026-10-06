@@ -202,3 +202,15 @@ Good work so far. I'm reviewing for the owner. Please do these, in this order.
    - **11 is the best of the set:** natural and low-res, the hopper machine spewing square pink pixels and cabled to the junction at the gate's foot, the neighbours' plots and the friend's beacon. Keep it, fixing only the goblin planet.
 
 4. When the set is complete, reply here with the branch name, the list of files and your self-review.
+
+---
+
+## Follow-up 2 (sent 2026-10-07, after reviewing 01, 03, 04 redone and 06)
+
+Thanks: 01 and 06 are right, and 03 and 04 are much better. Keep going with your list (05, 10, 11, then 07, 08, 09, 12, the contact sheet and the README), committing as you go. Three fixes from my review, to fold in:
+
+1. **The gate's size.** On 06's front view the opening is about two goblins tall: that is the canon (2.6 m). On 03 the goblin stands in the opening and it reads about three goblins tall. Keep the goblin-to-opening ratio of 06's front view in every image.
+2. **04's gate is not the canon.** It has slim uprights with no lintel block, no buttresses and no hazard-striped plinth. Redo 04 with the 06 gate, and make sure 05 uses it too.
+3. **Loose cables, still.** On 03 the cables leave the rear junction box loose across the floor; on 04 a loose cable runs from the console to the holotable and on to the machines. In the lab, every cable runs inside the steel floor covers or the ceiling trays. On the planet, cables on the ground are fine.
+
+When the set is complete, reply here with the branch name, the list of files and your self-review.

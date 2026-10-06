@@ -1,127 +1,179 @@
-# SUPERSEDED: do not paste
+# Arena art agent: SetMix concept art (rewritten 2026-10-06 evening)
 
-> The owner rejected the chimney in this brief ("i dont want a chimney, ive never said put a chimney in"). A new planning session rewrites it: see `docs/handoff/NEW_SESSION_PLAN.md`.
+From the approved plan, `docs/SETMIX_PLAN.md` (Phase 2), and the owner's words in `docs/OWNER_ASKS.md`. It replaces the earlier brief, which had a chimney in it. Everything below the line is pasted into the Arena agent (Agent mode, repo `Piskriek/HeavyMetal2`).
 
-# Arena art agent: SetMix concept art (the lab, the gate, the stages, the machines)
-
-Owner, 2026-10-06 20:30 (OWNER_ASKS): concept art to work towards. The brief comes from the game's own design: `docs/SETMIX_GAME_CONCEPT.md` and the winning design document `arena-gathered/setmix/site/src/data/gdd.ts` (LAB_MACHINES, FIELD_MACHINES, RESOURCES, PLAY_ARC). Copy everything below the line into the Arena Codex agent.
+Design notes for this brief:
+- The memorable things are the free-standing gate and the machines spewing pixels. Everything else is quiet and disciplined.
+- The lab is engineered equipment, not glossy sci-fi: the gate is a bolted door frame with cable glands, not a glowing ring.
+- The planet is a real, natural place at low resolution, not an abstract palette.
 
 ---
 
-You are the concept artist for **SetMix: The Resolution Crafter**, a game where terraforming a planet raises its graphical fidelity. A scientist works in a white high-fidelity lab. A freestanding gate in the lab opens onto a desolate, low-poly moon. Machines on the moon raise four metrics (Pixel Density, Vertex detail, Light, Water), and the world climbs six stages, from a 1990s flat-shaded moon to a lush PBR forest.
+You are the concept artist for **SetMix: The Resolution Crafter**. In this game, terraforming a planet raises its graphical resolution.
 
-Repository: https://github.com/Piskriek/HeavyMetal2. Start from `main`. Your session can only push to its own `arena/<id>-heavymetal2` branch: commit there, and touch nothing outside `docs/concept/setmix/`.
+- A scientist works in a white, high-fidelity lab.
+- A gate stands free in the lab. Through it you walk out onto your plot on a desolate planet, which you see at low resolution.
+- You build machines on the plot. They run on power and on materials you mine, and while they run they spew colourful pixels into the air.
+- Over six stages, the planet's textures, models and light climb from low-res to high-fidelity PBR. Water, a ground cover and finally a lush forest grow in.
 
-**Read these first. They are the source of truth for what every machine is and does:**
-- `docs/SETMIX_GAME_CONCEPT.md`: the premise, the lab, the gate, Play mode against Studio mode.
-- `arena-gathered/setmix/site/src/data/gdd.ts`: `LAB_MACHINES` (Material Synthesizer, Fusion Matrix, Hardware Fabricator, Planet Table, Cartridge Archive), `FIELD_MACHINES` (Pixel Chimney, Harmonic Mesh Vibrator, Lumen Mast, Clathrate Sublimator, Template Injector spire, Coherence Beacon, Compute Reactor, Relay Pylon), `RESOURCES`, and `PLAY_ARC` (Act I "Cold Boot": "One flickering bench, one console. The Portal is the only thing drawing full power, and it is drawing it from everything else.").
-- `docs/OWNER_ASKS.md`, the entry at 2026-10-06 20:30: the owner's own words on the gate, the lab and the stages.
+Your pictures are the target the game is built towards, so they must be consistent, logical and buildable.
+
+**Repository:** https://github.com/Piskriek/HeavyMetal2. Start from `main`. Your session can only push to its own `arena/<id>-heavymetal2` branch, so commit there. Touch nothing outside `docs/concept/setmix/`.
+
+**Read first:**
+- `docs/SETMIX_PLAN.md`, sections 2 and 3. These are the owner's decisions and outrank everything else.
+- `docs/SETMIX_GAME_CONCEPT.md`: the premise.
+- `arena-gathered/setmix/site/src/data/gdd.ts`: a design document of ideas. The owner has not decided any of it, so don't treat its machine names or its four-colour stage 1 as decisions. Where it disagrees with the plan, the plan wins.
 
 ## The owner's rules (do not bend these)
 
-1. **The gate** is a sci-fi door frame **standing upright in the room, not built into any wall**.
-   - The opening is as tall as two goblins stacked: 2.6 m tall and about 1.7 m wide.
-   - Thick cables run from it across the floor to control boxes and power relays.
-2. **Believable machines, never abstract shapes.** Before you draw a machine, write down in the README what it does, where its power comes from, and how it is held up. Then draw that.
-   - Everything stands on the floor: plinths, feet, steel skids, anchor bolts. Nothing floats.
-   - Cables run from a source (relay cabinet, breaker panel, reactor) to a load (gate, console, machine). They sag between supports and are routed along floor covers, trays or conduits.
-   - Machines have service panels, vents, cable glands, warning stripes, handles and indicator lights.
-   - The owner's words: "make the machines believable, not floating butt plugs please, use reasoning with this stuff."
-3. **A window and a doorway show different places.** The lab has an observation window onto the real outside: the desolate moon, black sky and stars. The gate shows somewhere else.
-4. **The stages change the models as well as the textures.**
-   - At stage 1, everything on the planet is low poly and flat shaded, with crisp pixel textures (a 1990s look).
-   - Over the stages it all turns high poly and smooth.
-   - At the last stage everything is high-fidelity PBR: textures, models and lighting.
-5. **Flora grows into the ground as a coverage layer**: dust, moss, vines, grass, leaves. It spreads over the stages like vines, as surface detail rather than big geometry. The last stage is a lush PBR forest.
+1. **The gate** is a sci-fi door frame **standing upright in the room, joined to no wall**.
+   - Its opening is as tall as two goblins stacked: 2.6 m tall and about 1.7 m wide.
+   - It stands on a plinth bolted to the floor.
+   - Thick cables run from it, along floor covers or trays, to control boxes and power relays.
+2. **Machines are believable** ("not floating butplugs please, use reasoning with this stuff"). Before you draw a machine, write down in the README:
+   - what it does;
+   - what goes in: power, and any material or preset;
+   - what comes out;
+   - where its power comes from;
+   - what holds it up.
 
-## The world, kept the same in every image
+   Then draw exactly that:
+   - Everything stands on feet, skids, plinths or anchor bolts. Nothing floats.
+   - Cables run from a source to the load. They sag between supports and follow trays, conduits or floor covers.
+   - Give machines the parts real equipment has: service panels, vents, cable glands, handles, warning stripes and indicator lights.
+3. **Machines spew colourful pixels while they run** ("it should feel logical and connected").
+   - The pixels are small, crisp squares that pour from a machine's exhaust vents and drift up into the air, thinning as they rise.
+   - Their colour says what the machine adds to the world:
+     - pink `#ff3d8a`: texture detail;
+     - green `#7cff4d`: shape detail;
+     - amber `#ffc13d`: light;
+     - cyan `#3dc8ff`: water;
+     - violet `#b46bff`: presets being mixed.
+   - A machine that is off spews nothing.
+   - The chain must be readable in every picture: material goes in at a feed or hopper, power arrives by cable, the machine works, and pixels come out. A preset cartridge in a machine's slot changes the pixels it spews.
+4. **The window and the gate show different places.** The lab's window looks out on the scientist's own world: a high-fidelity, real, rainy pine-forest mountainside at dusk. The gate shows the SetMix planet. Their contrast is the game's goal: make the planet as real as the view from your window.
+5. **The planet is natural at every stage, stage 1 included.** The owner: "the whole idea is so that it looks natural just low rez."
+   - Stage 1 is a real, natural desolate place: rock, dust, gravel, scree and cracked flats, several ground materials blended by slope and height. It is drawn at low resolution: low-poly shapes, low-res textures and simple light, like a late-1990s 3D game.
+   - Never a flat colour palette, and never one texture over everything.
+   - You can see very far.
+6. **Models climb the stages, not just textures.** At stage 1, everything on the planet (rocks, machines, the gate's planet end and later the plants) is low poly and flat shaded. Over the stages it all turns high poly and smooth. At stage 6, everything is high-fidelity PBR: textures, models and light.
+7. **The coverage layer.** Plant life spreads over the ground like vines: dust, moss, vines, grass and leaves creeping out across the ground as surface detail, not big geometry. Stage 6 is a lush PBR forest.
+8. **No chimney, and no tower at the centre of the plot.** The centre of every plot is the planet end of the gate.
 
-- **The goblin (for scale):** 1.3 m tall, green skin, pointed ears, yellow eyes, a leather vest and belt. In the lab the scientist is a person; on the moon the player is this goblin.
-- **The lab:** a clean white test-chamber lab with off-white square wall panels and thin dark seams, a dark steel band along the foot of the walls, a polished concrete tile floor, cold white strip lights in a dark ceiling, and 7 to 8 m ceilings. It is inspired by clean sci-fi labs. Do not copy any existing game's logos, signage or characters.
-- **The lab's floor plan** (camera at the front, looking at the back wall):
-  - The gate stands free in the middle-right of the room, facing the camera.
-  - The observation window is in the back wall, on the left.
-  - Power relay cabinets and a breaker panel stand against the back wall, on the right.
-  - The operator's console (with a big main lever) stands between the camera and the gate, a little left of the gate, facing it.
-  - The Planet Table (a 2.4 m holotable) is centre-left.
-  - The Cartridge Archive (a wall of slots) runs along the left wall.
-  - The Fusion Matrix and the Material Synthesizer stand along the right wall.
-  - The Hardware Fabricator bay is in the back-right corner.
-- **Your plot on the moon:**
-  - A round plot about 110 m across, holding a crater about 52 m across with a central peak.
-  - On the peak stands the **Pixel Chimney**: a 9 m white tower on a plinth that breathes coloured pixel motes.
-  - Boulders lie about, and from stage 4 a lake fills the crater.
-  - The plains run to a far horizon. Other players' finished plots show there as green patches under glowing air bubbles, with beacons.
-  - The goblin planet (green and ochre, with clouds) hangs in the sky.
-- **The light:** a low sun (about 20 to 25 degrees) from the right of the main view. The sky is black at stage 1 and blue by stage 6.
+## The world, the same in every image
+
+**The goblin (for scale):**
+- 1.3 m tall, with green skin, pointed ears and yellow eyes, wearing a leather vest and belt.
+- On the planet the goblin is drawn at the stage's resolution: low poly at stage 1.
+
+**The lab:**
+- A clean white test-chamber lab: off-white square wall panels with thin dark seams, a dark steel band along the foot of the walls, and a polished concrete floor.
+- Cold white strip lights in a dark ceiling, 7 to 8 m up.
+- Clean and clinical. Copy no existing game's logos, signage or characters.
+
+**The lab's floor plan** (camera at the front, looking at the back wall):
+- The gate stands free in the middle-right of the room, facing the camera, about 3 m in front of the back wall.
+- The window, a wide pane about 4 m by 2.5 m, is in the back wall on the left.
+- The lab's power source stands in the back-right corner: a capacitor bank on a steel skid. Next to it, against the back wall, are a breaker panel and a row of power relay cabinets.
+- Cables run in floor covers from the relays to the gate, and in ceiling trays to the other machines.
+- The operator's console stands a little left of the gate, between the camera and the gate, facing it. It has a big main lever and a few control boxes.
+- Along the left wall: the preset rack, a wall of physical cartridge slots.
+- Centre-left: the planet table, a 2.4 m holotable showing your plot.
+- Along the right wall: the preset bench (where presets are made) and the preset combiner (where two or more presets are mixed into a new one; the owner's example is a mud texture combined with terrain shaping to make a road).
+
+**The plot on the planet:**
+- About 1 km across.
+- At its centre stands **the planet end of the gate**: a twin of the lab's frame on a cast footing pad. This is where you step out.
+  - Power from the lab comes through the link to a junction box at its foot, and the player's first machines plug into that junction.
+  - The player's machines stand round it.
+- The land is natural: rolling ground, old craters, ridges, gullies, boulder fields and dust flats.
+- Other players' plots lie a kilometre and more away. From afar they read as patches of greener, wetter, sharper land.
+- The goblin planet (green and ochre, with clouds) hangs in the sky.
+
+**The light:**
+- A low sun, 20 to 25 degrees up, from the right of the main view.
+- The sky is black at stage 1, first glints of colour at stage 2, haze at stage 3, blue by stage 6.
 
 ## The images
 
-Make PNGs at 1920x1080 unless noted, saved in `docs/concept/setmix/`. Scene images have no text in them. Design sheets may carry short plain-English callouts.
+Make PNGs at 1920x1080 unless noted, in `docs/concept/setmix/`. Scene images have no text in them. Design sheets may carry short, plain-English callouts.
 
-1. `01-lab-cold-boot.png`: Play mode, the first visit (Act I).
-   - The lab runs on emergency light. One bench and one console are lit; the other machines are dark, some under dust covers.
-   - The gate is **off**: a dark, empty frame with cold coils.
-   - The cables from the gate run across the floor to the relay cabinets. The window shows the black-sky moon outside.
-   - A goblin stands by the console for scale.
-2. `02-gate-power-on.png`: the moment the main lever is thrown.
-   - Relays close and their indicator lights come on in a row. Power pulses visibly along the cables to the gate.
-   - The gate's field coils light from bottom to top. The lab lights dim, because the gate draws from everything else.
-   - The surface in the gate is forming: static resolving into a picture.
-3. `03-gate-on-your-plot.png`: the gate on, showing **your plot at stage 1** (low poly, four tones, black sky).
-   - The window beside it shows the moon's real outside from the lab.
-   - Two different places, side by side.
-4. `04-home-setmix.png`: the main menu's backdrop in the SetMix version.
-   - The lab is fully lit (Act III).
-   - The left third of the frame stays calm and uncluttered, because a menu goes there.
-   - The gate on the right shows **a fully realised plot at stage 6**: lush forest, the lake, the chimney overgrown.
-5. `05-home-goblin-racing.png`: the same framing in the Goblin Racing version. The gate shows **the goblin planet**: green and ochre, with clouds, close and huge in space.
-6. `06-sheet-gate.png` (2560x1440): an engineering design sheet of the gate.
-   - Front, side and back views, and a three-quarter render.
-   - Callouts for: the base plinth bolted to the floor, side buttresses, field coils, emitter channels on the inner faces, the cable junction box at the rear with its glands, service hatches, and the step up.
+1. `01-lab-first-play.png`: the first time the player enters the lab in Play.
+   - Emergency light only. One console is lit; the other machines are dark, some under dust covers.
+   - The gate is **off**: a dark frame with cold coils and an empty opening.
+   - The cables from the gate run across the floor to the relays.
+   - The window shows the rainy forest mountainside at dusk.
+   - A goblin stands by the console.
+2. `02-gate-power-on.png`: the main lever is thrown.
+   - Relays close and their indicator lights come on in a row.
+   - Power pulses visibly along the floor cables to the gate.
+   - The gate's coils light from bottom to top, and the lab lights dim because the gate draws from everything else.
+   - Static in the opening resolves into a picture.
+3. `03-gate-on-your-plot.png`: the gate is on, showing **your plot at stage 1** as seen from the planet end of the gate: natural, multi-textured, low-res, desolate, under a black sky.
+   - The window beside it shows the rainy forest.
+   - Two different places side by side.
+4. `04-menu-setmix.png`: the main menu backdrop in the SetMix version.
+   - The lab is fully lit, its machines running and spewing their pixels.
+   - The left third of the frame stays calm and uncluttered, because the menu goes there.
+   - The gate, on the right, shows **a fully realised plot at stage 6**: lush forest, water, machines overgrown with vines.
+5. `05-menu-goblin-racing.png`: the same framing in the Goblin Racing version. The gate shows **the goblin planet**: green and ochre with clouds, close and huge in space.
+6. `06-sheet-gate.png` (2560x1440): an engineering sheet of the gate.
+   - The lab gate in front, side and back views and a three-quarter render.
+   - Callouts for:
+     - the plinth and its anchor bolts;
+     - the side buttresses;
+     - the field coils;
+     - the emitter channels on the inner faces;
+     - the cable junction box at the rear with its glands;
+     - the service hatches;
+     - the step up.
+   - Beside it, its planet twin on the footing pad, with the junction box at its foot, at stage 1 (low poly) and stage 6 (PBR).
    - A goblin silhouette for scale.
-7. `07-sheet-lab-equipment.png` (2560x1440): a design sheet of the lab's power and machines.
-   - The power relay cabinet, the breaker panel, and the operator console with its main lever.
-   - Cable trays and floor cable covers, and the lab's power source (a Compute Reactor or a capacitor bank on a steel skid).
-   - Simple, grounded versions of the Material Synthesizer, the Fusion Matrix, the Planet Table and the Hardware Fabricator.
-   - Each machine shows where its power comes in and what holds it up.
-8. `08-plot-stage-ladder.png` (2560x1440): a 3 by 2 grid of the same camera on your plot, stages 1 to 6.
-   - Stage 1: flat-shaded, a four-tone palette, nearest-neighbour pixel textures, black sky.
-   - Stage 2: dithered colour, a glint in the sky.
-   - Stage 3: blocks bevelling into smooth hills, a haze.
-   - Stage 4: water fills the crater.
-   - Stage 5: the coverage layer creeping out from the water and the chimney, and the first trees, from low poly to smooth.
+7. `07-sheet-lab-power-and-machines.png` (2560x1440): the lab's power chain and machines.
+   - The power chain: the capacitor bank on its skid, the breaker panel, the relay cabinets, the control boxes, and the console with its lever. Show the cable trays and floor covers between them.
+   - The lab machines as **candidates for the owner to choose from**: the preset bench, the preset combiner, the preset rack, the planet table, and a fabricator for tools and suit parts.
+   - For each, show where its power comes in, what holds it up, and the pixels it spews while running.
+8. `08-plot-stage-ladder.png` (2560x1440): a 3 by 2 grid with the same camera on your plot at stages 1 to 6. The gate's planet end and a few machines are in view.
+   - Stage 1: natural and multi-textured, low poly, low-res textures, simple light, black sky.
+   - Stage 2: finer textures, the first sun glint and a thin band of colour at the horizon.
+   - Stage 3: shapes smoothing into real hills, normal detail, haze, shadows.
+   - Stage 4: water fills the low ground.
+   - Stage 5: the coverage layer creeping out from the water and the machines, and the first trees, low poly turning smooth.
    - Stage 6: the lush PBR forest.
-   - The rocks, trees and chimney change detail with the stages, not just the textures.
-9. `09-plot-stage-6-hero.png`: the target, your plot at stage 6.
-   - Golden-hour light from the right, layered canopy, and warm sun shafts through the gaps.
-   - The Pixel Chimney's foot is overgrown with vines. The crater lake is clear, with reeds and lily pads at its edge.
-   - Moon striders (gold, long-legged grazers) are in a clearing; violet sky mantas glide high.
-   - The goblin planet is a pale daytime moon in a blue sky.
-   - No bare ground is left.
-10. `10-sheet-coverage-growth.png` (2560x1440): one 2 m square of ground over six steps.
-    - The steps: bare regolith, dust, moss spreading in vine-like tendrils, grass and clover, leaf litter and ferns, then the full forest floor.
-    - Below them, the last step split into albedo, normal and roughness.
-11. `11-desolate-horizon.png`: stage 1 seen from your plot.
-    - A vast, desolate 1990s-looking moon, with the chimney's plume.
-    - Far across the plains, other players' finished plots: green under glowing air bubbles, beacons on their chimneys.
-    - The goblin planet hangs over it all. It should make a new player want to start.
-12. `12-sheet-field-machines.png` (2560x1440): the planet's machines in a lineup with a goblin for scale.
-    - The machines: the Pixel Chimney, the Harmonic Mesh Vibrator, the Lumen Mast, the Clathrate Sublimator, the 24 m Template Injector spire with its three cartridge slots, the Coherence Beacon, the Compute Reactor and the Relay Pylon.
-    - The top row shows them at stage 1 (low poly, flat shaded). The bottom row shows the same machines at stage 6 (high-fidelity PBR).
-    - Each has its foundation or anchors, and its cable or pipe connections.
+   - The rocks, machines and gate change detail with the stages, not just their textures. The machines' pixels can be seen at every stage.
+9. `09-sheet-coverage-growth.png` (2560x1440): one 2 m square of ground over six steps.
+   - The steps: bare natural ground, dust, moss spreading in vine-like tendrils, grass and clover, leaf litter and ferns, the full forest floor.
+   - Below, the last step split into albedo, normal and roughness.
+10. `10-plot-stage-6-hero.png`: the target, your plot at stage 6.
+    - Golden-hour light from the right, layered canopy, warm sun shafts through the gaps.
+    - The gate's planet end and the machines are overgrown at their feet but still running and spewing pixels.
+    - A clear lake with reeds at its edge.
+    - The goblin planet is a pale daytime moon in a blue sky.
+    - No bare ground is left.
+11. `11-desolate-horizon.png`: stage 1 seen from beside the gate's planet end.
+    - A vast, natural, desolate land drawn low-res, running to a far horizon.
+    - Your first machine beside the gate, spewing its first pixels.
+    - Far across the plains, other players' plots show as greener, wetter, sharper patches. One friend's plot has a beacon.
+    - The goblin planet hangs over it all.
+    - It should make a new player want to start.
+12. `12-sheet-field-machines.png` (2560x1440): **candidate planet machines for the owner to choose from**, in a lineup with a goblin for scale.
+    - At least: a drill that mines raw material; one machine for each colour of pixel (texture detail, shape detail, light, water); a power unit; a power relay pylon.
+    - Give them plain working names that say what they do.
+    - Top row: each at stage 1 (low poly, flat shaded). Bottom row: the same machines at stage 6 (high-fidelity PBR).
+    - Each one shows its footing, its power cable, its material feed, its cartridge slot (where it takes one) and its pixel exhaust running.
 
 ## What to hand in
 
 - The 12 PNGs.
 - `docs/concept/setmix/contact-sheet.jpg`: all 12, labelled by number.
-- `docs/concept/setmix/README.md`. For each image:
+- `docs/concept/setmix/README.md`. For each image, write:
   - what it is for;
   - **the full prompt you used**;
-  - for every machine in it, one line each on what it does, where its power comes from and what holds it up;
+  - for every machine in it, one line each on what it does, what goes in, what comes out, where its power comes from and what holds it up;
   - an honest self-review: what came out right, what is off, and what you would redo.
+- If you cannot see images yourself, say so plainly in the README rather than guessing.
+- Keep the world consistent across the images: the same gate, lab layout, goblin, machines and plot.
+- Use text-only prompts, and feed in no reference images from elsewhere.
 
-  If you cannot see images yourself, say so plainly in the README rather than guessing.
-- Keep the world consistent across images: the same gate, lab layout, goblin, chimney and plot. Use text-only prompts; do not feed in reference images from elsewhere.
-
-Commit everything to your own branch with a message that lists the 12 files.
+Commit everything to your own branch with a message that lists the 12 files, then reply here with the branch name.

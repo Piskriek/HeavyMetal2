@@ -1,0 +1,255 @@
+// ============================================================================
+//  /Game/SetMix/Shaders/M_SetMix_Nanite_Master.usf
+//  ---------------------------------------------------------------------------
+//  DEBT #1, SETTLED: the UE 5.5 Substrate master the importer parents to.
+//
+//  Pasted into a Custom expression (or included via /Project/ shader mapping)
+//  and wired to a Substrate Slab BSDF. This is the DUAL-HORIZON ceiling: the
+//  same four scalars that drive the WebGL uber-shader drive a Substrate slab
+//  with multi-scatter GGX, specular micro-occlusion and Nanite displacement.
+//
+//  THE CONTRACT WITH THE WEB CLIENT
+//  A cartridge authored in the browser at Stage 6 must look like itself here.
+//  That is only true because both renderers consume the SAME normalised
+//  metrics — not because anyone hand-matched two materials. If you change a
+//  curve below, change TerrainMaterial.ts in the same commit.
+//
+//  Requires: r.Substrate=1, r.Substrate.OpaqueMaterialRoughRefraction=1
+//  Target:   UE 5.5 · Nanite · Lumen (HW or SW)
+// ============================================================================
+
+#pragma once
+
+// ─────────────────────────────────────────────── parameters (from the MI) ──
+//  AlbedoMap                Texture2D  sRGB
+//  NormalMap                Texture2D  TC_Normalmap
+//  RoughnessMap (RMA)       Texture2D  TC_Masks   R=rough G=metal B=AO
+//  HeightMap                Texture2D  TC_Displacementmap, 16-bit
+//  FidelityStage            Scalar  1..6
+//  GeomorphSwell            Scalar  0..1   wave-front vertex blend
+//  PxdDitherGrid            Scalar  0 = off, else palette levels
+//  LumenRoughnessThreshold  Scalar  0..1   below this we force HW RT
+//  DisplacementScale        Scalar  cm
+//  TriplanarSharpness       Scalar
+//  WetnessMask              Scalar  0..1   Aq injection
+
+// ══════════════════════════════════════════════════════════ HELPERS ══════
+
+// Karis / Lazarov analytic DFG — the environment BRDF without a LUT fetch.
+// Nanite terrain is overwhelmingly rough dielectric, where this is within
+// ~1% of the tabulated split-sum and saves a dependent texture read on the
+// hottest pixels in the frame.
+float2 SetMix_EnvBRDFApprox(float Roughness, float NoV)
+{
+    const float4 c0 = float4(-1.0, -0.0275, -0.572,  0.022);
+    const float4 c1 = float4( 1.0,  0.0425,  1.040, -0.040);
+    float4 r = Roughness * c0 + c1;
+    float a004 = min(r.x * r.x, exp2(-9.28 * NoV)) * r.x + r.y;
+    return float2(-1.04, 1.04) * a004 + r.zw;
+}
+
+// Multi-scatter GGX energy compensation (Turquin 2019).
+// Single-scatter GGX loses energy at high roughness — rock reads chalky and
+// wet sand reads grey. One multiply fixes it, and it is the single biggest
+// visual difference between "looks like UE4" and "looks like UE5".
+float3 SetMix_MultiScatterCompensation(float3 F0, float Roughness, float NoV)
+{
+    float2 ab = SetMix_EnvBRDFApprox(Roughness, NoV);
+    float  Ess = ab.x + ab.y;
+    return 1.0 + F0 * (1.0 / max(Ess, 1e-4) - 1.0);
+}
+
+// Specular micro-occlusion. Dielectrics cannot have a dark specular response
+// where albedo is dark — that combination does not exist in nature and reads
+// as plastic. Clamp specular by luminance; it is cheap and it is correct.
+float SetMix_SpecularMicroOcclusion(float3 BaseColor, float AO)
+{
+    float Luma = dot(BaseColor, float3(0.2126, 0.7152, 0.0722));
+    return saturate(saturate(Luma * 50.0) * AO);
+}
+
+// Horizon-occlusion for normal-mapped Nanite surfaces: kills the fireflies
+// that appear where a normal map faces away from the view on a dense mesh.
+float SetMix_HorizonOcclusion(float3 N, float3 V, float3 VertexNormal)
+{
+    float3 R = reflect(-V, N);
+    float  H = 1.0 + dot(R, VertexNormal);
+    return saturate(H * H);
+}
+
+// ══════════════════════════════════════════ TRIPLANAR (Nanite-safe) ══════
+//  Nanite gives us no mesh UVs worth trusting on sculpted terrain, so every
+//  SetMix surface is triplanar. Sharpness comes from Vtx via the MI.
+
+struct FSetMixTriplanar { float3 W; float2 UVx, UVy, UVz; };
+
+FSetMixTriplanar SetMix_Triplanar(float3 WorldPos, float3 WorldNormal, float Scale, float Sharpness)
+{
+    FSetMixTriplanar O;
+    float3 b = pow(abs(WorldNormal), Sharpness.xxx);
+    O.W  = b / max(b.x + b.y + b.z, 1e-4);
+    O.UVx = WorldPos.yz * Scale;
+    O.UVy = WorldPos.xz * Scale;
+    O.UVz = WorldPos.xy * Scale;
+    return O;
+}
+
+float4 SetMix_TriplanarSample(Texture2D Tex, SamplerState S, FSetMixTriplanar T)
+{
+    return Tex.Sample(S, T.UVx) * T.W.x
+         + Tex.Sample(S, T.UVy) * T.W.y
+         + Tex.Sample(S, T.UVz) * T.W.z;
+}
+
+// Whiteout normal blend — preserves detail that a naive lerp flattens.
+float3 SetMix_TriplanarNormal(Texture2D NrmTex, SamplerState S, FSetMixTriplanar T, float3 N)
+{
+    float3 nx = NrmTex.Sample(S, T.UVx).rgb * 2.0 - 1.0;
+    float3 ny = NrmTex.Sample(S, T.UVy).rgb * 2.0 - 1.0;
+    float3 nz = NrmTex.Sample(S, T.UVz).rgb * 2.0 - 1.0;
+    nx = float3(nx.xy + N.zy, abs(nx.z) * N.x);
+    ny = float3(ny.xy + N.xz, abs(ny.z) * N.y);
+    nz = float3(nz.xy + N.xy, abs(nz.z) * N.z);
+    return normalize(nx.zyx * T.W.x + ny.xzy * T.W.y + nz.xyz * T.W.z);
+}
+
+// ═════════════════════════════════════ THE FIDELITY LADDER, IN UE ════════
+
+// Bayer 4×4, identical constants to TerrainMaterial.ts. At FidelityStage 1–2
+// an exported SetMix asset must still LOOK like Stage 1–2 inside Unreal,
+// otherwise the export is a lie and the Dual Horizon promise breaks.
+float SetMix_Bayer4(float2 SvPos)
+{
+    const float M[16] = { 0, 8, 2,10, 12, 4,14, 6, 3,11, 1, 9, 15, 7,13, 5 };
+    int2 p = int2(fmod(SvPos, 4.0));
+    return M[p.y * 4 + p.x] / 16.0 - 0.5;
+}
+
+float3 SetMix_Quantise(float3 C, float Levels, float2 SvPos)
+{
+    if (Levels < 0.5) return C;                       // truecolour
+    float q = 1.0 / max(Levels - 1.0, 1.0);
+    float d = saturate(1.0 - (Levels - 3.0) / 22.0) * q * 0.85;
+    return floor(C / q + SetMix_Bayer4(SvPos) * d / q + 0.5) * q;
+}
+
+// C¹ geomorph — the SAME S(u) = u²(3−2u) the wave engine uses. Driven from
+// the MI by the live link so a UE scene can play back a terraform sweep.
+float SetMix_GeomorphSwell(float Swell)
+{
+    float t = saturate(Swell);
+    return t * t * (3.0 - 2.0 * t);
+}
+
+// Aq injection: water fills micro-facets, so it darkens albedo and drops
+// roughness in one move. Same expression as the web fragment shader.
+void SetMix_ApplyWetness(inout float3 BaseColor, inout float Rough, float Wet)
+{
+    const float3 kSea = float3(0.07, 0.30, 0.42);
+    BaseColor = lerp(BaseColor, BaseColor * kSea * 0.84, Wet * 0.70);
+    Rough     = lerp(Rough, 0.08, Wet);
+}
+
+// ═══════════════════════════════ THE SUBSTRATE SLAB ASSEMBLY ═════════════
+
+struct FSetMixSurface
+{
+    float3 BaseColor;
+    float3 Normal;
+    float  Roughness;
+    float  Metallic;
+    float  AO;
+    float  SpecularScale;
+    float3 EnergyCompensation;
+    float  Displacement;
+};
+
+FSetMixSurface SetMix_EvaluateSurface(
+    float3 WorldPos, float3 WorldNormal, float3 VertexNormal, float3 V, float2 SvPos,
+    Texture2D AlbedoMap, Texture2D NormalMap, Texture2D RoughnessMap, Texture2D HeightMap,
+    SamplerState S,
+    float FidelityStage, float GeomorphSwell, float PxdDitherGrid,
+    float TriplanarSharpness, float WetnessMask, float NormalIntensity)
+{
+    FSetMixSurface O = (FSetMixSurface)0;
+
+    FSetMixTriplanar T = SetMix_Triplanar(WorldPos, WorldNormal, 0.01, TriplanarSharpness);
+
+    float3 Albedo = SetMix_TriplanarSample(AlbedoMap, S, T).rgb;
+    float3 RMA    = SetMix_TriplanarSample(RoughnessMap, S, T).rgb;
+    O.Displacement = SetMix_TriplanarSample(HeightMap, S, T).r;
+
+    float3 N = SetMix_TriplanarNormal(NormalMap, S, T, WorldNormal);
+    O.Normal = normalize(lerp(WorldNormal, N, saturate(NormalIntensity)));
+
+    O.Roughness = saturate(RMA.r);
+    O.Metallic  = saturate(RMA.g);
+    O.AO        = saturate(RMA.b);
+
+    SetMix_ApplyWetness(Albedo, O.Roughness, saturate(WetnessMask));
+
+    // Fidelity stage 1–2: honest low-bit output, dithered, inside Unreal.
+    Albedo = SetMix_Quantise(Albedo, PxdDitherGrid, SvPos);
+    O.BaseColor = Albedo;
+
+    float NoV = saturate(dot(O.Normal, V));
+    float3 F0 = lerp(0.04.xxx, O.BaseColor, O.Metallic);
+    O.EnergyCompensation = SetMix_MultiScatterCompensation(F0, O.Roughness, NoV);
+    O.SpecularScale = SetMix_SpecularMicroOcclusion(O.BaseColor, O.AO)
+                    * SetMix_HorizonOcclusion(O.Normal, V, VertexNormal);
+
+    // The geomorph term is consumed by the WPO output, not here, but it also
+    // softens the normal during a sweep so the band does not sparkle.
+    float g = SetMix_GeomorphSwell(GeomorphSwell);
+    O.Normal = normalize(lerp(O.Normal, VertexNormal, g * 0.35));
+
+    return O;
+}
+
+// ───────────────────────── Nanite displacement / tessellation ────────────
+//  UE 5.5 Nanite supports displacement natively. On the Nanite path we emit
+//  a Displacement output and let the tessellator do the work; on the
+//  fallback (mobile preview, forward shading, hair/translucent passes) we
+//  emit World Position Offset along the vertex normal instead. Identical
+//  magnitude either way, so the silhouette never jumps between paths.
+
+float3 SetMix_WorldPositionOffset(
+    float3 VertexNormal, float Height, float DisplacementScale,
+    float GeomorphSwell, float PrevHeight)
+{
+    float g = SetMix_GeomorphSwell(GeomorphSwell);
+    float h = lerp(PrevHeight, Height, g);
+    return VertexNormal * ((h - 0.5) * DisplacementScale);
+}
+
+float SetMix_NaniteDisplacement(float Height, float GeomorphSwell, float PrevHeight)
+{
+    return lerp(PrevHeight, Height, SetMix_GeomorphSwell(GeomorphSwell)) - 0.5;
+}
+
+// ───────────────────────────── Lumen quality routing ─────────────────────
+//  Below LumenRoughnessThreshold a surface is mirror-like enough that Lumen's
+//  screen-probe reflections visibly smear. We flag those pixels so the
+//  material can request hardware ray-traced reflections where available and
+//  fall back to a planar/SSR blend where not — one threshold, two horizons.
+float SetMix_WantsHardwareRT(float Roughness, float LumenRoughnessThreshold)
+{
+    return step(Roughness, LumenRoughnessThreshold);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  ENTRY — wire these into a Substrate Slab BSDF node:
+//
+//    DiffuseAlbedo      ← Out.BaseColor * (1 - Out.Metallic)
+//    F0                 ← lerp(0.04, Out.BaseColor, Out.Metallic)
+//                         * Out.EnergyCompensation
+//    Roughness          ← Out.Roughness
+//    Normal             ← Out.Normal
+//    SpecularScale      ← Out.SpecularScale
+//    Displacement       ← SetMix_NaniteDisplacement(...)
+//    WorldPositionOffset← SetMix_WorldPositionOffset(...)   [fallback path]
+//
+//  Substrate handles the slab integration, coverage and the Lumen hand-off.
+//  Our job is to hand it physically coherent inputs, which is the whole
+//  reason for the micro-occlusion and energy-compensation terms above.
+// ════════════════════════════════════════════════════════════════════════

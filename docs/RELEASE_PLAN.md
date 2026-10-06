@@ -1,5 +1,7 @@
 # From here to a polished release (written 2026-10-04, end of the laptop session)
 
+> **Direction change, 2026-10-06 (owner): "resolution crafter is the new setmix game mode".** SetMix's game is now *The Resolution Crafter* (STATUS 6d, `docs/SETMIX_LANDING.md`): the Lab, the portal and the Moon; machines that raise the world's fidelity; then a ship built with engineering flies from the shared world to the goblin planet and opens the galaxy. Goblin Racing later becomes standalone, with its own start and a world where you live as a goblin, so the crash, Shaman and racing chapters (QL8, QL9) move there. **Not rewritten yet:** Milestone 3 (the questline) and section 12 (the release scope) still describe the island story; rewrite them when the Resolution Crafter's progression is planned. Milestones 0.5, 1, 2, 4 and 5 still hold.
+
 The owner, with about 10% of the week's usage left: "make the most of the last 10% by planing out the next steps untill polished release down to the last detail". This is that plan. It is the order of work from now on; `STATUS.md` keeps the item-by-item state and `handoff/CATCHUP.md` 12ag says where the last session stopped.
 
 **How to use it (next session):**

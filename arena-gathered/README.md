@@ -38,3 +38,7 @@ smoothvox2 (A), toolanims (A) and tooljuice (B) are copied to packages/ with tsc
 ## Arena notes
 
 Arena sometimes shows a reCAPTCHA; a chat sent while it is up is lost (the link bounces to the home page). The owner completes the check, then resend. Vote buttons only enable once both builds load, so prompts now ask for a small preview page.
+
+## SetMix: The Resolution Crafter (2026-10-06)
+
+The winner of the side session's concept battles (battle 4, answer A, out of 8 concept answers) kept working in the same chat for eleven more phases; all of it is gathered in `setmix/` with its own README. One model per phase, so there is no A/B pick. The audit (its tests, its claims) and the landing waves are in `docs/SETMIX_LANDING.md`.

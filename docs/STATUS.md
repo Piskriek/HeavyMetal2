@@ -209,6 +209,20 @@ Full plan: **`docs/QUESTLINE.md`** (owner's words in `OWNER_ASKS.md`). Expands H
 | QL10 | Later games bring **further questlines** | NOT STARTED | Games register their questlines and classes as presets. |
 | QL11 | **Bring your own voxel builds** from other games; the questline shows it early with a **machine hooked up to a portal**, then you step into voxel worlds on the other side; the owner finds the first open-source world, then players do their own research (owner, 2026-10-04) | NOT STARTED | `RELEASE_PLAN.md` Milestone 2 (`@hm/vox`, `@hm/schematic` by Arena; the Importer machine, `portal` kind, `@hm/chunkworld`), `QUESTLINE.md` chapter 3. |
 
+## 6d. SetMix: The Resolution Crafter (owner, 2026-10-06)
+
+The owner's premise and the side session's Arena work (the concept in `docs/SETMIX_GAME_CONCEPT.md`, 12 Arena phases gathered in `zips/`). The audit of those drops and the landing plan: **`docs/SETMIX_LANDING.md`**.
+
+| ID | Ask | Status | Where / what is left |
+|---|---|---|---|
+| SM1 | **The game** (owner, 2026-10-06 07:30): a scientist in a white PBR lab opens a holodeck-style portal to a desolate low-poly moon; walking through is seamless and makes you a low-poly avatar; you mine pixels and build machines (like The Planet Crafter) whose pixels spew into the air and raise the planet's resolution and fidelity until it is a lush water planet with full PBR; presets made in the lab are inventory items you slot into machines on the planet; a lab machine combines presets (mud texture + terrain shaping = road) | NOT STARTED (designed; decided) | **Owner, 2026-10-06 14:05: "resolution crafter is the new setmix game mode".** Concept `docs/SETMIX_GAME_CONCEPT.md`; the Arena design and code: `docs/SETMIX_LANDING.md`. |
+| SM2 | **Studio and Play** (owner, 2026-10-06 07:30): Studio is a menu button (the fully upgraded lab, everything unlocked, for making and editing presets for any game); Play starts in a sparse lab with progression; the player gathers something logical on the planet that drives research, machine upgrades and new machines | NOT STARTED | `SETMIX_LANDING.md` Wave 5 (the game screens), after Waves 0 to 4. |
+| SM3 | **Land the Arena drops in the monorepo** (owner, 2026-10-06 handover to this session) | NOT STARTED (audit and plan done) | `SETMIX_LANDING.md`: the handoff's claims checked (its fidelity tests fail twice on real bugs, its gate fails both rollback checks, 0 of 50 vault cartridges run on our texgraph, its manifest would overwrite four packages); Waves 0 to 5; the parked list; three owner decisions. |
+| SM4 | **The goblin planet, and a ship to get there** (owner, 2026-10-06 14:05): from the shared world, players build a ship with engineering (Space Engineers style) and fly it to the goblin planet | NOT STARTED | Replaces the release plan's "buy or build a rocket" (QL7) inside the Resolution Crafter; `@hm/rocket` (blueprint parts, "ship ready" check, flight numbers) is the starting point. |
+| SM5 | **Players open up the galaxy from the Resolution Crafter** (owner, 2026-10-06 14:05) | NOT STARTED | The universe (H8) starts here: your star, your planets, then the flight out. |
+| SM6 | **Goblin Racing becomes standalone later**, on top of SetMix, with its own start and its own world where you live as a goblin (owner, 2026-10-06 14:05) | NOT STARTED | H6 (two launches on RUN). The release plan's crash, Shaman and racing questline (QL8, QL9) move into Goblin Racing's own start. |
+| SM7 | **A preview of what the Resolution Crafter looks like** (owner, 2026-10-06 14:05: "id like to see what it looks like if we can get a preview up once youe done all you need") | IN PROGRESS | After Waves 0 to 2 of `SETMIX_LANDING.md`: the Moon and the resolution wave as a SetMix mode, in the dev server. |
+
 ## 7. Honest quality assessment
 
 1. **Ground level** looked at this session in both skins: flat reads as voxel blocks that match the goblin; PBR is a painted jungle floor, now without seams.
@@ -230,6 +244,7 @@ Full plan: **`docs/QUESTLINE.md`** (owner's words in `OWNER_ASKS.md`). Expands H
 ## 9. What to do next (in order)
 
 0000. **`docs/RELEASE_PLAN.md` is the order of work from 2026-10-04 on** (milestones to a polished release, the critique of the plan in its section 11, the release scope in section 12). It supersedes the order below where they differ.
+000a. **SetMix: The Resolution Crafter (owner, 2026-10-06)**: `docs/SETMIX_LANDING.md` holds the audit of the Arena drops and the landing waves. Its owner decisions (section 6) settle where the game sits against the release plan.
 000. **The master plan** (`docs/MASTER_PLAN.md`, owner 2026-10-03: re-plan everything, the full view, then continue): the map of every place, the journeys start to finish, the gaps G1 to G15, the owner's decisions Q1 to Q5, all front-end design as one batch, and the automated tests (B16). Work in its section 7 order.
 00a. **After the hotbar V3 glue (S9, CATCHUP 12ae "Next glue"): the 2026-10-04 questline and rendering asks**, in the order of `docs/QUESTLINE.md` section 6: D20 dither first, then QL2/QL1 (unlock, quests, the tour as chapter 1), QL3/QL6 pixels and wallet, QL4 machines, QL5 selling, D12 smooth models, QL7 rocket, QL8/QL9 crash, revival and the racing questline. Arena battles listed in QUESTLINE.md section 7.
 00. **The owner's laptop list S1 to S6 (section 6b)**: Settings in the Esc menu with graphics preset buttons down to a Potato version, the hierarchy bar and Walk/Studio toggles not covering each other, the hierarchy highlight, the race track editor out of the Esc menu.

@@ -23,3 +23,6 @@ ui-map/
 
 # Arena reply-route deliveries (scripts/arena-recv.mjs)
 arena-out/
+
+# SetMix Arena zips and their extracted snapshots (the source is in arena-gathered/setmix)
+zips/

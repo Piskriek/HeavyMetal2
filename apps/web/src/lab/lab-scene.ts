@@ -13,7 +13,7 @@ import { smoothModel } from '../crafter/smooth-models';
 import { createCreatures, type Creatures } from '../crafter/creatures';
 import { createWorld, type Neighbour, type World } from '../crafter/world';
 
-/** Where the lab stands on the planet (just off your plot) and which way its arch looks: over the chimney, towards the goblin planet. */
+/** Where the lab stands on the planet (just off your plot) and which way its arch looks: over your plot's centre, towards the goblin planet. */
 export const LAB_AT = { x: 86, z: 30 } as const;
 const OUT = new THREE.Vector2(-0.944, -0.33).normalize();
 /** The vista's sun: 45 degrees to the right of the arch's view and 26 up, so its light falls in through the arch. */
@@ -218,7 +218,6 @@ export function createLabScene(o: { readonly canvas: HTMLCanvasElement; readonly
       // only the arch's view is ever seen: what lies outside it is not built
       world.setPlanet(base, neighbours, { lush: true, clear: { x: LAB_AT.x, z: LAB_AT.z, r: 40 }, view: { x: LAB_AT.x, z: LAB_AT.z, dirX: OUT.x, dirZ: OUT.y, halfAngle: 0.5 } });
       world.show(plot);
-      world.setChimney(false, ['#ffffff']);
       // animals in the meadow between the lab and your plot's lake, in the arch's view
       const right = new THREE.Vector2(-OUT.y, OUT.x);
       const at = (out: number, side: number) => ({ x: LAB_AT.x + OUT.x * out + right.x * side, z: LAB_AT.z + OUT.y * out + right.y * side });

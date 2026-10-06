@@ -7,7 +7,7 @@ import { craterProfile, hash, moonHeight, valueNoise, type Crater } from './moon
 
 /** The planet's radius (metres): the ground falls away by d^2 / 2R, so from 14 m up the horizon is about 580 m off. */
 export const PLANET_RADIUS = 12000;
-/** Your plot: the round piece of the planet your chimney terraforms. */
+/** Your plot: the round piece of the planet you terraform. */
 export const PLOT_RADIUS = 56;
 /** The band inside a plot's rim where it fades back into the plains (metres). */
 export const PLOT_EDGE = 12;
@@ -186,7 +186,7 @@ export function sunlight(grids: readonly HeightGrid[], x: number, z: number, y: 
 /** A boulder lying on the planet: where, how big, which shape, which way round. */
 export interface Boulder { readonly x: number; readonly z: number; readonly size: number; readonly shape: number; readonly turn: number; readonly tilt: number }
 
-/** The boulders: scattered on your plot (off the chimney's peak and the crater floor) and over the plains, none on a neighbour's plot. */
+/** The boulders: scattered on your plot (off the central peak and the crater floor) and over the plains, none on a neighbour's plot. */
 export const BOULDERS: readonly Boulder[] = (() => {
   const list: Boulder[] = [];
   for (let k = 0; list.length < 420 && k < 4000; k++) {

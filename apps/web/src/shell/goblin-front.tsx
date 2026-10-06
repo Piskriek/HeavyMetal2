@@ -1,5 +1,6 @@
 import { Fragment, type ReactElement, type Ref } from 'react';
 import { Maximize2 } from 'lucide-react';
+import { EDITION, type Edition } from '../edition';
 
 /**
  * Goblin Racing's front: its own menu (Play, Race modes, Settings) over its island. On the SetMix home it is a live window beside its planet
@@ -54,24 +55,33 @@ export function GoblinFront(props: GoblinStatus & { readonly onPlay: () => void;
   );
 }
 
-const HARNESS_MENU: readonly { readonly id: 'crafter' | 'racing' | 'island' | 'avatars' | 'community' | 'settings'; readonly label: string; readonly says: string }[] = [
-  { id: 'crafter', label: 'Resolution Crafter', says: 'Your plot on the planet: terraform it, stage by stage.' },
-  { id: 'racing', label: 'Goblin Racing', says: 'Race goblins in glass balls round an island.' },
+type MenuId = 'racing' | 'play' | 'studio' | 'island' | 'avatars' | 'community' | 'settings';
+interface MenuItem { readonly id: MenuId; readonly label: string; readonly says: string }
+
+const RACING_ITEM: MenuItem = { id: 'racing', label: 'Goblin Racing', says: 'Race goblins in glass balls round an island.' };
+const HARNESS_MENU: readonly MenuItem[] = [
+  { id: 'play', label: 'Play', says: 'Your plot on the planet: terraform it, stage by stage.' },
+  { id: 'studio', label: 'Studio', says: 'The full lab with everything unlocked. Coming with the new lab.' },
   { id: 'island', label: 'My planet', says: 'Your islands: pick one to go in, or make a new one.' },
   { id: 'avatars', label: 'Avatars', says: 'Who you are: goblins, humans and more.' },
   { id: 'community', label: 'Community', says: 'Presets other players share, and yours.' },
   { id: 'settings', label: 'Settings', says: 'Graphics, controls and your profile.' },
 ];
 
+/** The menu for a version of the game (owner, 2026-10-06 20:30): Goblin Racing is only in its own version, at the top. */
+export function homeMenu(edition: Edition): readonly MenuItem[] {
+  return edition === 'goblin-racing' ? [RACING_ITEM, ...HARNESS_MENU] : HARNESS_MENU;
+}
+
 /**
- * The SetMix home's own chrome over the lab (lab/lab.tsx): the wordmark and the menu (the Resolution Crafter, Goblin Racing, your island,
- * the community, settings). The leader line is the star chart's, drawn when a planet is picked there.
+ * The SetMix home's own chrome over the lab (lab/lab.tsx): the wordmark and the menu (Play, Studio, your island, the community,
+ * settings; Goblin Racing first in its own version). The leader line is the star chart's, drawn when a planet is picked there.
  */
 export function SetMixHome(props: {
   readonly onMyIsland: () => void; readonly onAvatars: () => void; readonly onCommunity: () => void; readonly onSettings: () => void; readonly credits: number;
-  /** The Resolution Crafter: SetMix's own game mode (a first look for now). */
-  readonly onCrafter: () => void;
-  /** Goblin Racing's own menu. */
+  /** Play: SetMix's own game mode, the Resolution Crafter (your plot for now; the lab with its gate comes in SETMIX_PLAN Phase 4). */
+  readonly onPlay: () => void;
+  /** Goblin Racing's own menu (the Goblin Racing version only). */
   readonly onGoblin: () => void;
   /** Straight into the island you were last on (or your first). */
   readonly onIslandNow: () => void;
@@ -79,15 +89,16 @@ export function SetMixHome(props: {
   readonly island: { readonly name: string; readonly visited: boolean } | null;
   readonly leader: { readonly line: Ref<SVGLineElement>; readonly ring: Ref<SVGCircleElement> };
 }): ReactElement {
-  const act = { crafter: props.onCrafter, racing: props.onGoblin, island: props.onMyIsland, avatars: props.onAvatars, community: props.onCommunity, settings: props.onSettings };
+  // Studio has nothing to open until the new lab exists, so it says so and stays disabled
+  const act: Record<MenuId, (() => void) | undefined> = { play: props.onPlay, studio: undefined, racing: props.onGoblin, island: props.onMyIsland, avatars: props.onAvatars, community: props.onCommunity, settings: props.onSettings };
   return (
     <div className="sm-home lab">
       <svg className="sm-leader" aria-hidden="true"><circle ref={props.leader.ring} r="0" /><line ref={props.leader.line} /></svg>
       <div className="sm-brand"><b>SetMix</b><i>Multiverse</i></div>
       <nav className="sm-menu" aria-label="SetMix">
-        {HARNESS_MENU.map((m, i) => (
+        {homeMenu(EDITION).map((m, i) => (
           <Fragment key={m.id}>
-            <button style={{ ['--i' as string]: i }} onClick={act[m.id]}><b>{m.label}</b><small>{m.says}</small></button>
+            <button style={{ ['--i' as string]: i }} onClick={act[m.id]} disabled={!act[m.id]}><b>{m.label}</b><small>{m.says}</small></button>
             {m.id === 'island' && props.island ? <button className="sm-sub" style={{ ['--i' as string]: i }} onClick={props.onIslandNow}>{props.island.visited ? `Carry on at ${props.island.name}` : `Go to ${props.island.name}`}</button> : null}
           </Fragment>
         ))}

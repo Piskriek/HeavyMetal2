@@ -8,6 +8,8 @@ const p = (rel: string) => fileURLToPath(new URL(rel, import.meta.url));
 export default defineConfig(({ mode }) => ({
   base: './',
   plugins: [viteSingleFile()],
+  // which game this build is (src/edition.ts): `HM_EDITION=goblin-racing npm run build` for the Goblin Racing launch; SetMix by default
+  define: { __HM_EDITION__: JSON.stringify(process.env.HM_EDITION ?? 'setmix') },
   resolve: {
     alias: {
       // browser build: the script host uses the transpile-only compiler (no TypeScript program, no Node fs)

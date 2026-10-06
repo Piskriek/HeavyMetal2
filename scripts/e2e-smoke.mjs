@@ -38,7 +38,7 @@ try {
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
   check('boots to the SetMix home with no page error', errors.length === 0, errors.join(' | '));
   console.log(`     renderer: ${await page.evaluate(() => { const g = document.createElement('canvas').getContext('webgl2'); const x = g?.getExtension('WEBGL_debug_renderer_info'); return g && x ? g.getParameter(x.UNMASKED_RENDERER_WEBGL) : 'unknown'; })}`);
-  check('the home is SetMix Multiverse with its menu', (await page.locator('.sm-brand b').innerText()) === 'SetMix' && (await page.locator('.sm-brand i').innerText()) === 'Multiverse' && JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Resolution Crafter', 'Goblin Racing', 'My planet', 'Avatars', 'Community', 'Settings']));
+  check('the home is SetMix Multiverse with its menu', (await page.locator('.sm-brand b').innerText()) === 'SetMix' && (await page.locator('.sm-brand i').innerText()) === 'Multiverse' && JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Play', 'Studio', 'My planet', 'Avatars', 'Community', 'Settings']));
   // the home is the lab (STATUS SM11): the finished planet shows through its arch once its trees and looks are built
   await page.waitForFunction(() => window.hmLab && window.hmLab.ready && window.hmLab.frames > 5, null, { timeout: T(60000) });
   check('the home is the lab, with the finished planet through its arch', await page.locator('.lab-home.ready').count() === 1);
@@ -57,6 +57,10 @@ try {
   await text('[aria-label="Settings"] button', 'Close').click();
   check('settings closes back to the home', await page.locator('.sm-home').count() === 1);
 
+  // the Goblin Racing version of the same build (owner, 2026-10-06 20:30): Goblin Racing tops its menu, and only there
+  await page.goto(`http://127.0.0.1:${port}/?edition=goblin-racing`);
+  await page.waitForSelector('.sm-home', { timeout: T(30000) });
+  check('the Goblin Racing version lists Goblin Racing first', JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Goblin Racing', 'Play', 'Studio', 'My planet', 'Avatars', 'Community', 'Settings']));
   // Goblin Racing: its menu entry opens its own menu; Race modes holds its sections; Esc steps back out to SetMix
   await dom(() => { [...document.querySelectorAll('.sm-menu button')].find((b) => b.querySelector('b')?.textContent === 'Goblin Racing')?.click(); });
   await page.waitForSelector('.gr-front', { timeout: T(15000) });
@@ -72,21 +76,25 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(T(400));
   check('Esc again returns to the SetMix home', await page.locator('.sm-home').count() === 1);
+  // back to the SetMix version for the rest
+  await page.goto(`http://127.0.0.1:${port}/`);
+  await page.waitForSelector('.sm-home', { timeout: T(30000) });
+  await page.waitForFunction(() => window.hmLab && window.hmLab.ready && window.hmLab.frames > 5, null, { timeout: T(60000) });
 
-  // the Resolution Crafter (a first look): the moon builds behind a loading bar; a stage jump sends a wave out from the chimney; Esc returns home
+  // Play opens the Resolution Crafter (a first look): the moon builds behind a loading bar; a stage jump sends a wave out from your plot's centre; Esc returns home
   const crafterErrors = errors.length;
-  await text('.sm-menu button', 'Resolution Crafter').click();
+  await text('.sm-menu button', 'Play').click();
   await page.waitForFunction(() => window.hmCrafter && window.hmCrafter.frames > 5, null, { timeout: T(30000) });
   check('the Resolution Crafter builds its moon and draws it', await page.locator('.rc-console').count() === 1 && await dom(() => window.hmCrafter.shown.startsWith('lunar_anorthosite@1@')));
   await dom(() => [...document.querySelectorAll('.rc-ladder button')][2]?.click());
   await page.waitForFunction(() => window.hmCrafter.radius > 0 && window.hmCrafter.target.includes('@3@'), null, { timeout: T(15000) });
-  check('a stage jump sends a wave out from the chimney', true);
+  check('a stage jump sends a wave out from your plot\'s centre', true);
   await page.waitForFunction(() => window.hmCrafter.shown.includes('@3@') && window.hmCrafter.radius < 0, null, { timeout: T(30000) });
   check('the wave crosses the moon and stage 3 settles', /Stage 3 of 6/.test(await page.locator('.rc-stage-line').innerText()));
   await shot('crafter-stage-3');
   await dom(() => document.querySelector('.rc-run')?.click());
   await page.waitForTimeout(T(1200));
-  check('the chimney runs and the world climbs', await dom(() => window.hmCrafter.p > 0.429));
+  check('Climb takes the world up the stages', await dom(() => window.hmCrafter.p > 0.429));
   await page.keyboard.press('Escape');
   await page.waitForTimeout(T(400));
   check('Esc leaves the Resolution Crafter for the SetMix home', await page.locator('.sm-home').count() === 1 && await dom(() => !window.hmCrafter));

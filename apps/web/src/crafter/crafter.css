@@ -52,7 +52,7 @@
 .rc-meter i b { position: absolute; left: 0; top: 0; bottom: 0; background: var(--text); transition: width .3s linear; }
 .rc-meter em { font: 600 12px/1 var(--font-setmix); font-style: normal; text-align: right; }
 
-.rc-chimney { display: grid; gap: 10px; align-content: start; }
+.rc-slot { display: grid; gap: 10px; align-content: start; }
 .rc-cart { margin: 0; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .rc-cart b { font-family: var(--font-setmix); font-weight: 600; font-size: 16px; }
 .rc-cart span { font-size: 12px; color: var(--dim); }

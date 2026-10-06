@@ -1,4 +1,4 @@
-// The Resolution Crafter's 3D view: the world (crafter/world.ts) with an orbit camera round your plot's chimney, low enough
+// The Resolution Crafter's 3D view: the world (crafter/world.ts) with an orbit camera round your plot's centre, low enough
 // to see across the plains to the horizon.
 // The screen tells it which looks to show and where the wave front is.
 import * as THREE from 'three';
@@ -13,14 +13,12 @@ export interface MoonScene {
   setPlanet(base: StageLook, neighbours: readonly Neighbour[]): void;
   /** Shows a look at once, everywhere (the first look, or after a wave settles). */
   show(look: StageLook): void;
-  /** The look the next wave carries out from the chimney. */
+  /** The look the next wave carries out from your plot's centre. */
   setTarget(look: StageLook): void;
-  /** Where the front is (metres from the chimney); call every frame while a wave runs. */
+  /** Where the front is (metres from your plot's centre); call every frame while a wave runs. */
   setFront(radius: number): void;
   /** The wave has crossed the whole moon: its look becomes the moon's look. */
   settle(): void;
-  /** Runs or stops the chimney (its plume), in the cartridge's colours. */
-  setChimney(running: boolean, palette: readonly string[]): void;
   /** Draws one frame. */
   frame(now: number, dt: number): void;
   /** `covered` is how many pixels the console covers at the bottom: the view centres on what is left above it. */
@@ -83,7 +81,6 @@ export function createMoonScene(o: MoonSceneOptions): MoonScene {
     setTarget: (look) => { world.setTarget(look); pendingStage = look.stage; },
     setFront: (radius) => world.setFront(radius),
     settle: () => { world.settle(); if (pendingStage) animalsFor(pendingStage); },
-    setChimney: (running, palette) => world.setChimney(running, palette),
     setPlanet: (base, neighbours) => world.setPlanet(base, neighbours),
     frame(now, dt) {
       if (!o.reducedMotion && !dragging) { orbit.idle += dt; if (orbit.idle > 5) orbit.yaw += dt * 0.035; }

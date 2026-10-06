@@ -1,6 +1,7 @@
 // The Resolution Crafter's world, without a camera: your plot (two looks blended by the wave), the plains out to a far
-// horizon, the neighbours' finished plots with their trees and air, smooth boulders, water, the sky with the goblin planet
-// in it, and the Pixel Chimney and its plume. The crafter screen orbits it; the lab menu will look at it through the archway.
+// horizon, the neighbours' finished plots with their trees and air, smooth boulders, water, and the sky with the goblin planet
+// in it. The crafter screen orbits it; the lab menu looks at it through the archway. Your plot's centre is kept clear for the
+// gate's planet end (owner, 2026-10-06; docs/SETMIX_PLAN.md): it is built to the concept art, so nothing stands there yet.
 import * as THREE from 'three';
 import type { StageLook } from './looks';
 import { MAIN_CRATER, facetedHeight, gridHeights, gridNormals, hash, makeGrid, type MoonGrid } from './moon';
@@ -18,17 +19,15 @@ export interface World {
   setPlanet(base: StageLook, neighbours: readonly Neighbour[], options?: PlanetOptions): void;
   /** Shows a look at once, over your whole plot. */
   show(look: StageLook): void;
-  /** The look the next wave carries out from the chimney. */
+  /** The look the next wave carries out from your plot's centre. */
   setTarget(look: StageLook): void;
-  /** Where the front is (metres from the chimney). */
+  /** Where the front is (metres from your plot's centre). */
   setFront(radius: number): void;
   /** The wave has crossed your plot: its look becomes the plot's look. */
   settle(): void;
-  /** Runs or stops the chimney (its plume), in the cartridge's colours. */
-  setChimney(running: boolean, palette: readonly string[]): void;
-  /** Moves what moves (water, plume); the sky keeps centred on the eye. */
+  /** Moves what moves (water); the sky keeps centred on the eye. */
   update(now: number, dt: number, eye: THREE.Vector3): void;
-  /** Height of the chimney's peak (the crater's centre). */
+  /** Height of your plot's centre (the main crater's central peak). */
   readonly peakY: number;
   dispose(): void;
 }
@@ -226,38 +225,15 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
     scene.add(pts);
   }
 
-  // ---- light for the smooth models (trees, chimneys): the low sun and a faint cold fill
+  // ---- light for the smooth models (the trees): the low sun and a faint cold fill
   const sunLight = new THREE.DirectionalLight('#fff4e6', 2.6); sunLight.position.copy(sun).multiplyScalar(100);
   const fill = new THREE.HemisphereLight('#8fb2ff', '#2a2622', 0.35);
   scene.add(sunLight, fill);
   const treeMaterial = keep(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0 }));
 
-  // ---- the Pixel Chimney, on the main crater's central peak (lab white: it came through the portal)
+  // your plot's centre, on the main crater's central peak, where the gate's planet end will stand
   const peakY = planetHeight(0, 0);
-  const machine = new THREE.Group();
-  const white = keep(new THREE.MeshStandardMaterial({ color: '#ebe8df', roughness: 0.38, metalness: 0.05 }));
-  const dark = keep(new THREE.MeshStandardMaterial({ color: '#25282d', roughness: 0.5, metalness: 0.4 }));
-  const slotMaterial = keep(new THREE.MeshBasicMaterial({ color: '#c56443' }));
-  const towerShape = keep(new THREE.LatheGeometry([
-    new THREE.Vector2(0, 0), new THREE.Vector2(2.9, 0), new THREE.Vector2(2.9, 0.75), new THREE.Vector2(2.55, 1.2), new THREE.Vector2(1.55, 1.35),
-    new THREE.Vector2(1.45, 2.2), new THREE.Vector2(0.95, 8.6), new THREE.Vector2(0.95, 8.7), new THREE.Vector2(0, 8.7),
-  ], 48));
-  const tower = new THREE.Mesh(towerShape, white);
-  const collar = new THREE.Mesh(keep(new THREE.CylinderGeometry(1.12, 1.12, 0.55, 48)), dark); collar.position.y = 8.85;
-  const slot = new THREE.Mesh(keep(new THREE.BoxGeometry(1.1, 0.42, 0.3)), slotMaterial); slot.position.set(0, 0.95, 2.62);
-  machine.add(tower, collar, slot);
-  machine.position.y = peakY - 0.25;
-  scene.add(machine);
-
-  // ---- the plume: cubes of the cartridge's colours, spiralling up (the pixels it is writing)
-  const plumeCount = 140;
-  const plume = new THREE.InstancedMesh(keep(new THREE.BoxGeometry(0.45, 0.45, 0.45)), keep(new THREE.MeshBasicMaterial()), plumeCount);
-  plume.frustumCulled = false;
-  scene.add(plume);
-  const top = peakY + 9.6;
-  let plumeLevel = 0, running = false;
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler();
-  const phase = (i: number) => ((i * 0.618034) % 1);
 
   /** Stands an object on the curved planet at x, z: down by the fall-away, tilted with the ground there. */
   const upright = new THREE.Vector3(), yAxis = new THREE.Vector3(0, 1, 0), tiltQ = new THREE.Quaternion(), spinQ = new THREE.Quaternion();
@@ -367,9 +343,7 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
     ringGeometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), FAR + 400);
     scene.add(new THREE.Mesh(ringGeometry, keep(new THREE.ShaderMaterial({ vertexShader: GROUND_VERTEX, fragmentShader: GROUND_FRAGMENT, uniforms: { ...shared, ...base, ...lookUniforms('To', blank) }, defines: { RING: '' } }))));
 
-    // ---- the neighbours: each plot's ground in its own look, its air, its chimney and its trees
-    const towers = new THREE.InstancedMesh(towerShape, white, Math.max(1, neighbours.length));
-    const beacons = new THREE.InstancedMesh(keep(new THREE.SphereGeometry(1, 16, 8)), keep(new THREE.MeshBasicMaterial()), Math.max(1, neighbours.length));
+    // ---- the neighbours: each plot's ground in its own look, its air and its trees
     const domeGeometry = keep(new THREE.SphereGeometry(1, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2));
     neighbours.forEach(({ plot, look }, i) => {
       const disc = makeDisc(plot);
@@ -403,12 +377,7 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
         dome.renderOrder = 3;
         scene.add(dome);
       }
-      // their chimney, and a light on top that reads from across the plains
-      towers.setMatrixAt(i, place(plot.x, groundY - 0.3, plot.z, 0, 0, 1, m));
-      beacons.setMatrixAt(i, place(plot.x, groundY + 9.6, plot.z, 0, 0, 0.5 + Math.hypot(plot.x, plot.z) / 700, m));
-      beacons.setColorAt(i, new THREE.Color(0.55, 0.95, 1.0));
-
-      // their trees: the cartridge's kinds, more of them the further the plot has come; none round the chimney
+      // their trees: the cartridge's kinds, more of them the further the plot has come; none round the plot's centre
       const kinds = FOREST[plot.cartridge] ?? ['broadleaf'];
       const want = Math.min(160, Math.round((TREES_AT[plot.stage] ?? 0) * (plot.r / 60) ** 2));
       const byKind = new Map<SmoothId, THREE.Matrix4[]>();
@@ -431,8 +400,6 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
         scene.add(trees);
       }
     });
-    towers.computeBoundingSphere(); beacons.computeBoundingSphere();
-    scene.add(towers, beacons);
 
     // ---- a finished planet: forest over the plains and round your plot's lake (off the neighbours' plots, which have their own)
     if (options.lush) {
@@ -507,7 +474,7 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
     },
     setFront(radius) {
       shared.uRadius.value = radius;
-      // the rings fade in as the wave leaves the chimney and out as it reaches your plot's rim
+      // the rings fade in as the wave leaves your plot's centre and out as it reaches its rim
       plotUniforms.uGlow.value = next ? Math.min(1, radius / 6) * Math.min(1, Math.max(0, (WAVE_REACH - radius) / 12)) : 0;
       blendSky(radius);
     },
@@ -518,30 +485,10 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
       apply();
       rest();
     },
-    setChimney(on, palette) {
-      running = on;
-      slotMaterial.color.set(palette[Math.min(2, palette.length - 1)] ?? '#c56443');
-      const colours = palette.map((c) => new THREE.Color(c));
-      for (let i = 0; i < plumeCount; i++) plume.setColorAt(i, colours[(i % Math.max(1, colours.length - 1)) + (colours.length > 1 ? 1 : 0)] ?? new THREE.Color('#ffffff'));
-      if (plume.instanceColor) plume.instanceColor.needsUpdate = true;
-    },
-    update(now, dt, eye) {
+    update(now, _dt, eye) {
       sky.position.copy(eye);
       for (const layer of starLayers) layer.position.copy(eye);
       waterUniforms.uTime.value = now;
-      plumeLevel = Math.max(0, Math.min(1, plumeLevel + (running ? dt / 1.2 : -dt / 1.6)));
-      for (let i = 0; i < plumeCount; i++) {
-        const life = (now * 0.16 + phase(i)) % 1;
-        const angle = phase(i * 7 + 3) * Math.PI * 2 + now * 0.5 + life * 4;
-        const radius = 0.5 + life * (3 + phase(i * 13 + 1) * 5);
-        p.set(Math.cos(angle) * radius, top + life * 30, Math.sin(angle) * radius);
-        const size = plumeLevel * Math.pow(1 - life, 0.6) * (0.7 + phase(i * 5 + 2) * 0.6);
-        s.set(size, size, size);
-        e.set(life * 3 + i, life * 2, 0); q.setFromEuler(e);
-        plume.setMatrixAt(i, m.compose(p, q, s));
-      }
-      plume.instanceMatrix.needsUpdate = true;
-      plume.visible = plumeLevel > 0.001;
     },
     dispose() {
       for (const g of [current, next]) if (g) { g.colour.dispose(); g.maps.dispose(); }

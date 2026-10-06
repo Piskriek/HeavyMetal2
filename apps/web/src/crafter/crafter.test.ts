@@ -10,10 +10,10 @@ import { bakeLook, stageMiddle, waterLevel } from './looks';
 test('the moon is the same moon every time, with its craters where they should be', () => {
   assert.equal(moonHeight(12.5, -7.25), moonHeight(12.5, -7.25));
   assert.ok(CRATERS.length >= 10);
-  // the main crater's floor is well below its rim, and its central peak keeps the chimney above the highest lake
+  // the main crater's floor is well below its rim, and its central peak keeps your plot's centre (the gate's planet end) above the highest lake
   const floor = moonHeight(MAIN_CRATER.r * 0.45, 0), rim = moonHeight(MAIN_CRATER.r, 0);
   assert.ok(rim - floor > 4, `rim ${rim.toFixed(2)} floor ${floor.toFixed(2)}`);
-  assert.ok(moonHeight(0, 0) > waterLevel(1) + 0.3, 'the chimney stands above the water at every stage');
+  assert.ok(moonHeight(0, 0) > waterLevel(1) + 0.3, 'the centre stands above the water at every stage');
   for (const c of CRATERS.slice(1)) assert.ok(moonHeight(c.x, c.z) < moonHeight(c.x + c.r, c.z), 'a crater dips');
 });
 

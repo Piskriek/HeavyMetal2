@@ -1,5 +1,6 @@
-// The Resolution Crafter preview (STATUS SM7): the moon, the Pixel Chimney and the resolution wave through the six stages.
-// Slot a cartridge, run the chimney: the world climbs the ladder and each new look sweeps out from the chimney.
+// The Resolution Crafter preview (STATUS SM7), opened by Play: your plot and the resolution wave through the six stages.
+// Slot a cartridge and climb: the world goes up the ladder and each new look sweeps out from your plot's centre. The climb is a
+// test control; machines drive it once they are picked from the concept art (docs/SETMIX_PLAN.md).
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { deviceFor, normalised, type DeviceProfile, type Stage } from '@hm/fidelity';
 import { VAULT, VAULT_BY_ID, type VaultCartridge } from '@hm/vault';
@@ -14,7 +15,7 @@ import { animalBody } from './creatures';
 import { STAGE_NAMES, STAGE_STARTS, WaveQueue, stageAt, stateAt } from './progress';
 import './crafter.css';
 
-/** The whole climb takes this long with the chimney running (seconds). */
+/** The whole climb takes this long (seconds). */
 const CLIMB_SECONDS = 80;
 const FIRST_CARTRIDGE = 'lunar_anorthosite';
 const CATEGORY_WORDS: Readonly<Record<VaultCartridge['category'], string>> = {
@@ -102,7 +103,6 @@ export function ResolutionCrafter(props: { readonly profile: Profile; readonly o
     const start = (): void => {
       const first = lookFor(FIRST_CARTRIDGE, 1);
       scene.show(first); shownKey = targetKey = wantKey = first.key;
-      scene.setChimney(false, VAULT_BY_ID.get(FIRST_CARTRIDGE)!.palette);
       for (let s = 2; s <= 6; s++) pending.push([FIRST_CARTRIDGE, s as Stage]);
       setReady(true);
       raf = requestAnimationFrame(loop);
@@ -120,7 +120,6 @@ export function ResolutionCrafter(props: { readonly profile: Profile; readonly o
         // a newly slotted cartridge gets its six looks baked ahead, one a frame
         if (l.cartId !== lastCart) for (let s = 1; s <= 6; s++) if (!looks.current.has(keyOf(l.cartId, s as Stage))) pending.push([l.cartId, s as Stage]);
         lastCart = l.cartId; lastRunning = l.running;
-        scene.setChimney(l.running, VAULT_BY_ID.get(l.cartId)!.palette);
       }
       const stage = stageAt(l.p);
       const want = keyOf(l.cartId, stage);
@@ -223,7 +222,7 @@ export function ResolutionCrafter(props: { readonly profile: Profile; readonly o
   }, []);
   const jump = useCallback((stage: number) => { live.current.jumpTo = STAGE_STARTS[stage - 1]! + (stage === 1 ? 0 : 0.002); }, []);
 
-  // Space runs the chimney, Esc goes back
+  // Space climbs or pauses, Esc goes back
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') { props.onBack(); return; }
@@ -252,7 +251,7 @@ export function ResolutionCrafter(props: { readonly profile: Profile; readonly o
       {!ready && !failure ? <div className="rc-loading gr-loading" role="status"><span>{loading}</span><i /></div> : null}
       {failure ? <p className="rc-failure" role="alert">{failure}</p> : null}
       {ready ? (
-        <section ref={consoleRef} className="rc-console" aria-label="Chimney console">
+        <section ref={consoleRef} className="rc-console" aria-label="Stage console">
           <div className="rc-stage">
             <p className="rc-stage-line"><b>Stage {hud.stage} of 6</b><span>{STAGE_NAMES[hud.stage]}</span></p>
             <ol className="rc-ladder" aria-label="Stages">
@@ -271,7 +270,7 @@ export function ResolutionCrafter(props: { readonly profile: Profile; readonly o
               </div>
             ))}
           </div>
-          <div className="rc-chimney">
+          <div className="rc-slot">
             <p className="rc-cart"><b>{cart.name}</b><span>{CATEGORY_WORDS[cart.category]}, tier {cart.tier}{hud.preparing ? `. Preparing ${hud.preparing}` : ''}</span></p>
             <div className="rc-strip" role="listbox" aria-label="Cartridges you can slot">
               {unlocked.map((c) => (
@@ -282,11 +281,11 @@ export function ResolutionCrafter(props: { readonly profile: Profile; readonly o
               ))}
               {locked ? <span className="rc-locked">{locked} more at higher stages</span> : null}
             </div>
-            <button className="go rc-run" onClick={run} aria-pressed={hud.running}>{hud.running ? 'Stop the chimney' : hud.p >= 1 ? 'Start again' : 'Run the chimney'}</button>
+            <button className="go rc-run" onClick={run} aria-pressed={hud.running}>{hud.running ? 'Pause' : hud.p >= 1 ? 'Start again' : 'Climb'}</button>
           </div>
         </section>
       ) : null}
-      {ready ? <p className="rc-hint">Drag to look around. Pick a cartridge, then run the chimney (Space): each stage sweeps out from it.</p> : null}
+      {ready ? <p className="rc-hint">Drag to look around. Pick a cartridge, then Climb (Space): each stage sweeps out from your plot's centre.</p> : null}
     </div>
   );
 }

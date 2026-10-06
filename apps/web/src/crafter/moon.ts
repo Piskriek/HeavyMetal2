@@ -4,10 +4,10 @@
 /** One crater: centre, radius, how deep its floor sits and how high its rim stands (metres). */
 export interface Crater { readonly x: number; readonly z: number; readonly r: number; readonly depth: number; readonly rim: number }
 
-/** The moon patch is SPAN metres across, centred on the chimney. */
+/** The moon patch is SPAN metres across, centred on your plot's centre. */
 export const SPAN = 128;
 
-/** The big crater the chimney stands in. */
+/** The big crater at your plot's centre. */
 export const MAIN_CRATER: Crater = { x: 0, z: 0, r: 26, depth: 5, rim: 2.4 };
 
 export function hash(i: number, j: number, seed: number): number {
@@ -51,7 +51,7 @@ export function craterProfile(c: Crater, distance: number): number {
   return bowl + rim;
 }
 
-/** The main crater's central peak (big craters have one): the chimney stands on it, above the lakes at every stage. */
+/** The main crater's central peak (big craters have one): the gate's planet end stands on it, above the lakes at every stage. */
 export const PEAK = { height: 7.4, radius: 5.5 } as const;
 
 /** The moon's true height (metres) at x, z: gentle rolling ground plus every crater. */

@@ -1,5 +1,5 @@
 // The planet's shaders. One ground shader draws three things (by define):
-//   PLOT   your plot: the look it had and the look the wave brings, blended by distance to the chimney, fading into the
+//   PLOT   your plot: the look it had and the look the wave brings, blended by distance to the plot's centre, fading into the
 //          plains at its rim; the wave front is three thin rings, red, green and blue: the planet's pixels being written
 //   DISC   a neighbour's plot: its look, fading into the plains at its rim
 //   RING   the plains, out to the horizon, in the base look (the planet as it was before anyone came)

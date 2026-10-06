@@ -20,7 +20,7 @@ export interface FidelityState {
   tick: number;
 }
 
-/** One machine that raises a metric (a Pixel Chimney raises pxd). */
+/** One machine that raises a metric (one that spews pink pixels raises pxd). */
 export interface Emitter {
   id: string;
   metric: MetricKey;

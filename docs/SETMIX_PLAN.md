@@ -54,7 +54,7 @@ Each phase ends at an owner checkpoint (**G**). Nothing moves to the next phase 
 ### Phase 0: agree this plan (now) → G0
 The owner's yes, and answers to section 3.
 
-### Phase 1: remove what the owner rejected (me, small, alongside Phase 2)
+### Phase 1: remove what the owner rejected (me, small, alongside Phase 2): DONE 2026-10-06 evening
 - Take the chimney out of the crafter and the lab's vista; the plot centre stays empty until the art for it is approved. The crafter's "Run the chimney" control becomes a plain stage control (a test tool, not a feature).
 - An edition flag (`setmix` or `goblin-racing`, set at build time): the SetMix menu has no Goblin Racing; the Goblin Racing menu lists it first.
 - The menu as answered in question 3.
@@ -63,6 +63,7 @@ The owner's yes, and answers to section 3.
 ### Phase 2: concept art (Arena Agent mode) → G1
 - I rewrite `docs/prompts/arena-setmix-concept-art.md` from section 2 and the answers: no chimney; machines that spew colourful pixels while they run, each with a feed (what goes in), a job, a pixel exhaust (what comes out, in its metric's colour), a power line from a relay, and feet on the ground.
 - I paste it into arena.ai (Agent mode, repo `Piskriek/HeavyMetal2`) myself. The agent pushes to its own branch and touches only `docs/concept/setmix/`.
+- **Sent 2026-10-06 evening:** https://arena.ai/agent/01a1132c-90e8-7965-8a90-9d69601f7fc1. The agent read the plan and the brief, generates images with its own tool, and can see them.
 - The set:
   1. the lab at first Play: emergency light, the gate off;
   2. the gate powering on (relays closing in a row, pulses along the cables, coils lighting bottom to top, the lab dimming);

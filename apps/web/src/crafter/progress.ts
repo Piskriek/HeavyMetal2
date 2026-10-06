@@ -1,5 +1,5 @@
 // The preview's progress: one number p (0 to 1) walks the world along the stage ladder, and a wave carries each new look
-// out from the chimney. The real economy (machines feeding stepFidelity) comes with Wave 4 of docs/SETMIX_LANDING.md.
+// out from your plot's centre. The real economy (machines feeding stepFidelity) comes with Wave 4 of docs/SETMIX_LANDING.md.
 import { fidelityIndex, stageOf, type FidelityState, type Stage } from '@hm/fidelity';
 
 /** A world at progress p: every metric grows together (pixels a little ahead, water behind), 10^2 to 10^8. */
@@ -41,7 +41,7 @@ export const WAVE_REACH = 62;
 /** How wide the band is where the old look swells into the new (metres). */
 export const WAVE_BAND = 7;
 
-/** How much of the new look a point at `distance` from the chimney shows when the front is at `radius`: 1 behind it, 0 ahead, smooth (C1) between. */
+/** How much of the new look a point at `distance` from your plot's centre shows when the front is at `radius`: 1 behind it, 0 ahead, smooth (C1) between. */
 export function waveFactor(distance: number, radius: number, band = WAVE_BAND): number {
   const t = Math.max(0, Math.min(1, (radius - distance) / band));
   return t * t * (3 - 2 * t);

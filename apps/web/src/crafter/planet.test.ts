@@ -15,7 +15,7 @@ test('the plains meet your plot: on and round it the planet is your moon', () =>
   for (let x = -4000; x <= 4000; x += 250) for (let z = -4000; z <= 4000; z += 250) assert.ok(Number.isFinite(planetHeight(x, z)));
 });
 
-test('neighbours keep off your plot and each other; boulders keep off their plots and the chimney', () => {
+test('neighbours keep off your plot and each other; boulders keep off their plots and the plot centre', () => {
   for (const [i, p] of NEIGHBOURS.entries()) {
     assert.ok(Math.hypot(p.x, p.z) > p.r + PLOT_RADIUS + 60, `${p.name} crowds your plot`);
     for (const q of NEIGHBOURS.slice(i + 1)) assert.ok(Math.hypot(p.x - q.x, p.z - q.z) > p.r + q.r, `${p.name} overlaps ${q.name}`);

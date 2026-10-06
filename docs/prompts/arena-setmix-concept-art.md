@@ -177,3 +177,28 @@ Make PNGs at 1920x1080 unless noted, in `docs/concept/setmix/`. Scene images hav
 - Use text-only prompts, and feed in no reference images from elsewhere.
 
 Commit everything to your own branch with a message that lists the 12 files, then reply here with the branch name.
+
+---
+
+## Follow-up 1 (sent 2026-10-07, after reviewing the first 10 images)
+
+The agent ran out of turn time after 7 finished images with nothing committed. My review of what it had made:
+
+Good work so far. I'm reviewing for the owner. Please do these, in this order.
+
+1. **Commit and push now** what you have (the finished PNGs, your scripts' outputs, a first README) to your branch `arena/601f7fc1-heavymetal2`, so nothing is lost. Then commit again after each image or two.
+
+2. **Finish the set:** 06, 07, 08, 09 and 12 (the sheets), then the contact sheet and the README.
+
+3. **Fixes from my review of what you made:**
+   - **One gate design everywhere.** The gate changes between images: a slim frame with coil strips, then a chunky frame with ribbed coil blocks, then an octagonal frame. Settle it on sheet 06 first: I prefer the chunky frame with ribbed amber coil blocks on the uprights, angled buttresses and the hazard-striped plinth, as in your power-on image. Then redo 01, 03, 04 and 05 so the gate matches it, and so the gate's planet end in 10 and 11 is its twin.
+   - **01 (first Play): the gate is OFF.** Its coils must be dark and cold, with no orange glow. Only the console and the emergency lights are lit.
+   - **Cables never lie loose on the floor.** There are no coils or loose runs of cable on the lab floor anywhere: they run inside low steel floor covers (cable ramps) or overhead trays, from the relay cabinets to the gate's rear junction box and to each machine. Loose cable across a lab floor is not believable.
+   - **The goblin planet must not look like Earth.** In 05 and 11 it shows Earth-like continents (Africa can be seen). Make it clearly alien: green and ochre land in irregular shapes that match no real continent, with swirling cloud bands. Keep it the same planet in every image.
+   - **Menu backdrops 04 and 05: keep the left third calm.** No planet table, hologram, goblin or rack in the left third: plain lit wall panels and floor there, with all the activity (gate, machines, pixels) from the centre to the right. The window can sit centre-left.
+   - **One rendering style.** 04 and 05 drifted towards an illustrated look. Keep the lab images photoreal like 01 to 03.
+   - **03: the stage-1 planet in the gate** reads as one pale ground. Make it like your 11: natural and multi-textured (sand, rock, gravel, cracked flats, reddish soil), low-res and low poly, black sky.
+   - **10 (stage 6 hero): the pixels** pour as rigid straight columns. Make them pour out of each machine's exhaust vents and drift up with the air, spreading and thinning as they rise. Show each machine's feed or hopper, and its power cable going to the relay pylon line.
+   - **11 is the best of the set:** natural and low-res, the hopper machine spewing square pink pixels and cabled to the junction at the gate's foot, the neighbours' plots and the friend's beacon. Keep it, fixing only the goblin planet.
+
+4. When the set is complete, reply here with the branch name, the list of files and your self-review.

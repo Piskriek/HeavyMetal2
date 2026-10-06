@@ -303,6 +303,12 @@
       "@hm/voxelart": [
         "packages/voxelart/src/index.ts"
       ],
+      "@hm/fauna": [
+        "packages/fauna/src/index.ts"
+      ],
+      "@hm/flora": [
+        "packages/flora/src/index.ts"
+      ],
       "@hm/vault": [
         "packages/vault/src/index.ts"
       ],

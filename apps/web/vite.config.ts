@@ -110,6 +110,8 @@ export default defineConfig(({ mode }) => ({
       '@hm/motion': p('../../packages/motion/src/index.ts'),
       '@hm/voxel': p('../../packages/voxel/src/index.ts'),
       '@hm/tools': p('../../packages/tools/src/index.ts'),
+      '@hm/fauna': p('../../packages/fauna/src/index.ts'),
+      '@hm/flora': p('../../packages/flora/src/index.ts'),
       '@hm/vault': p('../../packages/vault/src/index.ts'),
       '@hm/fidelity': p('../../packages/fidelity/src/index.ts'),
     },

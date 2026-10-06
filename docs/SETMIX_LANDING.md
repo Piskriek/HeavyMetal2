@@ -116,3 +116,52 @@ Main at the time of writing: typecheck clean, `npm test` 1,743 tests (1,739 pass
    - So the Resolution Crafter gets its own world (the Lab and the Moon), separate from the island. The preview (SM7) is built as its own SetMix screen and does not touch the island renderer.
 2. **Order against Milestone 0.5.** Its remaining items are the e2e suite split, Shift + wheel for tabs, and voxels in the budget. Proceeding as proposed (the owner: "once youe done all you need"): Waves 0 to 2 first, then the preview, then Milestone 0.5 before anything touches the island renderer.
 3. **Cartridge format.** Proceeding as proposed: cartridges are presets inside our existing bundle and `.setmix` files, and the binary `.smx` waits.
+
+## 7. Everything in the drops, item by item (the checklist)
+
+Added 2026-10-06 18:50 after the owner asked whether anything was missed ("you seem to have missed the fauna flora stuff now im worried about other stuff"). **Nothing is lost**: every file of all 12 phases is in `arena-gathered/setmix/site` (committed and pushed). This table says where each piece stands. Status words: **landed** (a tested package or app code), **now** (being worked on this session), **next** (planned, in order), **parked** (kept, waits for something named), **reference** (a demo page whose ideas we use; its code is a separate engine and is not mounted).
+
+| Phase | Piece | What it is | Status |
+|---|---|---|---|
+| 1-2 | Fidelity core: `deriveBudget`, `adaptGraph`, `fuse`, `certify` | The four numbers, budgets per tier, the Fusion Matrix's maths, the export check | **landed** `@hm/fidelity` (2 bugs fixed) |
+| 1-2 | Material Synthesizer, Fusion Matrix pages | Lab machines as demo pages | **reference**; the Fusion Matrix as a real machine is Wave 4 |
+| 3 | `field.ts` | The radial resolution wave, exact in time | **next** Wave 3 (`@hm/wavefield`); the preview has its own simple wave |
+| 3 | `mesh.ts` | Mesh policy per stage, seams between chunks | **landed** (policy and seams in `@hm/fidelity`); hooking into our mesher is Wave 3 |
+| 3 | `outliner.ts` | The 9-level "Inception" preset tree | **next** with Studio (Wave 5) and the hierarchy zoom (P1) |
+| 4 | `contracts.setmix.ts` | The data types | **landed** (`@hm/fidelity` types) |
+| 4 | `TerrainMaterial.ts` | The stage-look ground shader (dither, swell) | **landed in spirit** (the preview's ground shader does the stage looks); folds into Wave 3 |
+| 4 | `exportToUnreal.ts`, `import_setmix_to_ue5.py` | Export a world to Unreal Engine 5.5 and import it there | **parked: Unreal** (see below) |
+| 4 | `setmixAudio.ts` | Sound that changes with each stage (8 kHz mono at stage 1 up to full) | **next**, with the moon's walk mode |
+| 5 | `PortalRenderer.ts` | The Star Trek archway portal you walk through | **now** the archway on the new lab menu (SM11); walking through it is Wave 4 |
+| 5 | `GoblinController.ts`, `AvatarFidelityManager.ts` | The goblin astronaut: slope-aware feet, cape, the avatar's own stages | **next** Wave 5 (walking the planet) |
+| 5 | `machines.ts` | Power grid, pixel plumes | **landed in part** (the chimney and its plume in the preview); the grid is Wave 4 |
+| 5 | `galaxy.ts` | Many worlds in one universe | **next** with SM8 to SM10 (the shared planet, games in orbit, systems, galaxies) |
+| 6 | `SetMixPlayable.tsx`, `SetmixHUD.tsx` | A first-person playable slice and its HUD | **reference** (its own WebGL engine); walking comes in Wave 5 on our renderer |
+| 6 | `QuestEngine.ts` | The first 30 minutes, Acts 1 to 4 | **next** Wave 4, as questline data |
+| 6 | `NetBus.ts` | Online play at 120 Hz with rollback | **parked: online play** (1.1); its own test failed (clients diverged) |
+| 7 | `WaterShader.ts` | Gerstner waves, deep-water colour | **next** (the preview has simple water) |
+| 7 | `Ecosystem.ts` | Moisture spreading, plants filling in | **now** with flora |
+| 7 | `VolumetricVoxelField.ts`, `VoxelWorker.ts` | Caves and digging in 3D | **parked**: overlaps `voxelcsg`, `chunkworld`; with digging (QL3) |
+| 7 | `LogisticsSwarm.ts` | Drones and vacuum tubes carrying ore | **parked**: after machines (Wave 4) |
+| 7 | `CartridgeCompiler.ts` | The binary `.smx` cartridge file | **parked**: cartridges stay presets in our files (decision 3) |
+| 8 | `GoblinRover.ts`, `RaceEngine.ts` | A drifting rover on low gravity, ghost races | **parked**: for Goblin Racing's kart and spectating |
+| 8 | `SetmixWGSL.ts`, `GpuComputePipeline.ts` | WebGPU compute | **parked**: off on Low; Milestone 5 |
+| 8 | `DialogueEngine.ts`, `GoblinTrader.ts` | Talking goblins, trading | **parked**: NPCs and the market |
+| 8 | `SaveEngine.ts` | Binary saves | **parked**: we have IndexedDB saves with migrations |
+| 8 | `desktop.ts` | Tauri / Steam desktop build | **parked**: not 1.0 (run.studio first) |
+| 9 | `flora.ts` | Trees, shrubs, spires, kelp that grow; wind grass; the water cycle | **now** `@hm/flora` |
+| 9 | `fauna.ts` | Herds that follow the plants, creatures with real leg movement | **now** `@hm/fauna` |
+| 9 | `enclaves.ts`, `federation.ts` | Players' land on one big planet, blended borders, syncing it | **next** SM8 (the shared growing planet) |
+| 10 | `MasterRuntime.ts`, `SetMixMaster.tsx` | Four modes in one client | **reference** |
+| 10 | `SetmixLiveLink.py`, `ue5-bridge.ts` | Browser and Unreal kept in sync live | **parked: Unreal** |
+| 10 | `verify-all.ts` | The drop's own gate | **not used**: its checks tested stand-ins; real tests replace it |
+| 11 | `M_SetMix_Nanite_Master.usf`, `build_setmix_master.py` | The Unreal master material (Nanite, Lumen, Substrate) | **parked: Unreal** |
+| 11 | `png.ts`, `BakeWorkerPool.ts` | Faster texture bakes in workers | **next**: Ultra needs bakes off the main thread |
+| 11 | `texgraph-patch.ts` | Reusing texture buffers | **not used**: written for a texgraph we do not have |
+| 12 | `presets.ts` | The 50 cartridges | **landed** `@hm/vault` (art fixes) |
+| 12 | `recipes.ts` | 100 fusion recipes | **landed**, gap pinned (9 ingredients to author) |
+| 12 | `avatars.ts` | 8 goblin outfits | **next** with the goblin astronaut |
+| 12 | `events.ts` | A 30-day weather and sky calendar | **next** with weather |
+| 12 | `PresetVault.tsx` | A cartridge browser | **landed in part** (the preview's cartridge strip); the full browser is Studio |
+
+**Unreal Engine, in plain words.** Four pieces are for Unreal: the exporter, the importer script, the live link between the browser and Unreal, and the master material. All four are kept. They wait because they need Unreal Engine 5.5 installed, which CATCHUP 12ai put on the owner's desktop PC (this laptop is the minimum spec and cannot run it). The plan there is unchanged: the web game is Horizon 1 (run.studio); the Unreal edition is Horizon 2, fed by the same worlds. When the owner wants to start it, the first step is installing Unreal on the desktop PC; then the importer is tested on a world exported from here.

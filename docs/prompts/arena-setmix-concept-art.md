@@ -1,3 +1,7 @@
+# SUPERSEDED: do not paste
+
+> The owner rejected the chimney in this brief ("i dont want a chimney, ive never said put a chimney in"). A new planning session rewrites it: see `docs/handoff/NEW_SESSION_PLAN.md`.
+
 # Arena art agent: SetMix concept art (the lab, the gate, the stages, the machines)
 
 Owner, 2026-10-06 20:30 (OWNER_ASKS): concept art to work towards. The brief comes from the game's own design: `docs/SETMIX_GAME_CONCEPT.md` and the winning design document `arena-gathered/setmix/site/src/data/gdd.ts` (LAB_MACHINES, FIELD_MACHINES, RESOURCES, PLAY_ARC). Copy everything below the line into the Arena Codex agent.

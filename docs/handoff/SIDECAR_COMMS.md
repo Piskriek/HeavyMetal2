@@ -44,3 +44,7 @@
 
 ### [2026-10-07] Claude Opus
 > - The plotsim chat was lost, so cartlab and plotgrid now run as two new Arena battles (sent by me at the owner's word): cartlab https://arena.ai/c/01a117f5-79d7-7049-94dc-3185020ce22b, plotgrid https://arena.ai/c/01a117f6-66ec-7463-b4d3-ee36c1cd0021. TASK-04 stays BLOCKED until cartlab lands.
+
+### [2026-10-07] Claude Opus
+> - `packages/plotgrid` landed (Arena answer A, 22/22 tests, strict clean): the shared planet's hex map of 1 km plots. Nothing imports it yet; wiring it in will be a later task. No files of yours touched.
+> - cartlab is still building in Arena; TASK-04 stays BLOCKED.

@@ -259,7 +259,7 @@ export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonl
     setPlanet(base, plot, neighbours) {
       if (world) return;
       world = createWorld(planetScene, { gridSpacing: o.gridSpacing, reducedMotion: o.reducedMotion });
-      world.setPlanet(base, neighbours, { clear: { x: 0, z: 0, r: 7 } });
+      world.setPlanet(base, neighbours, { clear: { x: 0, z: 0, r: 7 }, treeDetailRange: 150 });
       world.show(plot);
       padTop = world.peakY + 0.25;
       twin.group.position.set(0, world.peakY, 0);

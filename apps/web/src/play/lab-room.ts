@@ -221,14 +221,14 @@ export function createLabRoom(o: { readonly textureSize: number; readonly portal
   // ---- light: ceiling strips (and one lamp standing in for them), orange emergency lamps, the gate's glow, the grey daylight from the window
   const stripMat = keep(new THREE.MeshStandardMaterial({ color: '#202428', emissive: '#eef6ff', emissiveIntensity: 0, roughness: 0.4 }));
   for (const x of [-6, -1.5, 3, 7.5]) add(new THREE.BoxGeometry(0.3, 0.06, depth - 4), stripMat, (s) => { s.position.set(x, ROOM.height - 0.04, (ROOM.back + ROOM.front) / 2); });
-  const mainLamp = new THREE.PointLight('#e6f2ff', 0, 0, 2); mainLamp.position.set(0, ROOM.height - 0.8, -5); group.add(mainLamp);
-  const mainLamp2 = new THREE.PointLight('#e6f2ff', 0, 0, 2); mainLamp2.position.set(5, ROOM.height - 0.8, -2); group.add(mainLamp2);
+  // one lamp stands in for all the strips: every light costs every pixel of the room, and the minimum spec has four to spend
+  const mainLamp = new THREE.PointLight('#e6f2ff', 0, 0, 2); mainLamp.position.set(1.5, ROOM.height - 0.8, -4); group.add(mainLamp);
   const emergencyMat = keep(new THREE.MeshStandardMaterial({ color: '#331a08', emissive: '#ff7a1c', emissiveIntensity: 0, roughness: 0.4 }));
-  const emergency: THREE.PointLight[] = [];
+  // three emergency lamps on the walls, one light for the three of them (cast from the room's middle, high up)
   for (const [x, z, face] of [[-1.2, ROOM.back + 0.08, 0], [ROOM.right - 0.08, -5, -Math.PI / 2], [ROOM.left + 0.08, -1, Math.PI / 2]] as const) {
     add(new THREE.BoxGeometry(0.18, 0.12, 0.1), emergencyMat, (e) => { e.position.set(x, 4.6, z); e.rotation.y = face; });
-    const l = new THREE.PointLight('#ff8a3a', 0, 14, 2); l.position.set(x + Math.sin(face) * 0.6, 4.4, z + Math.cos(face) * 0.6); group.add(l); emergency.push(l);
   }
+  const emergency = new THREE.PointLight('#ff8a3a', 0, 22, 1.6); emergency.position.set(-0.5, 4.8, -6.5); group.add(emergency);
   const gateGlow = new THREE.PointLight('#ff9a4a', 0, 9, 2); gateGlow.position.set(GATE_AT.x, 1.6, GATE_AT.z + 1.4); group.add(gateGlow);
   const windowLight = new THREE.PointLight('#9fb6cc', 3, 14, 2); windowLight.position.set(wx, wy, ROOM.back + 1.2); group.add(windowLight);
   const fill = new THREE.HemisphereLight('#d8e2ea', '#2a2e33', 0.08); group.add(fill);
@@ -242,10 +242,10 @@ export function createLabRoom(o: { readonly textureSize: number; readonly portal
     gate.coils.forEach((c, i) => kit.setLamp(c, p.coils * 3 > Math.floor(i / 2) ? Math.min(1, p.coils * 3 - Math.floor(i / 2)) : 0));
     pulseUniforms.uPower.value = p.pulse;
     stripMat.emissiveIntensity = p.main * 2.2;
-    mainLamp.intensity = p.main * 9; mainLamp2.intensity = p.main * 6;
+    mainLamp.intensity = p.main * 14;
     fill.intensity = 0.08 + p.main * 0.25;
     emergencyMat.emissiveIntensity = p.emergency * 2.4;
-    for (const l of emergency) l.intensity = p.emergency * 11;
+    emergency.intensity = p.emergency * 26;
     gateGlow.intensity = p.coils * 10;
     portal.visible = p.coils > 0.6;
   };

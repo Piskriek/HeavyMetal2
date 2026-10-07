@@ -146,6 +146,8 @@ export interface PlanetOptions {
   readonly clear?: { readonly x: number; readonly z: number; readonly r: number };
   /** Seen only from here, looking this way (the lab's arch): trees and boulders outside the view are not built at all. */
   readonly view?: { readonly x: number; readonly z: number; readonly dirX: number; readonly dirZ: number; readonly halfAngle: number };
+  /** Neighbours' trees further than this from the eye use the tiny model (default 700 m; the first Play draws its far neighbours cheaply). */
+  readonly treeDetailRange?: number;
 }
 
 export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
@@ -394,7 +396,7 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
         t++;
       }
       for (const [kind, list] of byKind) {
-        const trees = new THREE.InstancedMesh(Math.hypot(plot.x - eyeX, plot.z - eyeZ) < 700 ? smoothModel(kind).far : smoothModel(kind).tiny, treeMaterial, list.length);
+        const trees = new THREE.InstancedMesh(Math.hypot(plot.x - eyeX, plot.z - eyeZ) < (options.treeDetailRange ?? 700) ? smoothModel(kind).far : smoothModel(kind).tiny, treeMaterial, list.length);
         list.forEach((mm, k) => trees.setMatrixAt(k, mm));
         trees.computeBoundingSphere();
         scene.add(trees);

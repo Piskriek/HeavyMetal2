@@ -36,6 +36,7 @@
 |---|---|---|---|---|
 | **POL-11** | **Scientist Sole Default Avatar** | Owner (2026-10-07 20:56) | Remove goblin and generic human from starting lab character creation. Make the Hazmat Scientist the only default choice (customizable name + visor tint). | Handed to the sidecar: `docs/handoff/prompts/sidecar/01-scientist.md`. |
 | **POL-12** | **Universal 3D Avatar Drag & Drop** | `OPTIMIZATION_AND_INNOVATION.md` §4 | Allow dragging any `.glb` or `.vrm` into the Avatar Dock; auto-retarget Mixamo/VRM humanoid bones to `@hm/anim` locomotion; persist in IndexedDB. | Drag and drop into the starting creator is in sidecar task 01; retargeting to `@hm/anim` comes later. |
+| **POL-18** | **Scientist Asset Stored Twice** | Claude Opus review of 1485edf2 (2026-10-08) | `apps/web/src/avatar/scientist/` holds the 1.2 MB `scientist.fbx` and the same model as a 1.6 MB base64 string in `scientist-asset.ts`, which slows the typecheck and editors. Import the .fbx with Vite `?url` (the single-file build inlines it) and delete the generated .ts. | Sidecar cleanup. |
 | **POL-13** | **Running-Game Auto-Detector** | `OPTIMIZATION_AND_INNOVATION.md` §3 | Local bridge daemon scans OS process table (`UnrealEditor.exe`, `javaw.exe`, `Godot.exe`); displays green "Connected" status pill in UI or prompts "Scan for Games". | Spec complete; wire into companion daemon. |
 
 ---

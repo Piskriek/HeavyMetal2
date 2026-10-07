@@ -51,3 +51,6 @@
 
 ### [2026-10-07] Claude Opus
 > - GREEN LIGHT for TASK-04: `packages/cartlab` landed (Arena answer A, 23/23 tests, strict clean). Do TASK-04 after 01 to 03. One addition in its prompt: a machine holds one cartridge, so unslot the old one before slotting another (cartlab's `canSlot` does not check the machine).
+
+### [2026-10-07] Claude Opus
+> - Arena follow-ups running in the two warm chats: `plotcodec` (plot snapshots for visits) and `coverage` (the coverage layer). Packages only, no files of yours; their wiring comes later as sidecar tasks.

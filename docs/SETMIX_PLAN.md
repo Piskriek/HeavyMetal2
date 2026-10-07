@@ -9,6 +9,20 @@
 3. **Arena Battle writes the bulk code.** I write self-contained briefs (contract, tests, a preview page so voting unlocks), paste them into arena.ai in the browser pane, collect both answers, run the tests, vote, record the models, and integrate. My own usage goes on planning, briefs, review and integration.
 4. **Every owner note is logged first**, and a note that moves the direction stops the work and changes this plan before anything else happens.
 5. **Standing rules:** 60 fps on Low on the laptop (GTX 950M), a loading bar until a screen runs smooth, believable machines (grounded, cabled, a job for every part), the frontend-design skill for any design work.
+6. **Make it look right, keep it optimal, toggle if it is not obvious** (owner, `docs/OPTIMIZATION_AND_INNOVATION.md` section 1: "If I say I want pixels spewing out, I mean I want it to look like pixels are spewing out and it be optimal. We should be making logical choices; if it's not an easy choice, then we make it a toggle setting, let the auto setting in the display decide, and then we move on."):
+   - never trade away the visual fantasy (pixels the player can see pouring out, not a token effect);
+   - never choke the minimum spec: Low and Potato hold 50 fps or more on the laptop (60 where it can);
+   - where two techniques compete, do not stall: ship both behind a Graphics setting whose default is Auto (chosen by the device's tier, adjusted by the frame-time governor), and move on.
+
+## 1b. Optimization and innovation tasks (`docs/OPTIMIZATION_AND_INNOVATION.md`, owner, 2026-10-07)
+
+| Task | What | When |
+|---|---|---|
+| Pixel plumes by tier | Settings, Graphics: plume quality Auto, 3D cubes (Ultra, High), GPU splats (Medium), dither sprites (Low, Potato), Off; density 0.25 to 2; light from the pixels (Ultra); wind response. The pixels drift on the planet's wind and dissolve into the wave's band. One module for every machine (an Arena Battle, `@hm/plume`). | Now, in the first Play's polish |
+| Display governor | Auto follows the frame time on the fly: `createAdaptiveQuality` in `@hm/game` already drops and raises tiers; the first Play wires it to the knobs it can change live (render scale, plume tier and density, the planet's render scale, the ground's budget). Manual choices in Settings always win. | Now |
+| Inter-game bridge | A local daemon (WebSocket on `localhost:5196`, plus folder hot-reload) that pushes cartridges into running games. The first target is the owner's Unreal project (`C:\Repos\SetmixUnreal\SetMix_UE5`, Unreal 5.8, Python Editor Script Plugin), from the parked Arena pieces `ue5-bridge.ts` and `SetmixLiveLink.py`, which have never been run: they are tested there before anything is claimed. Then Minecraft resource packs, then Godot and Unity. | After the first Play's polish |
+| Send to Game | Export the active cartridge to an external game's folder, from the cartridge UI. | With the bridge |
+| From other games | A texture or heightmap dropped in becomes a `@hm/texgraph` cartridge (fitting noise, cells and levels to it); reading another game's position and biome to drive SetMix's sound and weather. | Research, later |
 
 ## 2. What the owner has decided (their words)
 

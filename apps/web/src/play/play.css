@@ -28,7 +28,8 @@
 .play-prompt.bad { border-bottom-color: #ff5a4a; color: #ffd9d4; }
 
 /* the build menu: a quiet card at the bottom, one machine for now */
-.play-build { position: absolute; left: 50%; bottom: clamp(16px, 6vh, 48px); transform: translateX(-50%); width: min(440px, calc(100vw - 32px)); padding: 14px 16px 12px; background: rgba(12, 14, 17, .86); border: 1px solid rgba(241, 244, 245, .12); }
+.play-build { position: absolute; left: 50%; bottom: clamp(16px, 6vh, 48px); transform: translateX(-50%); width: min(760px, calc(100vw - 32px)); max-height: 70vh; overflow: auto; padding: 14px 16px 12px; background: rgba(12, 14, 17, .88); border: 1px solid rgba(241, 244, 245, .12); }
+.play-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
 .play-build h3 { margin: 0 0 10px; font-family: var(--font-setmix); font-size: 15px; font-weight: 600; color: rgba(232, 238, 241, .7); }
 .play-card { display: grid; gap: 4px; width: 100%; text-align: left; padding: 12px 14px; background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 61, 138, .45); color: #f1f4f5; cursor: pointer; }
 .play-card:hover, .play-card:focus-visible { background: rgba(255, 61, 138, .12); outline: none; border-color: #ff3d8a; }
@@ -70,3 +71,33 @@
   .play-goal p { display: none; }
   .play-prompt { white-space: normal; max-width: calc(100vw - 32px); text-align: center; }
 }
+
+/* the plot: ore, power and the four fidelity levels (each in its pixels' colour) */
+.play-plot { position: absolute; left: clamp(16px, 4vw, 56px); bottom: clamp(16px, 5vh, 48px); width: min(260px, 70vw); padding: 10px 14px 12px; background: rgba(8, 10, 12, .62); border-left: 2px solid var(--power); color: #f1f4f5; font-size: 13px; pointer-events: none; }
+.play-plot p { margin: 0 0 4px; display: flex; gap: 8px; align-items: baseline; }
+.play-plot p b { font-family: var(--font-setmix); font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.play-plot p span { color: rgba(232, 238, 241, .6); font-variant-numeric: tabular-nums; }
+.play-power.short b { color: #ff7a5c; }
+.play-levels { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 5px; }
+.play-levels li { display: grid; grid-template-columns: 56px 1fr 28px; gap: 8px; align-items: center; }
+.play-levels li span { color: rgba(232, 238, 241, .75); }
+.play-levels li i { display: block; height: 6px; background: rgba(255, 255, 255, .08); }
+.play-levels li s { display: block; height: 100%; background: var(--c); box-shadow: 0 0 8px var(--c); text-decoration: none; }
+.play-levels li b { text-align: right; font-variant-numeric: tabular-nums; }
+.play-card.shut { opacity: .45; cursor: default; border-color: rgba(241, 244, 245, .15); }
+.play-card.short em { color: #ff9a7a; }
+
+/* a machine's panel: what it does, whether it runs, on and off, take it down, its cartridge */
+.play-machine { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(560px, calc(100vw - 32px)); max-height: 80vh; overflow: auto; padding: 16px 18px 14px; background: rgba(12, 14, 17, .92); border: 1px solid rgba(241, 244, 245, .14); color: #f1f4f5; }
+.play-machine h3 { margin: 0 0 6px; font-family: var(--font-setmix); font-size: 20px; font-weight: 700; }
+.play-machine p { margin: 0 0 12px; font-size: 13px; line-height: 1.45; color: rgba(232, 238, 241, .82); }
+.play-machine-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.play-machine button { padding: 8px 12px; background: rgba(255, 255, 255, .05); border: 1px solid rgba(241, 244, 245, .2); color: #f1f4f5; cursor: pointer; }
+.play-machine button:hover, .play-machine button:focus-visible { border-color: var(--power); outline: none; }
+.play-machine button.go { margin-top: 6px; background: var(--power); color: #101214; border-color: transparent; font-weight: 700; }
+.play-carts h4 { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: rgba(232, 238, 241, .6); }
+.play-carts > div { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin-bottom: 8px; }
+.play-carts button { display: grid; gap: 2px; text-align: left; }
+.play-carts button b { font-size: 13px; }
+.play-carts button span { font-size: 12px; color: rgba(232, 238, 241, .65); }
+.play-carts button.on { border-color: var(--power); background: rgba(255, 255, 255, .1); }

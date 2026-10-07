@@ -14,6 +14,9 @@ export const POST_FRAGMENT = /* glsl */ `
   /** The wave's front on the ground (metres from its centre; < 0 none, > 1e6 done), then on the sky (the sine of the elevation it
    *  has climbed to, from just below the horizon to the zenith): it never pops, it sweeps out to the horizon and up the sky. */
   uniform float uWaveR, uSkyRise, uGlitch, uTime, uLost;
+  /** The stage's look outside the wave (and everywhere when no wave runs), and the look the wave brings: x and y = one look pixel
+   *  in uv (the stage's resolution), z = colour levels (0 = all), w = 1 for stage 0's black-and-white dither. */
+  uniform vec4 uLookOut, uLookIn;
   varying vec2 vUv;
 
   float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
@@ -32,6 +35,23 @@ export const POST_FRAGMENT = /* glsl */ `
     vec4 v = uInvProj * vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
     v /= v.w;
     return (uCamWorld * v).xyz;
+  }
+  /** The planet at a stage's look: its pixels (cells of the picture), its colour levels, or stage 0's black and white. */
+  vec3 lookAt(vec4 look, vec2 uv){
+    vec2 cell = floor(uv / look.xy);
+    vec3 rgb = texture2D(uColour, (cell + 0.5) * look.xy).rgb;
+    if (look.w > 0.5) {
+      // stage 0: faint stars and haze drop to black; the ground's gentle middle tones are stretched apart, so lit and shaded
+      // slopes, stones and patches still read as land in one bit
+      float l = smoothstep(0.14, 0.6, dot(pow(rgb, vec3(1.0 / 2.2)), vec3(0.299, 0.587, 0.114)));
+      return mix(vec3(0.003, 0.0034, 0.004), vec3(0.74, 0.75, 0.72), step(bayer4(cell), l));
+    }
+    if (look.z > 0.0) {
+      // the early stages' few colour levels, posterised with the same ordered dither
+      vec3 c = floor(pow(rgb, vec3(1.0 / 2.2)) * look.z + bayer4(cell)) / look.z;
+      return pow(c, vec3(2.2));
+    }
+    return rgb;
   }
 
   void main(){
@@ -65,25 +85,10 @@ export const POST_FRAGMENT = /* glsl */ `
           front = smoothstep(0.07, 0.0, uSkyRise - ray.y);
         }
       }
-      if (inside > 0.5) {
-        // stage 1: colour at low resolution, gently posterised with the same dither
-        vec3 c = pow(fine.rgb, vec3(1.0 / 2.2));
-        c = floor(c * 10.0 + bayer4(px)) / 10.0;
-        // the wave's front: a band of light where the new look arrives
-        c += vec3(1.0, 0.24, 0.54) * front * 0.55;
-        gl_FragColor = vec4(pow(c, vec3(2.2)), 1.0);
-      } else {
-        // stage 0: black and white ordered dither, in pixels twice as big
-        vec2 cell = floor(px / 2.0);
-        vec3 coarse = texture2D(uColour, (cell * 2.0 + 1.0) / uRes).rgb;
-        float l = dot(pow(coarse, vec3(1.0 / 2.2)), vec3(0.299, 0.587, 0.114));
-        // faint stars and haze drop to black; the ground's gentle middle tones are stretched apart, so lit and shaded slopes,
-        // stones and patches still read as land in one bit
-        l = smoothstep(0.14, 0.6, l);
-        float on = step(bayer4(cell), l);
-        vec3 c = mix(vec3(0.003, 0.0034, 0.004), vec3(0.74, 0.75, 0.72), on);
-        gl_FragColor = vec4(c, 1.0);
-      }
+      // inside the wave the stage it brings, outside the stage the plot shows; the front is a band of light where the new look arrives
+      vec3 c = inside > 0.5 ? lookAt(uLookIn, uv) : lookAt(uLookOut, uv);
+      c += vec3(1.0, 0.24, 0.54) * front * inside * 0.32;
+      gl_FragColor = vec4(c, 1.0);
     }
     // static where sync is going, and a white-out when it is lost
     float n = hash(floor(px) + floor(uTime * 30.0));

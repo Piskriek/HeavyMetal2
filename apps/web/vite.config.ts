@@ -120,6 +120,8 @@ export default defineConfig(({ mode }) => ({
       '@hm/groundshader': p('../../packages/groundshader/src/index.ts'),
       '@hm/plume': p('../../packages/plume/src/index.ts'),
       '@hm/labkit': p('../../packages/labkit/src/index.ts'),
+      '@hm/plotsim': p('../../packages/plotsim/src/index.ts'),
+      '@hm/fieldkit': p('../../packages/fieldkit/src/index.ts'),
     },
   },
   build: { target: 'es2022', outDir: 'dist', emptyOutDir: true },

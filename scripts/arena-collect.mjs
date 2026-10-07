@@ -9,8 +9,12 @@ import { fileURLToPath } from 'node:url';
 const [pkg, file] = process.argv.slice(2);
 if (!pkg || !file) { console.error('usage: node scripts/arena-collect.mjs <package> <file>'); process.exit(2); }
 let data = JSON.parse(fs.readFileSync(file, 'utf8'));
-// the browser tool appends a note naming the page's origin after the value
-if (Array.isArray(data) && data[0] && typeof data[0].text === 'string') data = JSON.parse(data[0].text.replace(/\s*\(captured at origin [^)]*\)\s*$/, ''));
+// the browser tool appends a note naming the page's origin after the value (cut by position: a regex backtracks for minutes
+// over the 300k spaces of padding that make the tool save a result to a file)
+if (Array.isArray(data) && data[0] && typeof data[0].text === 'string') {
+  const t = data[0].text, note = t.lastIndexOf('(captured at origin');
+  data = JSON.parse(note >= 0 ? t.slice(0, note) : t);
+}
 if (typeof data === 'string') data = JSON.parse(data);
 const root = fileURLToPath(new URL(`../arena-gathered/${pkg}/`, import.meta.url));
 for (const answer of data.answers) {

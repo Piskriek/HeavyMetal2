@@ -1,10 +1,10 @@
-// The first Play (owner, 2026-10-07; STATUS SM22): the lab in first person, your human made there, the gate turned on,
-// the stage-0 planet looked round, the first machine placed and the plot lifted to stage 1. The scene is play-scene.ts,
-// the rules quest.ts; this screen loads them behind a bar, reads your keys and mouse, saves your progress and says what
-// to do next.
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+// Play (owner, 2026-10-07; STATUS SM22, SM30): the lab in first person, your human made there, the gate turned on, the stage-0
+// planet looked round, the first machine placed; then the plot's game loop (`@hm/plotsim`): mine ore, run power out, build the
+// machines whose pixels raise the plot's four fidelity metrics, and climb the six stages. The scene is play-scene.ts, the
+// tutorial quest.ts; this screen loads them behind a bar, reads your keys and mouse, runs the plot, saves, and says what to do.
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 import { deviceFor, type Stage } from '@hm/fidelity';
-import { VAULT_BY_ID } from '@hm/vault';
+import { VAULT, VAULT_BY_ID } from '@hm/vault';
 import { createAdaptiveQuality, parseQuality, type Quality } from '@hm/game';
 import { pixelRatioFor, resolveGraphics, type GraphicsSettings } from '@hm/render';
 import { noteTier, powerPreferenceOf, type Profile } from '../shell/profile';
@@ -14,7 +14,9 @@ import type { Plot } from '../crafter/planet';
 import { SMOOTH_IDS, smoothModel } from '../crafter/smooth-models';
 import { CreateGoblin } from '../avatar/create-goblin';
 import { createPlayScene, type Detail, type FrameOut, type PlayScene } from './play-scene';
-import { FRESH, SAVE_KEY, arrived, created, loadState, objective, placed, poweredOn, returned, type PlayState } from './quest';
+import { canPlace, KINDS, level, METRICS, network, place, rates, remove as removeMachine, running, setCartridge, setOn, step as stepPlot, type Env, type MachineKind, type Metric, type PlotState } from '@hm/plotsim';
+import { fx } from '../maker/feedback';
+import { FRESH, METRIC_COLOUR, METRIC_NAME, SAVE_KEY, arrived, created, loadState, objective, poweredOn, returned, withPlot, type PlayState } from './quest';
 import './play.css';
 
 /** Your plot's cartridge until the ground shader battle lands: sandy desert tones, the nearest in the vault to the concept art's stage 1. */
@@ -30,12 +32,34 @@ const NEIGHBOURS: readonly Plot[] = ([
 
 /** The ground's triangles by tier (the display governor changes it as you play). */
 const GROUND_BUDGET: Readonly<Record<Quality, number>> = { potato: 60000, low: 90000, medium: 200000, high: 200000, ultra: 280000 };
-const detailOf = (g: GraphicsSettings, q: Quality): Detail => ({ plumes: g.pixelPlumes, plumeDensity: g.plumeDensity, groundBudget: GROUND_BUDGET[q] });
+/** The most lines the planet is drawn at by tier: the later stages' resolution is capped on the light tiers, so they hold their frame rate. */
+const PLANET_LINES: Readonly<Record<Quality, number>> = { potato: 480, low: 720, medium: 1080, high: 1e5, ultra: 1e5 };
+const detailOf = (g: GraphicsSettings, q: Quality): Detail => ({ plumes: g.pixelPlumes, plumeDensity: g.plumeDensity, groundBudget: GROUND_BUDGET[q], planetLines: PLANET_LINES[q] });
+/** What each stage brings, for the toast when its wave has crossed the plot. */
+const STAGE_SAYS: readonly string[] = ['', 'Colour has reached your plot.', 'Shapes smooth out, textures sharpen.', 'Light: shading and a deeper sky.', 'Water and full detail.', 'Life takes hold.', 'Full fidelity: your plot is real.'];
 
 function loadSaved(): PlayState { try { return loadState(JSON.parse(localStorage.getItem(SAVE_KEY) ?? 'null')); } catch { return FRESH; } }
 function save(s: PlayState): void { try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); } catch { /* storage unavailable: progress lives for this visit */ } }
 
-interface Hud { readonly where: FrameOut['where']; readonly sync: number; readonly atLever: boolean; readonly ghost: FrameOut['ghost'] }
+/** The plot's numbers for the HUD. */
+interface PlotHud { readonly ore: number; readonly oreRate: number; readonly supply: number; readonly demand: number; readonly levels: Readonly<Record<Metric, number>>; readonly stage: number }
+interface Hud { readonly where: FrameOut['where']; readonly sync: number; readonly atLever: boolean; readonly ghost: FrameOut['ghost']; readonly aimed: number | null; readonly plot: PlotHud }
+const NO_PLOT: PlotHud = { ore: 0, oreRate: 0, supply: 0, demand: 0, levels: { pxd: 0, vtx: 0, lx: 0, aq: 0 }, stage: 0 };
+/** The build menu, in the order the plot needs them. */
+const BUILD_ORDER: readonly MachineKind[] = ['mill', 'drill', 'pylon', 'press', 'power', 'projector', 'water'];
+const BLURB: Readonly<Record<MachineKind, string>> = {
+  mill: 'Grinds ore into texture detail: pink pixels.', drill: 'Mines ore from the ground, best on rock and scree.', pylon: 'Carries power further out.',
+  press: 'Stamps the plot\'s shapes finer: green pixels.', power: 'Burns ore to make more power.', projector: 'Raises the light: amber pixels.',
+  water: 'Condenses water from gravel: cyan pixels.',
+};
+const signed = (v: number): string => `${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
+/** A preset cartridge's effect on a metric (the vault's affinity; 1 = none). */
+const affinityOf = (cartridge: string, metric: Metric): number => VAULT_BY_ID.get(cartridge)?.affinity[metric] ?? 1;
+/** The cartridges on your rack: the vault's presets your plot's stage has opened, the ones that help this metric first. */
+function cartridgesFor(metric: Metric, stage: number): readonly { readonly id: string; readonly name: string; readonly gain: number }[] {
+  return VAULT.filter((c) => c.minStage <= Math.max(1, stage)).map((c) => ({ id: c.id, name: c.name, gain: c.affinity[metric] ?? 1 }))
+    .sort((a, b) => b.gain - a.gain || a.name.localeCompare(b.name)).slice(0, 8);
+}
 const KEYS: readonly [string, string][] = [['W A S D', 'walk'], ['Mouse', 'look'], ['Shift', 'run'], ['E', 'use'], ['B', 'build'], ['Esc', 'pause']];
 
 export function PlayScreen(props: { readonly profile: Profile; readonly onBack: () => void }): ReactElement {
@@ -53,8 +77,16 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
   const pausedRef = useRef(false);
   useEffect(() => { pausedRef.current = paused; }, [paused]);
   const [menu, setMenu] = useState(false);
-  const [building, setBuilding] = useState(false);
-  const [hud, setHud] = useState<Hud>({ where: 'lab', sync: 1, atLever: false, ghost: null });
+  const [building, setBuilding] = useState<MachineKind | null>(null);
+  const [hud, setHud] = useState<Hud>({ where: 'lab', sync: 1, atLever: false, ghost: null, aimed: null, plot: NO_PLOT });
+  /** The machine whose panel is open (its plot id). */
+  const [panel, setPanel] = useState<number | null>(null);
+  /** Set while a menu takes the mouse: losing the pointer lock then does not pause. */
+  const quietRef = useRef(false);
+  /** The plot runs every frame here; the saved state catches up every few seconds and on events. */
+  const plotRef = useRef<PlotState>(state.plot);
+  const envRef = useRef<Env | null>(null);
+  const placeRef = useRef<((kind: MachineKind, x: number, z: number, yaw: number) => boolean) | null>(null);
   const [toast, setToast] = useState<{ readonly text: string; readonly sub: string; readonly id: number } | null>(null);
   const creating = state.step === 'create';
 
@@ -102,13 +134,31 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       }),
       ['Opening the lab', () => {
         scene.setPlanet(look(PLOT, 1), look(PLOT, 1), NEIGHBOURS.map((plot) => ({ plot, look: look(plot.cartridge, plot.stage) })));
-        scene.restore(stateRef.current);
+        env = { gate: scene.debug.gatePlanet(), plotRadius: 500, richness: (x, z) => scene.richness(x, z), affinity: affinityOf };
+        envRef.current = env;
+        plotRef.current = stateRef.current.plot;
+        scene.restore({ gateOn: stateRef.current.gateOn, plot: plotRef.current, running: running(plotRef.current, env), connected: network(plotRef.current, env).connected });
       }],
       ['Compiling shaders', () => { scene.warm(); }],
     ];
     const hook = { frames: 0, ready: false, step: stateRef.current.step, where: 'lab', sync: 1, wave: -1, triangles: 0, calls: 0, tier: tier as Quality };
     const keys = new Set<string>();
-    let dx = 0, dy = 0, cancelled = false, raf = 0, at = 0, timer = 0, last = performance.now(), hudAt = 0;
+    let dx = 0, dy = 0, cancelled = false, raf = 0, at = 0, timer = 0, last = performance.now(), hudAt = 0, savedAt = 0;
+    let env: Env | null = null;
+    /** Builds a machine if it may stand there: the plot pays, the scene shows it, and a stage it lifts sends the wave from it. */
+    const tryPlace = (kind: MachineKind, x: number, z: number, yaw: number): boolean => {
+      if (!env || scene.debug.where() !== 'planet') return false;
+      const before = plotRef.current;
+      if (!canPlace(before, env, kind, x, z).ok) return false;
+      const after = place(before, env, kind, x, z, yaw);
+      plotRef.current = after;
+      commit(withPlot(stateRef.current, after));
+      scene.setPlot(after, running(after, env), network(after, env).connected);
+      fx('mill-start');
+      if (after.stage > before.stage) scene.raiseStage(after.stage, { x, z });
+      return true;
+    };
+    placeRef.current = tryPlace;
     const onKey = (e: KeyboardEvent, down: boolean): void => { if (down) keys.add(e.code); else keys.delete(e.code); };
     const kd = (e: KeyboardEvent) => onKey(e, true), ku = (e: KeyboardEvent) => onKey(e, false);
     const onMove = (e: MouseEvent): void => { if (document.pointerLockElement === canvas) { dx += e.movementX; dy += e.movementY; } };
@@ -137,12 +187,29 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       if (out.event === 'powered') { s = poweredOn(s); say('The gate is on', 'Your plot is on the other side.'); }
       if (out.event === 'to-planet') { if (!s.visited) say('Stage 0', 'Black and white, and barely there. Your sync is running down.'); s = arrived(s); }
       if (out.event === 'to-lab') s = returned(s);
-      if (out.event === 'sync-lost') { s = returned(s); say('Sync lost', 'The gate pulled you back. Your sync refills in the lab.'); setBuilding(false); setMenu(false); }
-      if (out.event === 'stage-1') say('Stage 1', 'Colour has reached your plot.');
+      if (out.event === 'sync-lost') { s = returned(s); say('Sync lost', 'The gate pulled you back. Your sync refills in the lab.'); setBuilding(null); setMenu(false); }
+      if (out.event === 'stage-up') say(`Stage ${out.stage}`, STAGE_SAYS[out.stage] ?? '');
       if (s !== stateRef.current) commit(s);
+      // ---- the plot runs, in the lab too
+      if (env && stateRef.current.step !== 'create') {
+        const r = stepPlot(plotRef.current, env, dt);
+        plotRef.current = r.state;
+        for (const e of r.events) {
+          if (e.type === 'stage-up' && e.stage >= 2) scene.raiseStage(e.stage, env.gate);
+          if (e.type === 'ore-out') say('Out of ore', 'Build a rock drill on rocky ground.');
+          if (e.type === 'underpowered') say('Not enough power', 'Build a power unit, or switch a machine off.');
+        }
+        if (r.events.length || ms - savedAt > 5000) { savedAt = ms; commit(withPlot(stateRef.current, plotRef.current)); }
+        scene.setPlot(plotRef.current, running(plotRef.current, env), network(plotRef.current, env).connected);
+      }
       hook.frames += 1; hook.where = out.where; hook.sync = out.sync; hook.step = stateRef.current.step; hook.wave = scene.debug.wave();
       if (hook.frames % 30 === 0) Object.assign(hook, scene.debug.stats());
-      if (ms - hudAt > 90 || out.event) { hudAt = ms; setHud({ where: out.where, sync: out.sync, atLever: out.atLever, ghost: out.ghost }); }
+      if (ms - hudAt > 90 || out.event) {
+        hudAt = ms;
+        const p = plotRef.current, rt = env ? rates(p, env) : null;
+        const levels = { pxd: level(p, 'pxd'), vtx: level(p, 'vtx'), lx: level(p, 'lx'), aq: level(p, 'aq') };
+        setHud({ where: out.where, sync: out.sync, atLever: out.atLever, ghost: out.ghost, aimed: out.aimed, plot: { ore: p.ore, oreRate: rt?.ore ?? 0, supply: rt?.supply ?? 0, demand: rt?.demand ?? 0, levels, stage: p.stage } });
+      }
       raf = requestAnimationFrame(loop);
     };
     const step = (): void => {
@@ -156,12 +223,16 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
     };
     (window as unknown as { hmPlay?: unknown }).hmPlay = Object.assign(hook, {
       pull: () => scene.pullLever(),
-      go: (where: 'lab' | 'planet', x: number, z: number, yaw: number) => scene.debug.teleport(where, x, z, yaw),
+      go: (where: 'lab' | 'planet', x: number, z: number, yaw: number, pitch?: number) => scene.debug.teleport(where, x, z, yaw, pitch),
       gate: () => scene.debug.gatePlanet(),
       showGround: (on: boolean) => scene.debug.showGround(on),
-      placeAt: (x: number, z: number) => { const pm = scene.debug.placeAt(x, z); if (pm) commit(placed(stateRef.current, pm)); return !!pm; },
+      placeAt: (x: number, z: number, kind: MachineKind = 'mill') => { const g = scene.debug.gatePlanet(); return tryPlace(kind, x, z, Math.atan2(x - g.x, z - g.z)); },
+      plot: () => plotRef.current,
+      give: (ore: number) => { plotRef.current = { ...plotRef.current, ore: plotRef.current.ore + ore }; },
+      machines: () => scene.debug.machines(),
       state: () => stateRef.current,
       detail: () => scene.debug.detail(),
+      raise: (to: number) => scene.raiseStage(to, scene.debug.gatePlanet()),
     });
     setLoading(steps[0]![0]);
     timer = window.setTimeout(step, 30);
@@ -182,7 +253,8 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
     const onLock = (): void => {
       const on = document.pointerLockElement === canvasRef.current;
       setLocked(on);
-      if (!on && ready && !creating) setPaused(true);
+      if (!on && ready && !creating && !quietRef.current) setPaused(true);
+      quietRef.current = false;
     };
     document.addEventListener('pointerlockchange', onLock);
     return () => document.removeEventListener('pointerlockchange', onLock);
@@ -194,18 +266,31 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
 
   // ---- the keys that do things: E uses, B builds, Esc steps back
   const placeNow = useCallback(() => {
-    const pm = sceneRef.current?.place();
-    if (!pm) return;
-    commit(placed(stateRef.current, pm));
-    setBuilding(false);
-    say('Texture mill running', 'Watch the colour spread from it.');
-  }, [commit, say]);
+    const at = sceneRef.current?.aim();
+    if (!at || !building) return;
+    if (!placeRef.current?.(building, at.x, at.z, at.yaw)) return;
+    const name = KINDS[building].name;
+    setBuilding(null);
+    sceneRef.current?.setBuilding(null);
+    say(`${name} built`, KINDS[building].emits ? 'Watch its pixels pour while it runs.' : BLURB[building]);
+  }, [building, say]);
+  const stopBuilding = useCallback(() => { setBuilding(null); sceneRef.current?.setBuilding(null); }, []);
+  /** Frees the mouse for a menu without pausing the game. */
+  const freeMouse = useCallback(() => { if (document.pointerLockElement) { quietRef.current = true; document.exitPointerLock(); } }, []);
+  /** Changes the plot from a menu: the plot, the save and the scene follow at once. */
+  const changePlot = useCallback((next: PlotState) => {
+    const env = envRef.current;
+    plotRef.current = next;
+    commit(withPlot(stateRef.current, next));
+    if (env) sceneRef.current?.setPlot(next, running(next, env), network(next, env).connected);
+  }, [commit]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (!ready || creating) return;
       if (e.code === 'Escape') {
-        if (building) { setBuilding(false); sceneRef.current?.setBuilding(false); return; }
+        if (building) { stopBuilding(); return; }
         if (menu) { setMenu(false); return; }
+        if (panel !== null) { setPanel(null); return; }
         if (!locked) setPaused((p) => !p);
         return;
       }
@@ -213,28 +298,36 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       if (e.code === 'KeyE') {
         if (building) placeNow();
         else if (hud.atLever) sceneRef.current?.pullLever();
+        else if (hud.aimed !== null && panel === null) { setPanel(hud.aimed); setMenu(false); freeMouse(); }
       }
       if (e.code === 'KeyB' && hud.where === 'planet') {
-        if (building) { setBuilding(false); sceneRef.current?.setBuilding(false); } else setMenu((m) => !m);
+        if (building) stopBuilding(); else { setPanel(null); setMenu((m) => { if (!m) freeMouse(); return !m; }); }
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [ready, creating, building, menu, locked, paused, hud.atLever, hud.where, placeNow]);
+  }, [ready, creating, building, menu, panel, locked, paused, hud.atLever, hud.aimed, hud.where, placeNow, stopBuilding, freeMouse]);
   useEffect(() => {
     const onClick = (): void => { if (building && locked) placeNow(); };
     window.addEventListener('mousedown', onClick);
     return () => window.removeEventListener('mousedown', onClick);
   }, [building, locked, placeNow]);
   // leaving the planet closes the build menu
-  useEffect(() => { if (hud.where === 'lab') { setMenu(false); setBuilding(false); sceneRef.current?.setBuilding(false); } }, [hud.where]);
+  useEffect(() => { if (hud.where === 'lab') { setMenu(false); setPanel(null); stopBuilding(); } }, [hud.where, stopBuilding]);
 
-  const startBuilding = (): void => { setMenu(false); setBuilding(true); sceneRef.current?.setBuilding(true); if (!locked) lock(); };
-  const goal = objective(state, hud.where);
+  const startBuilding = (kind: MachineKind): void => {
+    setMenu(false);
+    setBuilding(kind);
+    const env = envRef.current;
+    sceneRef.current?.setBuilding(kind, env ? (x, z) => { const v = canPlace(plotRef.current, env, kind, x, z); return v.ok ? { ok: true, why: '' } : v; } : undefined);
+    if (!locked) lock();
+  };
+  const goal = objective({ ...state, plot: plotRef.current }, hud.where);
   const syncLit = Math.ceil(hud.sync * SYNC_BLOCKS);
   const prompt = building
-    ? (hud.ghost?.ok ? 'Click or E: place the texture mill' : hud.ghost?.why ?? 'Aim at the ground near the gate.')
-    : hud.atLever ? 'E: pull the main lever' : '';
+    ? (hud.ghost?.ok ? `Click or E: build the ${KINDS[building].name.toLowerCase()}` : hud.ghost?.why || 'Aim at the ground near the gate.')
+    : hud.atLever ? 'E: pull the main lever'
+    : hud.aimed !== null && panel === null ? `E: open the ${KINDS[plotRef.current.machines.find((x) => x.id === hud.aimed)?.kind ?? 'mill'].name.toLowerCase()}` : '';
 
   return (
     <div className={`play${ready ? ' ready' : ''}${hud.where === 'planet' ? ' on-planet' : ''}${hud.sync < 0.3 && hud.where === 'planet' ? ' sync-low' : ''}`}>
@@ -263,18 +356,71 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
           ) : null}
           <i className="play-dot" aria-hidden="true" />
           {prompt ? <p className={`play-prompt${building && !hud.ghost?.ok ? ' bad' : ''}`}>{prompt}</p> : null}
+          {state.step === 'build' || state.step === 'done' ? (
+            <section className="play-plot" aria-label="Your plot">
+              <p className="play-ore"><b>{Math.floor(hud.plot.ore)}</b> ore <span>{signed(hud.plot.oreRate)}/s</span></p>
+              <p className={`play-power${hud.plot.demand > hud.plot.supply + 1e-6 ? ' short' : ''}`}><b>{hud.plot.demand.toFixed(0)}</b> of {hud.plot.supply.toFixed(0)} kW</p>
+              <ul className="play-levels">
+                {METRICS.map((m) => (
+                  <li key={m} style={{ '--c': METRIC_COLOUR[m] } as CSSProperties}>
+                    <span>{METRIC_NAME[m]}</span><i><s style={{ width: `${Math.min(100, hud.plot.levels[m])}%` }} /></i><b>{Math.floor(hud.plot.levels[m])}</b>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
           {menu ? (
             <section className="play-build" aria-label="Build">
               <h3>Build</h3>
-              <button className="play-card" onClick={startBuilding} autoFocus>
-                <b>Texture mill</b>
-                <span>Grinds rock into texture detail: pink pixels that bring colour to your plot.</span>
-                <em>{state.machines.length === 0 ? 'Free: your first machine' : 'Free while you learn'}</em>
-              </button>
-              <p>Place it within 30 m of the gate: its cable runs from the gate&rsquo;s junction box.</p>
+              <div className="play-cards">
+                {BUILD_ORDER.map((k) => {
+                  const spec = KINDS[k], shut = hud.plot.stage < spec.unlock, short = hud.plot.ore < spec.cost;
+                  return (
+                    <button key={k} className={`play-card${shut ? ' shut' : ''}${short ? ' short' : ''}`} disabled={shut} onClick={() => startBuilding(k)} autoFocus={k === 'mill'}>
+                      <b>{spec.name}</b>
+                      <span>{BLURB[k]}</span>
+                      <em>{shut ? `Unlocks at stage ${spec.unlock}` : `${spec.cost} ore`}</em>
+                    </button>
+                  );
+                })}
+              </div>
+              <p>Machines run on power from the gate&rsquo;s junction box or a relay pylon; most use ore, which rock drills mine.</p>
             </section>
           ) : null}
-          {!locked && !paused ? (
+          {panel !== null ? (() => {
+            const mm = plotRef.current.machines.find((x) => x.id === panel);
+            const env = envRef.current;
+            if (!mm || !env) return null;
+            const spec = KINDS[mm.kind], metric = spec.emits;
+            const run = running(plotRef.current, env).get(mm.id) ?? 0, net = network(plotRef.current, env);
+            const status = !mm.on ? 'Switched off.' : !net.connected.has(mm.id) ? 'No power: out of reach of the network. Build a relay pylon closer.'
+              : run > 0.95 ? 'Running.' : run > 0.05 ? `Running at ${Math.round(run * 100)}%: short of ${net.satisfaction < 0.99 ? 'power' : 'ore'}.` : spec.oreUse > 0 && plotRef.current.ore <= 0 ? 'Idle: no ore. Build a rock drill.' : 'Idle.';
+            const close = (): void => { setPanel(null); lock(); };
+            return (
+              <section className="play-machine" aria-label={spec.name}>
+                <h3>{spec.name}</h3>
+                <p>{BLURB[mm.kind]} {status}</p>
+                <div className="play-machine-actions">
+                  <button onClick={() => changePlot(setOn(plotRef.current, mm.id, !mm.on))}>{mm.on ? 'Switch off' : 'Switch on'}</button>
+                  <button onClick={() => { changePlot(removeMachine(plotRef.current, mm.id)); setPanel(null); lock(); }}>Take it down (+{Math.floor(spec.cost / 2)} ore)</button>
+                </div>
+                {spec.slot && metric ? (
+                  <div className="play-carts">
+                    <h4>Cartridge: a preset from your rack shapes what it pours</h4>
+                    <div>
+                      {cartridgesFor(metric, plotRef.current.stage).map((c) => (
+                        <button key={c.id} className={mm.cartridge === c.id ? 'on' : ''} onClick={() => changePlot(setCartridge(plotRef.current, mm.id, mm.cartridge === c.id ? null : c.id))}>
+                          <b>{c.name}</b><span>{c.gain === 1 ? 'no effect on' : `${c.gain > 1 ? '+' : ''}${Math.round((c.gain - 1) * 100)}%`} {METRIC_NAME[metric]}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                <button className="go" onClick={close} autoFocus>Back to the plot</button>
+              </section>
+            );
+          })() : null}
+          {!locked && !paused && panel === null && !menu ? (
             <button className="play-start" onClick={lock}>
               <b>Click to look around</b>
               <span className="play-keys">{KEYS.map(([k, what]) => <span key={k}><kbd>{k}</kbd>{what}</span>)}</span>

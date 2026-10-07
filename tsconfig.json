@@ -324,6 +324,12 @@
       "@hm/labkit": [
         "packages/labkit/src/index.ts"
       ],
+      "@hm/plotsim": [
+        "packages/plotsim/src/index.ts"
+      ],
+      "@hm/fieldkit": [
+        "packages/fieldkit/src/index.ts"
+      ],
       "@hm/fidelity": [
         "packages/fidelity/src/index.ts"
       ]

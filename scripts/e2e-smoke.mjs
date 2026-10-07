@@ -130,17 +130,20 @@ try {
   if (edge) { await page.evaluate((p) => { window.hmPinView = { eye: [p[0] + 2.2, p[1] + 2.4, p[2] + 2.2], target: [p[0], p[1], p[2]] }; }, edge); await page.waitForTimeout(T(800)); await shot('flat-shore'); await page.evaluate(() => { window.hmPinView = null; }); }
   // the dither does not flicker as you move (owner, 2026-10-04): two pictures of the far shore, the camera 3 cm apart, differ little
   if (edge) {
-    const pics = [];
-    for (const d of [0, 0.03]) {
-      await page.evaluate(([p, dd]) => { window.hmPinView = { eye: [p[0] + 9 + dd, p[1] + 6, p[2] + 9], target: [p[0], p[1], p[2]] }; }, [edge, d]);
-      await page.waitForTimeout(T(600));
-      pics.push(PNG.sync.read(await page.screenshot({ clip: { x: 440, y: 280, width: 400, height: 160 } })));
-    }
+    const far = (dd) => page.evaluate(([p, d]) => { window.hmPinView = { eye: [p[0] + 9 + d, p[1] + 6, p[2] + 9], target: [p[0], p[1], p[2]] }; }, [edge, dd]);
+    const pic = async () => PNG.sync.read(await page.screenshot({ clip: { x: 440, y: 280, width: 400, height: 160 } }));
+    const change = (a, b) => { let d = 0; for (let i = 0; i < a.data.length; i += 4) d += Math.abs(a.data[i] - b.data[i]) + Math.abs(a.data[i + 1] - b.data[i + 1]) + Math.abs(a.data[i + 2] - b.data[i + 2]); return d / (a.width * a.height * 3); };
+    // the far view settles first (its ground streaming in, the camera arriving): a still camera gives the same picture twice.
+    // Measured before it settled, a still camera changed by 85 and the check failed on a cold PC; settled it is 0.01 still, 4.1 moved
+    await far(0);
+    let p0 = await pic(), still = Infinity;
+    for (let i = 0; i < 16 && still >= 1; i++) { await page.waitForTimeout(T(500)); const q = await pic(); still = change(p0, q); p0 = q; }
+    await far(0.03);
+    await page.waitForTimeout(T(600));
+    const p1 = await pic();
     await page.evaluate(() => { window.hmPinView = null; });
-    const [p0, p1] = pics; let diff = 0;
-    for (let i = 0; i < p0.data.length; i += 4) diff += Math.abs(p0.data[i] - p1.data[i]) + Math.abs(p0.data[i + 1] - p1.data[i + 1]) + Math.abs(p0.data[i + 2] - p1.data[i + 2]);
-    diff /= p0.width * p0.height * 3;
-    console.log(`     dither flicker: ${diff.toFixed(2)} (mean colour change, 0..255, the camera moved 3 cm)`);
+    const diff = change(p0, p1);
+    console.log(`     dither flicker: ${diff.toFixed(2)} (mean colour change, 0..255, the camera moved 3 cm; a still camera ${still.toFixed(2)})`);
     check('the far dither does not shimmer as you move (filtered: it was 10.4 before)', diff < 7, diff.toFixed(2));
     if (shotDir) { fs.writeFileSync(`${shotDir}/flicker-a.png`, PNG.sync.write(p0)); fs.writeFileSync(`${shotDir}/flicker-b.png`, PNG.sync.write(p1)); }
   }
@@ -709,14 +712,43 @@ try {
   await page.waitForFunction(() => window.hmPlay.where === 'planet', null, { timeout: T(8000) });
   check('a mill too far from the gate is refused', await dom(() => { const g = window.hmPlay.gate(); return !window.hmPlay.placeAt(g.x + 60, g.z); }));
   check('the first mill stands near the gate', await dom(() => { const g = window.hmPlay.gate(); return window.hmPlay.placeAt(g.x + 7, g.z + 5); }));
-  check('the first machine lifts the plot to stage 1', await dom(() => window.hmPlay.state().step === 'done' && window.hmPlay.state().stage === 1));
+  check('the first machine lifts the plot to stage 1', await dom(() => window.hmPlay.state().step === 'done' && window.hmPlay.plot().stage === 1));
+  // the plot's game loop (STATUS SM30): a drill mines ore, a press needs stage 1, the build menu lists every machine
+  check('a rock drill stands on the plot and mines ore', await dom(() => { const g = window.hmPlay.gate(); return window.hmPlay.placeAt(g.x - 8, g.z + 6, 'drill'); }));
+  const oreBefore = await dom(() => window.hmPlay.plot().ore);
+  await page.waitForTimeout(T(3000));
+  check('ore rises while the drill runs', await dom(() => window.hmPlay.plot().ore) > oreBefore, String(oreBefore));
+  check('the shape press is unlocked at stage 1 and runs', await dom(() => { window.hmPlay.give(100); const g = window.hmPlay.gate(); return window.hmPlay.placeAt(g.x + 12, g.z - 4, 'press'); }));
+  await page.waitForTimeout(T(1500));
+  check('both pixel machines pour their pixels', await dom(() => window.hmPlay.machines().pouring === 2 && window.hmPlay.machines().standing === 3));
+  await page.keyboard.press('KeyB');
+  check('the build menu lists the seven machines, the later ones locked', await dom(() => document.querySelectorAll('.play-card').length === 7 && document.querySelectorAll('.play-card.shut').length === 2));
+  await page.keyboard.press('KeyB');
+  check('the plot HUD shows ore, power and the four levels', await dom(() => /ore/.test(document.querySelector('.play-ore')?.textContent ?? '') && document.querySelectorAll('.play-levels li').length === 4));
+  // the machine panel (E on a machine you look at): switch it off and on, put a cartridge from the rack in
+  await dom(() => { const g = window.hmPlay.gate(); window.hmPlay.go('planet', g.x + 12, g.z - 0.5, 0, -0.15); });
+  await page.waitForTimeout(T(500));
+  await page.keyboard.press('KeyE');
+  await page.waitForSelector('.play-machine', { timeout: T(5000) }).catch(() => null);
+  check('E on a machine opens its panel', await dom(() => document.querySelector('.play-machine h3')?.textContent === 'Shape press'));
+  const pressOn = () => dom(() => window.hmPlay.plot().machines.find((m) => m.kind === 'press')?.on);
+  const panelButton = (label) => dom((l) => { [...document.querySelectorAll('.play-machine button')].find((b) => b.textContent === l)?.click(); }, label);
+  await panelButton('Switch off');
+  const wasOff = await pressOn();
+  await panelButton('Switch on');
+  check('the panel switches the machine off and on', wasOff === false && await pressOn() === true, String(wasOff));
+  await dom(() => document.querySelector('.play-carts button')?.click());
+  check('a cartridge from the rack goes in', await dom(() => !!window.hmPlay.plot().machines.find((m) => m.kind === 'press')?.cartridge));
+  await panelButton('Back to the plot');
+  await page.waitForTimeout(T(200));
+  check('Back to the plot closes the panel', await page.locator('.play-machine').count() === 0);
   await page.waitForFunction(() => window.hmPlay.wave > 1e6, null, { timeout: T(40000) });
   check('the wave crosses the plot', true);
   // the display governor may have changed the tier by now: the stage's look stays, the plume follows the tier
-  const detail = await dom(() => ({ ...window.hmPlay.detail(), tier: window.hmPlay.tier }));
+  const detail = await dom(() => ({ ...window.hmPlay.detail(), tier: window.hmPlay.tier, pouring: window.hmPlay.machines().pouring }));
   check('stage 1 is drawn about 240 lines tall, whatever the tier', detail.planet[1] >= 200 && detail.planet[1] <= 280, JSON.stringify(detail));
   const tierWay = detail.tier === 'potato' ? 'dither' : 'cubes';
-  check('the plume is drawn the way the tier asks, with as many pixels as it asks', detail.plumes === tierWay && detail.pixels === Math.floor(220 * detail.plumeDensity + 1e-6), JSON.stringify(detail));
+  check('the plume is drawn the way the tier asks, with as many pixels as it asks', detail.plumes === tierWay && detail.pixels === detail.pouring * Math.floor(220 * detail.plumeDensity + 1e-6), JSON.stringify(detail));
   await shot('play-stage-1');
   await page.keyboard.press('Escape');
   await page.waitForSelector('.play-pause', { timeout: T(5000) });

@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CABLE_REACH, FRESH, SYNC_SECONDS, arrived, created, loadState, objective, placeCheck, placed, poweredOn, returned, stepSync } from './quest';
+import { place, type Env } from '@hm/plotsim';
+import { FRESH, SYNC_SECONDS, arrived, created, loadState, objective, poweredOn, returned, stepSync, withPlot } from './quest';
+
+const env: Env = { gate: { x: 0, z: 0 }, plotRadius: 500, richness: () => 0.8 };
 
 test('the first Play runs create, power, explore, build, done', () => {
   let s = FRESH;
@@ -15,10 +18,13 @@ test('the first Play runs create, power, explore, build, done', () => {
   assert.equal(returned(s).step, 'explore');
   s = returned(arrived(s));
   assert.equal(s.step, 'build');
-  s = placed(s, { kind: 'texture-mill', x: 8, z: 3, yaw: 0 });
+  // a drill first does not end the tutorial; the first pixel machine (stage 1) does
+  s = withPlot(s, place(s.plot, env, 'drill', -9, 3, 0));
+  assert.equal(s.step, 'build');
+  s = withPlot(s, place(s.plot, env, 'mill', 8, 3, 0));
   assert.equal(s.step, 'done');
-  assert.equal(s.stage, 1);
-  assert.equal(s.machines.length, 1);
+  assert.equal(s.plot.stage, 1);
+  assert.equal(s.plot.machines.length, 2);
 });
 
 test('a save is checked: nothing odd traps a player', () => {
@@ -28,11 +34,12 @@ test('a save is checked: nothing odd traps a player', () => {
   const noHuman = loadState({ step: 'build', gateOn: true, stage: 1 });
   assert.equal(noHuman.step, 'create');
   assert.equal(noHuman.gateOn, false);
-  const good = loadState({ v: 1, step: 'done', avatarId: 'a', visited: true, stage: 9, machines: [{ kind: 'texture-mill', x: 5, z: 6, yaw: 1 }, { kind: 'chimney' }, 4] });
-  assert.equal(good.stage, 6);
-  assert.equal(good.gateOn, true);
-  assert.deepEqual(good.machines, [{ kind: 'texture-mill', x: 5, z: 6, yaw: 1 }]);
-  assert.deepEqual(loadState(JSON.parse(JSON.stringify(good))), good);
+  // a first-version save (a list of texture mills and a stage) becomes the plot's mills at that stage
+  const old = loadState({ v: 1, step: 'done', avatarId: 'a', visited: true, stage: 9, machines: [{ kind: 'texture-mill', x: 5, z: 6, yaw: 1 }, { kind: 'chimney' }, 4] });
+  assert.equal(old.plot.stage, 6);
+  assert.equal(old.gateOn, true);
+  assert.deepEqual(old.plot.machines.map((m) => [m.kind, m.x, m.z, m.yaw]), [['mill', 5, 6, 1]]);
+  assert.deepEqual(loadState(JSON.parse(JSON.stringify(old))), old);
 });
 
 test('every step tells you what to do, in the lab and on the planet', () => {
@@ -41,6 +48,9 @@ test('every step tells you what to do, in the lab and on the planet', () => {
     assert.ok(o.title.length > 0 && o.hint.length > 0);
   }
   assert.notEqual(objective({ ...FRESH, step: 'explore' }, 'lab').title, objective({ ...FRESH, step: 'explore' }, 'planet').title);
+  // after the tutorial, the next stage's needs
+  const done = withPlot({ ...FRESH, step: 'build' }, place(FRESH.plot, env, 'mill', 8, 3, 0));
+  assert.match(objective(done, 'planet').hint, /Stage 2 needs texture 15, shape 10/);
 });
 
 test('sync drains on the planet in about a minute and refills in the lab', () => {
@@ -52,13 +62,4 @@ test('sync drains on the planet in about a minute and refills in the lab', () =>
   assert.ok(stepSync(0.5, 1, { onPlanet: true, stage: 1, nearMachine: true }) > 0.5);
   const away = 0.5 - stepSync(0.5, 1, { onPlanet: true, stage: 1, nearMachine: false });
   assert.ok(away > 0 && away < 1 / SYNC_SECONDS);
-});
-
-test('a machine stands near the gate, in cable reach, apart from others', () => {
-  const gate = { x: 0, z: 0 };
-  assert.equal(placeCheck(1, 1, gate, []).ok, false);
-  assert.equal(placeCheck(CABLE_REACH + 1, 0, gate, []).ok, false);
-  assert.equal(placeCheck(10, 0, gate, []).ok, true);
-  assert.equal(placeCheck(10, 0, gate, [{ kind: 'texture-mill', x: 11, z: 1, yaw: 0 }]).ok, false);
-  assert.ok(placeCheck(40, 0, gate, []).why.length > 0);
 });

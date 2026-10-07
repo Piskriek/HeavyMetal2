@@ -8,13 +8,15 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { StageLook } from '../crafter/looks';
 import { createWorld, PLANET_DIR, SUN, type Neighbour, type World } from '../crafter/world';
-import { createPlume, METRIC_COLOURS, type PlumeMode } from '@hm/plume';
+import { createPlume, type PlumeMode } from '@hm/plume';
+import { GATE, KINDS, type Machine, type MachineKind, type PlotState } from '@hm/plotsim';
 import { createPlotGround, type PlotGround } from './plot-ground';
 import { fx as sfx } from '../maker/feedback';
 import * as kit from '@hm/labkit';
 import { createLabRoom, GATE_AT, POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, ROOM, type LabRoom } from './lab-room';
 import { COLOUR_MARK_FRAGMENT, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_VERTEX, POST_FRAGMENT, QUAD_VERTEX } from './portal-shaders';
-import { CABLE_REACH, MACHINE_FIELD, placeCheck, stepSync, type PlacedMachine } from './quest';
+import { MACHINE_FIELD, METRIC_COLOUR, stepSync } from './quest';
+import { disposeProp, lineSpan, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
 
 export type Where = 'lab' | 'planet';
 /** What the screen gives the scene each frame. */
@@ -33,20 +35,33 @@ export interface FrameOut {
   readonly atLever: boolean;
   /** The build ghost's verdict, when building. */
   readonly ghost: { readonly ok: boolean; readonly why: string } | null;
-  /** Something happened this frame. */
-  readonly event: 'to-planet' | 'to-lab' | 'sync-lost' | 'powered' | 'stage-1' | null;
+  /** The machine you are looking at, close enough to use (its plot id), when not building. */
+  readonly aimed: number | null;
+  /** The stage the picture shows (a wave brings the next one across the plot). */
+  readonly stage: number;
+  /** Something happened this frame ('stage-up': a wave has finished bringing `stage`). */
+  readonly event: 'to-planet' | 'to-lab' | 'sync-lost' | 'powered' | 'stage-up' | null;
 }
 
 /** What the display governor and Settings change while you play: how the machines' pixels are drawn, and the ground's triangles. */
-export interface Detail { readonly plumes: PlumeMode; readonly plumeDensity: number; readonly groundBudget: number }
+export interface Detail {
+  readonly plumes: PlumeMode; readonly plumeDensity: number; readonly groundBudget: number;
+  /** The most lines the planet is drawn at (the later stages' resolution is capped on the light tiers). */
+  readonly planetLines: number;
+}
 
 const EYE = 1.68, RADIUS = 0.3, WALK = 3.0, RUN = 5.6;
 /**
- * Stage 1 draws the planet about 240 lines tall, like a 1990s 3D game (stage 0 doubles its pixels again in the post pass): the stage's
- * look, whatever the screen, the window or the tier. The planet's picture is a whole fraction of the drawn picture, so each of its
- * pixels covers the same number of drawn ones.
+ * Each stage's look (the stages raise the resolution of one natural world): how many lines tall the planet is drawn, its colour
+ * levels (0 = all) and stage 0's black-and-white dither. Stage 1 is about 240 lines, like a 1990s 3D game, whatever the screen; a
+ * look's pixels are whole screen pixels, so the grid never shimmers. The planet's picture is drawn at a whole fraction of the screen,
+ * as fine as the finest look shown and never coarser than stage 1.
  */
-const PLANET_LINES = 240;
+const STAGE_LOOK: readonly { readonly lines: number; readonly levels: number; readonly dither: boolean }[] = [
+  { lines: 120, levels: 0, dither: true }, { lines: 240, levels: 10, dither: false }, { lines: 360, levels: 16, dither: false }, { lines: 480, levels: 28, dither: false },
+  { lines: 720, levels: 0, dither: false }, { lines: 1080, levels: 0, dither: false }, { lines: 1e5, levels: 0, dither: false },
+];
+const BASE_LINES = 240;
 /**
  * The wave never pops (owner, 2026-10-07: "the hill and the sky popped"): its front crosses your plot at a walk-and-a-half, then
  * races out ever faster over the plains and the neighbours to the horizon (the ground ends about 4.5 km from the gate), then climbs
@@ -66,14 +81,20 @@ const MILL_POUR = { count: 220, height: 7.5, spread: 4.5 };
 export interface PlayScene {
   /** Puts the planet in place (once, after its looks are baked). */
   setPlanet(base: StageLook, plot: StageLook, neighbours: readonly Neighbour[]): void;
-  /** The saved state, applied at once: the gate on or off, the machines standing, the stage reached. */
-  restore(o: { readonly gateOn: boolean; readonly machines: readonly PlacedMachine[]; readonly stage: number }): void;
+  /** The saved state, applied at once: the gate on or off, the plot's machines standing (already running), its stage. */
+  restore(o: { readonly gateOn: boolean; readonly plot: PlotState; readonly running: ReadonlyMap<number, number>; readonly connected: ReadonlySet<number> }): void;
+  /** The plot as it is now: machines built or removed appear or go (with their cables), running ones pour their pixels. */
+  setPlot(plot: PlotState, running: ReadonlyMap<number, number>, connected: ReadonlySet<number>): void;
+  /** Ore in the ground at x, z, 0..1 (rock and scree rich, dust poor): the drills' richness. */
+  richness(x: number, z: number): number;
   /** Throws the main lever: the power-on sequence runs, then a 'powered' event. */
   pullLever(): void;
-  /** Shows or hides the build ghost (a texture mill), on the planet. */
-  setBuilding(on: boolean): void;
-  /** Places the ghost's machine if it may stand there: the cable runs, it starts, and the first one sends the wave. */
-  place(): PlacedMachine | null;
+  /** Shows the build ghost of a machine (null hides it), on the planet; `check` says whether it may stand where it is aimed. */
+  setBuilding(kind: MachineKind | null, check?: (x: number, z: number) => { readonly ok: boolean; readonly why: string }): void;
+  /** Where the ghost stands, facing the gate, if it may stand there. */
+  aim(): { readonly x: number; readonly z: number; readonly yaw: number } | null;
+  /** The plot reached a stage: a wave from `from` (ground x, z) brings its look across the plot, out to the horizon and up the sky. */
+  raiseStage(to: number, from: { readonly x: number; readonly z: number }): void;
   frame(now: number, dt: number, c: Controls): FrameOut;
   resize(width: number, height: number, pixelRatio: number): void;
   /** The live detail (the display governor's tier, with your own Settings on top). */
@@ -85,12 +106,12 @@ export interface PlayScene {
   warm(): void;
   /** For the tests and the e2e: where you are, and a way to stand somewhere. */
   readonly debug: {
-    groundTriangles(): number; showGround(on: boolean): void; where(): Where; position(): THREE.Vector3; teleport(where: Where, x: number, z: number, yaw: number): void; sync(): number;
+    groundTriangles(): number; showGround(on: boolean): void; where(): Where; position(): THREE.Vector3; teleport(where: Where, x: number, z: number, yaw: number, pitch?: number): void; sync(): number;
     stats(): { readonly triangles: number; readonly calls: number }; wave(): number; gatePlanet(): { x: number; z: number };
     /** The detail in use, the planet picture's size, and the pixels each machine pours now. */
     detail(): Detail & { readonly planet: readonly [number, number]; readonly pixels: number };
-    /** Places a mill at x, z as if the ghost stood there (the e2e has no mouse to aim with). */
-    placeAt(x: number, z: number): PlacedMachine | null;
+    /** Machines standing on the plot, and how many pour pixels now. */
+    machines(): { readonly standing: number; readonly pouring: number };
   };
   dispose(): void;
 }
@@ -159,8 +180,13 @@ export function createPlayScene(o: {
     return ground ? ground.heightAt(x, z) : 0;
   };
 
-  // machines: the mill, its cable from the gate's junction box, and the pink pixels from its stack
-  const machines: { readonly m: PlacedMachine; readonly stack: THREE.Vector3; readonly power: THREE.Vector3 }[] = [];
+  // ---- the plot's machines (`@hm/plotsim`): each a prop (machine-props.ts) on the ground, its cable from the node that powers it,
+  // the lines between pylons, and the pixels pouring from every pixel machine that runs (one plume for all, `@hm/plume`)
+  interface MachineView { readonly m: Machine; prop: MachineProp; vent: THREE.Vector3 | null; emitter: number | null; running: number }
+  const views = new Map<number, MachineView>();
+  let cables: THREE.Mesh[] = [];
+  /** The detail the props are built at: chunky low poly until the plot shows stage 2. */
+  let propStage = 1;
   let detail: Detail = o.detail;
   // every machine's pixels in one plume (`@hm/plume`, one draw call): drawn as the tier asks, always in colour (alpha 0.5 marks them)
   const plume = createPlume({ mode: detail.plumes, density: detail.plumeDensity, markAlpha: 0.5 });
@@ -168,39 +194,87 @@ export function createPlayScene(o: {
   planetScene.add(plume.object);
   keep(plume);
   const cableMat = m.rubber;
-  const millGroups: THREE.Group[] = [];
-  const addMachine = (pm: PlacedMachine, now: number, animate: boolean): void => {
-    const mill = kit.textureMill(m, { stage: 1 });
-    const y = groundAt(pm.x, pm.z);
-    mill.group.position.set(pm.x, y - 0.05, pm.z);
-    mill.group.rotation.y = pm.yaw;
-    planetScene.add(mill.group);
-    millGroups.push(mill.group);
-    mill.group.updateMatrixWorld(true);
-    const at = (name: string) => new THREE.Vector3(...mill.sockets.find((s) => s.name === name)!.at).applyMatrix4(mill.group.matrixWorld);
-    const stack = at('stack'), power = at('power');
-    // the cable lies on the ground from the junction box to the mill's gland
-    const from = new THREE.Vector3(...twin.sockets.find((s) => s.name === 'rear-junction')!.at).applyMatrix4(twin.group.matrixWorld);
-    const pts: THREE.Vector3[] = [];
-    const n = Math.max(6, Math.ceil(from.distanceTo(power) / 0.8));
-    for (let i = 0; i <= n; i++) {
-      const t = i / n, x = from.x + (power.x - from.x) * t, z = from.z + (power.z - from.z) * t;
-      const lift = i === 0 ? from.y : i === n ? power.y : groundAt(x, z) + 0.05;
-      pts.push(new THREE.Vector3(x, lift, z));
-    }
-    const cable = new THREE.Mesh(keep(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), n * 3, 0.045, 6, false)), cableMat);
-    planetScene.add(cable);
-    // the texture mill pours Pxd's hot magenta: texture and colour, what stage 1 brings
-    plume.add({ at: [stack.x, stack.y, stack.z], colour: METRIC_COLOURS.pxd, ...MILL_POUR, startAt: animate ? now + 1.2 : -100 });
-    machines.push({ m: pm, stack, power });
+  const worldOf = (v: MachineView, local: THREE.Vector3): THREE.Vector3 => local.clone().applyMatrix4(v.prop.group.matrixWorld);
+  const build = (mm: Machine): MachineView => {
+    const prop = machineProp(m, mm.kind, propStage);
+    prop.group.position.set(mm.x, groundAt(mm.x, mm.z) - 0.05, mm.z);
+    prop.group.rotation.y = mm.yaw;
+    planetScene.add(prop.group);
+    prop.group.updateMatrixWorld(true);
+    prop.light(0.1);
+    return { m: mm, prop, vent: prop.vent ? prop.vent.clone().applyMatrix4(prop.group.matrixWorld) : null, emitter: null, running: 0 };
   };
+  const unbuild = (v: MachineView): void => {
+    planetScene.remove(v.prop.group);
+    disposeProp(v.prop);
+    if (v.emitter !== null) { plume.remove(v.emitter); v.emitter = null; }
+  };
+  /** A cable lying on the ground from a to b (both world points). */
+  const groundCable = (a: THREE.Vector3, b: THREE.Vector3): THREE.Mesh => {
+    const pts: THREE.Vector3[] = [];
+    const n = Math.max(6, Math.ceil(a.distanceTo(b) / 0.8));
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t;
+      pts.push(new THREE.Vector3(x, i === 0 ? a.y : i === n ? b.y : groundAt(x, z) + 0.05, z));
+    }
+    return new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), n * 3, 0.045, 6, false), cableMat);
+  };
+  /** The cables: each connected machine from the node that powers it (the gate's junction box when in its reach, else the nearest
+   *  connected pylon or power unit in reach); a pylon powered by a pylon hangs its line from top to top. */
+  const relay = (connected: ReadonlySet<number>): void => {
+    for (const c of cables) { planetScene.remove(c); c.geometry.dispose(); }
+    cables = [];
+    const junction = new THREE.Vector3(...twin.sockets.find((x) => x.name === 'rear-junction')!.at).applyMatrix4(twin.group.matrixWorld);
+    const nodes = [...views.values()].filter((v) => KINDS[v.m.kind].reach > 0 && connected.has(v.m.id));
+    const g = twin.group.position;
+    for (const v of views.values()) {
+      if (!connected.has(v.m.id)) continue;
+      let from: MachineView | null = null;
+      if (Math.hypot(v.m.x - g.x, v.m.z - g.z) > GATE.reach) {
+        let best = Infinity;
+        for (const n of nodes) {
+          if (n === v) continue;
+          const d = Math.hypot(n.m.x - v.m.x, n.m.z - v.m.z);
+          if (d <= KINDS[n.m.kind].reach && d < best) { best = d; from = n; }
+        }
+      }
+      const line = from && from.prop.top && v.prop.top
+        ? lineSpan(m, worldOf(from, from.prop.top), worldOf(v, v.prop.top))
+        : groundCable(from ? worldOf(from, from.prop.power) : junction, worldOf(v, v.prop.power));
+      planetScene.add(line);
+      cables.push(line);
+    }
+  };
+  /** Rebuilds every machine at the detail of the stage the plot shows (chunky until stage 2). */
+  const rebuildProps = (stageShown: number): void => {
+    const want = stageShown <= 1 ? 1 : 6;
+    if (want === propStage) return;
+    propStage = want;
+    for (const [id, v] of views) {
+      const running = v.running, emitter = v.emitter;
+      v.emitter = null;
+      unbuild(v);
+      const nv = build(v.m);
+      nv.running = running; nv.emitter = emitter;
+      if (running > 0.05) nv.prop.light(1);
+      views.set(id, nv);
+    }
+    relay(lastConnected);
+  };
+  let lastConnected: ReadonlySet<number> = new Set();
 
-  // the build ghost: the mill's shape, green where it may stand, red where it may not; always in colour
+  // the build ghost: the chosen machine's shape, green where it may stand, red where it may not; always in colour
   const ghostOk = keep(new THREE.ShaderMaterial({ vertexShader: MARK_VERTEX, fragmentShader: COLOUR_MARK_FRAGMENT, blending: THREE.NoBlending, uniforms: { uColour: { value: new THREE.Color('#6dff8a') }, uLit: { value: 1 } } }));
   const ghostBad = keep(new THREE.ShaderMaterial({ vertexShader: MARK_VERTEX, fragmentShader: COLOUR_MARK_FRAGMENT, blending: THREE.NoBlending, uniforms: { uColour: { value: new THREE.Color('#ff5a4a') }, uLit: { value: 1 } } }));
-  const ghost = kit.textureMill(m, { stage: 1 }).group;
-  ghost.visible = false;
-  planetScene.add(ghost);
+  let ghost: MachineProp | null = null, ghostKind: MachineKind | null = null;
+  let ghostCheck: ((x: number, z: number) => { readonly ok: boolean; readonly why: string }) | null = null;
+  const dropGhost = (): void => {
+    if (!ghost) return;
+    planetScene.remove(ghost.group);
+    ghost.group.traverse((obj) => { const mesh = obj as THREE.Mesh; if (mesh.isMesh) mesh.geometry.dispose(); });
+    ghost = null;
+  };
+  const paintGhost = (ok: boolean): void => ghost?.group.traverse((obj) => { const mesh = obj as THREE.Mesh; if (mesh.isMesh) mesh.material = ok ? ghostOk : ghostBad; });
   let building = false, ghostVerdict: { ok: boolean; why: string } = { ok: false, why: '' };
   const ghostAt = new THREE.Vector3();
 
@@ -209,6 +283,7 @@ export function createPlayScene(o: {
     uColour: { value: planetRT.texture as THREE.Texture }, uDepth: { value: planetRT.depthTexture as THREE.Texture | null }, uLab: { value: labRT.texture as THREE.Texture },
     uRes: { value: new THREE.Vector2(16, 16) }, uInvProj: { value: new THREE.Matrix4() }, uCamWorld: { value: new THREE.Matrix4() },
     uWaveCentre: { value: new THREE.Vector3() }, uWaveR: { value: -1 }, uSkyRise: { value: -1 }, uGlitch: { value: 0 }, uTime: { value: 0 }, uLost: { value: 0 },
+    uLookOut: { value: new THREE.Vector4(0.01, 0.01, 0, 1) }, uLookIn: { value: new THREE.Vector4(0.01, 0.01, 0, 1) },
   };
   const postScene = new THREE.Scene();
   const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -221,7 +296,11 @@ export function createPlayScene(o: {
   let sync = 1, lostAt = -100;
   /** Metres walked since the last footstep, and how many relay lamps the sequence has lit (one click each). */
   let stride = 0, relaysHeard = 0;
-  let powerT = -1, gateOn = false, stage = 0, waveStart = -1;
+  let powerT = -1, gateOn = false;
+  /** The plot's stage, the stage the picture shows, and the stage a running wave brings (-1: none) and since when. */
+  let stage = 0, shown = 0, waveTo = -1, waveStart = -1;
+  /** The drawn picture's size in pixels: a look's pixels are whole pixels of it. */
+  let bufW = 16, bufH = 16, planetK = 0;
   let pendingEvent: FrameOut['event'] = null;
   let clock = 0;
 
@@ -288,8 +367,7 @@ export function createPlayScene(o: {
 
   /** The front on the ground (metres; -1 none, 1e7 done) and on the sky (the sine of the elevation it has climbed to). */
   const waveNow = (): { readonly r: number; readonly sky: number } => {
-    if (stage < 1) return { r: -1, sky: -1 };
-    if (waveStart < 0) return { r: 1e7, sky: 1 };
+    if (waveTo < 0) return { r: -1, sky: -1 };
     const t = Math.max(0, clock - waveStart);
     if (t < GROUND_SECONDS) return { r: waveFront(t), sky: -1 };
     const p = (t - GROUND_SECONDS) / SKY_SECONDS;
@@ -297,7 +375,33 @@ export function createPlayScene(o: {
     // from just below the horizon (the far ground's edge sits below eye level) to the zenith, easing in and out
     return { r: GROUND_REACH, sky: -0.25 + 1.25 * p * p * (3 - 2 * p) };
   };
-  const waveRadius = (): number => waveNow().r;
+  /** -1 before the first stage, 1e7 once a stage has crossed the plot (the e2e waits on it), the front while a wave runs. */
+  const waveRadius = (): number => (waveTo >= 0 ? waveNow().r : shown >= 1 ? 1e7 : -1);
+
+  /** A stage's look pixel in screen pixels: its lines on this screen, never finer than the tier allows. */
+  const cellPx = (st: number): number => {
+    const look = STAGE_LOOK[Math.max(0, Math.min(6, st))]!;
+    return Math.max(1, Math.round(bufH / Math.min(look.lines, detail.planetLines)));
+  };
+  /** The looks either side of the wave, and the planet's picture as fine as the finest look shown (never coarser than stage 1). */
+  const fitLooks = (): void => {
+    const inStage = waveTo >= 0 ? waveTo : shown;
+    const cOut = cellPx(shown), cIn = cellPx(inStage);
+    const setLook = (v: THREE.Vector4, st: number, c: number): void => { const look = STAGE_LOOK[Math.max(0, Math.min(6, st))]!; v.set(c / bufW, c / bufH, look.levels, look.dither ? 1 : 0); };
+    setLook(postUniforms.uLookOut.value, shown, cOut);
+    setLook(postUniforms.uLookIn.value, inStage, cIn);
+    const k = Math.max(1, Math.min(cOut, cIn, Math.round(bufH / BASE_LINES)));
+    if (k === planetK) return;
+    planetK = k;
+    const pw = Math.max(64, Math.round(bufW / k)), ph = Math.max(36, Math.round(bufH / k));
+    planetRT.dispose(); viewRT.dispose();
+    planetRT = target(pw, ph, true, true);
+    viewRT = target(pw, ph, false, true);
+    postUniforms.uColour.value = planetRT.texture; postUniforms.uDepth.value = planetRT.depthTexture;
+    postUniforms.uRes.value.set(pw, ph);
+    openingUniforms.uView.value = viewRT.texture;
+    plume.setViewport(ph);
+  };
 
   const api: PlayScene = {
     setPlanet(base, plot, neighbours) {
@@ -319,9 +423,45 @@ export function createPlayScene(o: {
       room.setPower(gateOn ? POWER_ON : POWER_OFF);
       if (gateOn) room.lever.rotation.x = -1.1;
       openingUniforms.uStatic.value = gateOn ? 0 : 1;
-      stage = s.stage;
+      stage = shown = s.plot.stage;
+      waveTo = -1;
       ground?.setStage(Math.max(1, stage));
-      for (const pm of s.machines) addMachine(pm, clock, false);
+      fitLooks();
+      propStage = stage <= 1 ? 1 : 6;
+      api.setPlot(s.plot, s.running, s.connected);
+      // a restored plot's machines are already running: their pixels show at once
+      for (const v of views.values()) if (v.emitter !== null) { plume.remove(v.emitter); v.emitter = null; }
+      for (const v of views.values()) {
+        const metric = PIXELS_OF[v.m.kind];
+        if (metric && v.vent && v.running > 0.05) v.emitter = plume.add({ at: [v.vent.x, v.vent.y, v.vent.z], colour: METRIC_COLOUR[metric], ...MILL_POUR, startAt: -100 });
+      }
+    },
+    setPlot(plot, running, connected) {
+      const ids = new Set(plot.machines.map((mm) => mm.id));
+      let changed = false;
+      for (const [id, v] of views) if (!ids.has(id)) { unbuild(v); views.delete(id); changed = true; }
+      for (const mm of plot.machines) if (!views.has(mm.id)) { views.set(mm.id, build(mm)); changed = true; }
+      const sameNet = connected.size === lastConnected.size && [...connected].every((id) => lastConnected.has(id));
+      if (changed || !sameNet) { relay(connected); lastConnected = new Set(connected); }
+      // pixels pour from every pixel machine while it runs; lamps show which run
+      for (const v of views.values()) {
+        const r = running.get(v.m.id) ?? 0;
+        if ((r > 0.05) !== (v.running > 0.05)) v.prop.light(r > 0.05 ? 1 : 0.1);
+        v.running = r;
+        const metric = PIXELS_OF[v.m.kind];
+        if (!metric || !v.vent) continue;
+        if (r > 0.05 && v.emitter === null) v.emitter = plume.add({ at: [v.vent.x, v.vent.y, v.vent.z], colour: METRIC_COLOUR[metric], ...MILL_POUR, startAt: clock + 0.6 });
+        else if (r <= 0.05 && v.emitter !== null) { plume.remove(v.emitter); v.emitter = null; }
+      }
+    },
+    richness(x, z) {
+      if (!ground) return 0;
+      // rock, scree, gravel, dust, cracked flats, red soil: ore is in the rock
+      const w = ground.terrain.materials(x, z);
+      const ore = [1, 0.85, 0.55, 0.1, 0.3, 0.6];
+      let sum = 0, total = 0;
+      w.forEach((v, i) => { sum += v * ore[i]!; total += v; });
+      return total > 0 ? sum / total : 0;
     },
     pullLever() {
       if (gateOn || powerT >= 0) return;
@@ -329,16 +469,29 @@ export function createPlayScene(o: {
       relaysHeard = 0;
       sfx('lever-throw');
     },
-    setBuilding(on) { building = on && where === 'planet'; ghost.visible = building; },
-    place() {
+    setBuilding(kind, check) {
+      const k = kind && where === 'planet' ? kind : null;
+      if (k !== ghostKind) { dropGhost(); ghostKind = k; if (k) { ghost = machineProp(m, k, propStage); paintGhost(false); planetScene.add(ghost.group); } }
+      ghostCheck = check ?? null;
+      building = !!k;
+      if (ghost) ghost.group.visible = false;
+      ghostVerdict = { ok: false, why: '' };
+    },
+    aim() {
       if (!building || !ghostVerdict.ok) return null;
       const g = twin.group.position;
-      const pm: PlacedMachine = { kind: 'texture-mill', x: ghostAt.x, z: ghostAt.z, yaw: Math.atan2(ghostAt.x - g.x, ghostAt.z - g.z) };
-      addMachine(pm, clock, true);
-      sfx('mill-start');
-      building = false; ghost.visible = false;
-      if (stage < 1) { stage = 1; waveStart = clock + 2.0; postUniforms.uWaveCentre.value.set(pm.x, groundAt(pm.x, pm.z), pm.z); }
-      return pm;
+      return { x: ghostAt.x, z: ghostAt.z, yaw: Math.atan2(ghostAt.x - g.x, ghostAt.z - g.z) };
+    },
+    raiseStage(to, from) {
+      if (to <= stage) return;
+      // a wave still running is overtaken: the stage it was bringing shows at once
+      if (waveTo >= 0) shown = waveTo;
+      stage = to;
+      waveTo = to;
+      waveStart = clock + (shown === 0 ? 2.0 : 0.8);
+      postUniforms.uWaveCentre.value.set(from.x, groundAt(from.x, from.z), from.z);
+      ground?.setStage(Math.max(1, to));
+      fitLooks();
     },
     frame(now, dt, c) {
       clock = now;
@@ -391,7 +544,8 @@ export function createPlayScene(o: {
         if (Math.sign(a.z - op.z) !== Math.sign(b.z - op.z) && Math.abs(b.x) < op.width / 2 - 0.15) crossTo(where === 'lab' ? 'planet' : 'lab');
       }
       // ---- sync
-      const nearMachine = stage >= 1 && waveRadius() > 1e6 && machines.some((mm) => Math.hypot(mm.m.x - pos.x, mm.m.z - pos.z) < MACHINE_FIELD);
+      let nearMachine = false;
+      if (shown >= 1 && waveTo < 0) for (const v of views.values()) if (v.running > 0.05 && Math.hypot(v.m.x - pos.x, v.m.z - pos.z) < MACHINE_FIELD) { nearMachine = true; break; }
       sync = stepSync(sync, dt, { onPlanet: where === 'planet', stage, nearMachine });
       if (where === 'planet' && sync > 0 && sync < 0.3) sfx('sync-warning', { minGapMs: 1400, volume: 0.6 });
       if (where === 'planet' && sync <= 0) {
@@ -402,7 +556,7 @@ export function createPlayScene(o: {
         pos.set(GATE_AT.x, EYE, GATE_AT.z + 3.2);
         yaw = 0; pitch = 0;
         sync = 0.05;
-        building = false; ghost.visible = false;
+        building = false; if (ghost) ghost.group.visible = false;
         pendingEvent = 'sync-lost';
       }
       // ---- the camera
@@ -410,25 +564,28 @@ export function createPlayScene(o: {
       camera.rotation.set(pitch, yaw, 0, 'YXZ');
       camera.updateMatrixWorld(true);
       // ---- the build ghost
-      if (building) {
+      if (building && ghost) {
         const hit = aimGround();
-        ghost.visible = !!hit;
+        ghost.group.visible = !!hit;
         if (hit) {
           ghostAt.copy(hit);
-          ghost.position.set(hit.x, groundAt(hit.x, hit.z), hit.z);
-          ghost.rotation.y = Math.atan2(hit.x - twin.group.position.x, hit.z - twin.group.position.z);
-          ghostVerdict = placeCheck(hit.x, hit.z, twin.group.position, machines.map((mm) => mm.m));
-          ghost.traverse((obj) => { const mesh = obj as THREE.Mesh; if (mesh.isMesh) mesh.material = ghostVerdict.ok ? ghostOk : ghostBad; });
-        } else ghostVerdict = { ok: false, why: `Aim at the ground within ${CABLE_REACH} m of the gate.` };
+          ghost.group.position.set(hit.x, groundAt(hit.x, hit.z), hit.z);
+          ghost.group.rotation.y = Math.atan2(hit.x - twin.group.position.x, hit.z - twin.group.position.z);
+          const verdict = ghostCheck ? ghostCheck(hit.x, hit.z) : { ok: false, why: '' };
+          if (verdict.ok !== ghostVerdict.ok) paintGhost(verdict.ok);
+          ghostVerdict = { ok: verdict.ok, why: verdict.why };
+        } else ghostVerdict = { ok: false, why: 'Aim at the ground near the gate.' };
       }
+      // ---- machines at work
+      for (const v of views.values()) v.prop.animate(now, v.running);
       // ---- the wave, and the event when it has crossed
       const wave = waveNow(), r = wave.r;
-      if (waveStart >= 0 && r > 1e6) { waveStart = -1; pendingEvent = pendingEvent ?? 'stage-1'; sfx('stage-up'); }
-      postUniforms.uWaveR.value = r;
+      if (waveTo >= 0 && r > 1e6) { shown = waveTo; waveTo = -1; fitLooks(); rebuildProps(shown); pendingEvent = pendingEvent ?? 'stage-up'; sfx('stage-up'); }
+      postUniforms.uWaveR.value = waveTo >= 0 ? r : -1;
       postUniforms.uSkyRise.value = wave.sky;
       // a quarter of the pixels race out to the wave's front while it runs
       const wc = postUniforms.uWaveCentre.value;
-      plume.setWave([wc.x, wc.y, wc.z], r > 1e6 ? r : Math.min(r, RACER_REACH));
+      plume.setWave([wc.x, wc.y, wc.z], waveTo >= 0 ? Math.min(r, RACER_REACH) : -1);
       plume.update(now);
       postUniforms.uTime.value = now;
       postUniforms.uGlitch.value = where === 'planet' ? Math.max(0, Math.min(1, (0.4 - sync) / 0.4)) : 0;
@@ -466,7 +623,18 @@ export function createPlayScene(o: {
         }
         drawPlanet(camera, null, false);
       }
-      // ---- what you are looking at
+      // ---- what you are looking at: a machine on the planet within reach of your hand, or the lab's main lever
+      let aimed: number | null = null;
+      if (where === 'planet' && !building) {
+        const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        let best = 6;
+        for (const v of views.values()) {
+          const c = new THREE.Vector3(v.m.x, groundAt(v.m.x, v.m.z) + 1.0, v.m.z).sub(camera.position);
+          const t = c.dot(dir);
+          if (t <= 0 || t >= best) continue;
+          if (c.addScaledVector(dir, -t).length() < KINDS[v.m.kind].radius + 0.4) { best = t; aimed = v.m.id; }
+        }
+      }
       let atLever = false;
       if (where === 'lab' && !gateOn && powerT < 0) {
         const to = room.leverAt.clone().sub(camera.position);
@@ -475,66 +643,63 @@ export function createPlayScene(o: {
       }
       const ev = pendingEvent;
       pendingEvent = null;
-      return { where, sync, atLever, ghost: building ? ghostVerdict : null, event: ev };
+      return { where, sync, atLever, ghost: building ? ghostVerdict : null, aimed, stage: shown, event: ev };
     },
     resize(width, height, pixelRatio) {
       renderer.setPixelRatio(pixelRatio);
       renderer.setSize(width, height, false);
       const buf = renderer.getDrawingBufferSize(new THREE.Vector2());
       screen.copy(buf);
+      bufW = buf.x; bufH = buf.y;
       camera.aspect = virtual.aspect = width / Math.max(1, height);
       camera.updateProjectionMatrix(); virtual.updateProjectionMatrix();
-      const k = Math.max(1, Math.round(buf.y / PLANET_LINES));
-      const pw = Math.max(64, Math.round(buf.x / k)), ph = Math.max(36, Math.round(buf.y / k));
-      for (const t of [planetRT, viewRT, labRT]) t.dispose();
-      planetRT = target(pw, ph, true, true);
-      viewRT = target(pw, ph, false, true);
+      labRT.dispose();
       labRT = target(Math.round(buf.x / 2), Math.round(buf.y / 2), false, false);
-      postUniforms.uColour.value = planetRT.texture; postUniforms.uDepth.value = planetRT.depthTexture; postUniforms.uLab.value = labRT.texture;
-      postUniforms.uRes.value.set(pw, ph);
-      plume.setViewport(ph);
-      openingUniforms.uView.value = viewRT.texture;
+      postUniforms.uLab.value = labRT.texture;
+      // the planet's picture is fitted to the new screen
+      planetK = 0;
+      fitLooks();
     },
     setDetail(d) {
       detail = d;
+      fitLooks();
       ground?.setBudget(d.groundBudget);
       plume.setMode(d.plumes);
       plume.setDensity(d.plumeDensity);
     },
     warm() {
       // each scene for each place it draws to (the screen's colour space differs from the targets'), hidden things included (the
-      // plume's three ways, the build ghost), and the ghost again in its marks: what first appears mid-play is compiled here
+      // plume's three ways), with one of every machine standing in, and again in the ghost's marks: what first appears mid-play is
+      // compiled here, not as a hitch
+      const kinds = Object.keys(KINDS) as MachineKind[];
+      const stand = kinds.map((k) => { const p = machineProp(m, k, propStage); p.group.visible = false; planetScene.add(p.group); return p; });
       const passes: [THREE.Scene, THREE.Camera, THREE.WebGLRenderTarget | null][] = [
         [planetScene, camera, planetRT], [postScene, postCam, viewRT], [postScene, postCam, null], [labScene, camera, null], [labScene, camera, labRT],
       ];
       for (const [sc, cam, to] of passes) { renderer.setRenderTarget(to); renderer.compile(sc, cam); }
-      ghost.traverse((obj) => { const mesh = obj as THREE.Mesh; if (mesh.isMesh) mesh.material = ghostOk; });
+      for (const p of stand) p.group.traverse((obj) => { const mesh = obj as THREE.Mesh; if (mesh.isMesh) mesh.material = ghostOk; });
       renderer.setRenderTarget(planetRT);
       renderer.compile(planetScene, camera);
       renderer.setRenderTarget(null);
+      for (const p of stand) { planetScene.remove(p.group); p.group.traverse((obj) => { const mesh = obj as THREE.Mesh; if (mesh.isMesh) mesh.geometry.dispose(); }); }
     },
     debug: {
       groundTriangles: () => ground?.triangles() ?? 0,
       showGround: (on) => ground?.setVisible(on),
       where: () => where,
       position: () => pos.clone(),
-      teleport(w, x, z, y) { where = w; pos.set(x, w === 'lab' ? EYE : groundAt(x, z) + EYE, z); yaw = y; },
+      teleport(w, x, z, y, p) { where = w; pos.set(x, w === 'lab' ? EYE : groundAt(x, z) + EYE, z); yaw = y; if (p !== undefined) pitch = p; },
       sync: () => sync,
       stats: () => ({ triangles: renderer.info.render.triangles, calls: renderer.info.render.calls }),
       wave: () => waveRadius(),
       gatePlanet: () => ({ x: twin.group.position.x, z: twin.group.position.z }),
       detail: () => ({ ...detail, planet: [postUniforms.uRes.value.x, postUniforms.uRes.value.y] as const, pixels: plume.stats().pixels }),
-      placeAt(x, z) {
-        if (where !== 'planet') return null;
-        building = true;
-        ghostAt.set(x, groundAt(x, z), z);
-        ghostVerdict = placeCheck(x, z, twin.group.position, machines.map((mm) => mm.m));
-        const pm = api.place();
-        building = false; ghost.visible = false;
-        return pm;
-      },
+      machines: () => { let pouring = 0; for (const v of views.values()) if (v.emitter !== null) pouring++; return { standing: views.size, pouring }; },
     },
     dispose() {
+      for (const v of views.values()) unbuild(v);
+      for (const c of cables) c.geometry.dispose();
+      dropGhost();
       world?.dispose();
       ground?.dispose();
       room.dispose();

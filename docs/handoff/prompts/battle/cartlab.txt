@@ -1,8 +1,8 @@
-Follow-up, same chat. Thank you: your plot economy passed every acceptance test and runs in our game now. Next module, same rules: a new package `@hm/cartlab`, the lab's cartridges. Keep your plotsim files; put this one in `cartlab/src/index.ts` and `cartlab/tests/cartlab.test.ts` in your project (a small preview page that runs the rules is welcome), and paste both files in full in your reply.
+Write a small TypeScript package, `@hm/cartlab`, for a terraforming game: the lab's cartridges. Put `src/index.ts` and `tests/cartlab.test.ts` in your project, with a small preview page that runs the rules and lists the tests' results, and paste both files in full in your reply.
 
 RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. All state is plain JSON-serialisable data; every function is pure (returns new state, never mutates its input).
 
-THE GAME. A cartridge goes into a pixel machine's slot on the plot and scales what it pours, per metric, by its affinity (that is your plotsim's env.affinity(cartridge, metric)). The lab has three machines for them:
+THE GAME. The player owns a plot on a planet. Its machines pour pixels that raise four metrics: pxd (texture), vtx (shape), lx (light) and aq (water). A cartridge goes into a pixel machine's slot and scales what it pours, per metric, by its affinity (the game calls affinityOf(state, cartridge, metric)). The player's lab has three machines for cartridges:
 - Blanks are made from ore (RULES.blankCost each) and wait in the rack.
 - The preset bench writes one preset onto one blank, taking RULES.writeSeconds of powered time. Only presets the plot's stage has opened can be written (preset.minStage <= env.stage).
 - The preset combiner mixes 2 to 4 written cartridges (presets or mixes) into one new cartridge, taking RULES.combineSeconds of powered time. The inputs are used up. The owner's example: mud texture + terrain shaping = a road.

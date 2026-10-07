@@ -1,4 +1,4 @@
-Follow-up, same chat (after cartlab). Next module, same rules: a new package `@hm/plotgrid`, where every player's plot sits on the shared planet. Keep your other files; put this one in `plotgrid/src/index.ts` and `plotgrid/tests/plotgrid.test.ts` in your project (a small preview page drawing the hex map is welcome), and paste both files in full in your reply.
+Write a small TypeScript package, `@hm/plotgrid`, for a multiplayer terraforming game: where every player's plot sits on the shared planet. Put `src/index.ts` and `tests/plotgrid.test.ts` in your project, with a small preview page that draws the hex map and lists the tests' results, and paste both files in full in your reply.
 
 RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. Pure functions only. Never return -0 (normalise with `+ 0`).
 

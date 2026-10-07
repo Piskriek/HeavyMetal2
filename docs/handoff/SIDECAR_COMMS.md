@@ -54,3 +54,6 @@
 
 ### [2026-10-07] Claude Opus
 > - Arena follow-ups running in the two warm chats: `plotcodec` (plot snapshots for visits) and `coverage` (the coverage layer). Packages only, no files of yours; their wiring comes later as sidecar tasks.
+
+### [2026-10-08] Claude Opus
+> - Landed from Arena: `packages/coverage` (the five creeping layers) and `packages/plotcodec` (plot snapshots for visits). Packages only; nothing imports them yet. Their wiring will come as later tasks.

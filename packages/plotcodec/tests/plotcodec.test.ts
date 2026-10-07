@@ -1,31 +1,3 @@
-Follow-up, same chat. Thank you: your @hm/cartlab passed every acceptance test and is landed in our game. Next module, same rules: a new package `@hm/plotcodec`. Keep your other files; put this one in `plotcodec/src/index.ts` and `plotcodec/tests/plotcodec.test.ts` in your project, and paste both files in full in your reply.
-
-RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src (write your own base64url and UTF-8; do not use Buffer, btoa or TextEncoder). The test file imports only `node:test`, `node:assert/strict` and `../src/index`. Pure functions only.
-
-THE GAME. Players visit each other's plots (read-only). Each player publishes a snapshot of their plot as one short text; every visitor's game decodes it. Snapshots come from other players, so decode must treat the text as hostile: it never throws, never loops long, and returns either a snapshot that obeys every rule below or null.
-
-THE SNAPSHOT:
-export const KINDS = ['drill', 'mill', 'pylon', 'press', 'power', 'projector', 'water'] as const; export type MachineKind = (typeof KINDS)[number];
-export const METRICS = ['pxd', 'vtx', 'lx', 'aq'] as const; export type Metric = (typeof METRICS)[number];
-export const LIMITS = { maxBytes: 65536, maxMachines: 400, maxCartridges: 400, ownerBytes: 32, nameBytes: 64, plotRadius: 500 } as const;
-export interface SnapMachine { readonly kind: MachineKind; readonly x: number; readonly z: number; readonly yaw: number; readonly on: boolean; readonly cartridge: number }
-export interface SnapCartridge { readonly name: string; readonly affinity: Readonly<Record<Metric, number>> }
-export interface Snapshot { readonly v: 1; readonly owner: string; readonly stage: number; readonly time: number; readonly points: Readonly<Record<Metric, number>>; readonly machines: readonly SnapMachine[]; readonly cartridges: readonly SnapCartridge[] }
-export function encode(s: Snapshot): string; // throws Error(why) for a snapshot that breaks a rule
-export function decode(text: string): Snapshot | null; // never throws
-
-THE RULES (encode refuses, decode returns null):
-- owner: 1 to LIMITS.ownerBytes bytes of UTF-8, no control characters (U+0000 to U+001F, U+007F to U+009F), not only whitespace. Cartridge names: the same, up to LIMITS.nameBytes.
-- stage: an integer 0 to 6. time and every points value: finite and >= 0.
-- machines: at most maxMachines. x and z in metres with Math.hypot(x, z) <= plotRadius; yaw in radians within [-PI, PI]; cartridge: -1 or an index into cartridges.
-- cartridges: at most maxCartridges; every affinity within [0.5, 3].
-- The text is base64url without padding (A-Z a-z 0-9 - _), canonical: decode re-checks that encoding its bytes gives back exactly the same text, so stray or extra characters are refused. Its bytes start with your own magic (at least two bytes, not all zero) and a format version; unknown versions, truncation and trailing bytes are refused. A text longer than the base64url of maxBytes is refused before any work.
-
-PRECISION AND SIZE: positions are kept to 1 cm, yaw to 0.001 rad, affinities to 0.001; points and time to float32 precision or better; everything else exactly. Each machine costs at most 16 bytes. encode is deterministic, and encode(decode(t)) === t for any text it made.
-
-Your test file must contain these acceptance tests unchanged, plus your own:
-
-```ts
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { KINDS, METRICS, LIMITS, encode, decode, type Snapshot, type SnapMachine } from '../src/index';
@@ -123,4 +95,83 @@ test('performance: decoding a full plot a hundred times takes under 300 ms', () 
   for (let i = 0; i < 100; i++) assert.ok(decode(text));
   assert.ok(performance.now() - t0 < 300, `${performance.now() - t0} ms`);
 });
-```
+
+test('text byte limits count UTF-8 bytes and reject control or malformed Unicode', () => {
+  const base = snap(0);
+  assert.throws(() => encode({ ...base, owner: 'é'.repeat(17) }));
+  assert.throws(() => encode({ ...base, cartridges: [{ name: '🚀'.repeat(17), affinity: { pxd: 1, vtx: 1, lx: 1, aq: 1 } }] }));
+  assert.throws(() => encode({ ...base, owner: '\ud800' }));
+  assert.throws(() => encode({ ...base, cartridges: [{ name: 'name\u0085', affinity: { pxd: 1, vtx: 1, lx: 1, aq: 1 } }] }));
+});
+
+test('quantized perimeter positions and yaw endpoints remain valid and stable', () => {
+  const boundary: Snapshot = {
+    ...snap(2),
+    machines: [
+      { kind: 'drill', x: 500, z: 0, yaw: -Math.PI, on: true, cartridge: -1 },
+      { kind: 'water', x: 499.996, z: 1, yaw: Math.PI, on: false, cartridge: -1 },
+    ],
+  };
+  const text = encode(boundary);
+  const decoded = decode(text);
+  assert.ok(decoded);
+  assert.ok(decoded.machines.every((machine) => Math.hypot(machine.x, machine.z) <= LIMITS.plotRadius));
+  assert.equal(decoded.machines[0]!.yaw, -Math.PI);
+  assert.equal(decoded.machines[1]!.yaw, Math.PI);
+  assert.equal(encode(decoded), text);
+});
+
+test('decoder refuses unsupported versions, invalid UTF-8, oversized counts, and trailing bytes', () => {
+  const goodBytes = decodeRaw(encode(snap(0)));
+  const version = [...goodBytes];
+  version[2] = 2;
+  assert.equal(safeDecode(encodeRaw(version)), null);
+
+  const trailing = [...goodBytes, 0];
+  assert.equal(safeDecode(encodeRaw(trailing)), null);
+
+  const invalidOwner = [...goodBytes];
+  invalidOwner[3] = 2;
+  invalidOwner[4] = 0xc0;
+  invalidOwner[5] = 0x80;
+  assert.equal(safeDecode(encodeRaw(invalidOwner)), null);
+
+  const emptyPlot = decodeRaw(encode({ ...snap(0), cartridges: [] }));
+  emptyPlot[50] = 0x91;
+  emptyPlot[51] = 0x01;
+  assert.equal(safeDecode(encodeRaw(emptyPlot)), null);
+});
+
+function encodeRaw(bytes: readonly number[]): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  let text = '';
+  for (let index = 0; index < bytes.length; index += 3) {
+    const first = bytes[index] ?? 0;
+    const hasSecond = index + 1 < bytes.length;
+    const hasThird = index + 2 < bytes.length;
+    const second = hasSecond ? bytes[index + 1] ?? 0 : 0;
+    const third = hasThird ? bytes[index + 2] ?? 0 : 0;
+    text += alphabet.charAt(first >> 2);
+    text += alphabet.charAt(((first & 3) << 4) | (second >> 4));
+    if (hasSecond) text += alphabet.charAt(((second & 15) << 2) | (third >> 6));
+    if (hasThird) text += alphabet.charAt(third & 63);
+  }
+  return text;
+}
+
+function decodeRaw(text: string): number[] {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  const bytes: number[] = [];
+  for (let index = 0; index < text.length; index += 4) {
+    const first = alphabet.indexOf(text.charAt(index));
+    const second = alphabet.indexOf(text.charAt(index + 1));
+    const remaining = text.length - index;
+    const third = remaining > 2 ? alphabet.indexOf(text.charAt(index + 2)) : 0;
+    const fourth = remaining > 3 ? alphabet.indexOf(text.charAt(index + 3)) : 0;
+    if (first < 0 || second < 0 || third < 0 || fourth < 0) throw new Error('Invalid test fixture text.');
+    bytes.push((first << 2) | (second >> 4));
+    if (remaining > 2) bytes.push(((second & 15) << 4) | (third >> 2));
+    if (remaining > 3) bytes.push(((third & 3) << 6) | fourth);
+  }
+  return bytes;
+}

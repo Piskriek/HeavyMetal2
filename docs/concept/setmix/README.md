@@ -186,7 +186,9 @@ is: 02 exists to be the brightness payoff.
 magic.
 
 **Full prompt used (verbatim, second take; the first was rejected for a
-fully-lit ceiling, which broke the "gate drains everything" story):**
+fully-lit ceiling, which broke the "gate drains everything" story). FINAL
+(take 5) = this text plus two amendments that landed the cable fix and
+restored the staging beats; quoted after the block:**
 
 > Widescreen 16:9 game concept art, cinematic photorealistic render, crisp and
 > detailed. No text, no UI, no watermark, no logos. Interior of a clean white
@@ -232,10 +234,26 @@ covers; out: the opening; amber bottom-up), console (command source, lever
 thrown), breaker + 4 relay cabinets (cascade row), capacitor bank (charging),
 holotable + bench + rack (idle, dimmed).
 
-**Self-review:** the cascade row and bottom-up coils read exactly as
-storyboarded; floor-cover pulses sell "power in conduits, not magic". Nit: at
-thumbnail size the cover-pulses could be mistaken for glowing floor seams —
-acceptable, they ARE lit conduits. Owner approved this take as the gate canon.
+**Take-5 amendments (verbatim additions):** (a) "The console's own signal
+cables run straight DOWN inside its pedestal into a flush steel floor
+grommet beneath it — nothing snakes out of the console onto the floor."
+(b) "POWER DELIVERY, very important: the gate's high-amp feeders run from
+the relay cabinets to the gate plinth inside RIBBED STEEL FLOOR CABLE
+COVERS — low bolted metal ramps lying flat on the polished concrete like
+industrial speed bumps, ribbed along their length, each with a long narrow
+SLOT along its top face; through the slots, bright AMBER electric pulses
+travel visibly along each run from the relay wall to the gate, lighting the
+slot rims as they pass like light under rails. ABSOLUTELY NO bare cable lies
+anywhere on the lab floor — the only power routing in sight is inside the
+slotted metal covers or in the ceiling trays."
+
+**Self-review (final take):** the slotted covers + travelling pulses are the
+frame's spine now; bottom-up coils, cascade row, brownout and the static
+sheet all landed in the same take as the containment fix. Nits: only one
+cover run is prominent (the right-hand feeders; v4 had richer runs but also
+loose console cables — containment won over density); the pulse pool at the
+plinth's foot suggests arrival rather than showing entry. The owner's cable
+rule holds edge to edge.
 
 ---
 
@@ -550,7 +568,17 @@ slightly step to step.
 **For:** what the player is *for*: the finished plot in its best light — and
 proof that the machines don't stop when the world gets pretty.
 
-**Full prompt used (verbatim, 4th take — the goblin planet de-Earthed):**
+**Full prompt used (verbatim, 4th take, for the generated base plate) — and
+note the finishing method: the model kept giving the moon Earth continents
+(three regenerations), so the final moon is an ImageMagick COMPOSITE, not a
+generation: the alien disc was cut from `11-desolate-horizon.png`
+(planet-texture area x=514..710, y=49..245 — deliberately inside the limb to
+exclude the night-side rim), resized to 206 px, paled (`-modulate 124,48,100`,
+56% colourise to the sky's `#b8d0ea`, gamma 1.16, level 12%), the old
+Earth-moon melted into sky haze with a soft-masked heavy blur patch, and the
+new disc blended in at 82% with a feathered circle mask (r=103 at centre
+790,130 — exactly where the old moon sat). Reproduce from the two source
+PNGs; no AI pass involved. The prompt that generated the base plate:**
 
 > Widescreen 16:9 game concept art, cinematic photorealistic render, crisp
 > detail. No text, no UI, no watermark. A finished terraformed game plot at
@@ -594,11 +622,13 @@ proof that the machines don't stop when the world gets pretty.
 **Machines in frame:** planet-twin gate, drill (background), mill, press,
 light projector, water maker, relay pylons — all weathered, all working.
 
-**Self-review:** hero shot delivers; the four plumes now demonstrably exit
-*behind* the feeds. Nit: the mill's plume rises very close above its hopper
-(the stack sits directly behind it) — at small sizes it can still read
-hopper-born; sheet 12's mill portrait is the unambiguous reference. Also the
-press's side tray renders like a tipped ore bin; mechanically fine.
+**Self-review:** hero shot delivers; the four plumes demonstrably exit
+*behind* the feeds, and the moon is now verifiably the same alien planet as
+03/05/11 because it IS the same pixels. Nits: the mill's plume rises very
+close above its hopper (the stack sits directly behind it) — at small sizes
+it can still read hopper-born; sheet 12's mill portrait is the unambiguous
+reference. At full zoom a faint crop-edge brightness step ghosts at the
+disc's top rim; invisible at viewing size.
 
 ---
 

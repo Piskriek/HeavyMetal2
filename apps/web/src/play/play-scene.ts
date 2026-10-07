@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { StageLook } from '../crafter/looks';
 import { createWorld, PLANET_DIR, SUN, type Neighbour, type World } from '../crafter/world';
+import { createPlume, METRIC_COLOURS, type PlumeMode } from '@hm/plume';
 import { createPlotGround, type PlotGround } from './plot-ground';
 import { fx as sfx } from '../maker/feedback';
 import * as kit from './kit';
@@ -37,7 +38,7 @@ export interface FrameOut {
 }
 
 /** What the display governor and Settings change while you play: how the machines' pixels are drawn, and the ground's triangles. */
-export interface Detail { readonly plumes: 'cubes' | 'off'; readonly plumeDensity: number; readonly groundBudget: number }
+export interface Detail { readonly plumes: PlumeMode; readonly plumeDensity: number; readonly groundBudget: number }
 
 const EYE = 1.68, RADIUS = 0.3, WALK = 3.0, RUN = 5.6;
 /**
@@ -46,9 +47,21 @@ const EYE = 1.68, RADIUS = 0.3, WALK = 3.0, RUN = 5.6;
  * pixels covers the same number of drawn ones.
  */
 const PLANET_LINES = 240;
-const WAVE_SECONDS = 14, WAVE_REACH = 170;
-/** Pixels in a machine's plume as made (density 1), and the most any density may ask for (the setting's hard limit is 4). */
-const PIXELS = 160, PIXELS_MOST = PIXELS * 4;
+/**
+ * The wave never pops (owner, 2026-10-07: "the hill and the sky popped"): its front crosses your plot at a walk-and-a-half, then
+ * races out ever faster over the plains and the neighbours to the horizon (the ground ends about 4.5 km from the gate), then climbs
+ * the sky from the horizon to the zenith. Metres from the wave's centre, t seconds after it starts.
+ */
+const waveFront = (t: number): number => 25 * t + 4 * (Math.exp(0.6 * t) - 1);
+const GROUND_REACH = 4800, SKY_SECONDS = 3.2;
+/** When the front reaches the horizon (about 11.6 s). */
+const GROUND_SECONDS = ((): number => { let lo = 0, hi = 60; for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (waveFront(m) < GROUND_REACH) lo = m; else hi = m; } return hi; })();
+/** The pixels that race the front go no further than this (beyond it they would be a blur too small to see). */
+const RACER_REACH = 300;
+/** The planet's wind for the plumes: from the west-south-west, enough to lean a pour about 3 m downwind by the top. */
+const WIND = { x: 0.94, z: 0.35, speed: 3.3 };
+/** The texture mill's pour: a full, wide plume (the owner: pixels visibly spewing out), 220 pixels at density 1. */
+const MILL_POUR = { count: 220, height: 7.5, spread: 4.5 };
 
 export interface PlayScene {
   /** Puts the planet in place (once, after its looks are baked). */
@@ -147,13 +160,13 @@ export function createPlayScene(o: {
   };
 
   // machines: the mill, its cable from the gate's junction box, and the pink pixels from its stack
-  const machines: { readonly m: PlacedMachine; readonly stack: THREE.Vector3; readonly power: THREE.Vector3; started: number }[] = [];
+  const machines: { readonly m: PlacedMachine; readonly stack: THREE.Vector3; readonly power: THREE.Vector3 }[] = [];
   let detail: Detail = o.detail;
-  /** The pixels each plume pours at this density (none when the plumes are off). */
-  const pixelCount = (): number => (detail.plumes === 'off' ? 0 : Math.max(1, Math.min(PIXELS_MOST, Math.round(PIXELS * detail.plumeDensity))));
-  const pixelMat = keep(new THREE.ShaderMaterial({ vertexShader: MARK_VERTEX, fragmentShader: COLOUR_MARK_FRAGMENT, blending: THREE.NoBlending, uniforms: { uColour: { value: new THREE.Color('#ff3d8a') }, uLit: { value: 0.35 } } }));
-  const pixelGeo = keep(new THREE.BoxGeometry(0.14, 0.14, 0.14));
-  const pixelSets: THREE.InstancedMesh[] = [];
+  // every machine's pixels in one plume (`@hm/plume`, one draw call): drawn as the tier asks, always in colour (alpha 0.5 marks them)
+  const plume = createPlume({ mode: detail.plumes, density: detail.plumeDensity, markAlpha: 0.5 });
+  plume.setWind(WIND.x, WIND.z, WIND.speed);
+  planetScene.add(plume.object);
+  keep(plume);
   const cableMat = m.rubber;
   const millGroups: THREE.Group[] = [];
   const addMachine = (pm: PlacedMachine, now: number, animate: boolean): void => {
@@ -177,13 +190,9 @@ export function createPlayScene(o: {
     }
     const cable = new THREE.Mesh(keep(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), n * 3, 0.045, 6, false)), cableMat);
     planetScene.add(cable);
-    const set = new THREE.InstancedMesh(pixelGeo, pixelMat, PIXELS_MOST);
-    set.count = pixelCount();
-    set.visible = set.count > 0;
-    set.frustumCulled = false;
-    planetScene.add(set);
-    pixelSets.push(set);
-    machines.push({ m: pm, stack, power, started: animate ? now + 1.2 : -100 });
+    // the texture mill pours Pxd's hot magenta: texture and colour, what stage 1 brings
+    plume.add({ at: [stack.x, stack.y, stack.z], colour: METRIC_COLOURS.pxd, ...MILL_POUR, startAt: animate ? now + 1.2 : -100 });
+    machines.push({ m: pm, stack, power });
   };
 
   // the build ghost: the mill's shape, green where it may stand, red where it may not; always in colour
@@ -199,7 +208,7 @@ export function createPlayScene(o: {
   const postUniforms = {
     uColour: { value: planetRT.texture as THREE.Texture }, uDepth: { value: planetRT.depthTexture as THREE.Texture | null }, uLab: { value: labRT.texture as THREE.Texture },
     uRes: { value: new THREE.Vector2(16, 16) }, uInvProj: { value: new THREE.Matrix4() }, uCamWorld: { value: new THREE.Matrix4() },
-    uWaveCentre: { value: new THREE.Vector3() }, uWaveR: { value: -1 }, uGlitch: { value: 0 }, uTime: { value: 0 }, uLost: { value: 0 },
+    uWaveCentre: { value: new THREE.Vector3() }, uWaveR: { value: -1 }, uSkyRise: { value: -1 }, uGlitch: { value: 0 }, uTime: { value: 0 }, uLost: { value: 0 },
   };
   const postScene = new THREE.Scene();
   const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -277,13 +286,18 @@ export function createPlayScene(o: {
     renderer.render(postScene, postCam);
   };
 
-  const waveRadius = (): number => {
-    if (stage < 1) return -1;
-    if (waveStart < 0) return 1e7;
-    const t = (clock - waveStart) / WAVE_SECONDS;
-    if (t >= 1) return 1e7;
-    return WAVE_REACH * (1 - Math.pow(1 - Math.max(0, t), 2.2));
+  /** The front on the ground (metres; -1 none, 1e7 done) and on the sky (the sine of the elevation it has climbed to). */
+  const waveNow = (): { readonly r: number; readonly sky: number } => {
+    if (stage < 1) return { r: -1, sky: -1 };
+    if (waveStart < 0) return { r: 1e7, sky: 1 };
+    const t = Math.max(0, clock - waveStart);
+    if (t < GROUND_SECONDS) return { r: waveFront(t), sky: -1 };
+    const p = (t - GROUND_SECONDS) / SKY_SECONDS;
+    if (p >= 1) return { r: 1e7, sky: 1 };
+    // from just below the horizon (the far ground's edge sits below eye level) to the zenith, easing in and out
+    return { r: GROUND_REACH, sky: -0.25 + 1.25 * p * p * (3 - 2 * p) };
   };
+  const waveRadius = (): number => waveNow().r;
 
   const api: PlayScene = {
     setPlanet(base, plot, neighbours) {
@@ -407,31 +421,15 @@ export function createPlayScene(o: {
           ghost.traverse((obj) => { const mesh = obj as THREE.Mesh; if (mesh.isMesh) mesh.material = ghostVerdict.ok ? ghostOk : ghostBad; });
         } else ghostVerdict = { ok: false, why: `Aim at the ground within ${CABLE_REACH} m of the gate.` };
       }
-      // ---- machines: pixels pour from the stack while they run, rising and spreading on the wind
-      const mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler();
-      // a sparser plume has slightly bigger pixels, so it still reads as a pour
-      const big = Math.pow(PIXELS / Math.max(1, pixelCount()), 0.25);
-      machines.forEach((mm, k) => {
-        const set = pixelSets[k]!;
-        if (!set.visible) return;
-        const on = Math.max(0, Math.min(1, (now - mm.started) / 1.5));
-        for (let i = 0; i < set.count; i++) {
-          const ph = (i * 0.618034) % 1, life = (now * 0.32 + ph) % 1;
-          // a pour that widens as it rises and leans downwind, each pixel on its own small spiral
-          const spread = 0.15 + life * (0.9 + 2.6 * ((i * 0.37) % 1));
-          const a = i * 2.39996 + now * 0.25;
-          p.set(mm.stack.x + Math.cos(a) * spread + life * life * 3.2, mm.stack.y + life * 6.5, mm.stack.z + Math.sin(a) * spread + life * life * 1.2);
-          const size = on * (1 - life) * (0.7 + ((i * 0.53) % 1) * 0.6) * big;
-          s.set(size, size, size);
-          q.setFromEuler(e.set(life * 4 + i, life * 3, 0));
-          set.setMatrixAt(i, mtx.compose(p, q, s));
-        }
-        set.instanceMatrix.needsUpdate = true;
-      });
       // ---- the wave, and the event when it has crossed
-      const r = waveRadius();
+      const wave = waveNow(), r = wave.r;
       if (waveStart >= 0 && r > 1e6) { waveStart = -1; pendingEvent = pendingEvent ?? 'stage-1'; sfx('stage-up'); }
       postUniforms.uWaveR.value = r;
+      postUniforms.uSkyRise.value = wave.sky;
+      // a quarter of the pixels race out to the wave's front while it runs
+      const wc = postUniforms.uWaveCentre.value;
+      plume.setWave([wc.x, wc.y, wc.z], r > 1e6 ? r : Math.min(r, RACER_REACH));
+      plume.update(now);
       postUniforms.uTime.value = now;
       postUniforms.uGlitch.value = where === 'planet' ? Math.max(0, Math.min(1, (0.4 - sync) / 0.4)) : 0;
       postUniforms.uLost.value = Math.max(0, 1 - (now - lostAt) / 0.6);
@@ -494,19 +492,18 @@ export function createPlayScene(o: {
       labRT = target(Math.round(buf.x / 2), Math.round(buf.y / 2), false, false);
       postUniforms.uColour.value = planetRT.texture; postUniforms.uDepth.value = planetRT.depthTexture; postUniforms.uLab.value = labRT.texture;
       postUniforms.uRes.value.set(pw, ph);
+      plume.setViewport(ph);
       openingUniforms.uView.value = viewRT.texture;
     },
     setDetail(d) {
       detail = d;
       ground?.setBudget(d.groundBudget);
-      const n = pixelCount();
-      for (const set of pixelSets) { set.count = n; set.visible = n > 0; }
+      plume.setMode(d.plumes);
+      plume.setDensity(d.plumeDensity);
     },
     warm() {
-      // each scene for each place it draws to (the screen's colour space differs from the targets'), with what first appears
-      // mid-play standing in: a plume (the first machine's) and the build ghost, in the mill's materials and then in its marks
-      const plume = new THREE.InstancedMesh(pixelGeo, pixelMat, 1);
-      planetScene.add(plume);
+      // each scene for each place it draws to (the screen's colour space differs from the targets'), hidden things included (the
+      // plume's three ways, the build ghost), and the ghost again in its marks: what first appears mid-play is compiled here
       const passes: [THREE.Scene, THREE.Camera, THREE.WebGLRenderTarget | null][] = [
         [planetScene, camera, planetRT], [postScene, postCam, viewRT], [postScene, postCam, null], [labScene, camera, null], [labScene, camera, labRT],
       ];
@@ -515,8 +512,6 @@ export function createPlayScene(o: {
       renderer.setRenderTarget(planetRT);
       renderer.compile(planetScene, camera);
       renderer.setRenderTarget(null);
-      planetScene.remove(plume);
-      plume.dispose();
     },
     debug: {
       groundTriangles: () => ground?.triangles() ?? 0,
@@ -528,7 +523,7 @@ export function createPlayScene(o: {
       stats: () => ({ triangles: renderer.info.render.triangles, calls: renderer.info.render.calls }),
       wave: () => waveRadius(),
       gatePlanet: () => ({ x: twin.group.position.x, z: twin.group.position.z }),
-      detail: () => ({ ...detail, planet: [postUniforms.uRes.value.x, postUniforms.uRes.value.y] as const, pixels: pixelCount() }),
+      detail: () => ({ ...detail, planet: [postUniforms.uRes.value.x, postUniforms.uRes.value.y] as const, pixels: plume.stats().pixels }),
       placeAt(x, z) {
         if (where !== 'planet') return null;
         building = true;

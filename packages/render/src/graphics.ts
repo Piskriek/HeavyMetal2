@@ -38,16 +38,18 @@ export interface GraphicsSettings {
   /** The voxel ground blends two surfaces pixel by pixel (a dither) within this many metres of you; further away each block shows one. 0 = everywhere. */
   readonly ditherDistance: number;
   /**
-   * The pixels pouring from SetMix's machines: little 3D cubes that tumble as they rise, or none (the machines still work). The plume
-   * module brings the lighter ways (GPU splats, dither sprites) and its own ways of choosing them by tier (STATUS SM25).
+   * How the pixels pouring from SetMix's machines are drawn (`@hm/plume`): little 3D cubes tumbling as they rise, soft glowing splats,
+   * or square dithered sprites, the cheapest; or none (the machines still work). No tier turns them off (STATUS SM25). Cubes from Low up:
+   * at stage 1's 240 lines they read best and cost little (a mill's 220 are 2 640 triangles in one draw call, 60 fps on the laptop); splats
+   * are a few soft pixels there, the faintest. Potato draws sprites.
    */
-  readonly pixelPlumes: 'cubes' | 'off';
+  readonly pixelPlumes: 'cubes' | 'splats' | 'dither' | 'off';
   /** How many pixels pour from each machine, against the plume as made (1). */
   readonly plumeDensity: number;
 }
 
 export const GRAPHICS_TIERS: Readonly<Record<Quality, GraphicsSettings>> = {
-  potato: { pictureSize: 480, sharpness: 1, supersample: false, effects: false, glow: false, contactShadows: false, contactShadowSamples: 4, smoothEdges: false, shadows: 'off', reflections: false, simpleLighting: true, plantDetail: 10, skipHiddenPlants: true, simpleSea: true, plantDistance: 60, clouds: false, flatGround: true, ditherDistance: 20, pixelPlumes: 'cubes', plumeDensity: 0.5 },
+  potato: { pictureSize: 480, sharpness: 1, supersample: false, effects: false, glow: false, contactShadows: false, contactShadowSamples: 4, smoothEdges: false, shadows: 'off', reflections: false, simpleLighting: true, plantDetail: 10, skipHiddenPlants: true, simpleSea: true, plantDistance: 60, clouds: false, flatGround: true, ditherDistance: 20, pixelPlumes: 'dither', plumeDensity: 0.5 },
   low: { pictureSize: 720, sharpness: 1, supersample: false, effects: false, glow: false, contactShadows: false, contactShadowSamples: 8, smoothEdges: false, shadows: 'off', reflections: false, simpleLighting: true, plantDetail: 18, skipHiddenPlants: true, simpleSea: true, plantDistance: 0, clouds: true, flatGround: false, ditherDistance: 30, pixelPlumes: 'cubes', plumeDensity: 0.75 },
   medium: { pictureSize: 0, sharpness: 1.5, supersample: false, effects: true, glow: true, contactShadows: false, contactShadowSamples: 8, smoothEdges: false, shadows: 'on', reflections: true, simpleLighting: false, plantDetail: 35, skipHiddenPlants: false, simpleSea: false, plantDistance: 0, clouds: true, flatGround: false, ditherDistance: 45, pixelPlumes: 'cubes', plumeDensity: 1 },
   high: { pictureSize: 0, sharpness: 2, supersample: false, effects: true, glow: true, contactShadows: true, contactShadowSamples: 12, smoothEdges: true, shadows: 'detailed', reflections: true, simpleLighting: false, plantDetail: 70, skipHiddenPlants: false, simpleSea: false, plantDistance: 0, clouds: true, flatGround: false, ditherDistance: 60, pixelPlumes: 'cubes', plumeDensity: 1.5 },
@@ -85,7 +87,7 @@ export const graphicsSchema = defineSchema({
     { key: 'clouds', type: 'boolean', label: 'Clouds', doc: 'Clouds drift across the sky.', tier: 'play', default: true, group: 'World' },
     { key: 'ditherDistance', type: 'number', label: 'Dither distance', doc: 'How far from you the voxel ground blends two surfaces pixel by pixel. Further away each block shows one surface. 0 blends everywhere (far away it can shimmer).', tier: 'play', default: 45, min: 0, max: 200, step: 1, hardMin: 0, unit: 'm', group: 'World' },
     { key: 'flatGround', type: 'boolean', label: 'Always flat ground', doc: 'Show the flat block ground even when the island is set to PBR. The PBR ground is the heaviest thing to draw.', tier: 'play', default: false, group: 'World' },
-    { key: 'pixelPlumes', type: 'enum', label: 'Pixel plumes', doc: 'The pixels that pour from machines. Cubes are little blocks that tumble as they rise. Off hides them; the machines still work.', tier: 'play', default: 'cubes', options: ['cubes', 'off'], group: 'Machines' },
+    { key: 'pixelPlumes', type: 'enum', label: 'Pixel plumes', doc: 'How the pixels that pour from machines are drawn. Cubes are little blocks that tumble as they rise; splats are soft glowing dots; dither draws square pixels, the cheapest. Off hides them; the machines still work.', tier: 'play', default: 'cubes', options: ['cubes', 'splats', 'dither', 'off'], group: 'Machines' },
     { key: 'plumeDensity', type: 'number', label: 'Plume density', doc: 'How many pixels pour from each machine. 1 is the plume as made, 2 twice as many.', tier: 'play', default: 1.5, min: 0.25, max: 2, step: 0.05, hardMin: 0.1, hardMax: 4, group: 'Machines' },
   ],
 });

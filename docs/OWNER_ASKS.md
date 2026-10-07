@@ -535,4 +535,8 @@ create a example of a all in one 3d/2d/anim/sound studio program where everythin
 
 - 2026-10-07 (laptop, planning session, Opus 5.5): logged into arena ai for you (Done: the labkit battle is collected and landed nothing: A sat in "Running command" for 5 hours, B is plain boxes and fails 2 acceptance tests (`arena-gathered/README.md`). Sent: the plume battle (`@hm/plume`, STATUS SM25) and labkit v2 (the same API with tests that measure detail); both running.)
 
-- 2026-10-07 (laptop, planning session, Opus 5.5): restarting the unreal engine so the plugin takes effect i hope (In progress: after the restart I check that `SetMix_UE5.uproject` lists PythonScriptPlugin; before it, the project file did not, and the plugin is off by default in 5.8.)
+- 2026-10-07 (laptop, planning session, Opus 5.5): restarting the unreal engine so the plugin takes effect i hope (Answered: Python already ran in this morning's session: the editor log shows the Python plugin mounted and Python 3.11.8 enabled, pulled in by other enabled plugins, though the project file does not list it. Nothing else to do before the bridge, SM27.)
+
+- 2026-10-07 (laptop, planning session, Opus 5.5, with a screenshot of the Unreal Engine 5.8 start screen): let me know if i need to make a new project again (Answered: no new project; reopen SetMix_UE5 from My Projects when the bridge work starts (SM27). Python already runs in it. Unreal can stay closed until then.)
+
+- 2026-10-07 (laptop, planning session, Opus 5.5): the hill and the sky popped, can we have smooth transition or for it to move up once it hits the horizon orsomthing? (Done: the wave's front no longer stops at 170 m. It crosses your plot, then races on, faster and faster, over the plains and the neighbours to the horizon (about 11.6 s), then climbs the sky from the horizon to the zenith (3.2 s), its band of light with it; nothing pops.)

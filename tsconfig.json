@@ -318,6 +318,9 @@
       "@hm/plotterrain": [
         "packages/plotterrain/src/index.ts"
       ],
+      "@hm/plume": [
+        "packages/plume/src/index.ts"
+      ],
       "@hm/fidelity": [
         "packages/fidelity/src/index.ts"
       ]

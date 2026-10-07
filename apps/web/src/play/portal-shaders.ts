@@ -11,7 +11,9 @@ export const POST_FRAGMENT = /* glsl */ `
   uniform vec2 uRes;
   uniform mat4 uInvProj, uCamWorld;
   uniform vec3 uWaveCentre;
-  uniform float uWaveR, uGlitch, uTime, uLost;
+  /** The wave's front on the ground (metres from its centre; < 0 none, > 1e6 done), then on the sky (the sine of the elevation it
+   *  has climbed to, from just below the horizon to the zenith): it never pops, it sweeps out to the horizon and up the sky. */
+  uniform float uWaveR, uSkyRise, uGlitch, uTime, uLost;
   varying vec2 vUv;
 
   float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
@@ -46,15 +48,28 @@ export const POST_FRAGMENT = /* glsl */ `
     if (fine.a < 0.75) { gl_FragColor = vec4(fine.rgb, 1.0); }
     else {
       float d = texture2D(uDepth, uv).x;
-      float dist = d >= 0.99999 ? 1e9 : length(worldAt(uv, d) - uWaveCentre);
-      // once the wave has crossed, the whole picture is at the new stage (sky and far plains too)
-      float inside = uWaveR < 0.0 ? 0.0 : uWaveR > 1e6 ? 1.0 : step(dist, uWaveR);
+      // the sky writes no depth: what is drawn is ground (the plot, the plains, the neighbours), what is not is sky
+      bool sky = d >= 0.99999;
+      float inside = 0.0, front = 0.0;
+      if (uWaveR > 1e6) inside = 1.0;
+      else if (uWaveR >= 0.0) {
+        if (!sky) {
+          float dist = length(worldAt(uv, d) - uWaveCentre);
+          inside = step(dist, uWaveR);
+          // the band of light widens as the front races out, so far away it still shows
+          front = smoothstep(max(6.0, uWaveR * 0.04), 0.0, uWaveR - dist);
+        } else {
+          // the sky: the front climbs from the horizon to the zenith once the ground is crossed
+          vec3 ray = normalize(worldAt(uv, 1.0) - uCamWorld[3].xyz);
+          inside = step(ray.y, uSkyRise);
+          front = smoothstep(0.07, 0.0, uSkyRise - ray.y);
+        }
+      }
       if (inside > 0.5) {
         // stage 1: colour at low resolution, gently posterised with the same dither
         vec3 c = pow(fine.rgb, vec3(1.0 / 2.2));
         c = floor(c * 10.0 + bayer4(px)) / 10.0;
         // the wave's front: a band of light where the new look arrives
-        float front = uWaveR > 1e5 ? 0.0 : smoothstep(6.0, 0.0, uWaveR - dist);
         c += vec3(1.0, 0.24, 0.54) * front * 0.55;
         gl_FragColor = vec4(pow(c, vec3(2.2)), 1.0);
       } else {

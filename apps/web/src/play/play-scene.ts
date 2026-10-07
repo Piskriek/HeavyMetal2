@@ -57,6 +57,8 @@ export interface PlayScene {
   readonly debug: {
     where(): Where; position(): THREE.Vector3; teleport(where: Where, x: number, z: number, yaw: number): void; sync(): number;
     stats(): { readonly triangles: number; readonly calls: number }; wave(): number; gatePlanet(): { x: number; z: number };
+    /** Places a mill at x, z as if the ghost stood there (the e2e has no mouse to aim with). */
+    placeAt(x: number, z: number): PlacedMachine | null;
   };
   dispose(): void;
 }
@@ -123,9 +125,9 @@ export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonl
 
   // machines: the mill, its cable from the gate's junction box, and the pink pixels from its stack
   const machines: { readonly m: PlacedMachine; readonly stack: THREE.Vector3; readonly power: THREE.Vector3; started: number }[] = [];
-  const PIXELS = 110;
+  const PIXELS = 160;
   const pixelMat = keep(new THREE.ShaderMaterial({ vertexShader: MARK_VERTEX, fragmentShader: COLOUR_MARK_FRAGMENT, blending: THREE.NoBlending, uniforms: { uColour: { value: new THREE.Color('#ff3d8a') }, uLit: { value: 0.35 } } }));
-  const pixelGeo = keep(new THREE.BoxGeometry(0.09, 0.09, 0.09));
+  const pixelGeo = keep(new THREE.BoxGeometry(0.14, 0.14, 0.14));
   const pixelSets: THREE.InstancedMesh[] = [];
   const cableMat = m.rubber;
   const millGroups: THREE.Group[] = [];
@@ -253,7 +255,7 @@ export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonl
     return WAVE_REACH * (1 - Math.pow(1 - Math.max(0, t), 2.2));
   };
 
-  return {
+  const api: PlayScene = {
     setPlanet(base, plot, neighbours) {
       if (world) return;
       world = createWorld(planetScene, { gridSpacing: o.gridSpacing, reducedMotion: o.reducedMotion });
@@ -358,9 +360,10 @@ export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonl
         const on = Math.max(0, Math.min(1, (now - mm.started) / 1.5));
         for (let i = 0; i < PIXELS; i++) {
           const ph = (i * 0.618034) % 1, life = (now * 0.32 + ph) % 1;
-          const spread = life * (0.4 + 1.4 * ((i * 0.37) % 1));
+          // a pour that widens as it rises and leans downwind, each pixel on its own small spiral
+          const spread = 0.15 + life * (0.9 + 2.6 * ((i * 0.37) % 1));
           const a = i * 2.39996 + now * 0.25;
-          p.set(mm.stack.x + Math.cos(a) * spread + life * 1.6, mm.stack.y + life * 4.8, mm.stack.z + Math.sin(a) * spread + life * 0.6);
+          p.set(mm.stack.x + Math.cos(a) * spread + life * life * 3.2, mm.stack.y + life * 6.5, mm.stack.z + Math.sin(a) * spread + life * life * 1.2);
           const size = on * (1 - life) * (0.7 + ((i * 0.53) % 1) * 0.6);
           s.set(size, size, size);
           q.setFromEuler(e.set(life * 4 + i, life * 3, 0));
@@ -377,6 +380,7 @@ export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonl
       postUniforms.uLost.value = Math.max(0, 1 - (now - lostAt) / 0.6);
       openingUniforms.uTime.value = now;
       room.update(now, dt);
+      labScene.environmentIntensity = room.envLevel();
       world?.update(now, dt, where === 'planet' ? camera.position : virtual.position);
 
       // ---- draw
@@ -440,6 +444,15 @@ export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonl
       stats: () => ({ triangles: renderer.info.render.triangles, calls: renderer.info.render.calls }),
       wave: () => waveRadius(),
       gatePlanet: () => ({ x: twin.group.position.x, z: twin.group.position.z }),
+      placeAt(x, z) {
+        if (where !== 'planet') return null;
+        building = true;
+        ghostAt.set(x, groundAt(x, z), z);
+        ghostVerdict = placeCheck(x, z, twin.group.position, machines.map((mm) => mm.m));
+        const pm = api.place();
+        building = false; ghost.visible = false;
+        return pm;
+      },
     },
     dispose() {
       world?.dispose();
@@ -449,6 +462,7 @@ export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonl
       renderer.dispose();
     },
   };
+  return api;
 }
 
 /** Lab bounds, for the screen's hints. */

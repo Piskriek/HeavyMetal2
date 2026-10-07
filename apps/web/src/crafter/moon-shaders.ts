@@ -340,7 +340,8 @@ void main() {
       float l = dot(n, uSunDir);
       float land = smoothstep(0.5, 0.56, fbm(n * 2.6 + 7.0));
       float cloud = smoothstep(0.52, 0.75, fbm(n * 5.0 + vec3(3.0, 1.0, 2.0)));
-      vec3 albedo = mix(vec3(0.03, 0.12, 0.2), mix(vec3(0.16, 0.34, 0.12), vec3(0.42, 0.36, 0.2), smoothstep(0.6, 0.75, fbm(n * 6.0))), land);
+      // the goblin planet is green and ochre, no blue seas (the concept art): deep green lowlands, green uplands, ochre highlands
+      vec3 albedo = mix(vec3(0.06, 0.14, 0.06), mix(vec3(0.16, 0.34, 0.12), vec3(0.46, 0.36, 0.17), smoothstep(0.58, 0.72, fbm(n * 6.0))), land);
       albedo = mix(albedo, vec3(0.85), cloud * 0.8);
       vec3 lit = albedo * smoothstep(-0.08, 0.35, l) * 1.6;
       // its air: a blue-green rim on the lit side

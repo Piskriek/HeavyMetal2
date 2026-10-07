@@ -1,0 +1,72 @@
+/* The first Play's screen: the world is the interface. Text sits over the scene in the SetMix menu's voice (lab white,
+   a soft shadow); amber is the lab's power colour and marks what to do next; sync is a row of square pixels. */
+.play { position: absolute; inset: 0; overflow: hidden; background: #050607; color: #f1f4f5; --amber: #ffb02a; --power: #ffb02a; }
+.play-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+.play-loading { z-index: 3; }
+.play-failed { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--dim); }
+
+/* what to do now: top left, where the menu was */
+.play-goal { position: absolute; left: clamp(16px, 4vw, 56px); top: clamp(16px, 5vh, 48px); max-width: min(420px, 80vw); padding-left: 14px; border-left: 2px solid var(--power); text-shadow: 0 1px 3px rgba(4, 6, 8, .7); pointer-events: none; }
+.play-goal h2 { margin: 0; font-family: var(--font-setmix); font-weight: 700; font-size: clamp(20px, 2.1vw, 28px); line-height: 1.15; letter-spacing: -0.01em; }
+/* on the planet the dither runs right up to the text: a soft dark wash keeps it readable */
+.play.on-planet .play-goal { padding: 10px 18px 10px 14px; background: linear-gradient(90deg, rgba(4, 5, 6, .72), rgba(4, 5, 6, .35) 75%, transparent); }
+.play.on-planet .play-toast { padding: 14px 28px; background: radial-gradient(ellipse at center, rgba(4, 5, 6, .7), transparent 70%); }
+.play-goal p { margin: 6px 0 0; font-size: 14px; line-height: 1.45; color: rgba(232, 238, 241, .86); max-width: 36ch; }
+
+/* sync: square pixels that go out one by one, and flicker when few are left */
+.play-sync { position: absolute; left: 50%; top: clamp(14px, 3.4vh, 30px); transform: translateX(-50%); display: grid; justify-items: center; gap: 6px; pointer-events: none; }
+.play-sync span { font-family: var(--font-setmix); font-size: 12px; letter-spacing: 0.08em; color: rgba(232, 238, 241, .8); text-shadow: 0 1px 2px rgba(0, 0, 0, .8); }
+.play-sync ol { display: flex; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.play-sync li { width: 9px; height: 9px; background: rgba(241, 244, 245, .14); box-shadow: 0 0 0 1px rgba(0, 0, 0, .35); }
+.play-sync li.on { background: #f1f4f5; }
+.play.sync-low .play-sync li.on { background: var(--amber); animation: play-flicker .18s steps(2) infinite; }
+@keyframes play-flicker { 50% { opacity: .35; } }
+
+/* the crosshair is one pixel-square, and what you can do with what it points at */
+.play-dot { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; background: #f1f4f5; box-shadow: 0 0 0 1px rgba(0, 0, 0, .55); pointer-events: none; }
+.play-prompt { position: absolute; left: 50%; top: calc(50% + 22px); transform: translateX(-50%); margin: 0; padding: 4px 10px; font-size: 14px; white-space: nowrap; color: #fff; background: rgba(8, 10, 12, .55); border-bottom: 2px solid var(--power); pointer-events: none; }
+.play-prompt.bad { border-bottom-color: #ff5a4a; color: #ffd9d4; }
+
+/* the build menu: a quiet card at the bottom, one machine for now */
+.play-build { position: absolute; left: 50%; bottom: clamp(16px, 6vh, 48px); transform: translateX(-50%); width: min(440px, calc(100vw - 32px)); padding: 14px 16px 12px; background: rgba(12, 14, 17, .86); border: 1px solid rgba(241, 244, 245, .12); }
+.play-build h3 { margin: 0 0 10px; font-family: var(--font-setmix); font-size: 15px; font-weight: 600; color: rgba(232, 238, 241, .7); }
+.play-card { display: grid; gap: 4px; width: 100%; text-align: left; padding: 12px 14px; background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 61, 138, .45); color: #f1f4f5; cursor: pointer; }
+.play-card:hover, .play-card:focus-visible { background: rgba(255, 61, 138, .12); outline: none; border-color: #ff3d8a; }
+.play-card b { font-family: var(--font-setmix); font-size: 18px; font-weight: 700; }
+.play-card span { font-size: 13px; line-height: 1.4; color: rgba(232, 238, 241, .82); }
+.play-card em { font-style: normal; font-size: 12px; color: #ff7fb0; }
+.play-build p { margin: 10px 0 0; font-size: 12px; color: rgba(232, 238, 241, .6); }
+
+/* not looking yet: one clear thing to do, and the keys */
+.play-start { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 14px; padding: 18px 24px; background: rgba(8, 10, 12, .62); border: 1px solid rgba(241, 244, 245, .14); color: #f1f4f5; cursor: pointer; }
+.play-start b { font-family: var(--font-setmix); font-size: 20px; font-weight: 700; }
+.play-keys { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 14px; font-size: 12px; color: rgba(232, 238, 241, .75); }
+.play-keys span { display: inline-flex; align-items: center; gap: 6px; }
+.play kbd { font-family: inherit; font-size: 11px; padding: 1px 6px; border: 1px solid rgba(241, 244, 245, .3); border-bottom-width: 2px; color: #f1f4f5; }
+
+.play-pause { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 10px; background: rgba(5, 6, 8, .62); }
+.play-pause h2 { margin: 0 0 8px; font-family: var(--font-setmix); font-size: 30px; font-weight: 800; }
+.play-pause button { min-width: 220px; padding: 10px 18px; font-size: 15px; background: rgba(255, 255, 255, .06); color: #f1f4f5; border: 1px solid rgba(241, 244, 245, .22); cursor: pointer; }
+.play-pause button.go { background: var(--power); color: #17110a; border-color: var(--power); font-weight: 700; }
+.play-pause button:focus-visible, .play-start:focus-visible { outline: 2px solid var(--power); outline-offset: 2px; }
+
+/* moments: big, centred above the crosshair, gone in three seconds */
+.play-toast { position: absolute; left: 50%; top: 28%; transform: translateX(-50%); display: grid; justify-items: center; gap: 6px; text-align: center; pointer-events: none; text-shadow: 0 2px 8px rgba(0, 0, 0, .75); animation: play-toast 3.2s var(--ease-out) both; }
+.play-toast b { font-family: var(--font-setmix); font-size: clamp(30px, 4.4vw, 54px); font-weight: 800; letter-spacing: -0.02em; }
+.play-toast span { font-size: 15px; color: rgba(232, 238, 241, .9); max-width: 44ch; }
+.play-toast.lost b { color: var(--amber); animation: play-tear .5s steps(3) 2; }
+@keyframes play-toast { 0% { opacity: 0; transform: translate(-50%, 8px); } 10%, 82% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
+@keyframes play-tear { 33% { transform: translateX(-6px); } 66% { transform: translateX(5px); } }
+
+/* character creation happens in the lab: the lab shows on the left, the maker's panel on the right */
+.play-create { position: absolute; inset: 0; z-index: 2; color: var(--text); }
+.create-goblin.in-lab { background: linear-gradient(90deg, rgba(5, 6, 8, .15), rgba(5, 6, 8, .35)); }
+.create-goblin.in-lab .turntable { background: radial-gradient(ellipse at 50% 70%, rgba(255, 176, 42, .12), transparent 60%); }
+
+@media (prefers-reduced-motion: reduce) {
+  .play-toast, .play-toast.lost b, .play.sync-low .play-sync li.on { animation: none; }
+}
+@media (max-width: 640px) {
+  .play-goal p { display: none; }
+  .play-prompt { white-space: normal; max-width: calc(100vw - 32px); text-align: center; }
+}

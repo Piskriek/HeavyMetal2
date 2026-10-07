@@ -81,9 +81,9 @@ try {
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
   await page.waitForFunction(() => window.hmLab && window.hmLab.ready && window.hmLab.frames > 5, null, { timeout: T(60000) });
 
-  // Play opens the Resolution Crafter (a first look): the moon builds behind a loading bar; a stage jump sends a wave out from your plot's centre; Esc returns home
+  // the Resolution Crafter preview (?crafter, a test view): the moon builds behind a loading bar; a stage jump sends a wave out from your plot's centre; Esc returns home
   const crafterErrors = errors.length;
-  await text('.sm-menu button', 'Play').click();
+  await page.goto(`http://127.0.0.1:${port}/?crafter`);
   await page.waitForFunction(() => window.hmCrafter && window.hmCrafter.frames > 5, null, { timeout: T(30000) });
   check('the Resolution Crafter builds its moon and draws it', await page.locator('.rc-console').count() === 1 && await dom(() => window.hmCrafter.shown.startsWith('lunar_anorthosite@1@')));
   await dom(() => [...document.querySelectorAll('.rc-ladder button')][2]?.click());
@@ -99,6 +99,10 @@ try {
   await page.waitForTimeout(T(400));
   check('Esc leaves the Resolution Crafter for the SetMix home', await page.locator('.sm-home').count() === 1 && await dom(() => !window.hmCrafter));
   check('the Resolution Crafter raised no page error', errors.length === crafterErrors, errors.slice(crafterErrors).join(' | '));
+  await page.goto(`http://127.0.0.1:${port}/`);
+  await page.waitForSelector('.sm-home', { timeout: T(30000) });
+  await page.waitForFunction(() => window.hmLab && window.hmLab.ready && window.hmLab.frames > 5, null, { timeout: T(60000) });
+
 
   // My planet shows your islands drawn from above; going into one the first time makes your first avatar (look and name), then dives
   await text('.sm-menu button', 'My planet').click();
@@ -667,6 +671,54 @@ try {
     r.onerror = () => ok({ idb: [], ls: [] });
   }));
   check('island saves are in IndexedDB, none in localStorage', saved.idb.some((k) => k.startsWith('hm.island.')) && saved.idb.includes('hm.islands.v1') && saved.ls.length === 0, JSON.stringify(saved));
+
+  // the first Play runs last: your human made in the lab is your first avatar, and the island tour above needs a new player
+  await page.goto(`http://127.0.0.1:${port}/`);
+  await page.waitForSelector('.sm-home', { timeout: T(30000) });
+  await page.waitForFunction(() => window.hmLab && window.hmLab.ready && window.hmLab.frames > 5, null, { timeout: T(60000) });
+
+  // Play: the first Play (STATUS SM22). Your human is made in the lab; the main lever turns the gate on; you walk through onto
+  // the stage-0 planet, where sync runs down; you walk back; the first texture mill lifts the plot to stage 1; Esc pauses
+  const playErrors = errors.length;
+  await text('.sm-menu button', 'Play').click();
+  await page.waitForFunction(() => window.hmPlay && window.hmPlay.ready && window.hmPlay.frames > 5, null, { timeout: T(90000) });
+  check('Play opens the lab and asks who you are, in the lab', await page.locator('.play-create .create-goblin.in-lab').count() === 1);
+  check('you are a human in the lab', await dom(() => [...document.querySelectorAll('.play-create .cg-looks button span')].some((x) => x.textContent === 'Explorer')));
+  await page.fill('.play-create .cg-name input', 'Ada');
+  await dom(() => { [...document.querySelectorAll('.play-create .btns button')].find((b) => b.textContent.startsWith('Done'))?.click(); });
+  await page.waitForFunction(() => window.hmPlay.state().step === 'power', null, { timeout: T(10000) });
+  check('made: next, turn on the gate', /Turn on the gate/.test(await page.locator('.play-goal h2').innerText()));
+  await dom(() => window.hmPlay.pull());
+  await page.waitForFunction(() => window.hmPlay.state().gateOn, null, { timeout: T(30000) });
+  check('the main lever turns the gate on', /Step through the gate/.test(await page.locator('.play-goal h2').innerText()));
+  await shot('play-gate-on');
+  // walk through the gate: stand in front of it in the lab, facing it, and walk
+  const walk = async (key, ms) => { await page.keyboard.down(key); await page.waitForTimeout(ms); await page.keyboard.up(key); };
+  await dom(() => window.hmPlay.go('lab', 3.2, -6.9, 0));
+  await walk('KeyW', T(1400));
+  await page.waitForFunction(() => window.hmPlay.where === 'planet', null, { timeout: T(8000) });
+  check('walking through the gate takes you onto your plot', true);
+  await page.waitForTimeout(T(2500));
+  check('sync runs down on the planet', await dom(() => window.hmPlay.sync < 0.99) && await page.locator('.play-sync li').count() === 20);
+  await shot('play-stage-0');
+  await walk('KeyS', T(1700));
+  await page.waitForFunction(() => window.hmPlay.where === 'lab', null, { timeout: T(8000) });
+  check('walking back through the gate takes you home; next, build', await dom(() => window.hmPlay.state().step === 'build'));
+  await dom(() => window.hmPlay.go('lab', 3.2, -6.9, 0));
+  await walk('KeyW', T(1400));
+  await page.waitForFunction(() => window.hmPlay.where === 'planet', null, { timeout: T(8000) });
+  check('a mill too far from the gate is refused', await dom(() => { const g = window.hmPlay.gate(); return !window.hmPlay.placeAt(g.x + 60, g.z); }));
+  check('the first mill stands near the gate', await dom(() => { const g = window.hmPlay.gate(); return window.hmPlay.placeAt(g.x + 7, g.z + 5); }));
+  check('the first machine lifts the plot to stage 1', await dom(() => window.hmPlay.state().step === 'done' && window.hmPlay.state().stage === 1));
+  await page.waitForFunction(() => window.hmPlay.wave > 1e6, null, { timeout: T(40000) });
+  check('the wave crosses the plot', true);
+  await shot('play-stage-1');
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('.play-pause', { timeout: T(5000) });
+  await dom(() => { [...document.querySelectorAll('.play-pause button')].find((b) => b.textContent === 'Back to SetMix')?.click(); });
+  await page.waitForSelector('.sm-home', { timeout: T(15000) });
+  check('Esc pauses and Back to SetMix goes home', await dom(() => !window.hmPlay));
+  check('the first Play raised no page error', errors.length === playErrors, errors.slice(playErrors).join(' | '));
   check('no page errors during the whole tour', errors.length === 0, errors.join(' | '));
 } catch (e) {
   try { const pg = browser.contexts()[0]?.pages()[0]; if (pg) console.log('screen at failure:', await pg.evaluate(() => `${document.querySelector('.shell')?.getAttribute('data-screen')} | ${document.body.innerText.slice(0, 160).split(String.fromCharCode(10)).join(' / ')}`)); } catch { /* ignore */ }

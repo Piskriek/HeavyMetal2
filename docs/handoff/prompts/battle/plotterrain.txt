@@ -1,0 +1,138 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: the natural terrain of a 1 km round plot of land on a desolate planet in a game, as pure math (no rendering library). It gives heights, normals and the ground materials that belong at every point, the craters and the boulder positions, and builds chunked meshes (typed arrays) with detail by distance. A gate stands at the centre on a flat pad; the land around it must look natural, never like a pyramid, a crater bowl or a flat sheet.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/plotterrain.test.ts`. If your environment can show a web page, ALSO make a small preview page (index.html, three.js from a CDN is fine there) that draws the plot from above with its materials as colours and a low 3D view from the pad; the two code blocks in the chat are what gets collected. When the tests would pass, STOP.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random (use a seeded hash), no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. Units are metres; the plot frame has the gate at x = 0, z = 0; +y is up.
+
+## The land (what it must look like)
+A natural desolate landscape, like a high desert or a Moon-like plain seen in a 1990s 3D game, but shaped like real ground:
+- the gate's pad: flat within `padRadius` (default 9 m), easing into the land over the next 15 m with no ridge or ditch at its edge; the pad sits a little above its surroundings on a broad, low rise (never a cone);
+- beyond: gently rolling ground (long low swells of 1 to 4 m), shallow dune-like ripples on the flats, a few old eroded craters (8 to 70 m across, raised soft rims, shallow bowls, none within 40 m of the gate), two or three ridges and outcrops (up to about 25 m high, steeper rocky faces on one side), dry gullies cut by long-gone water running downhill;
+- detail at every scale: big shapes from a few octaves of smooth noise, warped so they are not grid-aligned or symmetric, small bumps on top; heights stay within -15 m .. +35 m of the pad over the whole plot.
+
+## Materials (what covers the ground where)
+Six materials, weights 0..1 summing to 1 at every point, varying smoothly (no hard stripes) but with clear patches:
+- `rock`: steep slopes (above about 30 degrees), ridge crests, crater rims, outcrops;
+- `scree`: the foot of steep slopes and below outcrops (loose broken rock);
+- `gravel`: gently sloping open ground;
+- `dust`: hollows, crater floors, the lee of ridges, fine and pale;
+- `cracked`: flat low basins (dried mud flats with polygon cracks);
+- `redsoil`: irregular patches of rust-red soil across the flats (a noise mask), never on rock.
+The pad itself is `gravel` and `dust`.
+
+## API (implement exactly; you may add more exports)
+
+```ts
+export type Material = 'rock' | 'scree' | 'gravel' | 'dust' | 'cracked' | 'redsoil';
+export const MATERIALS: readonly Material[]; // in that order
+export type Weights = [number, number, number, number, number, number]; // in MATERIALS order, summing to 1
+
+export interface Crater { x: number; z: number; r: number; depth: number }
+export interface Boulder { x: number; z: number; size: number; yaw: number }
+
+export interface Terrain {
+  readonly radius: number;     // the plot's radius (default 500)
+  readonly padRadius: number;
+  /** Height at x, z (any x, z: the land carries on smoothly past the plot's edge). Deterministic, continuous. */
+  height(x: number, z: number): number;
+  /** Unit normal at x, z, from the height field. */
+  normal(x: number, z: number): [number, number, number];
+  /** Slope in degrees at x, z. */
+  slope(x: number, z: number): number;
+  materials(x: number, z: number): Weights;
+  readonly craters: readonly Crater[];
+  /** Boulders in the square [x0, x0 + size) x [z0, z0 + size): deterministic (the same square always gives the same boulders, and
+   *  neighbouring squares never duplicate one), denser below outcrops and on crater rims, sparse on flats, none on the pad or within 2 m of it. */
+  boulders(x0: number, z0: number, size: number): Boulder[];
+}
+export function createTerrain(o: { seed: number; radius?: number; padRadius?: number }): Terrain;
+
+/** A chunk of ground: the square [cx - size/2, cx + size/2] x [cz - size/2, cz + size/2] in `cells` x `cells` quads.
+ *  smooth: shared vertices, smooth normals. flat (stage 1 look): every triangle has its own three vertices with the face's normal.
+ *  skirt (metres, default 0 = none): a strip hanging down along all four edges, hiding cracks against neighbours of other detail.
+ *  matA holds rock, scree, gravel and matB dust, cracked, redsoil, per vertex (3 floats each). */
+export interface ChunkMesh { positions: Float32Array; normals: Float32Array; matA: Float32Array; matB: Float32Array; indices: Uint32Array }
+export function chunkMesh(t: Terrain, cx: number, cz: number, size: number, cells: number, o?: { flat?: boolean; skirt?: number }): ChunkMesh;
+
+/** The chunks to draw round an eye at (x, z): a quadtree over the square [-extent, extent]^2, split finer near the eye; each leaf
+ *  is { cx, cz, size, cells } with cells fixed at `cells`. Leaves tile the square exactly (no gaps, no overlaps), neighbouring
+ *  leaves differ by at most one level, and the total triangles (2 * cells^2 per leaf) never exceed `budget`. */
+export function chunksAround(eyeX: number, eyeZ: number, o: { extent: number; cells: number; minSize: number; budget: number }): { cx: number; cz: number; size: number; cells: number }[];
+```
+
+## Budgets
+`height` must run at least 2 million times a second in Node (it is called for every vertex). `chunkMesh(t, 0, 0, 64, 64)` under 20 ms. `chunksAround` with extent 600, cells 32, minSize 16, budget 200000 under 5 ms.
+
+## Acceptance tests (copy unchanged, then add your own: determinism, materials sum to 1 everywhere, rock on steep slopes, redsoil never above rock, boulders deterministic and not on the pad, chunk normals unit length, flat meshes have unshared vertices, budgets)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createTerrain, chunkMesh, chunksAround, MATERIALS } from '../src/index';
+
+const t = createTerrain({ seed: 7 });
+const near = (a: number, b: number, tol: number) => Math.abs(a - b) <= tol;
+
+test('the pad is flat and the land rises gently from it, never a cone or a bowl', () => {
+  const h0 = t.height(0, 0);
+  for (let a = 0; a < Math.PI * 2; a += 0.3) for (const r of [0, 3, 6, 8.5]) assert.ok(near(t.height(Math.cos(a) * r, Math.sin(a) * r), h0, 0.03));
+  for (let a = 0; a < Math.PI * 2; a += 0.2) for (let r = 9; r < 24; r += 1) {
+    const s = t.slope(Math.cos(a) * r, Math.sin(a) * r);
+    assert.ok(s < 12, `slope ${s} at r ${r}`);
+  }
+  // the pad is not on a peak: the land 150 m out in every direction is not all far below it
+  let below = 0;
+  for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) if (t.height(Math.cos(a) * 150, Math.sin(a) * 150) < h0 - 10) below++;
+  assert.ok(below < 12);
+});
+
+test('natural relief within bounds, no craters near the gate', () => {
+  let lo = Infinity, hi = -Infinity, steep = 0, n = 0;
+  for (let x = -480; x <= 480; x += 16) for (let z = -480; z <= 480; z += 16) {
+    if (x * x + z * z > 480 * 480) continue;
+    const h = t.height(x, z) - t.height(0, 0);
+    lo = Math.min(lo, h); hi = Math.max(hi, h); n++;
+    if (t.slope(x, z) > 30) steep++;
+  }
+  assert.ok(lo >= -15.5 && hi <= 35.5 && hi - lo > 8, `relief ${lo}..${hi}`);
+  assert.ok(steep > 0 && steep < n * 0.15);
+  assert.ok(t.craters.length >= 3);
+  for (const c of t.craters) assert.ok(Math.hypot(c.x, c.z) - c.r >= 40);
+});
+
+test('materials sum to 1 and follow the land', () => {
+  assert.deepEqual([...MATERIALS], ['rock', 'scree', 'gravel', 'dust', 'cracked', 'redsoil']);
+  let rockOnSteep = 0, steep = 0, seenRed = false;
+  for (let x = -400; x <= 400; x += 10) for (let z = -400; z <= 400; z += 10) {
+    const w = t.materials(x, z);
+    assert.ok(near(w.reduce((a, b) => a + b, 0), 1, 1e-6));
+    for (const v of w) assert.ok(v >= 0 && v <= 1);
+    if (t.slope(x, z) > 35) { steep++; if (w[0] > 0.5) rockOnSteep++; }
+    if (w[5] > 0.5) seenRed = true;
+  }
+  assert.ok(steep === 0 || rockOnSteep / steep > 0.7);
+  assert.ok(seenRed);
+});
+
+test('boulders: deterministic, none on the pad', () => {
+  const a = t.boulders(-64, -64, 128), b = t.boulders(-64, -64, 128);
+  assert.deepEqual(a, b);
+  for (const k of a) assert.ok(Math.hypot(k.x, k.z) > t.padRadius + 2);
+});
+
+test('chunks: meshes and a crack-free quadtree within budget', () => {
+  const m = chunkMesh(t, 0, 0, 64, 16);
+  assert.equal(m.positions.length, 17 * 17 * 3);
+  assert.equal(m.indices.length, 16 * 16 * 6);
+  const f = chunkMesh(t, 0, 0, 64, 16, { flat: true });
+  assert.equal(f.positions.length, 16 * 16 * 6 * 3);
+  const leaves = chunksAround(5, -3, { extent: 600, cells: 32, minSize: 16, budget: 200000 });
+  let area = 0, tris = 0;
+  for (const l of leaves) { area += l.size * l.size; tris += 2 * l.cells * l.cells; }
+  assert.ok(near(area, 1200 * 1200, 1));
+  assert.ok(tris <= 200000);
+  // sizes halve from 1200: the finest near the eye is 18.75 (the first at or above minSize 16), the farthest 150 or more
+  assert.ok(leaves.some((l) => l.size < 20) && leaves.some((l) => l.size >= 150));
+  for (const l of leaves) assert.ok(l.size >= 16);
+});
+```

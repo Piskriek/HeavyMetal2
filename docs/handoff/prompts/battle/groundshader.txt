@@ -1,0 +1,118 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module for three.js: the ground material of a desolate planet in a game, natural at every stage of a six-stage "resolution" ladder. Six ground materials (rock, scree, gravel, dust, cracked mud, red soil) are generated procedurally as seamless texture tiles, blended per vertex by weights from the terrain, sampled triplanar on slopes and height-blended so they meet like real ground. Stage 1 is the same natural ground drawn at very low resolution (big texels, flat light, a few colour levels, like a 1990s 3D game); stage 6 is full high-fidelity PBR. Changing stage changes uniforms only, never the shader program.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/groundshader.test.ts`. If your environment can show a web page, ALSO make a preview page (index.html, three.js from a CDN) that draws a 200 m patch of rolling ground with the six materials in patches, a low sun, and a slider for stage 1..6; the two code blocks in the chat are what gets collected. When the tests would pass, STOP.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM (textures only as THREE.DataTexture / THREE.DataArrayTexture from typed arrays), no Date, no Math.random (seeded hash). The only import in src is `import * as THREE from 'three'` (three r170 or later, WebGL2). GLSL is a ShaderMaterial (GLSL3 is fine); include three's `#include <colorspace_fragment>` at the end of the fragment shader and `#include <fog_pars_fragment>` / `#include <fog_fragment>` so scene fog works. The test file imports only `node:test`, `node:assert/strict`, `three` and `../src/index`.
+
+## The materials (what each looks like, close up, at stage 6)
+- `rock`: grey-brown fractured stone, layered strata and cracks, rough with a few smoother faces;
+- `scree`: loose angular stones from fist- to head-sized over grit, grey-brown, high relief;
+- `gravel`: small pebbles packed in dusty soil, warm grey;
+- `dust`: fine pale sand-coloured powder with soft ripples, smooth, the lightest material;
+- `cracked`: a dried mud flat broken into polygons by dark cracks, light tan plates;
+- `redsoil`: rust-red soil with small dark stones, iron-rich, clearly red (r > g > b).
+Each tile is seamless and carries a height (for blending and normals) and a roughness. Use layered value/gradient noise, Worley (cells) for stones and cracks, domain warping so nothing looks grid-aligned. Colours natural and slightly varied within each tile.
+
+## API (implement exactly; you may add more exports)
+
+```ts
+import * as THREE from 'three';
+
+export const MATERIALS: readonly ['rock', 'scree', 'gravel', 'dust', 'cracked', 'redsoil'];
+
+export interface GroundTextures {
+  /** Six layers in MATERIALS order: rgb = albedo (sRGB), a = height 0..1. */
+  albedoHeight: THREE.DataArrayTexture;
+  /** Six layers: rgb = tangent-space normal (0.5, 0.5, 1 is flat), a = roughness 0..1. */
+  normalRough: THREE.DataArrayTexture;
+  /** How many metres of ground one tile covers, per material. */
+  metres: readonly number[];
+  size: number;
+}
+/** Builds the tiles (size: 64, 128, 256 or 512 px). Deterministic for a seed. */
+export function makeGroundTextures(o: { size: number; seed: number }): GroundTextures;
+
+/** How a stage draws the ground. */
+export interface GroundStage {
+  texelsPerMetre: number;   // the stage's resolution: stage 1 about 6, doubling-ish up to stage 6 (the tile's own resolution caps it)
+  nearest: boolean;         // stage 1 and 2: hard texels (UVs snapped to the texel grid), later stages filtered
+  normalStrength: number;   // 0.25 at stage 1 up to 1 at stage 6
+  levels: number;           // colour levels per channel (posterise): 12 at stage 1, 24 at stage 2, 0 (off) from stage 3
+  specular: number;         // 0 at stage 1 (flat diffuse) up to 1 at stage 6
+  triplanar: boolean;       // off at stage 1 (planar top-down), on from stage 3
+}
+export function stageLook(stage: number): GroundStage; // stage 0..6 (0 behaves as 1); fractional stages interpolate the numbers
+
+/** The material. Reads per-vertex attributes `position`, `normal`, `matA` (rock, scree, gravel weights) and `matB` (dust, cracked, redsoil).
+ *  Lighting: a sun (direction and colour uniforms) with lambert diffuse and, by stage, a GGX-ish specular from roughness; a hemisphere
+ *  ambient (sky and ground colours); a shade multiplier from an optional per-vertex `aShade` attribute (baked shadows; 1 if absent). */
+export function createGroundMaterial(tex: GroundTextures, o: { stage: number; sunDir: THREE.Vector3; sunColour?: THREE.Color; skyColour?: THREE.Color; groundColour?: THREE.Color }): THREE.ShaderMaterial;
+/** Moves the material to a stage (uniforms only: the same program, no recompile). */
+export function setStage(m: THREE.ShaderMaterial, stage: number): void;
+/** Mean albedo of one material's tile, linear 0..1 (for tests and tuning). */
+export function meanAlbedo(tex: GroundTextures, material: number): [number, number, number];
+```
+
+## How it must look
+- Materials meet like ground: height-blended (stones poke through dust, dust settles between stones), never a soft cross-fade smear and never a hard stripe.
+- No visible tiling at 30 m: break repetition with a second, rotated, scaled sample of each tile and a slow macro variation of brightness.
+- Stage 1: chunky texels (snapped UVs), few colour levels, flat diffuse light, no specular: unmistakably low resolution, but clearly sand, stone, red soil and rock, not flat colour.
+- Stage 6: detailed, normal-mapped, roughness-correct, triplanar on slopes.
+
+## Budgets
+`makeGroundTextures({ size: 256 })` under 400 ms in Node, `size: 64` under 40 ms. The fragment shader: at most 12 texture fetches per pixel at stage 6 and 6 at stage 1 (skip materials whose weight is under 0.02).
+
+## Acceptance tests (copy unchanged, then add your own: seamless tiles, determinism, stage numbers monotonic, setStage keeps the program, attributes named)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { MATERIALS, makeGroundTextures, stageLook, createGroundMaterial, setStage, meanAlbedo } from '../src/index';
+
+const tex = makeGroundTextures({ size: 64, seed: 3 });
+
+test('six seamless layers of the right size', () => {
+  assert.deepEqual([...MATERIALS], ['rock', 'scree', 'gravel', 'dust', 'cracked', 'redsoil']);
+  assert.equal(tex.albedoHeight.image.depth, 6);
+  assert.equal(tex.albedoHeight.image.width, 64);
+  assert.equal(tex.metres.length, 6);
+  const d = tex.albedoHeight.image.data as Uint8Array, n = 64;
+  // seamless: the jump across the tile's edge is no bigger than a typical step inside it
+  for (let layer = 0; layer < 6; layer++) {
+    let edge = 0, inner = 0;
+    for (let y = 0; y < n; y++) {
+      const at = (x: number) => d[(layer * n * n + y * n + x) * 4]!;
+      edge += Math.abs(at(n - 1) - at(0));
+      inner += Math.abs(at(n / 2) - at(n / 2 - 1));
+    }
+    assert.ok(edge <= inner * 2.5 + n * 6, `layer ${layer}: edge ${edge} vs inner ${inner}`);
+  }
+});
+
+test('materials look like themselves', () => {
+  const [rr, rg, rb] = meanAlbedo(tex, 5);
+  assert.ok(rr > rg * 1.25 && rg >= rb, 'red soil is red');
+  const lum = (i: number) => { const [r, g, b] = meanAlbedo(tex, i); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  for (const i of [0, 1, 2, 4, 5]) assert.ok(lum(3) > lum(i), `dust is the lightest (vs ${MATERIALS[i]})`);
+  const [kr, kg, kb] = meanAlbedo(tex, 0);
+  assert.ok(Math.max(kr, kg, kb) - Math.min(kr, kg, kb) < 0.12, 'rock is near grey');
+});
+
+test('stages climb, stage 1 is low resolution', () => {
+  const s1 = stageLook(1), s6 = stageLook(6);
+  assert.ok(s1.nearest && !s6.nearest);
+  assert.ok(s1.texelsPerMetre < s6.texelsPerMetre && s1.texelsPerMetre <= 8);
+  assert.ok(s1.specular === 0 && s6.specular > 0.5 && s1.levels > 0 && s6.levels === 0);
+  for (let s = 1; s < 6; s++) assert.ok(stageLook(s + 1).texelsPerMetre >= stageLook(s).texelsPerMetre);
+});
+
+test('one program for every stage', () => {
+  const m = createGroundMaterial(tex, { stage: 1, sunDir: new THREE.Vector3(0.4, 0.4, -0.8).normalize() });
+  const program = m.fragmentShader + JSON.stringify(m.defines ?? {});
+  setStage(m, 6);
+  assert.equal(m.fragmentShader + JSON.stringify(m.defines ?? {}), program);
+  assert.match(m.vertexShader, /matA/);
+  assert.match(m.vertexShader, /matB/);
+});
+```

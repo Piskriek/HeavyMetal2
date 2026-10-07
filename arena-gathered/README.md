@@ -42,3 +42,13 @@ Arena sometimes shows a reCAPTCHA; a chat sent while it is up is lost (the link 
 ## SetMix: The Resolution Crafter (2026-10-06)
 
 The winner of the side session's concept battles (battle 4, answer A, out of 8 concept answers) kept working in the same chat for eleven more phases; all of it is gathered in `setmix/` with its own README. One model per phase, so there is no A/B pick. The audit (its tests, its claims) and the landing waves are in `docs/SETMIX_LANDING.md`.
+
+## SetMix: the first Play and the plot (2026-10-07, `docs/SETMIX_PLAN.md` Phases 2b and 3)
+
+Battles sent in Code Arena (Battle mode), one self-contained module each, collected and tested here before landing.
+
+| Package | Prompt | Chat | State |
+|---|---|---|---|
+| labkit | `docs/handoff/prompts/battle/labkit.txt` | https://arena.ai/c/01a114b4-5730-76c3-bccc-670dc0d848f6 | running |
+| plotterrain | `docs/handoff/prompts/battle/plotterrain.txt` | https://arena.ai/c/01a114cf-75b0-78bf-a80e-1a0a05f7b398 | running |
+| groundshader | `docs/handoff/prompts/battle/groundshader.txt` | https://arena.ai/c/01a114d0-6882-7f53-aae8-a068f5c5921a | running |

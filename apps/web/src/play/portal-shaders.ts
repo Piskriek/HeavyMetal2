@@ -47,7 +47,8 @@ export const POST_FRAGMENT = /* glsl */ `
     else {
       float d = texture2D(uDepth, uv).x;
       float dist = d >= 0.99999 ? 1e9 : length(worldAt(uv, d) - uWaveCentre);
-      float inside = uWaveR < 0.0 ? 0.0 : step(dist, uWaveR);
+      // once the wave has crossed, the whole picture is at the new stage (sky and far plains too)
+      float inside = uWaveR < 0.0 ? 0.0 : uWaveR > 1e6 ? 1.0 : step(dist, uWaveR);
       if (inside > 0.5) {
         // stage 1: colour at low resolution, gently posterised with the same dither
         vec3 c = pow(fine.rgb, vec3(1.0 / 2.2));
@@ -61,9 +62,11 @@ export const POST_FRAGMENT = /* glsl */ `
         vec2 cell = floor(px / 2.0);
         vec3 coarse = texture2D(uColour, (cell * 2.0 + 1.0) / uRes).rgb;
         float l = dot(pow(coarse, vec3(1.0 / 2.2)), vec3(0.299, 0.587, 0.114));
-        l = clamp((l - 0.06) * 1.35, 0.0, 1.0);
+        // faint stars and haze drop to black; the pale rock spreads over the middle tones, so the land keeps its shapes
+        l = smoothstep(0.1, 0.95, l);
+        l = l * l * (1.6 - 0.6 * l);
         float on = step(bayer4(cell), l);
-        vec3 c = mix(vec3(0.035, 0.037, 0.04), vec3(0.86, 0.87, 0.84), on);
+        vec3 c = mix(vec3(0.003, 0.0034, 0.004), vec3(0.74, 0.75, 0.72), on);
         gl_FragColor = vec4(c, 1.0);
       }
     }

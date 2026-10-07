@@ -105,6 +105,8 @@ const RAIN_FRAGMENT = /* glsl */ `
   }`;
 
 export interface LabRoom {
+  /** How bright the room's reflections should be (the scene's environment light follows the ceiling lights). */
+  envLevel(): number;
   readonly group: THREE.Group;
   /** Walls and props to walk round, in the lab frame. */
   readonly colliders: readonly Box[];
@@ -228,7 +230,7 @@ export function createLabRoom(o: { readonly textureSize: number; readonly portal
     const l = new THREE.PointLight('#ff8a3a', 0, 14, 2); l.position.set(x + Math.sin(face) * 0.6, 4.4, z + Math.cos(face) * 0.6); group.add(l); emergency.push(l);
   }
   const gateGlow = new THREE.PointLight('#ff9a4a', 0, 9, 2); gateGlow.position.set(GATE_AT.x, 1.6, GATE_AT.z + 1.4); group.add(gateGlow);
-  const windowLight = new THREE.PointLight('#9fb6cc', 6, 16, 2); windowLight.position.set(wx, wy, ROOM.back + 1.2); group.add(windowLight);
+  const windowLight = new THREE.PointLight('#9fb6cc', 3, 14, 2); windowLight.position.set(wx, wy, ROOM.back + 1.2); group.add(windowLight);
   const fill = new THREE.HemisphereLight('#d8e2ea', '#2a2e33', 0.08); group.add(fill);
 
   const lamps = { relays: relays.flatMap((r) => r.lamps), boxes: boxes.flatMap((b) => b.lamps), desk: desk.lamps };
@@ -243,13 +245,14 @@ export function createLabRoom(o: { readonly textureSize: number; readonly portal
     mainLamp.intensity = p.main * 9; mainLamp2.intensity = p.main * 6;
     fill.intensity = 0.08 + p.main * 0.25;
     emergencyMat.emissiveIntensity = p.emergency * 2.4;
-    for (const l of emergency) l.intensity = p.emergency * 7;
+    for (const l of emergency) l.intensity = p.emergency * 11;
     gateGlow.intensity = p.coils * 10;
     portal.visible = p.coils > 0.6;
   };
   setPower(POWER_OFF);
 
   return {
+    envLevel: () => 0.03 + stripMat.emissiveIntensity / 2.2 * 0.2,
     group, colliders, gate, portal,
     leverAt: desk.lever.getWorldPosition(new THREE.Vector3()),
     lever: desk.lever,

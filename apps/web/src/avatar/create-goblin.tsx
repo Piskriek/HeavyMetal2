@@ -16,7 +16,7 @@ import { player, saveLook } from '../build/player';
  * (Goblin Racing's Play); SetMix's Avatars window makes any kind and edits the ones you have. Everything here is the avatar preset; the
  * same look opens later in the Avatar tab (P).
  */
-function GoblinTurntable(props: { readonly look: AvatarLook; readonly wave: number }): ReactElement {
+function GoblinTurntable(props: { readonly look: AvatarLook; readonly wave: number; readonly floor?: number }): ReactElement {
   const host = useRef<HTMLDivElement>(null);
   const api = useRef<{ setLook: (l: AvatarLook) => void; wave: () => void } | null>(null);
   useEffect(() => {
@@ -34,7 +34,7 @@ function GoblinTurntable(props: { readonly look: AvatarLook; readonly wave: numb
     sun.position.set(-2, 4, 3);
     sun.castShadow = true;
     scene.add(sun);
-    const floor = new THREE.Mesh(new THREE.CircleGeometry(1.1, 48), new THREE.MeshStandardMaterial({ color: 0x9cc06a, roughness: 0.95 }));
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(1.1, 48), new THREE.MeshStandardMaterial({ color: props.floor ?? 0x9cc06a, roughness: 0.95 }));
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     scene.add(floor);
@@ -98,6 +98,8 @@ export function CreateGoblin(props: {
   readonly fresh?: boolean;
   readonly title?: string;
   readonly doneLabel?: string;
+  /** Made in the lab (SetMix's first Play): the lab shows behind it and the turntable stands on the lab floor. */
+  readonly inLab?: boolean;
   /** Whose voice the maker speaks in: SetMix (the harness's avatars) or Goblin Racing's own (its first goblin). */
   readonly voice?: 'setmix' | 'goblin';
 }): ReactElement {
@@ -123,8 +125,8 @@ export function CreateGoblin(props: {
     props.onDone(saved);
   };
   return (
-    <div className={`create-goblin${props.voice === 'setmix' ? ' setmix' : ''}`} role="dialog" aria-label={props.title ?? 'Make your avatar'}>
-      <GoblinTurntable look={look} wave={wave} />
+    <div className={`create-goblin${props.voice === 'setmix' ? ' setmix' : ''}${props.inLab ? ' in-lab' : ''}`} role="dialog" aria-label={props.title ?? 'Make your avatar'}>
+      <GoblinTurntable look={look} wave={wave} {...(props.inLab ? { floor: 0x5b5f63 } : {})} />
       <section className="cg-panel">
         <h2>{props.title ?? (kind === 'goblin' ? 'Your goblin' : 'Your avatar')}</h2>
         {props.chooseKind ? (
@@ -153,7 +155,7 @@ export function CreateGoblin(props: {
             <label key={v.key}><input type="color" value={look[v.key as LookSlot]} onChange={(e) => change({ [v.key]: e.target.value } as Partial<AvatarLook>)} /><span>{v.label}</span></label>
           ))}
         </div>
-        <p className="hint">More colours, and how your avatar walks and runs, are in the Avatar and Animate tabs once you are on your island.</p>
+        {props.inLab ? null : <p className="hint">More colours, and how your avatar walks and runs, are in the Avatar and Animate tabs once you are on your island.</p>}
         <div className="btns">
           <button onClick={() => { change({ ...randomLook(Math.floor(Math.random() * 1e9), look.name, kind), id: look.id, parts: randomParts() }); fx('ui-toggle'); }}>Roll the dice</button>
           <span className="grow" />

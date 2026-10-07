@@ -3,7 +3,7 @@
 # 8 candidate machines x 2 fidelity rows (stage-1 low poly / stage-6 PBR).
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; source "$ROOT/tools/lib.sh"
-T="$ROOT/scratch/12"; mkdir -p "$T"; S="$ROOT/scratch/panels"
+T="$ROOT/scratch/12"; mkdir -p "$T"; S="$ROOT/panels/12"
 
 NAMES=( "ROCK DRILL" "TEXTURE MILL" "SHAPE PRESS" "LIGHT PROJECTOR" "WATER MAKER" "PRESET MIXER" "POWER UNIT" "RELAY PYLON" )
 JOBS=( "mines raw material" "grinds in texture detail" "stamps geometry finer" "raises the light level" "condenses water" "mixes 2-4 presets into 1" "makes electricity" "carries the spans" )

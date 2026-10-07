@@ -273,3 +273,5 @@ Reviewed at 42fc0421 (05, 10 redone; 12 assembled):
 - 05 RIGHT: gate right of centre, left third calm, goblin half the opening, alien planet, four plumes.
 - 12 STRONG: eight machines, S1 chunky low poly and S6 weathered PBR; each grounded, fed at a dark feed, pixels from its own stack; the power unit gives steam only; the pylon carries the spans. BUT every S6 caption reads "no pixels - a white pulse bead shows the line load" (the pylon's caption copied to all eight): fix the captions to match the S1 row. Panels small, bottom quarter of the sheet empty: make the panels bigger.
 - 10: STILL Earth (Africa and Arabia over blue seas) despite the commit message. The image model keeps drawing Earth for a planet in a day sky: composite the alien planet disc from 11 (paled for daylight) into 10 with ImageMagick instead of regenerating.
+
+Final round (2026-10-07): 10's goblin planet composited from 11 (paled, a little soft) at aadcd36b; 02 redone with slotted floor covers, pulses showing, relays lit in a row, coils lighting bottom up (0cedf68b). The set is complete on arena/601f7fc1-heavymetal2 at 0cedf68b.

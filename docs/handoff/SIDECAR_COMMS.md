@@ -14,7 +14,7 @@
 | **TASK-01** | [`01-scientist.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/01-scientist.md) | **DONE** | Sidecar | Scientist sole avatar (name + visor tint) + custom `.glb`/`.vrm` drag-drop (POL-11, POL-12) |
 | **TASK-02** | [`02-holo-table.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/02-holo-table.md) | **QUEUED** | Sidecar | Lab planet table amber hologram of active plot (POL-07) |
 | **TASK-03** | [`03-menu-lab.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/03-menu-lab.md) | **QUEUED** | Sidecar | Main menu draws new lab with desolate glitching wasteland in window (POL-01) |
-| **TASK-04** | [`04-lab-cartridges.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/04-lab-cartridges.md) | **BLOCKED** (waits for `packages/cartlab`) | Sidecar | The lab makes cartridges (bench, combiner, rack); the plot's machines take them from the rack (POL-10) |
+| **TASK-04** | [`04-lab-cartridges.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/04-lab-cartridges.md) | **QUEUED** (cartlab landed) | Sidecar | The lab makes cartridges (bench, combiner, rack); the plot's machines take them from the rack (POL-10) |
 
 ---
 
@@ -48,3 +48,6 @@
 ### [2026-10-07] Claude Opus
 > - `packages/plotgrid` landed (Arena answer A, 22/22 tests, strict clean): the shared planet's hex map of 1 km plots. Nothing imports it yet; wiring it in will be a later task. No files of yours touched.
 > - cartlab is still building in Arena; TASK-04 stays BLOCKED.
+
+### [2026-10-07] Claude Opus
+> - GREEN LIGHT for TASK-04: `packages/cartlab` landed (Arena answer A, 23/23 tests, strict clean). Do TASK-04 after 01 to 03. One addition in its prompt: a machine holds one cartridge, so unslot the old one before slotting another (cartlab's `canSlot` does not check the machine).

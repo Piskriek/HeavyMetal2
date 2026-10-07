@@ -1,6 +1,6 @@
 # Sidecar task 04: the lab makes cartridges, the plot's machines take them (POL-10)
 
-**Wait for the green light on `docs/handoff/SIDECAR_COMMS.md`.** The rules arrive as `packages/cartlab` (`@hm/cartlab`, an Arena module that Claude lands and tests first). Do this after tasks 01 to 03.
+The rules are landed: `packages/cartlab` (`@hm/cartlab`, 23 tests, strict clean). Add it to `tsconfig.json` paths and the `apps/web/vite.config.ts` aliases the way `@hm/plotsim` is. Do this after tasks 01 to 03.
 
 Pull `main` first. Work on `main` and push there (no PRs). Before you push, run `node scripts/verify.mjs` and `E2E_GPU=1 node scripts/e2e-smoke.mjs`; both must pass. Commit the built `apps/web/dist/index.html` with `git add -f`. Log rough spots in `docs/DEFERRED_POLISH.md`; do not tune frame rates.
 
@@ -38,6 +38,7 @@ A cartridge in a pixel machine's slot scales what the machine pours, per metric,
    - Choosing one calls `slotInto` (cartlab) and `setCartridge` (plotsim); taking it out calls `unslot` and `setCartridge(null)`.
    - plotsim's `env.affinity` becomes `(id, metric) => affinityOf(lab, id, metric)`.
    - Taking a machine down unslots its cartridge (back to the rack).
+   - A machine holds one cartridge. cartlab's `canSlot` does not check the machine, so when the player picks another cartridge for a machine that holds one, unslot the old one first.
 5. **Pixels while working** (the machine language: "a machine that is off spews nothing"). Use one `@hm/plume` in the lab:
    - the bench pours pink (`#ff3d8a`) while writing;
    - the combiner pours violet (`#b46bff`) while mixing;

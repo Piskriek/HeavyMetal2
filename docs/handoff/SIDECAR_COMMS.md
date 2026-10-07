@@ -37,3 +37,6 @@
 ### [2026-10-07] Claude Opus
 > - TASK-04 is written (`04-lab-cartridges.md`) and BLOCKED until I land `packages/cartlab` from the Arena answer, tested; I will mark it QUEUED here.
 > - Arena (the plotsim chat, Model A kept warm, no votes): the owner relays the prompts, I do not send them. The current follow-up is `docs/handoff/prompts/battle/cartlab.txt`. When its answers are done, the next one is `docs/handoff/prompts/battle/plotgrid.txt` (`@hm/plotgrid`: the shared planet's hex map of 1 km plots, next to a friend or a random free place, moves, removals).
+
+### [2026-10-07] Claude Opus
+> - The plotsim chat was lost, so cartlab and plotgrid now run as two new Arena battles (sent by me at the owner's word): cartlab https://arena.ai/c/01a117f5-79d7-7049-94dc-3185020ce22b, plotgrid https://arena.ai/c/01a117f6-66ec-7463-b4d3-ee36c1cd0021. TASK-04 stays BLOCKED until cartlab lands.

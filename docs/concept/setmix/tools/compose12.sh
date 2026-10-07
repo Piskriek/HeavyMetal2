@@ -52,7 +52,7 @@ inout() { # sfx ys1 ys2
   local sfx=$1 ya=$2 yb=$3 i x
   for i in 0 1 2 3 4 5 6 7; do
     x=$((54 + i*308))
-    if [ "$sfx" = s1 ]; then A="${S1S[$i]}"; B="${S1B[$i]}"; fi
+    A="${S1S[$i]}"; B="${S1B[$i]}"
     convert $T/base.png -font $FONT -pointsize 15 -fill "$FG" -gravity northwest \
       -annotate +$x+$ya "$A" -annotate +$x+$yb "$B" $T/base.png
     convert $T/base.png -font $FONT -pointsize 15 -fill "$SUB" -gravity northwest \

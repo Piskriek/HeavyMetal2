@@ -62,9 +62,9 @@ export const POST_FRAGMENT = /* glsl */ `
         vec2 cell = floor(px / 2.0);
         vec3 coarse = texture2D(uColour, (cell * 2.0 + 1.0) / uRes).rgb;
         float l = dot(pow(coarse, vec3(1.0 / 2.2)), vec3(0.299, 0.587, 0.114));
-        // faint stars and haze drop to black; the pale rock spreads over the middle tones, so the land keeps its shapes
-        l = smoothstep(0.1, 0.95, l);
-        l = l * l * (1.6 - 0.6 * l);
+        // faint stars and haze drop to black; the ground's gentle middle tones are stretched apart, so lit and shaded slopes,
+        // stones and patches still read as land in one bit
+        l = smoothstep(0.14, 0.6, l);
         float on = step(bayer4(cell), l);
         vec3 c = mix(vec3(0.003, 0.0034, 0.004), vec3(0.74, 0.75, 0.72), on);
         gl_FragColor = vec4(c, 1.0);

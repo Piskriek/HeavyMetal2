@@ -116,6 +116,8 @@ export default defineConfig(({ mode }) => ({
       '@hm/flora': p('../../packages/flora/src/index.ts'),
       '@hm/vault': p('../../packages/vault/src/index.ts'),
       '@hm/fidelity': p('../../packages/fidelity/src/index.ts'),
+      '@hm/plotterrain': p('../../packages/plotterrain/src/index.ts'),
+      '@hm/groundshader': p('../../packages/groundshader/src/index.ts'),
     },
   },
   build: { target: 'es2022', outDir: 'dist', emptyOutDir: true },

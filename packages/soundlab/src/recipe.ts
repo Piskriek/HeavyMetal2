@@ -5,7 +5,7 @@
 
 export type Wave = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
 export const WAVES: readonly Wave[] = ['sine', 'square', 'sawtooth', 'triangle', 'noise'];
-export const CATEGORIES = ['race', 'editor', 'ui'] as const;
+export const CATEGORIES = ['race', 'editor', 'ui', 'game'] as const;
 export const FILTER_TYPES = ['lowpass', 'highpass', 'bandpass'] as const;
 
 export interface SfxFilter { type: (typeof FILTER_TYPES)[number]; freq: readonly [number, number]; q: number }

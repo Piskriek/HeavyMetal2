@@ -137,6 +137,8 @@ export interface WorldOptions {
   readonly reducedMotion: boolean;
   readonly sun?: THREE.Vector3;
   readonly planetDir?: THREE.Vector3;
+  /** false: no plot, water, plains or boulders of its own; the first Play draws its own ground (@hm/plotterrain). Default true. */
+  readonly ground?: boolean;
 }
 
 /** How the planet is laid out: as it is now (neighbours under their air), or finished (`lush`: air everywhere, forest over the plains). */
@@ -148,6 +150,8 @@ export interface PlanetOptions {
   readonly view?: { readonly x: number; readonly z: number; readonly dirX: number; readonly dirZ: number; readonly halfAngle: number };
   /** Neighbours' trees further than this from the eye use the tiny model (default 700 m; the first Play draws its far neighbours cheaply). */
   readonly treeDetailRange?: number;
+  /** Where the neighbours stand (default the planet's own height): the first Play seats them on its own terrain. */
+  readonly height?: (x: number, z: number) => number;
 }
 
 export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
@@ -183,7 +187,7 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
   geometry.setIndex(new THREE.BufferAttribute(grid.index, 1));
   geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), PLOT_RADIUS + 20);
   const plotUniforms = { ...shared, ...base, ...lookUniforms('From', blank), ...lookUniforms('To', blank), uGlow: { value: 0 } };
-  scene.add(new THREE.Mesh(geometry, keep(new THREE.ShaderMaterial({ vertexShader: GROUND_VERTEX, fragmentShader: GROUND_FRAGMENT, uniforms: plotUniforms, defines: { PLOT: '' } }))));
+  if (o.ground !== false) scene.add(new THREE.Mesh(geometry, keep(new THREE.ShaderMaterial({ vertexShader: GROUND_VERTEX, fragmentShader: GROUND_FRAGMENT, uniforms: plotUniforms, defines: { PLOT: '' } }))));
 
   // ---- water: rises behind the wave, in the main crater's bowl (inside its rim, so it never spills over the plains)
   const waterGeometry = keep(new THREE.CircleGeometry(MAIN_CRATER.r + 1, 96));
@@ -193,7 +197,7 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
   };
   const water = new THREE.Mesh(waterGeometry, keep(new THREE.ShaderMaterial({ vertexShader: WATER_VERTEX, fragmentShader: WATER_FRAGMENT, uniforms: waterUniforms, transparent: true })));
   water.renderOrder = 2;
-  scene.add(water);
+  if (o.ground !== false) scene.add(water);
 
   // ---- sky and stars, centred on the eye
   const skyUniforms = {
@@ -314,7 +318,8 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
       const f = facetedHeight(x, z, cell);
       return d < 80 ? f : f + (planetHeight(x, z) - f) * smooth(80, 140, d);
     };
-    const grids: HeightGrid[] = [heightGrid(planetHeight, 170, 340), heightGrid(planetHeight, FAR, 420)];
+    const H = options.height ?? planetHeight, grounded = o.ground !== false;
+    const grids: HeightGrid[] = [heightGrid(H, 170, 340), heightGrid(H, FAR, 420)];
     const buckets = bucketBoulders(BOULDERS.filter((b) => Math.hypot(b.x, b.z) < 260));
     const shadeAt = (x: number, z: number, h: number): number => {
       const y = h - drop(x, z);
@@ -322,6 +327,7 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
       return Math.hypot(x, z) < 250 ? lit * boulderShade(sun, buckets, x, y, z) : lit;
     };
 
+    if (grounded) {
     // your plot's rim: the plains' heights; and every point's sunlight
     const baseShape = shapeFor(cell);
     baseHeights.set(baseShape.heights); baseNormals.set(baseShape.normals);
@@ -344,6 +350,7 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
     ringGeometry.setIndex(new THREE.BufferAttribute(ring.index, 1));
     ringGeometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), FAR + 400);
     scene.add(new THREE.Mesh(ringGeometry, keep(new THREE.ShaderMaterial({ vertexShader: GROUND_VERTEX, fragmentShader: GROUND_FRAGMENT, uniforms: { ...shared, ...base, ...lookUniforms('To', blank) }, defines: { RING: '' } }))));
+    }
 
     // ---- the neighbours: each plot's ground in its own look, its air and its trees
     const domeGeometry = keep(new THREE.SphereGeometry(1, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2));
@@ -351,9 +358,9 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
       const disc = makeDisc(plot);
       const dn = disc.xz.length / 2, dPos = new Float32Array(dn * 3), dNorm = new Float32Array(dn * 3), dShade = new Float32Array(dn);
       for (let k = 0; k < dn; k++) {
-        const x = disc.xz[k * 2]!, z = disc.xz[k * 2 + 1]!, h = planetHeight(x, z);
+        const x = disc.xz[k * 2]!, z = disc.xz[k * 2 + 1]!, h = H(x, z);
         dPos[k * 3] = x; dPos[k * 3 + 1] = h; dPos[k * 3 + 2] = z;
-        normalAt(planetHeight, x, z, 1.5, dNorm, k * 3);
+        normalAt(H, x, z, 1.5, dNorm, k * 3);
         dShade[k] = shadeAt(x, z, h);
       }
       const g = keep(new THREE.BufferGeometry());
@@ -366,7 +373,7 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
       setLook(u, 'To', { look, colour: keep(texture(look.colour, look.size, true, look.pixelated)), maps: keep(texture(look.maps, look.size, false, look.pixelated)) });
       scene.add(new THREE.Mesh(g, keep(new THREE.ShaderMaterial({ vertexShader: GROUND_VERTEX, fragmentShader: GROUND_FRAGMENT, uniforms: u, defines: { DISC: '' }, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8 }))));
 
-      const groundY = planetHeight(plot.x, plot.z);
+      const groundY = H(plot.x, plot.z);
       // their air: a bubble, thicker the further they have come
       const air = options.lush ? 0 : Math.max(0, (plot.stage - 2) / 4);
       if (air > 0) {
@@ -392,7 +399,7 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
         const size = (0.75 + hash(i, tries, 54) * 0.6) * (1 + plot.r / 220);
         let list = byKind.get(kind);
         if (!list) byKind.set(kind, (list = []));
-        list.push(place(x, planetHeight(x, z) - 0.2, z, hash(i, tries, 55) * 6.28, (hash(i, tries, 56) - 0.5) * 0.08, size, new THREE.Matrix4()));
+        list.push(place(x, H(x, z) - 0.2, z, hash(i, tries, 55) * 6.28, (hash(i, tries, 56) - 0.5) * 0.08, size, new THREE.Matrix4()));
         t++;
       }
       for (const [kind, list] of byKind) {
@@ -435,6 +442,7 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
     }
 
     // ---- boulders: smooth, wearing the ground's cartridge (your plot's looks on your plot, the plains' look beyond)
+    if (grounded) {
     const rockUniforms = { ...shared, ...base, ...lookUniforms('From', blank), ...lookUniforms('To', blank) };
     lookTargets.push(rockUniforms);
     const rockMaterial = keep(new THREE.ShaderMaterial({ vertexShader: ROCK_VERTEX, fragmentShader: ROCK_FRAGMENT, uniforms: rockUniforms }));
@@ -454,6 +462,7 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
       geo.setAttribute('aSun', new THREE.InstancedBufferAttribute(sun, 1));
       rocks.computeBoundingSphere();
       scene.add(rocks);
+    }
     }
     apply();
   };

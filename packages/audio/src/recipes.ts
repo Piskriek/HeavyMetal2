@@ -19,7 +19,7 @@ export interface SfxRecipe {
   id: SfxId;
   durationMs: number; /* >= every layer's delay + attack + decay, <= 1600 */
   layers: readonly SfxLayer[];
-  category: 'race' | 'editor' | 'ui';
+  category: 'race' | 'editor' | 'ui' | 'game';
 }
 
 export const SFX_IDS = [
@@ -52,6 +52,18 @@ export const SFX_IDS = [
   'select',
   'tool-switch',
   'save',
+  // the first Play (SetMix, STATUS SM22)
+  'lever-throw',
+  'relay-click',
+  'power-surge',
+  'coil-charge',
+  'static-burst',
+  'gate-open',
+  'sync-warning',
+  'sync-lost',
+  'mill-start',
+  'stage-up',
+  'step-grit',
 ] as const;
 
 export type SfxId = (typeof SFX_IDS)[number];
@@ -388,6 +400,91 @@ export const SFX: Readonly<Record<SfxId, SfxRecipe>> = {
       { wave: 'triangle', freq: [440, 440], gain: 0.25, attackMs: 5, decayMs: 140, delayMs: 0 },
       { wave: 'triangle', freq: [554.37, 554.37], gain: 0.25, attackMs: 5, decayMs: 140, delayMs: 90 },
       { wave: 'sine', freq: [659.25, 659.25], gain: 0.3, attackMs: 5, decayMs: 140, delayMs: 180 },
+    ],
+  },
+  // ---- the first Play: the lab's power, the gate, sync, the first machine, the stage, footsteps on grit
+  'lever-throw': {
+    id: 'lever-throw', durationMs: 320, category: 'game',
+    layers: [
+      { wave: 'sine', freq: [95, 48], gain: 0.6, attackMs: 2, decayMs: 260 },
+      { wave: 'noise', freq: [100, 100], gain: 0.35, attackMs: 1, decayMs: 140, filter: { type: 'lowpass', freq: [1400, 200], q: 1.2 } },
+      { wave: 'square', freq: [1500, 900], gain: 0.12, attackMs: 1, decayMs: 30, delayMs: 70 },
+    ],
+  },
+  'relay-click': {
+    id: 'relay-click', durationMs: 60, category: 'game',
+    layers: [
+      { wave: 'noise', freq: [100, 100], gain: 0.4, attackMs: 0, decayMs: 28, filter: { type: 'highpass', freq: [2600, 2600], q: 0.8 } },
+      { wave: 'square', freq: [2400, 1800], gain: 0.1, attackMs: 0, decayMs: 18 },
+    ],
+  },
+  'power-surge': {
+    id: 'power-surge', durationMs: 1400, category: 'game',
+    layers: [
+      { wave: 'sawtooth', freq: [48, 110], gain: 0.35, attackMs: 500, decayMs: 880, filter: { type: 'lowpass', freq: [300, 1500], q: 1 } },
+      { wave: 'sine', freq: [96, 220], gain: 0.3, attackMs: 500, decayMs: 880 },
+    ],
+  },
+  'coil-charge': {
+    id: 'coil-charge', durationMs: 1500, category: 'game',
+    layers: [
+      { wave: 'sine', freq: [260, 1240], gain: 0.25, attackMs: 900, decayMs: 580 },
+      { wave: 'triangle', freq: [520, 2480], gain: 0.1, attackMs: 900, decayMs: 580 },
+      { wave: 'noise', freq: [100, 100], gain: 0.12, attackMs: 900, decayMs: 580, filter: { type: 'bandpass', freq: [800, 3200], q: 3 } },
+    ],
+  },
+  'static-burst': {
+    id: 'static-burst', durationMs: 700, category: 'game',
+    layers: [
+      { wave: 'noise', freq: [100, 100], gain: 0.35, attackMs: 10, decayMs: 680, filter: { type: 'highpass', freq: [1800, 1800], q: 0.7 } },
+      { wave: 'noise', freq: [100, 100], gain: 0.2, attackMs: 10, decayMs: 600, filter: { type: 'bandpass', freq: [600, 2400], q: 2 } },
+    ],
+  },
+  'gate-open': {
+    id: 'gate-open', durationMs: 1600, category: 'game',
+    layers: [
+      { wave: 'sine', freq: [220, 220], gain: 0.25, attackMs: 180, decayMs: 1400 },
+      { wave: 'sine', freq: [330, 330], gain: 0.2, attackMs: 180, decayMs: 1380, delayMs: 20 },
+      { wave: 'sine', freq: [440, 440], gain: 0.18, attackMs: 180, decayMs: 1350, delayMs: 40 },
+      { wave: 'noise', freq: [100, 100], gain: 0.25, attackMs: 60, decayMs: 1100, filter: { type: 'bandpass', freq: [300, 1800], q: 1.5 } },
+    ],
+  },
+  'sync-warning': {
+    id: 'sync-warning', durationMs: 360, category: 'game',
+    layers: [
+      { wave: 'square', freq: [880, 880], gain: 0.18, attackMs: 2, decayMs: 110 },
+      { wave: 'square', freq: [880, 880], gain: 0.18, attackMs: 2, decayMs: 110, delayMs: 180 },
+    ],
+  },
+  'sync-lost': {
+    id: 'sync-lost', durationMs: 900, category: 'game',
+    layers: [
+      { wave: 'sawtooth', freq: [900, 55], gain: 0.35, attackMs: 5, decayMs: 880 },
+      { wave: 'noise', freq: [100, 100], gain: 0.3, attackMs: 5, decayMs: 860, filter: { type: 'bandpass', freq: [2400, 200], q: 2 } },
+    ],
+  },
+  'mill-start': {
+    id: 'mill-start', durationMs: 1500, category: 'game',
+    layers: [
+      { wave: 'sawtooth', freq: [36, 118], gain: 0.35, attackMs: 700, decayMs: 790, filter: { type: 'lowpass', freq: [250, 900], q: 1 } },
+      { wave: 'noise', freq: [100, 100], gain: 0.18, attackMs: 500, decayMs: 900, filter: { type: 'lowpass', freq: [400, 1200], q: 0.8 } },
+      { wave: 'square', freq: [1200, 1200], gain: 0.06, attackMs: 2, decayMs: 40, delayMs: 1300 },
+    ],
+  },
+  'stage-up': {
+    id: 'stage-up', durationMs: 1600, category: 'game',
+    layers: [
+      { wave: 'sine', freq: [523.25, 523.25], gain: 0.25, attackMs: 30, decayMs: 1450 },
+      { wave: 'sine', freq: [659.25, 659.25], gain: 0.22, attackMs: 30, decayMs: 1380, delayMs: 90 },
+      { wave: 'sine', freq: [783.99, 783.99], gain: 0.2, attackMs: 30, decayMs: 1300, delayMs: 180 },
+      { wave: 'triangle', freq: [1046.5, 1046.5], gain: 0.08, attackMs: 60, decayMs: 1200, delayMs: 260 },
+    ],
+  },
+  'step-grit': {
+    id: 'step-grit', durationMs: 90, category: 'game',
+    layers: [
+      { wave: 'noise', freq: [100, 100], gain: 0.22, attackMs: 2, decayMs: 70, filter: { type: 'lowpass', freq: [1800, 700], q: 0.9 } },
+      { wave: 'sine', freq: [140, 90], gain: 0.12, attackMs: 1, decayMs: 45 },
     ],
   },
 };

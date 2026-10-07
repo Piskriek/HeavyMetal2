@@ -312,6 +312,12 @@
       "@hm/vault": [
         "packages/vault/src/index.ts"
       ],
+      "@hm/groundshader": [
+        "packages/groundshader/src/index.ts"
+      ],
+      "@hm/plotterrain": [
+        "packages/plotterrain/src/index.ts"
+      ],
       "@hm/fidelity": [
         "packages/fidelity/src/index.ts"
       ]

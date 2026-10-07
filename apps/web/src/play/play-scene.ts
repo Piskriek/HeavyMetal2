@@ -7,8 +7,9 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { StageLook } from '../crafter/looks';
-import { drop, planetHeight } from '../crafter/planet';
-import { createWorld, PLANET_DIR, type Neighbour, type World } from '../crafter/world';
+import { createWorld, PLANET_DIR, SUN, type Neighbour, type World } from '../crafter/world';
+import { createPlotGround, type PlotGround } from './plot-ground';
+import { fx as sfx } from '../maker/feedback';
 import * as kit from './kit';
 import { createLabRoom, GATE_AT, POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, ROOM, type LabRoom } from './lab-room';
 import { COLOUR_MARK_FRAGMENT, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_VERTEX, POST_FRAGMENT, QUAD_VERTEX } from './portal-shaders';
@@ -55,7 +56,7 @@ export interface PlayScene {
   resize(width: number, height: number, pixelRatio: number): void;
   /** For the tests and the e2e: where you are, and a way to stand somewhere. */
   readonly debug: {
-    where(): Where; position(): THREE.Vector3; teleport(where: Where, x: number, z: number, yaw: number): void; sync(): number;
+    groundTriangles(): number; showGround(on: boolean): void; where(): Where; position(): THREE.Vector3; teleport(where: Where, x: number, z: number, yaw: number): void; sync(): number;
     stats(): { readonly triangles: number; readonly calls: number }; wave(): number; gatePlanet(): { x: number; z: number };
     /** Places a mill at x, z as if the ghost stood there (the e2e has no mouse to aim with). */
     placeAt(x: number, z: number): PlacedMachine | null;
@@ -63,7 +64,11 @@ export interface PlayScene {
   dispose(): void;
 }
 
-export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonly gridSpacing: number; readonly antialias: boolean; readonly powerPreference: WebGLPowerPreference; readonly reducedMotion: boolean; readonly textureSize: number }): PlayScene {
+export function createPlayScene(o: {
+  readonly canvas: HTMLCanvasElement; readonly gridSpacing: number; readonly antialias: boolean; readonly powerPreference: WebGLPowerPreference; readonly reducedMotion: boolean; readonly textureSize: number;
+  /** The plot's ground: triangles in its chunks, and the size of its material tiles (by graphics tier). */
+  readonly groundBudget: number; readonly groundTexture: number;
+}): PlayScene {
   const renderer = new THREE.WebGLRenderer({ canvas: o.canvas, antialias: o.antialias, powerPreference: o.powerPreference });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.setClearColor(0x000000, 1);
@@ -99,7 +104,7 @@ export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonl
   // ---- the planet
   const planetScene = new THREE.Scene();
   const m = kit.createMaterials();
-  let world: World | null = null;
+  let world: World | null = null, ground: PlotGround | null = null;
   const twin = kit.gate(m, { twin: true, stage: 1 });
   const openingMark = keep(new THREE.ShaderMaterial({ vertexShader: MARK_VERTEX, fragmentShader: OPENING_MARK_FRAGMENT, side: THREE.DoubleSide, blending: THREE.NoBlending }));
   const twinOpening = new THREE.Mesh(keep(new THREE.PlaneGeometry(twin.opening.width, twin.opening.height)), openingMark);
@@ -120,7 +125,7 @@ export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonl
     // on the footing pad you stand on the pad
     const local = new THREE.Vector3(x, 0, z).applyMatrix4(new THREE.Matrix4().copy(twin.group.matrixWorld).invert());
     if (Math.abs(local.x) < 1.9 && Math.abs(local.z) < 1.25) return padTop;
-    return planetHeight(x, z) - drop(x, z);
+    return ground ? ground.heightAt(x, z) : 0;
   };
 
   // machines: the mill, its cable from the gate's junction box, and the pink pixels from its stack
@@ -183,6 +188,8 @@ export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonl
   const pos = new THREE.Vector3(room.spawn.x, EYE, room.spawn.z);
   let yaw = room.spawn.yaw, pitch = -0.04;
   let sync = 1, lostAt = -100;
+  /** Metres walked since the last footstep, and how many relay lamps the sequence has lit (one click each). */
+  let stride = 0, relaysHeard = 0;
   let powerT = -1, gateOn = false, stage = 0, waveStart = -1;
   let pendingEvent: FrameOut['event'] = null;
   let clock = 0;
@@ -218,6 +225,7 @@ export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonl
     yaw += next === 'planet' ? gateYawDelta : -gateYawDelta;
     where = next;
     pendingEvent = next === 'planet' ? 'to-planet' : 'to-lab';
+    sfx('static-burst', { volume: 0.35 });
   };
 
   const aimGround = (): THREE.Vector3 | null => {
@@ -258,12 +266,17 @@ export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonl
   const api: PlayScene = {
     setPlanet(base, plot, neighbours) {
       if (world) return;
-      world = createWorld(planetScene, { gridSpacing: o.gridSpacing, reducedMotion: o.reducedMotion });
-      world.setPlanet(base, neighbours, { clear: { x: 0, z: 0, r: 7 }, treeDetailRange: 150 });
+      // the plot's natural ground (its own terrain and materials); the old world brings the sky, the stars and the neighbours, seated on it
+      const g = createPlotGround(planetScene, { seed: 7, sunDir: SUN, stage: Math.max(1, stage), textureSize: o.groundTexture, budget: o.groundBudget });
+      ground = g;
+      world = createWorld(planetScene, { gridSpacing: o.gridSpacing, reducedMotion: o.reducedMotion, ground: false });
+      world.setPlanet(base, neighbours, { treeDetailRange: 150, height: (x, z) => g.terrain.height(x, z) + 0.6 });
       world.show(plot);
-      padTop = world.peakY + 0.25;
-      twin.group.position.set(0, world.peakY, 0);
+      const gy = g.heightAt(0, 0);
+      padTop = gy + 0.25;
+      twin.group.position.set(0, gy, 0);
       syncPlanetMatrices();
+      g.update(0, 0, true);
     },
     restore(s) {
       gateOn = s.gateOn;
@@ -271,11 +284,14 @@ export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonl
       if (gateOn) room.lever.rotation.x = -1.1;
       openingUniforms.uStatic.value = gateOn ? 0 : 1;
       stage = s.stage;
+      ground?.setStage(Math.max(1, stage));
       for (const pm of s.machines) addMachine(pm, clock, false);
     },
     pullLever() {
       if (gateOn || powerT >= 0) return;
       powerT = 0;
+      relaysHeard = 0;
+      sfx('lever-throw');
     },
     setBuilding(on) { building = on && where === 'planet'; ghost.visible = building; },
     place() {
@@ -283,6 +299,7 @@ export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonl
       const g = twin.group.position;
       const pm: PlacedMachine = { kind: 'texture-mill', x: ghostAt.x, z: ghostAt.z, yaw: Math.atan2(ghostAt.x - g.x, ghostAt.z - g.z) };
       addMachine(pm, clock, true);
+      sfx('mill-start');
       building = false; ghost.visible = false;
       if (stage < 1) { stage = 1; waveStart = clock + 2.0; postUniforms.uWaveCentre.value.set(pm.x, groundAt(pm.x, pm.z), pm.z); }
       return pm;
@@ -291,9 +308,17 @@ export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonl
       clock = now;
       // ---- the power-on sequence
       if (powerT >= 0) {
+        const before = powerT;
         powerT += dt;
+        const crossed = (at: number): boolean => before < at && powerT >= at;
+        if (crossed(1.2)) sfx('power-surge');
+        if (crossed(2.0)) sfx('coil-charge');
+        if (crossed(3.8)) sfx('static-burst', { volume: 0.6 });
+        if (crossed(POWER_SECONDS - 0.6)) sfx('gate-open');
         room.lever.rotation.x = -1.1 * Math.min(1, powerT / 0.35);
         const p = powerAt(powerT);
+        const lit = Math.floor(p.relays * 12);
+        while (relaysHeard < lit) { relaysHeard++; sfx('relay-click', { pitch: 0.92 + (relaysHeard % 4) * 0.05 }); }
         room.setPower(p);
         openingUniforms.uStatic.value = p.static;
         if (powerT >= POWER_SECONDS) { powerT = -1; gateOn = true; pendingEvent = 'powered'; }
@@ -307,6 +332,11 @@ export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonl
       const before = pos.clone();
       pos.x += (fx * c.move.z + rx * c.move.x) * speed;
       pos.z += (fz * c.move.z + rz * c.move.x) * speed;
+      stride += Math.hypot(pos.x - before.x, pos.z - before.z);
+      if (stride > 1.35) {
+        stride = 0;
+        sfx('step-grit', where === 'planet' ? { pitch: 0.85 + Math.random() * 0.25, volume: 0.55 } : { pitch: 1.5 + Math.random() * 0.2, volume: 0.3 });
+      }
       if (where === 'lab') {
         collide(pos);
         pos.y = EYE;
@@ -327,7 +357,9 @@ export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonl
       // ---- sync
       const nearMachine = stage >= 1 && waveRadius() > 1e6 && machines.some((mm) => Math.hypot(mm.m.x - pos.x, mm.m.z - pos.z) < MACHINE_FIELD);
       sync = stepSync(sync, dt, { onPlanet: where === 'planet', stage, nearMachine });
+      if (where === 'planet' && sync > 0 && sync < 0.3) sfx('sync-warning', { minGapMs: 1400, volume: 0.6 });
       if (where === 'planet' && sync <= 0) {
+        sfx('sync-lost');
         // pulled back to the lab, in front of the gate, facing it
         lostAt = now;
         where = 'lab';
@@ -373,13 +405,15 @@ export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonl
       });
       // ---- the wave, and the event when it has crossed
       const r = waveRadius();
-      if (waveStart >= 0 && r > 1e6) { waveStart = -1; pendingEvent = pendingEvent ?? 'stage-1'; }
+      if (waveStart >= 0 && r > 1e6) { waveStart = -1; pendingEvent = pendingEvent ?? 'stage-1'; sfx('stage-up'); }
       postUniforms.uWaveR.value = r;
       postUniforms.uTime.value = now;
       postUniforms.uGlitch.value = where === 'planet' ? Math.max(0, Math.min(1, (0.4 - sync) / 0.4)) : 0;
       postUniforms.uLost.value = Math.max(0, 1 - (now - lostAt) / 0.6);
       openingUniforms.uTime.value = now;
       room.update(now, dt);
+      // the ground's chunks follow you on the planet; from the lab, they stay round the gate
+      ground?.update(where === 'planet' ? pos.x : 0, where === 'planet' ? pos.z : 0);
       labScene.environmentIntensity = room.envLevel();
       world?.update(now, dt, where === 'planet' ? camera.position : virtual.position);
 
@@ -437,6 +471,8 @@ export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonl
       openingUniforms.uView.value = viewRT.texture;
     },
     debug: {
+      groundTriangles: () => ground?.triangles() ?? 0,
+      showGround: (on) => ground?.setVisible(on),
       where: () => where,
       position: () => pos.clone(),
       teleport(w, x, z, y) { where = w; pos.set(x, w === 'lab' ? EYE : groundAt(x, z) + EYE, z); yaw = y; },
@@ -456,6 +492,7 @@ export function createPlayScene(o: { readonly canvas: HTMLCanvasElement; readonl
     },
     dispose() {
       world?.dispose();
+      ground?.dispose();
       room.dispose();
       for (const x of owned) x.dispose();
       for (const mat of Object.values(m)) (mat as THREE.Material).dispose();

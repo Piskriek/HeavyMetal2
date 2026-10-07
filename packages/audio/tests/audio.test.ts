@@ -19,11 +19,12 @@ function fakeCtx() {
   return { ctx, log };
 }
 
-test('the sfx library: 29 ids, every recipe sane', () => {
-  assert.equal(SFX_IDS.length, 29); assert.deepEqual(Object.keys(SFX).sort(), [...SFX_IDS].sort());
+test('the sfx library: 40 ids, every recipe sane', () => {
+  // 29, then 11 for the first Play (lever, relays, surge, coils, static, gate, sync warning and loss, mill, stage, steps)
+  assert.equal(SFX_IDS.length, 40); assert.deepEqual(Object.keys(SFX).sort(), [...SFX_IDS].sort());
   for (const id of SFX_IDS) {
     const r = SFX[id]!; assert.equal(r.id, id); assert.ok(r.layers.length >= 1 && r.layers.length <= 4, id); assert.ok(r.durationMs > 20 && r.durationMs <= 1600, id);
-    assert.ok(['race', 'editor', 'ui'].includes(r.category));
+    assert.ok(['race', 'editor', 'ui', 'game'].includes(r.category));
     let sum = 0;
     for (const l of r.layers) {
       sum += l.gain; assert.ok(l.gain > 0 && l.gain <= 0.8, `${id} gain`); assert.ok(l.attackMs >= 0 && l.decayMs > 0);

@@ -9,7 +9,7 @@ import { pixelRatioFor, resolveGraphics } from '@hm/render';
 import { powerPreferenceOf, type Profile } from '../shell/profile';
 import { tierFor } from '../crafter/crafter';
 import { bakeLookCached } from '../crafter/looks';
-import { NEIGHBOURS } from '../crafter/planet';
+import type { Plot } from '../crafter/planet';
 import { SMOOTH_IDS, smoothModel } from '../crafter/smooth-models';
 import { CreateGoblin } from '../avatar/create-goblin';
 import { createPlayScene, type FrameOut, type PlayScene } from './play-scene';
@@ -19,6 +19,13 @@ import './play.css';
 /** Your plot's cartridge until the ground shader battle lands: sandy desert tones, the nearest in the vault to the concept art's stage 1. */
 const PLOT = 'crater_calcite';
 const SYNC_BLOCKS = 20;
+/** Other players' plots, 1 km across like yours (owner, 2026-10-07): seen from your plot as greener, wetter patches 1.1 to 3 km away.
+ *  Samples until the shared planet is wired (SETMIX_PLAN Phase 5). */
+const NEIGHBOURS: readonly Plot[] = ([
+  ['Mossfold', 35, 1150, 170, 'emerald_canopy', 6], ['Kettle Rise', 112, 1480, 150, 'spore_meadow', 5], ['Fernreach', 168, 1900, 190, 'solar_fern_glade', 6],
+  ['Low Atoll', 214, 2350, 210, 'coral_atoll', 6], ['Prism Flats', 262, 1320, 120, 'prismata_grass', 4], ['Greywater', 305, 2700, 230, 'emerald_canopy', 5],
+  ['Stillgrove', 340, 3000, 240, 'spore_meadow', 6],
+] as const).map(([name, deg, dist, r, cartridge, stage]) => ({ name, r, cartridge, stage, x: Math.cos((deg * Math.PI) / 180) * dist, z: Math.sin((deg * Math.PI) / 180) * dist }));
 
 function loadSaved(): PlayState { try { return loadState(JSON.parse(localStorage.getItem(SAVE_KEY) ?? 'null')); } catch { return FRESH; } }
 function save(s: PlayState): void { try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); } catch { /* storage unavailable: progress lives for this visit */ } }
@@ -62,7 +69,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
     const device = deviceFor(tier), gridSpacing = low ? 1 : 0.5;
     let scene: PlayScene;
     try {
-      scene = createPlayScene({ canvas, gridSpacing, antialias: !low, powerPreference: powerPreferenceOf(props.profile.gpu), reducedMotion: reduced, textureSize: low ? 512 : 1024 });
+      scene = createPlayScene({ canvas, gridSpacing, antialias: !low, powerPreference: powerPreferenceOf(props.profile.gpu), reducedMotion: reduced, textureSize: low ? 512 : 1024, groundBudget: low ? 90000 : 200000, groundTexture: low ? 128 : 256 });
     } catch {
       setFailed(true);
       return undefined;
@@ -131,6 +138,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       pull: () => scene.pullLever(),
       go: (where: 'lab' | 'planet', x: number, z: number, yaw: number) => scene.debug.teleport(where, x, z, yaw),
       gate: () => scene.debug.gatePlanet(),
+      showGround: (on: boolean) => scene.debug.showGround(on),
       placeAt: (x: number, z: number) => { const pm = scene.debug.placeAt(x, z); if (pm) commit(placed(stateRef.current, pm)); return !!pm; },
       state: () => stateRef.current,
     });

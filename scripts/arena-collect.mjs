@@ -9,7 +9,8 @@ import { fileURLToPath } from 'node:url';
 const [pkg, file] = process.argv.slice(2);
 if (!pkg || !file) { console.error('usage: node scripts/arena-collect.mjs <package> <file>'); process.exit(2); }
 let data = JSON.parse(fs.readFileSync(file, 'utf8'));
-if (Array.isArray(data) && data[0] && typeof data[0].text === 'string') data = JSON.parse(data[0].text);
+// the browser tool appends a note naming the page's origin after the value
+if (Array.isArray(data) && data[0] && typeof data[0].text === 'string') data = JSON.parse(data[0].text.replace(/\s*\(captured at origin [^)]*\)\s*$/, ''));
 if (typeof data === 'string') data = JSON.parse(data);
 const root = fileURLToPath(new URL(`../arena-gathered/${pkg}/`, import.meta.url));
 for (const answer of data.answers) {

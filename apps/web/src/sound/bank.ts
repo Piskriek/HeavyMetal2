@@ -1,6 +1,6 @@
 import { cmd, type PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
-import { SFX, SFX_IDS, type PlayableRecipe, type SfxId } from '@hm/audio';
+import { SFX, SFX_IDS, type PlayableRecipe, type SfxId, type SfxRecipe } from '@hm/audio';
 import { RACE_SOUNDS, UI_SOUNDS } from '@hm/soundpack';
 
 const PACK = [...RACE_SOUNDS, ...UI_SOUNDS];
@@ -81,7 +81,7 @@ export function removeOverride(rt: Runtime, slot: string): boolean {
   return true;
 }
 
-export interface SoundSlot { readonly id: SfxId; readonly label: string; readonly category: 'race' | 'editor' | 'ui'; readonly edited: boolean }
+export interface SoundSlot { readonly id: SfxId; readonly label: string; readonly category: SfxRecipe['category']; readonly edited: boolean }
 
 export function listSlots(rt: Runtime): SoundSlot[] {
   return SFX_IDS.map((id) => ({ id, label: id.replace(/-/g, ' '), category: SFX[id].category, edited: hasOverride(rt, id) }));

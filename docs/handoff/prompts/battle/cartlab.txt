@@ -1,0 +1,196 @@
+Follow-up, same chat. Thank you: your plot economy passed every acceptance test and runs in our game now. Next module, same rules: a new package `@hm/cartlab`, the lab's cartridges. Keep your plotsim files; put this one in `cartlab/src/index.ts` and `cartlab/tests/cartlab.test.ts` in your project (a small preview page that runs the rules is welcome), and paste both files in full in your reply.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. All state is plain JSON-serialisable data; every function is pure (returns new state, never mutates its input).
+
+THE GAME. A cartridge goes into a pixel machine's slot on the plot and scales what it pours, per metric, by its affinity (that is your plotsim's env.affinity(cartridge, metric)). The lab has three machines for them:
+- Blanks are made from ore (RULES.blankCost each) and wait in the rack.
+- The preset bench writes one preset onto one blank, taking RULES.writeSeconds of powered time. Only presets the plot's stage has opened can be written (preset.minStage <= env.stage).
+- The preset combiner mixes 2 to 4 written cartridges (presets or mixes) into one new cartridge, taking RULES.combineSeconds of powered time. The inputs are used up. The owner's example: mud texture + terrain shaping = a road.
+- The preset rack holds up to RULES.rackSize cartridges; cartridges out in plot machines do not count. Its indexer glows (it catalogues) for RULES.catalogueSeconds after a cartridge is added.
+- The bench and the combiner work only while the lab has power (env.powered: the gate is on). Unpowered jobs pause; they never fail.
+- A cartridge is in the rack (slot null) or in exactly one plot machine (slot = that machine's id). Blanks never go in a machine. A cartridge in a machine or in a job cannot go into another job.
+
+COMBINING, per metric m: each input's gain is g = affinity[m] - 1. Sort the gains from high to low. The combined gain is the first in full plus half of each of the rest. The combined affinity is 1 + that gain, clamped to [0.5, 3]. So two cartridges that help the same metric make a better one, and a bad input costs half.
+
+API (export exactly these):
+export type Metric = 'pxd' | 'vtx' | 'lx' | 'aq';
+export const METRICS: readonly Metric[]; // ['pxd', 'vtx', 'lx', 'aq']
+export const RULES: { readonly blankCost: 12; readonly rackSize: 48; readonly writeSeconds: 20; readonly combineSeconds: 45; readonly catalogueSeconds: 2; readonly minInputs: 2; readonly maxInputs: 4 };
+export interface Preset { readonly id: string; readonly name: string; readonly affinity: Readonly<Partial<Record<Metric, number>>>; readonly minStage: number } // a missing metric is 1
+export interface Cartridge { readonly id: string; readonly name: string; readonly kind: 'blank' | 'preset' | 'mix'; readonly preset: string | null; readonly from: readonly string[]; readonly affinity: Readonly<Record<Metric, number>>; readonly slot: number | null }
+// ids 'c1', 'c2', ... in the order made. A written cartridge keeps its id, takes the preset's name, kind 'preset', preset = its id. A mix gets a new id, kind 'mix', preset null, the inputs' names joined with ' + ' in the order given, and from = the inputs' ids. A blank: name 'Blank', preset null, from [], every affinity 1.
+export interface Job { readonly inputs: readonly string[]; readonly preset: string | null; readonly done: number; readonly needs: number } // seconds
+export interface LabState { readonly v: 1; readonly time: number; readonly nextId: number; readonly cartridges: readonly Cartridge[]; readonly bench: Job | null; readonly combiner: Job | null; readonly catalogueUntil: number }
+export interface LabEnv { readonly presets: readonly Preset[]; readonly stage: number; readonly powered: boolean }
+export type LabEvent = { readonly type: 'written'; readonly id: string } | { readonly type: 'combined'; readonly id: string } | { readonly type: 'stalled'; readonly machine: 'bench' | 'combiner' };
+export interface Check { readonly ok: boolean; readonly why: string } // why is '' when ok, else one plain sentence for the player
+export function newLab(): LabState;
+export function rackCount(s: LabState): number; // cartridges not in a machine
+export function canMakeBlank(s: LabState, ore: number): Check;
+export function makeBlank(s: LabState, ore: number): { readonly state: LabState; readonly oreUsed: number }; // throws Error(why) when refused
+export function canWrite(s: LabState, env: LabEnv, blank: string, preset: string): Check;
+export function startWrite(s: LabState, env: LabEnv, blank: string, preset: string): LabState; // throws Error(why)
+export function canCombine(s: LabState, env: LabEnv, ids: readonly string[]): Check;
+export function startCombine(s: LabState, env: LabEnv, ids: readonly string[]): LabState; // throws Error(why)
+export function canSlot(s: LabState, id: string, machine: number): Check;
+export function slotInto(s: LabState, id: string, machine: number): LabState; // throws Error(why)
+export function unslot(s: LabState, id: string): LabState; // back to the rack; unchanged if it is there already
+export function step(s: LabState, env: LabEnv, dt: number): { readonly state: LabState; readonly events: readonly LabEvent[] };
+export function activity(s: LabState, env: LabEnv): { readonly bench: number; readonly combiner: number; readonly rack: number }; // 0..1, how hard each works now (for their pixels)
+export function affinityOf(s: LabState, id: string, metric: Metric): number; // 1 for an unknown id or a blank
+export function loadLab(json: unknown): LabState | null; // null for junk: wrong v, missing or mistyped fields, the same id twice, a job naming a missing cartridge
+
+DETAILS:
+- step: time += dt. Powered: each job's done += dt; when done >= needs the job finishes (a write turns its blank into the preset's cartridge; a combine removes its inputs and adds the mix to the rack) and its machine is free again. Unpowered: no progress, and one 'stalled' event per machine with a job when it stops (again only after it has run since).
+- canWrite refuses, checked in this order: no power ("No power: turn the gate on."), the bench busy, an unknown cartridge, not a blank, in a job, an unknown preset, a preset the stage has not opened ("That preset opens at stage N.").
+- canCombine refuses: no power, the combiner busy, fewer than 2 or more than 4, the same id twice, an unknown id, a blank, a cartridge in a machine or in a job.
+- canMakeBlank refuses: ore below blankCost ("Not enough ore: a blank costs 12."), then a full rack ("The rack is full: 48 cartridges.").
+- canSlot refuses: an unknown id, a blank ("A blank does nothing: write a preset on it first."), already in a machine, in a job.
+- Making a blank or finishing a mix sets catalogueUntil = time + catalogueSeconds. activity.rack is 1 while powered and time < catalogueUntil, else 0. activity.bench and activity.combiner are 1 while powered with a job, else 0.
+
+Your test file must contain these acceptance tests unchanged, plus your own:
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { RULES, METRICS, newLab, rackCount, canMakeBlank, makeBlank, canWrite, startWrite, canCombine, startCombine, canSlot, slotInto, unslot, step, activity, affinityOf, loadLab, type LabEnv, type Preset } from '../src/index';
+
+const P: Preset[] = [
+  { id: 'mud', name: 'Mud', affinity: { pxd: 1.4 }, minStage: 0 },
+  { id: 'terrain', name: 'Terrain shaping', affinity: { vtx: 1.5, pxd: 0.9 }, minStage: 0 },
+  { id: 'sun', name: 'Low sun', affinity: { lx: 1.6 }, minStage: 2 },
+];
+const env = (o: Partial<LabEnv> = {}): LabEnv => ({ presets: P, stage: 1, powered: true, ...o });
+
+test('blanks cost ore and wait in the rack', () => {
+  let s = newLab();
+  assert.equal(rackCount(s), 0);
+  assert.equal(canMakeBlank(s, RULES.blankCost - 1).ok, false);
+  assert.match(canMakeBlank(s, RULES.blankCost - 1).why, /ore/i);
+  assert.throws(() => makeBlank(s, 0));
+  const r = makeBlank(s, 100);
+  assert.equal(r.oreUsed, RULES.blankCost);
+  s = r.state;
+  assert.equal(rackCount(s), 1);
+  const c = s.cartridges[0]!;
+  assert.equal(c.kind, 'blank');
+  assert.equal(c.slot, null);
+  for (const m of METRICS) assert.equal(affinityOf(s, c.id, m), 1);
+  assert.equal(affinityOf(s, 'nope', 'pxd'), 1);
+});
+
+test('the bench writes a preset onto a blank, only with power and only presets the stage has opened', () => {
+  let s = makeBlank(newLab(), 100).state;
+  const id = s.cartridges[0]!.id;
+  assert.equal(canWrite(s, env(), id, 'sun').ok, false);
+  assert.match(canWrite(s, env(), id, 'sun').why, /stage 2/);
+  assert.equal(canWrite(s, env({ stage: 2 }), id, 'sun').ok, true);
+  assert.equal(canWrite(s, env({ powered: false }), id, 'mud').ok, false);
+  assert.equal(canWrite(s, env(), id, 'nope').ok, false);
+  s = startWrite(s, env(), id, 'mud');
+  assert.equal(canWrite(s, env(), id, 'mud').ok, false); // the bench is busy
+  s = step(s, env({ powered: false }), 100).state; // no power, no progress
+  assert.equal(s.cartridges.find((c) => c.id === id)!.kind, 'blank');
+  for (let t = 0; t < RULES.writeSeconds - 1; t++) s = step(s, env(), 1).state;
+  assert.equal(s.cartridges.find((c) => c.id === id)!.kind, 'blank');
+  const r = step(s, env(), 1);
+  s = r.state;
+  assert.ok(r.events.some((e) => e.type === 'written' && e.id === id));
+  const c = s.cartridges.find((x) => x.id === id)!;
+  assert.equal(c.kind, 'preset');
+  assert.equal(c.preset, 'mud');
+  assert.equal(c.name, 'Mud');
+  assert.equal(c.affinity.pxd, 1.4);
+  assert.equal(c.affinity.vtx, 1);
+  assert.equal(s.bench, null);
+});
+
+test('the combiner mixes two to four written cartridges into one; the best gain counts in full, the rest half', () => {
+  let s = newLab();
+  for (let i = 0; i < 4; i++) s = makeBlank(s, 100).state;
+  const [a, b, c, blank] = s.cartridges.map((x) => x.id) as [string, string, string, string];
+  for (const [id, p] of [[a, 'mud'], [b, 'terrain'], [c, 'mud']] as const) {
+    s = startWrite(s, env(), id, p);
+    s = step(s, env(), RULES.writeSeconds).state;
+  }
+  assert.equal(canCombine(s, env(), [a]).ok, false);
+  assert.equal(canCombine(s, env(), [a, a]).ok, false);
+  assert.equal(canCombine(s, env(), [a, blank]).ok, false);
+  assert.equal(canCombine(s, env({ powered: false }), [a, b]).ok, false);
+  s = startCombine(s, env(), [a, b, c]);
+  assert.equal(canCombine(s, env(), [a, b]).ok, false); // the combiner is busy
+  const r = step(s, env(), RULES.combineSeconds);
+  s = r.state;
+  const made = s.cartridges.find((x) => x.kind === 'mix')!;
+  assert.ok(r.events.some((e) => e.type === 'combined' && e.id === made.id));
+  assert.equal(s.cartridges.some((x) => x.id === a || x.id === b || x.id === c), false);
+  assert.deepEqual([...made.from].sort(), [a, b, c].sort());
+  assert.equal(made.name, 'Mud + Terrain shaping + Mud');
+  // pxd gains 0.4, 0.4, -0.1: 0.4 + (0.4 - 0.1) / 2 = 0.55
+  assert.ok(Math.abs(made.affinity.pxd - 1.55) < 1e-9, String(made.affinity.pxd));
+  assert.ok(Math.abs(made.affinity.vtx - 1.5) < 1e-9, String(made.affinity.vtx));
+  assert.equal(made.affinity.lx, 1);
+  assert.equal(rackCount(s), 2); // the mix and the blank
+});
+
+test('a written cartridge goes into one machine at a time and back to the rack; blanks never do', () => {
+  let s = makeBlank(makeBlank(newLab(), 100).state, 100).state;
+  const [id, other] = s.cartridges.map((c) => c.id) as [string, string];
+  assert.equal(canSlot(s, id, 7).ok, false);
+  assert.match(canSlot(s, id, 7).why, /blank/i);
+  for (const x of [id, other]) {
+    s = startWrite(s, env(), x, 'terrain');
+    s = step(s, env(), RULES.writeSeconds).state;
+  }
+  s = slotInto(s, id, 7);
+  assert.equal(s.cartridges.find((c) => c.id === id)!.slot, 7);
+  assert.equal(rackCount(s), 1);
+  assert.equal(canSlot(s, id, 8).ok, false);
+  assert.equal(canCombine(s, env(), [id, other]).ok, false); // it is out in a machine
+  assert.equal(affinityOf(s, id, 'vtx'), 1.5);
+  assert.equal(affinityOf(s, id, 'pxd'), 0.9);
+  s = unslot(s, id);
+  assert.equal(s.cartridges.find((c) => c.id === id)!.slot, null);
+  assert.equal(rackCount(s), 2);
+});
+
+test('the rack holds RULES.rackSize; cartridges out in machines do not count', () => {
+  let s = newLab();
+  for (let i = 0; i < RULES.rackSize; i++) s = makeBlank(s, 1e6).state;
+  assert.equal(canMakeBlank(s, 1e6).ok, false);
+  assert.match(canMakeBlank(s, 1e6).why, /full/i);
+  const id = s.cartridges[0]!.id;
+  s = startWrite(s, env(), id, 'mud');
+  s = step(s, env(), RULES.writeSeconds).state;
+  s = slotInto(s, id, 3);
+  assert.equal(canMakeBlank(s, 1e6).ok, true);
+});
+
+test('activity says how hard each lab machine works, for its pixels', () => {
+  assert.deepEqual(activity(newLab(), env()), { bench: 0, combiner: 0, rack: 0 });
+  let s = makeBlank(newLab(), 100).state;
+  assert.equal(activity(s, env()).rack, 1); // cataloguing the new blank
+  assert.equal(activity(s, env({ powered: false })).rack, 0);
+  s = step(s, env(), RULES.catalogueSeconds).state;
+  assert.equal(activity(s, env()).rack, 0);
+  s = startWrite(s, env(), s.cartridges[0]!.id, 'mud');
+  assert.equal(activity(s, env()).bench, 1);
+  assert.equal(activity(s, env({ powered: false })).bench, 0);
+  assert.equal(activity(s, env()).combiner, 0);
+});
+
+test('saves round-trip, junk is refused, nothing is mutated, and the same inputs give the same lab', () => {
+  const s = makeBlank(makeBlank(newLab(), 100).state, 100).state;
+  const frozen = JSON.stringify(s);
+  const x = s.cartridges[0]!.id;
+  const a = step(startWrite(s, env(), x, 'mud'), env(), 5).state;
+  const b = step(startWrite(s, env(), x, 'mud'), env(), 5).state;
+  assert.equal(JSON.stringify(s), frozen);
+  assert.deepEqual(a, b);
+  assert.deepEqual(loadLab(JSON.parse(JSON.stringify(a))), a);
+  assert.equal(loadLab(null), null);
+  assert.equal(loadLab({ v: 99 }), null);
+  assert.equal(loadLab({ ...a, cartridges: [a.cartridges[0], a.cartridges[0]] }), null); // the same id twice
+  assert.equal(loadLab({ ...a, bench: { inputs: ['c999'], preset: 'mud', done: 0, needs: 20 } }), null); // a job naming a missing cartridge
+});
+```

@@ -1,0 +1,185 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module for three.js: the pixel plumes of a game's machines. Terraforming machines stand on a desolate planet and, while they run, pour luminous coloured "pixels" (small cubes or squares) from their vents into the sky: a pour that rises, widens, swirls, leans downwind and fades. It must look like pixels really are pouring out, and cost almost nothing: one draw call for every plume together, and no per-pixel work on the CPU (every pixel's motion is computed in the vertex shader from its index and the time). Three ways to draw them, chosen by the game's graphics tier: 3D cubes (high end), soft splats (middle), dithered square point sprites (low end, a 10-year-old laptop's integrated GPU).
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/plume.test.ts`. If your environment can show a web page, ALSO make a preview page (index.html, three.js from a CDN): five vents in a row on dark ground, one per colour below, buttons for the four modes, sliders for density and wind, and a "wave" button that runs a wave from the middle vent out to 60 m over 8 seconds; the two code blocks in the chat are what gets collected. When the tests would pass, STOP.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM (no document, no canvas), no Date, no Math.random (use a seeded hash of the pixel index). The only import in src is `import * as THREE from 'three'` (three r170 or later, WebGL2). Shaders are THREE.ShaderMaterial (GLSL3 is fine); end each fragment shader with three's `#include <colorspace_fragment>`. The test file imports only `node:test`, `node:assert/strict`, `three` and `../src/index`. Units are metres, +y is up, time is in seconds.
+
+## The look
+- The pour: pixels leave the vent small and bright, rise about `height` metres with an ease-out, widen to about `spread` metres across at the top, each on its own slow spiral round the plume's axis, and shrink away at the end of their life. Lives are staggered (golden-ratio phases of the index), so the pour is continuous, never in waves.
+- Wind: old pixels lean and drift downwind (the drift grows with the square of their age), scaled by the plume's wind response (0 = none, 1 = as made, 2 = twice).
+- Luminous: a pixel's colour is its machine's colour, lit by a fixed soft light so cubes show their faces, never darker than 70% of the colour; new pixels are a little brighter.
+- The wave: when the game runs a "resolution wave" (a circle of new fidelity spreading over the ground from a centre), every fourth pixel of each plume stops rising and races outward from its vent on a low arc to the wave's front, dissolving (dithered) as it arrives: the colour visibly flows from the machines into the wave. No wave, no racers.
+- A starting machine fades its plume in over 1.5 seconds (sizes grow from 0).
+- Modes: `cubes`: little cubes (12 triangles each) tumbling as they rise. `splats`: camera-facing quads (2 triangles) with a soft round falloff, additive colour so overlaps glow, no sorting. `dither`: square point sprites (gl_PointSize from distance and the viewport height) with no blending at all; fading is a 4x4 Bayer-dithered discard. `off`: nothing drawn.
+- The metric colours: Pxd hot magenta `#ff3d8a`, Vtx neon green `#7cff4d`, Lx solar amber `#ffc13d`, Aq electric cyan `#3dc8ff`, All prismatic violet `#b46bff`.
+
+## The picture contract (the game's renderer depends on it)
+The plumes are drawn into an offscreen target whose ALPHA channel is a mark read by a post pass (0 = a portal, 0.5 = "always in full colour", 1 = the planet, which the post pass dithers to black and white at the lowest stage). So:
+- every plume fragment that is drawn writes alpha = the uniform `uMark` (the `markAlpha` option, default 0.5) exactly;
+- the alpha channel is never blended: either `blending = THREE.NoBlending`, or `THREE.CustomBlending` with `blendSrcAlpha = THREE.OneFactor` and `blendDstAlpha = THREE.ZeroFactor` (colour may blend additively);
+- a fragment with too little coverage (a splat's faint rim, a dithered fade) is discarded, never written faint;
+- the plumes test depth against the scene (cubes also write depth; splats and sprites do not).
+- `setViewport(heightPx)` gives the height in pixels of the target the plumes are drawn into (it can be a third of the screen): point sprites and splats size themselves from it so a pixel looks the same size in every mode.
+
+## API (implement exactly; you may add more exports)
+
+```ts
+import * as THREE from 'three';
+
+export type PlumeMode = 'cubes' | 'splats' | 'dither' | 'off';
+export const PLUME_MODES: readonly PlumeMode[];   // ['cubes', 'splats', 'dither', 'off']
+export const METRIC_COLOURS: { readonly pxd: string; readonly vtx: string; readonly lx: string; readonly aq: string; readonly all: string };
+
+export interface EmitterSpec {
+  at: [number, number, number];   // the vent, in world space
+  colour: string;                 // '#rrggbb', sRGB
+  count?: number;                 // pixels at density 1 (default 160)
+  height?: number;                // metres the pour rises (default 6.5)
+  spread?: number;                // metres across at the top (default 2.6)
+  life?: number;                  // seconds a pixel lives (default 3.1)
+  size?: number;                  // a new pixel's edge in metres (default 0.14)
+  startAt?: number;               // the plume's time it starts (fades in over 1.5 s); default 0
+}
+export interface PlumeEnv {
+  wind: [number, number];         // unit direction on the ground (x, z)
+  windSpeed: number;              // m/s
+  windResponse: number;           // 0..2
+  waveCentre: [number, number, number];
+  waveR: number;                  // the wave front's radius in metres; < 0: no wave; > 1e6: the wave has finished (no racers)
+}
+export interface PixelState { p: [number, number, number]; size: number; life: number; toWave: boolean }
+/** The CPU twin of the vertex shader: where pixel i of an emitter is at time t. Same formulas, same constant names as the GLSL (keep them side by side). */
+export function pixelAt(e: Required<EmitterSpec>, i: number, t: number, env: PlumeEnv): PixelState;
+
+export interface Plume {
+  readonly object: THREE.Object3D;          // add it to the scene once
+  readonly mode: PlumeMode;
+  setMode(mode: PlumeMode): void;
+  setDensity(d: number): void;              // multiplies every emitter's count, 0.1..4 (clamped); total capped by maxPixels (scaled down evenly)
+  setWind(dirX: number, dirZ: number, speed: number): void;
+  setWindResponse(k: number): void;         // 0..2, default 1
+  setWave(centre: [number, number, number], radius: number): void;
+  setViewport(heightPx: number): void;
+  add(e: EmitterSpec): number;              // returns an id
+  remove(id: number): void;
+  update(t: number): void;                  // the plume's time; uniforms only, no allocation, no per-pixel CPU work
+  stats(): { mode: PlumeMode; emitters: number; pixels: number; drawCalls: number; triangles: number };
+  dispose(): void;
+}
+export function createPlume(o?: { mode?: PlumeMode; density?: number; maxPixels?: number; markAlpha?: number }): Plume;  // defaults: cubes, 1, 16384, 0.5
+```
+
+Build it as one InstancedBufferGeometry (cubes, splats) or one Points geometry (dither) holding every emitter's pixels: per-instance attributes (emitter slot, pixel index, seed), emitter parameters in a uniform array or a small DataTexture (at least 64 emitters). `add`, `remove`, `setDensity` and `setMode` may rebuild the attributes (rare events); `update` only sets uniforms. Changing mode keeps one material per mode (built once), so switching never compiles twice.
+
+## Budgets
+One draw call per plume object whatever the number of emitters. `update` under 0.05 ms. Rebuilding attributes for 16384 pixels under 3 ms in Node. On an Intel HD 530 at 1/3 of 1080p: `dither` with 5000 pixels well under 0.5 ms of GPU, `cubes` with 2000 under 1.5 ms.
+
+## Acceptance tests (copy unchanged, then add your own: determinism of the attributes, ids, removing the last emitter, density clamps, the fade-in, stats per mode)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { createPlume, pixelAt, METRIC_COLOURS, PLUME_MODES, type EmitterSpec, type PlumeEnv } from '../src/index';
+
+const calm: PlumeEnv = { wind: [1, 0], windSpeed: 0, windResponse: 1, waveCentre: [0, 0, 0], waveR: -1 };
+const spec = (o: Partial<EmitterSpec> = {}): Required<EmitterSpec> => ({ at: [0, 1, 0], colour: METRIC_COLOURS.pxd, count: 160, height: 6.5, spread: 2.6, life: 3.1, size: 0.14, startAt: 0, ...o });
+const sample = (e: Required<EmitterSpec>, t: number, env: PlumeEnv) => Array.from({ length: e.count }, (_, i) => pixelAt(e, i, t, env));
+const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
+const flat = (p: { p: [number, number, number] }) => Math.hypot(p.p[0], p.p[2]);
+const drawn = (o: THREE.Object3D): THREE.Object3D[] => {
+  const out: THREE.Object3D[] = [];
+  o.traverseVisible((x) => { if ((x as THREE.Mesh).isMesh || (x as THREE.Points).isPoints) out.push(x); });
+  return out;
+};
+
+test('pixels rise from the vent, widen as they go, and shrink away at the end of their life', () => {
+  const px = sample(spec(), 10, calm);
+  const young = px.filter((p) => p.life < 0.2), old = px.filter((p) => p.life > 0.8);
+  assert.ok(young.length > 15 && old.length > 15, 'lives are staggered, not in step');
+  assert.ok(mean(old.map((p) => p.p[1])) > mean(young.map((p) => p.p[1])) + 3, 'old pixels are higher');
+  assert.ok(mean(old.map(flat)) > mean(young.map(flat)) + 0.8, 'the pour widens');
+  for (const p of px) {
+    assert.ok(p.life >= 0 && p.life < 1);
+    assert.ok(p.p[1] >= 1 - 1e-6, 'never below the vent');
+    if (p.life > 0.97) assert.ok(p.size < 0.05, 'nearly gone at the end of its life');
+  }
+  assert.deepEqual(sample(spec(), 10, calm), sample(spec(), 10, calm), 'deterministic');
+});
+
+test('the wind carries the old pixels downwind, more with a stronger response', () => {
+  const wind = (k: number): PlumeEnv => ({ ...calm, wind: [0, 1], windSpeed: 4, windResponse: k });
+  const z = (k: number) => mean(sample(spec(), 10, wind(k)).filter((p) => p.life > 0.7).map((p) => p.p[2]));
+  assert.ok(z(1) > 1.5, 'downwind is +z here');
+  assert.ok(z(2) > z(1) + 0.5);
+  assert.ok(Math.abs(z(0)) < 0.5, 'no response, no drift');
+});
+
+test('a starting machine fades its plume in over 1.5 seconds', () => {
+  const e = spec({ startAt: 5 });
+  assert.ok(sample(e, 4, calm).every((p) => p.size === 0), 'nothing before it starts');
+  assert.ok(sample(e, 5, calm).every((p) => p.size === 0), 'nothing at the very start');
+  assert.ok(sample(e, 7, calm).filter((p) => p.size > 0).length > 100, 'all of it after 1.5 s');
+});
+
+test('while a wave runs, a quarter of the pixels race out to its front and dissolve there', () => {
+  const env: PlumeEnv = { ...calm, waveR: 60 };
+  const out = sample(spec(), 10, env).filter((p) => p.toWave);
+  assert.ok(out.length >= 30 && out.length <= 50, `about a quarter (${out.length})`);
+  assert.ok(out.filter((p) => flat(p) > 30).length > 5, 'some are well on their way');
+  assert.ok(out.every((p) => flat(p) <= 61), 'none beyond the front');
+  assert.equal(sample(spec(), 10, calm).filter((p) => p.toWave).length, 0, 'no wave, no racers');
+  assert.equal(sample(spec(), 10, { ...calm, waveR: 2e6 }).filter((p) => p.toWave).length, 0, 'a finished wave, no racers');
+});
+
+test('modes: one draw call each, the right primitive, and off draws nothing', () => {
+  assert.deepEqual([...PLUME_MODES], ['cubes', 'splats', 'dither', 'off']);
+  const plume = createPlume({ mode: 'cubes', density: 1 });
+  plume.add({ at: [0, 1, 0], colour: METRIC_COLOURS.vtx });
+  plume.add({ at: [10, 1, 0], colour: METRIC_COLOURS.lx, count: 80 });
+  plume.update(3);
+  let s = plume.stats();
+  assert.equal(s.pixels, 240); assert.equal(s.drawCalls, 1); assert.equal(s.triangles, 240 * 12);
+  assert.equal(drawn(plume.object).length, 1);
+  plume.setMode('splats'); s = plume.stats();
+  assert.equal(s.drawCalls, 1); assert.equal(s.triangles, 240 * 2); assert.equal(drawn(plume.object).length, 1);
+  plume.setMode('dither'); s = plume.stats();
+  const sprites = drawn(plume.object);
+  assert.equal(sprites.length, 1); assert.ok((sprites[0] as THREE.Points).isPoints); assert.equal(s.triangles, 0); assert.equal(s.pixels, 240);
+  plume.setMode('off'); s = plume.stats();
+  assert.equal(drawn(plume.object).length, 0); assert.equal(s.drawCalls, 0); assert.equal(s.pixels, 0);
+  plume.dispose();
+});
+
+test('density scales every plume, within the pixel budget', () => {
+  const plume = createPlume({ mode: 'dither', maxPixels: 1000 });
+  const a = plume.add({ at: [0, 0, 0], colour: METRIC_COLOURS.aq, count: 200 });
+  plume.add({ at: [5, 0, 0], colour: METRIC_COLOURS.all, count: 200 });
+  plume.setDensity(0.5); assert.equal(plume.stats().pixels, 200);
+  plume.setDensity(2); assert.equal(plume.stats().pixels, 800);
+  plume.setDensity(4); assert.equal(plume.stats().pixels, 1000, 'capped by maxPixels');
+  plume.remove(a); plume.setDensity(1);
+  assert.equal(plume.stats().pixels, 200); assert.equal(plume.stats().emitters, 1);
+  plume.dispose();
+});
+
+test('the picture contract: every fragment writes the mark, alpha is never blended, and updating never changes a program', () => {
+  const plume = createPlume({ mode: 'cubes', markAlpha: 0.5 });
+  plume.add({ at: [0, 0, 0], colour: METRIC_COLOURS.pxd });
+  for (const mode of ['cubes', 'splats', 'dither'] as const) {
+    plume.setMode(mode);
+    const [obj] = drawn(plume.object);
+    const mat = (obj as THREE.Mesh).material as THREE.ShaderMaterial;
+    assert.ok(mat.isShaderMaterial, mode);
+    assert.match(mat.fragmentShader, /uMark/, `${mode} writes the mark`);
+    assert.equal((mat.uniforms.uMark as { value: number }).value, 0.5);
+    const alphaSafe = mat.blending === THREE.NoBlending || (mat.blending === THREE.CustomBlending && mat.blendSrcAlpha === THREE.OneFactor && mat.blendDstAlpha === THREE.ZeroFactor);
+    assert.ok(alphaSafe, `${mode}: the alpha channel is written, not blended`);
+    const program = mat.vertexShader + mat.fragmentShader + JSON.stringify(mat.defines ?? {});
+    plume.update(1); plume.setDensity(2); plume.setWind(1, 0, 5); plume.setWave([0, 0, 0], 30); plume.setViewport(360); plume.update(2);
+    assert.equal(mat.vertexShader + mat.fragmentShader + JSON.stringify(mat.defines ?? {}), program, `${mode}: uniforms only`);
+    plume.setDensity(1); plume.setWave([0, 0, 0], -1);
+  }
+  plume.dispose();
+});
+```

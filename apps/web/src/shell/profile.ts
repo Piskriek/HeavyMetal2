@@ -67,9 +67,11 @@ export function noteGpu(name: string | null): void { if (name) gpuSeen = name; }
 export const gpuInUse = (): string | null => gpuSeen;
 
 let tierSeen: Quality | null = null;
+/** Note the tier a view draws (its own renderer applies it), so Settings can show what is drawing. */
+export function noteTier(tier: Quality): void { tierSeen = tier; }
 /** Draw a tier with the player's own graphics changes on top, and note it so Settings can show what is drawing. */
 export function showTier(renderer: ThreeRenderer, tier: Quality, own: Params): void {
-  tierSeen = tier;
+  noteTier(tier);
   renderer.setGraphics(resolveGraphics(tier, own));
 }
 export const tierInUse = (): Quality | null => tierSeen;

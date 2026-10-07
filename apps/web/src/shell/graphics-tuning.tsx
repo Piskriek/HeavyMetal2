@@ -3,9 +3,13 @@ import type { Params } from '@hm/contracts';
 import type { Quality } from '@hm/game';
 import { graphicsSchema, resolveGraphics } from '@hm/render';
 import { Inspector } from '@hm/ui';
+import { EDITION } from '../edition';
 
-/** The fine-tuning shows every knob but the dither distance, which has its own slider above it (its far end reads Unlimited). */
-const TUNED = { ...graphicsSchema, variables: graphicsSchema.variables.filter((v) => v.key !== 'ditherDistance') };
+/**
+ * The fine-tuning shows every knob but the dither distance, which has its own slider above it (its far end reads Unlimited), and, in
+ * Goblin Racing, SetMix's machines (it has none).
+ */
+const TUNED = { ...graphicsSchema, variables: graphicsSchema.variables.filter((v) => v.key !== 'ditherDistance' && !(EDITION === 'goblin-racing' && v.group === 'Machines')) };
 const TIER_NAME: Readonly<Record<Quality, string>> = { potato: 'Potato', low: 'Low', medium: 'Medium', high: 'High', ultra: 'Ultra' };
 
 /**

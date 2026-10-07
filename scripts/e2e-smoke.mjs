@@ -712,6 +712,10 @@ try {
   check('the first machine lifts the plot to stage 1', await dom(() => window.hmPlay.state().step === 'done' && window.hmPlay.state().stage === 1));
   await page.waitForFunction(() => window.hmPlay.wave > 1e6, null, { timeout: T(40000) });
   check('the wave crosses the plot', true);
+  // the display governor may have changed the tier by now: the stage's look stays, the plume follows the tier
+  const detail = await dom(() => ({ ...window.hmPlay.detail(), tier: window.hmPlay.tier }));
+  check('stage 1 is drawn about 240 lines tall, whatever the tier', detail.planet[1] >= 200 && detail.planet[1] <= 280, JSON.stringify(detail));
+  check('the plume pours as many pixels as the tier asks', detail.plumes === 'cubes' && detail.pixels === Math.round(160 * detail.plumeDensity), JSON.stringify(detail));
   await shot('play-stage-1');
   await page.keyboard.press('Escape');
   await page.waitForSelector('.play-pause', { timeout: T(5000) });

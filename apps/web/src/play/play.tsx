@@ -5,14 +5,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { deviceFor, type Stage } from '@hm/fidelity';
 import { VAULT_BY_ID } from '@hm/vault';
-import { pixelRatioFor, resolveGraphics } from '@hm/render';
-import { powerPreferenceOf, type Profile } from '../shell/profile';
+import { createAdaptiveQuality, parseQuality, type Quality } from '@hm/game';
+import { pixelRatioFor, resolveGraphics, type GraphicsSettings } from '@hm/render';
+import { noteTier, powerPreferenceOf, type Profile } from '../shell/profile';
 import { tierFor } from '../crafter/crafter';
 import { bakeLookCached } from '../crafter/looks';
 import type { Plot } from '../crafter/planet';
 import { SMOOTH_IDS, smoothModel } from '../crafter/smooth-models';
 import { CreateGoblin } from '../avatar/create-goblin';
-import { createPlayScene, type FrameOut, type PlayScene } from './play-scene';
+import { createPlayScene, type Detail, type FrameOut, type PlayScene } from './play-scene';
 import { FRESH, SAVE_KEY, arrived, created, loadState, objective, placed, poweredOn, returned, type PlayState } from './quest';
 import './play.css';
 
@@ -26,6 +27,10 @@ const NEIGHBOURS: readonly Plot[] = ([
   ['Low Atoll', 214, 2350, 210, 'coral_atoll', 6], ['Prism Flats', 262, 1320, 120, 'prismata_grass', 4], ['Greywater', 305, 2700, 230, 'emerald_canopy', 5],
   ['Stillgrove', 340, 3000, 240, 'spore_meadow', 6],
 ] as const).map(([name, deg, dist, r, cartridge, stage]) => ({ name, r, cartridge, stage, x: Math.cos((deg * Math.PI) / 180) * dist, z: Math.sin((deg * Math.PI) / 180) * dist }));
+
+/** The ground's triangles by tier (the display governor changes it as you play). */
+const GROUND_BUDGET: Readonly<Record<Quality, number>> = { potato: 60000, low: 90000, medium: 200000, high: 200000, ultra: 280000 };
+const detailOf = (g: GraphicsSettings, q: Quality): Detail => ({ plumes: g.pixelPlumes, plumeDensity: g.plumeDensity, groundBudget: GROUND_BUDGET[q] });
 
 function loadSaved(): PlayState { try { return loadState(JSON.parse(localStorage.getItem(SAVE_KEY) ?? 'null')); } catch { return FRESH; } }
 function save(s: PlayState): void { try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); } catch { /* storage unavailable: progress lives for this visit */ } }
@@ -67,15 +72,19 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
     if (!canvas) return undefined;
     const low = tier === 'potato' || tier === 'low';
     const device = deviceFor(tier), gridSpacing = low ? 1 : 0.5;
+    // the display governor (SETMIX_PLAN rule 6): auto follows the frame time from the starting tier; a tier chosen in Settings is kept.
+    // What it can change while you play: the picture's sharpness, the plumes and the ground's triangles; the rest is the starting tier's.
+    const adaptive = createAdaptiveQuality(tier, { locked: parseQuality(props.profile.quality) !== null, targetFps: props.profile.fpsTarget });
+    let graphics = resolveGraphics(tier, props.profile.graphics);
+    noteTier(tier);
     let scene: PlayScene;
     try {
-      scene = createPlayScene({ canvas, gridSpacing, antialias: !low, powerPreference: powerPreferenceOf(props.profile.gpu), reducedMotion: reduced, textureSize: low ? 512 : 1024, groundBudget: low ? 90000 : 200000, groundTexture: low ? 128 : 256 });
+      scene = createPlayScene({ canvas, gridSpacing, antialias: !low, powerPreference: powerPreferenceOf(props.profile.gpu), reducedMotion: reduced, textureSize: low ? 512 : 1024, groundTexture: low ? 128 : 256, detail: detailOf(graphics, tier) });
     } catch {
       setFailed(true);
       return undefined;
     }
     sceneRef.current = scene;
-    const graphics = resolveGraphics(tier, props.profile.graphics);
     const size = (): void => {
       const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
       scene.resize(w, h, pixelRatioFor(graphics, w, h, window.devicePixelRatio || 1));
@@ -95,8 +104,9 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
         scene.setPlanet(look(PLOT, 1), look(PLOT, 1), NEIGHBOURS.map((plot) => ({ plot, look: look(plot.cartridge, plot.stage) })));
         scene.restore(stateRef.current);
       }],
+      ['Compiling shaders', () => { scene.warm(); }],
     ];
-    const hook = { frames: 0, ready: false, step: stateRef.current.step, where: 'lab', sync: 1, wave: -1, triangles: 0, calls: 0 };
+    const hook = { frames: 0, ready: false, step: stateRef.current.step, where: 'lab', sync: 1, wave: -1, triangles: 0, calls: 0, tier: tier as Quality };
     const keys = new Set<string>();
     let dx = 0, dy = 0, cancelled = false, raf = 0, at = 0, timer = 0, last = performance.now(), hudAt = 0;
     const onKey = (e: KeyboardEvent, down: boolean): void => { if (down) keys.add(e.code); else keys.delete(e.code); };
@@ -105,9 +115,19 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
     window.addEventListener('keydown', kd); window.addEventListener('keyup', ku); window.addEventListener('mousemove', onMove);
     const loop = (ms: number): void => {
       if (cancelled) return;
-      const dt = Math.min(0.1, (ms - last) / 1000);
+      const frameMs = ms - last;
+      const dt = Math.min(0.1, frameMs / 1000);
       last = ms;
       const live = !pausedRef.current && stateRef.current.step !== 'create';
+      // the governor judges only the frames you play (the creator draws its own turntable over the lab)
+      const next = live ? adaptive.frame(frameMs) : null;
+      if (next) {
+        graphics = resolveGraphics(next, props.profile.graphics);
+        scene.setDetail(detailOf(graphics, next));
+        size();
+        noteTier(next);
+        hook.tier = next;
+      }
       const axis = (a: string[], b: string[]) => (a.some((k) => keys.has(k)) ? 1 : 0) - (b.some((k) => keys.has(k)) ? 1 : 0);
       const out = scene.frame(ms / 1000, dt, live
         ? { move: { x: axis(['KeyD', 'ArrowRight'], ['KeyA', 'ArrowLeft']), z: axis(['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']) }, look: { dx, dy }, run: keys.has('ShiftLeft') || keys.has('ShiftRight') }
@@ -141,6 +161,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       showGround: (on: boolean) => scene.debug.showGround(on),
       placeAt: (x: number, z: number) => { const pm = scene.debug.placeAt(x, z); if (pm) commit(placed(stateRef.current, pm)); return !!pm; },
       state: () => stateRef.current,
+      detail: () => scene.debug.detail(),
     });
     setLoading(steps[0]![0]);
     timer = window.setTimeout(step, 30);
@@ -154,7 +175,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       sceneRef.current = null;
       scene.dispose();
     };
-  }, [tier, reduced, props.profile.gpu, props.profile.graphics, commit, say]);
+  }, [tier, reduced, props.profile.gpu, props.profile.graphics, props.profile.quality, props.profile.fpsTarget, commit, say]);
 
   // ---- pointer lock: click to look round; losing it (Esc) pauses
   useEffect(() => {

@@ -37,3 +37,12 @@ test('the dither distance: each tier has one, ultra blends everywhere (0), your 
   assert.equal(resolveGraphics('potato', { ditherDistance: 150 }).ditherDistance, 150);
   assert.equal(resolveGraphics('low', { ditherDistance: -5 }).ditherDistance, 30, 'a negative distance is junk');
 });
+
+test('the pixel plumes: every tier pours cubes (the fantasy is never switched off by a tier), denser as the tiers rise; your own wins', () => {
+  assert.deepEqual(['potato', 'low', 'medium', 'high', 'ultra'].map((x) => GRAPHICS_TIERS[x as 'low'].pixelPlumes), ['cubes', 'cubes', 'cubes', 'cubes', 'cubes']);
+  assert.deepEqual(['potato', 'low', 'medium', 'high', 'ultra'].map((x) => GRAPHICS_TIERS[x as 'low'].plumeDensity), [0.5, 0.75, 1, 1.5, 2]);
+  assert.equal(resolveGraphics('ultra', { pixelPlumes: 'off' }).pixelPlumes, 'off');
+  assert.equal(resolveGraphics('low', { pixelPlumes: 'sparkles' }).pixelPlumes, 'cubes', 'an unknown way is junk');
+  assert.equal(resolveGraphics('low', { plumeDensity: 2 }).plumeDensity, 2);
+  assert.equal(resolveGraphics('low', { plumeDensity: 0 }).plumeDensity, 0.75, 'below the hard limit is refused');
+});

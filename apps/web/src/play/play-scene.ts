@@ -36,10 +36,19 @@ export interface FrameOut {
   readonly event: 'to-planet' | 'to-lab' | 'sync-lost' | 'powered' | 'stage-1' | null;
 }
 
+/** What the display governor and Settings change while you play: how the machines' pixels are drawn, and the ground's triangles. */
+export interface Detail { readonly plumes: 'cubes' | 'off'; readonly plumeDensity: number; readonly groundBudget: number }
+
 const EYE = 1.68, RADIUS = 0.3, WALK = 3.0, RUN = 5.6;
-/** The planet is drawn at a third of the screen's resolution (stage 1's pixels); stage 0 doubles them again in the post pass. */
-const PLANET_SCALE = 1 / 3;
+/**
+ * Stage 1 draws the planet about 240 lines tall, like a 1990s 3D game (stage 0 doubles its pixels again in the post pass): the stage's
+ * look, whatever the screen, the window or the tier. The planet's picture is a whole fraction of the drawn picture, so each of its
+ * pixels covers the same number of drawn ones.
+ */
+const PLANET_LINES = 240;
 const WAVE_SECONDS = 14, WAVE_REACH = 170;
+/** Pixels in a machine's plume as made (density 1), and the most any density may ask for (the setting's hard limit is 4). */
+const PIXELS = 160, PIXELS_MOST = PIXELS * 4;
 
 export interface PlayScene {
   /** Puts the planet in place (once, after its looks are baked). */
@@ -54,10 +63,19 @@ export interface PlayScene {
   place(): PlacedMachine | null;
   frame(now: number, dt: number, c: Controls): FrameOut;
   resize(width: number, height: number, pixelRatio: number): void;
+  /** The live detail (the display governor's tier, with your own Settings on top). */
+  setDetail(d: Detail): void;
+  /**
+   * Compiles every shader the frames will need, for each place it draws, behind the loading bar: a compile mid-play is a hitch the
+   * display governor would read as a slow machine (and the owner's rule is never to start a screen choppy).
+   */
+  warm(): void;
   /** For the tests and the e2e: where you are, and a way to stand somewhere. */
   readonly debug: {
     groundTriangles(): number; showGround(on: boolean): void; where(): Where; position(): THREE.Vector3; teleport(where: Where, x: number, z: number, yaw: number): void; sync(): number;
     stats(): { readonly triangles: number; readonly calls: number }; wave(): number; gatePlanet(): { x: number; z: number };
+    /** The detail in use, the planet picture's size, and the pixels each machine pours now. */
+    detail(): Detail & { readonly planet: readonly [number, number]; readonly pixels: number };
     /** Places a mill at x, z as if the ghost stood there (the e2e has no mouse to aim with). */
     placeAt(x: number, z: number): PlacedMachine | null;
   };
@@ -66,8 +84,8 @@ export interface PlayScene {
 
 export function createPlayScene(o: {
   readonly canvas: HTMLCanvasElement; readonly gridSpacing: number; readonly antialias: boolean; readonly powerPreference: WebGLPowerPreference; readonly reducedMotion: boolean; readonly textureSize: number;
-  /** The plot's ground: triangles in its chunks, and the size of its material tiles (by graphics tier). */
-  readonly groundBudget: number; readonly groundTexture: number;
+  /** The size of the ground's material tiles (by the starting tier), and the live detail to start with. */
+  readonly groundTexture: number; readonly detail: Detail;
 }): PlayScene {
   const renderer = new THREE.WebGLRenderer({ canvas: o.canvas, antialias: o.antialias, powerPreference: o.powerPreference });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -130,7 +148,9 @@ export function createPlayScene(o: {
 
   // machines: the mill, its cable from the gate's junction box, and the pink pixels from its stack
   const machines: { readonly m: PlacedMachine; readonly stack: THREE.Vector3; readonly power: THREE.Vector3; started: number }[] = [];
-  const PIXELS = 160;
+  let detail: Detail = o.detail;
+  /** The pixels each plume pours at this density (none when the plumes are off). */
+  const pixelCount = (): number => (detail.plumes === 'off' ? 0 : Math.max(1, Math.min(PIXELS_MOST, Math.round(PIXELS * detail.plumeDensity))));
   const pixelMat = keep(new THREE.ShaderMaterial({ vertexShader: MARK_VERTEX, fragmentShader: COLOUR_MARK_FRAGMENT, blending: THREE.NoBlending, uniforms: { uColour: { value: new THREE.Color('#ff3d8a') }, uLit: { value: 0.35 } } }));
   const pixelGeo = keep(new THREE.BoxGeometry(0.14, 0.14, 0.14));
   const pixelSets: THREE.InstancedMesh[] = [];
@@ -157,7 +177,9 @@ export function createPlayScene(o: {
     }
     const cable = new THREE.Mesh(keep(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), n * 3, 0.045, 6, false)), cableMat);
     planetScene.add(cable);
-    const set = new THREE.InstancedMesh(pixelGeo, pixelMat, PIXELS);
+    const set = new THREE.InstancedMesh(pixelGeo, pixelMat, PIXELS_MOST);
+    set.count = pixelCount();
+    set.visible = set.count > 0;
     set.frustumCulled = false;
     planetScene.add(set);
     pixelSets.push(set);
@@ -267,7 +289,7 @@ export function createPlayScene(o: {
     setPlanet(base, plot, neighbours) {
       if (world) return;
       // the plot's natural ground (its own terrain and materials); the old world brings the sky, the stars and the neighbours, seated on it
-      const g = createPlotGround(planetScene, { seed: 7, sunDir: SUN, stage: Math.max(1, stage), textureSize: o.groundTexture, budget: o.groundBudget });
+      const g = createPlotGround(planetScene, { seed: 7, sunDir: SUN, stage: Math.max(1, stage), textureSize: o.groundTexture, budget: detail.groundBudget });
       ground = g;
       world = createWorld(planetScene, { gridSpacing: o.gridSpacing, reducedMotion: o.reducedMotion, ground: false });
       world.setPlanet(base, neighbours, { treeDetailRange: 150, height: (x, z) => g.terrain.height(x, z) + 0.6 });
@@ -387,16 +409,19 @@ export function createPlayScene(o: {
       }
       // ---- machines: pixels pour from the stack while they run, rising and spreading on the wind
       const mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler();
+      // a sparser plume has slightly bigger pixels, so it still reads as a pour
+      const big = Math.pow(PIXELS / Math.max(1, pixelCount()), 0.25);
       machines.forEach((mm, k) => {
         const set = pixelSets[k]!;
+        if (!set.visible) return;
         const on = Math.max(0, Math.min(1, (now - mm.started) / 1.5));
-        for (let i = 0; i < PIXELS; i++) {
+        for (let i = 0; i < set.count; i++) {
           const ph = (i * 0.618034) % 1, life = (now * 0.32 + ph) % 1;
           // a pour that widens as it rises and leans downwind, each pixel on its own small spiral
           const spread = 0.15 + life * (0.9 + 2.6 * ((i * 0.37) % 1));
           const a = i * 2.39996 + now * 0.25;
           p.set(mm.stack.x + Math.cos(a) * spread + life * life * 3.2, mm.stack.y + life * 6.5, mm.stack.z + Math.sin(a) * spread + life * life * 1.2);
-          const size = on * (1 - life) * (0.7 + ((i * 0.53) % 1) * 0.6);
+          const size = on * (1 - life) * (0.7 + ((i * 0.53) % 1) * 0.6) * big;
           s.set(size, size, size);
           q.setFromEuler(e.set(life * 4 + i, life * 3, 0));
           set.setMatrixAt(i, mtx.compose(p, q, s));
@@ -461,7 +486,8 @@ export function createPlayScene(o: {
       screen.copy(buf);
       camera.aspect = virtual.aspect = width / Math.max(1, height);
       camera.updateProjectionMatrix(); virtual.updateProjectionMatrix();
-      const pw = Math.max(64, Math.round(buf.x * PLANET_SCALE)), ph = Math.max(36, Math.round(buf.y * PLANET_SCALE));
+      const k = Math.max(1, Math.round(buf.y / PLANET_LINES));
+      const pw = Math.max(64, Math.round(buf.x / k)), ph = Math.max(36, Math.round(buf.y / k));
       for (const t of [planetRT, viewRT, labRT]) t.dispose();
       planetRT = target(pw, ph, true, true);
       viewRT = target(pw, ph, false, true);
@@ -469,6 +495,28 @@ export function createPlayScene(o: {
       postUniforms.uColour.value = planetRT.texture; postUniforms.uDepth.value = planetRT.depthTexture; postUniforms.uLab.value = labRT.texture;
       postUniforms.uRes.value.set(pw, ph);
       openingUniforms.uView.value = viewRT.texture;
+    },
+    setDetail(d) {
+      detail = d;
+      ground?.setBudget(d.groundBudget);
+      const n = pixelCount();
+      for (const set of pixelSets) { set.count = n; set.visible = n > 0; }
+    },
+    warm() {
+      // each scene for each place it draws to (the screen's colour space differs from the targets'), with what first appears
+      // mid-play standing in: a plume (the first machine's) and the build ghost, in the mill's materials and then in its marks
+      const plume = new THREE.InstancedMesh(pixelGeo, pixelMat, 1);
+      planetScene.add(plume);
+      const passes: [THREE.Scene, THREE.Camera, THREE.WebGLRenderTarget | null][] = [
+        [planetScene, camera, planetRT], [postScene, postCam, viewRT], [postScene, postCam, null], [labScene, camera, null], [labScene, camera, labRT],
+      ];
+      for (const [sc, cam, to] of passes) { renderer.setRenderTarget(to); renderer.compile(sc, cam); }
+      ghost.traverse((obj) => { const mesh = obj as THREE.Mesh; if (mesh.isMesh) mesh.material = ghostOk; });
+      renderer.setRenderTarget(planetRT);
+      renderer.compile(planetScene, camera);
+      renderer.setRenderTarget(null);
+      planetScene.remove(plume);
+      plume.dispose();
     },
     debug: {
       groundTriangles: () => ground?.triangles() ?? 0,
@@ -480,6 +528,7 @@ export function createPlayScene(o: {
       stats: () => ({ triangles: renderer.info.render.triangles, calls: renderer.info.render.calls }),
       wave: () => waveRadius(),
       gatePlanet: () => ({ x: twin.group.position.x, z: twin.group.position.z }),
+      detail: () => ({ ...detail, planet: [postUniforms.uRes.value.x, postUniforms.uRes.value.y] as const, pixels: pixelCount() }),
       placeAt(x, z) {
         if (where !== 'planet') return null;
         building = true;

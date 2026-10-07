@@ -15,6 +15,8 @@ export interface PlotGround {
   /** Keeps the chunks round the eye: builds every one now (behind the loading bar) or one per call (while you walk). */
   update(eyeX: number, eyeZ: number, all?: boolean): void;
   setStage(stage: number): void;
+  /** A new triangle budget (the display governor's): the chunks are planned again round the eye and built one a call, the old ones standing in. */
+  setBudget(budget: number): void;
   /** Triangles in the chunks now drawn. */
   triangles(): number;
   /** Shows or hides the ground (the tests measure what it costs). */
@@ -34,7 +36,7 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
   const group = new THREE.Group();
   scene.add(group);
   const chunks = new Map<string, THREE.Mesh>();
-  let flat = o.stage <= 1, wanted: { key: string; cx: number; cz: number; size: number }[] = [], lastX = Infinity, lastZ = Infinity;
+  let flat = o.stage <= 1, budget = o.budget, wanted: { key: string; cx: number; cz: number; size: number }[] = [], lastX = Infinity, lastZ = Infinity;
 
   const build = (cx: number, cz: number, size: number): THREE.Mesh => {
     const m = chunkMesh(terrain, cx, cz, size, CELLS, { flat, skirt: SKIRT });
@@ -54,14 +56,14 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
 
   /** Which chunks the eye wants now; the old ones stay until their replacements are built, so no hole ever opens. */
   const plan = (eyeX: number, eyeZ: number): void => {
-    wanted = chunksAround(eyeX, eyeZ, { extent: EXTENT, cells: CELLS, minSize: MIN_SIZE, budget: o.budget }).map((l) => ({ key: `${l.cx},${l.cz},${l.size}`, cx: l.cx, cz: l.cz, size: l.size }));
+    wanted = chunksAround(eyeX, eyeZ, { extent: EXTENT, cells: CELLS, minSize: MIN_SIZE, budget }).map((l) => ({ key: `${l.cx},${l.cz},${l.size}`, cx: l.cx, cz: l.cz, size: l.size }));
     lastX = eyeX; lastZ = eyeZ;
   };
-  const step = (budget: number): void => {
+  const step = (most: number): void => {
     let built = 0;
     for (const w of wanted) {
       if (chunks.has(w.key)) continue;
-      if (built >= budget) return;
+      if (built >= most) return;
       chunks.set(w.key, build(w.cx, w.cz, w.size));
       built++;
     }
@@ -108,6 +110,11 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
         for (const mesh of old) { group.remove(mesh); mesh.geometry.dispose(); }
         step(Infinity);
       }
+    },
+    setBudget(next) {
+      if (next === budget) return;
+      budget = next;
+      if (Number.isFinite(lastX)) plan(lastX, lastZ);
     },
     setVisible(on) { group.visible = on; },
     triangles() { let n = 0; for (const [, mesh] of chunks) n += (mesh.geometry.index?.count ?? 0) / 3; return n; },

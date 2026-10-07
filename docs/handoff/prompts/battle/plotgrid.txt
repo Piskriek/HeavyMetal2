@@ -1,0 +1,133 @@
+Follow-up, same chat (after cartlab). Next module, same rules: a new package `@hm/plotgrid`, where every player's plot sits on the shared planet. Keep your other files; put this one in `plotgrid/src/index.ts` and `plotgrid/tests/plotgrid.test.ts` in your project (a small preview page drawing the hex map is welcome), and paste both files in full in your reply.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. Pure functions only. Never return -0 (normalise with `+ 0`).
+
+THE GAME. Every player has one plot about 1 km across, its gate at the centre. There is no server: every player's game works out the whole map for itself from the same published list of events, and must get exactly the same answer. The owner's rules:
+- A new player's plot goes next to a friend's plot; with no friend to join, at a random free place.
+- Friends can move their plots next to each other.
+- Abandoned plots stay for ever; a deleted plot frees its cell and moves no one.
+
+THE MAP: a hex grid of plots in axial coordinates (q, r), pointy-top, neighbouring centres CELL = 1000 m apart. centreOf({q, r}) = { x: CELL * (q + r / 2), z: CELL * (Math.sqrt(3) / 2) * r }. hexAt(x, z) is its inverse with cube rounding. DIRS = [{q:1,r:0},{q:1,r:-1},{q:0,r:-1},{q:-1,r:0},{q:-1,r:1},{q:0,r:1}]. ring(c, n) for n >= 1: start at c + DIRS[4] * n, then for i = 0..5 take n steps along DIRS[i], recording each cell before stepping (6n cells). spiral(c, R): c, then ring 1, ring 2, ... ring R, each in ring order.
+
+PLACEMENT. Events are processed in order of `at`, then `id`, then kind (claim before move before remove).
+- claim {id, near}: ignored if `id` is already placed. If `near` names a placed plot other than itself, the plot takes the first free cell in ring order round that plot (ring 1, then ring 2, ...). Otherwise (near is null, unknown or not placed) it takes a free place: with n plots placed so far, R = settledRadius(n) = ceil(sqrt(n / 3)) + 2, cells = spiral({q:0,r:0}, R), target = cells[fnv1a(id) % cells.length]; the plot takes the target if free, else the first free cell in ring order round the target.
+- move {id, near}: ignored unless both are placed, different, and not already neighbours (distance 1). Otherwise the plot leaves its cell (now free) and takes the first free cell in ring order round `near`.
+- remove {id}: ignored unless placed; its cell becomes free; nobody else moves.
+fnv1a(s): 32-bit FNV-1a over the string's UTF-16 code units: h = 2166136261; for each unit c: h ^= c; h = Math.imul(h, 16777619) >>> 0. Returns h (unsigned).
+
+API (export exactly these):
+export interface Hex { readonly q: number; readonly r: number }
+export type GridEvent = { readonly kind: 'claim'; readonly id: string; readonly at: number; readonly near: string | null } | { readonly kind: 'move'; readonly id: string; readonly at: number; readonly near: string } | { readonly kind: 'remove'; readonly id: string; readonly at: number };
+export const CELL: 1000;
+export const MIN_PLANET_RADIUS: 12000;
+export const DIRS: readonly Hex[];
+export function centreOf(h: Hex): { readonly x: number; readonly z: number };
+export function hexAt(x: number, z: number): Hex;
+export function distance(a: Hex, b: Hex): number; // (|dq| + |dr| + |dq + dr|) / 2
+export function neighbours(h: Hex): readonly Hex[]; // h + DIRS[i], in DIRS order
+export function ring(c: Hex, n: number): readonly Hex[];
+export function spiral(c: Hex, R: number): readonly Hex[];
+export function fnv1a(s: string): number;
+export function settledRadius(placed: number): number;
+export function layout(events: readonly GridEvent[]): ReadonlyMap<string, Hex>; // every placed plot's cell; the input order does not matter
+export function planetRadiusFor(count: number): number; // rings = the smallest R >= 0 with 1 + 3R(R+1) >= count; max(MIN_PLANET_RADIUS, CELL * (rings + 2) / (0.85 * Math.PI))
+
+Your test file must contain these acceptance tests unchanged, plus your own:
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { CELL, MIN_PLANET_RADIUS, centreOf, hexAt, distance, neighbours, ring, spiral, fnv1a, settledRadius, layout, planetRadiusFor, type GridEvent } from '../src/index';
+
+const claim = (id: string, at: number, near: string | null = null): GridEvent => ({ kind: 'claim', id, at, near });
+const same = (a: { q: number; r: number }, b: { q: number; r: number }) => a.q === b.q && a.r === b.r;
+
+test('hex maths: centres, distance, neighbours, rings, the hash', () => {
+  assert.deepEqual(centreOf({ q: 0, r: 0 }), { x: 0, z: 0 });
+  const n = neighbours({ q: 0, r: 0 });
+  assert.equal(n.length, 6);
+  for (const h of n) {
+    const c = centreOf(h);
+    assert.ok(Math.abs(Math.hypot(c.x, c.z) - CELL) < 1e-6);
+    assert.equal(distance(h, { q: 0, r: 0 }), 1);
+  }
+  const c = centreOf({ q: 3, r: -2 });
+  assert.deepEqual(hexAt(c.x + 120, c.z - 90), { q: 3, r: -2 });
+  assert.equal(ring({ q: 0, r: 0 }, 1).length, 6);
+  assert.equal(ring({ q: 0, r: 0 }, 3).length, 18);
+  assert.deepEqual(ring({ q: 0, r: 0 }, 1)[0], { q: -1, r: 1 });
+  assert.equal(spiral({ q: 0, r: 0 }, 2).length, 19);
+  assert.deepEqual(spiral({ q: 0, r: 0 }, 2)[0], { q: 0, r: 0 });
+  assert.equal(distance({ q: 0, r: 0 }, { q: 3, r: -1 }), 3);
+  assert.equal(fnv1a(''), 0x811c9dc5);
+  assert.equal(fnv1a('a'), 0xe40c292c);
+  assert.equal(fnv1a('foobar'), 0xbf9cf968);
+});
+
+test('a new plot goes next to the friend it names, in ring order; ties go by id', () => {
+  const L = layout([claim('ann', 1), claim('bob', 2, 'ann'), claim('dan', 3, 'ann'), claim('cat', 3, 'ann')]);
+  const r1 = ring(L.get('ann')!, 1);
+  assert.deepEqual(L.get('bob'), r1[0]);
+  assert.deepEqual(L.get('cat'), r1[1]);
+  assert.deepEqual(L.get('dan'), r1[2]);
+});
+
+test('when every neighbour is taken, the next ring out', () => {
+  const evs = [claim('hub', 0)];
+  for (let i = 0; i < 7; i++) evs.push(claim(`f${i}`, 1 + i, 'hub'));
+  const L = layout(evs);
+  const h = L.get('hub')!;
+  for (let i = 0; i < 6; i++) assert.equal(distance(L.get(`f${i}`)!, h), 1);
+  assert.deepEqual(L.get('f6'), ring(h, 2)[0]);
+});
+
+test('with no friend: a free cell from the plot id inside the settled disc; the same list gives the same map', () => {
+  const one = layout([claim('p0', 0)]);
+  const cells = spiral({ q: 0, r: 0 }, settledRadius(0));
+  assert.deepEqual(one.get('p0'), cells[fnv1a('p0') % cells.length]);
+  const evs = Array.from({ length: 200 }, (_, i) => claim(`p${i}`, i));
+  const L1 = layout(evs), L2 = layout([...evs].reverse());
+  assert.equal(L1.size, 200);
+  assert.equal(new Set([...L1.values()].map((h) => `${h.q},${h.r}`)).size, 200);
+  for (const [id, h] of L1) assert.deepEqual(L2.get(id), h);
+  const far = Math.max(...[...L1.values()].map((h) => distance(h, { q: 0, r: 0 })));
+  assert.ok(far <= 19, `farthest ring ${far}`);
+});
+
+test('a plot moves next to a friend and frees its old cell; a plot already beside the friend stays', () => {
+  const evs: GridEvent[] = [claim('ann', 1), claim('bob', 2), claim('cat', 3, 'ann')];
+  const before = layout(evs);
+  const bobOld = before.get('bob')!;
+  const after = layout([...evs, { kind: 'move', id: 'bob', at: 4, near: 'ann' }]);
+  assert.equal(distance(after.get('bob')!, after.get('ann')!), 1);
+  if (distance(bobOld, before.get('ann')!) > 1) assert.ok(![...after.values()].some((h) => same(h, bobOld)), 'the old cell is free');
+  else assert.deepEqual(after.get('bob'), bobOld);
+  const still = layout([...evs, { kind: 'move', id: 'cat', at: 4, near: 'ann' }]);
+  assert.deepEqual(still.get('cat'), before.get('cat'));
+});
+
+test('a removed plot frees its cell and moves no one; naming an unknown plot falls back to a free place', () => {
+  const evs: GridEvent[] = [claim('ann', 1), claim('bob', 2, 'ann'), claim('cat', 3, 'ann')];
+  const before = layout(evs);
+  const after = layout([...evs, { kind: 'remove', id: 'bob', at: 4 }, claim('dan', 5, 'ann')]);
+  assert.equal(after.has('bob'), false);
+  assert.deepEqual(after.get('ann'), before.get('ann'));
+  assert.deepEqual(after.get('cat'), before.get('cat'));
+  assert.deepEqual(after.get('dan'), before.get('bob'));
+  assert.equal(layout([claim('eve', 1, 'nobody')]).size, 1);
+});
+
+test('the planet grows with its plots, never below MIN_PLANET_RADIUS', () => {
+  assert.equal(planetRadiusFor(1), MIN_PLANET_RADIUS);
+  assert.equal(planetRadiusFor(1000), MIN_PLANET_RADIUS);
+  assert.ok(planetRadiusFor(100000) > MIN_PLANET_RADIUS);
+});
+
+test('performance: ten thousand plots lay out in under half a second', () => {
+  const evs = Array.from({ length: 10000 }, (_, i) => claim(`p${i}`, i, i % 3 === 0 ? null : `p${i - 1}`));
+  const t0 = performance.now();
+  const L = layout(evs);
+  assert.equal(L.size, 10000);
+  assert.ok(performance.now() - t0 < 500, `${performance.now() - t0} ms`);
+});
+```

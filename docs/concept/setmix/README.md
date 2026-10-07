@@ -1,10 +1,13 @@
 # SetMix: The Resolution Crafter — concept art set (FINAL)
 
 **Branch:** `arena/601f7fc1-heavymetal2` · set complete 2026-10-07.
+Sheet 13 (the human scientist, the player) was added 2026-10-07 on
+`arena/456036d4-heavymetal2`, against section 2b ("a smooth human in the avatar
+maker"), and is registered here the same way.
 Canon decisions come from `docs/SETMIX_PLAN.md` sections 2–3 (owner's
 decisions outrank everything; `gdd.ts` names are an undecided idea menu).
 
-**Files (deliverables, 12 + contact):**
+**Files (deliverables, 13 + contact):**
 
 | # | File | What it is |
 |---|------|-----------|
@@ -20,11 +23,13 @@ decisions outrank everything; `gdd.ts` names are an undecided idea menu).
 | 10 | `10-plot-stage-6-hero.png` | scene — the finished plot, golden hour |
 | 11 | `11-desolate-horizon.png` | scene — day one on the plot |
 | 12 | `12-sheet-field-machines.png` | design sheet — 8 candidate field machines, S1/S6 |
-| — | `contact-sheet.jpg` | all 12, numbered |
+| 13 | `13-sheet-human-scientist.png` | design sheet — the human scientist, the player |
+| — | `contact-sheet.jpg` | all 13, numbered |
 
 Supporting material (tracked for reproducibility): `panels/12/` — the 16 panel
-renders of sheet 12; `tools/` — `compose06/07/08/09/12.sh`, `contact.sh`,
-`derive_maps.sh`, `lib.sh`. The `scratch/` dir is git-ignored working space.
+renders of sheet 12; `panels/13/` — the 8 panel renders of sheet 13 (including
+the 01 lab frame used as the in-context plate); `tools/` —
+`compose06/07/08/09/12/13.sh`, `contact.sh`, `derive_maps.sh`, `lib.sh`. The `scratch/` dir is git-ignored working space.
 Note: the sandbox rolled untracked files back several times; everything
 committed is safe, panel sources were moved into git for that reason.
 
@@ -809,12 +814,399 @@ large, slightly cartoonish in proportion.
 
 ---
 
+## 13 · sheet-human-scientist — the player
+
+**For:** the player, drawn for the first time. Section 2b's open item — "a smooth
+human in the avatar maker (the voxel human is blocky in the PBR lab)" — needs one
+canon human on paper: what the avatar maker offers, what the body is made of so a
+modeller can cut it, and how big she is against the gate she walks through.
+
+**Who she is:** an adult SCIENTIST who runs this lab — the one who turns the gate
+on, makes presets at the bench and walks through the gate onto the plot. Late
+thirties in the default, a little worn by long shifts, capable and practical. Not
+a soldier, not a superhero, not a cartoon. Drawn as a stylised SMOOTH 3D game
+character that belongs in the photoreal PBR lab: clean smooth forms, realistic
+materials (fabric, rubber, leather, brushed metal, stylised skin), simplified like
+a modern stylised game hero — not photoreal skin and pores, not anime, not voxels,
+not a mannequin.
+
+**Garment pieces (identical construction on every variant):**
+
+- **Work jumpsuit** — fitted, zip front with a collar, reinforced knee panels,
+  cuffs at the wrists, patch pocket on the thigh.
+- **Short lab coat** — over the jumpsuit, open, collar, two deep side pockets, hem
+  at mid-thigh (it covers the hips and swings in the walk).
+- **Utility belt** — pouches, a tool loop, and a cartridge holster on the right hip
+  holding one preset cartridge (the presets are cartridges).
+- **Gloves** — dark work gloves, cuffs hiding the wrists.
+- **Boots** — sturdy laced work boots, tops hiding the ankles.
+- **Safety goggles** — black rubber strap, clear lenses, worn up on the forehead
+  or down over the eyes.
+- **ID badge clip** — chest, blank card. No text, no logo, anywhere on her.
+
+**The nine rigid parts, and where they join (the exploded view's argument):**
+the body is buildable from smooth rigid parts joined at the neck, shoulders,
+elbows, wrists, waist, hips, knees and ankles, and the clothing hides every joint.
+
+| # | Part | Hides the joint at | Neighbour |
+|---|------|--------------------|-----------|
+| 1 | head + hair + goggles | neck — the collar | torso, flat neck disc |
+| 2 | torso + collar + coat | waist — the belt | pelvis, flat waist face |
+| 3 | upper arm ×2 | shoulder — the sleeve seam | torso, flat shoulder socket |
+| 4 | forearm + sleeve cuff ×2 | elbow — pad + seam | upper arm, flat elbow face |
+| 5 | gloved hand ×2 | wrist — cuff / glove edge | forearm, flat wrist face |
+| 6 | belt + pelvis | hips — belt + coat hem | thighs, flat hip sockets |
+| 7 | thigh ×2 | knee — the knee pad | shin, flat knee face |
+| 8 | shin + knee pad ×2 | ankle — the boot top | boot, flat ankle face |
+| 9 | boot ×2 | — | shin |
+
+Every cut is a clean flat face: nothing merges, nothing overlaps, nothing floats.
+
+**Variant ranges (the avatar maker's knobs):** skin tones ×6 (deep brown through
+warm tan to pale freckled) · builds light / medium / heavy · ages late twenties to
+early fifties · hair: short crop, buzz cut, low bun, high ponytail, tight curls,
+shaved sides · facial hair on some (trimmed beard, full beard, clean-shaven) ·
+goggles up or worn · colourways on the same garment pieces: lab-white coat over
+teal, slate over orange, navy over yellow, bone over graphite, off-white over rust,
+light grey over deep green. One parametric character, six different people.
+
+**Where she is seen:** the avatar maker in the lab (character creation, on a
+turntable, before the gate is first turned on); in menus, beside the gate; and
+later, other players visiting your lab. In play you mostly see through her eyes.
+
+**Scale:** 1.75 m against the gate's 2.6 m × 1.7 m opening (sheet 06), with the
+goblin's 1.3 m exactly half the opening. The sheet's gate outline and the 1.75 m
+dimension line are drawn to those proportions in ImageMagick — see the ratio trap
+in the process notes.
+
+**Full prompts used (verbatim; text-only, no reference images).** Every panel is
+one generation; the sheet's callouts, the scale bars and the gate-outline overlay
+are typeset afterwards, never baked in.
+
+**(1) TURNAROUND PANEL** (`panels/13/13-turnaround.png`):
+
+> Character turnaround sheet: the SAME ONE character drawn four times in ONE ROW
+> in a single wide image — from left to right FRONT VIEW, THREE-QUARTER VIEW, SIDE
+> PROFILE VIEW, BACK VIEW. All four are complete figures head to toe, EXACTLY the
+> same height and scale, evenly spaced, turning progressively, each standing in a
+> relaxed A-POSE: feet about shoulder-width apart, arms held slightly out from the
+> body at about 20 degrees, palms facing in, hands relaxed and empty.
+>
+> STYLE — a modern stylised 3D game character: smooth simplified forms and clean
+> rounded shapes with realistic human proportions, the look of a current AAA game
+> hero — NOT photoreal skin with pores, NOT anime, NOT voxels, NOT low poly, NOT a
+> mannequin or a doll, NOT a cartoon. Real PBR materials: matte woven fabric, soft
+> worn leather, black rubber, brushed metal, and a soft stylised skin shader that
+> shows form and warmth without any photographic skin detail.
+>
+> THE SCIENTIST (the player, one canon design) — an adult woman in her late
+> thirties, 1.75 m tall, medium athletic build, square capable shoulders, warm tan
+> skin, short dark-brown cropped hair, no facial hair, calm practical expression,
+> a little worn by long shifts. She is not a soldier and not a superhero: an
+> engineer in work clothes.
+>
+> HER OUTFIT — a fitted work jumpsuit in deep teal with a zip down the front,
+> reinforced knee panels and cuffs; over it a short off-white lab coat that ends
+> at mid-thigh, open, with a collar and two deep side pockets; a utility belt at
+> her waist carrying pouches and on the right hip a cartridge holster holding one
+> small plain grey data cartridge; dark charcoal work gloves; sturdy dark laced
+> work boots with thick soles; safety goggles with a black rubber strap and clear
+> lenses pushed up on her forehead; a small ID badge on a clip on the coat chest,
+> a blank white card with NO writing on it.
+>
+> RENDER — plain dark neutral grey seamless studio background, NOTHING else in the
+> scene: no doorway, no frame, no props, no architecture, only the four figures on
+> a soft contact shadow, neutral soft studio lighting from frame right with gentle
+> fill, no dramatic colour cast, crisp clean edges, generous empty grey space above
+> the heads and below the boots.
+>
+> NO text, NO letters, NO numbers, NO labels, NO logos, NO watermark anywhere in
+> the image.
+
+**(2) SIX VARIANTS** (`panels/13/13-variants.png`):
+
+> A character-creation options sheet: SIX different human scientists shown as six
+> separate full figures standing in one row, evenly spaced, each seen from the
+> front in a relaxed A-pose, each complete head to toe, identical height and
+> scale, on a dark neutral grey studio background with soft contact shadows —
+> nice, clean, orderly, like the options page of a modern game's avatar maker.
+>
+> CRITICAL: every one of the six wears EXACTLY THE SAME GARMENT CONSTRUCTION,
+> only the person and the colourway change. The garment pieces are identical on
+> all six:
+> - a fitted work jumpsuit with a zip front, reinforced knee panels and cuffs;
+> - a short lab coat over it ending at mid-thigh, open, with a collar and two deep
+>   side pockets;
+> - a utility belt at the waist with pouches and a cartridge holster on the right
+>   hip holding one small plain grey data cartridge;
+> - work gloves; sturdy laced work boots;
+> - safety goggles with a black rubber strap and clear lenses, pushed up on the
+>   forehead OR worn down over the eyes;
+> - a small blank ID badge on a clip, no writing on it.
+>
+> STYLE for all six: modern stylised 3D game characters — smooth simplified forms
+> and clean rounded shapes, realistic human proportions, the look of a current AAA
+> game hero: NOT photoreal skin with pores, NOT anime, NOT voxels, NOT low poly,
+> NOT mannequins, NOT cartoons. Real PBR materials: matte woven fabric, soft worn
+> leather, black rubber, brushed metal, soft stylised skin. Flat-shaded hero
+> renders with soft key light from frame right and gentle fill; no dramatic colour
+> cast. No text, no logos, no watermark.
+>
+> THE SIX PEOPLE, left to right — all of them plainly adult, all the same height,
+> all practical engineers:
+> 1. Woman, late twenties, medium build, deep brown skin, shaved sides with short
+>    cropped hair on top, no facial hair. Lab-white coat over a teal jumpsuit,
+>    goggles on the forehead.
+> 2. Man, early fifties, heavy solid build, pale freckled skin, short grey buzz cut
+>    and a trimmed grey beard. Slate-grey coat over an orange jumpsuit, goggles on
+>    the forehead.
+> 3. Woman, late thirties, slim wiry build, light olive skin, dark hair in a neat
+>    low bun. Navy coat over a safety-yellow jumpsuit, goggles worn DOWN over the
+>    eyes.
+> 4. Woman, early forties, tall and broad-shouldered, dark brown skin, hair in
+>    tight short curls and a close-trimmed black beard. Bone-white coat over a
+>    graphite jumpsuit, goggles on the forehead.
+> 5. Woman, mid forties, medium build, deep brown skin, long dark hair in a high
+>    ponytail. Off-white coat over a rust-red jumpsuit, goggles on the forehead.
+> 6. Man, late twenties, medium build, warm tan skin, buzz cut, shaved sides,
+>    clean-shaven. Light grey coat over a deep green jumpsuit, goggles worn DOWN
+>    over the eyes.
+>
+> Each figure is a different person but unmistakably the same outfit, the same
+> construction and the same parametric character kit in a different colourway.
+
+**(3) EXPLODED VIEW** (`panels/13/13-exploded.png`):
+
+> A 3D asset breakdown board for a game character: the character's separate rigid
+> parts are laid out in an orderly vertical stack of horizontal rows, like a box of
+> components unpacked and placed on a dark neutral grey surface, photographed from
+> straight on. Every part is DISCONNECTED and separated from the others by clear
+> empty grey gaps — absolutely no part touches, overlaps or connects to another
+> part. Each row is centred, the parts lie in order from head to feet, and all
+> parts are shown at the same scale, face-on to the camera, flat on the grey
+> surface with a soft drop shadow under each piece.
+>
+> The character is an engineer, an adult woman about 1.75 m tall: a fitted
+> deep-teal work jumpsuit with reinforced knees, a short off-white lab coat, a
+> utility belt with pouches and a small cartridge holster, dark work gloves, sturdy
+> dark work boots, safety goggles pushed up on her forehead, a small blank ID
+> badge.
+>
+> THE ROWS, top to bottom:
+> 1. the HEAD with hair and goggles (a single piece, floating alone).
+> 2. the TORSO with the jumpsuit's collar and the short lab coat mounted on it (a
+>    single piece: shoulders, chest, coat, a flat open neck socket at the top).
+> 3. two UPPER ARMS lying side by side, each cut off cleanly at the shoulder top
+>    and at the elbow.
+> 4. two FOREARMS with flared sleeve cuffs lying side by side.
+> 5. two GLOVED HANDS lying side by side, palm down.
+> 6. the UTILITY BELT with the PELVIS as one piece, pouches and cartridge holster
+>    attached.
+> 7. two THIGHS lying side by side.
+> 8. two SHINS lying side by side, each with a knee pad at its top end.
+> 9. two BOOTS lying side by side.
+>
+> ENGINEERING DETAIL: these parts will be joined together later in a 3D tool, so
+> where each part meets the next it ends in a CLEAN FLAT CUT — flat circular disc
+> faces at the neck, shoulders, elbows, wrists, waist, hips, knees and ankles. Each
+> limb piece is a separate, clearly detached object with its two flat cut ends
+> visible.
+>
+> STYLE — modern stylised 3D game characters: smooth simplified forms, clean
+> rounded shapes, realistic proportions, the look of a current AAA game hero: NOT
+> photoreal skin with pores, NOT anime, NOT voxels, NOT a mannequin, NOT a cartoon.
+> Real PBR materials: matte woven fabric, worn leather, black rubber, brushed
+> metal, stylised skin. Neutral soft studio lighting from frame right, gentle fill,
+> crisp clean edges.
+>
+> NO text, NO letters, NO numbers, NO labels, NO arrows, NO logos, NO watermark
+> anywhere in the image.
+
+**(4) THE THREE POSES** (`panels/13/13-pose-idle.png`, `-wave.png`, `-walk.png`)
+— one shared wrapper plus the pose paragraph, verbatim wrapper:
+
+> One full-body character render on a plain dark neutral grey studio background:
+> a stylised 3D game character [POSE], seen from a three-quarter front view,
+> complete figure head to toe, standing on a soft contact shadow, soft neutral
+> studio key light from frame right with gentle fill.
+>
+> The character: an adult woman in her late thirties, 1.75 m tall, medium athletic
+> build, warm tan skin, short dark-brown cropped hair, [EXPRESSION] — an engineer,
+> not a soldier. She wears a fitted deep-teal work jumpsuit with a zip front and
+> reinforced knee panels, a short off-white open lab coat ending at mid-thigh with
+> a collar, a utility belt at her waist with pouches and a small cartridge holster
+> on the right hip, dark work gloves, sturdy dark laced work boots, and safety
+> goggles pushed up on her forehead; a small blank ID badge on a clip, no writing
+> on it.
+>
+> [POSE PARAGRAPH — verbatim:]
+> - **breathing idle:** "standing still in a calm BREATHING IDLE pose … standing
+>   relaxed, weight even on both feet, feet about shoulder-width apart, legs
+>   straight but not stiff, chest slightly lifted as she breathes in, shoulders
+>   level, both arms hanging relaxed with a slight natural bend at the elbow, hands
+>   open and loose at her sides, head level, eyes looking straight ahead. Very
+>   slight, natural asymmetry — a true idle loop pose, no exaggeration."
+> - **wave:** "standing and giving a friendly WAVE … her RIGHT arm is raised up and
+>   out to the side with the elbow bent, forearm up, open gloved hand at about head
+>   height, palm facing the viewer, mid-wave with the fingers relaxed; her left arm
+>   hangs relaxed and slightly away from her body, hand loose; weight settled on
+>   one leg with the other slightly relaxed, feet on the ground, body upright and
+>   easy. A natural, human greeting gesture — no exaggeration, no cartoon energy."
+> - **mid-stride walk:** "captured MID-STRIDE in a WALK … a normal walking step
+>   caught in the middle — the front leg reaching forward with the knee slightly
+>   bent and the heel just landing, the back leg extended behind with the toe still
+>   on the ground, arms swinging naturally in opposition to the legs with elbows
+>   slightly bent, torso very slightly turned, head level and looking ahead, coat
+>   hem and coat tails swinging back a little with the step. A believable walking
+>   cycle, not a run, not a march, not a pose."
+>
+> STYLE: modern stylised 3D game character — smooth simplified forms and clean
+> rounded shapes, realistic human proportions, current AAA game hero look: NOT
+> photoreal skin with pores, NOT anime, NOT voxels, NOT low poly, NOT a mannequin,
+> NOT a cartoon. Real PBR materials: matte woven fabric, worn leather, black
+> rubber, brushed metal, stylised skin. Crisp clean edges, generous empty grey
+> space around her.
+>
+> NO text, NO letters, NO numbers, NO labels, NO logos, NO watermark anywhere in
+> the image.
+
+**(5) STAGE 1 — the same scientist, low poly** (`panels/13/13-stage1.png`):
+
+> A comparison render: TWO versions of the SAME character standing side by side on
+> a plain dark neutral grey studio background, facing the camera, both complete
+> figures head to toe, both the same height, both standing on soft contact shadows.
+> Soft neutral studio key light from frame right, gentle fill, no colour cast.
+>
+> LEFT — the smooth version: a modern stylised 3D game character with smooth
+> simplified forms and clean rounded shapes, the look of a current AAA game hero,
+> realistic proportions, real PBR materials (matte woven fabric, worn leather,
+> black rubber, brushed metal, soft stylised skin). NOT photoreal skin with pores,
+> NOT anime, NOT voxels, NOT low poly, NOT a mannequin, NOT a cartoon.
+>
+> RIGHT — the same character at STAGE 1, the planet's low resolution applied to a
+> person: the identical character rebuilt as a CHUNKY LOW POLY game model — the
+> same silhouette, the same proportions, the same height, the same colours and the
+> same garment pieces, but the whole body is built from big flat triangular facets,
+> flat shaded with hard face edges, visibly angular and simplified: a faceted head,
+> a faceted torso, straight faceted limbs, blocky boots. It is still clearly the
+> same person and the same outfit, merely low resolution.
+>
+> CRITICAL: absolutely NO black contour lines, NO outline strokes, NO cel shading,
+> NO toon shading — it is a plain flat-shaded 3D render of a low-polygon model,
+> like a game engine screenshot of an early-gen character.
+>
+> The character: an adult woman, 1.75 m tall, an engineer — fitted deep-teal work
+> jumpsuit with reinforced knees, short off-white lab coat over it, utility belt
+> with pouches and a small cartridge holster, dark work gloves, sturdy dark work
+> boots, safety goggles pushed up on the forehead, a small blank ID badge on a
+> clip.
+>
+> NO text, NO letters, NO numbers, NO labels, NO logos, NO watermark anywhere in
+> the image.
+
+**(6) IN CONTEXT — beside the gate** (`panels/13/13-context-lab.png`):
+
+> Widescreen 16:9 game screenshot-style render, cinematic and crisp. Interior of a
+> clean off-white high-fidelity laboratory at night on emergency power, seen from
+> the front of the room at standing eye height: off-white square wall panels with
+> thin dark seams, a dark steel kick band along the foot of the walls, a polished
+> concrete floor with soft reflections, a dark ceiling about 8 m up whose ceiling
+> strip lights are mostly dead except one flickering tube. On the centre-left of
+> the back wall a wide window about 4 x 2.5 m shows outside a photoreal rainy
+> pine-forest mountainside at dusk: dark wet pines, sheets of rain, drifting mist.
+> Two small amber emergency beacons glow faintly on the walls.
+>
+> Facing the camera, standing free about 3 m in front of the back wall, is a heavy
+> industrial GATE: a chunky gunmetal-steel door frame with wide box-column uprights
+> under a flat rectangular lintel, joined to no wall, its opening about 2.6 m tall
+> and 1.7 m wide with a rounded inner reveal; the front face of each upright is
+> covered by stacked RIBBED COIL BLOCKS that are DARK, COLD, UNLIT gunmetal — the
+> gate is completely switched off and its opening is a black void; big angled
+> triangular buttress plates brace each flank; the frame stands on a low wide
+> plinth with a black-and-yellow hazard-striped rim and anchor bolts, with a low
+> steel step-up plate at the threshold in front. In the back-right of the room,
+> relay cabinets stand dark and idle.
+>
+> LEFT OF THE GATE stands a low control console pedestal with a small lit status
+> screen and a BIG RED MAIN LEVER, the lever pushed fully DOWN, its own cables
+> running down inside the pedestal into the floor. Standing at that console is ONE
+> HUMAN BEING — the player, the scientist who runs this lab: a woman in her late
+> thirties, 1.75 m tall, medium athletic build, warm tan skin, short dark-brown
+> cropped hair, calm practical expression, a little worn by long shifts; not a
+> soldier, not a superhero. She is dressed for practical lab and field work: a
+> fitted deep-teal work jumpsuit with a zip front and reinforced knee panels, a
+> short off-white lab coat over it ending at mid-thigh, a utility belt at her waist
+> with pouches and a small cartridge holster on her right hip holding one plain
+> grey preset cartridge, dark work gloves, sturdy dark work boots, safety goggles
+> pushed up on her forehead, a small blank ID badge on a clip.
+>
+> She stands close beside the console, one gloved hand resting on the console's
+> edge next to the red lever, her body relaxed and upright, her head turned
+> slightly toward the dark gate, as if she has just walked in and is about to
+> switch it on. She reads clearly as life-size in the room: SHE IS NOTICEABLY
+> SHORTER THAN THE GATE — her head reaches roughly two thirds of the way up the
+> 2.6 m opening, leaving about a head's height of dark opening above her.
+>
+> STYLE: the room and its machines are photorealistic PBR (real concrete, real
+> brushed steel, rain on the glass) while the woman is a modern stylised 3D game
+> character — smooth simplified forms, clean rounded shapes, realistic human
+> proportions, the look of a current AAA game hero: NOT photoreal skin with pores,
+> NOT anime, NOT voxels, NOT low poly, NOT a mannequin, NOT a cartoon. Her
+> materials are real: matte woven fabric, worn leather, black rubber, brushed
+> metal, soft stylised skin. She is lit by the same dim room light as everything
+> else and casts a soft contact shadow on the floor.
+>
+> Mood: the quiet minute before the first power-on. Dim, cold, one person, one
+> dead gate. Nothing floats, no cable lies loose on the floor.
+>
+> NO text, NO letters, NO numbers, NO UI, NO HUD, NO watermark, NO logos anywhere
+> in the image; her badge and the console screen carry no readable writing.
+
+**Rejected takes (recorded, not shipped):**
+
+- **turnaround v1** put a bare gate outline behind the figures; the gate belonged
+  in sheet 06's language, not a clean character row, so the shipped panel is
+  figure-only and the 2.6 m opening is a dashed outline typeset to scale over it.
+- **exploded v1** rendered the character still assembled with parts floating off
+  it; v2's "components unpacked on a surface, no part touches another" landed it.
+- **the generated scale helper** (`scratch`, discarded): a prompt for "her head
+  reaching two thirds of a 2.6 m opening" returned ≈1.95:1 three takes running —
+  the model will not hold a stated ratio. The shipped overlay is drawn in
+  ImageMagick from the canon numbers; its prompt (verbatim) was: *"A scale
+  reference render: ONE adult woman standing straight in a relaxed A-pose… She
+  stands exactly inside that doorway, and the doorway is clearly much taller than
+  her: her head reaches about two thirds of the way up the opening, with about a
+  head's height of empty doorway above her."*
+
+**Composed** (`tools/compose13.sh`, sources in `panels/13/`): 2560×1440. Top row —
+the four-view turnaround at one true scale (55 %) with the dashed 2.6 m × 1.7 m
+opening outline and the 1.75 m dimension line drawn over it, and the six variants
+beside it at the same scale, both rows sharing one floor line; a SCALE panel with
+the three bars (2.6 / 1.75 / 1.3 m), the nine rigid parts and the joint-hiding
+list. Bottom row — exploded view, the three poses, the stage-1 pair and the
+in-context lab frame, captioned; footer carries the garment pieces, the variant
+ranges and where she is seen.
+
+**Self-review:** the sheet answers section 2b's open item: the avatar maker now has
+a body to build (nine rigid parts, nine flat cuts, every joint hidden by clothing),
+a parameter list (skin ×6, builds, ages, hair, facial hair, six colourways), and
+her size against the gate — 1.75 m in the 2.6 m opening, both drawn to the same
+millimetre so nothing about it is a guess. The stage-1 pair reads correctly as the
+same person at two resolutions: chunky, flat-shaded, no outlines. Honest nits:
+(a) the variants' figures are independently generated, so their garment details
+match in construction rather than millimetre-for-millimetre (the same trade the
+08 and 12 rows make); (b) the exploded view renders the joints as open sockets
+rather than a strict measurement diagram — panel 6's belt/pelvis piece also
+carries a slight seam line to the torso; treat the labels, not the pixels, as the
+canon cut list; (c) the in-context frame's coil blocks read a little sleeker than
+sheet 06's chunky stacked blocks — the canon gate reference stays 06.
+
 ## contact-sheet.jpg
 
-`tools/contact.sh` — 12 numbered tiles, 4×3, labeled by number and slug. The
+`tools/contact.sh` — 13 numbered tiles, 5×3, labeled by number and slug. The
 owner's one-glance checklist: every canon fix visible at once (gate silhouette
 in 6 frames, alien planet in 3, four plumes where required, calm left thirds
-in 04/05).
+in 04/05, and 13's 1.75 m figure against the gate's 2.6 m opening).
 
 ---
 
@@ -839,6 +1231,11 @@ in 04/05).
   accepted image.
 - Sheets are composed with ImageMagick (`tools/compose*.sh`); callouts are
   typeset, never generated.
+- **Ratio trap (new, sheet 13):** a model will not hold a stated size ratio
+  between two objects in one render — asked for a 1.75 m figure in a 2.6 m
+  opening three times, it returned ≈1.95:1. Where a picture must carry a
+  measurement, draw the measurement in ImageMagick over a clean render (13
+  does exactly that) and keep the numbers in the prompt only as a soft guide.
 
 ## Open questions back to the owner
 
@@ -848,3 +1245,9 @@ in 04/05).
    three" tolerance; nudge or accept?
 3. **Machine shortlist:** which of the eight field machines (sheet 12) and
    which lab machines (sheet 07) get built first?
+4. **The scientist's default (13):** the sheet's canon default is the late-thirties
+   woman in white coat / teal; the six variants are the maker's range. Confirm the
+   default, or name a different one.
+5. **Her stage-1 body:** the sheet draws the low-poly twin beside the smooth one;
+   the in-game voxel human is the thing to replace (section 2b). Is the nine-part
+   cut in 13 the build target for it?

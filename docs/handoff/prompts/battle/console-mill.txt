@@ -1,0 +1,121 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module for three.js: two props of a sci-fi game, built procedurally from three.js geometry as believable working equipment, matching approved concept art (described below in words): the OPERATOR'S CONSOLE of a laboratory, and the TEXTURE MILL, a field machine that stands on a planet. Every part stands on something, has the parts real equipment has, and says where its cables connect. Nothing floats.
+
+THE LOOK IS THE JOB. A reviewer renders both props beside the concept art and picks the answer that looks more like it; the tests are only the floor. Plain boxes and bare cylinders lose even when every test passes. Think like a prop modeller: what is the machine, how is it made, what holds it together, where does power come in, what would a technician open, turn or read on it? Chamfer or bevel every large part, add panel seams, stack forms, and add the small parts that sell scale (bolts, rivets, hinges, gland nuts, bezels, grille slats).
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/console-mill.test.ts`. If your environment can show a web page, ALSO make a small preview page (index.html, three.js from a CDN) that shows the console (lever thrown, screen lit) and the mill at stage 1 and stage 6 on a grey floor under a key light and an environment light, slowly turning; the two code blocks in the chat are what gets collected. When the tests pass, compare your props with the descriptions below and improve the weakest parts; then STOP.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM (no document, no canvas: textures only as THREE.DataTexture from typed arrays), no Date, no Math.random (seeded hash if you need variation). The only imports in src are `import * as THREE from 'three'` (three r170 or later) and, to merge geometry, `import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'`. The test file imports only `node:test`, `node:assert/strict`, `three` and `../src/index`. Units are metres; +y is up; each prop faces +z (its front) and is centred on x = 0, z = 0. Never use `transmission` on a material (it makes three.js draw the whole scene a second time every frame): glass is plain transparency.
+
+## The concept art, in words
+
+### The operator's console (lab, clean grey industrial)
+A grey painted DESK CONSOLE on a PEDESTAL, like a 1970s power-station control desk.
+- The desk: about 1.2 m wide and 0.7 m deep. Its front top edge is at about 1.05 m; the top is a CONTROL PANEL sloping up toward the back at about 20 degrees; at the back a RAISED UPPER PANEL (about 0.3 m tall, leaning back slightly) carries: four ROUND ANALOGUE GAUGES in two rows (chrome bezels, white faces, a needle each), a small SCREEN (about 0.22 x 0.15 m, green phosphor, showing a waveform trace from a DataTexture: this is the `screen` mesh, emissive), and a KEYPAD (a 3 x 4 grid of small keys) beside the screen.
+- On the sloped panel: a row of six TOGGLE SWITCHES (small levers on round bases), two PUSH BUTTONS in bezels (one red, one green), and two small INDICATOR LAMPS (the `lamps`, green and amber).
+- At the right end of the desk: the big MAIN LEVER on a slotted QUADRANT PLATE (a curved guide), a pivot hub, a steel arm and a RED GRIP. It pivots about its x axis: `lever.rotation.x = 0` is OFF (up and back), `-1.1` is ON (thrown forward).
+- The pedestal: a narrower box (about 0.6 m wide, 0.45 m deep) under the desk, with a recessed SERVICE DOOR (hinges, a handle) on its front, on a plinth with four ANCHOR BOLTS. The console's signal cables run down INSIDE the pedestal into a flush steel FLOOR GROMMET under it: nothing loose on the floor. Socket 'cable' at the grommet.
+- Materials: grey paint for the body, dark steel for the plinth and quadrant, chrome-ish gunmetal for bezels, black rubber for knobs.
+
+### The texture mill (planet field machine)
+A BOXY GRINDING MILL on FOUR BOLTED FEET, about 1.7 m long (front to back, along z), 1.1 m wide and 1.3 m tall to the top of its body.
+- The body: a box whose top long edges are CHAMFERED at 45 degrees (an octagonal outline seen from the front), with RIVETED PANEL SEAMS, a raised PYRAMID BOSS panel (a square plate rising to a low point) on its front face, and a vertical seam splitting the body into a front and a rear section.
+- At the FRONT, on top: a FEED HOPPER, a trapezoid tray that widens upward and leans forward, HEAPED with 8 to 12 FACETED ORE CHUNKS (low-poly rocks, flat shaded, grey-beige); its mouth is dark: material only goes IN here. Socket 'hopper' at its mouth.
+- At the REAR, on top: a short round EXHAUST STACK with vertical SLOTS around it and a grille cap. The machine's pixels pour out of it (the game draws them). Socket 'stack' at its mouth, clearly separate from the hopper: higher, and behind it.
+- On the LEFT flank: a CARTRIDGE SLOT (a framed opening) holding a PINK-STRIPED preset cartridge half sticking out (pink #ff3d8a and white stripes from a DataTexture).
+- On the RIGHT flank: a SERVICE DOOR with hinges and a handle, and a pink LABEL PLATE.
+- At the right REAR, low: a CABLE GLAND with a short thick cable stub going down to the ground. Socket 'power' at the gland.
+- Along the base: a HAZARD-STRIPED TOE STRIP (yellow and black diagonal stripes).
+- A small amber STATUS LAMP on the rear top (lamps[0]).
+- The feet: four short posts with square foot pads, each pad with four bolts; the body sits on them about 0.15 m above the ground.
+- Paint: warm light grey.
+- `stage`: 0 or 1 is CHUNKY LOW POLY with FLAT SHADING (the same silhouette and the same big parts: hopper with chunky rocks, stack, slot and cartridge, door, feet, toe strip; no rivets, bolts or slots; few segments); 6 is full detail. Default 6.
+
+## API (implement exactly; you may add more exports)
+
+```ts
+import * as THREE from 'three';
+
+export interface Box { min: [number, number, number]; max: [number, number, number] }
+export interface Socket { name: string; at: [number, number, number] }
+export interface Prop {
+  group: THREE.Group;          // standing on y = 0
+  colliders: Box[];            // at least one; together they cover the footprint
+  sockets: Socket[];
+  /** Lamps and glowing parts, each with its own material, so each can be lit alone. */
+  lamps: THREE.Mesh[];
+}
+/** The shared materials (the game passes its own set with exactly these fields). */
+export interface LabMaterials {
+  gunmetal: THREE.MeshStandardMaterial; darkSteel: THREE.MeshStandardMaterial; paint: THREE.MeshStandardMaterial;
+  copper: THREE.MeshStandardMaterial; rubber: THREE.MeshStandardMaterial; hazard: THREE.MeshStandardMaterial; // hazard: diagonal yellow/black stripes
+  glass: THREE.MeshPhysicalMaterial; concrete: THREE.MeshStandardMaterial;
+}
+export function createMaterials(): LabMaterials;
+/** Sets a lamp's glow 0..1 (its emissive intensity). */
+export function setLamp(lamp: THREE.Mesh, glow: number): void;
+export function operatorConsole(m: LabMaterials): Prop & { lever: THREE.Object3D; screen: THREE.Mesh };
+export function textureMill(m: LabMaterials, o?: { stage?: number }): Prop;
+/** Triangles in a prop (indexed or not). */
+export function triangles(p: Prop): number;
+```
+
+You may create your own few materials for the screen, the lamps, the label, the cartridge and the mill's warm grey paint (stage 1 needs flat-shaded copies); everything else uses `m`. Merge each prop's static parts that share a material into one mesh; keep separate only the lamps, the lever and the screen. A prop is at most 16 meshes plus its lamps.
+
+## Budgets
+Console: 2 500 to 8 000 triangles. Mill at stage 6: 2 500 to 8 000; at stage 1: at most 1 500 and at most half of stage 6. Both build in under 40 ms in Node.
+
+## Acceptance tests (copy unchanged, then add your own: determinism, sockets inside the bounding box, the lever's pivot, flat shading at stage 1, lamps glowing)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { createMaterials, operatorConsole, textureMill, triangles, setLamp, type Prop } from '../src/index';
+
+const m = createMaterials();
+const box = (p: Prop) => new THREE.Box3().setFromObject(p.group);
+const meshes = (p: Prop) => { let n = 0; p.group.traverse((o) => { if ((o as THREE.Mesh).isMesh) n++; }); return n; };
+const at = (p: Prop, n: string) => p.sockets.find((s) => s.name === n)!.at;
+
+test('both stand on the floor, with colliders, and are cheap to draw', () => {
+  for (const p of [operatorConsole(m), textureMill(m), textureMill(m, { stage: 1 })]) {
+    assert.ok(Math.abs(box(p).min.y) <= 0.002, `grounded (min y ${box(p).min.y})`);
+    assert.ok(p.colliders.length >= 1);
+    assert.ok(meshes(p) <= 16 + p.lamps.length, `${meshes(p)} meshes`);
+    for (const o of [p.group]) o.traverse((x) => { const mat = (x as THREE.Mesh).material as THREE.MeshPhysicalMaterial | undefined; if (mat && 'transmission' in mat) assert.equal(mat.transmission, 0, 'no transmission'); });
+  }
+});
+
+test('the console: a desk on a pedestal, the lever off, a lit screen, its cable into the floor', () => {
+  const c = operatorConsole(m);
+  const b = box(c);
+  assert.ok(b.max.x - b.min.x >= 0.9 && b.max.x - b.min.x <= 1.5, `width ${b.max.x - b.min.x}`);
+  assert.ok(b.max.z - b.min.z >= 0.5 && b.max.z - b.min.z <= 1.0, `depth ${b.max.z - b.min.z}`);
+  assert.ok(b.max.y >= 1.15 && b.max.y <= 1.7, `height ${b.max.y}`);
+  assert.equal(c.lever.rotation.x, 0);
+  c.lever.rotation.x = -1.1;
+  assert.ok(c.screen.isMesh);
+  assert.ok(c.lamps.length >= 2);
+  setLamp(c.lamps[0]!, 1);
+  assert.ok((c.lamps[0]!.material as THREE.MeshStandardMaterial).emissiveIntensity > 0);
+  assert.ok(at(c, 'cable')[1] <= 0.1, 'the cable goes into the floor');
+  const t = triangles(c);
+  assert.ok(t >= 2500 && t <= 8000, `${t} triangles`);
+});
+
+test('the mill: hopper in front, stack behind and above it, power low at the back, chunky at stage 1', () => {
+  const mill = textureMill(m, { stage: 6 });
+  const b = box(mill);
+  assert.ok(b.max.z - b.min.z >= 1.3 && b.max.z - b.min.z <= 2.1, `length ${b.max.z - b.min.z}`);
+  assert.ok(b.max.x - b.min.x >= 0.8 && b.max.x - b.min.x <= 1.5, `width ${b.max.x - b.min.x}`);
+  assert.ok(b.max.y >= 1.2 && b.max.y <= 2.0, `height ${b.max.y}`);
+  const hopper = at(mill, 'hopper'), stack = at(mill, 'stack'), power = at(mill, 'power');
+  assert.ok(hopper[2] > 0.2, 'the hopper is at the front');
+  assert.ok(stack[2] < hopper[2] - 0.5 && stack[1] > hopper[1] + 0.2, 'the stack is behind and above the hopper');
+  assert.ok(power[1] < 0.7 && power[2] < 0, 'power comes in low at the back');
+  assert.ok(mill.lamps.length >= 1);
+  const t6 = triangles(mill), t1 = triangles(textureMill(m, { stage: 1 }));
+  assert.ok(t6 >= 2500 && t6 <= 8000, `stage 6: ${t6}`);
+  assert.ok(t1 <= 1500 && t1 * 2 <= t6, `stage 1: ${t1}`);
+});
+```

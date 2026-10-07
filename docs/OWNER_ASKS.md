@@ -544,3 +544,7 @@ create a example of a all in one 3d/2d/anim/sound studio program where everythin
 - 2026-10-07 (laptop, planning session, Opus 5.5): Try again (Done: my last report had not come through; the labkit landing was verified (1 881 tests, e2e 166/166), committed and pushed, and the report resent.)
 
 - 2026-10-07 (laptop, planning session, Opus 5.5): lets go with your reccomendations, continue (In progress: the concept art set approved; planet machines: all of sheet 12 but the planet's preset mixer; lab machines: bench, combiner, rack, planet table (fabricator later); no drill wisp; a smooth human (concept art, then a battle); a richer operator console and mill; then the rest of the first Play's polish.)
+
+- 2026-10-07 (laptop, planning session, Opus 5.5): polish at the end please get the code stuff built, graphics polish last (In progress: graphics polish parked to the end of the plan (the ground glow from the plumes, half written, reverted; the console and mill battle and the human art run on in Arena and land at the end); building the game's code next: the first Play's game loop (SETMIX_PLAN Phase 5).)
+
+- 2026-10-07 (laptop, planning session, Opus 5.5): let the arena ai do the heavy lifting (In progress: the game loop goes to Arena Battles: `@hm/plotsim` (the plot's economy: ore, power, the machines, the metrics, the stages) and `@hm/fieldkit` (the six other picked field machines); I write the briefs, review, and wire them into Play.)

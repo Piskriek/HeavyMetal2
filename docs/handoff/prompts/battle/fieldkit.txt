@@ -1,0 +1,109 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module for three.js: six field machines of a terraforming game, built procedurally from three.js geometry as believable working equipment, matching approved concept art (described below in words). They stand on a desolate planet, run on power brought by cable, take material in at a dark feed and pour coloured "pixels" (the game draws those) out of a SEPARATE vent or stack, never out of the feed. Every machine stands on legs, feet, a skid, a base plate or anchor bolts. Nothing floats.
+
+THE LOOK IS THE JOB. A reviewer renders all six beside the concept art and picks the answer that looks more like it; the tests are only the floor. Plain boxes and bare cylinders lose even when every test passes. Think like a prop modeller: what does the machine do, how is it built, what holds it up, where does power come in, what would a technician open, turn or read? Chamfer or bevel large parts, add seams, stack forms, and the small parts that sell scale (bolts, rivets, hinges, gland nuts, grille slats, gauges, ladder rungs).
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/fieldkit.test.ts`. If your environment can show a web page, ALSO make a small preview page (index.html, three.js from a CDN) with all six at stage 1 and at stage 6 on sandy ground under a low sun, slowly turning, two pylons joined by a sagging span; the two code blocks in the chat are what gets collected. When the tests pass, compare your machines with the descriptions and improve the weakest; then STOP.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM (no document, no canvas: textures only as THREE.DataTexture from typed arrays), no Date, no Math.random (seeded hash if you need variation). The only imports in src are `import * as THREE from 'three'` (three r170 or later) and, to merge geometry, `import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'`. The test file imports only `node:test`, `node:assert/strict`, `three` and `../src/index`. Units are metres; +y is up; each machine faces +z (its front) and is centred on x = 0, z = 0. Never use `transmission` on a material. Merge each machine's static parts that share a material into one mesh; keep separate only the lamps and the moving parts named in the API. A machine is at most 16 meshes plus its lamps and moving parts.
+
+`stage`: 0 or 1 is CHUNKY LOW POLY with FLAT SHADING (the same silhouette and big parts, no bolts, rivets or slats, few segments, flat-shaded copies of the materials); 6 is full detail. Default 6.
+
+## The six machines, in words (sheet 12 of the concept art)
+1. **ROCK DRILL** (mines raw ore; no pixels): a drill rig on FOUR SPLAYED LEGS with bolted anchor pads, about 2.2 m across; a vertical MAST about 3 m tall with an electric motor housing near its top driving a spiral AUGER BIT down into the ground (the `bit` spins about y); a DISCHARGE TRAY at the front where faceted ore chunks pile up (socket 'tray'); a cable gland low at the back (socket 'power'); a small amber status lamp.
+2. **SHAPE PRESS** (stamps geometry finer; green pixels): a low wide PRESS FRAME on an anchored BASE PLATE with four corner bolts, about 2 m wide and 1.4 m deep; two vertical HYDRAULIC RAMS (the `rams`, they move up and down) over a flat die bed between grease-dark columns; a sloped FEED TRAY on the side holding crushed rock (socket 'feed'); a wide EXHAUST VENT GRILLE at the rear top (socket 'vent'); a CARTRIDGE SLOT with a green-striped cartridge (#7cff4d) on the front; a cable gland low at the back (socket 'power').
+3. **LIGHT PROJECTOR** (raises the light; amber pixels): a tall TRIPOD MAST (about 2.6 m) on three legs with bolted pad feet; a big round faceted LAMP HEAD tilted up (the `head`, it tilts about x), its front lens glowing (a lamp); VENT GRILLES round the BACK RIM of the lamp housing, apart from the lens (socket 'vent'); a base housing at the foot of the mast with a CARTRIDGE SLOT and an amber-striped cartridge (#ffc13d); a ladder-rung strip up the mast; a cable gland on the base housing (socket 'power').
+4. **WATER MAKER** (condenses water; cyan pixels): a RIBBED CYLINDRICAL CONDENSER TANK lying in a CRADLE FRAME on four feet, about 2.4 m long and 1.4 m wide; a side INTAKE HOPPER for gravel and scree (socket 'feed'); a TOP-REAR VENT (socket 'vent'); a CARTRIDGE SLOT with a cyan-striped cartridge (#3dc8ff); a pressure gauge and pipe runs; a cable gland low on the cradle (socket 'power').
+5. **POWER UNIT** (makes electricity; NO pixels, a steam wisp only): a boxy GENERATOR on a steel SKID with ANTI-VIBRATION FEET, about 2 m long; radiator grilles on its flanks; a material-cell INTAKE at the front (socket 'feed'); a short STEAM STACK on top (socket 'steam'); an output panel with two thick cable sockets low at the back (socket 'out'); green status lamps.
+6. **RELAY PYLON** (carries the power line; no pixels): a LATTICE STEEL TOWER about 6 m tall, tapering, on a CONCRETE BASE with anchor bolts; a cross-arm at the top with INSULATORS where the line attaches (`top`, socket 'top'); a DISTRIBUTION BOX with cable glands at its foot (socket 'box'); a small red lamp on the very top.
+
+Plus `cableSpan`: a black rubber power cable between two points, sagging as a catenary (or a parabola) by `sag` metres at the middle, at least 12 segments.
+
+## Materials
+```ts
+export interface LabMaterials {
+  gunmetal: THREE.MeshStandardMaterial; darkSteel: THREE.MeshStandardMaterial; paint: THREE.MeshStandardMaterial;
+  copper: THREE.MeshStandardMaterial; rubber: THREE.MeshStandardMaterial; hazard: THREE.MeshStandardMaterial; // hazard: diagonal yellow/black stripes
+  glass: THREE.MeshPhysicalMaterial; concrete: THREE.MeshStandardMaterial;
+}
+export function createMaterials(): LabMaterials;  // the game passes its own set with exactly these fields
+```
+You may make your own few materials for lamps, lenses, cartridges, the machines' warm grey paint and ore (stage 1 needs flat-shaded copies).
+
+## API (implement exactly; you may add more exports)
+
+```ts
+import * as THREE from 'three';
+export interface Box { min: [number, number, number]; max: [number, number, number] }
+export interface Socket { name: string; at: [number, number, number] }
+export interface Prop { group: THREE.Group; colliders: Box[]; sockets: Socket[]; lamps: THREE.Mesh[] }
+export function createMaterials(): LabMaterials;
+export function setLamp(lamp: THREE.Mesh, glow: number): void;   // emissive 0..1
+export function rockDrill(m: LabMaterials, o?: { stage?: number }): Prop & { bit: THREE.Object3D };
+export function shapePress(m: LabMaterials, o?: { stage?: number }): Prop & { rams: THREE.Object3D[] };
+export function lightProjector(m: LabMaterials, o?: { stage?: number }): Prop & { head: THREE.Object3D };
+export function waterMaker(m: LabMaterials, o?: { stage?: number }): Prop;
+export function powerUnit(m: LabMaterials, o?: { stage?: number }): Prop;
+export function relayPylon(m: LabMaterials, o?: { stage?: number }): Prop & { top: [number, number, number] };
+export function cableSpan(m: LabMaterials, from: [number, number, number], to: [number, number, number], sag: number): THREE.Mesh;
+export function triangles(p: Prop): number;
+```
+
+## Budgets
+At stage 6: each machine 1 500 to 8 000 triangles (the pylon 600 to 5 000). At stage 1: at most 1 200 (the pylon 800) and at most half of its stage 6. All six build in under 80 ms in Node.
+
+## Acceptance tests (copy unchanged, then add your own: determinism, sockets inside the bounding box, moving parts move, flat shading at stage 1, lamps glow)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { createMaterials, rockDrill, shapePress, lightProjector, waterMaker, powerUnit, relayPylon, cableSpan, triangles, type Prop } from '../src/index';
+
+const m = createMaterials();
+const box = (p: Prop) => new THREE.Box3().setFromObject(p.group);
+const at = (p: Prop, n: string) => { const s = p.sockets.find((x) => x.name === n); assert.ok(s, `socket ${n}`); return s!.at; };
+const dist = (a: number[], b: number[]) => Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!);
+const builders = { drill: rockDrill, press: shapePress, projector: lightProjector, water: waterMaker, power: powerUnit, pylon: relayPylon };
+
+test('all six stand on the ground, with colliders, power in low, cheap at stage 1', () => {
+  for (const [name, make] of Object.entries(builders)) {
+    const p6 = make(m), p1 = make(m, { stage: 1 });
+    for (const p of [p6, p1]) {
+      assert.ok(Math.abs(box(p).min.y) <= 0.002, `${name} grounded (min y ${box(p).min.y})`);
+      assert.ok(p.colliders.length >= 1, `${name} colliders`);
+    }
+    const t6 = triangles(p6), t1 = triangles(p1);
+    const [lo, hi, s1] = name === 'pylon' ? [600, 5000, 800] : [1500, 8000, 1200];
+    assert.ok(t6 >= lo && t6 <= hi, `${name} stage 6: ${t6}`);
+    assert.ok(t1 <= s1 && t1 * 2 <= t6, `${name} stage 1: ${t1}`);
+    if (name !== 'pylon') assert.ok(at(p6, name === 'power' ? 'out' : 'power')[1] < 0.9, `${name} power comes in low`);
+  }
+});
+
+test('pixels come out of a vent apart from the feed, higher up', () => {
+  for (const make of [shapePress, waterMaker]) {
+    const p = make(m);
+    const feed = at(p, 'feed'), vent = at(p, 'vent');
+    assert.ok(dist(feed, vent) >= 0.6 && vent[1] > feed[1], 'the vent is apart from and above the feed');
+  }
+  const pr = lightProjector(m);
+  assert.ok(at(pr, 'vent')[1] > 1.5, 'the projector vents from its head');
+  assert.ok(at(rockDrill(m), 'tray')[2] > 0.2, 'the drill drops ore at the front');
+  assert.ok(at(powerUnit(m), 'steam')[1] > 1.0, 'steam leaves from the top');
+});
+
+test('sizes, moving parts and the pylon\'s line', () => {
+  const d = rockDrill(m); assert.ok(box(d).max.y >= 2.4 && box(d).max.y <= 4.5, `drill height ${box(d).max.y}`);
+  assert.ok(d.bit.parent !== null);
+  const pr = shapePress(m); assert.ok(pr.rams.length === 2);
+  const lp = lightProjector(m); assert.ok(box(lp).max.y >= 2.2 && box(lp).max.y <= 4.0, `projector height ${box(lp).max.y}`);
+  const py = relayPylon(m);
+  assert.ok(box(py).max.y >= 5 && box(py).max.y <= 8.5, `pylon height ${box(py).max.y}`);
+  assert.ok(py.top[1] >= 4.5 && dist(py.top, at(py, 'top')) < 0.01);
+  at(py, 'box');
+  const span = cableSpan(m, [0, 6, 0], [30, 6, 0], 1.2);
+  const sb = new THREE.Box3().setFromObject(span);
+  assert.ok(sb.min.y <= 6 - 1.0 && sb.min.y >= 6 - 1.6, `the span sags (lowest ${sb.min.y})`);
+  assert.ok(sb.max.x >= 29.9 && sb.min.x <= 0.1, 'from one end to the other');
+});
+```

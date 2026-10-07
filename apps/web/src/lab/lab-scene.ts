@@ -45,7 +45,7 @@ function archOutline(half: number, from = 0, steps = 24): THREE.Vector2[] {
 const smoothstep = (a: number, b: number, x: number): number => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 /** Albedo, roughness and normal textures from a height function over a tile (h 0 in seams .. 1 on faces), drawn once. */
-function surfaceTextures(size: number, at: (px: number, py: number) => { h: number; colour: [number, number, number]; rough: number }, bump: number) {
+export function surfaceTextures(size: number, at: (px: number, py: number) => { h: number; colour: [number, number, number]; rough: number }, bump: number) {
   const albedo = new Uint8Array(size * size * 4), rough = new Uint8Array(size * size * 4), normal = new Uint8Array(size * size * 4), height = new Float32Array(size * size);
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     const s = at(x, y), k = (y * size + x) * 4;
@@ -70,7 +70,7 @@ function surfaceTextures(size: number, at: (px: number, py: number) => { h: numb
 }
 
 /** Test-chamber wall panels: cool white squares with dark seams and a soft bevel, a few a shade off from their neighbours. */
-function panelTextures(size: number) {
+export function panelTextures(size: number) {
   const cell = size / 4;
   return surfaceTextures(size, (px, py) => {
     const lx = px % cell, ly = py % cell, edge = Math.min(lx, ly, cell - 1 - lx, cell - 1 - ly);
@@ -84,7 +84,7 @@ function panelTextures(size: number) {
 }
 
 /** Concrete floor tiles: mottled grey, darker seams, a little polish so the strip lights and the daylight show in it. */
-function floorTextures(size: number) {
+export function floorTextures(size: number) {
   const cell = size / 2;
   const noise = (x: number, y: number, s: number, seed: number) => {
     const fx = x / s, fy = y / s, i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j, n = size / s;

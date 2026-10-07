@@ -1,0 +1,147 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module for three.js: the props of a sci-fi laboratory in a game, built procedurally from three.js geometry, as believable working equipment. Every prop stands on the floor (or on a stated wall mount), has the parts real equipment has (panels, louvres, bolts, cable glands, handles, hazard stripes, indicator lamps), and says where its cables connect. Nothing floats.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/labkit.test.ts`. If your environment can show a web page, ALSO make a small preview page (index.html, three.js from a CDN) that shows every prop on a grey floor under a key light and an environment light, slowly turning, with the gate powered on; the two code blocks in the chat are what gets collected. When the tests would pass, STOP.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM (no document, no canvas: textures only as THREE.DataTexture from typed arrays), no Date, no Math.random (use a seeded hash if you need variation). The only import in src is `import * as THREE from 'three'` (three r170 or later). The test file imports only `node:test`, `node:assert/strict`, `three` and `../src/index`. Units are metres; +y is up; every prop faces +z (its front) and is centred on x = 0, z = 0 unless stated.
+
+## The look (from the concept art)
+A clean white test-chamber lab. Equipment is industrial: gunmetal and dark steel with brushed edges, grey painted cabinets, copper coils and bus bars, black rubber cable, yellow-and-black hazard stripes on plinths and skids, small amber, green and red indicator lamps. PBR throughout (MeshStandardMaterial / MeshPhysicalMaterial): metalness and roughness chosen per material, bevelled edges where a real part would have them (use ExtrudeGeometry with bevels, or chamfered boxes), never plain untextured cubes.
+
+## API (implement exactly; you may add more exports)
+
+```ts
+import * as THREE from 'three';
+
+/** An axis-aligned box in the prop's own frame, for walking collisions. */
+export interface Box { min: [number, number, number]; max: [number, number, number] }
+/** A named point where a cable or a pipe connects, in the prop's own frame. */
+export interface Socket { name: string; at: [number, number, number] }
+
+export interface Prop {
+  group: THREE.Group;          // the prop, standing on y = 0 (or hanging from its wall mount)
+  colliders: Box[];            // at least one; together they cover the prop's footprint
+  sockets: Socket[];
+  /** Lamps and glowing parts that light up when the prop is powered, in the order they come on. Their material is their own (not shared), so each can be lit alone. */
+  lamps: THREE.Mesh[];
+}
+
+/** The shared materials. Call once; every builder takes it. */
+export interface LabMaterials {
+  gunmetal: THREE.MeshStandardMaterial; darkSteel: THREE.MeshStandardMaterial; paint: THREE.MeshStandardMaterial;
+  copper: THREE.MeshStandardMaterial; rubber: THREE.MeshStandardMaterial; hazard: THREE.MeshStandardMaterial; // hazard: diagonal yellow/black stripes from a DataTexture
+  glass: THREE.MeshPhysicalMaterial; concrete: THREE.MeshStandardMaterial;
+}
+export function createMaterials(): LabMaterials;
+
+/** Sets a lamp's glow 0..1 (its emissive intensity, from dark to bright). */
+export function setLamp(lamp: THREE.Mesh, glow: number): void;
+
+/** THE GATE: a heavy door frame standing upright and free, joined to no wall.
+ *  - opening 2.6 m tall x 1.7 m wide (two goblins of 1.3 m stacked), its sill at y = sill (top of the plinth and step plate);
+ *  - box-section uprights about 0.45 m wide, a wide flat lintel block on top; outer height about 3.2 m, frame width about 2.6 m, depth about 1.1 m;
+ *  - on each upright's front face, three ribbed copper coil blocks stacked (horizontal fins, like transformer radiators): these are the coils, glowing amber when powered;
+ *  - an angled steel buttress (a gusset) bracing each upright at the side;
+ *  - a low plinth (0.15 m) with a hazard-striped rim and anchor bolts, and a 40 mm step-up plate at the threshold;
+ *  - a rear junction box with six round cable glands at the back of the right upright's foot;
+ *  - service hatches on the uprights, recessed emitter channels on the inner faces of the opening.
+ *  twin: the planet end (weathered, on a cast concrete footing pad instead of the plinth). stage 1 = chunky low poly with flat shading (few segments, no small parts); stage 6 = full detail. Default: the lab gate, full detail. */
+export function gate(m: LabMaterials, o?: { twin?: boolean; stage?: number }): Prop & {
+  opening: { width: number; height: number; sill: number; z: number };   // z: the plane of the opening
+  coils: THREE.Mesh[];   // six: left bottom, right bottom, left middle, right middle, left top, right top (they light bottom to top)
+};
+
+/** A power relay cabinet: 0.6 w x 1.9 h x 0.5 d, grey paint, louvres, a door with a handle, three indicator lamps along the top front, cable entry at the top. Sockets: 'cable-top', 'cable-bottom'. */
+export function relayCabinet(m: LabMaterials): Prop;
+/** A breaker panel on short legs: 0.9 w x 1.6 h x 0.35 d, a big rotary isolator with a red handle on a yellow plate, two gauges, louvres. Sockets: 'in', 'out'. */
+export function breakerPanel(m: LabMaterials): Prop & { handle: THREE.Object3D };
+/** The lab's power source: six capacitor cylinders (0.35 m across, 1.5 m tall, ribbed grey) on a 2.0 x 1.0 steel skid with a hazard rim and lifting eyes, copper bus bars across their tops on insulators. Socket: 'out'. */
+export function capacitorBank(m: LabMaterials): Prop;
+/** The operator's console: a pedestal about 1.05 m to a sloped control panel, gauges, a small screen, rows of switches, and the big main lever with a red grip. The lever pivots about its x axis: rotation.x = 0 is OFF (up/back), -1.1 is ON (thrown forward). Socket: 'cable'. */
+export function operatorConsole(m: LabMaterials): Prop & { lever: THREE.Object3D; screen: THREE.Mesh };
+/** A small control box mounted on a floor post (0.35 x 0.45 x 0.2 box at about 1.2 m), two lamps, two buttons, a cable gland underneath. */
+export function controlBox(m: LabMaterials): Prop;
+/** A low ribbed steel floor cable cover (a cable ramp) along a path of floor points [x, z] (straight runs with mitred corners): about 0.35 m wide and 0.05 m tall, with a row of slots along its top through which a glowing strip shows. pulse: the strip; its uv.x is the distance along the path in metres (0 at the first point), uv.y 0..1 across, so a shader can run pulses along it. */
+export function floorCover(m: LabMaterials, path: [number, number][], width?: number): Prop & { pulse: THREE.Mesh; length: number };
+/** A ladder cable tray hung from a ceiling at height `ceiling` on drop rods, running from `from` to `to` (floor points [x, z]) at height `y`, with three cables in it. */
+export function cableTray(m: LabMaterials, from: [number, number], to: [number, number], y: number, ceiling: number): Prop;
+/** The planet table: a round 2.4 m holotable, its top at 0.95 m on a pedestal with a bolted base; a glowing projection disc in the top (lamps[0]). */
+export function planetTable(m: LabMaterials): Prop;
+/** The preset rack: a wall of cartridge slots, 3.0 w x 2.4 h x 0.4 d, standing on feet against a wall (its back at z = -0.2), each slot with a tiny lamp (lamps: every slot's lamp). */
+export function presetRack(m: LabMaterials, cols?: number, rows?: number): Prop;
+/** The preset bench: a 1.8 x 0.9 work table on four legs, a glowing light-table top (lamps[0]), a cartridge slot at the side, an articulated lamp. */
+export function presetBench(m: LabMaterials): Prop;
+/** The preset combiner: a round pedestal about 1.3 m tall with a glass dome on top and four cartridge slots round it. */
+export function presetCombiner(m: LabMaterials): Prop;
+/** A field machine on the planet, the texture mill: on a steel skid with four bolted feet; a feed hopper at the FRONT (rock goes in); a body with a service door and a label plate; an exhaust stack with a grille at the TOP REAR, separate from the hopper (pixels come out of it); a cartridge slot on the side; a power cable gland at the back; hazard stripes along the skid.
+ *  stage 0 or 1: chunky low poly, flat shaded, few segments; stage 6: full detail. Sockets: 'hopper' (the hopper's mouth), 'stack' (the exhaust's mouth, above and behind the hopper), 'power' (the gland). */
+export function textureMill(m: LabMaterials, o?: { stage?: number }): Prop;
+
+/** Triangles in a prop (indexed or not). */
+export function triangles(p: Prop): number;
+```
+
+## Budgets
+Triangles: gate full ≤ 16 000, gate twin stage 1 ≤ 2 000; texture mill stage 6 ≤ 6 000, stage 1 ≤ 800; every other prop ≤ 8 000; floor cover ≤ 400 per metre. The whole kit must build in under 150 ms in Node.
+
+## Acceptance tests (copy unchanged, then add your own: every builder grounded and deterministic, lamps glow, budgets, sockets inside the bounding box)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { createMaterials, gate, relayCabinet, breakerPanel, capacitorBank, operatorConsole, controlBox, floorCover, cableTray, planetTable, presetRack, presetBench, presetCombiner, textureMill, triangles, setLamp, type Prop } from '../src/index';
+
+const m = createMaterials();
+const box = (p: Prop) => new THREE.Box3().setFromObject(p.group);
+const near = (a: number, b: number, tol: number) => Math.abs(a - b) <= tol;
+
+test('every prop stands on the floor and has a collider', () => {
+  const props: Prop[] = [gate(m), gate(m, { twin: true, stage: 1 }), relayCabinet(m), breakerPanel(m), capacitorBank(m), operatorConsole(m), controlBox(m), planetTable(m), presetRack(m), presetBench(m), presetCombiner(m), textureMill(m), textureMill(m, { stage: 1 })];
+  for (const p of props) {
+    assert.ok(near(box(p).min.y, 0, 0.002), `grounded (min y ${box(p).min.y})`);
+    assert.ok(p.colliders.length >= 1);
+  }
+});
+
+test('the gate: a 2.6 x 1.7 opening in a free-standing frame, six coils bottom to top', () => {
+  const g = gate(m);
+  assert.ok(near(g.opening.height, 2.6, 0.02) && near(g.opening.width, 1.7, 0.02));
+  const b = box(g);
+  assert.ok(near(b.max.y, 3.2, 0.25) && near(b.max.x - b.min.x, 2.6, 0.3) && near(b.max.z - b.min.z, 1.1, 0.3));
+  assert.equal(g.coils.length, 6);
+  const ys = g.coils.map((c) => new THREE.Box3().setFromObject(c).getCenter(new THREE.Vector3()).y);
+  assert.ok(ys[0]! < ys[2]! && ys[2]! < ys[4]! && ys[1]! < ys[3]! && ys[3]! < ys[5]!);
+  assert.ok(g.sockets.some((s) => s.name === 'rear-junction'));
+  assert.ok(triangles(g) <= 16000 && triangles(gate(m, { twin: true, stage: 1 })) <= 2000);
+});
+
+test('the mill: exhaust apart from the hopper, cheaper at stage 1', () => {
+  const s = (p: Prop, n: string) => p.sockets.find((x) => x.name === n)!.at;
+  const mill = textureMill(m, { stage: 6 });
+  assert.ok(s(mill, 'stack')[1] > s(mill, 'hopper')[1] && s(mill, 'stack')[2] < s(mill, 'hopper')[2]);
+  assert.ok(triangles(textureMill(m, { stage: 1 })) < triangles(mill));
+});
+
+test('a floor cover follows its path, low, with a pulse strip measured in metres', () => {
+  const f = floorCover(m, [[0, 0], [4, 0], [4, 3]]);
+  assert.ok(near(f.length, 7, 0.01));
+  assert.ok(box(f).max.y <= 0.07);
+  const uv = f.pulse.geometry.getAttribute('uv');
+  let lo = Infinity, hi = -Infinity;
+  for (let i = 0; i < uv.count; i++) { lo = Math.min(lo, uv.getX(i)); hi = Math.max(hi, uv.getX(i)); }
+  assert.ok(near(lo, 0, 0.05) && near(hi, 7, 0.1));
+});
+
+test('lamps light, the lever throws, the tray hangs', () => {
+  const r = relayCabinet(m);
+  assert.equal(r.lamps.length, 3);
+  setLamp(r.lamps[0]!, 1);
+  assert.ok((r.lamps[0]!.material as THREE.MeshStandardMaterial).emissiveIntensity > 0);
+  assert.equal((r.lamps[1]!.material as THREE.MeshStandardMaterial).emissiveIntensity, 0);
+  const c = operatorConsole(m);
+  assert.equal(c.lever.rotation.x, 0);
+  const t = cableTray(m, [0, 0], [6, 0], 6, 8);
+  assert.ok(near(box(t).max.y, 8, 0.05) && box(t).min.y >= 5.5);
+  assert.ok(triangles(breakerPanel(m)) <= 8000 && triangles(capacitorBank(m)) <= 8000);
+});
+```

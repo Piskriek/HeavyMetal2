@@ -525,3 +525,5 @@ create a example of a all in one 3d/2d/anim/sound studio program where everythin
 - 2026-10-07 (laptop, planning session, Opus 5.5): if youve added it to the tasks you can continue to impliment until polish is done (In progress: the first-Play slice is added to `docs/SETMIX_PLAN.md` and STATUS; building it through to polish.)
 
 - 2026-10-07 (laptop, planning session, Opus 5.5): unreal engine has bee n installed, let me know what i need to do regarding it (In progress: answered with what the parked Unreal pieces need; see `docs/SETMIX_LANDING.md` section 7.)
+
+- 2026-10-07 (laptop, planning session, Opus 5.5): you are writing alot of code, is it cos its less efficient to use battle agents? (Answered: partly, but I overdid it; the split from here on is in `docs/SETMIX_PLAN.md` Phase 2b.)

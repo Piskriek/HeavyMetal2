@@ -22,7 +22,7 @@ const run = (label, cmd, args) => {
 run('typecheck', 'npm', ['run', 'typecheck']);
 const packages = only.length ? only : readdirSync(fileURLToPath(new URL('../packages', import.meta.url)));
 const patterns = packages.map((p) => `packages/${p}/tests/*.test.ts`);
-run(`tests (${only.length ? only.join(', ') : 'all packages'})`, 'node', ['--import', 'tsx', '--test', '--test-skip-pattern=^performance:', ...(only.length ? patterns : ['packages/*/tests/*.test.ts', 'apps/web/src/build/*.test.ts', 'apps/web/src/build/ways/*.test.ts', 'apps/web/src/storage/*.test.ts', 'apps/web/src/islands/*.test.ts', 'apps/web/src/crafter/*.test.ts', 'apps/web/src/edition.test.ts'])]);
+run(`tests (${only.length ? only.join(', ') : 'all packages'})`, 'node', ['--import', 'tsx', '--test', '--test-skip-pattern=^performance:', ...(only.length ? patterns : ['packages/*/tests/*.test.ts', 'apps/web/src/build/*.test.ts', 'apps/web/src/build/ways/*.test.ts', 'apps/web/src/storage/*.test.ts', 'apps/web/src/islands/*.test.ts', 'apps/web/src/crafter/*.test.ts', 'apps/web/src/edition.test.ts', 'apps/web/src/play/*.test.ts'])]);
 // speed tests (named `performance: ...`) run alone afterwards: timed while every other test file runs at once they swing by 4x
 const timed = packages.flatMap((p) => {
   const dir = fileURLToPath(new URL(`../packages/${p}/tests`, import.meta.url));

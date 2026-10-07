@@ -58,7 +58,10 @@ continents of deep green and warm ochre in shapes that match no real-world
 landmass, wrapped in swirling white cloud bands; **no blue oceans**.
 
 **Pixel language:** small, crisp, square pixels pour from a running machine's
-exhaust vents and drift up, spreading and thinning; colour = what it adds:
+exhaust vents and drift up, spreading and thinning. **The exhaust is never the
+hopper:** raw material goes IN at the feed hopper/tray/scree (dark, inert),
+pixels come OUT of a separate exhaust stack or vent grille on top-rear or back
+of the machine. Colour = what it adds:
 pink `#ff3d8a` texture · green `#7cff4d` shape · amber `#ffc13d` light ·
 cyan `#3dc8ff` water · violet `#b46bff` preset mixing. A machine that is off
 spews nothing.
@@ -138,9 +141,9 @@ band S2 → haze S3 → blue by S6.
 | 06 | `06-sheet-gate.png` | 🚧 painting: settles the canon gate (views + planet twins S1/S6) |
 | 07 | `07-sheet-lab-power-and-machines.png` | ⬜ pending |
 | 08 | `08-plot-stage-ladder.png` | ⬜ pending |
-| 09 | `09-sheet-coverage-growth.png` | ⬜ pending (normal/roughness derived from albedo) |
-| 10 | `10-plot-stage-6-hero.png` | 🔁 redo queued: pixel plumes that drift, spread and thin; feeds + pylon cabling readable |
-| 11 | `11-desolate-horizon.png` | 🔁 keep the take; only the goblin planet is fixed (no Earth continents) |
+| 09 | `09-sheet-coverage-growth.png` | ✅ six steps, one marked square; step-6 albedo/normal/roughness strip derived via `tools/derive_maps.sh` |
+| 10 | `10-plot-stage-6-hero.png` | ✅ v3: exhaust stacks separate from feed hoppers; plumes drift and thin; span line + ground cables |
+| 11 | `11-desolate-horizon.png` | ✅ v5: planet end is 06's twin (low poly); mill's hopper inert, rear stack spews; 3D render, no outlines |
 | 12 | `12-sheet-field-machines.png` | ⬜ pending |
 | — | `contact-sheet.jpg` | ⬜ built last from the 12 finals |
 
@@ -214,15 +217,19 @@ owner picked this as the canon.
 
 ## Owner review fix list (status)
 
-- [in progress] one gate design everywhere (chunky ribbed-coil canon) — 06
-  first, then redos of 01/03/04/05; planet twins in 10/11 to match
-- [pending] 01 gate OFF: coils dark and cold, zero orange glow
-- [pending] no loose cables anywhere — steel floor covers / overhead trays only
-- [pending] goblin planet alien: irregular green+ochre, cloud bands, no blue,
+- [done] one gate design everywhere (chunky ribbed-coil canon) — 06 first,
+  then redos of 01/03/04/05; planet twin in 11 redrawn low-poly (v5)
+- [done] 01 gate OFF: coils dark and cold, zero orange glow
+- [done] no loose cables in the lab — steel floor covers / overhead trays;
+  planet-side ground cables are fine (10/11 ship with them)
+- [done] goblin planet alien: irregular green+ochre, cloud bands, no blue,
   identical in every image
-- [pending] 04/05 left third calm (plain wall + floor); window centre-left
-- [pending] lab images photoreal (04/05 drifted illustrative)
-- [pending] 03 plot view: multi-textured like 11 (sand/rock/gravel/cracked
+- [done] 04/05 left third calm (plain wall + floor); window centre-left
+- [done] lab images photoreal (04/05 drifted illustrative)
+- [done] 03 plot view: multi-textured like 11 (sand/rock/gravel/cracked
   flats/reddish soil), low-res, black sky
-- [pending] 10 pixel plumes drift, spread, thin; feeds/hoppers + pylon cabling
-- [pending] 11: keep, replace only the goblin planet
+- [done] 10 pixel plumes drift, spread, thin; span line + ground cables (v3)
+- [done] 11: keep land/neighbours/beacon; goblin planet already alien (v2)
+- [done] exhaust ≠ hopper everywhere: separate stack/vent per machine (10 v3,
+  11 v5) — sheet 12 is designed this way from the start
+- [done] 11 gate: redrawn as 06's planet twin at stage-1 low poly (v5)

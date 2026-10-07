@@ -686,10 +686,13 @@ try {
   await text('.sm-menu button', 'Play').click();
   await page.waitForFunction(() => window.hmPlay && window.hmPlay.ready && window.hmPlay.frames > 5, null, { timeout: T(90000) });
   check('Play opens the lab and asks who you are, in the lab', await page.locator('.play-create .create-goblin.in-lab').count() === 1);
-  check('you are a human in the lab', await dom(() => [...document.querySelectorAll('.play-create .cg-looks button span')].some((x) => x.textContent === 'Explorer')));
+  check('the scientist is the only default in the lab', await page.locator('.play-create .create-scientist').count() === 1 && await page.locator('.play-create .cg-looks').count() === 0);
+  check('the import option is there', await page.locator('.play-create .custom-dropzone button').count() >= 1);
+  await dom(() => { [...document.querySelectorAll('.play-create .visor-chip')][1]?.click(); });
   await page.fill('.play-create .cg-name input', 'Ada');
   await dom(() => { [...document.querySelectorAll('.play-create .btns button')].find((b) => b.textContent.startsWith('Done'))?.click(); });
   await page.waitForFunction(() => window.hmPlay.state().step === 'power', null, { timeout: T(10000) });
+  check('Done leads into the lab', await page.locator('.play-create').count() === 0);
   check('made: next, turn on the gate', /Turn on the gate/.test(await page.locator('.play-goal h2').innerText()));
   await dom(() => window.hmPlay.pull());
   await page.waitForFunction(() => window.hmPlay.state().gateOn, null, { timeout: T(30000) });

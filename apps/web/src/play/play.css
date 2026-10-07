@@ -64,6 +64,18 @@
 .create-goblin.in-lab { background: linear-gradient(90deg, rgba(5, 6, 8, .15), rgba(5, 6, 8, .35)); }
 .create-goblin.in-lab .turntable { background: radial-gradient(ellipse at 50% 70%, rgba(255, 176, 42, .12), transparent 60%); }
 
+.visor-swatches { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.visor-chip { width: 32px; height: 32px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .2); cursor: pointer; transition: transform .15s, border-color .15s; }
+.visor-chip:hover { transform: scale(1.1); }
+.visor-chip.on { border-color: #fff; box-shadow: 0 0 10px rgba(255, 255, 255, .6); transform: scale(1.12); }
+.visor-custom { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: var(--dim); }
+.visor-custom input { width: 28px; height: 28px; border: none; border-radius: 4px; background: transparent; cursor: pointer; }
+
+.custom-dropzone { display: grid; gap: 8px; margin-top: 4px; }
+.custom-dropzone button { padding: 9px 12px; font-size: 13px; text-align: left; background: rgba(255, 255, 255, .06); border: 1px dashed rgba(241, 244, 245, .3); color: #f1f4f5; cursor: pointer; }
+.custom-dropzone button:hover:not(:disabled) { border-color: var(--power); background: rgba(255, 255, 255, .1); }
+.custom-dropzone button:disabled { opacity: .45; cursor: default; }
+
 @media (prefers-reduced-motion: reduce) {
   .play-toast, .play-toast.lost b, .play.sync-low .play-sync li.on { animation: none; }
 }

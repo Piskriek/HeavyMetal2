@@ -143,11 +143,70 @@ SetMix can read and react to external game worlds:
 
 ---
 
-## 4. IMMEDIATE ACTION ITEMS & LANDING PLAN
+### 3. Automatic Running-Game Detection & Scanner
+
+How does SetMix know if another game is running?
+1. **Background Companion Daemon (`SetmixBridgeDaemon.ts`)**:
+   - Runs locally on the host machine listening on `localhost:5196`.
+   - Periodically samples running OS process signatures:
+     - `UnrealEditor.exe` $\to$ **Unreal Engine 5.8** (verifies LiveLink/Python RPC on port 6766).
+     - `javaw.exe` / `.minecraft/` $\to$ **Minecraft** (locates active resource pack hot-folder).
+     - `Godot_v*.exe` $\to$ **Godot Engine** (locates project workspace).
+     - `vrchat.exe`, `gmod.exe`, `hl2.exe` $\to$ **VRChat / Source Engine**.
+2. **Zero-Configuration UI in SetMix**:
+   - The SetMix browser client queries `http://localhost:5196/status`.
+   - If an active game process is detected, a status pill lights up in the HUD / Cartridge Vault:
+     `🟢 Connected to Unreal Engine 5.8 (LiveLink Active)`
+   - No IP addresses, ports, or manual paths required from the player!
+3. **Graceful Fallback ("Scan for Games" Prompt)**:
+   - If the sidecar daemon is not running or the game is pure browser-based, the menu displays a subtle prompt:
+     `"Connect External Game? [Scan for Games / Launch Bridge]"`
+   - If standalone, players simply drag-and-drop `.glb` / `.vrm` files or download raw `.smx` cartridges.
+
+---
+
+## 4. UNIVERSAL AVATAR PIPELINE: CUSTOM MODEL IMPORTS & INTER-GAME BRIDGING
+
+### Core Philosophy: Minimalist Setup, Infinite Modularity
+Rather than trapping players in a complex 150-slider micro-morph character editor, SetMix empowers players to bring their identity from any game or 3D tool:
+1. **Lightweight Built-In Character Selection**: Pick archetype (Goblin, Human, Hazmat Scientist) + color palette tinting.
+2. **Universal 3D Upload (`.glb` / `.vrm` / `.gltf`)**: Drag and drop any 3D model into the browser or avatar dock; persists in browser `IndexedDB`.
+3. **Inter-Game Sidecar Avatar Bridge**: Live hot-folder (`~/.setmix/bridge/avatars/`) where models exported from Unreal Engine, Blender, VRChat, or Garry's Mod instantly populate the player's active character roster.
+4. **Reactive Resolution Harmonization**: Imported high-fidelity models adapt to the ambient terraforming tier via real-time Bayer dither, posterization, or wireframe quantization shaders.
+
+---
+
+### Audit & Rigging: Hazmat / Biohazard Scientist Model (`zips/Models/`)
+
+- **Attribution & License**:
+  - Model: ["Scientist"](https://skfb.ly/pGVYq) by Scarecrow_original
+  - License: [Creative Commons Attribution (CC BY 4.0)](http://creativecommons.org/licenses/by/4.0/)
+  - Documented in project [`CREDITS.md`](file:///c:/MarbleGp/CREDITS.md) and [`zips/Models/CREDITS.md`](file:///c:/MarbleGp/zips/Models/CREDITS.md).
+
+- **Source Assets**:
+  - **`scientist.glb`** (27.7 MB) & **`scientist.zip`** (25.6 MB containing `Sketchfab.fbx` + 4K PBR textures).
+  - **Geometry**: 18,548 vertices, 33,274 triangles across 9 clean sub-meshes (`head`, `torso/legs`, `shoes`, `hands/arms`, `glasses/visor`). Clean manifold topology, scaled to standard human height (~1.75 m).
+  - **Materials & Textures**: Full PBR set (`BaseColor.jpg`, `Metallic.jpg`, `Roughness.jpg`, `Normal_map.png` at 4096×4096).
+
+- **Rigged Delivery (`zips/Models/rigged/Sketchfab.fbx`)**:
+  - **Armature**: Fully rigged Mixamo humanoid skeleton (66 bones: `Hips`, `Spine`, `Spine1`, `Spine2`, `Neck`, `Head`, `LeftShoulder`, `LeftArm`, `LeftForeArm`, `LeftHand`, finger chains, `LeftUpLeg`, `LeftLeg`, `LeftFoot`, etc.).
+  - **Skinning**: 9 `SkinnedMesh` instances mapped with vertex skin weights.
+  - **Status**: Verified fully parsable in Three.js (`FBXLoader`). Rigged bones map 1:1 to `@hm/anim` locomotion controller.
+
+#### Web & Potato-Spec Optimization:
+The uncompressed normal map is 22 MB alone (making the raw model ~28 MB). For web play:
+- Generate a downscaled 1K/2K texture variant (~3 MB total) for instant 50ms loading on low-spec hardware.
+- Retain the full 4K version for High/Ultra tiers and Unreal Engine live-sync.
+
+---
+
+## 5. IMMEDIATE ACTION ITEMS & LANDING PLAN
 
 | Area | Action Item | Status / Plan |
 |---|---|---|
 | **Pixel Plumes** | Wire `PlumeSettings` toggle (`Auto`, `3D Cubes`, `GPU Splats`, `Dither`). Ensure 3D plumes spew from machines with high visual presence. | Planned in `@hm/particles` & WebGL/WebGPU renderer. |
 | **Inter-Game Bridge** | Expose `scripts/ue5-bridge.ts` as a generalized local daemon supporting both WebSocket and directory hot-reload targets (`SetmixBridgeDaemon.ts`). | Core daemon exists; generalize target adapters. |
-| **Cartridge Auto-Exporter** | Add a "Send to Game" button in [PresetVault.tsx](file:///c:/MarbleGp/zips/extracted/winner_plan_extended910/src/components/p12/PresetVault.tsx) to export active cartridges to external game folders. | High-value player feature for standalone/sidecar mode. |
-| **Display Governor** | Keep the Potato/Low spec (50+ FPS) sacred by defaulting to Auto tiering with manual user override. | Fully aligns with `docs/SETMIX_LANDING.md`. |
+| **Custom Avatar Loader** | Implement drag-and-drop `.glb`/`.vrm` ingestion in `AvatarDock` with `IndexedDB` storage and Mixamo/VRM standard humanoid bone retargeting. | Verified Three.js `GLTFLoader` ready; ready for wiring. |
+| **Hazmat Scientist Rig** | Add biohazard suit scientist preset using the audited model geometry and palette. | Model audited in `zips/Models/`. |
+| **Display Governor** | Keep Potato/Low spec (50+ FPS) sacred by defaulting to Auto tiering with manual user override. | Fully aligns with `docs/SETMIX_LANDING.md`. |
+

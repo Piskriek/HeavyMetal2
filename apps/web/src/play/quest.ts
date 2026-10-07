@@ -8,11 +8,17 @@ import { loadPlot, newPlot, nextStage, type MachineKind, type Metric, type PlotS
 export type Step = 'create' | 'power' | 'explore' | 'build' | 'done';
 export const STEPS: readonly Step[] = ['create', 'power', 'explore', 'build', 'done'];
 
+export type PlayAvatar =
+  | { readonly kind: 'scientist'; readonly name: string; readonly visor: string }
+  | { readonly kind: 'custom'; readonly name: string; readonly key: string };
+
 /** Everything Play saves. */
 export interface PlayState {
-  readonly v: 2;
+  readonly v: 3;
   readonly step: Step;
-  /** The human you made in the lab (the avatar maker's look id). */
+  /** The scientist or custom avatar made in the lab. */
+  readonly avatar: PlayAvatar | null;
+  /** Legacy look id kept for compatibility. */
   readonly avatarId: string | null;
   readonly gateOn: boolean;
   /** You have stood on the planet at least once. */
@@ -21,7 +27,7 @@ export interface PlayState {
   readonly plot: PlotState;
 }
 
-export const FRESH: PlayState = { v: 2, step: 'create', avatarId: null, gateOn: false, visited: false, plot: newPlot() };
+export const FRESH: PlayState = { v: 3, step: 'create', avatar: null, avatarId: null, gateOn: false, visited: false, plot: newPlot() };
 export const SAVE_KEY = 'hm.setmix.play';
 
 /** What players call the four metrics. */
@@ -39,25 +45,48 @@ function migrate(raw: Record<string, unknown>): PlotState {
   return loadPlot({ ...newPlot(), machines, nextId: machines.length + 1, stage: machines.length ? Math.max(1, stage) : stage });
 }
 
+function parseAvatar(raw: unknown, legacyId: string | null, rawName?: unknown): PlayAvatar | null {
+  const defaultName = typeof rawName === 'string' && rawName.trim() ? rawName.trim() : 'Scientist';
+  if (raw && typeof raw === 'object') {
+    const r = raw as Record<string, unknown>;
+    const name = typeof r['name'] === 'string' && r['name'].trim() ? r['name'].trim() : defaultName;
+    if (r['kind'] === 'custom' && typeof r['key'] === 'string') {
+      return { kind: 'custom', name, key: r['key'] };
+    }
+    const visor = typeof r['visor'] === 'string' && r['visor'] ? r['visor'] : '#f59e0b';
+    return { kind: 'scientist', name, visor };
+  }
+  if (legacyId) {
+    return { kind: 'scientist', name: defaultName, visor: '#f59e0b' };
+  }
+  return null;
+}
+
 /** A saved state, checked: anything missing or odd falls back to the fresh value, so a bad save never traps a player. */
 export function loadState(raw: unknown): PlayState {
   if (!raw || typeof raw !== 'object') return FRESH;
   const r = raw as Record<string, unknown>;
   const step = STEPS.includes(r['step'] as Step) ? (r['step'] as Step) : 'create';
-  const avatarId = typeof r['avatarId'] === 'string' && r['avatarId'] ? r['avatarId'] : null;
-  // a step past 'create' needs a human; past 'power' needs the gate on
-  const fixedStep: Step = step !== 'create' && !avatarId ? 'create' : step;
+  const legacyId = typeof r['avatarId'] === 'string' && r['avatarId'] ? r['avatarId'] : null;
+  const avatar = parseAvatar(r['avatar'], legacyId, r['name']);
+  const avatarId = avatar ? (avatar.kind === 'scientist' ? 'scientist' : avatar.key) : legacyId;
+  // a step past 'create' needs an avatar; past 'power' needs the gate on
+  const fixedStep: Step = step !== 'create' && !avatar && !avatarId ? 'create' : step;
   return {
-    v: 2, step: fixedStep, avatarId,
+    v: 3, step: fixedStep, avatar, avatarId,
     gateOn: fixedStep === 'create' || fixedStep === 'power' ? false : true,
     visited: r['visited'] === true,
     plot: r['plot'] !== undefined ? loadPlot(r['plot']) : migrate(r),
   };
 }
 
-/** You made your human: next, turn on the gate. */
-export function created(s: PlayState, avatarId: string): PlayState {
-  return { ...s, avatarId, step: s.step === 'create' ? 'power' : s.step };
+/** You made your avatar: next, turn on the gate. */
+export function created(s: PlayState, avatar: PlayAvatar | string): PlayState {
+  const av: PlayAvatar = typeof avatar === 'string'
+    ? { kind: 'scientist', name: 'Scientist', visor: '#f59e0b' }
+    : avatar;
+  const avatarId = av.kind === 'scientist' ? 'scientist' : av.key;
+  return { ...s, avatar: av, avatarId, step: s.step === 'create' ? 'power' : s.step };
 }
 /** The main lever is thrown and the gate is on: next, step through and look around. */
 export function poweredOn(s: PlayState): PlayState {

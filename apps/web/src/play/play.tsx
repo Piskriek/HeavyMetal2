@@ -12,7 +12,7 @@ import { tierFor } from '../crafter/crafter';
 import { bakeLookCached } from '../crafter/looks';
 import type { Plot } from '../crafter/planet';
 import { SMOOTH_IDS, smoothModel } from '../crafter/smooth-models';
-import { CreateGoblin } from '../avatar/create-goblin';
+import { CreateScientist } from '../avatar/create-scientist';
 import { createPlayScene, type Detail, type FrameOut, type PlayScene } from './play-scene';
 import { canPlace, KINDS, level, METRICS, network, place, rates, remove as removeMachine, running, setCartridge, setOn, step as stepPlot, type Env, type MachineKind, type Metric, type PlotState } from '@hm/plotsim';
 import { fx } from '../maker/feedback';
@@ -336,8 +336,8 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
 
       {ready && creating ? (
         <div className="play-create">
-          <CreateGoblin inLab kind="human" voice="setmix" title="Who are you?" doneLabel="Done: into the lab"
-            onDone={(look) => { commit(created(stateRef.current, look.id)); say('Turn on the gate', 'The console with the big lever stands in front of it.'); }}
+          <CreateScientist inLab title="Who are you?" doneLabel="Done: into the lab"
+            onDone={(avatar) => { commit(created(stateRef.current, avatar)); say('Turn on the gate', 'The console with the big lever stands in front of it.'); }}
             onBack={props.onBack} />
         </div>
       ) : null}

@@ -17,8 +17,8 @@ export interface KeyValueBackend {
   remove(key: string): Promise<void>;
 }
 
-/** The keys that belong in the big store: every island's map, the island list, the racetrack. */
-export const isBigKey = (key: string): boolean => key.startsWith('hm.island.') || key === 'hm.islands.v1' || key.startsWith('hm.racing.map.');
+/** The keys that belong in the big store: every island's map, the island list, the racetrack, and custom avatars. */
+export const isBigKey = (key: string): boolean => key.startsWith('hm.island.') || key === 'hm.islands.v1' || key.startsWith('hm.racing.map.') || key.startsWith('hm.avatar.custom.');
 
 export class BigStore {
   private readonly data = new Map<string, string>();

@@ -11,7 +11,7 @@ import { createWorld, PLANET_DIR, SUN, type Neighbour, type World } from '../cra
 import { createPlume, METRIC_COLOURS, type PlumeMode } from '@hm/plume';
 import { createPlotGround, type PlotGround } from './plot-ground';
 import { fx as sfx } from '../maker/feedback';
-import * as kit from './kit';
+import * as kit from '@hm/labkit';
 import { createLabRoom, GATE_AT, POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, ROOM, type LabRoom } from './lab-room';
 import { COLOUR_MARK_FRAGMENT, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_VERTEX, POST_FRAGMENT, QUAD_VERTEX } from './portal-shaders';
 import { CABLE_REACH, MACHINE_FIELD, placeCheck, stepSync, type PlacedMachine } from './quest';

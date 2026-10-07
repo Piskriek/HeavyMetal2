@@ -6,8 +6,8 @@
 import * as THREE from 'three';
 import { hash } from '../crafter/moon';
 import { floorTextures, panelTextures } from '../lab/lab-scene';
-import * as kit from './kit';
-import type { Box, Prop } from './kit';
+import * as kit from '@hm/labkit';
+import type { Box, Prop } from '@hm/labkit';
 
 export const ROOM = { left: -10, right: 10, back: -12, front: 4, height: 8 } as const;
 const WINDOW = { x0: -8.6, x1: -2.6, y0: 1.0, y1: 4.3 } as const;

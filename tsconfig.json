@@ -321,6 +321,9 @@
       "@hm/plume": [
         "packages/plume/src/index.ts"
       ],
+      "@hm/labkit": [
+        "packages/labkit/src/index.ts"
+      ],
       "@hm/fidelity": [
         "packages/fidelity/src/index.ts"
       ]

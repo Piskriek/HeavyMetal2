@@ -540,3 +540,5 @@ create a example of a all in one 3d/2d/anim/sound studio program where everythin
 - 2026-10-07 (laptop, planning session, Opus 5.5, with a screenshot of the Unreal Engine 5.8 start screen): let me know if i need to make a new project again (Answered: no new project; reopen SetMix_UE5 from My Projects when the bridge work starts (SM27). Python already runs in it. Unreal can stay closed until then.)
 
 - 2026-10-07 (laptop, planning session, Opus 5.5): the hill and the sky popped, can we have smooth transition or for it to move up once it hits the horizon orsomthing? (Done: the wave's front no longer stops at 170 m. It crosses your plot, then races on, faster and faster, over the plains and the neighbours to the horizon (about 11.6 s), then climbs the sky from the horizon to the zenith (3.2 s), its band of light with it; nothing pops.)
+
+- 2026-10-07 (laptop, planning session, Opus 5.5): Try again (Done: my last report had not come through; the labkit landing was verified (1 881 tests, e2e 166/166), committed and pushed, and the report resent.)

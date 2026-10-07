@@ -119,6 +119,7 @@ export default defineConfig(({ mode }) => ({
       '@hm/plotterrain': p('../../packages/plotterrain/src/index.ts'),
       '@hm/groundshader': p('../../packages/groundshader/src/index.ts'),
       '@hm/plume': p('../../packages/plume/src/index.ts'),
+      '@hm/labkit': p('../../packages/labkit/src/index.ts'),
     },
   },
   build: { target: 'es2022', outDir: 'dist', emptyOutDir: true },

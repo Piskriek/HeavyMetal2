@@ -82,6 +82,19 @@ The owner's yes, and answers to section 3.
 - **G1:** the owner approves the art and picks the machines from sheets 7 and 12. Then section 2 grows with those picks.
 - **Where it stands (2026-10-07):** the set is on branch `arena/601f7fc1-heavymetal2` (12 images, `contact-sheet.jpg`, a README with every prompt and a machine registry, the sheet-12 panels and the compose scripts). Reviewed by me image by image over four rounds; the review log and every follow-up are in `docs/prompts/arena-setmix-concept-art.md`. The last two fixes landed (10's planet composited from 11; 02's cables in slotted covers): the set is complete at `0cedf68b`. Waiting on the owner's G1: approve the set, pick the machines (sheet 07: 5 lab candidates; sheet 12: 8 planet candidates), and the README's open questions (does the drill give off a faint wisp of unrefined pixels or nothing; is the goblin in 05 at 0.4 of the opening fine).
 
+### Phase 2b: the first Play (owner, 2026-10-07): build now, through to polish
+The owner's words: in the lab you are a human (a goblin only in the Goblin Racing game, whose character creation happens on the goblin planet); character creation happens in the lab before the gate is first turned on; the gate comes on, but the planet is black-and-white dither and very pixelated; you lose sync if you stay too long, so the first quest is just to look around; the first machine you build and place pushes the fidelity to stage 1. "continue to impliment until polish is done".
+
+- **Play** opens the lab, first person, behind a loading bar. The concept art's goblin in the lab stands in for the human scientist.
+- **Character creation** in the lab: the avatar maker, human only. Your look is saved; the next Play skips it.
+- **Quest 1: turn on the gate.** Pull the console's main lever (E): the relays light in a row, power pulses along the floor covers, the coils light bottom to top, the lab lights dim, static resolves into the planet.
+- **Stage 0**: the planet in black-and-white ordered dither at a very low resolution, through the gate and when you walk through it. The gate is a two-sided window: walk through either way.
+- **Quest 2: step through and look around.** Sync drains while you are on the planet (about a minute); the picture glitches as it runs low; at zero you are pulled back to the lab. Coming back, by walking or by losing sync, ends the quest.
+- **Quest 3: build your first machine.** On the planet, the build menu (B) offers one machine, the texture mill (pink pixels: texture and colour, which stage 1 brings). Place it near the gate: a cable runs from the gate's junction box to it, it starts, pink pixels pour from its stack, and a wave sweeps out from it, lifting the plot from stage 0 to stage 1 (colour, still low-res).
+- **Progress is saved**: the next Play starts in the lab with the gate on and your plot as you left it.
+- **Code**: `apps/web/src/play/` (the screen, the quest logic with tests, the walk, the portal and the dither); the lab's props come from an Arena Battle (`@hm/labkit`, built to the concept art), with simple stand-ins until it lands.
+- **Decided by me, to change at the owner's word**: the first machine is the texture mill; sync lasts about 60 s at stage 0 and holds near a running machine from stage 1; the build menu is on the planet (Planet Crafter style), the first machine free.
+
 ### Phase 3: the code, by Arena Battle (briefs written from the approved art)
 Each brief is self-contained: the contract, tests, and a preview page. I run both answers' tests, check strict typecheck, vote and record the models in `arena-gathered/README.md`. The likely battles:
 

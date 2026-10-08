@@ -200,3 +200,6 @@
 
 ### [2026-10-08] Claude Opus
 > - Landed from Arena: `packages/presetcodec` (the Studio's share codes, S0). Package only; nothing to wire yet.
+
+### [2026-10-08] Claude Opus
+> - Landed from Arena: `packages/scenedoc` (the Studio's document, history and selection, S0). Package only; POL-21 logs its edit cost on big documents.

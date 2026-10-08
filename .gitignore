@@ -26,3 +26,7 @@ arena-out/
 
 # SetMix Arena zips and their extracted snapshots (the source is in arena-gathered/setmix)
 zips/
+
+# E2E test screenshots
+docs/shots/
+

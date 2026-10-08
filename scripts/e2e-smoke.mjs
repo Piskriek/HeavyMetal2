@@ -31,6 +31,10 @@ try {
   await page.addInitScript(() => { Element.prototype.requestPointerLock = function () { return Promise.reject(new Error('pointer lock is stubbed in tests')); }; });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message.slice(0, 200)));
+  const text = (sel, t) => page.locator(sel, { hasText: t }).first();
+  const shotDir = process.env.E2E_SHOTS;
+  const shot = async (name) => { if (shotDir) await page.screenshot({ path: `${shotDir}/${name}.png` }); };
+  const dom = (fn, arg) => page.evaluate(fn, arg); // software rendering starves the page: click through the DOM instead of waiting for Playwright stability checks
   await page.goto(`http://127.0.0.1:${port}/`);
   // the saves live in IndexedDB too (storage/big-store.ts): the delete waits for this page to close, then the reload starts clean
   await page.evaluate(() => { localStorage.clear(); indexedDB.deleteDatabase('hm-store'); });
@@ -42,11 +46,8 @@ try {
   // the home is the lab (STATUS SM11): the finished planet shows through its arch once its trees and looks are built
   await page.waitForFunction(() => window.hmLab && window.hmLab.ready && window.hmLab.frames > 5, null, { timeout: T(60000) });
   check('the home is the lab, with the finished planet through its arch', await page.locator('.lab-home.ready').count() === 1);
-
-  const text = (sel, t) => page.locator(sel, { hasText: t }).first();
-  const shotDir = process.env.E2E_SHOTS;
-  const shot = async (name) => { if (shotDir) await page.screenshot({ path: `${shotDir}/${name}.png` }); };
-  const dom = (fn, arg) => page.evaluate(fn, arg); // software rendering starves the page: click through the DOM instead of waiting for Playwright stability checks
+  check('the menu lab has the free-standing gate and no arch', await dom(() => window.hmLab.gate && !window.hmLab.arch));
+  await shot('menu-setmix');
   await text('.sm-menu button', 'Settings').click();
   check('settings opens', await page.locator('[aria-label="Settings"]').count() === 1);
   check('with graphics presets from Potato to Auto', await page.locator('.graphics-presets button').count() === 6);
@@ -60,6 +61,8 @@ try {
   // the Goblin Racing version of the same build (owner, 2026-10-06 20:30): Goblin Racing tops its menu, and only there
   await page.goto(`http://127.0.0.1:${port}/?edition=goblin-racing`);
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
+  await page.waitForFunction(() => window.hmLab && window.hmLab.ready && window.hmLab.frames > 5, null, { timeout: T(60000) });
+  await shot('menu-goblin-racing');
   check('the Goblin Racing version lists Goblin Racing first', JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Goblin Racing', 'Play', 'Studio', 'My planet', 'Avatars', 'Community', 'Settings']));
   // Goblin Racing: its menu entry opens its own menu; Race modes holds its sections; Esc steps back out to SetMix
   await dom(() => { [...document.querySelectorAll('.sm-menu button')].find((b) => b.querySelector('b')?.textContent === 'Goblin Racing')?.click(); });
@@ -751,6 +754,7 @@ try {
   const detail = await dom(() => ({ ...window.hmPlay.detail(), tier: window.hmPlay.tier, pouring: window.hmPlay.machines().pouring }));
   check('stage 1 is drawn about 240 lines tall, whatever the tier', detail.planet[1] >= 200 && detail.planet[1] <= 280, JSON.stringify(detail));
   const tierWay = detail.tier === 'potato' ? 'dither' : 'cubes';
+  check('the plume is drawn the way the tier asks, with as many pixels as it asks', detail.plumes === tierWay && detail.pixels === detail.pouring * Math.floor(220 * detail.plumeDensity + 1e-6), JSON.stringify(detail));
   await shot('play-stage-1');
   // teleport back into the lab with the gate on, standing ~2 m away from the planet table looking at it (-z)
   await dom(() => window.hmPlay.go('lab', -3.6, -3.0, 0, -0.32));

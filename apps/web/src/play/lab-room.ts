@@ -4,7 +4,6 @@
 // the main lever in front of the gate, the planet table centre-left, the preset rack on the left wall, the bench and the
 // combiner on the right. Cables run in floor covers and ceiling trays. Lab frame: x right, y up, z towards the start.
 import * as THREE from 'three';
-import { hash } from '../crafter/moon';
 import { floorTextures, panelTextures } from '../lab/lab-scene';
 import * as kit from '@hm/labkit';
 import type { Box, Prop } from '@hm/labkit';
@@ -51,46 +50,125 @@ export function powerAt(t: number): Power {
   };
 }
 
-/** A rainy pine mountainside at dusk, painted once (the view out of the lab's window: the scientist's own world). */
-function paintForest(w: number, h: number): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = w; c.height = h;
-  const g = c.getContext('2d')!;
-  const sky = g.createLinearGradient(0, 0, 0, h);
-  sky.addColorStop(0, '#3a4a5c'); sky.addColorStop(0.55, '#7e8e9a'); sky.addColorStop(1, '#5d6b70');
-  g.fillStyle = sky; g.fillRect(0, 0, w, h);
-  const rnd = (i: number, s: number) => hash(i, s, 77);
-  // ridges far to near: each paler with mist, pines along its crest
-  const layers = [
-    { y: 0.34, amp: 0.12, col: [104, 118, 128], pine: 0.018, haze: 0.55 },
-    { y: 0.46, amp: 0.1, col: [74, 88, 92], pine: 0.03, haze: 0.4 },
-    { y: 0.6, amp: 0.08, col: [44, 56, 54], pine: 0.05, haze: 0.22 },
-    { y: 0.78, amp: 0.05, col: [24, 32, 30], pine: 0.09, haze: 0.0 },
-  ];
-  layers.forEach((L, li) => {
-    const crest = (x: number) => h * (L.y - L.amp * (0.6 * Math.sin(x / w * 5.3 + li * 1.7) + 0.4 * Math.sin(x / w * 13.1 + li * 3.1)));
-    g.fillStyle = `rgb(${L.col.join(',')})`;
-    g.beginPath(); g.moveTo(0, h);
-    for (let x = 0; x <= w; x += 4) g.lineTo(x, crest(x));
-    g.lineTo(w, h); g.closePath(); g.fill();
-    // pines: narrow dark triangles standing on the crest and below it
-    const n = Math.round(w * L.pine);
-    for (let i = 0; i < n; i++) {
-      const x = rnd(i, li * 3 + 1) * w, base = crest(x) + rnd(i, li * 3 + 2) * h * 0.18, tall = h * (0.04 + 0.08 * (li + 1) / 4) * (0.6 + rnd(i, li * 3 + 3) * 0.7);
-      g.beginPath(); g.moveTo(x, base - tall); g.lineTo(x - tall * 0.18, base); g.lineTo(x + tall * 0.18, base); g.closePath(); g.fill();
+const WASTELAND_VERTEX = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const WASTELAND_FRAGMENT = /* glsl */ `
+  uniform float uTime;
+  varying vec2 vUv;
+
+  float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+  float noise(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i + vec2(0.0, 0.0)), hash(i + vec2(1.0, 0.0)), u.x),
+               mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+  }
+  float fbm(vec2 p) {
+    float v = 0.0, a = 0.5;
+    for (int i = 0; i < 4; i++) {
+      v += a * noise(p);
+      p = p * 2.04 + vec2(1.7, 2.3);
+      a *= 0.5;
     }
-    // mist rolling over the ridge
-    if (L.haze > 0) {
-      const mist = g.createLinearGradient(0, crest(w / 2) - h * 0.1, 0, crest(w / 2) + h * 0.15);
-      mist.addColorStop(0, 'rgba(150,165,175,0)'); mist.addColorStop(0.5, `rgba(150,165,175,${L.haze})`); mist.addColorStop(1, 'rgba(150,165,175,0)');
-      g.fillStyle = mist; g.fillRect(0, 0, w, h);
+    return v;
+  }
+
+  // 4x4 Bayer dither matrix
+  float bayer4(vec2 p) {
+    vec2 q = mod(floor(p), 4.0);
+    float i = q.x + q.y * 4.0;
+    float m = 0.0;
+    if (i < 0.5) m = 0.0; else if (i < 1.5) m = 8.0; else if (i < 2.5) m = 2.0; else if (i < 3.5) m = 10.0;
+    else if (i < 4.5) m = 12.0; else if (i < 5.5) m = 4.0; else if (i < 6.5) m = 14.0; else if (i < 7.5) m = 6.0;
+    else if (i < 8.5) m = 3.0; else if (i < 9.5) m = 11.0; else if (i < 10.5) m = 1.0; else if (i < 11.5) m = 9.0;
+    else if (i < 12.5) m = 15.0; else if (i < 13.5) m = 7.0; else if (i < 14.5) m = 13.0; else m = 5.0;
+    return (m + 0.5) / 16.0;
+  }
+
+  // Desolate barren Stage 0/1 planet: rock, dust, scree, craters, no vegetation
+  float evalWasteland(vec2 p) {
+    p = clamp(p, 0.0, 1.0);
+    // Hazy desolate sky with pale low sun
+    float sky = mix(0.18, 0.50, 1.0 - p.y);
+    float paleSun = smoothstep(0.16, 0.0, length(p - vec2(0.68, 0.74))) * 0.35;
+    float luma = sky + paleSun;
+
+    // Distant jagged barren mountain range
+    float crest1 = 0.54 + 0.11 * sin(p.x * 7.2) + 0.05 * cos(p.x * 16.8) + 0.03 * fbm(vec2(p.x * 14.0, 3.0));
+    if (p.y < crest1) {
+      float slope1 = 0.38 + 0.16 * fbm(vec2(p.x * 22.0, p.y * 28.0));
+      luma = slope1;
     }
-  });
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
-  return t;
-}
+
+    // Mid scree slope and crater rim
+    float crest2 = 0.40 + 0.07 * sin(p.x * 10.5 + 2.1) + 0.04 * cos(p.x * 23.0) + 0.025 * fbm(vec2(p.x * 20.0, 7.5));
+    if (p.y < crest2) {
+      float scree = 0.24 + 0.18 * fbm(vec2(p.x * 38.0, p.y * 48.0));
+      luma = scree;
+    }
+
+    // Near barren cracked ground and scree talus with boulders
+    float crest3 = 0.22 + 0.04 * sin(p.x * 14.0 + 3.8) + 0.02 * fbm(vec2(p.x * 32.0, 12.0));
+    if (p.y < crest3) {
+      float boulder = step(0.88, hash(floor(vec2(p.x * 80.0, p.y * 90.0)))) * 0.18;
+      float rock = 0.12 + 0.16 * fbm(vec2(p.x * 55.0, p.y * 65.0)) - boulder;
+      luma = max(0.04, rock);
+    }
+
+    return clamp(luma, 0.0, 1.0);
+  }
+
+  void main() {
+    vec2 uv = vUv;
+
+    // Scanlines that jitter sideways now and then (glitch band jumps)
+    float tGlitch = floor(uTime * 9.0);
+    float band = floor(uv.y * 38.0 + tGlitch * 6.0);
+    float glitchChance = step(0.86, fract(sin(band * 45.12 + tGlitch * 13.57) * 43758.5453));
+    float jitter = (fract(sin(band * 78.9) * 23456.7) - 0.5) * 0.10 * glitchChance;
+    float microJitter = (fract(sin(floor(uv.y * 220.0) + uTime * 50.0) * 43758.5453) - 0.5) * 0.004;
+    vec2 uvJitter = uv + vec2(jitter + microJitter, 0.0);
+
+    // Chromatic aberration that flares and settles (like sync loss in Stage 0)
+    float flarePulse = pow(max(0.0, sin(uTime * 1.1)), 10.0) * 0.035;
+    float flareSpike = step(0.93, fract(sin(floor(uTime * 3.8) * 67.89) * 43758.5453)) * 0.045;
+    float ca = 0.005 + flarePulse + flareSpike;
+
+    float lumaR = evalWasteland(uvJitter + vec2(ca, 0.0));
+    float lumaG = evalWasteland(uvJitter);
+    float lumaB = evalWasteland(uvJitter - vec2(ca, 0.0));
+
+    // Black-and-white CRT ordered dither (Bayer 4x4)
+    vec2 ditherPos = gl_FragCoord.xy * 0.5;
+    float threshold = bayer4(ditherPos);
+
+    float bitR = step(threshold, lumaR);
+    float bitG = step(threshold, lumaG);
+    float bitB = step(threshold, lumaB);
+
+    // CRT scanlines
+    float scanline = 0.86 + 0.14 * sin(gl_FragCoord.y * 1.57);
+    vec3 rgb = vec3(bitR, bitG, bitB) * scanline;
+
+    // CRT phosphor darks and brights
+    vec3 dark = vec3(0.015, 0.018, 0.022);
+    vec3 bright = vec3(0.82, 0.86, 0.88);
+    vec3 col = mix(dark, bright, rgb);
+
+    // Static noise burst during flares
+    float staticNoise = hash(floor(gl_FragCoord.xy * 0.5) + floor(uTime * 30.0));
+    col = mix(col, vec3(staticNoise), clamp((flarePulse + flareSpike) * 4.0, 0.0, 0.45));
+
+    gl_FragColor = vec4(col, 1.0);
+    #include <colorspace_fragment>
+  }
+`;
 
 const RAIN_VERTEX = /* glsl */ `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
 const RAIN_FRAGMENT = /* glsl */ `
@@ -161,8 +239,9 @@ export function createLabRoom(o: { readonly textureSize: number; readonly portal
   for (const [x, y, w, h] of [[wx, WINDOW.y0 - 0.06, ww + 0.24, 0.12], [wx, WINDOW.y1 + 0.06, ww + 0.24, 0.12], [WINDOW.x0 - 0.06, wy, 0.12, wh], [WINDOW.x1 + 0.06, wy, 0.12, wh], [wx - ww / 6, wy, 0.07, wh], [wx + ww / 6, wy, 0.07, wh]] as const) {
     add(new THREE.BoxGeometry(w, h, 0.3), m.gunmetal, (f) => { f.position.set(x, y, ROOM.back); });
   }
-  const forest = keep(paintForest(2048, 896));
-  add(new THREE.PlaneGeometry(46, 20), keep(new THREE.MeshBasicMaterial({ map: forest, toneMapped: false })), (p) => { p.position.set(wx, wy + 1.5, ROOM.back - 16); });
+  const wastelandUniforms = { uTime: { value: 0 } };
+  const wastelandMat = keep(new THREE.ShaderMaterial({ vertexShader: WASTELAND_VERTEX, fragmentShader: WASTELAND_FRAGMENT, uniforms: wastelandUniforms, toneMapped: false }));
+  add(new THREE.PlaneGeometry(46, 20), wastelandMat, (p) => { p.position.set(wx, wy + 1.5, ROOM.back - 14); });
   const rainUniforms = { uTime: { value: 0 } };
   add(new THREE.PlaneGeometry(ww, wh), keep(new THREE.ShaderMaterial({ vertexShader: RAIN_VERTEX, fragmentShader: RAIN_FRAGMENT, uniforms: rainUniforms, transparent: true, depthWrite: false })), (p) => { p.position.set(wx, wy, ROOM.back - 0.05); });
   add(new THREE.PlaneGeometry(ww, wh), m.glass, (p) => { p.position.set(wx, wy, ROOM.back + 0.02); });
@@ -272,7 +351,7 @@ export function createLabRoom(o: { readonly textureSize: number; readonly portal
     lever: desk.lever,
     spawn: { x: -1.2, z: 1.8, yaw: 0.22 },
     setPower,
-    update(now) { rainUniforms.uTime.value = now; pulseUniforms.uTime.value = now; },
+    update(now) { rainUniforms.uTime.value = now; pulseUniforms.uTime.value = now; wastelandUniforms.uTime.value = now; },
     dispose() {
       for (const x of owned) x.dispose();
       group.traverse((o) => { const mesh = o as THREE.Mesh; if (mesh.isMesh) { mesh.geometry.dispose(); } });

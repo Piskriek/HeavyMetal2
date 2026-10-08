@@ -1,48 +1,26 @@
-// The SetMix home's 3D view: a lab (white test-chamber panels, a steel band, a concrete floor, cold strip lights) with an
-// archway on the right that opens onto the planet as it will look once everyone has terraformed it. The menu sits over
-// the lab's left side.
-// Two scenes share one camera: the lab draws first and fills the depth buffer, so the planet shows only through the arch,
-// and neither scene's lights reach into the other. Daylight comes in through the arch as a patch on the floor (drawn, not
-// lit: there are no shadow maps on the minimum spec) and a warm lamp standing in for its bounce.
+// The SetMix and Goblin Racing home's 3D backdrop (POL-01, 03-menu-lab.md):
+// Unified with Play's lab room (createLabRoom) with the free-standing gate, illuminated coils,
+// active planet table amber hologram, and the desolate glitching Stage 0/1 wasteland in the window.
+// Through the free-standing gate, the edition-specific vista is shown:
+// - SetMix: the lush sunlit terraformed planet (docs/concept/setmix/04-menu-setmix.png)
+// - Goblin Racing: the goblin planet in deep space (docs/concept/setmix/05-menu-goblin-racing.png)
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import type { StageLook } from '../crafter/looks';
-import { hash } from '../crafter/moon';
-import { drop, planetHeight } from '../crafter/planet';
+import { createLabRoom, GATE_AT, POWER_ON, type LabRoom } from '../play/lab-room';
+import { createPlotHolo, type PlotHolo } from '../play/plot-holo';
+import type { PlotGround } from '../play/plot-ground';
+import type { PlotState } from '@hm/plotsim';
 import { smoothModel } from '../crafter/smooth-models';
-import { createCreatures, type Creatures } from '../crafter/creatures';
-import { createWorld, type Neighbour, type World } from '../crafter/world';
+import { EDITION } from '../edition';
+import type { StageLook } from '../crafter/looks';
+import type { Neighbour } from '../crafter/world';
+import { hash } from '../crafter/moon';
 
-/** Where the lab stands on the planet (just off your plot) and which way its arch looks: over your plot's centre, towards the goblin planet. */
 export const LAB_AT = { x: 86, z: 30 } as const;
-const OUT = new THREE.Vector2(-0.944, -0.33).normalize();
-/** The vista's sun: 45 degrees to the right of the arch's view and 26 up, so its light falls in through the arch. */
-const VISTA_SUN = (() => {
-  const right = new THREE.Vector2(-OUT.y, OUT.x), a = Math.PI / 4, up = 0.45;
-  const xz = OUT.clone().multiplyScalar(Math.cos(a)).add(right.multiplyScalar(Math.sin(a))).normalize();
-  return new THREE.Vector3(xz.x * Math.cos(up), Math.sin(up), xz.y * Math.cos(up)).normalize();
-})();
-/** The goblin planet, low in the arch. */
-const VISTA_PLANET = new THREE.Vector3(OUT.x * Math.cos(0.1), Math.sin(0.1), OUT.y * Math.cos(0.1)).normalize();
 
-// the room, in the lab's own frame: x right, y up, z towards the camera; the arch is in the back wall, right of centre
-const ROOM = { left: -8, right: 8, back: -14, front: 3, height: 8 } as const;
-const ARCH = { x: 2.8, half: 2.6, spring: 4.4 } as const;
-const EYE = new THREE.Vector3(-2.2, 1.7, 0.8), LOOK = new THREE.Vector3(-0.9, 3.1, -14);
-/** On a tall screen the menu takes the top: the eye stands back and aims at the arch, which sits below it. */
-const EYE_TALL = new THREE.Vector3(0.9, 1.5, 2.7), LOOK_TALL = new THREE.Vector3(2.7, 9.4, -14);
-/** One panel texture covers 4 x 4 panels of 1.28 m. */
-const PANEL_TILE = 5.12, FLOOR_TILE = 4;
-
-/** The arch's outline (x, y) in the back wall: up the left side, over the round top, down the right. */
-function archOutline(half: number, from = 0, steps = 24): THREE.Vector2[] {
-  const pts = [new THREE.Vector2(ARCH.x - half, from), new THREE.Vector2(ARCH.x - half, ARCH.spring)];
-  for (let i = 1; i < steps; i++) { const a = Math.PI - (i / steps) * Math.PI; pts.push(new THREE.Vector2(ARCH.x + Math.cos(a) * half, ARCH.spring + Math.sin(a) * half)); }
-  pts.push(new THREE.Vector2(ARCH.x + half, ARCH.spring), new THREE.Vector2(ARCH.x + half, from));
-  return pts;
-}
-
-const smoothstep = (a: number, b: number, x: number): number => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const smoothstep = (a: number, b: number, x: number): number => {
+  const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
 
 /** Albedo, roughness and normal textures from a height function over a tile (h 0 in seams .. 1 on faces), drawn once. */
 export function surfaceTextures(size: number, at: (px: number, py: number) => { h: number; colour: [number, number, number]; rough: number }, bump: number) {
@@ -51,7 +29,7 @@ export function surfaceTextures(size: number, at: (px: number, py: number) => { 
     const s = at(x, y), k = (y * size + x) * 4;
     height[y * size + x] = s.h;
     albedo[k] = s.colour[0] * 255; albedo[k + 1] = s.colour[1] * 255; albedo[k + 2] = s.colour[2] * 255; albedo[k + 3] = 255;
-    rough[k] = 255; rough[k + 1] = s.rough * 255; rough[k + 2] = 255; rough[k + 3] = 255; // three reads roughness from green
+    rough[k] = 255; rough[k + 1] = s.rough * 255; rough[k + 2] = 255; rough[k + 3] = 255;
   }
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     const h = (xx: number, yy: number) => height[((yy + size) % size) * size + ((xx + size) % size)]!;
@@ -69,13 +47,12 @@ export function surfaceTextures(size: number, at: (px: number, py: number) => { 
   return { map: tex(albedo, true), roughnessMap: tex(rough, false), normalMap: tex(normal, false) };
 }
 
-/** Test-chamber wall panels: cool white squares with dark seams and a soft bevel, a few a shade off from their neighbours. */
+/** Test-chamber wall panels: cool white squares with dark seams and a soft bevel. */
 export function panelTextures(size: number) {
   const cell = size / 4;
   return surfaceTextures(size, (px, py) => {
     const lx = px % cell, ly = py % cell, edge = Math.min(lx, ly, cell - 1 - lx, cell - 1 - ly);
     const ix = Math.floor(px / cell), iy = Math.floor(py / cell), tint = 0.93 + hash(ix, iy, 3) * 0.07;
-    // grime gathers low on a panel and in its corners
     const grime = 1 - 0.05 * (ly / cell) - 0.04 * (1 - smoothstep(0, cell * 0.25, edge));
     const seam = edge < 1.5;
     const c = seam ? 0.13 : tint * grime;
@@ -83,7 +60,7 @@ export function panelTextures(size: number) {
   }, 2.2);
 }
 
-/** Concrete floor tiles: mottled grey, darker seams, a little polish so the strip lights and the daylight show in it. */
+/** Concrete floor tiles: mottled grey, darker seams. */
 export function floorTextures(size: number) {
   const cell = size / 2;
   const noise = (x: number, y: number, s: number, seed: number) => {
@@ -99,171 +76,244 @@ export function floorTextures(size: number) {
   }, 1.4);
 }
 
+const PORTAL_VERTEX = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const PORTAL_FRAGMENT = /* glsl */ `
+  uniform float uTime;
+  uniform float uIsGoblin;
+  varying vec2 vUv;
+
+  float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+  float noise(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i + vec2(0.0, 0.0)), hash(i + vec2(1.0, 0.0)), u.x),
+               mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+  }
+  float fbm(vec2 p) {
+    float v = 0.0, a = 0.5;
+    for (int i = 0; i < 4; i++) {
+      v += a * noise(p);
+      p = p * 2.04 + vec2(1.5, 2.1);
+      a *= 0.5;
+    }
+    return v;
+  }
+
+  vec3 renderGoblinPlanet(vec2 uv) {
+    // Deep space with stars
+    vec2 spaceCoord = uv * 90.0;
+    float star = step(0.985, hash(floor(spaceCoord))) * (0.6 + 0.4 * sin(uTime * 3.0 + hash(floor(spaceCoord)) * 6.28));
+    vec3 bg = vec3(0.005, 0.008, 0.02) + vec3(star * 0.9, star * 0.95, star * 1.0);
+
+    // Goblin planet sphere
+    vec2 pc = uv - vec2(0.5, 0.52);
+    float r = length(pc);
+    float R = 0.41;
+    if (r > R) {
+      float glow = smoothstep(R + 0.08, R, r) * 0.55;
+      return bg + vec3(0.15, 0.55, 0.95) * glow;
+    }
+
+    float z = sqrt(max(0.0, R * R - r * r));
+    vec3 normal = normalize(vec3(pc.x, pc.y, z));
+    vec3 sunDir = normalize(vec3(-0.7, 0.6, 0.8));
+    float diff = max(0.0, dot(normal, sunDir));
+
+    vec2 sphUv = vec2(atan(normal.x, normal.z) / 3.14159 * 0.5 + 0.5 + uTime * 0.012, normal.y * 0.5 + 0.5);
+    float continent = fbm(sphUv * 6.0);
+    float isLand = smoothstep(0.46, 0.52, continent);
+
+    vec3 ocean = vec3(0.05, 0.28, 0.65);
+    vec3 land = mix(vec3(0.2, 0.55, 0.22), vec3(0.7, 0.52, 0.25), fbm(sphUv * 12.0));
+    vec3 surface = mix(ocean, land, isLand);
+
+    float clouds = fbm(sphUv * 9.0 + vec2(uTime * 0.018, 0.0));
+    float cloudMask = smoothstep(0.52, 0.68, clouds);
+    surface = mix(surface, vec3(0.95, 0.98, 1.0), cloudMask * 0.85);
+
+    float fresnel = pow(1.0 - normal.z, 2.5);
+    vec3 atmo = vec3(0.2, 0.65, 1.0) * fresnel * 0.9;
+
+    return surface * (diff * 0.9 + 0.15) + atmo;
+  }
+
+  vec3 renderSetmixVista(vec2 uv) {
+    float sunDist = length(uv - vec2(0.55, 0.78));
+    float sunGlow = smoothstep(0.45, 0.0, sunDist) * 0.85;
+    vec3 sky = mix(vec3(0.85, 0.88, 0.75), vec3(0.45, 0.65, 0.88), uv.y);
+    sky += vec3(1.0, 0.82, 0.45) * sunGlow;
+
+    float crest1 = 0.58 + 0.10 * sin(uv.x * 5.5) + 0.05 * cos(uv.x * 12.0) + 0.03 * fbm(vec2(uv.x * 10.0, 2.0));
+    vec3 col = sky;
+    if (uv.y < crest1) {
+      vec3 mtn = mix(vec3(0.35, 0.45, 0.48), vec3(0.65, 0.72, 0.60), fbm(vec2(uv.x * 18.0, uv.y * 22.0)));
+      col = mix(mtn, sky, 0.35);
+    }
+
+    float crest2 = 0.42 + 0.08 * sin(uv.x * 8.5 + 1.2) + 0.04 * cos(uv.x * 19.0);
+    if (uv.y < crest2) {
+      vec3 forest = mix(vec3(0.12, 0.32, 0.18), vec3(0.22, 0.48, 0.25), fbm(vec2(uv.x * 30.0, uv.y * 35.0)));
+      col = forest;
+    }
+
+    float crest3 = 0.22 + 0.04 * sin(uv.x * 11.0 + 3.0);
+    if (uv.y < crest3) {
+      float isWater = smoothstep(0.48, 0.52, fbm(vec2(uv.x * 15.0, uv.y * 20.0)));
+      vec3 grass = vec3(0.18, 0.45, 0.15);
+      vec3 water = mix(vec3(0.15, 0.4, 0.5), vec3(0.9, 0.85, 0.6), sunGlow);
+      col = mix(grass, water, isWater);
+    }
+
+    float rays = max(0.0, sin(atan(uv.y - 0.78, uv.x - 0.55) * 8.0 + uTime * 0.2)) * 0.12;
+    col += vec3(1.0, 0.9, 0.6) * rays;
+
+    return col;
+  }
+
+  void main() {
+    vec3 c = uIsGoblin > 0.5 ? renderGoblinPlanet(vUv) : renderSetmixVista(vUv);
+    gl_FragColor = vec4(c, 1.0);
+    #include <colorspace_fragment>
+  }
+`;
+
 export interface LabScene {
-  /** Puts the finished planet outside the arch (once, after its looks and models are ready). */
+  /** Configures or enriches the gate vista */
   setVista(base: StageLook, plot: StageLook, neighbours: readonly Neighbour[]): void;
   frame(now: number, dt: number): void;
-  /** What the last frame drew (for the test hook). */
+  /** What the last frame drew (for test hooks) */
   stats(): { readonly triangles: number; readonly calls: number };
   resize(width: number, height: number, pixelRatio: number): void;
-  /** Where the pointer is, -1..1 across the screen: the eye leans a little towards it. */
+  /** Where the pointer is, -1..1 across screen: the eye leans towards it */
   lean(x: number, y: number): void;
   dispose(): void;
 }
 
-export function createLabScene(o: { readonly canvas: HTMLCanvasElement; readonly gridSpacing: number; readonly antialias: boolean; readonly powerPreference: WebGLPowerPreference; readonly reducedMotion: boolean; readonly textureSize: number }): LabScene {
+export function createLabScene(o: {
+  readonly canvas: HTMLCanvasElement;
+  readonly gridSpacing: number;
+  readonly antialias: boolean;
+  readonly powerPreference: WebGLPowerPreference;
+  readonly reducedMotion: boolean;
+  readonly textureSize: number;
+}): LabScene {
   const renderer = new THREE.WebGLRenderer({ canvas: o.canvas, antialias: o.antialias, powerPreference: o.powerPreference });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.autoClear = false;
   renderer.setClearColor(0x000000, 1);
-  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 9000);
+
   const owned: { dispose(): void }[] = [];
   const keep = <T extends { dispose(): void }>(x: T): T => { owned.push(x); return x; };
 
-  // ---- the lab stands on the planet, its floor above the highest ground under it
-  const lab = new THREE.Scene();
-  const room = new THREE.Group();
-  const toEye = new THREE.Vector2(ARCH.x - EYE.x, ROOM.back - EYE.z);
-  room.rotation.y = Math.atan2(toEye.y, toEye.x) - Math.atan2(OUT.y, OUT.x);
-  room.updateMatrix();
-  let floorY = -Infinity;
-  for (let x = ROOM.left; x <= ROOM.right; x += 2) for (let z = ROOM.back - 3; z <= ROOM.front; z += 2) {
-    const w = new THREE.Vector3(x, 0, z).applyMatrix4(room.matrix).add(new THREE.Vector3(LAB_AT.x, 0, LAB_AT.z));
-    floorY = Math.max(floorY, planetHeight(w.x, w.z) - drop(w.x, w.z));
-  }
-  // raised a few metres, so the arch looks down over the plains
-  room.position.set(LAB_AT.x, floorY + 5, LAB_AT.z);
-  room.updateMatrixWorld(true);
-  lab.add(room);
-  const pmrem = keep(new THREE.PMREMGenerator(renderer));
-  const room0 = new RoomEnvironment();
-  const env = keep(pmrem.fromScene(room0, 0.04).texture);
-  room0.dispose();
-  lab.environment = env;
-  lab.environmentIntensity = 0.24;
+  const isGoblin = EDITION === 'goblin-racing' ? 1.0 : 0.0;
+  const portalUniforms = { uTime: { value: 0 }, uIsGoblin: { value: isGoblin } };
+  const portalMat = keep(new THREE.ShaderMaterial({
+    vertexShader: PORTAL_VERTEX,
+    fragmentShader: PORTAL_FRAGMENT,
+    uniforms: portalUniforms,
+    side: THREE.DoubleSide,
+  }));
 
-  const panels = panelTextures(o.textureSize), floorTex = floorTextures(o.textureSize);
-  for (const t of [panels.map, panels.roughnessMap, panels.normalMap]) { keep(t); t.repeat.set(1 / PANEL_TILE, 1 / PANEL_TILE); }
-  for (const t of [floorTex.map, floorTex.roughnessMap, floorTex.normalMap]) { keep(t); t.repeat.set(1 / FLOOR_TILE, 1 / FLOOR_TILE); }
-  const wallMat = keep(new THREE.MeshStandardMaterial({ ...panels, normalScale: new THREE.Vector2(0.6, 0.6), metalness: 0 }));
-  const floorMat = keep(new THREE.MeshStandardMaterial({ ...floorTex, normalScale: new THREE.Vector2(0.5, 0.5), metalness: 0 }));
-  const steel = keep(new THREE.MeshStandardMaterial({ color: '#2a2f34', roughness: 0.42, metalness: 0.75 }));
-  const ceilingMat = keep(new THREE.MeshStandardMaterial({ color: '#1f2327', roughness: 0.85, metalness: 0.2 }));
-  const glow = keep(new THREE.MeshBasicMaterial({ color: '#eef8ff' }));
-  const trim = keep(new THREE.MeshBasicMaterial({ color: '#9ff1ff' }));
+  const labScene = new THREE.Scene();
+  const room: LabRoom = createLabRoom({ textureSize: o.textureSize, portalMaterial: portalMat });
+  labScene.add(room.group);
+  room.setPower(POWER_ON);
+  room.lever.rotation.x = -1.1;
 
-  /** A flat shape as geometry, its UVs in metres (so every wall's panels line up at the same size). */
-  const flat = (shape: THREE.Shape): THREE.ShapeGeometry => keep(new THREE.ShapeGeometry(shape, 24));
-  const rect = (x0: number, y0: number, x1: number, y1: number): THREE.Shape => new THREE.Shape([new THREE.Vector2(x0, y0), new THREE.Vector2(x1, y0), new THREE.Vector2(x1, y1), new THREE.Vector2(x0, y1)]);
-  const add = (g: THREE.BufferGeometry, m: THREE.Material, f: (mesh: THREE.Mesh) => void = () => undefined): THREE.Mesh => { const mesh = new THREE.Mesh(g, m); f(mesh); room.add(mesh); return mesh; };
+  // ---- Amber hologram planet table in the menu
+  const holo: PlotHolo = createPlotHolo();
+  room.group.add(holo.group);
+  holo.group.position.set(-3.6, 0, -5.2);
+  const mockGround = {
+    heightAt: (x: number, z: number) => 15 + 4 * Math.sin(x * 0.015) + 3 * Math.cos(z * 0.015),
+  } as unknown as PlotGround;
+  holo.build(mockGround, { x: 0, z: 0 });
 
-  // back wall, with the arch cut through it (the wall starts below the floor, so the arch's foot is not on its edge)
-  const back = rect(ROOM.left, -0.2, ROOM.right, ROOM.height);
-  back.holes.push(new THREE.Path(archOutline(ARCH.half)));
-  add(flat(back), wallMat, (m) => { m.position.z = ROOM.back; });
-  const depth = ROOM.front - ROOM.back;
-  add(flat(rect(0, 0, depth, ROOM.height)), wallMat, (m) => { m.rotation.y = Math.PI / 2; m.position.set(ROOM.left, 0, ROOM.front); });
-  add(flat(rect(0, 0, depth, ROOM.height)), wallMat, (m) => { m.rotation.y = -Math.PI / 2; m.position.set(ROOM.right, 0, ROOM.back); });
-  // the floor runs on out through the arch: a threshold to stand on above the planet
-  add(flat(rect(ROOM.left, -ROOM.front, ROOM.right, -(ROOM.back - 3.5))), floorMat, (m) => { m.rotation.x = -Math.PI / 2; });
-  add(flat(rect(ROOM.left, ROOM.back, ROOM.right, ROOM.front)), ceilingMat, (m) => { m.rotation.x = Math.PI / 2; m.position.y = ROOM.height; });
-  // the threshold's front edge and the lab's outer skin round the arch (seen from outside the lab only edge-on)
-  add(keep(new THREE.BoxGeometry(ARCH.half * 2 + 1.4, 0.6, 0.25)), steel, (m) => { m.position.set(ARCH.x, -0.3, ROOM.back - 3.5); });
+  const demoPlot = {
+    machines: [
+      { id: 1, kind: 'mill' as const, x: 25, z: 15, yaw: 0, on: true, cartridge: null, built: 0 },
+      { id: 2, kind: 'drill' as const, x: -30, z: 20, yaw: 0, on: true, cartridge: null, built: 0 },
+      { id: 3, kind: 'press' as const, x: 40, z: -25, yaw: 0, on: true, cartridge: null, built: 0 },
+    ],
+  } as unknown as PlotState;
+  holo.setPlot(demoPlot, new Map([[1, 1], [2, 1], [3, 1]]), new Set([1, 2, 3]));
 
-  // the steel band along the foot of the walls
-  const band = (x0: number, x1: number, z0: number, z1: number) => add(keep(new THREE.BoxGeometry(Math.max(0.12, x1 - x0), 1.05, Math.max(0.12, z1 - z0))), steel, (m) => { m.position.set((x0 + x1) / 2, 0.525, (z0 + z1) / 2); });
-  band(ROOM.left, ROOM.left + 0.12, ROOM.back, ROOM.front);
-  band(ROOM.right - 0.12, ROOM.right, ROOM.back, ROOM.front);
-  band(ROOM.left, ARCH.x - ARCH.half - 0.5, ROOM.back, ROOM.back + 0.12);
-  band(ARCH.x + ARCH.half + 0.5, ROOM.right, ROOM.back, ROOM.back + 0.12);
+  // ---- Goblin character looking through the gate threshold
+  const goblinGeo = smoothModel('goblin').near;
+  const goblinMat = keep(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0 }));
+  const goblin = new THREE.Mesh(goblinGeo, goblinMat);
+  goblin.position.set(GATE_AT.x - 0.7, 0.12, GATE_AT.z + 1.3);
+  goblin.rotation.y = Math.PI - 0.4;
+  goblin.scale.setScalar(0.9);
+  room.group.add(goblin);
 
-  // the arch: a deep steel frame with a cold light strip round its inner edge
-  const frame = new THREE.Shape(archOutline(ARCH.half + 0.5, -0.05));
-  frame.holes.push(new THREE.Path(archOutline(ARCH.half, 0.02)));
-  add(keep(new THREE.ExtrudeGeometry(frame, { depth: 0.9, bevelEnabled: false, curveSegments: 24 })), steel, (m) => { m.position.z = ROOM.back - 0.3; });
-  const strip = new THREE.Shape(archOutline(ARCH.half + 0.02, 0.0));
-  strip.holes.push(new THREE.Path(archOutline(ARCH.half - 0.07, 0.04)));
-  add(keep(new THREE.ExtrudeGeometry(strip, { depth: 0.04, bevelEnabled: false, curveSegments: 24 })), trim, (m) => { m.position.z = ROOM.back + 0.6; });
+  // ---- Camera framing from concept art 04 and 05
+  // Left third calm for menu overlay; planet table center; free-standing gate right
+  const EYE = new THREE.Vector3(-1.6, 2.1, 2.4);
+  const LOOK = new THREE.Vector3(1.1, 2.1, -7.8);
+  const EYE_TALL = new THREE.Vector3(-0.6, 2.5, 3.8);
+  const LOOK_TALL = new THREE.Vector3(1.5, 2.2, -7.0);
 
-  // the ceiling's light strips, and the light they give
-  for (const x of [-5, -1, 3]) add(keep(new THREE.BoxGeometry(0.28, 0.06, depth - 3)), glow, (m) => { m.position.set(x, ROOM.height - 0.04, (ROOM.back + ROOM.front) / 2); });
-  // one lamp stands in for all three strips (each light costs every pixel of the room)
-  const lamp = new THREE.PointLight('#e6f2ff', 13, 0, 2);
-  lamp.position.set(-1, ROOM.height - 0.6, -5.5);
-  room.add(lamp);
-  // the room is dim: the brightest thing in it is the arch
-  room.add(new THREE.HemisphereLight('#dfe8f0', '#2f3438', 0.32));
-
-  // ---- daylight through the arch: where it lands on the floor, and a lamp standing in for its bounce
-  const inward = VISTA_SUN.clone().negate().applyQuaternion(room.quaternion.clone().invert());
-  const outline = archOutline(ARCH.half, 0, 16).map((p) => new THREE.Vector3(p.x, p.y, ROOM.back));
-  const onFloor = outline.map((p) => p.clone().addScaledVector(inward, p.y / -inward.y));
-  const patch = new THREE.Shape(onFloor.map((p) => new THREE.Vector2(p.x, -p.z)));
-  add(keep(new THREE.ShapeGeometry(patch)), keep(new THREE.MeshBasicMaterial({ color: '#ffe9c8', transparent: true, opacity: 0.26, blending: THREE.AdditiveBlending, depthWrite: false })), (m) => { m.rotation.x = -Math.PI / 2; m.position.y = 0.01; });
-  // daylight bouncing in off the floor by the arch: warm, strongest near it
-  const bounce = new THREE.PointLight('#ffe2bd', 60, 0, 2);
-  bounce.position.set(ARCH.x - 1, 1.2, ROOM.back + 3.5);
-  room.add(bounce);
-
-  // ---- the planet outside
-  const outside = new THREE.Scene();
-  let world: World | null = null, animals: Creatures | null = null;
-  const eye = new THREE.Vector3(), look = new THREE.Vector3(), leanTo = new THREE.Vector2(), leanNow = new THREE.Vector2();
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+  const eye = new THREE.Vector3(), look = new THREE.Vector3();
+  const leanTo = new THREE.Vector2(), leanNow = new THREE.Vector2();
   let tall = false;
 
   return {
-    setVista(base, plot, neighbours) {
-      if (world) return;
-      world = createWorld(outside, { gridSpacing: o.gridSpacing, reducedMotion: o.reducedMotion, sun: VISTA_SUN, planetDir: VISTA_PLANET });
-      // only the arch's view is ever seen: what lies outside it is not built
-      world.setPlanet(base, neighbours, { lush: true, clear: { x: LAB_AT.x, z: LAB_AT.z, r: 40 }, view: { x: LAB_AT.x, z: LAB_AT.z, dirX: OUT.x, dirZ: OUT.y, halfAngle: 0.5 } });
-      world.show(plot);
-      // animals in the meadow between the lab and your plot's lake, in the arch's view
-      const right = new THREE.Vector2(-OUT.y, OUT.x);
-      const at = (out: number, side: number) => ({ x: LAB_AT.x + OUT.x * out + right.x * side, z: LAB_AT.z + OUT.y * out + right.y * side });
-      animals = createCreatures(outside, [
-        { id: 'MOON_STRIDER', ...at(56, -5), count: 9, roam: 14 },
-        { id: 'CRYSTAL_TORTOISE', ...at(72, 12), count: 3, roam: 8 },
-        { id: 'SKY_MANTA', ...at(120, 0), count: 3, roam: 45 },
-      ], (x, z) => planetHeight(x, z) - drop(x, z), o.reducedMotion);
-      // a goblin on the threshold, looking out at it
-      const goblin = new THREE.Mesh(smoothModel('goblin').near, keep(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0 })));
-      goblin.position.set(ARCH.x - 0.7, 0, ROOM.back - 0.9);
-      goblin.rotation.y = 0.45;
-      goblin.scale.setScalar(1.15);
-      room.add(goblin);
+    setVista() {
+      // Menu vista is driven cleanly by procedural portal shader
     },
-    lean(x, y) { leanTo.set(x, y); },
+
+    lean(x, y) {
+      leanTo.set(x, y);
+    },
+
     stats: () => ({ triangles: renderer.info.render.triangles, calls: renderer.info.render.calls }),
+
     frame(now, dt) {
-      // the eye breathes a little and leans towards the pointer; it never moves far (the menu stays over the same wall)
       const k = Math.min(1, dt * 2.5);
       leanNow.lerp(leanTo, k);
       const sway = o.reducedMotion ? 0 : 1;
-      eye.copy(tall ? EYE_TALL : EYE).add(new THREE.Vector3(Math.sin(now * 0.31) * 0.05 * sway + leanNow.x * 0.25, Math.sin(now * 0.43) * 0.03 * sway - leanNow.y * 0.12, 0));
+
+      eye.copy(tall ? EYE_TALL : EYE).add(new THREE.Vector3(
+        Math.sin(now * 0.31) * 0.05 * sway + leanNow.x * 0.25,
+        Math.sin(now * 0.43) * 0.03 * sway - leanNow.y * 0.12,
+        0,
+      ));
       look.copy(tall ? LOOK_TALL : LOOK).add(new THREE.Vector3(leanNow.x * 0.9, -leanNow.y * 0.5, 0));
-      camera.position.copy(room.localToWorld(eye.clone()));
-      camera.lookAt(room.localToWorld(look.clone()));
-      world?.update(now, dt, camera.position);
-      animals?.update(now, dt);
+
+      camera.position.copy(eye);
+      camera.lookAt(look);
+
+      room.update(now, dt);
+      holo.update(now, dt, 1, -1);
+      portalUniforms.uTime.value = now;
+
       renderer.info.autoReset = false;
       renderer.info.reset();
       renderer.clear();
-      renderer.render(lab, camera);
-      if (world) renderer.render(outside, camera);
+      renderer.render(labScene, camera);
     },
+
     resize(width, height, pixelRatio) {
       renderer.setPixelRatio(pixelRatio);
       renderer.setSize(width, height, false);
       camera.aspect = width / Math.max(1, height);
-      // a tall screen sees more of the room top to bottom, and aims at the arch
       tall = camera.aspect < 0.8;
-      camera.fov = tall ? 74 : camera.aspect < 1 ? 62 : 50;
+      camera.fov = tall ? 72 : camera.aspect < 1 ? 60 : 50;
       camera.updateProjectionMatrix();
     },
+
     dispose() {
-      animals?.dispose();
-      world?.dispose();
+      holo.dispose();
+      room.dispose();
       for (const x of owned) x.dispose();
       renderer.dispose();
     },

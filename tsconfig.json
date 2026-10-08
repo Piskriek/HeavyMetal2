@@ -335,6 +335,9 @@
       ],
       "@hm/cartlab": [
         "packages/cartlab/src/index.ts"
+      ],
+      "@hm/plotcodec": [
+        "packages/plotcodec/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

@@ -123,6 +123,7 @@ export default defineConfig(({ mode }) => ({
       '@hm/plotsim': p('../../packages/plotsim/src/index.ts'),
       '@hm/fieldkit': p('../../packages/fieldkit/src/index.ts'),
       '@hm/cartlab': p('../../packages/cartlab/src/index.ts'),
+      '@hm/plotcodec': p('../../packages/plotcodec/src/index.ts'),
     },
   },
   build: { target: 'es2022', outDir: 'dist', emptyOutDir: true },

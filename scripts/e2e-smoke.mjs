@@ -69,8 +69,8 @@ try {
   await page.waitForSelector('.gr-front', { timeout: T(15000) });
   check('Goblin Racing opens its own menu', JSON.stringify(await page.$$eval('.gr-front .shell-menu button', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Play', 'Race modes', 'Settings', 'Back to SetMix']));
   check('its menu tells a new player what Play does', /first avatar/.test(await page.locator('.gr-front .shell-foot').innerText()));
-  await dom(() => { [...document.querySelectorAll('.gr-front .shell-menu button')].find((b) => b.textContent === 'Race modes')?.click(); });
-  await page.waitForSelector('.shell-racing');
+  await text('.gr-front .shell-menu button', 'Race modes').click();
+  await page.waitForSelector('.shell-racing', { timeout: T(30000) });
   for (const s of ['Tournaments', 'Spectate', 'Rankings', 'Track editor', 'Settings', 'My goblin', 'The Bookie', 'Quick race']) await dom((t) => { [...document.querySelectorAll('.shell-racing-nav button')].find((b) => b.textContent === t)?.click(); }, s);
   check('every Goblin Racing section opens', true);
   await page.keyboard.press('Escape');
@@ -827,6 +827,37 @@ try {
   await page.waitForTimeout(T(300));
   check('the planet table hologram is visible and tracks the machines', await dom(() => { const h = window.hmPlay.holo(); return h.visible && h.machines === 3; }));
   await shot('play-holo-table');
+
+  // ---- task 06: plot codes and visiting plots
+  await dom(() => window.hmPlay.go('lab', 0, -1.8, 0, -0.2));
+  await page.waitForTimeout(T(200));
+  const myCode = await dom(() => window.hmPlay.plotCode());
+  check('your plot produces a valid plot code', typeof myCode === 'string' && myCode.length > 20, String(myCode));
+  await dom(() => window.hmPlay.openDial());
+  await page.waitForSelector('.play-dial-panel', { timeout: T(5000) });
+  await shot('play-dial');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(T(200));
+
+  check('damaged code is refused by dial', await dom(() => !window.hmPlay.dial('damaged-code-xyz')));
+  check('your code dials your own plot back', await dom((c) => window.hmPlay.dial(c), myCode));
+  check('visiting returns player name', await dom(() => window.hmPlay.visiting() === window.hmPlay.state().avatar.name));
+  check('visiting plot has same number of machines', await dom(() => window.hmPlay.machines().standing === 3));
+
+  await dom(() => { const g = window.hmPlay.gate(); window.hmPlay.go('planet', g.x + 3, g.z + 5, 0); });
+  await page.waitForFunction(() => window.hmPlay.where === 'planet', null, { timeout: T(8000) });
+  await page.waitForTimeout(T(200));
+  await shot('play-visiting');
+
+  await page.keyboard.press('KeyB');
+  await page.waitForTimeout(T(200));
+  check('build menu is refused while visiting', await page.locator('.play-build').count() === 0);
+
+  await dom(() => window.hmPlay.go('lab', 0, -2.5, 0));
+  await page.waitForFunction(() => window.hmPlay.where === 'lab', null, { timeout: T(8000) });
+  await page.waitForTimeout(T(200));
+  check('walking back ends the visit', await dom(() => window.hmPlay.visiting() === null));
+
   await page.keyboard.press('Escape');
   await page.waitForSelector('.play-pause', { timeout: T(5000) });
   await dom(() => { [...document.querySelectorAll('.play-pause button')].find((b) => b.textContent === 'Back to SetMix')?.click(); });

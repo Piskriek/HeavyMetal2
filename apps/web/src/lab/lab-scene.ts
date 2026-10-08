@@ -217,12 +217,16 @@ function createScientistModel(visorHex = '#f59e0b'): THREE.Group {
     '9': { color: 0x334155, roughness: 0.7 },
   };
   const visorColor = new THREE.Color(visorHex);
+
+  // Relax arms down from T-pose (~70 degrees down)
+  const leftArm = group.getObjectByName('mixamorigLeftArm');
+  if (leftArm) leftArm.rotation.x = 1.15;
+  const rightArm = group.getObjectByName('mixamorigRightArm');
+  if (rightArm) rightArm.rotation.x = 1.15;
+  const spine = group.getObjectByName('mixamorigSpine') as THREE.Bone | undefined;
+  group.userData.spine = spine ?? null;
+
   group.traverse((c) => {
-    if ((c as THREE.Bone).isBone) {
-      const b = c as THREE.Bone;
-      if (b.name === 'mixamorigLeftArm') b.rotation.z -= 1.15;
-      if (b.name === 'mixamorigRightArm') b.rotation.z += 1.15;
-    }
     if ((c as THREE.Mesh).isMesh) {
       const mesh = c as THREE.Mesh;
       if (mesh.name === '6' || mesh.name === '7' || mesh.name === '8') {
@@ -296,7 +300,7 @@ export function createLabScene(o: {
   holo.setPlot(demoPlot, new Map([[1, 1], [2, 1], [3, 1]]), new Set([1, 2, 3]));
 
   // ---- Character looking through the gate threshold
-  // SetMix edition: human scientist with default amber visor; Goblin Racing: goblin
+  let scientistSpine: THREE.Bone | null = null;
   if (isGoblin > 0.5) {
     const goblinGeo = smoothModel('goblin').near;
     const goblinMat = keep(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0 }));
@@ -310,6 +314,7 @@ export function createLabScene(o: {
     scientist.position.set(GATE_AT.x - 0.6, 0.0, GATE_AT.z + 1.2);
     scientist.rotation.y = Math.PI - 0.4;
     room.group.add(scientist);
+    scientistSpine = (scientist.userData.spine as THREE.Bone) ?? null;
   }
 
   // ---- Camera framing from concept art 04 and 05
@@ -350,10 +355,14 @@ export function createLabScene(o: {
       camera.position.copy(eye);
       camera.lookAt(look);
 
+      // Subtle breathing sway for scientist figure
+      if (scientistSpine && !o.reducedMotion) {
+        scientistSpine.rotation.x = Math.sin(now * 2) * 0.02;
+      }
+
       room.update(now, dt);
       holo.update(now, dt, 1, -1);
       portalUniforms.uTime.value = now;
-
       renderer.info.autoReset = false;
       renderer.info.reset();
       renderer.clear();

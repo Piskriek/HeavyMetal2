@@ -36,6 +36,8 @@ export interface FrameOut {
   readonly sync: number;
   /** You are looking at the main lever, close enough to pull it. */
   readonly atLever: boolean;
+  /** You are looking at the console while the gate is on, close enough to dial a plot. */
+  readonly atDial: boolean;
   /** The build ghost's verdict, when building. */
   readonly ghost: { readonly ok: boolean; readonly why: string } | null;
   /** The machine you are looking at, close enough to use (its plot id), when not building. */
@@ -686,12 +688,16 @@ export function createPlayScene(o: {
         }
       }
       let atLever = false;
+      let atDial = false;
       let aimedLab: LabMachineKind | null = null;
       if (where === 'lab') {
         const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        const to = room.leverAt.clone().sub(camera.position);
+        const atConsole = to.length() < 2.4 && to.normalize().dot(dir) > 0.86;
         if (!gateOn && powerT < 0) {
-          const to = room.leverAt.clone().sub(camera.position);
-          atLever = to.length() < 2.4 && to.normalize().dot(dir) > 0.86;
+          atLever = atConsole;
+        } else if (gateOn) {
+          atDial = atConsole;
         }
         const targets: [LabMachineKind, THREE.Vector3, number, number][] = [
           ['rack', new THREE.Vector3(-9.55, 1.2, -5.5), 1.6, 4.0],
@@ -711,7 +717,7 @@ export function createPlayScene(o: {
       }
       const ev = pendingEvent;
       pendingEvent = null;
-      return { where, sync, atLever, ghost: building ? ghostVerdict : null, aimed, aimedLab, stage: shown, event: ev };
+      return { where, sync, atLever, atDial, ghost: building ? ghostVerdict : null, aimed, aimedLab, stage: shown, event: ev };
     },
     resize(width, height, pixelRatio) {
       renderer.setPixelRatio(pixelRatio);
@@ -760,7 +766,12 @@ export function createPlayScene(o: {
       showGround: (on) => ground?.setVisible(on),
       where: () => where,
       position: () => pos.clone(),
-      teleport(w, x, z, y, p) { where = w; pos.set(x, w === 'lab' ? EYE : groundAt(x, z) + EYE, z); yaw = y; if (p !== undefined) pitch = p; },
+      teleport(w, x, z, y, p) {
+        if (where !== w) {
+          pendingEvent = w === 'planet' ? 'to-planet' : 'to-lab';
+        }
+        where = w; pos.set(x, w === 'lab' ? EYE : groundAt(x, z) + EYE, z); yaw = y; if (p !== undefined) pitch = p;
+      },
       sync: () => sync,
       stats: () => ({ triangles: renderer.info.render.triangles, calls: renderer.info.render.calls }),
       wave: () => waveRadius(),

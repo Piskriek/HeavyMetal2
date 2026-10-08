@@ -492,12 +492,15 @@ function base64UrlDecode(text: string): Uint8Array | null {
     const fourth = remaining > 3 ? base64Value(text.charAt(index + 3)) : 0;
     if (first < 0 || second < 0 || third < 0 || fourth < 0) return null;
 
+    if (remaining === 2 && (second & 0x0f) !== 0) return null;
+    if (remaining === 3 && (third & 0x03) !== 0) return null;
+
     if (output < byteLength) bytes[output++] = (first << 2) | (second >> 4);
     if (remaining > 2 && output < byteLength) bytes[output++] = ((second & 0x0f) << 4) | (third >> 2);
     if (remaining > 3 && output < byteLength) bytes[output++] = ((third & 0x03) << 6) | fourth;
   }
 
-  return base64UrlEncode(bytes) === text ? bytes : null;
+  return bytes;
 }
 
 function readText(reader: ByteReader, maximum: number): string | null {

@@ -139,3 +139,14 @@
 .play-combine-preview h4 { margin: 0 0 6px; font-size: 13px; color: #b46bff; }
 
 .play-why { display: block; font-size: 12px; color: #ff9a7a; margin-top: 6px; }
+
+/* plot dial panel & visiting HUD */
+.play-dial-section { margin-bottom: 14px; }
+.play-dial-section h4 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: rgba(232, 238, 241, .85); }
+.play-dial-row { display: flex; gap: 8px; }
+.play-code-box, .play-code-input, .play-dial-code, .play-dial-input { flex: 1; padding: 8px 10px; background: rgba(0, 0, 0, .4); border: 1px solid rgba(241, 244, 245, .2); color: #f1f4f5; font-family: monospace; font-size: 12px; }
+.play-code-input:focus { border-color: var(--power); outline: none; }
+.play-dial-error { margin: 6px 0 0; font-size: 12px; color: #ff5a4a; }
+.play-visiting-banner { margin-top: 4px; font-size: 13px; color: var(--amber); }
+.play-visiting-banner b { color: #fff; }
+

@@ -81,13 +81,13 @@ function ScientistTurntable(props: { readonly visor: string; readonly customScen
         '9': { color: 0x334155, roughness: 0.7 },
       };
 
+      const leftArm = scientistGroup.getObjectByName('mixamorigLeftArm');
+      if (leftArm) leftArm.rotation.x = 1.15;
+      const rightArm = scientistGroup.getObjectByName('mixamorigRightArm');
+      if (rightArm) rightArm.rotation.x = 1.15;
+      spine = (scientistGroup.getObjectByName('mixamorigSpine') as THREE.Bone) ?? null;
+
       scientistGroup.traverse((c) => {
-        if ((c as THREE.Bone).isBone) {
-          const b = c as THREE.Bone;
-          if (b.name === 'mixamorigLeftArm') b.rotation.z -= 1.15;
-          if (b.name === 'mixamorigRightArm') b.rotation.z += 1.15;
-          if (b.name === 'mixamorigSpine') spine = b;
-        }
         if ((c as THREE.Mesh).isMesh) {
           const mesh = c as THREE.Mesh;
           mesh.castShadow = true;

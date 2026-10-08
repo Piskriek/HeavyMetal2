@@ -35,6 +35,8 @@ import {
 } from '@hm/cartlab';
 import { fx } from '../maker/feedback';
 import { FRESH, METRIC_COLOUR, METRIC_NAME, SAVE_KEY, arrived, created, loadState, objective, poweredOn, returned, withLab, withPlot, type PlayState } from './quest';
+import { encodePlot, decodePlot, plotOfSnapshot } from './plot-code';
+import type { Snapshot } from '@hm/plotcodec';
 import './play.css';
 
 /** Your plot's cartridge until the ground shader battle lands: sandy desert tones, the nearest in the vault to the concept art's stage 1. */
@@ -61,7 +63,7 @@ function save(s: PlayState): void { try { localStorage.setItem(SAVE_KEY, JSON.st
 
 /** The plot's numbers for the HUD. */
 interface PlotHud { readonly ore: number; readonly oreRate: number; readonly supply: number; readonly demand: number; readonly levels: Readonly<Record<Metric, number>>; readonly stage: number }
-interface Hud { readonly where: FrameOut['where']; readonly sync: number; readonly atLever: boolean; readonly ghost: FrameOut['ghost']; readonly aimed: number | null; readonly aimedLab: FrameOut['aimedLab']; readonly plot: PlotHud }
+interface Hud { readonly where: FrameOut['where']; readonly sync: number; readonly atLever: boolean; readonly atDial: boolean; readonly ghost: FrameOut['ghost']; readonly aimed: number | null; readonly aimedLab: FrameOut['aimedLab']; readonly plot: PlotHud; readonly visitingOwner: string | null }
 const NO_PLOT: PlotHud = { ore: 0, oreRate: 0, supply: 0, demand: 0, levels: { pxd: 0, vtx: 0, lx: 0, aq: 0 }, stage: 0 };
 /** The build menu, in the order the plot needs them. */
 const BUILD_ORDER: readonly MachineKind[] = ['mill', 'drill', 'pylon', 'press', 'power', 'projector', 'water'];
@@ -89,7 +91,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
   useEffect(() => { pausedRef.current = paused; }, [paused]);
   const [menu, setMenu] = useState(false);
   const [building, setBuilding] = useState<MachineKind | null>(null);
-  const [hud, setHud] = useState<Hud>({ where: 'lab', sync: 1, atLever: false, ghost: null, aimed: null, aimedLab: null, plot: NO_PLOT });
+  const [hud, setHud] = useState<Hud>({ where: 'lab', sync: 1, atLever: false, atDial: false, ghost: null, aimed: null, aimedLab: null, plot: NO_PLOT, visitingOwner: null });
   /** The machine whose panel is open (its plot id). */
   const [panel, setPanel] = useState<number | null>(null);
   /** The lab machine whose panel is open ('rack' | 'bench' | 'combiner'). */
@@ -97,6 +99,14 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
   const [benchBlank, setBenchBlank] = useState<string | null>(null);
   const [benchPreset, setBenchPreset] = useState<string | null>(null);
   const [combineIds, setCombineIds] = useState<readonly string[]>([]);
+  /** State of visiting another player's plot via code. */
+  const [visiting, setVisiting] = useState<{ readonly snapshot: Snapshot; readonly plot: PlotState; readonly lab: LabState } | null>(null);
+  const visitingRef = useRef<{ readonly snapshot: Snapshot; readonly plot: PlotState; readonly lab: LabState } | null>(null);
+  const [dialOpen, setDialOpen] = useState(false);
+  const [dialInput, setDialInput] = useState('');
+  const [dialError, setDialError] = useState<string | null>(null);
+  const dialRef = useRef<((code: string) => { readonly ok: boolean; readonly why?: string }) | null>(null);
+  const openDialRef = useRef<(() => void) | null>(null);
   /** Set while a menu takes the mouse: losing the pointer lock then does not pause. */
   const quietRef = useRef(false);
   /** The plot runs every frame here; the saved state catches up every few seconds and on events. */
@@ -114,6 +124,59 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
     const t = window.setTimeout(() => setToast((x) => (x?.id === toast.id ? null : x)), 3200);
     return () => window.clearTimeout(t);
   }, [toast]);
+
+  const dial = useCallback((raw: string): { readonly ok: boolean; readonly why?: string } => {
+    const code = raw.trim();
+    if (!code) return { ok: false, why: 'That is not a plot code.' };
+    const snap = decodePlot(code);
+    if (!snap) return { ok: false, why: 'That code is damaged.' };
+    const env = envRef.current;
+    if (!env) return { ok: false, why: 'Lab not ready.' };
+    const reconstructed = plotOfSnapshot(snap, env.gate);
+    const vPlot = {
+      snapshot: snap,
+      plot: reconstructed.plot,
+      lab: reconstructed.lab,
+    };
+    visitingRef.current = vPlot;
+    setVisiting(vPlot);
+    const vEnv: Env = {
+      gate: env.gate,
+      plotRadius: env.plotRadius,
+      richness: env.richness,
+      affinity: (id, metric) => cartlabAffinityOf(reconstructed.lab, id, metric),
+    };
+    const vRun = running(reconstructed.plot, vEnv);
+    const vNet = network(reconstructed.plot, vEnv);
+    sceneRef.current?.restore({
+      gateOn: true,
+      plot: reconstructed.plot,
+      running: vRun,
+      connected: vNet.connected,
+    });
+    say(`Dialed ${snap.owner}'s plot`, 'Step through the gate to visit.');
+    return { ok: true };
+  }, [say]);
+  dialRef.current = dial;
+
+  const endVisit = useCallback(() => {
+    if (!visitingRef.current) return;
+    const owner = visitingRef.current.snapshot.owner;
+    visitingRef.current = null;
+    setVisiting(null);
+    const env = envRef.current;
+    if (env) {
+      const run = running(plotRef.current, env);
+      const net = network(plotRef.current, env);
+      sceneRef.current?.restore({
+        gateOn: stateRef.current.gateOn,
+        plot: plotRef.current,
+        running: run,
+        connected: net.connected,
+      });
+    }
+    say('Back at your plot', `Visit to ${owner}'s plot ended.`);
+  }, [say]);
 
   // ---- the scene, built behind the loading bar
   useEffect(() => {
@@ -164,6 +227,10 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
     let env: Env | null = null;
     /** Builds a machine if it may stand there: the plot pays, the scene shows it, and a stage it lifts sends the wave from it. */
     const tryPlace = (kind: MachineKind, x: number, z: number, yaw: number): boolean => {
+      if (visitingRef.current) {
+        say(`Visiting ${visitingRef.current.snapshot.owner}'s plot`, 'Visits are read-only.');
+        return false;
+      }
       if (!env || scene.debug.where() !== 'planet') return false;
       const before = plotRef.current;
       if (!canPlace(before, env, kind, x, z).ok) return false;
@@ -203,8 +270,17 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       let s = stateRef.current;
       if (out.event === 'powered') { s = poweredOn(s); say('The gate is on', 'Your plot is on the other side.'); }
       if (out.event === 'to-planet') { if (!s.visited) say('Stage 0', 'Black and white, and barely there. Your sync is running down.'); s = arrived(s); }
-      if (out.event === 'to-lab') s = returned(s);
-      if (out.event === 'sync-lost') { s = returned(s); say('Sync lost', 'The gate pulled you back. Your sync refills in the lab.'); setBuilding(null); setMenu(false); }
+      if (out.event === 'to-lab') {
+        s = returned(s);
+        if (visitingRef.current) endVisit();
+      }
+      if (out.event === 'sync-lost') {
+        s = returned(s);
+        say('Sync lost', 'The gate pulled you back. Your sync refills in the lab.');
+        setBuilding(null);
+        setMenu(false);
+        if (visitingRef.current) endVisit();
+      }
       if (out.event === 'stage-up') say(`Stage ${out.stage}`, STAGE_SAYS[out.stage] ?? '');
       if (s !== stateRef.current) commit(withLab(withPlot(s, plotRef.current), labRef.current));
       // ---- the lab runs every frame
@@ -229,12 +305,23 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
         const r = stepPlot(plotRef.current, env, dt);
         plotRef.current = r.state;
         for (const e of r.events) {
-          if (e.type === 'stage-up' && e.stage >= 2) scene.raiseStage(e.stage, env.gate);
-          if (e.type === 'ore-out') say('Out of ore', 'Build a rock drill on rocky ground.');
-          if (e.type === 'underpowered') say('Not enough power', 'Build a power unit, or switch a machine off.');
+          if (e.type === 'stage-up' && e.stage >= 2 && !visitingRef.current) scene.raiseStage(e.stage, env.gate);
+          if (e.type === 'ore-out' && !visitingRef.current) say('Out of ore', 'Build a rock drill on rocky ground.');
+          if (e.type === 'underpowered' && !visitingRef.current) say('Not enough power', 'Build a power unit, or switch a machine off.');
         }
         if (r.events.length) plotChanged = true;
-        scene.setPlot(plotRef.current, running(plotRef.current, env), network(plotRef.current, env).connected);
+        if (!visitingRef.current) {
+          scene.setPlot(plotRef.current, running(plotRef.current, env), network(plotRef.current, env).connected);
+        } else {
+          const vp = visitingRef.current;
+          const vEnv: Env = {
+            gate: env.gate,
+            plotRadius: env.plotRadius,
+            richness: env.richness,
+            affinity: (id, metric) => cartlabAffinityOf(vp.lab, id, metric),
+          };
+          scene.setPlot(vp.plot, running(vp.plot, vEnv), network(vp.plot, vEnv).connected);
+        }
       }
       if (plotChanged || labRes.events.length || ms - savedAt > 5000) {
         savedAt = ms;
@@ -244,9 +331,36 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       if (hook.frames % 30 === 0) Object.assign(hook, scene.debug.stats());
       if (ms - hudAt > 90 || out.event || labRes.events.length) {
         hudAt = ms;
-        const p = plotRef.current, rt = env ? rates(p, env) : null;
-        const levels = { pxd: level(p, 'pxd'), vtx: level(p, 'vtx'), lx: level(p, 'lx'), aq: level(p, 'aq') };
-        setHud({ where: out.where, sync: out.sync, atLever: out.atLever, ghost: out.ghost, aimed: out.aimed, aimedLab: out.aimedLab, plot: { ore: p.ore, oreRate: rt?.ore ?? 0, supply: rt?.supply ?? 0, demand: rt?.demand ?? 0, levels, stage: p.stage } });
+        const vis = visitingRef.current;
+        if (vis) {
+          const vp = vis.plot;
+          const levels = { pxd: level(vp, 'pxd'), vtx: level(vp, 'vtx'), lx: level(vp, 'lx'), aq: level(vp, 'aq') };
+          setHud({
+            where: out.where,
+            sync: out.sync,
+            atLever: out.atLever,
+            atDial: out.atDial,
+            ghost: out.ghost,
+            aimed: out.aimed,
+            aimedLab: out.aimedLab,
+            visitingOwner: vis.snapshot.owner,
+            plot: { ore: 0, oreRate: 0, supply: 0, demand: 0, levels, stage: vp.stage },
+          });
+        } else {
+          const p = plotRef.current, rt = env ? rates(p, env) : null;
+          const levels = { pxd: level(p, 'pxd'), vtx: level(p, 'vtx'), lx: level(p, 'lx'), aq: level(p, 'aq') };
+          setHud({
+            where: out.where,
+            sync: out.sync,
+            atLever: out.atLever,
+            atDial: out.atDial,
+            ghost: out.ghost,
+            aimed: out.aimed,
+            aimedLab: out.aimedLab,
+            visitingOwner: null,
+            plot: { ore: p.ore, oreRate: rt?.ore ?? 0, supply: rt?.supply ?? 0, demand: rt?.demand ?? 0, levels, stage: p.stage },
+          });
+        }
       }
       raf = requestAnimationFrame(loop);
     };
@@ -265,7 +379,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       gate: () => scene.debug.gatePlanet(),
       showGround: (on: boolean) => scene.debug.showGround(on),
       placeAt: (x: number, z: number, kind: MachineKind = 'mill') => { const g = scene.debug.gatePlanet(); return tryPlace(kind, x, z, Math.atan2(x - g.x, z - g.z)); },
-      plot: () => plotRef.current,
+      plot: () => (visitingRef.current ? visitingRef.current.plot : plotRef.current),
       give: (ore: number) => { plotRef.current = { ...plotRef.current, ore: plotRef.current.ore + ore }; },
       machines: () => scene.debug.machines(),
       state: () => stateRef.current,
@@ -294,7 +408,15 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
         commit(withLab(withPlot(stateRef.current, plotRef.current), next));
         return next;
       },
-      rates: () => (envRef.current ? rates(plotRef.current, envRef.current) : null),
+      rates: () => (envRef.current ? rates(visitingRef.current ? visitingRef.current.plot : plotRef.current, envRef.current) : null),
+      plotCode: () => {
+        const g = envRef.current?.gate ?? scene.debug.gatePlanet();
+        const r = encodePlot(stateRef.current, g);
+        return r.ok ? r.code : null;
+      },
+      openDial: () => { openDialRef.current?.(); },
+      dial: (code: string) => (dialRef.current ? dialRef.current(code).ok : false),
+      visiting: () => (visitingRef.current ? visitingRef.current.snapshot.owner : null),
     });
     setLoading(steps[0]![0]);
     timer = window.setTimeout(step, 30);
@@ -339,6 +461,8 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
   const stopBuilding = useCallback(() => { setBuilding(null); sceneRef.current?.setBuilding(null); }, []);
   /** Frees the mouse for a menu without pausing the game. */
   const freeMouse = useCallback(() => { if (document.pointerLockElement) { quietRef.current = true; document.exitPointerLock(); } }, []);
+  const openDial = useCallback(() => { setDialOpen(true); freeMouse(); }, [freeMouse]);
+  openDialRef.current = openDial;
   /** Changes the plot from a menu: the plot, the save and the scene follow at once. */
   const changePlot = useCallback((next: PlotState) => {
     const env = envRef.current;
@@ -352,6 +476,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       if (e.code === 'Escape') {
         if (building) { stopBuilding(); return; }
         if (menu) { setMenu(false); return; }
+        if (dialOpen) { setDialOpen(false); return; }
         if (panel !== null) { setPanel(null); return; }
         if (labPanel !== null) { setLabPanel(null); return; }
         if (!locked) setPaused((p) => !p);
@@ -361,16 +486,21 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       if (e.code === 'KeyE') {
         if (building) placeNow();
         else if (hud.atLever) sceneRef.current?.pullLever();
+        else if (hud.atDial && !dialOpen) { setDialOpen(true); freeMouse(); }
         else if (hud.where === 'planet' && hud.aimed !== null && panel === null) { setPanel(hud.aimed); setMenu(false); freeMouse(); }
         else if (hud.where === 'lab' && hud.aimedLab !== null && labPanel === null) { setLabPanel(hud.aimedLab); freeMouse(); }
       }
       if (e.code === 'KeyB' && hud.where === 'planet') {
+        if (visitingRef.current) {
+          say(`Visiting ${visitingRef.current.snapshot.owner}'s plot`, 'Visits are read-only.');
+          return;
+        }
         if (building) stopBuilding(); else { setPanel(null); setMenu((m) => { if (!m) freeMouse(); return !m; }); }
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [ready, creating, building, menu, panel, labPanel, locked, paused, hud.atLever, hud.aimed, hud.aimedLab, hud.where, placeNow, stopBuilding, freeMouse]);
+  }, [ready, creating, building, menu, panel, labPanel, dialOpen, locked, paused, hud.atLever, hud.atDial, hud.aimed, hud.aimedLab, hud.where, placeNow, stopBuilding, freeMouse, say]);
   useEffect(() => {
     const onClick = (): void => { if (building && locked) placeNow(); };
     window.addEventListener('mousedown', onClick);
@@ -379,7 +509,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
   // leaving the planet closes the build menu; entering planet closes lab panels
   useEffect(() => {
     if (hud.where === 'lab') { setMenu(false); setPanel(null); stopBuilding(); }
-    if (hud.where === 'planet') { setLabPanel(null); }
+    if (hud.where === 'planet') { setLabPanel(null); setDialOpen(false); }
   }, [hud.where, stopBuilding]);
 
   const startBuilding = (kind: MachineKind): void => {
@@ -394,7 +524,8 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
   const prompt = building
     ? (hud.ghost?.ok ? `Click or E: build the ${KINDS[building].name.toLowerCase()}` : hud.ghost?.why || 'Aim at the ground near the gate.')
     : hud.atLever ? 'E: pull the main lever'
-    : hud.where === 'planet' && hud.aimed !== null && panel === null ? `E: open the ${KINDS[plotRef.current.machines.find((x) => x.id === hud.aimed)?.kind ?? 'mill'].name.toLowerCase()}`
+    : hud.atDial ? 'E: plot dial'
+    : hud.where === 'planet' && hud.aimed !== null && panel === null ? `E: open the ${KINDS[(visiting ? visiting.plot.machines : plotRef.current.machines).find((x) => x.id === hud.aimed)?.kind ?? 'mill'].name.toLowerCase()}`
     : hud.where === 'lab' && hud.aimedLab !== null && labPanel === null ? `E: open the ${hud.aimedLab === 'rack' ? 'cartridge rack' : hud.aimedLab === 'bench' ? 'preset bench' : 'preset combiner'}`
     : '';
 
@@ -414,8 +545,8 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       {ready && !creating ? (
         <>
           <section className="play-goal" aria-live="polite">
-            <h2>{goal.title}</h2>
-            <p>{goal.hint}</p>
+            <h2>{visiting ? `Visiting ${visiting.snapshot.owner}’s plot` : goal.title}</h2>
+            <p>{visiting ? 'Read-only visit. Walk back through the gate to return to your lab.' : goal.hint}</p>
           </section>
           {hud.where === 'planet' ? (
             <div className="play-sync" role="meter" aria-label="Sync" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(hud.sync * 100)}>
@@ -425,10 +556,19 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
           ) : null}
           <i className="play-dot" aria-hidden="true" />
           {prompt ? <p className={`play-prompt${building && !hud.ghost?.ok ? ' bad' : ''}`}>{prompt}</p> : null}
-          {state.step === 'build' || state.step === 'done' ? (
-            <section className="play-plot" aria-label="Your plot">
-              <p className="play-ore"><b>{Math.floor(hud.plot.ore)}</b> ore <span>{signed(hud.plot.oreRate)}/s</span></p>
-              <p className={`play-power${hud.plot.demand > hud.plot.supply + 1e-6 ? ' short' : ''}`}><b>{hud.plot.demand.toFixed(0)}</b> of {hud.plot.supply.toFixed(0)} kW</p>
+          {state.step === 'build' || state.step === 'done' || visiting ? (
+            <section className="play-plot" aria-label={visiting ? `Visiting ${visiting.snapshot.owner}'s plot` : 'Your plot'}>
+              {visiting ? (
+                <div className="play-visiting-banner">
+                  <span>Visiting <b>{visiting.snapshot.owner}</b></span>
+                  <em>Stage {visiting.plot.stage}</em>
+                </div>
+              ) : (
+                <>
+                  <p className="play-ore"><b>{Math.floor(hud.plot.ore)}</b> ore <span>{signed(hud.plot.oreRate)}/s</span></p>
+                  <p className={`play-power${hud.plot.demand > hud.plot.supply + 1e-6 ? ' short' : ''}`}><b>{hud.plot.demand.toFixed(0)}</b> of {hud.plot.supply.toFixed(0)} kW</p>
+                </>
+              )}
               <ul className="play-levels">
                 {METRICS.map((m) => (
                   <li key={m} style={{ '--c': METRIC_COLOUR[m] } as CSSProperties}>
@@ -457,14 +597,47 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
             </section>
           ) : null}
           {panel !== null ? (() => {
-            const mm = plotRef.current.machines.find((x) => x.id === panel);
+            const curPlot = visiting ? visiting.plot : plotRef.current;
+            const curLab = visiting ? visiting.lab : labRef.current;
+            const mm = curPlot.machines.find((x) => x.id === panel);
             const env = envRef.current;
             if (!mm || !env) return null;
+            const vEnv: Env = visiting ? {
+              gate: env.gate,
+              plotRadius: env.plotRadius,
+              richness: env.richness,
+              affinity: (id, metric) => cartlabAffinityOf(curLab, id, metric),
+            } : env;
             const spec = KINDS[mm.kind], metric = spec.emits;
-            const run = running(plotRef.current, env).get(mm.id) ?? 0, net = network(plotRef.current, env);
-            const status = !mm.on ? 'Switched off.' : !net.connected.has(mm.id) ? 'No power: out of reach of the network. Build a relay pylon closer.'
-              : run > 0.95 ? 'Running.' : run > 0.05 ? `Running at ${Math.round(run * 100)}%: short of ${net.satisfaction < 0.99 ? 'power' : 'ore'}.` : spec.oreUse > 0 && plotRef.current.ore <= 0 ? 'Idle: no ore. Build a rock drill.' : 'Idle.';
+            const run = running(curPlot, vEnv).get(mm.id) ?? 0, net = network(curPlot, vEnv);
+            const status = !mm.on ? 'Switched off.' : !net.connected.has(mm.id) ? 'No power: out of reach of the network.'
+              : run > 0.95 ? 'Running.' : run > 0.05 ? `Running at ${Math.round(run * 100)}%: short of ${net.satisfaction < 0.99 ? 'power' : 'ore'}.` : spec.oreUse > 0 && curPlot.ore <= 0 ? 'Idle: no ore.' : 'Idle.';
             const close = (): void => { setPanel(null); lock(); };
+
+            if (visiting) {
+              return (
+                <section className="play-machine" aria-label={spec.name}>
+                  <h3>{spec.name}</h3>
+                  <p>{BLURB[mm.kind]} {status}</p>
+                  <p style={{ color: '#8892b0', fontSize: '0.85rem' }}>Visiting {visiting.snapshot.owner}&rsquo;s plot (read-only).</p>
+                  {spec.slot && metric && mm.cartridge ? (() => {
+                    const c = curLab.cartridges.find((cart) => cart.id === mm.cartridge);
+                    if (!c) return null;
+                    const gain = c.affinity[metric] ?? 1;
+                    return (
+                      <div className="play-carts">
+                        <h4>Slotted cartridge: {c.name}</h4>
+                        <p className="cart-gain" style={{ color: METRIC_COLOUR[metric] }}>
+                          {gain === 1 ? 'No effect on' : `${gain > 1 ? '+' : ''}${Math.round((gain - 1) * 100)}%`} {METRIC_NAME[metric]}
+                        </p>
+                      </div>
+                    );
+                  })() : null}
+                  <button className="go" onClick={close} autoFocus>Back to the plot</button>
+                </section>
+              );
+            }
+
             return (
               <section className="play-machine" aria-label={spec.name}>
                 <h3>{spec.name}</h3>
@@ -782,7 +955,76 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
 
             return null;
           })() : null}
-          {!locked && !paused && panel === null && labPanel === null && !menu ? (
+          {dialOpen ? (() => {
+            const gate = envRef.current?.gate ?? sceneRef.current?.debug.gatePlanet() ?? { x: 0, z: 0 };
+            const codeRes = encodePlot(stateRef.current, gate);
+            const myCode = codeRes.ok ? codeRes.code : '';
+            const close = (): void => { setDialOpen(false); lock(); };
+            return (
+              <section className="play-machine play-dial-panel" aria-label="Gate Plot Dial">
+                <h3>Gate Plot Dial</h3>
+                <p>Dial a friend&rsquo;s plot code to open the gate onto their world, or copy yours to share.</p>
+
+                <div className="play-dial-section">
+                  <h4>Your plot&rsquo;s code</h4>
+                  <div className="play-dial-row">
+                    <input type="text" readOnly value={myCode} className="play-dial-code" onFocus={(e) => e.target.select()} />
+                    <button
+                      onClick={() => {
+                        if (myCode) {
+                          navigator.clipboard?.writeText(myCode).catch(() => {});
+                          say('Code copied', 'Share it with a friend so they can visit your plot.');
+                        }
+                      }}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+
+                <div className="play-dial-section">
+                  <h4>Dial a plot</h4>
+                  <div className="play-dial-row">
+                    <input
+                      type="text"
+                      placeholder="Paste plot code here..."
+                      value={dialInput}
+                      onChange={(e) => { setDialInput(e.target.value); setDialError(null); }}
+                      className="play-dial-input"
+                    />
+                    <button
+                      className="go"
+                      disabled={!dialInput.trim()}
+                      onClick={() => {
+                        const res = dial(dialInput.trim());
+                        if (res.ok) {
+                          close();
+                        } else {
+                          setDialError(res.why ?? 'That code is damaged.');
+                        }
+                      }}
+                    >
+                      Dial
+                    </button>
+                  </div>
+                  {dialError ? <p className="play-why">{dialError}</p> : null}
+                </div>
+
+                {visiting ? (
+                  <div className="play-machine-actions">
+                    <button onClick={() => { endVisit(); say('Returned to own plot', 'The gate opens onto your own world.'); }}>
+                      Return to your own plot
+                    </button>
+                  </div>
+                ) : null}
+
+                <button className="go" onClick={close} style={{ marginTop: '12px' }} autoFocus>
+                  Back to the lab
+                </button>
+              </section>
+            );
+          })() : null}
+          {!locked && !paused && panel === null && labPanel === null && !dialOpen && !menu ? (
             <button className="play-start" onClick={lock}>
               <b>Click to look around</b>
               <span className="play-keys">{KEYS.map(([k, what]) => <span key={k}><kbd>{k}</kbd>{what}</span>)}</span>

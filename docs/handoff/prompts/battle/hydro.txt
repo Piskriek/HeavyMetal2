@@ -1,0 +1,120 @@
+Follow-up, same chat. Thank you: your @hm/coverage passed every acceptance test and is landed in our game. Next module, same rules: a new package `@hm/hydro`, water on the plot. Keep your other files; put this one in `hydro/src/index.ts` and `hydro/tests/hydro.test.ts` in your project (a small preview page showing a terrain filling with water as you raise the volume is welcome), and paste both files in full in your reply.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. Pure functions only; never mutate the input.
+
+THE GAME. At stage 4 the player's water makers bring water to the desolate plot. Given the terrain and the water poured so far, this module says where it lies: streams running downhill from each source, lakes filling the hollows with one flat surface each, the overflow spilling into the next hollow, and water leaving the plot over its edge. It also says how wet the ground is near water, which feeds the coverage layer (moss and grass).
+
+API (export exactly these):
+export const WET_REACH: 6; // cells
+export interface Terrain { readonly size: number; readonly cell: number; readonly heights: readonly number[] } // size * size heights in metres, row-major (index = z * size + x); cell = metres per cell
+export interface Source { readonly x: number; readonly z: number; readonly share: number } // an integer cell, and its share of the water (> 0)
+export interface Water { readonly depth: readonly number[]; readonly level: readonly number[]; readonly stream: readonly number[]; readonly wet: readonly number[]; readonly volume: number; readonly drained: number }
+export function flood(t: Terrain, sources: readonly Source[], volume: number): Water; // throws Error for heights of the wrong length, a source outside the grid, a share <= 0, or a negative volume
+
+THE WATER, per source in the order given, each with volume * share / (sum of shares) cubic metres:
+- It runs downhill by steepest descent over the 4 neighbours (ties in the order -x, +x, -z, +z), from cell to strictly lower cell.
+- At a cell with no lower neighbour: on the grid's border the water drains off the plot; elsewhere it is a pit, and it fills the pit's hollow.
+- Filling: the lake keeps its cells and its level. Take the lowest cell on its rim (the 4-neighbours not in the lake). If that cell is on the border, or has a lower 4-neighbour outside the lake, the lake is full at that cell's height: it spills there, and the rest runs on from that cell, downhill and away from the lake (or drains off the border). Otherwise the level rises to that cell's height, or less if the water runs out first (solve the level exactly: each lake cell holds (level - height) * cell * cell), and the cell joins the lake.
+- Lakes keep their water between sources: a later source reaching a lake adds to it. Rising water that reaches another lake joins it into one level.
+- depth = max(0, level - height); level = height + depth on every cell. volume = the water lying in lakes; drained = the water that left over the border; volume + drained = the volume given.
+- stream: for dry cells (depth 0), the share of the total volume that ran through the cell (0..1); 0 under lakes and where no water ran.
+- wet: 1 on cells with depth > 0 or stream > 0, else max(0, 1 - d / WET_REACH), with d the number of 4-neighbour steps to the nearest such cell.
+
+Your test file must contain these acceptance tests unchanged, plus your own:
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { WET_REACH, flood, type Terrain, type Source } from '../src/index';
+
+const grid = (size: number, cell: number, h: (x: number, z: number) => number): Terrain => ({ size, cell, heights: Array.from({ length: size * size }, (_, i) => h(i % size, Math.floor(i / size))) });
+const idx = (t: Terrain, x: number, z: number): number => z * t.size + x;
+const bowl = (): { t: Terrain; V: number } => {
+  const t = grid(33, 10, (x, z) => Math.hypot(x - 16, z - 16));
+  let V = 0;
+  for (const h of t.heights) if (h < 5.5) V += (5.5 - h) * t.cell * t.cell;
+  return { t, V };
+};
+
+test('a bowl fills to one flat surface holding exactly the water given', () => {
+  const { t, V } = bowl();
+  const w = flood(t, [{ x: 20, z: 16, share: 1 }], V);
+  for (let i = 0; i < t.heights.length; i++) {
+    const h = t.heights[i]!;
+    if (h < 5.5) {
+      assert.ok(Math.abs(w.depth[i]! - (5.5 - h)) < 1e-6, `depth at cell ${i}`);
+      assert.ok(Math.abs(w.level[i]! - 5.5) < 1e-6, `level at cell ${i}`);
+    } else assert.equal(w.depth[i], 0);
+  }
+  assert.ok(Math.abs(w.volume - V) < V * 1e-9);
+  assert.equal(w.drained, 0);
+});
+
+test('on a slope the water runs downhill off the plot: a stream, no lake, and nothing lost', () => {
+  const t = grid(32, 10, (x) => x);
+  const w = flood(t, [{ x: 20, z: 16, share: 1 }], 5000);
+  assert.ok(w.depth.every((d) => d === 0));
+  for (let x = 0; x <= 20; x++) assert.ok(w.stream[idx(t, x, 16)]! > 0, `no stream at x ${x}`);
+  assert.equal(w.stream[idx(t, 25, 16)], 0);
+  assert.equal(w.volume, 0);
+  assert.ok(Math.abs(w.drained - 5000) < 1e-6);
+});
+
+test('a full hollow spills over its lowest rim into the next one, and stays level at the spill height', () => {
+  const t = grid(33, 10, (x, z) => Math.min(Math.hypot(x - 8, z - 16), Math.hypot(x - 24, z - 16)) + 0.02 * ((x - 16) ** 2 + (z - 16) ** 2));
+  let C = 0;
+  for (let i = 0; i < t.heights.length; i++) { const h = t.heights[i]!; if (i % t.size < 16 && h < 8) C += (8 - h) * t.cell * t.cell; }
+  const w = flood(t, [{ x: 8, z: 16, share: 1 }], C * 1.5);
+  for (let i = 0; i < t.heights.length; i++) if (i % t.size < 16 && w.depth[i]! > 0) assert.ok(Math.abs(w.level[i]! - 8) < 1e-6, `left level ${w.level[i]}`);
+  assert.ok(w.depth[idx(t, 8, 16)]! > 0);
+  assert.ok(w.depth[idx(t, 24, 16)]! > 0, 'the right hollow got the overflow');
+  assert.ok(w.level[idx(t, 24, 16)]! < 8);
+  assert.ok(Math.abs(w.volume + w.drained - C * 1.5) < C * 1e-9);
+  assert.equal(w.drained, 0);
+});
+
+test('more water never makes any cell shallower, and no water is lost', () => {
+  const t = grid(48, 10, (x, z) => 10 * Math.sin(x / 5) * Math.cos(z / 7) + 0.1 * x + 0.05 * z);
+  const src: Source[] = [{ x: 10, z: 10, share: 1 }, { x: 35, z: 30, share: 2 }];
+  let prev = flood(t, src, 0);
+  assert.ok(prev.depth.every((d) => d === 0));
+  for (const V of [1e4, 5e4, 2e5, 1e6]) {
+    const w = flood(t, src, V);
+    for (let i = 0; i < w.depth.length; i++) assert.ok(w.depth[i]! >= prev.depth[i]! - 1e-9, `cell ${i} got shallower at ${V}`);
+    assert.ok(Math.abs(w.volume + w.drained - V) < V * 1e-9);
+    prev = w;
+  }
+});
+
+test('ground is wet at the water and dries out over WET_REACH cells', () => {
+  const { t, V } = bowl();
+  const w = flood(t, [{ x: 20, z: 16, share: 1 }], V);
+  assert.equal(WET_REACH, 6);
+  assert.equal(w.wet[idx(t, 16, 16)], 1);
+  assert.ok(Math.abs(w.wet[idx(t, 24, 16)]! - 0.5) < 1e-9, `wet ${w.wet[idx(t, 24, 16)]}`);
+  assert.equal(w.wet[idx(t, 16, 28)], 0);
+  for (const v of w.wet) assert.ok(v >= 0 && v <= 1);
+});
+
+test('the same inputs give the same water, the inputs are left alone, and bad inputs are refused', () => {
+  const t = grid(40, 10, (x, z) => 5 * Math.sin(x / 4) + 5 * Math.cos(z / 6) + 0.2 * x);
+  const src: Source[] = [{ x: 5, z: 5, share: 1 }, { x: 30, z: 20, share: 1 }];
+  const frozen = JSON.stringify([t, src]);
+  const a = flood(t, src, 3e5), b = flood(t, src, 3e5);
+  assert.deepEqual(a, b);
+  assert.equal(JSON.stringify([t, src]), frozen);
+  assert.throws(() => flood({ ...t, heights: t.heights.slice(1) }, src, 1));
+  assert.throws(() => flood(t, [{ x: 99, z: 0, share: 1 }], 1));
+  assert.throws(() => flood(t, [{ x: 1, z: 1, share: 0 }], 1));
+  assert.throws(() => flood(t, src, -1));
+});
+
+test('performance: a 128 x 128 plot with four sources floods in under 150 ms', () => {
+  const t = grid(128, 7.8, (x, z) => 20 * Math.sin(x / 9) * Math.cos(z / 11) + 8 * Math.sin((x + z) / 5) + 0.15 * x);
+  const src: Source[] = [{ x: 20, z: 20, share: 1 }, { x: 100, z: 30, share: 1 }, { x: 64, z: 64, share: 2 }, { x: 30, z: 110, share: 1 }];
+  const t0 = performance.now();
+  const w = flood(t, src, 5e6);
+  assert.ok(performance.now() - t0 < 150, `${performance.now() - t0} ms`);
+  assert.ok(Math.abs(w.volume + w.drained - 5e6) < 5e6 * 1e-9);
+});
+```

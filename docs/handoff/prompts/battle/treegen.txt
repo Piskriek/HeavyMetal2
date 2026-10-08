@@ -1,0 +1,141 @@
+Follow-up, same chat. Thank you: @hm/plotcodec passed every acceptance test and is landed in our game. Next module, a different kind: `@hm/treegen`, real trees for the terraformed plot. Keep your other files; put this one in `treegen/src/index.ts` and `treegen/tests/treegen.test.ts` in your project, with a preview page that shows the three species side by side at all four detail levels under a low sun (plain materials are fine: brown bark, green leaf cards), and paste both files in full in your reply.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random. The only import in src is `three` (0.186). The test file imports only `node:test`, `node:assert/strict`, `three` and `../src/index`. Pure functions: the same options always give the same tree (use your own seeded PRNG).
+
+THE GAME. A player terraforms a desolate plot through six stages; at the last stages forest grows. Trees must look grown, not assembled: a branching skeleton from space colonisation (attraction points in the species' crown envelope; branches grow towards them), branch radii from the pipe model (a parent's cross-section carries its children's), bark tubes with UVs, and leaves as alpha cards (quads) in clusters at the twig ends. The game supplies the materials (a bark texture, a leaf-cluster texture with alpha).
+
+One tree has one skeleton; the four detail levels draw that same skeleton, so swapping levels never moves a branch:
+- detail 0, the stage-1 look: chunky low poly and flat shaded (non-indexed, every triangle's three normals equal). Trunk and main limbs as 3-sided prisms, the crown as a few big faceted blobs.
+- detail 1: 5-sided tubes down to the second branch order, leaf cards in clusters.
+- detail 2: 8-sided tubes down to the third order, more cards.
+- detail 3: 12-sided tubes for every branch, every card.
+
+Species: 'pine' (straight trunk, narrow conical crown, whorls of near-level limbs), 'oak' (short thick trunk, wide domed crown, crooked limbs), 'birch' (slender trunk, tall narrow oval crown, fine drooping twigs).
+
+API (export exactly these):
+export type Species = 'pine' | 'oak' | 'birch';
+export interface TreeOptions { readonly species: Species; readonly seed: number; readonly height: number; readonly detail: 0 | 1 | 2 | 3 }
+export interface Branch { readonly id: number; readonly parent: number | null; readonly start: readonly [number, number, number]; readonly end: readonly [number, number, number]; readonly r0: number; readonly r1: number } // a segment; r0 at the start, r1 at the end
+export interface Tree { readonly species: Species; readonly branches: readonly Branch[]; readonly bark: THREE.BufferGeometry; readonly leaves: THREE.BufferGeometry; readonly height: number; readonly radius: number; readonly triangles: number }
+// branches: parents before children, the one root starting at (0, 0, 0); height: the highest vertex's y; radius: the farthest vertex from the y axis; triangles: bark plus leaves
+export const BUDGET: readonly [number, number, number, number]; // [400, 2000, 8000, 24000] triangles per detail level
+export function growTree(o: TreeOptions): Tree;
+
+Both geometries carry position, normal and uv (bark: u around, v along the branch in metres; leaves: each card maps the whole leaf texture, uv in 0..1).
+
+Your test file must contain these acceptance tests unchanged, plus your own:
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { BUDGET, growTree, type Species } from '../src/index';
+
+const SPECIES: Species[] = ['pine', 'oak', 'birch'];
+const tris = (g: THREE.BufferGeometry): number => (g.index ? g.index.count : g.getAttribute('position').count) / 3;
+const ys = (g: THREE.BufferGeometry): number[] => { const p = g.getAttribute('position'); return Array.from({ length: p.count }, (_, i) => p.getY(i)); };
+const max = (a: number[]): number => a.reduce((m, v) => Math.max(m, v), -Infinity);
+const min = (a: number[]): number => a.reduce((m, v) => Math.min(m, v), Infinity);
+
+test('the same seed grows the same tree; another seed grows another', () => {
+  const a = growTree({ species: 'oak', seed: 7, height: 12, detail: 2 });
+  const b = growTree({ species: 'oak', seed: 7, height: 12, detail: 2 });
+  const c = growTree({ species: 'oak', seed: 8, height: 12, detail: 2 });
+  const pos = (g: THREE.BufferGeometry): number[] => { const p = g.getAttribute('position'); return Array.from({ length: p.count * 3 }, (_, i) => p.getComponent(Math.floor(i / 3), i % 3)); };
+  assert.deepEqual(pos(a.bark), pos(b.bark));
+  assert.deepEqual(a.branches, b.branches);
+  assert.notDeepEqual(a.branches, c.branches);
+});
+
+test('one trunk on the ground, and every branch grows from the end of its parent', () => {
+  for (const species of SPECIES) {
+    const t = growTree({ species, seed: 3, height: 10, detail: 3 });
+    const byId = new Map(t.branches.map((b) => [b.id, b] as const));
+    assert.equal(byId.size, t.branches.length);
+    const roots = t.branches.filter((b) => b.parent === null);
+    assert.equal(roots.length, 1);
+    assert.ok(roots[0]!.start.every((v) => Math.abs(v) < 1e-9));
+    const seen = new Set<number>();
+    for (const b of t.branches) {
+      if (b.parent !== null) {
+        assert.ok(seen.has(b.parent), `branch ${b.id} comes before its parent`);
+        const p = byId.get(b.parent)!;
+        for (let k = 0; k < 3; k++) assert.ok(Math.abs(b.start[k]! - p.end[k]!) < 1e-9, `branch ${b.id} floats`);
+        assert.ok(b.r0 <= p.r0 + 1e-9, `branch ${b.id} is thicker than its parent`);
+      }
+      assert.ok(b.r0 >= b.r1 && b.r1 > 0, `branch ${b.id} does not taper`);
+      seen.add(b.id);
+    }
+    assert.ok(t.branches.length >= 20, `${species}: only ${t.branches.length} branches`);
+  }
+});
+
+test('the detail levels draw the same skeleton, so swapping them never moves a branch', () => {
+  const ladder = ([0, 1, 2, 3] as const).map((detail) => growTree({ species: 'birch', seed: 11, height: 14, detail }));
+  for (const t of ladder) assert.deepEqual(t.branches, ladder[0]!.branches);
+});
+
+test('every detail level keeps to its triangle budget, and each level is richer than the one before', () => {
+  for (const species of SPECIES) {
+    let before = 0;
+    for (const detail of [0, 1, 2, 3] as const) {
+      const t = growTree({ species, seed: 5, height: 12, detail });
+      const n = tris(t.bark) + tris(t.leaves);
+      assert.equal(t.triangles, n);
+      assert.ok(n <= BUDGET[detail], `${species} detail ${detail}: ${n} triangles`);
+      assert.ok(n > before, `${species} detail ${detail} is not richer`);
+      before = n;
+    }
+  }
+});
+
+test('detail 0 is chunky and flat shaded, as stage 1 draws it', () => {
+  const t = growTree({ species: 'oak', seed: 1, height: 10, detail: 0 });
+  for (const g of [t.bark, t.leaves]) {
+    assert.equal(g.index, null);
+    const n = g.getAttribute('normal');
+    for (let i = 0; i < n.count; i += 3) for (const k of [1, 2]) {
+      assert.ok(Math.abs(n.getX(i) - n.getX(i + k)) + Math.abs(n.getY(i) - n.getY(i + k)) + Math.abs(n.getZ(i) - n.getZ(i + k)) < 1e-6, `triangle ${i / 3} is smooth`);
+    }
+  }
+});
+
+test('trees stand on the ground and reach the height asked for', () => {
+  for (const species of SPECIES) for (const height of [6, 15]) {
+    const t = growTree({ species, seed: 2, height, detail: 2 });
+    const top = max([...ys(t.bark), ...ys(t.leaves)]), bottom = min(ys(t.bark));
+    assert.ok(top >= height * 0.85 && top <= height * 1.15, `${species} asked ${height} m, grew ${top}`);
+    assert.ok(bottom >= -0.05 && bottom <= 0.05, `${species} trunk base at ${bottom}`);
+    assert.ok(t.radius > 0 && Math.abs(t.height - top) < 1e-6);
+  }
+});
+
+test('bark and leaves carry positions, unit normals and UVs, with no NaN', () => {
+  const t = growTree({ species: 'oak', seed: 9, height: 11, detail: 3 });
+  for (const g of [t.bark, t.leaves]) {
+    const p = g.getAttribute('position'), n = g.getAttribute('normal'), uv = g.getAttribute('uv');
+    assert.ok(p && n && uv);
+    assert.equal(n.count, p.count);
+    assert.equal(uv.count, p.count);
+    for (let i = 0; i < p.count; i++) {
+      assert.ok(Number.isFinite(p.getX(i) + p.getY(i) + p.getZ(i)));
+      assert.ok(Math.abs(Math.hypot(n.getX(i), n.getY(i), n.getZ(i)) - 1) < 1e-3);
+      assert.ok(Number.isFinite(uv.getX(i) + uv.getY(i)));
+    }
+  }
+  const uv = t.leaves.getAttribute('uv');
+  for (let i = 0; i < uv.count; i++) assert.ok(uv.getX(i) >= 0 && uv.getX(i) <= 1 && uv.getY(i) >= 0 && uv.getY(i) <= 1);
+});
+
+test('species keep their shape: pines and birches are narrow, oaks are wide', () => {
+  const shape = (species: Species): number => { const t = growTree({ species, seed: 4, height: 12, detail: 2 }); return t.radius / t.height; };
+  assert.ok(shape('pine') < shape('oak'));
+  assert.ok(shape('birch') < shape('oak'));
+});
+
+test('performance: twenty full-detail trees grow in under two seconds', () => {
+  const t0 = performance.now();
+  for (let i = 0; i < 20; i++) growTree({ species: SPECIES[i % 3]!, seed: i, height: 8 + (i % 7), detail: 3 });
+  assert.ok(performance.now() - t0 < 2000, `${performance.now() - t0} ms`);
+});
+```

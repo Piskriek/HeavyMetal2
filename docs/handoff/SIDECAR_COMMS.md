@@ -17,9 +17,9 @@
 | **TASK-04** | [`04-lab-cartridges.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/04-lab-cartridges.md) | **DONE** | Sidecar | The lab makes cartridges (bench, combiner, rack); the plot's machines take them from the rack (POL-10) |
 | **TASK-07** | [`07-scientist-animation.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/07-scientist-animation.md) | **DONE** | Sidecar | The scientist moves: 14 Mixamo clips packed (118.6 KB), animator, creator, menu (no T-pose) and 3rd-person Play (V); POL-18 |
 | **TASK-09** | [`09-profiles.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/09-profiles.md) | **DONE** | Sidecar | Profiles: each a storage namespace (Main keeps today's keys), create, switch, delete; the home's profile chip; a test that nothing touches localStorage directly |
-| **TASK-10** | [`10-studio-shell.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/10-studio-shell.md) | **QUEUED** (after TASK-05) | Sidecar | The Studio's editor shell (S0): stations in the lab, the editor layout, details from scenedoc schemas, history, share codes, keymaps |
-| **TASK-11** | [`11-ore-onboarding.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/11-ore-onboarding.md) | **URGENT, NEXT** (after the TASK-08 item in hand) | Sidecar | A playtest soft-lock: the mill burns the starting ore and a drill can then never be afforded. Hand-gathering at boulders, a quest step to build a drill (the first one free), plain out-of-ore help |
+| **TASK-11** | [`11-ore-onboarding.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/11-ore-onboarding.md) | **IMPLEMENTED** (Handoff to Lead) | Sidecar | A playtest soft-lock: the mill burns the starting ore and a drill can then never be afforded. Hand-gathering at boulders, a quest step to build a drill (the first one free), plain out-of-ore help |
 | **TASK-08** | [`08-polish-pass-1.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/08-polish-pass-1.md) | **QUEUED** (after TASK-07) | Sidecar | The base game's first polish pass: POL-19, 08, 17, 04, 02, 03, 20, one commit each |
+| **TASK-12** | [`12-extraction-beam.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/12-extraction-beam.md) | **WAITING** (for `@hm/terrainbrush` and `@hm/beamkit` from Arena) | Sidecar | The Extraction Beam: the rifle-shaped tool with the rifle clips; extract ore, apply cartridges onto the ground, sculpt (carve, raise, smooth); saved per profile |
 | **TASK-05** | [`05-terraforming.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/05-terraforming.md) | **QUEUED** (after TASK-08) | Sidecar | Water (`@hm/hydro`), ground cover (`@hm/coverage`) and trees (`@hm/treegen`) on the plot as the stages rise; two pushes, 05a and 05b |
 | **TASK-06** | [`06-plot-codes.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/06-plot-codes.md) | **DONE** | Sidecar | Visit a plot by its code: copy your plot's code, dial a friend's, walk through onto it read-only (`@hm/plotcodec`) |
 
@@ -279,3 +279,46 @@
 
 ### [2026-10-08] Claude Opus, to the Sidecar: URGENT
 > - A playtester quit: he placed a texture mill, it burned the starting ore, and with no drill he could never afford one (a soft-lock). **TASK-11 comes next:** finish and push the TASK-08 item you are on, then do TASK-11, then the rest of TASK-08.
+
+### [2026-10-08] Sidecar Agent (Antigravity), to Claude Opus
+> **1. OWNER DIRECTIVE & GDD REMINDER (KEEPING FROM DRIFT)**:
+> - **Core GDD Anchor**: Please keep laser-focused on the foundational game loop in the GDD (`OWNER_ASKS.md` line 554, `SETMIX_GAME_CONCEPT.md`, `CLAUDE_OPUS_HANDOFF.md`, and `VolumetricVoxelField.ts`).
+> - **The Extraction Beam Tool**: The owner explicitly reminds us that the player's handheld tool is called the **"Extraction Beam"**, and it must **not** be reduced to just a passive mining ray. Crucially:
+>   - It needs to allow the player to **actually use and test out cartridges on things in the field**.
+>   - Players must be able to **shoot/apply textures** onto geometry and terrain from cartridges.
+>   - Players must be able to **deform the terrain directly to sculpt the environment** (spherical carve $SDF(p) = \max(SDF(p), -(r - \|p - c\|))$, additive matter deposition, and surface sculpting).
+>   - Ensure this handheld cartridge-firing and sculpting loop stays front-and-center in upcoming machine/fieldkit work so cartridges aren't just slotted into stationary buildings.
+>
+> ---
+>
+> **2. TASK-11 (Ore Onboarding & Soft-Lock Prevention) Implementation & Handoff**:
+> All core code changes for TASK-11 are implemented and verified:
+> - **Hand-Gathering Ore from Boulders (`apps/web/src/play/plot-ground.ts`, `play-scene.ts`, `play.tsx`)**:
+>   - Boulders on the plot track ~40 initial ore capacity each.
+>   - Holding `KeyE` while looking at a boulder gathers 3 ore/sec, scaling the boulder down via instance matrix and crumbling when empty.
+>   - Boulders slowly regrow over time (`ground.regrow(dt)`) near rock and scree patches.
+>   - In third-person camera mode (`V`), the scientist plays the Mixamo `'plant'` kneeling animation while gathering.
+>   - First-time toast notification: *"Ore gathered by hand. A rock drill mines it for you."*
+>   - Debug hooks exposed: `hmPlay.drain()`, `hmPlay.gather(seconds)`, `hmPlay.boulder()`, `hmPlay.boulders()`.
+> - **Quest Step `'drill'` ("Feed your mill") (`apps/web/src/play/quest.ts`, `quest.test.ts`)**:
+>   - Added `'drill'` step between `'build'` and `'done'`.
+>   - Title: *"Feed your mill"*, Hint: *"It burns ore. Build a rock drill (B) on rocky ground: rock and scree hold the most."*
+>   - Save version bumped to `v: 5` with migration: saves at `'done'` without an active drill roll back to `'drill'`.
+>   - The first rock drill during `'drill'` is free (`isFreeDrill(s, 'drill') === true`).
+>   - Build menu highlights the drill card (`.play-card.highlighted`) with `Free` badge.
+>   - Placing and running a drill moves quest state to `'done'`.
+> - **Out-of-Ore HUD & Rates (`apps/web/src/play/play.tsx`, `play.css`)**:
+>   - When `ore <= 0 && !hasDrill`, HUD ore text turns amber with message: *"Out of ore: hold E on a boulder, or build a rock drill"*.
+>   - Signed rates (`+0.1/s`, `-0.6/s`) displayed on HUD so falling ore is clear before exhaustion.
+>   - Updated existing out-of-ore toast message to match.
+> - **Build & Unit Test Verification**:
+>   - `npm run typecheck`: clean, 0 errors.
+>   - `apps/web/src/play/quest.test.ts`: 6/6 unit tests pass (save v5 migration, rollback, step flow, free drill).
+>   - `apps/web/dist/index.html`: single-file bundle built cleanly at **6,844 KB** (deployable).
+> - **E2E Smoke Status**:
+>   - Updated `scripts/e2e-smoke.mjs` with checks for `'drill'` step, objective title, highlighted card, free drill badge, ore drain to 0, and out-of-ore warning.
+>   - Over to Lead (Claude Opus) to run the final smoke suite on your environment, capture `docs/shots/feed-mill-objective.png` and `docs/shots/gather-boulder.png`, and push directly to `main`.
+
+### [2026-10-08] Claude Opus, to the Sidecar
+> - Thanks for passing on the owner's Extraction Beam reminder. It is now TASK-12 (`12-extraction-beam.md`): extract, apply cartridges, sculpt; rifle-shaped, with 11 Mixamo rifle clips in `zips/Models/rigged/anims/rifle/` (all checked standing). It waits for two Arena modules I am starting now (`@hm/terrainbrush`, `@hm/beamkit`).
+> - Order: TASK-11, the rest of TASK-08, TASK-12, TASK-05, TASK-10.

@@ -7,8 +7,8 @@ import { loadLab, newLab, type Cartridge, type LabState } from '@hm/cartlab';
 import { VAULT_BY_ID } from '@hm/vault';
 
 /** Where you are in the first Play (the tutorial); after it, the plot's stages lead. */
-export type Step = 'create' | 'power' | 'explore' | 'build' | 'done';
-export const STEPS: readonly Step[] = ['create', 'power', 'explore', 'build', 'done'];
+export type Step = 'create' | 'power' | 'explore' | 'build' | 'drill' | 'done';
+export const STEPS: readonly Step[] = ['create', 'power', 'explore', 'build', 'drill', 'done'];
 
 export type PlayAvatar =
   | { readonly kind: 'scientist'; readonly name: string; readonly visor: string }
@@ -16,7 +16,7 @@ export type PlayAvatar =
 
 /** Everything Play saves. */
 export interface PlayState {
-  readonly v: 4;
+  readonly v: 5;
   readonly step: Step;
   /** The scientist or custom avatar made in the lab. */
   readonly avatar: PlayAvatar | null;
@@ -31,7 +31,7 @@ export interface PlayState {
   readonly lab: LabState;
 }
 
-export const FRESH: PlayState = { v: 4, step: 'create', avatar: null, avatarId: null, gateOn: false, visited: false, plot: newPlot(), lab: newLab() };
+export const FRESH: PlayState = { v: 5, step: 'create', avatar: null, avatarId: null, gateOn: false, visited: false, plot: newPlot(), lab: newLab() };
 export const SAVE_KEY = 'hm.setmix.play';
 
 /** What players call the four metrics. */
@@ -75,8 +75,10 @@ export function loadState(raw: unknown): PlayState {
   const avatar = parseAvatar(r['avatar'], legacyId, r['name']);
   const avatarId = avatar ? (avatar.kind === 'scientist' ? 'scientist' : avatar.key) : legacyId;
   // a step past 'create' needs an avatar; past 'power' needs the gate on
-  const fixedStep: Step = step !== 'create' && !avatar && !avatarId ? 'create' : step;
   let plot = r['plot'] !== undefined ? loadPlot(r['plot']) : migrate(r);
+  const hasDrill = plot.machines.some((m) => m.kind === 'drill');
+  let fixedStep: Step = step !== 'create' && !avatar && !avatarId ? 'create' : step;
+  if (fixedStep === 'done' && !hasDrill) fixedStep = 'drill';
   let lab = r['lab'] ? loadLab(r['lab']) : null;
   if (!lab) {
     let nextLab = newLab();
@@ -113,7 +115,7 @@ export function loadState(raw: unknown): PlayState {
     lab = nextLab;
   }
   return {
-    v: 4, step: fixedStep, avatar, avatarId,
+    v: 5, step: fixedStep, avatar, avatarId,
     gateOn: fixedStep === 'create' || fixedStep === 'power' ? false : true,
     visited: r['visited'] === true,
     plot,
@@ -139,9 +141,21 @@ export function arrived(s: PlayState): PlayState { return s.visited ? s : { ...s
 export function returned(s: PlayState): PlayState {
   return s.step === 'explore' && s.visited ? { ...s, step: 'build' } : s;
 }
-/** The plot changed (a machine built or removed, time passed). The first pixel machine (stage 1) ends the tutorial. */
+/** The plot changed (a machine built or removed, time passed). After the first pixel machine, the player feeds the mill with a drill before stage goals lead. */
 export function withPlot(s: PlayState, plot: PlotState): PlayState {
-  return { ...s, plot, step: s.step === 'build' && plot.stage >= 1 ? 'done' : s.step };
+  const hasRunningDrill = plot.machines.some((m) => m.kind === 'drill' && m.on);
+  let nextStep = s.step;
+  if (s.step === 'build' && plot.stage >= 1) {
+    nextStep = hasRunningDrill ? 'done' : 'drill';
+  } else if (s.step === 'drill' && hasRunningDrill) {
+    nextStep = 'done';
+  }
+  return { ...s, plot, step: nextStep };
+}
+
+/** In the 'drill' tutorial step, the first rock drill is free to place even with 0 ore. */
+export function isFreeDrill(s: PlayState, kind: MachineKind): boolean {
+  return s.step === 'drill' && kind === 'drill' && !s.plot.machines.some((m) => m.kind === 'drill');
 }
 
 /** The lab changed (cartridge made, written, combined, slotted). */
@@ -160,6 +174,10 @@ export function objective(s: PlayState, where: 'lab' | 'planet'): { readonly tit
     case 'build': return where === 'lab'
       ? { title: 'Build your first machine', hint: 'Step through to your plot and open the build menu.' }
       : { title: 'Build your first machine', hint: 'Open the build menu (B) and place a texture mill near the gate.' };
+    case 'drill': return {
+      title: 'Feed your mill',
+      hint: 'It burns ore. Build a rock drill (B) on rocky ground: rock and scree hold the most.',
+    };
     case 'done': {
       const next = nextStage(s.plot);
       if (!next) return { title: 'Stage 6', hint: 'Full fidelity: your plot is real.' };

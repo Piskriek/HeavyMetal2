@@ -755,9 +755,35 @@ try {
   await page.waitForFunction(() => window.hmPlay.where === 'planet', null, { timeout: T(8000) });
   check('a mill too far from the gate is refused', await dom(() => { const g = window.hmPlay.gate(); return !window.hmPlay.placeAt(g.x + 60, g.z); }));
   check('the first mill stands near the gate', await dom(() => { const g = window.hmPlay.gate(); return window.hmPlay.placeAt(g.x + 7, g.z + 5); }));
-  check('the first machine lifts the plot to stage 1', await dom(() => window.hmPlay.state().step === 'done' && window.hmPlay.plot().stage === 1));
+  check('the first machine lifts the plot to stage 1', await dom(() => window.hmPlay.state().step === 'drill' && window.hmPlay.plot().stage === 1));
+  check('objective is "Feed your mill"', await dom(() => document.querySelector('.play-goal h2')?.textContent === 'Feed your mill'));
+  await page.keyboard.press('KeyB');
+  await page.waitForSelector('.play-card.highlighted', { timeout: T(5000) });
+  check('the rock drill card is highlighted in the build menu', await page.locator('.play-card.highlighted').count() === 1);
+  check('the first drill is marked free', await dom(() => document.querySelector('.play-card.highlighted em')?.textContent?.includes('Free') ?? false));
+  await page.evaluate(() => { [...document.querySelectorAll('.play-toast')].forEach((el) => el.remove()); });
+  await page.screenshot({ path: 'docs/shots/feed-mill-objective.png' });
+  await page.keyboard.press('KeyB');
+  await page.waitForTimeout(T(300));
+
+  // soft-lock prevention tests (TASK-11):
+  // 1. drain ore to 0
+  await dom(() => window.hmPlay.drain());
+  check('draining ore sets ore to 0', await dom(() => window.hmPlay.plot().ore === 0));
+  check('out of ore HUD line warns player', await dom(() => document.querySelector('.play-ore.out-of-ore') !== null && /Out of ore: hold E on a boulder, or build a rock drill/.test(document.querySelector('.play-ore-warn')?.textContent ?? '')));
+
+  // 2. hand gather ore from a boulder
+  await page.evaluate(() => { [...document.querySelectorAll('.play-toast')].forEach((el) => el.remove()); });
+  await dom(() => window.hmPlay.gather(2));
+  check('gathering ore by hand increases ore', await dom(() => window.hmPlay.plot().ore >= 5.5));
+  await page.screenshot({ path: 'docs/shots/gather-boulder.png' });
+
+  // 3. drain back to 0 and verify the first rock drill can be placed for free at 0 ore
+  await dom(() => window.hmPlay.drain());
+  check('ore is 0 before placing free drill', await dom(() => window.hmPlay.plot().ore === 0));
   // the plot's game loop (STATUS SM30): a drill mines ore, a press needs stage 1, the build menu lists every machine
   check('a rock drill stands on the plot and mines ore', await dom(() => { const g = window.hmPlay.gate(); return window.hmPlay.placeAt(g.x - 8, g.z + 6, 'drill'); }));
+  check('the quest step moves to done once a drill runs', await dom(() => window.hmPlay.state().step === 'done'));
   const oreBefore = await dom(() => window.hmPlay.plot().ore);
   await page.waitForTimeout(T(3000));
   check('ore rises while the drill runs', await dom(() => window.hmPlay.plot().ore) > oreBefore, String(oreBefore));

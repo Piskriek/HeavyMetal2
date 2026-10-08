@@ -10,7 +10,7 @@ import type { StageLook } from '../crafter/looks';
 import { createWorld, PLANET_DIR, SUN, type Neighbour, type World } from '../crafter/world';
 import { createPlume, type PlumeMode } from '@hm/plume';
 import { GATE, KINDS, type Machine, type MachineKind, type PlotState } from '@hm/plotsim';
-import { createPlotGround, type PlotGround } from './plot-ground';
+import { createPlotGround, type BoulderInfo, type PlotGround } from './plot-ground';
 import { fx as sfx } from '../maker/feedback';
 import * as kit from '@hm/labkit';
 import { createLabRoom, GATE_AT, POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, ROOM, type LabRoom } from './lab-room';
@@ -45,6 +45,8 @@ export interface FrameOut {
   readonly ghost: { readonly ok: boolean; readonly why: string } | null;
   /** The machine you are looking at, close enough to use (its plot id), when not building. */
   readonly aimed: number | null;
+  /** The boulder with ore you are looking at, close enough to gather from. */
+  readonly aimedBoulder: number | null;
   /** The lab machine you are looking at, close enough to use. */
   readonly aimedLab: LabMachineKind | null;
   /** The stage the picture shows (a wave brings the next one across the plot). */
@@ -118,6 +120,8 @@ export interface PlayScene {
   playAction(kind: OneShotKind): void;
   /** Updates the scientist avatar appearance. */
   setAvatar(avatar: PlayAvatar | null): void;
+  /** Gathers ore from a boulder. */
+  gatherBoulder(id: number, amount: number): number;
   /**
    * Compiles every shader the frames will need, for each place it draws, behind the loading bar: a compile mid-play is a hitch the
    * display governor would read as a slow machine (and the owner's rule is never to start a screen choppy).
@@ -136,6 +140,9 @@ export interface PlayScene {
     clipWeight(name: ClipName): number;
     currentOneShot(): OneShotKind | null;
     animator(): ScientistAnimator | null;
+    gather(amount: number): number;
+    aimedBoulder(): number | null;
+    boulders(): readonly BoulderInfo[];
   };
   dispose(): void;
 }
@@ -549,6 +556,8 @@ export function createPlayScene(o: {
     plume.setViewport(ph);
   };
 
+  let lastAimedBoulder: number | null = null;
+
   const api: PlayScene = {
     setPlanet(base, plot, neighbours) {
       if (world) return;
@@ -785,6 +794,7 @@ export function createPlayScene(o: {
       const mainPower = powerT >= 0 ? powerAt(powerT).main : (gateOn ? 1 : 0);
       holo.update(now, dt, mainPower, waveTo >= 0 ? r : -1);
       // the ground's chunks follow you on the planet; from the lab, they stay round the gate
+      ground?.regrow(dt);
       ground?.update(where === 'planet' ? pos.x : 0, where === 'planet' ? pos.z : 0);
       labScene.environmentIntensity = room.envLevel();
       world?.update(now, dt, where === 'planet' ? camera.position : virtual.position);
@@ -815,8 +825,9 @@ export function createPlayScene(o: {
         }
         drawPlanet(camera, null, false);
       }
-      // ---- what you are looking at: a machine on the planet within reach of your hand, or the lab's main lever, or lab machines
+      // ---- what you are looking at: a machine on the planet within reach of your hand, a boulder with ore, the lab's main lever, or lab machines
       let aimed: number | null = null;
+      let aimedBoulder: number | null = null;
       if (where === 'planet' && !building) {
         const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
         let best = 6;
@@ -826,7 +837,25 @@ export function createPlayScene(o: {
           if (t <= 0 || t >= best) continue;
           if (c.addScaledVector(dir, -t).length() < KINDS[v.m.kind].radius + 0.4) { best = t; aimed = v.m.id; }
         }
+        if (ground) {
+          const bId = ground.findAimedBoulder(pos, dir, 5.0);
+          if (bId !== null) {
+            if (aimed !== null) {
+              const bInfo = ground.getBoulders().find((b) => b.id === bId);
+              if (bInfo) {
+                const bDist = Math.hypot(bInfo.x - pos.x, bInfo.z - pos.z);
+                if (bDist < best) {
+                  aimed = null;
+                  aimedBoulder = bId;
+                }
+              }
+            } else {
+              aimedBoulder = bId;
+            }
+          }
+        }
       }
+      lastAimedBoulder = aimedBoulder;
       let atLever = false;
       let atDial = false;
       let aimedLab: LabMachineKind | null = null;
@@ -857,7 +886,7 @@ export function createPlayScene(o: {
       }
       const ev = pendingEvent;
       pendingEvent = null;
-      return { where, sync, atLever, atDial, ghost: building ? ghostVerdict : null, aimed, aimedLab, stage: shown, event: ev };
+      return { where, sync, atLever, atDial, ghost: building ? ghostVerdict : null, aimed, aimedBoulder, aimedLab, stage: shown, event: ev };
     },
     resize(width, height, pixelRatio) {
       renderer.setPixelRatio(pixelRatio);
@@ -894,6 +923,9 @@ export function createPlayScene(o: {
     },
     setAvatar(avatar) {
       if (avatar?.kind === 'scientist') setVisorColor(avatar.visor);
+    },
+    gatherBoulder(id, amount) {
+      return ground?.gather(id, amount) ?? 0;
     },
     warm() {
       // each scene for each place it draws to (the screen's colour space differs from the targets'), hidden things included (the
@@ -941,6 +973,14 @@ export function createPlayScene(o: {
       clipWeight: (name: ClipName) => scientistAnimator?.getClipWeight(name) ?? 0,
       currentOneShot: () => scientistAnimator?.currentOneShot ?? null,
       animator: () => scientistAnimator,
+      gather(amount) {
+        if (!ground) return 0;
+        const targetId = lastAimedBoulder ?? ground.findNearestBoulder(pos);
+        if (targetId === null) return 0;
+        return ground.gather(targetId, amount);
+      },
+      aimedBoulder: () => lastAimedBoulder,
+      boulders: () => ground?.getBoulders() ?? [],
     },
     dispose() {
       scientistAnimator?.dispose();

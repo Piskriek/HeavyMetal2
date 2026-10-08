@@ -36,7 +36,7 @@ import {
   type LabState,
 } from '@hm/cartlab';
 import { fx } from '../maker/feedback';
-import { FRESH, METRIC_COLOUR, METRIC_NAME, SAVE_KEY, arrived, created, loadState, objective, poweredOn, returned, withLab, withPlot, type PlayState } from './quest';
+import { FRESH, METRIC_COLOUR, METRIC_NAME, SAVE_KEY, arrived, created, isFreeDrill, loadState, objective, poweredOn, returned, withLab, withPlot, type PlayState } from './quest';
 import { encodePlot, decodePlot, plotOfSnapshot } from './plot-code';
 import type { Snapshot } from '@hm/plotcodec';
 import './play.css';
@@ -67,7 +67,7 @@ function save(s: PlayState): void { try { kv.set(SAVE_KEY, JSON.stringify(s)); }
 
 /** The plot's numbers for the HUD. */
 interface PlotHud { readonly ore: number; readonly oreRate: number; readonly supply: number; readonly demand: number; readonly levels: Readonly<Record<Metric, number>>; readonly stage: number }
-interface Hud { readonly where: FrameOut['where']; readonly sync: number; readonly atLever: boolean; readonly atDial: boolean; readonly ghost: FrameOut['ghost']; readonly aimed: number | null; readonly aimedLab: FrameOut['aimedLab']; readonly plot: PlotHud; readonly visitingOwner: string | null }
+interface Hud { readonly where: FrameOut['where']; readonly sync: number; readonly atLever: boolean; readonly atDial: boolean; readonly ghost: FrameOut['ghost']; readonly aimed: number | null; readonly aimedBoulder: FrameOut['aimedBoulder']; readonly aimedLab: FrameOut['aimedLab']; readonly plot: PlotHud; readonly visitingOwner: string | null }
 const NO_PLOT: PlotHud = { ore: 0, oreRate: 0, supply: 0, demand: 0, levels: { pxd: 0, vtx: 0, lx: 0, aq: 0 }, stage: 0 };
 /** The build menu, in the order the plot needs them. */
 const BUILD_ORDER: readonly MachineKind[] = ['mill', 'drill', 'pylon', 'press', 'power', 'projector', 'water'];
@@ -95,7 +95,8 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
   useEffect(() => { pausedRef.current = paused; }, [paused]);
   const [menu, setMenu] = useState(false);
   const [building, setBuilding] = useState<MachineKind | null>(null);
-  const [hud, setHud] = useState<Hud>({ where: 'lab', sync: 1, atLever: false, atDial: false, ghost: null, aimed: null, aimedLab: null, plot: NO_PLOT, visitingOwner: null });
+  const [hud, setHud] = useState<Hud>({ where: 'lab', sync: 1, atLever: false, atDial: false, ghost: null, aimed: null, aimedBoulder: null, aimedLab: null, plot: NO_PLOT, visitingOwner: null });
+  const firstGatherRef = useRef(false);
   /** The machine whose panel is open (its plot id). */
   const [panel, setPanel] = useState<number | null>(null);
   /** The lab machine whose panel is open ('rack' | 'bench' | 'combiner'). */
@@ -248,8 +249,11 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       }
       if (!env || scene.debug.where() !== 'planet') return false;
       const before = plotRef.current;
-      if (!canPlace(before, env, kind, x, z).ok) return false;
-      const after = place(before, env, kind, x, z, yaw);
+      const isFree = isFreeDrill(stateRef.current, kind);
+      const checkPlot = isFree ? { ...before, ore: Math.max(before.ore, KINDS[kind].cost) } : before;
+      if (!canPlace(checkPlot, env, kind, x, z).ok) return false;
+      const placed = place(checkPlot, env, kind, x, z, yaw);
+      const after = isFree ? { ...placed, ore: before.ore } : placed;
       plotRef.current = after;
       commit(withPlot(stateRef.current, after));
       scene.setPlot(after, running(after, env), network(after, env).connected);
@@ -299,6 +303,24 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       }
       if (out.event === 'stage-up') say(`Stage ${out.stage}`, STAGE_SAYS[out.stage] ?? '');
       if (s !== stateRef.current) commit(withLab(withPlot(s, plotRef.current), labRef.current));
+
+      // ---- hand gathering ore from boulders on the plot: hold E to gather 3 ore/s
+      let plotChanged = false;
+      if (live && !visitingRef.current && out.where === 'planet' && out.aimedBoulder !== null && keys.has('KeyE')) {
+        const mined = scene.gatherBoulder(out.aimedBoulder, 3 * dt);
+        if (mined > 0) {
+          plotRef.current = { ...plotRef.current, ore: Math.min(1e5, plotRef.current.ore + mined) };
+          plotChanged = true;
+          if (scene.getCameraView() === 'third' && scene.debug.currentOneShot() !== 'plant') {
+            scene.playAction('plant');
+          }
+          if (!firstGatherRef.current) {
+            firstGatherRef.current = true;
+            say('Ore gathered by hand.', 'A rock drill mines it for you.');
+          }
+        }
+      }
+
       // ---- the lab runs every frame
       const labEnv: LabEnv = { presets: VAULT, stage: plotRef.current.stage, powered: stateRef.current.gateOn };
       const labRes = stepCartlab(labRef.current, labEnv, dt);
@@ -316,13 +338,12 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       }
       scene.setLabActivity(labActivity(labRef.current, labEnv));
       // ---- the plot runs, in the lab too
-      let plotChanged = false;
       if (env && stateRef.current.step !== 'create') {
         const r = stepPlot(plotRef.current, env, dt);
         plotRef.current = r.state;
         for (const e of r.events) {
           if (e.type === 'stage-up' && e.stage >= 2 && !visitingRef.current) scene.raiseStage(e.stage, env.gate);
-          if (e.type === 'ore-out' && !visitingRef.current) say('Out of ore', 'Build a rock drill on rocky ground.');
+          if (e.type === 'ore-out' && !visitingRef.current) say('Out of ore', 'Hold E on a boulder, or build a rock drill.');
           if (e.type === 'underpowered' && !visitingRef.current) say('Not enough power', 'Build a power unit, or switch a machine off.');
         }
         if (r.events.length) plotChanged = true;
@@ -358,6 +379,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
             atDial: out.atDial,
             ghost: out.ghost,
             aimed: out.aimed,
+            aimedBoulder: out.aimedBoulder,
             aimedLab: out.aimedLab,
             visitingOwner: vis.snapshot.owner,
             plot: { ore: 0, oreRate: 0, supply: 0, demand: 0, levels, stage: vp.stage },
@@ -372,6 +394,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
             atDial: out.atDial,
             ghost: out.ghost,
             aimed: out.aimed,
+            aimedBoulder: out.aimedBoulder,
             aimedLab: out.aimedLab,
             visitingOwner: null,
             plot: { ore: p.ore, oreRate: rt?.ore ?? 0, supply: rt?.supply ?? 0, demand: rt?.demand ?? 0, levels, stage: p.stage },
@@ -397,6 +420,25 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       placeAt: (x: number, z: number, kind: MachineKind = 'mill') => { const g = scene.debug.gatePlanet(); return tryPlace(kind, x, z, Math.atan2(x - g.x, z - g.z)); },
       plot: () => (visitingRef.current ? visitingRef.current.plot : plotRef.current),
       give: (ore: number) => { plotRef.current = { ...plotRef.current, ore: plotRef.current.ore + ore }; },
+      drain: () => {
+        plotRef.current = { ...plotRef.current, ore: 0 };
+        setHud((h) => ({ ...h, plot: { ...h.plot, ore: 0 } }));
+      },
+      gather: (seconds = 1) => {
+        const amount = seconds * 3;
+        const gathered = scene.debug.gather(amount);
+        if (gathered > 0) {
+          plotRef.current = { ...plotRef.current, ore: Math.min(1e5, plotRef.current.ore + gathered) };
+          if (scene.getCameraView() === 'third') scene.playAction('plant');
+          if (!firstGatherRef.current) {
+            firstGatherRef.current = true;
+            say('Ore gathered by hand.', 'A rock drill mines it for you.');
+          }
+        }
+        return gathered;
+      },
+      boulder: () => scene.debug.aimedBoulder(),
+      boulders: () => scene.debug.boulders(),
       machines: () => scene.debug.machines(),
       state: () => stateRef.current,
       detail: () => scene.debug.detail(),
@@ -550,7 +592,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [ready, creating, building, menu, panel, labPanel, dialOpen, locked, paused, hud.atLever, hud.atDial, hud.aimed, hud.aimedLab, hud.where, placeNow, stopBuilding, freeMouse, say, props.profile]);
+  }, [ready, creating, building, menu, panel, labPanel, dialOpen, locked, paused, hud.atLever, hud.atDial, hud.aimed, hud.aimedBoulder, hud.aimedLab, hud.where, placeNow, stopBuilding, freeMouse, say, props.profile]);
   useEffect(() => {
     const onClick = (): void => { if (building && locked) placeNow(); };
     window.addEventListener('mousedown', onClick);
@@ -566,7 +608,12 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
     setMenu(false);
     setBuilding(kind);
     const env = envRef.current;
-    sceneRef.current?.setBuilding(kind, env ? (x, z) => { const v = canPlace(plotRef.current, env, kind, x, z); return v.ok ? { ok: true, why: '' } : v; } : undefined);
+    const isFree = isFreeDrill(stateRef.current, kind);
+    sceneRef.current?.setBuilding(kind, env ? (x, z) => {
+      const checkPlot = isFree ? { ...plotRef.current, ore: Math.max(plotRef.current.ore, KINDS[kind].cost) } : plotRef.current;
+      const v = canPlace(checkPlot, env, kind, x, z);
+      return v.ok ? { ok: true, why: '' } : v;
+    } : undefined);
     if (!locked) lock();
   };
   const goal = objective({ ...state, plot: plotRef.current }, hud.where);
@@ -575,6 +622,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
     ? (hud.ghost?.ok ? `Click or E: build the ${KINDS[building].name.toLowerCase()}` : hud.ghost?.why || 'Aim at the ground near the gate.')
     : hud.atLever ? 'E: pull the main lever'
     : hud.atDial ? 'E: plot dial'
+    : hud.where === 'planet' && hud.aimedBoulder !== null && !visiting ? 'Hold E: gather ore'
     : hud.where === 'planet' && hud.aimed !== null && panel === null ? `E: open the ${KINDS[(visiting ? visiting.plot.machines : plotRef.current.machines).find((x) => x.id === hud.aimed)?.kind ?? 'mill'].name.toLowerCase()}`
     : hud.where === 'lab' && hud.aimedLab !== null && labPanel === null ? `E: open the ${hud.aimedLab === 'rack' ? 'cartridge rack' : hud.aimedLab === 'bench' ? 'preset bench' : 'preset combiner'}`
     : '';
@@ -610,19 +658,26 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
           ) : null}
           <i className="play-dot" aria-hidden="true" />
           {prompt ? <p className={`play-prompt${building && !hud.ghost?.ok ? ' bad' : ''}`}>{prompt}</p> : null}
-          {state.step === 'build' || state.step === 'done' || visiting ? (
+          {state.step === 'build' || state.step === 'drill' || state.step === 'done' || visiting ? (
             <section className="play-plot" aria-label={visiting ? `Visiting ${visiting.snapshot.owner}'s plot` : 'Your plot'}>
               {visiting ? (
                 <div className="play-visiting-banner">
                   <span>Visiting <b>{visiting.snapshot.owner}</b></span>
                   <em>Stage {visiting.plot.stage}</em>
                 </div>
-              ) : (
-                <>
-                  <p className="play-ore"><b>{Math.floor(hud.plot.ore)}</b> ore <span>{signed(hud.plot.oreRate)}/s</span></p>
-                  <p className={`play-power${hud.plot.demand > hud.plot.supply + 1e-6 ? ' short' : ''}`}><b>{hud.plot.demand.toFixed(0)}</b> of {hud.plot.supply.toFixed(0)} kW</p>
-                </>
-              )}
+              ) : (() => {
+                const hasDrill = plotRef.current.machines.some((m) => m.kind === 'drill');
+                const outOfOreNoDrill = hud.plot.ore <= 0 && !hasDrill;
+                return (
+                  <>
+                    <p className={`play-ore${outOfOreNoDrill ? ' out-of-ore' : ''}`}>
+                      <b>{Math.floor(hud.plot.ore)}</b> ore <span>{signed(hud.plot.oreRate)}/s</span>
+                      {outOfOreNoDrill ? <em className="play-ore-warn">Out of ore: hold E on a boulder, or build a rock drill</em> : null}
+                    </p>
+                    <p className={`play-power${hud.plot.demand > hud.plot.supply + 1e-6 ? ' short' : ''}`}><b>{hud.plot.demand.toFixed(0)}</b> of {hud.plot.supply.toFixed(0)} kW</p>
+                  </>
+                );
+              })()}
               <ul className="play-levels">
                 {METRICS.map((m) => (
                   <li key={m} style={{ '--c': METRIC_COLOUR[m] } as CSSProperties}>
@@ -637,12 +692,15 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
               <h3>Build</h3>
               <div className="play-cards">
                 {BUILD_ORDER.map((k) => {
-                  const spec = KINDS[k], shut = hud.plot.stage < spec.unlock, short = hud.plot.ore < spec.cost;
+                  const spec = KINDS[k], shut = hud.plot.stage < spec.unlock;
+                  const isFree = isFreeDrill(stateRef.current, k);
+                  const short = !isFree && hud.plot.ore < spec.cost;
+                  const highlighted = state.step === 'drill' && k === 'drill';
                   return (
-                    <button key={k} className={`play-card${shut ? ' shut' : ''}${short ? ' short' : ''}`} disabled={shut} onClick={() => startBuilding(k)} autoFocus={k === 'mill'}>
+                    <button key={k} className={`play-card${shut ? ' shut' : ''}${short ? ' short' : ''}${highlighted ? ' highlighted' : ''}`} disabled={shut} onClick={() => startBuilding(k)} autoFocus={k === (state.step === 'drill' ? 'drill' : 'mill')}>
                       <b>{spec.name}</b>
                       <span>{BLURB[k]}</span>
-                      <em>{shut ? `Unlocks at stage ${spec.unlock}` : `${spec.cost} ore`}</em>
+                      <em>{shut ? `Unlocks at stage ${spec.unlock}` : isFree ? 'Free' : `${spec.cost} ore`}</em>
                     </button>
                   );
                 })}

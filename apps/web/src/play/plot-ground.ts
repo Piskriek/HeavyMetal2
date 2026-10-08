@@ -8,6 +8,15 @@ import { createGroundMaterial, makeGroundTextures, setStage as setGroundStage } 
 import { drop } from '../crafter/planet';
 import { smoothModel, type SmoothId } from '../crafter/smooth-models';
 
+export interface BoulderInfo {
+  readonly id: number;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly size: number;
+  readonly ore: number;
+}
+
 export interface PlotGround {
   readonly terrain: Terrain;
   /** The ground's height at x, z, the planet's curve included. */
@@ -21,6 +30,16 @@ export interface PlotGround {
   triangles(): number;
   /** Shows or hides the ground (the tests measure what it costs). */
   setVisible(on: boolean): void;
+  /** Gathers up to `amount` ore from boulder `id`. Shrinks as taken and crumbles when empty. */
+  gather(id: number, amount: number): number;
+  /** Finds the boulder with ore aimed at by the ray from `origin` in `dir` within `maxDist`. */
+  findAimedBoulder(origin: THREE.Vector3, dir: THREE.Vector3, maxDist?: number): number | null;
+  /** Finds the nearest boulder with ore to `origin`. */
+  findNearestBoulder(origin: THREE.Vector3): number | null;
+  /** Advances boulder regrowth slowly over a few minutes near rock and scree. */
+  regrow(dt: number): void;
+  /** Returns boulder states for debug and inspection. */
+  getBoulders(): readonly BoulderInfo[];
   dispose(): void;
 }
 
@@ -28,6 +47,20 @@ export interface PlotGround {
 const CELLS = 32, MIN_SIZE = 16, SKIRT = 2, EXTENT = 4096;
 /** Boulders stand within this square round the gate. */
 const BOULDER_SPAN = 320;
+/** Each boulder holds about 40 ore when full. */
+export const BOULDER_INITIAL_ORE = 40;
+
+interface TrackedBoulder {
+  readonly id: number;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly size: number;
+  readonly shape: number;
+  readonly instanceIndex: number;
+  readonly baseMatrix: THREE.Matrix4;
+  ore: number;
+}
 
 export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number; readonly sunDir: THREE.Vector3; readonly stage: number; readonly textureSize: number; readonly budget: number }): PlotGround {
   const terrain = createTerrain({ seed: o.seed });
@@ -76,10 +109,25 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
   const rockMat = new THREE.MeshStandardMaterial({ color: '#7d756b', roughness: 0.92, metalness: 0, flatShading: flat });
   const boulders = terrain.boulders(-BOULDER_SPAN / 2, -BOULDER_SPAN / 2, BOULDER_SPAN);
   const byShape: THREE.Matrix4[][] = [[], [], []];
+  const trackedBoulders: TrackedBoulder[] = [];
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(), e = new THREE.Euler();
   boulders.forEach((b, i) => {
     const y = terrain.height(b.x, b.z) - drop(b.x, b.z) - b.size * 0.2;
-    byShape[i % 3]!.push(m4.compose(p.set(b.x, y, b.z), q.setFromEuler(e.set(0, b.yaw, 0)), s.set(b.size, b.size, b.size)).clone());
+    const shape = i % 3;
+    const instanceIndex = byShape[shape]!.length;
+    const baseMat = m4.compose(p.set(b.x, y, b.z), q.setFromEuler(e.set(0, b.yaw, 0)), s.set(b.size, b.size, b.size)).clone();
+    byShape[shape]!.push(baseMat);
+    trackedBoulders.push({
+      id: i,
+      x: b.x,
+      y,
+      z: b.z,
+      size: b.size,
+      shape,
+      instanceIndex,
+      baseMatrix: baseMat,
+      ore: BOULDER_INITIAL_ORE,
+    });
   });
   const rocks: THREE.InstancedMesh[] = byShape.map((list, shape) => {
     const model = smoothModel(`boulder${shape}` as SmoothId);
@@ -118,6 +166,91 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
     },
     setVisible(on) { group.visible = on; },
     triangles() { let n = 0; for (const [, mesh] of chunks) n += (mesh.geometry.index?.count ?? 0) / 3; return n; },
+    gather(id, amount) {
+      const b = trackedBoulders[id];
+      if (!b || b.ore <= 0 || amount <= 0) return 0;
+      const mined = Math.min(b.ore, amount);
+      b.ore -= mined;
+      const im = rocks[b.shape];
+      if (im) {
+        if (b.ore <= 0) {
+          b.ore = 0;
+          m4.copy(b.baseMatrix).scale(s.set(0, 0, 0));
+        } else {
+          const factor = Math.cbrt(b.ore / BOULDER_INITIAL_ORE);
+          m4.copy(b.baseMatrix).scale(s.set(factor, factor, factor));
+        }
+        im.setMatrixAt(b.instanceIndex, m4);
+        im.instanceMatrix.needsUpdate = true;
+      }
+      return mined;
+    },
+    findAimedBoulder(origin, dir, maxDist = 5.0) {
+      let bestT = maxDist;
+      let bestId: number | null = null;
+      for (const b of trackedBoulders) {
+        if (b.ore <= 0) continue;
+        const cx = b.x - origin.x;
+        const cy = (b.y + b.size * 0.4) - origin.y;
+        const cz = b.z - origin.z;
+        const t = cx * dir.x + cy * dir.y + cz * dir.z;
+        if (t <= 0 || t >= bestT) continue;
+        const px = cx - dir.x * t;
+        const py = cy - dir.y * t;
+        const pz = cz - dir.z * t;
+        const distSq = px * px + py * py + pz * pz;
+        const hitRadius = b.size * 0.8 + 0.6;
+        if (distSq < hitRadius * hitRadius) {
+          bestT = t;
+          bestId = b.id;
+        }
+      }
+      return bestId;
+    },
+    findNearestBoulder(origin) {
+      let bestDistSq = Infinity;
+      let bestId: number | null = null;
+      for (const b of trackedBoulders) {
+        if (b.ore <= 0) continue;
+        const dx = b.x - origin.x;
+        const dy = b.y - origin.y;
+        const dz = b.z - origin.z;
+        const dSq = dx * dx + dy * dy + dz * dz;
+        if (dSq < bestDistSq) {
+          bestDistSq = dSq;
+          bestId = b.id;
+        }
+      }
+      return bestId;
+    },
+    regrow(dt) {
+      if (dt <= 0) return;
+      let dirty = false;
+      const changed = [false, false, false];
+      for (const b of trackedBoulders) {
+        if (b.ore >= BOULDER_INITIAL_ORE) continue;
+        const mats = terrain.materials(b.x, b.z);
+        const richness = mats[0] + mats[1]; // rock + scree
+        const rate = (BOULDER_INITIAL_ORE / 180) * Math.max(0.12, richness);
+        const prevOre = b.ore;
+        b.ore = Math.min(BOULDER_INITIAL_ORE, b.ore + rate * dt);
+        if (Math.abs(b.ore - prevOre) > 0.01) {
+          const factor = Math.cbrt(b.ore / BOULDER_INITIAL_ORE);
+          m4.copy(b.baseMatrix).scale(s.set(factor, factor, factor));
+          rocks[b.shape]?.setMatrixAt(b.instanceIndex, m4);
+          changed[b.shape] = true;
+          dirty = true;
+        }
+      }
+      if (dirty) {
+        changed.forEach((c, idx) => {
+          if (c && rocks[idx]) rocks[idx]!.instanceMatrix.needsUpdate = true;
+        });
+      }
+    },
+    getBoulders() {
+      return trackedBoulders.map((b) => ({ id: b.id, x: b.x, y: b.y, z: b.z, size: b.size, ore: b.ore }));
+    },
     dispose() {
       for (const [, mesh] of chunks) mesh.geometry.dispose();
       chunks.clear();

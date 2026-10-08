@@ -98,6 +98,13 @@
 .play-levels li b { text-align: right; font-variant-numeric: tabular-nums; }
 .play-card.shut { opacity: .45; cursor: default; border-color: rgba(241, 244, 245, .15); }
 .play-card.short em { color: #ff9a7a; }
+.play-card.highlighted { border-color: var(--amber); box-shadow: 0 0 12px rgba(255, 176, 42, .45); background: rgba(255, 176, 42, .12); }
+.play-card.highlighted em { color: var(--amber); font-weight: 700; }
+
+.play-ore.out-of-ore { color: var(--amber); flex-wrap: wrap; }
+.play-ore.out-of-ore b { color: var(--amber); }
+.play-ore.out-of-ore span { color: rgba(255, 176, 42, .85); }
+.play-ore.out-of-ore .play-ore-warn { display: block; width: 100%; font-style: normal; font-size: 11px; line-height: 1.35; color: var(--amber); margin-top: 2px; }
 
 /* a machine's panel: what it does, whether it runs, on and off, take it down, its cartridge */
 .play-machine { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(560px, calc(100vw - 32px)); max-height: 80vh; overflow: auto; padding: 16px 18px 14px; background: rgba(12, 14, 17, .92); border: 1px solid rgba(241, 244, 245, .14); color: #f1f4f5; }

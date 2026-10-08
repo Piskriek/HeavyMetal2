@@ -920,6 +920,23 @@ try {
   check('stage 4 on low tier caps planet lines to at most 480', detail4.planetLines <= 480 && detail4.planet[1] <= 480, JSON.stringify(detail4));
   await shot('play-stage-4-low');
 
+  // POL-02: plume ground glow under pouring machines on High/Ultra tier, off on Low/Medium
+  await page.keyboard.press('KeyV');
+  await dom(() => { const g = window.hmPlay.gate(); window.hmPlay.go('planet', g.x + 8.8, g.z + 5.5, -0.65, -0.35); });
+  await page.waitForTimeout(T(300));
+  check('on low tier plume ground glow is off by default', await dom(() => window.hmPlay.plumeGlowCount() === 0));
+  await shot('plume-ground-glow-off');
+
+  await dom(() => window.hmPlay.setPlumeGlow(true));
+  await page.waitForTimeout(T(300));
+  check('enabling plume ground glow illuminates the ground under running pouring machines', await dom(() => window.hmPlay.plumeGlowCount() > 0));
+  await shot('plume-ground-glow-on');
+
+  await dom(() => window.hmPlay.setPlumeGlow(false));
+  await page.waitForTimeout(T(200));
+  check('disabling plume ground glow hides the glow meshes', await dom(() => window.hmPlay.plumeGlowCount() === 0));
+  await page.keyboard.press('KeyV');
+
   // teleport back into the lab with the gate on, standing ~2 m away from the planet table looking at it (-z)
   await dom(() => window.hmPlay.go('lab', -3.6, -3.0, 0, -0.32));
   await page.waitForTimeout(T(300));

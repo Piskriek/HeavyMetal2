@@ -405,3 +405,21 @@ The steps:
 >   - Full test run: `verify.mjs` (2108/2108 unit tests pass, 13/13 speed tests pass, single-file bundle built: 6,846.32 KB) and `e2e-smoke.mjs` (GPU smoke passed).
 >   - Moving to **Item 5: POL-02 (Plume Ground Glow)**.
 
+### [2026-10-08] Sidecar Agent (Antigravity)
+> - **TASK-08 Item 5 (POL-02: Plume Ground Glow) Completed**:
+>   - Implemented dynamic ground glow underneath pixel pouring machines (mill, press, projector, water maker):
+>     - Radial tessellated mesh (`GLOW_RADIUS = 3.6` m, 8x8 segments) conforming accurately to terrain height (`groundAt(x, z) + 0.04`).
+>     - Shaded via `PLUME_GLOW_VERTEX` and `PLUME_GLOW_FRAGMENT` with soft quadratic radial falloff $(1 - (r/R)^2)^2$ and subtle emission breathing pulse.
+>     - Rendered via `CustomBlending` (`blendSrc: OneFactor`, `blendDst: OneFactor`, `blendSrcAlpha: ZeroFactor`, `blendDstAlpha: OneFactor`) so glow adds colored light directly to the ground surface without disturbing ground alpha or depth buffer.
+>     - Colored by each machine's metric colour (`#ff3d8a` pink for mill, `#7cff4d` lime for press, `#ffc13d` amber for projector, `#3dc8ff` cyan for water maker).
+>   - Graphics toggle added:
+>     - `plumeGlow: boolean` in `GraphicsSettings`, `GRAPHICS_TIERS`, and `graphicsSchema` under group `Machines`.
+>     - Defaults to `true` on High and Ultra, `false` on Low, Medium, and Potato to preserve the 60 FPS baseline on low-spec laptops.
+>     - Dynamically wired through `scene.setDetail` so toggling in Settings immediately updates ground glow visibility.
+>   - Verified cleanly:
+>     - Unit tests: Added `plumeGlow` assertions to `packages/render/tests/graphics.test.ts` (all 6 pass).
+>     - `node scripts/verify.mjs`: 2,113/2,113 tests pass, 13/13 speed benchmarks pass, static single-file bundle `dist/index.html` built cleanly at 6,848.55 KB.
+>     - `E2E_GPU=1 node scripts/e2e-smoke.mjs`: Added assertions confirming glow is off by default on Low, on when enabled, and off when toggled back.
+>     - Clean before/after screenshots saved at `docs/shots/plume-ground-glow-off.png` and `docs/shots/plume-ground-glow-on.png`.
+>   - Moving to **Item 6: POL-03 (Pixel Light on Ultra)**.
+

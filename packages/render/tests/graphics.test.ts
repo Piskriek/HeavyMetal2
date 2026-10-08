@@ -47,3 +47,9 @@ test('the pixel plumes: dither sprites on potato, cubes from low up, never off b
   assert.equal(resolveGraphics('low', { plumeDensity: 2 }).plumeDensity, 2);
   assert.equal(resolveGraphics('low', { plumeDensity: 0 }).plumeDensity, 0.75, 'below the hard limit is refused');
 });
+
+test('the plume ground glow: off on potato, low and medium, on on high and ultra; your own wins', () => {
+  assert.deepEqual(['potato', 'low', 'medium', 'high', 'ultra'].map((x) => GRAPHICS_TIERS[x as 'low'].plumeGlow), [false, false, false, true, true]);
+  assert.equal(resolveGraphics('low', { plumeGlow: true }).plumeGlow, true);
+  assert.equal(resolveGraphics('ultra', { plumeGlow: false }).plumeGlow, false);
+});

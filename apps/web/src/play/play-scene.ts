@@ -15,7 +15,7 @@ import { fx as sfx } from '../maker/feedback';
 import * as kit from '@hm/labkit';
 import { createLabRoom, GATE_AT, POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, ROOM, type LabRoom } from './lab-room';
 import { createPlotHolo, type PlotHolo } from './plot-holo';
-import { COLOUR_MARK_FRAGMENT, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_VERTEX, POST_FRAGMENT, QUAD_VERTEX } from './portal-shaders';
+import { COLOUR_MARK_FRAGMENT, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX } from './portal-shaders';
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
 import { disposeProp, lineSpan, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
 import { createScientistInstance } from '../avatar/scientist/scientist-model';
@@ -60,6 +60,8 @@ export interface Detail {
   readonly plumes: PlumeMode; readonly plumeDensity: number; readonly groundBudget: number;
   /** The most lines the planet is drawn at (the later stages' resolution is capped on the light tiers). */
   readonly planetLines: number;
+  /** A soft coloured glow on the ground under each pouring machine. */
+  readonly plumeGlow: boolean;
 }
 
 const EYE = 1.68, RADIUS = 0.3, WALK = 3.0, RUN = 5.6;
@@ -144,6 +146,7 @@ export interface PlayScene {
     aimedBoulder(): number | null;
     boulders(): readonly BoulderInfo[];
     twinStage(): number;
+    plumeGlowCount(): number;
   };
   dispose(): void;
 }
@@ -259,7 +262,7 @@ export function createPlayScene(o: {
 
   // ---- the plot's machines (`@hm/plotsim`): each a prop (machine-props.ts) on the ground, its cable from the node that powers it,
   // the lines between pylons, and the pixels pouring from every pixel machine that runs (one plume for all, `@hm/plume`)
-  interface MachineView { readonly m: Machine; prop: MachineProp; vent: THREE.Vector3 | null; emitter: number | null; running: number }
+  interface MachineView { readonly m: Machine; prop: MachineProp; vent: THREE.Vector3 | null; emitter: number | null; running: number; glow: THREE.Mesh | null }
   const views = new Map<number, MachineView>();
   let cables: THREE.Mesh[] = [];
   /** The detail the props are built at: chunky low poly until the plot shows stage 2. */
@@ -272,6 +275,49 @@ export function createPlayScene(o: {
   keep(plume);
   const cableMat = m.rubber;
   const worldOf = (v: MachineView, local: THREE.Vector3): THREE.Vector3 => local.clone().applyMatrix4(v.prop.group.matrixWorld);
+  const GLOW_RADIUS = 3.6, GLOW_SEGS = 8;
+  const makePlumeGroundGlow = (x: number, z: number, colorHex: string): THREE.Mesh => {
+    const geo = new THREE.PlaneGeometry(GLOW_RADIUS * 2, GLOW_RADIUS * 2, GLOW_SEGS, GLOW_SEGS);
+    geo.rotateX(-Math.PI / 2);
+    const pos = geo.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < pos.count; i++) {
+      const lx = pos.getX(i), lz = pos.getZ(i);
+      const wx = x + lx, wz = z + lz;
+      pos.setXYZ(i, wx, groundAt(wx, wz) + 0.04, wz);
+    }
+    pos.needsUpdate = true;
+    geo.computeVertexNormals();
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: PLUME_GLOW_VERTEX,
+      fragmentShader: PLUME_GLOW_FRAGMENT,
+      uniforms: {
+        uColour: { value: new THREE.Color(colorHex) },
+        uStrength: { value: 0.8 },
+        uTime: { value: 0 },
+      },
+      transparent: true,
+      depthWrite: false,
+      depthTest: true,
+      blending: THREE.CustomBlending,
+      blendSrc: THREE.OneFactor,
+      blendDst: THREE.OneFactor,
+      blendSrcAlpha: THREE.ZeroFactor,
+      blendDstAlpha: THREE.OneFactor,
+      side: THREE.DoubleSide,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(0, 0, 0);
+    mesh.visible = false;
+    return mesh;
+  };
+  const setGlowStrength = (mesh: THREE.Mesh, strength: number): void => {
+    const u = (mesh.material as THREE.ShaderMaterial).uniforms as Record<string, THREE.IUniform>;
+    if (u['uStrength']) u['uStrength'].value = strength;
+  };
+  const setGlowTime = (mesh: THREE.Mesh, time: number): void => {
+    const u = (mesh.material as THREE.ShaderMaterial).uniforms as Record<string, THREE.IUniform>;
+    if (u['uTime']) u['uTime'].value = time;
+  };
   const build = (mm: Machine): MachineView => {
     const prop = machineProp(m, mm.kind, propStage);
     prop.group.position.set(mm.x, groundAt(mm.x, mm.z) - 0.05, mm.z);
@@ -279,12 +325,24 @@ export function createPlayScene(o: {
     planetScene.add(prop.group);
     prop.group.updateMatrixWorld(true);
     prop.light(0.1);
-    return { m: mm, prop, vent: prop.vent ? prop.vent.clone().applyMatrix4(prop.group.matrixWorld) : null, emitter: null, running: 0 };
+    const metric = PIXELS_OF[mm.kind];
+    let glow: THREE.Mesh | null = null;
+    if (metric) {
+      glow = makePlumeGroundGlow(mm.x, mm.z, METRIC_COLOUR[metric]);
+      planetScene.add(glow);
+    }
+    return { m: mm, prop, vent: prop.vent ? prop.vent.clone().applyMatrix4(prop.group.matrixWorld) : null, emitter: null, running: 0, glow };
   };
   const unbuild = (v: MachineView): void => {
     planetScene.remove(v.prop.group);
     disposeProp(v.prop);
     if (v.emitter !== null) { plume.remove(v.emitter); v.emitter = null; }
+    if (v.glow) {
+      planetScene.remove(v.glow);
+      v.glow.geometry.dispose();
+      (v.glow.material as THREE.Material).dispose();
+      v.glow = null;
+    }
   };
   /** A cable lying on the ground from a to b (both world points). */
   const groundCable = (a: THREE.Vector3, b: THREE.Vector3): THREE.Mesh => {
@@ -361,6 +419,10 @@ export function createPlayScene(o: {
       const nv = build(v.m);
       nv.running = running; nv.emitter = emitter;
       if (running > 0.05) nv.prop.light(1);
+      if (nv.glow) {
+        nv.glow.visible = detail.plumeGlow && running > 0.05;
+        setGlowStrength(nv.glow, Math.min(1.0, running) * 0.75);
+      }
       views.set(id, nv);
     }
     relay(lastConnected);
@@ -631,6 +693,10 @@ export function createPlayScene(o: {
       for (const v of views.values()) {
         const metric = PIXELS_OF[v.m.kind];
         if (metric && v.vent && v.running > 0.05) v.emitter = plume.add({ at: [v.vent.x, v.vent.y, v.vent.z], colour: METRIC_COLOUR[metric], ...MILL_POUR, startAt: -100 });
+        if (v.glow) {
+          v.glow.visible = detail.plumeGlow && v.running > 0.05;
+          setGlowStrength(v.glow, Math.min(1.0, v.running) * 0.75);
+        }
       }
     },
     setPlot(plot, running, connected) {
@@ -646,6 +712,10 @@ export function createPlayScene(o: {
         const r = running.get(v.m.id) ?? 0;
         if ((r > 0.05) !== (v.running > 0.05)) v.prop.light(r > 0.05 ? 1 : 0.1);
         v.running = r;
+        if (v.glow) {
+          v.glow.visible = detail.plumeGlow && r > 0.05;
+          setGlowStrength(v.glow, Math.min(1.0, r) * 0.75);
+        }
         const metric = PIXELS_OF[v.m.kind];
         if (!metric || !v.vent) continue;
         if (r > 0.05 && v.emitter === null) v.emitter = plume.add({ at: [v.vent.x, v.vent.y, v.vent.z], colour: METRIC_COLOUR[metric], ...MILL_POUR, startAt: clock + 0.6 });
@@ -804,7 +874,10 @@ export function createPlayScene(o: {
         } else ghostVerdict = { ok: false, why: 'Aim at the ground near the gate.' };
       }
       // ---- machines at work
-      for (const v of views.values()) v.prop.animate(now, v.running);
+      for (const v of views.values()) {
+        v.prop.animate(now, v.running);
+        if (v.glow && v.glow.visible) setGlowTime(v.glow, now);
+      }
       // ---- the wave, and the event when it has crossed
       const wave = waveNow(), r = wave.r;
       if (waveTo >= 0 && r > 1e6) { shown = waveTo; waveTo = -1; fitLooks(); rebuildProps(shown); pendingEvent = pendingEvent ?? 'stage-up'; sfx('stage-up'); }
@@ -940,6 +1013,9 @@ export function createPlayScene(o: {
       plume.setDensity(d.plumeDensity);
       labPlume.setMode(d.plumes);
       labPlume.setDensity(d.plumeDensity);
+      for (const v of views.values()) {
+        if (v.glow) v.glow.visible = detail.plumeGlow && v.running > 0.05;
+      }
     },
     setLabActivity,
     setCameraView(mode) {
@@ -1011,6 +1087,11 @@ export function createPlayScene(o: {
       aimedBoulder: () => lastAimedBoulder,
       boulders: () => ground?.getBoulders() ?? [],
       twinStage: () => twinStage,
+      plumeGlowCount: () => {
+        let count = 0;
+        for (const v of views.values()) if (v.glow && v.glow.visible) count++;
+        return count;
+      },
     },
     dispose() {
       scientistAnimator?.dispose();

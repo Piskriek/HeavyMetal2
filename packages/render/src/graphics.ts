@@ -46,14 +46,16 @@ export interface GraphicsSettings {
   readonly pixelPlumes: 'cubes' | 'splats' | 'dither' | 'off';
   /** How many pixels pour from each machine, against the plume as made (1). */
   readonly plumeDensity: number;
+  /** A soft coloured glow on the ground under each pouring machine (on for High and Ultra, off for Low and Medium). */
+  readonly plumeGlow: boolean;
 }
 
 export const GRAPHICS_TIERS: Readonly<Record<Quality, GraphicsSettings>> = {
-  potato: { pictureSize: 480, sharpness: 1, supersample: false, effects: false, glow: false, contactShadows: false, contactShadowSamples: 4, smoothEdges: false, shadows: 'off', reflections: false, simpleLighting: true, plantDetail: 10, skipHiddenPlants: true, simpleSea: true, plantDistance: 60, clouds: false, flatGround: true, ditherDistance: 20, pixelPlumes: 'dither', plumeDensity: 0.5 },
-  low: { pictureSize: 720, sharpness: 1, supersample: false, effects: false, glow: false, contactShadows: false, contactShadowSamples: 8, smoothEdges: false, shadows: 'off', reflections: false, simpleLighting: true, plantDetail: 18, skipHiddenPlants: true, simpleSea: true, plantDistance: 0, clouds: true, flatGround: false, ditherDistance: 30, pixelPlumes: 'cubes', plumeDensity: 0.75 },
-  medium: { pictureSize: 0, sharpness: 1.5, supersample: false, effects: true, glow: true, contactShadows: false, contactShadowSamples: 8, smoothEdges: false, shadows: 'on', reflections: true, simpleLighting: false, plantDetail: 35, skipHiddenPlants: false, simpleSea: false, plantDistance: 0, clouds: true, flatGround: false, ditherDistance: 45, pixelPlumes: 'cubes', plumeDensity: 1 },
-  high: { pictureSize: 0, sharpness: 2, supersample: false, effects: true, glow: true, contactShadows: true, contactShadowSamples: 12, smoothEdges: true, shadows: 'detailed', reflections: true, simpleLighting: false, plantDetail: 70, skipHiddenPlants: false, simpleSea: false, plantDistance: 0, clouds: true, flatGround: false, ditherDistance: 60, pixelPlumes: 'cubes', plumeDensity: 1.5 },
-  ultra: { pictureSize: 0, sharpness: 2, supersample: true, effects: true, glow: true, contactShadows: true, contactShadowSamples: 16, smoothEdges: true, shadows: 'finest', reflections: true, simpleLighting: false, plantDetail: 0, skipHiddenPlants: false, simpleSea: false, plantDistance: 0, clouds: true, flatGround: false, ditherDistance: 0, pixelPlumes: 'cubes', plumeDensity: 2 },
+  potato: { pictureSize: 480, sharpness: 1, supersample: false, effects: false, glow: false, contactShadows: false, contactShadowSamples: 4, smoothEdges: false, shadows: 'off', reflections: false, simpleLighting: true, plantDetail: 10, skipHiddenPlants: true, simpleSea: true, plantDistance: 60, clouds: false, flatGround: true, ditherDistance: 20, pixelPlumes: 'dither', plumeDensity: 0.5, plumeGlow: false },
+  low: { pictureSize: 720, sharpness: 1, supersample: false, effects: false, glow: false, contactShadows: false, contactShadowSamples: 8, smoothEdges: false, shadows: 'off', reflections: false, simpleLighting: true, plantDetail: 18, skipHiddenPlants: true, simpleSea: true, plantDistance: 0, clouds: true, flatGround: false, ditherDistance: 30, pixelPlumes: 'cubes', plumeDensity: 0.75, plumeGlow: false },
+  medium: { pictureSize: 0, sharpness: 1.5, supersample: false, effects: true, glow: true, contactShadows: false, contactShadowSamples: 8, smoothEdges: false, shadows: 'on', reflections: true, simpleLighting: false, plantDetail: 35, skipHiddenPlants: false, simpleSea: false, plantDistance: 0, clouds: true, flatGround: false, ditherDistance: 45, pixelPlumes: 'cubes', plumeDensity: 1, plumeGlow: false },
+  high: { pictureSize: 0, sharpness: 2, supersample: false, effects: true, glow: true, contactShadows: true, contactShadowSamples: 12, smoothEdges: true, shadows: 'detailed', reflections: true, simpleLighting: false, plantDetail: 70, skipHiddenPlants: false, simpleSea: false, plantDistance: 0, clouds: true, flatGround: false, ditherDistance: 60, pixelPlumes: 'cubes', plumeDensity: 1.5, plumeGlow: true },
+  ultra: { pictureSize: 0, sharpness: 2, supersample: true, effects: true, glow: true, contactShadows: true, contactShadowSamples: 16, smoothEdges: true, shadows: 'finest', reflections: true, simpleLighting: false, plantDetail: 0, skipHiddenPlants: false, simpleSea: false, plantDistance: 0, clouds: true, flatGround: false, ditherDistance: 0, pixelPlumes: 'cubes', plumeDensity: 2, plumeGlow: true },
 };
 
 const SHADOW_SIZE: Readonly<Record<GraphicsSettings['shadows'], number>> = { off: 0, on: 1024, detailed: 2048, finest: 4096 };
@@ -89,6 +91,7 @@ export const graphicsSchema = defineSchema({
     { key: 'flatGround', type: 'boolean', label: 'Always flat ground', doc: 'Show the flat block ground even when the island is set to PBR. The PBR ground is the heaviest thing to draw.', tier: 'play', default: false, group: 'World' },
     { key: 'pixelPlumes', type: 'enum', label: 'Pixel plumes', doc: 'How the pixels that pour from machines are drawn. Cubes are little blocks that tumble as they rise; splats are soft glowing dots; dither draws square pixels, the cheapest. Off hides them; the machines still work.', tier: 'play', default: 'cubes', options: ['cubes', 'splats', 'dither', 'off'], group: 'Machines' },
     { key: 'plumeDensity', type: 'number', label: 'Plume density', doc: 'How many pixels pour from each machine. 1 is the plume as made, 2 twice as many.', tier: 'play', default: 1.5, min: 0.25, max: 2, step: 0.05, hardMin: 0.1, hardMax: 4, group: 'Machines' },
+    { key: 'plumeGlow', type: 'boolean', label: 'Plume ground glow', doc: 'A soft coloured glow on the ground under each pouring machine.', tier: 'play', default: true, group: 'Machines' },
   ],
 });
 

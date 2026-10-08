@@ -134,3 +134,28 @@ export const COLOUR_MARK_FRAGMENT = /* glsl */ `
     float shade = mix(1.0, 0.55 + 0.45 * max(0.0, dot(normalize(vN), normalize(vec3(0.4, 0.8, 0.3)))), uLit);
     gl_FragColor = vec4(uColour * shade, 0.5);
   }`;
+
+/** Plume ground glow: a soft coloured glow on the ground under each pouring machine (POL-02). */
+export const PLUME_GLOW_VERTEX = /* glsl */ `
+  varying vec2 vUv;
+  void main(){
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+export const PLUME_GLOW_FRAGMENT = /* glsl */ `
+  uniform vec3 uColour;
+  uniform float uStrength;
+  uniform float uTime;
+  varying vec2 vUv;
+  void main(){
+    vec2 c = vUv - vec2(0.5);
+    float d = length(c) * 2.0;
+    if (d >= 1.0) discard;
+    float falloff = (1.0 - d * d) * (1.0 - d * d);
+    float pulse = 0.9 + 0.1 * sin(uTime * 4.5 + c.x * 3.0);
+    float intensity = falloff * uStrength * pulse * 1.6;
+    gl_FragColor = vec4(uColour * intensity, 1.0);
+  }
+`;

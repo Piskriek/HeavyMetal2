@@ -274,11 +274,11 @@ export function createLabRoom(o: { readonly textureSize: number; readonly portal
   const tableDisc = pTable.lamps[0];
   if (tableDisc) {
     tableDisc.material = keep(new THREE.MeshStandardMaterial({
-      color: '#332200',
-      emissive: new THREE.Color('#ff8811'),
+      color: '#120c02',
+      emissive: new THREE.Color('#ff7700'),
       emissiveIntensity: 0,
-      roughness: 0.15,
-      metalness: 0.1,
+      roughness: 0.4,
+      metalness: 0.3,
     }));
   }
   place(kit.presetRack(m), ROOM.left + 0.45, -5.5, Math.PI / 2);
@@ -330,7 +330,7 @@ export function createLabRoom(o: { readonly textureSize: number; readonly portal
     lamps.desk.forEach((l) => kit.setLamp(l, 1));
     gate.coils.forEach((c, i) => kit.setLamp(c, p.coils * 3 > Math.floor(i / 2) ? Math.min(1, p.coils * 3 - Math.floor(i / 2)) : 0));
     if (tableDisc && tableDisc.material instanceof THREE.MeshStandardMaterial) {
-      tableDisc.material.emissiveIntensity = p.main * 1.4;
+      tableDisc.material.emissiveIntensity = p.main * 0.22;
     }
     pTable.lamps.slice(1).forEach((l) => kit.setLamp(l, p.main > 0.5 ? 1 : 0));
     pulseUniforms.uPower.value = p.pulse;

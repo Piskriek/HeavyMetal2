@@ -276,27 +276,39 @@ const RELIEF_FRAGMENT = /* glsl */ `
   void main() {
     if (uPower <= 0.001) discard;
 
-    vec3 amberBase = vec3(1.0, 0.62, 0.12);
-    vec3 amberBright = vec3(1.0, 0.88, 0.38);
-    vec3 amberDeep = vec3(0.45, 0.22, 0.02);
+    vec3 amberBase = vec3(1.0, 0.65, 0.15);
+    vec3 amberBright = vec3(1.0, 0.94, 0.42);
+    vec3 amberDeep = vec3(0.52, 0.26, 0.03);
 
     vec3 N = normalize(vNormal);
     vec3 V = normalize(vViewPosition);
     float slope = clamp(N.y, 0.25, 1.0);
 
-    float fresnel = pow(1.0 - max(0.0, dot(N, V)), 2.2);
+    // Sharp lit rim for contouring terrain shapes from distance (POL-19)
+    float fresnel = pow(1.0 - max(0.0, dot(N, V)), 1.85);
 
-    // Contour lines every 10 meters of height
-    float contourMod = abs(fract(vWorldHeight / 10.0 - 0.5) - 0.5);
-    float contourWidth = fwidth(vWorldHeight / 10.0) * 1.8;
-    float contour = 1.0 - smoothstep(0.0, max(contourWidth, 0.04), contourMod);
+    // Minor contour lines every 10 meters of height
+    float minorMod = abs(fract(vWorldHeight / 10.0 - 0.5) - 0.5);
+    float minorWidth = fwidth(vWorldHeight / 10.0) * 2.2;
+    float minorContour = 1.0 - smoothstep(0.0, max(minorWidth, 0.05), minorMod);
+
+    // Major index contour lines every 50 meters (bold, brighter)
+    float majorMod = abs(fract(vWorldHeight / 50.0 - 0.5) - 0.5);
+    float majorWidth = fwidth(vWorldHeight / 50.0) * 3.0;
+    float majorContour = 1.0 - smoothstep(0.0, max(majorWidth, 0.075), majorMod);
+
+    float contour = max(minorContour * 0.9, majorContour * 1.5);
 
     // Fine horizontal scanlines drifting upward
     float scanline = sin(vLocalPos.y * 360.0 - uTime * 7.5);
     float scan = 0.82 + 0.18 * scanline;
 
     // Disc perimeter soft falloff
-    float rimFalloff = smoothstep(0.85, 0.81, length(vLocalPos.xz));
+    float edgeDist = length(vLocalPos.xz);
+    float rimFalloff = smoothstep(0.85, 0.81, edgeDist);
+
+    // Luminous perimeter disc boundary ring
+    float discEdgeRing = smoothstep(0.79, 0.835, edgeDist) * smoothstep(0.855, 0.835, edgeDist);
 
     // Stage wave sweep ring
     float waveRing = 0.0;
@@ -306,15 +318,16 @@ const RELIEF_FRAGMENT = /* glsl */ `
     }
 
     vec3 col = mix(amberDeep, amberBase, slope * 0.7 + 0.3);
-    col += amberBright * (contour * 0.6);
+    col += amberBright * (contour * 1.1);
     col += vec3(1.0, 0.95, 0.7) * (waveRing * 1.4);
-    col += amberBright * (fresnel * 0.75);
+    col += amberBright * (fresnel * 1.25);
+    col += amberBright * (discEdgeRing * 1.4);
     col *= scan;
 
     float flicker = 0.96 + 0.04 * sin(uTime * 37.0) * cos(uTime * 21.0);
     col *= flicker * uFlicker * uPower;
 
-    float alpha = clamp((0.45 * slope + 0.35 * fresnel + contour * 0.4 + waveRing * 0.8) * rimFalloff * uPower, 0.0, 1.0);
+    float alpha = clamp((0.55 * slope + 0.45 * fresnel + contour * 0.55 + discEdgeRing * 0.75 + waveRing * 0.8) * rimFalloff * uPower, 0.0, 1.0);
 
     gl_FragColor = vec4(col, alpha);
     #include <colorspace_fragment>

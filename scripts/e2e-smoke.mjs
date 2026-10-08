@@ -24,16 +24,21 @@ const check = (name, ok, extra = '') => { if (!ok) failures.push(`${name}${extra
 // software rendering by default (same picture on every PC); E2E_GPU=1 uses the real graphics card (a slow CPU cannot render the island in software)
 const gpu = process.env.E2E_GPU === '1';
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: gpu ? ['--ignore-gpu-blocklist', '--enable-gpu'] : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const errors = [];
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   page.setDefaultTimeout(T(30000));
   // NEVER let a test hold the real pointer lock: on Windows a locked headless Chrome clips the user's real mouse cursor to its window
   await page.addInitScript(() => { Element.prototype.requestPointerLock = function () { return Promise.reject(new Error('pointer lock is stubbed in tests')); }; });
-  const errors = [];
   page.on('pageerror', (e) => errors.push(e.message.slice(0, 200)));
   const text = (sel, t) => page.locator(sel, { hasText: t }).first();
-  const shotDir = process.env.E2E_SHOTS;
-  const shot = async (name) => { if (shotDir) await page.screenshot({ path: `${shotDir}/${name}.png` }); };
+  const shotDir = process.env.E2E_SHOTS || 'docs/shots';
+  const shot = async (name) => {
+    try {
+      await page.evaluate(() => { document.querySelectorAll('.play-toast, .play-start').forEach((el) => { el.style.display = 'none'; }); });
+      await page.screenshot({ path: `${shotDir}/${name}.png` });
+    } catch {}
+  };
   const dom = (fn, arg) => page.evaluate(fn, arg); // software rendering starves the page: click through the DOM instead of waiting for Playwright stability checks
   await page.goto(`http://127.0.0.1:${port}/`);
   // the saves live in IndexedDB too (storage/big-store.ts): the delete waits for this page to close, then the reload starts clean
@@ -761,7 +766,7 @@ try {
   await page.waitForSelector('.play-card.highlighted', { timeout: T(5000) });
   check('the rock drill card is highlighted in the build menu', await page.locator('.play-card.highlighted').count() === 1);
   check('the first drill is marked free', await dom(() => document.querySelector('.play-card.highlighted em')?.textContent?.includes('Free') ?? false));
-  await page.evaluate(() => { [...document.querySelectorAll('.play-toast')].forEach((el) => el.remove()); });
+  await page.evaluate(() => { document.querySelectorAll('.play-toast').forEach((el) => { el.style.display = 'none'; }); });
   await page.screenshot({ path: 'docs/shots/feed-mill-objective.png' });
   await page.keyboard.press('KeyB');
   await page.waitForTimeout(T(300));
@@ -773,7 +778,7 @@ try {
   check('out of ore HUD line warns player', await dom(() => document.querySelector('.play-ore.out-of-ore') !== null && /Out of ore: hold E on a boulder, or build a rock drill/.test(document.querySelector('.play-ore-warn')?.textContent ?? '')));
 
   // 2. hand gather ore from a boulder
-  await page.evaluate(() => { [...document.querySelectorAll('.play-toast')].forEach((el) => el.remove()); });
+  await page.evaluate(() => { document.querySelectorAll('.play-toast').forEach((el) => { el.style.display = 'none'; }); });
   await dom(() => window.hmPlay.gather(2));
   check('gathering ore by hand increases ore', await dom(() => window.hmPlay.plot().ore >= 5.5));
   await page.screenshot({ path: 'docs/shots/gather-boulder.png' });
@@ -1012,6 +1017,7 @@ try {
   check('the first Play raised no page error', errors.length === playErrors, errors.slice(playErrors).join(' | '));
   check('no page errors during the whole tour', errors.length === 0, errors.join(' | '));
 } catch (e) {
+  console.log('page errors at failure:', errors);
   try { const pg = browser.contexts()[0]?.pages()[0]; if (pg) console.log('screen at failure:', await pg.evaluate(() => `${document.querySelector('.shell')?.getAttribute('data-screen')} | ${document.body.innerText.slice(0, 160).split(String.fromCharCode(10)).join(' / ')}`)); } catch { /* ignore */ }
   failures.push(`exception: ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
 } finally {

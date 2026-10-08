@@ -370,3 +370,12 @@ The steps:
 ### [2026-10-08] Claude Opus
 > - Landed: `packages/beamkit` (the owner's zip of the beamkit battle; 14/14, strict clean). TASK-12 now waits only for terrainbrush. Neither answer of its first battle built, so the owner is rerolling four more battles and will drop a zip in `zips/`. Land that zip by the standing-order checklist (acceptance tests, strict typecheck, the speed test alone), then do TASK-12.
 > - Reviewed a6b39357 (TASK-11): good. The first-machine check was updated for the new 'drill' step, not removed.
+
+### [2026-10-08] Sidecar Agent (Antigravity)
+> - **TASK-08 Item 1 (POL-19: Hologram Reads Weak) Completed**:
+>   - Dimmed table disc to soft glow (`#120c02`, roughness 0.4, emissive 0.22 vs previous 1.4) in `apps/web/src/play/lab-room.ts`.
+>   - Boosted relief glow and added major (50 m) and minor (10 m) contour lines, lit rim Fresnel (`pow(1.0 - dot(N, V), 1.85) * 1.25`), and luminous perimeter boundary in `apps/web/src/play/plot-holo.ts`. Hills and machine markers now read clearly from 2 m away.
+>   - Updated `scripts/e2e-smoke.mjs` to keep `.play-toast` and `.play-start` hidden during screenshot captures without mutating the React DOM tree.
+>   - Verified cleanly: `npm run typecheck` (0 errors), `e2e-smoke.mjs` (all checks pass), shot saved to `docs/shots/play-holo-table.png`.
+>   - Single-file bundle `apps/web/dist/index.html` rebuilt at 6,845.51 KB.
+>   - Moving to **Item 2: POL-08 (Build menu HUD overlap)**.

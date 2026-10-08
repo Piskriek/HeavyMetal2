@@ -73,6 +73,8 @@ export function homeMenu(edition: Edition): readonly MenuItem[] {
   return edition === 'goblin-racing' ? [RACING_ITEM, ...HARNESS_MENU] : HARNESS_MENU;
 }
 
+import { ProfileChip } from './profile-chip';
+
 /**
  * The SetMix home's own chrome over the lab (lab/lab.tsx): the wordmark and the menu (Play, Studio, your island, the community,
  * settings; Goblin Racing first in its own version). The leader line is the star chart's, drawn when a planet is picked there.
@@ -88,6 +90,8 @@ export function SetMixHome(props: {
   /** The island My island opens, and whether you have been there before (then it says you carry on where you left off). */
   readonly island: { readonly name: string; readonly visited: boolean } | null;
   readonly leader: { readonly line: Ref<SVGLineElement>; readonly ring: Ref<SVGCircleElement> };
+  readonly onManageProfiles?: () => void;
+  readonly onSwitching?: (name: string) => void;
 }): ReactElement {
   // Studio has nothing to open until the new lab exists, so it says so and stays disabled
   const act: Record<MenuId, (() => void) | undefined> = { play: props.onPlay, studio: undefined, racing: props.onGoblin, island: props.onMyIsland, avatars: props.onAvatars, community: props.onCommunity, settings: props.onSettings };
@@ -103,7 +107,10 @@ export function SetMixHome(props: {
           </Fragment>
         ))}
       </nav>
-      <span className="sm-credits" title="In-game credits. Never real money.">{props.credits} cr</span>
+      <div className="sm-top-controls">
+        <ProfileChip onManageProfiles={props.onManageProfiles ?? (() => {})} onSwitching={props.onSwitching} />
+        <span className="sm-credits" title="In-game credits. Never real money.">{props.credits} cr</span>
+      </div>
     </div>
   );
 }

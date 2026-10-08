@@ -6,11 +6,13 @@ import { audio, setSoundEnabled } from '../maker/feedback';
  * Sound and racing settings (volumes, touch controls, the minimap, steering, reduced motion): one copy for the whole game, edited in Settings
  * wherever it is opened (SetMix, Goblin Racing, the island, a paused race). Graphics live in the profile, not here.
  */
+import { kv } from '../storage/profile-storage';
+
 const KEY = 'hm.settings';
 const listeners = new Set<() => void>();
 
 function read(): Settings {
-  try { const raw = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Partial<Settings> | null; return { ...DEFAULT_SETTINGS, ...(raw && typeof raw === 'object' ? raw : {}) }; } catch { return DEFAULT_SETTINGS; }
+  try { const raw = JSON.parse(kv.get(KEY) ?? 'null') as Partial<Settings> | null; return { ...DEFAULT_SETTINGS, ...(raw && typeof raw === 'object' ? raw : {}) }; } catch { return DEFAULT_SETTINGS; }
 }
 let current: Settings = read();
 
@@ -26,7 +28,7 @@ if (typeof window !== 'undefined') window.addEventListener('pointerdown', () => 
 export const playSettings = (): Settings => current;
 export function setPlaySettings(patch: Partial<Settings>): void {
   current = { ...current, ...patch };
-  try { localStorage.setItem(KEY, JSON.stringify(current)); } catch { /* storage blocked: still applies for this visit */ }
+  try { kv.set(KEY, JSON.stringify(current)); } catch { /* storage blocked: still applies for this visit */ }
   applySound();
   listeners.forEach((l) => l());
 }

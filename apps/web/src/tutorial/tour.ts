@@ -19,12 +19,14 @@ let rev = 0;
 let handler: ((e: Effect) => void) | null = null;
 const listeners = new Set<() => void>();
 
+import { kv } from '../storage/profile-storage';
+
 const stepsFor = (k: 'build' | 'walk'): Step[] => (k === 'build' ? ISLAND_STEPS : WALK_STEPS);
 function read(): Saved | null {
-  try { const r = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Saved | null; return r && typeof r === 'object' ? r : null; } catch { return null; }
+  try { const r = JSON.parse(kv.get(KEY) ?? 'null') as Saved | null; return r && typeof r === 'object' ? r : null; } catch { return null; }
 }
 function save(): void {
-  try { localStorage.setItem(KEY, JSON.stringify({ mode, kind, progress: tour?.toJSON() ?? null } satisfies Saved)); } catch { /* storage blocked */ }
+  try { kv.set(KEY, JSON.stringify({ mode, kind, progress: tour?.toJSON() ?? null } satisfies Saved)); } catch { /* storage blocked */ }
 }
 function changed(): void { rev++; save(); listeners.forEach((l) => l()); }
 function deliver(effects: readonly Effect[]): void { for (const e of effects) handler?.(e); if (effects.length || tour) changed(); }
@@ -66,7 +68,7 @@ export function tourNever(): void { mode = 'never'; changed(); }
 /** Forget the tour (Settings: Replay the tour, Reset progress): the next island visit starts it from the first step. */
 export function resetTour(): void {
   tour = null; mode = 'on'; later = false;
-  try { localStorage.removeItem(KEY); sessionStorage.removeItem(LATER); } catch { /* ignore */ }
+  try { kv.remove(KEY); sessionStorage.removeItem(LATER); } catch { /* ignore */ }
   rev++; listeners.forEach((l) => l());
 }
 /** Start the tour again from the first step. */

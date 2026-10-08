@@ -122,6 +122,8 @@ export function decodeAnimationClips(buffer: ArrayBuffer | ArrayBufferView): Map
 
 let cachedClipsPromise: Promise<Map<string, THREE.AnimationClip>> | null = null;
 
+import { animsBinUrl } from './scientist-model';
+
 /**
  * Loads and caches the scientist animation clips.
  */
@@ -133,11 +135,10 @@ export async function loadScientistAnimations(bufferOverride?: ArrayBuffer | Arr
     if (typeof window === 'undefined') {
       const { readFile } = await import('node:fs/promises');
       const { fileURLToPath } = await import('node:url');
-      const nodeBuf = await readFile(fileURLToPath(new URL('./anims.bin', import.meta.url)));
+      const nodeBuf = await readFile(fileURLToPath(animsBinUrl));
       buf = nodeBuf.buffer.slice(nodeBuf.byteOffset, nodeBuf.byteOffset + nodeBuf.byteLength);
     } else {
-      const url = new URL('./anims.bin', import.meta.url).href;
-      const res = await fetch(url);
+      const res = await fetch(animsBinUrl.href);
       if (!res.ok) throw new Error(`Failed to fetch anims.bin: ${res.statusText}`);
       buf = await res.arrayBuffer();
     }

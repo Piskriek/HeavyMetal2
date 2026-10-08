@@ -4,10 +4,12 @@ import type { Runtime } from '@hm/engine';
 import { baselineOf, changesBetween, summarise, type Baseline, type Decision, type Snap } from '@hm/lineage';
 import { mapBundle } from './storage';
 
+import { kv } from '../storage/profile-storage';
+
 const KEY = 'hm.decisions.v1';
 
-const load = (): Decision[] => { try { const v = JSON.parse(localStorage.getItem(KEY) ?? '[]') as unknown; return Array.isArray(v) ? (v as Decision[]) : []; } catch { return []; } };
-const save = (d: readonly Decision[]): void => { try { localStorage.setItem(KEY, JSON.stringify(d.slice(-50))); } catch { /* storage may be unavailable; the panel still works for this session */ } };
+const load = (): Decision[] => { try { const v = JSON.parse(kv.get(KEY) ?? '[]') as unknown; return Array.isArray(v) ? (v as Decision[]) : []; } catch { return []; } };
+const save = (d: readonly Decision[]): void => { try { kv.set(KEY, JSON.stringify(d.slice(-50))); } catch { /* storage may be unavailable; the panel still works for this session */ } };
 
 /** The map's presets in the form the lineage compares: what each is, what it holds, and its content hash. */
 export function snapshotOf(rt: Runtime, sceneId: PresetId): Snap[] {

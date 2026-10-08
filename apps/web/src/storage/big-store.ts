@@ -11,6 +11,8 @@
  * In RUN.world, `localStorage` is already the cloud-backed shim (platform/storage-shim.ts), so the big store simply uses it.
  */
 
+import { bigStoreName, getRawStorage } from './profile-storage';
+
 export interface KeyValueBackend {
   getAll(): Promise<Record<string, string>>;
   set(key: string, value: string): Promise<void>;
@@ -72,13 +74,14 @@ export class BigStore {
 
 /* ---- the browser backend: one IndexedDB database, one object store of key -> string ---- */
 
-const DB = 'hm-store', STORE = 'kv';
+const STORE = 'kv';
 
 const req = <T>(r: IDBRequest<T>): Promise<T> => new Promise((ok, bad) => { r.onsuccess = () => ok(r.result); r.onerror = () => bad(r.error); });
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((ok, bad) => {
-    const r = indexedDB.open(DB, 1);
+    const dbName = bigStoreName();
+    const r = indexedDB.open(dbName, 1);
     r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains(STORE)) r.result.createObjectStore(STORE); };
     r.onsuccess = () => ok(r.result);
     r.onerror = () => bad(r.error);
@@ -142,22 +145,31 @@ export function bigStore(): BigStore {
 
 /** Load every big key into memory. Call once at boot, after the platform (RUN's cloud store) and before anything reads a save. Never throws. */
 export async function initBigStore(platform: 'browser' | 'run'): Promise<{ backend: 'idb' | 'localStorage' | 'memory'; moved: number }> {
+  const rawStorage = getRawStorage();
   try {
-    if (platform === 'run' || typeof indexedDB === 'undefined') {
-      const b = storageBackend(window.localStorage);
-      instance = new BigStore(b, await b.getAll());
-      return { backend: 'localStorage', moved: 0 };
+    if (platform === 'run' || typeof indexedDB === 'undefined' || !rawStorage) {
+      if (rawStorage) {
+        const b = storageBackend(rawStorage);
+        instance = new BigStore(b, await b.getAll());
+        return { backend: 'localStorage', moved: 0 };
+      }
+      instance = new BigStore(null);
+      return { backend: 'memory', moved: 0 };
     }
     const b = idbBackend(await openDb());
     instance = new BigStore(b, await b.getAll());
-    const moved = await migrateFromLocalStorage(instance, window.localStorage);
+    const moved = await migrateFromLocalStorage(instance, rawStorage);
     return { backend: 'idb', moved };
   } catch (err) {
     console.warn('[storage] IndexedDB unavailable; saves stay in localStorage', err);
     try {
-      const b = storageBackend(window.localStorage);
-      instance = new BigStore(b, await b.getAll());
-      return { backend: 'localStorage', moved: 0 };
+      if (rawStorage) {
+        const b = storageBackend(rawStorage);
+        instance = new BigStore(b, await b.getAll());
+        return { backend: 'localStorage', moved: 0 };
+      }
+      instance = new BigStore(null);
+      return { backend: 'memory', moved: 0 };
     } catch {
       instance = new BigStore(null);
       return { backend: 'memory', moved: 0 };

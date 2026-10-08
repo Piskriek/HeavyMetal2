@@ -22,6 +22,8 @@ export function HelpOverlay({ onClose, firstRun }: { readonly onClose: () => voi
   );
 }
 
+import { kv } from '../storage/profile-storage';
+
 const SEEN = 'hm.maker.seenHelp';
-export const helpSeen = (): boolean => { try { return localStorage.getItem(SEEN) === '1'; } catch { return true; } };
-export const markHelpSeen = (): void => { try { localStorage.setItem(SEEN, '1'); } catch { /* ignore */ } };
+export const helpSeen = (): boolean => { try { return kv.get(SEEN) === '1'; } catch { return true; } };
+export const markHelpSeen = (): void => { try { kv.set(SEEN, '1'); } catch { /* ignore */ } };

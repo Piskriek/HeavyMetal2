@@ -78,12 +78,14 @@ export function showTier(renderer: ThreeRenderer, tier: Quality, own: Params): v
 }
 export const tierInUse = (): Quality | null => tierSeen;
 
+import { kv } from '../storage/profile-storage';
+
 const KEY = 'hm.profile.v2';
 export const DEFAULT_PROFILE: Profile = { name: 'Goblin', credits: 500, grownUp: true, tutorialDone: false, style: 'voxel', skin: 'flat', favIslands: [], quality: 'auto', fpsTarget: 60, graphics: {}, gpu: 'fast', activities: ActivityRegistry.withDefaults().all(), tournament: null, controls: DEFAULT_CONTROLS, cameraView: 'first' };
 
 export function loadProfile(): Profile {
   try {
-    const raw = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Partial<Profile> | null;
+    const raw = JSON.parse(kv.get(KEY) ?? 'null') as Partial<Profile> | null;
     if (!raw || typeof raw !== 'object') return DEFAULT_PROFILE;
     const reg = new ActivityRegistry(Array.isArray(raw.activities) ? (raw.activities as Activity[]) : []);
     const acts = reg.get('goblin-racing') ? reg.all() : ActivityRegistry.withDefaults().all().concat(reg.all());
@@ -99,7 +101,7 @@ export function loadProfile(): Profile {
     return { ...DEFAULT_PROFILE, ...raw, favIslands, groundLooks: looks, style, skin: raw.skin === 'pbr' ? 'pbr' : 'flat', quality: parseQuality(raw.quality) ?? 'auto', gpu, fpsTarget: parseFpsTarget(raw.fpsTarget), graphics, activities: acts, tournament: t ? t.toJSON() : null, controls: normalizeControls(raw.controls), cameraView } as Profile;
   } catch { return DEFAULT_PROFILE; }
 }
-export function saveProfile(p: Profile): void { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* storage unavailable */ } }
+export function saveProfile(p: Profile): void { try { kv.set(KEY, JSON.stringify(p)); } catch { /* storage unavailable */ } }
 
 const registry = (p: Profile): ActivityRegistry => new ActivityRegistry([...p.activities]);
 const apply = (p: Profile, f: (r: ActivityRegistry) => ActivityRegistry): Profile => {

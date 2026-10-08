@@ -23,8 +23,10 @@ const CARDS: RacerCard[] = RACERS.map((r, i) => ({
 }));
 const DEFAULT_CUSTOM: RacerCard = { id: 'custom', name: 'My goblin', color: '#7cd24a', accent: '#ff7a3d', weight: 5, speed: 5, bounce: 5 };
 
-const load = <T,>(key: string, fallback: T): T => { try { const raw = localStorage.getItem(key); return raw ? { ...fallback, ...(JSON.parse(raw) as object) } as T : fallback; } catch { return fallback; } };
-const save = (key: string, value: unknown): void => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage may be unavailable */ } };
+import { kv } from './storage/profile-storage';
+
+const load = <T,>(key: string, fallback: T): T => { try { const raw = kv.get(key); return raw ? { ...fallback, ...(JSON.parse(raw) as object) } as T : fallback; } catch { return fallback; } };
+const save = (key: string, value: unknown): void => { try { kv.set(key, JSON.stringify(value)); } catch { /* storage may be unavailable */ } };
 
 /**
  * The whole game: title, goblin select, loading, the race with its countdown and pause, results and the championship table.
@@ -48,7 +50,7 @@ export function App({ rt, fromMap, autoStart = false, onEditor, entry, onExit, p
     }
     if (!autoStart) return first;
     let last = '0';
-    try { last = localStorage.getItem(KEY_RACER) ?? '0'; } catch { /* default goblin */ }
+    try { last = kv.get(KEY_RACER) ?? '0'; } catch { /* default goblin */ }
     return [{ type: 'play', mode: 'quick' }, { type: 'selectRacer', id: last }, { type: 'confirmRacer' }].reduce((s, a) => reduceFlow(s, a as never), first);
   });
   const theme = useMemo(() => themeOf(rt), [rt]);
@@ -69,7 +71,7 @@ export function App({ rt, fromMap, autoStart = false, onEditor, entry, onExit, p
     const next = reduceFlow(cur, a);
     if (next.screen === 'loading' && cur.screen !== 'loading') {
       setRaceKey((n) => n + 1); setReady(false); setResults(null); setProgress(0); loadedAt.current = performance.now();
-      try { if (next.selectedRacer) localStorage.setItem(KEY_RACER, next.selectedRacer); } catch { /* ignore */ }
+      try { if (next.selectedRacer) kv.set(KEY_RACER, next.selectedRacer); } catch { /* ignore */ }
     }
     dispatch(a);
   }, []);

@@ -60,8 +60,10 @@ const detailOf = (g: GraphicsSettings, q: Quality): Detail => ({ plumes: g.pixel
 /** What each stage brings, for the toast when its wave has crossed the plot. */
 const STAGE_SAYS: readonly string[] = ['', 'Colour has reached your plot.', 'Shapes smooth out, textures sharpen.', 'Light: shading and a deeper sky.', 'Water and full detail.', 'Life takes hold.', 'Full fidelity: your plot is real.'];
 
-function loadSaved(): PlayState { try { return loadState(JSON.parse(localStorage.getItem(SAVE_KEY) ?? 'null')); } catch { return FRESH; } }
-function save(s: PlayState): void { try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); } catch { /* storage unavailable: progress lives for this visit */ } }
+import { kv } from '../storage/profile-storage';
+
+function loadSaved(): PlayState { try { return loadState(JSON.parse(kv.get(SAVE_KEY) ?? 'null')); } catch { return FRESH; } }
+function save(s: PlayState): void { try { kv.set(SAVE_KEY, JSON.stringify(s)); } catch { /* storage unavailable: progress lives for this visit */ } }
 
 /** The plot's numbers for the HUD. */
 interface PlotHud { readonly ore: number; readonly oreRate: number; readonly supply: number; readonly demand: number; readonly levels: Readonly<Record<Metric, number>>; readonly stage: number }

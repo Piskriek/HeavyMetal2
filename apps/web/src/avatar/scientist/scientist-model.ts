@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
-const scientistFbxUrl = new URL('./scientist.fbx', import.meta.url).href;
+export const scientistFbxUrl = new URL('./scientist.fbx', import.meta.url);
+export const animsBinUrl = new URL('./anims.bin', import.meta.url);
 
 export const SUBMESH_COLORS: Record<string, { color: number; roughness: number; metalness?: number }> = {
   '1': { color: 0x334155, roughness: 0.7 },
@@ -30,10 +31,10 @@ export async function loadScientistTemplate(): Promise<THREE.Group> {
     if (typeof window === 'undefined') {
       const { readFile } = await import('node:fs/promises');
       const { fileURLToPath } = await import('node:url');
-      const nodeBuf = await readFile(fileURLToPath(new URL('./scientist.fbx', import.meta.url)));
+      const nodeBuf = await readFile(fileURLToPath(scientistFbxUrl));
       buf = nodeBuf.buffer.slice(nodeBuf.byteOffset, nodeBuf.byteOffset + nodeBuf.byteLength);
     } else {
-      const res = await fetch(scientistFbxUrl);
+      const res = await fetch(scientistFbxUrl.href);
       if (!res.ok) throw new Error(`Failed to fetch scientist.fbx: ${res.statusText}`);
       buf = await res.arrayBuffer();
     }

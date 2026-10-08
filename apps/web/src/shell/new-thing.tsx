@@ -7,11 +7,13 @@ import type { ReactElement, ReactNode } from 'react';
  */
 export type NewWay = 'quick' | 'wizard' | 'manual';
 
+import { kv } from '../storage/profile-storage';
+
 const KEY = (thing: string): string => `hm.newway.${thing}`;
 export function lastWay(thing: string): NewWay | null {
-  try { const v = localStorage.getItem(KEY(thing)); return v === 'quick' || v === 'wizard' || v === 'manual' ? v : null; } catch { return null; }
+  try { const v = kv.get(KEY(thing)); return v === 'quick' || v === 'wizard' || v === 'manual' ? v : null; } catch { return null; }
 }
-const remember = (thing: string, way: NewWay): void => { try { localStorage.setItem(KEY(thing), way); } catch { /* storage blocked */ } };
+const remember = (thing: string, way: NewWay): void => { try { kv.set(KEY(thing), way); } catch { /* storage blocked */ } };
 
 const WAYS: readonly { readonly id: NewWay; readonly name: string; readonly effort: string }[] = [
   { id: 'quick', name: 'Quick setup', effort: 'One click' },

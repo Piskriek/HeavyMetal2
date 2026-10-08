@@ -112,19 +112,23 @@ function palette(m: LabMaterials, low: boolean): Pal {
 
 /* ---------------- geometry kit: collects per-material geos and merges ---------------- */
 
+const _v3 = new THREE.Vector3();
+const _q = new THREE.Quaternion();
+const _e = new THREE.Euler();
+const _m4 = new THREE.Matrix4();
+const _one = new THREE.Vector3(1, 1, 1);
+
 class Kit {
   private buckets = new Map<PalKey, THREE.BufferGeometry[]>();
   constructor(private pal: Pal, private low: boolean, readonly group: THREE.Group) {}
 
   add(key: PalKey, geo: THREE.BufferGeometry, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0): void {
     const g = geo.index ? geo.toNonIndexed() : geo;
-    g.applyMatrix4(
-      new THREE.Matrix4().compose(
-        new THREE.Vector3(x, y, z),
-        new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)),
-        new THREE.Vector3(1, 1, 1),
-      ),
-    );
+    _v3.set(x, y, z);
+    _e.set(rx, ry, rz);
+    _q.setFromEuler(_e);
+    _m4.compose(_v3, _q, _one);
+    g.applyMatrix4(_m4);
     const list = this.buckets.get(key);
     if (list) list.push(g);
     else this.buckets.set(key, [g]);
@@ -132,9 +136,9 @@ class Kit {
 
   addQ(key: PalKey, geo: THREE.BufferGeometry, x: number, y: number, z: number, q: THREE.Quaternion): void {
     const g = geo.index ? geo.toNonIndexed() : geo;
-    g.applyMatrix4(
-      new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(1, 1, 1)),
-    );
+    _v3.set(x, y, z);
+    _m4.compose(_v3, q, _one);
+    g.applyMatrix4(_m4);
     const list = this.buckets.get(key);
     if (list) list.push(g);
     else this.buckets.set(key, [g]);

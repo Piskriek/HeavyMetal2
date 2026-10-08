@@ -29,6 +29,8 @@ export function SettingsBody(props: {
   readonly profile: Profile; readonly update: (fn: (p: Profile) => Profile) => void;
   /** Replay the tour and reset progress (left out where they make no sense, e.g. in a paused race). */
   readonly onReplayTour?: () => void; readonly onReset?: () => void;
+  /** Open profile manager dialog. */
+  readonly onManageProfiles?: () => void;
   /** Shown first (the island adds a jump to the lighting presets). */
   readonly top?: ReactNode;
 }): ReactElement {
@@ -93,6 +95,12 @@ export function SettingsBody(props: {
         <label className="row">Island style <select value={profile.style} onChange={(e) => update((p) => ({ ...p, style: e.target.value as 'voxel' | 'painted' }))}><option value="voxel">Voxel (blocks that match the avatars)</option><option value="painted">Painted (the full ground)</option></select></label>
         <label className="row">Detail <select value={profile.skin} onChange={(e) => update((p) => ({ ...p, skin: e.target.value as 'flat' | 'pbr' }))}><option value="flat">Flat (plain colours, lighter)</option><option value="pbr">PBR (bumps, shine and height detail)</option></select></label>
         <label className="row"><input type="checkbox" checked={play.reducedMotion} onChange={(e) => setPlaySettings({ reducedMotion: e.target.checked })} /> Less motion (no camera swoops or bouncing menus)</label>
+        {props.onManageProfiles ? (
+          <div className="row">
+            <span>Profiles</span>
+            <button type="button" onClick={props.onManageProfiles} className="manage-profiles-btn">Manage profiles</button>
+          </div>
+        ) : null}
         {props.onReplayTour || props.onReset ? <div className="btns">{props.onReplayTour ? <button onClick={props.onReplayTour}>Replay the tour</button> : null}{props.onReset ? <button className="danger" onClick={props.onReset}>Reset progress</button> : null}</div> : null}
       </section>
     </div>

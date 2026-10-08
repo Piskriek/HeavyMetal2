@@ -71,10 +71,12 @@ const blank = (): PlayerState => {
   };
 };
 
+import { kv } from '../storage/profile-storage';
+
 function load(): PlayerState {
   const base = blank();
   let raw: Record<string, unknown> = {};
-  try { const r = JSON.parse(localStorage.getItem(KEY) ?? 'null') as unknown; if (r && typeof r === 'object') raw = r as Record<string, unknown>; } catch { /* first run */ }
+  try { const r = JSON.parse(kv.get(KEY) ?? 'null') as unknown; if (r && typeof r === 'object') raw = r as Record<string, unknown>; } catch { /* first run */ }
   const obj = (v: unknown): Record<string, Record<string, unknown>> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, Record<string, unknown>>) : {});
   const looks = Array.isArray(raw.looks) ? raw.looks.map(normalizeLook).filter((l, i, a) => a.findIndex((m) => m.id === l.id) === i) : [];
   const p: CatalogPlayer = { tools: obj(raw.tools), anims: obj(raw.anims), looks };
@@ -124,7 +126,7 @@ let state: PlayerState | null = null;
 const get = (): PlayerState => (state ??= load());
 function set(next: PlayerState): void {
   state = next;
-  try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
+  try { kv.set(KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
   listeners.forEach((l) => l());
 }
 export const subscribePlayer = (cb: () => void): (() => void) => { listeners.add(cb); return () => { listeners.delete(cb); }; };
@@ -185,7 +187,7 @@ export const setView = (view: 'third' | 'first'): void => { const s = get(); if 
 export const setMode = (mode: 'walk' | 'studio'): void => { const s = get(); if (s.mode !== mode) set({ ...s, mode }); };
 export const markCreated = (): void => { const s = get(); if (!s.created) set({ ...s, created: true }); };
 /** For tests and "reset progress". */
-export function resetPlayer(): void { state = blank(); try { localStorage.removeItem(KEY); } catch { /* ignore */ } listeners.forEach((l) => l()); }
+export function resetPlayer(): void { state = blank(); try { kv.remove(KEY); } catch { /* ignore */ } listeners.forEach((l) => l()); }
 
 /** Easy, Pro or Studio: how deep the hotbar goes. */
 export const setLevel = (level: HotbarLevel): void => { const s = get(); if (s.level !== level) set({ ...s, level }); };

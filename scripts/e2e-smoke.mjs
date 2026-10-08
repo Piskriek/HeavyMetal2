@@ -51,9 +51,24 @@ try {
   const armAngle = await dom(() => window.hmLab.scientistArmAngle());
   check('in the menu, the figure upper arms hang down (no T-pose)', typeof armAngle === 'number' && Math.abs(armAngle) > 0.5, `arm angle: ${armAngle}`);
   await shot('menu-setmix');
+
+  // Profile menu (TASK-09): chip in top right shows active profile; menu allows switching and opening manager
+  check('active profile chip shows Main', (await page.locator('.sm-profile-label').innerText()).trim() === 'Main');
+  await page.locator('.sm-profile-chip').click();
+  await page.waitForSelector('.sm-profile-menu', { timeout: T(5000) });
+  check('profile menu lists Main and actions', await page.locator('.sm-profile-menu').count() === 1);
+  await shot('profile-menu');
+  await dom(() => { [...document.querySelectorAll('.sm-profile-item')].find((b) => b.textContent.includes('Manage profiles'))?.click(); });
+  await page.waitForSelector('[aria-label="Manage profiles"]', { timeout: T(5000) });
+  check('Manage profiles opens from chip menu', await page.locator('[aria-label="Manage profiles"]').count() === 1);
+  check('Main profile cannot be deleted (no delete button)', await page.locator('.profile-manager-window .delete-profile-btn').count() === 0);
+  await page.locator('[aria-label="Manage profiles"] button[aria-label="Close"]').click();
+  await page.waitForSelector('[aria-label="Manage profiles"]', { state: 'detached', timeout: T(5000) });
+
   await text('.sm-menu button', 'Settings').click();
   check('settings opens', await page.locator('[aria-label="Settings"]').count() === 1);
   check('with graphics presets from Potato to Auto', await page.locator('.graphics-presets button').count() === 6);
+  check('Settings has Manage profiles button', await page.locator('.manage-profiles-btn').count() === 1);
   // the dither distance (owner: it looked good at his feet and crappy 2 m away): its far end blends everywhere
   await dom(() => { const el = document.querySelector('[data-ui="settings.dither"] input'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set; if (el) { set?.call(el, el.max); el.dispatchEvent(new Event('input', { bubbles: true })); } });
   await page.waitForTimeout(T(200));
@@ -889,6 +904,85 @@ try {
   await dom(() => { [...document.querySelectorAll('.play-pause button')].find((b) => b.textContent === 'Back to SetMix')?.click(); });
   await page.waitForSelector('.sm-home', { timeout: T(15000) });
   check('Esc pauses and Back to SetMix goes home', await dom(() => !window.hmPlay));
+
+  // TASK-09 Profile lifecycle: fresh start, save isolation, deletion
+  const mainPlaySave = await page.evaluate(() => localStorage.getItem('hm.setmix.play'));
+  check('Main has play save with stage >= 1', typeof mainPlaySave === 'string' && JSON.parse(mainPlaySave).plot?.stage >= 1);
+
+  // 1. Create a profile "E2E fresh" and switch to it: Play starts at the scientist creator (a fresh start).
+  await page.locator('.sm-profile-chip').click();
+  await page.waitForSelector('.sm-profile-menu', { timeout: T(5000) });
+  await dom(() => { [...document.querySelectorAll('.sm-profile-item')].find((b) => b.textContent.includes('New profile...'))?.click(); });
+  await page.waitForSelector('.sm-profile-new-input', { timeout: T(5000) });
+  await page.fill('.sm-profile-new-input', 'E2E fresh');
+  await page.evaluate(() => { window.__beforeReload = true; });
+  await dom(() => { [...document.querySelectorAll('.sm-profile-create-btns button')].find((b) => b.textContent.includes('Create'))?.click(); });
+  await page.waitForFunction(() => !window.__beforeReload && document.querySelector('.sm-profile-label')?.textContent?.trim() === 'E2E fresh' && window.hmLab && window.hmLab.ready, null, { timeout: T(30000) });
+  check('switched to fresh profile E2E fresh', (await page.locator('.sm-profile-label').innerText()).trim() === 'E2E fresh');
+
+  // Verify Play starts fresh at scientist creator
+  await text('.sm-menu button', 'Play').click();
+  await page.waitForFunction(() => window.hmPlay && window.hmPlay.ready && window.hmPlay.frames > 5, null, { timeout: T(90000) });
+  check('E2E fresh profile starts fresh at scientist creator', await page.locator('.play-create .create-scientist').count() === 1);
+
+  // 2. Make an avatar, then switch back to Main: Main's Play save is exactly as before.
+  await page.fill('.play-create .cg-name input', 'Fresh Scientist');
+  await dom(() => { [...document.querySelectorAll('.play-create .btns button')].find((b) => b.textContent.startsWith('Done'))?.click(); });
+  await page.waitForFunction(() => window.hmPlay.state().avatar?.name === 'Fresh Scientist', null, { timeout: T(10000) });
+  check('avatar created on fresh profile', await dom(() => window.hmPlay.state().avatar?.name === 'Fresh Scientist'));
+
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('.play-pause', { timeout: T(5000) });
+  await dom(() => { [...document.querySelectorAll('.play-pause button')].find((b) => b.textContent === 'Back to SetMix')?.click(); });
+  await page.waitForSelector('.sm-home', { timeout: T(15000) });
+
+  // Switch back to Main
+  await page.locator('.sm-profile-chip').click();
+  await page.waitForSelector('.sm-profile-menu', { timeout: T(5000) });
+  await page.evaluate(() => { window.__beforeReload = true; });
+  await dom(() => { [...document.querySelectorAll('.sm-profile-item')].find((b) => b.querySelector('.sm-profile-item-name')?.textContent?.trim() === 'Main')?.click(); });
+  await page.waitForFunction(() => !window.__beforeReload && document.querySelector('.sm-profile-label')?.textContent?.trim() === 'Main' && window.hmLab && window.hmLab.ready, null, { timeout: T(30000) });
+  check('switched back to Main profile', (await page.locator('.sm-profile-label').innerText()).trim() === 'Main');
+
+  // Verify Main's Play save is intact
+  const mainPlayAfter = await page.evaluate(() => localStorage.getItem('hm.setmix.play'));
+  check('Main Play save is exactly as before', mainPlayAfter === mainPlaySave);
+  await text('.sm-menu button', 'Play').click();
+  await page.waitForFunction(() => window.hmPlay && window.hmPlay.ready && window.hmPlay.frames > 5, null, { timeout: T(90000) });
+  check('Main Play has saved avatar Ada (no creator shown)', await page.locator('.play-create').count() === 0 && await dom(() => window.hmPlay.state().avatar?.name === 'Ada'));
+  check('Main Play plot stage is still >= 1', await dom(() => window.hmPlay.plot().stage >= 1));
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('.play-pause', { timeout: T(5000) });
+  await dom(() => { [...document.querySelectorAll('.play-pause button')].find((b) => b.textContent === 'Back to SetMix')?.click(); });
+  await page.waitForSelector('.sm-home', { timeout: T(15000) });
+
+  // 3. Delete "E2E fresh": no hm.p.<id>. key is left, and its database is gone.
+  await page.locator('.sm-profile-chip').click();
+  await page.waitForSelector('.sm-profile-menu', { timeout: T(5000) });
+  await dom(() => { [...document.querySelectorAll('.sm-profile-item')].find((b) => b.textContent.includes('Manage profiles'))?.click(); });
+  await page.waitForSelector('.profile-manager-window', { timeout: T(5000) });
+  await dom(() => {
+    const row = [...document.querySelectorAll('.profile-row')].find((r) => r.querySelector('.profile-name')?.textContent?.includes('E2E fresh'));
+    row?.querySelector('.delete-profile-btn')?.click();
+  });
+  await page.waitForSelector('.profile-delete-confirm', { timeout: T(5000) });
+  check('delete confirmation asks plainly with profile name', /Delete profile 'E2E fresh'\? Its Play save/.test(await page.locator('.confirm-text').innerText()));
+  await shot('profile-delete-confirm');
+  await page.locator('.delete-confirm-btn').click();
+  await page.waitForSelector('.profile-delete-confirm', { state: 'detached', timeout: T(5000) });
+  await page.locator('[aria-label="Manage profiles"] button[aria-label="Close"]').click();
+  await page.waitForSelector('[aria-label="Manage profiles"]', { state: 'detached', timeout: T(5000) });
+
+  const leftoverKeys = await page.evaluate(() => {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('hm.p.')) keys.push(k);
+    }
+    return keys;
+  });
+  check('no hm.p.<id>. keys left in localStorage after deleting E2E fresh', leftoverKeys.length === 0, leftoverKeys.join(', '));
+
   check('the first Play raised no page error', errors.length === playErrors, errors.slice(playErrors).join(' | '));
   check('no page errors during the whole tour', errors.length === 0, errors.join(' | '));
 } catch (e) {

@@ -59,19 +59,21 @@ export function shareProblems(req: PublishRequest, bytes: number): string[] {
 
 export const parseTags = (s: string): string[] => s.split(/[,\s]+/).map((t) => t.trim().toLowerCase()).filter(Boolean);
 
+import { kv } from '../storage/profile-storage';
+
 const KEY = 'hm.shares.v1';
 const listeners = new Set<() => void>();
 let cache: readonly Share[] | null = null;
 function load(): readonly Share[] {
   try {
-    const raw = JSON.parse(localStorage.getItem(KEY) ?? '[]') as unknown;
+    const raw = JSON.parse(kv.get(KEY) ?? '[]') as unknown;
     return Array.isArray(raw) ? (raw.filter((s) => s && typeof s === 'object' && typeof (s as Share).id === 'string') as Share[]) : [];
   } catch { return []; }
 }
 const get = (): readonly Share[] => (cache ??= load());
 function set(next: readonly Share[]): void {
   cache = next;
-  try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* storage full or blocked: kept for this visit */ }
+  try { kv.set(KEY, JSON.stringify(next)); } catch { /* storage full or blocked: kept for this visit */ }
   listeners.forEach((l) => l());
 }
 const subscribe = (cb: () => void): (() => void) => { listeners.add(cb); return () => { listeners.delete(cb); }; };

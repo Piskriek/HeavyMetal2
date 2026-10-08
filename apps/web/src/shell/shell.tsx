@@ -21,6 +21,7 @@ import { GoblinRacingMenu } from './racing-menu';
 import { COMMUNITY_ISLANDS, Community } from './community';
 import { duplicateActivity, loadProfile, makeActivity, removeActivity, saveProfile, unhideAll, type Profile } from './profile';
 import { SettingsBody } from './settings-body';
+import { ManageProfilesModal } from './manage-profiles-modal';
 import { GoblinFront, SetMixHome } from './goblin-front';
 import { LabHome } from '../lab/lab';
 import { captureMouse } from './capture-mouse';
@@ -101,6 +102,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   const createForRef = useRef(createFor);
   createForRef.current = createFor;
   const [profile, setProfile] = useState<Profile>(() => loadProfile());
+  const [manageProfilesOpen, setManageProfilesOpen] = useState(false);
+  const [switchingProfile, setSwitchingProfile] = useState<string | null>(null);
   const [session, setSession] = useState(false); // you have been on your island this visit
   const [intro, setIntro] = useState(false);
   const [level, setLevel] = useState<Level>('goblin');
@@ -315,6 +318,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
       {screen === 'home' ? (
         <div className="shell-layer shell-ui sm-layer" style={{ zIndex: 4 }}>
           <SetMixHome leader={{ line: leaderLine, ring: leaderRing }} credits={profile.credits} onPlay={() => { origin.current = 'home'; go('play'); }} onGoblin={toGoblin} onMyIsland={() => { setPicked('home'); toIslands(); }} onAvatars={toAvatars} onCommunity={() => toHub()} onSettings={toSettings}
+            onManageProfiles={() => setManageProfilesOpen(true)} onSwitching={(name) => setSwitchingProfile(name)}
             onIslandNow={() => void myIsland()} island={homeIsland ? { name: homeIsland.name, visited: player().created && homeIsland.lastVisitedAt > homeIsland.createdAt + 1000 } : null} />
           {/* another planet picked: what is played there (Goblin Racing shows its live window instead) */}
           {/* your planet picked: its islands, drawn from above; pick one to go in, or open the planet for all of them */}
@@ -410,7 +414,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
         <div className="shell-layer shell-ui" style={{ zIndex: 3 }}>
           <div className="shell-window narrow" role="dialog" aria-label="Settings">
             <header><h3>Settings</h3><button onClick={back}>Close</button></header>
-            <SettingsBody profile={profile} update={update} onReplayTour={replayTour} onReset={resetProgress} />
+            <SettingsBody profile={profile} update={update} onReplayTour={replayTour} onReset={resetProgress} onManageProfiles={() => setManageProfilesOpen(true)} />
           </div>
         </div>
       ) : null}
@@ -440,6 +444,21 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
       {storageFull ? (
         <div className="toasts" style={{ position: 'fixed', zIndex: 50, pointerEvents: 'auto' }} role="alert">
           <button type="button" className="toast error" onClick={() => setStorageFull('')}>{storageFull}</button>
+        </div>
+      ) : null}
+      {manageProfilesOpen ? (
+        <ManageProfilesModal
+          onClose={() => setManageProfilesOpen(false)}
+          onSwitching={(name) => setSwitchingProfile(name)}
+        />
+      ) : null}
+      {switchingProfile ? (
+        <div className="shell-layer profile-switching-overlay" style={{ zIndex: 10000 }}>
+          <div className="profile-switching-box">
+            <h3>Switching profile...</h3>
+            <p className="hint">Loading {switchingProfile}</p>
+            <div className="profile-loading-bar"><div className="profile-loading-fill" /></div>
+          </div>
         </div>
       ) : null}
     </div>

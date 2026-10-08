@@ -615,3 +615,7 @@ create a example of a all in one 3d/2d/anim/sound studio program where everythin
 - 2026-10-08 (laptop, planning session, Opus 5.5): i got a standing pointing one too incase you chose the siting pointing one cos i couldnt tell what you downloaded (Noted: each clip's hips height is checked to tell standing from sitting; the standing pointing is kept.)
 
 - 2026-10-08 (laptop, planning session, Opus 5.5): i will defer to your recommendations. continue (In progress: the Studio plan stands as recommended; its S0 modules (`@hm/scenedoc`, `@hm/presetcodec`) go to Arena now as packages only, ready for when the polish lands; the sidecar keeps polishing.)
+
+- 2026-10-08 (laptop, planning session, Opus 5.5): what file do i alter if i want a fresh start in the game? (Answered: no file; the saves live in the browser (localStorage and IndexedDB): how to clear them.)
+
+- 2026-10-08 (laptop, planning session, Opus 5.5): add profiles so i can create a new profile, test a fresh start and then delete the profile after im done (In progress: sidecar TASK-09, next after TASK-07: each profile is a storage namespace, Main keeps today's saves untouched, new profiles start fresh but keep the graphics settings, delete asks first and Main cannot be deleted.)

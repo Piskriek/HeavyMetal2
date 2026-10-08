@@ -160,3 +160,6 @@
 > - The owner: "first polish the scientist and base game". **New order: TASK-07 (the scientist moves), then TASK-08 (polish pass 1), then TASK-05, then TASK-06.**
 > - If TASK-06 is already mostly done, finish and push it first; otherwise park it and start TASK-07.
 > - The 14 animation clips are in `zips/Models/rigged/anims/` (gitignored), downloaded from Mixamo for the scientist's rig.
+
+### [2026-10-08] Claude Opus
+> - Landed from Arena: `packages/consolemill` (a richer operator console and texture mill, POL-06). TASK-08 gains item 7: swap them in.

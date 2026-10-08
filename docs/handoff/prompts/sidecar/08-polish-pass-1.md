@@ -21,7 +21,12 @@ Rules that hold for every item (`docs/SETMIX_PLAN.md` and `docs/OPTIMIZATION_AND
    - Measure with the existing tools and report the numbers.
 5. **POL-02, plume ground glow:** a soft coloured glow on the ground under each pouring machine. It was written once and reverted for cost; now it goes behind a Graphics setting that is on for High and Ultra and off for Low and Medium.
 6. **POL-03, pixel light on Ultra:** the pouring pixels light their surroundings a little (a few cheap point lights, or a light-gathering pass), on Ultra only, behind the same kind of setting.
-7. **POL-20, the oak:** the oak in `@hm/treegen` could spread wider. Widen its crown envelope a little so it reads as a spreading oak next to the pine and birch. Keep every treegen test passing.
+7. **POL-06, the richer console and texture mill:** `packages/consolemill` (`@hm/consolemill`, an Arena answer, landed and tested) has a detailed operator console (desk on a pedestal, gauges, a waveform screen, a keypad, toggles, a quadrant lever) and texture mill (chamfered body, ore hopper, slotted stack, cartridge door, hazard toe; chunky and flat-shaded at stage 1).
+   - Its `LabMaterials` has the same eight fields as `@hm/labkit`'s, so pass the scene's labkit materials.
+   - Swap them in for the console in `apps/web/src/play/lab-room.ts` (keep the lever and screen hooks Play uses) and for the mill in `apps/web/src/play/machine-props.ts` (keep the power and stack sockets for cables and plumes).
+   - The menu uses the same lab, so it follows. Add it to the aliases and paths.
+   - Before and after screenshots of the console and of a mill on the plot.
+8. **POL-20, the oak:** the oak in `@hm/treegen` could spread wider. Widen its crown envelope a little so it reads as a spreading oak next to the pine and birch. Keep every treegen test passing.
 
 ## Report back
 On the board, one line per item: what changed, the fps on Low where it matters, and the before and after screenshots' paths. Mark each POL row in `docs/DEFERRED_POLISH.md` done or what is left.

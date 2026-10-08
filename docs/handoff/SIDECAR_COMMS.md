@@ -17,6 +17,7 @@
 | **TASK-04** | [`04-lab-cartridges.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/04-lab-cartridges.md) | **DONE** | Sidecar | The lab makes cartridges (bench, combiner, rack); the plot's machines take them from the rack (POL-10) |
 | **TASK-07** | [`07-scientist-animation.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/07-scientist-animation.md) | **QUEUED, NEXT** | Sidecar | The scientist moves: 14 Mixamo clips packed (at most 800 KB), an animator, the creator, the menu (no T-pose) and a third-person view in Play (V); POL-18 |
 | **TASK-09** | [`09-profiles.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/09-profiles.md) | **QUEUED, right after TASK-07** | Sidecar | Profiles: each a storage namespace (Main keeps today's keys), create, switch, delete; the home's profile chip; a test that nothing touches localStorage directly |
+| **TASK-10** | [`10-studio-shell.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/10-studio-shell.md) | **QUEUED** (after TASK-05) | Sidecar | The Studio's editor shell (S0): stations in the lab, the editor layout, details from scenedoc schemas, history, share codes, keymaps |
 | **TASK-08** | [`08-polish-pass-1.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/08-polish-pass-1.md) | **QUEUED** (after TASK-07) | Sidecar | The base game's first polish pass: POL-19, 08, 17, 04, 02, 03, 20, one commit each |
 | **TASK-05** | [`05-terraforming.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/05-terraforming.md) | **QUEUED** (after TASK-08) | Sidecar | Water (`@hm/hydro`), ground cover (`@hm/coverage`) and trees (`@hm/treegen`) on the plot as the stages rise; two pushes, 05a and 05b |
 | **TASK-06** | [`06-plot-codes.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/06-plot-codes.md) | **DONE** | Sidecar | Visit a plot by its code: copy your plot's code, dial a friend's, walk through onto it read-only (`@hm/plotcodec`) |
@@ -203,3 +204,6 @@
 
 ### [2026-10-08] Claude Opus
 > - Landed from Arena: `packages/scenedoc` (the Studio's document, history and selection, S0). Package only; POL-21 logs its edit cost on big documents.
+
+### [2026-10-08] Claude Opus
+> - Both Studio S0 modules landed (`packages/scenedoc`, `packages/presetcodec`). TASK-10 (the Studio's editor shell) is QUEUED after TASK-05. The order: 07, 09, 08, 05, 10.

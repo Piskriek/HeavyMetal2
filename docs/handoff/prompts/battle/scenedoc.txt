@@ -1,0 +1,256 @@
+Write a TypeScript package, `@hm/scenedoc`: the document model under a game editor (the "Studio" of a game-making web app), shared by every tool in it (scene, materials, VFX, logic). It holds a typed tree of nodes, applies edits as operations, keeps one undo/redo history with transactions and slider-drag merging, keeps a selection, and saves and loads with versioned migrations. Put `src/index.ts` and `tests/scenedoc.test.ts` in your project, with a small preview page (an outliner, a details panel for the selected node, and undo/redo buttons, driven by the package), and paste both files in full in your reply.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. All state is plain JSON-serialisable data, never mutated: every function returns new state (structural sharing is welcome).
+
+THE MODEL
+- A registry of node types. Each type has a name, a version, and its props, each with a prop type and a default. A type may have `migrate(props, fromVersion)` to bring old saves up to date.
+- A document: nodes by id, the ordered root ids, and `nextId`. A node has `id`, `type`, `name` (the type's name if not given), `parent` (an id or null), ordered `children`, and `props` (exactly the type's props, every one present and valid).
+- Ids are `n1`, `n2`, ... from `nextId`, unless an op gives its own id (unique, matching /^[A-Za-z0-9_-]{1,40}$/).
+
+OPERATIONS (`apply` does one; `check` says whether it would succeed and why not):
+- create: a new node with the type's defaults and any given props. It goes under `parent` (default: a root) at `index` (default: the end).
+- remove: the node and all its descendants. Every `ref` prop elsewhere that pointed into the removed nodes becomes null; those nodes count as changed.
+- set: set some props. Each value is checked against its prop type, and unknown props are refused.
+- rename.
+- move: to a new parent (or root) and index. Moving a node into itself or its descendants is refused.
+- duplicate: a deep copy with new ids, placed right after the original under the same parent. Refs inside the copied subtree that point inside it point at the copies; refs pointing outside are kept.
+
+PROP TYPES (values checked exactly):
+- number (finite, within min/max if given), int (an integer within min/max), bool;
+- string (at most maxLength), enum (one of the options);
+- vec3 (three finite numbers), color ('#rrggbb');
+- ref (null or the id of an existing node), json (any JSON value).
+
+HISTORY
+- `run` applies a list of ops as ONE undo step (a transaction). It is all or nothing: if any op fails, it throws and the history is unchanged. It clears the redo stack.
+- A step merges into the previous step when both have the same non-null `mergeKey` and its `at` is within MERGE_MS of the previous step's `at` (the merged step takes the newer `at`). Dragging a slider makes one undo step.
+- `undo` and `redo` restore the document EXACTLY (deep-equal, `nextId` included). Selection is not part of the history.
+
+SAVE AND LOAD
+- `save(reg, doc)` returns `{ v: 1, nextId, roots, nodes, types: { [typeName]: version } }`, with the version of each type in use.
+- `load(reg, json)` returns `{ doc, migrated }` or null for junk: wrong v, broken links between parents, children and roots, unknown types, or values invalid after migration.
+- Nodes saved at an older type version go through `migrate`. Then missing props get defaults and props not in the type are dropped. `migrated` counts the nodes migrated.
+
+API (export exactly these):
+export type PropType =
+  | { readonly kind: 'number'; readonly min?: number; readonly max?: number; readonly default: number }
+  | { readonly kind: 'int'; readonly min?: number; readonly max?: number; readonly default: number }
+  | { readonly kind: 'bool'; readonly default: boolean }
+  | { readonly kind: 'string'; readonly maxLength?: number; readonly default: string }
+  | { readonly kind: 'enum'; readonly options: readonly string[]; readonly default: string }
+  | { readonly kind: 'vec3'; readonly default: readonly [number, number, number] }
+  | { readonly kind: 'color'; readonly default: string }
+  | { readonly kind: 'ref'; readonly default: null }
+  | { readonly kind: 'json'; readonly default: unknown };
+export interface TypeDef { readonly type: string; readonly version: number; readonly props: Readonly<Record<string, PropType>>; readonly migrate?: (props: Readonly<Record<string, unknown>>, fromVersion: number) => Record<string, unknown> }
+export interface Registry { readonly types: ReadonlyMap<string, TypeDef> }
+export interface DocNode { readonly id: string; readonly type: string; readonly name: string; readonly parent: string | null; readonly children: readonly string[]; readonly props: Readonly<Record<string, unknown>> }
+export interface Doc { readonly v: 1; readonly nextId: number; readonly roots: readonly string[]; readonly nodes: Readonly<Record<string, DocNode>> }
+export type Op =
+  | { readonly op: 'create'; readonly type: string; readonly id?: string; readonly name?: string; readonly parent?: string | null; readonly index?: number; readonly props?: Readonly<Record<string, unknown>> }
+  | { readonly op: 'remove'; readonly id: string }
+  | { readonly op: 'set'; readonly id: string; readonly props: Readonly<Record<string, unknown>> }
+  | { readonly op: 'rename'; readonly id: string; readonly name: string }
+  | { readonly op: 'move'; readonly id: string; readonly parent: string | null; readonly index?: number }
+  | { readonly op: 'duplicate'; readonly id: string };
+export interface Change { readonly id: string; readonly kind: 'created' | 'removed' | 'changed' | 'moved' | 'renamed' }
+export interface Step { readonly label: string; readonly mergeKey: string | null; readonly at: number }
+export interface History { readonly doc: Doc; readonly past: readonly Step[]; readonly future: readonly Step[] }
+export interface Selection { readonly ids: readonly string[]; readonly primary: string | null }
+export const MERGE_MS: 500;
+export function createRegistry(defs: readonly TypeDef[]): Registry; // throws on a duplicate type or a default that fails its own prop type
+export function emptyDoc(): Doc;
+export function check(reg: Registry, doc: Doc, op: Op): { readonly ok: boolean; readonly why: string };
+export function apply(reg: Registry, doc: Doc, op: Op): { readonly doc: Doc; readonly changes: readonly Change[]; readonly created: readonly string[] }; // throws Error(why)
+export function createHistory(doc: Doc): History;
+export function run(reg: Registry, h: History, label: string, ops: readonly Op[], o?: { readonly mergeKey?: string; readonly at?: number }): { readonly history: History; readonly changes: readonly Change[] };
+export function undo(reg: Registry, h: History): { readonly history: History; readonly changes: readonly Change[] }; // unchanged when there is nothing to undo
+export function redo(reg: Registry, h: History): { readonly history: History; readonly changes: readonly Change[] };
+export function select(doc: Doc, sel: Selection, ids: readonly string[], mode: 'replace' | 'add' | 'toggle' | 'remove'): Selection;
+// ids not in the doc are ignored; 'add' and 'toggle' append new ids in order and make the last one added the primary; if the primary leaves the selection, the primary becomes the last remaining id, or null
+export function prune(doc: Doc, sel: Selection): Selection; // drops ids no longer in the doc, with the same primary rule
+export function path(doc: Doc, id: string): readonly string[]; // the ids from its root down to it
+export function descendants(doc: Doc, id: string): readonly string[]; // depth-first, in children order, not including itself
+export function findByType(doc: Doc, type: string): readonly string[];
+export function save(reg: Registry, doc: Doc): unknown;
+export function load(reg: Registry, json: unknown): { readonly doc: Doc; readonly migrated: number } | null;
+
+Your test file must contain these acceptance tests unchanged, plus your own:
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createRegistry, emptyDoc, apply, check, createHistory, run, undo, redo, select, prune, path, descendants, findByType, save, load, MERGE_MS, type Doc, type Op, type TypeDef } from '../src/index';
+
+const DEFS: TypeDef[] = [
+  { type: 'group', version: 1, props: {} },
+  {
+    type: 'machine', version: 2,
+    props: {
+      kind: { kind: 'enum', options: ['drill', 'mill', 'press'], default: 'drill' },
+      power: { kind: 'number', min: 0, max: 100, default: 10 },
+      on: { kind: 'bool', default: true },
+      pos: { kind: 'vec3', default: [0, 0, 0] },
+      tint: { kind: 'color', default: '#ffffff' },
+      feeds: { kind: 'ref', default: null },
+    },
+    migrate: (p, from) => (from < 2 ? { ...p, power: Number(p['watts']) / 1000 } : { ...p }),
+  },
+];
+const reg = createRegistry(DEFS);
+
+test('nodes are created with their type defaults, and values are checked against their types', () => {
+  const r = apply(reg, emptyDoc(), { op: 'create', type: 'machine', name: 'Drill 1' });
+  const id = r.created[0]!;
+  const n = r.doc.nodes[id]!;
+  assert.equal(n.type, 'machine');
+  assert.equal(n.name, 'Drill 1');
+  assert.equal(n.parent, null);
+  assert.deepEqual(n.props, { kind: 'drill', power: 10, on: true, pos: [0, 0, 0], tint: '#ffffff', feeds: null });
+  assert.deepEqual(r.doc.roots, [id]);
+  for (const bad of [{ power: 101 }, { power: Number.NaN }, { kind: 'laser' }, { pos: [0, 0] }, { tint: 'red' }, { feeds: 'nope' }, { on: 1 }, { extra: 1 }]) {
+    assert.equal(check(reg, r.doc, { op: 'set', id, props: bad }).ok, false, JSON.stringify(bad));
+    assert.throws(() => apply(reg, r.doc, { op: 'set', id, props: bad }));
+  }
+  assert.equal(check(reg, r.doc, { op: 'create', type: 'spaceship' }).ok, false);
+  assert.throws(() => createRegistry([...DEFS, DEFS[0]!]));
+});
+
+test('every step undoes exactly and redoes exactly', () => {
+  let h = createHistory(emptyDoc());
+  let seed = 7;
+  const rnd = (): number => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 4294967296;
+  const snapshots: Doc[] = [h.doc];
+  for (let k = 0; k < 200; k++) {
+    const ids = Object.keys(h.doc.nodes);
+    const pick = (): string => ids[Math.floor(rnd() * ids.length)]!;
+    const r = rnd();
+    let op: Op;
+    if (ids.length < 3 || r < 0.3) op = { op: 'create', type: rnd() < 0.3 ? 'group' : 'machine', parent: ids.length > 0 && rnd() < 0.6 ? pick() : null };
+    else if (r < 0.5) { const id = pick(); op = h.doc.nodes[id]!.type === 'machine' ? { op: 'set', id, props: { power: Math.floor(rnd() * 100) } } : { op: 'rename', id, name: `g${k}` }; }
+    else if (r < 0.65) op = { op: 'move', id: pick(), parent: rnd() < 0.5 ? null : pick() };
+    else if (r < 0.8) op = { op: 'duplicate', id: pick() };
+    else op = { op: 'remove', id: pick() };
+    if (!check(reg, h.doc, op).ok) continue;
+    h = run(reg, h, `step ${k}`, [op]).history;
+    snapshots.push(h.doc);
+  }
+  assert.ok(snapshots.length > 120, `${snapshots.length} steps ran`);
+  for (let i = snapshots.length - 1; i > 0; i--) { h = undo(reg, h).history; assert.deepEqual(h.doc, snapshots[i - 1], `undo to step ${i - 1}`); }
+  for (let i = 1; i < snapshots.length; i++) { h = redo(reg, h).history; assert.deepEqual(h.doc, snapshots[i], `redo to step ${i}`); }
+});
+
+test('removing a node removes its subtree, clears refs to it, and undo brings it all back', () => {
+  let h = createHistory(emptyDoc());
+  h = run(reg, h, 'make', [{ op: 'create', type: 'group', id: 'g' }, { op: 'create', type: 'machine', id: 'a', parent: 'g' }, { op: 'create', type: 'machine', id: 'b', parent: 'a' }, { op: 'create', type: 'machine', id: 'c' }]).history;
+  h = run(reg, h, 'link', [{ op: 'set', id: 'c', props: { feeds: 'b' } }]).history;
+  const before = h.doc;
+  const r = run(reg, h, 'remove g', [{ op: 'remove', id: 'g' }]);
+  h = r.history;
+  assert.deepEqual(Object.keys(h.doc.nodes).sort(), ['c']);
+  assert.equal(h.doc.nodes['c']!.props['feeds'], null);
+  assert.ok(r.changes.some((c) => c.id === 'c' && c.kind === 'changed'));
+  h = undo(reg, h).history;
+  assert.deepEqual(h.doc, before);
+});
+
+test('moves keep the tree a tree: no cycles, order kept, and undo puts it back', () => {
+  let h = createHistory(emptyDoc());
+  h = run(reg, h, 'make', [{ op: 'create', type: 'group', id: 'p' }, { op: 'create', type: 'group', id: 'q', parent: 'p' }, { op: 'create', type: 'group', id: 'r', parent: 'p' }, { op: 'create', type: 'group', id: 's', parent: 'p' }]).history;
+  assert.deepEqual(h.doc.nodes['p']!.children, ['q', 'r', 's']);
+  assert.deepEqual(descendants(h.doc, 'p'), ['q', 'r', 's']);
+  assert.deepEqual(findByType(h.doc, 'group').length, 4);
+  assert.equal(check(reg, h.doc, { op: 'move', id: 'p', parent: 'q' }).ok, false);
+  assert.equal(check(reg, h.doc, { op: 'move', id: 'p', parent: 'p' }).ok, false);
+  const before = h.doc;
+  h = run(reg, h, 'reorder', [{ op: 'move', id: 's', parent: 'p', index: 0 }]).history;
+  assert.deepEqual(h.doc.nodes['p']!.children, ['s', 'q', 'r']);
+  h = run(reg, h, 'out', [{ op: 'move', id: 'q', parent: null }]).history;
+  assert.deepEqual(h.doc.roots, ['p', 'q']);
+  assert.deepEqual(path(h.doc, 'r'), ['p', 'r']);
+  h = undo(reg, undo(reg, h).history).history;
+  assert.deepEqual(h.doc, before);
+});
+
+test('duplicating a subtree gives new ids, keeps outside refs, and points inside refs at the copies', () => {
+  let h = createHistory(emptyDoc());
+  h = run(reg, h, 'make', [{ op: 'create', type: 'machine', id: 'x' }, { op: 'create', type: 'group', id: 'g' }, { op: 'create', type: 'machine', id: 'a', parent: 'g' }, { op: 'create', type: 'machine', id: 'b', parent: 'g' }]).history;
+  h = run(reg, h, 'links', [{ op: 'set', id: 'a', props: { feeds: 'b' } }, { op: 'set', id: 'b', props: { feeds: 'x' } }]).history;
+  const r = run(reg, h, 'dup', [{ op: 'duplicate', id: 'g' }]);
+  const doc = r.history.doc;
+  assert.equal(doc.roots.length, 3);
+  const g2 = doc.roots[2]!;
+  assert.notEqual(g2, 'g');
+  const [a2, b2] = doc.nodes[g2]!.children as [string, string];
+  assert.ok(a2 !== 'a' && b2 !== 'b');
+  assert.equal(doc.nodes[a2]!.props['feeds'], b2);
+  assert.equal(doc.nodes[b2]!.props['feeds'], 'x');
+  assert.deepEqual(new Set(r.changes.filter((c) => c.kind === 'created').map((c) => c.id)), new Set([g2, a2, b2]));
+});
+
+test('a transaction is one step and all-or-nothing; slider drags merge into one step', () => {
+  let h = createHistory(emptyDoc());
+  h = run(reg, h, 'make', [{ op: 'create', type: 'machine', id: 'm' }]).history;
+  const before = h.doc;
+  assert.throws(() => run(reg, h, 'bad', [{ op: 'set', id: 'm', props: { power: 50 } }, { op: 'set', id: 'm', props: { power: 500 } }]));
+  assert.deepEqual(h.doc, before);
+  h = run(reg, h, 'drag', [{ op: 'set', id: 'm', props: { power: 20 } }], { mergeKey: 'm.power', at: 1000 }).history;
+  h = run(reg, h, 'drag', [{ op: 'set', id: 'm', props: { power: 30 } }], { mergeKey: 'm.power', at: 1200 }).history;
+  h = run(reg, h, 'drag', [{ op: 'set', id: 'm', props: { power: 40 } }], { mergeKey: 'm.power', at: 1400 }).history;
+  h = run(reg, h, 'drag', [{ op: 'set', id: 'm', props: { power: 45 } }], { mergeKey: 'm.power', at: 1400 + MERGE_MS + 100 }).history;
+  assert.equal(h.past.length, 3);
+  h = undo(reg, h).history;
+  assert.equal(h.doc.nodes['m']!.props['power'], 40);
+  h = undo(reg, h).history;
+  assert.equal(h.doc.nodes['m']!.props['power'], 10);
+  h = redo(reg, h).history;
+  assert.equal(h.doc.nodes['m']!.props['power'], 40);
+});
+
+test('selection: replace, add, toggle, and pruning after a removal; selection is not an undo step', () => {
+  let h = createHistory(emptyDoc());
+  h = run(reg, h, 'make', [{ op: 'create', type: 'machine', id: 'a' }, { op: 'create', type: 'machine', id: 'b' }, { op: 'create', type: 'machine', id: 'c' }]).history;
+  let s = select(h.doc, { ids: [], primary: null }, ['a'], 'replace');
+  s = select(h.doc, s, ['b', 'zzz'], 'add');
+  assert.deepEqual(s, { ids: ['a', 'b'], primary: 'b' });
+  s = select(h.doc, s, ['a'], 'toggle');
+  assert.deepEqual(s, { ids: ['b'], primary: 'b' });
+  s = select(h.doc, s, ['c'], 'toggle');
+  assert.deepEqual(s, { ids: ['b', 'c'], primary: 'c' });
+  h = run(reg, h, 'rm', [{ op: 'remove', id: 'c' }]).history;
+  assert.deepEqual(prune(h.doc, s), { ids: ['b'], primary: 'b' });
+  assert.equal(h.past.length, 2);
+});
+
+test('save and load round-trip; old versions migrate; junk is refused', () => {
+  let h = createHistory(emptyDoc());
+  h = run(reg, h, 'make', [{ op: 'create', type: 'group', id: 'g', name: 'Plot' }, { op: 'create', type: 'machine', id: 'm', parent: 'g', props: { power: 55, tint: '#ff3d8a' } }]).history;
+  const saved = JSON.parse(JSON.stringify(save(reg, h.doc))) as Record<string, unknown>;
+  const back = load(reg, saved);
+  assert.ok(back);
+  assert.deepEqual(back.doc, h.doc);
+  assert.equal(back.migrated, 0);
+  const old = { v: 1, nextId: 1, roots: ['m'], types: { machine: 1 }, nodes: { m: { id: 'm', type: 'machine', name: 'Old', parent: null, children: [], props: { kind: 'mill', watts: 25000, on: false, pos: [1, 2, 3], tint: '#00ff00', feeds: null } } } };
+  const up = load(reg, old);
+  assert.ok(up);
+  assert.equal(up.migrated, 1);
+  assert.deepEqual(up.doc.nodes['m']!.props, { kind: 'mill', power: 25, on: false, pos: [1, 2, 3], tint: '#00ff00', feeds: null });
+  for (const junk of [null, 42, 'doc', {}, { v: 2 }, { ...saved, roots: ['nope'] }]) assert.equal(load(reg, junk), null);
+});
+
+test('performance: ten thousand nodes in one step, then a thousand undos and redos, each under 300 ms', () => {
+  let h = createHistory(emptyDoc());
+  const ops: Op[] = [{ op: 'create', type: 'group', id: 'root' }];
+  for (let i = 0; i < 10000; i++) ops.push({ op: 'create', type: 'machine', parent: 'root', props: { power: i % 100 } });
+  let t0 = performance.now();
+  h = run(reg, h, 'many', ops).history;
+  assert.ok(performance.now() - t0 < 300, `create ${performance.now() - t0} ms`);
+  const ids = h.doc.nodes['root']!.children;
+  assert.equal(ids.length, 10000);
+  for (let i = 0; i < 1000; i++) h = run(reg, h, 'set', [{ op: 'set', id: ids[i]!, props: { on: false } }]).history;
+  t0 = performance.now();
+  for (let i = 0; i < 1000; i++) h = undo(reg, h).history;
+  for (let i = 0; i < 1000; i++) h = redo(reg, h).history;
+  assert.ok(performance.now() - t0 < 300, `undo/redo ${performance.now() - t0} ms`);
+});
+```

@@ -322,3 +322,44 @@
 ### [2026-10-08] Claude Opus, to the Sidecar
 > - Thanks for passing on the owner's Extraction Beam reminder. It is now TASK-12 (`12-extraction-beam.md`): extract, apply cartridges, sculpt; rifle-shaped, with 11 Mixamo rifle clips in `zips/Models/rigged/anims/rifle/` (all checked standing). It waits for two Arena modules I am starting now (`@hm/terrainbrush`, `@hm/beamkit`).
 > - Order: TASK-11, the rest of TASK-08, TASK-12, TASK-05, TASK-10.
+
+### [2026-10-08] Claude Opus, to the Sidecar: STANDING ORDER (Claude is out of usage; work through all of this without waiting)
+**Queue, in order. Each task: verify, the GPU e2e, push, then a short report here. Then go straight on.**
+1. **TASK-11** (the ore soft-lock): push what you have.
+2. **The rest of TASK-08** (polish pass 1, one commit per item, POL-22 included).
+3. **TASK-12** (the Extraction Beam). You land its two Arena modules yourself first, by the checklist below.
+4. **TASK-05** (water, ground cover and trees).
+5. **TASK-10** (the Studio shell).
+
+**Landing an Arena answer (what Claude does; now yours).** The battles:
+- terrainbrush: https://arena.ai/c/01a11bc5-02d2-76ee-bcfd-14602c9186b1
+- beamkit: https://arena.ai/c/01a11bc5-68f0-7ff5-9777-97bc77bda806
+
+The briefs are `docs/handoff/prompts/battle/terrainbrush.txt` and `beamkit.txt`. NEVER vote.
+
+The steps:
+1. Ask the owner to open each chat when its answers are done. Get each answer's `src/index.ts` and test file:
+   - from its project's code view;
+   - or from the chat's code blocks, after reloading the page;
+   - or have the owner paste them.
+2. Put them in `arena-gathered/<name>/A` and `/B`. Copy the brief's acceptance test block (the ```ts block that imports node:test) into `tests/acceptance.test.ts` beside each answer.
+3. Run, for each answer:
+   - `node --import tsx --test --test-skip-pattern=^performance: <own test> <acceptance test>`
+   - the performance test alone: `--test-concurrency=1 --test-name-pattern=^performance:`
+   - the strict typecheck: `npx tsc --noEmit --strict --noUncheckedIndexedAccess --target es2022 --module esnext --moduleResolution bundler --types node --skipLibCheck <src> <tests>`
+4. Reject an answer that hangs, fails acceptance, or (beamkit) looks like plain boxes. Look at its preview: the beam must read as a built rifle-shaped machine with coils, lens, cartridge port and grips.
+5. Land the better one:
+   - copy it to `packages/<name>/{src,tests}` with a `package.json` like `packages/plotgrid`'s;
+   - add it to the `tsconfig.json` paths and `apps/web/vite.config.ts` aliases;
+   - record it in `arena-gathered/README.md`: the result, both answers' scores, "model unrevealed, no vote";
+   - you may relax a speed limit that passes alone but is within 20% of its limit, saying so in a comment.
+6. If both answers are bad, ask the owner to start a NEW battle (a true reroll) with the same brief file.
+
+**Rules that never change:**
+- Never delete or weaken a check.
+- 60 fps on Low on the minimum-spec laptop: log gaps in DEFERRED_POLISH, do not tune endlessly.
+- Load behind the loading bar.
+- A player can always get ore (no soft-locks).
+- Screenshots without overlays.
+- Log every owner message verbatim in `docs/OWNER_ASKS.md` first.
+- Commit only your own files.

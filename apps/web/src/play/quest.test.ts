@@ -36,23 +36,43 @@ test('a save is checked: nothing odd traps a player', () => {
   assert.equal(noHuman.gateOn, false);
   // a first-version save (a list of texture mills and a stage) becomes the plot's mills at that stage
   const old = loadState({ v: 1, step: 'done', avatarId: 'a', visited: true, stage: 9, machines: [{ kind: 'texture-mill', x: 5, z: 6, yaw: 1 }, { kind: 'chimney' }, 4] });
-  assert.equal(old.v, 3);
+  assert.equal(old.v, 4);
   assert.equal(old.plot.stage, 6);
   assert.equal(old.gateOn, true);
   assert.deepEqual(old.plot.machines.map((m) => [m.kind, m.x, m.z, m.yaw]), [['mill', 5, 6, 1]]);
   assert.deepEqual(old.avatar, { kind: 'scientist', name: 'Scientist', visor: '#f59e0b' });
+  assert.equal(old.lab.v, 1);
   assert.deepEqual(loadState(JSON.parse(JSON.stringify(old))), old);
 
   // a v2 save with avatarId migrates to scientist avatar
   const v2 = loadState({ v: 2, step: 'power', avatarId: 'avatar-ada', name: 'Ada', gateOn: false, visited: false });
-  assert.equal(v2.v, 3);
+  assert.equal(v2.v, 4);
   assert.equal(v2.step, 'power');
   assert.deepEqual(v2.avatar, { kind: 'scientist', name: 'Ada', visor: '#f59e0b' });
+  assert.equal(v2.lab.v, 1);
 
   // a v3 custom avatar round-trips cleanly
   const v3Custom = loadState({ v: 3, step: 'build', avatar: { kind: 'custom', name: 'Gordan', key: 'hm.avatar.custom.123' }, gateOn: true, visited: true });
-  assert.equal(v3Custom.v, 3);
+  assert.equal(v3Custom.v, 4);
   assert.deepEqual(v3Custom.avatar, { kind: 'custom', name: 'Gordan', key: 'hm.avatar.custom.123' });
+
+  // an old save whose plot machine holds a vault preset id migrates it to a written cartridge in the lab slotted into that machine
+  const v3Cart = loadState({
+    v: 3, step: 'done', avatar: { kind: 'scientist', name: 'Ada', visor: '#f59e0b' }, gateOn: true, visited: true,
+    plot: {
+      v: 1, stage: 1, points: { pxd: 0, vtx: 0, lx: 0, aq: 0 }, ore: 50, nextId: 2,
+      machines: [{ id: 1, kind: 'mill', x: 5, z: 6, yaw: 0, on: true, cartridge: 'red_ochre_silt', built: 0 }],
+    },
+  });
+  assert.equal(v3Cart.v, 4);
+  assert.equal(v3Cart.lab.cartridges.length, 1);
+  const migratedCart = v3Cart.lab.cartridges[0]!;
+  assert.equal(migratedCart.id, 'c1');
+  assert.equal(migratedCart.name, 'Red Ochre Silt');
+  assert.equal(migratedCart.kind, 'preset');
+  assert.equal(migratedCart.preset, 'red_ochre_silt');
+  assert.equal(migratedCart.slot, 1);
+  assert.equal(v3Cart.plot.machines[0]?.cartridge, 'c1');
 });
 
 test('every step tells you what to do, in the lab and on the planet', () => {

@@ -28,6 +28,8 @@ export interface Controls {
   readonly look: { readonly dx: number; readonly dy: number };
   readonly run: boolean;
 }
+export type LabMachineKind = 'rack' | 'bench' | 'combiner';
+
 /** What the scene tells the screen each frame. */
 export interface FrameOut {
   readonly where: Where;
@@ -38,6 +40,8 @@ export interface FrameOut {
   readonly ghost: { readonly ok: boolean; readonly why: string } | null;
   /** The machine you are looking at, close enough to use (its plot id), when not building. */
   readonly aimed: number | null;
+  /** The lab machine you are looking at, close enough to use. */
+  readonly aimedLab: LabMachineKind | null;
   /** The stage the picture shows (a wave brings the next one across the plot). */
   readonly stage: number;
   /** Something happened this frame ('stage-up': a wave has finished bringing `stage`). */
@@ -100,6 +104,8 @@ export interface PlayScene {
   resize(width: number, height: number, pixelRatio: number): void;
   /** The live detail (the display governor's tier, with your own Settings on top). */
   setDetail(d: Detail): void;
+  /** Activity of the lab machines (bench writing, combiner mixing, rack cataloguing) for the lab plume. */
+  setLabActivity(act: { readonly bench: number; readonly combiner: number; readonly rack: number }): void;
   /**
    * Compiles every shader the frames will need, for each place it draws, behind the loading bar: a compile mid-play is a hitch the
    * display governor would read as a slow machine (and the owner's rule is never to start a screen choppy).
@@ -157,6 +163,39 @@ export function createPlayScene(o: {
   roomEnv.dispose();
   room.group.updateMatrixWorld(true);
   const labGateM = room.gate.group.matrixWorld.clone();
+
+  // one plume for the lab's machines (@hm/plume)
+  const labPlume = createPlume({ mode: o.detail.plumes, density: o.detail.plumeDensity, markAlpha: 0.5 });
+  labScene.add(labPlume.object);
+  keep(labPlume);
+
+  let benchEmitter: number | null = null;
+  let combinerEmitter: number | null = null;
+  let rackEmitter: number | null = null;
+
+  const setLabActivity = (act: { readonly bench: number; readonly combiner: number; readonly rack: number }): void => {
+    // bench pours pink (#ff3d8a) while writing
+    if (act.bench > 0 && benchEmitter === null) {
+      benchEmitter = labPlume.add({ at: [9.25, 0.9, -3.4], colour: '#ff3d8a', count: 140, height: 2.2, spread: 0.9, life: 1.8 });
+    } else if (act.bench <= 0 && benchEmitter !== null) {
+      labPlume.remove(benchEmitter);
+      benchEmitter = null;
+    }
+    // combiner pours violet (#b46bff) while mixing
+    if (act.combiner > 0 && combinerEmitter === null) {
+      combinerEmitter = labPlume.add({ at: [9.1, 1.25, -0.6], colour: '#b46bff', count: 150, height: 2.4, spread: 1.1, life: 2.0 });
+    } else if (act.combiner <= 0 && combinerEmitter !== null) {
+      labPlume.remove(combinerEmitter);
+      combinerEmitter = null;
+    }
+    // rack shows faint violet wisp at its indexer while cataloguing
+    if (act.rack > 0 && rackEmitter === null) {
+      rackEmitter = labPlume.add({ at: [-9.35, 1.4, -5.5], colour: '#b46bff', count: 35, height: 1.0, spread: 0.4, life: 1.2 });
+    } else if (act.rack <= 0 && rackEmitter !== null) {
+      labPlume.remove(rackEmitter);
+      rackEmitter = null;
+    }
+  };
 
   // ---- the planet
   const planetScene = new THREE.Scene();
@@ -595,6 +634,7 @@ export function createPlayScene(o: {
       const wc = postUniforms.uWaveCentre.value;
       plume.setWave([wc.x, wc.y, wc.z], waveTo >= 0 ? Math.min(r, RACER_REACH) : -1);
       plume.update(now);
+      labPlume.update(now);
       postUniforms.uTime.value = now;
       postUniforms.uGlitch.value = where === 'planet' ? Math.max(0, Math.min(1, (0.4 - sync) / 0.4)) : 0;
       postUniforms.uLost.value = Math.max(0, 1 - (now - lostAt) / 0.6);
@@ -633,7 +673,7 @@ export function createPlayScene(o: {
         }
         drawPlanet(camera, null, false);
       }
-      // ---- what you are looking at: a machine on the planet within reach of your hand, or the lab's main lever
+      // ---- what you are looking at: a machine on the planet within reach of your hand, or the lab's main lever, or lab machines
       let aimed: number | null = null;
       if (where === 'planet' && !building) {
         const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -646,14 +686,32 @@ export function createPlayScene(o: {
         }
       }
       let atLever = false;
-      if (where === 'lab' && !gateOn && powerT < 0) {
-        const to = room.leverAt.clone().sub(camera.position);
+      let aimedLab: LabMachineKind | null = null;
+      if (where === 'lab') {
         const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-        atLever = to.length() < 2.4 && to.normalize().dot(dir) > 0.86;
+        if (!gateOn && powerT < 0) {
+          const to = room.leverAt.clone().sub(camera.position);
+          atLever = to.length() < 2.4 && to.normalize().dot(dir) > 0.86;
+        }
+        const targets: [LabMachineKind, THREE.Vector3, number, number][] = [
+          ['rack', new THREE.Vector3(-9.55, 1.2, -5.5), 1.6, 4.0],
+          ['bench', new THREE.Vector3(9.25, 0.85, -3.4), 1.2, 3.8],
+          ['combiner', new THREE.Vector3(9.1, 0.9, -0.6), 1.0, 3.5],
+        ];
+        let bestLab = 4.5;
+        for (const [kind, pos, radius, maxDist] of targets) {
+          const c = pos.clone().sub(camera.position);
+          const t = c.dot(dir);
+          if (t <= 0 || t >= bestLab || t > maxDist) continue;
+          if (c.addScaledVector(dir, -t).length() < radius + 0.35) {
+            bestLab = t;
+            aimedLab = kind;
+          }
+        }
       }
       const ev = pendingEvent;
       pendingEvent = null;
-      return { where, sync, atLever, ghost: building ? ghostVerdict : null, aimed, stage: shown, event: ev };
+      return { where, sync, atLever, ghost: building ? ghostVerdict : null, aimed, aimedLab, stage: shown, event: ev };
     },
     resize(width, height, pixelRatio) {
       renderer.setPixelRatio(pixelRatio);
@@ -676,7 +734,10 @@ export function createPlayScene(o: {
       ground?.setBudget(d.groundBudget);
       plume.setMode(d.plumes);
       plume.setDensity(d.plumeDensity);
+      labPlume.setMode(d.plumes);
+      labPlume.setDensity(d.plumeDensity);
     },
+    setLabActivity,
     warm() {
       // each scene for each place it draws to (the screen's colour space differs from the targets'), hidden things included (the
       // plume's three ways), with one of every machine standing in, and again in the ghost's marks: what first appears mid-play is

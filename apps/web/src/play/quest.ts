@@ -3,6 +3,8 @@
 // steps, what each one asks of you, sync, and the save. The screen (play.tsx, play-scene.ts) draws it; this file decides it.
 
 import { loadPlot, newPlot, nextStage, type MachineKind, type Metric, type PlotState } from '@hm/plotsim';
+import { loadLab, newLab, type Cartridge, type LabState } from '@hm/cartlab';
+import { VAULT_BY_ID } from '@hm/vault';
 
 /** Where you are in the first Play (the tutorial); after it, the plot's stages lead. */
 export type Step = 'create' | 'power' | 'explore' | 'build' | 'done';
@@ -14,7 +16,7 @@ export type PlayAvatar =
 
 /** Everything Play saves. */
 export interface PlayState {
-  readonly v: 3;
+  readonly v: 4;
   readonly step: Step;
   /** The scientist or custom avatar made in the lab. */
   readonly avatar: PlayAvatar | null;
@@ -25,9 +27,11 @@ export interface PlayState {
   readonly visited: boolean;
   /** Your plot: its ore, its machines, its four fidelity metrics and its stage (`@hm/plotsim`). */
   readonly plot: PlotState;
+  /** The lab's cartridges (bench, combiner, rack) (`@hm/cartlab`). */
+  readonly lab: LabState;
 }
 
-export const FRESH: PlayState = { v: 3, step: 'create', avatar: null, avatarId: null, gateOn: false, visited: false, plot: newPlot() };
+export const FRESH: PlayState = { v: 4, step: 'create', avatar: null, avatarId: null, gateOn: false, visited: false, plot: newPlot(), lab: newLab() };
 export const SAVE_KEY = 'hm.setmix.play';
 
 /** What players call the four metrics. */
@@ -72,11 +76,48 @@ export function loadState(raw: unknown): PlayState {
   const avatarId = avatar ? (avatar.kind === 'scientist' ? 'scientist' : avatar.key) : legacyId;
   // a step past 'create' needs an avatar; past 'power' needs the gate on
   const fixedStep: Step = step !== 'create' && !avatar && !avatarId ? 'create' : step;
+  let plot = r['plot'] !== undefined ? loadPlot(r['plot']) : migrate(r);
+  let lab = r['lab'] ? loadLab(r['lab']) : null;
+  if (!lab) {
+    let nextLab = newLab();
+    const newMachines = plot.machines.map((m) => {
+      if (m.cartridge) {
+        const p = VAULT_BY_ID.get(m.cartridge);
+        if (p) {
+          const cid = `c${nextLab.nextId}`;
+          const c: Cartridge = {
+            id: cid,
+            name: p.name,
+            kind: 'preset',
+            preset: p.id,
+            from: [],
+            affinity: {
+              pxd: p.affinity.pxd ?? 1,
+              vtx: p.affinity.vtx ?? 1,
+              lx: p.affinity.lx ?? 1,
+              aq: p.affinity.aq ?? 1,
+            },
+            slot: m.id,
+          };
+          nextLab = {
+            ...nextLab,
+            nextId: nextLab.nextId + 1,
+            cartridges: [...nextLab.cartridges, c],
+          };
+          return { ...m, cartridge: cid };
+        }
+      }
+      return m;
+    });
+    plot = { ...plot, machines: newMachines };
+    lab = nextLab;
+  }
   return {
-    v: 3, step: fixedStep, avatar, avatarId,
+    v: 4, step: fixedStep, avatar, avatarId,
     gateOn: fixedStep === 'create' || fixedStep === 'power' ? false : true,
     visited: r['visited'] === true,
-    plot: r['plot'] !== undefined ? loadPlot(r['plot']) : migrate(r),
+    plot,
+    lab,
   };
 }
 
@@ -101,6 +142,11 @@ export function returned(s: PlayState): PlayState {
 /** The plot changed (a machine built or removed, time passed). The first pixel machine (stage 1) ends the tutorial. */
 export function withPlot(s: PlayState, plot: PlotState): PlayState {
   return { ...s, plot, step: s.step === 'build' && plot.stage >= 1 ? 'done' : s.step };
+}
+
+/** The lab changed (cartridge made, written, combined, slotted). */
+export function withLab(s: PlayState, lab: LabState): PlayState {
+  return { ...s, lab };
 }
 
 /** What the screen says you should do now, where you are. */

@@ -113,3 +113,29 @@
 .play-carts button b { font-size: 13px; }
 .play-carts button span { font-size: 12px; color: rgba(232, 238, 241, .65); }
 .play-carts button.on { border-color: var(--power); background: rgba(255, 255, 255, .1); }
+
+/* lab machines: rack, bench, combiner */
+.play-rack-list { display: grid; gap: 8px; max-height: 48vh; overflow-y: auto; margin-bottom: 12px; }
+.play-cart-item { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; background: rgba(255, 255, 255, .04); border: 1px solid rgba(241, 244, 245, .1); }
+.cart-head { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.cart-badge { font-size: 10px; text-transform: uppercase; padding: 2px 5px; border-radius: 2px; font-weight: 700; letter-spacing: .5px; }
+.cart-badge.blank { background: rgba(255, 255, 255, .15); color: #cbd5e1; }
+.cart-badge.preset { background: rgba(245, 158, 11, .25); color: #f59e0b; border: 1px solid rgba(245, 158, 11, .4); }
+.cart-badge.mix { background: rgba(180, 107, 255, .25); color: #b46bff; border: 1px solid rgba(180, 107, 255, .4); }
+.cart-slotted { margin-left: auto; font-size: 11px; color: var(--power); font-style: normal; }
+.cart-in-rack { margin-left: auto; font-size: 11px; color: rgba(232, 238, 241, .4); font-style: normal; }
+.cart-affinities { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; font-variant-numeric: tabular-nums; }
+
+.play-progress { width: 100%; height: 10px; background: rgba(255, 255, 255, .08); border-radius: 2px; overflow: hidden; margin: 8px 0; }
+.play-progress .bar { height: 100%; background: var(--power); transition: width .1s linear; }
+
+.play-select-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; max-height: 36vh; overflow-y: auto; margin: 8px 0 12px; }
+.play-select-grid button { display: grid; gap: 2px; text-align: left; padding: 6px 8px; font-size: 12px; }
+.play-select-grid button.on { border-color: var(--power); background: rgba(255, 255, 255, .1); }
+.play-select-grid button.locked { opacity: .4; cursor: default; }
+.play-select-grid button em { font-size: 10px; color: #ff9a7a; font-style: normal; }
+
+.play-combine-preview { padding: 10px; background: rgba(180, 107, 255, .08); border: 1px solid rgba(180, 107, 255, .3); margin: 8px 0 12px; }
+.play-combine-preview h4 { margin: 0 0 6px; font-size: 13px; color: #b46bff; }
+
+.play-why { display: block; font-size: 12px; color: #ff9a7a; margin-top: 6px; }

@@ -5,7 +5,8 @@
 // - SetMix: the lush sunlit terraformed planet (docs/concept/setmix/04-menu-setmix.png)
 // - Goblin Racing: the goblin planet in deep space (docs/concept/setmix/05-menu-goblin-racing.png)
 import * as THREE from 'three';
-import { createLabRoom, GATE_AT, POWER_ON, type LabRoom } from '../play/lab-room';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { createLabRoom, GATE_AT, type LabRoom } from '../play/lab-room';
 import { createPlotHolo, type PlotHolo } from '../play/plot-holo';
 import type { PlotGround } from '../play/plot-ground';
 import type { PlotState } from '@hm/plotsim';
@@ -14,6 +15,7 @@ import { EDITION } from '../edition';
 import type { StageLook } from '../crafter/looks';
 import type { Neighbour } from '../crafter/world';
 import { hash } from '../crafter/moon';
+import { SCIENTIST_FBX_BASE64 } from '../avatar/scientist/scientist-asset';
 
 export const LAB_AT = { x: 86, z: 30 } as const;
 
@@ -196,6 +198,51 @@ export interface LabScene {
   dispose(): void;
 }
 
+function createScientistModel(visorHex = '#f59e0b'): THREE.Group {
+  const binStr = atob(SCIENTIST_FBX_BASE64);
+  const len = binStr.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) bytes[i] = binStr.charCodeAt(i);
+  const fbxLoader = new FBXLoader();
+  const group = fbxLoader.parse(bytes.buffer, '') as THREE.Group;
+  group.scale.setScalar(0.01);
+  const submeshColors: Record<string, { color: number; roughness: number; metalness?: number }> = {
+    '1': { color: 0x334155, roughness: 0.7 },
+    '2': { color: 0x1e293b, roughness: 0.8 },
+    '3': { color: 0x475569, roughness: 0.6 },
+    '4': { color: 0xe2e8f0, roughness: 0.5 },
+    '5': { color: 0xf5f8fa, roughness: 0.5, metalness: 0.05 },
+    '6': { color: 0x0f172a, roughness: 0.9 },
+    '7': { color: 0x0f172a, roughness: 0.9 },
+    '9': { color: 0x334155, roughness: 0.7 },
+  };
+  const visorColor = new THREE.Color(visorHex);
+  group.traverse((c) => {
+    if ((c as THREE.Bone).isBone) {
+      const b = c as THREE.Bone;
+      if (b.name === 'mixamorigLeftArm') b.rotation.z -= 1.15;
+      if (b.name === 'mixamorigRightArm') b.rotation.z += 1.15;
+    }
+    if ((c as THREE.Mesh).isMesh) {
+      const mesh = c as THREE.Mesh;
+      if (mesh.name === '6' || mesh.name === '7' || mesh.name === '8') {
+        mesh.material = new THREE.MeshStandardMaterial({
+          color: visorColor,
+          emissive: visorColor,
+          emissiveIntensity: 0.9,
+          roughness: 0.1,
+          metalness: 0.1,
+          transparent: true,
+          opacity: 0.9,
+        });
+      } else if (submeshColors[mesh.name]) {
+        mesh.material = new THREE.MeshStandardMaterial(submeshColors[mesh.name]);
+      }
+    }
+  });
+  return group;
+}
+
 export function createLabScene(o: {
   readonly canvas: HTMLCanvasElement;
   readonly gridSpacing: number;
@@ -206,6 +253,8 @@ export function createLabScene(o: {
 }): LabScene {
   const renderer = new THREE.WebGLRenderer({ canvas: o.canvas, antialias: o.antialias, powerPreference: o.powerPreference });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 0.85;
   renderer.autoClear = false;
   renderer.setClearColor(0x000000, 1);
 
@@ -224,7 +273,8 @@ export function createLabScene(o: {
   const labScene = new THREE.Scene();
   const room: LabRoom = createLabRoom({ textureSize: o.textureSize, portalMaterial: portalMat });
   labScene.add(room.group);
-  room.setPower(POWER_ON);
+  // Dim lab where the open gate is the brightest thing (matches 04-menu-setmix.png)
+  room.setPower({ relays: 1, pulse: 1, coils: 1, main: 0.35, emergency: 0, static: 0 });
   room.lever.rotation.x = -1.1;
 
   // ---- Amber hologram planet table in the menu
@@ -245,21 +295,29 @@ export function createLabScene(o: {
   } as unknown as PlotState;
   holo.setPlot(demoPlot, new Map([[1, 1], [2, 1], [3, 1]]), new Set([1, 2, 3]));
 
-  // ---- Goblin character looking through the gate threshold
-  const goblinGeo = smoothModel('goblin').near;
-  const goblinMat = keep(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0 }));
-  const goblin = new THREE.Mesh(goblinGeo, goblinMat);
-  goblin.position.set(GATE_AT.x - 0.7, 0.12, GATE_AT.z + 1.3);
-  goblin.rotation.y = Math.PI - 0.4;
-  goblin.scale.setScalar(0.9);
-  room.group.add(goblin);
+  // ---- Character looking through the gate threshold
+  // SetMix edition: human scientist with default amber visor; Goblin Racing: goblin
+  if (isGoblin > 0.5) {
+    const goblinGeo = smoothModel('goblin').near;
+    const goblinMat = keep(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0 }));
+    const goblin = new THREE.Mesh(goblinGeo, goblinMat);
+    goblin.position.set(GATE_AT.x - 0.7, 0.12, GATE_AT.z + 1.3);
+    goblin.rotation.y = Math.PI - 0.4;
+    goblin.scale.setScalar(0.9);
+    room.group.add(goblin);
+  } else {
+    const scientist = createScientistModel('#f59e0b');
+    scientist.position.set(GATE_AT.x - 0.6, 0.0, GATE_AT.z + 1.2);
+    scientist.rotation.y = Math.PI - 0.4;
+    room.group.add(scientist);
+  }
 
   // ---- Camera framing from concept art 04 and 05
-  // Left third calm for menu overlay; planet table center; free-standing gate right
-  const EYE = new THREE.Vector3(-1.6, 2.1, 2.4);
-  const LOOK = new THREE.Vector3(1.1, 2.1, -7.8);
-  const EYE_TALL = new THREE.Vector3(-0.6, 2.5, 3.8);
-  const LOOK_TALL = new THREE.Vector3(1.5, 2.2, -7.0);
+  // Left third calm for menu overlay (plain lit wall and floor); window and table center; free-standing gate right
+  const EYE = new THREE.Vector3(-4.5, 2.3, 5.8);
+  const LOOK = new THREE.Vector3(-3.0, 1.8, -7.5);
+  const EYE_TALL = new THREE.Vector3(-3.2, 2.6, 6.5);
+  const LOOK_TALL = new THREE.Vector3(-2.2, 2.0, -7.0);
 
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
   const eye = new THREE.Vector3(), look = new THREE.Vector3();

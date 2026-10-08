@@ -731,6 +731,73 @@ try {
   check('the build menu lists the seven machines, the later ones locked', await dom(() => document.querySelectorAll('.play-card').length === 7 && document.querySelectorAll('.play-card.shut').length === 2));
   await page.keyboard.press('KeyB');
   check('the plot HUD shows ore, power and the four levels', await dom(() => /ore/.test(document.querySelector('.play-ore')?.textContent ?? '') && document.querySelectorAll('.play-levels li').length === 4));
+
+  // the lab makes cartridges, the plot's machines take them (TASK-04, POL-10)
+  const panelButton = (label) => dom((l) => { [...document.querySelectorAll('.play-machine button')].find((b) => b.textContent === l)?.click(); }, label);
+  // 1. rack: make a blank
+  await dom(() => window.hmPlay.go('lab', -7.5, -5.5, Math.PI / 2, -0.1));
+  await page.waitForTimeout(T(300));
+  await page.keyboard.press('KeyE');
+  await page.waitForSelector('.play-machine[aria-label="Cartridge Rack"]', { timeout: T(5000) });
+  check('E on the rack opens the Cartridge Rack panel', await page.locator('.play-machine[aria-label="Cartridge Rack"]').count() === 1);
+  await shot('play-cart-rack');
+  const blankOreBefore = await dom(() => window.hmPlay.plot().ore);
+  await dom(() => { [...document.querySelectorAll('.play-machine button')].find((b) => /Make a blank/.test(b.textContent ?? ''))?.click(); });
+  await page.waitForTimeout(T(200));
+  check('make a blank adds a blank to the rack and uses 12 ore', (await dom(() => window.hmPlay.lab().cartridges.length === 1 && window.hmPlay.lab().cartridges[0].kind === 'blank')) && Math.abs((await dom(() => window.hmPlay.plot().ore)) - (blankOreBefore - 12)) < 1.0);
+  await panelButton('Back to the lab');
+  await page.waitForTimeout(T(200));
+
+  // 2. bench: write a preset onto the blank
+  await dom(() => window.hmPlay.go('lab', 7.5, -3.4, -Math.PI / 2, -0.1));
+  await page.waitForTimeout(T(300));
+  await page.keyboard.press('KeyE');
+  await page.waitForSelector('.play-machine[aria-label="Preset Bench"]', { timeout: T(5000) });
+  check('E on the bench opens the Preset Bench panel', await page.locator('.play-machine[aria-label="Preset Bench"]').count() === 1);
+  await shot('play-cart-bench');
+  await dom(() => { [...document.querySelectorAll('.play-select-grid button')].find((b) => /Crater Calcite/.test(b.textContent ?? ''))?.click(); });
+  await page.waitForTimeout(T(200));
+  await dom(() => { [...document.querySelectorAll('.play-machine button')].find((b) => b.textContent === 'Start writing')?.click(); });
+  await page.waitForTimeout(T(200));
+  check('writing starts on the bench', await dom(() => window.hmPlay.lab().bench !== null));
+  await panelButton('Back to the lab');
+  await page.waitForTimeout(T(200));
+  await shot('play-bench-pour');
+  await dom(() => window.hmPlay.labStep(25));
+  check('fast-forward finishes the write, cartridge is written', await dom(() => { const c = window.hmPlay.lab().cartridges[0]; return c && c.kind === 'preset' && c.preset === 'crater_calcite'; }));
+
+  // 3. combiner panel
+  await dom(() => window.hmPlay.go('lab', 7.5, -0.6, -Math.PI / 2, -0.1));
+  await page.waitForTimeout(T(300));
+  await page.keyboard.press('KeyE');
+  await page.waitForSelector('.play-machine[aria-label="Preset Combiner"]', { timeout: T(5000) });
+  check('E on the combiner opens the Preset Combiner panel', await page.locator('.play-machine[aria-label="Preset Combiner"]').count() === 1);
+  await shot('play-cart-combiner');
+  await panelButton('Back to the lab');
+  await page.waitForTimeout(T(200));
+
+  // 4. slot into the mill on the planet
+  const pxdBefore = await dom(() => window.hmPlay.rates().points.pxd);
+  await dom(() => { const g = window.hmPlay.gate(); window.hmPlay.go('planet', g.x + 7, g.z + 7.5, 0, -0.15); });
+  await page.waitForTimeout(T(500));
+  await page.keyboard.press('KeyE');
+  await page.waitForSelector('.play-machine', { timeout: T(5000) });
+  check('E on the mill opens its panel', await dom(() => document.querySelector('.play-machine h3')?.textContent === 'Texture mill'));
+  await dom(() => document.querySelector('.play-carts button')?.click());
+  check('the written cartridge slots into the mill', await dom(() => !!window.hmPlay.plot().machines.find((m) => m.kind === 'mill')?.cartridge));
+  await panelButton('Back to the plot');
+  await page.waitForTimeout(T(200));
+  const pxdAfter = await dom(() => window.hmPlay.rates().points.pxd);
+  check('the mill metric rate changes by the cartridge affinity', pxdAfter > pxdBefore, `${pxdBefore} -> ${pxdAfter}`);
+
+  // unslot from mill so the shape press can test slotting it
+  await page.keyboard.press('KeyE');
+  await page.waitForSelector('.play-machine', { timeout: T(5000) });
+  await dom(() => document.querySelector('.play-carts button')?.click());
+  check('the cartridge unslots back to the rack', await dom(() => !window.hmPlay.plot().machines.find((m) => m.kind === 'mill')?.cartridge));
+  await panelButton('Back to the plot');
+  await page.waitForTimeout(T(200));
+
   // the machine panel (E on a machine you look at): switch it off and on, put a cartridge from the rack in
   await dom(() => { const g = window.hmPlay.gate(); window.hmPlay.go('planet', g.x + 12, g.z - 0.5, 0, -0.15); });
   await page.waitForTimeout(T(500));
@@ -738,7 +805,6 @@ try {
   await page.waitForSelector('.play-machine', { timeout: T(5000) }).catch(() => null);
   check('E on a machine opens its panel', await dom(() => document.querySelector('.play-machine h3')?.textContent === 'Shape press'));
   const pressOn = () => dom(() => window.hmPlay.plot().machines.find((m) => m.kind === 'press')?.on);
-  const panelButton = (label) => dom((l) => { [...document.querySelectorAll('.play-machine button')].find((b) => b.textContent === l)?.click(); }, label);
   await panelButton('Switch off');
   const wasOff = await pressOn();
   await panelButton('Switch on');

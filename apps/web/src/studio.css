@@ -589,7 +589,7 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
 .sm-menu button:disabled b { opacity: .6; }
 .sm-foot { position: absolute; left: clamp(20px, 5vw, 72px); bottom: 18px; margin: 0; font-size: 12px; color: var(--dim); animation: sm-in .6s var(--ease-out) .35s both; }
 /* the lab behind the SetMix home (lab/lab.tsx): revealed once, when the planet outside the arch is ready */
-.lab-home { position: absolute; inset: 0; background: #c8cfd2; }
+.lab-home { position: absolute; inset: 0; background: #0c1014; }
 .lab-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity .9s ease; }
 .lab-home.ready .lab-canvas { opacity: 1; }
 .lab-loading { left: 45%; right: 5%; }

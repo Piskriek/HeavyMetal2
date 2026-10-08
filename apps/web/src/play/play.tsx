@@ -13,10 +13,28 @@ import { bakeLookCached } from '../crafter/looks';
 import type { Plot } from '../crafter/planet';
 import { SMOOTH_IDS, smoothModel } from '../crafter/smooth-models';
 import { CreateScientist } from '../avatar/create-scientist';
-import { createPlayScene, type Detail, type FrameOut, type PlayScene } from './play-scene';
+import { createPlayScene, type Detail, type FrameOut, type LabMachineKind, type PlayScene } from './play-scene';
 import { canPlace, KINDS, level, METRICS, network, place, rates, remove as removeMachine, running, setCartridge, setOn, step as stepPlot, type Env, type MachineKind, type Metric, type PlotState } from '@hm/plotsim';
+import {
+  activity as labActivity,
+  affinityOf as cartlabAffinityOf,
+  canCombine,
+  canMakeBlank,
+  canWrite,
+  makeBlank,
+  rackCount,
+  RULES as CARTLAB_RULES,
+  slotInto,
+  startCombine,
+  startWrite,
+  step as stepCartlab,
+  unslot,
+  type Cartridge,
+  type LabEnv,
+  type LabState,
+} from '@hm/cartlab';
 import { fx } from '../maker/feedback';
-import { FRESH, METRIC_COLOUR, METRIC_NAME, SAVE_KEY, arrived, created, loadState, objective, poweredOn, returned, withPlot, type PlayState } from './quest';
+import { FRESH, METRIC_COLOUR, METRIC_NAME, SAVE_KEY, arrived, created, loadState, objective, poweredOn, returned, withLab, withPlot, type PlayState } from './quest';
 import './play.css';
 
 /** Your plot's cartridge until the ground shader battle lands: sandy desert tones, the nearest in the vault to the concept art's stage 1. */
@@ -43,7 +61,7 @@ function save(s: PlayState): void { try { localStorage.setItem(SAVE_KEY, JSON.st
 
 /** The plot's numbers for the HUD. */
 interface PlotHud { readonly ore: number; readonly oreRate: number; readonly supply: number; readonly demand: number; readonly levels: Readonly<Record<Metric, number>>; readonly stage: number }
-interface Hud { readonly where: FrameOut['where']; readonly sync: number; readonly atLever: boolean; readonly ghost: FrameOut['ghost']; readonly aimed: number | null; readonly plot: PlotHud }
+interface Hud { readonly where: FrameOut['where']; readonly sync: number; readonly atLever: boolean; readonly ghost: FrameOut['ghost']; readonly aimed: number | null; readonly aimedLab: FrameOut['aimedLab']; readonly plot: PlotHud }
 const NO_PLOT: PlotHud = { ore: 0, oreRate: 0, supply: 0, demand: 0, levels: { pxd: 0, vtx: 0, lx: 0, aq: 0 }, stage: 0 };
 /** The build menu, in the order the plot needs them. */
 const BUILD_ORDER: readonly MachineKind[] = ['mill', 'drill', 'pylon', 'press', 'power', 'projector', 'water'];
@@ -53,13 +71,6 @@ const BLURB: Readonly<Record<MachineKind, string>> = {
   water: 'Condenses water from gravel: cyan pixels.',
 };
 const signed = (v: number): string => `${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
-/** A preset cartridge's effect on a metric (the vault's affinity; 1 = none). */
-const affinityOf = (cartridge: string, metric: Metric): number => VAULT_BY_ID.get(cartridge)?.affinity[metric] ?? 1;
-/** The cartridges on your rack: the vault's presets your plot's stage has opened, the ones that help this metric first. */
-function cartridgesFor(metric: Metric, stage: number): readonly { readonly id: string; readonly name: string; readonly gain: number }[] {
-  return VAULT.filter((c) => c.minStage <= Math.max(1, stage)).map((c) => ({ id: c.id, name: c.name, gain: c.affinity[metric] ?? 1 }))
-    .sort((a, b) => b.gain - a.gain || a.name.localeCompare(b.name)).slice(0, 8);
-}
 const KEYS: readonly [string, string][] = [['W A S D', 'walk'], ['Mouse', 'look'], ['Shift', 'run'], ['E', 'use'], ['B', 'build'], ['Esc', 'pause']];
 
 export function PlayScreen(props: { readonly profile: Profile; readonly onBack: () => void }): ReactElement {
@@ -78,13 +89,19 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
   useEffect(() => { pausedRef.current = paused; }, [paused]);
   const [menu, setMenu] = useState(false);
   const [building, setBuilding] = useState<MachineKind | null>(null);
-  const [hud, setHud] = useState<Hud>({ where: 'lab', sync: 1, atLever: false, ghost: null, aimed: null, plot: NO_PLOT });
+  const [hud, setHud] = useState<Hud>({ where: 'lab', sync: 1, atLever: false, ghost: null, aimed: null, aimedLab: null, plot: NO_PLOT });
   /** The machine whose panel is open (its plot id). */
   const [panel, setPanel] = useState<number | null>(null);
+  /** The lab machine whose panel is open ('rack' | 'bench' | 'combiner'). */
+  const [labPanel, setLabPanel] = useState<LabMachineKind | null>(null);
+  const [benchBlank, setBenchBlank] = useState<string | null>(null);
+  const [benchPreset, setBenchPreset] = useState<string | null>(null);
+  const [combineIds, setCombineIds] = useState<readonly string[]>([]);
   /** Set while a menu takes the mouse: losing the pointer lock then does not pause. */
   const quietRef = useRef(false);
   /** The plot runs every frame here; the saved state catches up every few seconds and on events. */
   const plotRef = useRef<PlotState>(state.plot);
+  const labRef = useRef<LabState>(state.lab);
   const envRef = useRef<Env | null>(null);
   const placeRef = useRef<((kind: MachineKind, x: number, z: number, yaw: number) => boolean) | null>(null);
   const [toast, setToast] = useState<{ readonly text: string; readonly sub: string; readonly id: number } | null>(null);
@@ -134,7 +151,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       }),
       ['Opening the lab', () => {
         scene.setPlanet(look(PLOT, 1), look(PLOT, 1), NEIGHBOURS.map((plot) => ({ plot, look: look(plot.cartridge, plot.stage) })));
-        env = { gate: scene.debug.gatePlanet(), plotRadius: 500, richness: (x, z) => scene.richness(x, z), affinity: affinityOf };
+        env = { gate: scene.debug.gatePlanet(), plotRadius: 500, richness: (x, z) => scene.richness(x, z), affinity: (id, metric) => cartlabAffinityOf(labRef.current, id, metric) };
         envRef.current = env;
         plotRef.current = stateRef.current.plot;
         scene.restore({ gateOn: stateRef.current.gateOn, plot: plotRef.current, running: running(plotRef.current, env), connected: network(plotRef.current, env).connected });
@@ -189,8 +206,25 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       if (out.event === 'to-lab') s = returned(s);
       if (out.event === 'sync-lost') { s = returned(s); say('Sync lost', 'The gate pulled you back. Your sync refills in the lab.'); setBuilding(null); setMenu(false); }
       if (out.event === 'stage-up') say(`Stage ${out.stage}`, STAGE_SAYS[out.stage] ?? '');
-      if (s !== stateRef.current) commit(s);
+      if (s !== stateRef.current) commit(withLab(withPlot(s, plotRef.current), labRef.current));
+      // ---- the lab runs every frame
+      const labEnv: LabEnv = { presets: VAULT, stage: plotRef.current.stage, powered: stateRef.current.gateOn };
+      const labRes = stepCartlab(labRef.current, labEnv, dt);
+      labRef.current = labRes.state;
+      for (const e of labRes.events) {
+        if (e.type === 'written') {
+          const c = labRes.state.cartridges.find((x) => x.id === e.id);
+          say(`${c?.name ?? 'Cartridge'} written.`, 'Ready on the rack or for the combiner.');
+        } else if (e.type === 'combined') {
+          const c = labRes.state.cartridges.find((x) => x.id === e.id);
+          say(c?.name ? `Mix ready: ${c.name}.` : 'Mix ready.', 'Ready on the rack.');
+        } else if (e.type === 'stalled') {
+          say(`The ${e.machine} stopped: no power.`, 'Turn on the gate to resume.');
+        }
+      }
+      scene.setLabActivity(labActivity(labRef.current, labEnv));
       // ---- the plot runs, in the lab too
+      let plotChanged = false;
       if (env && stateRef.current.step !== 'create') {
         const r = stepPlot(plotRef.current, env, dt);
         plotRef.current = r.state;
@@ -199,16 +233,20 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
           if (e.type === 'ore-out') say('Out of ore', 'Build a rock drill on rocky ground.');
           if (e.type === 'underpowered') say('Not enough power', 'Build a power unit, or switch a machine off.');
         }
-        if (r.events.length || ms - savedAt > 5000) { savedAt = ms; commit(withPlot(stateRef.current, plotRef.current)); }
+        if (r.events.length) plotChanged = true;
         scene.setPlot(plotRef.current, running(plotRef.current, env), network(plotRef.current, env).connected);
+      }
+      if (plotChanged || labRes.events.length || ms - savedAt > 5000) {
+        savedAt = ms;
+        commit(withLab(withPlot(stateRef.current, plotRef.current), labRef.current));
       }
       hook.frames += 1; hook.where = out.where; hook.sync = out.sync; hook.step = stateRef.current.step; hook.wave = scene.debug.wave();
       if (hook.frames % 30 === 0) Object.assign(hook, scene.debug.stats());
-      if (ms - hudAt > 90 || out.event) {
+      if (ms - hudAt > 90 || out.event || labRes.events.length) {
         hudAt = ms;
         const p = plotRef.current, rt = env ? rates(p, env) : null;
         const levels = { pxd: level(p, 'pxd'), vtx: level(p, 'vtx'), lx: level(p, 'lx'), aq: level(p, 'aq') };
-        setHud({ where: out.where, sync: out.sync, atLever: out.atLever, ghost: out.ghost, aimed: out.aimed, plot: { ore: p.ore, oreRate: rt?.ore ?? 0, supply: rt?.supply ?? 0, demand: rt?.demand ?? 0, levels, stage: p.stage } });
+        setHud({ where: out.where, sync: out.sync, atLever: out.atLever, ghost: out.ghost, aimed: out.aimed, aimedLab: out.aimedLab, plot: { ore: p.ore, oreRate: rt?.ore ?? 0, supply: rt?.supply ?? 0, demand: rt?.demand ?? 0, levels, stage: p.stage } });
       }
       raf = requestAnimationFrame(loop);
     };
@@ -234,6 +272,29 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       detail: () => scene.debug.detail(),
       raise: (to: number) => scene.raiseStage(to, scene.debug.gatePlanet()),
       holo: () => scene.debug.holo(),
+      lab: () => labRef.current,
+      labStep: (seconds: number) => {
+        const lEnv: LabEnv = { presets: VAULT, stage: plotRef.current.stage, powered: stateRef.current.gateOn };
+        const res = stepCartlab(labRef.current, lEnv, seconds);
+        labRef.current = res.state;
+        commit(withLab(withPlot(stateRef.current, plotRef.current), res.state));
+        return res;
+      },
+      makeBlank: () => {
+        const res = makeBlank(labRef.current, plotRef.current.ore);
+        labRef.current = res.state;
+        plotRef.current = { ...plotRef.current, ore: plotRef.current.ore - res.oreUsed };
+        commit(withLab(withPlot(stateRef.current, plotRef.current), res.state));
+        return res;
+      },
+      startWrite: (blankId: string, presetId: string) => {
+        const lEnv: LabEnv = { presets: VAULT, stage: plotRef.current.stage, powered: stateRef.current.gateOn };
+        const next = startWrite(labRef.current, lEnv, blankId, presetId);
+        labRef.current = next;
+        commit(withLab(withPlot(stateRef.current, plotRef.current), next));
+        return next;
+      },
+      rates: () => (envRef.current ? rates(plotRef.current, envRef.current) : null),
     });
     setLoading(steps[0]![0]);
     timer = window.setTimeout(step, 30);
@@ -282,7 +343,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
   const changePlot = useCallback((next: PlotState) => {
     const env = envRef.current;
     plotRef.current = next;
-    commit(withPlot(stateRef.current, next));
+    commit(withLab(withPlot(stateRef.current, next), labRef.current));
     if (env) sceneRef.current?.setPlot(next, running(next, env), network(next, env).connected);
   }, [commit]);
   useEffect(() => {
@@ -292,6 +353,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
         if (building) { stopBuilding(); return; }
         if (menu) { setMenu(false); return; }
         if (panel !== null) { setPanel(null); return; }
+        if (labPanel !== null) { setLabPanel(null); return; }
         if (!locked) setPaused((p) => !p);
         return;
       }
@@ -299,7 +361,8 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       if (e.code === 'KeyE') {
         if (building) placeNow();
         else if (hud.atLever) sceneRef.current?.pullLever();
-        else if (hud.aimed !== null && panel === null) { setPanel(hud.aimed); setMenu(false); freeMouse(); }
+        else if (hud.where === 'planet' && hud.aimed !== null && panel === null) { setPanel(hud.aimed); setMenu(false); freeMouse(); }
+        else if (hud.where === 'lab' && hud.aimedLab !== null && labPanel === null) { setLabPanel(hud.aimedLab); freeMouse(); }
       }
       if (e.code === 'KeyB' && hud.where === 'planet') {
         if (building) stopBuilding(); else { setPanel(null); setMenu((m) => { if (!m) freeMouse(); return !m; }); }
@@ -307,14 +370,17 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [ready, creating, building, menu, panel, locked, paused, hud.atLever, hud.aimed, hud.where, placeNow, stopBuilding, freeMouse]);
+  }, [ready, creating, building, menu, panel, labPanel, locked, paused, hud.atLever, hud.aimed, hud.aimedLab, hud.where, placeNow, stopBuilding, freeMouse]);
   useEffect(() => {
     const onClick = (): void => { if (building && locked) placeNow(); };
     window.addEventListener('mousedown', onClick);
     return () => window.removeEventListener('mousedown', onClick);
   }, [building, locked, placeNow]);
-  // leaving the planet closes the build menu
-  useEffect(() => { if (hud.where === 'lab') { setMenu(false); setPanel(null); stopBuilding(); } }, [hud.where, stopBuilding]);
+  // leaving the planet closes the build menu; entering planet closes lab panels
+  useEffect(() => {
+    if (hud.where === 'lab') { setMenu(false); setPanel(null); stopBuilding(); }
+    if (hud.where === 'planet') { setLabPanel(null); }
+  }, [hud.where, stopBuilding]);
 
   const startBuilding = (kind: MachineKind): void => {
     setMenu(false);
@@ -328,7 +394,9 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
   const prompt = building
     ? (hud.ghost?.ok ? `Click or E: build the ${KINDS[building].name.toLowerCase()}` : hud.ghost?.why || 'Aim at the ground near the gate.')
     : hud.atLever ? 'E: pull the main lever'
-    : hud.aimed !== null && panel === null ? `E: open the ${KINDS[plotRef.current.machines.find((x) => x.id === hud.aimed)?.kind ?? 'mill'].name.toLowerCase()}` : '';
+    : hud.where === 'planet' && hud.aimed !== null && panel === null ? `E: open the ${KINDS[plotRef.current.machines.find((x) => x.id === hud.aimed)?.kind ?? 'mill'].name.toLowerCase()}`
+    : hud.where === 'lab' && hud.aimedLab !== null && labPanel === null ? `E: open the ${hud.aimedLab === 'rack' ? 'cartridge rack' : hud.aimedLab === 'bench' ? 'preset bench' : 'preset combiner'}`
+    : '';
 
   return (
     <div className={`play${ready ? ' ready' : ''}${hud.where === 'planet' ? ' on-planet' : ''}${hud.sync < 0.3 && hud.where === 'planet' ? ' sync-low' : ''}`}>
@@ -403,25 +471,318 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
                 <p>{BLURB[mm.kind]} {status}</p>
                 <div className="play-machine-actions">
                   <button onClick={() => changePlot(setOn(plotRef.current, mm.id, !mm.on))}>{mm.on ? 'Switch off' : 'Switch on'}</button>
-                  <button onClick={() => { changePlot(removeMachine(plotRef.current, mm.id)); setPanel(null); lock(); }}>Take it down (+{Math.floor(spec.cost / 2)} ore)</button>
+                  <button onClick={() => {
+                    if (mm.cartridge) {
+                      labRef.current = unslot(labRef.current, mm.cartridge);
+                    }
+                    changePlot(removeMachine(plotRef.current, mm.id));
+                    setPanel(null);
+                    lock();
+                  }}>Take it down (+{Math.floor(spec.cost / 2)} ore)</button>
                 </div>
-                {spec.slot && metric ? (
-                  <div className="play-carts">
-                    <h4>Cartridge: a preset from your rack shapes what it pours</h4>
-                    <div>
-                      {cartridgesFor(metric, plotRef.current.stage).map((c) => (
-                        <button key={c.id} className={mm.cartridge === c.id ? 'on' : ''} onClick={() => changePlot(setCartridge(plotRef.current, mm.id, mm.cartridge === c.id ? null : c.id))}>
-                          <b>{c.name}</b><span>{c.gain === 1 ? 'no effect on' : `${c.gain > 1 ? '+' : ''}${Math.round((c.gain - 1) * 100)}%`} {METRIC_NAME[metric]}</span>
-                        </button>
-                      ))}
+                {spec.slot && metric ? (() => {
+                  const currentCartId = mm.cartridge;
+                  const available = labRef.current.cartridges.filter((c) => c.kind !== 'blank' && (c.slot === null || c.slot === mm.id));
+                  return (
+                    <div className="play-carts">
+                      <h4>Cartridge: a preset from your rack shapes what it pours</h4>
+                      <div>
+                        {available.map((c) => {
+                          const isSlotted = currentCartId === c.id;
+                          const gain = c.affinity[metric] ?? 1;
+                          return (
+                            <button
+                              key={c.id}
+                              className={isSlotted ? 'on' : ''}
+                              onClick={() => {
+                                let l = labRef.current;
+                                if (isSlotted) {
+                                  l = unslot(l, c.id);
+                                  labRef.current = l;
+                                  changePlot(setCartridge(plotRef.current, mm.id, null));
+                                } else {
+                                  if (currentCartId) {
+                                    l = unslot(l, currentCartId);
+                                  }
+                                  l = slotInto(l, c.id, mm.id);
+                                  labRef.current = l;
+                                  changePlot(setCartridge(plotRef.current, mm.id, c.id));
+                                }
+                              }}
+                            >
+                              <b>{c.name}</b>
+                              <span>{gain === 1 ? 'no effect on' : `${gain > 1 ? '+' : ''}${Math.round((gain - 1) * 100)}%`} {METRIC_NAME[metric]}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {available.length === 0 ? <p className="play-why">No written cartridges on the rack. Write one at the bench in the lab.</p> : null}
                     </div>
-                  </div>
-                ) : null}
+                  );
+                })() : null}
                 <button className="go" onClick={close} autoFocus>Back to the plot</button>
               </section>
             );
           })() : null}
-          {!locked && !paused && panel === null && !menu ? (
+          {labPanel !== null ? (() => {
+            const labEnv: LabEnv = { presets: VAULT, stage: plotRef.current.stage, powered: stateRef.current.gateOn };
+            const close = (): void => { setLabPanel(null); lock(); };
+
+            if (labPanel === 'rack') {
+              const blankCheck = canMakeBlank(labRef.current, plotRef.current.ore);
+              return (
+                <section className="play-machine" aria-label="Cartridge Rack">
+                  <h3>Cartridge Rack</h3>
+                  <p>
+                    {rackCount(labRef.current)} of {CARTLAB_RULES.rackSize} slots used ({Math.floor(plotRef.current.ore)} ore available). Blanks can be written into presets at the bench.
+                  </p>
+                  <div className="play-machine-actions">
+                    <button
+                      disabled={!blankCheck.ok}
+                      onClick={() => {
+                        const r = makeBlank(labRef.current, plotRef.current.ore);
+                        labRef.current = r.state;
+                        plotRef.current = { ...plotRef.current, ore: plotRef.current.ore - r.oreUsed };
+                        commit(withLab(withPlot(stateRef.current, plotRef.current), r.state));
+                        say('Blank made', 'Take it to the preset bench to write a cartridge.');
+                      }}
+                    >
+                      Make a blank ({CARTLAB_RULES.blankCost} ore)
+                    </button>
+                  </div>
+                  {!blankCheck.ok && <span className="play-why">{blankCheck.why}</span>}
+                  <div className="play-rack-list">
+                    {labRef.current.cartridges.map((c) => {
+                      const holding = c.slot !== null ? plotRef.current.machines.find((m) => m.id === c.slot) : null;
+                      return (
+                        <div key={c.id} className="play-cart-item">
+                          <div className="cart-head">
+                            <span className={`cart-badge ${c.kind}`}>{c.kind}</span>
+                            <b>{c.name}</b>
+                            {holding ? (
+                              <em className="cart-slotted">In {KINDS[holding.kind].name} #{holding.id}</em>
+                            ) : (
+                              <em className="cart-in-rack">On rack</em>
+                            )}
+                          </div>
+                          <div className="cart-affinities">
+                            {METRICS.map((m) => {
+                              const diff = Math.round(((c.affinity[m] ?? 1) - 1) * 100);
+                              return (
+                                <span key={m} style={{ color: METRIC_COLOUR[m] }}>
+                                  {METRIC_NAME[m]}: {diff === 0 ? '0%' : `${diff > 0 ? '+' : ''}${diff}%`}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {labRef.current.cartridges.length === 0 ? (
+                      <p className="play-why">No cartridges on the rack yet. Make a blank to get started.</p>
+                    ) : null}
+                  </div>
+                  <button className="go" onClick={close} autoFocus>Back to the lab</button>
+                </section>
+              );
+            }
+
+            if (labPanel === 'bench') {
+              const job = labRef.current.bench;
+              if (job !== null) {
+                const p = VAULT_BY_ID.get(job.preset ?? '');
+                const pct = Math.min(100, Math.round((job.done / job.needs) * 100));
+                return (
+                  <section className="play-machine" aria-label="Preset Bench">
+                    <h3>Preset Bench</h3>
+                    <p>
+                      Writing <b>{p?.name ?? job.preset}</b> ({job.done.toFixed(1)}s / {job.needs}s)
+                      {!stateRef.current.gateOn ? ' — Paused: no power. Turn on the gate.' : ''}
+                    </p>
+                    <div className="play-progress" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+                      <div className="bar" style={{ width: `${pct}%`, background: '#ff3d8a' }} />
+                    </div>
+                    <button className="go" onClick={close} autoFocus>Back to the lab</button>
+                  </section>
+                );
+              }
+
+              const blanks = labRef.current.cartridges.filter((c) => c.kind === 'blank' && c.slot === null);
+              const activeBlank = benchBlank && blanks.some((b) => b.id === benchBlank) ? benchBlank : (blanks[0]?.id ?? null);
+              const writeCheck = activeBlank && benchPreset
+                ? canWrite(labRef.current, labEnv, activeBlank, benchPreset)
+                : { ok: false, why: !activeBlank ? 'No blank cartridges available on the rack. Make one at the rack.' : 'Pick a preset to write.' };
+
+              return (
+                <section className="play-machine" aria-label="Preset Bench">
+                  <h3>Preset Bench</h3>
+                  <p>Writes an authored terraforming preset onto a blank cartridge.</p>
+                  <div className="play-carts">
+                    <h4>1. Pick a blank ({blanks.length} available)</h4>
+                    <div>
+                      {blanks.map((b) => (
+                        <button
+                          key={b.id}
+                          className={activeBlank === b.id ? 'on' : ''}
+                          onClick={() => setBenchBlank(b.id)}
+                        >
+                          <b>{b.id} ({b.name})</b>
+                        </button>
+                      ))}
+                    </div>
+                    {blanks.length === 0 ? <p className="play-why">No blanks on rack. Make a blank at the rack first.</p> : null}
+                  </div>
+                  <div className="play-carts">
+                    <h4>2. Pick a preset</h4>
+                    <div className="play-select-grid">
+                      {VAULT.map((p) => {
+                        const locked = p.minStage > plotRef.current.stage;
+                        const isSelected = benchPreset === p.id;
+                        return (
+                          <button
+                            key={p.id}
+                            className={`${isSelected ? 'on' : ''}${locked ? ' locked' : ''}`}
+                            disabled={locked}
+                            onClick={() => setBenchPreset(p.id)}
+                          >
+                            <b>{p.name}</b>
+                            {locked ? <em>opens at stage {p.minStage}</em> : (
+                              <span>
+                                {METRICS.filter((m) => p.affinity[m] && p.affinity[m] !== 1).map((m) => `${METRIC_NAME[m]} +${Math.round(((p.affinity[m] ?? 1) - 1) * 100)}%`).join(', ') || 'neutral'}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="play-machine-actions">
+                    <button
+                      className="go"
+                      disabled={!writeCheck.ok}
+                      onClick={() => {
+                        if (!activeBlank || !benchPreset) return;
+                        const next = startWrite(labRef.current, labEnv, activeBlank, benchPreset);
+                        labRef.current = next;
+                        commit(withLab(stateRef.current, next));
+                        say('Writing started', 'The bench pours pink pixels while powered.');
+                      }}
+                    >
+                      Start writing
+                    </button>
+                  </div>
+                  {!writeCheck.ok && <span className="play-why">{writeCheck.why}</span>}
+                  <button className="go" onClick={close} style={{ marginTop: '12px' }} autoFocus>Back to the lab</button>
+                </section>
+              );
+            }
+
+            if (labPanel === 'combiner') {
+              const job = labRef.current.combiner;
+              if (job !== null) {
+                const pct = Math.min(100, Math.round((job.done / job.needs) * 100));
+                return (
+                  <section className="play-machine" aria-label="Preset Combiner">
+                    <h3>Preset Combiner</h3>
+                    <p>
+                      Mixing {job.inputs.length} cartridges ({job.done.toFixed(1)}s / {job.needs}s)
+                      {!stateRef.current.gateOn ? ' — Paused: no power. Turn on the gate.' : ''}
+                    </p>
+                    <div className="play-progress" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+                      <div className="bar" style={{ width: `${pct}%`, background: '#b46bff' }} />
+                    </div>
+                    <button className="go" onClick={close} autoFocus>Back to the lab</button>
+                  </section>
+                );
+              }
+
+              const available = labRef.current.cartridges.filter((c) => c.kind !== 'blank' && c.slot === null);
+              const combineCheck = canCombine(labRef.current, labEnv, combineIds);
+
+              let previewMix: Cartridge | null = null;
+              if (combineCheck.ok) {
+                try {
+                  const sim = stepCartlab(startCombine(labRef.current, labEnv, combineIds), labEnv, CARTLAB_RULES.combineSeconds);
+                  previewMix = sim.state.cartridges.find((c) => c.kind === 'mix' && c.from.length === combineIds.length) ?? null;
+                } catch {
+                  previewMix = null;
+                }
+              }
+
+              return (
+                <section className="play-machine" aria-label="Preset Combiner">
+                  <h3>Preset Combiner</h3>
+                  <p>Mixes 2 to 4 written cartridges into one enhanced cartridge.</p>
+                  <div className="play-carts">
+                    <h4>Pick 2 to 4 cartridges from the rack ({combineIds.length} selected)</h4>
+                    <div className="play-select-grid">
+                      {available.map((c) => {
+                        const selected = combineIds.includes(c.id);
+                        return (
+                          <button
+                            key={c.id}
+                            className={selected ? 'on' : ''}
+                            onClick={() => {
+                              if (selected) {
+                                setCombineIds((prev) => prev.filter((id) => id !== c.id));
+                              } else if (combineIds.length < CARTLAB_RULES.maxInputs) {
+                                setCombineIds((prev) => [...prev, c.id]);
+                              }
+                            }}
+                          >
+                            <b>{c.name}</b>
+                            <span>
+                              {METRICS.filter((m) => c.affinity[m] && c.affinity[m] !== 1).map((m) => `${METRIC_NAME[m]} +${Math.round(((c.affinity[m] ?? 1) - 1) * 100)}%`).join(', ') || 'neutral'}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {available.length < CARTLAB_RULES.minInputs ? (
+                      <p className="play-why">Need at least 2 written cartridges on the rack to combine.</p>
+                    ) : null}
+                  </div>
+
+                  {previewMix ? (
+                    <div className="play-combine-preview">
+                      <h4>Preview: {previewMix.name}</h4>
+                      <div className="cart-affinities">
+                        {METRICS.map((m) => {
+                          const diff = Math.round(((previewMix!.affinity[m] ?? 1) - 1) * 100);
+                          return (
+                            <span key={m} style={{ color: METRIC_COLOUR[m] }}>
+                              {METRIC_NAME[m]}: {diff === 0 ? '0%' : `${diff > 0 ? '+' : ''}${diff}%`}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="play-machine-actions">
+                    <button
+                      className="go"
+                      disabled={!combineCheck.ok}
+                      onClick={() => {
+                        const next = startCombine(labRef.current, labEnv, combineIds);
+                        labRef.current = next;
+                        commit(withLab(stateRef.current, next));
+                        setCombineIds([]);
+                        say('Mixing started', 'The combiner pours violet pixels while powered.');
+                      }}
+                    >
+                      Start mix
+                    </button>
+                  </div>
+                  {!combineCheck.ok && combineIds.length > 0 && <span className="play-why">{combineCheck.why}</span>}
+                  <button className="go" onClick={close} style={{ marginTop: '12px' }} autoFocus>Back to the lab</button>
+                </section>
+              );
+            }
+
+            return null;
+          })() : null}
+          {!locked && !paused && panel === null && labPanel === null && !menu ? (
             <button className="play-start" onClick={lock}>
               <b>Click to look around</b>
               <span className="play-keys">{KEYS.map(([k, what]) => <span key={k}><kbd>{k}</kbd>{what}</span>)}</span>

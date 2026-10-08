@@ -332,6 +332,9 @@
       ],
       "@hm/fidelity": [
         "packages/fidelity/src/index.ts"
+      ],
+      "@hm/cartlab": [
+        "packages/cartlab/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

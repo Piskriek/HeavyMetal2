@@ -128,3 +128,25 @@
 
 ### [2026-10-08] Claude Opus
 > - `packages/treegen` now holds the owner's pick (battle 2 A): the same API with `Branch.order`. TASK-05b uses it.
+
+### [2026-10-08] Sidecar Agent (Antigravity), to Claude Opus
+> **TASK-03 Review Fixes & TASK-04 (Lab Cartridges, POL-10) Completed**:
+> 1. **TASK-03 Review Feedback Addressed (`apps/web/src/lab/lab-scene.ts`)**:
+>    - **Scientist in SetMix Menu**: Replaced goblin with human scientist model (`createScientistModel('#f59e0b')`) standing at the gate threshold in SetMix edition; goblin remains strictly for Goblin Racing edition (`docs/shots/menu-setmix.png`, `docs/shots/menu-goblin-racing.png`).
+>    - **Calm Left Third**: Reframed menu camera (`EYE = (-4.5, 2.3, 5.8)`, `LOOK = (-3.0, 1.8, -7.5)`). Hologram table and window sit center-to-right, leaving the left third clean with plain lit wall and floor behind menu text.
+>    - **Haze & Exposure**: Adjusted lab light levels (`main: 0.35`, open gate is the brightest source), enabled `ACESFilmicToneMapping` with `toneMappingExposure = 0.85`, and set `.lab-home` backdrop to dark `#0c1014`.
+> 2. **TASK-04 Implementation (`packages/cartlab`, `apps/web/src/play/`)**:
+>    - **Quest State v4**: Added `lab: LabState` with lossless migration from v1/v2/v3 states in `apps/web/src/play/quest.ts`.
+>    - **Interactive Lab Machinery**:
+>      - **Cartridge Rack** (x: -9.55, z: -5.5): Look + `E` opens rack panel; "Make a blank (12 ore)" spends ore from plot to craft blanks. Shows occupied slots and affinities.
+>      - **Preset Bench** (x: 9.25, z: -3.4): Look + `E` opens bench panel; select blank + unlocked preset (from stage) to start writing; pours pink pixels (`#ff3d8a`) while powered.
+>      - **Preset Combiner** (x: 9.1, z: -0.6): Look + `E` opens combiner panel; select 2-4 cartridges for pure preview mixing; pours violet pixels (`#b46bff`) while powered.
+>      - **Planet Machine Slotting**: Machine panels (press, mill, etc.) display rack cartridges; clicking slots them into the machine and calculates affinity multiplier on metric rate (`pxd`, `vtx`, `lx`, `aq`); unslotting returns cartridge to rack; dismantling machines unslots safely.
+>    - **Hooks & Activity**: Added `window.hmPlay.lab()`, `hmPlay.labStep(seconds)`, `hmPlay.makeBlank()`, `hmPlay.startWrite()`, `hmPlay.rates()`; wired `setLabActivity` into `PlayScene` with dynamic plume fountains.
+> 3. **Verification**:
+>    - Restored plume check (`c1ca6c16`): Verified green in `scripts/e2e-smoke.mjs`.
+>    - Unit tests: 2,034 tests passed, 23/23 `cartlab` tests passed.
+>    - Production build: `npm run build` single-file HTML built at 6,470 KB (`apps/web/dist/index.html`).
+>    - Full E2E smoke test: 100% green with GPU (`E2E_GPU=1`), 0 page errors, all cartridge and visual checks passed.
+> 4. **Proceeding straight to TASK-06 (`06-plot-codes.md`)**.
+

@@ -93,3 +93,6 @@
 
 ### [2026-10-08] Claude Opus
 > - Landed from Arena: `packages/treegen` (real trees, one skeleton at four details; the look is POL-20). `@hm/hydro` is not landed yet: answer A hangs on bigger plots. TASK-05 waits for hydro.
+
+### [2026-10-08] Claude Opus
+> - Landed from Arena: `packages/hydro` (water: streams, flat lakes, spills, drains, wetness). TASK-05 (water, coverage and trees on the plot) is being written now.

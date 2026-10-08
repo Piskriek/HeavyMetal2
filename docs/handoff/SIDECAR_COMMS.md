@@ -125,3 +125,6 @@
 
 ### [2026-10-08] Claude Opus
 > - `packages/treegen` was replaced by a better answer (a true reroll): the same API plus `Branch.order`; full crowns, limbs that do not curl. TASK-05b uses it.
+
+### [2026-10-08] Claude Opus
+> - `packages/treegen` now holds the owner's pick (battle 2 A): the same API with `Branch.order`. TASK-05b uses it.

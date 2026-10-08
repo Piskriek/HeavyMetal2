@@ -4,7 +4,7 @@ The owner (2026-10-08, verbatim): "the studio is how i will polish the game, it 
 
 Earlier, in `docs/SETMIX_PLAN.md`: Studio is a menu button, "the fully upgraded lab, for making presets for any game".
 
-**Order:** the scientist and the base-game polish come first (sidecar TASK-07 and TASK-08). This document is the research and the plan. Nothing here is built until the owner has answered section 7.
+**Order:** the scientist and the base-game polish come first (sidecar TASK-07 and TASK-08). This document is the research and the plan. Building starts when the polish has landed. Section 7's decisions were made from the research, at the owner's word.
 
 ## 1. What the Studio is
 - **Where:** the fully upgraded lab, with every machine and tool unlocked.
@@ -34,6 +34,65 @@ Earlier, in `docs/SETMIX_PLAN.md`: Studio is a menu button, "the fully upgraded 
   - Terrain: Unreal Landscape, World Machine and Gaea.
   - Dialogue and quests: ink, Yarn Spinner.
 - **Files that move between tools:** glTF/GLB (and FBX in, VRM for avatars), PNG and KTX2, WAV and OGG, JSON.
+
+## 2b. What users like and dislike, and what the Studio does about it
+The owner (2026-10-08): "research what users of those tools like and dont like (perhaps we can make our tools better or add toggles for where opinion is split) so that our studio is the new gold standard in game editing and creation". Each line: what people say, then our answer.
+
+- **Unreal Engine editor.**
+  - Liked: the power and look, Blueprints that designers can use, the details panel.
+  - Disliked:
+    - Press Play and the editor can hang for minutes while dirty Blueprints compile.
+    - So many action buttons that the property values are hard to read.
+    - A C++ change can break the Blueprints built on it.
+    - New rendering features mean recompiling the engine.
+
+    ([UE forums, UI/UX](https://forums.unrealengine.com/t/ue5-editor-ui-ux-problem/2742994); [Play-in-editor compile hang](https://answers.unrealengine.com/questions/430240/view.html))
+  - **Ours:**
+    - No compile step anywhere: every edit is live, and shader variants are compiled once behind the loading bar.
+    - Actions live in context menus; the details panel shows values.
+    - Versioned schemas with migrations, so a change never breaks saved presets.
+    - Render features are presets and graphs, never an engine rebuild.
+- **Unity editor.**
+  - Liked: the Inspector and its serialised fields (a core strength), prefabs, the asset ecosystem.
+  - Disliked: domain reload (the slow wait to enter Play, "time behind loading bars"), and slow prefab workflows at scale ([Unity discussions](https://discussions.unity.com/t/why-is-domain-reload-sooo-slow-and-will-this-ever-be-fixed/798176), [Unity docs](https://docs.unity3d.com/Manual/project-auditor/domain-reloading-issues.html)).
+  - **Ours:** a Unity-style inspector generated from schemas with instant reload (Play is the same page, nothing reloads), and prefab-style preset instances with overrides, nested, and fast at thousands.
+- **Blender.**
+  - Liked: free, complete, fast once learned.
+  - Opinion is split on its keymap. Right-click select keeps selecting apart from transforming; left-click is familiar from every other application. The Industry Compatible keymap was the most up-voted request in Blender's tracker, yet it makes tutorials (which use the default keys) hard to follow ([Blender devtalk](https://devtalk.blender.org/t/industry-standards-and-keymaps/613), [Blender manual](https://docs.blender.org/manual/ja/latest/editors/preferences/keymap.html)).
+  - **Ours:** a keymap toggle:
+    - SetMix (Unreal/Unity style: left-click select, W/E/R, right-mouse fly) as the default;
+    - Blender;
+    - Maya.
+
+    Every tooltip, hint and tutorial shows the keys of the keymap in use, which fixes Blender's tutorial problem.
+- **Substance 3D Painter.**
+  - Liked: smart materials and smart masks, the layer stack (paint, fills, masks, filters), instant feedback painting on the model.
+  - Disliked: slow at high resolutions and many UDIMs, export into other tools needs care, the price, a steep start ([G2 reviews](https://www.g2.com/products/adobe-substance-3d-painter/reviews), [Creative Bloq](https://creativebloq.com/software/substance-painter-review-21514156)).
+  - **Ours:**
+    - The material workspace keeps a layer stack with smart presets and masks.
+    - Resolution caps per graphics tier, and the layers baked and cached on the GPU.
+    - One-click export to glTF/KTX2, with targets for Unreal, Unity and Godot.
+    - Free, with guided presets for the first steps.
+- **Godot.**
+  - Liked: the editor opens in seconds and stays light (about 100 MB), the interface "doesn't try to show you everything at once", everything is a node in one scene tree ([kodeco](https://www.kodeco.com/42418371-getting-started-with-godot-for-unity-developers), [dev.to](https://dev.to/hayyanstudio/why-you-should-use-godot-over-unity-3mpm)).
+  - **Ours:** the Studio opens in seconds (the single-file build), shows advanced panels only when asked (Simple/Advanced per panel), and puts everything in one outliner as nodes.
+- **Roblox Studio.**
+  - Liked: instant play and test, built-in publishing, scripting with an AI assistant.
+  - Disliked: a new interface forced on everyone (with a petition to bring the old one back), and more barriers to publishing ([petition](https://www.petitions.com/please-sign-the-petition-for-the-return-of-the-old-roblox-studio), [Digiday](https://digiday.com/media/robloxs-ad-expansion-sparks-backlash-from-creator-studios/)).
+  - **Ours:** never force a layout change. Layouts are saved, named and shareable, and a "classic" layout stays selectable after every redesign. Sharing is a code, with nothing to apply for.
+- **Niagara and Unity VFX Graph.**
+  - Opinion is split. Unity's graph is more beginner-friendly and prescriptive, with millions of GPU particles. Niagara's modules, emitters and systems are more flexible but steeper. Shuriken is easiest for the basics ([CG Channel](https://www.cgchannel.com/?p=98194), [realtimevfx.com](https://realtimevfx.com/t/what-is-easier-to-learn-unity-or-unreal-to-do-vfx-real-time/23316)).
+  - **Ours:** one VFX system with two views of the same data: a module stack (the default, Niagara/Shuriken-like) and a graph (VFX Graph-like). It runs on the GPU within each tier's budget.
+- **FMOD and Wwise.**
+  - FMOD is gentler and feels like a DAW; Wwise is deeper (interactive music, profiling, spatial audio) and seen as the AAA standard ([StraySpark](https://www.strayspark.studio/blog/wwise-fmod-metasounds-audio-middleware-comparison), [G2](https://www.g2.com/compare/fmod-vs-wwise)).
+  - **Ours:** a DAW-like timeline by default (FMOD's feel), with buses, profiling and spatial settings under Advanced (Wwise's depth).
+- **Visual scripting (Blueprints) and animation state machines (Mecanim, Animation Blueprints).**
+  - Well-known pains: graphs turn to spaghetti, are hard to diff and merge, and are hard to debug; transition webs between states pile up.
+  - **Ours:**
+    - Every graph has a text view that is the same model: TypeScript for logic, readable data for state machines. It is saved as readable text, so diffs work.
+    - Auto-layout, comments, collapsing and search.
+    - Hierarchical states, and locomotion built automatically from tagged clips (as the scientist's).
+    - A live debug overlay showing which state, node or transition runs now.
 
 ## 3. The workspaces
 Each workspace says what it is modelled on, its presets, what you can tune, the overhaul path, what we already have, and what to build. The bulk of "to build" goes to Arena (section 6).
@@ -66,6 +125,28 @@ An AI assistant panel (as Roblox Studio has, over MCP) and the bridges come in l
 - **Three depths in the data:** a preset is parameters plus an optional graph or script. "Overhaul" opens the graph or the script. A bridge sends the asset out to Blender or Unreal and takes it back in.
 - **SetMix reads presets by id**, so the Studio's edits show in Play at once. This is how the owner polishes the game.
 - **Safety:** shared presets and scripts come from other people, so they are validated like `plotcodec` (decoders that never throw, within limits). Scripts run in a sandbox with no DOM and no network.
+
+## 4b. The tools work together (the owner: "make sure the tools work together seamlessly")
+- **One content browser** for every workspace. Drag a material onto a mesh, a sound onto a machine, or a VFX preset onto a socket, from anywhere.
+- **One undo history** across workspaces. Ctrl+Z works everywhere, and the history panel can filter by workspace.
+- **One selection, every discipline.** Select a machine and the details panel has its Model, Material, VFX, Sound, Animation and Logic tabs: the same object seen by each tool, not six tools that each need it re-picked.
+- **Live links.** Change a material and every prop using it updates at once. Change any value and its cost on the minimum spec updates beside it.
+- **The same viewport everywhere:** the same navigation, gizmos, snapping and keymap in every workspace.
+- **Play in place.** Any workspace can be tried in the real game at once (the lab or the plot), with no reload, and stopping returns to the same selection.
+- **Open files.** glTF/GLB, KTX2/PNG, WAV/OGG and JSON go in and out. The bridges send an asset to Blender or Unreal and take it back to the same place.
+
+## 4c. Toggles where opinion splits
+Each toggle is stored in the profile and shared with layouts:
+- **Keymap:** SetMix (Unreal/Unity style), Blender, Maya. Hints and tutorials follow it.
+- **Select button:** left or right click.
+- **Viewport navigation:** fly (right mouse plus WASD, as Unreal), orbit with Alt (Maya), orbit with the middle button (Blender).
+- **Panels:** Simple or Advanced, per panel (Godot's calm by default, all the depth one click away).
+- **VFX:** module stack or graph view.
+- **Logic:** graph or TypeScript view (the same model).
+- **Audio:** timeline or Advanced (buses, profiling, spatial).
+- **Studio entry:** through the lab (walk to a station) or straight to the editor.
+- **Layout:** any saved layout, including "classic", kept forever.
+- **Theme:** dark or light.
 
 ## 5. Phases
 - **S0, the foundation:**
@@ -102,9 +183,11 @@ Every phase works the same way:
 | S4 | `@hm/sfx`, `@hm/audiomix` | Procedural sound synthesis with presets; events, buses, ducking, adaptive music |
 | S4 | `@hm/camrig`, `@hm/timeline` | Camera rigs; a keyframe timeline for cutscenes |
 
-## 7. Decisions for the owner
-1. **Priority:** S0, then S1 (the look of SetMix first, since the Studio is how you will polish the game), then S2 to S5. Agree, or reorder?
-2. **The layout:** walk to a station in the lab, and its workspace opens in a desktop editor layout. Or would you rather have a pure editor with no walking?
-3. **The overhaul language:** a visual graph plus TypeScript (recommended: web-native, the code the game is written in), or Lua as Roblox and Core use?
-4. **The bridges:** Blender (S2) and Unreal (S5) as the overhaul paths for models and scenes. Keep them both?
-5. **The AI assistant** in the Studio (as Roblox's): in S5, or sooner?
+## 7. Decisions (made from the research; the owner, 2026-10-08: "just make logical choices based on research")
+1. **Order:** S0, then S1 (the look of SetMix first, because the Studio is how the owner will polish the game), then S2 to S5.
+2. **Entry:** both, as a toggle (4c). By default you walk to a lab station and its workspace opens in the editor layout, because the lab is SetMix's identity. "Straight to the editor" is one setting away for speed.
+3. **The overhaul language:** graphs with a TypeScript view of the same model. TypeScript is the game's own language and the web's; the dual view answers both the Blueprint "spaghetti and no diffs" complaint and the "I'd rather type it" camp. No Lua.
+4. **Bridges:** keep Blender (S2, through its MCP) and Unreal (S5, through SetMix_UE5's Python) as the overhaul paths. Mixamo stays the animation source.
+5. **AI assistant:** in S5. It needs a server and its costs settled with RUN. Until then, a built-in help layer: every preset and parameter explains itself in place, searchable.
+
+The owner can change any of these at a word; they are recorded in `docs/OWNER_ASKS.md`.

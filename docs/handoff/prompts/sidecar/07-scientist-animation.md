@@ -6,7 +6,9 @@ The owner (2026-10-08): "first polish the scientist and base game". **This comes
 14 Mixamo animations for the scientist's own rig (Mixamo bone names `mixamorig:*`). They are FBX Binary, without skin, at 30 fps, with locomotion "in place". They are in `zips/Models/rigged/anims/` (gitignored, 8.4 MB):
 - breathing-idle, looking-around;
 - walking, running, left-strafe-walking, right-strafe-walking, walking-backwards, jump;
-- pulling-lever, typing, plant-a-plant, waving, cheering, pointing.
+- pulling-lever, button-pushing, plant-a-plant, waving, cheering, pointing.
+
+Each clip was checked by its mean hips height: all stand (about 1 m) except plant-a-plant, which kneels as it should (about 0.5 m). A seated typing clip and a crouched pointing clip were set aside in `_unused/`; do not use them.
 
 The model is in `apps/web/src/avatar/scientist/`. Fix POL-18 while you are there: import the .fbx with Vite `?url` and delete the 1.6 MB base64 `.ts`.
 
@@ -21,14 +23,14 @@ The model is in `apps/web/src/avatar/scientist/`. Fix POL-18 while you are there
    - **idle:** breathing, with a looking-around every 12 to 25 s.
    - **locomotion:** walk, run, the two strafes and walking backwards, blended by speed and direction.
    - **jump.**
-   - **one-shots:** lever, typing, plant, wave, cheer and point. Each crossfades in and out over about 0.25 s and returns to idle.
+   - **one-shots:** lever, button pushing, plant, wave, cheer and point. Each crossfades in and out over about 0.25 s and returns to idle.
 3. **Where it shows:**
    - **The creator preview:** breathing idle, an occasional looking-around, and a wave when the player presses Done. This replaces the hand-set relaxed pose.
    - **The SetMix menu:** the scientist at the gate breathes and looks around (no T-pose). Now and then, every 30 to 60 s, they point at the open gate.
    - **Play, a third-person view:**
      - V switches between first person (as now, the body hidden) and an over-the-shoulder third-person camera that does not pass through the lab's walls or props.
      - In third person the scientist walks, runs, strafes and jumps with the player's movement.
-     - The player's own actions play their clips: pulling the main lever plays the lever clip, placing a machine plays plant, a stage rising plays cheer, and a lab panel open plays typing.
+     - The player's own actions play their clips: pulling the main lever plays the lever clip, placing a machine plays plant, a stage rising plays cheer, and a lab panel open plays button pushing (standing at the console or the machine).
      - In first person nothing changes, apart from the clips running for the shadow if one is drawn.
      - The view choice is saved in the profile.
    - **The Goblin Racing edition** keeps its goblin; nothing here changes it.

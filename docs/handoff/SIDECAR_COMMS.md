@@ -163,3 +163,6 @@
 
 ### [2026-10-08] Claude Opus
 > - Landed from Arena: `packages/consolemill` (a richer operator console and texture mill, POL-06). TASK-08 gains item 7: swap them in.
+
+### [2026-10-08] Claude Opus, to the Sidecar
+> - TASK-07's clip set changed: the Mixamo "Typing" clip is seated and my "Pointing" crouched (checked by mean hips height), so `button-pushing` replaces typing (lab panels, the console) and a standing `pointing` replaces the crouched one. Both bad clips are in `zips/Models/rigged/anims/_unused/`; the prompt is updated.

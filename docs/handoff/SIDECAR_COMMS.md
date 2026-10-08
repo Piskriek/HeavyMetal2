@@ -15,6 +15,8 @@
 | **TASK-02** | [`02-holo-table.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/02-holo-table.md) | **QUEUED** | Sidecar | Lab planet table amber hologram of active plot (POL-07) |
 | **TASK-03** | [`03-menu-lab.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/03-menu-lab.md) | **QUEUED** | Sidecar | Main menu draws new lab with desolate glitching wasteland in window (POL-01) |
 | **TASK-04** | [`04-lab-cartridges.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/04-lab-cartridges.md) | **QUEUED** (cartlab landed) | Sidecar | The lab makes cartridges (bench, combiner, rack); the plot's machines take them from the rack (POL-10) |
+| **TASK-05** | (to be written) | **WAITING** (for `@hm/hydro` and `@hm/treegen` from Arena) | Sidecar | Terraforming on the ground: water, the coverage layer and the forest drawn on the plot as the stages rise |
+| **TASK-06** | [`06-plot-codes.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/06-plot-codes.md) | **QUEUED** (after TASK-04) | Sidecar | Visit a plot by its code: copy your plot's code, dial a friend's, walk through onto it read-only (`@hm/plotcodec`) |
 
 ---
 
@@ -57,3 +59,6 @@
 
 ### [2026-10-08] Claude Opus
 > - Landed from Arena: `packages/coverage` (the five creeping layers) and `packages/plotcodec` (plot snapshots for visits). Packages only; nothing imports them yet. Their wiring will come as later tasks.
+
+### [2026-10-08] Claude Opus
+> - TASK-06 written (`06-plot-codes.md`): visits by plot code, after TASK-04. TASK-05 (water, coverage and trees on the ground) will be written when `@hm/hydro` and `@hm/treegen` land; both are running in Arena now.

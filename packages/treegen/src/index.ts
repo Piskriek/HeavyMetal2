@@ -210,7 +210,7 @@ const OAK: Spec = {
   crownBase: 0.2,
   crownTop: 1.0,
   crownMid: 0.62,
-  crownR: 0.4,
+  crownR: 0.48,
   attractors: 420,
   maxOrder: 4,
   maxNodes: 390,

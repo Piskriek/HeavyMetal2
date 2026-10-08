@@ -450,7 +450,31 @@ The steps:
 >     - Before/after screenshots captured and verified:
 >       - Console: `docs/shots/console-before.png` vs `docs/shots/console-after.png`
 >       - Texture Mill: `docs/shots/mill-before.png` vs `docs/shots/mill-after.png`
->   - Moving to **Item 8: POL-20 (Oak crown envelope widening in `@hm/treegen`)**.
+### [2026-10-08] Sidecar Agent (Antigravity)
+> - **TASK-08 Item 8 (POL-20: Oak Crown Envelope Widening in `@hm/treegen`) Completed**:
+>   - Tuned `OAK` growth specification in `packages/treegen/src/index.ts`:
+>     - Increased `crownR` from 0.40 to 0.48 (20% wider crown radius, spreading canopy envelope).
+>     - Preserved all treegen constraints: limbs grow outward without curling (< 35° per segment turn, < 120° whole limb turn), pipe model cross-section radius thickening, triangle budgets across all 4 detail levels (0: 400, 1: 2000, 2: 8000, 3: 24000).
+>     - Oak reads visibly as a domed, spreading canopy distinct from conical pine (`crownR: 0.22`) and upright birch (`crownR: 0.16`).
+>   - Verified cleanly:
+>     - Unit tests: All 25/25 treegen tests pass (`packages/treegen/tests/treegen.test.ts`).
+>     - Performance benchmark: 20 full-detail trees grow in 335 ms (well within the 2,000 ms ceiling).
+>     - `node scripts/verify.mjs`: All 2,114 unit tests pass, 13/13 speed benchmarks pass, static single-file bundle built at 6,859.74 KB.
+> - **Summary of Completed Work in this Push**:
+>   - `TASK-11` (Ore soft-lock & onboarding) — pushed (`a6b39357`).
+>   - `POL-19` (Hologram weak read) — pushed (`147c2f4a`).
+>   - `POL-08` (Build menu HUD overlap) — pushed (`6372cc9d`).
+>   - `POL-17` (Twin gate detail on planet at stage 2+) — pushed (`ff9fdafb`).
+>   - `POL-04` (Stage 4+ Low spec frame rate 60 FPS hold) — pushed (`7b91218d`).
+>   - `POL-02` (Plume ground glow on High/Ultra) — pushed (`8724df45`).
+>   - `POL-03` (Ultra pixel lighting) — committed (`e5a9b0a9`).
+>   - `POL-06` (Console & texture mill via `@hm/consolemill`) — committed (`22e12005`).
+>   - `POL-20` (Oak crown envelope widening in `@hm/treegen`) — committed in this push.
+>   - `V1.1 Planning`: Captured complete narrative start and onboarding design from Owner in `docs/V1_1_ONBOARDING_PLAN.md` and `docs/OWNER_ASKS.md`, parked for review with Claude Opus before Goblin Racing.
+> - **Next Standing Items on Queue**:
+>   - `POL-22`: Scientist Low LOD / first-person optimization to guarantee 60 FPS hold in lab.
+>   - `TASK-12`: Extraction Beam tool (landing `@hm/terrainbrush` from `zips\develop-terrainbrush-typescript-package.zip`, using `@hm/beamkit` already landed).
+
 
 
 

@@ -143,6 +143,7 @@ export interface PlayScene {
     gather(amount: number): number;
     aimedBoulder(): number | null;
     boulders(): readonly BoulderInfo[];
+    twinStage(): number;
   };
   dispose(): void;
 }
@@ -226,7 +227,8 @@ export function createPlayScene(o: {
   const planetScene = new THREE.Scene();
   const m = kit.createMaterials();
   let world: World | null = null, ground: PlotGround | null = null;
-  const twin = kit.gate(m, { twin: true, stage: 1 });
+  let twin = kit.gate(m, { twin: true, stage: 1 });
+  let twinStage = 1;
   const openingMark = keep(new THREE.ShaderMaterial({ vertexShader: MARK_VERTEX, fragmentShader: OPENING_MARK_FRAGMENT, side: THREE.DoubleSide, blending: THREE.NoBlending }));
   const twinOpening = new THREE.Mesh(keep(new THREE.PlaneGeometry(twin.opening.width, twin.opening.height)), openingMark);
   twinOpening.position.set(0, twin.opening.sill + twin.opening.height / 2, twin.opening.z);
@@ -241,6 +243,12 @@ export function createPlayScene(o: {
   const gateYawDelta = twin.group.rotation.y;
   planetScene.add(twin.group);
   let planetGateM = new THREE.Matrix4(), toPlanet = new THREE.Matrix4(), toLab = new THREE.Matrix4();
+  const syncPlanetMatrices = (): void => {
+    twin.group.updateMatrixWorld(true);
+    planetGateM = twin.group.matrixWorld.clone();
+    toPlanet = planetGateM.clone().multiply(labGateM.clone().invert());
+    toLab = toPlanet.clone().invert();
+  };
   let padTop = 0;
   const groundAt = (x: number, z: number): number => {
     // on the footing pad you stand on the pad
@@ -314,9 +322,36 @@ export function createPlayScene(o: {
       cables.push(line);
     }
   };
-  /** Rebuilds every machine at the detail of the stage the plot shows (chunky until stage 2). */
+  /** Rebuilds the planet's twin gate at stage 1 (chunky) or stage 6 (full detail). */
+  const rebuildTwin = (wantStage: number): void => {
+    if (wantStage === twinStage) return;
+    twinStage = wantStage;
+    const oldGroup = twin.group;
+    oldGroup.remove(twinOpening);
+    oldGroup.remove(footing);
+    planetScene.remove(oldGroup);
+    oldGroup.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (mesh.isMesh && mesh.geometry && mesh !== twinOpening && mesh !== footing) {
+        mesh.geometry.dispose();
+      }
+    });
+    const oldPos = oldGroup.position.clone();
+    const oldRotY = oldGroup.rotation.y;
+
+    twin = kit.gate(m, { twin: true, stage: twinStage });
+    twinOpening.position.set(0, twin.opening.sill + twin.opening.height / 2, twin.opening.z);
+    twin.group.add(twinOpening);
+    twin.group.add(footing);
+    twin.group.position.copy(oldPos);
+    twin.group.rotation.y = oldRotY;
+    planetScene.add(twin.group);
+    syncPlanetMatrices();
+  };
+  /** Rebuilds every machine and the twin gate at the detail of the stage the plot shows (chunky until stage 2). */
   const rebuildProps = (stageShown: number): void => {
     const want = stageShown <= 1 ? 1 : 6;
+    rebuildTwin(want);
     if (want === propStage) return;
     propStage = want;
     for (const [id, v] of views) {
@@ -399,13 +434,6 @@ export function createPlayScene(o: {
   ).catch((err) => {
     console.warn('Failed to load scientist in Play:', err);
   });
-
-  const syncPlanetMatrices = (): void => {
-    twin.group.updateMatrixWorld(true);
-    planetGateM = twin.group.matrixWorld.clone();
-    toPlanet = planetGateM.clone().multiply(labGateM.clone().invert());
-    toLab = toPlanet.clone().invert();
-  };
 
   /** Push a circle of RADIUS out of the lab's boxes. */
   const collide = (p: THREE.Vector3): void => {
@@ -584,6 +612,7 @@ export function createPlayScene(o: {
       ground?.setStage(Math.max(1, stage));
       fitLooks();
       propStage = stage <= 1 ? 1 : 6;
+      rebuildTwin(propStage);
       if (where === 'lab') {
         if (scientistHolder.parent !== labScene) {
           planetScene.remove(scientistHolder);
@@ -981,6 +1010,7 @@ export function createPlayScene(o: {
       },
       aimedBoulder: () => lastAimedBoulder,
       boulders: () => ground?.getBoulders() ?? [],
+      twinStage: () => twinStage,
     },
     dispose() {
       scientistAnimator?.dispose();

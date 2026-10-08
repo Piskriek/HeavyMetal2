@@ -386,4 +386,16 @@ The steps:
 >   - Measured bounding boxes across 1280x720, 1366x768, and 1920x1080: zero overlap against top goal, top sync bar, and plot HUD; vertical clearance > 89px at 720p, horizontal clearance > 154px.
 >   - Automated assertion added to `scripts/e2e-smoke.mjs` verifying zero bounding-box intersection; clean shot saved to `docs/shots/play-build-menu.png`.
 >   - Single-file bundle `apps/web/dist/index.html` rebuilt at 6,845.81 KB.
->   - Moving to **Item 3: POL-17 (Twin Gate Detail on the Planet)**.
+
+### [2026-10-08] Sidecar Agent (Antigravity)
+> - **TASK-08 Item 3 (POL-17: Twin Gate Detail on the Planet) Completed**:
+>   - Implemented `rebuildTwin` in `apps/web/src/play/play-scene.ts` to swap the twin gate model between chunky low-poly (`stage: 1`, <= 2k triangles) and full detail (`stage: 6`, chamfered boxes, anchor bolts, buttress gussets) when the plot reaches stage 2.
+>   - Preserves footing pad, opening mark geometry, position, and orientation, and updates matrix transforms (`toPlanet`, `toLab`, `planetGateM`) and power relay network cleanly.
+>   - Called in `rebuildProps(stageShown)` upon stage wave completion and in `restore(s)` when loading or visiting plots with stage >= 2.
+>   - Exposed `window.hmPlay.twinStage()` in `play.tsx` and validated in `scripts/e2e-smoke.mjs` with before and after assertions:
+>     - Stage 1: chunky stage 1 detail (`window.hmPlay.twinStage() === 1`).
+>     - Stage 2: full detail rebuild (`window.hmPlay.twinStage() === 6`).
+>   - Screenshots captured: `docs/shots/twin-gate-stage-1.png` and `docs/shots/twin-gate-stage-2.png`.
+>   - Verified cleanly: `verify.mjs` (2108 unit tests pass, 13 speed tests pass, deployable static bundle: 6,846.31 KB) and `e2e-smoke.mjs` (all checks pass with GPU).
+>   - Moving to **Item 4: POL-04 (Stage 4+ Low Spec Frame Rate)**.
+

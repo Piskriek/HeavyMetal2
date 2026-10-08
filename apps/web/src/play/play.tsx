@@ -443,6 +443,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       state: () => stateRef.current,
       detail: () => scene.debug.detail(),
       raise: (to: number) => scene.raiseStage(to, scene.debug.gatePlanet()),
+      twinStage: () => scene.debug.twinStage(),
       holo: () => scene.debug.holo(),
       lab: () => labRef.current,
       labStep: (seconds: number) => {

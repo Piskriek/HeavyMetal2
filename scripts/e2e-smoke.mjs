@@ -901,6 +901,18 @@ try {
   const tierWay = detail.tier === 'potato' ? 'dither' : 'cubes';
   check('the plume is drawn the way the tier asks, with as many pixels as it asks', detail.plumes === tierWay && detail.pixels === detail.pouring * Math.floor(220 * detail.plumeDensity + 1e-6), JSON.stringify(detail));
   await shot('play-stage-1');
+
+  // POL-17: twin gate detail on the planet (chunky at stage 1, full detail at stage 2)
+  await dom(() => { const g = window.hmPlay.gate(); window.hmPlay.go('planet', g.x, g.z + 5.5, Math.PI, -0.08); });
+  await page.waitForTimeout(T(300));
+  check('at stage 1 the twin gate is built at chunky stage 1 detail', await dom(() => window.hmPlay.twinStage() === 1));
+  await shot('twin-gate-stage-1');
+
+  await dom(() => window.hmPlay.raise(2));
+  await page.waitForFunction(() => window.hmPlay.wave > 1e6 && window.hmPlay.twinStage() === 6, null, { timeout: T(40000) });
+  check('raising to stage 2 rebuilds the twin gate at full detail', await dom(() => window.hmPlay.twinStage() === 6));
+  await shot('twin-gate-stage-2');
+
   // teleport back into the lab with the gate on, standing ~2 m away from the planet table looking at it (-z)
   await dom(() => window.hmPlay.go('lab', -3.6, -3.0, 0, -0.32));
   await page.waitForTimeout(T(300));

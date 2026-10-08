@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { floorTextures, panelTextures } from '../lab/lab-scene';
 import * as kit from '@hm/labkit';
 import type { Box, Prop } from '@hm/labkit';
+import { operatorConsole as consoleMillOperatorConsole } from '@hm/consolemill';
 
 export const ROOM = { left: -10, right: 10, back: -12, front: 4, height: 8 } as const;
 const WINDOW = { x0: -8.6, x1: -2.6, y0: 1.0, y1: 4.3 } as const;
@@ -268,7 +269,7 @@ export function createLabRoom(o: { readonly textureSize: number; readonly portal
   place(kit.breakerPanel(m), 8.35, ROOM.back + 0.4);
   place(kit.capacitorBank(m), ROOM.right - 0.75, -8.4, -Math.PI / 2);
   const boxes = [place(kit.controlBox(m), 4.75, ROOM.back + 0.55), place(kit.controlBox(m), 9.2, ROOM.back + 0.55)];
-  const desk = kit.operatorConsole(m);
+  const desk = consoleMillOperatorConsole(m);
   place(desk, 1.35, -6.2);
   const pTable = place(kit.planetTable(m), -3.6, -5.2);
   const tableDisc = pTable.lamps[0];

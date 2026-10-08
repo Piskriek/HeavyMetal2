@@ -338,6 +338,9 @@
       ],
       "@hm/plotcodec": [
         "packages/plotcodec/src/index.ts"
+      ],
+      "@hm/consolemill": [
+        "packages/consolemill/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

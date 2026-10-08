@@ -437,6 +437,20 @@ The steps:
 >     - `node scripts/verify.mjs`: All 2,114 unit tests pass, 13/13 speed benchmarks pass, static single-file bundle built at 6,849.97 KB.
 >     - `E2E_GPU=1 node scripts/e2e-smoke.mjs`: Assertions verify point lights are off on Low tier, created and active when enabled, and cleaned up when disabled.
 >     - Screenshots captured and verified at `docs/shots/pixel-light-off.png` and `docs/shots/pixel-light-on.png`.
->   - Moving to **Item 7: POL-06 (Console & Texture Mill Upgrades via `@hm/consolemill`)**.
+### [2026-10-08] Sidecar Agent (Antigravity)
+> - **TASK-08 Item 7 (POL-06: Console & Texture Mill Upgrades via `@hm/consolemill`) Completed**:
+>   - Swapped in richer 3D operator console and texture mill from `@hm/consolemill` (concept sheet 12):
+>     - Operator Console in `apps/web/src/play/lab-room.ts`: 1970s power-station control desk on pedestal with dual analog dial gauges, CRT oscilloscope screen displaying simulated waveform grid, status indicator lamps, keypad, toggle switches, and working red-handled quadrant lever for gate power-on sequence. Lever position/animation hooks and camera gaze raycast continue working seamlessly.
+>     - Texture Mill in `apps/web/src/play/machine-props.ts`: Octagonal chamfered body, front ore hopper loaded with raw ore chunks, slotted exhaust stack pouring pixel cubes, working status lamp, cartridge service door, and yellow-black hazard toe skirt. Preserved `power` cable socket and `stack` plume emission socket.
+>     - Added `@hm/consolemill` path mapping to `tsconfig.json` and alias to `apps/web/vite.config.ts`.
+>   - Verified cleanly:
+>     - Unit tests: `@hm/consolemill` suite passes (8/8 tests pass).
+>     - `node scripts/verify.mjs`: All 2,114 tests pass, 13/13 speed benchmarks pass, static single-file bundle built at 6,859.74 KB.
+>     - `E2E_GPU=1 node scripts/e2e-smoke.mjs`: Lever throw, gate activation, machine placement, and plot interaction pass on hardware GPU.
+>     - Before/after screenshots captured and verified:
+>       - Console: `docs/shots/console-before.png` vs `docs/shots/console-after.png`
+>       - Texture Mill: `docs/shots/mill-before.png` vs `docs/shots/mill-after.png`
+>   - Moving to **Item 8: POL-20 (Oak crown envelope widening in `@hm/treegen`)**.
+
 
 

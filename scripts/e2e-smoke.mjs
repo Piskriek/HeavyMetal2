@@ -733,6 +733,7 @@ try {
   await page.waitForFunction(() => window.hmPlay.state().gateOn, null, { timeout: T(30000) });
   check('the main lever turns the gate on', /Step through the gate/.test(await page.locator('.play-goal h2').innerText()));
   await shot('play-gate-on');
+  await shot('console-after');
 
   // V key switches between first and third person; while walking, walk clip weight > 0.5
   await page.keyboard.press('KeyV');
@@ -941,6 +942,7 @@ try {
   await dom(() => { const g = window.hmPlay.gate(); window.hmPlay.go('planet', g.x + 7.0, g.z + 2.5, Math.PI, -0.2); });
   await page.waitForTimeout(T(300));
   check('on low tier pixel lighting is off by default', await dom(() => window.hmPlay.pixelLightCount() === 0));
+  await shot('mill-after');
   await shot('pixel-light-off');
 
   await dom(() => window.hmPlay.setPixelLights(true));

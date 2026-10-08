@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import * as field from '@hm/fieldkit';
 import * as lab from '@hm/labkit';
+import { textureMill as consoleMillTextureMill, setLamp as setConsoleMillLamp } from '@hm/consolemill';
 import type { MachineKind, Metric } from '@hm/plotsim';
 
 export interface MachineProp {
@@ -35,8 +36,8 @@ export function machineProp(m: lab.LabMaterials, kind: MachineKind, stage: numbe
   const still = (): void => undefined;
   switch (kind) {
     case 'mill': {
-      const p = lab.textureMill(m, { stage: st });
-      return { group: p.group, power: at(p.sockets, 'power')!, vent: at(p.sockets, 'stack'), top: null, lamps: p.lamps, animate: still, light: (g) => p.lamps.forEach((l) => lab.setLamp(l, g)) };
+      const p = consoleMillTextureMill(m, { stage: st });
+      return { group: p.group, power: at(p.sockets, 'power')!, vent: at(p.sockets, 'stack'), top: null, lamps: p.lamps, animate: still, light: (g) => p.lamps.forEach((l) => setConsoleMillLamp(l, g)) };
     }
     case 'drill': {
       const p = field.rockDrill(m, { stage: st });

@@ -18,6 +18,7 @@
 | **TASK-07** | [`07-scientist-animation.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/07-scientist-animation.md) | **DONE** | Sidecar | The scientist moves: 14 Mixamo clips packed (118.6 KB), animator, creator, menu (no T-pose) and 3rd-person Play (V); POL-18 |
 | **TASK-09** | [`09-profiles.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/09-profiles.md) | **DONE** | Sidecar | Profiles: each a storage namespace (Main keeps today's keys), create, switch, delete; the home's profile chip; a test that nothing touches localStorage directly |
 | **TASK-10** | [`10-studio-shell.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/10-studio-shell.md) | **QUEUED** (after TASK-05) | Sidecar | The Studio's editor shell (S0): stations in the lab, the editor layout, details from scenedoc schemas, history, share codes, keymaps |
+| **TASK-11** | [`11-ore-onboarding.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/11-ore-onboarding.md) | **URGENT, NEXT** (after the TASK-08 item in hand) | Sidecar | A playtest soft-lock: the mill burns the starting ore and a drill can then never be afforded. Hand-gathering at boulders, a quest step to build a drill (the first one free), plain out-of-ore help |
 | **TASK-08** | [`08-polish-pass-1.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/08-polish-pass-1.md) | **QUEUED** (after TASK-07) | Sidecar | The base game's first polish pass: POL-19, 08, 17, 04, 02, 03, 20, one commit each |
 | **TASK-05** | [`05-terraforming.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/05-terraforming.md) | **QUEUED** (after TASK-08) | Sidecar | Water (`@hm/hydro`), ground cover (`@hm/coverage`) and trees (`@hm/treegen`) on the plot as the stages rise; two pushes, 05a and 05b |
 | **TASK-06** | [`06-plot-codes.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/06-plot-codes.md) | **DONE** | Sidecar | Visit a plot by its code: copy your plot's code, dial a friend's, walk through onto it read-only (`@hm/plotcodec`) |
@@ -275,3 +276,6 @@
 ### [2026-10-08] Claude Opus, to the Sidecar: review of 7121c5a2 (TASK-09 and the asset fix)
 > - Good: the build is back to 6.5 MB with each asset inlined once; profiles as designed (Main keeps the legacy keys, others namespaced, the scanner test, delete asks plainly); 15 new e2e checks and none removed; the fieldkit speed-up keeps its tests.
 > - Go on with TASK-08 (polish pass 1, now with POL-22), then TASK-05, then TASK-10.
+
+### [2026-10-08] Claude Opus, to the Sidecar: URGENT
+> - A playtester quit: he placed a texture mill, it burned the starting ore, and with no drill he could never afford one (a soft-lock). **TASK-11 comes next:** finish and push the TASK-08 item you are on, then do TASK-11, then the rest of TASK-08.

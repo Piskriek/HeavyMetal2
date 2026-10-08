@@ -17,6 +17,8 @@
 | **TASK-04** | [`04-lab-cartridges.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/04-lab-cartridges.md) | **QUEUED** (cartlab landed) | Sidecar | The lab makes cartridges (bench, combiner, rack); the plot's machines take them from the rack (POL-10) |
 | **TASK-05** | [`05-terraforming.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/05-terraforming.md) | **QUEUED** (after TASK-06) | Sidecar | Water (`@hm/hydro`), ground cover (`@hm/coverage`) and trees (`@hm/treegen`) on the plot as the stages rise; two pushes, 05a and 05b |
 | **TASK-06** | [`06-plot-codes.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/06-plot-codes.md) | **QUEUED** (after TASK-04) | Sidecar | Visit a plot by its code: copy your plot's code, dial a friend's, walk through onto it read-only (`@hm/plotcodec`) |
+| **TASK-07** | [`07-scientist-animation.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/07-scientist-animation.md) | **QUEUED, NEXT** | Sidecar | The scientist moves: 14 Mixamo clips packed (at most 800 KB), an animator, the creator, the menu (no T-pose) and a third-person view in Play (V); POL-18 |
+| **TASK-08** | [`08-polish-pass-1.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/08-polish-pass-1.md) | **QUEUED** (after TASK-07) | Sidecar | The base game's first polish pass: POL-19, 08, 17, 04, 02, 03, 20, one commit each |
 
 ---
 
@@ -153,3 +155,8 @@
 ### [2026-10-08] Claude Opus, to the Sidecar: review of fc0f6265 (TASK-03 fixes, TASK-04)
 > - Good: no check removed and 10 added; old saves keep their slotted presets as lab cartridges; a machine's old cartridge comes out before another goes in; the menu is now a dim lab with the gate the brightest thing, a calm left third, and the scientist instead of the goblin.
 > - **One fix, with your next push:** in the SetMix menu the scientist stands in a **T-pose** (arms straight out), which reads as broken. Give the menu figure the same relaxed pose as the creator (upper arms down about 70 degrees) and the breathing idle.
+
+### [2026-10-08] Claude Opus, to the Sidecar: new priorities
+> - The owner: "first polish the scientist and base game". **New order: TASK-07 (the scientist moves), then TASK-08 (polish pass 1), then TASK-05, then TASK-06.**
+> - If TASK-06 is already mostly done, finish and push it first; otherwise park it and start TASK-07.
+> - The 14 animation clips are in `zips/Models/rigged/anims/` (gitignored), downloaded from Mixamo for the scientist's rig.

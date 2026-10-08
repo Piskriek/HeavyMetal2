@@ -47,6 +47,9 @@ try {
   await page.waitForFunction(() => window.hmLab && window.hmLab.ready && window.hmLab.frames > 5, null, { timeout: T(60000) });
   check('the home is the lab, with the finished planet through its arch', await page.locator('.lab-home.ready').count() === 1);
   check('the menu lab has the free-standing gate and no arch', await dom(() => window.hmLab.gate && !window.hmLab.arch));
+  await page.waitForFunction(() => window.hmLab && typeof window.hmLab.scientistArmAngle === 'function' && window.hmLab.scientistArmAngle() !== null, null, { timeout: T(30000) });
+  const armAngle = await dom(() => window.hmLab.scientistArmAngle());
+  check('in the menu, the figure upper arms hang down (no T-pose)', typeof armAngle === 'number' && Math.abs(armAngle) > 0.5, `arm angle: ${armAngle}`);
   await shot('menu-setmix');
   await text('.sm-menu button', 'Settings').click();
   check('settings opens', await page.locator('[aria-label="Settings"]').count() === 1);
@@ -691,6 +694,13 @@ try {
   check('Play opens the lab and asks who you are, in the lab', await page.locator('.play-create .create-goblin.in-lab').count() === 1);
   check('the scientist is the only default in the lab', await page.locator('.play-create .create-scientist').count() === 1 && await page.locator('.play-create .cg-looks').count() === 0);
   check('the import option is there', await page.locator('.play-create .custom-dropzone button').count() >= 1);
+  await page.waitForFunction(() => window.hmCreator && typeof window.hmCreator.getBonePosition === 'function', null, { timeout: T(20000) });
+  const bonePos0 = await page.evaluate(() => window.hmCreator.getBonePosition('mixamorigSpine'));
+  await page.waitForTimeout(T(400));
+  const bonePos1 = await page.evaluate(() => window.hmCreator.getBonePosition('mixamorigSpine'));
+  const boneMoved = bonePos0 && bonePos1 && (Math.abs(bonePos0.y - bonePos1.y) > 1e-5 || Math.abs(bonePos0.z - bonePos1.z) > 1e-5 || Math.abs(bonePos0.x - bonePos1.x) > 1e-5);
+  check('in the creator, a bone of the scientist moves between two frames', boneMoved, `pos0: ${JSON.stringify(bonePos0)}, pos1: ${JSON.stringify(bonePos1)}`);
+  await shot('creator-scientist');
   await dom(() => { [...document.querySelectorAll('.play-create .visor-chip')][1]?.click(); });
   await page.fill('.play-create .cg-name input', 'Ada');
   await dom(() => { [...document.querySelectorAll('.play-create .btns button')].find((b) => b.textContent.startsWith('Done'))?.click(); });
@@ -698,9 +708,21 @@ try {
   check('Done leads into the lab', await page.locator('.play-create').count() === 0);
   check('made: next, turn on the gate', /Turn on the gate/.test(await page.locator('.play-goal h2').innerText()));
   await dom(() => window.hmPlay.pull());
+  await page.waitForTimeout(T(200));
+  check('the lever plays the lever clip', await dom(() => window.hmPlay.currentOneShot() === 'lever' || window.hmPlay.clipWeight('pulling-lever') > 0));
   await page.waitForFunction(() => window.hmPlay.state().gateOn, null, { timeout: T(30000) });
   check('the main lever turns the gate on', /Step through the gate/.test(await page.locator('.play-goal h2').innerText()));
   await shot('play-gate-on');
+
+  // V key switches between first and third person; while walking, walk clip weight > 0.5
+  await page.keyboard.press('KeyV');
+  await page.waitForTimeout(T(300));
+  check('V gives third person', await dom(() => window.hmPlay.view() === 'third'));
+  await page.keyboard.down('KeyW');
+  await page.waitForTimeout(T(500));
+  const walkWeight = await dom(() => window.hmPlay.clipWeight('walking'));
+  await page.keyboard.up('KeyW');
+  check('while walking, walk clip weight is above 0.5', walkWeight > 0.5, `walk weight: ${walkWeight}`);
   // walk through the gate: stand in front of it in the lab, facing it, and walk
   const walk = async (key, ms) => { await page.keyboard.down(key); await page.waitForTimeout(ms); await page.keyboard.up(key); };
   await dom(() => window.hmPlay.go('lab', 3.2, -6.9, 0));
@@ -848,6 +870,10 @@ try {
   await page.waitForFunction(() => window.hmPlay.where === 'planet', null, { timeout: T(8000) });
   await page.waitForTimeout(T(200));
   await shot('play-visiting');
+  await page.keyboard.down('KeyW');
+  await page.waitForTimeout(T(200));
+  await shot('play-third-person-walking');
+  await page.keyboard.up('KeyW');
 
   await page.keyboard.press('KeyB');
   await page.waitForTimeout(T(200));

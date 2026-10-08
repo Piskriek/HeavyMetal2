@@ -5,7 +5,6 @@
 // - SetMix: the lush sunlit terraformed planet (docs/concept/setmix/04-menu-setmix.png)
 // - Goblin Racing: the goblin planet in deep space (docs/concept/setmix/05-menu-goblin-racing.png)
 import * as THREE from 'three';
-import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { createLabRoom, GATE_AT, type LabRoom } from '../play/lab-room';
 import { createPlotHolo, type PlotHolo } from '../play/plot-holo';
 import type { PlotGround } from '../play/plot-ground';
@@ -15,7 +14,9 @@ import { EDITION } from '../edition';
 import type { StageLook } from '../crafter/looks';
 import type { Neighbour } from '../crafter/world';
 import { hash } from '../crafter/moon';
-import { SCIENTIST_FBX_BASE64 } from '../avatar/scientist/scientist-asset';
+import { createScientistInstance } from '../avatar/scientist/scientist-model';
+import { loadScientistAnimations } from '../avatar/scientist/anims-loader';
+import { createScientistAnimator, type ScientistAnimator } from '../avatar/scientist/animator';
 
 export const LAB_AT = { x: 86, z: 30 } as const;
 
@@ -196,55 +197,8 @@ export interface LabScene {
   /** Where the pointer is, -1..1 across screen: the eye leans towards it */
   lean(x: number, y: number): void;
   dispose(): void;
-}
-
-function createScientistModel(visorHex = '#f59e0b'): THREE.Group {
-  const binStr = atob(SCIENTIST_FBX_BASE64);
-  const len = binStr.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) bytes[i] = binStr.charCodeAt(i);
-  const fbxLoader = new FBXLoader();
-  const group = fbxLoader.parse(bytes.buffer, '') as THREE.Group;
-  group.scale.setScalar(0.01);
-  const submeshColors: Record<string, { color: number; roughness: number; metalness?: number }> = {
-    '1': { color: 0x334155, roughness: 0.7 },
-    '2': { color: 0x1e293b, roughness: 0.8 },
-    '3': { color: 0x475569, roughness: 0.6 },
-    '4': { color: 0xe2e8f0, roughness: 0.5 },
-    '5': { color: 0xf5f8fa, roughness: 0.5, metalness: 0.05 },
-    '6': { color: 0x0f172a, roughness: 0.9 },
-    '7': { color: 0x0f172a, roughness: 0.9 },
-    '9': { color: 0x334155, roughness: 0.7 },
-  };
-  const visorColor = new THREE.Color(visorHex);
-
-  // Relax arms down from T-pose (~70 degrees down)
-  const leftArm = group.getObjectByName('mixamorigLeftArm');
-  if (leftArm) leftArm.rotation.x = 1.15;
-  const rightArm = group.getObjectByName('mixamorigRightArm');
-  if (rightArm) rightArm.rotation.x = 1.15;
-  const spine = group.getObjectByName('mixamorigSpine') as THREE.Bone | undefined;
-  group.userData.spine = spine ?? null;
-
-  group.traverse((c) => {
-    if ((c as THREE.Mesh).isMesh) {
-      const mesh = c as THREE.Mesh;
-      if (mesh.name === '6' || mesh.name === '7' || mesh.name === '8') {
-        mesh.material = new THREE.MeshStandardMaterial({
-          color: visorColor,
-          emissive: visorColor,
-          emissiveIntensity: 0.9,
-          roughness: 0.1,
-          metalness: 0.1,
-          transparent: true,
-          opacity: 0.9,
-        });
-      } else if (submeshColors[mesh.name]) {
-        mesh.material = new THREE.MeshStandardMaterial(submeshColors[mesh.name]);
-      }
-    }
-  });
-  return group;
+  /** Returns the left arm rotation angle if scientist is loaded */
+  scientistArmAngle?: () => number | null;
 }
 
 export function createLabScene(o: {
@@ -300,7 +254,11 @@ export function createLabScene(o: {
   holo.setPlot(demoPlot, new Map([[1, 1], [2, 1], [3, 1]]), new Set([1, 2, 3]));
 
   // ---- Character looking through the gate threshold
-  let scientistSpine: THREE.Bone | null = null;
+  let scientistAnimator: ScientistAnimator | null = null;
+  let pointTimer = 0;
+  let nextPointTime = 30 + Math.random() * 30; // 30 to 60s
+  let leftArmBone: THREE.Object3D | null = null;
+
   if (isGoblin > 0.5) {
     const goblinGeo = smoothModel('goblin').near;
     const goblinMat = keep(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0 }));
@@ -310,11 +268,20 @@ export function createLabScene(o: {
     goblin.scale.setScalar(0.9);
     room.group.add(goblin);
   } else {
-    const scientist = createScientistModel('#f59e0b');
-    scientist.position.set(GATE_AT.x - 0.6, 0.0, GATE_AT.z + 1.2);
-    scientist.rotation.y = Math.PI - 0.4;
-    room.group.add(scientist);
-    scientistSpine = (scientist.userData.spine as THREE.Bone) ?? null;
+    const scientistHolder = new THREE.Group();
+    scientistHolder.position.set(GATE_AT.x - 0.6, 0.0, GATE_AT.z + 1.2);
+    scientistHolder.rotation.y = Math.PI - 0.4;
+    room.group.add(scientistHolder);
+
+    void Promise.all([createScientistInstance('#f59e0b'), loadScientistAnimations()]).then(
+      ([{ group }, clips]) => {
+        scientistHolder.add(group);
+        leftArmBone = group.getObjectByName('mixamorigLeftArm') ?? null;
+        scientistAnimator = createScientistAnimator(group, clips);
+      }
+    ).catch((err) => {
+      console.warn('Failed to load scientist in menu:', err);
+    });
   }
 
   // ---- Camera framing from concept art 04 and 05
@@ -340,6 +307,8 @@ export function createLabScene(o: {
 
     stats: () => ({ triangles: renderer.info.render.triangles, calls: renderer.info.render.calls }),
 
+    scientistArmAngle: () => (leftArmBone ? leftArmBone.rotation.x : null),
+
     frame(now, dt) {
       const k = Math.min(1, dt * 2.5);
       leanNow.lerp(leanTo, k);
@@ -355,9 +324,14 @@ export function createLabScene(o: {
       camera.position.copy(eye);
       camera.lookAt(look);
 
-      // Subtle breathing sway for scientist figure
-      if (scientistSpine && !o.reducedMotion) {
-        scientistSpine.rotation.x = Math.sin(now * 2) * 0.02;
+      if (scientistAnimator && !o.reducedMotion) {
+        scientistAnimator.update(dt);
+        pointTimer += dt;
+        if (pointTimer >= nextPointTime) {
+          pointTimer = 0;
+          nextPointTime = 30 + Math.random() * 30;
+          scientistAnimator.playOneShot('point');
+        }
       }
 
       room.update(now, dt);
@@ -379,6 +353,7 @@ export function createLabScene(o: {
     },
 
     dispose() {
+      scientistAnimator?.dispose();
       holo.dispose();
       room.dispose();
       for (const x of owned) x.dispose();

@@ -47,7 +47,15 @@ export function LabHome(props: { readonly profile: Profile }): ReactElement {
     window.addEventListener('pointermove', onPointer);
 
     // a test hook, like window.hmCrafter: the e2e reads that the lab drew
-    const hook = { frames: 0, ready: false, triangles: 0, calls: 0, gate: true, arch: false };
+    const hook = {
+      frames: 0,
+      ready: false,
+      triangles: 0,
+      calls: 0,
+      gate: true,
+      arch: false,
+      scientistArmAngle: () => scene.scientistArmAngle?.() ?? null,
+    };
     (window as unknown as { hmLab?: typeof hook }).hmLab = hook;
     const look = (id: string) => bakeLookCached(VAULT_BY_ID.get(id)!, LAST, device, gridSpacing);
     const cartridges = [...new Set([FINISHED, ...NEIGHBOURS.map((n) => n.cartridge)])];

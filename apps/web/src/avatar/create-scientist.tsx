@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import * as THREE from 'three';
-import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { nameProblem } from '@hm/avatarlook';
 import { fx } from '../maker/feedback';
 import { bigStore } from '../storage/big-store';
 import type { PlayAvatar } from '../play/quest';
-import { SCIENTIST_FBX_BASE64 } from './scientist/scientist-asset';
+import { createScientistInstance } from './scientist/scientist-model';
+import { loadScientistAnimations } from './scientist/anims-loader';
+import { createScientistAnimator, type ScientistAnimator } from './scientist/animator';
 
 export const VISOR_SWATCHES = [
   { id: 'amber', label: 'Amber', hex: '#f59e0b' },
@@ -20,9 +21,14 @@ export const VISOR_SWATCHES = [
 interface ScientistPreviewApi {
   setVisor: (color: string) => void;
   setCustomScene: (scene: THREE.Group | null) => void;
+  wave: (onDone: () => void) => void;
 }
 
-function ScientistTurntable(props: { readonly visor: string; readonly customScene: THREE.Group | null }): ReactElement {
+function ScientistTurntable(props: {
+  readonly visor: string;
+  readonly customScene: THREE.Group | null;
+  readonly apiRef?: { current: ScientistPreviewApi | null };
+}): ReactElement {
   const host = useRef<HTMLDivElement>(null);
   const api = useRef<ScientistPreviewApi | null>(null);
 
@@ -54,66 +60,30 @@ function ScientistTurntable(props: { readonly visor: string; readonly customScen
 
     const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
 
-    // Decode base64 FBX
+    let animator: ScientistAnimator | null = null;
     let scientistGroup: THREE.Group | null = null;
     let customGroup: THREE.Group | null = null;
-    let spine: THREE.Bone | null = null;
     const visorMaterials: THREE.MeshStandardMaterial[] = [];
+    let cancelled = false;
 
-    try {
-      const binStr = atob(SCIENTIST_FBX_BASE64);
-      const len = binStr.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) bytes[i] = binStr.charCodeAt(i);
+    void Promise.all([createScientistInstance(props.visor), loadScientistAnimations()]).then(
+      ([{ group, visorMaterials: vMats }, clips]) => {
+        if (cancelled) return;
+        scientistGroup = group;
+        visorMaterials.push(...vMats);
+        scene.add(group);
+        animator = createScientistAnimator(group, clips);
 
-      const fbxLoader = new FBXLoader();
-      scientistGroup = fbxLoader.parse(bytes.buffer, '') as THREE.Group;
-      scientistGroup.scale.setScalar(0.01); // 175 cm -> 1.75 m
-
-      const submeshColors: Record<string, { color: number; roughness: number; metalness?: number }> = {
-        '1': { color: 0x334155, roughness: 0.7 },
-        '2': { color: 0x1e293b, roughness: 0.8 },
-        '3': { color: 0x475569, roughness: 0.6 },
-        '4': { color: 0xe2e8f0, roughness: 0.5 },
-        '5': { color: 0xf1f5f9, roughness: 0.6, metalness: 0.05 },
-        '6': { color: 0x0f172a, roughness: 0.9 },
-        '7': { color: 0x0f172a, roughness: 0.9 },
-        '9': { color: 0x334155, roughness: 0.7 },
-      };
-
-      const leftArm = scientistGroup.getObjectByName('mixamorigLeftArm');
-      if (leftArm) leftArm.rotation.x = 1.15;
-      const rightArm = scientistGroup.getObjectByName('mixamorigRightArm');
-      if (rightArm) rightArm.rotation.x = 1.15;
-      spine = (scientistGroup.getObjectByName('mixamorigSpine') as THREE.Bone) ?? null;
-
-      scientistGroup.traverse((c) => {
-        if ((c as THREE.Mesh).isMesh) {
-          const mesh = c as THREE.Mesh;
-          mesh.castShadow = true;
-          mesh.receiveShadow = true;
-          if (mesh.name === '6' || mesh.name === '7' || mesh.name === '8') {
-            const vMat = new THREE.MeshStandardMaterial({
-              color: new THREE.Color(props.visor),
-              emissive: new THREE.Color(props.visor),
-              emissiveIntensity: 0.8,
-              roughness: 0.1,
-              metalness: 0.1,
-              transparent: true,
-              opacity: 0.9,
-            });
-            mesh.material = vMat;
-            visorMaterials.push(vMat);
-          } else if (submeshColors[mesh.name]) {
-            mesh.material = new THREE.MeshStandardMaterial(submeshColors[mesh.name]);
-          }
-        }
-      });
-
-      scene.add(scientistGroup);
-    } catch (err) {
-      console.warn('Failed to parse scientist FBX preview:', err);
-    }
+        // Expose debug hook for e2e smoke verification
+        (window as unknown as { hmCreator?: unknown }).hmCreator = {
+          getSpineRotation: () => group.getObjectByName('mixamorigSpine')?.rotation.x ?? 0,
+          getBonePosition: (name = 'mixamorigSpine') => group.getObjectByName(name)?.getWorldPosition(new THREE.Vector3()),
+          getAnimator: () => animator,
+        };
+      }
+    ).catch((err) => {
+      console.warn('Failed to load scientist character in preview:', err);
+    });
 
     const setVisor = (hex: string): void => {
       const col = new THREE.Color(hex);
@@ -137,7 +107,17 @@ function ScientistTurntable(props: { readonly visor: string; readonly customScen
       }
     };
 
-    api.current = { setVisor, setCustomScene };
+    const wave = (onDone: () => void): void => {
+      if (animator && scientistGroup?.visible) {
+        animator.playOneShot('wave', onDone);
+      } else {
+        onDone();
+      }
+    };
+
+    const previewApi: ScientistPreviewApi = { setVisor, setCustomScene, wave };
+    api.current = previewApi;
+    if (props.apiRef) props.apiRef.current = previewApi;
 
     if (props.customScene) setCustomScene(props.customScene);
 
@@ -154,16 +134,18 @@ function ScientistTurntable(props: { readonly visor: string; readonly customScen
     ro.observe(el);
 
     let raf = 0;
+    let lastTime = performance.now();
     const loop = (now: number): void => {
+      const dt = Math.min(0.1, (now - lastTime) * 0.001);
+      lastTime = now;
       const time = now * 0.001;
       const angle = time * 0.35;
       const dist = 4.6;
       camera.position.set(Math.sin(angle) * dist, 1.35, Math.cos(angle) * dist);
       camera.lookAt(0, 0.95, 0);
 
-      // Subtle breathing sway
-      if (spine && scientistGroup?.visible) {
-        spine.rotation.x = Math.sin(time * 2) * 0.02;
+      if (animator && scientistGroup?.visible) {
+        animator.update(dt);
       }
 
       renderer.render(scene, camera);
@@ -172,6 +154,9 @@ function ScientistTurntable(props: { readonly visor: string; readonly customScen
     raf = requestAnimationFrame(loop);
 
     return () => {
+      cancelled = true;
+      delete (window as unknown as { hmCreator?: unknown }).hmCreator;
+      animator?.dispose();
       cancelAnimationFrame(raf);
       ro.disconnect();
       renderer.dispose();
@@ -205,6 +190,7 @@ export function CreateScientist(props: {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const turntableApi = useRef<ScientistPreviewApi | null>(null);
 
   const problem = nameProblem(name);
 
@@ -287,10 +273,22 @@ export function CreateScientist(props: {
     }
     const cleanName = name.trim();
     fx('ui-success');
-    if (customKey) {
-      props.onDone({ kind: 'custom', name: cleanName, key: customKey });
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      if (customKey) {
+        props.onDone({ kind: 'custom', name: cleanName, key: customKey });
+      } else {
+        props.onDone({ kind: 'scientist', name: cleanName, visor });
+      }
+    };
+
+    if (turntableApi.current && !customKey) {
+      turntableApi.current.wave(finish);
+      window.setTimeout(finish, 450);
     } else {
-      props.onDone({ kind: 'scientist', name: cleanName, visor });
+      finish();
     }
   };
 
@@ -300,7 +298,7 @@ export function CreateScientist(props: {
       role="dialog"
       aria-label={props.title ?? 'Who are you?'}
     >
-      <ScientistTurntable visor={visor} customScene={customScene} />
+      <ScientistTurntable visor={visor} customScene={customScene} apiRef={turntableApi} />
 
       <section className="cg-panel">
         <h2>{props.title ?? 'Who are you?'}</h2>

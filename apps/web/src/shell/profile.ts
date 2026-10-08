@@ -38,6 +38,8 @@ export interface Profile {
   readonly tournament: TournamentState | null;
   /** How the mouse and the view feel (Settings, Controls). */
   readonly controls: Controls;
+  /** First person (body hidden) or third person over the shoulder in Play. */
+  readonly cameraView?: 'first' | 'third';
 }
 
 /** Mouse and view settings: a preset like everything else (Settings shows it in the inspector). */
@@ -77,7 +79,7 @@ export function showTier(renderer: ThreeRenderer, tier: Quality, own: Params): v
 export const tierInUse = (): Quality | null => tierSeen;
 
 const KEY = 'hm.profile.v2';
-export const DEFAULT_PROFILE: Profile = { name: 'Goblin', credits: 500, grownUp: true, tutorialDone: false, style: 'voxel', skin: 'flat', favIslands: [], quality: 'auto', fpsTarget: 60, graphics: {}, gpu: 'fast', activities: ActivityRegistry.withDefaults().all(), tournament: null, controls: DEFAULT_CONTROLS };
+export const DEFAULT_PROFILE: Profile = { name: 'Goblin', credits: 500, grownUp: true, tutorialDone: false, style: 'voxel', skin: 'flat', favIslands: [], quality: 'auto', fpsTarget: 60, graphics: {}, gpu: 'fast', activities: ActivityRegistry.withDefaults().all(), tournament: null, controls: DEFAULT_CONTROLS, cameraView: 'first' };
 
 export function loadProfile(): Profile {
   try {
@@ -93,7 +95,8 @@ export function loadProfile(): Profile {
     const favIslands = Array.isArray(raw.favIslands) ? raw.favIslands.filter((x): x is string => typeof x === 'string').slice(0, 40) : [];
     // before style and detail were two choices, PBR meant the painted ground: keep what each player saw
     const style = raw.style === 'voxel' || raw.style === 'painted' ? raw.style : raw.skin === 'pbr' ? 'painted' : 'voxel';
-    return { ...DEFAULT_PROFILE, ...raw, favIslands, groundLooks: looks, style, skin: raw.skin === 'pbr' ? 'pbr' : 'flat', quality: parseQuality(raw.quality) ?? 'auto', gpu, fpsTarget: parseFpsTarget(raw.fpsTarget), graphics, activities: acts, tournament: t ? t.toJSON() : null, controls: normalizeControls(raw.controls) } as Profile;
+    const cameraView: 'first' | 'third' = raw.cameraView === 'third' ? 'third' : 'first';
+    return { ...DEFAULT_PROFILE, ...raw, favIslands, groundLooks: looks, style, skin: raw.skin === 'pbr' ? 'pbr' : 'flat', quality: parseQuality(raw.quality) ?? 'auto', gpu, fpsTarget: parseFpsTarget(raw.fpsTarget), graphics, activities: acts, tournament: t ? t.toJSON() : null, controls: normalizeControls(raw.controls), cameraView } as Profile;
   } catch { return DEFAULT_PROFILE; }
 }
 export function saveProfile(p: Profile): void { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* storage unavailable */ } }

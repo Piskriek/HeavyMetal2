@@ -16,8 +16,11 @@ import * as kit from '@hm/labkit';
 import { createLabRoom, GATE_AT, POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, ROOM, type LabRoom } from './lab-room';
 import { createPlotHolo, type PlotHolo } from './plot-holo';
 import { COLOUR_MARK_FRAGMENT, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_VERTEX, POST_FRAGMENT, QUAD_VERTEX } from './portal-shaders';
-import { MACHINE_FIELD, METRIC_COLOUR, stepSync } from './quest';
+import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
 import { disposeProp, lineSpan, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
+import { createScientistInstance } from '../avatar/scientist/scientist-model';
+import { loadScientistAnimations, type ClipName } from '../avatar/scientist/anims-loader';
+import { createScientistAnimator, type OneShotKind, type ScientistAnimator } from '../avatar/scientist/animator';
 
 export type Where = 'lab' | 'planet';
 /** What the screen gives the scene each frame. */
@@ -108,6 +111,13 @@ export interface PlayScene {
   setDetail(d: Detail): void;
   /** Activity of the lab machines (bench writing, combiner mixing, rack cataloguing) for the lab plume. */
   setLabActivity(act: { readonly bench: number; readonly combiner: number; readonly rack: number }): void;
+  /** Sets first person (body hidden) or third person over the shoulder. */
+  setCameraView(mode: 'first' | 'third'): void;
+  getCameraView(): 'first' | 'third';
+  /** Plays a scientist one-shot animation action (lever, button, plant, cheer, wave, point). */
+  playAction(kind: OneShotKind): void;
+  /** Updates the scientist avatar appearance. */
+  setAvatar(avatar: PlayAvatar | null): void;
   /**
    * Compiles every shader the frames will need, for each place it draws, behind the loading bar: a compile mid-play is a hitch the
    * display governor would read as a slow machine (and the owner's rule is never to start a screen choppy).
@@ -122,6 +132,10 @@ export interface PlayScene {
     /** Machines standing on the plot, and how many pour pixels now. */
     machines(): { readonly standing: number; readonly pouring: number };
     holo(): { readonly visible: boolean; readonly machines: number };
+    view(): 'first' | 'third';
+    clipWeight(name: ClipName): number;
+    currentOneShot(): OneShotKind | null;
+    animator(): ScientistAnimator | null;
   };
   dispose(): void;
 }
@@ -130,6 +144,8 @@ export function createPlayScene(o: {
   readonly canvas: HTMLCanvasElement; readonly gridSpacing: number; readonly antialias: boolean; readonly powerPreference: WebGLPowerPreference; readonly reducedMotion: boolean; readonly textureSize: number;
   /** The size of the ground's material tiles (by the starting tier), and the live detail to start with. */
   readonly groundTexture: number; readonly detail: Detail;
+  readonly cameraView?: 'first' | 'third';
+  readonly avatar?: PlayAvatar | null;
 }): PlayScene {
   const renderer = new THREE.WebGLRenderer({ canvas: o.canvas, antialias: o.antialias, powerPreference: o.powerPreference });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -350,6 +366,33 @@ export function createPlayScene(o: {
   let pendingEvent: FrameOut['event'] = null;
   let clock = 0;
 
+  // ---- scientist character model & animation (TASK-07, POL-18)
+  let cameraView: 'first' | 'third' = o.cameraView ?? 'first';
+  let scientistAnimator: ScientistAnimator | null = null;
+  const scientistHolder = new THREE.Group();
+  scientistHolder.visible = cameraView === 'third';
+  labScene.add(scientistHolder);
+
+  let visorMaterials: THREE.MeshStandardMaterial[] = [];
+  const setVisorColor = (hex: string): void => {
+    const col = new THREE.Color(hex);
+    for (const mat of visorMaterials) {
+      mat.color.copy(col);
+      mat.emissive.copy(col);
+    }
+  };
+
+  const initialVisor = o.avatar?.kind === 'scientist' ? o.avatar.visor : '#f59e0b';
+  void Promise.all([createScientistInstance(initialVisor), loadScientistAnimations()]).then(
+    ([{ group, visorMaterials: vm }, clips]) => {
+      scientistHolder.add(group);
+      visorMaterials = vm;
+      scientistAnimator = createScientistAnimator(group, clips);
+    }
+  ).catch((err) => {
+    console.warn('Failed to load scientist in Play:', err);
+  });
+
   const syncPlanetMatrices = (): void => {
     twin.group.updateMatrixWorld(true);
     planetGateM = twin.group.matrixWorld.clone();
@@ -379,14 +422,71 @@ export function createPlayScene(o: {
     const M = next === 'planet' ? toPlanet : toLab;
     pos.applyMatrix4(M);
     yaw += next === 'planet' ? gateYawDelta : -gateYawDelta;
+    if (where !== next) {
+      if (next === 'planet') {
+        labScene.remove(scientistHolder);
+        planetScene.add(scientistHolder);
+      } else {
+        planetScene.remove(scientistHolder);
+        labScene.add(scientistHolder);
+      }
+    }
     where = next;
     pendingEvent = next === 'planet' ? 'to-planet' : 'to-lab';
     sfx('static-burst', { volume: 0.35 });
   };
 
+  /** Over-the-shoulder third-person camera raycast/collision clamping against lab walls, props, and ground. */
+  const resolveThirdPersonCamera = (head: THREE.Vector3, desired: THREE.Vector3, inWhere: Where): THREE.Vector3 => {
+    const result = desired.clone();
+    const dir = desired.clone().sub(head);
+    const maxDist = dir.length();
+    if (maxDist < 1e-4) return result;
+    dir.normalize();
+
+    let hitDist = maxDist;
+    const ray = new THREE.Ray(head, dir);
+    const hitPoint = new THREE.Vector3();
+
+    if (inWhere === 'lab') {
+      const margin = 0.32;
+      result.x = Math.max(ROOM.left + margin, Math.min(ROOM.right - margin, result.x));
+      result.y = Math.max(0.25 + margin, Math.min(ROOM.height - margin, result.y));
+      result.z = Math.max(ROOM.back + margin, Math.min(ROOM.front - margin, result.z));
+      hitDist = Math.min(hitDist, result.distanceTo(head));
+
+      const colBox = new THREE.Box3();
+      for (const b of room.colliders) {
+        colBox.min.set(b.min[0] - 0.25, b.min[1] - 0.25, b.min[2] - 0.25);
+        colBox.max.set(b.max[0] + 0.25, b.max[1] + 0.25, b.max[2] + 0.25);
+        if (ray.intersectBox(colBox, hitPoint)) {
+          const d = head.distanceTo(hitPoint);
+          if (d < hitDist) {
+            hitDist = Math.max(0.4, d - 0.1);
+          }
+        }
+      }
+      result.copy(head).addScaledVector(dir, hitDist);
+    } else {
+      for (let t = 0.3; t <= maxDist; t += 0.35) {
+        const p = head.clone().addScaledVector(dir, t);
+        const gy = groundAt(p.x, p.z) + 0.35;
+        if (p.y < gy) {
+          hitDist = Math.min(hitDist, Math.max(0.4, t - 0.2));
+          break;
+        }
+      }
+      result.copy(head).addScaledVector(dir, hitDist);
+      const groundMin = groundAt(result.x, result.z) + 0.35;
+      if (result.y < groundMin) result.y = groundMin;
+    }
+
+    return result;
+  };
+
   const aimGround = (): THREE.Vector3 | null => {
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-    const p = camera.position.clone();
+    const p = pos.clone();
     for (let d = 1; d < 36; d += 0.25) {
       const q = p.clone().addScaledVector(dir, d);
       if (q.y <= groundAt(q.x, q.z)) return q;
@@ -475,6 +575,17 @@ export function createPlayScene(o: {
       ground?.setStage(Math.max(1, stage));
       fitLooks();
       propStage = stage <= 1 ? 1 : 6;
+      if (where === 'lab') {
+        if (scientistHolder.parent !== labScene) {
+          planetScene.remove(scientistHolder);
+          labScene.add(scientistHolder);
+        }
+      } else {
+        if (scientistHolder.parent !== planetScene) {
+          labScene.remove(scientistHolder);
+          planetScene.add(scientistHolder);
+        }
+      }
       api.setPlot(s.plot, s.running, s.connected);
       holo.setPlot(s.plot, s.running, s.connected);
       // a restored plot's machines are already running: their pixels show at once
@@ -517,6 +628,7 @@ export function createPlayScene(o: {
       powerT = 0;
       relaysHeard = 0;
       sfx('lever-throw');
+      scientistAnimator?.playOneShot('lever');
     },
     setBuilding(kind, check) {
       const k = kind && where === 'planet' ? kind : null;
@@ -533,6 +645,7 @@ export function createPlayScene(o: {
     },
     raiseStage(to, from) {
       if (to <= stage) return;
+      scientistAnimator?.playOneShot('cheer');
       // a wave still running is overtaken: the stage it was bringing shows at once
       if (waveTo >= 0) shown = waveTo;
       stage = to;
@@ -608,8 +721,35 @@ export function createPlayScene(o: {
         building = false; if (ghost) ghost.group.visible = false;
         pendingEvent = 'sync-lost';
       }
-      // ---- the camera
-      camera.position.copy(pos);
+      // ---- character model & animator (TASK-07, POL-18)
+      scientistHolder.position.set(pos.x, pos.y - EYE, pos.z);
+      scientistHolder.rotation.set(0, yaw + Math.PI, 0);
+      scientistHolder.visible = cameraView === 'third';
+
+      if (scientistAnimator) {
+        scientistAnimator.update(dt, {
+          forward: c.move.z,
+          strafe: c.move.x,
+          run: c.run,
+          jumping: false,
+        });
+      }
+
+      // ---- the camera (first person or over-the-shoulder third person)
+      if (cameraView === 'third') {
+        const camRot = new THREE.Euler(pitch, yaw, 0, 'YXZ');
+        const rightVec = new THREE.Vector3(1, 0, 0).applyEuler(camRot);
+        const upVec = new THREE.Vector3(0, 1, 0).applyEuler(camRot);
+        const backVec = new THREE.Vector3(0, 0, 1).applyEuler(camRot);
+        const desiredPos = pos.clone()
+          .addScaledVector(rightVec, 0.38)
+          .addScaledVector(upVec, 0.12)
+          .addScaledVector(backVec, 2.2);
+        const clampedPos = resolveThirdPersonCamera(pos, desiredPos, where);
+        camera.position.copy(clampedPos);
+      } else {
+        camera.position.copy(pos);
+      }
       camera.rotation.set(pitch, yaw, 0, 'YXZ');
       camera.updateMatrixWorld(true);
       // ---- the build ghost
@@ -681,7 +821,7 @@ export function createPlayScene(o: {
         const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
         let best = 6;
         for (const v of views.values()) {
-          const c = new THREE.Vector3(v.m.x, groundAt(v.m.x, v.m.z) + 1.0, v.m.z).sub(camera.position);
+          const c = new THREE.Vector3(v.m.x, groundAt(v.m.x, v.m.z) + 1.0, v.m.z).sub(pos);
           const t = c.dot(dir);
           if (t <= 0 || t >= best) continue;
           if (c.addScaledVector(dir, -t).length() < KINDS[v.m.kind].radius + 0.4) { best = t; aimed = v.m.id; }
@@ -692,7 +832,7 @@ export function createPlayScene(o: {
       let aimedLab: LabMachineKind | null = null;
       if (where === 'lab') {
         const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-        const to = room.leverAt.clone().sub(camera.position);
+        const to = room.leverAt.clone().sub(pos);
         const atConsole = to.length() < 2.4 && to.normalize().dot(dir) > 0.86;
         if (!gateOn && powerT < 0) {
           atLever = atConsole;
@@ -705,8 +845,8 @@ export function createPlayScene(o: {
           ['combiner', new THREE.Vector3(9.1, 0.9, -0.6), 1.0, 3.5],
         ];
         let bestLab = 4.5;
-        for (const [kind, pos, radius, maxDist] of targets) {
-          const c = pos.clone().sub(camera.position);
+        for (const [kind, targetPos, radius, maxDist] of targets) {
+          const c = targetPos.clone().sub(pos);
           const t = c.dot(dir);
           if (t <= 0 || t >= bestLab || t > maxDist) continue;
           if (c.addScaledVector(dir, -t).length() < radius + 0.35) {
@@ -744,6 +884,17 @@ export function createPlayScene(o: {
       labPlume.setDensity(d.plumeDensity);
     },
     setLabActivity,
+    setCameraView(mode) {
+      cameraView = mode;
+      scientistHolder.visible = (mode === 'third');
+    },
+    getCameraView: () => cameraView,
+    playAction(kind) {
+      scientistAnimator?.playOneShot(kind);
+    },
+    setAvatar(avatar) {
+      if (avatar?.kind === 'scientist') setVisorColor(avatar.visor);
+    },
     warm() {
       // each scene for each place it draws to (the screen's colour space differs from the targets'), hidden things included (the
       // plume's three ways), with one of every machine standing in, and again in the ghost's marks: what first appears mid-play is
@@ -768,6 +919,13 @@ export function createPlayScene(o: {
       position: () => pos.clone(),
       teleport(w, x, z, y, p) {
         if (where !== w) {
+          if (w === 'planet') {
+            labScene.remove(scientistHolder);
+            planetScene.add(scientistHolder);
+          } else {
+            planetScene.remove(scientistHolder);
+            labScene.add(scientistHolder);
+          }
           pendingEvent = w === 'planet' ? 'to-planet' : 'to-lab';
         }
         where = w; pos.set(x, w === 'lab' ? EYE : groundAt(x, z) + EYE, z); yaw = y; if (p !== undefined) pitch = p;
@@ -779,8 +937,15 @@ export function createPlayScene(o: {
       detail: () => ({ ...detail, planet: [postUniforms.uRes.value.x, postUniforms.uRes.value.y] as const, pixels: plume.stats().pixels }),
       machines: () => { let pouring = 0; for (const v of views.values()) if (v.emitter !== null) pouring++; return { standing: views.size, pouring }; },
       holo: () => holo.debug(),
+      view: () => cameraView,
+      clipWeight: (name: ClipName) => scientistAnimator?.getClipWeight(name) ?? 0,
+      currentOneShot: () => scientistAnimator?.currentOneShot ?? null,
+      animator: () => scientistAnimator,
     },
     dispose() {
+      scientistAnimator?.dispose();
+      labScene.remove(scientistHolder);
+      planetScene.remove(scientistHolder);
       for (const v of views.values()) unbuild(v);
       for (const c of cables) c.geometry.dispose();
       dropGhost();

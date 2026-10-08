@@ -126,5 +126,6 @@ export default defineConfig(({ mode }) => ({
       '@hm/plotcodec': p('../../packages/plotcodec/src/index.ts'),
     },
   },
-  build: { target: 'es2022', outDir: 'dist', emptyOutDir: true },
+  assetsInclude: ['**/*.fbx', '**/*.bin'],
+  build: { target: 'es2022', outDir: 'dist', emptyOutDir: true, assetsInlineLimit: 100_000_000 },
 }));

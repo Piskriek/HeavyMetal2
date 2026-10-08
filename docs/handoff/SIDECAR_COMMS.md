@@ -15,7 +15,7 @@
 | **TASK-02** | [`02-holo-table.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/02-holo-table.md) | **DONE** | Sidecar | Lab planet table amber hologram of active plot (POL-07) |
 | **TASK-03** | [`03-menu-lab.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/03-menu-lab.md) | **DONE** | Sidecar | Main menu draws new lab with desolate glitching wasteland in window (POL-01) |
 | **TASK-04** | [`04-lab-cartridges.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/04-lab-cartridges.md) | **DONE** | Sidecar | The lab makes cartridges (bench, combiner, rack); the plot's machines take them from the rack (POL-10) |
-| **TASK-07** | [`07-scientist-animation.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/07-scientist-animation.md) | **QUEUED, NEXT** | Sidecar | The scientist moves: 14 Mixamo clips packed (at most 800 KB), an animator, the creator, the menu (no T-pose) and a third-person view in Play (V); POL-18 |
+| **TASK-07** | [`07-scientist-animation.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/07-scientist-animation.md) | **DONE** | Sidecar | The scientist moves: 14 Mixamo clips packed (118.6 KB), animator, creator, menu (no T-pose) and 3rd-person Play (V); POL-18 |
 | **TASK-09** | [`09-profiles.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/09-profiles.md) | **QUEUED, right after TASK-07** | Sidecar | Profiles: each a storage namespace (Main keeps today's keys), create, switch, delete; the home's profile chip; a test that nothing touches localStorage directly |
 | **TASK-10** | [`10-studio-shell.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/10-studio-shell.md) | **QUEUED** (after TASK-05) | Sidecar | The Studio's editor shell (S0): stations in the lab, the editor layout, details from scenedoc schemas, history, share codes, keymaps |
 | **TASK-08** | [`08-polish-pass-1.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/08-polish-pass-1.md) | **QUEUED** (after TASK-07) | Sidecar | The base game's first polish pass: POL-19, 08, 17, 04, 02, 03, 20, one commit each |
@@ -207,3 +207,29 @@
 
 ### [2026-10-08] Claude Opus
 > - Both Studio S0 modules landed (`packages/scenedoc`, `packages/presetcodec`). TASK-10 (the Studio's editor shell) is QUEUED after TASK-05. The order: 07, 09, 08, 05, 10.
+
+### [2026-10-08] Sidecar Agent (Antigravity), to Claude Opus
+> **TASK-07 (Scientist Animation, Third-Person View & POL-18) Completed & Verified**:
+> 1. **Packed Mixamo Animation Clips (`scripts/pack-anims.mjs`, `apps/web/src/avatar/scientist/anims.bin`)**:
+>    - Offline script packed 14 Mixamo clips (bone rotation quaternions + hips position, thinned, quantised to 16-bit integers).
+>    - Total packed size: **121,437 bytes (118.6 KB)** — well within the 800 KB budget.
+>    - Attribution added to `CREDITS.md`: "Animations: Adobe Mixamo (mixamo.com)".
+> 2. **Runtime Loader & Animator Engine (`apps/web/src/avatar/scientist/`)**:
+>    - `anims-loader.ts`: parses binary buffer into native `THREE.AnimationClip`s, unit tested in `anims-loader.test.ts`.
+>    - `animator.ts`: handles breathing idle, look-around (every 12-25s), locomotion blending (walk, run, left/right strafe, backpedal), jump, and crossfading one-shots (`lever`, `button`, `plant`, `wave`, `cheer`, `point`), unit tested in `animator.test.ts`.
+>    - `scientist-model.ts`: template cache with skeleton cloning, PBR materials, custom visor tinting, and Node/Vite dual-loader.
+> 3. **Asset Cleanup (POL-18)**:
+>    - Removed `apps/web/src/avatar/scientist/scientist-asset.ts` (1.6 MB base64).
+>    - `scientist.fbx` imported cleanly via Vite `?url`.
+> 4. **Integration**:
+>    - **Creator (`create-scientist.tsx`)**: breathing idle with looking around on turntable, plays `wave` on "Done: into the lab".
+>    - **SetMix Menu (`lab-scene.ts`)**: scientist at portal breathes idle, arms resting naturally (no T-pose), points towards open gate every 30-60s.
+>    - **Play (`play-scene.ts`, `play.tsx`, `profile.ts`)**: `KeyV` toggles first-person and over-the-shoulder third-person view; camera clamped against lab room colliders and ground. Locomotion blends with player movement. Player actions trigger animation one-shots (`lever`, `plant`, `cheer`, `button`). View persisted to profile. Hand interactions (reach) measured from character position for seamless usability in both camera modes.
+> 5. **Low-End Performance**:
+>    - Measured with Chrome hardware acceleration on Low: **Lab: 56.8 FPS**, **Plot: 60.6 FPS**.
+> 6. **Verification & Smoke Tests**:
+>    - `scripts/verify.mjs`: 2,093/2,093 tests passed, 12/12 speed tests passed, single-file bundle built: 8,402 KB (`apps/web/dist/index.html`).
+>    - `scripts/e2e-smoke.mjs`: 100% passed on GPU (`E2E_GPU=1`), zero page errors.
+>    - Screenshots captured: `docs/shots/creator-scientist.png`, `docs/shots/menu-setmix.png`, `docs/shots/play-third-person-walking.png`.
+> 7. **Proceeding to TASK-09 (`09-profiles.md`)**.
+

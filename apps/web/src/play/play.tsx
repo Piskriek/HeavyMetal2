@@ -7,12 +7,14 @@ import { deviceFor, type Stage } from '@hm/fidelity';
 import { VAULT, VAULT_BY_ID } from '@hm/vault';
 import { createAdaptiveQuality, parseQuality, type Quality } from '@hm/game';
 import { pixelRatioFor, resolveGraphics, type GraphicsSettings } from '@hm/render';
-import { noteTier, powerPreferenceOf, type Profile } from '../shell/profile';
+import { noteTier, powerPreferenceOf, saveProfile, type Profile } from '../shell/profile';
 import { tierFor } from '../crafter/crafter';
 import { bakeLookCached } from '../crafter/looks';
 import type { Plot } from '../crafter/planet';
 import { SMOOTH_IDS, smoothModel } from '../crafter/smooth-models';
 import { CreateScientist } from '../avatar/create-scientist';
+import type { ClipName } from '../avatar/scientist/anims-loader';
+import type { OneShotKind } from '../avatar/scientist/animator';
 import { createPlayScene, type Detail, type FrameOut, type LabMachineKind, type PlayScene } from './play-scene';
 import { canPlace, KINDS, level, METRICS, network, place, rates, remove as removeMachine, running, setCartridge, setOn, step as stepPlot, type Env, type MachineKind, type Metric, type PlotState } from '@hm/plotsim';
 import {
@@ -73,7 +75,7 @@ const BLURB: Readonly<Record<MachineKind, string>> = {
   water: 'Condenses water from gravel: cyan pixels.',
 };
 const signed = (v: number): string => `${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
-const KEYS: readonly [string, string][] = [['W A S D', 'walk'], ['Mouse', 'look'], ['Shift', 'run'], ['E', 'use'], ['B', 'build'], ['Esc', 'pause']];
+const KEYS: readonly [string, string][] = [['W A S D', 'walk'], ['Mouse', 'look'], ['Shift', 'run'], ['V', 'view'], ['E', 'use'], ['B', 'build'], ['Esc', 'pause']];
 
 export function PlayScreen(props: { readonly profile: Profile; readonly onBack: () => void }): ReactElement {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -191,7 +193,18 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
     noteTier(tier);
     let scene: PlayScene;
     try {
-      scene = createPlayScene({ canvas, gridSpacing, antialias: !low, powerPreference: powerPreferenceOf(props.profile.gpu), reducedMotion: reduced, textureSize: low ? 512 : 1024, groundTexture: low ? 128 : 256, detail: detailOf(graphics, tier) });
+      scene = createPlayScene({
+        canvas,
+        gridSpacing,
+        antialias: !low,
+        powerPreference: powerPreferenceOf(props.profile.gpu),
+        reducedMotion: reduced,
+        textureSize: low ? 512 : 1024,
+        groundTexture: low ? 128 : 256,
+        detail: detailOf(graphics, tier),
+        cameraView: props.profile.cameraView ?? 'first',
+        avatar: stateRef.current.avatar,
+      });
     } catch {
       setFailed(true);
       return undefined;
@@ -239,6 +252,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       commit(withPlot(stateRef.current, after));
       scene.setPlot(after, running(after, env), network(after, env).connected);
       fx('mill-start');
+      scene.playAction('plant');
       if (after.stage > before.stage) scene.raiseStage(after.stage, { x, z });
       return true;
     };
@@ -417,6 +431,17 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       openDial: () => { openDialRef.current?.(); },
       dial: (code: string) => (dialRef.current ? dialRef.current(code).ok : false),
       visiting: () => (visitingRef.current ? visitingRef.current.snapshot.owner : null),
+      view: () => scene.debug.view(),
+      toggleView: () => {
+        const next = scene.debug.view() === 'first' ? 'third' : 'first';
+        scene.setCameraView(next);
+        saveProfile({ ...props.profile, cameraView: next });
+        return next;
+      },
+      clipWeight: (name: ClipName) => scene.debug.clipWeight(name),
+      currentOneShot: () => scene.debug.currentOneShot(),
+      animator: () => scene.debug.animator(),
+      playAction: (kind: OneShotKind) => scene.playAction(kind),
     });
     setLoading(steps[0]![0]);
     timer = window.setTimeout(step, 30);
@@ -461,7 +486,11 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
   const stopBuilding = useCallback(() => { setBuilding(null); sceneRef.current?.setBuilding(null); }, []);
   /** Frees the mouse for a menu without pausing the game. */
   const freeMouse = useCallback(() => { if (document.pointerLockElement) { quietRef.current = true; document.exitPointerLock(); } }, []);
-  const openDial = useCallback(() => { setDialOpen(true); freeMouse(); }, [freeMouse]);
+  const openDial = useCallback(() => {
+    sceneRef.current?.playAction('button');
+    setDialOpen(true);
+    freeMouse();
+  }, [freeMouse]);
   openDialRef.current = openDial;
   /** Changes the plot from a menu: the plot, the save and the scene follow at once. */
   const changePlot = useCallback((next: PlotState) => {
@@ -483,12 +512,31 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
         return;
       }
       if (paused) return;
+      if (e.code === 'KeyV') {
+        const current = sceneRef.current?.getCameraView() ?? 'first';
+        const next = current === 'first' ? 'third' : 'first';
+        sceneRef.current?.setCameraView(next);
+        saveProfile({ ...props.profile, cameraView: next });
+        say(next === 'third' ? 'Third-person view' : 'First-person view');
+        return;
+      }
       if (e.code === 'KeyE') {
         if (building) placeNow();
         else if (hud.atLever) sceneRef.current?.pullLever();
-        else if (hud.atDial && !dialOpen) { setDialOpen(true); freeMouse(); }
-        else if (hud.where === 'planet' && hud.aimed !== null && panel === null) { setPanel(hud.aimed); setMenu(false); freeMouse(); }
-        else if (hud.where === 'lab' && hud.aimedLab !== null && labPanel === null) { setLabPanel(hud.aimedLab); freeMouse(); }
+        else if (hud.atDial && !dialOpen) {
+          sceneRef.current?.playAction('button');
+          setDialOpen(true);
+          freeMouse();
+        } else if (hud.where === 'planet' && hud.aimed !== null && panel === null) {
+          sceneRef.current?.playAction('button');
+          setPanel(hud.aimed);
+          setMenu(false);
+          freeMouse();
+        } else if (hud.where === 'lab' && hud.aimedLab !== null && labPanel === null) {
+          sceneRef.current?.playAction('button');
+          setLabPanel(hud.aimedLab);
+          freeMouse();
+        }
       }
       if (e.code === 'KeyB' && hud.where === 'planet') {
         if (visitingRef.current) {
@@ -500,7 +548,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [ready, creating, building, menu, panel, labPanel, dialOpen, locked, paused, hud.atLever, hud.atDial, hud.aimed, hud.aimedLab, hud.where, placeNow, stopBuilding, freeMouse, say]);
+  }, [ready, creating, building, menu, panel, labPanel, dialOpen, locked, paused, hud.atLever, hud.atDial, hud.aimed, hud.aimedLab, hud.where, placeNow, stopBuilding, freeMouse, say, props.profile]);
   useEffect(() => {
     const onClick = (): void => { if (building && locked) placeNow(); };
     window.addEventListener('mousedown', onClick);
@@ -537,7 +585,11 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       {ready && creating ? (
         <div className="play-create">
           <CreateScientist inLab title="Who are you?" doneLabel="Done: into the lab"
-            onDone={(avatar) => { commit(created(stateRef.current, avatar)); say('Turn on the gate', 'The console with the big lever stands in front of it.'); }}
+            onDone={(avatar) => {
+              commit(created(stateRef.current, avatar));
+              sceneRef.current?.setAvatar(avatar);
+              say('Turn on the gate', 'The console with the big lever stands in front of it.');
+            }}
             onBack={props.onBack} />
         </div>
       ) : null}

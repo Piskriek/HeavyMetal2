@@ -53,9 +53,9 @@ const NEIGHBOURS: readonly Plot[] = ([
 ] as const).map(([name, deg, dist, r, cartridge, stage]) => ({ name, r, cartridge, stage, x: Math.cos((deg * Math.PI) / 180) * dist, z: Math.sin((deg * Math.PI) / 180) * dist }));
 
 /** The ground's triangles by tier (the display governor changes it as you play). */
-const GROUND_BUDGET: Readonly<Record<Quality, number>> = { potato: 60000, low: 90000, medium: 200000, high: 200000, ultra: 280000 };
+const GROUND_BUDGET: Readonly<Record<Quality, number>> = { potato: 60000, low: 75000, medium: 200000, high: 200000, ultra: 280000 };
 /** The most lines the planet is drawn at by tier: the later stages' resolution is capped on the light tiers, so they hold their frame rate. */
-const PLANET_LINES: Readonly<Record<Quality, number>> = { potato: 480, low: 720, medium: 1080, high: 1e5, ultra: 1e5 };
+const PLANET_LINES: Readonly<Record<Quality, number>> = { potato: 360, low: 480, medium: 1080, high: 1e5, ultra: 1e5 };
 const detailOf = (g: GraphicsSettings, q: Quality): Detail => ({ plumes: g.pixelPlumes, plumeDensity: g.plumeDensity, groundBudget: GROUND_BUDGET[q], planetLines: PLANET_LINES[q] });
 /** What each stage brings, for the toast when its wave has crossed the plot. */
 const STAGE_SAYS: readonly string[] = ['', 'Colour has reached your plot.', 'Shapes smooth out, textures sharpen.', 'Light: shading and a deeper sky.', 'Water and full detail.', 'Life takes hold.', 'Full fidelity: your plot is real.'];

@@ -913,6 +913,13 @@ try {
   check('raising to stage 2 rebuilds the twin gate at full detail', await dom(() => window.hmPlay.twinStage() === 6));
   await shot('twin-gate-stage-2');
 
+  // POL-04: stage 4 on Low tier caps planet resolution to 480 lines to hold 60 FPS
+  await dom(() => window.hmPlay.raise(4));
+  await page.waitForFunction(() => window.hmPlay.wave > 1e6, null, { timeout: T(40000) });
+  const detail4 = await dom(() => window.hmPlay.detail());
+  check('stage 4 on low tier caps planet lines to at most 480', detail4.planetLines <= 480 && detail4.planet[1] <= 480, JSON.stringify(detail4));
+  await shot('play-stage-4-low');
+
   // teleport back into the lab with the gate on, standing ~2 m away from the planet table looking at it (-z)
   await dom(() => window.hmPlay.go('lab', -3.6, -3.0, 0, -0.32));
   await page.waitForTimeout(T(300));

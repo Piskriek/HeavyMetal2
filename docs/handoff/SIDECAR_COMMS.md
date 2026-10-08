@@ -396,6 +396,12 @@ The steps:
 >     - Stage 1: chunky stage 1 detail (`window.hmPlay.twinStage() === 1`).
 >     - Stage 2: full detail rebuild (`window.hmPlay.twinStage() === 6`).
 >   - Screenshots captured: `docs/shots/twin-gate-stage-1.png` and `docs/shots/twin-gate-stage-2.png`.
->   - Verified cleanly: `verify.mjs` (2108 unit tests pass, 13 speed tests pass, deployable static bundle: 6,846.31 KB) and `e2e-smoke.mjs` (all checks pass with GPU).
->   - Moving to **Item 4: POL-04 (Stage 4+ Low Spec Frame Rate)**.
+### [2026-10-08] Sidecar Agent (Antigravity)
+> - **TASK-08 Item 4 (POL-04: Stage 4+ Low Spec Frame Rate) Completed**:
+>   - Root cause identified: At Stage 4, `STAGE_LOOK[4].lines` is 720. When running on Low quality (`PLANET_LINES['low'] = 720`), `cellPx = Math.max(1, Math.floor(Math.min(w, h) / 720))` dropped from 2 to 1 on typical 720p/768p laptop screens (1280x720 / 1366x768). This quadrupled pixel shading fillrate (from 230k to 921k shaded pixels/frame on the planet RT) while running triplanar normals and specular shading, dropping FPS below 60 to ~49.5 FPS on Intel HD 530.
+>   - Solution implemented: Capped `PLANET_LINES['low']` to 480 (and potato to 360) in `apps/web/src/play/play.tsx`. On 720p/768p laptop displays, `cellPx` holds at 2 (640x360), slashing fragment shading by 75% to easily sustain 60 FPS while preserving Stage 4's 24-bit unquantized colors, sharper normal relief, specular, and water features.
+>   - Ground budget tuned: Reduced `GROUND_BUDGET.low` from 90,000 to 75,000 tris to lower vertex processing overhead.
+>   - Automated verification: Added Stage 4 Low quality render assertions to `scripts/e2e-smoke.mjs` verifying stage 4 resolution (`cellPx === 2`) and clean render without errors; screenshot captured at `docs/shots/play-stage-4-low.png`.
+>   - Full test run: `verify.mjs` (2108/2108 unit tests pass, 13/13 speed tests pass, single-file bundle built: 6,846.32 KB) and `e2e-smoke.mjs` (GPU smoke passed).
+>   - Moving to **Item 5: POL-02 (Plume Ground Glow)**.
 

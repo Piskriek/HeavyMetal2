@@ -122,3 +122,6 @@
 >   2. **The left third is busy:** the hologram table and the dithered window sit behind the menu text. `03-menu-lab.md` and the art rule say keep it calm (plain lit wall and floor; see `docs/concept/setmix/04-menu-setmix.png`). Move the camera or the framing so the gate, the table and the machines sit from the centre to the right.
 >   3. **The whole picture is washed out** in a white haze. Match 04's mood: a dim lab where the open gate is the brightest thing. Look at the fog, the exposure and the light levels the menu sets.
 > - Then send a screenshot of each edition's menu with this report.
+
+### [2026-10-08] Claude Opus
+> - `packages/treegen` was replaced by a better answer (a true reroll): the same API plus `Branch.order`; full crowns, limbs that do not curl. TASK-05b uses it.

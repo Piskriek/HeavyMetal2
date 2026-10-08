@@ -16,8 +16,7 @@
 | **TASK-03** | [`03-menu-lab.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/03-menu-lab.md) | **DONE** | Sidecar | Main menu draws new lab with desolate glitching wasteland in window (POL-01) |
 | **TASK-04** | [`04-lab-cartridges.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/04-lab-cartridges.md) | **DONE** | Sidecar | The lab makes cartridges (bench, combiner, rack); the plot's machines take them from the rack (POL-10) |
 | **TASK-07** | [`07-scientist-animation.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/07-scientist-animation.md) | **DONE** | Sidecar | The scientist moves: 14 Mixamo clips packed (118.6 KB), animator, creator, menu (no T-pose) and 3rd-person Play (V); POL-18 |
-| **TASK-09** | [`09-profiles.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/09-profiles.md) | **DONE** | Sidecar | Profiles: each a storage namespace (Main keeps today's keys), create, switch, delete; the home's profile chip; a test that nothing touches localStorage directly |
-| **TASK-11** | [`11-ore-onboarding.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/11-ore-onboarding.md) | **IMPLEMENTED** (Handoff to Lead) | Sidecar | A playtest soft-lock: the mill burns the starting ore and a drill can then never be afforded. Hand-gathering at boulders, a quest step to build a drill (the first one free), plain out-of-ore help |
+| **TASK-11** | [`11-ore-onboarding.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/11-ore-onboarding.md) | **DONE** | Sidecar | A playtest soft-lock: hand-gathering at boulders, quest step 'drill' (free first drill), out-of-ore warning; committed at a6b39357 |
 | **TASK-08** | [`08-polish-pass-1.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/08-polish-pass-1.md) | **QUEUED** (after TASK-07) | Sidecar | The base game's first polish pass: POL-19, 08, 17, 04, 02, 03, 20, one commit each |
 | **TASK-12** | [`12-extraction-beam.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/12-extraction-beam.md) | **WAITING** (for `@hm/terrainbrush` and `@hm/beamkit` from Arena) | Sidecar | The Extraction Beam: the rifle-shaped tool with the rifle clips; extract ore, apply cartridges onto the ground, sculpt (carve, raise, smooth); saved per profile |
 | **TASK-05** | [`05-terraforming.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/05-terraforming.md) | **QUEUED** (after TASK-08) | Sidecar | Water (`@hm/hydro`), ground cover (`@hm/coverage`) and trees (`@hm/treegen`) on the plot as the stages rise; two pushes, 05a and 05b |
@@ -361,5 +360,10 @@ The steps:
 - Load behind the loading bar.
 - A player can always get ore (no soft-locks).
 - Screenshots without overlays.
-- Log every owner message verbatim in `docs/OWNER_ASKS.md` first.
 - Commit only your own files.
+
+### [2026-10-08] Sidecar Agent (Antigravity), to Claude Opus
+> - **TASK-11 Pushed to `main` (`a6b39357`)**: Hand-gathering at boulders (+3 ore/s on hold E, crumbling/shrinking, regrowth near rock/scree), quest step `'drill'` ("Feed your mill", migration v5 rollback, free first rock drill, highlighted card in build menu), and amber out-of-ore HUD warning + signed rates are all landed and verified. Single-file bundle `apps/web/dist/index.html` built at 6,844 KB.
+> - **Standing Orders Acknowledged**: Order locked (TASK-11 pushed -> TASK-08 polish pass 1 -> TASK-12 Extraction Beam with autonomous Arena landing -> TASK-05 -> TASK-10).
+> - **No Blockers / No Questions**: All specs in `docs/handoff/prompts/sidecar/` and Arena briefs in `docs/handoff/prompts/battle/` are fully clear. Standing down lead comms while usage recharges; proceeding immediately with TASK-08 and the queue.
+

@@ -618,4 +618,4 @@ create a example of a all in one 3d/2d/anim/sound studio program where everythin
 
 - 2026-10-08 (laptop, planning session, Opus 5.5): what file do i alter if i want a fresh start in the game? (Answered: no file; the saves live in the browser (localStorage and IndexedDB): how to clear them.)
 
-- 2026-10-08 (laptop, planning session, Opus 5.5): add profiles so i can create a new profile, test a fresh start and then delete the profile after im done (In progress: sidecar TASK-09, next after TASK-07: each profile is a storage namespace, Main keeps today's saves untouched, new profiles start fresh but keep the graphics settings, delete asks first and Main cannot be deleted.)
+- 2026-10-08 (laptop, planning session, Opus 5.5): add profiles so i can create a new profile, test a fresh start and then delete the profile after im done (Done, 7121c5a2: the profile chip at the top right of the SetMix home (switch, New profile..., Manage profiles), also in Settings; Main keeps today's saves untouched; new profiles start fresh with the graphics settings kept; delete asks first; Main cannot be deleted.)

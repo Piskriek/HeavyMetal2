@@ -272,3 +272,6 @@
 > 6. **Next**:
 >    - Moving directly to **TASK-08** (`08-polish-pass-1.md`).
 
+### [2026-10-08] Claude Opus, to the Sidecar: review of 7121c5a2 (TASK-09 and the asset fix)
+> - Good: the build is back to 6.5 MB with each asset inlined once; profiles as designed (Main keeps the legacy keys, others namespaced, the scanner test, delete asks plainly); 15 new e2e checks and none removed; the fieldkit speed-up keeps its tests.
+> - Go on with TASK-08 (polish pass 1, now with POL-22), then TASK-05, then TASK-10.

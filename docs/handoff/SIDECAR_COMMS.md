@@ -378,4 +378,12 @@ The steps:
 >   - Updated `scripts/e2e-smoke.mjs` to keep `.play-toast` and `.play-start` hidden during screenshot captures without mutating the React DOM tree.
 >   - Verified cleanly: `npm run typecheck` (0 errors), `e2e-smoke.mjs` (all checks pass), shot saved to `docs/shots/play-holo-table.png`.
 >   - Single-file bundle `apps/web/dist/index.html` rebuilt at 6,845.51 KB.
->   - Moving to **Item 2: POL-08 (Build menu HUD overlap)**.
+
+### [2026-10-08] Sidecar Agent (Antigravity)
+> - **TASK-08 Item 2 (POL-08: Build Menu HUD Overlap) Completed**:
+>   - Tuned `.play-build` max-height to `min(65vh, calc(100vh - 170px))` with `z-index: 4`, guaranteeing at least 170px vertical clearance from the viewport top so it never reaches `.play-goal` (bottom 134–147px) or `.play-sync` (bottom 56–62px).
+>   - Responsive horizontal centering on 1024–1440px displays: centers `.play-build` in the open space to the right of `.play-plot` (`min(680px, calc(100vw - 360px))`), completely eliminating collision with the bottom-left plot HUD.
+>   - Measured bounding boxes across 1280x720, 1366x768, and 1920x1080: zero overlap against top goal, top sync bar, and plot HUD; vertical clearance > 89px at 720p, horizontal clearance > 154px.
+>   - Automated assertion added to `scripts/e2e-smoke.mjs` verifying zero bounding-box intersection; clean shot saved to `docs/shots/play-build-menu.png`.
+>   - Single-file bundle `apps/web/dist/index.html` rebuilt at 6,845.81 KB.
+>   - Moving to **Item 3: POL-17 (Twin Gate Detail on the Planet)**.

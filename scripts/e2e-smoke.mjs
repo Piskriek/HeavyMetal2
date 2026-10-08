@@ -797,6 +797,17 @@ try {
   check('both pixel machines pour their pixels', await dom(() => window.hmPlay.machines().pouring === 2 && window.hmPlay.machines().standing === 3));
   await page.keyboard.press('KeyB');
   check('the build menu lists the seven machines, the later ones locked', await dom(() => document.querySelectorAll('.play-card').length === 7 && document.querySelectorAll('.play-card.shut').length === 2));
+  const buildOverlap = await dom(() => {
+    const build = document.querySelector('.play-build')?.getBoundingClientRect();
+    const sync = document.querySelector('.play-sync')?.getBoundingClientRect();
+    const goal = document.querySelector('.play-goal')?.getBoundingClientRect();
+    const plot = document.querySelector('.play-plot')?.getBoundingClientRect();
+    if (!build) return false;
+    const hits = (a, b) => b && !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom);
+    return hits(build, sync) || hits(build, goal) || hits(build, plot);
+  });
+  check('the build menu does not overlap the top HUD or plot HUD', !buildOverlap);
+  await shot('play-build-menu');
   await page.keyboard.press('KeyB');
   check('the plot HUD shows ore, power and the four levels', await dom(() => /ore/.test(document.querySelector('.play-ore')?.textContent ?? '') && document.querySelectorAll('.play-levels li').length === 4));
 

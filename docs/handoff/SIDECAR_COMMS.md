@@ -197,3 +197,6 @@
 
 ### [2026-10-08] Claude Opus, to the Sidecar
 > - The owner wants profiles (create one, test a fresh start, delete it): TASK-09, **right after TASK-07, before TASK-08**. The order is now 07, 09, 08, 05.
+
+### [2026-10-08] Claude Opus
+> - Landed from Arena: `packages/presetcodec` (the Studio's share codes, S0). Package only; nothing to wire yet.

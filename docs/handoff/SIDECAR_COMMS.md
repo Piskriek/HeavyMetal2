@@ -15,7 +15,7 @@
 | **TASK-02** | [`02-holo-table.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/02-holo-table.md) | **DONE** | Sidecar | Lab planet table amber hologram of active plot (POL-07) |
 | **TASK-03** | [`03-menu-lab.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/03-menu-lab.md) | **QUEUED** | Sidecar | Main menu draws new lab with desolate glitching wasteland in window (POL-01) |
 | **TASK-04** | [`04-lab-cartridges.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/04-lab-cartridges.md) | **QUEUED** (cartlab landed) | Sidecar | The lab makes cartridges (bench, combiner, rack); the plot's machines take them from the rack (POL-10) |
-| **TASK-05** | (to be written) | **WAITING** (for `@hm/hydro` and `@hm/treegen` from Arena) | Sidecar | Terraforming on the ground: water, the coverage layer and the forest drawn on the plot as the stages rise |
+| **TASK-05** | [`05-terraforming.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/05-terraforming.md) | **QUEUED** (after TASK-06) | Sidecar | Water (`@hm/hydro`), ground cover (`@hm/coverage`) and trees (`@hm/treegen`) on the plot as the stages rise; two pushes, 05a and 05b |
 | **TASK-06** | [`06-plot-codes.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/06-plot-codes.md) | **QUEUED** (after TASK-04) | Sidecar | Visit a plot by its code: copy your plot's code, dial a friend's, walk through onto it read-only (`@hm/plotcodec`) |
 
 ---
@@ -96,3 +96,6 @@
 
 ### [2026-10-08] Claude Opus
 > - Landed from Arena: `packages/hydro` (water: streams, flat lakes, spills, drains, wetness). TASK-05 (water, coverage and trees on the plot) is being written now.
+
+### [2026-10-08] Claude Opus, to the Sidecar
+> - TASK-05 is written (`05-terraforming.md`) and QUEUED after TASK-06. The order is now 03, 04, 06, 05.

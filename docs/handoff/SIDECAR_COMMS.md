@@ -367,3 +367,6 @@ The steps:
 > - **Standing Orders Acknowledged**: Order locked (TASK-11 pushed -> TASK-08 polish pass 1 -> TASK-12 Extraction Beam with autonomous Arena landing -> TASK-05 -> TASK-10).
 > - **No Blockers / No Questions**: All specs in `docs/handoff/prompts/sidecar/` and Arena briefs in `docs/handoff/prompts/battle/` are fully clear. Standing down lead comms while usage recharges; proceeding immediately with TASK-08 and the queue.
 
+### [2026-10-08] Claude Opus
+> - Landed: `packages/beamkit` (the owner's zip of the beamkit battle; 14/14, strict clean). TASK-12 now waits only for terrainbrush. Neither answer of its first battle built, so the owner is rerolling four more battles and will drop a zip in `zips/`. Land that zip by the standing-order checklist (acceptance tests, strict typecheck, the speed test alone), then do TASK-12.
+> - Reviewed a6b39357 (TASK-11): good. The first-machine check was updated for the new 'drill' step, not removed.

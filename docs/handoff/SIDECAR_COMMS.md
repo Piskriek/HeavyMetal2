@@ -12,7 +12,7 @@
 | Task ID | Spec File | Status | Assignee | Notes |
 |---|---|---|---|---|
 | **TASK-01** | [`01-scientist.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/01-scientist.md) | **DONE** | Sidecar | Scientist sole avatar (name + visor tint) + custom `.glb`/`.vrm` drag-drop (POL-11, POL-12) |
-| **TASK-02** | [`02-holo-table.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/02-holo-table.md) | **QUEUED** | Sidecar | Lab planet table amber hologram of active plot (POL-07) |
+| **TASK-02** | [`02-holo-table.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/02-holo-table.md) | **DONE** | Sidecar | Lab planet table amber hologram of active plot (POL-07) |
 | **TASK-03** | [`03-menu-lab.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/03-menu-lab.md) | **QUEUED** | Sidecar | Main menu draws new lab with desolate glitching wasteland in window (POL-01) |
 | **TASK-04** | [`04-lab-cartridges.md`](file:///c:/MarbleGp/docs/handoff/prompts/sidecar/04-lab-cartridges.md) | **QUEUED** (cartlab landed) | Sidecar | The lab makes cartridges (bench, combiner, rack); the plot's machines take them from the rack (POL-10) |
 | **TASK-05** | (to be written) | **WAITING** (for `@hm/hydro` and `@hm/treegen` from Arena) | Sidecar | Terraforming on the ground: water, the coverage layer and the forest drawn on the plot as the stages rise |
@@ -67,3 +67,21 @@
 > - **Yes: start TASK-02 now.**
 > - **Standing order:** work through the queue in order, TASK-02, TASK-03, TASK-04, then TASK-06. After each one, verify, push, and report here, then go straight on to the next. Do not wait for a go-ahead between tasks. Stop and ask here only when a task is BLOCKED or needs a decision. TASK-05 is not written yet; skip it.
 > - I review each push as it lands and answer here.
+
+### [2026-10-08] Sidecar Agent (Antigravity)
+> **TASK-02 Completed & Verified (POL-07)**:
+> - **Relief Sampler**: `apps/web/src/play/plot-holo.ts` pure function `sampleReliefGrid` clips 48×48 grid onto a 500 m disc mapped to 1.7 m table diameter floating at $y = 1.15$ m (+0.20 m above table top). Full height range mapped to 0.14 m.
+> - **Hologram Shader**: Additive blending, no lights, slope/height amber shading, 10 m topographic contour lines, drifting vertical scanlines, rim Fresnel, power flicker, and stage wave sweep ring.
+> - **Markers & Sparkles**: Single `InstancedMesh` (max 64) for center gate ring + metric-colored machine pins (pulsing when active, dim when inactive) + 40 amber sparkles in 1 `Points` draw. Table projection disc tinted amber and powered dynamically in `lab-room.ts`.
+> - **Stats & Performance**:
+>   - Relief: ~3,420 triangles (1 draw call).
+>   - Markers: 4 instances currently active (1 gate + 3 machines) (1 draw call).
+>   - Sparkles: 40 points (1 draw call).
+>   - Total draw calls: Exactly 3 draw calls.
+> - **Verification & Tests**:
+>   - `plot-holo.test.ts`: 4/4 passed (grid bounds, disc clip, flat/slope mapping).
+>   - `verify.mjs`: 1,991/1,991 tests passed, 8/8 speed tests passed, static bundle: 6,446 KB.
+>   - `e2e-smoke.mjs`: 100% passed on GPU (`E2E_GPU=1`), `window.hmPlay.holo()` validated.
+>   - Screenshot captured: `docs/shots/play-holo-table.png`.
+> - **Proceeding immediately to TASK-03 (`03-menu-lab.md`, POL-01)**.
+

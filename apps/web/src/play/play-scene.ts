@@ -14,6 +14,7 @@ import { createPlotGround, type PlotGround } from './plot-ground';
 import { fx as sfx } from '../maker/feedback';
 import * as kit from '@hm/labkit';
 import { createLabRoom, GATE_AT, POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, ROOM, type LabRoom } from './lab-room';
+import { createPlotHolo, type PlotHolo } from './plot-holo';
 import { COLOUR_MARK_FRAGMENT, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_VERTEX, POST_FRAGMENT, QUAD_VERTEX } from './portal-shaders';
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync } from './quest';
 import { disposeProp, lineSpan, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
@@ -112,6 +113,7 @@ export interface PlayScene {
     detail(): Detail & { readonly planet: readonly [number, number]; readonly pixels: number };
     /** Machines standing on the plot, and how many pour pixels now. */
     machines(): { readonly standing: number; readonly pouring: number };
+    holo(): { readonly visible: boolean; readonly machines: number };
   };
   dispose(): void;
 }
@@ -145,6 +147,9 @@ export function createPlayScene(o: {
   const labScene = new THREE.Scene();
   const room: LabRoom = createLabRoom({ textureSize: o.textureSize, portalMaterial: openingMat });
   labScene.add(room.group);
+  const holo: PlotHolo = createPlotHolo();
+  room.group.add(holo.group);
+  holo.group.position.set(-3.6, 0, -5.2);
   const pmrem = keep(new THREE.PMREMGenerator(renderer));
   const roomEnv = new RoomEnvironment();
   labScene.environment = keep(pmrem.fromScene(roomEnv, 0.04).texture);
@@ -417,6 +422,7 @@ export function createPlayScene(o: {
       twin.group.position.set(0, gy, 0);
       syncPlanetMatrices();
       g.update(0, 0, true);
+      holo.build(g, { x: 0, z: 0 });
     },
     restore(s) {
       gateOn = s.gateOn;
@@ -429,6 +435,7 @@ export function createPlayScene(o: {
       fitLooks();
       propStage = stage <= 1 ? 1 : 6;
       api.setPlot(s.plot, s.running, s.connected);
+      holo.setPlot(s.plot, s.running, s.connected);
       // a restored plot's machines are already running: their pixels show at once
       for (const v of views.values()) if (v.emitter !== null) { plume.remove(v.emitter); v.emitter = null; }
       for (const v of views.values()) {
@@ -443,6 +450,7 @@ export function createPlayScene(o: {
       for (const mm of plot.machines) if (!views.has(mm.id)) { views.set(mm.id, build(mm)); changed = true; }
       const sameNet = connected.size === lastConnected.size && [...connected].every((id) => lastConnected.has(id));
       if (changed || !sameNet) { relay(connected); lastConnected = new Set(connected); }
+      holo.setPlot(plot, running, connected);
       // pixels pour from every pixel machine while it runs; lamps show which run
       for (const v of views.values()) {
         const r = running.get(v.m.id) ?? 0;
@@ -592,6 +600,8 @@ export function createPlayScene(o: {
       postUniforms.uLost.value = Math.max(0, 1 - (now - lostAt) / 0.6);
       openingUniforms.uTime.value = now;
       room.update(now, dt);
+      const mainPower = powerT >= 0 ? powerAt(powerT).main : (gateOn ? 1 : 0);
+      holo.update(now, dt, mainPower, waveTo >= 0 ? r : -1);
       // the ground's chunks follow you on the planet; from the lab, they stay round the gate
       ground?.update(where === 'planet' ? pos.x : 0, where === 'planet' ? pos.z : 0);
       labScene.environmentIntensity = room.envLevel();
@@ -682,6 +692,7 @@ export function createPlayScene(o: {
       renderer.compile(planetScene, camera);
       renderer.setRenderTarget(null);
       for (const p of stand) { planetScene.remove(p.group); p.group.traverse((obj) => { const mesh = obj as THREE.Mesh; if (mesh.isMesh) mesh.geometry.dispose(); }); }
+      holo.warm(renderer, camera);
     },
     debug: {
       groundTriangles: () => ground?.triangles() ?? 0,
@@ -695,6 +706,7 @@ export function createPlayScene(o: {
       gatePlanet: () => ({ x: twin.group.position.x, z: twin.group.position.z }),
       detail: () => ({ ...detail, planet: [postUniforms.uRes.value.x, postUniforms.uRes.value.y] as const, pixels: plume.stats().pixels }),
       machines: () => { let pouring = 0; for (const v of views.values()) if (v.emitter !== null) pouring++; return { standing: views.size, pouring }; },
+      holo: () => holo.debug(),
     },
     dispose() {
       for (const v of views.values()) unbuild(v);
@@ -702,6 +714,7 @@ export function createPlayScene(o: {
       dropGhost();
       world?.dispose();
       ground?.dispose();
+      holo.dispose();
       room.dispose();
       for (const x of owned) x.dispose();
       for (const mat of Object.values(m)) (mat as THREE.Material).dispose();

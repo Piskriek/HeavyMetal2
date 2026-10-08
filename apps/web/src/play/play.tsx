@@ -233,6 +233,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       state: () => stateRef.current,
       detail: () => scene.debug.detail(),
       raise: (to: number) => scene.raiseStage(to, scene.debug.gatePlanet()),
+      holo: () => scene.debug.holo(),
     });
     setLoading(steps[0]![0]);
     timer = window.setTimeout(step, 30);

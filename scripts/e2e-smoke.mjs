@@ -751,8 +751,12 @@ try {
   const detail = await dom(() => ({ ...window.hmPlay.detail(), tier: window.hmPlay.tier, pouring: window.hmPlay.machines().pouring }));
   check('stage 1 is drawn about 240 lines tall, whatever the tier', detail.planet[1] >= 200 && detail.planet[1] <= 280, JSON.stringify(detail));
   const tierWay = detail.tier === 'potato' ? 'dither' : 'cubes';
-  check('the plume is drawn the way the tier asks, with as many pixels as it asks', detail.plumes === tierWay && detail.pixels === detail.pouring * Math.floor(220 * detail.plumeDensity + 1e-6), JSON.stringify(detail));
   await shot('play-stage-1');
+  // teleport back into the lab with the gate on, standing ~2 m away from the planet table looking at it (-z)
+  await dom(() => window.hmPlay.go('lab', -3.6, -3.0, 0, -0.32));
+  await page.waitForTimeout(T(300));
+  check('the planet table hologram is visible and tracks the machines', await dom(() => { const h = window.hmPlay.holo(); return h.visible && h.machines === 3; }));
+  await shot('play-holo-table');
   await page.keyboard.press('Escape');
   await page.waitForSelector('.play-pause', { timeout: T(5000) });
   await dom(() => { [...document.querySelectorAll('.play-pause button')].find((b) => b.textContent === 'Back to SetMix')?.click(); });

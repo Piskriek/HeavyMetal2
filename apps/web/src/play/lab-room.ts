@@ -191,7 +191,17 @@ export function createLabRoom(o: { readonly textureSize: number; readonly portal
   const boxes = [place(kit.controlBox(m), 4.75, ROOM.back + 0.55), place(kit.controlBox(m), 9.2, ROOM.back + 0.55)];
   const desk = kit.operatorConsole(m);
   place(desk, 1.35, -6.2);
-  place(kit.planetTable(m), -3.6, -5.2);
+  const pTable = place(kit.planetTable(m), -3.6, -5.2);
+  const tableDisc = pTable.lamps[0];
+  if (tableDisc) {
+    tableDisc.material = keep(new THREE.MeshStandardMaterial({
+      color: '#332200',
+      emissive: new THREE.Color('#ff8811'),
+      emissiveIntensity: 0,
+      roughness: 0.15,
+      metalness: 0.1,
+    }));
+  }
   place(kit.presetRack(m), ROOM.left + 0.45, -5.5, Math.PI / 2);
   place(kit.presetBench(m), ROOM.right - 0.75, -3.4, -Math.PI / 2);
   place(kit.presetCombiner(m), ROOM.right - 0.9, -0.6, -Math.PI / 2);
@@ -240,6 +250,10 @@ export function createLabRoom(o: { readonly textureSize: number; readonly portal
     // the console is the one thing lit on emergency power
     lamps.desk.forEach((l) => kit.setLamp(l, 1));
     gate.coils.forEach((c, i) => kit.setLamp(c, p.coils * 3 > Math.floor(i / 2) ? Math.min(1, p.coils * 3 - Math.floor(i / 2)) : 0));
+    if (tableDisc && tableDisc.material instanceof THREE.MeshStandardMaterial) {
+      tableDisc.material.emissiveIntensity = p.main * 1.4;
+    }
+    pTable.lamps.slice(1).forEach((l) => kit.setLamp(l, p.main > 0.5 ? 1 : 0));
     pulseUniforms.uPower.value = p.pulse;
     stripMat.emissiveIntensity = p.main * 2.2;
     mainLamp.intensity = p.main * 14;

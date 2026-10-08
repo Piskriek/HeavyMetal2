@@ -935,6 +935,22 @@ try {
   await dom(() => window.hmPlay.setPlumeGlow(false));
   await page.waitForTimeout(T(200));
   check('disabling plume ground glow hides the glow meshes', await dom(() => window.hmPlay.plumeGlowCount() === 0));
+
+  // POL-03: ultra pixel lighting casts dynamic point light from pouring pixels
+  // Step in front of the texture mill to show dynamic pixel lighting on the machine and its surroundings
+  await dom(() => { const g = window.hmPlay.gate(); window.hmPlay.go('planet', g.x + 7.0, g.z + 2.5, Math.PI, -0.2); });
+  await page.waitForTimeout(T(300));
+  check('on low tier pixel lighting is off by default', await dom(() => window.hmPlay.pixelLightCount() === 0));
+  await shot('pixel-light-off');
+
+  await dom(() => window.hmPlay.setPixelLights(true));
+  await page.waitForTimeout(T(300));
+  check('enabling pixel lights creates dynamic point lights for pouring machines', await dom(() => window.hmPlay.pixelLightCount() > 0));
+  await shot('pixel-light-on');
+
+  await dom(() => window.hmPlay.setPixelLights(false));
+  await page.waitForTimeout(T(200));
+  check('disabling pixel lights turns off machine point lights', await dom(() => window.hmPlay.pixelLightCount() === 0));
   await page.keyboard.press('KeyV');
 
   // teleport back into the lab with the gate on, standing ~2 m away from the planet table looking at it (-z)

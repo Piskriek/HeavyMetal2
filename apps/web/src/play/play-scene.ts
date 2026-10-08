@@ -62,6 +62,8 @@ export interface Detail {
   readonly planetLines: number;
   /** A soft coloured glow on the ground under each pouring machine. */
   readonly plumeGlow: boolean;
+  /** Pouring pixels cast dynamic light on their surroundings (Ultra only). */
+  readonly pixelLights: boolean;
 }
 
 const EYE = 1.68, RADIUS = 0.3, WALK = 3.0, RUN = 5.6;
@@ -147,6 +149,7 @@ export interface PlayScene {
     boulders(): readonly BoulderInfo[];
     twinStage(): number;
     plumeGlowCount(): number;
+    pixelLightCount(): number;
   };
   dispose(): void;
 }
@@ -262,7 +265,7 @@ export function createPlayScene(o: {
 
   // ---- the plot's machines (`@hm/plotsim`): each a prop (machine-props.ts) on the ground, its cable from the node that powers it,
   // the lines between pylons, and the pixels pouring from every pixel machine that runs (one plume for all, `@hm/plume`)
-  interface MachineView { readonly m: Machine; prop: MachineProp; vent: THREE.Vector3 | null; emitter: number | null; running: number; glow: THREE.Mesh | null }
+  interface MachineView { readonly m: Machine; prop: MachineProp; vent: THREE.Vector3 | null; emitter: number | null; running: number; glow: THREE.Mesh | null; light: THREE.PointLight | null }
   const views = new Map<number, MachineView>();
   let cables: THREE.Mesh[] = [];
   /** The detail the props are built at: chunky low poly until the plot shows stage 2. */
@@ -327,11 +330,19 @@ export function createPlayScene(o: {
     prop.light(0.1);
     const metric = PIXELS_OF[mm.kind];
     let glow: THREE.Mesh | null = null;
+    let light: THREE.PointLight | null = null;
     if (metric) {
       glow = makePlumeGroundGlow(mm.x, mm.z, METRIC_COLOUR[metric]);
       planetScene.add(glow);
+      if (prop.vent) {
+        const vPos = prop.vent.clone().applyMatrix4(prop.group.matrixWorld);
+        light = new THREE.PointLight(METRIC_COLOUR[metric], 0, 18, 1.2);
+        light.position.set(vPos.x, vPos.y + 1.2, vPos.z);
+        light.visible = false;
+        planetScene.add(light);
+      }
     }
-    return { m: mm, prop, vent: prop.vent ? prop.vent.clone().applyMatrix4(prop.group.matrixWorld) : null, emitter: null, running: 0, glow };
+    return { m: mm, prop, vent: prop.vent ? prop.vent.clone().applyMatrix4(prop.group.matrixWorld) : null, emitter: null, running: 0, glow, light };
   };
   const unbuild = (v: MachineView): void => {
     planetScene.remove(v.prop.group);
@@ -342,6 +353,11 @@ export function createPlayScene(o: {
       v.glow.geometry.dispose();
       (v.glow.material as THREE.Material).dispose();
       v.glow = null;
+    }
+    if (v.light) {
+      planetScene.remove(v.light);
+      v.light.dispose();
+      v.light = null;
     }
   };
   /** A cable lying on the ground from a to b (both world points). */
@@ -422,6 +438,10 @@ export function createPlayScene(o: {
       if (nv.glow) {
         nv.glow.visible = detail.plumeGlow && running > 0.05;
         setGlowStrength(nv.glow, Math.min(1.0, running) * 0.75);
+      }
+      if (nv.light) {
+        nv.light.visible = detail.pixelLights && running > 0.05;
+        nv.light.intensity = nv.light.visible ? running * 12.0 : 0;
       }
       views.set(id, nv);
     }
@@ -697,6 +717,10 @@ export function createPlayScene(o: {
           v.glow.visible = detail.plumeGlow && v.running > 0.05;
           setGlowStrength(v.glow, Math.min(1.0, v.running) * 0.75);
         }
+        if (v.light) {
+          v.light.visible = detail.pixelLights && v.running > 0.05;
+          v.light.intensity = v.light.visible ? v.running * 12.0 : 0;
+        }
       }
     },
     setPlot(plot, running, connected) {
@@ -715,6 +739,10 @@ export function createPlayScene(o: {
         if (v.glow) {
           v.glow.visible = detail.plumeGlow && r > 0.05;
           setGlowStrength(v.glow, Math.min(1.0, r) * 0.75);
+        }
+        if (v.light) {
+          v.light.visible = detail.pixelLights && r > 0.05;
+          v.light.intensity = v.light.visible ? r * 12.0 : 0;
         }
         const metric = PIXELS_OF[v.m.kind];
         if (!metric || !v.vent) continue;
@@ -877,6 +905,17 @@ export function createPlayScene(o: {
       for (const v of views.values()) {
         v.prop.animate(now, v.running);
         if (v.glow && v.glow.visible) setGlowTime(v.glow, now);
+        if (v.light && v.light.visible) {
+          const flicker = 0.88 + 0.12 * Math.sin(now * 8.5 + v.m.id * 2.7);
+          v.light.intensity = v.running * 12.0 * flicker;
+          if (v.vent) {
+            v.light.position.set(
+              v.vent.x + Math.sin(now * 2.5 + v.m.id) * 0.25,
+              v.vent.y + 1.2 + Math.cos(now * 3.0) * 0.18,
+              v.vent.z + Math.cos(now * 2.1 + v.m.id) * 0.25
+            );
+          }
+        }
       }
       // ---- the wave, and the event when it has crossed
       const wave = waveNow(), r = wave.r;
@@ -1015,6 +1054,10 @@ export function createPlayScene(o: {
       labPlume.setDensity(d.plumeDensity);
       for (const v of views.values()) {
         if (v.glow) v.glow.visible = detail.plumeGlow && v.running > 0.05;
+        if (v.light) {
+          v.light.visible = detail.pixelLights && v.running > 0.05;
+          v.light.intensity = v.light.visible ? v.running * 12.0 : 0;
+        }
       }
     },
     setLabActivity,
@@ -1090,6 +1133,11 @@ export function createPlayScene(o: {
       plumeGlowCount: () => {
         let count = 0;
         for (const v of views.values()) if (v.glow && v.glow.visible) count++;
+        return count;
+      },
+      pixelLightCount: () => {
+        let count = 0;
+        for (const v of views.values()) if (v.light && v.light.visible) count++;
         return count;
       },
     },

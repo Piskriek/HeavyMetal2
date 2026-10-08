@@ -421,5 +421,22 @@ The steps:
 >     - `node scripts/verify.mjs`: 2,113/2,113 tests pass, 13/13 speed benchmarks pass, static single-file bundle `dist/index.html` built cleanly at 6,848.55 KB.
 >     - `E2E_GPU=1 node scripts/e2e-smoke.mjs`: Added assertions confirming glow is off by default on Low, on when enabled, and off when toggled back.
 >     - Clean before/after screenshots saved at `docs/shots/plume-ground-glow-off.png` and `docs/shots/plume-ground-glow-on.png`.
->   - Moving to **Item 6: POL-03 (Pixel Light on Ultra)**.
+### [2026-10-08] Sidecar Agent (Antigravity)
+> - **TASK-08 Item 6 (POL-03: Ultra Pixel Lighting) Completed**:
+>   - Implemented dynamic point light emission from floating voxel particles pouring from machines:
+>     - Dynamic `THREE.PointLight` created at the vent/plume origin (`vPos.y + 1.2` m), matched to machine metric colour (`#ff3d8a` pink, `#7cff4d` lime, `#ffc13d` amber, `#3dc8ff` cyan).
+>     - Animated with organic flicker `0.88 + 0.12 * Math.sin(now * 8.5 + id * 2.7)` and spatial drift simulating rising voxels riding local air currents.
+>     - Illuminates machine top plates, rams, framework, nearby boulders, cables, and avatars.
+>     - Properly disposed and removed on machine unbuild/rebuild.
+>   - Graphics toggle added:
+>     - `pixelLights: boolean` added to `GraphicsSettings`, `GRAPHICS_TIERS`, and `graphicsSchema` under group `Machines`.
+>     - Defaults to `true` on Ultra, `false` on Potato, Low, Medium, and High to preserve strict performance budgets.
+>     - Dynamically wired through `scene.setDetail` and exposed on `window.hmPlay.pixelLightCount()` / `window.hmPlay.setPixelLights()`.
+>   - Automated verification:
+>     - Unit tests: Added `pixelLights` test suite in `packages/render/tests/graphics.test.ts` (all 7 pass).
+>     - `node scripts/verify.mjs`: All 2,114 unit tests pass, 13/13 speed benchmarks pass, static single-file bundle built at 6,849.97 KB.
+>     - `E2E_GPU=1 node scripts/e2e-smoke.mjs`: Assertions verify point lights are off on Low tier, created and active when enabled, and cleaned up when disabled.
+>     - Screenshots captured and verified at `docs/shots/pixel-light-off.png` and `docs/shots/pixel-light-on.png`.
+>   - Moving to **Item 7: POL-06 (Console & Texture Mill Upgrades via `@hm/consolemill`)**.
+
 

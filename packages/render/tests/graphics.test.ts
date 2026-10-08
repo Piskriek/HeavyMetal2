@@ -53,3 +53,9 @@ test('the plume ground glow: off on potato, low and medium, on on high and ultra
   assert.equal(resolveGraphics('low', { plumeGlow: true }).plumeGlow, true);
   assert.equal(resolveGraphics('ultra', { plumeGlow: false }).plumeGlow, false);
 });
+
+test('the pixel lights: off on potato, low, medium and high, on on ultra; your own wins', () => {
+  assert.deepEqual(['potato', 'low', 'medium', 'high', 'ultra'].map((x) => GRAPHICS_TIERS[x as 'low'].pixelLights), [false, false, false, false, true]);
+  assert.equal(resolveGraphics('low', { pixelLights: true }).pixelLights, true);
+  assert.equal(resolveGraphics('ultra', { pixelLights: false }).pixelLights, false);
+});

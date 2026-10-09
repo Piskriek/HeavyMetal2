@@ -1,5 +1,5 @@
 # V1.1 Game Onboarding & Narrative Start Plan
-> **Status**: PARKED FOR V1.1 PLANNING. To be revisited before any Goblin Racing takes place, when Claude Opus usage resets.
+> **Status**: EXPANDED INTO V2.0 MASTER PLAN. See **[`docs/V2_0_MASTER_PLAN.md`](file:///c:/MarbleGp/docs/V2_0_MASTER_PLAN.md)** for the complete roadmap including Monster Mash mob combat, lab armory, and bio-splicer integration.
 > **Origin**: Owner design message (2026-10-08).
 
 ---

@@ -69,18 +69,19 @@ The theme **Monster Mash** is deeply woven into the simulation lore:
 ---
 
 ### Act II: The Window & The Meta-Simulation Reveal
-4. **The Void Outside the Window**:
+4. **The Void Outside the Window & The Simulation Breakdown**:
    - Narrator: *"Look outside the observation window."*
    - Player walks to the glass: outside is a terrifying apocalyptic storm collapsing into a gravitational black-hole void in the sky.
    - Rendering fidelity degrades non-linearly toward the event horizon: crisp PBR in the foreground $\to$ digital glitch tearing $\to$ low dither $\to$ monochrome wireframe $\to$ pitch-black vortex.
+   - Narrator (Canonical Lore):  
+     > *"That's you if you didn't turn the power on just now. A simulation can't sustain simulations running inside of it. Our experiments created a bridge to feed more power to our digital creations... We only noticed when the fidelity started to change. Our creations were no longer bound to their simulated chains."*
+5. **The Shielded Lab & The Lunar Portal**:
    - Narrator:  
-     > *"That's you if you didn't turn the power on just now. The void appeared and started swallowing everything... Turns out we're living inside a simulation."*
-5. **Decoding the Simulation**:
-   - Narrator explains that humanity learned to decode and manipulate the simulation substrate using cartridges, spires, and studio tools.
+     > *"The good news is you figured out a way to fix it. This lab is shielded, and using the bridge technology we created a portal to the moon. If you can get those machines set up, that should allow us to start restoring the fidelity and hope it spreads to Earth before it's too late."*
 6. **Activating the Gate**:
-   - Narrator: *"The portal is ready, you just gotta flip the lever."*
+   - Narrator: *"The portal is ready, you just gotta flip the console lever."*
    - Player pulls the main console lever.
-   - The freestanding archway portal sputters dramatically, hums to life, and reveals the desolate, monochrome, low-dither Stage 0 plot on the other side.
+   - The freestanding archway portal sputters dramatically, hums to life, and reveals the desolate, monochrome, low-dither Stage 0 lunar plot on the other side.
 
 ---
 

@@ -40,6 +40,7 @@ import { FRESH, METRIC_COLOUR, METRIC_NAME, SAVE_KEY, arrived, created, isFreeDr
 import { encodePlot, decodePlot, plotOfSnapshot } from './plot-code';
 import type { Snapshot } from '@hm/plotcodec';
 import type { MobStatus, CombatStats } from './monster-mash-combat';
+import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import './play.css';
 
 /** Your plot's cartridge until the ground shader battle lands: sandy desert tones, the nearest in the vault to the concept art's stage 1. */
@@ -59,7 +60,15 @@ const GROUND_BUDGET: Readonly<Record<Quality, number>> = { potato: 60000, low: 7
 const PLANET_LINES: Readonly<Record<Quality, number>> = { potato: 360, low: 480, medium: 1080, high: 1e5, ultra: 1e5 };
 const detailOf = (g: GraphicsSettings, q: Quality): Detail => ({ plumes: g.pixelPlumes, plumeDensity: g.plumeDensity, groundBudget: GROUND_BUDGET[q], planetLines: PLANET_LINES[q], plumeGlow: g.plumeGlow, pixelLights: g.pixelLights });
 /** What each stage brings, for the toast when its wave has crossed the plot. */
-const STAGE_SAYS: readonly string[] = ['', 'Colour has reached your plot.', 'Shapes smooth out, textures sharpen.', 'Light: shading and a deeper sky.', 'Water and full detail.', 'Life takes hold.', 'Full fidelity: your plot is real.'];
+const STAGE_SAYS: readonly string[] = [
+  'Stage 0: 1-Bit Dither. Reality degraded; digital entities roam unbound.',
+  'Stage 1: 16-Color EGA. Colour reaches the moon; basic geometry stabilizes.',
+  'Stage 2: 256-Color VGA. Shapes smooth out; resolution wave gathers strength.',
+  'Stage 3: Lit Gouraud. Diffuse light returns; deeper sky over the craters.',
+  'Stage 4: Full PBR & Detail. High fidelity restored; spreading toward Earth.',
+  'Stage 5: Life takes hold across the planetary surface.',
+  'Stage 6: Full fidelity: reality is healed and stabilized.',
+];
 
 import { kv } from '../storage/profile-storage';
 
@@ -296,7 +305,14 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
     placeRef.current = tryPlace;
     const onKey = (e: KeyboardEvent, down: boolean): void => { if (down) keys.add(e.code); else keys.delete(e.code); };
     const kd = (e: KeyboardEvent) => onKey(e, true), ku = (e: KeyboardEvent) => onKey(e, false);
-    const onMove = (e: MouseEvent): void => { if (document.pointerLockElement === canvas) { dx += e.movementX; dy += e.movementY; } };
+    const realMove = lookFilter();
+    const onMove = (e: MouseEvent): void => {
+      if (document.pointerLockElement === canvas) {
+        if (!realMove(e.movementX, e.movementY)) return;
+        dx += e.movementX;
+        dy += e.movementY;
+      }
+    };
     const onMouseDown = (e: MouseEvent): void => {
       if (e.button === 0 && document.pointerLockElement === canvas) {
         if (scene.mash.isEquipped()) {
@@ -327,8 +343,8 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
         : { move: { x: 0, z: 0 }, look: { dx: 0, dy: 0 }, run: false });
       dx = 0; dy = 0;
       let s = stateRef.current;
-      if (out.event === 'powered') { s = poweredOn(s); say('The gate is on', 'Your plot is on the other side.'); }
-      if (out.event === 'to-planet') { if (!s.visited) say('Stage 0', 'Black and white, and barely there. Your sync is running down.'); s = arrived(s); }
+      if (out.event === 'powered') { s = poweredOn(s); say('Lunar Portal Online', 'Bridge technology stable. Step onto the moon to begin restoring the fidelity.'); }
+      if (out.event === 'to-planet') { if (!s.visited) say('Stage 0: Lunar Surface', 'Monochrome & degrading. Our digital creations broke their simulated chains—build the machines before the collapse reaches Earth!'); s = arrived(s); }
       if (out.event === 'to-lab') {
         s = returned(s);
         if (visitingRef.current) endVisit();
@@ -568,7 +584,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
   }, [ready, creating]);
   const lock = useCallback(() => {
     setPaused(false);
-    try { void canvasRef.current?.requestPointerLock()?.catch?.(() => undefined); } catch { /* no pointer lock here: keys still walk */ }
+    if (canvasRef.current) captureMouse(canvasRef.current);
   }, []);
 
   // ---- the keys that do things: E uses, B builds, Esc steps back
@@ -726,7 +742,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
             onDone={(avatar) => {
               commit(created(stateRef.current, avatar));
               sceneRef.current?.setAvatar(avatar);
-              say('Turn on the gate', 'The console with the big lever stands in front of it.');
+              say('Simulation Bridge Alert', 'The lab is shielded. A nested simulation broke down—pull the console lever to open the portal to the moon.');
             }}
             onBack={props.onBack} />
         </div>

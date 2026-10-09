@@ -1028,13 +1028,14 @@ export function createMonsterMashCombat(options: {
 
       // Orientation and billboarding:
       if (mob.kind === 'demon') {
+        mob.group.rotation.set(0, 0, 0);
         if (mob.state === 'death') {
           // Fallen flat on the ground as a horizontal plane
           mob.mesh.rotation.set(-Math.PI / 2, 0, 0);
           mob.mesh.position.y = 0.06;
           mob.healthBar.mesh.visible = false;
         } else {
-          // Standing upright with cylindrical yaw billboarding (no camera pitch tilt in 3rd person)
+          // Standing upright with cylindrical yaw billboarding facing camera
           mob.mesh.position.y = 1.1;
           const camDx = camera.position.x - mob.group.position.x;
           const camDz = camera.position.z - mob.group.position.z;
@@ -1124,9 +1125,11 @@ export function createMonsterMashCombat(options: {
           }
         }
       } else if (mob.state === 'chase') {
-        // Rotate towards player
+        // Rotate towards player (3D Ogro only; Demon billboarding faces camera)
         const targetYaw = Math.atan2(dx, dz);
-        mob.group.rotation.y = THREE.MathUtils.lerp(mob.group.rotation.y, targetYaw, Math.min(1, dt * 8));
+        if (mob.kind === 'ogro') {
+          mob.group.rotation.y = THREE.MathUtils.lerp(mob.group.rotation.y, targetYaw, Math.min(1, dt * 8));
+        }
 
         if (dist > 2.2) {
           // Walk towards player
@@ -1145,9 +1148,11 @@ export function createMonsterMashCombat(options: {
           }
         }
       } else if (mob.state === 'attack') {
-        // Face player while attacking
+        // Face player while attacking (3D Ogro only)
         const targetYaw = Math.atan2(dx, dz);
-        mob.group.rotation.y = THREE.MathUtils.lerp(mob.group.rotation.y, targetYaw, Math.min(1, dt * 8));
+        if (mob.kind === 'ogro') {
+          mob.group.rotation.y = THREE.MathUtils.lerp(mob.group.rotation.y, targetYaw, Math.min(1, dt * 8));
+        }
 
         if (dist > 2.8) {
           mob.state = 'chase';

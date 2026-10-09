@@ -19,6 +19,41 @@
 > *SetMix: The Resolution Crafter* is a first-person survival-crafting and engineering game combining the automation loops of ***The Planet Crafter***, the physical voxel engineering of ***Space Engineers***, and the seamless world-crossing of ***Portal***.  
 > The core hook: **Terraforming physically raises the graphic rendering fidelity of reality.**
 
+### The Canonical Story & Narrative Bible: The Nested Simulation Crisis
+> **"A simulation cannot sustain simulations running inside of it."**
+
+1. **The Origin of the Collapse**:
+   - For decades, humanity ran increasingly sophisticated digital simulations. To breathe true autonomy and life into these simulated worlds, researchers created **The Bridge**—an experimental quantum conduit designed to siphon raw physical computing power into our digital creations.
+   - We did not realize the existential cost until the boundary conditions began to tear: reality itself is a simulation, and *a simulation cannot sustain simulations running inside of it*.
+   - When the power threshold was breached, the rendering engine of reality began to fail. We only noticed when the fidelity of the world began to visually degrade: colors posterized into EGA/VGA palettes, geometric topology collapsed into low-poly meshes, and shadows vanished into 1-bit Bayer dither.
+2. **Breaking the Simulated Chains (The Monster Mash)**:
+   - As the containment substrate broke down, our digital creations were **no longer bound to their simulated chains**.
+   - Decades of digital history leaked across the rift: vintage 1990s retro shareware monsters (DOOM Demons, Quake Ogres, 2D sprites, MD2 morph meshes) manifested into physical space alongside native biological forms.
+3. **The Shielded Lab & The Lunar Portal**:
+   - The player's pristine white-room laboratory is among the last quantum-shielded enclaves on Earth, insulated from the entropic collapse outside the observation window.
+   - Using the reverse polarity of the bridge technology, you engineered an escape valve: a freestanding portal anchored to the vacuum of **the Moon**.
+4. **The Terraforming Mission**:
+   - You must step through the portal onto the desolate, low-fidelity lunar crater.
+   - Armed with tactical retro armaments and automated terraforming machines (Pixel Chimneys, Shape Presses, Light Amplifiers), your mission is to systematically reconstruct the four mathematical metrics of reality:
+     $$\mathbf{S} = (\text{Pxd}, \text{Vtx}, \text{Lx}, \text{Aq})$$
+   - Raising these metrics triggers outward-expanding radial resolution waves. If you can fully restore reality's fidelity on the moon, the mathematical resonance will spread through the bridge network back to Earth before the simulation permanently crashes into the void.
+
+### The Narrator Script (Lead Scientist Voice Lines)
+- **Wake-up / Emergency Power (Act I)**:
+  > *"Careful with that relay... You're the only one left in the shielded zone who can still do something about this. Power up the lab before the pocket collapses."*
+- **The Observation Window (Act II)**:
+  > *"Look outside the observation window. That storm? That's what happens when reality runs out of compute. A simulation can't sustain simulations running inside of it... We fed too much power to our digital creations, and now our creations are no longer bound to their simulated chains."*
+- **Activating the Gate (Act II)**:
+  > *"The good news is you figured out a way to fix it. This lab is shielded, and using the bridge technology we punched a portal straight to the moon. Pull the lever and let's see if the link holds."*
+- **Stepping Onto the Moon (Act III)**:
+  > *"Stage 0. Black and white, 1-bit Bayer dither, barely holding together. In these conditions your sync will drain fast. Get that first Shape Press down and start feeding the resolution loop."*
+- **Encountering the Mobs (Act IV)**:
+  > *"Perimeter alarm! The rift is leaking vintage shareware entities across the sector—Demons, Ogres, corrupted digital sprites! Grab the Combat Shotgun from the armory rack and clear the landing zone!"*
+- **First Resolution Wave (Act IV–V)**:
+  > *"Look at the crater—the wave is spreading! Textures are sharpening, colors are returning. If we can push this all the way to Stage 4, the resonance will propagate through the bridge all the way back to Earth before it's too late!"*
+
+---
+
 ### The Dual-World Loop
 1. **The White Room Lab**:
    - The player wakes in a high-tech pristine lab. In the wall is a seamless *Star Trek* archway portal. Through the opening lies a desolate, low-poly moon surrounded by stars.

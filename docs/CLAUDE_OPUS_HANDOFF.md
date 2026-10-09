@@ -144,7 +144,38 @@ scripts/
 
 ---
 
-## 5. IMMEDIATE ACTION PLAN FOR CLAUDE OPUS
+## 5. ARENA.AI OPERATING PROCEDURES (TRUNCATED) & DRIFT GUARDS
+> ⚠️ **CRITICAL: Keeping Each Other Honest & Focused**  
+> Claude has maximum reasoning capabilities, but high reasoning can lead to tunnel-vision drift (e.g. attempting to code heavy algorithms in-session instead of delegating to Arena, forgetting frontend design craft, or attempting to draw crude SVG vector art). Keep these rules pinned:
+
+### Truncated Arena.ai Operating Procedure
+- **Division of Labor**: Heavy, self-contained TypeScript packages are built by **Arena.ai Battle AIs**; Claude designs the interfaces, writes the glue, builds UI windows, connects schemas, and integrates e2e.
+- **Operating Rules**:
+  - Maximum 2 battles running concurrently (captcha limits).
+  - Prompts must stay under ~5,000 characters.
+  - Strict pure TypeScript (`noUncheckedIndexedAccess`, zero DOM, zero `Date.now()`, zero `Math.random()`).
+  - Delivery via reply route: `scripts/arena-recv.mjs` on `127.0.0.1:8791` writes files directly to `arena-out/<pkg>/`.
+- **Full Reference**: When launching or managing battles, consult [`docs/ARENA_PLAN.md`](file:///c:/MarbleGp/docs/ARENA_PLAN.md) and [`docs/handoff/CATCHUP.md`](file:///c:/MarbleGp/docs/handoff/CATCHUP.md).
+
+### The Four Cardinal Drift Guards
+1. **DRIFT GUARD 1: Concept Art (NO VECTOR / SVG ART)**:
+   - **NEVER draw vector graphic (SVG) concept art.** If you feel the urge to hand-code an SVG picture, STOP.
+   - Concept art is created by **Arena.ai Codex / Art agents** (prompt template: [`docs/prompts/arena-setmix-concept-art.md`](file:///c:/MarbleGp/docs/prompts/arena-setmix-concept-art.md)).
+   - Claude reviews, coordinates, and builds 3D assets to match Arena's concept art.
+2. **DRIFT GUARD 2: Load Frontend Design Skills (`/frontend`)**:
+   - Claude's deep reasoning can cause him to overlook UI polish. **Never ship raw unstyled DOM or browser default controls.**
+   - Explicitly invoke frontend design skills: rich dark-mode palettes, glassmorphism, glowing HUD telemetry, clean typography (Inter / Outfit), fluid transitions, and responsive layouts.
+3. **DRIFT GUARD 3: Respect Owner Asks & Avoid Feature Hallucinations**:
+   - Cross-check features against verbatim owner directives in [`docs/OWNER_ASKS.md`](file:///c:/MarbleGp/docs/OWNER_ASKS.md).
+   - No unprompted chimneys or floating abstract geometry. Machines must feel grounded, logical, and spew colorful pixel plumes while operating.
+4. **DRIFT GUARD 4: Current Branch & Spike State**:
+   - Current active branch: `feat/monster-mash-exploration`.
+   - Verified live: `@hm/shareware` (WAD & MD2 parsers, multi-stage shaders), Ogro terrain elevation (`mesh.position.y = 1.444`), Demon transparent cutout & cylindrical billboarding (always faces camera, collapses flat on ground when dead), mouse pointer-lock freeze eliminated via `lookFilter()` and `captureMouse()`.
+   - Always run verification gates: `npm run typecheck`, `npm test --workspace=@hm/shareware`, `npm run build`, `node scripts/test-planet-monstermash.mjs`.
+
+---
+
+## 6. IMMEDIATE ACTION PLAN FOR CLAUDE OPUS
 
 When you take over, execute the following roadmap:
 
@@ -170,6 +201,6 @@ Apply the 6-line patch from [`texgraph-patch.ts`](file:///c:/MarbleGp/zips/extra
 
 ---
 
-## 6. FINAL DIRECTIVE
+## 7. FINAL DIRECTIVE
 *Remember the architect's constitution:*  
 **"The planet's save state is four floats: Pxd, Vtx, Lx, Aq. Everything else in twelve thousand lines is a pure function of those four numbers and a content-hashed preset graph. Build the stage-transition sweep first. Defend purity like a load-bearing wall. Go build it."**

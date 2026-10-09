@@ -586,6 +586,7 @@ export function createMonsterMashCombat(options: {
         const tex = new THREE.CanvasTexture(canvas);
         tex.magFilter = THREE.NearestFilter;
         tex.minFilter = THREE.NearestFilter;
+        tex.colorSpace = THREE.SRGBColorSpace;
         return tex;
       };
 
@@ -672,9 +673,12 @@ export function createMonsterMashCombat(options: {
         const material = createFidelityMobMaterial({ map: texture, stage });
         mesh.material = material;
 
-        // Scale Ogro to ~2.2m tall and stand upright on ground
+        // Scale Ogro and stand upright on ground
         mesh.scale.set(0.045, 0.045, 0.045);
         mesh.rotation.set(0, -Math.PI / 2, 0); // Stand upright (Y-up), face forward (+Z)
+        // Offset Y so feet are at ground level (y = 0) inside group
+        // MD2 model min.y is -32.093 units -> 32.093 * 0.045 = 1.4442m
+        mesh.position.y = 1.444;
 
         const group = new THREE.Group();
         group.add(mesh);
@@ -693,9 +697,9 @@ export function createMonsterMashCombat(options: {
         const y = groundHeightAt(x, z);
         group.position.set(x, y, z);
 
-        // Health bar
+        // Health bar positioned above Ogro's head (~3.9m)
         const healthBar = createHealthBarCanvas();
-        healthBar.mesh.position.set(0, 2.3, 0);
+        healthBar.mesh.position.set(0, 4.1, 0);
         group.add(healthBar.mesh);
         healthBar.update(100, 100, `OGRO #${mobId}`);
 
@@ -713,8 +717,8 @@ export function createMonsterMashCombat(options: {
           state: 'chase',
           stateTimer: 0,
           speed: 2.8,
-          hitRadius: 0.9,
-          height: 2.2,
+          hitRadius: 1.2,
+          height: 3.9,
           healthBar,
           material,
           painFlash: 0,
@@ -904,6 +908,12 @@ export function createMonsterMashCombat(options: {
           stats.mobsDefeated++;
           audio.playDeathRoar();
 
+          mob.healthBar.mesh.visible = false;
+          if (mob.kind === 'demon') {
+            mob.mesh.rotation.set(-Math.PI / 2, 0, 0);
+            mob.mesh.position.y = 0.06;
+          }
+
           if (mob.actions) {
             mob.actions.get('run')?.stop();
             mob.actions.get('attack')?.stop();
@@ -1016,10 +1026,29 @@ export function createMonsterMashCombat(options: {
         mob.mixer.update(dt);
       }
 
-      // Billboard orientation for Demon sprite and Health Bars
-      mob.healthBar.mesh.quaternion.copy(camera.quaternion);
+      // Orientation and billboarding:
       if (mob.kind === 'demon') {
-        mob.mesh.quaternion.copy(camera.quaternion);
+        if (mob.state === 'death') {
+          // Fallen flat on the ground as a horizontal plane
+          mob.mesh.rotation.set(-Math.PI / 2, 0, 0);
+          mob.mesh.position.y = 0.06;
+          mob.healthBar.mesh.visible = false;
+        } else {
+          // Standing upright with cylindrical yaw billboarding (no camera pitch tilt in 3rd person)
+          mob.mesh.position.y = 1.1;
+          const camDx = camera.position.x - mob.group.position.x;
+          const camDz = camera.position.z - mob.group.position.z;
+          mob.mesh.rotation.set(0, Math.atan2(camDx, camDz), 0);
+          mob.healthBar.mesh.quaternion.copy(camera.quaternion);
+          mob.healthBar.mesh.visible = true;
+        }
+      } else {
+        if (mob.state === 'death') {
+          mob.healthBar.mesh.visible = false;
+        } else {
+          mob.healthBar.mesh.quaternion.copy(camera.quaternion);
+          mob.healthBar.mesh.visible = true;
+        }
       }
 
       // Update DOOM Demon sprite sequences
@@ -1061,7 +1090,6 @@ export function createMonsterMashCombat(options: {
           const mat = mob.mesh.material as THREE.MeshStandardMaterial & { uniforms?: any };
           if (mat.map !== targetTex) {
             mat.map = targetTex;
-            mat.needsUpdate = true;
           }
           if (mat.uniforms?.uMap) {
             mat.uniforms.uMap.value = targetTex;

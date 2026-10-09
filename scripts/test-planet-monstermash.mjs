@@ -118,7 +118,23 @@ try {
   const mobCount = await page.locator('.mash-mob-card').count();
   console.log(`OK: Active mobs on planet: ${mobCount}`);
 
-  // Test Fidelity Stage Switcher Buttons
+  // Test Stage 0: 1-bit Dither
+  console.log('Testing Fidelity Stage 0: Dither...');
+  const ditherBtn = page.locator('button:has-text("0: Dither")');
+  await ditherBtn.click();
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: 'docs/shots/planet-mash-dither.png' });
+  console.log('Captured docs/shots/planet-mash-dither.png');
+
+  // Test Stage 4: PBR
+  console.log('Testing Fidelity Stage 4: PBR...');
+  const pbrBtn = page.locator('button:has-text("4: PBR")');
+  await pbrBtn.click();
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: 'docs/shots/planet-mash-pbr.png' });
+  console.log('Captured docs/shots/planet-mash-pbr.png');
+
+  // Test Fidelity Stage Switcher Buttons - Switch to Stage 2 (VGA)
   console.log('Testing Fidelity Stage buttons...');
   const vgaBtn = page.locator('button:has-text("2: VGA")');
   await vgaBtn.click();
@@ -129,12 +145,12 @@ try {
   await page.screenshot({ path: 'docs/shots/planet-mash-equipped.png' });
   console.log('Captured docs/shots/planet-mash-equipped.png');
 
-  // Fire the shotgun multiple times
+  // Fire the shotgun multiple times to inflict damage and kill
   console.log('Firing Combat Shotgun at monsters...');
   const fireBtn = page.locator('button:has-text("Fire Shotgun")');
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 9; i++) {
     await fireBtn.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(400);
   }
 
   // Check combat stats
@@ -147,7 +163,8 @@ try {
     console.log('OK: Shots fired verified:', stats.shotsFired);
   }
 
-  // Screenshot combat state
+  // Screenshot combat state and corpse
+  await page.waitForTimeout(600);
   await page.screenshot({ path: 'docs/shots/planet-mash-combat.png' });
   console.log('Captured docs/shots/planet-mash-combat.png');
 

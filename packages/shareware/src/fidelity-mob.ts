@@ -38,7 +38,7 @@ export type FidelityMobMaterial = THREE.MeshStandardMaterial & {
  */
 export function createFidelityMobMaterial(options: MobMaterialOptions = {}): FidelityMobMaterial {
   const stage = (options.stage ?? 4) as FidelityStage;
-  const emissive = options.emissiveColor ?? new THREE.Color(0xff2200);
+  const emissive = options.emissiveColor ?? new THREE.Color(0x000000);
   const emissiveIntensity = options.emissiveIntensity ?? 1.5;
 
   const mat = new THREE.MeshStandardMaterial({
@@ -46,6 +46,9 @@ export function createFidelityMobMaterial(options: MobMaterialOptions = {}): Fid
     roughness: 0.8,
     metalness: 0.1,
     side: THREE.DoubleSide,
+    alphaTest: 0.5,
+    transparent: true,
+    depthWrite: true,
   }) as FidelityMobMaterial;
 
   const uniforms = {
@@ -89,14 +92,17 @@ export function createFidelityMobMaterial(options: MobMaterialOptions = {}): Fid
       /* glsl */ `
       #include <dithering_fragment>
 
+      if (gl_FragColor.a < 0.5) discard;
+
       vec2 screenCoord = gl_FragCoord.xy;
 
-      // STAGE 0: 1-bit Bayer monochrome dither
+      // STAGE 0: 1-bit Bayer monochrome dither (boosted contrast for legible retro models)
       if (uStage == 0) {
         float lum = dot(gl_FragColor.rgb, vec3(0.299, 0.587, 0.114));
+        lum = clamp(pow(max(0.0, lum), 0.72) * 1.65, 0.0, 1.0);
         float dither = bayer4(screenCoord);
         float bit = step(dither, lum);
-        gl_FragColor = vec4(mix(vec3(0.01), vec3(0.85), bit), gl_FragColor.a);
+        gl_FragColor = vec4(mix(vec3(0.02), vec3(0.96), bit), gl_FragColor.a);
       }
       // STAGE 1: 16-color EGA posterization
       else if (uStage == 1) {
@@ -109,7 +115,7 @@ export function createFidelityMobMaterial(options: MobMaterialOptions = {}): Fid
         gl_FragColor.rgb = floor(gl_FragColor.rgb * levels + bayer4(screenCoord)) / levels;
       }
       // STAGE 3: Smooth Gouraud / Diffuse lit (standard MeshStandardMaterial output)
-      // STAGE 4: Full PBR with emissive boost
+      // STAGE 4: Full PBR with emissive boost (zero if emissiveColor is black)
       else if (uStage == 4) {
         gl_FragColor.rgb += uEmissive * (uEmissiveIntensity * 0.25);
       }

@@ -125,6 +125,7 @@ export default defineConfig(({ mode }) => ({
       '@hm/cartlab': p('../../packages/cartlab/src/index.ts'),
       '@hm/plotcodec': p('../../packages/plotcodec/src/index.ts'),
       '@hm/consolemill': p('../../packages/consolemill/src/index.ts'),
+      '@hm/shareware': p('../../packages/shareware/src/index.ts'),
     },
   },
   assetsInclude: ['**/*.fbx', '**/*.bin'],

@@ -1,0 +1,13 @@
+{
+  "name": "@hm/shareware",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "node --import tsx --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
+  }
+}

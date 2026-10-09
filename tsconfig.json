@@ -341,6 +341,9 @@
       ],
       "@hm/consolemill": [
         "packages/consolemill/src/index.ts"
+      ],
+      "@hm/shareware": [
+        "packages/shareware/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

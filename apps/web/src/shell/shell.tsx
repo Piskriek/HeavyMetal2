@@ -31,6 +31,7 @@ import { bigStore } from '../storage/big-store';
 import { ResolutionCrafter } from '../crafter/crafter';
 import { PlayScreen } from '../play/play';
 import { exportIsland, importIsland } from '../islands/island-transfer';
+import { MonsterMashScreen } from '../monstermash/monstermash-screen';
 
 /**
  * The shell of **SetMix Multiverse** (first called SetMix Harness): a world of activities. It opens on the SetMix home: the galaxy, with Goblin Racing selected and its menu live
@@ -39,7 +40,7 @@ import { exportIsland, importIsland } from '../islands/island-transfer';
  * brings a bar down from the top (back to galaxy, up one level, into the selected). Everything is a screen of this one shell: there are no
  * separate pages, so nothing can strand you (see ROUTES and the e2e smoke test). Goblin words belong to Goblin Racing; the harness is SetMix.
  */
-export type Screen = 'home' | 'goblin' | 'create' | 'avatars' | 'zoom' | 'island' | 'activities' | 'hub' | 'activity' | 'racing' | 'settings' | 'build' | 'islands' | 'crafter' | 'play';
+export type Screen = 'home' | 'goblin' | 'create' | 'avatars' | 'zoom' | 'island' | 'activities' | 'hub' | 'activity' | 'racing' | 'settings' | 'build' | 'islands' | 'crafter' | 'play' | 'monstermash';
 
 /** Where "back" goes from every screen. The e2e test and the unit test walk this table: each screen must have a way home. */
 export const ROUTES: Readonly<Record<Screen, { readonly back: Screen | 'origin' | null; readonly doc: string }>> = {
@@ -58,6 +59,7 @@ export const ROUTES: Readonly<Record<Screen, { readonly back: Screen | 'origin' 
   build: { back: 'activity', doc: "Goblin Racing's track editor, on the Goblin Racing island. Esc opens its menu; Back to Goblin Racing returns." },
   crafter: { back: 'home', doc: 'The Resolution Crafter preview: your plot through the six stages, a test view (open with ?crafter in the address). Esc or Back to SetMix returns.' },
   play: { back: 'home', doc: 'Play: the first Play of the Resolution Crafter, in first person: you make your human in the lab, turn on the gate, look round your stage-0 plot and place your first machine. Esc pauses; Back to SetMix returns.' },
+  monstermash: { back: 'home', doc: 'Monster Mash game jam exploration spike: live retro model, sprite, sound, and fidelity adaptation test.' },
 };
 
 const HOME: PlanetDef = { id: 'home', name: 'My Island', hue: 0.52, size: 1, ring: false, doc: 'Your own planet: walk it as your avatar, build, host.' };
@@ -87,8 +89,15 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   /** The activities window is making a new activity (quick, wizard or manual). */
   const [newActivity, setNewActivity] = useState(false);
   useEffect(() => onFork((m) => { setNote(`This island is now yours: "${m.name}". Rename it in My islands.`); window.setTimeout(() => setNote(''), 6000); }), []);
-  // ?crafter opens the stage-tool preview straight away (the e2e and testing; it is not on the menu)
-  const [screen, setScreen] = useState<Screen>(() => (typeof location !== 'undefined' && new URLSearchParams(location.search).has('crafter') ? 'crafter' : 'home'));
+  // ?crafter or ?monstermash opens testing screens straight away
+  const [screen, setScreen] = useState<Screen>(() => {
+    if (typeof location !== 'undefined') {
+      const p = new URLSearchParams(location.search);
+      if (p.has('monstermash')) return 'monstermash';
+      if (p.has('crafter')) return 'crafter';
+    }
+    return 'home';
+  });
   // where the hub / activities / settings / the avatar maker were opened from: their Back and Esc return there, never to each other
   const origin = useRef<'home' | 'goblin' | 'island'>('home');
   /** The Goblin Racing island: the world its menu orbits (its own map, never mixed with your islands). */
@@ -439,6 +448,11 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
       {screen === 'crafter' ? (
         <div className="shell-layer" style={{ zIndex: 4 }}>
           <ResolutionCrafter profile={profile} onBack={toHome} />
+        </div>
+      ) : null}
+      {screen === 'monstermash' ? (
+        <div className="shell-layer" style={{ zIndex: 4 }}>
+          <MonsterMashScreen onBack={toHome} />
         </div>
       ) : null}
       {storageFull ? (

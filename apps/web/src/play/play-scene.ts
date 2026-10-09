@@ -21,6 +21,7 @@ import { disposeProp, lineSpan, machineProp, PIXELS_OF, type MachineProp } from 
 import { createScientistInstance } from '../avatar/scientist/scientist-model';
 import { loadScientistAnimations, type ClipName } from '../avatar/scientist/anims-loader';
 import { createScientistAnimator, type OneShotKind, type ScientistAnimator } from '../avatar/scientist/animator';
+import { createMonsterMashCombat, type MonsterMashCombatManager } from './monster-mash-combat';
 
 export type Where = 'lab' | 'planet';
 /** What the screen gives the scene each frame. */
@@ -131,6 +132,8 @@ export interface PlayScene {
    * display governor would read as a slow machine (and the owner's rule is never to start a screen choppy).
    */
   warm(): void;
+  /** Monster Mash retro mob spawning and weapon combat system. */
+  readonly mash: MonsterMashCombatManager;
   /** For the tests and the e2e: where you are, and a way to stand somewhere. */
   readonly debug: {
     groundTriangles(): number; showGround(on: boolean): void; where(): Where; position(): THREE.Vector3; teleport(where: Where, x: number, z: number, yaw: number, pitch?: number): void; sync(): number;
@@ -262,6 +265,14 @@ export function createPlayScene(o: {
     if (Math.abs(local.x) < 1.9 && Math.abs(local.z) < 1.25) return padTop;
     return ground ? ground.heightAt(x, z) : 0;
   };
+
+  // ---- Monster Mash retro mob & combat manager
+  const mash = createMonsterMashCombat({
+    planetScene,
+    camera,
+    groundHeightAt: (x, z) => groundAt(x, z),
+    initialStage: 1,
+  });
 
   // ---- the plot's machines (`@hm/plotsim`): each a prop (machine-props.ts) on the ground, its cable from the node that powers it,
   // the lines between pylons, and the pixels pouring from every pixel machine that runs (one plume for all, `@hm/plume`)
@@ -789,6 +800,7 @@ export function createPlayScene(o: {
       waveStart = clock + (shown === 0 ? 2.0 : 0.8);
       postUniforms.uWaveCentre.value.set(from.x, groundAt(from.x, from.z), from.z);
       ground?.setStage(Math.max(1, to));
+      mash.setFidelityStage(to);
       fitLooks();
     },
     frame(now, dt, c) {
@@ -927,6 +939,10 @@ export function createPlayScene(o: {
       plume.setWave([wc.x, wc.y, wc.z], waveTo >= 0 ? Math.min(r, RACER_REACH) : -1);
       plume.update(now);
       labPlume.update(now);
+      if (where === 'planet') {
+        const isMoving = Math.abs(c.move.x) > 0.01 || Math.abs(c.move.z) > 0.01;
+        mash.update(dt, pos, isMoving);
+      }
       postUniforms.uTime.value = now;
       postUniforms.uGlitch.value = where === 'planet' ? Math.max(0, Math.min(1, (0.4 - sync) / 0.4)) : 0;
       postUniforms.uLost.value = Math.max(0, 1 - (now - lostAt) / 0.6);
@@ -1155,7 +1171,9 @@ export function createPlayScene(o: {
       for (const x of owned) x.dispose();
       for (const mat of Object.values(m)) (mat as THREE.Material).dispose();
       renderer.dispose();
+      mash.dispose();
     },
+    mash,
   };
   return api;
 }

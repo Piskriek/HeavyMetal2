@@ -11,7 +11,12 @@ import {
 } from '../src/wad';
 
 describe('@hm/shareware - DOOM WAD Parser', () => {
-  const assetPath = path.resolve('packages/shareware/assets/doom1.wad');
+  const dir = typeof __dirname !== 'undefined' ? __dirname : path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
+  const assetPath = [
+    path.resolve('packages/shareware/assets/doom1.wad'),
+    path.resolve('assets/doom1.wad'),
+    path.resolve(dir, '../assets/doom1.wad'),
+  ].find((p) => fs.existsSync(p))!;
   const buffer = fs.readFileSync(assetPath).buffer;
 
   it('rejects buffers smaller than 12 bytes', () => {

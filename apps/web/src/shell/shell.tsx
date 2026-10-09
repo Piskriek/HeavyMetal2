@@ -95,6 +95,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
       const p = new URLSearchParams(location.search);
       if (p.has('monstermash')) return 'monstermash';
       if (p.has('crafter')) return 'crafter';
+      if (p.has('play') || p.has('mash')) return 'play';
     }
     return 'home';
   });

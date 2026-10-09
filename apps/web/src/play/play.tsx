@@ -39,6 +39,7 @@ import { fx } from '../maker/feedback';
 import { FRESH, METRIC_COLOUR, METRIC_NAME, SAVE_KEY, arrived, created, isFreeDrill, loadState, objective, poweredOn, returned, withLab, withPlot, type PlayState } from './quest';
 import { encodePlot, decodePlot, plotOfSnapshot } from './plot-code';
 import type { Snapshot } from '@hm/plotcodec';
+import type { MobStatus, CombatStats } from './monster-mash-combat';
 import './play.css';
 
 /** Your plot's cartridge until the ground shader battle lands: sandy desert tones, the nearest in the vault to the concept art's stage 1. */
@@ -120,7 +121,8 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
   const envRef = useRef<Env | null>(null);
   const placeRef = useRef<((kind: MachineKind, x: number, z: number, yaw: number) => boolean) | null>(null);
   const [toast, setToast] = useState<{ readonly text: string; readonly sub: string; readonly id: number } | null>(null);
-  const creating = state.step === 'create';
+  const isMashTest = typeof location !== 'undefined' && (new URLSearchParams(location.search).has('mash') || new URLSearchParams(location.search).has('monstermash'));
+  const creating = state.step === 'create' && !isMashTest;
 
   const commit = useCallback((next: PlayState) => { stateRef.current = next; setState(next); save(next); }, []);
   const say = useCallback((text: string, sub = '') => setToast({ text, sub, id: Date.now() }), []);
@@ -129,6 +131,34 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
     const t = window.setTimeout(() => setToast((x) => (x?.id === toast.id ? null : x)), 3200);
     return () => window.clearTimeout(t);
   }, [toast]);
+
+  // ---- Monster Mash combat states & firing action
+  const [mashOpen, setMashOpen] = useState(false);
+  const [mashEquipped, setMashEquipped] = useState(false);
+  const [hitMarker, setHitMarker] = useState(false);
+  const [mashAmmo, setMashAmmo] = useState({ current: 8, max: 8 });
+  const [mashMobs, setMashMobs] = useState<readonly MobStatus[]>([]);
+  const [mashStats, setMashStats] = useState<CombatStats>({ mobsSpawned: 0, mobsDefeated: 0, damageDealt: 0, shotsFired: 0, pelletsHit: 0, oreCollected: 0 });
+  const hitMarkerTimeout = useRef<number | null>(null);
+
+  const fireWeapon = useCallback(() => {
+    const scene = sceneRef.current;
+    if (!scene || !scene.mash.isEquipped()) return;
+    const res = scene.mash.fire();
+    if (res.fired) {
+      setMashAmmo(scene.mash.getAmmo());
+      setMashStats(scene.mash.getStats());
+      setMashMobs(scene.mash.getMobList());
+      if (res.hits > 0) {
+        setHitMarker(true);
+        if (hitMarkerTimeout.current) window.clearTimeout(hitMarkerTimeout.current);
+        hitMarkerTimeout.current = window.setTimeout(() => setHitMarker(false), 110);
+        if (res.killed > 0) {
+          say('Monster neutralized!', `+${res.killed * 50} Biomass Ore recovered.`);
+        }
+      }
+    }
+  }, [say]);
 
   const dial = useCallback((raw: string): { readonly ok: boolean; readonly why?: string } => {
     const code = raw.trim();
@@ -266,7 +296,15 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
     const onKey = (e: KeyboardEvent, down: boolean): void => { if (down) keys.add(e.code); else keys.delete(e.code); };
     const kd = (e: KeyboardEvent) => onKey(e, true), ku = (e: KeyboardEvent) => onKey(e, false);
     const onMove = (e: MouseEvent): void => { if (document.pointerLockElement === canvas) { dx += e.movementX; dy += e.movementY; } };
+    const onMouseDown = (e: MouseEvent): void => {
+      if (e.button === 0 && document.pointerLockElement === canvas) {
+        if (scene.mash.isEquipped()) {
+          fireWeapon();
+        }
+      }
+    };
     window.addEventListener('keydown', kd); window.addEventListener('keyup', ku); window.addEventListener('mousemove', onMove);
+    window.addEventListener('mousedown', onMouseDown);
     const loop = (ms: number): void => {
       if (cancelled) return;
       const frameMs = ms - last;
@@ -366,6 +404,10 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       }
       hook.frames += 1; hook.where = out.where; hook.sync = out.sync; hook.step = stateRef.current.step; hook.wave = scene.debug.wave();
       if (hook.frames % 30 === 0) Object.assign(hook, scene.debug.stats());
+      if (hook.frames % 15 === 0) {
+        setMashMobs(scene.mash.getMobList());
+        setMashStats(scene.mash.getStats());
+      }
       if (ms - hudAt > 90 || out.event || labRes.events.length) {
         hudAt = ms;
         const vis = visitingRef.current;
@@ -491,6 +533,11 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       currentOneShot: () => scene.debug.currentOneShot(),
       animator: () => scene.debug.animator(),
       playAction: (kind: OneShotKind) => scene.playAction(kind),
+      mash: () => scene.mash,
+      spawnOgro: (count = 1) => scene.mash.spawnOgro(count),
+      spawnDemon: (count = 1) => scene.mash.spawnDemon(count),
+      equipShotgun: (on = true) => { scene.mash.equip(on); setMashEquipped(on); },
+      fireShotgun: () => fireWeapon(),
     });
     setLoading(steps[0]![0]);
     timer = window.setTimeout(step, 30);
@@ -501,6 +548,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', size);
       window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mousedown', onMouseDown);
       sceneRef.current = null;
       scene.dispose();
     };
@@ -553,6 +601,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       if (!ready || creating) return;
       if (e.code === 'Escape') {
         if (building) { stopBuilding(); return; }
+        if (mashOpen) { setMashOpen(false); return; }
         if (menu) { setMenu(false); return; }
         if (dialOpen) { setDialOpen(false); return; }
         if (panel !== null) { setPanel(null); return; }
@@ -561,6 +610,18 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
         return;
       }
       if (paused) return;
+      if (e.code === 'KeyM') {
+        setMashOpen((m) => {
+          const next = !m;
+          if (next) freeMouse();
+          return next;
+        });
+        return;
+      }
+      if (e.code === 'Space' && locked && mashEquipped) {
+        fireWeapon();
+        return;
+      }
       if (e.code === 'KeyV') {
         const current = sceneRef.current?.getCameraView() ?? 'first';
         const next = current === 'first' ? 'third' : 'first';
@@ -597,7 +658,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [ready, creating, building, menu, panel, labPanel, dialOpen, locked, paused, hud.atLever, hud.atDial, hud.aimed, hud.aimedBoulder, hud.aimedLab, hud.where, placeNow, stopBuilding, freeMouse, say, props.profile]);
+  }, [ready, creating, building, mashOpen, mashEquipped, fireWeapon, menu, panel, labPanel, dialOpen, locked, paused, hud.atLever, hud.atDial, hud.aimed, hud.aimedBoulder, hud.aimedLab, hud.where, placeNow, stopBuilding, freeMouse, say, props.profile]);
   useEffect(() => {
     const onClick = (): void => { if (building && locked) placeNow(); };
     window.addEventListener('mousedown', onClick);
@@ -608,6 +669,27 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
     if (hud.where === 'lab') { setMenu(false); setPanel(null); stopBuilding(); }
     if (hud.where === 'planet') { setLabPanel(null); setDialOpen(false); }
   }, [hud.where, stopBuilding]);
+
+  // auto-teleport to planet surface and equip shotgun when URL has ?mash or ?monstermash
+  useEffect(() => {
+    if (ready && typeof location !== 'undefined') {
+      const p = new URLSearchParams(location.search);
+      if (p.has('mash') || p.has('monstermash') || p.has('spawn_test')) {
+        const scene = sceneRef.current;
+        if (scene) {
+          if (stateRef.current.step === 'create') {
+            commit({ ...stateRef.current, step: 'drill', gateOn: true });
+          }
+          const g = scene.debug.gatePlanet();
+          scene.debug.teleport('planet', g.x + 3, g.z + 5, Math.PI);
+          scene.mash.equip(true);
+          setMashEquipped(true);
+          void scene.mash.spawnOgro(1);
+          setMashOpen(true);
+        }
+      }
+    }
+  }, [ready, commit]);
 
   const startBuilding = (kind: MachineKind): void => {
     setMenu(false);
@@ -1153,6 +1235,166 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
               <button className="go" onClick={lock}>Resume</button>
               <button onClick={props.onBack}>Back to SetMix</button>
             </div>
+          ) : null}
+          <button
+            className={`play-mash-btn${mashOpen ? ' active' : ''}`}
+            onClick={() => {
+              setMashOpen((m) => !m);
+              freeMouse();
+            }}
+            title="Monster Mash Combat Sandbox (Shortcut: M)"
+          >
+            👹 Monster Mash {mashMobs.filter((m) => m.state !== 'death').length > 0 ? `(${mashMobs.filter((m) => m.state !== 'death').length})` : ''}
+          </button>
+          {mashEquipped && (
+            <div className={`play-crosshair${hitMarker ? ' hit' : ''}`}>
+              <div className="ch-top" />
+              <div className="ch-bottom" />
+              <div className="ch-left" />
+              <div className="ch-right" />
+              <div className="ch-dot" />
+              {hitMarker ? <div className="ch-hit-x">✕</div> : null}
+            </div>
+          )}
+          {mashOpen ? (
+            <section className="play-mash-panel" aria-label="Monster Mash Sandbox">
+              <header>
+                <h3>👹 Monster Mash Combat</h3>
+                <button onClick={() => setMashOpen(false)}>✕</button>
+              </header>
+
+              <div className="mash-section">
+                <h4>Weapon Loadout</h4>
+                <div className="mash-weapon-status">
+                  <span>Status: <b>{mashEquipped ? 'Combat Shotgun' : 'Holstered'}</b></span>
+                  {mashEquipped && <span className="mash-ammo-pill">{mashAmmo.current} / {mashAmmo.max} Shells</span>}
+                </div>
+                <div className="mash-btn-grid">
+                  <button
+                    className={mashEquipped ? '' : 'primary'}
+                    onClick={() => {
+                      const scene = sceneRef.current;
+                      if (!scene) return;
+                      const next = !mashEquipped;
+                      scene.mash.equip(next);
+                      setMashEquipped(next);
+                      say(next ? 'Combat Shotgun equipped' : 'Weapon holstered', next ? 'LMB or Space to shoot. Pellets deal 20-35 dmg per hit.' : '');
+                    }}
+                  >
+                    {mashEquipped ? 'Unequip Weapon' : '🔫 Equip Shotgun'}
+                  </button>
+                  <button
+                    className="primary"
+                    disabled={!mashEquipped}
+                    onClick={() => fireWeapon()}
+                  >
+                    💥 Fire Shotgun
+                  </button>
+                </div>
+              </div>
+
+              <div className="mash-section">
+                <h4>Spawn Monsters on Planet</h4>
+                <div className="mash-btn-grid">
+                  <button
+                    onClick={() => {
+                      void sceneRef.current?.mash.spawnOgro(1).then(() => {
+                        setMashMobs(sceneRef.current?.mash.getMobList() ?? []);
+                        setMashStats(sceneRef.current?.mash.getStats() ?? mashStats);
+                        say('3D Ogro spawned!', 'Quake 2 retro MD2 mob with run/attack/pain/death animations.');
+                      });
+                    }}
+                  >
+                    👹 Spawn 3D Ogro (Q2)
+                  </button>
+                  <button
+                    onClick={() => {
+                      void sceneRef.current?.mash.spawnDemon(1).then(() => {
+                        setMashMobs(sceneRef.current?.mash.getMobList() ?? []);
+                        setMashStats(sceneRef.current?.mash.getStats() ?? mashStats);
+                        say('2D Demon spawned!', 'DOOM 1 retro WAD patch sprite billboard.');
+                      });
+                    }}
+                  >
+                    👾 Spawn 2D Demon (WAD)
+                  </button>
+                  <button
+                    onClick={() => {
+                      void Promise.all([
+                        sceneRef.current?.mash.spawnOgro(2),
+                        sceneRef.current?.mash.spawnDemon(1),
+                      ]).then(() => {
+                        setMashMobs(sceneRef.current?.mash.getMobList() ?? []);
+                        setMashStats(sceneRef.current?.mash.getStats() ?? mashStats);
+                        say('Monster Horde spawned!', '3 shareware monsters spawned in perimeter.');
+                      });
+                    }}
+                  >
+                    🔥 Spawn Horde (x3)
+                  </button>
+                  <button
+                    onClick={() => {
+                      sceneRef.current?.mash.clearMobs();
+                      setMashMobs([]);
+                      say('Mobs cleared');
+                    }}
+                  >
+                    🧹 Clear All Mobs
+                  </button>
+                </div>
+                {hud.where === 'lab' && (
+                  <button
+                    className="mash-action-btn primary"
+                    style={{ width: '100%', marginTop: '6px' }}
+                    onClick={() => {
+                      const scene = sceneRef.current;
+                      if (scene) {
+                        const g = scene.debug.gatePlanet();
+                        scene.debug.teleport('planet', g.x + 3, g.z + 5, Math.PI);
+                        say('Teleported to Planet Surface', 'Step back through the gate anytime to return to the lab.');
+                      }
+                    }}
+                  >
+                    🚀 Teleport to Planet Surface
+                  </button>
+                )}
+              </div>
+
+              <div className="mash-section">
+                <h4>Combat Telemetry</h4>
+                <div className="mash-stats-grid">
+                  <div className="mash-stat-box">
+                    <span>Shots / Hits</span>
+                    <b>{mashStats.shotsFired} / {mashStats.pelletsHit}</b>
+                  </div>
+                  <div className="mash-stat-box">
+                    <span>Mobs Defeated</span>
+                    <b>{mashStats.mobsDefeated} / {mashStats.mobsSpawned}</b>
+                  </div>
+                  <div className="mash-stat-box">
+                    <span>Ore Harvested</span>
+                    <b>+{mashStats.oreCollected}</b>
+                  </div>
+                </div>
+              </div>
+
+              {mashMobs.length > 0 && (
+                <div className="mash-section">
+                  <h4>Active Mob Entities ({mashMobs.length})</h4>
+                  <div className="mash-mob-list">
+                    {mashMobs.map((m) => (
+                      <div key={m.id} className={`mash-mob-card${m.state === 'death' ? ' dead' : ''}`}>
+                        <span><b>{m.kind.toUpperCase()} #{m.id}</b> [{m.state}]</span>
+                        <div className="mash-hp-bar">
+                          <div style={{ width: `${Math.max(0, (m.hp / m.maxHp) * 100)}%`, background: m.hp > 40 ? '#10b981' : '#ef4444' }} />
+                        </div>
+                        <span>{Math.ceil(m.hp)} HP</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
           ) : null}
           {toast ? <div key={toast.id} className={`play-toast${toast.text === 'Sync lost' ? ' lost' : ''}`} role="status"><b>{toast.text}</b>{toast.sub ? <span>{toast.sub}</span> : null}</div> : null}
         </>

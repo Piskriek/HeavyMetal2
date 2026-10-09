@@ -5,7 +5,12 @@ import path from 'node:path';
 import { parseMd2, createMd2Mesh } from '../src/md2';
 
 describe('@hm/shareware - Quake MD2 Model Parser', () => {
-  const assetPath = path.resolve('packages/shareware/assets/ogro.md2');
+  const dir = typeof __dirname !== 'undefined' ? __dirname : path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
+  const assetPath = [
+    path.resolve('packages/shareware/assets/ogro.md2'),
+    path.resolve('assets/ogro.md2'),
+    path.resolve(dir, '../assets/ogro.md2'),
+  ].find((p) => fs.existsSync(p))!;
   const buffer = fs.readFileSync(assetPath).buffer;
 
   it('parses ogro.md2 BufferGeometry and morph animations', () => {

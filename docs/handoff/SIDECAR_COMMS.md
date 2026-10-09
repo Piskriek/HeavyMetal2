@@ -490,7 +490,10 @@ The steps:
 >     - Accessible via `?monstermash` query parameter (`apps/web/src/monstermash/monstermash-screen.tsx`).
 >     - Real-time 3D viewport rendering Quake 2 Ogro running animation and DOOM Demon sprite, with stage toggle buttons (0 to 4), live sound FX playback, Internet Archive search terminal, and drag-and-drop file ingestion.
 >     - Verified with Playwright GPU screenshots at `docs/shots/monster-mash-stage0.png`, `stage1.png`, `stage2.png`, `stage4.png`.
-> - **Parked for Claude Opus**: Lead Engineer to review the master architectural design at [`monster_mash_design_proposal.md`](file:///C:/Users/Pierro/.gemini/antigravity-ide/brain/b7706f37-1ad3-40ff-8def-508582194b33/monster_mash_design_proposal.md) and plan full integration when usage resets in ~20 hours.
+> - **Parked for Claude Opus**:
+>   - Master V2.0 Plan established at [`docs/V2_0_MASTER_PLAN.md`](file:///c:/MarbleGp/docs/V2_0_MASTER_PLAN.md) integrating the full narrative awakening (Acts I–III), the Game Jam "Monster Mash" weapon & mob combat expansion (Act IV: perimeter anomaly, armory shotgun, mob combat, dirt mining), the Studio schema editor & multi-branch consensus (Act V), color bloom (Act VI), and the bio-splicer combiner (Act VIII).
+>   - Free & legal games catalog researched and documented at [`docs/FREE_GAMES_AND_ASSETS_RESEARCH.md`](file:///c:/MarbleGp/docs/FREE_GAMES_AND_ASSETS_RESEARCH.md) covering Tier 1 Libre (Freedoom BSD, LibreQuake BSD, Kenney CC0, Wesnoth GPL), Tier 2 Freeware (Chex Quest, Hacx 1.2, Bio Menace), Tier 3 Shareware episodes (DOOM1.WAD, Quake PAK0.PAK, Heretic, Hexen, Wolf3D), and Tier 4 Internet Archive CORS APIs.
+>   - Lead Engineer to review both docs and plan implementation waves when usage resets in ~20 hours.
 
 
 

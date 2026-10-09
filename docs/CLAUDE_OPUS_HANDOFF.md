@@ -2,6 +2,7 @@
 
 > 🚀 **ACTIVE V2.0 MASTER PLAN (2026-10-09)**: **Read [`docs/V2_0_MASTER_PLAN.md`](file:///c:/MarbleGp/docs/V2_0_MASTER_PLAN.md) first!**  
 > Integrates the full narrative awakening (Acts I–III), the Game Jam **"Monster Mash"** weapon/combat expansion (Act IV: perimeter anomaly, armory shotgun, mob combat, dirt mining), the Studio schema editor & multi-branch consensus (Act V), color bloom (Act VI), and the bio-splicer combiner (Act VIII).  
+> Free & legal games catalog documented in **[`docs/FREE_GAMES_AND_ASSETS_RESEARCH.md`](file:///c:/MarbleGp/docs/FREE_GAMES_AND_ASSETS_RESEARCH.md)** (Freedoom BSD, LibreQuake BSD, Kenney CC0, Chex Quest freeware, shareware episodes).  
 > The technical exploration spike is verified with live GPU screenshots on branch [`feat/monster-mash-exploration`](file:///c:/MarbleGp/tree/feat/monster-mash-exploration) (`@hm/shareware` package, DOOM WAD lump/sprite/sound parser, Quake MD2 loader, fidelity shaders).
 
 > **Target Model**: Claude 3.5 / 4.5 / 5.5 Opus (Max Reasoning Enabled)  

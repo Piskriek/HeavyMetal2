@@ -1,11 +1,14 @@
 # SETMIX: THE RESOLUTION CRAFTER — MASTER HANDOFF TO CLAUDE OPUS
 
-> **Audit, 2026-10-06 (Opus 5.5): read `docs/SETMIX_LANDING.md` before acting on this file.** Several claims below did not hold when checked against the code. The drops are typed but not verified: 2 of the 29 fidelity specs fail on real bugs, and `verify-all.ts` passes 12 of 14 (both rollback checks fail) while testing its own re-implementations rather than the drop's modules. 0 of the 50 vault cartridges validate on our `@hm/texgraph`. The texgraph patch does not apply to our evaluator. The target layout in section 4 would overwrite the existing `render`, `audio`, `machines` and `content` packages. The waves in `SETMIX_LANDING.md` section 4 replace the roadmap in section 5.
+> 🚀 **ACTIVE V2.0 MASTER PLAN (2026-10-09)**: **Read [`docs/V2_0_MASTER_PLAN.md`](file:///c:/MarbleGp/docs/V2_0_MASTER_PLAN.md) first!**  
+> Integrates the full narrative awakening (Acts I–III), the Game Jam **"Monster Mash"** weapon/combat expansion (Act IV: perimeter anomaly, armory shotgun, mob combat, dirt mining), the Studio schema editor & multi-branch consensus (Act V), color bloom (Act VI), and the bio-splicer combiner (Act VIII).  
+> Free & legal games catalog documented in **[`docs/FREE_GAMES_AND_ASSETS_RESEARCH.md`](file:///c:/MarbleGp/docs/FREE_GAMES_AND_ASSETS_RESEARCH.md)** (Freedoom BSD, LibreQuake BSD, Kenney CC0, Chex Quest freeware, shareware episodes).  
+> The technical exploration spike is verified with live GPU screenshots on branch [`feat/monster-mash-exploration`](file:///c:/MarbleGp/tree/feat/monster-mash-exploration) (`@hm/shareware` package, DOOM WAD lump/sprite/sound parser, Quake MD2 loader, fidelity shaders).
 
 > **Target Model**: Claude 3.5 / 4.5 / 5.5 Opus (Max Reasoning Enabled)  
 > **Repository**: [`https://github.com/Piskriek/HeavyMetal2`](https://github.com/Piskriek/HeavyMetal2)  
 > **Workspace Root**: `c:\MarbleGp`  
-> **Status**: 12 complete architectural & content drops extracted in `c:\MarbleGp\zips\extracted\winner_plan*`. Fully designed, typed, and mathematically verified. Ready for landing into the monorepo.
+> **Status**: Verified on main, ready for V2.0 implementation waves.
 
 ---
 

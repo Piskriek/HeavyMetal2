@@ -474,6 +474,26 @@ The steps:
 > - **Next Standing Items on Queue**:
 >   - `POL-22`: Scientist Low LOD / first-person optimization to guarantee 60 FPS hold in lab.
 >   - `TASK-12`: Extraction Beam tool (landing `@hm/terrainbrush` from `zips\develop-terrainbrush-typescript-package.zip`, using `@hm/beamkit` already landed).
+>
+> ### [2026-10-09] Sidecar Agent (Antigravity) — Game Jam "Monster Mash" Exploration Spike
+> - **Game Jam Theme Revealed**: **"Monster Mash"**.
+> - **Owner Request**: Explore ingesting Internet Archive / retro shareware / abandonware games in background, allowing players to pull mobs and weapons into SetMix, dynamically matching environmental fidelity.
+> - **Spike Branch**: `feat/monster-mash-exploration` (pushed to origin).
+> - **What was Implemented & 100% Verified**:
+>   - New package [`@hm/shareware`](file:///c:/MarbleGp/packages/shareware):
+>     - `src/wad.ts`: Pure-TS DOOM WAD lump parser. Decodes 256-color `PLAYPAL`, monster sprite patches (`SARGA1`), and 8-bit PCM audio (`DSSHOTGN`) in < 20 ms.
+>     - `src/md2.ts`: Quake 2 MD2 3D animated model loader with keyframe morph targets (idle, walk, run, attack, pain, death).
+>     - `src/fidelity-mob.ts`: Custom multi-stage shader material that dynamically adapts imported mobs to the world's fidelity stage (Stage 0: 1-bit Bayer dither; Stage 1: 16-color EGA; Stage 2: 256-color VGA with PSX jitter; Stage 3: Lit diffuse; Stage 4: Full PBR & emissive).
+>     - `src/archive-client.ts`: Live client querying `archive.org/advancedsearch.php` and metadata APIs with open CORS.
+>     - All 14/14 unit tests pass (`packages/shareware/tests/*.test.ts`).
+>   - Interactive Exploration Screen in `apps/web`:
+>     - Accessible via `?monstermash` query parameter (`apps/web/src/monstermash/monstermash-screen.tsx`).
+>     - Real-time 3D viewport rendering Quake 2 Ogro running animation and DOOM Demon sprite, with stage toggle buttons (0 to 4), live sound FX playback, Internet Archive search terminal, and drag-and-drop file ingestion.
+>     - Verified with Playwright GPU screenshots at `docs/shots/monster-mash-stage0.png`, `stage1.png`, `stage2.png`, `stage4.png`.
+> - **Parked for Claude Opus**:
+>   - Master V2.0 Plan established at [`docs/V2_0_MASTER_PLAN.md`](file:///c:/MarbleGp/docs/V2_0_MASTER_PLAN.md) integrating the full narrative awakening (Acts I–III), the Game Jam "Monster Mash" weapon & mob combat expansion (Act IV: perimeter anomaly, armory shotgun, mob combat, dirt mining), the Studio schema editor & multi-branch consensus (Act V), color bloom (Act VI), and the bio-splicer combiner (Act VIII).
+>   - Free & legal games catalog researched and documented at [`docs/FREE_GAMES_AND_ASSETS_RESEARCH.md`](file:///c:/MarbleGp/docs/FREE_GAMES_AND_ASSETS_RESEARCH.md) covering Tier 1 Libre (Freedoom BSD, LibreQuake BSD, Kenney CC0, Wesnoth GPL), Tier 2 Freeware (Chex Quest, Hacx 1.2, Bio Menace), Tier 3 Shareware episodes (DOOM1.WAD, Quake PAK0.PAK, Heretic, Hexen, Wolf3D), and Tier 4 Internet Archive CORS APIs.
+>   - Lead Engineer to review both docs and plan implementation waves when usage resets in ~20 hours.
 
 
 

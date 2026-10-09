@@ -134,6 +134,8 @@ export interface PlayScene {
   warm(): void;
   /** Monster Mash retro mob spawning and weapon combat system. */
   readonly mash: MonsterMashCombatManager;
+  /** Immediately sets the world and mob visual fidelity stage (0 to 4). */
+  setFidelityStage(stage: number): void;
   /** For the tests and the e2e: where you are, and a way to stand somewhere. */
   readonly debug: {
     groundTriangles(): number; showGround(on: boolean): void; where(): Where; position(): THREE.Vector3; teleport(where: Where, x: number, z: number, yaw: number, pitch?: number): void; sync(): number;
@@ -801,6 +803,15 @@ export function createPlayScene(o: {
       postUniforms.uWaveCentre.value.set(from.x, groundAt(from.x, from.z), from.z);
       ground?.setStage(Math.max(1, to));
       mash.setFidelityStage(to);
+      fitLooks();
+    },
+    setFidelityStage(to) {
+      const s = Math.max(0, Math.min(4, Math.floor(to)));
+      stage = s;
+      shown = s;
+      waveTo = -1;
+      ground?.setStage(Math.max(1, s));
+      mash.setFidelityStage(s);
       fitLooks();
     },
     frame(now, dt, c) {

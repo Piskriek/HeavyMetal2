@@ -118,6 +118,13 @@ try {
   const mobCount = await page.locator('.mash-mob-card').count();
   console.log(`OK: Active mobs on planet: ${mobCount}`);
 
+  // Test Fidelity Stage Switcher Buttons
+  console.log('Testing Fidelity Stage buttons...');
+  const vgaBtn = page.locator('button:has-text("2: VGA")');
+  await vgaBtn.click();
+  await page.waitForTimeout(600);
+  console.log('OK: Switched to Stage 2 (VGA)');
+
   // Screenshot equipped state with mobs
   await page.screenshot({ path: 'docs/shots/planet-mash-equipped.png' });
   console.log('Captured docs/shots/planet-mash-equipped.png');

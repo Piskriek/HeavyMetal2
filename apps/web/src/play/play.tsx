@@ -139,6 +139,7 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
   const [mashAmmo, setMashAmmo] = useState({ current: 8, max: 8 });
   const [mashMobs, setMashMobs] = useState<readonly MobStatus[]>([]);
   const [mashStats, setMashStats] = useState<CombatStats>({ mobsSpawned: 0, mobsDefeated: 0, damageDealt: 0, shotsFired: 0, pelletsHit: 0, oreCollected: 0 });
+  const [mashStage, setMashStage] = useState<number>(0);
   const hitMarkerTimeout = useRef<number | null>(null);
 
   const fireWeapon = useCallback(() => {
@@ -1358,6 +1359,34 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
                     🚀 Teleport to Planet Surface
                   </button>
                 )}
+              </div>
+
+              <div className="mash-section">
+                <h4>World & Mob Fidelity Stage</h4>
+                <div className="mash-stage-grid">
+                  {[
+                    { st: 0, label: '0: Dither' },
+                    { st: 1, label: '1: EGA' },
+                    { st: 2, label: '2: VGA' },
+                    { st: 3, label: '3: Gouraud' },
+                    { st: 4, label: '4: PBR' },
+                  ].map(({ st, label }) => (
+                    <button
+                      key={st}
+                      className={`mash-stage-btn${mashStage === st ? ' active' : ''}`}
+                      onClick={() => {
+                        const scene = sceneRef.current;
+                        if (!scene) return;
+                        scene.setFidelityStage(st);
+                        setMashStage(st);
+                        say(`Fidelity Stage ${st}`, STAGE_SAYS[st] || `Fidelity set to Stage ${st}`);
+                      }}
+                      title={`Switch planet terrain and monsters to Fidelity Stage ${st}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="mash-section">

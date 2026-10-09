@@ -157,6 +157,23 @@ class CombatAudio {
     osc.stop(now + 0.75);
   }
 
+  playAttackBite(): void {
+    const ctx = this.init();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(150, now);
+    osc.frequency.linearRampToValueAtTime(75, now + 0.14);
+    gain.gain.setValueAtTime(0.4, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.16);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.18);
+  }
+
   playEquip(): void {
     const ctx = this.init();
     if (!ctx) return;
@@ -337,6 +354,13 @@ function createHealthBarCanvas(): { canvas: HTMLCanvasElement; texture: THREE.Ca
 // -----------------------------------------------------------------------------
 // Mob Entity Representation
 // -----------------------------------------------------------------------------
+interface DemonSprites {
+  readonly walk: readonly THREE.Texture[];
+  readonly attack: readonly THREE.Texture[];
+  readonly pain: readonly THREE.Texture[];
+  readonly death: readonly THREE.Texture[];
+}
+
 interface MobEntity {
   readonly id: number;
   readonly kind: MobKind;
@@ -344,6 +368,9 @@ interface MobEntity {
   mesh: THREE.Mesh;
   mixer?: THREE.AnimationMixer;
   actions?: Map<string, THREE.AnimationAction>;
+  sprites?: DemonSprites;
+  animTimer?: number;
+  animIndex?: number;
   hp: number;
   maxHp: number;
   state: MobState;
@@ -352,7 +379,7 @@ interface MobEntity {
   hitRadius: number;
   height: number;
   healthBar: ReturnType<typeof createHealthBarCanvas>;
-  material: THREE.ShaderMaterial;
+  material: THREE.Material & { uniforms?: Record<string, { value: any }> };
   painFlash: number;
 }
 
@@ -498,7 +525,7 @@ export function createMonsterMashCombat(options: {
   // Cached assets
   let ogroModelCache: Md2ParsedModel | null = null;
   let ogroTextureCache: THREE.Texture | null = null;
-  let demonTextureCache: THREE.Texture | null = null;
+  let demonSpritesCache: DemonSprites | null = null;
 
   const mobs: MobEntity[] = [];
 
@@ -535,9 +562,9 @@ export function createMonsterMashCombat(options: {
     return { model, texture };
   }
 
-  // Helper to load DOOM Demon sprite from WAD
-  async function loadDemonTexture(): Promise<THREE.Texture> {
-    if (demonTextureCache) return demonTextureCache;
+  // Helper to load full animated DOOM Demon sprite sequences from WAD
+  async function loadDemonSprites(): Promise<DemonSprites> {
+    if (demonSpritesCache) return demonSpritesCache;
 
     try {
       const res = await fetch('./shareware/doom1.wad');
@@ -545,38 +572,62 @@ export function createMonsterMashCombat(options: {
       const buf = await res.arrayBuffer();
       const wad = parseWad(buf);
       const pal = extractPlaypal(wad);
-      const patch = extractPatch(wad, 'SARGA1', pal);
 
-      const canvas = document.createElement('canvas');
-      canvas.width = patch.width;
-      canvas.height = patch.height;
-      const ctx = canvas.getContext('2d')!;
-      const imgData = ctx.createImageData(patch.width, patch.height);
-      imgData.data.set(patch.data);
-      ctx.putImageData(imgData, 0, 0);
+      const makeTex = (lump: string): THREE.Texture => {
+        const patch = extractPatch(wad, lump, pal);
+        const canvas = document.createElement('canvas');
+        canvas.width = patch.width;
+        canvas.height = patch.height;
+        const ctx = canvas.getContext('2d')!;
+        const imgData = ctx.createImageData(patch.width, patch.height);
+        imgData.data.set(patch.data);
+        ctx.putImageData(imgData, 0, 0);
 
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.magFilter = THREE.NearestFilter;
-      texture.minFilter = THREE.NearestFilter;
-      demonTextureCache = texture;
-      return texture;
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.magFilter = THREE.NearestFilter;
+        tex.minFilter = THREE.NearestFilter;
+        return tex;
+      };
+
+      const walkLumps = ['SARGA1', 'SARGB1', 'SARGC1', 'SARGD1'];
+      const attackLumps = ['SARGE1', 'SARGF1', 'SARGG1'];
+      const painLumps = ['SARGH1'];
+      const deathLumps = ['SARGI0', 'SARGJ0', 'SARGK0', 'SARGL0', 'SARGM0', 'SARGN0'];
+
+      const sprites: DemonSprites = {
+        walk: walkLumps.map(makeTex),
+        attack: attackLumps.map(makeTex),
+        pain: painLumps.map(makeTex),
+        death: deathLumps.map(makeTex),
+      };
+
+      demonSpritesCache = sprites;
+      return sprites;
     } catch (e) {
-      console.warn('WAD load failed, generating fallback Demon sprite:', e);
-      // Fallback procedural retro monster sprite
-      const canvas = document.createElement('canvas');
-      canvas.width = 64;
-      canvas.height = 64;
-      const ctx = canvas.getContext('2d')!;
-      ctx.fillStyle = '#b91c1c';
-      ctx.fillRect(16, 12, 32, 40);
-      ctx.fillStyle = '#f59e0b';
-      ctx.fillRect(20, 20, 8, 8); // eye
-      ctx.fillRect(36, 20, 8, 8); // eye
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(24, 38, 16, 6); // fangs
-      const texture = new THREE.CanvasTexture(canvas);
-      demonTextureCache = texture;
-      return texture;
+      console.warn('WAD load failed, generating fallback Demon sprites:', e);
+      const makeFallback = (color: string): THREE.Texture => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 64;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d')!;
+        ctx.fillStyle = color;
+        ctx.fillRect(16, 12, 32, 40);
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(20, 20, 8, 8);
+        ctx.fillRect(36, 20, 8, 8);
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.magFilter = THREE.NearestFilter;
+        tex.minFilter = THREE.NearestFilter;
+        return tex;
+      };
+      const sprites: DemonSprites = {
+        walk: [makeFallback('#b91c1c'), makeFallback('#991b1b')],
+        attack: [makeFallback('#dc2626'), makeFallback('#ef4444')],
+        pain: [makeFallback('#f87171')],
+        death: [makeFallback('#450a0a')],
+      };
+      demonSpritesCache = sprites;
+      return sprites;
     }
   }
 
@@ -621,9 +672,9 @@ export function createMonsterMashCombat(options: {
         const material = createFidelityMobMaterial({ map: texture, stage });
         mesh.material = material;
 
-        // Scale Ogro to ~2.2m tall
+        // Scale Ogro to ~2.2m tall and stand upright on ground
         mesh.scale.set(0.045, 0.045, 0.045);
-        mesh.rotateX(-Math.PI / 2); // Quake coordinate alignment
+        mesh.rotation.set(0, -Math.PI / 2, 0); // Stand upright (Y-up), face forward (+Z)
 
         const group = new THREE.Group();
         group.add(mesh);
@@ -670,7 +721,11 @@ export function createMonsterMashCombat(options: {
         };
 
         // Start run animation
-        actions.get('run')?.play();
+        const runAction = actions.get('run');
+        if (runAction) {
+          runAction.reset();
+          runAction.play();
+        }
         mobs.push(entity);
         stats.mobsSpawned++;
 
@@ -685,11 +740,12 @@ export function createMonsterMashCombat(options: {
 
   async function spawnDemon(count = 1, customPos?: { x: number; z: number }): Promise<void> {
     try {
-      const texture = await loadDemonTexture();
+      const sprites = await loadDemonSprites();
+      const initialTexture = sprites.walk[0]!;
 
       for (let i = 0; i < count; i++) {
         const mobId = nextMobId++;
-        const material = createFidelityMobMaterial({ map: texture, stage });
+        const material = createFidelityMobMaterial({ map: initialTexture, stage });
 
         const geo = new THREE.PlaneGeometry(1.8, 2.2);
         const mesh = new THREE.Mesh(geo, material);
@@ -722,6 +778,9 @@ export function createMonsterMashCombat(options: {
           kind: 'demon',
           group,
           mesh,
+          sprites,
+          animTimer: 0,
+          animIndex: 0,
           hp: 80,
           maxHp: 80,
           state: 'chase',
@@ -839,6 +898,8 @@ export function createMonsterMashCombat(options: {
           // Death!
           mob.state = 'death';
           mob.stateTimer = 0;
+          mob.animIndex = 0;
+          mob.animTimer = 0;
           killed++;
           stats.mobsDefeated++;
           audio.playDeathRoar();
@@ -846,6 +907,7 @@ export function createMonsterMashCombat(options: {
           if (mob.actions) {
             mob.actions.get('run')?.stop();
             mob.actions.get('attack')?.stop();
+            mob.actions.get('pain_a')?.stop();
             const deathAction = mob.actions.get('death_a');
             if (deathAction) {
               deathAction.reset();
@@ -865,9 +927,13 @@ export function createMonsterMashCombat(options: {
           // Flinch / Pain
           mob.state = 'pain';
           mob.stateTimer = 0.32;
+          mob.animIndex = 0;
+          mob.animTimer = 0;
           audio.playPainGrunt();
           if (mob.actions) {
-            const painAction = mob.actions.get('pain_a');
+            mob.actions.get('run')?.stop();
+            mob.actions.get('attack')?.stop();
+            const painAction = mob.actions.get('pain_a') ?? mob.actions.get('pain_b');
             if (painAction) {
               painAction.reset();
               painAction.setLoop(THREE.LoopOnce, 1);
@@ -945,7 +1011,7 @@ export function createMonsterMashCombat(options: {
     for (let i = mobs.length - 1; i >= 0; i--) {
       const mob = mobs[i]!;
 
-      // Animation mixer
+      // Animation mixer for 3D MD2 Ogro
       if (mob.mixer) {
         mob.mixer.update(dt);
       }
@@ -954,6 +1020,53 @@ export function createMonsterMashCombat(options: {
       mob.healthBar.mesh.quaternion.copy(camera.quaternion);
       if (mob.kind === 'demon') {
         mob.mesh.quaternion.copy(camera.quaternion);
+      }
+
+      // Update DOOM Demon sprite sequences
+      if (mob.kind === 'demon' && mob.sprites) {
+        let targetTex: THREE.Texture | null = null;
+        if (mob.state === 'death') {
+          mob.animTimer = (mob.animTimer ?? 0) + dt;
+          if (mob.animTimer >= 0.14) {
+            mob.animTimer = 0;
+            if ((mob.animIndex ?? 0) < mob.sprites.death.length - 1) {
+              mob.animIndex = (mob.animIndex ?? 0) + 1;
+            }
+          }
+          targetTex = mob.sprites.death[mob.animIndex ?? 0] ?? null;
+        } else if (mob.state === 'pain') {
+          targetTex = mob.sprites.pain[0] ?? null;
+        } else if (mob.state === 'attack') {
+          mob.animTimer = (mob.animTimer ?? 0) + dt;
+          if (mob.animTimer >= 0.18) {
+            mob.animTimer = 0;
+            const prev = mob.animIndex ?? 0;
+            mob.animIndex = (prev + 1) % mob.sprites.attack.length;
+            if (mob.animIndex === 1) {
+              audio.playAttackBite();
+            }
+          }
+          targetTex = mob.sprites.attack[mob.animIndex ?? 0] ?? null;
+        } else {
+          // Walk / Chase
+          mob.animTimer = (mob.animTimer ?? 0) + dt;
+          if (mob.animTimer >= 0.16) {
+            mob.animTimer = 0;
+            mob.animIndex = ((mob.animIndex ?? 0) + 1) % mob.sprites.walk.length;
+          }
+          targetTex = mob.sprites.walk[mob.animIndex ?? 0] ?? null;
+        }
+
+        if (targetTex && mob.mesh.material) {
+          const mat = mob.mesh.material as THREE.MeshStandardMaterial & { uniforms?: any };
+          if (mat.map !== targetTex) {
+            mat.map = targetTex;
+            mat.needsUpdate = true;
+          }
+          if (mat.uniforms?.uMap) {
+            mat.uniforms.uMap.value = targetTex;
+          }
+        }
       }
 
       // Pain flash fade
@@ -975,30 +1088,47 @@ export function createMonsterMashCombat(options: {
         mob.stateTimer -= dt;
         if (mob.stateTimer <= 0) {
           mob.state = 'chase';
-          mob.actions?.get('run')?.play();
+          mob.animIndex = 0;
+          mob.animTimer = 0;
+          if (mob.actions) {
+            mob.actions.get('pain_a')?.stop();
+            mob.actions.get('run')?.reset().play();
+          }
         }
       } else if (mob.state === 'chase') {
         // Rotate towards player
         const targetYaw = Math.atan2(dx, dz);
         mob.group.rotation.y = THREE.MathUtils.lerp(mob.group.rotation.y, targetYaw, Math.min(1, dt * 8));
 
-        if (dist > 2.0) {
+        if (dist > 2.2) {
           // Walk towards player
           const moveSpeed = mob.speed * dt;
           mob.group.position.x += Math.sin(targetYaw) * moveSpeed;
           mob.group.position.z += Math.cos(targetYaw) * moveSpeed;
           mob.group.position.y = groundHeightAt(mob.group.position.x, mob.group.position.z);
         } else {
-          // Attack range
+          // In attack range!
           mob.state = 'attack';
-          mob.actions?.get('run')?.stop();
-          mob.actions?.get('attack')?.play();
+          mob.animIndex = 0;
+          mob.animTimer = 0;
+          if (mob.actions) {
+            mob.actions.get('run')?.stop();
+            mob.actions.get('attack')?.reset().play();
+          }
         }
       } else if (mob.state === 'attack') {
-        if (dist > 2.5) {
+        // Face player while attacking
+        const targetYaw = Math.atan2(dx, dz);
+        mob.group.rotation.y = THREE.MathUtils.lerp(mob.group.rotation.y, targetYaw, Math.min(1, dt * 8));
+
+        if (dist > 2.8) {
           mob.state = 'chase';
-          mob.actions?.get('attack')?.stop();
-          mob.actions?.get('run')?.play();
+          mob.animIndex = 0;
+          mob.animTimer = 0;
+          if (mob.actions) {
+            mob.actions.get('attack')?.stop();
+            mob.actions.get('run')?.reset().play();
+          }
         }
       }
     }

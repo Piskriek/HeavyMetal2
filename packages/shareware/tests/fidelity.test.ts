@@ -24,4 +24,10 @@ describe('@hm/shareware - Fidelity Mob Material', () => {
     setMobMaterialStage(mat, 4);
     assert.equal(mat.uniforms.uStage?.value, 4);
   });
+
+  it('supports morph targets with ShaderMaterial chunks', () => {
+    const mat = createFidelityMobMaterial({ stage: 2 });
+    assert.ok(mat.isMeshStandardMaterial);
+    assert.equal(typeof mat.onBeforeCompile, 'function');
+  });
 });

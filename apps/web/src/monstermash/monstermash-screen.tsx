@@ -12,6 +12,7 @@ import {
   type ArchiveSearchItem,
   type Md2ParsedModel,
   type WadArchive,
+  type FidelityMobMaterial,
 } from '@hm/shareware';
 import './monstermash.css';
 
@@ -27,8 +28,8 @@ export function MonsterMashScreen(props: { readonly onBack: () => void }): React
 
   // References for Three.js state
   const sceneRef = useRef<THREE.Scene | null>(null);
-  const mobMaterialRef = useRef<THREE.ShaderMaterial | null>(null);
-  const spriteMatRef = useRef<THREE.ShaderMaterial | null>(null);
+  const mobMaterialRef = useRef<FidelityMobMaterial | null>(null);
+  const spriteMatRef = useRef<FidelityMobMaterial | null>(null);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
   const actionsRef = useRef<Map<string, THREE.AnimationAction>>(new Map());
   const wadRef = useRef<WadArchive | null>(null);

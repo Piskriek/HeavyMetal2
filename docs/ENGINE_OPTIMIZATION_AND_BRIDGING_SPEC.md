@@ -169,7 +169,7 @@ How does SetMix know if another game is running?
 
 ### Core Philosophy: Minimalist Setup, Infinite Modularity
 Rather than trapping players in a complex 150-slider micro-morph character editor, SetMix empowers players to bring their identity from any game or 3D tool:
-1. **Lightweight Built-In Character Selection**: Pick archetype (Goblin, Human, Hazmat Scientist) + color palette tinting.
+1. **Lightweight Built-In Character Selection**: Pick archetype (Hazmat Scientist, IVA/EVA Human Researcher) + color palette tinting.
 2. **Universal 3D Upload (`.glb` / `.vrm` / `.gltf`)**: Drag and drop any 3D model into the browser or avatar dock; persists in browser `IndexedDB`.
 3. **Inter-Game Sidecar Avatar Bridge**: Live hot-folder (`~/.setmix/bridge/avatars/`) where models exported from Unreal Engine, Blender, VRChat, or Garry's Mod instantly populate the player's active character roster.
 4. **Reactive Resolution Harmonization**: Imported high-fidelity models adapt to the ambient terraforming tier via real-time Bayer dither, posterization, or wireframe quantization shaders.

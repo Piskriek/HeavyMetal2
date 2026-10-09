@@ -32,6 +32,7 @@ import { ResolutionCrafter } from '../crafter/crafter';
 import { PlayScreen } from '../play/play';
 import { exportIsland, importIsland } from '../islands/island-transfer';
 import { MonsterMashScreen } from '../monstermash/monstermash-screen';
+import { StudioScreen } from '../studio/studio-screen';
 
 /**
  * The shell of **SetMix Multiverse** (first called SetMix Harness): a world of activities. It opens on the SetMix home: the galaxy, with Goblin Racing selected and its menu live
@@ -40,7 +41,7 @@ import { MonsterMashScreen } from '../monstermash/monstermash-screen';
  * brings a bar down from the top (back to galaxy, up one level, into the selected). Everything is a screen of this one shell: there are no
  * separate pages, so nothing can strand you (see ROUTES and the e2e smoke test). Goblin words belong to Goblin Racing; the harness is SetMix.
  */
-export type Screen = 'home' | 'goblin' | 'create' | 'avatars' | 'zoom' | 'island' | 'activities' | 'hub' | 'activity' | 'racing' | 'settings' | 'build' | 'islands' | 'crafter' | 'play' | 'monstermash';
+export type Screen = 'home' | 'goblin' | 'create' | 'avatars' | 'zoom' | 'island' | 'activities' | 'hub' | 'activity' | 'racing' | 'settings' | 'build' | 'islands' | 'crafter' | 'play' | 'monstermash' | 'studio';
 
 /** Where "back" goes from every screen. The e2e test and the unit test walk this table: each screen must have a way home. */
 export const ROUTES: Readonly<Record<Screen, { readonly back: Screen | 'origin' | null; readonly doc: string }>> = {
@@ -60,6 +61,7 @@ export const ROUTES: Readonly<Record<Screen, { readonly back: Screen | 'origin' 
   crafter: { back: 'home', doc: 'The Resolution Crafter preview: your plot through the six stages, a test view (open with ?crafter in the address). Esc or Back to SetMix returns.' },
   play: { back: 'home', doc: 'Play: the first Play of the Resolution Crafter, in first person: you make your human in the lab, turn on the gate, look round your stage-0 plot and place your first machine. Esc pauses; Back to SetMix returns.' },
   monstermash: { back: 'home', doc: 'Monster Mash game jam exploration spike: live retro model, sprite, sound, and fidelity adaptation test.' },
+  studio: { back: 'home', doc: 'The Studio: modify the moon base game and forge new activity planets in the SetMix Multiverse.' },
 };
 
 const HOME: PlanetDef = { id: 'home', name: 'My Island', hue: 0.52, size: 1, ring: false, doc: 'Your own planet: walk it as your avatar, build, host.' };
@@ -101,6 +103,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   });
   // where the hub / activities / settings / the avatar maker were opened from: their Back and Esc return there, never to each other
   const origin = useRef<'home' | 'goblin' | 'island'>('home');
+  /** Campaign mode for PlayScreen: 'desynced' (solo branch) vs 'synced' (shared planetary grid). */
+  const [playSyncMode, setPlaySyncMode] = useState<'desynced' | 'synced'>('desynced');
   /** The Goblin Racing island: the world its menu orbits (its own map, never mixed with your islands). */
   const [raceWorld, setRaceWorld] = useState<World | null>(null);
   /** What the avatar maker leads to when done: a race (Goblin Racing's Play) or your island (My island). */
@@ -186,7 +190,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   // the window slides in once when it first appears on the home, not again each time Goblin Racing shrinks back into it
   const [arriving, setArriving] = useState(true);
   useEffect(() => { if (!raceWorld) return; const t = window.setTimeout(() => setArriving(false), 1300); return () => window.clearTimeout(t); }, [raceWorld]);
-  const go = useCallback((to: Screen) => { setScreen(to); setGalaxyOpacity(to === 'island' || to === 'build' || to === 'racing' || to === 'play' || to === 'crafter' ? 0 : 1); }, []);
+  const go = useCallback((to: Screen) => { setScreen(to); setGalaxyOpacity(to === 'island' || to === 'build' || to === 'racing' || to === 'play' || to === 'crafter' || to === 'studio' ? 0 : 1); }, []);
   const toHome = useCallback(() => { origin.current = 'home'; go('home'); setPicked('goblin-racing'); setIslandMenu(false); }, [go]);
   /** Goblin Racing's window grows into its own menu; the galaxy fades out behind it. */
   const toGoblin = useCallback(() => {
@@ -194,6 +198,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
     go('goblin');
   }, [go]);
   const toIsland = useCallback(() => { setIntro(false); setLevel('goblin'); setIslandMenu(false); go('island'); }, [go]);
+  /** The Studio: modify the moon base game and forge new activity planets in the SetMix Multiverse. */
+  const toStudio = useCallback(() => { origin.current = 'home'; go('studio'); }, [go]);
   /** Goblin Racing's track editor: the Goblin Racing island itself (your changes are your proposal for its weekly evolution, H7). */
   const toTrackEditor = useCallback(() => { if (!raceWorld) openRaceWorld(); setEditing('racing'); go('build'); }, [raceWorld, openRaceWorld, go]);
   const remember = (): void => { const s = screenRef.current; origin.current = s === 'home' ? 'home' : s === 'goblin' || s === 'activity' ? 'goblin' : s === 'island' || s === 'build' || s === 'zoom' ? 'island' : origin.current; };
@@ -327,9 +333,24 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
       {screen === 'home' ? <div className="shell-layer" style={{ zIndex: 2 }}><LabHome profile={profile} /></div> : null}
       {screen === 'home' ? (
         <div className="shell-layer shell-ui sm-layer" style={{ zIndex: 4 }}>
-          <SetMixHome leader={{ line: leaderLine, ring: leaderRing }} credits={profile.credits} onPlay={() => { origin.current = 'home'; go('play'); }} onGoblin={toGoblin} onMyIsland={() => { setPicked('home'); toIslands(); }} onAvatars={toAvatars} onCommunity={() => toHub()} onSettings={toSettings}
-            onManageProfiles={() => setManageProfilesOpen(true)} onSwitching={(name) => setSwitchingProfile(name)}
-            onIslandNow={() => void myIsland()} island={homeIsland ? { name: homeIsland.name, visited: player().created && homeIsland.lastVisitedAt > homeIsland.createdAt + 1000 } : null} />
+          <SetMixHome
+            leader={{ line: leaderLine, ring: leaderRing }}
+            credits={profile.credits}
+            onExpedition={() => { origin.current = 'home'; setPlaySyncMode('desynced'); go('play'); }}
+            onGrid={() => { origin.current = 'home'; setPlaySyncMode('synced'); go('play'); }}
+            onStudio={() => { toStudio(); }}
+            onWorkshop={() => { origin.current = 'home'; go('monstermash'); }}
+            onCommunity={() => toHub()}
+            onSettings={toSettings}
+            onPlay={() => { origin.current = 'home'; setPlaySyncMode('desynced'); go('play'); }}
+            onGoblin={toGoblin}
+            onMyIsland={() => { setPicked('home'); toIslands(); }}
+            onAvatars={toAvatars}
+            onManageProfiles={() => setManageProfilesOpen(true)}
+            onSwitching={(name) => setSwitchingProfile(name)}
+            onIslandNow={() => void myIsland()}
+            island={homeIsland ? { name: homeIsland.name, visited: player().created && homeIsland.lastVisitedAt > homeIsland.createdAt + 1000 } : null}
+          />
           {/* another planet picked: what is played there (Goblin Racing shows its live window instead) */}
           {/* your planet picked: its islands, drawn from above; pick one to go in, or open the planet for all of them */}
           {picks && picks.id === 'home' ? (
@@ -431,8 +452,17 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
 
       {screen === 'build' && editWorld ? (
         <div className="shell-layer" style={{ zIndex: 4 }}>
-          <MapMaker key={editWorld.id} rt={editWorld.rt} scene={editWorld.scene} onTestDrive={() => { setRaceEntry('select'); setRaceAuto(true); setRaceBack('build'); setRaceRt(null); go('racing'); }}
-            onExit={editing === 'racing' ? openSections : toIsland} onMenu={toHome} {...(editing === 'racing' ? { exitLabel: 'Back to Goblin Racing', place: 'Goblin Racing island' } : { onIslands: toIslands })} onCommunity={() => toHub()} />
+          <MapMaker
+            key={editWorld.id}
+            rt={editWorld.rt}
+            scene={editWorld.scene}
+            onTestDrive={() => { setRaceEntry('select'); setRaceAuto(true); setRaceBack('build'); setRaceRt(null); go('racing'); }}
+            onExit={toHome}
+            onMenu={toHome}
+            exitLabel="Back to FIDELITY"
+            place="Substrate Studio"
+            onCommunity={() => toHub()}
+          />
         </div>
       ) : null}
 
@@ -443,7 +473,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
       ) : null}
       {screen === 'play' ? (
         <div className="shell-layer" style={{ zIndex: 4 }}>
-          <PlayScreen profile={profile} onBack={toHome} />
+          <PlayScreen profile={profile} onBack={toHome} initialSyncMode={playSyncMode} />
         </div>
       ) : null}
       {screen === 'crafter' ? (
@@ -454,6 +484,25 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
       {screen === 'monstermash' ? (
         <div className="shell-layer" style={{ zIndex: 4 }}>
           <MonsterMashScreen onBack={toHome} />
+        </div>
+      ) : null}
+      {screen === 'studio' ? (
+        <div className="shell-layer" style={{ zIndex: 4 }}>
+          <StudioScreen
+            profile={profile}
+            onBack={toHome}
+            onUpdateProfile={(fn) => update(fn)}
+            onPlayCampaign={() => {
+              origin.current = 'home';
+              setPlaySyncMode('desynced');
+              go('play');
+            }}
+            onPlayPlanet={(_planetId) => {
+              origin.current = 'home';
+              setPlaySyncMode('desynced');
+              go('play');
+            }}
+          />
         </div>
       ) : null}
       {storageFull ? (

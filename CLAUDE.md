@@ -1,10 +1,29 @@
 # CLAUDE OPUS MASTER CONTEXT & OPERATING DIRECTIVE
-> **Game**: *SetMix: The Resolution Crafter* (incorporating the Game Jam *Monster Mash* expansion)  
+> **Game**: *FIDELITY: The SetMix Multiverse* (incorporating *The Resolution Crafter* & *Monster Mash*)  
 > **Repository**: `https://github.com/Piskriek/HeavyMetal2`  
 > **Active Branch**: `feat/monster-mash-exploration`  
 > **Root Workspace**: `c:\MarbleGp`  
-> **Handoff Document**: [`docs/CLAUDE_OPUS_HANDOFF.md`](file:///c:/MarbleGp/docs/CLAUDE_OPUS_HANDOFF.md)  
-> **Master Roadmap**: [`docs/V2_0_MASTER_PLAN.md`](file:///c:/MarbleGp/docs/V2_0_MASTER_PLAN.md) | Owner words: [`docs/OWNER_ASKS.md`](file:///c:/MarbleGp/docs/OWNER_ASKS.md)
+> **Sidecar Comms**: [`docs/SIDECAR_COMMS.md`](file:///c:/MarbleGp/docs/SIDECAR_COMMS.md)  
+> **Active Roadmap**: [`docs/ACTIVE_ROADMAP.md`](file:///c:/MarbleGp/docs/ACTIVE_ROADMAP.md)  
+> **Narrative Bible**: [`docs/NARRATIVE_AND_LORE_BIBLE.md`](file:///c:/MarbleGp/docs/NARRATIVE_AND_LORE_BIBLE.md) | Owner words: [`docs/OWNER_ASKS.md`](file:///c:/MarbleGp/docs/OWNER_ASKS.md)
+
+---
+
+## 0. THE CO-PILOT CONTRACT: "AAA THE FLASH JOB"
+> ⚠️ **CRITICAL DIRECTIVE FOR CLAUDE OPUS 5.5 MAX**:  
+> **DO NOT LOOK AT GEMINI FLASH'S CODE AND THINK: *"Oh, that's finished code."***
+
+### The Cognitive Gap & Division of Labor:
+- **Gemini Flash 3.8 High (The Vanguard / Scaffolder)**: Optimized for blazing throughput and rapid synthesis. Flash builds the rails, wires routes, satisfies the compiler, sets up WebGL hooks, creates working UI layouts, and ensures green tests.
+- **Claude Opus 5.5 Max (The Systems Architect / AAA Craftsman)**: Optimized for deep, multi-step deliberate reasoning, mathematical rigor, and production-grade craftsmanship.
+
+### Your Mandate as Claude Opus:
+1. **Never Assume Prototype Code is Final**: Flash builds working functional prototypes ("Flash jobs") so you never face a blank slate or broken build. **Your job is to "AAA" the Flash job**:
+   - Turn prototype UI into rich, deeply polished game-engine HUDs with micro-interactions, sound feedback, and live telemetry.
+   - Refactor client state and heuristic math into robust, pure ECS architectures and deterministic simulation logic.
+   - Deepen physics, collision meshes, stage shaders, and world persistence.
+2. **Do Not Become Passive**: If tests pass and TypeScript compiles, that is the *starting line*, not the finish line. Look at the prototype systems (Studio, Planet Forge, Monster Mash mobs, synced campaign) and elevate them into master-tier production systems.
+3. **Keep Sidecar Comms Synchronized**: Check [`docs/SIDECAR_COMMS.md`](file:///c:/MarbleGp/docs/SIDECAR_COMMS.md) before and after major architectural shifts.
 
 ---
 
@@ -35,7 +54,7 @@
 
 1. **NO VECTOR / SVG CONCEPT ART**:
    - **NEVER sketch crude SVG or vector graphic concept art.**
-   - Concept art is produced by **Arena.ai Codex / Art agents** (see [`docs/prompts/arena-setmix-concept-art.md`](file:///c:/MarbleGp/docs/prompts/arena-setmix-concept-art.md)).
+   - Concept art is produced by **Arena.ai Codex / Art agents** (see [`docs/concept/setmix/`](file:///c:/MarbleGp/docs/concept/setmix/)).
    - Claude reviews, plans, and builds toward approved concept art; Claude does not draw art.
 2. **LOAD FRONTEND DESIGN SKILLS (`/frontend`)**:
    - Do NOT ship bare, unstyled DOM, raw buttons, or browser defaults.
@@ -55,24 +74,58 @@
   - Prompts < 5,000 characters.
   - Pure TypeScript, strict types (`noUncheckedIndexedAccess`), zero DOM/Date/Math.random.
   - Reply route receiver: `scripts/arena-recv.mjs` (127.0.0.1:8791) writes to `arena-out/<pkg>/`.
-- **Full Reference**: Read [`docs/ARENA_PLAN.md`](file:///c:/MarbleGp/docs/ARENA_PLAN.md) and [`docs/handoff/CATCHUP.md`](file:///c:/MarbleGp/docs/handoff/CATCHUP.md) when preparing or running battles.
+- **Full Reference**: Read [`docs/ACTIVE_ROADMAP.md`](file:///c:/MarbleGp/docs/ACTIVE_ROADMAP.md) and [`docs/ENGINE_OPTIMIZATION_AND_BRIDGING_SPEC.md`](file:///c:/MarbleGp/docs/ENGINE_OPTIMIZATION_AND_BRIDGING_SPEC.md) when preparing or running battles.
 
 ---
 
-## 5. CURRENT MONSTER MASH SPIKE STATE (`feat/monster-mash-exploration`)
-- **Package `@hm/shareware`**:
-  - Pure DOOM WAD lump/palette/patch/sound parser.
-  - Quake 2 MD2 model loader with vertex morph target animations.
-  - Stage-adaptive fidelity material with Bayer dithering and contrast gamma curves.
-- **Recent Fixes Landed**:
-  - Ogro terrain elevation: grounded at surface level (`mesh.position.y = 1.444`).
-  - Demon transparent background: alpha cutout with `alphaTest: 0.5` and hardware fragment discard.
-  - Demon billboarding: cylindrical yaw-only facing camera (no pitch tilt, no group double rotation).
-  - Demon death: falls flat on ground as a horizontal gore decal (`rotation.x = -Math.PI / 2`, `y = 0.06`).
-  - Mouse input: pointer-lock freeze and exponential teleport jump eliminated via `captureMouse` and `lookFilter`.
-  - Tactical HUD: Stage switcher buttons (`0: Dither` to `4: PBR`) and combat telemetry live.
+## 5. CURRENT FIDELITY BASE GAME & STUDIO SUITE STATE (`feat/monster-mash-exploration`)
+- **FIDELITY Creative Studio (`apps/web/src/studio/studio-screen.tsx`)**:
+  - **Moon Base Game Editor**:
+    - Live 3D WebGL 2 lunar surface viewport with orbit camera & zoom controls.
+    - Fidelity stage progression scrubber ($S_1$ through $S_6$).
+    - Geological mantle cartridge slotting from `@hm/vault` (Lunar Anorthosite, Basalt, Olivine, Obsidian, Quartz, etc.).
+    - Topological elevation tuning (crater radius, floor depth, peak height).
+    - Machinery grid controls (pylon density, replicator yield, quantum bridge bandwidth).
+    - Substrate Coherence Telemetry HUD (resolution, lattice spacing, vertex budget, sync drift).
+    - Weekly Update Consensus Patch generator (JSON diff, cryptographic hash, submit to consensus queue).
+  - **Planet Forge (Multiverse Activity Creator)**:
+    - Celestial preset templates: *Ignis-IV Caldera* (Volcano), *Verdant-Prime Canopy* (Emerald), *Thalassa-Atoll Basin* (Coral), *Myco-VI Steppe* (Spore), *Lumen-IX Flats* (Prismata), *Selene Outpost* (Lunar).
+    - Real-time celestial visualizer with spherical 3D lighting, dynamic atmospheric hue (0°-359°), and ring configurations (none, thin, dense, dual).
+    - Activity Game System: Rover Circuit, Daemon Containment (Monster Mash), Terraforming Rally, Open Expedition, Quantum Sandbox.
+    - "Publish to SetMix Multiverse": registers custom activity planet into `profile.activities`, galaxy canvas orbit, and generates shareable `SMX-PLN-XXXX-NAME` code.
+- **Eradication of Legacy Island from Studio**:
+  - `toStudio` completely decoupled from old `openRaceWorld()` / `MapMaker` island path.
+  - Studio route is its own dedicated creative screen (`screen === 'studio'`).
+- **Unified Synced vs. Desynced Campaign**:
+  - Desynced (solo local branch) vs Synced (40,000 km shared world with majority-rules merging).
+  - In-game live branch toggle on campaign HUD (`[GRID SYNCED]` / `[SOLO DESYNCED]`).
+- **Monster Mash Retro Entities (`@hm/shareware`)**:
+  - Quake 2 MD2 3D Ogro + DOOM 2D billboard Demon with shotgun weapon pickups and combat telemetry.
 - **Verification Workflow**:
-  - `npm run typecheck` — TypeScript check across all packages.
-  - `npm test --workspace=@hm/shareware` — Run shareware unit tests (15/15 pass).
+  - `npm run typecheck` — TypeScript check across all packages (0 errors).
   - `npm run build` — Build single-file production bundle (`dist/index.html`).
+  - `node scripts/test-fidelity-sync-studio.mjs` — Automated Playwright test verifying Main Menu, Studio (Moon Editor + Planet Forge), and Synced/Desynced campaign.
   - `node scripts/test-planet-monstermash.mjs` — Automated Playwright test verifying mobs, combat, and rendering.
+
+---
+
+## 6. PINNED FOR NEXT MILESTONE: BASE-BUILDING, SUBSTRATE HARVESTING & LINKED STORAGE
+> 📌 **Directive from Owner**: Once current plans and Monster Mash stabilization wrap up, do NOT spiral into premature implementation. This architecture is formally pinned as the immediate next major milestone:
+
+1. **Freeform Base & Machine Construction (Valheim / Dune: Awakening style)**:
+   - Move away from machine spam: terraformers become **more expensive, heavier, and far more efficient**.
+   - Players build with structural freedom: foundations, walls, ramps, airlocks, and machine hardpoints.
+   - Deploy Arena Codex agent to build the base-building ECS package.
+2. **Substrate Resource Harvesting & Material Synthesis**:
+   - Harvest raw pixels ($\text{Pxd}$) and raw geometry vertices ($\text{Vtx}$) from anomalies and terrain.
+   - Refine raw pixels into **Material Texture Maps** and vertices into **3D Geometric Primitives** (cubes, cylinders, chassis frames).
+   - Combine primitives + maps at a Drafting Table to create custom structural presets.
+3. **Linked Quantum Bridge Storage**:
+   - The lab's quantum bridge technology links all base storage containers into an inter-dimensional shared inventory.
+   - Crafting benches and fabricators pull directly from the linked storage network.
+4. **Player Inventory & Hotbar**:
+   - Proper grid inventory, weight/stacking, hotbar slots, and tool/weapon equipment slots.
+5. **In-Game Vehicle & Weapon Fabricators**:
+   - Vehicles and weapons are researched and built in-game via fabricator benches.
+   - In The Workshop, players can skin their rovers with imported vehicle meshes from their favorite games.
+

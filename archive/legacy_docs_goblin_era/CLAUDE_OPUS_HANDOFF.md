@@ -1,14 +1,22 @@
-# SETMIX: THE RESOLUTION CRAFTER — MASTER HANDOFF TO CLAUDE OPUS
+# FIDELITY: THE SETMIX MULTIVERSE — MASTER HANDOFF TO CLAUDE OPUS
 
 > 🚀 **ACTIVE V2.0 MASTER PLAN (2026-10-09)**: **Read [`docs/V2_0_MASTER_PLAN.md`](file:///c:/MarbleGp/docs/V2_0_MASTER_PLAN.md) first!**  
-> Integrates the full narrative awakening (Acts I–III), the Game Jam **"Monster Mash"** weapon/combat expansion (Act IV: perimeter anomaly, armory shotgun, mob combat, dirt mining), the Studio schema editor & multi-branch consensus (Act V), color bloom (Act VI), and the bio-splicer combiner (Act VIII).  
-> Free & legal games catalog documented in **[`docs/FREE_GAMES_AND_ASSETS_RESEARCH.md`](file:///c:/MarbleGp/docs/FREE_GAMES_AND_ASSETS_RESEARCH.md)** (Freedoom BSD, LibreQuake BSD, Kenney CC0, Chex Quest freeware, shareware episodes).  
-> The technical exploration spike is verified with live GPU screenshots on branch [`feat/monster-mash-exploration`](file:///c:/MarbleGp/tree/feat/monster-mash-exploration) (`@hm/shareware` package, DOOM WAD lump/sprite/sound parser, Quake MD2 loader, fidelity shaders).
-
+> **Sidecar Comms Protocol**: [`docs/SIDECAR_COMMS.md`](file:///c:/MarbleGp/docs/SIDECAR_COMMS.md)  
 > **Target Model**: Claude 3.5 / 4.5 / 5.5 Opus (Max Reasoning Enabled)  
 > **Repository**: [`https://github.com/Piskriek/HeavyMetal2`](https://github.com/Piskriek/HeavyMetal2)  
+> **Active Branch**: `feat/monster-mash-exploration`  
 > **Workspace Root**: `c:\MarbleGp`  
-> **Status**: Verified on main, ready for V2.0 implementation waves.
+> **Status**: Verified build & Playwright tests passing. Ready for Claude Opus AAA systems elevation pass.
+
+---
+
+## 0. THE CO-PILOT CONTRACT: "AAA THE FLASH JOB"
+> ⚠️ **MANDATE FOR CLAUDE OPUS**:  
+> **Gemini Flash 3.8 High builds the fast, functional, typed prototypes ("Flash jobs"). DO NOT look at this working code and think "oh that's finished". Your explicit job is to "AAA" Flash's scaffolds.**
+>
+> 1. **Elevate Naive UI to Game-Engine Caliber**: Refactor layout scaffolds into rich, interactive HUDs with micro-animations, glowing telemetry, sound effects, and zero browser-default aesthetics.
+> 2. **Harden Systems & Math**: Upgrade prototype state hooks into pure, deterministic ECS systems and rigorous mathematical simulation models.
+> 3. **Implement Next Milestone**: Spearhead the pinned freeform base-building (Valheim/Dune style), raw pixel/vertex harvesting, and linked quantum bridge storage systems.
 
 ---
 

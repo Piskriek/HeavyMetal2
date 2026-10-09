@@ -89,11 +89,16 @@ const BLURB: Readonly<Record<MachineKind, string>> = {
 const signed = (v: number): string => `${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
 const KEYS: readonly [string, string][] = [['W A S D', 'walk'], ['Mouse', 'look'], ['Shift', 'run'], ['V', 'view'], ['E', 'use'], ['B', 'build'], ['Esc', 'pause']];
 
-export function PlayScreen(props: { readonly profile: Profile; readonly onBack: () => void }): ReactElement {
+export function PlayScreen(props: {
+  readonly profile: Profile;
+  readonly onBack: () => void;
+  readonly initialSyncMode?: 'desynced' | 'synced';
+}): ReactElement {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<PlayScene | null>(null);
   const reduced = useMemo(() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } }, []);
   const tier = useMemo(() => tierFor(props.profile), [props.profile.quality]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [syncMode, setSyncMode] = useState<'desynced' | 'synced'>(() => props.initialSyncMode ?? 'desynced');
   const [state, setState] = useState<PlayState>(loadSaved);
   const stateRef = useRef(state);
   const [ready, setReady] = useState(false);
@@ -736,6 +741,28 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
       {failed ? <p className="play-failed" role="alert">This browser could not start 3D graphics (WebGL 2). Try another browser, or turn on hardware acceleration in its settings.</p> : <canvas ref={canvasRef} className="play-canvas" onClick={() => { if (ready && !creating && !locked) lock(); }} aria-label="The lab, in first person. Click to look around." />}
       {!ready && !failed ? <div className="gr-loading play-loading" role="status"><span>{loading}</span><i /></div> : null}
 
+      {ready ? (
+        <div className="play-sync-indicator" title={syncMode === 'synced' ? 'Connected to shared 40,000 km planetary substrate' : 'Playing on private local simulation branch'}>
+          <span className={`sync-badge ${syncMode}`}>
+            <span className="sync-pulse" />
+            {syncMode === 'synced' ? 'GRID SYNCED' : 'SOLO DESYNCED'}
+          </span>
+          <button
+            className="sync-branch-toggle"
+            onClick={() => {
+              const next = syncMode === 'synced' ? 'desynced' : 'synced';
+              setSyncMode(next);
+              say(
+                next === 'synced' ? 'Synced with Planetary Grid' : 'Desynced to Solo Branch',
+                next === 'synced' ? 'Majority consensus active on Sector 4.' : 'Playing solo offline.',
+              );
+            }}
+          >
+            {syncMode === 'synced' ? 'Desync' : 'Sync'}
+          </button>
+        </div>
+      ) : null}
+
       {ready && creating ? (
         <div className="play-create">
           <CreateScientist inLab title="Who are you?" doneLabel="Done: into the lab"
@@ -1249,8 +1276,26 @@ export function PlayScreen(props: { readonly profile: Profile; readonly onBack: 
           {paused ? (
             <div className="play-pause" role="dialog" aria-label="Paused">
               <h2>Paused</h2>
+              <div className="play-pause-sync">
+                <span>Simulation Mode:</span>
+                <b className={syncMode === 'synced' ? 'synced' : 'desynced'}>
+                  {syncMode === 'synced' ? 'Planetary Grid (Synced Shared World)' : 'Expedition (Desynced Solo Branch)'}
+                </b>
+              </div>
               <button className="go" onClick={lock}>Resume</button>
-              <button onClick={props.onBack}>Back to SetMix</button>
+              <button
+                onClick={() => {
+                  const next = syncMode === 'synced' ? 'desynced' : 'synced';
+                  setSyncMode(next);
+                  say(
+                    next === 'synced' ? 'Connected to Planetary Grid' : 'Desynced to Solo Branch',
+                    next === 'synced' ? 'Majority consensus active on Sector 4.' : 'Playing solo offline. Changes are local.',
+                  );
+                }}
+              >
+                {syncMode === 'synced' ? 'Desync to Solo Branch' : 'Sync to Planetary Grid (Majority Merge)'}
+              </button>
+              <button onClick={props.onBack}>Back to FIDELITY</button>
             </div>
           ) : null}
           <button

@@ -55,58 +55,162 @@ export function GoblinFront(props: GoblinStatus & { readonly onPlay: () => void;
   );
 }
 
-type MenuId = 'racing' | 'play' | 'studio' | 'island' | 'avatars' | 'community' | 'settings';
-interface MenuItem { readonly id: MenuId; readonly label: string; readonly says: string }
+export type MenuId =
+  | 'expedition'
+  | 'grid'
+  | 'fabricator'
+  | 'studio'
+  | 'workshop'
+  | 'community'
+  | 'settings'
+  | 'racing'
+  | 'play'
+  | 'island'
+  | 'avatars';
 
-const RACING_ITEM: MenuItem = { id: 'racing', label: 'Goblin Racing', says: 'Race goblins in glass balls round an island.' };
-const HARNESS_MENU: readonly MenuItem[] = [
-  { id: 'play', label: 'Play', says: 'Your plot on the planet: terraform it, stage by stage.' },
-  { id: 'studio', label: 'Studio', says: 'The full lab with everything unlocked. Coming with the new lab.' },
-  { id: 'island', label: 'My planet', says: 'Your islands: pick one to go in, or make a new one.' },
-  { id: 'avatars', label: 'Avatars', says: 'Who you are: goblins, humans and more.' },
-  { id: 'community', label: 'Community', says: 'Presets other players share, and yours.' },
-  { id: 'settings', label: 'Settings', says: 'Graphics, controls and your profile.' },
+export interface MenuItem {
+  readonly id: MenuId;
+  readonly label: string;
+  readonly says: string;
+  readonly badge?: string;
+}
+
+const FIDELITY_MENU: readonly MenuItem[] = [
+  { id: 'expedition', label: 'Expedition', says: 'Singleplayer campaign (desynced): private local simulation branch. Play solo/offline.', badge: 'DESYNCED' },
+  { id: 'grid', label: 'Planetary Grid', says: 'Multiplayer campaign (synced): shared 40,000 km world. Majority rules merging.', badge: 'SYNCED' },
+  { id: 'studio', label: 'The Studio', says: 'In-engine world & schema editor. Terrain sculpting, machine placement & test drive.', badge: 'EDITOR' },
+  { id: 'workshop', label: 'The Workshop', says: 'Game bridging manager: ingest WAD/PAK/MD2, calibrate vehicle & weapon adapters.' },
+  { id: 'community', label: 'Community Nexus', says: 'Share presets, bridge cartridges, and sector layouts.' },
+  { id: 'settings', label: 'Diagnostics & Settings', says: 'Fidelity stages, Bayer dither, raw input, audio & hardware.' },
 ];
 
-/** The menu for a version of the game (owner, 2026-10-06 20:30): Goblin Racing is only in its own version, at the top. */
+const RACING_ITEM: MenuItem = { id: 'racing', label: 'Goblin Racing', says: 'Race goblins in glass balls round an island.' };
+
+/** The menu for a version of the game: Goblin Racing remains accessible if specifically requested. */
 export function homeMenu(edition: Edition): readonly MenuItem[] {
-  return edition === 'goblin-racing' ? [RACING_ITEM, ...HARNESS_MENU] : HARNESS_MENU;
+  return edition === 'goblin-racing' ? [RACING_ITEM, ...FIDELITY_MENU] : FIDELITY_MENU;
 }
 
 import { ProfileChip } from './profile-chip';
+import { FidelityLogo } from './fidelity-logo';
 
 /**
- * The SetMix home's own chrome over the lab (lab/lab.tsx): the wordmark and the menu (Play, Studio, your island, the community,
- * settings; Goblin Racing first in its own version). The leader line is the star chart's, drawn when a planet is picked there.
+ * The FIDELITY home: The base game of the SetMix Multiverse.
+ * Operates over the Lunar Observation Lab backdrop, presenting the comprehensive
+ * mission suite (Expedition [Desynced], Planetary Grid [Synced], Studio, Workshop, Community, Settings)
+ * and real-time substrate telemetry.
  */
 export function SetMixHome(props: {
-  readonly onMyIsland: () => void; readonly onAvatars: () => void; readonly onCommunity: () => void; readonly onSettings: () => void; readonly credits: number;
-  /** Play: SetMix's own game mode, the Resolution Crafter (your plot for now; the lab with its gate comes in SETMIX_PLAN Phase 4). */
-  readonly onPlay: () => void;
-  /** Goblin Racing's own menu (the Goblin Racing version only). */
-  readonly onGoblin: () => void;
-  /** Straight into the island you were last on (or your first). */
-  readonly onIslandNow: () => void;
-  /** The island My island opens, and whether you have been there before (then it says you carry on where you left off). */
-  readonly island: { readonly name: string; readonly visited: boolean } | null;
-  readonly leader: { readonly line: Ref<SVGLineElement>; readonly ring: Ref<SVGCircleElement> };
+  readonly onExpedition?: () => void;
+  readonly onGrid?: () => void;
+  readonly onFabricator?: () => void;
+  readonly onStudio?: () => void;
+  readonly onWorkshop?: () => void;
+  readonly onCommunity: () => void;
+  readonly onSettings: () => void;
+  readonly credits: number;
+  // Compatibility props:
+  readonly onPlay?: () => void;
+  readonly onGoblin?: () => void;
+  readonly onMyIsland?: () => void;
+  readonly onAvatars?: () => void;
+  readonly onIslandNow?: () => void;
+  readonly island?: { readonly name: string; readonly visited: boolean } | null;
+  readonly leader?: { readonly line: Ref<SVGLineElement>; readonly ring: Ref<SVGCircleElement> };
   readonly onManageProfiles?: () => void;
   readonly onSwitching?: (name: string) => void;
 }): ReactElement {
-  // Studio has nothing to open until the new lab exists, so it says so and stays disabled
-  const act: Record<MenuId, (() => void) | undefined> = { play: props.onPlay, studio: undefined, racing: props.onGoblin, island: props.onMyIsland, avatars: props.onAvatars, community: props.onCommunity, settings: props.onSettings };
+  const act: Record<MenuId, (() => void) | undefined> = {
+    expedition: props.onExpedition ?? props.onPlay,
+    play: props.onPlay,
+    grid: props.onGrid ?? props.onPlay,
+    island: props.onMyIsland,
+    fabricator: props.onFabricator,
+    studio: props.onStudio,
+    workshop: props.onWorkshop,
+    community: props.onCommunity,
+    settings: props.onSettings,
+    racing: props.onGoblin,
+    avatars: props.onAvatars,
+  };
+
   return (
-    <div className="sm-home lab">
-      <svg className="sm-leader" aria-hidden="true"><circle ref={props.leader.ring} r="0" /><line ref={props.leader.line} /></svg>
-      <div className="sm-brand"><b>SetMix</b><i>Multiverse</i></div>
-      <nav className="sm-menu" aria-label="SetMix">
+    <div className="sm-home lab fidelity-home">
+      {props.leader ? (
+        <svg className="sm-leader" aria-hidden="true"><circle ref={props.leader.ring} r="0" /><line ref={props.leader.line} /></svg>
+      ) : null}
+
+      {/* Brand Header */}
+      <div className="sm-brand fidelity-brand">
+        <div className="fidelity-brand-lockup">
+          <FidelityLogo size={58} glow />
+          <div className="fidelity-brand-text">
+            <b>FIDELITY</b>
+            <i>A SetMix System // Substrate Research Initiative</i>
+          </div>
+        </div>
+      </div>
+
+      {/* Primary Navigation Suite */}
+      <nav className="sm-menu fidelity-menu" aria-label="FIDELITY Operations">
         {homeMenu(EDITION).map((m, i) => (
           <Fragment key={m.id}>
-            <button style={{ ['--i' as string]: i }} onClick={act[m.id]} disabled={!act[m.id]}><b>{m.label}</b><small>{m.says}</small></button>
-            {m.id === 'island' && props.island ? <button className="sm-sub" style={{ ['--i' as string]: i }} onClick={props.onIslandNow}>{props.island.visited ? `Carry on at ${props.island.name}` : `Go to ${props.island.name}`}</button> : null}
+            <button
+              style={{ ['--i' as string]: i }}
+              onClick={act[m.id]}
+              disabled={!act[m.id]}
+              className={m.badge ? 'has-badge' : ''}
+            >
+              <div className="sm-menu-label-row">
+                <b>{m.label}</b>
+                {m.badge ? <span className="fidelity-badge">{m.badge}</span> : null}
+              </div>
+              <small>{m.says}</small>
+            </button>
           </Fragment>
         ))}
       </nav>
+
+      {/* Live Substrate Telemetry HUD (Right Observation Panel) */}
+      <aside className="fidelity-telemetry-hud" aria-label="Substrate Telemetry">
+        <div className="hud-panel-header">
+          <span className="hud-indicator-dot pulsing" />
+          <span>SUBSTRATE TELEMETRY</span>
+        </div>
+
+        <div className="hud-tile">
+          <div className="hud-tile-title">CONTAINMENT INTEGRITY</div>
+          <div className="hud-tile-value cyan">98.4%</div>
+          <div className="hud-meter-track">
+            <div className="hud-meter-bar" style={{ width: '98.4%' }} />
+          </div>
+          <div className="hud-tile-sub">SUBSTRATE DRIFT: NOMINAL</div>
+        </div>
+
+        <div className="hud-tile">
+          <div className="hud-tile-title">ACTIVE RESOLUTION VECTOR</div>
+          <div className="hud-vector-grid">
+            <span title="Pixel Density">Pxd: <b>1.00</b></span>
+            <span title="Vertex Tessellation">Vtx: <b>1.00</b></span>
+            <span title="Lux / Shading">Lx: <b>1.00</b></span>
+            <span title="Acoustics">Aq: <b>1.00</b></span>
+          </div>
+          <div className="hud-tile-sub">S = (Pxd, Vtx, Lx, Aq)</div>
+        </div>
+
+        <div className="hud-tile">
+          <div className="hud-tile-title">WEEKLY PROTOCOL</div>
+          <div className="hud-tile-value amber">CYCLE 42</div>
+          <div className="hud-tile-sub">COMMUNITY CONSENSUS ACTIVE</div>
+        </div>
+
+        <div className="hud-tile">
+          <div className="hud-tile-title">LUNAR PORTAL</div>
+          <div className="hud-badge-online">GATE SHIELDED // READY</div>
+        </div>
+      </aside>
+
+      {/* Top Controls */}
       <div className="sm-top-controls">
         <ProfileChip onManageProfiles={props.onManageProfiles ?? (() => {})} onSwitching={props.onSwitching} />
         <span className="sm-credits" title="In-game credits. Never real money.">{props.credits} cr</span>

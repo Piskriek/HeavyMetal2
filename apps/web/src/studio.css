@@ -604,6 +604,186 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
 .sm-layer .shell-card .quiet { margin-left: 8px; }
 @keyframes sm-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
+/* ==========================================================================
+   FIDELITY: Base Game Branding & Substrate Telemetry HUD
+   ========================================================================== */
+.fidelity-brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: clamp(14px, 1.8vw, 24px);
+}
+.fidelity-logo {
+  width: clamp(56px, 6vw, 78px);
+  height: clamp(56px, 6vw, 78px);
+  flex-shrink: 0;
+  transition: transform 0.3s var(--ease-out), filter 0.3s ease;
+}
+.fidelity-logo.glow {
+  filter: drop-shadow(0 0 12px rgba(0, 229, 255, 0.4));
+}
+.fidelity-logo:hover {
+  transform: scale(1.05);
+  filter: drop-shadow(0 0 22px rgba(0, 229, 255, 0.75));
+}
+.fidelity-brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.fidelity-brand-text b {
+  font-family: var(--font-setmix);
+  font-weight: 800;
+  font-size: clamp(40px, 5.5vw, 76px);
+  letter-spacing: 0.03em;
+  line-height: 0.88;
+  color: #f1f4f5;
+  text-shadow: 0 0 24px rgba(0, 229, 255, 0.28), 0 2px 6px rgba(0, 0, 0, 0.85);
+}
+.fidelity-brand-text i {
+  font-family: var(--font-mono, monospace);
+  font-size: clamp(11px, 0.95vw, 13px);
+  letter-spacing: 0.12em;
+  color: #00e5ff;
+  text-transform: uppercase;
+  margin-top: 2px;
+  opacity: 0.92;
+}
+
+.sm-menu-label-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.fidelity-badge {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 1px 7px;
+  border-radius: 3px;
+  background: rgba(0, 229, 255, 0.12);
+  color: #00e5ff;
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  text-shadow: 0 0 6px rgba(0, 229, 255, 0.4);
+}
+
+/* Substrate Telemetry Observation Panel */
+.fidelity-telemetry-hud {
+  position: absolute;
+  right: clamp(20px, 3.5vw, 48px);
+  top: clamp(80px, 12vh, 120px);
+  width: min(300px, 32vw);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+  animation: sm-in 0.8s var(--ease-out) 0.2s both;
+  z-index: 10;
+}
+.hud-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: rgba(232, 238, 241, 0.7);
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(0, 229, 255, 0.2);
+}
+.hud-indicator-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #00e5ff;
+  box-shadow: 0 0 8px #00e5ff;
+}
+.hud-indicator-dot.pulsing {
+  animation: hud-pulse 2s infinite ease-in-out;
+}
+@keyframes hud-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.2); box-shadow: 0 0 12px #00e5ff; }
+}
+
+.hud-tile {
+  background: rgba(10, 16, 22, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(0, 229, 255, 0.18);
+  border-left: 3px solid rgba(0, 229, 255, 0.6);
+  border-radius: 4px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+.hud-tile-title {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: rgba(232, 238, 241, 0.6);
+  text-transform: uppercase;
+}
+.hud-tile-value {
+  font-family: var(--font-mono, monospace);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+.hud-tile-value.cyan {
+  color: #00e5ff;
+  text-shadow: 0 0 12px rgba(0, 229, 255, 0.5);
+}
+.hud-tile-value.amber {
+  color: #ffb300;
+  text-shadow: 0 0 12px rgba(255, 179, 0, 0.5);
+}
+.hud-tile-sub {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: rgba(232, 238, 241, 0.5);
+}
+.hud-meter-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 2px 0;
+}
+.hud-meter-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #00e5ff, #7be7ff);
+  box-shadow: 0 0 6px #00e5ff;
+}
+.hud-vector-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: rgba(232, 238, 241, 0.85);
+  margin: 3px 0;
+}
+.hud-vector-grid b {
+  color: #00e5ff;
+}
+.hud-badge-online {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 700;
+  color: #00e5ff;
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+
 /* Goblin Racing's stage: a live window beside its planet on the home; open it and the same window grows to fill the screen */
 /* The window: --gr-l / --gr-t are where it sits; the scene inside is moved back by the same amount on the same curve, so the 3D view stays put */
 .gr-stage { --gr-w: min(42vw, 640px); --gr-l: calc(96vw - var(--gr-w)); --gr-t: 16vh; position: absolute; left: var(--gr-l); top: var(--gr-t); width: var(--gr-w); height: min(58vh, 470px);

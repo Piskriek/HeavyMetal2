@@ -123,3 +123,43 @@ export const ITEMS: Readonly<Record<string, ItemSpec>> = buildItems();
 export const EQUIP: Readonly<Record<string, EquipSlot>> = {
   'eq-visor': 'visor', 'eq-shield': 'shield', 'eq-rebreather': 'rebreather', 'tool-beam': 'beam', 'wpn-shotgun': 'sidearm',
 };
+
+// ---------------------------------------------------------------------------------------------- heavy machines and refining
+/** The heavy terraformers that bolt onto a hardpoint (D3). Mills and presses also refine; projectors and water makers only pour. */
+export const HEAVY = ['mill', 'press', 'projector', 'water'] as const;
+export type HeavyKind = (typeof HEAVY)[number];
+
+/** What installing one costs: heavy, expensive, and worth about twenty field machines. */
+export const HEAVY_BILL: Readonly<Record<HeavyKind, readonly { readonly item: string; readonly n: number }[]>> = {
+  mill: [{ item: 'ore', n: 200 }, { item: 'prim-cube', n: 6 }, { item: 'prim-chassis', n: 2 }],
+  press: [{ item: 'ore', n: 260 }, { item: 'prim-cube', n: 4 }, { item: 'prim-beam', n: 4 }, { item: 'prim-chassis', n: 2 }],
+  projector: [{ item: 'ore', n: 320 }, { item: 'prim-column', n: 4 }, { item: 'prim-chassis', n: 3 }, { item: 'map-quartz', n: 4 }],
+  water: [{ item: 'ore', n: 380 }, { item: 'prim-column', n: 6 }, { item: 'prim-chassis', n: 3 }, { item: 'map-moss', n: 4 }],
+};
+
+export interface Recipe {
+  readonly id: string;
+  readonly machine: 'mill' | 'press';
+  readonly inputs: readonly { readonly item: string; readonly n: number }[];
+  readonly output: { readonly item: string; readonly n: number };
+  /** Seconds of work at full power. */
+  readonly seconds: number;
+}
+
+/** Mills turn raw pixels into texture maps; presses turn raw vertices into primitives. Chroma and fine grades come later in the stages. */
+export const RECIPES: readonly Recipe[] = [
+  { id: 'map-basalt', machine: 'mill', inputs: [{ item: 'pxd-mono', n: 20 }, { item: 'ore', n: 5 }], output: { item: 'map-basalt', n: 1 }, seconds: 30 },
+  { id: 'map-obsidian', machine: 'mill', inputs: [{ item: 'pxd-mono', n: 30 }, { item: 'pxd-chroma', n: 5 }], output: { item: 'map-obsidian', n: 1 }, seconds: 45 },
+  { id: 'map-quartz', machine: 'mill', inputs: [{ item: 'pxd-chroma', n: 25 }], output: { item: 'map-quartz', n: 1 }, seconds: 45 },
+  { id: 'map-moss', machine: 'mill', inputs: [{ item: 'pxd-chroma', n: 15 }, { item: 'pxd-mono', n: 15 }], output: { item: 'map-moss', n: 1 }, seconds: 40 },
+  { id: 'prim-cube', machine: 'press', inputs: [{ item: 'vtx-rough', n: 12 }], output: { item: 'prim-cube', n: 1 }, seconds: 20 },
+  { id: 'prim-column', machine: 'press', inputs: [{ item: 'vtx-rough', n: 8 }, { item: 'vtx-fine', n: 2 }], output: { item: 'prim-column', n: 1 }, seconds: 25 },
+  { id: 'prim-beam', machine: 'press', inputs: [{ item: 'vtx-rough', n: 6 }, { item: 'vtx-fine', n: 4 }], output: { item: 'prim-beam', n: 1 }, seconds: 25 },
+  { id: 'prim-chassis', machine: 'press', inputs: [{ item: 'vtx-fine', n: 12 }, { item: 'vtx-rough', n: 8 }], output: { item: 'prim-chassis', n: 1 }, seconds: 50 },
+];
+export const RECIPE_BY_ID: Readonly<Record<string, Recipe>> = Object.fromEntries(RECIPES.map((r) => [r.id, r]));
+
+/** Jobs a machine holds at once (the one running plus the waiting ones). */
+export const QUEUE_MAX = 5;
+/** The plot's anomaly field: its radius in metres (one 1 km plot). */
+export const FIELD_RADIUS = 500;

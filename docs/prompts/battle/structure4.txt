@@ -1,0 +1,40 @@
+Follow-up, same chat, same package `@hm/structure`: keep rounds 1-3 (all their tests must still pass) and add NEW PIECE KINDS, so bases stop looking like boxes. Reply with the two full files again, src/index.ts and tests/structure.test.ts, then STOP. Same rules: strict TS (noUncheckedIndexedAccess), pure, deterministic, no DOM/Date/Math.random.
+APPEND to Kind (never reorder): 'halfWall' | 'windowWall' | 'doorframe' | 'door' | 'railing' | 'ladder' | 'stairs' | 'lifeSupport'.
+EDGE FAMILY: the six new edge kinds use the wall's slot (r is 0 or 1, one piece per edge). Each one is held up exactly as a wall is today (cells at its level on either side, pillars at its ends, neighbouring edges in line), and they snap like walls.
+- CARRYING edges (wall, airlock, windowWall, doorframe, door) carry what rests on them: the cells of the level above take vertical support from them, as from walls now, and so does the edge directly above.
+- halfWall, railing and ladder carry nothing: no cell and no edge takes support from them.
+- SEALING in rooms(): wall and windowWall always seal; airlock and door seal only when shut; halfWall, doorframe, railing and ladder never seal.
+- setOpen works on airlocks and doors (base unchanged otherwise). `open` may appear only on those two kinds.
+STAIRS: a cell kind with the ramp's slot, rules, support and snapping (r 0..3).
+LIFE SUPPORT: a fixture kind, like bin and bench (needs a floor or foundation in its cell).
+Room gains two fields, both ascending ids: `doors: number[]` (door pieces on the room's boundary, like airlocks) and `lifeSupport: number[]` (lifeSupport pieces standing in the room's cells).
+CODEC v2: today a piece byte packs kindIndex + r*16 + open*64, and 18 kinds no longer fit in 4 bits. encode now writes format version 2 with the kind in its own field; append the new kinds to the codec's kind list. decode reads BOTH versions: every text round 3 made still decodes to the same base. All round-3 hostile rules stay, plus `open` only on airlock/door, and decode leaves `open` absent unless it is true.
+Keep this test unchanged too; add your own:
+```ts
+import { empty, found, place, rooms, setOpen, encode, decode, type Base, type Env, type Piece } from '../src/index';
+const E: Env = { heightAt: () => 0, materials: { reg: { vKeep: 0.9, hKeep: 0.6 } } };
+const put = (b: Base, p: Omit<Piece, 'id' | 'mat'>): Base => { const r = place(b, E, { ...p, mat: 'reg' }); assert.ok(r.ok, `${p.kind}: ${r.why}`); return r.base; };
+test('round 4a: new edges seal, carry and open as their kinds say; codec v1 still reads', () => {
+  let b = found(empty(), E, 0, 0, 0, 'reg').base; const s = b.structures[0]!.id;
+  b = put(b, { s, kind: 'wall', i: 0, j: 0, k: 0, r: 0 }); b = put(b, { s, kind: 'windowWall', i: 0, j: 1, k: 0, r: 0 });
+  b = put(b, { s, kind: 'door', i: 0, j: 0, k: 0, r: 1 }); b = put(b, { s, kind: 'wall', i: 1, j: 0, k: 0, r: 1 });
+  b = put(b, { s, kind: 'floor', i: 0, j: 0, k: 1, r: 0 }); b = put(b, { s, kind: 'lifeSupport', i: 0, j: 0, k: 0, r: 0 });
+  const room = rooms(b).find((rm) => rm.k === 0)!;
+  assert.equal(room.sealed, true); assert.equal(room.doors.length, 1); assert.equal(room.lifeSupport.length, 1); assert.deepEqual(room.airlocks, []);
+  const door = b.pieces.find((p) => p.kind === 'door')!;
+  assert.equal(rooms(setOpen(b, door.id, true)).find((rm) => rm.k === 0)!.sealed, false);
+  // a doorframe carries a floor above; a railing does not
+  b = put(b, { s, kind: 'foundation', i: 6, j: 0, k: 0, r: 0 }); b = put(b, { s, kind: 'doorframe', i: 6, j: 0, k: 0, r: 0 }); b = put(b, { s, kind: 'floor', i: 6, j: 0, k: 1, r: 0 });
+  b = put(b, { s, kind: 'foundation', i: 9, j: 0, k: 0, r: 0 }); b = put(b, { s, kind: 'railing', i: 9, j: 0, k: 0, r: 0 });
+  const hang = place(b, E, { s, kind: 'floor', i: 9, j: 0, k: 1, r: 0, mat: 'reg' }); assert.equal(hang.ok, false); assert.equal(hang.why, 'unsupported');
+  // a wall cannot stand on a half wall alone, but can on a window wall
+  b = put(b, { s, kind: 'foundation', i: 12, j: 0, k: 0, r: 0 }); b = put(b, { s, kind: 'halfWall', i: 12, j: 0, k: 0, r: 0 }); b = put(b, { s, kind: 'windowWall', i: 12, j: 1, k: 0, r: 0 });
+  assert.equal(place(b, E, { s, kind: 'wall', i: 12, j: 0, k: 1, r: 0, mat: 'reg' }).why, 'unsupported');
+  b = put(b, { s, kind: 'wall', i: 12, j: 1, k: 1, r: 0 });
+  b = put(b, { s, kind: 'stairs', i: 0, j: -1, k: 0, r: 2 }); b = put(b, { s, kind: 'ladder', i: 6, j: 1, k: 0, r: 0 });
+  const back = decode(encode(b)); assert.ok(back); assert.deepEqual(back, b);
+  const v1 = decode('SE0BBwEC6AIAn0rwLgEDcmVnBQQAAAAAAAACAAMAAAAAAgBUAAAAAAIAJwAAAAACAAACAAAA');
+  assert.ok(v1); assert.deepEqual(v1.pieces.map((p) => [p.kind, p.i, p.j, p.r, p.open === true]), [['foundation', 0, 0, 0, false], ['wall', 0, 0, 0, false], ['airlock', 0, 0, 1, true], ['bin', 0, 0, 2, false], ['foundation', 1, 0, 0, false]]);
+  assert.equal(decode(encode(b).slice(0, -2)), null);
+});
+```

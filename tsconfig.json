@@ -333,6 +333,9 @@
       "@hm/lattice": [
         "packages/lattice/src/index.ts"
       ],
+      "@hm/substrate": [
+        "packages/substrate/src/index.ts"
+      ],
       "@hm/fieldkit": [
         "packages/fieldkit/src/index.ts"
       ],

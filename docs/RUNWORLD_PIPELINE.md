@@ -136,6 +136,22 @@ About 1.1k credits per prop, so the 55k 3D pool covers about 45 to 50 props.
 - **Audio: RUN** (ElevenLabs): the narration in the FIDELITY Mentor voice, then music and effects.
 - Batch: `docs/runworld/assets.json` (63 assets). Scripts: `runworld-assets.mjs` (images), `local3d.mjs` (models), `runworld-post.mjs` (fit, levels, bake, pack), `runworld-contact.mjs` (review sheets).
 
+## 4d. Packaging decision for the owner (measured 2026-10-11 on 23 finished assets)
+- **Per asset, on average:** low 69 KB, mid 156 KB, high 298 KB, so about 523 KB.
+  - At 64 assets that is **about 33 MB**, or **about 44 MB once inlined** into the single-file bundle (base64 adds a third).
+  - The bundle is 9.7 MB today.
+- **Options:**
+
+| Option | Single file? | Bundle | Notes |
+|---|---|---|---|
+| A. All three levels inline | yes | ~54 MB | The constitution kept as is. A slow first load on the web and more memory. |
+| B. Low + high inline (drop mid) | yes | ~41 MB | The Graphics setting picks low or high. Mid adds little over high on the min-spec laptop. |
+| C. One shared colour and metal/roughness map per asset (only the normal map per level) | yes | saves ~3–4 MB on A or B | It costs no quality: the UVs are the same on every level. Do it whatever else is chosen. |
+| D. Low inline, mid and high as an "HD pack" file beside the HTML (or fetched from the RUN.world deploy) | the game stays one file and playable; HD is optional | ~15 MB + pack ~30 MB | Breaks "zero-dependency" only for the optional upgrade. |
+
+- **My recommendation:** C plus D. The single file stays playable and lean (the faceted low level is the stage-1 look anyway), and the HD pack upgrades it when present. B plus C is the choice if one file is non-negotiable.
+- **Git:** about 33 MB of binary GLBs. Options: commit them (fine under GitHub's 100 MB per-file limit, but the repo grows with every regeneration), use Git LFS, or keep them in `zips/` and package from a release archive. My recommendation is Git LFS for `apps/web/src/assets/gen/**/*.glb`.
+
 ## 5. Credit plan (proposal for the owner)
 | Pool | Credits | Notes |
 |---|---|---|

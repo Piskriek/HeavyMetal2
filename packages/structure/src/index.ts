@@ -16,7 +16,13 @@ export type Kind =
   | 'railing'
   | 'ladder'
   | 'stairs'
-  | 'lifeSupport';
+  | 'lifeSupport'
+  | 'roof'
+  | 'lowRoof'
+  | 'roofOuter'
+  | 'roofInner'
+  | 'gable'
+  | 'ridgeCap';
 
 export interface Material {
   readonly vKeep: number;
@@ -110,7 +116,9 @@ export const LIMITS = {
   maxLevel: 63,
 } as const;
 
-const CELL_KINDS: readonly Kind[] = ['foundation', 'floor', 'ramp', 'stairs'];
+/** Roof cells take the cell slot of the storey they cap; their eave sits on that level's floor top. */
+const ROOF_KINDS: readonly Kind[] = ['roof', 'lowRoof', 'roofOuter', 'roofInner'];
+const CELL_KINDS: readonly Kind[] = ['foundation', 'floor', 'ramp', 'stairs', ...ROOF_KINDS];
 const EDGE_KINDS: readonly Kind[] = [
   'wall',
   'airlock',
@@ -120,6 +128,8 @@ const EDGE_KINDS: readonly Kind[] = [
   'door',
   'railing',
   'ladder',
+  'gable',
+  'ridgeCap',
 ];
 const FIXTURE_KINDS: readonly Kind[] = [
   'hardpoint',
@@ -165,7 +175,13 @@ function isKind(value: unknown): value is Kind {
     value === 'railing' ||
     value === 'ladder' ||
     value === 'stairs' ||
-    value === 'lifeSupport'
+    value === 'lifeSupport' ||
+    value === 'roof' ||
+    value === 'lowRoof' ||
+    value === 'roofOuter' ||
+    value === 'roofInner' ||
+    value === 'gable' ||
+    value === 'ridgeCap'
   );
 }
 
@@ -179,6 +195,68 @@ function isEdgeKind(kind: Kind): boolean {
 
 function isFixtureKind(kind: Kind): boolean {
   return FIXTURE_KINDS.includes(kind);
+}
+
+function isRoofKind(kind: Kind): boolean {
+  return ROOF_KINDS.includes(kind);
+}
+
+/** A side of a cell. A quarter turn (r + 1) takes +z to -x, -x to -z, -z to +x and +x to +z, as the renderer turns pieces. */
+type Side = '+z' | '-x' | '-z' | '+x';
+const TURN: readonly Side[] = ['+z', '-x', '-z', '+x'];
+const turned = (side: Side, r: number): Side => TURN[(TURN.indexOf(side) + r) % 4] ?? side;
+
+/** The edge slot on one side of cell (i, j), as [i, j, r]. */
+function sideEdge(i: number, j: number, side: Side): readonly [number, number, 0 | 1] {
+  switch (side) {
+    case '+z': return [i, j + 1, 0];
+    case '-z': return [i, j, 0];
+    case '+x': return [i + 1, j, 1];
+    case '-x': return [i, j, 1];
+  }
+}
+
+/**
+ * Which sides of a roof cell are high (the ridge), low (the eave, on the floor line) and rising sides. For r = 0 a roof
+ * or low roof rises toward +z; a hip corner (roofOuter) has its eaves on -z and -x and rises to the (+x, +z) corner; a
+ * valley corner (roofInner) rises from the (-x, -z) corner to high edges on +z and +x.
+ */
+function roofSides(kind: Kind, r: number): { readonly high: readonly Side[]; readonly low: readonly Side[]; readonly sides: readonly Side[] } {
+  if (kind === 'roof' || kind === 'lowRoof') return { high: [turned('+z', r)], low: [turned('-z', r)], sides: [turned('+x', r), turned('-x', r)] };
+  if (kind === 'roofOuter') return { high: [], low: [turned('-z', r), turned('-x', r)], sides: [turned('+z', r), turned('+x', r)] };
+  if (kind === 'roofInner') return { high: [turned('+z', r), turned('+x', r)], low: [], sides: [turned('-z', r), turned('-x', r)] };
+  return { high: [], low: [], sides: [] };
+}
+
+const isEdge = (e: readonly [number, number, number], i: number, j: number, r: number): boolean => e[0] === i && e[1] === j && e[2] === r;
+
+/** The two cells either side of edge (i, j, r). */
+function edgeCells(i: number, j: number, r: number): readonly (readonly [number, number])[] {
+  return r === 0 ? [[i, j - 1], [i, j]] : [[i - 1, j], [i, j]];
+}
+
+/** Whether edge slot (i, j, k, r) is the eave of a roof cell beside it: the slope meets the floor line there, so nothing stands on it. */
+function roofEaveAt(base: Base, s: number, i: number, j: number, k: number, r: number): boolean {
+  for (const [ci, cj] of edgeCells(i, j, r)) {
+    for (const p of base.pieces) {
+      if (p.s !== s || p.k !== k || p.i !== ci || p.j !== cj || !isRoofKind(p.kind)) continue;
+      if (roofSides(p.kind, p.r).low.some((side) => isEdge(sideEdge(ci, cj, side), i, j, r))) return true;
+    }
+  }
+  return false;
+}
+
+/** Whether a gable (on a rising side of a pitched roof) or a ridge cap (on the high edge of a roof or low roof) has its roof beside it. */
+function roofFor(base: Base, piece: Omit<Piece, 'id'>): boolean {
+  for (const [ci, cj] of edgeCells(piece.i, piece.j, piece.r)) {
+    for (const p of base.pieces) {
+      if (p.s !== piece.s || p.k !== piece.k || p.i !== ci || p.j !== cj) continue;
+      const on = (sides: readonly Side[]): boolean => sides.some((side) => isEdge(sideEdge(ci, cj, side), piece.i, piece.j, piece.r));
+      if (piece.kind === 'gable' && p.kind === 'roof' && on(roofSides(p.kind, p.r).sides)) return true;
+      if (piece.kind === 'ridgeCap' && (p.kind === 'roof' || p.kind === 'lowRoof') && on(roofSides(p.kind, p.r).high)) return true;
+    }
+  }
+  return false;
 }
 
 function materialFor(env: Env, name: string): Material | undefined {
@@ -521,6 +599,27 @@ function supportValues(
           }
         }
       }
+      if (piece.kind === 'roof' || piece.kind === 'lowRoof') {
+        // back to back: the roof across the shared high edge (the ridge) holds this one up vertically
+        for (const side of roofSides(piece.kind, piece.r).high) {
+          const [ei, ej, er] = sideEdge(i, j, side);
+          for (const [ci, cj] of edgeCells(ei, ej, er)) {
+            if (ci === i && cj === j) continue;
+            const across = cells.get(cellKey(s, ci, cj, k)), other = across === undefined ? undefined : pieces[across];
+            if (other !== undefined && (other.kind === 'roof' || other.kind === 'lowRoof') && roofSides(other.kind, other.r).high.some((h) => isEdge(sideEdge(ci, cj, h), ei, ej, er))) {
+              addDependency(targetIndex, across, true);
+            }
+          }
+        }
+      }
+      if (piece.kind === 'roof') {
+        // a gable under a rising side holds the roof up vertically
+        for (const side of roofSides(piece.kind, piece.r).sides) {
+          const [ei, ej, er] = sideEdge(i, j, side);
+          const gable = edges.get(edgeKey(s, ei, ej, k, er));
+          if (gable !== undefined && pieces[gable]?.kind === 'gable') addDependency(targetIndex, gable, true);
+        }
+      }
       addCellSupport(targetIndex, s, i - 1, j, k, false);
       addCellSupport(targetIndex, s, i + 1, j, k, false);
       addCellSupport(targetIndex, s, i, j - 1, k, false);
@@ -718,6 +817,19 @@ export function check(
     return { ok: false, why: 'material', support: 0 };
   }
   if (occupied(base, piece)) return { ok: false, why: 'occupied', support: 0 };
+  if (isEdgeKind(piece.kind) && roofEaveAt(base, piece.s, piece.i, piece.j, piece.k, piece.r)) {
+    return { ok: false, why: 'occupied', support: 0 };
+  }
+  if (isRoofKind(piece.kind)) {
+    for (const side of roofSides(piece.kind, piece.r).low) {
+      const [ei, ej, er] = sideEdge(piece.i, piece.j, side);
+      const taken = base.pieces.some((p) => p.s === piece.s && p.k === piece.k && isEdgeKind(p.kind) && p.i === ei && p.j === ej && p.r === er);
+      if (taken) return { ok: false, why: 'occupied', support: 0 };
+    }
+  }
+  if ((piece.kind === 'gable' || piece.kind === 'ridgeCap') && !roofFor(base, piece)) {
+    return { ok: false, why: 'no-roof', support: 0 };
+  }
 
   const structure = base.structures.find((item) => item.id === piece.s);
   if (structure === undefined) return { ok: false, why: 'bad-slot', support: 0 };
@@ -749,7 +861,7 @@ export function check(
       (existing) =>
         (piece.kind === 'lifeSupport'
           ? existing.kind === 'foundation' || existing.kind === 'floor'
-          : isCellKind(existing.kind)) &&
+          : isCellKind(existing.kind) && !isRoofKind(existing.kind)) &&
         existing.s === piece.s &&
         existing.i === piece.i &&
         existing.j === piece.j &&
@@ -1076,7 +1188,7 @@ export function snap(
 
     for (let i = ci - 1; i <= ci + 1; i += 1) {
       for (let j = cj - 1; j <= cj + 1; j += 1) {
-        if (kind === 'wall' || kind === 'airlock') {
+        if (isEdgeKind(kind)) {
           append(i, j, 0, (i + 0.5) * CELL, j * CELL);
           append(i, j, 1, i * CELL, (j + 0.5) * CELL);
         } else if (kind === 'pillar') {
@@ -1084,7 +1196,7 @@ export function snap(
         } else if (kind === 'hardpoint') {
           append(i, j, rotation, (i + 1) * CELL, (j + 1) * CELL);
         } else {
-          const r = kind === 'ramp' || kind === 'stairs' || isFixtureKind(kind) ? rotation : 0;
+          const r = kind === 'ramp' || kind === 'stairs' || isRoofKind(kind) || isFixtureKind(kind) ? rotation : 0;
           append(i, j, r, (i + 0.5) * CELL, (j + 0.5) * CELL);
         }
       }
@@ -1218,6 +1330,12 @@ const CODEC_KINDS: readonly Kind[] = [
   'ladder',
   'stairs',
   'lifeSupport',
+  'roof',
+  'lowRoof',
+  'roofOuter',
+  'roofInner',
+  'gable',
+  'ridgeCap',
 ];
 
 function codecValidationError(

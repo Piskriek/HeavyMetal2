@@ -59,9 +59,10 @@ async function main(): Promise<void> {
   scene.children.forEach((o) => { if (o !== ground && !(o instanceof THREE.Light)) all.expandByObject(o); });
   const centre = all.getCenter(new THREE.Vector3()), size = all.getSize(new THREE.Vector3());
   const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.1, 800);
-  const front = q.get('view') === 'front';
+  // view=back looks from -z (the far side: the top of a roof that rises toward +z)
+  const front = q.get('view') === 'front', back = q.get('view') === 'back' ? -1 : 1;
   const fit = Math.max(size.x / camera.aspect, size.z, size.y) / (2 * Math.tan((camera.fov * Math.PI) / 360)) * 1.15;
-  camera.position.set(centre.x + (front ? 0 : fit * 0.35), centre.y + fit * (front ? 0.25 : 0.6), centre.z + fit * 0.9);
+  camera.position.set(centre.x + (front ? 0 : fit * 0.35), centre.y + fit * (front ? 0.25 : 0.6), centre.z + back * fit * 0.9);
   camera.lookAt(centre);
   renderer.render(scene, camera);
   info.textContent = `${modKey} · ${tris.join(' · ')}`;

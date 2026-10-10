@@ -354,6 +354,9 @@
       "@hm/rover": [
         "packages/rover/src/index.ts"
       ],
+      "@hm/rovergear": [
+        "packages/rovergear/src/index.ts"
+      ],
       "@hm/batcher": [
         "packages/batcher/src/index.ts"
       ],

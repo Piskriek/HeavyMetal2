@@ -1,10 +1,13 @@
 // Dev-only mesh gallery for reviewing Arena mesh answers side by side (not part of the game bundle).
 //   /gallery.html?mod=basegear2/r2B&fns=hardpoint,heavyMill,bin,repeater,draftingTable[&spacing=10][&view=front][&ground=-2.6]
+//   Rovers (a body, a wheel and hubs, as rovergear returns) are assembled with a wheel at each hub: mod=rovergear/B&fns=scout,hauler,crawler,fabricator
 // Row 1 is stage 1, row 2 is stage 6, on sandy ground under a low warm sun, with a 1.8 m scale post per column.
 /// <reference types="vite/client" />
 import * as THREE from 'three';
 
 const modules = import.meta.glob<Record<string, unknown>>('../../../../arena-gathered/*/*/src/index.ts');
+// landed packages too: mod=pkg/rovergear
+const packages = import.meta.glob<Record<string, unknown>>('../../../../packages/*/src/index.ts');
 const q = new URLSearchParams(location.search);
 const modKey = q.get('mod') ?? '';
 const fns = (q.get('fns') ?? '').split(',').filter(Boolean);
@@ -12,7 +15,9 @@ const spacing = Number(q.get('spacing') ?? 10);
 const info = document.getElementById('info')!;
 
 async function main(): Promise<void> {
-  const entry = Object.entries(modules).find(([k]) => k.includes(`/arena-gathered/${modKey}/src/index.ts`));
+  const entry = modKey.startsWith('pkg/')
+    ? Object.entries(packages).find(([k]) => k.includes(`/packages/${modKey.slice(4)}/src/index.ts`))
+    : Object.entries(modules).find(([k]) => k.includes(`/arena-gathered/${modKey}/src/index.ts`));
   if (!entry) { info.textContent = `no module for mod=${modKey}; have: ${Object.keys(modules).map((k) => k.split('arena-gathered/')[1]?.replace('/src/index.ts', '')).join(', ')}`; return; }
   const mod = await entry[1]();
   const m = (mod['createMaterials'] as () => unknown)();
@@ -40,10 +45,21 @@ async function main(): Promise<void> {
   scene.add(ground);
   const tris: string[] = [];
   fns.forEach((name, col) => {
-    const build = mod[name] as ((mm: unknown, o: unknown) => { group: THREE.Object3D }) | undefined;
+    type Built = { group?: THREE.Object3D; body?: THREE.Object3D; wheel?: THREE.Object3D | null; hubs?: [number, number, number][] };
+    const build = mod[name] as ((mm: unknown, o: unknown) => Built) | undefined;
     [1, 6].forEach((stage, row) => {
       if (!build) return;
-      const g = build(m, { stage }).group;
+      const built = build(m, { stage });
+      // a rover (rovergear) is a body plus one wheel cloned at each hub; stand it on its lowest point
+      let g: THREE.Object3D;
+      if (built.group) g = built.group;
+      else {
+        g = new THREE.Group();
+        const rig = new THREE.Group(); rig.add(built.body!);
+        for (const [x, y, z] of built.hubs ?? []) { if (!built.wheel) break; const w = built.wheel.clone(); w.position.set(x, y, z); rig.add(w); }
+        rig.position.y = -new THREE.Box3().setFromObject(rig).min.y;
+        g.add(rig);
+      }
       g.position.set(col * spacing, 0, -row * spacing);
       g.traverse((o) => { const mesh = o as THREE.Mesh; if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; } });
       scene.add(g);

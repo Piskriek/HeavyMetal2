@@ -38,3 +38,20 @@ FIRST BATCH REVIEW (side by side, S1 over S6), pieces 38 and 39:
 REVISION 2 (rev 4 of the frame S6 is an image-edit of the S1 frame): for consistency, the frame S6 uses the S1 render as the reference image (images parameter) with the W6 wrapper and the explicit clauses above. The same method is used for the part variants.
 
 PENDING: piece 40, the PART VARIANTS. Eleven variant panels at S1 and S6 (22 renders): cores (semi-auto, burst, beam), barrels (short, long, scatter), sights (iron, scope, holo), cells (compact, extended). Each is the bare frame with the part fitted, drawn from the approved frame panel as reference. The parts board is assembled by tools/compose20.sh from those panels.
+
+BATCH 2 (piece 40, part variants). Drawn: one S1 full set and nine S6 variants, each from the kept S6 frame as the reference image (images parameter), W6 wrapper with the clause, one part fitted, no beam, no glow, no light column.
+
+S1 FULL SET (20-full-s1): the S1 frame as reference with a semi-auto core, long barrel, scope and compact cell fitted. Status: pending full-size review.
+S6 variants drawn:
+- 20-core-semi-s6: semi-auto core. Status: pending full-size review.
+- 20-core-burst-s6: burst core, longer housing with a selector wheel. Status: pending full-size review.
+- 20-core-beam-s6: REJECTED (rev1). The core drew a scope-like cylinder on top, not a receiver core with a beam emitter. Moved to rejected/20-core-beam-s6-rev1.png. Redraw next batch.
+- 20-barrel-short-s6: short barrel. KEPT after side-by-side check against the frame S6: a stubby straight barrel in the muzzle collar, no other change.
+- 20-barrel-long-s6: long barrel. Status: pending full-size review (the frame's framing shifted in the grid).
+- 20-barrel-scatter-s6: scatter barrel with a wide flared muzzle. Status: pending full-size review (the frame's framing shifted in the grid).
+- 20-sight-iron-s6: iron sights on the rail. Status: pending full-size review.
+- 20-sight-scope-s6: scope on two mount rings. Status: pending full-size review.
+- 20-sight-holo-s6: holo sight on a clamp block, dark glass. Status: pending full-size review.
+
+STILL TO DRAW: 20-cell-compact-s6 and 20-cell-extended-s6 (the two cell variants).
+Piece 40 is not complete. tools/compose20.sh and the sheet 20-sheet-weapons.png are not yet written.

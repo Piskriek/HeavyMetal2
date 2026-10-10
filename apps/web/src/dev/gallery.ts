@@ -1,9 +1,10 @@
 // Dev-only mesh gallery for reviewing Arena mesh answers side by side (not part of the game bundle).
 //   /gallery.html?mod=basegear2/r2B&fns=hardpoint,heavyMill,bin,repeater,draftingTable[&spacing=10][&view=front]
 // Row 1 is stage 1, row 2 is stage 6, on sandy ground under a low warm sun, with a 1.8 m scale post per column.
+/// <reference types="vite/client" />
 import * as THREE from 'three';
 
-const modules = import.meta.glob('../../../../arena-gathered/*/*/src/index.ts');
+const modules = import.meta.glob<Record<string, unknown>>('../../../../arena-gathered/*/*/src/index.ts');
 const q = new URLSearchParams(location.search);
 const modKey = q.get('mod') ?? '';
 const fns = (q.get('fns') ?? '').split(',').filter(Boolean);
@@ -13,7 +14,7 @@ const info = document.getElementById('info')!;
 async function main(): Promise<void> {
   const entry = Object.entries(modules).find(([k]) => k.includes(`/arena-gathered/${modKey}/src/index.ts`));
   if (!entry) { info.textContent = `no module for mod=${modKey}; have: ${Object.keys(modules).map((k) => k.split('arena-gathered/')[1]?.replace('/src/index.ts', '')).join(', ')}`; return; }
-  const mod = (await entry[1]()) as Record<string, unknown>;
+  const mod = await entry[1]();
   const m = (mod['createMaterials'] as () => unknown)();
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(2, devicePixelRatio));

@@ -1,0 +1,42 @@
+Write TS package `@hm/structure`, a Valheim/Dune-style base-building kernel. Reply with two full code blocks, src/index.ts and tests/structure.test.ts, then STOP.
+RULES: strict (noUncheckedIndexedAccess), no any/DOM/Date/Math.random, no imports in src; pure, never mutate inputs; a refused call returns the SAME base; all fields readonly.
+export type Kind='foundation'|'floor'|'ramp'|'wall'|'airlock'|'pillar'|'hardpoint'|'bin'|'bench'|'repeater';
+export interface Material{vKeep:number;hKeep:number}
+export interface Structure{id:number;x:number;y:number;z:number;yaw:number}
+export interface Piece{id:number;s:number;kind:Kind;i:number;j:number;k:number;r:0|1|2|3;mat:string}
+export interface Base{v:1;structures:Structure[];pieces:Piece[];nextId:number}
+export interface Env{heightAt(x:number,z:number):number;materials:Record<string,Material>}
+export interface Result{ok:boolean;why:string;base:Base;id:number}
+export const CELL=4,LEVEL=3,SKIRT=3,MIN_SUPPORT=0.2;
+empty():Base; toWorld(s,u,v,k):{x,y,z}; found(b,env,cx,cz,yaw,mat):Result; check(b,env,p:Omit<Piece,'id'>):{ok,why,support}; place(b,env,p):Result; remove(b,env,id):{base,collapsed:number[]}; supports(b,env):ReadonlyMap<number,number>
+LATTICE: pose = corner (0,0) at level 0 floor top; local (u,v) -> x=s.x+u*cos(yaw)-v*sin(yaw), z=s.z+u*sin(yaw)+v*cos(yaw), y=s.y+k*LEVEL. Cell (i,j) spans corners (i,j)..(i+1,j+1). found: new structure with cell (0,0) centred on (cx,cz) and a foundation there (Result.id). Ids (structures too) from nextId; pieces in id order; refused: id -1; ok: why ''.
+SLOTS (one piece each): foundation/floor/ramp: cell (i,j,k). wall/airlock: edge r=0 runs corner (i,j)->(i+1,j) between cells (i,j),(i,j-1); r=1 runs (i,j)->(i,j+1) between (i,j),(i-1,j). pillar: corner (i,j,k). bin/bench/repeater: fixture spot of cell (i,j,k), needs a cell piece there; hardpoint: fixture spots of cells i..i+1 x j..j+1, needs 4 grounded foundations.
+CHECKS (first failure wins): 'bad-slot' (non-integer, k<0, unknown s, edge r>1), 'material', 'occupied', 'ground' (cell piece with any of 5 terrain samples, 4 corners + centre, above its floor top + 0.05), 'steep', 'overlap', 'needs-floor', 'needs-pad', 'unsupported' (support < MIN_SUPPORT).
+TERRAIN: a foundation is grounded when its floor top - lowest sample <= SKIRT. found sets s.y = highest sample; 'steep' if s.y - lowest > SKIRT; 'overlap' if its square overlaps a cell piece of another structure by > 0.05 m.
+SUPPORT: grounded foundation 1; else max over supporters q of support(q)*keep (own material: vKeep for V, hKeep for H); none 0.
+ cell piece: V walls/airlocks on its 4 edges and pillars at its 4 corners at level k-1; a foundation also V on a foundation at (i,j,k-1). H cell pieces at (i+-1,j,k),(i,j+-1,k).
+ wall/airlock: V cell pieces on both sides (level k) and the same edge at k-1. H pillars at both ends and the 2 collinear edges (level k).
+ pillar: V the 4 cell pieces at that corner (level k) and the pillar below.
+ fixture: V its cell piece(s); fixtures support nothing.
+remove deletes it, then all pieces now under MIN_SUPPORT (collapsed: sorted ids) and empty structures. 900 pieces x 50 supports() < 1 s.
+Keep this test unchanged; add your own (a hidden suite checks every rule):
+```ts
+import test from 'node:test'; import assert from 'node:assert/strict';
+import { empty, found, place, check, remove, supports, type Env, type Kind } from '../src/index';
+const m = { reg: { vKeep: 0.9, hKeep: 0.6 } }, F: Env = { heightAt: () => 0, materials: m };
+const P = (kind: Kind, i: number, j: number, k: number, s: number, r: 0|1|2|3 = 0) => ({ s, kind, i, j, k, r, mat: 'reg' });
+const near = (a: number | undefined, b: number) => assert.ok(Math.abs((a ?? NaN) - b) < 1e-9, `${a} vs ${b}`);
+test('support, slots, collapse', () => {
+  const f = found(empty(), F, 2, 2, 0, 'reg'), s = f.base.structures[0]!.id;
+  const a = place(f.base, F, P('floor', 1, 0, 0, s)), c = place(a.base, F, P('floor', 2, 0, 0, s)), d = place(c.base, F, P('bench', 2, 0, 0, s));
+  const w = place(d.base, F, P('wall', 0, 0, 0, s)), p = place(w.base, F, P('pillar', 1, 1, 0, s)), u = place(p.base, F, P('floor', 0, 0, 1, s));
+  const e = place(u.base, F, P('floor', 3, 0, 0, s)), sup = supports(e.base, F);
+  [[f.id, 1], [a.id, 0.6], [c.id, 0.36], [d.id, 0.324], [w.id, 0.9], [p.id, 0.9], [u.id, 0.81], [e.id, 0.216]].forEach(([id, v]) => near(sup.get(id!), v!));
+  const x = check(e.base, F, P('floor', 4, 0, 0, s)); assert.equal(x.why, 'unsupported'); near(x.support, 0.1296);
+  assert.equal(place(e.base, F, P('floor', 4, 0, 0, s)).base, e.base);
+  const why = (q: ReturnType<typeof P>) => check(e.base, F, q).why;
+  assert.deepEqual([P('wall', 0, 0, 0, s), P('wall', 5, 0, 0, s, 2), P('bin', 0, 1, 0, s), P('hardpoint', 0, 0, 0, s)].map(why), ['occupied', 'bad-slot', 'needs-floor', 'needs-pad']);
+  const copy = JSON.stringify(e.base), r = remove(e.base, F, a.id);
+  assert.deepEqual(r.collapsed, [c.id, d.id, e.id]); assert.equal(JSON.stringify(e.base), copy);
+});
+```

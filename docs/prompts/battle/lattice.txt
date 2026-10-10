@@ -1,0 +1,47 @@
+Write TS package `@hm/lattice`: storage boxes linked into shared networks by relays, for a base-building game (one inventory across a whole base). Reply with two full code blocks, src/index.ts and tests/lattice.test.ts, then STOP.
+RULES: strict (noUncheckedIndexedAccess), no any/DOM/Date/Math.random, no imports in src; pure, never mutate inputs; all fields readonly. Counts are integers >= 0 (round down; negative/NaN act as 0).
+export interface ItemDef{stack:number;kg:number}
+export type Defs=Record<string,ItemDef>;
+export interface Stack{item:string;n:number}
+export interface Box{id:number;x:number;z:number;slots:(Stack|null)[];maxKg:number}
+export interface Relay{id:number;x:number;z:number;range:number}
+export type Taken={box:number;item:string;n:number};
+box(id,x,z,slotCount,maxKg):Box (all slots null)
+kg(b,defs):number; count(b,item):number
+deposit(b,defs,item,n):{box:Box;left:number}
+withdraw(b,item,n):{box:Box;got:number}
+links(boxes,relays):number[][]
+totals(boxes,ids):Record<string,number>
+pull(boxes,ids,at:{x,z},need:Stack[]):{ok:true;boxes:Box[];taken:Taken[]}|{ok:false;short:Stack[]}
+store(boxes,ids,at,defs,items:Stack[]):{boxes:Box[];left:Stack[]}
+DEPOSIT: unknown item -> nothing stored. Top up existing stacks of the item in slot order (to def.stack), then fill empty slots in order; never exceed maxKg (units * def.kg summed over the box, unknown items weigh 0). left = what did not fit.
+WITHDRAW: take from the smallest stack of the item first (ties: lowest slot); an emptied slot becomes null.
+LINKS: a box joins every relay within range (distance <= relay.range, x/z plane); two relays link when distance <= max(their ranges); a box inside two fields joins them. Box ids and relay ids are separate namespaces. Return groups of box ids (each ascending, groups ordered by first id); a box near no relay is its own group.
+PULL is atomic: merge duplicate needs (first-seen order), use only boxes whose id is in ids, visit them nearest to `at` first (ties: lower id), and withdraw each need in turn. If any need is short, return {ok:false, short} (missing amounts, need order) and change nothing. taken lists every withdrawal in order, merged per box+item. boxes keep the input order (untouched boxes are the same objects).
+STORE: per item in order: boxes in ids that already hold the item, nearest first, then the other boxes in ids, nearest first (ties: lower id). left = leftovers, in order, only n > 0.
+2000 pulls over 200 linked boxes of 30 slots must take < 1 s.
+Keep this test unchanged; add your own (a hidden suite checks every rule):
+```ts
+import test from 'node:test'; import assert from 'node:assert/strict';
+import { box, deposit, withdraw, kg, count, links, totals, pull, store, type Box } from '../src/index';
+const defs = { ore: { stack: 50, kg: 1 }, map: { stack: 10, kg: 0.5 } };
+const B = (id: number, x: number, slots: Box['slots']): Box => ({ id, x, z: 0, slots, maxKg: 1e6 });
+test('boxes, networks, pull, store', () => {
+  let r = deposit(box(1, 0, 0, 4, 1000), defs, 'ore', 120);
+  assert.deepEqual(r.box.slots.map((s) => s?.n ?? 0), [50, 50, 20, 0]); r = deposit(r.box, defs, 'ore', 90);
+  assert.equal(r.left, 10); assert.equal(kg(r.box, defs), 200); assert.equal(deposit(box(2, 0, 0, 10, 25), defs, 'ore', 40).left, 15);
+  const w = withdraw(B(1, 0, [{ item: 'ore', n: 50 }, { item: 'ore', n: 20 }, { item: 'map', n: 5 }, { item: 'ore', n: 50 }]), 'ore', 30);
+  assert.deepEqual(w.box.slots, [{ item: 'ore', n: 40 }, null, { item: 'map', n: 5 }, { item: 'ore', n: 50 }]);
+  const bs = [B(1, 10, [{ item: 'ore', n: 30 }]), B(2, 55, [{ item: 'ore', n: 50 }, { item: 'map', n: 3 }]), B(3, 200, [])];
+  const r1 = { id: 1, x: 0, z: 0, range: 30 }, r2 = { id: 2, x: 50, z: 0, range: 20 };
+  assert.deepEqual(links(bs, [r1, r2]), [[1], [2], [3]]); assert.deepEqual(links(bs, [r1, r2, { id: 3, x: 25, z: 0, range: 30 }]), [[1, 2], [3]]);
+  const copy = JSON.stringify(bs), at = { x: 50, z: 0 };
+  const p = pull(bs, [1, 2], at, [{ item: 'ore', n: 40 }, { item: 'map', n: 2 }, { item: 'ore', n: 20 }]);
+  assert.ok(p.ok); assert.deepEqual(p.taken, [{ box: 2, item: 'ore', n: 50 }, { box: 1, item: 'ore', n: 10 }, { box: 2, item: 'map', n: 2 }]);
+  assert.equal(count(p.boxes[0]!, 'ore'), 20); assert.equal(p.boxes[2], bs[2]);
+  assert.deepEqual(pull(bs, [1, 2], at, [{ item: 'map', n: 5 }, { item: 'ore', n: 1 }]), { ok: false, short: [{ item: 'map', n: 2 }] });
+  assert.equal(JSON.stringify(bs), copy); assert.deepEqual(totals(bs, [1, 2]), { ore: 80, map: 3 });
+  const s = store([B(1, 0, [null, null]), B(2, 90, [{ item: 'map', n: 3 }, null])], [1, 2], { x: 0, z: 0 }, defs, [{ item: 'map', n: 4 }, { item: 'ore', n: 10 }]);
+  assert.deepEqual(s.left, []); assert.deepEqual(s.boxes[1]!.slots[0], { item: 'map', n: 7 }); assert.equal(count(s.boxes[0]!, 'ore'), 10);
+});
+```

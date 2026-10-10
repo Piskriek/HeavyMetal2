@@ -28,7 +28,7 @@ convert -size 3840x2160 xc:"$BG" \
   -font $BOLD -pointsize 26 -fill "$ACC" -gravity northwest -annotate +40+134 \
     "STAGE 1 · chunky low poly, flat-shaded, ~16 colours" \
   -font $BOLD -pointsize 26 -fill "$ACC" -gravity northwest -annotate +40+634 \
-    "STAGE 6 · full PBR, decades weathered, moss and wildflowers" \
+    "STAGE 6 · the same design at full PBR resolution, in service, on the lush terraformed plot" \
   "$T/base.png"
 
 for i in $(seq 0 10); do
@@ -54,6 +54,6 @@ convert "$T/base.png" \
   -font $BOLD -pointsize 26 -fill "$ACC" -gravity northwest -annotate +1900+1340 "FOR THE OWNER" \
   -font $FONT -pointsize 22 -fill "$FG" -gravity northwest \
     -annotate +1900+1386 "check the hardpoint pad before the mill: the mill is the only piece that spews" \
-    -annotate +1900+1422 "the S6 row is the same piece, decades later, in the same pose" \
+    -annotate +1900+1422 "the S6 row is the same piece at full PBR resolution, in the same condition, on the lush terraformed plot" \
   -strip -define png:compression-level=9 "$ROOT/13-sheet-base-construction.png"
 identify -format "%f %wx%h\n" "$ROOT/13-sheet-base-construction.png"

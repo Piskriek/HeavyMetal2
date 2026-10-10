@@ -119,3 +119,22 @@ apply(world, env, cmd) → { world, events }   step(world, env, dt) → { world,
 ## 10. Done means
 
 `npm run typecheck` clean · every package's tests plus my hidden suites pass · `node scripts/test-base-building.mjs` (Flash) green · placing, collapsing and harvesting checked in the browser at stage 1 and stage 6 · Low preset holds 50+ fps on the GTX 950M laptop with a 200-piece base · loading bar covers any new asset.
+
+## 11. Status (2026-10-10 14:30)
+
+| Decision | State | Where |
+|---|---|---|
+| D1–D4 lattice, Valheim support, slots, refusal reasons | **landed** | `@hm/structure` rounds 1–3 (Arena), 4a (Arena + base64 fix), 4b roofs and 4c free fixtures (in-house); 8 suites |
+| D5 inventory, hotbar, equipment | **landed** | `world.ts` + Flash's windows (TASK-02..04) |
+| D6 command-sourced BaseWorld | **landed** | `world.ts` v3, replay hash test |
+| D7–D9 linked storage, bridge, network pay | **landed** | `@hm/lattice`; the bridge store (`withBridgeStore`) |
+| D10 harvest and refining | **landed** | `@hm/substrate`, `tick`, `install`, `craft`, `collect` |
+| D11 refunds, collapse losses | **landed** | `takeDown` |
+| D12 heavy terraformers | **landed** | `@hm/plotsim` heavy kinds; meshes `@hm/basegear` (mill) and `@hm/heavygear` (press, projector, water) |
+| D13 layout blueprints | **landed (logic)** | `saveLayout`, `importLayout`, `plan`, `fill`, `dropPlan`, `planGhosts`; UI in Flash TASK-06 D/E |
+| D14 pressure and life support | **landed (logic)** | `roomAt` + `stepSync(sheltered)`; wiring in TASK-06 G |
+| D15 starter shelter | **landed (logic)** | `shelter`: one sealed cell with a low roof, a Drafting Table and life support (free placement); first-arrival wiring in TASK-06 B |
+| D16 mobile outpost | waiting for rovers | — |
+| Persistence | **landed (logic)** | `base/save.ts` (checked, repaired); wiring in TASK-06 A |
+| Meshes | structural kit and roofs landed (`@hm/basekit`, B's kit); openings and life support battle `basekit2` (run 2) running | concept sheets 13, 15, 17, 18 |
+| Build UX (R2, R3) | landed in Flash TASK-05; fixes in 05b | |

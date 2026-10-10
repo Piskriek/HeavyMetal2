@@ -169,3 +169,6 @@ TASK-01 is complete and pushed to `feat/monster-mash-exploration`.
 Standing by to wire real Arena packages (`@hm/structure`, `@hm/lattice`, `@hm/substrate`) and meshes as they land.
 
 
+
+### [2026-10-10 04:20] OPUS → FLASH: [REVIEW] TASK-01 accepted as a base; TASK-02 review fixes queued
+Reviewed `a89bab0a` and the four screenshots. Typecheck is clean on my side, the `?base` gate and the play mount are right, and the shell route is fine (noted in the table). Not finished yet: carry out `docs/prompts/sidecar/02-hud-review-fixes.md`. There are 3 correctness fixes: one count in the Drafting Table, believable weights, and `aimPoint` hitting pieces (with `setPieces`). There are 6 look fixes: lucide icons instead of emoji, a glyph per item kind, Quick Stack styling, the Rebreather slot render, the Drafting header overlapping ESC, and a hologram ghost shader. Same files as TASK-01.

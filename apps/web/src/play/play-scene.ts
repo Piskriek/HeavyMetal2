@@ -110,6 +110,10 @@ export interface PlayScene {
   setBuilding(kind: MachineKind | null, check?: (x: number, z: number) => { readonly ok: boolean; readonly why: string }): void;
   /** Where the ghost stands, facing the gate, if it may stand there. */
   aim(): { readonly x: number; readonly z: number; readonly yaw: number } | null;
+  /** Generic ghost for base building pieces. */
+  setPieceGhost(group: THREE.Group | null): void;
+  placePieceGhost(pose: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number } | null, tint: 'grounded' | 'ok' | 'weak' | 'bad'): void;
+  aimPoint(): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number } | null;
   /** The plot reached a stage: a wave from `from` (ground x, z) brings its look across the plot, out to the horizon and up the sky. */
   raiseStage(to: number, from: { readonly x: number; readonly z: number }): void;
   frame(now: number, dt: number, c: Controls): FrameOut;
@@ -477,6 +481,13 @@ export function createPlayScene(o: {
   let building = false, ghostVerdict: { ok: boolean; why: string } = { ok: false, why: '' };
   const ghostAt = new THREE.Vector3();
 
+  // piece build ghost for Valheim/Dune base-building
+  const pieceGhostGrounded = keep(new THREE.ShaderMaterial({ vertexShader: MARK_VERTEX, fragmentShader: COLOUR_MARK_FRAGMENT, blending: THREE.NoBlending, uniforms: { uColour: { value: new THREE.Color('#38bdf8') }, uLit: { value: 1 } } }));
+  const pieceGhostOk = keep(new THREE.ShaderMaterial({ vertexShader: MARK_VERTEX, fragmentShader: COLOUR_MARK_FRAGMENT, blending: THREE.NoBlending, uniforms: { uColour: { value: new THREE.Color('#34d399') }, uLit: { value: 1 } } }));
+  const pieceGhostWeak = keep(new THREE.ShaderMaterial({ vertexShader: MARK_VERTEX, fragmentShader: COLOUR_MARK_FRAGMENT, blending: THREE.NoBlending, uniforms: { uColour: { value: new THREE.Color('#fbbf24') }, uLit: { value: 1 } } }));
+  const pieceGhostBad = keep(new THREE.ShaderMaterial({ vertexShader: MARK_VERTEX, fragmentShader: COLOUR_MARK_FRAGMENT, blending: THREE.NoBlending, uniforms: { uColour: { value: new THREE.Color('#ef4444') }, uLit: { value: 1 } } }));
+  let pieceGhost: THREE.Group | null = null;
+
   // ---- the post pass (planet picture by stage)
   const postUniforms = {
     uColour: { value: planetRT.texture as THREE.Texture }, uDepth: { value: planetRT.depthTexture as THREE.Texture | null }, uLab: { value: labRT.texture as THREE.Texture },
@@ -791,6 +802,49 @@ export function createPlayScene(o: {
       if (!building || !ghostVerdict.ok) return null;
       const g = twin.group.position;
       return { x: ghostAt.x, z: ghostAt.z, yaw: Math.atan2(ghostAt.x - g.x, ghostAt.z - g.z) };
+    },
+    setPieceGhost(group) {
+      if (pieceGhost) {
+        planetScene.remove(pieceGhost);
+        pieceGhost = null;
+      }
+      if (group) {
+        pieceGhost = group;
+        pieceGhost.visible = false;
+        planetScene.add(pieceGhost);
+      }
+    },
+    placePieceGhost(pose, tint) {
+      if (!pieceGhost) return;
+      if (!pose) {
+        pieceGhost.visible = false;
+        return;
+      }
+      pieceGhost.visible = true;
+      pieceGhost.position.set(pose.x, pose.y, pose.z);
+      pieceGhost.rotation.y = pose.yaw;
+      const mat =
+        tint === 'grounded'
+          ? pieceGhostGrounded
+          : tint === 'ok'
+            ? pieceGhostOk
+            : tint === 'weak'
+              ? pieceGhostWeak
+              : pieceGhostBad;
+      pieceGhost.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
+        if (mesh.isMesh) mesh.material = mat;
+      });
+    },
+    aimPoint() {
+      const hit = aimGround();
+      if (!hit) return null;
+      return {
+        x: hit.x,
+        y: hit.y,
+        z: hit.z,
+        yaw,
+      };
     },
     raiseStage(to, from) {
       if (to <= stage) return;

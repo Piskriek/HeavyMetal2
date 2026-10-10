@@ -1,0 +1,550 @@
+/* FIDELITY // Base-Building & Substrate HUD Styles
+   Design tokens: docs/UI_DESIGN_SYSTEM_AND_TOKENS.md */
+
+:root {
+  --base-cyan: #00f0ff;
+  --base-cyan-glow: rgba(0, 240, 255, 0.35);
+  --base-cyan-hairline: rgba(0, 240, 255, 0.22);
+  --base-bg-dark: rgba(7, 12, 20, 0.9);
+  --base-bg-surface: rgba(15, 23, 38, 0.75);
+  --base-bg-slot: rgba(10, 18, 30, 0.65);
+  --base-bg-slot-hover: rgba(0, 240, 255, 0.12);
+  --base-bg-slot-active: rgba(0, 240, 255, 0.22);
+  --base-text-primary: #f8fafc;
+  --base-text-secondary: #94a3b8;
+  --base-text-muted: #64748b;
+  --base-border-subtle: rgba(255, 255, 255, 0.08);
+  --base-radius-sm: 4px;
+  --base-radius-md: 8px;
+  --base-radius-lg: 12px;
+}
+
+/* -------------------------------------------------------------
+   1. Hotbar (Bottom Center)
+   ------------------------------------------------------------- */
+.hm-hotbar-container {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--base-bg-dark);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--base-cyan-hairline);
+  border-radius: var(--base-radius-lg);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 16px var(--base-cyan-glow);
+  z-index: 100;
+  user-select: none;
+  pointer-events: auto;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hm-hotbar-slot {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  background: var(--base-bg-slot);
+  border: 1px solid var(--base-border-subtle);
+  border-radius: var(--base-radius-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease-out;
+}
+
+.hm-hotbar-slot:hover {
+  background: var(--base-bg-slot-hover);
+  border-color: var(--base-cyan-hairline);
+  transform: translateY(-2px);
+}
+
+.hm-hotbar-slot.selected {
+  background: var(--base-bg-slot-active);
+  border: 1.5px solid var(--base-cyan);
+  box-shadow: 0 0 14px var(--base-cyan-glow), inset 0 0 8px rgba(0, 240, 255, 0.15);
+  transform: translateY(-4px);
+}
+
+.hm-slot-keybind {
+  position: absolute;
+  top: 3px;
+  left: 5px;
+  font-family: 'Oxanium', monospace, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--base-cyan);
+  opacity: 0.8;
+}
+
+.hm-slot-icon-box {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.4);
+}
+
+.hm-slot-count {
+  position: absolute;
+  bottom: 3px;
+  right: 5px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+/* -------------------------------------------------------------
+   2. Windows Overlay Generic
+   ------------------------------------------------------------- */
+.hm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 7, 12, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  animation: hmFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes hmFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes hmSlideUp {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.hm-window-panel {
+  background: var(--base-bg-dark);
+  border: 1px solid var(--base-cyan-hairline);
+  border-radius: var(--base-radius-lg);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.75), 0 0 24px rgba(0, 240, 255, 0.2);
+  padding: 24px;
+  color: var(--base-text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: hmSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hm-window-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--base-border-subtle);
+  padding-bottom: 12px;
+}
+
+.hm-window-title {
+  font-family: 'Oxanium', monospace, sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--base-cyan);
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hm-window-close-btn {
+  background: transparent;
+  border: 1px solid var(--base-border-subtle);
+  color: var(--base-text-secondary);
+  font-family: 'Oxanium', monospace;
+  font-size: 14px;
+  padding: 4px 10px;
+  border-radius: var(--base-radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.hm-window-close-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+  color: #f87171;
+}
+
+/* -------------------------------------------------------------
+   3. Inventory Window (Tab / I)
+   ------------------------------------------------------------- */
+.hm-inv-layout {
+  display: flex;
+  gap: 24px;
+}
+
+.hm-equip-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 130px;
+  background: var(--base-bg-surface);
+  padding: 12px;
+  border-radius: var(--base-radius-md);
+  border: 1px solid var(--base-border-subtle);
+}
+
+.hm-equip-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--base-bg-slot);
+  padding: 8px;
+  border-radius: var(--base-radius-sm);
+  border: 1px solid var(--base-border-subtle);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.hm-equip-slot:hover {
+  border-color: var(--base-cyan-hairline);
+  background: var(--base-bg-slot-hover);
+}
+
+.hm-equip-label {
+  font-family: 'Oxanium', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--base-text-secondary);
+  text-transform: uppercase;
+}
+
+.hm-grid-9x4 {
+  display: grid;
+  grid-template-columns: repeat(9, 52px);
+  grid-template-rows: repeat(4, 52px);
+  gap: 6px;
+}
+
+.hm-inv-slot {
+  position: relative;
+  background: var(--base-bg-slot);
+  border: 1px solid var(--base-border-subtle);
+  border-radius: var(--base-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.hm-inv-slot:hover {
+  background: var(--base-bg-slot-hover);
+  border-color: var(--base-cyan-hairline);
+}
+
+.hm-inv-slot.is-hotbar-row {
+  border-top: 2px solid rgba(0, 240, 255, 0.4);
+}
+
+.hm-weight-bar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.hm-weight-label {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: var(--base-text-secondary);
+}
+
+.hm-weight-bar-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.hm-weight-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00f0ff, #10b981);
+  transition: width 0.3s ease;
+}
+
+.hm-quick-stack-btn {
+  background: var(--base-bg-surface);
+  border: 1px solid var(--base-cyan-hairline);
+  color: var(--base-cyan);
+  font-family: 'Oxanium', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: var(--base-radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hm-quick-stack-btn:hover {
+  background: rgba(0, 240, 255, 0.15);
+  box-shadow: 0 0 12px var(--base-cyan-glow);
+}
+
+/* -------------------------------------------------------------
+   4. Drafting Table Window
+   ------------------------------------------------------------- */
+.hm-drafting-layout {
+  display: grid;
+  grid-template-columns: 240px 240px 320px;
+  gap: 20px;
+}
+
+.hm-draft-column {
+  background: var(--base-bg-surface);
+  padding: 16px;
+  border-radius: var(--base-radius-md);
+  border: 1px solid var(--base-border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hm-draft-col-header {
+  font-family: 'Oxanium', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--base-cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.hm-draft-item-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--base-bg-slot);
+  border: 1px solid var(--base-border-subtle);
+  border-radius: var(--base-radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.hm-draft-item-card:hover {
+  background: var(--base-bg-slot-hover);
+  border-color: var(--base-cyan-hairline);
+}
+
+.hm-draft-item-card.selected {
+  border-color: var(--base-cyan);
+  background: var(--base-bg-slot-active);
+  box-shadow: 0 0 8px var(--base-cyan-glow);
+}
+
+.hm-draft-preview-panel {
+  background: rgba(10, 18, 30, 0.85);
+  border: 1px solid var(--base-cyan-hairline);
+  border-radius: var(--base-radius-md);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hm-draft-reach-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hm-reach-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: var(--base-text-secondary);
+}
+
+.hm-reach-bar {
+  width: 140px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.hm-reach-fill {
+  height: 100%;
+  background: var(--base-cyan);
+}
+
+.hm-synthesize-btn {
+  background: var(--base-cyan);
+  color: #040810;
+  font-family: 'Oxanium', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 12px;
+  border: none;
+  border-radius: var(--base-radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hm-synthesize-btn:hover:not(:disabled) {
+  box-shadow: 0 0 16px var(--base-cyan-glow);
+  transform: translateY(-1px);
+}
+
+.hm-synthesize-btn:disabled {
+  background: #334155;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+/* -------------------------------------------------------------
+   5. Lattice Window (Linked Quantum Storage)
+   ------------------------------------------------------------- */
+.hm-lattice-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 640px;
+}
+
+.hm-quantum-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-family: 'Oxanium', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.hm-quantum-status-badge.in-range {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid #10b981;
+  color: #34d399;
+}
+
+.hm-quantum-status-badge.out-of-range {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid #ef4444;
+  color: #f87171;
+}
+
+.hm-lattice-totals-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.hm-lattice-item-tile {
+  background: var(--base-bg-surface);
+  border: 1px solid var(--base-border-subtle);
+  border-radius: var(--base-radius-sm);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* -------------------------------------------------------------
+   6. Build Readout HUD (Under Reticle)
+   ------------------------------------------------------------- */
+.hm-build-readout-hud {
+  position: absolute;
+  top: 56%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  user-select: none;
+  z-index: 100;
+}
+
+.hm-build-blueprint-pill {
+  font-family: 'Oxanium', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 4px 12px;
+  border-radius: 14px;
+  background: rgba(10, 16, 26, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--base-cyan-hairline);
+  color: var(--base-cyan);
+  text-transform: uppercase;
+}
+
+.hm-build-verdict-banner {
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 14px;
+  border-radius: 4px;
+  backdrop-filter: blur(8px);
+}
+
+.hm-build-verdict-banner.ok {
+  background: rgba(16, 185, 129, 0.25);
+  border: 1px solid #10b981;
+  color: #a7f3d0;
+}
+
+.hm-build-verdict-banner.refused {
+  background: rgba(239, 68, 68, 0.25);
+  border: 1px solid #ef4444;
+  color: #fca5a5;
+}
+
+.hm-support-meter-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.65);
+  padding: 3px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hm-support-meter-bar {
+  width: 90px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.hm-support-meter-fill {
+  height: 100%;
+  transition: width 0.15s ease;
+}

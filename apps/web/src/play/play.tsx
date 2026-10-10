@@ -41,6 +41,9 @@ import { encodePlot, decodePlot, plotOfSnapshot } from './plot-code';
 import type { Snapshot } from '@hm/plotcodec';
 import type { MobStatus, CombatStats } from './monster-mash-combat';
 import { captureMouse, lookFilter } from '../shell/capture-mouse';
+import { BaseHud } from '../base/ui/base-hud';
+import { mockBaseViewSource } from '../base/mock-view';
+import '../base/base.css';
 import './play.css';
 
 /** Your plot's cartridge until the ground shader battle lands: sandy desert tones, the nearest in the vault to the concept art's stage 1. */
@@ -136,6 +139,7 @@ export function PlayScreen(props: {
   const placeRef = useRef<((kind: MachineKind, x: number, z: number, yaw: number) => boolean) | null>(null);
   const [toast, setToast] = useState<{ readonly text: string; readonly sub: string; readonly id: number } | null>(null);
   const isMashTest = typeof location !== 'undefined' && (new URLSearchParams(location.search).has('mash') || new URLSearchParams(location.search).has('monstermash'));
+  const isBase = typeof location !== 'undefined' && (new URLSearchParams(location.search).has('base') || new URLSearchParams(location.search).has('building'));
   const creating = state.step === 'create' && !isMashTest;
 
   const commit = useCallback((next: PlayState) => { stateRef.current = next; setState(next); save(next); }, []);
@@ -560,6 +564,8 @@ export function PlayScreen(props: {
       spawnDemon: (count = 1) => scene.mash.spawnDemon(count),
       equipShotgun: (on = true) => { scene.mash.equip(on); setMashEquipped(on); },
       fireShotgun: () => fireWeapon(),
+      base: () => mockBaseViewSource,
+      teleportPlanet: () => scene.debug.teleport('planet', 0, 10, 0),
     });
     setLoading(steps[0]![0]);
     timer = window.setTimeout(step, 30);
@@ -696,7 +702,7 @@ export function PlayScreen(props: {
   useEffect(() => {
     if (ready && typeof location !== 'undefined') {
       const p = new URLSearchParams(location.search);
-      if (p.has('mash') || p.has('monstermash') || p.has('spawn_test')) {
+      if (p.has('mash') || p.has('monstermash') || p.has('spawn_test') || p.has('base') || p.has('building')) {
         const scene = sceneRef.current;
         if (scene) {
           if (stateRef.current.step === 'create') {
@@ -704,10 +710,12 @@ export function PlayScreen(props: {
           }
           const g = scene.debug.gatePlanet();
           scene.debug.teleport('planet', g.x + 3, g.z + 5, Math.PI);
-          scene.mash.equip(true);
-          setMashEquipped(true);
-          void scene.mash.spawnOgro(1);
-          setMashOpen(true);
+          if (p.has('mash') || p.has('monstermash') || p.has('spawn_test')) {
+            scene.mash.equip(true);
+            setMashEquipped(true);
+            void scene.mash.spawnOgro(1);
+            setMashOpen(true);
+          }
         }
       }
     }
@@ -1485,6 +1493,19 @@ export function PlayScreen(props: {
                 </div>
               )}
             </section>
+          ) : null}
+          {isBase && hud.where === 'planet' ? (
+            <BaseHud
+              source={mockBaseViewSource}
+              onOpenChange={(isOpen) => {
+                if (isOpen) {
+                  quietRef.current = true;
+                  document.exitPointerLock?.();
+                } else {
+                  quietRef.current = false;
+                }
+              }}
+            />
           ) : null}
           {toast ? <div key={toast.id} className={`play-toast${toast.text === 'Sync lost' ? ' lost' : ''}`} role="status"><b>{toast.text}</b>{toast.sub ? <span>{toast.sub}</span> : null}</div> : null}
         </>

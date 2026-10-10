@@ -85,6 +85,42 @@ Keeping it at design time means:
 - Line files are made with `rundot generate tts --voice-id eBTgYm9Qho6PFSGSs2wn --model eleven_v3 --stability 0.4`. v3 audio tags (`[breathes]`, `[pause]`, `[quietly]`) steer the delivery.
 - Costs so far: the design call took 150 credits (the cost of its 3 previews).
 
+## 4b. Test results (2026-10-10)
+| Step | Credits | Time | Result |
+|---|---|---|---|
+| Image gen: clean product view of the life-support unit from concept panel 18 (reference image, Nano Banana 2) | 120 | 20 s | Faithful to the panel and isolated on white. One flaw: the fan box floats a little above the cabinet, which breaks the nothing-floats rule. Prompt for contact. |
+| Hunyuan 3D v3.1 Pro, standard, image to 3D (that view; and the weapon frame panel 20) | about 1,013 each | 2.5 min | Excellent fronts. Plausible invented backs (blank on the cabinet, mirrored on the gun). About 500k triangles each, three 2048² maps (colour, normal, metal/roughness), 1.9 to 2.4 MB with Draco. |
+| `remesh-3d` | 0 | | **Broken upstream:** fal retired its Meshy remesh endpoint (`THREE_D_GEN_DEPRECATED_ENDPOINT`). |
+| Meshy v6, `target_polycount=5000` | **1,800** | over 10 min | **Lost.** The CLI times out at 600 s, the call is billed anyway, and `rundot assets list` does not list 3D jobs, so nothing can be recovered. Avoid Meshy through the CLI. |
+| Local slim (`scripts/slim-glb.mjs --tris 5000 --angle 25`) | free | 1 min | 500k to 5k triangles. Plain smoothing with the old normal map goes blotchy, because that map was made for the dense surface. Auto smooth by angle (owner: "auto the normals at an angle") keeps hard edges crisp. |
+| Blender normal bake (`scripts/bake-normals.py`, headless Blender 5.2, CPU) | free | under 1 min | Bakes the 500k detail into a new 1024² normal map on the 5k mesh, with tangents exported. Rails, screws and the round muzzle come back. **This is the route.** |
+| TTS (eleven_v3, 250 characters) / SFX 20 s / music 60 s / voice design | 38 / 60 / 225 / 150 | seconds | All fine. |
+
+**The route for a prop:**
+1. Concept panel.
+2. Image gen (a clean view on white): 120 credits.
+3. Hunyuan standard: about 1,013 credits.
+4. Review in `/glb.html`.
+5. Slim to each stage's budget with `--angle 25..30`, then bake normals (free).
+6. Pack.
+
+About 1.1k credits per prop, so the 55k 3D pool covers about 45 to 50 props.
+
+### Limits (owner: "there might be a limit to how much we are allowed to generate via the cli per day")
+- **No published daily cap for creator (CLI) generation.**
+  - The documented caps (about $500 per game per day, about $10 per user per day) are runtime defaults, for SDK calls made inside a deployed game.
+  - The 3D docs mention "per-creator rate-limit tiers and monthly budget caps" without numbers.
+  - The CLI has a `QUOTA_EXCEEDED` error.
+- **Rate limit:** three calls at once drew "Rate limited; retry in about 20 s". Two 3D jobs at once were fine.
+- **The tier:** only the two Standard image models are listed (no Power models), so this is a lower creator tier. Creator quests (`rundot quests`) pay out credits.
+- **The plan:**
+  - Run generation from one queue, one call at a time, with backoff. That means a script per batch, like `scratchpad gen-3d.ps1`.
+  - Spread big batches across days.
+  - Check `rundot credits --period today` after each batch.
+  - Stop on the first `QUOTA_EXCEEDED` and note the day's total here; that is the real cap.
+  - Do the VO first: it is cheap and its reserve is protected.
+- **Windows note:** this PC's locale (en-ZA) uses a comma decimal, so the CLI rejects `--stability 0.4`. Set `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1`.
+
 ## 5. Credit plan (proposal for the owner)
 | Pool | Credits | Notes |
 |---|---|---|

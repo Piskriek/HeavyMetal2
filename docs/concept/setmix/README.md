@@ -879,4 +879,4 @@ in 04/05).
 
 ---
 
-**Status:** all 22 sheet-13 panels are redrawn to one design per piece and reviewed: the S6 pylon has a plain ring top like the S1 ring, and the S6 drafting table stands alone with no extra object. Sheet 13 and the contact sheet are rebuilt from these panels.
+**Still open (this turn's image budget ran out):** the S6 pylon (its top ring has added insulators and coils that the S1 ring does not have) and the S6 drafting table (an extra cabinet with symbols sits beside it) are not yet redrawn. Sheet 13 and the contact sheet are rebuilt after those two.

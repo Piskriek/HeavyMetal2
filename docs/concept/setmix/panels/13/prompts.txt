@@ -56,7 +56,3 @@ REVISION 3b (review of rev-3 S6 renders): five S6 renders came back with baked t
 Rejected rev-3 files are kept in rejected/ (*-rev3-baked-text.png). Still to redraw with the clause: hardpoint-empty-s6, pylon-s6 (top ring as in S1, no label on the distribution box), foundation-s6, wall-s6, floor-s6, and bin-s6 (its dish must match the S1 dish: no fins).
 
 REVISION 3c (redraw pass). Every S6 prompt = W6 (rev 3) + the no-lettering clause (rev 3b) + the piece paragraph. Pieces redrawn: hardpoint-empty-s6, pylon-s6, bin-s6 (plain dish, NO fins, to match S1), foundation-s6, wall-s6, floor-s6, ramp-s6 (clean, no rust), airlock-s6 (clean wall, no rust, light wear at most), drafting-s6 (flat horizontal top, to match S1).
-
-REVISION 3d (last two redraws). pylon-s6: the ring top is a PLAIN flat ring, the same as the low-poly version: NO insulators, NO coils, NO hex housings, NO antennas, NO rods, NO cables on the ring. drafting-s6: the table and its items only: NO extra cabinet, NO machine, NO other objects, NO symbols.
-
-REVISION 3e (hardpoint S6 only, to match S1 exactly). The S1 hardpoint is a flat bolted mounting RING (a low disc about 1 metre tall, not a tall drum) with a short socket cap, POWER and DATA glands on its edge, sitting on a 2 by 2 pad of FOUR SEPARATE slabs (8 by 8 metres, seams visible), with cables in ribbed floor covers. hardpoint-empty-s6 and hardpoint-mill-s6 are redrawn to that design; the mill version bolts the heavy mill to the same ring.

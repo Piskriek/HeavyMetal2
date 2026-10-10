@@ -345,6 +345,9 @@
       "@hm/basekit2": [
         "packages/basekit2/src/index.ts"
       ],
+      "@hm/navpath": [
+        "packages/navpath/src/index.ts"
+      ],
       "@hm/basekit": [
         "packages/basekit/src/index.ts"
       ],

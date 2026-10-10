@@ -697,16 +697,26 @@ export function createPlayScene(o: {
 
   let lastAimedBoulder: number | null = null;
 
+  const pieceRaycaster = new THREE.Raycaster();
+  const aimRayDir = new THREE.Vector3();
+
   const aimPointFn = (): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null => {
-    // 1. Raycast placed pieces group first
+    // 1. Raycast ground
+    const groundHit = aimGround();
+    const groundDist = groundHit ? camera.position.distanceTo(groundHit) : Infinity;
+
+    // 2. Raycast pieces group
+    let pieceHit: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null = null;
+    let pieceDist = Infinity;
+
     if (piecesGroup && piecesGroup.children.length > 0) {
-      const raycaster = new THREE.Raycaster();
-      const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-      raycaster.set(camera.position, dir);
-      raycaster.far = 36;
-      const hits = raycaster.intersectObjects(piecesGroup.children, true);
+      aimRayDir.set(0, 0, -1).applyQuaternion(camera.quaternion);
+      pieceRaycaster.set(camera.position, aimRayDir);
+      pieceRaycaster.far = 36;
+      const hits = pieceRaycaster.intersectObjects(piecesGroup.children, true);
       if (hits.length > 0 && hits[0]) {
         const first = hits[0];
+        pieceDist = first.distance;
         let pieceId: number | null = null;
         let curr: THREE.Object3D | null = first.object;
         while (curr && curr !== piecesGroup) {
@@ -717,7 +727,7 @@ export function createPlayScene(o: {
           curr = curr.parent;
         }
         const norm = first.face ? first.face.normal.clone().transformDirection(first.object.matrixWorld) : new THREE.Vector3(0, 1, 0);
-        return {
+        pieceHit = {
           x: first.point.x,
           y: first.point.y,
           z: first.point.z,
@@ -728,17 +738,21 @@ export function createPlayScene(o: {
       }
     }
 
-    // 2. Fallback to ground
-    const hit = aimGround();
-    if (!hit) return null;
-    return {
-      x: hit.x,
-      y: hit.y,
-      z: hit.z,
-      yaw,
-      normal: { x: 0, y: 1, z: 0 },
-      piece: null,
-    };
+    // 3. Return nearer hit (ground skirts into terrain must not eclipse ground in front)
+    if (pieceHit && pieceDist <= groundDist) {
+      return pieceHit;
+    }
+    if (groundHit) {
+      return {
+        x: groundHit.x,
+        y: groundHit.y,
+        z: groundHit.z,
+        yaw,
+        normal: { x: 0, y: 1, z: 0 },
+        piece: null,
+      };
+    }
+    return pieceHit;
   };
 
   const api: PlayScene = {

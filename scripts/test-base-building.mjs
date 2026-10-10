@@ -126,14 +126,18 @@ try {
   await page.waitForTimeout(300);
   console.log('OK: Moved item stack to slot 8');
 
+  // Move mouse away to ensure resting state
+  await page.mouse.move(0, 0);
+  await page.waitForTimeout(200);
+
+  await page.screenshot({ path: 'docs/shots/base/inventory-window.png' });
+  console.log('Captured docs/shots/base/inventory-window.png');
+
   // Test Quick Stack button
   const quickStackBtn = page.locator('[data-testid="quick-stack-btn"]');
   await quickStackBtn.click();
   await page.waitForTimeout(300);
   console.log('OK: Quick Stack triggered');
-
-  await page.screenshot({ path: 'docs/shots/base/inventory-window.png' });
-  console.log('Captured docs/shots/base/inventory-window.png');
 
   // Close inventory with Escape
   console.log('Closing inventory with Escape...');

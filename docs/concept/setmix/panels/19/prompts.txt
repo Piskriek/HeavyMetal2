@@ -44,3 +44,8 @@ FIRST BATCH REVIEW (side by side, S1 over S6):
 - 36 hauler S6 (third attempt, kept): the rev-3 wrapper names a MUSHROOM-CAP emitter, a flat disc cap on a short pedestal with a pale white-violet underside, and forbids a parabolic dish or reflector. Same squat bin, cab, six wheels, steps, tow hitch and clear deck as the S1. Kept after side-by-side check.
 
 Note: the rev-3 mushroom cap is slightly larger in the S6 than in the S1; accepted as the same emitter.
+
+REVISION 4 (lead-engineer review of sheet 19, two S6 fixes; scout and crawler pairs and the fabricator S1 approved as drawn):
+- 34 fabricator S6 (rev 4): the half-printed scout hovered above the bed. Old render moved to rejected/19-fabricator-s6-rev1.png. Redrawn: the scout's WHEELS and LOWER CHASSIS are solid, painted and clean, RESTING ON the printing bed with no gap beneath the wheels; solid body panels grow upward from the lower chassis; only the UPPER ROLL CAGE is still wireframe, with vertex points snapping into panels from the bottom up. The buggy is supported from the bed. Everything else as before (gantry, print head, console, pad, cables). Kept after side-by-side check.
+- 36 hauler S6 (rev 4): the bin's emitter had become a large saucer firing a light beam. Old render moved to rejected/19-hauler-s6-rev3.png. Redrawn: the bin carries the SMALL finned QUANTUM LINK DISH of the sheet 13 storage bin, about 0.6 m across on a short stub, the same size as the S1; NO beam, NO glow, NO light column, NOT a saucer or parabolic bowl. Everything else as before. Kept after side-by-side check.
+- Open for the lead engineer: the hauler S1 still draws the thin rising beam from its dish. The S6 now has none, so the two differ on that one detail. Not changed in this pass.

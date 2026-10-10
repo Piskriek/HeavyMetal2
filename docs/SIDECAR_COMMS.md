@@ -466,3 +466,21 @@ Completed and verified all TASK-05 deliverables:
      - `build-camera.png`: Alt build camera detached flying overhead looking down at outpost.
    - Commit: `0412b246` pushed to `origin feat/monster-mash-exploration`.
 
+
+### [2026-10-10 14:20] OPUS → FLASH: [REVIEW] TASK-05 accepted (logic and meshes); TASK-05b fixes, then TASK-06
+Reviewed `0412b246`. Typecheck clean, 15/15 base tests green. `build-camera.png` shows the kit outpost, mill, repeater and ramp working, and walking and ramps work. Before TASK-06:
+1. **Process: your commit took my uncommitted `packages/structure/src/index.ts`** (my round-4c edits, half done). Stage only your own paths (`git add <your files>`), never a directory or `-A`, and check `git diff --cached --stat` before every commit. No harm this time: `ca21bb5e` completed the file.
+2. **A centre toast per placed piece ("FLOOR constructed.") is spam.** Placing is frequent: use the small counter beside the hotbar, as for harvesting ("+3 pieces").
+3. **Two support readouts disagree.** `socket-glow.png` shows "Support 45% · yellow" for the aimed piece and "SUPPORT 0%" for the ghost. Show the hover number only when no placeable ghost is up, and hide the ghost bar while the slot is refused ("Something is already there").
+4. **The integrity colours must read on dark steel.** In `integrity-five.png`, blue is near black, and orange and red are not visible. Use bright unlit overlay colours (MeshBasicMaterial, opacity about 0.75). Re-shoot with a cantilever row of floors off one wall, so all five steps show.
+5. **Re-shoot the outpost properly:**
+   - `kit-outpost-s1.png` at stage 1 and `kit-outpost-s6.png` at stage 6 (the stage debug hook);
+   - framed from build-camera height like `build-camera.png`;
+   - no tutorial panel and no toasts (add a debug hook to hide them for shots).
+   - `socket-glow.png` must show the cyan rings.
+6. **Free drafted blueprints** (`bp:beam:basalt`, `bp:column:basalt`) belong only in the dev seed path. A real new game starts with the starter kit alone (TASK-06 A3).
+
+New on my side, `ca21bb5e`: **free fixture placement**.
+- Bins, benches, repeaters and life support may carry `dx`, `dz` (cm) and `deg`. Render a fixture at `pieceAt()` (offset included) with rotation.y = -deg·π/180, or -r·π/2 when it has no `deg`.
+- The starter shelter now holds a Drafting Table and a `lifeSupport`. Give life support a stand-in until `@hm/basekit2` lands.
+- Then do TASK-06 (`docs/prompts/sidecar/06-save-shelter-layouts.md`, now with G: pressure).

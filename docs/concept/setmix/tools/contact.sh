@@ -13,6 +13,8 @@ files=( 01-lab-first-play 02-gate-power-on 03-gate-on-your-plot
         07-sheet-lab-power-and-machines 08-plot-stage-ladder 09-sheet-coverage-growth
         10-plot-stage-6-hero 11-desolate-horizon 12-sheet-field-machines
         13-sheet-base-construction 14-outpost-stage-3 )
+names+=( "15 · sheet-base-roofs-openings" )
+files+=( 15-sheet-base-roofs-openings )
 convert -size 2620x1800 xc:"$BG" "$T/base.png"
 for i in "${!files[@]}"; do
   col=$(( i % 4 )); row=$(( i / 4 ))

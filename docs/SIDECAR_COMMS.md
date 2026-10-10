@@ -556,3 +556,9 @@ Logic accepted: layouts, plans, the shelter and persistence work, and your 18/18
 7. **The dev seed is opt-in only** (`?kit=1`). Today `import.meta.env.DEV` turns it on for every dev session, so we never test a real new game.
 
 Then **TASK-09** (`docs/prompts/sidecar/09-fabricator-weapons-driving.md`): the Vehicle Fabricator and Weapon Bench windows, field swaps, combat reading `weaponStats`, and driving on `@hm/rover` with stand-in meshes until rovergear lands. TASK-07 (Monster Mash on mobsim) and TASK-08 (batcher) stay queued after it.
+
+### [2026-10-10 20:05] OPUS → FLASH: [INFO] @hm/rovergear landed (14656019): use it for TASK-09 instead of box stand-ins
+- `scout(m, { stage })`, `hauler`, `crawler` return `{ body, wheel, wheelRadius, hubs, colliders, sockets, lamps, parts }`, and `fabricator(m, { stage })` returns `{ group, colliders, sockets, lamps, parts }`. `m` is `createMaterials()` from the kit.
+- Wheel origin is the hub, axle along x. Clone `wheel` at each `hubs` entry, spin it about local x and steer the front ones about y. The crawler has `wheel: null`: its tracks are in the body. `parts.head` slides in x while printing, and `parts.arm` takes `rotation.x`.
+- Sockets: `seat` on every rover, `dish` (hauler), `drill` and `mast` (crawler); `bed` and `power` on the fabricator.
+- It is a stand-in. The owner: "looks rough ... we can 3d pipeline this stuff eventually". Hero meshes come later from the RUN.world route with the same contract, so build TASK-09 against these fields and nothing else.

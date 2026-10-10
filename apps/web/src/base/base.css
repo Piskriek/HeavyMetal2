@@ -109,13 +109,13 @@
 .hm-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(4, 7, 12, 0.72);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(4, 7, 12, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 200;
+  z-index: 1000;
   animation: hmFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -130,10 +130,10 @@
 }
 
 .hm-window-panel {
-  background: var(--base-bg-dark);
+  background: rgba(8, 13, 20, 0.98);
   border: 1px solid var(--base-cyan-hairline);
   border-radius: var(--base-radius-lg);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.75), 0 0 24px rgba(0, 240, 255, 0.2);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.95), 0 0 24px rgba(0, 240, 255, 0.2);
   padding: 24px;
   color: var(--base-text-primary);
   display: flex;
@@ -655,3 +655,59 @@ button.hm-quick-stack-btn:active,
   height: 100%;
   transition: width 0.15s ease;
 }
+
+/* -------------------------------------------------------------
+   Running Harvest Counter (Beside Hotbar)
+   ------------------------------------------------------------- */
+.hm-harvest-counter {
+  position: absolute;
+  bottom: 24px;
+  left: calc(50% + 320px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(10, 16, 26, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  border-radius: var(--base-radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7), 0 0 16px rgba(0, 240, 255, 0.25);
+  z-index: 500;
+  pointer-events: none;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  color: #fff;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+}
+
+.hm-harvest-counter.fading {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.hm-harvest-counter .hm-count-pill {
+  color: var(--base-cyan-bright);
+  font-weight: 700;
+  font-size: 14px;
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
+}
+
+.hm-harvest-counter .hm-count-name {
+  color: var(--base-text-subtle);
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .hm-harvest-counter {
+    left: 50%;
+    bottom: 96px;
+    transform: translateX(-50%);
+  }
+  .hm-harvest-counter.fading {
+    transform: translate(-50%, 6px);
+  }
+}
+

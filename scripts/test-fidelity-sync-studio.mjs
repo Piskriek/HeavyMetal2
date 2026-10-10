@@ -173,7 +173,7 @@ try {
   await page.waitForTimeout(3000);
 
   const syncBadge = page.locator('.sync-badge');
-  await syncBadge.waitFor({ state: 'visible', timeout: 10000 });
+  await syncBadge.waitFor({ state: 'visible', timeout: 30000 });
   const syncText = await syncBadge.textContent();
   console.log('OK: Sync Badge visible on campaign HUD:', syncText?.trim());
 

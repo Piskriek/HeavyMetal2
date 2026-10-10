@@ -94,6 +94,12 @@ try {
     if (window.hmPlay?.teleportPlanet) {
       window.hmPlay.teleportPlanet();
     }
+    if (window.hmPlay?.setPaused) {
+      window.hmPlay.setPaused(false);
+    }
+    if (window.hmPlay?.setLocked) {
+      window.hmPlay.setLocked(true);
+    }
   });
   await page.waitForTimeout(1000);
 
@@ -396,7 +402,7 @@ try {
     if (!w.field || !w.field.nodes || w.field.nodes.length === 0) {
       return { ok: false, error: 'No anomaly nodes found in world.field' };
     }
-    const node0 = w.field.nodes[0];
+    const node0 = w.field.nodes.slice().sort((a, b) => Math.hypot(a.x - 12, a.z - 12) - Math.hypot(b.x - 12, b.z - 12))[0];
     const initialReserve = node0.reserve;
     const countItems = (slots, prefix) => slots.reduce((acc, s) => acc + (s && s.item.startsWith(prefix) ? s.n : 0), 0);
     const pxdBefore = countItems(w.player.slots, 'pxd');
@@ -425,12 +431,39 @@ try {
       return { ok: false, error: `Player did not receive raw pxd/vtx harvest (gained ${gained})` };
     }
 
-    // Set visual beam for screenshot
+    // Clear lingering toasts and select neutral hotbar slot (ore) so no build ghost blocks reticle
+    if (window.hmPlay?.clearToast) {
+      window.hmPlay.clearToast();
+    }
+    baseApi.apply({ t: 'hotbar', index: 2 });
+
+    // Unpause game so pause overlay does not show, and lock to hide Click to look around
+    if (window.hmPlay?.setPaused) {
+      window.hmPlay.setPaused(false);
+    }
+    if (window.hmPlay?.setLocked) {
+      window.hmPlay.setLocked(true);
+    }
+
+    // Teleport camera right in front of node0 looking directly at its center
     const scene = window.__playScene;
     if (scene) {
-      const muzzle = scene.beamMuzzle();
-      const target = { x: node0.x, y: scene.heightAt(node0.x, node0.z) + 0.35, z: node0.z };
-      scene.setBeam(muzzle, target, 'extract', '#d9d9d9', true);
+      const px = node0.x;
+      const pz = node0.z + 2.8;
+      const camY = scene.heightAt(px, pz) + 1.7;
+      const nodeY = scene.heightAt(node0.x, node0.z) + 0.35;
+      const dx = node0.x - px;
+      const dz = node0.z - pz;
+      const dy = nodeY - camY;
+      const distHoriz = Math.hypot(dx, dz);
+      const desiredYaw = Math.atan2(-dx, -dz);
+      const desiredPitch = Math.atan2(dy, Math.max(0.1, distHoriz));
+      scene.debug.teleport('planet', px, pz, desiredYaw, desiredPitch);
+    }
+
+    // Activate live continuous beam targeting node0
+    if (baseApi.startBeam) {
+      baseApi.startBeam(node0.id);
     }
 
     return {
@@ -449,9 +482,10 @@ try {
   await page.screenshot({ path: 'docs/shots/base/beam-harvesting.png' });
   console.log('Captured docs/shots/base/beam-harvesting.png');
 
-  // Turn beam visual off after screenshot
+  // Turn live beam off after screenshot
   await page.evaluate(() => {
-    window.__playScene?.setBeam(null, null, 'extract', '#ffffff', false);
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    baseApi?.stopBeam?.();
   });
 
   // 8. Verify Heavy Machine Hardpoint, Install & Refinery Lifecycle (Part C)

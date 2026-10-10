@@ -9,11 +9,20 @@ import { BuildReadout } from './build-readout';
 interface BaseHudProps {
   source: BaseViewSource;
   onOpenChange?: (isOpen: boolean) => void;
+  paused?: boolean;
+  modalOpen?: boolean;
+  harvestCounter?: { count: number; name: string; fading?: boolean } | null;
 }
 
 export type OpenWindow = 'none' | 'inventory' | 'drafting' | 'lattice';
 
-export const BaseHud: React.FC<BaseHudProps> = ({ source, onOpenChange }) => {
+export const BaseHud: React.FC<BaseHudProps> = ({
+  source,
+  onOpenChange,
+  paused = false,
+  modalOpen = false,
+  harvestCounter = null,
+}) => {
   const [view, setView] = useState<BaseView>(() => source.get());
   const [openWindow, setOpenWindow] = useState<OpenWindow>('none');
 
@@ -66,8 +75,18 @@ export const BaseHud: React.FC<BaseHudProps> = ({ source, onOpenChange }) => {
 
   return (
     <>
-      {/* Reticle Build Readout */}
-      <BuildReadout build={view.build} />
+      {/* Reticle Build Readout - hidden when paused or any window/modal is open */}
+      {!paused && openWindow === 'none' && !modalOpen && (
+        <BuildReadout build={view.build} />
+      )}
+
+      {/* Running harvest counter pill beside hotbar */}
+      {harvestCounter && !paused && openWindow === 'none' && !modalOpen && (
+        <div className={`hm-harvest-counter${harvestCounter.fading ? ' fading' : ''}`} data-testid="base-harvest-counter">
+          <span className="hm-count-pill">+{harvestCounter.count}</span>
+          <span className="hm-count-name">{harvestCounter.name}</span>
+        </div>
+      )}
 
       {/* Hotbar */}
       <Hotbar inventory={view.inventory} actions={source.actions} />

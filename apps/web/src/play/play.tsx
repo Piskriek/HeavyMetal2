@@ -211,6 +211,11 @@ export function PlayScreen(props: {
   const tryPlaceBaseRef = useRef<() => boolean>(() => false);
   const [machinePickerHardpoint, setMachinePickerHardpoint] = useState<number | null>(null);
   const [refineryMachineId, setRefineryMachineId] = useState<number | null>(null);
+  const [baseWindowOpen, setBaseWindowOpen] = useState(false);
+  const [beamHarvest, setBeamHarvest] = useState<{ count: number; name: string; fading?: boolean } | null>(null);
+  const beamHarvestTimerRef = useRef<number | null>(null);
+  const forceBeamRef = useRef<number | null>(null);
+  const isAnyBaseWindowOpen = baseWindowOpen || machinePickerHardpoint !== null || refineryMachineId !== null;
   const hardpointToPlotMachineRef = useRef<Map<number, number>>(new Map());
   const isLmbDownRef = useRef(false);
   const harvestAccRef = useRef(0);
@@ -273,8 +278,27 @@ export function PlayScreen(props: {
       } else if (ev.type === 'door') {
         say(ev.open ? 'Airlock opened.' : 'Airlock closed.');
       } else if (ev.type === 'harvested') {
-        const itemSummary = ev.items.map((s) => `${s.n}x ${ITEMS[s.item]?.name ?? s.item}`).join(', ');
-        say(`+${itemSummary}`, 'Stored in pack/lattice');
+        let totalHarvested = 0;
+        let itemName = 'Raw Material';
+        for (const item of ev.items) {
+          totalHarvested += item.n;
+          itemName = ITEMS[item.item]?.name ?? item.item;
+        }
+        setBeamHarvest((prev) => ({
+          count: (prev ? prev.count : 0) + totalHarvested,
+          name: itemName,
+          fading: false,
+        }));
+        if (beamHarvestTimerRef.current !== null) {
+          window.clearTimeout(beamHarvestTimerRef.current);
+        }
+        beamHarvestTimerRef.current = window.setTimeout(() => {
+          setBeamHarvest((prev) => (prev ? { ...prev, fading: true } : null));
+          beamHarvestTimerRef.current = window.setTimeout(() => {
+            setBeamHarvest(null);
+          }, 400);
+        }, 2000);
+
         fx('relay-click', { minGapMs: 80 });
         if (ev.lost.length > 0) {
           say('Pack full', 'Storage lost: cannot fit cargo');
@@ -587,7 +611,10 @@ export function PlayScreen(props: {
         harvestAccRef.current += dt;
         const aimedNode = scene.aimNode(w.field, BEAM_RANGE);
         const hasBeam = w.equipment.beam?.item === 'tool-beam';
-        const isMining = isLmbDownRef.current && hasBeam && aimedNode !== null && !scene.mash.isEquipped();
+        const targetNode = forceBeamRef.current !== null
+          ? (w.field.nodes.find((n) => n.id === forceBeamRef.current) ?? aimedNode)
+          : aimedNode;
+        const isMining = (isLmbDownRef.current || forceBeamRef.current !== null) && hasBeam && targetNode !== null && !scene.mash.isEquipped();
 
         if (harvestAccRef.current >= 0.1) {
           const powerMap: Record<number, number> = {};
@@ -606,17 +633,17 @@ export function PlayScreen(props: {
               t: 'tick',
               at: { x: playerPos.x, z: playerPos.z },
               dt: 0.1,
-              beam: isMining && aimedNode ? { node: aimedNode.id, power: 1 } : null,
+              beam: isMining && targetNode ? { node: targetNode.id, power: 1 } : null,
               power: powerMap,
             });
           }
         }
 
         // 2. Beam VFX update
-        if (isMining && aimedNode) {
+        if (isMining && targetNode) {
           const muzzle = scene.beamMuzzle();
-          const target = { x: aimedNode.x, y: scene.heightAt(aimedNode.x, aimedNode.z) + 0.35, z: aimedNode.z };
-          const col = aimedNode.kind === 'dither' ? '#d9d9d9' : aimedNode.kind === 'fold' ? '#7dd3fc' : aimedNode.kind === 'chroma' ? '#ff4fd8' : '#22d3ee';
+          const target = { x: targetNode.x, y: scene.heightAt(targetNode.x, targetNode.z) + 0.35, z: targetNode.z };
+          const col = targetNode.kind === 'dither' ? '#d9d9d9' : targetNode.kind === 'fold' ? '#7dd3fc' : targetNode.kind === 'chroma' ? '#ff4fd8' : '#22d3ee';
           scene.setBeam(muzzle, target, 'extract', col, true);
         } else {
           scene.setBeam(null, null, 'extract', '#ffffff', false);
@@ -949,6 +976,10 @@ export function PlayScreen(props: {
       spawnDemon: (count = 1) => scene.mash.spawnDemon(count),
       equipShotgun: (on = true) => { scene.mash.equip(on); setMashEquipped(on); },
       fireShotgun: () => fireWeapon(),
+      setPaused: (p: boolean) => setPaused(p),
+      isPaused: () => pausedRef.current,
+      setLocked: (l: boolean) => setLocked(l),
+      clearToast: () => setToast(null),
       base: {
         world: () => baseWorldRef.current,
         apply: (cmd: BaseCommand) => dispatchBaseRef.current(cmd),
@@ -960,11 +991,21 @@ export function PlayScreen(props: {
           setRefineryMachineId(machineId);
           freeMouse();
         },
+        startBeam: (nodeId: number) => {
+          forceBeamRef.current = nodeId;
+        },
+        stopBeam: () => {
+          forceBeamRef.current = null;
+        },
       },
       teleportPlanet: () => scene.debug.teleport('planet', 0, 10, 0),
     });
     if (typeof window !== 'undefined') {
       (window as unknown as { __hm?: unknown }).__hm = {
+        setPaused: (p: boolean) => setPaused(p),
+        isPaused: () => pausedRef.current,
+        setLocked: (l: boolean) => setLocked(l),
+        clearToast: () => setToast(null),
         base: {
           world: () => baseWorldRef.current,
           apply: (cmd: BaseCommand) => dispatchBaseRef.current(cmd),
@@ -975,6 +1016,12 @@ export function PlayScreen(props: {
           openRefinery: (machineId: number) => {
             setRefineryMachineId(machineId);
             freeMouse();
+          },
+          startBeam: (nodeId: number) => {
+            forceBeamRef.current = nodeId;
+          },
+          stopBeam: () => {
+            forceBeamRef.current = null;
           },
         },
       };
@@ -1745,13 +1792,13 @@ export function PlayScreen(props: {
               </section>
             );
           })() : null}
-          {!locked && !paused && panel === null && labPanel === null && !dialOpen && !menu ? (
+          {!locked && !paused && panel === null && labPanel === null && !dialOpen && !menu && !isAnyBaseWindowOpen ? (
             <button className="play-start" onClick={lock}>
               <b>Click to look around</b>
               <span className="play-keys">{KEYS.map(([k, what]) => <span key={k}><kbd>{k}</kbd>{what}</span>)}</span>
             </button>
           ) : null}
-          {paused ? (
+          {paused && !isAnyBaseWindowOpen ? (
             <div className="play-pause" role="dialog" aria-label="Paused">
               <h2>Paused</h2>
               <div className="play-pause-sync">
@@ -1967,7 +2014,11 @@ export function PlayScreen(props: {
           {isBase && hud.where === 'planet' ? (
             <BaseHud
               source={baseViewSource}
+              paused={paused}
+              modalOpen={isAnyBaseWindowOpen}
+              harvestCounter={beamHarvest}
               onOpenChange={(isOpen) => {
+                setBaseWindowOpen(isOpen);
                 if (isOpen) {
                   quietRef.current = true;
                   document.exitPointerLock?.();
@@ -2018,7 +2069,7 @@ export function PlayScreen(props: {
               onClose={() => setRefineryMachineId(null)}
             />
           )}
-          {toast ? <div key={toast.id} className={`play-toast${toast.text === 'Sync lost' ? ' lost' : ''}`} role="status"><b>{toast.text}</b>{toast.sub ? <span>{toast.sub}</span> : null}</div> : null}
+          {toast && !isAnyBaseWindowOpen ? <div key={toast.id} className={`play-toast${toast.text === 'Sync lost' ? ' lost' : ''}`} role="status"><b>{toast.text}</b>{toast.sub ? <span>{toast.sub}</span> : null}</div> : null}
         </>
       ) : null}
     </div>

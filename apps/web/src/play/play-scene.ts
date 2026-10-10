@@ -531,6 +531,34 @@ export function createPlayScene(o: {
   planetScene.add(beamFx.object);
   beamFx.object.visible = false;
 
+  const beamCoreGeom = keep(new THREE.CylinderGeometry(0.04, 0.07, 1, 10));
+  const beamCoreUniforms = { uColour: { value: new THREE.Color('#00e5ff') }, uLit: { value: 0 } };
+  const beamCoreMat = keep(new THREE.ShaderMaterial({
+    vertexShader: MARK_VERTEX,
+    fragmentShader: COLOUR_MARK_FRAGMENT,
+    blending: THREE.NoBlending,
+    depthTest: true,
+    depthWrite: false,
+    uniforms: beamCoreUniforms,
+  }));
+  const beamCoreMesh = new THREE.Mesh(beamCoreGeom, beamCoreMat);
+  beamCoreMesh.visible = false;
+  planetScene.add(beamCoreMesh);
+
+  const beamSparkGeom = keep(new THREE.SphereGeometry(0.24, 16, 16));
+  const beamSparkUniforms = { uColour: { value: new THREE.Color('#00e5ff') }, uLit: { value: 0 } };
+  const beamSparkMat = keep(new THREE.ShaderMaterial({
+    vertexShader: MARK_VERTEX,
+    fragmentShader: COLOUR_MARK_FRAGMENT,
+    blending: THREE.NoBlending,
+    depthTest: true,
+    depthWrite: false,
+    uniforms: beamSparkUniforms,
+  }));
+  const beamSparkMesh = new THREE.Mesh(beamSparkGeom, beamSparkMat);
+  beamSparkMesh.visible = false;
+  planetScene.add(beamSparkMesh);
+
   // ---- the post pass (planet picture by stage)
   const postUniforms = {
     uColour: { value: planetRT.texture as THREE.Texture }, uDepth: { value: planetRT.depthTexture as THREE.Texture | null }, uLab: { value: labRT.texture as THREE.Texture },
@@ -1040,9 +1068,32 @@ export function createPlayScene(o: {
     },
     setBeam(from, to, mode, colour, on) {
       if (on && from && to) {
-        beamFx.set(new THREE.Vector3(from.x, from.y, from.z), new THREE.Vector3(to.x, to.y, to.z), mode, colour, true);
+        const vFrom = new THREE.Vector3(from.x, from.y, from.z);
+        const vTo = new THREE.Vector3(to.x, to.y, to.z);
+        const beamCol = colour === '#d9d9d9' ? '#00e5ff' : colour;
+        beamFx.set(vFrom, vTo, mode, beamCol, true);
+
+        const dir = vTo.clone().sub(vFrom);
+        const dist = dir.length();
+        if (dist > 0.001) {
+          const mid = vFrom.clone().add(vTo).multiplyScalar(0.5);
+          beamCoreMesh.position.copy(mid);
+          beamCoreMesh.scale.set(1, dist, 1);
+          beamCoreMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+          beamCoreUniforms.uColour.value.set(beamCol);
+          beamCoreMesh.visible = true;
+
+          beamSparkMesh.position.copy(vTo);
+          beamSparkUniforms.uColour.value.set(beamCol);
+          beamSparkMesh.visible = true;
+        } else {
+          beamCoreMesh.visible = false;
+          beamSparkMesh.visible = false;
+        }
       } else {
         beamFx.object.visible = false;
+        beamCoreMesh.visible = false;
+        beamSparkMesh.visible = false;
       }
     },
     beamMuzzle() {
@@ -1212,6 +1263,7 @@ export function createPlayScene(o: {
       plume.setWave([wc.x, wc.y, wc.z], waveTo >= 0 ? Math.min(r, RACER_REACH) : -1);
       plume.update(now);
       labPlume.update(now);
+      beamFx.update(now);
       holoUniforms.uTime.value = now;
       if (where === 'planet') {
         const isMoving = Math.abs(c.move.x) > 0.01 || Math.abs(c.move.z) > 0.01;
@@ -1465,6 +1517,10 @@ export function createPlayScene(o: {
       renderer.dispose();
       mash.dispose();
       beamFx.dispose();
+      beamCoreGeom.dispose();
+      beamCoreMat.dispose();
+      beamSparkGeom.dispose();
+      beamSparkMat.dispose();
       for (const k of (['dither', 'fold', 'chroma', 'spire'] as const)) {
         nodeGeometries[k]?.dispose();
         nodeMaterials[k]?.dispose();

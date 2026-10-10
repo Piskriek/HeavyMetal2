@@ -55,3 +55,19 @@ S6 variants drawn:
 
 STILL TO DRAW: 20-cell-compact-s6 and 20-cell-extended-s6 (the two cell variants).
 Piece 40 is not complete. tools/compose20.sh and the sheet 20-sheet-weapons.png are not yet written.
+
+BATCH 3 (piece 40 completed; review of every part variant at full size against the kept frame):
+- 20-core-semi-s6: REJECTED (rev1, rejected/20-core-semi-s6-rev1.png): a scope-like block on top of the rail, not a receiver core. REDRAWN: a semi-auto receiver core replacing the frame's front receiver block, flush on the dovetail rail, nothing on top. KEPT.
+- 20-core-burst-s6: KEPT (borderline): a longer receiver housing with a three-notch selector on the top front; reads as a receiver module.
+- 20-core-beam-s6: rejected rev1 earlier (scope-like cylinder on top). REDRAWN: a beam receiver core replacing the front block, flat dull emitter lens at the tip, fins underneath, no glow. KEPT.
+- 20-barrel-short-s6: KEPT (batch 2).
+- 20-barrel-long-s6: KEPT. The long barrel seats in the muzzle collar, no other change.
+- 20-barrel-scatter-s6: REJECTED (rev1, rejected/20-barrel-scatter-s6-rev1.png): the wide flare sat at the stock end. REDRAWN: the bell-shaped flare at the muzzle end. KEPT.
+- 20-sight-iron-s6: KEPT. Two small posts clamped to the rail.
+- 20-sight-scope-s6: KEPT. A short scope on two mount rings.
+- 20-sight-holo-s6: KEPT. A compact holo on a clamp block, dark glass.
+- 20-cell-compact-s6: KEPT. A short cell flush in the well with a latch.
+- 20-cell-extended-s6: KEPT. A longer cell pack below the well, clear of the ground.
+- 20-full-s1: REJECTED (rev1, rejected/20-full-s1-rev1.png): the frame body differed from the S1 frame. REDRAWN from the S1 frame as the reference: receiver, stock, grip and sight rail match the S1 frame. The compact cell sits slightly below the underside (a minor difference from the flush S6 cell). KEPT.
+
+SHEET: panels/20 composed by tools/compose20.sh into 20-sheet-weapons.png (3840x1960): the bench and frame at S1 and S6 on the top row, then the eleven variant panels at S6 and the S1 full set. Contact sheet rebuilt with 19 tiles.

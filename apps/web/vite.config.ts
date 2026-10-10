@@ -125,6 +125,7 @@ export default defineConfig(({ mode }) => ({
       '@hm/lattice': p('../../packages/lattice/src/index.ts'),
       '@hm/substrate': p('../../packages/substrate/src/index.ts'),
       '@hm/basegear': p('../../packages/basegear/src/index.ts'),
+      '@hm/heavygear': p('../../packages/heavygear/src/index.ts'),
       '@hm/basekit': p('../../packages/basekit/src/index.ts'),
       '@hm/fieldkit': p('../../packages/fieldkit/src/index.ts'),
       '@hm/cartlab': p('../../packages/cartlab/src/index.ts'),

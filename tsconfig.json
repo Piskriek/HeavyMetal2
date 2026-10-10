@@ -339,6 +339,9 @@
       "@hm/basegear": [
         "packages/basegear/src/index.ts"
       ],
+      "@hm/heavygear": [
+        "packages/heavygear/src/index.ts"
+      ],
       "@hm/basekit": [
         "packages/basekit/src/index.ts"
       ],

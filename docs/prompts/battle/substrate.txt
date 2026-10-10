@@ -1,0 +1,38 @@
+Write TS package `@hm/substrate`: harvestable anomaly nodes on a moon plot (a base-building game where you mine raw pixels and raw vertices). Reply with two full code blocks, src/index.ts and tests/substrate.test.ts, then STOP.
+RULES: strict (noUncheckedIndexedAccess), no any/DOM/Date/Math.random, no imports in src; pure, never mutate inputs; all fields readonly.
+export type Kind='dither'|'fold'|'chroma'|'spire';
+export const ITEM={dither:'pxd-mono',chroma:'pxd-chroma',fold:'vtx-rough',spire:'vtx-fine'} as const;
+export const MAX={dither:60,fold:60,chroma:120,spire:120}, RATE={dither:1.5,fold:1.5,chroma:1,spire:1}, G0=1/600, CELL=20;
+export interface Node{id:number;kind:Kind;x:number;z:number;reserve:number;carry:number}
+export interface Field{v:1;seed:number;time:number;nodes:Node[]}
+export interface Stack{item:string;n:number}
+export function hash(seed:number,i:number,j:number,k:number):number{let h=(seed^Math.imul(i,374761393)^Math.imul(j,668265263)^Math.imul(k,2147483647))>>>0;h=Math.imul(h^(h>>>13),1274126177)>>>0;h=(h^(h>>>16))>>>0;return h/4294967296}
+generate(seed,radius,stage):Field; regen(field,radius,stage):Field; advance(field,dt,stage,beam:{id:number;power:number}|null):{field:Field;items:Stack[]}
+GENERATE: cells (ci,cj) of CELL m whose centre (ci*CELL,cj*CELL) has length <= radius-10. A node is there when hash(seed,ci,cj,0) < 0.18+0.04*stage. x = ci*CELL+(hash(..,1)-0.5)*12, z = cj*CELL+(hash(..,2)-0.5)*12. Family: hash(..,3) < 0.5 -> pixels else vertices. Upgraded (chroma for pixels, spire for vertices) when hash(..,4) < max(0,(stage-1)*0.15), else dither / fold. id = (ci+1000)*2001+(cj+1000). reserve = MAX[kind], carry 0, time 0. Nodes sorted by id. stage is an integer 0..6 (clamp).
+REGEN (the plot reached a new stage): generate(field.seed, radius, stage), but a node whose id existed keeps its reserve fraction (old.reserve/MAX[old kind] * MAX[new kind]) and carry; time kept.
+ADVANCE by dt seconds (dt <= 0 or not finite: return the same field, no items). time += dt. Every node except the beamed one regrows: R = M-(M-R0)*exp(-g*dt), g = G0*(1+stage/2), M = MAX[kind]. The beamed node (id found, power clamped to [0,4], else nothing happens to it) is harvested at rate k*(0.5+0.5*R/M) units/s with k = RATE[kind]*power, so R(t) = (R0+M)*exp(-k*t/(2M)) - M, stopping at 0 (R never below 0). Harvested h = R0 - R1. n = floor(carry + h + 1e-9); new carry = carry + h - n clamped to [0,1). items = [{item: ITEM[kind], n}] when n > 0, else []. These closed forms make one long step equal many short ones.
+Keep this test unchanged; add your own (a hidden suite checks every rule):
+```ts
+import test from 'node:test'; import assert from 'node:assert/strict';
+import { generate, regen, advance, MAX, type Field } from '../src/index';
+const near = (a: number | undefined, b: number, e = 1e-6) => assert.ok(Math.abs((a ?? NaN) - b) < e, `${a} vs ${b}`);
+const one = (kind: 'dither' | 'chroma', reserve: number): Field => ({ v: 1, seed: 1, time: 0, nodes: [{ id: 5, kind, x: 0, z: 0, reserve, carry: 0 }] });
+test('field, harvest, regrowth', () => {
+  const a = generate(7, 500, 0), b = generate(7, 500, 4);
+  assert.deepEqual(a, generate(7, 500, 0)); assert.notDeepEqual(a, generate(8, 500, 0));
+  assert.ok(a.nodes.length > 50 && b.nodes.length > a.nodes.length);
+  assert.ok(a.nodes.every((n) => n.kind === 'dither' || n.kind === 'fold')); assert.ok(b.nodes.some((n) => n.kind === 'chroma'));
+  for (const n of a.nodes) { const m = b.nodes.find((q) => q.id === n.id); assert.ok(m); near(m.x, n.x); near(m.z, n.z); }
+  for (const n of b.nodes) assert.ok(Math.hypot(n.x, n.z) <= 500);
+  const f = one('chroma', 120);
+  const big = advance(f, 10, 0, { id: 5, power: 2 });
+  near(big.field.nodes[0]!.reserve, 240 * Math.exp(-10 / 120) - 120); assert.deepEqual(big.items, [{ item: 'pxd-chroma', n: 19 }]);
+  let g = f, got = 0; for (let i = 0; i < 10; i++) { const r = advance(g, 1, 0, { id: 5, power: 2 }); g = r.field; got += r.items[0]?.n ?? 0; }
+  near(g.nodes[0]!.reserve, big.field.nodes[0]!.reserve, 1e-9); assert.equal(got, 19);
+  const all = advance(one('dither', 60), 1e6, 0, { id: 5, power: 1 }); assert.equal(all.field.nodes[0]!.reserve, 0); assert.equal(all.items[0]?.n, 60);
+  near(advance(one('dither', 0), 600, 0, null).field.nodes[0]!.reserve, 60 * (1 - Math.exp(-1)));
+  near(advance(one('dither', 0), 600, 2, null).field.nodes[0]!.reserve, 60 * (1 - Math.exp(-2)));
+  const half = regen({ ...a, nodes: a.nodes.map((n) => ({ ...n, reserve: MAX[n.kind] / 2 })) }, 500, 4);
+  for (const n of half.nodes) if (a.nodes.some((q) => q.id === n.id)) near(n.reserve, MAX[n.kind] / 2);
+});
+```

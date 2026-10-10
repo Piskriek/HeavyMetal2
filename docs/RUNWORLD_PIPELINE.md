@@ -82,6 +82,7 @@ Keeping it at design time means:
 - **"FIDELITY Mentor"**, voice id `eBTgYm9Qho6PFSGSs2wn`. It was designed from a description (candidate C of 3) and saved permanently on the owner's RUN account.
 - The description: a lead physicist in her early forties at a lab on the edge of collapse, speaking to the one survivor over a field radio; calm under pressure, warm, dry-witted, quietly urgent; mid-low pitch; a clear neutral accent.
 - The owner: "with some bg noise and atmospheric music it will sound right". So the VO files stay clean, and the game adds a radio band-pass filter, a static bed and the music at runtime, as separate stems that can be mixed and ducked.
+- **The mix (owner, set by ear):** Voice 80, Radio 10, Static 30, Music 45, Overdrive 10, so mostly the clean voice with a light touch of radio. The values and the chain live in `apps/web/src/audio/mentor-mix.ts`, which both `/radio.html` and the game read.
 - Line files are made with `rundot generate tts --voice-id eBTgYm9Qho6PFSGSs2wn --model eleven_v3 --stability 0.4`. v3 audio tags (`[breathes]`, `[pause]`, `[quietly]`) steer the delivery.
 - Costs so far: the design call took 150 credits (the cost of its 3 previews).
 

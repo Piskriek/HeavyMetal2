@@ -164,3 +164,4 @@
 - The narrator voice: "mentor C is the winner, with some bg noise and atmospheric music it will sound right". Saved on RUN.world as "FIDELITY Mentor".
 - Limits: "just check, there might be a limit to how much we are alowed to generate via the cli per day, so we should plan it smart".
 - Slimming: "reduced is smoothing the normals weird, will need to auto the normals at an angle"; "or fully smoothe and let the texture do the work, do they have normals textures?"; Blender: "yea you can use blender".
+- The mix, set by ear on the audition page: Voice 80, Radio 10, Static 30, Music 45, Overdrive 10 ("here are the numbers for the voice"). Earlier: the full radio filter was "a touch too heavy ... sounds wrong without it, but its a bit harsh on the ear".

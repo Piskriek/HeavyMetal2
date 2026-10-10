@@ -1,13 +1,16 @@
-export {};
-
-// Dev-only: audition the mentor's voice the way the game will play it: the clean VO through a field-radio chain,
-// over a static bed and the music bed, each on its own fader. The music ducks under her while she talks.
+// Dev-only: audition the mentor's voice the way the game will play it: the clean VO blended with a field-radio
+// chain, over a static bed and the music bed, each on its own fader. The music ducks under her while she talks.
+// The chain and the default levels come from ../audio/mentor-mix.ts, the same source the game uses.
 //   /radio.html
+import { MENTOR_MIX, driveCurve, radioBlend } from '../audio/mentor-mix';
+
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const LINES: Record<string, string> = {
   'mentor-act3.mp3': 'Act III: "Stage zero..." (eleven_v3 with tags)',
   'mentor-C.mp3': 'Act II: "Look outside..." (the design preview)',
 };
+// fader ids on the page, and the mix level each one starts at
+const FADERS = { vo: 'voice', blend: 'radio', static: 'static', music: 'music', drive: 'overdrive' } as const;
 
 let ctx: AudioContext | null = null;
 let stopPlayback: (() => void) | null = null;
@@ -21,53 +24,44 @@ async function buffer(c: AudioContext, name: string): Promise<AudioBuffer> {
   return b;
 }
 
-/** A soft clipper: the radio's overdriven speaker. */
-function drive(amount: number): Float32Array {
-  const n = 1024, k = amount * 40, out = new Float32Array(n);
-  for (let i = 0; i < n; i++) { const x = (i / (n - 1)) * 2 - 1; out[i] = ((1 + k) * x) / (1 + k * Math.abs(x)); }
-  return out;
-}
-
-const fader = (id: string): number => Number($<HTMLInputElement>(id).value) / 100;
+const fader = (id: keyof typeof FADERS): number => Number($<HTMLInputElement>(id).value) / 100;
 
 async function play(): Promise<void> {
   stopPlayback?.();
   ctx ??= new AudioContext();
-  const c = ctx;
+  const c = ctx, M = MENTOR_MIX;
   const line = $<HTMLSelectElement>('line').value;
   const [vo, st, mu] = await Promise.all([buffer(c, line), buffer(c, 'bed-static.mp3'), buffer(c, 'bed-music.mp3')]);
   const t0 = c.currentTime + 0.1, lead = 1.6;
 
-  // the voice: a field-radio band blended with the clean voice by the Radio fader (owner: the full filter is
-  // "a touch too heavy ... a bit harsh on the ear", but it "sounds wrong without it"). The band is wider than a
-  // phone line and the 2.5-4 kHz region that grates is cut instead of boosted; the presence lift sits lower.
+  // the voice: the radio band (wet) blended with the clean voice (dry)
   const voSrc = c.createBufferSource(); voSrc.buffer = vo;
-  const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 240; hp.Q.value = 0.6;
-  const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 4800; lp.Q.value = 0.5;
-  const mid = c.createBiquadFilter(); mid.type = 'peaking'; mid.frequency.value = 1300; mid.Q.value = 0.8; mid.gain.value = 2.5;
-  const deHarsh = c.createBiquadFilter(); deHarsh.type = 'peaking'; deHarsh.frequency.value = 3200; deHarsh.Q.value = 1.2; deHarsh.gain.value = -3;
-  const sh = c.createWaveShaper(); sh.curve = drive(fader('drive')) as unknown as Float32Array<ArrayBuffer>; sh.oversample = '4x';
-  const comp = c.createDynamicsCompressor(); comp.threshold.value = -20; comp.ratio.value = 3; comp.attack.value = 0.008; comp.release.value = 0.18;
-  const wet = c.createGain(), dry = c.createGain(), amount = $<HTMLInputElement>('radio').checked ? fader('blend') : 0;
-  // equal-power blend, so the level holds as the fader moves
-  wet.gain.value = Math.sin((amount * Math.PI) / 2); dry.gain.value = Math.cos((amount * Math.PI) / 2);
-  const voGain = c.createGain(); voGain.gain.value = fader('vo') * 1.4;
+  const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = M.band.highpassHz; hp.Q.value = M.band.highpassQ;
+  const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = M.band.lowpassHz; lp.Q.value = M.band.lowpassQ;
+  const mid = c.createBiquadFilter(); mid.type = 'peaking'; mid.frequency.value = M.presence.hz; mid.Q.value = M.presence.q; mid.gain.value = M.presence.gainDb;
+  const deHarsh = c.createBiquadFilter(); deHarsh.type = 'peaking'; deHarsh.frequency.value = M.deHarsh.hz; deHarsh.Q.value = M.deHarsh.q; deHarsh.gain.value = M.deHarsh.gainDb;
+  const sh = c.createWaveShaper(); sh.curve = driveCurve(fader('drive')) as unknown as Float32Array<ArrayBuffer>; sh.oversample = '4x';
+  const comp = c.createDynamicsCompressor();
+  comp.threshold.value = M.compressor.thresholdDb; comp.ratio.value = M.compressor.ratio; comp.attack.value = M.compressor.attackS; comp.release.value = M.compressor.releaseS;
+  const blend = radioBlend($<HTMLInputElement>('radio').checked ? fader('blend') : 0);
+  const wet = c.createGain(), dry = c.createGain(); wet.gain.value = blend.wet; dry.gain.value = blend.dry;
+  const voGain = c.createGain(); voGain.gain.value = fader('vo') * M.scale.voice;
   voSrc.connect(hp).connect(lp).connect(mid).connect(deHarsh).connect(sh).connect(comp).connect(wet).connect(voGain);
   voSrc.connect(dry).connect(voGain);
   voGain.connect(c.destination);
 
   // the static bed, looped, filtered to sit behind the voice
   const stSrc = c.createBufferSource(); stSrc.buffer = st; stSrc.loop = true;
-  const stLp = c.createBiquadFilter(); stLp.type = 'lowpass'; stLp.frequency.value = 5000;
-  const stGain = c.createGain(); stGain.gain.value = fader('static') * 0.6;
+  const stLp = c.createBiquadFilter(); stLp.type = 'lowpass'; stLp.frequency.value = M.staticLowpassHz;
+  const stGain = c.createGain(); stGain.gain.value = fader('static') * M.scale.static;
   stSrc.connect(stLp).connect(stGain).connect(c.destination);
 
   // the music, ducked while she speaks
   const muSrc = c.createBufferSource(); muSrc.buffer = mu; muSrc.loop = true;
-  const muGain = c.createGain(), m = fader('music'), duck = m * 0.45, end = t0 + lead + vo.duration;
+  const muGain = c.createGain(), m = fader('music'), duck = m * M.duck.to, end = t0 + lead + vo.duration;
   muGain.gain.setValueAtTime(m, t0);
-  muGain.gain.setValueAtTime(m, t0 + lead - 0.4); muGain.gain.linearRampToValueAtTime(duck, t0 + lead);
-  muGain.gain.setValueAtTime(duck, end); muGain.gain.linearRampToValueAtTime(m, end + 1.2);
+  muGain.gain.setValueAtTime(m, t0 + lead - M.duck.downS); muGain.gain.linearRampToValueAtTime(duck, t0 + lead);
+  muGain.gain.setValueAtTime(duck, end); muGain.gain.linearRampToValueAtTime(m, end + M.duck.upS);
   muSrc.connect(muGain).connect(c.destination);
 
   muSrc.start(t0); stSrc.start(t0); voSrc.start(t0 + lead);
@@ -84,8 +78,9 @@ async function play(): Promise<void> {
 for (const [file, label] of Object.entries(LINES)) {
   const o = document.createElement('option'); o.value = file; o.textContent = label; $<HTMLSelectElement>('line').appendChild(o);
 }
-for (const id of ['vo', 'blend', 'static', 'music', 'drive']) {
+for (const [id, level] of Object.entries(FADERS) as [keyof typeof FADERS, keyof typeof MENTOR_MIX.levels][]) {
   const input = $<HTMLInputElement>(id), out = $(`${id}-v`);
+  input.value = String(MENTOR_MIX.levels[level]);
   const show = (): void => { out.textContent = input.value; };
   input.addEventListener('input', show); show();
 }

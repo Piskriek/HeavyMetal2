@@ -1,5 +1,5 @@
 // Dev-only mesh gallery for reviewing Arena mesh answers side by side (not part of the game bundle).
-//   /gallery.html?mod=basegear2/r2B&fns=hardpoint,heavyMill,bin,repeater,draftingTable[&spacing=10][&view=front]
+//   /gallery.html?mod=basegear2/r2B&fns=hardpoint,heavyMill,bin,repeater,draftingTable[&spacing=10][&view=front][&ground=-2.6]
 // Row 1 is stage 1, row 2 is stage 6, on sandy ground under a low warm sun, with a 1.8 m scale post per column.
 /// <reference types="vite/client" />
 import * as THREE from 'three';
@@ -34,6 +34,8 @@ async function main(): Promise<void> {
   scene.add(sun);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({ color: '#b9a27f', roughness: 1 }));
   ground.rotation.x = -Math.PI / 2;
+  // ground=-2.6 drops the ground below foundation skirts (their tops sit at y=0)
+  ground.position.y = Number(q.get('ground') ?? 0);
   ground.receiveShadow = true;
   scene.add(ground);
   const tris: string[] = [];

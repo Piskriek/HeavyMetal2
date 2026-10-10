@@ -132,3 +132,16 @@
   > 5. **In-Game Vehicle & Weapon Fabricators**:
   >    - Vehicles and weapons are researched and built in-game via fabricator benches.
   >    - In The Workshop, reskin vehicles with imported vehicle meshes.
+
+---
+
+### 2026-10-10: Base-building milestone in progress (Opus session)
+
+- **On the first concept kit (sheet 13)**:
+  > "art looks good, i dont see roof pieces, this just preliminary? did you do the required research on similar games?"
+- **Research becomes standard procedure**:
+  > "make this part of your SOP's research, because these days there is always a new innovation and we are pushing the frontier"
+- **On the research proposals** (`docs/BASE_BUILDING_RESEARCH.md`): approved layout blueprints (R5), pressure + life support (R7), starter shelter (R8) and the mobile outpost (R13), with:
+  > "make sure our system feels familiar and logical to players"
+- **Arena agent mode** (how the owner got a long prompt accepted):
+  > "i cheesed it, by saying hi, then stoppping generation, then pasting the long prompt then sumbitting and it worked"

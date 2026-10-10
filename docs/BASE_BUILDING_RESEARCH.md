@@ -1,6 +1,7 @@
 # FIDELITY // Base-Building Research: what similar games do, what players like and hate
 > **Why this exists**: the owner (2026-10-10): "i dont see roof pieces, this just preliminary? did you do the required research on similar games?" The first kit (sheet 13) was designed from memory of Valheim and Dune, without research. This is that research. It changes the piece list, the rules and the build UX below.
-> **Read with**: [`BASE_BUILDING_ARCHITECTURE.md`](BASE_BUILDING_ARCHITECTURE.md) (decisions D1–D11). New proposals here are R1–R12; the ones needing the owner are marked **OWNER**.
+> **Read with**: [`BASE_BUILDING_ARCHITECTURE.md`](BASE_BUILDING_ARCHITECTURE.md) (decisions D1–D16). The proposals here are R1–R13.
+> **Owner decision, 2026-10-10**: R5, R7, R8 and R13 are approved and are now D13–D16, under the owner's principle D12: "make sure our system feels familiar and logical to players".
 
 ---
 

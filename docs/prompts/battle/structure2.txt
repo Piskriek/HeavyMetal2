@@ -1,0 +1,35 @@
+Follow-up, same chat, same package `@hm/structure`: keep all of round 1 (its tests must still pass) and add the rules below. Reply with the two full files again, src/index.ts and tests/structure.test.ts, then STOP.
+1. Piece gains `open?: boolean` (airlocks only; absent = closed). setOpen(b, id, open): Base flips it; returns the SAME base when id is not an airlock or nothing changes.
+2. check/place: a cell piece whose square overlaps a cell piece of ANOTHER structure by > 0.05 m is refused 'overlap' (same test as found; checked right after 'ground').
+3. rooms(b): Room[] with export interface Room{s:number;k:number;cells:[number,number][];sealed:boolean;airlocks:number[]}. A room cell at level k has a foundation or floor (not ramp) at (i,j,k) and any cell piece at (i,j,k+1). Rooms = groups of room cells joined through edges that hold no barrier (a wall, or an airlock that is not open). sealed = no barrier-free edge of the group leads to a cell that is not a room cell. airlocks = ids of airlocks on any edge of the group's cells, ascending. cells sorted by i then j; rooms ordered by s, then k, then first cell.
+4. snap(b, env, kind, aim:{x,y,z,yaw}, mat, reach=3): Snap|null where
+export type Snap={mode:'place';piece:Omit<Piece,'id'>;ok:boolean;why:string;support:number}|{mode:'found';cx:number;cz:number;yaw:number;ok:boolean;why:string};
+ For each structure (ascending id): take aim into local (u,v); skip the structure unless (u,v) is within reach of one of its cell pieces' squares (2D point-to-square distance, 0 inside). k = max(0, round((aim.y - s.y)/LEVEL)). Let (ci,cj) = floor(u/CELL), floor(v/CELL); over the 3x3 cells around it, candidates by kind with an anchor (local metres): cell kinds and fixtures: the cell, anchor its centre; wall/airlock: both edges r=0 (anchor ((i+0.5)CELL, jCELL)) and r=1 (anchor (iCELL, (j+0.5)CELL)); pillar: corner (i,j), anchor (iCELL, jCELL); hardpoint: block at (i,j), anchor ((i+1)CELL, (j+1)CELL). Keep candidates whose anchor is within reach of (u,v). r = round((aim.yaw - s.yaw)/(PI/2)) mod 4 (0..3) for ramps and fixtures, the edge's r for walls/airlocks, else 0.
+ Order candidates by distance, then s, i, j, r; drop repeats of the same slot. Return the first whose check is ok, else the first, as mode 'place' with that check's ok/why/support. With no candidate: a foundation returns mode 'found' with cx=aim.x, cz=aim.z, yaw=aim.yaw and found()'s ok/why; any other kind returns null.
+Keep this test unchanged too; add your own:
+```ts
+import test from 'node:test'; import assert from 'node:assert/strict';
+import { empty, found, place, check, remove, rooms, setOpen, snap, type Base, type Env, type Kind } from '../src/index';
+const m = { reg: { vKeep: 0.9, hKeep: 0.6 } }, F: Env = { heightAt: () => 0, materials: m };
+const P = (kind: Kind, i: number, j: number, k: number, s: number, r: 0|1|2|3 = 0) => ({ s, kind, i, j, k, r, mat: 'reg' });
+const add = (b: Base, ...ps: ReturnType<typeof P>[]) => ps.reduce((x, p) => { const r = place(x, F, p); assert.ok(r.ok, `${p.kind} ${r.why}`); return r.base; }, b);
+test('rooms, airlocks, snap, overlap', () => {
+  const f = found(empty(), F, 2, 2, 0, 'reg'), s = f.base.structures[0]!.id;
+  let b = add(f.base, P('foundation', 1, 0, 0, s), P('wall', 0, 0, 0, s), P('wall', 1, 0, 0, s), P('wall', 0, 1, 0, s), P('wall', 1, 1, 0, s), P('wall', 0, 0, 0, s, 1));
+  const lock = place(b, F, P('airlock', 2, 0, 0, s, 1)); b = add(lock.base, P('floor', 0, 0, 1, s), P('floor', 1, 0, 1, s));
+  assert.deepEqual(rooms(b), [{ s, k: 0, cells: [[0, 0], [1, 0]], sealed: true, airlocks: [lock.id] }]);
+  const open = setOpen(b, lock.id, true); assert.equal(rooms(open)[0]!.sealed, false); assert.equal(setOpen(b, f.id, true), b);
+  assert.equal(rooms(remove(b, F, b.pieces.find((p) => p.kind === 'wall')!.id).base)[0]!.sealed, false);
+  const w = snap(f.base, F, 'wall', { x: 2.2, y: 0, z: 3.9, yaw: 0 }, 'reg');
+  assert.ok(w && w.mode === 'place' && w.ok); assert.deepEqual([w.piece.i, w.piece.j, w.piece.k, w.piece.r], [0, 1, 0, 0]);
+  const fd = snap(f.base, F, 'foundation', { x: 6, y: 0, z: 2, yaw: 0 }, 'reg');
+  assert.ok(fd && fd.mode === 'place' && fd.ok); assert.deepEqual([fd.piece.i, fd.piece.j], [1, 0]);
+  const far = snap(f.base, F, 'foundation', { x: 50, y: 0, z: 50, yaw: 1 }, 'reg');
+  assert.deepEqual(far, { mode: 'found', cx: 50, cz: 50, yaw: 1, ok: true, why: '' });
+  assert.equal(snap(f.base, F, 'bin', { x: 20, y: 0, z: 20, yaw: 0 }, 'reg'), null);
+  const up = snap(f.base, F, 'floor', { x: 2, y: 3, z: 2, yaw: 0 }, 'reg');
+  assert.ok(up && up.mode === 'place' && !up.ok); assert.equal(up.why, 'unsupported'); assert.deepEqual([up.piece.i, up.piece.j, up.piece.k], [0, 0, 1]);
+  const two = found(add(f.base, P('foundation', 1, 0, 0, s)), F, 10.5, 2, 0, 'reg'); assert.ok(two.ok, two.why);
+  assert.equal(check(two.base, F, P('foundation', 2, 0, 0, s)).why, 'overlap');
+});
+```

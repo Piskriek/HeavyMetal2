@@ -71,6 +71,8 @@ Battles sent in Code Arena (Battle mode), one self-contained module each, collec
 
 ## Base building (2026-10-10, `docs/BASE_BUILDING_ARCHITECTURE.md`)
 
+**Mesh battles must pass `node --import tsx scripts/mesh-audit.ts <answer>/src/index.ts <builders>`** (nothing floats: every welded part touches another part or the ground). Calibrated on basegear round 1: it found A's floating repeater ring and B round 2's 10 loose heavy-mill parts, the "detached polygons" the owner saw.
+
 Briefs are under 5,000 characters; most acceptance tests live in hidden landing suites (`docs/prompts/battle/tests/<pkg>.accept.test.ts`), run against both answers before landing. Never vote: round 2 goes to the better model as a follow-up in the same chat.
 
 | Package | Prompt | Chat | State |

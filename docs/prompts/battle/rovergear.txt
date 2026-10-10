@@ -1,5 +1,5 @@
 One three.js module, `src/index.ts` (package @hm/rovergear) and `tests/rovergear.test.ts`. Then STOP.
-RULES: strict TS (noUncheckedIndexedAccess), no any/DOM/Date/Math.random. Imports: `three`, and `mergeGeometries` from three/examples/jsm/utils/BufferGeometryUtils.js. Merge per material (<= 8 top-level children per group). NO transmission. Stage 1 = chunky low poly, flat; stage 6 = full detail. Nothing floats (every part touches its holder), no poke-through except at welds, no coplanar faces, parts non-indexed with position, normal, uv.
+RULES: strict TS (noUncheckedIndexedAccess), no any/DOM/Date/Math.random. Imports: `three`, and `mergeGeometries` from three/examples/jsm/utils/BufferGeometryUtils.js. Merge per material (<= 8 children per group). NO transmission. S1 chunky low poly, flat; S6 full detail. Nothing floats (every part touches its holder), no poke-through except at welds, no coplanar faces, parts non-indexed with position, normal, uv.
 KIT: a Vehicle Fabricator and three rovers in the base kit style (slate-blue steel, gunmetal, hazard bands, amber lamps).
 FRAMES (m, y up, forward = +z):
 - A ROVER's body origin is the centre between its axles at hub height.

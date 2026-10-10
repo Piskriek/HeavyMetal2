@@ -1,0 +1,51 @@
+One TypeScript module, `src/index.ts` (package @hm/navpath), and `tests/navpath.test.ts` (node:test). Then STOP.
+RULES: strict TS (noUncheckedIndexedAccess), pure and deterministic: no DOM, Date, Math.random, imports or globals.
+TASK: EXACT any-angle shortest paths for monsters on a grid of blocked square cells.
+- Cell (x, y) covers [x, x+1] x [y, y+1]; outside the w x h grid counts as blocked. The grid never has a diagonal pinch (two blocked cells touching only at a corner with the other two free).
+- A path is a polyline from `from` to `to` (any points inside free cells). It may touch blocked cells' edges and corners, but must never cross a blocked cell's interior, and never run along an edge that has blocked cells on both sides.
+- The answer must be the TRUE Euclidean shortest such path (within 1e-6), not a grid path, a smoothed A* path or Theta*: the tests compare against an exact solver on random grids.
+- Null when `to` cannot be reached, or when either end is in a blocked cell.
+API:
+export interface Grid { readonly w: number; readonly h: number; blocked(x: number, y: number): boolean }
+export interface Path { points: [number, number][]; length: number } // points[0] is from, the last is to; length is the sum of its segments
+export function navigator(grid: Grid): { path(from: readonly [number, number], to: readonly [number, number]): Path | null } // may precompute; the grid does not change
+export function shortestPath(grid: Grid, from: readonly [number, number], to: readonly [number, number]): Path | null
+Same input gives the same output (ties broken deterministically). Speed matters: see the last test.
+Keep this test unchanged; add your own:
+```ts
+import test from 'node:test'; import assert from 'node:assert/strict';
+import { navigator, shortestPath, type Grid } from '../src/index';
+const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-6, `${a} vs ${b}`);
+test('open ground is a straight line', () => {
+  const p = shortestPath({ w: 10, h: 10, blocked: () => false }, [0.5, 0.5], [9.5, 9.5]);
+  assert.ok(p); near(p.length, 9 * Math.SQRT2); assert.equal(p.points.length, 2);
+});
+test('around the end of a wall, touching its corners', () => {
+  const wall: Grid = { w: 10, h: 10, blocked: (x, y) => x === 5 && y <= 8 };
+  const p = shortestPath(wall, [2.5, 0.5], [7.5, 0.5]);
+  assert.ok(p); near(p.length, Math.sqrt(78.5) + 1 + Math.sqrt(74.5));
+  assert.deepEqual(p.points.map(([x, y]) => [Math.round(x * 1e6) / 1e6, Math.round(y * 1e6) / 1e6]), [[2.5, 0.5], [5, 9], [6, 9], [7.5, 0.5]]);
+});
+test('sealed off, or starting in a wall: null', () => {
+  const sealed: Grid = { w: 10, h: 10, blocked: (x) => x === 5 };
+  assert.equal(shortestPath(sealed, [2.5, 0.5], [7.5, 0.5]), null);
+  assert.equal(shortestPath(sealed, [5.5, 0.5], [7.5, 0.5]), null);
+});
+test('no running along the seam inside a two-row wall', () => {
+  const thick: Grid = { w: 10, h: 10, blocked: (x, y) => (y === 4 || y === 5) && x >= 1 && x <= 8 };
+  const p = shortestPath(thick, [0.5, 5], [9.5, 5]);
+  assert.ok(p); near(p.length, 8 + 2 * Math.hypot(0.5, 1));
+});
+test('fast: a 64 x 64 maze, 100 queries, under 3 s including precompute', () => {
+  let s = 12345; const rnd = () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296);
+  const cells = Array.from({ length: 64 * 64 }, () => rnd() < 0.25);
+  for (let ch = true; ch;) { ch = false; for (let x = 0; x < 63; x++) for (let y = 0; y < 63; y++) {
+    const a = cells[y * 64 + x], b = cells[y * 64 + x + 1], c = cells[(y + 1) * 64 + x], d = cells[(y + 1) * 64 + x + 1];
+    if ((a && d && !b && !c) || (b && c && !a && !d)) { cells[y * 64 + x + (a ? 1 : 0)] = true; ch = true; } } }
+  const g: Grid = { w: 64, h: 64, blocked: (x, y) => cells[y * 64 + x] === true };
+  const free: [number, number][] = []; for (let i = 0; i < 64 * 64; i++) if (!cells[i]) free.push([(i % 64) + 0.5, Math.floor(i / 64) + 0.5]);
+  const t0 = performance.now(), nav = navigator(g); let found = 0;
+  for (let q = 0; q < 100; q++) { const p = nav.path(free[(q * 37) % free.length]!, free[(q * 91 + 13) % free.length]!); if (p) found++; }
+  assert.ok(performance.now() - t0 < 3000, `${performance.now() - t0} ms`); assert.ok(found > 50);
+});
+```

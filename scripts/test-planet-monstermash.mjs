@@ -212,6 +212,108 @@ try {
   }
 
   // ---------------------------------------------------------------------------
+  // TASK-07b: Weapon Loadout Simulator Verification (Long, Scatter, Burst)
+  // ---------------------------------------------------------------------------
+  console.log('Testing weapon loadout sim verification (long barrel <= 1 hit, scatter <= 7 hits, burst = 3 shots)...');
+  const loadoutTest = await page.evaluate(() => {
+    const mash = window.hmPlay.mash();
+    const origin = { x: 0, y: 1.8, z: 0 };
+    const dir = { x: 0, y: 0, z: 1 }; // aim directly along +z
+
+    // 1. Long Barrel: pellets: 1, damage: [27, 39], spread: 0.006, range: 90
+    mash.setWeaponStats({
+      mode: 'semi',
+      burst: 1,
+      burstGap: 0,
+      cooldown: 0.52,
+      pellets: 1,
+      damage: [27, 39],
+      spread: 0.006,
+      range: 90,
+      zoom: 1,
+      magazine: 8,
+    });
+    mash.resetSim(101);
+    mash.spawnDirect('ogro', 0, 8); // directly ahead of ray at 8m
+    const longRes = mash.fire(origin, dir);
+
+    // 2. Scatter Barrel: pellets: 7, damage: [20, 29], spread: 0.0275, range: 60
+    mash.setWeaponStats({
+      mode: 'semi',
+      burst: 1,
+      burstGap: 0,
+      cooldown: 0.52,
+      pellets: 7,
+      damage: [20, 29],
+      spread: 0.0275,
+      range: 60,
+      zoom: 1,
+      magazine: 8,
+    });
+    mash.resetSim(102);
+    mash.spawnDirect('ogro', 0, 5); // directly ahead at 5m
+    const scatterRes = mash.fire(origin, dir);
+
+    // 3. Burst Core: burst: 3, burstGap: 0.08, cooldown: 0.8
+    mash.setWeaponStats({
+      mode: 'burst',
+      burst: 3,
+      burstGap: 0.08,
+      cooldown: 0.8,
+      pellets: 7,
+      damage: [16, 22],
+      spread: 0.0275,
+      range: 60,
+      zoom: 1,
+      magazine: 24,
+    });
+    mash.resetSim(103);
+    mash.spawnDirect('ogro', 0, 5);
+    const initialShots = mash.getStats().shotsFired;
+    mash.fire(origin, dir);
+    const shotsAfterTrigger = mash.getStats().shotsFired;
+
+    // Step 15 ticks on sim clock (15 * 1/30 = 0.5s > 2 * 0.08s burst duration)
+    for (let i = 0; i < 15; i++) {
+      mash.step({ x: 0, z: 0 });
+    }
+    const shotsAfterBurst = mash.getStats().shotsFired;
+
+    // Reset back to standard shotgun stats for subsequent tests
+    mash.setWeaponStats(null);
+
+    return {
+      longHits: longRes.hits,
+      longKilled: longRes.killed,
+      scatterHits: scatterRes.hits,
+      scatterKilled: scatterRes.killed,
+      initialShots,
+      shotsAfterTrigger,
+      shotsAfterBurst,
+      burstCount: shotsAfterBurst - initialShots,
+    };
+  });
+
+  console.log('Loadout test results:', loadoutTest);
+  if (loadoutTest.longHits > 1) {
+    throw new Error(`Long barrel landed ${loadoutTest.longHits} hits (expected <= 1)`);
+  }
+  if (loadoutTest.longHits !== 1) {
+    throw new Error(`Long barrel missed target (expected 1 hit, got ${loadoutTest.longHits})`);
+  }
+  console.log('OK: Long barrel verified (landed exactly 1 hit per shot)');
+
+  if (loadoutTest.scatterHits < 2 || loadoutTest.scatterHits > 7) {
+    throw new Error(`Scatter barrel landed ${loadoutTest.scatterHits} hits (expected between 2 and 7)`);
+  }
+  console.log('OK: Scatter barrel verified (landed', loadoutTest.scatterHits, 'pellets <= 7)');
+
+  if (loadoutTest.burstCount !== 3) {
+    throw new Error(`Burst pull fired ${loadoutTest.burstCount} shots (expected exactly 3)`);
+  }
+  console.log('OK: Burst pull verified (landed exactly 3 shots on the sim clock)');
+
+  // ---------------------------------------------------------------------------
   // TASK-07: Starter Shelter & Airlock Sealed/Open Navigation Tests
   // ---------------------------------------------------------------------------
   console.log('Testing starter shelter navigation with airlock shut and open...');

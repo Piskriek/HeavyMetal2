@@ -858,6 +858,7 @@ export function PlayScreen(props: {
       if (e.button === 0 && document.pointerLockElement === canvas) {
         isLmbDownRef.current = true;
         if (scene.mash.isEquipped()) {
+          scene.mash.setTrigger(true);
           fireWeapon();
         } else if (isBase) {
           if (placingLayoutId !== null) {
@@ -888,6 +889,7 @@ export function PlayScreen(props: {
     const onMouseUp = (e: MouseEvent): void => {
       if (e.button === 0) {
         isLmbDownRef.current = false;
+        scene.mash.setTrigger(false);
       }
     };
     window.addEventListener('keydown', kd); window.addEventListener('keyup', ku); window.addEventListener('mousemove', onMove);

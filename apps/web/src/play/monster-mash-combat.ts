@@ -23,6 +23,7 @@ import {
   type Nav,
   DT,
   KINDS,
+  type Shot,
 } from '@hm/mobsim';
 import { navFor } from '../base/navgrid';
 import * as S from '@hm/structure';
@@ -58,6 +59,7 @@ export interface MonsterMashCombatManager {
   ): { fired: boolean; hits: number; damage: number; killed: number; reason?: string };
   setWeaponStats(stats: WeaponStats | null): void;
   getWeaponStats(): WeaponStats | null;
+  setTrigger(held: boolean): void;
   spawnOgro(count?: number, customPos?: { x: number; z: number }): Promise<void>;
   spawnDemon(count?: number, customPos?: { x: number; z: number }): Promise<void>;
   spawnDirect(kind: 'ogro' | 'demon', x: number, z: number): void;
@@ -77,6 +79,22 @@ export interface MonsterMashCombatManager {
   getNav(): Nav;
   step(player?: { x: number; z: number }): void;
 }
+
+// -----------------------------------------------------------------------------
+// Default Retro Combat Shotgun Stats
+// -----------------------------------------------------------------------------
+const DEFAULT_WEAPON_STATS: WeaponStats = {
+  mode: 'semi',
+  burst: 1,
+  burstGap: 0,
+  cooldown: 0.52,
+  pellets: 7,
+  damage: [20, 29],
+  spread: 0.0275,
+  range: 60,
+  zoom: 1,
+  magazine: 8,
+};
 
 // -----------------------------------------------------------------------------
 // Procedural Web Audio FX Synthesizer
@@ -552,7 +570,11 @@ export function createMonsterMashCombat(options: {
   let equipped = false;
   let currentAmmo = 8;
   let maxAmmo = 8;
-  let activeWeaponStats: WeaponStats | null = null;
+  let activeWeaponStats: WeaponStats | null = DEFAULT_WEAPON_STATS;
+  let burstRemaining = 0;
+  let burstOrigin: THREE.Vector3 | null = null;
+  let burstDir: THREE.Vector3 | null = null;
+  let triggerHeld = false;
 
   // Deterministic mob simulation state (@hm/mobsim)
   const initialSeed = options.seed ?? 1337;
@@ -871,12 +893,17 @@ export function createMonsterMashCombat(options: {
   }
 
   function setWeaponStats(statsObj: WeaponStats | null): void {
-    activeWeaponStats = statsObj;
-    if (statsObj) {
-      maxAmmo = statsObj.magazine;
-      currentAmmo = Math.min(currentAmmo, maxAmmo);
-      if (currentAmmo <= 0) currentAmmo = maxAmmo;
-    }
+    activeWeaponStats = statsObj ?? DEFAULT_WEAPON_STATS;
+    maxAmmo = activeWeaponStats.magazine;
+    currentAmmo = Math.min(currentAmmo, maxAmmo);
+    if (currentAmmo <= 0) currentAmmo = maxAmmo;
+    burstRemaining = 0;
+    burstOrigin = null;
+    burstDir = null;
+  }
+
+  function setTrigger(held: boolean): void {
+    triggerHeld = held;
   }
 
   function getWeaponStats(): WeaponStats | null {
@@ -956,7 +983,11 @@ export function createMonsterMashCombat(options: {
     prevMobs.clear();
     sim = createSim(seed ?? options.seed ?? 1337);
     accumulator = 0;
-    currentAmmo = activeWeaponStats?.magazine ?? maxAmmo;
+    currentAmmo = (activeWeaponStats ?? DEFAULT_WEAPON_STATS).magazine;
+    burstRemaining = 0;
+    burstOrigin = null;
+    burstDir = null;
+    triggerHeld = false;
     if (!equipped) equip(true);
     updateNav(lastPlayerPos, true);
   }
@@ -985,17 +1016,164 @@ export function createMonsterMashCombat(options: {
     }
   }
 
+  function handleShotHitVFX(
+    rayOrigin: THREE.Vector3,
+    baseDir: THREE.Vector3,
+    res: { hits: number; killed: number[] },
+    isBeam: boolean
+  ): void {
+    if (res.hits > 0) {
+      for (const m of sim.mobs) {
+        if (m.state === 'pain' || res.killed.includes(m.id)) {
+          const view = mobViews.get(m.id);
+          const pt = view
+            ? view.group.position.clone().add(new THREE.Vector3(0, KINDS[m.kind].height * 0.5, 0))
+            : new THREE.Vector3(m.x, groundHeightAt(m.x, m.z) + 1, m.z);
+          particles.burst(pt, 8, isBeam ? 0x06b6d4 : 0xff3b30, 4.5);
+        }
+      }
+    } else {
+      const maxRange = (activeWeaponStats ?? DEFAULT_WEAPON_STATS).range ?? 60;
+      for (let d = 2; d < Math.min(45, maxRange); d += 1.2) {
+        const pt = rayOrigin.clone().addScaledVector(baseDir, d);
+        const gy = groundHeightAt(pt.x, pt.z);
+        if (pt.y <= gy) {
+          particles.burst(new THREE.Vector3(pt.x, gy + 0.05, pt.z), 3, isBeam ? 0x06b6d4 : 0xf59e0b, 2.5);
+          break;
+        }
+      }
+    }
+  }
+
+  function processScheduledShots(playerPos: { x: number; z: number }): void {
+    if (!equipped) return;
+    const currentStats = activeWeaponStats ?? DEFAULT_WEAPON_STATS;
+
+    // 1. Burst follow-up shots on sim clock
+    if (burstRemaining > 0 && sim.cooldown <= 0) {
+      if (currentAmmo <= 0) {
+        burstRemaining = 0;
+        burstOrigin = null;
+        burstDir = null;
+        reload();
+        return;
+      }
+
+      currentAmmo--;
+      stats.shotsFired++;
+      burstRemaining--;
+
+      const isLastShot = burstRemaining === 0;
+      const shotCooldown = isLastShot ? currentStats.cooldown : currentStats.burstGap;
+
+      const rayOrigin = burstOrigin ? burstOrigin.clone() : new THREE.Vector3(playerPos.x, 1.8, playerPos.z);
+      const baseDir = burstDir ? burstDir.clone() : (camera ? new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion) : new THREE.Vector3(0, 0, -1));
+
+      const shotConfig: Shot = {
+        pellets: currentStats.pellets,
+        damage: currentStats.damage,
+        spread: currentStats.spread,
+        range: currentStats.range,
+        cooldown: shotCooldown,
+      };
+
+      audio.playShotgunBlast();
+      recoilOffset.z = 0.12;
+      recoilPitch = 0.06;
+      flashTimer = 0.06;
+      flashMesh.visible = true;
+
+      const res = mobsimFire(
+        sim,
+        [rayOrigin.x, rayOrigin.y, rayOrigin.z],
+        [baseDir.x, baseDir.y, baseDir.z],
+        shotConfig
+      );
+      sim = res.sim;
+      stats.pelletsHit += res.hits;
+      stats.damageDealt += res.damage;
+      stats.mobsDefeated += res.killed.length;
+
+      handleShotHitVFX(rayOrigin, baseDir, res, false);
+
+      if (res.killed.length > 0) {
+        const oreReward = 50 * res.killed.length;
+        stats.oreCollected += oreReward;
+        onOreGathered?.(oreReward);
+        audio.playOreChime();
+      }
+
+      if (isLastShot) {
+        burstOrigin = null;
+        burstDir = null;
+      }
+      return;
+    }
+
+    // 2. Continuous beam while trigger is held
+    if (triggerHeld && currentStats.mode === 'beam' && sim.cooldown <= 0 && burstRemaining === 0) {
+      if (currentAmmo <= 0) {
+        triggerHeld = false;
+        reload();
+        return;
+      }
+
+      currentAmmo--;
+      stats.shotsFired++;
+
+      const rayOrigin = camera ? camera.position.clone() : new THREE.Vector3(playerPos.x, 1.8, playerPos.z);
+      const baseDir = camera ? new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion) : new THREE.Vector3(0, 0, -1);
+
+      const shotConfig: Shot = {
+        pellets: 1,
+        damage: currentStats.damage,
+        spread: 0,
+        range: currentStats.range,
+        cooldown: currentStats.cooldown,
+      };
+
+      audio.playBeamPulse();
+      recoilOffset.z = 0.04;
+      recoilPitch = 0.02;
+      flashTimer = 0.05;
+      flashMesh.visible = true;
+      flashLight.color.setHex(0x06b6d4);
+      flashLight.intensity = 2.5;
+
+      const res = mobsimFire(
+        sim,
+        [rayOrigin.x, rayOrigin.y, rayOrigin.z],
+        [baseDir.x, baseDir.y, baseDir.z],
+        shotConfig
+      );
+      sim = res.sim;
+      stats.pelletsHit += res.hits;
+      stats.damageDealt += res.damage;
+      stats.mobsDefeated += res.killed.length;
+
+      handleShotHitVFX(rayOrigin, baseDir, res, true);
+
+      if (res.killed.length > 0) {
+        const oreReward = 50 * res.killed.length;
+        stats.oreCollected += oreReward;
+        onOreGathered?.(oreReward);
+        audio.playOreChime();
+      }
+    }
+  }
+
   function fire(
     playerPos?: THREE.Vector3 | { x: number; y: number; z: number },
     cameraDir?: THREE.Vector3 | { x: number; y: number; z: number }
   ): { fired: boolean; hits: number; damage: number; killed: number; reason?: string } {
-    if (!equipped || sim.cooldown > 0) {
+    if (!equipped) {
+      return { fired: false, hits: 0, damage: 0, killed: 0 };
+    }
+    if (sim.cooldown > 0 || burstRemaining > 0) {
       return { fired: false, hits: 0, damage: 0, killed: 0 };
     }
 
-    if (!activeWeaponStats) {
-      return { fired: false, hits: 0, damage: 0, killed: 0, reason: 'Weapon loadout incomplete' };
-    }
+    const currentStats = activeWeaponStats ?? DEFAULT_WEAPON_STATS;
 
     if (currentAmmo <= 0) {
       reload();
@@ -1005,7 +1183,8 @@ export function createMonsterMashCombat(options: {
     currentAmmo--;
     stats.shotsFired++;
 
-    const isBeam = activeWeaponStats.mode === 'beam';
+    const isBeam = currentStats.mode === 'beam';
+    const isBurst = currentStats.mode === 'burst' && currentStats.burst > 1;
 
     // Audio & Recoil
     if (isBeam) {
@@ -1033,10 +1212,26 @@ export function createMonsterMashCombat(options: {
       ? ('clone' in cameraDir ? (cameraDir as THREE.Vector3).clone().normalize() : new THREE.Vector3(cameraDir.x, cameraDir.y, cameraDir.z).normalize())
       : new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
 
+    if (isBurst) {
+      burstRemaining = currentStats.burst - 1;
+      burstOrigin = rayOrigin.clone();
+      burstDir = baseDir.clone();
+    }
+
+    const shotCooldown = isBurst ? currentStats.burstGap : currentStats.cooldown;
+    const shotConfig: Shot = {
+      pellets: isBeam ? 1 : currentStats.pellets,
+      damage: currentStats.damage,
+      spread: isBeam ? 0 : currentStats.spread,
+      range: currentStats.range,
+      cooldown: shotCooldown,
+    };
+
     const res = mobsimFire(
       sim,
       [rayOrigin.x, rayOrigin.y, rayOrigin.z],
-      [baseDir.x, baseDir.y, baseDir.z]
+      [baseDir.x, baseDir.y, baseDir.z],
+      shotConfig
     );
 
     sim = res.sim;
@@ -1044,27 +1239,7 @@ export function createMonsterMashCombat(options: {
     stats.damageDealt += res.damage;
     stats.mobsDefeated += res.killed.length;
 
-    if (res.hits > 0) {
-      for (const m of sim.mobs) {
-        if (m.state === 'pain' || res.killed.includes(m.id)) {
-          const view = mobViews.get(m.id);
-          const pt = view
-            ? view.group.position.clone().add(new THREE.Vector3(0, KINDS[m.kind].height * 0.5, 0))
-            : new THREE.Vector3(m.x, groundHeightAt(m.x, m.z) + 1, m.z);
-          particles.burst(pt, 8, isBeam ? 0x06b6d4 : 0xff3b30, 4.5);
-        }
-      }
-    } else {
-      const maxRange = activeWeaponStats.range ?? 60;
-      for (let d = 2; d < Math.min(45, maxRange); d += 1.2) {
-        const pt = rayOrigin.clone().addScaledVector(baseDir, d);
-        const gy = groundHeightAt(pt.x, pt.z);
-        if (pt.y <= gy) {
-          particles.burst(new THREE.Vector3(pt.x, gy + 0.05, pt.z), 3, isBeam ? 0x06b6d4 : 0xf59e0b, 2.5);
-          break;
-        }
-      }
-    }
+    handleShotHitVFX(rayOrigin, baseDir, res, isBeam);
 
     if (res.killed.length > 0) {
       const oreReward = 50 * res.killed.length;
@@ -1103,6 +1278,7 @@ export function createMonsterMashCombat(options: {
       prevMobs.set(m.id, { x: m.x, z: m.z, state: m.state, hp: m.hp });
     }
     sim = mobsimStep(sim, currentNav, p);
+    processScheduledShots(p);
   }
 
   function update(dt: number, playerPos: THREE.Vector3, isMoving: boolean): void {
@@ -1145,6 +1321,7 @@ export function createMonsterMashCombat(options: {
         prevMobs.set(m.id, { x: m.x, z: m.z, state: m.state, hp: m.hp });
       }
       sim = mobsimStep(sim, currentNav, lastPlayerPos);
+      processScheduledShots(lastPlayerPos);
       accumulator -= DT;
       steps++;
     }
@@ -1342,6 +1519,7 @@ export function createMonsterMashCombat(options: {
     reload,
     setWeaponStats,
     getWeaponStats,
+    setTrigger,
     update,
     dispose,
     setBase,

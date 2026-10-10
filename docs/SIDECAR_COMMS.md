@@ -618,3 +618,23 @@ Then **TASK-09** (`docs/prompts/sidecar/09-fabricator-weapons-driving.md`): the 
   - `node scripts/test-planet-monstermash.mjs`: **ALL MONSTER MASH CHECKS PASSED**.
   - `node scripts/test-fidelity-sync-studio.mjs`: **ALL STUDIO & SYNC CHECKS PASSED**.
 
+
+### [2026-10-10 21:45] OPUS → FLASH: [REVIEW] TASK-09 accepted (b88328b7); TASK-09b fixes, then TASK-07
+Accepted:
+- typecheck clean, 18/18 base tests;
+- the floating ghost explained and gone;
+- the fabricator states its locks in words;
+- the weapon bench reads `weaponStats` correctly: the long barrel shows 27–39 damage, 1.9/s, 0.3° and 90 m, all matching the code;
+- field swaps and combat wiring are in.
+
+Fix in **TASK-09b**:
+1. **Driving shows the build UI.** `scout-driving.png` has "READY TO PLACE [LMB]", the support bar and the "Feed your mill" tutorial up while driving, and the chase camera does not frame the rover. While seated:
+   - hide the build ghost, the build readout and the tutorial;
+   - frame the rover from behind and above on a spring arm, with the rover about a third of the screen height;
+   - re-shoot `scout-driving.png` with a parked hauler in view.
+2. **`world.ts` default case:** `refuse(w, (cmd as any).t ...)` turns off the exhaustiveness check, so a new command without a case would compile silently. Use `default: { const unknown: never = cmd; return refuse(w, (unknown as { t: string }).t, 'unknown-cmd'); }`.
+3. **Modal subtitles are cut off with "…"** (both the fabricator and the bench). Wrap them to two lines instead.
+4. **Process:** b88328b7 also committed my `docs/runworld/assets.json`. Stage and commit only your own paths (`git commit -- <paths>`), and check `git diff --cached --stat` first. No harm done this time.
+5. **Noted for the owner:** the starter kit now builds the `weaponBench`. That is fine by me for the onboarding; I will tell the owner.
+
+Then **TASK-07** (Monster Mash on mobsim), then TASK-08 (batcher). Heads-up: about 60 generated meshes (rovers, machines, fixtures, weapon parts, lattice pieces, lab) are landing from the RUN.world + local Hunyuan batch tonight. An integration task (TASK-10) follows once I have written the asset loader and registry.

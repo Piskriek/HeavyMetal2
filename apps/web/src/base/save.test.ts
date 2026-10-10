@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { hashValue } from '@hm/kernel';
 import * as L from '@hm/lattice';
 import { BRIDGE_STORE, apply, createWorld, hashWorld, withBridgeStore, type BaseCommand, type BaseWorld, type WorldEnv } from './world';
 import { loadWorld, saveWorld } from './save';
@@ -59,5 +60,5 @@ test('an edited save is repaired, never trusted', () => {
   assert.deepEqual(back.plans[0]!.left, w.plans[0]!.left);
   assert.equal(back.field.nodes.every((n) => n.reserve >= 0), true, 'a broken field is regrown');
   assert.equal(back.hotbar, 0);
-  assert.equal(hashWorld(back.base), hashWorld(w.base), 'the structures survive');
+  assert.equal(hashValue(back.base), hashValue(w.base), 'the structures survive');
 });

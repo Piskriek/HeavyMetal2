@@ -4,6 +4,17 @@
 >
 > This doc follows the research-first SOP (CLAUDE.md drift guard 4). The findings are below, with sources. Every R is a **proposal for the owner** wherever it goes beyond those words. Nothing is built from it yet.
 
+## Owner decisions (2026-10-10)
+
+| Question | Decision |
+|---|---|
+| How players build vehicles | **A fixed vehicle catalog**: designed rovers printed at the fabricator, no assembly. This replaces R2's modular builder. |
+| What unlocks better vehicles and weapons | **World fidelity** (R5): a tier opens as the plot's stage rises. |
+| How weapons work | **A frame plus 4 part slots** (R4), with field swaps; the bench crafts parts. |
+| Who sees imported rover skins | **Local only** (R6). |
+
+Taken as defaults, since nothing above changes them: R1 (heavy fabricator stations on linked storage), R3 (finished in one piece once paid) and R7 (the mobile outpost is a catalog rover with a linked bin).
+
 ## Findings
 
 ### F1. Vehicles come from a dedicated station, unlocked by progress

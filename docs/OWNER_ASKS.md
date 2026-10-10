@@ -145,3 +145,10 @@
   > "make sure our system feels familiar and logical to players"
 - **Arena agent mode** (how the owner got a long prompt accepted):
   > "i cheesed it, by saying hi, then stoppping generation, then pasting the long prompt then sumbitting and it worked"
+
+## 2026-10-10: fabricator decisions (answers to the research questions)
+- Vehicles: "Fixed vehicle catalog".
+- Unlocks: "World fidelity" (tiers open as the plot's stage rises).
+- Weapons: "Frame + 4 part slots".
+- Imported rover skins: "Local only".
+- On the research: "your research on fabricators seems solid".

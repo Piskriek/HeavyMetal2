@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { deviceFor, type DeviceProfile, type Stage } from '@hm/fidelity';
+import { hashValue } from '@hm/kernel';
 import { VAULT, VAULT_BY_ID } from '@hm/vault';
 import {
   Globe,
@@ -326,7 +327,8 @@ export function StudioScreen(props: StudioScreenProps): ReactElement {
         quantumRelayBandwidthGbps: quantumBandwidth,
       },
       status: 'QUEUED_FOR_WEEKLY_CONSENSUS',
-      signature: `sha256:${Math.random().toString(16).slice(2)}${Math.random().toString(16).slice(2)}`,
+      // a content hash of the settings (the same patch always signs the same), not a random string dressed as sha256
+      signature: `content:${hashValue({ moonCartridge, moonStage, craterRadius, craterDepth, peakHeight, pylonDensity, replicatorYield, quantumBandwidth, author: props.profile.name || 'Pioneer' })}`,
     };
   }, [moonCartridge, moonStage, craterRadius, craterDepth, peakHeight, pylonDensity, replicatorYield, quantumBandwidth, props.profile.name]);
 
@@ -334,7 +336,9 @@ export function StudioScreen(props: StudioScreenProps): ReactElement {
   const handlePublishPlanet = useCallback(() => {
     const cleanName = planetName.trim() || 'Custom Planet';
     const cleanLore = planetLore.trim() || `Activity planet in the SetMix Multiverse.`;
-    const regCode = `SMX-PLN-${Math.floor(1000 + Math.random() * 9000)}-${cleanName.slice(0, 4).toUpperCase().replace(/[^A-Z]/g, 'X')}`;
+    // the same planet always gets the same code (derived from what it is, not a dice roll)
+    const digits = 1000 + (parseInt(hashValue({ cleanName, cleanLore, planetHue, planetRing }).slice(0, 6), 36) % 9000);
+    const regCode = `SMX-PLN-${digits}-${cleanName.slice(0, 4).toUpperCase().replace(/[^A-Z]/g, 'X')}`;
 
     if (props.onUpdateProfile) {
       props.onUpdateProfile((pr) =>

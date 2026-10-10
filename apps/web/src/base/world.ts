@@ -694,9 +694,9 @@ export function planGhosts(w: BaseWorld, env: WorldEnv, planId: number): readonl
 }
 
 /**
- * The starter shelter (D15): one sealed regolith cell (foundation, three walls, an airlock to the front at +z, a ceiling
- * and a Drafting Table inside), free, placed in one action and once per world. Its ceiling becomes a low roof, and a
- * life-support unit joins it, when @hm/structure gains those kinds.
+ * The starter shelter (D15): one sealed regolith cell (foundation, three walls, an airlock to the front at +z, a low
+ * roof rising to the back and a Drafting Table inside), free, placed in one action and once per world. A life-support
+ * unit joins it once fixtures can share a cell (free fixture placement, R2.5): one cell holds one fixture today.
  */
 export const SHELTER: readonly Omit<S.Piece, 'id' | 's' | 'mat'>[] = [
   { kind: 'foundation', i: 0, j: 0, k: 0, r: 0 },
@@ -704,7 +704,7 @@ export const SHELTER: readonly Omit<S.Piece, 'id' | 's' | 'mat'>[] = [
   { kind: 'wall', i: 0, j: 0, k: 0, r: 1 },
   { kind: 'wall', i: 1, j: 0, k: 0, r: 1 },
   { kind: 'airlock', i: 0, j: 1, k: 0, r: 0 },
-  { kind: 'floor', i: 0, j: 0, k: 1, r: 0 },
+  { kind: 'lowRoof', i: 0, j: 0, k: 1, r: 2 },
   { kind: 'bench', i: 0, j: 0, k: 0, r: 2 },
 ];
 

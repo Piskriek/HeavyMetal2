@@ -80,8 +80,8 @@ export interface Blueprint {
 }
 
 export function blueprint(id: string): Blueprint | null {
-  // the starter also builds the first Drafting Table: every other blueprint is drafted at one
-  if (id === STARTER) return { id, name: 'Regolith Slab Kit', kinds: ['foundation', 'floor', 'wall', 'bench'], mat: 'regolith', map: null };
+  // the starter also builds the first Drafting Table and the shelter's low roof: every other blueprint is drafted at one
+  if (id === STARTER) return { id, name: 'Regolith Slab Kit', kinds: ['foundation', 'floor', 'wall', 'lowRoof', 'bench'], mat: 'regolith', map: null };
   const m = /^bp:([a-z]+):([a-z]+)$/.exec(id);
   const p = m?.[1] as PrimitiveId | undefined, map = m?.[2] as MapId | undefined;
   if (!p || !map || !PRIMITIVES.includes(p) || !MAPS.includes(map)) return null;

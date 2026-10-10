@@ -84,8 +84,9 @@ async function normalize(src, dst, a) {
 }
 
 for (const a of manifest.assets.filter((x) => only.length === 0 || only.includes(x.id))) {
-  const d = path.join(OUT, a.id), model = path.join(d, 'model.glb');
-  if (!fs.existsSync(model)) continue;
+  // RUN's Hunyuan 3.1 Pro model if there is one, else the local 3080 pipeline's (scripts/local3d.mjs)
+  const d = path.join(OUT, a.id), model = ['model.glb', 'model-local.glb'].map((f) => path.join(d, f)).find((f) => fs.existsSync(f));
+  if (!model) continue;
   if (fs.existsSync(path.join(d, 'high.glb')) && only.length === 0) continue;
   const [low, mid, high] = manifest.budgets[a.class];
   const norm = path.join(d, 'norm.glb'), slim = 'scripts/slim-glb.mjs';

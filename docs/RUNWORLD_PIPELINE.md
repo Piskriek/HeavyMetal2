@@ -78,6 +78,13 @@ Keeping it at design time means:
 - **Price:** about 0.15 credits per character. The full script with retakes (about 75k characters) comes to about **11k credits**.
 - **Library:** 762 voices: 21 premade, 410 professional, 287 generated, 44 cloned. Each one has a free preview clip. The shortlist for the mentor: Sarah, Lily, Matilda (premade); Cate, Tamsin, Nicola, Viktoria, Emily E. (professional). Hearing one of our own lines in a voice costs about 23 credits.
 
+### The mentor's voice (chosen 2026-10-10)
+- **"FIDELITY Mentor"**, voice id `eBTgYm9Qho6PFSGSs2wn`. It was designed from a description (candidate C of 3) and saved permanently on the owner's RUN account.
+- The description: a lead physicist in her early forties at a lab on the edge of collapse, speaking to the one survivor over a field radio; calm under pressure, warm, dry-witted, quietly urgent; mid-low pitch; a clear neutral accent.
+- The owner: "with some bg noise and atmospheric music it will sound right". So the VO files stay clean, and the game adds a radio band-pass filter, a static bed and the music at runtime, as separate stems that can be mixed and ducked.
+- Line files are made with `rundot generate tts --voice-id eBTgYm9Qho6PFSGSs2wn --model eleven_v3 --stability 0.4`. v3 audio tags (`[breathes]`, `[pause]`, `[quietly]`) steer the delivery.
+- Costs so far: the design call took 150 credits (the cost of its 3 previews).
+
 ## 5. Credit plan (proposal for the owner)
 | Pool | Credits | Notes |
 |---|---|---|

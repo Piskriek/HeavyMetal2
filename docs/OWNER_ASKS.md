@@ -160,3 +160,5 @@
 
 ## 2026-10-10: RUN.world
 - "i have a run.world account, can you install the CLI ... we have 100k credits, can you check if they have a 3d pipepline we can utilize to our advantage? there is good voice ai availible too so we also need to hold some of the tokens for the narator voice overs"
+- Spending: "the run.world people give away alot of tokens so we will be ok with token spend"; asked for a custom voice with a sample, plus tests of the 3D and image generation, "so we can decide".
+- The narrator voice: "mentor C is the winner, with some bg noise and atmospheric music it will sound right". Saved on RUN.world as "FIDELITY Mentor".

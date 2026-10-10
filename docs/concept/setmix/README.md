@@ -897,3 +897,17 @@ in 04/05).
 **Panels:** `panels/18/18-<piece>-s1.png` and `18-<piece>-s6.png`. `panels/18/rejected/` keeps the renders that failed review (`18-lifesupport-s1-rev1`, `18-vestibule-s6-rev1`). Composed by `tools/compose18.sh`.
 
 **Review notes:** no chimneys, stacks or smokestacks; the life-support unit emits no pixels; every piece is grounded with skirts, plinths or bolts visible; no text baked into any kept image; the scientist (1.8 m) gives the scale on piece 31. Known gap: on 31 the cables run beside the unit rather than into a clearly drawn wall conduit. Noted for a later pass.
+
+---
+
+## 19 · sheet-vehicle-fabricator — the vehicle fabricator and the rover catalog
+
+**For:** the art direction for vehicles as a fixed catalog of designed rovers. Each rover prints whole at a Vehicle Fabricator on the base, and better rovers unlock as the world's fidelity rises. Four pieces, continuing sheets 13 to 18 (kit, pad, cable covers, paint and lamp style). Each piece is one design, drawn twice: stage 1 (chunky low poly, flat-shaded, about 16 flat colours) and stage 6 (the same design at full PBR, clean and in service, on the lush terraformed plot).
+
+**Pieces:** 34 vehicle fabricator (a heavy station on a 2 x 2 slab hardpoint pad: a 5 m steel gantry straddling a printing bed, a print head on the rail, a control console at one corner, power and data cables in ribbed floor covers; S1 empty, S6 mid-print with a scout half formed in glowing wireframe, the print the only glow) · 35 scout (stage 2, a light one-seat moon buggy about 3.2 m: open tubular roll cage, four wire-mesh wheels, tool rack, headlamps, whip antenna) · 36 hauler (stage 4, a six-wheeled flatbed about 6 m: two-seat cab, steel storage bin with the sheet 13 link dish, tow hitch, side steps, flat deck left clear behind the bin) · 37 crawler (stage 6, a tracked survey vehicle about 7 m: armoured cab, folding beam-drill arm, sensor mast, heat-sink spine).
+
+**Prompts:** verbatim in `panels/19/prompts.txt`. Wrapper W1 (stage 1), wrapper W6 (the same piece at full PBR, no rust, no decay), and the clause that forbids any lettering on any surface. The rover shown on the S6 print is the scout.
+
+**Panels:** `panels/19/19-<piece>-s1.png` and `19-<piece>-s6.png`. `panels/19/rejected/` keeps the hauler S6 renders that failed review (`19-hauler-s6-rev1`, `19-hauler-s6-rev2`). Composed by `tools/compose19.sh`.
+
+**Review notes:** no chimneys, stacks or smokestacks; no smoke; the fabricator's print is the only glow on the station; every piece is grounded (wheels, tracks, pads and bolts touch the ground); cables run in low ribbed floor covers; no text baked into any kept image; the scientist (1.8 m) stands beside each piece for scale. The hauler S6 emitter matches the S1 mushroom cap, slightly larger in the S6.

@@ -16,7 +16,8 @@ PIECES (sheet 15, numbered 12 to 25, continuing sheet 13):
 23 ladder: one storey, on a wall face, with safety hoops
 24 railing: a half-height rail along a cell edge, posts bolted to the slab
 25 diagonal brace: a steel strut from a wall face up to the underside of the floor above, bolted at both ends
-Plus a proposed (not yet decided) 26 life-support unit: a floor-standing cabinet with vents, a status light and a cable gland, which pressurises a sealed room.
+26 life-support unit (approved by the owner): a floor-standing cabinet with intake vents, a status light and a cable gland. It pressurises the sealed room it stands in.
+27 airlock vestibule: one cell with two airlock doors facing each other, the classic two-door airlock, shown as a short sealed corridor.
 
 SCENE (optional, if budget allows): 16-outpost-roofed.png, the scene-14 outpost grown by two cells, with a pitched roof, a gable end, a window wall and an outside stair to a railed upper deck, at stage 3, in the same camera spirit as 14.
 

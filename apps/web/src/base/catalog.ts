@@ -48,7 +48,7 @@ export const FAMILY: Readonly<Record<PrimitiveId, readonly Kind[]>> = {
   cube: ['foundation', 'floor', 'wall', 'bin'],
   column: ['pillar', 'repeater'],
   beam: ['ramp'],
-  chassis: ['airlock', 'hardpoint', 'bench'],
+  chassis: ['airlock', 'hardpoint', 'bench', 'lifeSupport'],
 };
 
 /** Ore per piece; blueprint pieces add one unit of their map. Heavy hardpoints also need refined beams and frames. */

@@ -179,13 +179,13 @@ export function pieceAt(base: S.Base, p: S.Piece): { x: number; y: number; z: nu
 }
 
 /** pieceAt for a structure pose that may not be in the base yet (a plan's ghost). */
-export function pieceAtIn(st: S.Structure, p: Pick<S.Piece, 'kind' | 'i' | 'j' | 'k' | 'r'>): { x: number; y: number; z: number } {
+export function pieceAtIn(st: S.Structure, p: Pick<S.Piece, 'kind' | 'i' | 'j' | 'k' | 'r' | 'dx' | 'dz'>): { x: number; y: number; z: number } {
   const C = S.CELL;
   const local = p.kind === 'wall' || p.kind === 'airlock'
     ? (p.r === 0 ? [(p.i + 0.5) * C, p.j * C] : [p.i * C, (p.j + 0.5) * C])
     : p.kind === 'pillar' ? [p.i * C, p.j * C]
       : p.kind === 'hardpoint' ? [(p.i + 1) * C, (p.j + 1) * C]
-        : [(p.i + 0.5) * C, (p.j + 0.5) * C];
+        : [(p.i + 0.5) * C + (p.dx ?? 0) / 100, (p.j + 0.5) * C + (p.dz ?? 0) / 100];
   return S.toWorld(st, local[0]!, local[1]!, p.k);
 }
 
@@ -657,7 +657,8 @@ function blueprintFor(w: BaseWorld, kind: S.Kind, mat: string): Blueprint | null
 function placePlanned(base: S.Base, env: WorldEnv, p: Plan, piece: S.Piece): S.Result {
   const senv = structureEnv(env);
   if (p.s === null) return S.found(base, senv, p.cx, p.cz, p.yaw, piece.mat);
-  return S.place(base, senv, { s: p.s, kind: piece.kind, i: piece.i, j: piece.j, k: piece.k, r: piece.r, mat: piece.mat });
+  const placement = piece.deg !== undefined ? { dx: piece.dx, dz: piece.dz, deg: piece.deg } : {};
+  return S.place(base, senv, { s: p.s, kind: piece.kind, i: piece.i, j: piece.j, k: piece.k, r: piece.r, mat: piece.mat, ...placement });
 }
 
 function addBox(boxes: readonly L.Box[], base: S.Base, id: number): readonly L.Box[] {
@@ -717,8 +718,8 @@ export function planGhosts(w: BaseWorld, env: WorldEnv, planId: number): readonl
 
 /**
  * The starter shelter (D15): one sealed regolith cell (foundation, three walls, an airlock to the front at +z, a low
- * roof rising to the back and a Drafting Table inside), free, placed in one action and once per world. A life-support
- * unit joins it once fixtures can share a cell (free fixture placement, R2.5): one cell holds one fixture today.
+ * roof rising to the back, a Drafting Table along the back wall and a life-support unit by the door), free, placed in
+ * one action and once per world. The two fixtures share the cell by free placement (R2.5).
  */
 export const SHELTER: readonly Omit<S.Piece, 'id' | 's' | 'mat'>[] = [
   { kind: 'foundation', i: 0, j: 0, k: 0, r: 0 },
@@ -727,7 +728,8 @@ export const SHELTER: readonly Omit<S.Piece, 'id' | 's' | 'mat'>[] = [
   { kind: 'wall', i: 1, j: 0, k: 0, r: 1 },
   { kind: 'airlock', i: 0, j: 1, k: 0, r: 0 },
   { kind: 'lowRoof', i: 0, j: 0, k: 1, r: 2 },
-  { kind: 'bench', i: 0, j: 0, k: 0, r: 2 },
+  { kind: 'bench', i: 0, j: 0, k: 0, r: 2, dx: 0, dz: -110, deg: 180 },
+  { kind: 'lifeSupport', i: 0, j: 0, k: 0, r: 0, dx: -130, dz: 100, deg: 0 },
 ];
 
 function shelter(w: BaseWorld, env: WorldEnv, cmd: Extract<BaseCommand, { t: 'shelter' }>): Applied {

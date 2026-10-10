@@ -1384,6 +1384,8 @@ const CODEC_MAGIC_0 = 0x48;
 const CODEC_MAGIC_1 = 0x4d;
 const CODEC_VERSION_V1 = 1;
 const CODEC_VERSION_V2 = 2;
+/** v3 adds a fixture's free placement (flag 8, then dx, dz, deg); encode writes it only when a piece has one. */
+const CODEC_VERSION_V3 = 3;
 const CODEC_MAX_ID = 2 ** 31;
 const CODEC_MAX_ID_DELTA = CODEC_MAX_ID - 1;
 const CODEC_MAX_UVARINT = 2 ** 32 - 1;
@@ -1472,6 +1474,7 @@ function codecValidationError(
   const edgeSlots = new Set<string>();
   const pillarSlots = new Set<string>();
   const fixtureSlots = new Set<string>();
+  const fixturesByCell = new Map<string, Piece[]>();
   const hardpointSpots = new Set<string>();
 
   for (const piece of base.pieces) {
@@ -1546,7 +1549,18 @@ function codecValidationError(
     }
 
     const key = cellKey(piece.s, piece.i, piece.j, piece.k);
-    if (fixtureSlots.has(key) || hardpointSpots.has(key)) return 'duplicate-slot';
+    if (hardpointSpots.has(key)) return 'duplicate-slot';
+    if (hasPlacement(piece)) {
+      const { dx, dz, deg } = piece;
+      if (FOOTPRINT[piece.kind] === undefined || !Number.isInteger(dx) || !Number.isInteger(dz) || !Number.isInteger(deg)) return 'bad-placement';
+      if (Math.abs(dx as number) > PLACE_LIMIT_CM || Math.abs(dz as number) > PLACE_LIMIT_CM || (deg as number) < 0 || (deg as number) > 359) return 'bad-placement';
+    }
+    // free fixtures share a cell while their footprints stay inside it and apart (R2.5)
+    if (!footprintInside(piece)) return 'bad-placement';
+    const here = fixturesByCell.get(key) ?? [];
+    if (here.some((other) => footprintsOverlap(other, piece))) return 'duplicate-slot';
+    here.push(piece);
+    fixturesByCell.set(key, here);
     fixtureSlots.add(key);
   }
 
@@ -1622,7 +1636,7 @@ function quantizedYaw(yaw: number): number {
   return Math.max(-CODEC_MAX_YAW_Q, Math.min(CODEC_MAX_YAW_Q, rounded));
 }
 
-function encodeBaseVersion(base: Base, version: 1 | 2): string {
+function encodeBaseVersion(base: Base, version: 1 | 2 | 3): string {
   const allowedKinds = version === CODEC_VERSION_V1 ? CODEC_KINDS_V1 : CODEC_KINDS;
   const why = codecValidationError(base, allowedKinds);
   if (why !== '') throw new Error(why);
@@ -1677,8 +1691,15 @@ function encodeBaseVersion(base: Base, version: 1 | 2): string {
     if (version === CODEC_VERSION_V1) {
       bytes.push(kindIndex + piece.r * 16 + (piece.open === true ? 64 : 0));
     } else {
+      const placed = hasPlacement(piece);
+      if (placed && version !== CODEC_VERSION_V3) throw new Error('placement-needs-v3');
       writeUnsigned(bytes, kindIndex);
-      bytes.push(piece.r + (piece.open === true ? 4 : 0));
+      bytes.push(piece.r + (piece.open === true ? 4 : 0) + (placed ? 8 : 0));
+      if (placed) {
+        writeSigned(bytes, piece.dx ?? 0);
+        writeSigned(bytes, piece.dz ?? 0);
+        writeUnsigned(bytes, piece.deg ?? 0);
+      }
     }
     writeSigned(bytes, piece.i);
     writeSigned(bytes, piece.j);
@@ -1692,7 +1713,7 @@ function encodeBaseVersion(base: Base, version: 1 | 2): string {
 }
 
 function encodeBase(base: Base): string {
-  return encodeBaseVersion(base, CODEC_VERSION_V2);
+  return encodeBaseVersion(base, base.pieces.some(hasPlacement) ? CODEC_VERSION_V3 : CODEC_VERSION_V2);
 }
 
 export function encode(base: Base): string {
@@ -1715,7 +1736,7 @@ export function decode(text: string): Base | null {
       bytes.length < 3 ||
       bytes[0] !== CODEC_MAGIC_0 ||
       bytes[1] !== CODEC_MAGIC_1 ||
-      (version !== CODEC_VERSION_V1 && version !== CODEC_VERSION_V2)
+      (version !== CODEC_VERSION_V1 && version !== CODEC_VERSION_V2 && version !== CODEC_VERSION_V3)
     ) {
       return null;
     }
@@ -1802,6 +1823,7 @@ export function decode(text: string): Base | null {
       let kindIndex: number | undefined;
       let rotation: number | undefined;
       let isOpen = false;
+      let placement: { dx: number; dz: number; deg: number } | null = null;
       if (version === CODEC_VERSION_V1) {
         const metadata = readByte();
         if (metadata === undefined || metadata >= 128) return null;
@@ -1811,9 +1833,14 @@ export function decode(text: string): Base | null {
       } else {
         kindIndex = readUnsigned(CODEC_KINDS.length - 1);
         const flags = readByte();
-        if (flags === undefined || flags >= 8) return null;
+        if (flags === undefined || flags >= (version === CODEC_VERSION_V3 ? 16 : 8)) return null;
         rotation = flags % 4;
-        isOpen = flags >= 4;
+        isOpen = (flags & 4) !== 0;
+        if ((flags & 8) !== 0) {
+          const dx = readSigned(PLACE_LIMIT_CM), dz = readSigned(PLACE_LIMIT_CM), deg = readUnsigned(359);
+          if (dx === undefined || dz === undefined || deg === undefined) return null;
+          placement = { dx, dz, deg };
+        }
       }
       const i = readSigned(LIMITS.cell);
       const j = readSigned(LIMITS.cell);
@@ -1845,14 +1872,16 @@ export function decode(text: string): Base | null {
         id < 0 ||
         id >= CODEC_MAX_ID ||
         (isOpen && kind !== 'airlock' && kind !== 'door') ||
-        (isEdgeKind(kind) && rotation > 1)
+        (isEdgeKind(kind) && rotation > 1) ||
+        (placement !== null && FOOTPRINT[kind] === undefined)
       ) {
         return null;
       }
       previousPieceId = id;
-      pieces.push(isOpen
+      const piece: Piece = isOpen
         ? { id, s: structure.id, kind, i, j, k, r: rotation as Piece['r'], mat, open: true }
-        : { id, s: structure.id, kind, i, j, k, r: rotation as Piece['r'], mat });
+        : { id, s: structure.id, kind, i, j, k, r: rotation as Piece['r'], mat };
+      pieces.push(placement === null ? piece : { ...piece, ...placement });
     }
 
     if (offset !== bytes.length) return null;

@@ -184,10 +184,11 @@ test('the bridge store stands at the gate on the network, and building pulls fro
 });
 
 test('the starter shelter: free, sealed, once per world; it saves as a layout that rebuilds elsewhere as you pay', () => {
-  const stock = [{ item: 'ore', n: 200 }, { item: 'prim-chassis', n: 1 }, { item: 'map-basalt', n: 2 }];
+  const stock = [{ item: 'ore', n: 200 }, { item: 'prim-chassis', n: 1 }, { item: 'map-basalt', n: 3 }];
   let w = run(withBridgeStore(createWorld(), env, stock), { t: 'shelter', cx: 2, cz: 2, yaw: 0 });
   assert.equal(w.shelter, true);
   assert.deepEqual(S.rooms(w.base).map((r) => [r.k, r.sealed]), [[0, true]]);
+  assert.equal(roomAt(w, env, { x: 2, y: 0, z: 2 }).pressurized, true, 'its life-support unit runs off the bridge');
   assert.equal(apply(w, env, { t: 'shelter', cx: 30, cz: 30, yaw: 0 }).events[0]!.type, 'refused');
   assert.equal(L.totals(w.boxes, [BRIDGE_STORE])['ore'], 200, 'the shelter is free');
 
@@ -204,17 +205,17 @@ test('the starter shelter: free, sealed, once per world; it saves as a layout th
   assert.equal(ghosts.length, SHELTER.length);
   assert.ok(Math.abs(ghosts[0]!.at.x - 40) < 1e-9 && Math.abs(ghosts[0]!.at.z - 2) < 1e-9);
 
-  // the starter kit builds everything but the airlock: six pieces go up, paid from the bridge store
+  // the starter kit builds everything but the airlock and the life-support unit: six pieces go up, paid from the bridge store
   const at = { x: 38, z: 2 };
   const first = apply(w, env, { t: 'fill', at, plan: 1 });
   const filled = first.events.find((e) => e.type === 'filled');
-  assert.deepEqual(filled && { ...filled, built: filled.built.length }, { type: 'filled', plan: 1, built: 6, left: 1, blocked: 1 });
+  assert.deepEqual(filled && { ...filled, built: filled.built.length }, { type: 'filled', plan: 1, built: 6, left: 2, blocked: 2 });
   w = first.world;
   assert.equal(L.totals(w.boxes, [BRIDGE_STORE])['ore'], 200 - (20 + 3 * 12 + 10 + 25));
-  assert.equal(planGhosts(w, env, 1).length, 1);
+  assert.equal(planGhosts(w, env, 1).length, 2);
   assert.equal(apply(w, env, { t: 'fill', at, plan: 1 }).events[0]!.type, 'refused', 'nothing new to build');
 
-  // a basalt chassis blueprint builds the airlock (the piece takes basalt): the plan completes and the copy seals
+  // a basalt chassis blueprint builds the airlock and the life-support unit (they take basalt): the plan completes and the copy seals
   w = run(w, { t: 'draft', at: { x: 2, z: 2 }, primitive: 'chassis', map: 'basalt' }, { t: 'fill', at, plan: 1 });
   assert.deepEqual(w.plans, []);
   assert.equal(w.base.pieces.filter((p) => p.kind === 'airlock' && p.mat === 'basalt').length, 1);

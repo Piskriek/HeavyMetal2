@@ -42,3 +42,9 @@ P-27 AIRLOCK VESTIBULE: an airlock vestibule: a short sealed corridor, one 4 met
 
 FILE NAMES: 15-<key>-s1.png and 15-<key>-s6.png, keys: roof-pitched (12), roof-low (13), corner-outer (14), corner-inner (15), ridge-cap (16), gable (17), half-wall (18), window-wall (19), doorframe (20), door-interior (21), stairs (22), ladder (23), railing (24), brace (25), lifesupport (26), vestibule (27).
 Each generation: W1 or W6, then the P-text. offer_options = false (assets inside a build).
+
+REVISION (review of 14, 17, 18 and 19 pairs):
+- 14 outer corner: the S6 had two 3 m wall panels under the roof edges; the S1 had none. Redo both with the two wall panels under the two low eaves, so the designs match.
+- 17 gable: the S1 lacked the hazard-striped foot band. Redo with the band on the S1 as well.
+- 18 half wall: the S1 showed a 2x4 panel grid; the S6 showed 1x4. Specify ONE row of four panels, 1.5 m tall, in both.
+- 15 inner corner and 19 window wall: kept as drawn.

@@ -41,6 +41,47 @@ if '--no-weld' not in argv:
     bpy.ops.mesh.remove_doubles(threshold=0.0001)
     bpy.ops.object.mode_set(mode='OBJECT')
 
+# Drop floating debris: generated meshes can carry small loose fragments clear of the object (a stray chunk beside
+# the scout wheel), which also breaks the nothing-floats rule. Split into loose parts and delete every part whose
+# box lies entirely outside the largest part's box (grown by 2% of its size); parts touching the body stay.
+if '--keep-debris' not in argv:
+    from mathutils import Vector
+    bpy.ops.object.select_all(action='DESELECT')
+    high.select_set(True)
+    bpy.context.view_layer.objects.active = high
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.separate(type='LOOSE')
+    bpy.ops.object.mode_set(mode='OBJECT')
+    parts = [o for o in bpy.context.selected_objects if o.type == 'MESH']
+    def box(o):
+        pts = [o.matrix_world @ Vector(c) for c in o.bound_box]
+        return Vector((min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts))), Vector((max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
+    main = max(parts, key=lambda o: len(o.data.polygons))
+    mlo, mhi = box(main)
+    grow = (mhi - mlo) * 0.02
+    mlo, mhi = mlo - grow, mhi + grow
+    dropped, keep = 0, [main]
+    for o in parts:
+        if o is main:
+            continue
+        lo, hi = box(o)
+        outside = hi.x < mlo.x or lo.x > mhi.x or hi.y < mlo.y or lo.y > mhi.y or hi.z < mlo.z or lo.z > mhi.z
+        if outside:
+            bpy.data.objects.remove(o, do_unlink=True)
+            dropped += 1
+        else:
+            keep.append(o)
+    bpy.ops.object.select_all(action='DESELECT')
+    for o in keep:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = main
+    if len(keep) > 1:
+        bpy.ops.object.join()
+    high = bpy.context.view_layer.objects.active
+    high.name = 'high'
+    print(f'debris: {len(parts)} loose parts, {dropped} floating dropped')
+
 # the low copy, decimated to the target
 low = high.copy()
 low.data = high.data.copy()

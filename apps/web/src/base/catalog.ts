@@ -97,6 +97,10 @@ export function pieceCost(bp: Blueprint, kind: Kind): { readonly item: string; r
   return [...bill, ...(PIECE_EXTRA[kind] ?? [])];
 }
 
+/** Weapon part item ids and names (the parts' bills and stages are in FORGE, below). */
+const PART_IDS = ['core-semi', 'core-burst', 'core-beam', 'barrel-short', 'barrel-long', 'barrel-scatter', 'sight-iron', 'sight-scope', 'sight-holo', 'cell-compact', 'cell-extended'] as const;
+const PART_NAMES: Readonly<Record<string, string>> = { 'core-semi': 'Semi-auto Core', 'core-burst': 'Burst Core', 'core-beam': 'Beam Core', 'barrel-short': 'Short Barrel', 'barrel-long': 'Long Barrel', 'barrel-scatter': 'Scatter Barrel', 'sight-iron': 'Iron Sight', 'sight-scope': 'Scope', 'sight-holo': 'Holo Sight', 'cell-compact': 'Compact Cell', 'cell-extended': 'Extended Cell' };
+
 function buildItems(): Record<string, ItemSpec> {
   const out: Record<string, ItemSpec> = {
     ore: { name: 'Regolith Ore', kind: 'bulk', tint: '#a08a6a', stack: 50, kg: 1 },
@@ -107,12 +111,14 @@ function buildItems(): Record<string, ItemSpec> {
     [STARTER]: { name: 'Regolith Slab Kit', kind: 'blueprint', tint: '#38bdf8', stack: 1, kg: 0 },
     'tool-beam': { name: 'Extraction Beam', kind: 'tool', tint: '#22d3ee', stack: 1, kg: 6 },
     'wpn-shotgun': { name: 'Combat Shotgun', kind: 'weapon', tint: '#f59e0b', stack: 1, kg: 4 },
+    'wpn-frame': { name: 'Weapon Frame', kind: 'weapon', tint: '#94a3b8', stack: 1, kg: 3 },
     'eq-visor': { name: 'Hazmat Visor', kind: 'equip', tint: '#38bdf8', stack: 1, kg: 1 },
     'eq-shield': { name: 'Sync Shield Generator', kind: 'equip', tint: '#a855f7', stack: 1, kg: 5 },
     'eq-rebreather': { name: 'Oxygen Rebreather', kind: 'equip', tint: '#14b8a6', stack: 1, kg: 3 },
   };
   for (const map of MAPS) out[`map-${map}`] = { name: MAP_NAMES[map][0], kind: 'map', tint: MAP_NAMES[map][1], stack: 20, kg: 1 };
   for (const p of PRIMITIVES) out[`prim-${p}`] = { name: PRIMITIVE_NAMES[p][0], kind: 'primitive', tint: '#94a3b8', stack: 10, kg: PRIMITIVE_NAMES[p][1] };
+  for (const id of PART_IDS) out[id] = { name: PART_NAMES[id] ?? id, kind: 'part', tint: '#cbd5e1', stack: 5, kg: 0.5 };
   for (const p of PRIMITIVES) for (const map of MAPS) {
     const bp = blueprint(blueprintId(p, map))!;
     out[bp.id] = { name: bp.name, kind: 'blueprint', tint: MAP_NAMES[map][1], stack: 1, kg: 0 };
@@ -124,7 +130,7 @@ export const ITEMS: Readonly<Record<string, ItemSpec>> = buildItems();
 
 /** Which equipment slot takes which item; everything else stays in the grid. */
 export const EQUIP: Readonly<Record<string, EquipSlot>> = {
-  'eq-visor': 'visor', 'eq-shield': 'shield', 'eq-rebreather': 'rebreather', 'tool-beam': 'beam', 'wpn-shotgun': 'sidearm',
+  'eq-visor': 'visor', 'eq-shield': 'shield', 'eq-rebreather': 'rebreather', 'tool-beam': 'beam', 'wpn-shotgun': 'sidearm', 'wpn-frame': 'sidearm',
 };
 
 // ---------------------------------------------------------------------------------------------- heavy machines and refining
@@ -142,7 +148,9 @@ export const HEAVY_BILL: Readonly<Record<HeavyKind, readonly { readonly item: st
 
 export interface Recipe {
   readonly id: string;
-  readonly machine: 'mill' | 'press';
+  readonly machine: 'mill' | 'press' | 'fabricator';
+  /** The plot's fidelity stage that unlocks it (none: always open). */
+  readonly stage?: number;
   readonly inputs: readonly { readonly item: string; readonly n: number }[];
   readonly output: { readonly item: string; readonly n: number };
   /** Seconds of work at full power. */
@@ -160,9 +168,66 @@ export const RECIPES: readonly Recipe[] = [
   { id: 'prim-beam', machine: 'press', inputs: [{ item: 'vtx-rough', n: 6 }, { item: 'vtx-fine', n: 4 }], output: { item: 'prim-beam', n: 1 }, seconds: 25 },
   { id: 'prim-chassis', machine: 'press', inputs: [{ item: 'vtx-fine', n: 12 }, { item: 'vtx-rough', n: 8 }], output: { item: 'prim-chassis', n: 1 }, seconds: 50 },
 ];
-export const RECIPE_BY_ID: Readonly<Record<string, Recipe>> = Object.fromEntries(RECIPES.map((r) => [r.id, r]));
 
 /** Jobs a machine holds at once (the one running plus the waiting ones). */
 export const QUEUE_MAX = 5;
 /** The plot's anomaly field: its radius in metres (one 1 km plot). */
 export const FIELD_RADIUS = 500;
+
+// ---------------------------------------------------------------------------------------------- fabrication (owner, 2026-10-10)
+// Vehicles are a fixed catalog, each printed whole at a Vehicle Fabricator. Weapons are one frame with four part slots,
+// crafted at a Weapon Bench and swapped in the field. Better ones open as the plot's fidelity stage rises
+// (docs/FABRICATOR_RESEARCH.md, concept sheets 19 and 20).
+type Bill = readonly { readonly item: string; readonly n: number }[];
+
+/** Stations that bolt onto a hardpoint: the heavy terraformers, and the Vehicle Fabricator (sheet 19, piece 34). */
+export type StationKind = HeavyKind | 'fabricator';
+export const FABRICATOR_BILL: Bill = [{ item: 'ore', n: 240 }, { item: 'prim-beam', n: 6 }, { item: 'prim-column', n: 4 }, { item: 'prim-chassis', n: 4 }];
+
+export const VEHICLES = ['scout', 'hauler', 'crawler'] as const;
+export type VehicleKind = (typeof VEHICLES)[number];
+export interface VehicleSpec {
+  readonly name: string;
+  /** The plot's fidelity stage that unlocks it. */
+  readonly stage: number;
+  /** Seconds to print at full power. */
+  readonly seconds: number;
+  readonly seats: number;
+  /** Whether it carries a storage bin on the linked network (the hauler; the future mobile outpost, D16). */
+  readonly cargo: boolean;
+  readonly bill: Bill;
+}
+export const VEHICLE: Readonly<Record<VehicleKind, VehicleSpec>> = {
+  scout: { name: 'Scout', stage: 2, seconds: 120, seats: 1, cargo: false, bill: [{ item: 'ore', n: 150 }, { item: 'prim-beam', n: 6 }, { item: 'prim-column', n: 4 }, { item: 'prim-chassis', n: 2 }, { item: 'map-basalt', n: 2 }] },
+  hauler: { name: 'Hauler', stage: 4, seconds: 240, seats: 2, cargo: true, bill: [{ item: 'ore', n: 300 }, { item: 'prim-cube', n: 6 }, { item: 'prim-beam', n: 4 }, { item: 'prim-chassis', n: 6 }, { item: 'map-basalt', n: 4 }] },
+  crawler: { name: 'Crawler', stage: 6, seconds: 420, seats: 2, cargo: false, bill: [{ item: 'ore', n: 500 }, { item: 'prim-cube', n: 8 }, { item: 'prim-beam', n: 6 }, { item: 'prim-chassis', n: 10 }, { item: 'map-obsidian', n: 4 }, { item: 'map-quartz', n: 2 }] },
+};
+/** A fabricator recipe's output item names the vehicle it prints. */
+export const VEHICLE_ITEM = (kind: VehicleKind): string => `vehicle:${kind}`;
+
+export const PART_SLOTS = ['core', 'barrel', 'sight', 'cell'] as const;
+export type PartSlot = (typeof PART_SLOTS)[number];
+export const WEAPON_FRAME = 'wpn-frame';
+export interface ForgeSpec { readonly id: string; readonly name: string; readonly slot: PartSlot | null; readonly stage: number; readonly bill: Bill }
+/** What the Weapon Bench makes: the frame, then the parts for its four slots (sheet 20). */
+export const FORGE: readonly ForgeSpec[] = [
+  { id: WEAPON_FRAME, name: 'Weapon Frame', slot: null, stage: 1, bill: [{ item: 'ore', n: 40 }, { item: 'prim-chassis', n: 1 }, { item: 'prim-beam', n: 1 }] },
+  { id: 'core-semi', name: 'Semi-auto Core', slot: 'core', stage: 1, bill: [{ item: 'ore', n: 20 }, { item: 'prim-cube', n: 1 }] },
+  { id: 'core-burst', name: 'Burst Core', slot: 'core', stage: 3, bill: [{ item: 'ore', n: 30 }, { item: 'prim-cube', n: 1 }, { item: 'prim-chassis', n: 1 }] },
+  { id: 'core-beam', name: 'Beam Core', slot: 'core', stage: 5, bill: [{ item: 'ore', n: 40 }, { item: 'prim-chassis', n: 2 }, { item: 'map-quartz', n: 1 }] },
+  { id: 'barrel-short', name: 'Short Barrel', slot: 'barrel', stage: 1, bill: [{ item: 'ore', n: 10 }, { item: 'prim-column', n: 1 }] },
+  { id: 'barrel-long', name: 'Long Barrel', slot: 'barrel', stage: 3, bill: [{ item: 'ore', n: 20 }, { item: 'prim-column', n: 2 }] },
+  { id: 'barrel-scatter', name: 'Scatter Barrel', slot: 'barrel', stage: 1, bill: [{ item: 'ore', n: 15 }, { item: 'prim-column', n: 1 }, { item: 'prim-cube', n: 1 }] },
+  { id: 'sight-iron', name: 'Iron Sight', slot: 'sight', stage: 1, bill: [{ item: 'ore', n: 5 }] },
+  { id: 'sight-scope', name: 'Scope', slot: 'sight', stage: 3, bill: [{ item: 'ore', n: 15 }, { item: 'prim-column', n: 1 }, { item: 'map-quartz', n: 1 }] },
+  { id: 'sight-holo', name: 'Holo Sight', slot: 'sight', stage: 5, bill: [{ item: 'ore', n: 20 }, { item: 'map-quartz', n: 2 }] },
+  { id: 'cell-compact', name: 'Compact Cell', slot: 'cell', stage: 1, bill: [{ item: 'ore', n: 10 }, { item: 'prim-cube', n: 1 }] },
+  { id: 'cell-extended', name: 'Extended Cell', slot: 'cell', stage: 3, bill: [{ item: 'ore', n: 20 }, { item: 'prim-cube', n: 2 }] },
+];
+export const FORGE_BY_ID: Readonly<Record<string, ForgeSpec>> = Object.fromEntries(FORGE.map((f) => [f.id, f]));
+
+/** Every recipe by id: refining at mills and presses, and vehicles at the fabricator. */
+export const RECIPE_BY_ID: Readonly<Record<string, Recipe>> = Object.fromEntries([
+  ...RECIPES,
+  ...VEHICLES.map((v): Recipe => ({ id: `vehicle-${v}`, machine: 'fabricator', inputs: VEHICLE[v].bill, output: { item: VEHICLE_ITEM(v), n: 1 }, seconds: VEHICLE[v].seconds, stage: VEHICLE[v].stage })),
+].map((r) => [r.id, r]));

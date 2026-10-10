@@ -17,7 +17,10 @@ names+=( "15 · sheet-base-roofs-openings" )
 files+=( 15-sheet-base-roofs-openings )
 names+=( "17 · sheet-heavy-terraformers" )
 files+=( 17-sheet-heavy-terraformers )
+names+=( "18 · sheet-life-support" )
+files+=( 18-sheet-life-support )
 convert -size 2620x1800 xc:"$BG" "$T/base.png"
+convert "$T/base.png" -background "$BG" -gravity northwest -extent 2620x2200 "$T/base.png"
 for i in "${!files[@]}"; do
   col=$(( i % 4 )); row=$(( i / 4 ))
   x=$(( 40 + col * 640 )); y=$(( 40 + row * 432 ))

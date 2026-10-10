@@ -1,54 +1,25 @@
 import * as THREE from 'three';
 import * as S from '@hm/structure';
+import * as L from '@hm/lattice';
+import * as basegear from '@hm/basegear';
 import type { BaseWorld, WorldEnv } from './world';
-import { pieceAt, structureEnv } from './world';
-import { createStandInPiece } from './stand-in-pieces';
+import { pieceAt, structureEnv, BENCH_REACH, relays } from './world';
+import { WalkWorld, type PlacedPiece } from './walk';
+import {
+  globalKitPieceCache,
+  computeSkirt,
+  integrityMaterialForSupport,
+  type Box,
+} from './kit-pieces';
 
-// Shared materials for Integrity Overlay (Zero per-frame allocations)
-const INTEGRITY_MATERIALS = {
-  blue: new THREE.MeshStandardMaterial({
-    color: 0x38bdf8,
-    roughness: 0.4,
-    metalness: 0.1,
-    transparent: true,
-    opacity: 0.85,
-  }),
-  green: new THREE.MeshStandardMaterial({
-    color: 0x22c55e,
-    roughness: 0.4,
-    metalness: 0.1,
-    transparent: true,
-    opacity: 0.85,
-  }),
-  yellow: new THREE.MeshStandardMaterial({
-    color: 0xeab308,
-    roughness: 0.4,
-    metalness: 0.1,
-    transparent: true,
-    opacity: 0.85,
-  }),
-  red: new THREE.MeshStandardMaterial({
-    color: 0xef4444,
-    roughness: 0.4,
-    metalness: 0.1,
-    transparent: true,
-    opacity: 0.85,
-  }),
-};
-
-// Default materials per kind for normal gameplay
-const DEFAULT_MATERIALS: Record<S.Kind, THREE.Material> = {
-  foundation: new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.8 }),
-  floor: new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.6 }),
-  wall: new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.7 }),
-  airlock: new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.5, metalness: 0.4 }),
-  pillar: new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.5, metalness: 0.2 }),
-  ramp: new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.7 }),
-  hardpoint: new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9, metalness: 0.6 }),
-  bin: new THREE.MeshStandardMaterial({ color: 0x0d9488, roughness: 0.5, metalness: 0.3 }),
-  bench: new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.6, metalness: 0.2 }),
-  repeater: new THREE.MeshStandardMaterial({ color: 0x6366f1, roughness: 0.4, metalness: 0.5 }),
-};
+interface ActivePieceEntry {
+  group: THREE.Group;
+  colliders: readonly Box[];
+  lamps: readonly THREE.Mesh[];
+  kind: S.Kind;
+  pos: { x: number; y: number; z: number };
+  yaw: number;
+}
 
 interface CollapsingPiece {
   group: THREE.Group;
@@ -59,9 +30,11 @@ interface CollapsingPiece {
 
 export class PieceMeshManager {
   readonly root: THREE.Group;
-  private pieceMap: Map<number, THREE.Group> = new Map();
+  readonly walkWorld: WalkWorld = new WalkWorld();
+  private pieceMap: Map<number, ActivePieceEntry> = new Map();
   private collapsing: CollapsingPiece[] = [];
   private lastIntegrity = false;
+  private lastStage = 1;
 
   constructor() {
     this.root = new THREE.Group();
@@ -73,101 +46,152 @@ export class PieceMeshManager {
     const activeIds = new Set<number>();
     const supportMap = integrity ? S.supports(world.base, structureEnv(env)) : null;
 
+    // Stage change: rebuild all pieces from new stage cache, then dispose old cache
+    if (world.stage !== this.lastStage) {
+      for (const entry of this.pieceMap.values()) {
+        this.root.remove(entry.group);
+      }
+      this.pieceMap.clear();
+      globalKitPieceCache.dispose();
+      this.lastStage = world.stage;
+    }
+
+    const linkedGroups = L.links(world.boxes, relays(world, env));
+    const placedForWalk: PlacedPiece[] = [];
+
     for (const piece of activePieces) {
       activeIds.add(piece.id);
-      let pieceGroup = this.pieceMap.get(piece.id);
+      let entry = this.pieceMap.get(piece.id);
 
-      if (!pieceGroup) {
-        // Create new mesh
-        pieceGroup = createStandInPiece(piece.kind, 'ok');
-        pieceGroup.userData.pieceId = piece.id;
-        pieceGroup.userData.pieceKind = piece.kind;
+      const st = world.base.structures.find((s) => s.id === piece.s);
+      const pos = pieceAt(world.base, piece);
+      if (!pos || !st) continue;
 
-        // Position & Rotate
-        const st = world.base.structures.find((s) => s.id === piece.s);
-        const pos = pieceAt(world.base, piece);
-        if (pos && st) {
-          pieceGroup.position.set(pos.x, pos.y, pos.z);
-          let extraAngle = 0;
-          if (piece.kind === 'wall' || piece.kind === 'airlock') {
-            if (piece.r === 1) extraAngle = -Math.PI / 2;
-          } else if (
-            piece.kind === 'ramp' ||
-            piece.kind === 'bench' ||
-            piece.kind === 'bin' ||
-            piece.kind === 'repeater'
-          ) {
-            extraAngle = -piece.r * (Math.PI / 2);
-          }
-          pieceGroup.rotation.y = -st.yaw + extraAngle;
-        }
+      let extraAngle = 0;
+      if (piece.kind === 'wall' || piece.kind === 'airlock') {
+        if (piece.r === 1) extraAngle = -Math.PI / 2;
+      } else if (
+        piece.kind === 'ramp' ||
+        piece.kind === 'bench' ||
+        piece.kind === 'bin' ||
+        piece.kind === 'repeater'
+      ) {
+        extraAngle = -piece.r * (Math.PI / 2);
+      }
+      const totalYaw = -st.yaw + extraAngle;
 
-        pieceGroup.updateMatrixWorld(true);
-        this.root.add(pieceGroup);
-        this.pieceMap.set(piece.id, pieceGroup);
+      if (!entry) {
+        // Compute foundation skirt
+        const skirt = computeSkirt(world, env, piece);
+
+        // Instantiate clone from GTX 950M shared cache
+        const instance = globalKitPieceCache.instantiate(piece.kind, world.stage, skirt);
+        instance.group.userData.pieceId = piece.id;
+        instance.group.userData.pieceKind = piece.kind;
+
+        instance.group.position.set(pos.x, pos.y, pos.z);
+        instance.group.rotation.y = totalYaw;
+        instance.group.updateMatrixWorld(true);
+
+        this.root.add(instance.group);
+
+        entry = {
+          group: instance.group,
+          colliders: instance.colliders,
+          lamps: instance.lamps,
+          kind: piece.kind,
+          pos,
+          yaw: totalYaw,
+        };
+        this.pieceMap.set(piece.id, entry);
+      } else {
+        // Update transform if needed
+        entry.group.position.set(pos.x, pos.y, pos.z);
+        entry.group.rotation.y = totalYaw;
+        entry.group.updateMatrixWorld(true);
+        entry.pos = pos;
+        entry.yaw = totalYaw;
       }
 
-      // Material assignment: integrity mode vs default
+      placedForWalk.push({
+        id: piece.id,
+        kind: piece.kind,
+        pos,
+        yaw: totalYaw,
+        colliders: entry.colliders,
+      });
+
+      // Update lamp lighting
+      if (entry.lamps.length > 0) {
+        if (piece.kind === 'bin') {
+          const isLinked = linkedGroups.some((g: readonly number[]) => g.includes(piece.id));
+          for (const lamp of entry.lamps) {
+            basegear.setLamp(lamp, isLinked ? 1 : 0);
+          }
+        } else if (piece.kind === 'repeater') {
+          for (const lamp of entry.lamps) {
+            basegear.setLamp(lamp, 1);
+          }
+        } else if (piece.kind === 'bench') {
+          const distToPlayer = Math.hypot(world.player.x - pos.x, world.player.z - pos.z);
+          const isNear = distToPlayer <= BENCH_REACH;
+          for (const lamp of entry.lamps) {
+            basegear.setLamp(lamp, isNear ? 1 : 0);
+          }
+        } else if (piece.kind === 'airlock') {
+          for (const lamp of entry.lamps) {
+            basegear.setLamp(lamp, 1);
+          }
+        }
+      }
+
+      // Material assignment: 5-step integrity overlay vs restoring kit materials
       if (integrity && supportMap) {
         const sup = supportMap.get(piece.id) ?? 0;
-        let mat = INTEGRITY_MATERIALS.red;
-        if (sup >= 0.85) mat = INTEGRITY_MATERIALS.blue;
-        else if (sup >= 0.5) mat = INTEGRITY_MATERIALS.green;
-        else if (sup >= 0.28) mat = INTEGRITY_MATERIALS.yellow;
-
-        this.applyMaterial(pieceGroup, mat);
-      } else if (this.lastIntegrity !== integrity) {
-        const defaultMat = DEFAULT_MATERIALS[piece.kind] ?? DEFAULT_MATERIALS.foundation;
-        this.applyMaterial(pieceGroup, defaultMat);
+        const mat = integrityMaterialForSupport(sup);
+        this.applyOverlayMaterial(entry.group, mat);
+      } else if (this.lastIntegrity && !integrity) {
+        this.restoreKitMaterials(entry.group);
       }
     }
 
     this.lastIntegrity = integrity;
+    this.walkWorld.setPieces(placedForWalk);
 
     // Remove any pieces that disappeared without collapse animation
-    for (const [id, grp] of this.pieceMap.entries()) {
+    for (const [id, entry] of this.pieceMap.entries()) {
       if (!activeIds.has(id)) {
-        this.root.remove(grp);
+        this.root.remove(entry.group);
         this.pieceMap.delete(id);
-        grp.traverse((child) => {
-          if (child instanceof THREE.Mesh) {
-            child.geometry?.dispose();
-          }
-        });
       }
     }
   }
 
   handleRemoval(removedId: number, collapsedIds: readonly number[]): void {
     // The removed piece vanishes immediately
-    const removedGrp = this.pieceMap.get(removedId);
-    if (removedGrp) {
-      this.root.remove(removedGrp);
+    const removedEntry = this.pieceMap.get(removedId);
+    if (removedEntry) {
+      this.root.remove(removedEntry.group);
       this.pieceMap.delete(removedId);
-      removedGrp.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.geometry?.dispose();
-        }
-      });
     }
 
     // Collapsed pieces animate: drop 0.5m, tilt, and fade over 0.6s
     for (const cId of collapsedIds) {
-      const grp = this.pieceMap.get(cId);
-      if (grp) {
+      const entry = this.pieceMap.get(cId);
+      if (entry) {
         this.pieceMap.delete(cId);
         // Clone materials to allow fading
-        grp.traverse((child) => {
+        entry.group.traverse((child) => {
           if (child instanceof THREE.Mesh && child.material) {
-            child.material = child.material.clone();
+            child.material = (child.material as THREE.Material).clone();
             child.material.transparent = true;
           }
         });
         this.collapsing.push({
-          group: grp,
+          group: entry.group,
           elapsed: 0,
           duration: 0.6,
-          initialY: grp.position.y,
+          initialY: entry.group.position.y,
         });
       }
     }
@@ -193,12 +217,9 @@ export class PieceMeshManager {
       if (progress >= 1) {
         this.root.remove(col.group);
         col.group.traverse((child) => {
-          if (child instanceof THREE.Mesh) {
-            child.geometry?.dispose();
-            if (child.material) {
-              if (Array.isArray(child.material)) child.material.forEach((m) => m.dispose());
-              else child.material.dispose();
-            }
+          if (child instanceof THREE.Mesh && child.material) {
+            if (Array.isArray(child.material)) child.material.forEach((m) => m.dispose());
+            else child.material.dispose();
           }
         });
         this.collapsing.splice(i, 1);
@@ -206,7 +227,7 @@ export class PieceMeshManager {
     }
   }
 
-  private applyMaterial(group: THREE.Group, mat: THREE.Material): void {
+  private applyOverlayMaterial(group: THREE.Group, mat: THREE.Material): void {
     group.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         child.material = mat;
@@ -214,7 +235,27 @@ export class PieceMeshManager {
     });
   }
 
+  private restoreKitMaterials(group: THREE.Group): void {
+    group.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.userData.kitMat) {
+        child.material = child.userData.kitMat;
+      }
+    });
+  }
+
   getMeshes(): THREE.Group {
     return this.root;
+  }
+
+  dispose(): void {
+    for (const entry of this.pieceMap.values()) {
+      this.root.remove(entry.group);
+    }
+    this.pieceMap.clear();
+    for (const col of this.collapsing) {
+      this.root.remove(col.group);
+    }
+    this.collapsing = [];
+    globalKitPieceCache.dispose();
   }
 }

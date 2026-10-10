@@ -656,6 +656,33 @@ button.hm-quick-stack-btn:active,
   transition: width 0.15s ease;
 }
 
+.hm-build-hover-badge {
+  font-family: 'Oxanium', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 4px 14px;
+  border-radius: 6px;
+  background: rgba(10, 16, 26, 0.9);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  text-shadow: 0 0 8px currentColor;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+
+.hm-build-wheel-hint,
+.hm-build-rot-hint {
+  font-family: 'Outfit', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--base-text-muted);
+  background: rgba(0, 0, 0, 0.6);
+  padding: 2px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 /* -------------------------------------------------------------
    Running Harvest Counter (Beside Hotbar)
    ------------------------------------------------------------- */

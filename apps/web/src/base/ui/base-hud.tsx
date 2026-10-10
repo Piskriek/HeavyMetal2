@@ -12,6 +12,9 @@ interface BaseHudProps {
   paused?: boolean;
   modalOpen?: boolean;
   harvestCounter?: { count: number; name: string; fading?: boolean } | null;
+  hoverSupport?: { text: string; color: string } | null;
+  wheelCycleText?: string | null;
+  rotationText?: string | null;
 }
 
 export type OpenWindow = 'none' | 'inventory' | 'drafting' | 'lattice';
@@ -22,6 +25,9 @@ export const BaseHud: React.FC<BaseHudProps> = ({
   paused = false,
   modalOpen = false,
   harvestCounter = null,
+  hoverSupport = null,
+  wheelCycleText = null,
+  rotationText = null,
 }) => {
   const [view, setView] = useState<BaseView>(() => source.get());
   const [openWindow, setOpenWindow] = useState<OpenWindow>('none');
@@ -77,7 +83,12 @@ export const BaseHud: React.FC<BaseHudProps> = ({
     <>
       {/* Reticle Build Readout - hidden when paused or any window/modal is open */}
       {!paused && openWindow === 'none' && !modalOpen && (
-        <BuildReadout build={view.build} />
+        <BuildReadout
+          build={view.build}
+          hoverSupport={hoverSupport}
+          wheelCycleText={wheelCycleText}
+          rotationText={rotationText}
+        />
       )}
 
       {/* Running harvest counter pill beside hotbar */}

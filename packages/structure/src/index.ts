@@ -47,6 +47,14 @@ export interface Piece {
   readonly r: 0 | 1 | 2 | 3;
   readonly mat: string;
   readonly open?: boolean;
+  /**
+   * Free placement for a bin, bench, repeater or life-support unit (R2.5): its centre's offset from the cell centre in
+   * whole centimetres along the structure's x and z (at most 150), and its yaw in whole degrees (0..359, the sense r
+   * turns). All three are present or none; none means centred, turned r quarter turns.
+   */
+  readonly dx?: number;
+  readonly dz?: number;
+  readonly deg?: number;
 }
 
 export interface Base {
@@ -246,6 +254,50 @@ function roofEaveAt(base: Base, s: number, i: number, j: number, k: number, r: n
   return false;
 }
 
+/** Fixtures that may be placed freely inside their cell, with their footprint (width along x, depth along z, metres). */
+const FOOTPRINT: Readonly<Partial<Record<Kind, readonly [number, number]>>> = {
+  bin: [1.2, 0.9],
+  bench: [2.4, 1.2],
+  repeater: [1.6, 1.6],
+  lifeSupport: [1.1, 0.7],
+};
+export const PLACE_LIMIT_CM = 150;
+const CELL_MARGIN = 0.05;
+
+const hasPlacement = (p: Omit<Piece, 'id'>): boolean => p.dx !== undefined || p.dz !== undefined || p.deg !== undefined;
+
+/** A free fixture's footprint in its cell's frame (corner at 0, 0): centre, half sizes and its two axes. */
+function footprint(p: Omit<Piece, 'id'>): { readonly cx: number; readonly cz: number; readonly hw: number; readonly hd: number; readonly ax: readonly [number, number]; readonly az: readonly [number, number] } | null {
+  const size = FOOTPRINT[p.kind];
+  if (size === undefined) return null;
+  const theta = ((p.deg ?? p.r * 90) * Math.PI) / 180;
+  const c = Math.cos(theta), sn = Math.sin(theta);
+  return { cx: CELL / 2 + (p.dx ?? 0) / 100, cz: CELL / 2 + (p.dz ?? 0) / 100, hw: size[0] / 2, hd: size[1] / 2, ax: [c, sn], az: [-sn, c] };
+}
+
+function footprintInside(p: Omit<Piece, 'id'>): boolean {
+  const fp = footprint(p);
+  if (fp === null) return true;
+  for (const [a, b] of [[1, 1], [1, -1], [-1, 1], [-1, -1]] as const) {
+    const x = fp.cx + a * fp.hw * fp.ax[0] + b * fp.hd * fp.az[0], z = fp.cz + a * fp.hw * fp.ax[1] + b * fp.hd * fp.az[1];
+    if (x < CELL_MARGIN || x > CELL - CELL_MARGIN || z < CELL_MARGIN || z > CELL - CELL_MARGIN) return false;
+  }
+  return true;
+}
+
+/** Whether two free fixtures' footprints overlap (separating axes; touching is fine). */
+function footprintsOverlap(p: Omit<Piece, 'id'>, q: Omit<Piece, 'id'>): boolean {
+  const a = footprint(p), b = footprint(q);
+  if (a === null || b === null) return false;
+  const dx = b.cx - a.cx, dz = b.cz - a.cz;
+  for (const axis of [a.ax, a.az, b.ax, b.az]) {
+    const ra = a.hw * Math.abs(a.ax[0] * axis[0] + a.ax[1] * axis[1]) + a.hd * Math.abs(a.az[0] * axis[0] + a.az[1] * axis[1]);
+    const rb = b.hw * Math.abs(b.ax[0] * axis[0] + b.ax[1] * axis[1]) + b.hd * Math.abs(b.az[0] * axis[0] + b.az[1] * axis[1]);
+    if (Math.abs(dx * axis[0] + dz * axis[1]) >= ra + rb - 1e-9) return false;
+  }
+  return true;
+}
+
 /** Whether a gable (on a rising side of a pitched roof) or a ridge cap (on the high edge of a roof or low roof) has its roof beside it. */
 function roofFor(base: Base, piece: Omit<Piece, 'id'>): boolean {
   for (const [ci, cj] of edgeCells(piece.i, piece.j, piece.r)) {
@@ -439,7 +491,7 @@ function occupied(base: Base, candidate: Omit<Piece, 'id'>): boolean {
       continue;
     }
 
-    if (existing.i === candidate.i && existing.j === candidate.j) return true;
+    if (existing.i === candidate.i && existing.j === candidate.j && footprintsOverlap(existing, candidate)) return true;
   }
   return false;
 }
@@ -726,6 +778,12 @@ function validSlot(base: Base, piece: Omit<Piece, 'id'>): boolean {
     return false;
   }
   if (isEdgeKind(piece.kind) && piece.r !== 0 && piece.r !== 1) return false;
+  if (hasPlacement(piece)) {
+    if (FOOTPRINT[piece.kind] === undefined) return false;
+    const { dx, dz, deg } = piece;
+    if (!Number.isInteger(dx) || !Number.isInteger(dz) || !Number.isInteger(deg)) return false;
+    if (Math.abs(dx as number) > PLACE_LIMIT_CM || Math.abs(dz as number) > PLACE_LIMIT_CM || (deg as number) < 0 || (deg as number) > 359) return false;
+  }
   return base.structures.some((structure) => structure.id === piece.s);
 }
 
@@ -821,6 +879,7 @@ export function check(
   if (materialFor(env, piece.mat) === undefined) {
     return { ok: false, why: 'material', support: 0 };
   }
+  if (!footprintInside(piece)) return { ok: false, why: 'no-room', support: 0 };
   if (occupied(base, piece)) return { ok: false, why: 'occupied', support: 0 };
   if (isEdgeKind(piece.kind) && roofEaveAt(base, piece.s, piece.i, piece.j, piece.k, piece.r)) {
     return { ok: false, why: 'occupied', support: 0 };
@@ -941,6 +1000,7 @@ export function place(base: Base, env: Env, piece: Omit<Piece, 'id'>): Result {
         k: piece.k,
         r: piece.r,
         mat: piece.mat,
+        ...(hasPlacement(piece) ? { dx: piece.dx, dz: piece.dz, deg: piece.deg } : {}),
       };
   const nextBase: Base = {
     ...base,

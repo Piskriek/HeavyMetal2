@@ -44,9 +44,11 @@ import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { BaseHud } from '../base/ui/base-hud';
 import { mockBaseViewSource } from '../base/mock-view';
 import { createWorldViewSource, WorldViewSource, formatRefusalToast } from '../base/world-view';
-import { createWorld, apply, pieceAt, preview, BRIDGE_RANGE, BEAM_RANGE, type BaseWorld, type BaseCommand, type WorldEnv } from '../base/world';
+import { createWorld, apply, pieceAt, pieceAtIn, preview, withBridgeStore, BRIDGE_RANGE, BEAM_RANGE, PLAYER_KG, structureEnv, type BaseWorld, type BaseCommand, type WorldEnv, type Applied } from '../base/world';
 import { PieceMeshManager } from '../base/piece-meshes';
-import { createStandInPiece } from '../base/stand-in-pieces';
+import { globalKitPieceCache, integrityColorName } from '../base/kit-pieces';
+
+const isFixture = (kind: Kind): boolean => kind === 'bin' || kind === 'bench' || kind === 'repeater';
 import { blueprint, STARTER, ITEMS } from '../base/catalog';
 import { MachinePickerModal } from '../base/ui/machine-picker-modal';
 import { RefineryModal } from '../base/ui/refinery-modal';
@@ -165,33 +167,33 @@ export function PlayScreen(props: {
     return () => window.clearTimeout(t);
   }, [toast]);
 
+  const SEED_STOCK: readonly L.Stack[] = [
+    { item: 'ore', n: 600 },
+    { item: 'prim-cube', n: 15 },
+    { item: 'prim-chassis', n: 8 },
+    { item: 'prim-beam', n: 8 },
+    { item: 'prim-column', n: 8 },
+    { item: 'map-basalt', n: 10 },
+    { item: 'pxd-mono', n: 80 },
+    { item: 'vtx-rough', n: 80 },
+  ];
+
   const createSeededBaseWorld = (): BaseWorld => {
     const w = createWorld();
     const slots = w.player.slots.slice();
     slots[0] = { item: STARTER, n: 1 };
-    slots[1] = { item: 'ore', n: 50 };
-    slots[2] = { item: 'ore', n: 50 };
-    slots[3] = { item: 'ore', n: 50 };
-    slots[4] = { item: 'ore', n: 50 };
-    slots[5] = { item: 'ore', n: 50 };
-    slots[6] = { item: 'ore', n: 50 };
-    slots[7] = { item: 'prim-cube', n: 15 };
-    slots[8] = { item: 'prim-chassis', n: 8 };
-    slots[9] = { item: 'map-basalt', n: 10 };
-    slots[10] = { item: 'pxd-mono', n: 80 };
-    slots[11] = { item: 'vtx-rough', n: 80 };
-    slots[12] = { item: 'prim-beam', n: 8 };
-    slots[13] = { item: 'ore', n: 50 };
-    slots[14] = { item: 'ore', n: 50 };
-    slots[15] = { item: 'ore', n: 50 };
-    slots[16] = { item: 'ore', n: 50 };
-    slots[17] = { item: 'ore', n: 50 };
-    slots[18] = { item: 'ore', n: 50 };
+    slots[1] = { item: 'bp:beam:basalt', n: 1 };
+    slots[2] = { item: 'bp:column:basalt', n: 1 };
+    const defaultEnv: WorldEnv = {
+      heightAt: () => 0,
+      bridge: { x: 0, z: 0, range: BRIDGE_RANGE },
+    };
+    const seeded = withBridgeStore(w, defaultEnv, SEED_STOCK);
     return {
-      ...w,
+      ...seeded,
       player: {
-        ...w.player,
-        maxKg: 1200,
+        ...seeded.player,
+        maxKg: PLAYER_KG,
         slots,
       },
     };
@@ -200,14 +202,18 @@ export function PlayScreen(props: {
   const baseWorldRef = useRef<BaseWorld>(isBase ? createSeededBaseWorld() : createWorld());
   const pieceManagerRef = useRef<PieceMeshManager>(new PieceMeshManager());
   const buildKindRef = useRef<Kind | null>(null);
+  const buildRotationRef = useRef<number>(0);
   const ghostKindRef = useRef<Kind | null>(null);
+  const [hoverSupport, setHoverSupport] = useState<{ text: string; color: string } | null>(null);
+  const [wheelCycleText, setWheelCycleText] = useState<string | null>(null);
+  const [rotationText, setRotationText] = useState<string | null>(null);
   const lastPreviewRef = useRef<{
     prev: { snap: S.Snap | null; cost: readonly L.Stack[]; short: readonly L.Stack[] };
     aim: { x: number; y: number; z: number; yaw: number };
     bp: { id: string; name: string };
     kind: Kind;
   } | null>(null);
-  const dispatchBaseRef = useRef<(cmd: BaseCommand) => void>(() => {});
+  const dispatchBaseRef = useRef<(cmd: BaseCommand) => Applied | void>(() => {});
   const tryPlaceBaseRef = useRef<() => boolean>(() => false);
   const [machinePickerHardpoint, setMachinePickerHardpoint] = useState<number | null>(null);
   const [refineryMachineId, setRefineryMachineId] = useState<number | null>(null);
@@ -234,8 +240,11 @@ export function PlayScreen(props: {
       bridge: { x: gate.x, z: gate.z, range: BRIDGE_RANGE },
     };
     baseEnvRef.current = env;
+    if (isBase) {
+      baseWorldRef.current = withBridgeStore(baseWorldRef.current, env, SEED_STOCK);
+    }
     return env;
-  }, []);
+  }, [isBase]);
 
   const baseViewSource = useMemo(() => {
     if (!isBase) return mockBaseViewSource;
@@ -262,6 +271,7 @@ export function PlayScreen(props: {
 
     for (const ev of res.events) {
       if (ev.type === 'refused') {
+        console.warn('[dispatchBase refused]', ev);
         say(formatRefusalToast(ev));
       } else if (ev.type === 'placed') {
         say(`${ev.kind.toUpperCase()} constructed.`);
@@ -338,7 +348,9 @@ export function PlayScreen(props: {
 
     const integrity = (baseViewSource as WorldViewSource).get?.()?.build?.integrity ?? false;
     pieceManagerRef.current.sync(baseWorldRef.current, bEnv, integrity);
+    scene?.setWalkWorld(pieceManagerRef.current.walkWorld);
     (baseViewSource as WorldViewSource).notify?.();
+    return res;
   }, [say, baseViewSource, getBaseEnv, commit]);
 
   dispatchBaseRef.current = dispatchBase;
@@ -356,7 +368,17 @@ export function PlayScreen(props: {
       return false;
     }
     if (snap.mode === 'place') {
+      let finalR = snap.piece.r;
+      if (
+        snap.piece.kind === 'ramp' ||
+        snap.piece.kind === 'bench' ||
+        snap.piece.kind === 'bin' ||
+        snap.piece.kind === 'repeater'
+      ) {
+        finalR = ((snap.piece.r + buildRotationRef.current) % 4) as any;
+      }
       const { mat, id, ...pieceSpec } = snap.piece as any;
+      pieceSpec.r = finalR;
       dispatchBase({
         t: 'place',
         at: { x: lp.aim.x, z: lp.aim.z },
@@ -520,9 +542,11 @@ export function PlayScreen(props: {
           const gate = scene.debug.gatePlanet();
           const bEnv = { heightAt: (x: number, z: number) => scene.heightAt(x, z), bridge: { x: gate.x, z: gate.z, range: BRIDGE_RANGE } };
           baseEnvRef.current = bEnv;
+          baseWorldRef.current = withBridgeStore(baseWorldRef.current, bEnv, SEED_STOCK);
           scene.setPieces(pieceManagerRef.current.getMeshes());
           scene.setNodes(baseWorldRef.current.field);
           pieceManagerRef.current.sync(baseWorldRef.current, bEnv, false);
+          scene.setWalkWorld(pieceManagerRef.current.walkWorld);
           for (const m of baseWorldRef.current.machines) {
             const piece = baseWorldRef.current.base.pieces.find((p) => p.id === m.id);
             if (piece) {
@@ -657,7 +681,7 @@ export function PlayScreen(props: {
             ? buildKindRef.current
             : activeBp.kinds[0]!) as Kind;
           if (ghostKindRef.current !== curKind) {
-            scene.setPieceGhost(createStandInPiece(curKind, 'ok'));
+            scene.setPieceGhost(globalKitPieceCache.instantiate(curKind, w.stage, 0).group);
             ghostKindRef.current = curKind;
           }
           const aim = scene.aimPoint();
@@ -685,6 +709,70 @@ export function PlayScreen(props: {
               lastPreviewBpRef.current = activeBp.id;
               lastPreviewKindRef.current = curKind;
               lastPreviewAimRef.current = { x: aim.x, y: aim.y, z: aim.z, yaw: aim.yaw };
+
+              // Socket glow (Item C2): ok slots within 8m of aim, on aimed level and level above, max 48
+              const okSlots: { x: number; y: number; z: number; yaw: number }[] = [];
+              const sEnv = structureEnv(bEnv);
+              const structures = w.base.structures.filter(
+                (st) => Math.hypot(aim.x - st.x, aim.z - st.z) <= 16
+              );
+              for (const structure of structures) {
+                const dx = aim.x - structure.x;
+                const dz = aim.z - structure.z;
+                const cos = Math.cos(structure.yaw);
+                const sin = Math.sin(structure.yaw);
+                const u = dx * cos + dz * sin;
+                const v = -dx * sin + dz * cos;
+                const ci = Math.floor(u / S.CELL);
+                const cj = Math.floor(v / S.CELL);
+                const aimedK = Math.max(0, Math.round((aim.y - structure.y) / S.LEVEL));
+
+                for (let k = aimedK; k <= aimedK + 1; k++) {
+                  for (let i = ci - 2; i <= ci + 2; i++) {
+                    for (let j = cj - 2; j <= cj + 2; j++) {
+                      const candidatePieces: S.Piece[] = [];
+                      if (curKind === 'wall' || curKind === 'airlock') {
+                        candidatePieces.push(
+                          { id: -1, s: structure.id, kind: curKind, i, j, k, r: 0, mat: 'reg' },
+                          { id: -1, s: structure.id, kind: curKind, i, j, k, r: 1, mat: 'reg' },
+                        );
+                      } else if (curKind === 'pillar' || curKind === 'hardpoint') {
+                        candidatePieces.push({ id: -1, s: structure.id, kind: curKind, i, j, k, r: 0, mat: 'reg' });
+                      } else {
+                        const rRot = (curKind === 'ramp' || isFixture(curKind)) ? ((buildRotationRef.current) % 4 as any) : 0;
+                        candidatePieces.push({ id: -1, s: structure.id, kind: curKind, i, j, k, r: rRot, mat: 'reg' });
+                      }
+
+                      for (const cand of candidatePieces) {
+                        const cWorld = pieceAtIn(structure, cand);
+                        if (Math.hypot(cWorld.x - aim.x, cWorld.z - aim.z) <= 8) {
+                          const verdict = S.check(w.base, sEnv, cand);
+                          if (verdict.ok) {
+                            let exAngle = 0;
+                            if (cand.kind === 'wall' || cand.kind === 'airlock') {
+                              if (cand.r === 1) exAngle = -Math.PI / 2;
+                            } else if (cand.kind === 'ramp' || cand.kind === 'bench' || cand.kind === 'bin' || cand.kind === 'repeater') {
+                              exAngle = -cand.r * (Math.PI / 2);
+                            }
+                            okSlots.push({
+                              x: cWorld.x,
+                              y: cWorld.y,
+                              z: cWorld.z,
+                              yaw: -structure.yaw + exAngle,
+                            });
+                            if (okSlots.length >= 48) break;
+                          }
+                        }
+                      }
+                      if (okSlots.length >= 48) break;
+                    }
+                    if (okSlots.length >= 48) break;
+                  }
+                  if (okSlots.length >= 48) break;
+                }
+                if (okSlots.length >= 48) break;
+              }
+              scene.setSocketRings(okSlots);
             }
             const snap = prev.snap;
             if (snap) {
@@ -701,7 +789,8 @@ export function PlayScreen(props: {
                   snap.piece.kind === 'repeater' ||
                   snap.piece.kind === 'hardpoint'
                 ) {
-                  extraAngle = -snap.piece.r * (Math.PI / 2);
+                  const rRot = (snap.piece.r + buildRotationRef.current) % 4;
+                  extraAngle = -rRot * (Math.PI / 2);
                 }
                 const yaw = (st ? -st.yaw : 0) + extraAngle;
                 const pose = pPos ? { x: pPos.x, y: pPos.y, z: pPos.z, yaw } : null;
@@ -719,7 +808,7 @@ export function PlayScreen(props: {
                   { x: snap.cx - (C / 2) * cosine + (C / 2) * sine, z: snap.cz - (C / 2) * sine - (C / 2) * cosine },
                   { x: snap.cx + (C / 2) * cosine + (C / 2) * sine, z: snap.cz + (C / 2) * sine - (C / 2) * cosine },
                   { x: snap.cx - (C / 2) * cosine - (C / 2) * sine, z: snap.cz - (C / 2) * sine + (C / 2) * cosine },
-                  { x: snap.cx + (C / 2) * cosine - (C / 2) * sine, z: snap.cz + (C / 2) * sine + (C / 2) * cosine },
+                  { x: snap.cx + (C / 2) * cosine + (C / 2) * sine, z: snap.cz + (C / 2) * sine + (C / 2) * cosine },
                   { x: snap.cx, z: snap.cz },
                 ];
                 let highest = -Infinity;
@@ -737,12 +826,57 @@ export function PlayScreen(props: {
           } else {
             scene.placePieceGhost(null, 'bad');
           }
+
+          if (activeBp && activeBp.kinds.length > 1) {
+            setWheelCycleText(`wheel: ${activeBp.kinds.join(' · ')}`);
+          } else {
+            setWheelCycleText(null);
+          }
+          if (activeBp && (curKind === 'ramp' || isFixture(curKind))) {
+            setRotationText(`R: ${buildRotationRef.current * 90}°`);
+          } else {
+            setRotationText(null);
+          }
         } else {
           if (ghostKindRef.current !== null) {
             scene.setPieceGhost(null);
             ghostKindRef.current = null;
           }
           lastPreviewRef.current = null;
+          scene.setSocketRings([]);
+          setWheelCycleText(null);
+          setRotationText(null);
+        }
+
+        // 4. Hover support % check (Item C4)
+        const aimHit = scene.aimPoint();
+        const isIntegrityOn = (baseViewSource as WorldViewSource).get?.()?.build?.integrity ?? false;
+        if (aimHit && aimHit.piece !== null && (isIntegrityOn || activeBp !== null)) {
+          const placedP = w.base.pieces.find((x) => x.id === aimHit.piece);
+          if (placedP) {
+            const bEnv = getBaseEnv();
+            const supMap = S.supports(w.base, structureEnv(bEnv));
+            const supVal = supMap.get(placedP.id) ?? 0;
+            const colName = integrityColorName(supVal);
+            const hexColor =
+              colName === 'blue'
+                ? '#38bdf8'
+                : colName === 'green'
+                  ? '#22c55e'
+                  : colName === 'yellow'
+                    ? '#eab308'
+                    : colName === 'orange'
+                      ? '#f97316'
+                      : '#ef4444';
+            setHoverSupport({
+              text: `Support ${Math.round(supVal * 100)}% · ${colName}`,
+              color: hexColor,
+            });
+          } else {
+            setHoverSupport(null);
+          }
+        } else {
+          setHoverSupport(null);
         }
       }
       const live = !pausedRef.current && stateRef.current.step !== 'create';
@@ -755,9 +889,17 @@ export function PlayScreen(props: {
         noteTier(next);
         hook.tier = next;
       }
+      const isAltCam = isBase && (keys.has('AltLeft') || keys.has('AltRight'));
+      const flyUp = (keys.has('Space') ? 1 : 0) - (keys.has('ControlLeft') || keys.has('ControlRight') ? 1 : 0);
       const axis = (a: string[], b: string[]) => (a.some((k) => keys.has(k)) ? 1 : 0) - (b.some((k) => keys.has(k)) ? 1 : 0);
       const out = scene.frame(ms / 1000, dt, live
-        ? { move: { x: axis(['KeyD', 'ArrowRight'], ['KeyA', 'ArrowLeft']), z: axis(['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']) }, look: { dx, dy }, run: keys.has('ShiftLeft') || keys.has('ShiftRight') }
+        ? {
+            move: { x: axis(['KeyD', 'ArrowRight'], ['KeyA', 'ArrowLeft']), z: axis(['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']) },
+            look: { dx, dy },
+            run: keys.has('ShiftLeft') || keys.has('ShiftRight'),
+            altCam: isAltCam,
+            flyUp,
+          }
         : { move: { x: 0, z: 0 }, look: { dx: 0, dy: 0 }, run: false });
       dx = 0; dy = 0;
       let s = stateRef.current;
@@ -997,6 +1139,17 @@ export function PlayScreen(props: {
         stopBeam: () => {
           forceBeamRef.current = null;
         },
+        toggleIntegrity: (force?: boolean) => {
+          const vs = baseViewSource as WorldViewSource;
+          const cur = vs.get?.()?.build?.integrity ?? false;
+          const next = force !== undefined ? force : !cur;
+          if (cur !== next) {
+            vs.actions?.toggleIntegrity();
+          }
+          const bEnv = getBaseEnv();
+          pieceManagerRef.current.sync(baseWorldRef.current, bEnv, next);
+          return next;
+        },
       },
       teleportPlanet: () => scene.debug.teleport('planet', 0, 10, 0),
     });
@@ -1022,6 +1175,17 @@ export function PlayScreen(props: {
           },
           stopBeam: () => {
             forceBeamRef.current = null;
+          },
+          toggleIntegrity: (force?: boolean) => {
+            const vs = baseViewSource as WorldViewSource;
+            const cur = vs.get?.()?.build?.integrity ?? false;
+            const next = force !== undefined ? force : !cur;
+            if (cur !== next) {
+              vs.actions?.toggleIntegrity();
+            }
+            const bEnv = getBaseEnv();
+            pieceManagerRef.current.sync(baseWorldRef.current, bEnv, next);
+            return next;
           },
         },
       };
@@ -1102,6 +1266,12 @@ export function PlayScreen(props: {
       if (paused) return;
       if (isBase) {
         if (e.code === 'KeyR') {
+          buildRotationRef.current = (buildRotationRef.current + 1) % 4;
+          say(`Rotation: ${buildRotationRef.current * 90}°`);
+          (baseViewSource as WorldViewSource).notify?.();
+          return;
+        }
+        if (e.code === 'KeyQ') {
           const w = baseWorldRef.current;
           const slot = w.player.slots[w.hotbar];
           if (slot && slot.n > 0) {
@@ -1109,8 +1279,8 @@ export function PlayScreen(props: {
             if (bp && bp.kinds.length > 1) {
               const curKind = buildKindRef.current ?? bp.kinds[0]!;
               const curIdx = bp.kinds.indexOf(curKind);
-              const nextIdx = (curIdx + 1) % bp.kinds.length;
-              buildKindRef.current = bp.kinds[nextIdx]!;
+              const prevIdx = (curIdx - 1 + bp.kinds.length) % bp.kinds.length;
+              buildKindRef.current = bp.kinds[prevIdx]!;
               (baseViewSource as WorldViewSource).notify?.();
               say(`Selected: ${buildKindRef.current.toUpperCase()}`);
               return;
@@ -1127,6 +1297,16 @@ export function PlayScreen(props: {
             });
             return;
           }
+        }
+        if (e.code === 'KeyV') {
+          const vs = baseViewSource as WorldViewSource;
+          const cur = vs.get?.()?.build?.integrity ?? false;
+          const next = !cur;
+          vs.actions?.toggleIntegrity();
+          const bEnv = getBaseEnv();
+          pieceManagerRef.current.sync(baseWorldRef.current, bEnv, next);
+          say(next ? 'Structural Integrity: ON' : 'Structural Integrity: OFF');
+          return;
         }
       }
       if (e.code === 'KeyM') {
@@ -1209,6 +1389,28 @@ export function PlayScreen(props: {
     window.addEventListener('mousedown', onClick);
     return () => window.removeEventListener('mousedown', onClick);
   }, [building, locked, placeNow]);
+
+  // Mouse wheel kind cycling for base-building (Item C1)
+  useEffect(() => {
+    if (!isBase) return;
+    const onWheel = (e: WheelEvent) => {
+      const w = baseWorldRef.current;
+      const slot = w.player.slots[w.hotbar];
+      if (!slot || slot.n <= 0) return;
+      const bp = blueprint(slot.item);
+      if (!bp || bp.kinds.length <= 1) return;
+      const curKind = buildKindRef.current ?? bp.kinds[0]!;
+      const curIdx = bp.kinds.indexOf(curKind);
+      const dir = e.deltaY > 0 ? 1 : -1;
+      const nextIdx = (curIdx + dir + bp.kinds.length) % bp.kinds.length;
+      buildKindRef.current = bp.kinds[nextIdx]!;
+      (baseViewSource as WorldViewSource).notify?.();
+      say(`Selected: ${buildKindRef.current.toUpperCase()}`);
+    };
+    window.addEventListener('wheel', onWheel, { passive: true });
+    return () => window.removeEventListener('wheel', onWheel);
+  }, [isBase, baseViewSource, say]);
+
   // leaving the planet closes the build menu; entering planet closes lab panels
   useEffect(() => {
     if (hud.where === 'lab') { setMenu(false); setPanel(null); stopBuilding(); }
@@ -2017,6 +2219,9 @@ export function PlayScreen(props: {
               paused={paused}
               modalOpen={isAnyBaseWindowOpen}
               harvestCounter={beamHarvest}
+              hoverSupport={hoverSupport}
+              wheelCycleText={wheelCycleText}
+              rotationText={rotationText}
               onOpenChange={(isOpen) => {
                 setBaseWindowOpen(isOpen);
                 if (isOpen) {

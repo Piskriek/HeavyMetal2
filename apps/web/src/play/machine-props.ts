@@ -4,6 +4,8 @@
 import * as THREE from 'three';
 import * as field from '@hm/fieldkit';
 import * as lab from '@hm/labkit';
+import * as basegear from '@hm/basegear';
+import * as heavygear from '@hm/heavygear';
 import { textureMill as consoleMillTextureMill, setLamp as setConsoleMillLamp } from '@hm/consolemill';
 import type { MachineKind, Metric } from '@hm/plotsim';
 
@@ -28,12 +30,8 @@ export const PIXELS_OF: Readonly<Record<MachineKind, Metric | null>> = {
   'heavy-mill': 'pxd', 'heavy-press': 'vtx', 'heavy-projector': 'lx', 'heavy-water': 'aq',
 };
 
-/** Stand-in for a heavy terraformer until its own mesh lands (after the base-construction concept art): its field twin at 1.9x, sockets moved with it. */
-const HEAVY_SCALE = 1.9;
-function heavy(p: MachineProp): MachineProp {
-  p.group.scale.multiplyScalar(HEAVY_SCALE);
-  return { ...p, power: p.power.clone().multiplyScalar(HEAVY_SCALE), vent: p.vent ? p.vent.clone().multiplyScalar(HEAVY_SCALE) : null, top: p.top ? p.top.clone().multiplyScalar(HEAVY_SCALE) : null };
-}
+/** Hardpoint ring top height where heavy machines stand. */
+export const RING_TOP_Y = 0.78;
 
 const at = (sockets: readonly { readonly name: string; readonly at: readonly [number, number, number] }[], ...names: string[]): THREE.Vector3 | null => {
   for (const n of names) { const s = sockets.find((x) => x.name === n); if (s) return new THREE.Vector3(...s.at); }
@@ -45,10 +43,78 @@ export function machineProp(m: lab.LabMaterials, kind: MachineKind, stage: numbe
   const st = stage <= 1 ? 1 : 6;
   const still = (): void => undefined;
   switch (kind) {
-    case 'heavy-mill': return heavy(machineProp(m, 'mill', stage));
-    case 'heavy-press': return heavy(machineProp(m, 'press', stage));
-    case 'heavy-projector': return heavy(machineProp(m, 'projector', stage));
-    case 'heavy-water': return heavy(machineProp(m, 'water', stage));
+    case 'heavy-mill': {
+      const p = basegear.heavyMill(m as any, { stage: st });
+      p.group.position.y += RING_TOP_Y;
+      const lift = new THREE.Vector3(0, RING_TOP_Y, 0);
+      const rawPower = at(p.sockets, 'power') ?? new THREE.Vector3(0, 0.1, -1.58);
+      const rawVent = at(p.sockets, 'vent') ?? new THREE.Vector3(1.715, 2.28, -0.48);
+      return {
+        group: p.group,
+        power: rawPower.clone().add(lift),
+        vent: rawVent.clone().add(lift),
+        top: null,
+        lamps: p.lamps,
+        animate: still,
+        light: (g) => p.lamps.forEach((l) => basegear.setLamp(l, g)),
+      };
+    }
+    case 'heavy-press': {
+      const p = heavygear.heavyPress(m as any, { stage: st });
+      p.group.position.y += RING_TOP_Y;
+      const lift = new THREE.Vector3(0, RING_TOP_Y, 0);
+      const rawPower = at(p.sockets, 'power') ?? new THREE.Vector3(0, 0, 0.76);
+      const rawVent = at(p.sockets, 'vent') ?? new THREE.Vector3(0, 3.2, -0.56);
+      const ram = p.parts?.ram;
+      const restY = ram?.position.y ?? 0;
+      return {
+        group: p.group,
+        power: rawPower.clone().add(lift),
+        vent: rawVent.clone().add(lift),
+        top: null,
+        lamps: p.lamps,
+        animate: (t, run) => {
+          if (ram) ram.position.y = restY - Math.max(0, Math.sin(t * 2.0)) * 0.6 * run;
+        },
+        light: (g) => p.lamps.forEach((l) => heavygear.setLamp(l, g)),
+      };
+    }
+    case 'heavy-projector': {
+      const p = heavygear.heavyProjector(m as any, { stage: st });
+      p.group.position.y += RING_TOP_Y;
+      const lift = new THREE.Vector3(0, RING_TOP_Y, 0);
+      const rawPower = at(p.sockets, 'power') ?? new THREE.Vector3(0, 0, 0.6);
+      const rawVent = at(p.sockets, 'vent') ?? new THREE.Vector3(0, 4.1, -0.66);
+      const head = p.parts?.head;
+      const restRotX = head?.rotation.x ?? 0;
+      return {
+        group: p.group,
+        power: rawPower.clone().add(lift),
+        vent: rawVent.clone().add(lift),
+        top: null,
+        lamps: p.lamps,
+        animate: (t, run) => {
+          if (head) head.rotation.x = restRotX + Math.sin(t * 0.35) * 0.08 * run;
+        },
+        light: (g) => p.lamps.forEach((l) => heavygear.setLamp(l, g)),
+      };
+    }
+    case 'heavy-water': {
+      const p = heavygear.heavyWater(m as any, { stage: st });
+      p.group.position.y += RING_TOP_Y;
+      const lift = new THREE.Vector3(0, RING_TOP_Y, 0);
+      const rawPower = at(p.sockets, 'power') ?? new THREE.Vector3(0, 0, 0.6);
+      const rawVent = at(p.sockets, 'vent') ?? new THREE.Vector3(0, 3.155, -0.58);
+      return {
+        group: p.group,
+        power: rawPower.clone().add(lift),
+        vent: rawVent.clone().add(lift),
+        top: null,
+        lamps: p.lamps,
+        animate: still,
+        light: (g) => p.lamps.forEach((l) => heavygear.setLamp(l, g)),
+      };
+    }
     case 'mill': {
       const p = consoleMillTextureMill(m, { stage: st });
       return { group: p.group, power: at(p.sockets, 'power')!, vent: at(p.sockets, 'stack'), top: null, lamps: p.lamps, animate: still, light: (g) => p.lamps.forEach((l) => setConsoleMillLamp(l, g)) };

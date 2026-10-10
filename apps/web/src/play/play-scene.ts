@@ -25,6 +25,7 @@ import { createMonsterMashCombat, type MonsterMashCombatManager } from './monste
 import * as F from '@hm/substrate';
 import { beamEffect, type BeamFx, type BeamMode } from '@hm/beamkit';
 import { BEAM_RANGE } from '../base/world';
+import type { WalkWorld } from '../base/walk';
 
 export type Where = 'lab' | 'planet';
 /** What the screen gives the scene each frame. */
@@ -34,6 +35,9 @@ export interface Controls {
   /** Look: mouse movement since the last frame, in pixels. */
   readonly look: { readonly dx: number; readonly dy: number };
   readonly run: boolean;
+  /** Build camera controls (Alt held) */
+  readonly altCam?: boolean;
+  readonly flyUp?: number;
 }
 export type LabMachineKind = 'rack' | 'bench' | 'combiner';
 
@@ -118,6 +122,8 @@ export interface PlayScene {
   placePieceGhost(pose: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number } | null, tint: 'grounded' | 'ok' | 'weak' | 'bad'): void;
   /** Placed base pieces group for aim raycasting. */
   setPieces(group: THREE.Group | null): void;
+  setWalkWorld(walkWorld: WalkWorld | null): void;
+  setSocketRings(poses: readonly { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }[]): void;
   heightAt(x: number, z: number): number;
   aimPoint(): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null;
   /** Sets or updates the field's anomaly node instanced markers. Rebuilds instances only when field updates. */
@@ -504,6 +510,23 @@ export function createPlayScene(o: {
   const pieceGhostBad = keep(new THREE.ShaderMaterial({ vertexShader: PIECE_HOLO_VERTEX, fragmentShader: PIECE_HOLO_FRAGMENT, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uColour: { value: new THREE.Color('#ef4444') }, uTime: holoUniforms.uTime } }));
   let pieceGhost: THREE.Group | null = null;
   let piecesGroup: THREE.Group | null = null;
+  let activeWalkWorld: WalkWorld | null = null;
+  let altCamPos: THREE.Vector3 | null = null;
+
+  // Single InstancedMesh capped at 48 for pulsing cyan socket glow
+  const socketRingGeo = keep(new THREE.RingGeometry(0.35, 0.45, 24));
+  socketRingGeo.rotateX(-Math.PI / 2);
+  const socketRingMat = keep(new THREE.MeshBasicMaterial({
+    color: 0x22d3ee,
+    transparent: true,
+    opacity: 0.85,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  }));
+  const socketRingMesh = keep(new THREE.InstancedMesh(socketRingGeo, socketRingMat, 48));
+  socketRingMesh.count = 0;
+  socketRingMesh.visible = false;
+  planetScene.add(socketRingMesh);
 
   // Stand-in anomaly node markers awaiting concept art
   const nodeGeometries: Record<F.Kind, THREE.BufferGeometry> = {
@@ -978,6 +1001,26 @@ export function createPlayScene(o: {
         planetScene.add(piecesGroup);
       }
     },
+    setWalkWorld(walkWorld) {
+      activeWalkWorld = walkWorld;
+    },
+    setSocketRings(poses) {
+      const count = Math.min(48, poses.length);
+      socketRingMesh.count = count;
+      socketRingMesh.visible = count > 0;
+      const m4 = new THREE.Matrix4();
+      const q = new THREE.Quaternion();
+      const s = new THREE.Vector3(1, 1, 1);
+      const p = new THREE.Vector3();
+      for (let i = 0; i < count; i++) {
+        const pose = poses[i]!;
+        p.set(pose.x, pose.y + 0.05, pose.z);
+        q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pose.yaw);
+        m4.compose(p, q, s);
+        socketRingMesh.setMatrixAt(i, m4);
+      }
+      socketRingMesh.instanceMatrix.needsUpdate = true;
+    },
     heightAt: (x, z) => groundAt(x, z),
     aimPoint: () => aimPointFn(),
     setNodes(field) {
@@ -1129,6 +1172,7 @@ export function createPlayScene(o: {
       clock = now;
       beamFx.update(clock);
       holoUniforms.uTime.value = now;
+      socketRingMat.opacity = 0.55 + 0.35 * Math.sin(now * 5.0);
       // ---- the power-on sequence
       if (powerT >= 0) {
         const before = powerT;
@@ -1151,24 +1195,59 @@ export function createPlayScene(o: {
       yaw -= c.look.dx * sens;
       pitch = Math.max(-1.45, Math.min(1.45, pitch - c.look.dy * sens));
       const speed = (c.run ? RUN : WALK) * dt;
-      const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
       const before = pos.clone();
-      pos.x += (fx * c.move.z + rx * c.move.x) * speed;
-      pos.z += (fz * c.move.z + rz * c.move.x) * speed;
-      stride += Math.hypot(pos.x - before.x, pos.z - before.z);
-      if (stride > 1.35) {
-        stride = 0;
-        sfx('step-grit', where === 'planet' ? { pitch: 0.85 + Math.random() * 0.25, volume: 0.55 } : { pitch: 1.5 + Math.random() * 0.2, volume: 0.3 });
+
+      if (c.altCam && where === 'planet') {
+        if (!altCamPos) {
+          altCamPos = (cameraView === 'third' ? camera.position.clone() : pos.clone());
+        }
+        const flySpeed = (c.run ? RUN * 1.5 : WALK * 1.5) * dt;
+        const camRot = new THREE.Euler(pitch, yaw, 0, 'YXZ');
+        const fwd = new THREE.Vector3(0, 0, -1).applyEuler(camRot);
+        const rgt = new THREE.Vector3(1, 0, 0).applyEuler(camRot);
+        altCamPos.addScaledVector(fwd, c.move.z * flySpeed);
+        altCamPos.addScaledVector(rgt, c.move.x * flySpeed);
+        if (c.flyUp) {
+          altCamPos.y += c.flyUp * flySpeed;
+        }
+        const dist = altCamPos.distanceTo(pos);
+        if (dist > 30) {
+          altCamPos.sub(pos).normalize().multiplyScalar(30).add(pos);
+        }
+      } else {
+        altCamPos = null;
+        const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
+        pos.x += (fx * c.move.z + rx * c.move.x) * speed;
+        pos.z += (fz * c.move.z + rz * c.move.x) * speed;
+        stride += Math.hypot(pos.x - before.x, pos.z - before.z);
+        if (stride > 1.35) {
+          stride = 0;
+          sfx('step-grit', where === 'planet' ? { pitch: 0.85 + Math.random() * 0.25, volume: 0.55 } : { pitch: 1.5 + Math.random() * 0.2, volume: 0.3 });
+        }
       }
+
       if (where === 'lab') {
         collide(pos);
         pos.y = EYE;
       } else {
-        // keep to your plot's surroundings; stand on the ground
+        // keep to your plot's surroundings; stand on the ground or base
         const r = Math.hypot(pos.x, pos.z);
         if (r > 420) { pos.x *= 420 / r; pos.z *= 420 / r; }
-        const target = groundAt(pos.x, pos.z) + EYE;
-        pos.y += (target - pos.y) * Math.min(1, dt * 14);
+        if (!c.altCam) {
+          if (activeWalkWorld) {
+            const feetY = pos.y - EYE;
+            const pushed = activeWalkWorld.push(pos.x, pos.z, feetY, 0.35);
+            pos.x = pushed.x;
+            pos.z = pushed.z;
+            const groundY = groundAt(pos.x, pos.z);
+            const standY = activeWalkWorld.standAt(pos.x, pos.z, feetY, groundY);
+            const target = standY + EYE;
+            pos.y += (target - pos.y) * Math.min(1, dt * 14);
+          } else {
+            const target = groundAt(pos.x, pos.z) + EYE;
+            pos.y += (target - pos.y) * Math.min(1, dt * 14);
+          }
+        }
       }
       // ---- through the gate (only when it is on and the picture is clear)
       if (gateOn && world) {
@@ -1196,7 +1275,7 @@ export function createPlayScene(o: {
       // ---- character model & animator (TASK-07, POL-18)
       scientistHolder.position.set(pos.x, pos.y - EYE, pos.z);
       scientistHolder.rotation.set(0, yaw + Math.PI, 0);
-      scientistHolder.visible = cameraView === 'third';
+      scientistHolder.visible = cameraView === 'third' && !altCamPos;
 
       if (scientistAnimator) {
         scientistAnimator.update(dt, {
@@ -1207,8 +1286,10 @@ export function createPlayScene(o: {
         });
       }
 
-      // ---- the camera (first person or over-the-shoulder third person)
-      if (cameraView === 'third') {
+      // ---- the camera (first person, third person, or Alt build camera)
+      if (altCamPos) {
+        camera.position.copy(altCamPos);
+      } else if (cameraView === 'third') {
         const camRot = new THREE.Euler(pitch, yaw, 0, 'YXZ');
         const rightVec = new THREE.Vector3(1, 0, 0).applyEuler(camRot);
         const upVec = new THREE.Vector3(0, 1, 0).applyEuler(camRot);
@@ -1270,6 +1351,7 @@ export function createPlayScene(o: {
         mash.update(dt, pos, isMoving);
       }
       postUniforms.uTime.value = now;
+      socketRingMat.opacity = 0.45 + 0.4 * Math.sin(now * 5.0);
       postUniforms.uGlitch.value = where === 'planet' ? Math.max(0, Math.min(1, (0.4 - sync) / 0.4)) : 0;
       postUniforms.uLost.value = Math.max(0, 1 - (now - lostAt) / 0.6);
       openingUniforms.uTime.value = now;

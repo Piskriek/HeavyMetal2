@@ -18,7 +18,7 @@ function crossesOpen(a: P, b: P, x: number, y: number): boolean {
 
 function segOk(g: Grid, a: P, b: P): boolean {
   for (const axis of [0, 1] as const) {
-    const o = 1 - axis;
+    const o = axis === 0 ? 1 : 0;
     if (Math.abs(a[o] - b[o]) < EPS && Math.abs(a[o] - Math.round(a[o])) < EPS) {
       const line = Math.round(a[o]), lo = Math.min(a[axis], b[axis]), hi = Math.max(a[axis], b[axis]);
       for (let c = Math.floor(lo); c < Math.ceil(hi); c++) {

@@ -164,7 +164,7 @@ export function PlayScreen(props: {
   const placeRef = useRef<((kind: MachineKind, x: number, z: number, yaw: number) => boolean) | null>(null);
   const [toast, setToast] = useState<{ readonly text: string; readonly sub: string; readonly id: number } | null>(null);
   const isMashTest = typeof location !== 'undefined' && (new URLSearchParams(location.search).has('mash') || new URLSearchParams(location.search).has('monstermash'));
-  const isBase = typeof location !== 'undefined' && (new URLSearchParams(location.search).has('base') || new URLSearchParams(location.search).has('building'));
+  const isBase = typeof location !== 'undefined' && (new URLSearchParams(location.search).has('base') || new URLSearchParams(location.search).has('building') || new URLSearchParams(location.search).has('mash') || new URLSearchParams(location.search).has('monstermash'));
   const isDevSeed = typeof location !== 'undefined' && new URLSearchParams(location.search).get('kit') === '1';
   const creating = state.step === 'create' && !isMashTest;
 
@@ -427,6 +427,7 @@ export function PlayScreen(props: {
       const res = apply(baseWorldRef.current, bEnv, { t: 'shelter', cx: spot.cx, cz: spot.cz, yaw: spot.yaw });
       if (!res.events.some((e) => e.type === 'refused')) {
         baseWorldRef.current = res.world;
+        scene.setBase(baseWorldRef.current.base);
         pieceManagerRef.current.sync(baseWorldRef.current, bEnv, false);
         scene.setWalkWorld(pieceManagerRef.current.walkWorld);
         say(
@@ -465,6 +466,7 @@ export function PlayScreen(props: {
     const res = apply(baseWorldRef.current, bEnv, cmd);
     if (!res || !res.world) return;
     baseWorldRef.current = res.world;
+    scene?.setBase(baseWorldRef.current.base);
 
     for (const ev of res.events) {
       if (ev.type === 'refused') {
@@ -782,6 +784,7 @@ export function PlayScreen(props: {
             dropStarterShelter(scene);
           }
           scene.setPieces(pieceManagerRef.current.getMeshes());
+          scene.setBase(baseWorldRef.current.base);
           scene.setNodes(baseWorldRef.current.field);
           pieceManagerRef.current.sync(baseWorldRef.current, bEnv, false);
           scene.setWalkWorld(pieceManagerRef.current.walkWorld);
@@ -1537,6 +1540,9 @@ export function PlayScreen(props: {
       currentOneShot: () => scene.debug.currentOneShot(),
       animator: () => scene.debug.animator(),
       playAction: (kind: OneShotKind) => scene.playAction(kind),
+      teleport: (where: 'lab' | 'planet', x: number, z: number, y: number, p?: number) => scene.debug.teleport(where, x, z, y, p),
+      setAltCam: (eye: { x: number; y: number; z: number }, p: number, y: number) => scene.debug.setAltCam(eye, p, y),
+      clearAltCam: () => scene.debug.clearAltCam(),
       mash: () => scene.mash,
       spawnOgro: (count = 1) => scene.mash.spawnOgro(count),
       spawnDemon: (count = 1) => scene.mash.spawnDemon(count),
@@ -1577,6 +1583,7 @@ export function PlayScreen(props: {
         save: () => persistBaseWorld(true),
         load: () => {
           baseWorldRef.current = initBaseWorld();
+          scene.setBase(baseWorldRef.current.base);
           pieceManagerRef.current.sync(baseWorldRef.current, getBaseEnv(), false);
           scene.setWalkWorld(pieceManagerRef.current.walkWorld);
           scene.setVehicles(baseWorldRef.current.vehicles);

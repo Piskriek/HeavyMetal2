@@ -168,6 +168,200 @@ try {
   await page.screenshot({ path: 'docs/shots/planet-mash-combat.png' });
   console.log('Captured docs/shots/planet-mash-combat.png');
 
+  // ---------------------------------------------------------------------------
+  // TASK-07: Deterministic hashSim Replay Check
+  // ---------------------------------------------------------------------------
+  console.log('Testing deterministic hashSim replay across two identical runs...');
+  const determinismResult = await page.evaluate(() => {
+    const mash = window.hmPlay.mash();
+    const origin = { x: 0, y: 1.8, z: 0 };
+    const dir = { x: 1, y: 0, z: 1 };
+
+    mash.resetSim(42);
+    mash.spawnDirect('ogro', 8, 8);
+    for (let i = 0; i < 20; i++) mash.step({ x: 0, z: 0 });
+    mash.fire(origin, dir);
+    for (let i = 0; i < 10; i++) mash.step({ x: 0, z: 0 });
+    const hashA = mash.hashSim();
+
+    // Replay with exact same seed and actions
+    mash.resetSim(42);
+    mash.spawnDirect('ogro', 8, 8);
+    for (let i = 0; i < 20; i++) mash.step({ x: 0, z: 0 });
+    mash.fire(origin, dir);
+    for (let i = 0; i < 10; i++) mash.step({ x: 0, z: 0 });
+    const hashB = mash.hashSim();
+
+    // Different seed must differ
+    mash.resetSim(999);
+    mash.spawnDirect('ogro', 8, 8);
+    for (let i = 0; i < 20; i++) mash.step({ x: 0, z: 0 });
+    mash.fire(origin, dir);
+    for (let i = 0; i < 10; i++) mash.step({ x: 0, z: 0 });
+    const hashC = mash.hashSim();
+
+    return { match: hashA === hashB, hashA, diff: hashA !== hashC };
+  });
+
+  console.log('hashSim replay match:', determinismResult.match, 'Hash:', determinismResult.hashA);
+  if (!determinismResult.match) {
+    throw new Error('hashSim determinism check failed: identical seeds diverged!');
+  }
+  if (!determinismResult.diff) {
+    throw new Error('hashSim check failed: different seed produced identical hash!');
+  }
+
+  // ---------------------------------------------------------------------------
+  // TASK-07: Starter Shelter & Airlock Sealed/Open Navigation Tests
+  // ---------------------------------------------------------------------------
+  console.log('Testing starter shelter navigation with airlock shut and open...');
+  const shelterTest = await page.evaluate(async () => {
+    const w = window.hmPlay.base.world();
+    const st = w.base.structures.find((s) => s.id === 1) || w.base.structures[0];
+    if (!st) return { error: 'No shelter structure found' };
+    const lock = w.base.pieces.find((p) => p.kind === 'airlock');
+    if (!lock) return { error: 'No airlock piece found in base' };
+
+    // Center of foundation in world space: cell (0, 0), center is (2, 2) local
+    const cosY = Math.cos(st.yaw), sinY = Math.sin(st.yaw);
+    const insideX = st.x + 2 * cosY - 2 * sinY;
+    const insideZ = st.z + 2 * sinY + 2 * cosY;
+
+    // Outside the airlock door in world space: (j = 1 is +z edge, so outside is z = 7 local)
+    const outsideX = st.x + 2 * cosY - 7 * sinY;
+    const outsideZ = st.z + 2 * sinY + 7 * cosY;
+
+    const mash = window.hmPlay.mash();
+    mash.clearMobs();
+
+    // Ensure airlock is closed
+    if (lock.open) {
+      window.hmPlay.base.apply({ t: 'door', id: lock.id, open: false });
+    }
+
+    // Teleport player inside the shelter
+    window.hmPlay.teleport('planet', insideX, insideZ, 0);
+
+    // Spawn 1 Demon outside the closed shelter
+    await mash.spawnDemon(1, { x: outsideX, z: outsideZ });
+
+    // Step 90 ticks with player inside
+    for (let i = 0; i < 90; i++) {
+      mash.step({ x: insideX, z: insideZ });
+    }
+
+    const mobsShut = mash.getMobList();
+    const mobShut = mobsShut[0];
+    const distShut = mobShut ? Math.hypot(mobShut.pos.x - insideX, mobShut.pos.z - insideZ) : -1;
+
+    // Camera framed above the shelter showing the mob held outside the shut airlock
+    window.hmPlay.setPaused(false);
+    window.hmPlay.setLocked(true);
+    window.hmPlay.setAltCam(
+      { x: insideX - 5 * sinY, y: 7.5, z: insideZ + 5 * cosY },
+      -0.65,
+      st.yaw + Math.PI
+    );
+
+    return {
+      lockId: lock.id,
+      insideX,
+      insideZ,
+      outsideX,
+      outsideZ,
+      distShut,
+      mobShutPos: mobShut ? mobShut.pos : null,
+    };
+  });
+
+  console.log('Shut airlock result: dist =', shelterTest.distShut, 'pos =', shelterTest.mobShutPos);
+  if (shelterTest.distShut < 2.5) {
+    throw new Error(`Mob entered sealed shelter with airlock shut! Distance: ${shelterTest.distShut}`);
+  }
+  console.log('OK: Mob stayed safely outside shut shelter (dist =', shelterTest.distShut, 'm)');
+
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: 'docs/shots/monstermash/shelter-safe.png' });
+  console.log('Captured docs/shots/monstermash/shelter-safe.png');
+
+  // Now test with airlock open: mob walks in through the door
+  console.log('Opening airlock and stepping simulation...');
+  const openTest = await page.evaluate(async (lockId) => {
+    const mash = window.hmPlay.mash();
+    window.hmPlay.base.apply({ t: 'door', id: lockId, open: true });
+
+    // Step 90 ticks with airlock open
+    const w = window.hmPlay.base.world();
+    const st = w.base.structures.find((s) => s.id === 1) || w.base.structures[0];
+    const cosY = Math.cos(st.yaw), sinY = Math.sin(st.yaw);
+    const insideX = st.x + 2 * cosY - 2 * sinY;
+    const insideZ = st.z + 2 * sinY + 2 * cosY;
+
+    for (let i = 0; i < 90; i++) {
+      mash.step({ x: insideX, z: insideZ });
+    }
+
+    const mobsOpen = mash.getMobList();
+    const mobOpen = mobsOpen[0];
+    const distOpen = mobOpen ? Math.hypot(mobOpen.pos.x - insideX, mobOpen.pos.z - insideZ) : -1;
+
+    return {
+      distOpen,
+      mobOpenPos: mobOpen ? mobOpen.pos : null,
+      state: mobOpen ? mobOpen.state : null,
+    };
+  }, shelterTest.lockId);
+
+  console.log('Open airlock result: dist =', openTest.distOpen, 'state =', openTest.state);
+  if (openTest.distOpen > 2.5) {
+    throw new Error(`Mob failed to walk in through open airlock! Distance: ${openTest.distOpen}`);
+  }
+  console.log('OK: Mob walked through open door into shelter (dist =', openTest.distOpen, 'm, state =', openTest.state, ')');
+
+  // ---------------------------------------------------------------------------
+  // TASK-07: Mob pathing round a wall
+  // ---------------------------------------------------------------------------
+  console.log('Testing mob pathing round a wall...');
+  await page.evaluate(async () => {
+    const w = window.hmPlay.base.world();
+    const st = w.base.structures.find((s) => s.id === 1) || w.base.structures[0];
+    const cosY = Math.cos(st.yaw), sinY = Math.sin(st.yaw);
+    // Player on south-east side outside wall
+    const targetX = st.x + 5 * cosY + 2 * sinY;
+    const targetZ = st.z - 2 * sinY + 5 * cosY;
+
+    // Spawn an Ogro on the opposite side of the wall
+    const spawnX = st.x - 3 * cosY - 2 * sinY;
+    const spawnZ = st.z - 2 * sinY - 3 * cosY;
+
+    const mash = window.hmPlay.mash();
+    mash.clearMobs();
+    await mash.spawnOgro(1, { x: spawnX, z: spawnZ });
+
+    // Step 45 ticks so the mob rounds the corner
+    for (let i = 0; i < 45; i++) {
+      mash.step({ x: targetX, z: targetZ });
+    }
+
+    // Frame camera from above to view the mob curving around the corner
+    window.hmPlay.setPaused(false);
+    window.hmPlay.setLocked(true);
+    window.hmPlay.setAltCam(
+      { x: st.x + 4, y: 8, z: st.z + 4 },
+      -0.75,
+      st.yaw + 0.5
+    );
+  });
+
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: 'docs/shots/monstermash/mobs-round-wall.png' });
+  console.log('Captured docs/shots/monstermash/mobs-round-wall.png');
+
+  // Reset alt camera
+  await page.evaluate(() => {
+    window.hmPlay.clearAltCam();
+  });
+
   if (pageErrors.length > 0) {
     console.error('Page errors encountered:', pageErrors);
     server.kill();

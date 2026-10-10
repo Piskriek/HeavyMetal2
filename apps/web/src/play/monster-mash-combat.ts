@@ -1,13 +1,31 @@
 /**
  * Monster Mash Combat & Spawning Subsystem for SetMix.
- * Allows equipping retro weapons (Shotgun), spawning shareware mobs (Quake 2 Ogro & DOOM Demon)
- * onto the planet surface, shooting them with hitscan raycasts, triggering recoil, pain flinches,
- * death animations, particle impacts, and fidelity stage adaptation.
+ * Powered by deterministic @hm/mobsim 30 Hz simulation, @hm/navpath any-angle pathing,
+ * and @hm/structure base navigation grid (navgrid.ts).
+ * Allows equipping retro weapons, spawning Quake 2 Ogro (3D MD2) and DOOM Demon (2D billboard)
+ * mobs that path intelligently around base walls and shelters, shooting them with deterministic shotgun/beam raycasts,
+ * triggering recoil, flinches, pain/attack/death sequences, and fidelity stage adaptation.
  */
 import * as THREE from 'three';
 import { parseMd2, createMd2Mesh, type Md2ParsedModel } from '@hm/shareware';
 import { parseWad, extractPatch, extractPlaypal } from '@hm/shareware';
 import { createFidelityMobMaterial, type FidelityStage } from '@hm/shareware';
+import {
+  createSim,
+  spawn,
+  spawnNear,
+  fire as mobsimFire,
+  step as mobsimStep,
+  hashSim as mobsimHash,
+  type Sim,
+  type Mob,
+  type MobState as MobSimState,
+  type Nav,
+  DT,
+  KINDS,
+} from '@hm/mobsim';
+import { navFor } from '../base/navgrid';
+import * as S from '@hm/structure';
 import type { WeaponStats } from '../base/weapons';
 
 export type MobKind = 'ogro' | 'demon';
@@ -34,11 +52,15 @@ export interface CombatStats {
 export interface MonsterMashCombatManager {
   isEquipped(): boolean;
   equip(on: boolean): void;
-  fire(playerPos?: THREE.Vector3, cameraDir?: THREE.Vector3): { fired: boolean; hits: number; damage: number; killed: number; reason?: string };
+  fire(
+    playerPos?: THREE.Vector3 | { x: number; y: number; z: number },
+    cameraDir?: THREE.Vector3 | { x: number; y: number; z: number }
+  ): { fired: boolean; hits: number; damage: number; killed: number; reason?: string };
   setWeaponStats(stats: WeaponStats | null): void;
   getWeaponStats(): WeaponStats | null;
   spawnOgro(count?: number, customPos?: { x: number; z: number }): Promise<void>;
   spawnDemon(count?: number, customPos?: { x: number; z: number }): Promise<void>;
+  spawnDirect(kind: 'ogro' | 'demon', x: number, z: number): void;
   clearMobs(): void;
   setFidelityStage(stage: number): void;
   getMobList(): readonly MobStatus[];
@@ -47,6 +69,13 @@ export interface MonsterMashCombatManager {
   reload(): void;
   update(dt: number, playerPos: THREE.Vector3, isMoving: boolean): void;
   dispose(): void;
+  setBase(base: S.Base | null): void;
+  setIsOnPlanet(onPlanet: boolean): void;
+  getSim(): Sim;
+  hashSim(): string;
+  resetSim(seed?: number): void;
+  getNav(): Nav;
+  step(player?: { x: number; z: number }): void;
 }
 
 // -----------------------------------------------------------------------------
@@ -511,6 +540,9 @@ export function createMonsterMashCombat(options: {
   readonly groundHeightAt: (x: number, z: number) => number;
   readonly onOreGathered?: (amount: number) => void;
   readonly initialStage?: number;
+  readonly seed?: number;
+  readonly initialBase?: S.Base | null;
+  readonly isPlanet?: () => boolean;
 }): MonsterMashCombatManager {
   const { planetScene, camera, groundHeightAt, onOreGathered } = options;
   const audio = new CombatAudio();
@@ -521,8 +553,21 @@ export function createMonsterMashCombat(options: {
   let currentAmmo = 8;
   let maxAmmo = 8;
   let activeWeaponStats: WeaponStats | null = null;
-  let cooldownTimer = 0;
-  let nextMobId = 1;
+
+  // Deterministic mob simulation state (@hm/mobsim)
+  const initialSeed = options.seed ?? 1337;
+  let sim: Sim = createSim(initialSeed);
+  let accumulator = 0;
+  const prevMobs = new Map<number, { x: number; z: number; state: MobSimState; hp: number }>();
+
+  // Ground navigation grid state (navgrid.ts & @hm/structure)
+  let currentBase: S.Base | null = options.initialBase ?? null;
+  let isOnPlanet = options.isPlanet ? options.isPlanet() : true;
+  let lastPlayerPos = { x: 0, z: 0 };
+  let currentNav: Nav = openNav({ x: 0, z: 0 }, 32);
+  let lastGridCenter = { x: 0, z: 0 };
+  let lastBaseHash = '';
+  let lastNavRebuildTime = 0;
 
   const stats: CombatStats = {
     mobsSpawned: 0,
@@ -543,12 +588,59 @@ export function createMonsterMashCombat(options: {
   let recoilPitch = 0;
   let flashTimer = 0;
 
-  // Cached assets
+  // Cached shareware assets
   let ogroModelCache: Md2ParsedModel | null = null;
   let ogroTextureCache: THREE.Texture | null = null;
   let demonSpritesCache: DemonSprites | null = null;
 
-  const mobs: MobEntity[] = [];
+  // Render views keyed by mob ID
+  const mobViews = new Map<number, MobEntity>();
+
+  function openNav(center: { readonly x: number; readonly z: number }, radius = 32, cell = 0.25): Nav {
+    const w = Math.ceil((2 * radius) / cell);
+    const h = w;
+    const originX = center.x - radius;
+    const originZ = center.z - radius;
+    return {
+      originX,
+      originZ,
+      cell,
+      grid: { w, h, blocked: () => false },
+    };
+  }
+
+  function baseHash(base: S.Base | null): string {
+    if (!base) return '';
+    let h = `${base.structures.length}:${base.pieces.length}:`;
+    for (const p of base.pieces) {
+      h += `${p.id},${p.kind},${p.i},${p.j},${p.k},${p.r},${p.open ? 1 : 0};`;
+    }
+    return h;
+  }
+
+  function updateNav(playerPos: { x: number; z: number }, force = false): void {
+    const nowSec = performance.now() / 1000;
+    if (!isOnPlanet || !currentBase || currentBase.pieces.length === 0) {
+      if (force || !currentNav) {
+        currentNav = openNav(playerPos, 32);
+        lastGridCenter = { x: playerPos.x, z: playerPos.z };
+        lastBaseHash = '';
+        lastNavRebuildTime = nowSec;
+      }
+      return;
+    }
+
+    const dist = Math.hypot(playerPos.x - lastGridCenter.x, playerPos.z - lastGridCenter.z);
+    const bHash = baseHash(currentBase);
+    const baseChanged = bHash !== lastBaseHash;
+
+    if (force || ((baseChanged || dist > 12) && (nowSec - lastNavRebuildTime >= 1.0 || !currentNav))) {
+      currentNav = navFor(currentBase, playerPos, 32);
+      lastGridCenter = { x: playerPos.x, z: playerPos.z };
+      lastBaseHash = bHash;
+      lastNavRebuildTime = nowSec;
+    }
+  }
 
   // Helper to load Ogro assets
   async function loadOgroModel(): Promise<{ model: Md2ParsedModel; texture: THREE.Texture }> {
@@ -653,9 +745,113 @@ export function createMonsterMashCombat(options: {
     }
   }
 
+  function createOgroView(m: Mob): MobEntity | null {
+    if (!ogroModelCache || !ogroTextureCache) return null;
+    const { mesh, mixer, actions } = createMd2Mesh(ogroModelCache, ogroTextureCache);
+    const material = createFidelityMobMaterial({ map: ogroTextureCache, stage });
+    mesh.material = material;
+
+    mesh.scale.set(0.045, 0.045, 0.045);
+    mesh.rotation.set(0, -Math.PI / 2, 0);
+    mesh.position.y = 1.444;
+
+    const group = new THREE.Group();
+    group.add(mesh);
+    const y = groundHeightAt(m.x, m.z);
+    group.position.set(m.x, y, m.z);
+
+    const healthBar = createHealthBarCanvas();
+    healthBar.mesh.position.set(0, 4.1, 0);
+    group.add(healthBar.mesh);
+    healthBar.update(m.hp, KINDS.ogro.hp, `OGRO #${m.id}`);
+
+    planetScene.add(group);
+
+    const runAction = actions.get('run');
+    if (runAction && m.state !== 'death') {
+      runAction.reset().play();
+    }
+
+    const view: MobEntity = {
+      id: m.id,
+      kind: 'ogro',
+      group,
+      mesh,
+      mixer,
+      actions,
+      hp: m.hp,
+      maxHp: KINDS.ogro.hp,
+      state: m.state,
+      stateTimer: m.timer,
+      speed: KINDS.ogro.speed,
+      hitRadius: KINDS.ogro.radius,
+      height: KINDS.ogro.height,
+      healthBar,
+      material,
+      painFlash: 0,
+    };
+    return view;
+  }
+
+  function createDemonView(m: Mob): MobEntity | null {
+    if (!demonSpritesCache) return null;
+    const initialTexture = demonSpritesCache.walk[0]!;
+    const material = createFidelityMobMaterial({ map: initialTexture, stage });
+
+    const geo = new THREE.PlaneGeometry(1.8, 2.2);
+    const mesh = new THREE.Mesh(geo, material);
+    mesh.position.y = 1.1;
+
+    const group = new THREE.Group();
+    group.add(mesh);
+    const y = groundHeightAt(m.x, m.z);
+    group.position.set(m.x, y, m.z);
+
+    const healthBar = createHealthBarCanvas();
+    healthBar.mesh.position.set(0, 2.3, 0);
+    group.add(healthBar.mesh);
+    healthBar.update(m.hp, KINDS.demon.hp, `DEMON #${m.id}`);
+
+    planetScene.add(group);
+
+    const view: MobEntity = {
+      id: m.id,
+      kind: 'demon',
+      group,
+      mesh,
+      sprites: demonSpritesCache,
+      animTimer: 0,
+      animIndex: 0,
+      hp: m.hp,
+      maxHp: KINDS.demon.hp,
+      state: m.state,
+      stateTimer: m.timer,
+      speed: KINDS.demon.speed,
+      hitRadius: KINDS.demon.radius,
+      height: KINDS.demon.height,
+      healthBar,
+      material,
+      painFlash: 0,
+    };
+    return view;
+  }
+
+  function syncMobViews(): void {
+    for (const m of sim.mobs) {
+      if (!mobViews.has(m.id)) {
+        const view = m.kind === 'ogro' ? createOgroView(m) : createDemonView(m);
+        if (view) {
+          mobViews.set(m.id, view);
+          particles.burst(view.group.position, 16, m.kind === 'ogro' ? 0xb46bff : 0xef4444, 4.0);
+          audio.playSpawn();
+        }
+      }
+    }
+  }
+
   function setFidelityStage(newStage: number): void {
     stage = Math.max(0, Math.min(4, newStage)) as FidelityStage;
-    for (const mob of mobs) {
+    for (const mob of mobViews.values()) {
       if (mob.material && mob.material.uniforms && mob.material.uniforms['uStage']) {
         mob.material.uniforms['uStage'].value = stage;
       }
@@ -698,79 +894,17 @@ export function createMonsterMashCombat(options: {
 
   async function spawnOgro(count = 1, customPos?: { x: number; z: number }): Promise<void> {
     try {
-      const { model, texture } = await loadOgroModel();
-
-      for (let i = 0; i < count; i++) {
-        const mobId = nextMobId++;
-        const { mesh, mixer, actions } = createMd2Mesh(model, texture);
-
-        const material = createFidelityMobMaterial({ map: texture, stage });
-        mesh.material = material;
-
-        // Scale Ogro and stand upright on ground
-        mesh.scale.set(0.045, 0.045, 0.045);
-        mesh.rotation.set(0, -Math.PI / 2, 0); // Stand upright (Y-up), face forward (+Z)
-        // Offset Y so feet are at ground level (y = 0) inside group
-        // MD2 model min.y is -32.093 units -> 32.093 * 0.045 = 1.4442m
-        mesh.position.y = 1.444;
-
-        const group = new THREE.Group();
-        group.add(mesh);
-
-        // Position on planet ground
-        let x = 0, z = 0;
-        if (customPos) {
-          x = customPos.x + (Math.random() - 0.5) * 4;
-          z = customPos.z + (Math.random() - 0.5) * 4;
-        } else {
-          // Spawn in front of player
-          const camDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-          x = camera.position.x + camDir.x * (7 + Math.random() * 4) + (Math.random() - 0.5) * 5;
-          z = camera.position.z + camDir.z * (7 + Math.random() * 4) + (Math.random() - 0.5) * 5;
+      await loadOgroModel();
+      updateNav(lastPlayerPos, true);
+      if (customPos) {
+        for (let i = 0; i < count; i++) {
+          sim = spawn(sim, currentNav, 'ogro', customPos.x, customPos.z);
         }
-        const y = groundHeightAt(x, z);
-        group.position.set(x, y, z);
-
-        // Health bar positioned above Ogro's head (~3.9m)
-        const healthBar = createHealthBarCanvas();
-        healthBar.mesh.position.set(0, 4.1, 0);
-        group.add(healthBar.mesh);
-        healthBar.update(100, 100, `OGRO #${mobId}`);
-
-        planetScene.add(group);
-
-        const entity: MobEntity = {
-          id: mobId,
-          kind: 'ogro',
-          group,
-          mesh,
-          mixer,
-          actions,
-          hp: 100,
-          maxHp: 100,
-          state: 'chase',
-          stateTimer: 0,
-          speed: 2.8,
-          hitRadius: 1.2,
-          height: 3.9,
-          healthBar,
-          material,
-          painFlash: 0,
-        };
-
-        // Start run animation
-        const runAction = actions.get('run');
-        if (runAction) {
-          runAction.reset();
-          runAction.play();
-        }
-        mobs.push(entity);
-        stats.mobsSpawned++;
-
-        // Particles & Audio
-        particles.burst(group.position, 16, 0xb46bff, 4.0);
-        audio.playSpawn();
+      } else {
+        sim = spawnNear(sim, currentNav, 'ogro', count, lastPlayerPos.x, lastPlayerPos.z, 7, 11);
       }
+      stats.mobsSpawned += count;
+      syncMobViews();
     } catch (err) {
       console.error('Failed to spawn Ogro:', err);
     }
@@ -778,84 +912,84 @@ export function createMonsterMashCombat(options: {
 
   async function spawnDemon(count = 1, customPos?: { x: number; z: number }): Promise<void> {
     try {
-      const sprites = await loadDemonSprites();
-      const initialTexture = sprites.walk[0]!;
-
-      for (let i = 0; i < count; i++) {
-        const mobId = nextMobId++;
-        const material = createFidelityMobMaterial({ map: initialTexture, stage });
-
-        const geo = new THREE.PlaneGeometry(1.8, 2.2);
-        const mesh = new THREE.Mesh(geo, material);
-        mesh.position.y = 1.1;
-
-        const group = new THREE.Group();
-        group.add(mesh);
-
-        let x = 0, z = 0;
-        if (customPos) {
-          x = customPos.x + (Math.random() - 0.5) * 4;
-          z = customPos.z + (Math.random() - 0.5) * 4;
-        } else {
-          const camDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-          x = camera.position.x + camDir.x * (8 + Math.random() * 3) + (Math.random() - 0.5) * 4;
-          z = camera.position.z + camDir.z * (8 + Math.random() * 3) + (Math.random() - 0.5) * 4;
+      await loadDemonSprites();
+      updateNav(lastPlayerPos, true);
+      if (customPos) {
+        for (let i = 0; i < count; i++) {
+          sim = spawn(sim, currentNav, 'demon', customPos.x, customPos.z);
         }
-        const y = groundHeightAt(x, z);
-        group.position.set(x, y, z);
-
-        const healthBar = createHealthBarCanvas();
-        healthBar.mesh.position.set(0, 2.3, 0);
-        group.add(healthBar.mesh);
-        healthBar.update(80, 80, `DEMON #${mobId}`);
-
-        planetScene.add(group);
-
-        const entity: MobEntity = {
-          id: mobId,
-          kind: 'demon',
-          group,
-          mesh,
-          sprites,
-          animTimer: 0,
-          animIndex: 0,
-          hp: 80,
-          maxHp: 80,
-          state: 'chase',
-          stateTimer: 0,
-          speed: 3.2,
-          hitRadius: 0.85,
-          height: 2.0,
-          healthBar,
-          material,
-          painFlash: 0,
-        };
-
-        mobs.push(entity);
-        stats.mobsSpawned++;
-
-        particles.burst(group.position, 16, 0xef4444, 4.0);
-        audio.playSpawn();
+      } else {
+        sim = spawnNear(sim, currentNav, 'demon', count, lastPlayerPos.x, lastPlayerPos.z, 7, 11);
       }
+      stats.mobsSpawned += count;
+      syncMobViews();
     } catch (err) {
       console.error('Failed to spawn Demon:', err);
     }
   }
 
+  function spawnDirect(kind: 'ogro' | 'demon', x: number, z: number): void {
+    updateNav(lastPlayerPos, true);
+    sim = spawn(sim, currentNav, kind, x, z);
+    stats.mobsSpawned++;
+    syncMobViews();
+  }
+
   function clearMobs(): void {
-    for (const mob of mobs) {
+    for (const mob of mobViews.values()) {
       planetScene.remove(mob.group);
       mob.material.dispose();
       mob.healthBar.texture.dispose();
     }
-    mobs.length = 0;
+    mobViews.clear();
+    prevMobs.clear();
+    sim = createSim(options.seed ?? 1337);
+  }
+
+  function resetSim(seed?: number): void {
+    for (const mob of mobViews.values()) {
+      planetScene.remove(mob.group);
+      mob.material.dispose();
+      mob.healthBar.texture.dispose();
+    }
+    mobViews.clear();
+    prevMobs.clear();
+    sim = createSim(seed ?? options.seed ?? 1337);
+    accumulator = 0;
+    currentAmmo = activeWeaponStats?.magazine ?? maxAmmo;
+    if (!equipped) equip(true);
+    updateNav(lastPlayerPos, true);
+  }
+
+  function getSim(): Sim {
+    return sim;
+  }
+
+  function hashSim(): string {
+    return mobsimHash(sim);
+  }
+
+  function getNav(): Nav {
+    return currentNav;
+  }
+
+  function setBase(base: S.Base | null): void {
+    currentBase = base;
+    updateNav(lastPlayerPos, true);
+  }
+
+  function setIsOnPlanet(onPlanet: boolean): void {
+    if (isOnPlanet !== onPlanet) {
+      isOnPlanet = onPlanet;
+      updateNav(lastPlayerPos, true);
+    }
   }
 
   function fire(
-    playerPos?: THREE.Vector3,
-    cameraDir?: THREE.Vector3
+    playerPos?: THREE.Vector3 | { x: number; y: number; z: number },
+    cameraDir?: THREE.Vector3 | { x: number; y: number; z: number }
   ): { fired: boolean; hits: number; damage: number; killed: number; reason?: string } {
-    if (!equipped || cooldownTimer > 0) {
+    if (!equipped || sim.cooldown > 0) {
       return { fired: false, hits: 0, damage: 0, killed: 0 };
     }
 
@@ -870,7 +1004,6 @@ export function createMonsterMashCombat(options: {
 
     currentAmmo--;
     stats.shotsFired++;
-    cooldownTimer = activeWeaponStats.cooldown;
 
     const isBeam = activeWeaponStats.mode === 'beam';
 
@@ -893,157 +1026,89 @@ export function createMonsterMashCombat(options: {
       flashLight.intensity = 3.5;
     }
 
-    let hits = 0;
-    let totalDamage = 0;
-    let killed = 0;
+    const rayOrigin = playerPos
+      ? ('clone' in playerPos ? (playerPos as THREE.Vector3).clone() : new THREE.Vector3(playerPos.x, playerPos.y, playerPos.z))
+      : camera.position.clone();
+    const baseDir = cameraDir
+      ? ('clone' in cameraDir ? (cameraDir as THREE.Vector3).clone().normalize() : new THREE.Vector3(cameraDir.x, cameraDir.y, cameraDir.z).normalize())
+      : new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
 
-    const PELLET_COUNT = activeWeaponStats.pellets;
-    const spreadRad = activeWeaponStats.spread;
-    const maxRange = activeWeaponStats.range;
-    const [minDmg, maxDmg] = activeWeaponStats.damage;
+    const res = mobsimFire(
+      sim,
+      [rayOrigin.x, rayOrigin.y, rayOrigin.z],
+      [baseDir.x, baseDir.y, baseDir.z]
+    );
 
-    const raycaster = new THREE.Raycaster();
-    const rayOrigin = playerPos?.clone() ?? camera.position.clone();
-    const baseDir = cameraDir?.clone() ?? new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    sim = res.sim;
+    stats.pelletsHit += res.hits;
+    stats.damageDealt += res.damage;
+    stats.mobsDefeated += res.killed.length;
 
-    const camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-    const camUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-
-    for (let p = 0; p < PELLET_COUNT; p++) {
-      const spreadX = spreadRad > 0 ? (Math.random() - 0.5) * 2 * spreadRad : 0;
-      const spreadY = spreadRad > 0 ? (Math.random() - 0.5) * 2 * spreadRad : 0;
-      const pelletDir = baseDir.clone()
-        .addScaledVector(camRight, spreadX)
-        .addScaledVector(camUp, spreadY)
-        .normalize();
-
-      raycaster.set(rayOrigin, pelletDir);
-      let closestHit: { mob: MobEntity; dist: number; point: THREE.Vector3 } | null = null;
-
-      for (const mob of mobs) {
-        if (mob.state === 'death') continue;
-
-        // Bounding sphere hit test for performance and reliable registration
-        const mobCenter = mob.group.position.clone().add(new THREE.Vector3(0, mob.height * 0.5, 0));
-        const rayPoint = new THREE.Vector3();
-        raycaster.ray.closestPointToPoint(mobCenter, rayPoint);
-        const distToRay = rayPoint.distanceTo(mobCenter);
-
-        if (distToRay <= mob.hitRadius) {
-          const hitDist = rayOrigin.distanceTo(rayPoint);
-          if (hitDist <= maxRange && (!closestHit || hitDist < closestHit.dist)) {
-            closestHit = { mob, dist: hitDist, point: rayPoint };
-          }
+    if (res.hits > 0) {
+      for (const m of sim.mobs) {
+        if (m.state === 'pain' || res.killed.includes(m.id)) {
+          const view = mobViews.get(m.id);
+          const pt = view
+            ? view.group.position.clone().add(new THREE.Vector3(0, KINDS[m.kind].height * 0.5, 0))
+            : new THREE.Vector3(m.x, groundHeightAt(m.x, m.z) + 1, m.z);
+          particles.burst(pt, 8, isBeam ? 0x06b6d4 : 0xff3b30, 4.5);
         }
       }
-
-      if (closestHit) {
-        hits++;
-        stats.pelletsHit++;
-        const pelletDmg = Math.floor(minDmg + Math.random() * (maxDmg - minDmg + 1));
-        totalDamage += pelletDmg;
-        stats.damageDealt += pelletDmg;
-
-        const mob = closestHit.mob;
-        mob.hp = Math.max(0, mob.hp - pelletDmg);
-        mob.painFlash = 0.15;
-        mob.healthBar.update(mob.hp, mob.maxHp, `${mob.kind.toUpperCase()} #${mob.id}`);
-
-        // Blood / spark burst at hit point
-        particles.burst(closestHit.point, 6, isBeam ? 0x06b6d4 : 0xff3b30, 4.5);
-
-        if (mob.hp <= 0 && mob.state !== 'death') {
-          // Death!
-          mob.state = 'death';
-          mob.stateTimer = 0;
-          mob.animIndex = 0;
-          mob.animTimer = 0;
-          killed++;
-          stats.mobsDefeated++;
-          audio.playDeathRoar();
-
-          mob.healthBar.mesh.visible = false;
-          if (mob.kind === 'demon') {
-            mob.mesh.rotation.set(-Math.PI / 2, 0, 0);
-            mob.mesh.position.y = 0.06;
-          }
-
-          if (mob.actions) {
-            mob.actions.get('run')?.stop();
-            mob.actions.get('attack')?.stop();
-            mob.actions.get('pain_a')?.stop();
-            const deathAction = mob.actions.get('death_a');
-            if (deathAction) {
-              deathAction.reset();
-              deathAction.setLoop(THREE.LoopOnce, 1);
-              deathAction.clampWhenFinished = true;
-              deathAction.play();
-            }
-          }
-
-          // Ore loot reward
-          const oreReward = 50;
-          stats.oreCollected += oreReward;
-          onOreGathered?.(oreReward);
-          audio.playOreChime();
-          particles.burst(mob.group.position, 24, 0x10b981, 5.0);
-        } else if (mob.state !== 'death') {
-          // Flinch / Pain
-          mob.state = 'pain';
-          mob.stateTimer = 0.32;
-          mob.animIndex = 0;
-          mob.animTimer = 0;
-          audio.playPainGrunt();
-          if (mob.actions) {
-            mob.actions.get('run')?.stop();
-            mob.actions.get('attack')?.stop();
-            const painAction = mob.actions.get('pain_a') ?? mob.actions.get('pain_b');
-            if (painAction) {
-              painAction.reset();
-              painAction.setLoop(THREE.LoopOnce, 1);
-              painAction.play();
-            }
-          }
-          // Pushback away from blast
-          mob.group.position.addScaledVector(pelletDir, 0.45);
-        }
-      } else {
-        // Check ground impact
-        for (let d = 2; d < Math.min(45, maxRange); d += 0.8) {
-          const pt = rayOrigin.clone().addScaledVector(pelletDir, d);
-          const gy = groundHeightAt(pt.x, pt.z);
-          if (pt.y <= gy) {
-            particles.burst(new THREE.Vector3(pt.x, gy + 0.05, pt.z), 3, isBeam ? 0x06b6d4 : 0xf59e0b, 2.5);
-            break;
-          }
+    } else {
+      const maxRange = activeWeaponStats.range ?? 60;
+      for (let d = 2; d < Math.min(45, maxRange); d += 1.2) {
+        const pt = rayOrigin.clone().addScaledVector(baseDir, d);
+        const gy = groundHeightAt(pt.x, pt.z);
+        if (pt.y <= gy) {
+          particles.burst(new THREE.Vector3(pt.x, gy + 0.05, pt.z), 3, isBeam ? 0x06b6d4 : 0xf59e0b, 2.5);
+          break;
         }
       }
     }
 
-    return { fired: true, hits, damage: totalDamage, killed };
+    if (res.killed.length > 0) {
+      const oreReward = 50 * res.killed.length;
+      stats.oreCollected += oreReward;
+      onOreGathered?.(oreReward);
+      audio.playOreChime();
+    }
+
+    return { fired: true, hits: res.hits, damage: res.damage, killed: res.killed.length };
   }
 
   function getMobList(): readonly MobStatus[] {
-    return mobs.map((m) => ({
-      id: m.id,
-      kind: m.kind,
-      hp: m.hp,
-      maxHp: m.maxHp,
-      state: m.state,
-      pos: { x: m.group.position.x, y: m.group.position.y, z: m.group.position.z },
-    }));
+    return sim.mobs.map((m) => {
+      const view = mobViews.get(m.id);
+      const y = view ? view.group.position.y : groundHeightAt(m.x, m.z);
+      return {
+        id: m.id,
+        kind: m.kind,
+        hp: m.hp,
+        maxHp: KINDS[m.kind].hp,
+        state: m.state,
+        pos: { x: m.x, y, z: m.z },
+      };
+    });
   }
 
   function getStats(): CombatStats {
     return { ...stats };
   }
 
+  function step(player?: { x: number; z: number }): void {
+    const p = player ?? lastPlayerPos;
+    lastPlayerPos = p;
+    updateNav(p);
+    for (const m of sim.mobs) {
+      prevMobs.set(m.id, { x: m.x, z: m.z, state: m.state, hp: m.hp });
+    }
+    sim = mobsimStep(sim, currentNav, p);
+  }
+
   function update(dt: number, playerPos: THREE.Vector3, isMoving: boolean): void {
     particles.update(dt);
-
-    if (cooldownTimer > 0) {
-      cooldownTimer = Math.max(0, cooldownTimer - dt);
-    }
+    lastPlayerPos = { x: playerPos.x, z: playerPos.z };
+    updateNav(lastPlayerPos);
 
     // Flash light & muzzle quad fade
     if (flashTimer > 0) {
@@ -1071,25 +1136,62 @@ export function createMonsterMashCombat(options: {
       viewmodelGroup.rotation.set(recoilPitch, -0.06, 0);
     }
 
-    // Update active mobs
-    for (let i = mobs.length - 1; i >= 0; i--) {
-      const mob = mobs[i]!;
+    // Advance mob simulation at fixed 30 Hz DT (cap 5 steps a frame)
+    accumulator += dt;
+    const MAX_STEPS = 5;
+    let steps = 0;
+    while (accumulator >= DT && steps < MAX_STEPS) {
+      for (const m of sim.mobs) {
+        prevMobs.set(m.id, { x: m.x, z: m.z, state: m.state, hp: m.hp });
+      }
+      sim = mobsimStep(sim, currentNav, lastPlayerPos);
+      accumulator -= DT;
+      steps++;
+    }
+    if (steps >= MAX_STEPS) {
+      accumulator = 0;
+    }
+
+    const alpha = Math.min(1, Math.max(0, accumulator / DT));
+
+    // Ensure any newly appeared mob IDs have views
+    syncMobViews();
+
+    // Render each mob interpolated between previous and current state
+    for (const m of sim.mobs) {
+      const mob = mobViews.get(m.id);
+      if (!mob) continue;
 
       // Animation mixer for 3D MD2 Ogro
       if (mob.mixer) {
         mob.mixer.update(dt);
       }
 
-      // Orientation and billboarding:
+      // Pain flash fade
+      if (mob.painFlash > 0) {
+        mob.painFlash -= dt;
+      }
+
+      // Interpolate position
+      if (m.state === 'death') {
+        const cy = groundHeightAt(m.x, m.z);
+        mob.group.position.set(m.x, cy, m.z);
+      } else {
+        const prev = prevMobs.get(m.id) ?? { x: m.x, z: m.z, state: m.state, hp: m.hp };
+        const ix = prev.x + (m.x - prev.x) * alpha;
+        const iz = prev.z + (m.z - prev.z) * alpha;
+        const iy = groundHeightAt(ix, iz);
+        mob.group.position.set(ix, iy, iz);
+      }
+
+      // Update orientation and billboarding
       if (mob.kind === 'demon') {
         mob.group.rotation.set(0, 0, 0);
-        if (mob.state === 'death') {
-          // Fallen flat on the ground as a horizontal plane
+        if (m.state === 'death') {
           mob.mesh.rotation.set(-Math.PI / 2, 0, 0);
           mob.mesh.position.y = 0.06;
           mob.healthBar.mesh.visible = false;
         } else {
-          // Standing upright with cylindrical yaw billboarding facing camera
           mob.mesh.position.y = 1.1;
           const camDx = camera.position.x - mob.group.position.x;
           const camDz = camera.position.z - mob.group.position.z;
@@ -1098,18 +1200,83 @@ export function createMonsterMashCombat(options: {
           mob.healthBar.mesh.visible = true;
         }
       } else {
-        if (mob.state === 'death') {
+        if (m.state === 'death') {
           mob.healthBar.mesh.visible = false;
         } else {
+          const dx = playerPos.x - mob.group.position.x;
+          const dz = playerPos.z - mob.group.position.z;
+          const targetYaw = Math.atan2(dx, dz);
+          mob.group.rotation.y = THREE.MathUtils.lerp(mob.group.rotation.y, targetYaw, Math.min(1, dt * 8));
           mob.healthBar.mesh.quaternion.copy(camera.quaternion);
           mob.healthBar.mesh.visible = true;
         }
       }
 
-      // Update DOOM Demon sprite sequences
+      // Synchronize HP and health bar
+      if (mob.hp !== m.hp) {
+        mob.hp = m.hp;
+        mob.healthBar.update(m.hp, mob.maxHp, `${mob.kind.toUpperCase()} #${mob.id}`);
+      }
+
+      // Handle state changes and trigger animations / sounds
+      if (mob.state !== m.state) {
+        mob.state = m.state;
+        mob.animIndex = 0;
+        mob.animTimer = 0;
+
+        if (m.state === 'pain') {
+          mob.painFlash = 0.15;
+          audio.playPainGrunt();
+          if (mob.actions) {
+            mob.actions.get('run')?.stop();
+            mob.actions.get('attack')?.stop();
+            const painAction = mob.actions.get('pain_a') ?? mob.actions.get('pain_b');
+            if (painAction) {
+              painAction.reset();
+              painAction.setLoop(THREE.LoopOnce, 1);
+              painAction.play();
+            }
+          }
+        } else if (m.state === 'attack') {
+          audio.playAttackBite();
+          if (mob.actions) {
+            mob.actions.get('run')?.stop();
+            mob.actions.get('pain_a')?.stop();
+            mob.actions.get('attack')?.reset().play();
+          }
+        } else if (m.state === 'chase') {
+          if (mob.actions) {
+            mob.actions.get('attack')?.stop();
+            mob.actions.get('pain_a')?.stop();
+            mob.actions.get('run')?.reset().play();
+          }
+        } else if (m.state === 'death') {
+          audio.playDeathRoar();
+          mob.healthBar.mesh.visible = false;
+          if (mob.kind === 'demon') {
+            mob.mesh.rotation.set(-Math.PI / 2, 0, 0);
+            mob.mesh.position.y = 0.06;
+          }
+          if (mob.actions) {
+            mob.actions.get('run')?.stop();
+            mob.actions.get('attack')?.stop();
+            mob.actions.get('pain_a')?.stop();
+            const deathAction = mob.actions.get('death_a');
+            if (deathAction) {
+              deathAction.reset();
+              deathAction.setLoop(THREE.LoopOnce, 1);
+              deathAction.clampWhenFinished = true;
+              deathAction.play();
+            }
+          }
+          particles.burst(mob.group.position, 24, 0x10b981, 5.0);
+        }
+      }
+
+      // Update DOOM Demon sprite frames
       if (mob.kind === 'demon' && mob.sprites) {
         let targetTex: THREE.Texture | null = null;
-        if (mob.state === 'death') {
+        if (m.state === 'death') {
           mob.animTimer = (mob.animTimer ?? 0) + dt;
           if (mob.animTimer >= 0.14) {
             mob.animTimer = 0;
@@ -1118,14 +1285,14 @@ export function createMonsterMashCombat(options: {
             }
           }
           targetTex = mob.sprites.death[mob.animIndex ?? 0] ?? null;
-        } else if (mob.state === 'pain') {
+        } else if (m.state === 'pain') {
           targetTex = mob.sprites.pain[0] ?? null;
-        } else if (mob.state === 'attack') {
+        } else if (m.state === 'attack') {
           mob.animTimer = (mob.animTimer ?? 0) + dt;
           if (mob.animTimer >= 0.18) {
             mob.animTimer = 0;
-            const prev = mob.animIndex ?? 0;
-            mob.animIndex = (prev + 1) % mob.sprites.attack.length;
+            const prevIdx = mob.animIndex ?? 0;
+            mob.animIndex = (prevIdx + 1) % mob.sprites.attack.length;
             if (mob.animIndex === 1) {
               audio.playAttackBite();
             }
@@ -1151,73 +1318,6 @@ export function createMonsterMashCombat(options: {
           }
         }
       }
-
-      // Pain flash fade
-      if (mob.painFlash > 0) {
-        mob.painFlash -= dt;
-      }
-
-      if (mob.state === 'death') {
-        mob.stateTimer += dt;
-        // Keep dead corpse on ground
-        continue;
-      }
-
-      const dx = playerPos.x - mob.group.position.x;
-      const dz = playerPos.z - mob.group.position.z;
-      const dist = Math.hypot(dx, dz);
-
-      if (mob.state === 'pain') {
-        mob.stateTimer -= dt;
-        if (mob.stateTimer <= 0) {
-          mob.state = 'chase';
-          mob.animIndex = 0;
-          mob.animTimer = 0;
-          if (mob.actions) {
-            mob.actions.get('pain_a')?.stop();
-            mob.actions.get('run')?.reset().play();
-          }
-        }
-      } else if (mob.state === 'chase') {
-        // Rotate towards player (3D Ogro only; Demon billboarding faces camera)
-        const targetYaw = Math.atan2(dx, dz);
-        if (mob.kind === 'ogro') {
-          mob.group.rotation.y = THREE.MathUtils.lerp(mob.group.rotation.y, targetYaw, Math.min(1, dt * 8));
-        }
-
-        if (dist > 2.2) {
-          // Walk towards player
-          const moveSpeed = mob.speed * dt;
-          mob.group.position.x += Math.sin(targetYaw) * moveSpeed;
-          mob.group.position.z += Math.cos(targetYaw) * moveSpeed;
-          mob.group.position.y = groundHeightAt(mob.group.position.x, mob.group.position.z);
-        } else {
-          // In attack range!
-          mob.state = 'attack';
-          mob.animIndex = 0;
-          mob.animTimer = 0;
-          if (mob.actions) {
-            mob.actions.get('run')?.stop();
-            mob.actions.get('attack')?.reset().play();
-          }
-        }
-      } else if (mob.state === 'attack') {
-        // Face player while attacking (3D Ogro only)
-        const targetYaw = Math.atan2(dx, dz);
-        if (mob.kind === 'ogro') {
-          mob.group.rotation.y = THREE.MathUtils.lerp(mob.group.rotation.y, targetYaw, Math.min(1, dt * 8));
-        }
-
-        if (dist > 2.8) {
-          mob.state = 'chase';
-          mob.animIndex = 0;
-          mob.animTimer = 0;
-          if (mob.actions) {
-            mob.actions.get('attack')?.stop();
-            mob.actions.get('run')?.reset().play();
-          }
-        }
-      }
     }
   }
 
@@ -1233,6 +1333,7 @@ export function createMonsterMashCombat(options: {
     fire,
     spawnOgro,
     spawnDemon,
+    spawnDirect,
     clearMobs,
     setFidelityStage,
     getMobList,
@@ -1243,5 +1344,12 @@ export function createMonsterMashCombat(options: {
     getWeaponStats,
     update,
     dispose,
+    setBase,
+    setIsOnPlanet,
+    getSim,
+    hashSim,
+    resetSim,
+    getNav,
+    step,
   };
 }

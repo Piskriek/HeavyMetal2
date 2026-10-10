@@ -23,6 +23,7 @@ import { loadScientistAnimations, type ClipName } from '../avatar/scientist/anim
 import { createScientistAnimator, type OneShotKind, type ScientistAnimator } from '../avatar/scientist/animator';
 import { createMonsterMashCombat, type MonsterMashCombatManager } from './monster-mash-combat';
 import * as F from '@hm/substrate';
+import * as S from '@hm/structure';
 import type { Kind } from '@hm/structure';
 import { globalKitPieceCache } from '../base/kit-pieces';
 import { beamEffect, type BeamFx, type BeamMode } from '@hm/beamkit';
@@ -137,6 +138,8 @@ export interface PlayScene {
   placePieceGhost(pose: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number } | null, tint: 'grounded' | 'ok' | 'weak' | 'bad'): void;
   /** Placed base pieces group for aim raycasting. */
   setPieces(group: THREE.Group | null): void;
+  /** Sets the base structure for ground navigation and mob pathfinding. */
+  setBase(base: S.Base | null): void;
   setWalkWorld(walkWorld: WalkWorld | null): void;
   setSocketRings(poses: readonly { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }[]): void;
   setPlanGhosts(ghosts: readonly { readonly kind: Kind; readonly at: { readonly x: number; readonly y: number; readonly z: number }; readonly yaw: number }[]): void;
@@ -204,8 +207,8 @@ export interface PlayScene {
     plumeGlowCount(): number;
     pixelLightCount(): number;
     testPieceAim(pieceId: number): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null;
-    setAltCam?: (eye: { readonly x: number; readonly y: number; readonly z: number }, pitch: number, yaw: number) => void;
-    clearAltCam?: () => void;
+    setAltCam(eye: { readonly x: number; readonly y: number; readonly z: number }, pitch: number, yaw: number): void;
+    clearAltCam(): void;
   };
   dispose(): void;
 }
@@ -1241,6 +1244,9 @@ export function createPlayScene(o: {
         planetScene.add(piecesGroup);
       }
     },
+    setBase(base) {
+      mash.setBase(base);
+    },
     setWalkWorld(walkWorld) {
       activeWalkWorld = walkWorld;
     },
@@ -1705,8 +1711,11 @@ export function createPlayScene(o: {
       beamFx.update(now);
       holoUniforms.uTime.value = now;
       if (where === 'planet') {
+        mash.setIsOnPlanet(true);
         const isMoving = Math.abs(c.move.x) > 0.01 || Math.abs(c.move.z) > 0.01;
         mash.update(dt, pos, isMoving);
+      } else {
+        mash.setIsOnPlanet(false);
       }
       postUniforms.uTime.value = now;
       socketRingMat.opacity = 0.45 + 0.4 * Math.sin(now * 5.0);

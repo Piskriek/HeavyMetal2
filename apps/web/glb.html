@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GLB Review</title>
+<style>
+  :root { --bg: #0b0e13; --ink: #e6edf3; --dim: #8b949e; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 13px/1.4 Inter, system-ui, sans-serif; }
+  #bar { position: fixed; left: 12px; top: 10px; z-index: 2; background: rgba(13,17,23,.85); border: 1px solid rgba(255,255,255,.12); padding: 8px 12px; border-radius: 6px; }
+  #bar b { font-family: Oxanium, monospace; letter-spacing: .04em; }
+  #bar span { color: var(--dim); }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<div id="bar"><b>GLB REVIEW</b> <span id="info">loading…</span></div>
+<script type="module" src="/src/dev/glb.ts"></script>
+</body>
+</html>

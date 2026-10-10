@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mentor Radio</title>
+<style>
+  :root { --bg: #0b0e13; --panel: rgba(13,17,23,.88); --ink: #e6edf3; --dim: #8b949e; --line: rgba(255,255,255,.12); --glow: #3fdc8c; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: radial-gradient(1200px 600px at 50% -10%, #17322a 0%, var(--bg) 60%); color: var(--ink); font: 14px/1.45 Inter, system-ui, sans-serif; }
+  main { max-width: 560px; margin: 48px auto; padding: 0 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px 22px; box-shadow: 0 0 0 1px rgba(63,220,140,.06), 0 18px 50px rgba(0,0,0,.45); }
+  h1 { margin: 0 0 4px; font: 600 15px/1 Oxanium, ui-monospace, monospace; letter-spacing: .14em; color: var(--glow); text-shadow: 0 0 12px rgba(63,220,140,.45); }
+  p.sub { margin: 0 0 18px; color: var(--dim); font-size: 12.5px; }
+  label { display: grid; grid-template-columns: 110px 1fr 36px; align-items: center; gap: 12px; margin: 10px 0; color: var(--dim); font-size: 12.5px; }
+  label output { color: var(--ink); font-variant-numeric: tabular-nums; text-align: right; }
+  input[type=range] { width: 100%; accent-color: var(--glow); }
+  select { width: 100%; background: #0f141b; color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font: inherit; }
+  .check { grid-template-columns: 110px 1fr; }
+  .row { display: flex; gap: 10px; margin-top: 18px; }
+  button { flex: 1; background: #0f1a16; color: var(--glow); border: 1px solid rgba(63,220,140,.45); border-radius: 6px; padding: 10px 0; font: 600 13px Oxanium, ui-monospace, monospace; letter-spacing: .12em; cursor: pointer; transition: background .15s, box-shadow .15s; }
+  button:hover { background: #12271f; box-shadow: 0 0 14px rgba(63,220,140,.25); }
+  button.ghost { color: var(--dim); border-color: var(--line); background: transparent; }
+  #state { margin-top: 14px; color: var(--dim); font-size: 12px; min-height: 1.2em; }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <h1>MENTOR RADIO · AUDITION</h1>
+    <p class="sub">The clean voice file through a field-radio chain, over the static and music beds. Music ducks under her lines.</p>
+    <label class="check">Line <select id="line"></select></label>
+    <label>Voice <input id="vo" type="range" min="0" max="100" value="80" /><output id="vo-v"></output></label>
+    <label>Static <input id="static" type="range" min="0" max="100" value="30" /><output id="static-v"></output></label>
+    <label>Music <input id="music" type="range" min="0" max="100" value="45" /><output id="music-v"></output></label>
+    <label>Overdrive <input id="drive" type="range" min="0" max="100" value="25" /><output id="drive-v"></output></label>
+    <label class="check">Radio filter <span><input id="radio" type="checkbox" checked /></span></label>
+    <div class="row"><button id="play">▶ PLAY</button><button id="stop" class="ghost">■ STOP</button></div>
+    <div id="state"></div>
+  </div>
+</main>
+<script type="module" src="/src/dev/radio.ts"></script>
+</body>
+</html>

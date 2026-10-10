@@ -918,3 +918,18 @@ in 04/05).
 **Revision 5:** the hauler S1 is redrawn to the revised S6 design: a rectangular storage bin with the small finned link dish, and no beam. No piece on sheet 19 now has a beam. Old S1 renders are in `panels/19/rejected/` (`19-hauler-s1-rev1`, `19-hauler-s1-rev2`).
 
 **Accepted (lead engineer, 2026-10-10):** sheet 19 after revisions 4 and 5. The S1 hauler's dish is a small flat disc where the S6 has an upright finned dish; that is a style gap at S1 only. The meshes follow the S6.
+---
+
+## 20 · sheet-weapons — the weapon bench and the modular weapon
+
+**For:** the art direction for the modular weapon: ONE frame with FOUR part slots (core, barrel, sight, cell). Parts are crafted at a Weapon Bench and swapped in the field. Lab family kit: gunmetal and slate paint, hazard bands, amber lamp style. Three pieces, continuing sheets 13 to 19.
+
+**Pieces so far:** 38 weapon bench (2.4 x 1.2 m, 0.95 m high, braced legs; padded jig clamp holding the frame, pegboard of tools and parts, a parts printer box with its door shut and a green lamp, a power cable down a leg into a ribbed floor cover; a scientist at the bench for scale) · 39 weapon frame, bare (side-on on a neutral backdrop; four empty mounts: core, barrel, sight, cell; grip, long stock, hazard band on the trigger guard, amber lamp) · 40 part variants (pending: 3 cores, 3 barrels, 3 sights, 2 cells, each drawn at S1 and S6 on the frame).
+
+**Panels:** `panels/20/20-bench-s1.png`, `20-bench-s6.png`, `20-frame-s1.png`, `20-frame-s6.png`. `panels/20/rejected/` keeps the frame S6 renders that failed review (`20-frame-s6-rev1`, `-rev2`, `-rev3`). Prompts in `panels/20/prompts.txt`. The sheet `20-sheet-weapons.png` is not yet composed, because piece 40 is pending.
+
+**Batch 2 status:** the S1 full set and nine S6 part variants are drawn. Kept: barrel short (S6). Rejected: core beam (S6, `panels/20/rejected/20-core-beam-s6-rev1.png`). Pending full-size review: the other eight. Still to draw: the two cell variants. The sheet is not yet composed.
+
+**Sheet 20 status (complete):** `20-sheet-weapons.png` (3840x1960) shows the weapon bench (38) and the bare frame (39) at S1 and S6, then the part variants (40): three cores (semi-auto, burst, beam), three barrels (short, long, scatter), three sights (iron, scope, holo), two cells (compact, extended), each fitted to the kept S6 frame, and the S1 full set (semi-auto, long barrel, scope, compact cell). Rejected renders are in `panels/20/rejected/` (`20-core-semi-s6-rev1`, `20-core-beam-s6-rev1`, `20-barrel-scatter-s6-rev1`, `20-full-s1-rev1`, `20-frame-s6-rev1` to `-rev3`). Composed by `tools/compose20.sh`. Note: the S1 full set's compact cell sits slightly below the underside, where the S6 cell is flush.
+
+**Accepted (lead engineer, 2026-10-10):** sheet 20. Notes for the mesh brief: the burst core's top housing and the beam core's front shroud must read as receivers (seated in the core well), not as a rail accessory or a barrel shroud. The "S1 full set" panel renders closer to S6 than to chunky low poly; take the S1 look from 20-frame-s1.

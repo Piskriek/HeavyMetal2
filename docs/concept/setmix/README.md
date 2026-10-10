@@ -24,6 +24,7 @@ decisions outrank everything; `gdd.ts` names are an undecided idea menu).
 | 14 | `14-outpost-stage-3.png` | scene — a sealed four-cell outpost at stage 3, mill on its pad, cables in floor covers, gate on the horizon |
 | 15 | `15-sheet-base-roofs-openings.png` | design sheet — 16 pieces (12–27): roofs, corners, ridge, gable, half and window walls, doorframe, interior door, stairs, ladder, railing, brace, life-support unit, airlock vestibule; S1/S6, same design at both stages |
 | 16 | `16-outpost-roofed.png` | scene — the stage-3 outpost grown by two cells: pitched roof, gable end, window wall, outside stair to a railed deck, mill on its pad, gate and Earth |
+| 17 | `17-sheet-heavy-terraformers.png` | design sheet — the three heavy terraformers (28 shape press, 29 light projector, 30 water maker), S1/S6, each on the sheet 13 hardpoint socket |
 | — | `contact-sheet.jpg` | all 12, numbered |
 
 Supporting material (tracked for reproducibility): `panels/12/` — the 16 panel

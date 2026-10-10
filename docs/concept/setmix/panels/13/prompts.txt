@@ -54,3 +54,5 @@ SCENE 14 (rev 3): the four-cell sealed outpost, see README section 14 (verbatim 
 REVISION 3b (review of rev-3 S6 renders): five S6 renders came back with baked text (labels, unit codes, logos, "STAGE 6", "LOAD CAP"). Every S6 prompt now also carries this clause, verbatim, after the W6 wrapper:
 "NO lettering, NO words, NO numbers, NO logos, NO stencils, NO labels, NO signs anywhere on any surface: plain blank painted steel and ceramic only."
 Rejected rev-3 files are kept in rejected/ (*-rev3-baked-text.png). Still to redraw with the clause: hardpoint-empty-s6, pylon-s6 (top ring as in S1, no label on the distribution box), foundation-s6, wall-s6, floor-s6, and bin-s6 (its dish must match the S1 dish: no fins).
+
+REVISION 3c (redraw pass). Every S6 prompt = W6 (rev 3) + the no-lettering clause (rev 3b) + the piece paragraph. Pieces redrawn: hardpoint-empty-s6, pylon-s6, bin-s6 (plain dish, NO fins, to match S1), foundation-s6, wall-s6, floor-s6, ramp-s6 (clean, no rust), airlock-s6 (clean wall, no rust, light wear at most), drafting-s6 (flat horizontal top, to match S1).

@@ -48,3 +48,20 @@ REVISION (review of 14, 17, 18 and 19 pairs):
 - 17 gable: the S1 lacked the hazard-striped foot band. Redo with the band on the S1 as well.
 - 18 half wall: the S1 showed a 2x4 panel grid; the S6 showed 1x4. Specify ONE row of four panels, 1.5 m tall, in both.
 - 15 inner corner and 19 window wall: kept as drawn.
+
+REVISION (review of batch 3):
+- 14 outer corner, 17 gable, 20 doorframe: kept as drawn.
+- 18 half wall S6: rejected for small warning triangles and a logo-like emblem on the panels. Redraw with plain blank panels; the S1 stays.
+- 21 interior door S6: rejected for a small label-like plate on the wall. Redraw with a plain wall; the S1 stays.
+
+REVISION (review of batch 4):
+- 18 half wall, 22 stairs, 24 railing: kept as drawn.
+- 21 interior door S6: rejected again. It drew a freestanding frame with an overhead track, not a wall with a door. Redraw as a 4 m wall panel with the sliding door set in it, as the S1.
+- 23 ladder S6: rejected. It sat on a building with a shelter roof; the S1 is a single wall panel with a top flange. Redraw as the S1: a single wall panel, no building, no roof.
+- 25 brace S6: rejected. It had a plain block at the foot and no hazard strut; the S1 has a wall at the foot and a hazard-striped strut. Redraw to match the S1.
+
+BRANCH RECONCILIATION (rebase onto d7e1643, the owner's review commit):
+- Half wall (18): KEPT the batch-4 pair (S1 single row of four, batch 3; S6 single row of four with hazard foot band, batch 4). Passed side-by-side. The owner's copy in d7e1643 is superseded.
+- Window wall (19): KEPT the batch-2 pair (3x2 panels, viewport, hazard foot, no markings). Passed side-by-side in both stages. The owner's copy in rejected/ is kept as the record of that review.
+- Outer corner (14), gable (17), doorframe (20): kept as drawn in batches 3-4.
+- Owner's rejected/ folder restored to d7e1643. My older rejects are in rejected/review-batch/.

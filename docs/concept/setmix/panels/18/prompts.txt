@@ -1,0 +1,46 @@
+SHEET 18 — pressure and the starter shelter (pieces 31 to 33), continuing sheets 13, 15 and 17. Source brief: docs/prompts/art/life-support-sheet18.md (feat, 1c1cd72). Two owner-approved systems: a sealed room only stops the sync drain while a powered LIFE-SUPPORT UNIT runs inside it; a new player gets a free one-cell STARTER SHELTER placed in one action.
+
+Rules for every panel: one design drawn twice. S1 and S6 use the SAME piece description; only the wrapper differs. Walls, roofs and floors use the sheet 13 and 15 kit (flat steel panels, lattice corner joints, hazard-striped edges, 21-degree low roof). Nothing floats: feet, skirts, plinths and bolts are visible. Cables run in low ribbed steel floor covers or wall conduits. NO chimneys, NO stacks, NO smokestacks, NO exhaust pipes. No lettering on any surface. Review each S1/S6 pair side by side before keeping it.
+
+W1 (stage-1 wrapper, every 18 panel):
+A realtime 3D GAME ENGINE SCREENSHOT, Blender/Unity style render at stage-1 low-poly fidelity: flat-shaded triangle meshes, a restricted palette of about 16 flat colours, soft physically-based lighting, gentle ambient occlusion, clean anti-aliased edges — STRICTLY a 3D render, absolutely NO line art, NO black contour outlines, NO cel shading, NOT a cartoon or illustration. No text, no UI, no watermark, NO lettering, NO numerals, NO symbols on any surface. ONE single image: one render, one camera, NOT a split-screen, NOT a diptych, NOT a multi-view sheet. Soft key light from frame right, one soft shadow.
+
+W6 (stage-6 wrapper, every 18 panel):
+Photorealistic 3D render — a videogame base-building design study at STAGE 6 fidelity: the SAME piece as its stage-1 version, identical silhouette, parts and proportions, rendered at full PBR materials, clean painted steel and ceramic, crisp decals, light honest wear at most; in service and freshly maintained — NO rust, NO peeling, NO ruin, NO decay. The ground is a lush terraformed plot: green grass, clover and small wildflowers at the feet of the piece; soft blue sky with a few thin clouds; warm low sun from frame right. ONE single image: one render, one camera, NOT a split-screen, NOT a diptych, NOT a multi-view sheet. No text, no UI, no watermark. NOT a cartoon, NOT low poly.
+
+CLAUSE (every S1 and S6 prompt): NO lettering, NO words, NO numbers, NO logos, NO stencils, NO labels, NO signs anywhere on any surface: plain blank painted steel and ceramic only.
+
+P-31 LIFE-SUPPORT UNIT (lifesupport): a floor-standing life-support unit about 1.9 metres tall, 1.1 metres wide and 0.7 metres deep, on a bolted base plate on a foundation slab, set against a flat steel interior wall panel (a sheet 13 wall, with lattice corner joints) inside a small room. Front face, from low to high: a LOUVRED INTAKE GRILLE near the bottom; in the middle, a row of THREE swappable SCRUBBER CANISTERS (tall cylinders) behind one CLEAR WINDOW; a PRESSURE DIAL (round gauge, needle, no numerals) on the front; a STATUS LIGHT BAR along the top of the front face, lit GREEN. A small square FAN HOUSING sits on top with a grille. An OXYGEN BOTTLE (a squat cylinder) is strapped to one side with two steel bands. A POWER cable (black) and a DATA cable (grey) run from the base in a low ribbed steel floor cover and rise into a vertical WALL CONDUIT on the wall behind the unit. A hazmat scientist, 1.8 metres tall, stands beside the unit for scale. No pixels of any colour: the unit emits nothing; no pipes going up, no chimney, no stack.
+
+P-32 AIRLOCK VESTIBULE (vestibule): a one-cell entry room, 4 by 4 metres and 3 metres tall, shown as a CUTAWAY: the near wall and the roof are removed, so the interior is open and both doors are visible. Two side walls and the far wall form the room. In the far wall, the OUTER AIRLOCK: a sealed thick round-cornered door with a dark rubber pressure seal ring. Opposite it, on the inner wall, a second airlock door into the base, same design. Between the doors, a wall-mounted PRESSURE PANEL with one big round CYCLE BUTTON (plain, no lettering). A WARNING BEACON over each door: the outer beacon lit AMBER, the inner beacon lit GREEN. The floor is steel GRATING with a central floor DRAIN in a low ribbed cover. A steel SUIT HOOK is on the side wall. The room sits on a foundation slab with hazard-striped threshold steps. No pixels, no lamps other than the two beacons and the panel.
+
+P-33 STARTER SHELTER (shelter): one 4 by 4 metre cell on a grey foundation slab about 0.5 metres thick, its levelling SKIRT sunk into the ground, hazard-striped top edge. Three plain flat steel WALL panels, 3 metres tall, with lattice corner joints, and one AIRLOCK wall with a sealed round door and a status light. A LOW ROOF of standing-seam steel sloping about 21 degrees, its low edge on a 1.5 metre half wall and its high edge on a steel post, the same roof as sheet 15. Inside the cell: a LIFE-SUPPORT UNIT (the P-31 unit, same design) and a DRAFTING TABLE (a waist-high steel bench with a sloped top). Outside by the door, a squat plain steel BIN on four bolted feet. One cable runs from the cell's base in a low ribbed steel floor cover. The shelter is humble, sturdy and obviously expandable.
+
+S1 SCENE (shelter, stage 1): the piece stands outside on the GREY STAGE-1 MOON: flat grey regolith, low grey hills, dark sky, no vegetation, desolate. Beside it, on the left horizon, the GATE PORTAL: a chunky steel door frame standing free, with ribbed amber coil blocks, for scale of place. The walls are closed; the airlock door is shut.
+
+S6 SCENE (shelter, stage 6): the SAME shelter on the lush terraformed plot, shown as a CUTAWAY: the roof is removed entirely and is not shown anywhere in the frame, so the four walls stand open at the top; the life-support unit and the drafting table are visible inside the cell. The bin stands outside by the door.
+
+PIECE LINES (per panel):
+- S1 lifesupport: W1 + P-31 + "ONE piece alone in a small room, three-quarter view, filling about two thirds of frame height; the wall and floor are the only other parts of the room; the hazmat scientist stands beside the unit".
+- S6 lifesupport: W6 + the clause + P-31 + the same framing as S1.
+- S1 vestibule: W1 + P-32 + "three-quarter view of the cutaway room, filling about two thirds of frame height".
+- S6 vestibule: W6 + the clause + P-32 + the same framing.
+- S1 shelter: W1 + P-33 + S1 SCENE + "three-quarter view of the shelter, filling about two thirds of frame height".
+- S6 shelter: W6 + the clause + P-33 + S6 SCENE + the same framing.
+
+FILE NAMES: 18-<key>-s1.png and 18-<key>-s6.png, keys: lifesupport (31), vestibule (32), shelter (33). offer_options = false (assets inside a build). References: sheet 13 wall-s1 and airlock-s1, sheet 15 lifesupport-s1 and vestibule-s1, sheet 15 roof-low-s1, sheet 13 foundation-s1, sheet 13 drafting-s1 and bin-s1, sheet 06 gate.
+
+REVIEW (side-by-side, S1 vs S6):
+- (filled in after the first batch)
+FIRST BATCH REVIEW (side by side, S1 over S6):
+- 31 life-support S1: rejected, rendered in smooth soft-shaded surfaces, not the faceted low poly of the sheet 13 kit. Moved to rejected/18-lifesupport-s1-rev1.png. Redrawn with the same design and an explicit "FACETED low-poly, visible flat facets, NO smooth gradients" wrapper; kept. Known gap: the power and data cables rise beside the unit rather than into a clearly drawn wall conduit. Noted, not redrawn.
+- 31 life-support S6: kept (same window with three canisters, fan, bottle, dial, green bar, intake grille).
+- 32 vestibule S1: kept (two-wall cutaway, amber outer beacon, green inner beacon, grating, drain, steps, suit hook).
+- 32 vestibule S6: rejected for extra interior fittings: a pipe along the back wall and a hanging suit figure, neither in the S1 (the same class of fault as sheet 15's vestibule). Moved to rejected/18-vestibule-s6-rev1.png. Redrawn as a bare L-shaped interior, as the S1: walls on the left and right only, no pipes, no figures; kept.
+- 33 shelter S1 and S6: kept. The S1 shows the gate portal on the left horizon, the 21-degree roof, lattice joints and the bin by the door. The S6 is a cutaway with the roof removed entirely; the life-support unit and drafting table are visible inside.
+
+REVISION LINES (applied in the redraws above):
+- S1 lifesupport wrapper: W1 plus "FACETED low-poly, visible flat facets on every surface, NO smooth gradients, simple blocky geometry" (rev 1).
+- S6 vestibule: "BARE INTERIOR: no pipes, no conduits running across the walls, no hanging suits, no figures, no other fittings" and "only two walls stand, forming an L-shaped corner" (rev 1).
+
+COMPOSITION: tools/compose18.sh builds 18-sheet-life-support.png (3840x2260), three pieces by two rows, with the RULES block. The contact sheet tile for 18 is added in tools/contact.sh.

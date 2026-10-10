@@ -883,3 +883,19 @@ in 04/05).
 ---
 
 **Status (lead engineer review, 2026-10-10):** complete. All eleven S1/S6 pairs are one design; the S6 hardpoints were redrawn in 9c47f00a to the S1 bolted cylinder socket with cable glands on its pad. The owner: "art looks good". Roofs, openings and circulation pieces follow on sheet 15.
+
+---
+
+## 18 · sheet-life-support — pressure and the starter shelter
+
+**For:** the art direction for the two owner-approved systems: a sealed room only stops the sync drain while a powered life-support unit runs inside it, and new players get a free one-cell starter shelter placed in one action. Three pieces, continuing sheets 13, 15 and 17 (kit, joints and roof). Each piece is one design, drawn twice: stage 1 (chunky low poly, flat-shaded, about 16 flat colours) and stage 6 (the same design at full PBR, clean and in service, on the lush terraformed plot).
+
+**Pieces:** 31 life-support unit (floor-standing, about 1.9 m tall, 1.1 m wide, 0.7 m deep; louvred intake low down, three swappable scrubber canisters behind a clear window, fan housing on top, oxygen bottle strapped to one side, power and data cables rising into a wall conduit, pressure dial, green status bar; no pixels) · 32 airlock vestibule (one-cell cutaway, near wall and roof removed; outer and inner airlock doors, pressure panel with a cycle button, amber and green beacons, grating and drain, suit hook) · 33 starter shelter (one 4 x 4 m cell on a skirted foundation, three plain walls and one airlock wall, the sheet 15 21-degree roof, life-support unit and drafting table inside, bin by the door; S1 beside the gate portal, S6 as a roof-off cutaway).
+
+**Prompts:** verbatim in `panels/18/prompts.txt`. Wrapper W1 (stage 1), wrapper W6 (the same piece at full PBR, no rust, no decay), and the clause that forbids any lettering, labels or signs on any surface.
+
+**Panels:** `panels/18/18-<piece>-s1.png` and `18-<piece>-s6.png`. `panels/18/rejected/` keeps the renders that failed review (`18-lifesupport-s1-rev1`, `18-vestibule-s6-rev1`). Composed by `tools/compose18.sh`.
+
+**Review notes:** no chimneys, stacks or smokestacks; the life-support unit emits no pixels; every piece is grounded with skirts, plinths or bolts visible; no text baked into any kept image; the scientist (1.8 m) gives the scale on piece 31. Known gap: on 31 the cables run beside the unit rather than into a clearly drawn wall conduit. Noted for a later pass.
+
+**Canon (lead engineer, 2026-10-10):** piece 31 is THE life-support unit (D14). It supersedes sheet 15 piece 26, which was drawn before the pressure system was specified. The vestibule (32) is accepted with its doors on adjacent walls (an L), which is a valid two-edge airlock on the lattice. Known gap on 31: its cables run to a floor cover, not a wall conduit; fix this in the mesh brief.

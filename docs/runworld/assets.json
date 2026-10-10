@@ -7,7 +7,7 @@
       "size": 3.2,
       "axis": "length",
       "view": "three-quarter",
-      "subject": "the scout rover's chassis and body with its four wheels REMOVED, built CHUNKY and solid: a roll cage of THICK square-section steel bars with solid steel side panels and a solid roof plate, a deep steel body tub, the single seat, the small tool rack at the back, the twin amber headlamps and a short stubby antenna. Armoured fenders and skirts enclose the suspension, with a solid steel belly pan underneath; at each corner a bare wheel hub on a short axle stub shows inside the wheel arch where the wheel mounts",
+      "subject": "the scout rover's body with its four wheels REMOVED: a compact one-seat buggy whose roll protection is BUILT INTO SOLID PANELS, an enclosed armoured cab shell of flat bolted steel plates with a wide windscreen opening and side window openings, NO open cage, NO tubes, NO bars; a deep steel body tub, the small tool rack set into the rear panel, the twin amber headlamps set into the front plate, a short stubby antenna, armoured fenders over the four wheel arches and a solid steel belly pan. The cab interior is EMPTY: NO seats, NO steering wheel, NO controls inside (those are added separately). The wheel arches are EMPTY: NO hubs, NO axles, NO brake discs, NO suspension visible in them (the wheels cover that)",
       "class": "rover-body"
     },
     {
@@ -25,7 +25,7 @@
       "size": 6,
       "axis": "length",
       "view": "three-quarter",
-      "subject": "the hauler rover with its six wheels REMOVED: the two-seat cab at the front, the flat load bed, the bolted storage bin with a small finned link dish on its top, the tow hitch and the side steps. Solid armoured side skirts run the full length below the cab and the bed, covering the chassis rails, axles, tanks and suspension, with a solid belly pan underneath; bare wheel hubs show inside the wheel arches cut in the skirts, three per side, where the wheels mount",
+      "subject": "the hauler rover with its six wheels REMOVED: the two-seat cab at the front, the flat load bed, the bolted storage bin with a small finned link dish on its top, the tow hitch and the side steps; solid armoured side skirts run the full length below the cab and the bed with three wheel arches cut in each side, and a solid belly pan underneath. The cab interior is EMPTY: NO seats, NO steering wheel, NO controls inside (those are added separately). The wheel arches are EMPTY: NO hubs, NO axles, NO brake discs, NO suspension visible in them (the wheels cover that)",
       "class": "rover-body"
     },
     {
@@ -43,7 +43,7 @@
       "size": 7,
       "axis": "length",
       "view": "three-quarter",
-      "subject": "the tracked crawler with its front drill arm REMOVED: the armoured cab, the two track units, the sensor mast and the heat-sink spine; armoured side skirts cover the upper run of each track and its road wheels; a solid belly pan; a hinge bracket on the front where the arm mounts",
+      "subject": "the tracked crawler with its front drill arm REMOVED: the armoured cab, the two track units, the sensor mast and the heat-sink spine; armoured side skirts cover the upper run of each track and its road wheels; a solid belly pan; a hinge bracket on the front where the arm mounts. The cab interior is EMPTY: NO seats, NO controls inside (those are added separately)",
       "class": "rover-body"
     },
     {
@@ -436,7 +436,7 @@
       "size": 1.65,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the low-pitch roof panel on its own: one gently sloped steel roof plane rising 1.5 metres over a 4-metre run, standing-seam ribs running down the slope, a drip edge at the low eave"
+      "subject": "ONLY the roof surface on its own, with NO walls, NO posts and NO box under it: one flat gently sloped steel roof plane, 4 by 4 metres, rising 1.5 metres from its low eave to its high edge, dark slate-grey standing-seam steel with ribs running down the slope and a drip edge at the low eave"
     },
     {
       "id": "roof-corner-outer",
@@ -480,7 +480,7 @@
       "size": 3.0999999999999996,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the inner roof corner piece on its own: a valley corner where two sloped steel roof planes meet along a diagonal valley gutter, rising 3 metres over a 4 by 4 metre cell, standing-seam ribs"
+      "subject": "ONLY the roof surface on its own, with NO walls and NO box under it: an inner valley roof corner where two sloped dark slate-grey standing-seam steel roof planes meet along a diagonal valley gutter, covering a 4 by 4 metre cell and rising 3 metres"
     },
     {
       "id": "ridge-cap",
@@ -524,7 +524,7 @@
       "size": 3,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the gable wall on its own: a triangular steel end wall exactly 4 metres wide at its base and 3 metres tall at its peak, panel seams, bolted edge brackets"
+      "subject": "the gable wall on its own: a triangular steel end wall exactly 4 metres wide at its base and 3 metres tall at its peak, warm light-grey painted steel panels with thin seams and dark grey edge trim, bolted edge brackets, a hazard-striped plinth along its foot"
     },
     {
       "id": "half-wall",
@@ -568,7 +568,7 @@
       "size": 3,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the window wall on its own: a steel wall panel exactly 4 metres wide and 3 metres tall with one wide thick-framed window in its upper half (dark glass), bolted corner brackets, a hazard-striped plinth"
+      "subject": "the window wall on its own: a steel wall panel exactly 4 metres wide and 3 metres tall in warm light-grey painted steel with dark grey trim, one wide thick-framed window in its upper half (dark glass), bolted corner brackets, a hazard-striped plinth"
     },
     {
       "id": "doorframe",
@@ -643,7 +643,7 @@
       "size": 3.9,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the ladder on its own: a fixed steel wall ladder 3.9 metres tall and 70 cm wide, THICK square-section side rails and thick flat rungs, bolted wall brackets at top and bottom; every member thick and boxy"
+      "subject": "the ladder on its own: a fixed steel wall ladder 3.9 metres tall and 70 cm wide with THICK square-section side rails and thick flat rungs, bolted wall brackets at its top and bottom. NO safety cage, NO hoops, NO back guard"
     },
     {
       "id": "stairs",
@@ -665,7 +665,7 @@
       "size": 4.01,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the stair flight on its own: a straight steel staircase rising 3 metres over a 4-metre run, about 3.4 metres wide, solid steel treads, closed side stringers, and a thick handrail on each side"
+      "subject": "the stair flight on its own: a straight steel staircase rising 3 metres over a 4-metre run, about 3.4 metres wide, warm light-grey painted steel, SOLID closed side stringers that rise as solid side panels (a solid balustrade) with a thick rounded handrail cap on each, solid steel treads with hazard-striped nosings. NO open railings, NO thin bars"
     },
     {
       "id": "hardpoint",
@@ -711,7 +711,7 @@
       "size": 0.45,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the breaker panel's big red rotary breaker handle on its own: the round hub and the lever arm. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+      "subject": "ONLY the breaker panel's big red rotary breaker handle on its own: the round hub and the thick lever arm, NO mounting plate, NO hazard stripes, NO cables, NO box. In the base kit family style"
     },
     {
       "id": "relay-cabinet",
@@ -747,7 +747,8 @@
       "size": 0.6,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the operator console's big throw lever on its own: a red-gripped lever arm on its pivot block. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+      "subject": "ONLY the operator console's big throw lever on its own: the thick lever arm with its red grip and the round pivot boss at its foot, NO block, NO box, NO cables. In the base kit family style",
+      "integration": "The image keeps a base block and pivot clevis: split the mesh at the pivot axis in Blender at integration so only the arm rotates."
     },
     {
       "id": "preset-bench",
@@ -784,6 +785,24 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "the planet table on its own: a wide round steel table ring on a thick bolted pedestal, a flat projector disc set in its centre (unlit, no hologram). In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+    },
+    {
+      "id": "vehicle-seat",
+      "panel": "19/19-scout-s6.png",
+      "class": "moving-part",
+      "size": 1.1,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "one rover seat on its own: a chunky padded bucket seat with a high back and side bolsters on a solid bolted steel seat base. NO harness, NO belts, NO straps, NO buckles"
+    },
+    {
+      "id": "steering-wheel",
+      "panel": "19/19-scout-s6.png",
+      "class": "moving-part",
+      "size": 0.45,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "one rover steering wheel on its own: a chunky thick-rimmed steering wheel with three wide solid spokes and a centre hub, on a short thick steering column with a bolted mounting flange"
     }
   ],
   "reused": {
@@ -842,6 +861,10 @@
     "2026-10-10 owner: \"the roll cage will need to be built by hand or the shape needs to be more chunky, that thos buggys wont work\". The scout body and wheel are re-prompted chunky (thick square bars, solid panels, a disc rim with cut-outs). Thin tubes and wire spokes do not survive generation or decimation; avoid them in every prompt.",
     "2026-10-10 owner: \"add the building pieces and other 3d stuff like lab pieces to the pipeline, might as well have it all match\"; \"the lab design is not final so feel free to make it nice as you can and have it match\"; \"the layout, it can all change if you feel there is a more AAA presentation\". Structure assets carry `box`, the procedural kit piece bounds at S6 (lattice frame): the post step fits each to its box exactly and snaps edge vertices flush so neighbours meet. Lab pieces take the base kit family style.",
     "2026-10-10 owner: \"the undersides of the trucks are all tubing, the models can have tubing but inset into something solid, cover some things with armor if they wont read well\". Every prompt now asks for armour plates, skirts and a belly pan over suspension and undercarriage; the vehicle bodies are re-prompted.",
-    "2026-10-10 owner: \"if there is an option to preserve the uv islands when you reduce the polygons it might help\". It found the real cause: the generated mesh arrives in Blender as disconnected UV islands, so Decimate shrank each island alone and the borders pulled apart. scripts/lod-bake.py now welds them (merge by distance) before decimating: no more shards, even on the thin scout at 2.5k."
+    "2026-10-10 owner: \"if there is an option to preserve the uv islands when you reduce the polygons it might help\". It found the real cause: the generated mesh arrives in Blender as disconnected UV islands, so Decimate shrank each island alone and the borders pulled apart. scripts/lod-bake.py now welds them (merge by distance) before decimating: no more shards, even on the thin scout at 2.5k.",
+    "2026-10-10 owner: \"the scout can have a roll cage but built into panels so no more tubes/cages\". The scout body is an enclosed panelled cab shell.",
+    "2026-10-10 review: structure palette fixed in the prompts (warm light-grey wall panels with dark grey trim and hazard plinths; dark slate-grey standing-seam roofs); roof pieces are the roof surface only (two came back with walls under them); the ladder lost its safety cage and the stairs their open railings.",
+    "2026-10-10 owner: \"the wheels will cover the axel/dics, we dont need those, we can have empty cabins and pop in seprate chairs and steering wheels\". Vehicle bodies are re-prompted with empty cabs and empty wheel arches; vehicle-seat and steering-wheel are separate assets placed at each body's seat sockets.",
+    "2026-10-10 owner: use the LOCAL 3D model (the 3080 Hunyuan3D pipeline) for every model: it is free, so anything that does not reduce well is re-imaged without the problem part and run again; \"if we wont ever realy see it its just a waste of polygons\" (e.g. the seat belts). RUN.world stays for source images, narration, music and effects."
   ]
 }

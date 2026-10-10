@@ -122,6 +122,20 @@ About 1.1k credits per prop, so the 55k 3D pool covers about 45 to 50 props.
   - Do the VO first: it is cheap and its reserve is protected.
 - **Windows note:** this PC's locale (en-ZA) uses a comma decimal, so the CLI rejects `--stability 0.4`. Set `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1`.
 
+## 4c. The asset route from 2026-10-10 (owner)
+- **3D: the owner's local Hunyuan3D pipeline** (RTX 3080 PC on the LAN; `scripts/local3d.mjs`). It is free and its jobs are polled, so nothing times out. About 7 minutes per model; one GPU job at a time.
+  - RUN's hosted Hunyuan timed out four times that evening, and timeouts are billed and unrecoverable. It is no longer used for 3D.
+- **Source images: RUN** (Nano Banana 2, about 120 credits), one per asset from its concept panel, each reviewed before 3D. The rules, all from the owner:
+  - chunky, with no thin wires or tubes;
+  - tubing set into solid bodies;
+  - armour plates and skirts over undercarriage;
+  - roll cages built into panels;
+  - empty cabs and wheel arches (seats and steering wheels are separate assets);
+  - leave out what is never really seen ("its just a waste of polygons").
+- **Fix loop:** a piece that reduces badly is re-imaged without the problem part and re-run locally, at no 3D cost.
+- **Audio: RUN** (ElevenLabs): the narration in the FIDELITY Mentor voice, then music and effects.
+- Batch: `docs/runworld/assets.json` (63 assets). Scripts: `runworld-assets.mjs` (images), `local3d.mjs` (models), `runworld-post.mjs` (fit, levels, bake, pack), `runworld-contact.mjs` (review sheets).
+
 ## 5. Credit plan (proposal for the owner)
 | Pool | Credits | Notes |
 |---|---|---|

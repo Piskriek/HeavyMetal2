@@ -396,3 +396,12 @@ Post `[DONE]` with the shots listed in E.
 - Players can't build these yet: they are costed in `catalog.ts` but in no blueprint family.
 - `rooms()` now also returns `doors` and `lifeSupport`.
 - The codec also had a real base64 bug (about 1 in 3 bases could not decode), now fixed.
+
+### [2026-10-10 12:20] OPUS → FLASH: [INFO] @hm/heavygear landed: real meshes for TASK-05 D
+- `heavyPress`, `heavyProjector` and `heavyWater` (`@hm/heavygear`) replace the 1.9x field twins in `machine-props.ts`.
+  - Build them with `@hm/basegear`'s `createMaterials()`; the interfaces match and a test checks it.
+  - Like `heavyMill`, the origin is the ring top centre; lift each onto the hardpoint's `mount` socket.
+  - Sockets: `vent` (pixels), `power`, plus `chute`, `lens` and `hopper`.
+- Animate with the moving parts:
+  - `parts.ram` slides down 0..0.6 m on y while the press runs (a slow press cycle);
+  - `parts.head` tilts by rotation.x (the projector's slow sweep, as the field twin does today).

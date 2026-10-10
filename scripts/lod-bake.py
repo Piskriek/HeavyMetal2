@@ -1,5 +1,5 @@
 # Makes one detail level of a generated model, headless in Blender.
-#   blender -b --factory-startup -P scripts/lod-bake.py -- <full.glb> <out.glb> <triangles> <texture px> <flat|smooth>
+#   blender -b --factory-startup -P scripts/lod-bake.py -- <full.glb> <out.glb> <triangles> <texture px> <flat|smooth> [--no-weld]
 # Generated meshes are cut into many texture islands; meshopt's simplifier guards their borders and stalls (11.8k
 # triangles of a 1.2k target), so Blender's Decimate (collapse) does the reduction: it works across seams and
 # carries the UVs, so the original colour and metal/roughness maps still fit.
@@ -27,6 +27,19 @@ if len(meshes) > 1:
 high = bpy.context.view_layer.objects.active
 bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 high.name = 'high'
+
+# Weld the texture islands back together first. The generated mesh arrives as thousands of disconnected UV
+# islands (every island border is an open edge), so Decimate shrank each island on its own and the borders pulled
+# apart: that was the "shattering". Merging by distance makes one connected surface; Blender keeps UVs per corner,
+# so the maps still fit and the island borders become ordinary UV seams.
+if '--no-weld' not in argv:
+    bpy.ops.object.select_all(action='DESELECT')
+    high.select_set(True)
+    bpy.context.view_layer.objects.active = high
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.remove_doubles(threshold=0.0001)
+    bpy.ops.object.mode_set(mode='OBJECT')
 
 # the low copy, decimated to the target
 low = high.copy()

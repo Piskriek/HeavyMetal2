@@ -7,7 +7,7 @@
       "size": 3.2,
       "axis": "length",
       "view": "three-quarter",
-      "subject": "the scout rover's chassis and body with its four wheels REMOVED, built CHUNKY and solid: a roll cage of THICK square-section steel bars (about 12 cm across) with solid steel side panels and a solid roof plate, a deep steel body tub, the single seat, the small tool rack at the back, the twin amber headlamps and a short stubby antenna; bare wheel hubs on short axle stubs show where the wheels mount. No thin tubes, no thin wires: every member is thick and boxy",
+      "subject": "the scout rover's chassis and body with its four wheels REMOVED, built CHUNKY and solid: a roll cage of THICK square-section steel bars with solid steel side panels and a solid roof plate, a deep steel body tub, the single seat, the small tool rack at the back, the twin amber headlamps and a short stubby antenna. Armoured fenders and skirts enclose the suspension, with a solid steel belly pan underneath; at each corner a bare wheel hub on a short axle stub shows inside the wheel arch where the wheel mounts",
       "class": "rover-body"
     },
     {
@@ -25,7 +25,7 @@
       "size": 6,
       "axis": "length",
       "view": "three-quarter",
-      "subject": "the hauler rover with its six wheels REMOVED: the two-seat cab at the front, the flat load bed, the bolted storage bin with a small finned link dish on its top, the tow hitch and the side steps; bare wheel hubs on short axle stubs show where the wheels mount",
+      "subject": "the hauler rover with its six wheels REMOVED: the two-seat cab at the front, the flat load bed, the bolted storage bin with a small finned link dish on its top, the tow hitch and the side steps. Solid armoured side skirts run the full length below the cab and the bed, covering the chassis rails, axles, tanks and suspension, with a solid belly pan underneath; bare wheel hubs show inside the wheel arches cut in the skirts, three per side, where the wheels mount",
       "class": "rover-body"
     },
     {
@@ -43,7 +43,7 @@
       "size": 7,
       "axis": "length",
       "view": "three-quarter",
-      "subject": "the tracked crawler with its front drill arm REMOVED: the armoured cab, the two track units with their road wheels, the sensor mast and the heat-sink spine; a hinge bracket on the front where the arm mounts",
+      "subject": "the tracked crawler with its front drill arm REMOVED: the armoured cab, the two track units, the sensor mast and the heat-sink spine; armoured side skirts cover the upper run of each track and its road wheels; a solid belly pan; a hinge bracket on the front where the arm mounts",
       "class": "rover-body"
     },
     {
@@ -840,6 +840,8 @@
   },
   "notes": [
     "2026-10-10 owner: \"the roll cage will need to be built by hand or the shape needs to be more chunky, that thos buggys wont work\". The scout body and wheel are re-prompted chunky (thick square bars, solid panels, a disc rim with cut-outs). Thin tubes and wire spokes do not survive generation or decimation; avoid them in every prompt.",
-    "2026-10-10 owner: \"add the building pieces and other 3d stuff like lab pieces to the pipeline, might as well have it all match\"; \"the lab design is not final so feel free to make it nice as you can and have it match\"; \"the layout, it can all change if you feel there is a more AAA presentation\". Structure assets carry `box`, the procedural kit piece bounds at S6 (lattice frame): the post step fits each to its box exactly and snaps edge vertices flush so neighbours meet. Lab pieces take the base kit family style."
+    "2026-10-10 owner: \"add the building pieces and other 3d stuff like lab pieces to the pipeline, might as well have it all match\"; \"the lab design is not final so feel free to make it nice as you can and have it match\"; \"the layout, it can all change if you feel there is a more AAA presentation\". Structure assets carry `box`, the procedural kit piece bounds at S6 (lattice frame): the post step fits each to its box exactly and snaps edge vertices flush so neighbours meet. Lab pieces take the base kit family style.",
+    "2026-10-10 owner: \"the undersides of the trucks are all tubing, the models can have tubing but inset into something solid, cover some things with armor if they wont read well\". Every prompt now asks for armour plates, skirts and a belly pan over suspension and undercarriage; the vehicle bodies are re-prompted.",
+    "2026-10-10 owner: \"if there is an option to preserve the uv islands when you reduce the polygons it might help\". It found the real cause: the generated mesh arrives in Blender as disconnected UV islands, so Decimate shrank each island alone and the borders pulled apart. scripts/lod-bake.py now welds them (merge by distance) before decimating: no more shards, even on the thin scout at 2.5k."
   ]
 }

@@ -36,6 +36,8 @@ const prompt = (a) => [
   'Every part is physically attached to the rest: nothing floats, no gaps between parts.',
   // owner: "poly reduce doesnt really work on thin/tube stuff, pieces just turn to artifacts"
   'Chunky, solid game-asset proportions: NO thin wires, NO thin tubes, NO thin rods, NO thin spokes, NO dangling cables; every member is at least 8 cm thick, and cables are thick and run tight against the body.',
+  // owner: "the models can have tubing but inset into something solid, cover some things with armor if they wont read well"
+  'Any tubing, piping, suspension, axles or undercarriage is set into solid bodies or covered by armour plates, skirts and a solid belly pan; nothing spindly is left exposed.',
   'NO lettering, NO numbers, NO logos, NO labels on any surface.',
 ].join(' ');
 

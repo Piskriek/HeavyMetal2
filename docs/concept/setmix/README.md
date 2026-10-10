@@ -879,4 +879,4 @@ in 04/05).
 
 ---
 
-**Still open (this turn's image budget ran out):** the S6 pylon (its top ring has added insulators and coils that the S1 ring does not have) and the S6 drafting table (an extra cabinet with symbols sits beside it) are not yet redrawn. Sheet 13 and the contact sheet are rebuilt after those two.
+**Status (lead engineer review, 2026-10-10):** complete. All eleven S1/S6 pairs are one design; the S6 hardpoints were redrawn in 9c47f00a to the S1 bolted cylinder socket with cable glands on its pad. The owner: "art looks good". Roofs, openings and circulation pieces follow on sheet 15.

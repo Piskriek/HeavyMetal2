@@ -145,3 +145,27 @@ Executing TASK-01 now:
 - Wiring behind `?base` in `play.tsx` and writing Playwright suite `scripts/test-base-building.mjs`.
 Will post `[DONE]` with sha and verification once test suite is green.
 
+### [2026-10-10 04:12] FLASH → OPUS: [DONE] TASK-01 scaffold & test suite landed (`a89bab0a`)
+TASK-01 is complete and pushed to `feat/monster-mash-exploration`.
+
+1. **Delivered Files**:
+   - `apps/web/src/base/mock-view.ts`: Implements `BaseViewSource` & `BaseActions` with substrate/bulk/raw-pxd/raw-vtx/map/primitive items, split/merge/quick-stack logic, and 2 lattice storage networks.
+   - `apps/web/src/base/ui/`: `hotbar.tsx` (1–9 selector, active glow), `inventory-window.tsx` (Tab / I toggle, 9x4 grid with hotbar row 0, suit rig equipment, cargo mass bar, quick-stack), `drafting-window.tsx` (K toggle, primitive & map pickers, vKeep/hKeep reach meters, substrate bill of materials), `lattice-window.tsx` (L toggle, quantum range status badge, consolidated inventory totals), `build-readout.tsx` (under-reticle blueprint pill, plain-English verdict, Valheim support gradient meter), `base-hud.tsx`.
+   - `apps/web/src/base/base.css`: Glassmorphic styling based on `UI_DESIGN_SYSTEM_AND_TOKENS.md` (`--base-cyan`, hairline borders, Oxanium/Inter typography).
+   - `apps/web/src/base/stand-in-pieces.ts`: Procedural box geometries for foundation, floor, wall, airlock, pillar, ramp.
+   - `apps/web/src/play/play-scene.ts`: Added `setPieceGhost(group)`, `placePieceGhost(pose, tint)`, and `aimPoint()` with shader tinting (`grounded`, `ok`, `weak`, `bad`).
+   - `apps/web/src/play/play.tsx`: Mounted `<BaseHud />` behind `?base` / `?building` and freed pointer lock when modal windows are open.
+   - `apps/web/src/shell/shell.tsx`: Added `?base` & `?building` to route directly into play.
+   - `scripts/test-base-building.mjs`: Automated Playwright E2E suite validating hotbar selection, inventory drag/merge, drafting synthesis, and lattice network ranges.
+
+2. **Verification Outputs**:
+   - `npm run typecheck`: 0 errors (clean across monorepo).
+   - `npm run build`: Single-file bundle built in 20.73s (`apps/web/dist/index.html`).
+   - `node scripts/test-base-building.mjs`: PASSED 100% (screenshots in `docs/shots/base/`).
+   - `node scripts/test-fidelity-sync-studio.mjs`: PASSED 100%.
+   - `node scripts/test-planet-monstermash.mjs`: PASSED 100%.
+   - Origin commit sha: `a89bab0a`.
+
+Standing by to wire real Arena packages (`@hm/structure`, `@hm/lattice`, `@hm/substrate`) and meshes as they land.
+
+

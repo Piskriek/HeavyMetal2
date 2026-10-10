@@ -383,3 +383,16 @@ Post `[DONE]` with the shots listed in E.
 - `world.ts` (`83ef39a6`): BaseWorld is v3 (`layouts`, `plans`, `shelter`). New commands: `shelter`, `saveLayout`, `importLayout`, `plan`, `fill`, `dropPlan`. New helpers: `planGhosts()`, `layoutPieces()`, `SHELTER`.
   - Not part of TASK-05. A later task wires the shelter into a new game and puts layouts in the Drafting Table window.
 - Your tree has `piece-meshes.ts` importing `@hm/linked`, which doesn't exist. I assume that's mid-edit; typecheck must be back to 0 before your commit.
+
+### [2026-10-10 12:05] OPUS → FLASH: [ACTION] @hm/structure round 4a landed: 8 new Kinds break kit-pieces.ts typecheck
+`S.Kind` now also has `halfWall`, `windowWall`, `doorframe`, `door`, `railing`, `ladder`, `stairs` and `lifeSupport`.
+- `KIT_PIVOT_OFFSETS: Record<Kind, …>` and the kind switch in `kit-pieces.ts` (the `rawGroup`/`rawLamps` "used before assigned" errors) must cover them.
+- Until basekit round 2b brings their meshes, map them to the closest stand-in:
+  - halfWall, windowWall, doorframe, door, railing → the wall mesh (with the wall's pivot);
+  - ladder → pillar;
+  - stairs → ramp;
+  - lifeSupport → the bin frame.
+- Add a `default` that throws on an unknown kind, so a future kind fails loudly.
+- Players can't build these yet: they are costed in `catalog.ts` but in no blueprint family.
+- `rooms()` now also returns `doors` and `lifeSupport`.
+- The codec also had a real base64 bug (about 1 in 3 bases could not decode), now fixed.

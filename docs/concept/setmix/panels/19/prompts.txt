@@ -1,0 +1,57 @@
+SHEET 19 — the vehicle fabricator and the rover catalog (pieces 34 to 37), continuing sheets 13 to 18. Source brief: docs/prompts/art/fabricator-sheet19.md (feat, 2026-10-10). The owner decided vehicles are a fixed catalog of designed rovers; each prints whole at a Vehicle Fabricator on the base; better rovers unlock as the world's fidelity rises (scout at stage 2, hauler at stage 4, crawler at stage 6).
+
+Rules for every panel: one design drawn twice. S1 and S6 use the SAME piece description; only the wrapper and the stated state differ. The fabricator's pad and socket are the sheet 13 hardpoint family (2 by 2 slab pad, socket on a bolted ring, power and data glands, cables in low ribbed floor covers). The rovers are one family with the base kit: the same warm light-grey steel paint, dark grey mesh and cable, amber hazard bands and amber lamp style. Nothing floats: wheels, tracks, feet, skirts and bolts touch the ground or the pad. Cables run in low ribbed steel floor covers. NO chimneys, NO stacks, NO smokestacks, NO exhaust pipes, NO smoke. No lettering on any surface. The scientist (1.8 m) stands beside each piece for scale. A rover is a tool, not a toy: no decoration, no cartoon faces, no bright toy colours. Review each S1/S6 pair side by side before keeping it.
+
+W1 (stage-1 wrapper, every 19 panel):
+A realtime 3D GAME ENGINE SCREENSHOT, Blender/Unity style render at stage-1 low-poly fidelity: FACETED flat-shaded triangle meshes with visible flat facets, a restricted palette of about 16 flat colours, NO smooth gradients, soft physically-based lighting, gentle ambient occlusion, clean anti-aliased edges. STRICTLY a 3D render, absolutely NO line art, NO black contour outlines, NO cel shading, NOT a cartoon or illustration. No text, no UI, no watermark, NO lettering, NO numerals, NO symbols on any surface. ONE single image: one render, one camera, NOT a split-screen, NOT a diptych, NOT a multi-view sheet. Desolate grey stage-1 Moon: flat grey regolith, low grey hills, dark starless sky. Soft key light from frame right, one soft shadow.
+
+W6 (stage-6 wrapper, every 19 panel):
+Photorealistic 3D render — a videogame base-building design study at STAGE 6 fidelity: the SAME piece as its stage-1 version, identical silhouette, parts and proportions, rendered at full PBR materials, clean painted steel and ceramic, crisp decals, light honest wear at most; in service and freshly maintained — NO rust, NO peeling, NO ruin, NO decay. The ground is a lush terraformed plot: green grass, clover and small wildflowers at the feet of the piece; soft blue sky with a few thin clouds; warm low sun from frame right. ONE single image: one render, one camera, NOT a split-screen, NOT a diptych, NOT a multi-view sheet. No text, no UI, no watermark. NOT a cartoon, NOT low poly.
+
+CLAUSE (every S1 and S6 prompt): NO lettering, NO words, NO numbers, NO logos, NO stencils, NO labels, NO signs anywhere on any surface: plain blank painted steel and ceramic only.
+
+P-34 VEHICLE FABRICATOR (fabricator): a heavy station on a 2 by 2 pad of four grounded slabs (8 by 8 metres in total, seams visible, hazard-striped edges), with a round SOCKET on a bolted mounting ring with visible bolts, a POWER gland (orange) and a DATA gland (green) on the socket's side, cables in low ribbed steel floor covers running to the pad edge. The station: a steel GANTRY frame about 5 metres tall straddling a flat printing BED in the centre of the pad: two heavy uprights on either side of the bed, joined at the top by a crossbeam RAIL; a PRINT HEAD, a squarish nozzle block on a carriage, hangs on the rail; a CONTROL CONSOLE with a sloped panel on a short steel post at one corner of the pad. The scientist stands beside the station for scale.
+S1 STATE: the printing bed is bare and empty; the print head is parked at the end of the rail; no glow of any kind.
+S6 STATE: a rover half formed on the bed, a light buggy (the scout) built from glowing WIREFRAME EDGES of pale cyan-white light, with floating VERTEX POINTS of light that snap into solid painted panels from the bottom up: the lower body panels are solid and painted, the upper body is still wire. The print glow is the only light on the station; the print's vertex points belong to the print only. No smoke, no steam, no chimney.
+
+P-35 SCOUT (scout, unlocks at stage 2): a light one-seat moon buggy about 3.2 metres long and 1.8 metres wide, fast and fragile-looking: an open thin TUBULAR ROLL CAGE over one plain bucket SEAT (empty); four big WIRE-MESH WHEELS on long-travel suspension with visible springs and thin arms; a small TOOL RACK at the back with two plain tool handles; two HEADLAMPS at the front with amber lamp heads; a thin WHIP ANTENNA on a rear post; hazard-striped band on the chassis edge. The scientist stands beside it for scale.
+
+P-36 HAULER (hauler, unlocks at stage 4): a six-wheeled flatbed about 6 metres long, sturdy and working-class: a two-seat CAB at the front (two empty seats, plain windows); six large wheels on three axles, the wheels touching the ground; side STEPS on the cab door side; a flat steel BED behind the cab with a TOW HITCH at the rear; a squat steel STORAGE BIN bolted on the bed, on four bolted feet, with a hatch and a finned QUANTUM LINK DISH EMITTER on its top (pale white-violet lens, a thin beam of light rising from it: the same dish as the sheet 13 storage bin); behind the bin, a flat empty steel DECK left clear for a future structure. Hazard-striped bumper band. The scientist stands beside it for scale.
+
+P-37 CRAWLER (crawler, unlocks at stage 6): a tracked survey vehicle about 7 metres long, heavy, slow, capable: an ARMOURED CAB at the rear (a box cab of plain armour plates with a narrow slit window); two continuous steel TRACKS with ribbed track pads and bogie wheels, the tracks on the ground; a folding BEAM-DRILL ARM on the front, folded in its stowed pose, a segmented steel arm ending in a drill-head with a pale white-violet emitter lens (the extraction beam's big brother); a short SENSOR MAST on the cab roof, about 2 metres, with a flat sensor disc on top; a low HEAT-SINK SPINE along the top of the rear deck, a row of flat fins that emit nothing; hazard-striped track guards. The scientist stands beside it for scale.
+
+FRAMING PER PIECE:
+- S1 fabricator: W1 + P-34 + the S1 STATE, three-quarter view, the station and the scientist filling about two thirds of frame height.
+- S6 fabricator: W6 + the clause + P-34 + the S6 STATE, the same framing.
+- S1 scout: W1 + P-35 + "ONE vehicle alone on the ground with the scientist beside it, three-quarter view, filling about two thirds of frame height".
+- S6 scout: W6 + the clause + P-35 + the same framing.
+- S1 hauler: W1 + P-36 + the same framing.
+- S6 hauler: W6 + the clause + P-36 + the same framing.
+- S1 crawler: W1 + P-37 + the same framing.
+- S6 crawler: W6 + the clause + P-37 + the same framing.
+
+FILE NAMES: 19-<key>-s1.png and 19-<key>-s6.png, keys: fabricator (34), scout (35), hauler (36), crawler (37). offer_options = false (assets inside a build). References: sheet 13 hardpoint-empty-s1 and bin-s1 (dish emitter), sheet 17 press-s1 (heavy station on the hardpoint), sheet 18 lifesupport-s1 (paint and lamp style), sheet 18 shelter-s1 (base kit).
+
+REVIEW (side by side, S1 over S6):
+- (first batch review recorded below when done)
+
+FIRST BATCH REVIEW (side by side, S1 over S6):
+- 34 fabricator S1 and S6: kept. Same gantry, print head, console, pad and cables; the S6 bed carries the glowing wire scout half formed, the only glow.
+- 35 scout S1 and S6: kept. Same roll cage, seat, tool rack, amber lamps, whip antenna and hazard band. The S6 spokes are a little lighter; same vehicle.
+- 37 crawler S1 and S6: kept. Same armoured cab, drill arm, sensor mast, tracks and fins.
+- 36 hauler S6 (first attempt): rejected, a large parabolic dish on a tall bin against the small dish of the S1. Moved to rejected/19-hauler-s6-rev1.png.
+- 36 hauler S6 (second attempt): rejected, the dish was still a bowl. Moved to rejected/19-hauler-s6-rev2.png.
+- 36 hauler S6 (third attempt, kept): the rev-3 wrapper names a MUSHROOM-CAP emitter, a flat disc cap on a short pedestal with a pale white-violet underside, and forbids a parabolic dish or reflector. Same squat bin, cab, six wheels, steps, tow hitch and clear deck as the S1. Kept after side-by-side check.
+
+Note: the rev-3 mushroom cap is slightly larger in the S6 than in the S1; accepted as the same emitter.
+
+REVISION 4 (lead-engineer review of sheet 19, two S6 fixes; scout and crawler pairs and the fabricator S1 approved as drawn):
+- 34 fabricator S6 (rev 4): the half-printed scout hovered above the bed. Old render moved to rejected/19-fabricator-s6-rev1.png. Redrawn: the scout's WHEELS and LOWER CHASSIS are solid, painted and clean, RESTING ON the printing bed with no gap beneath the wheels; solid body panels grow upward from the lower chassis; only the UPPER ROLL CAGE is still wireframe, with vertex points snapping into panels from the bottom up. The buggy is supported from the bed. Everything else as before (gantry, print head, console, pad, cables). Kept after side-by-side check.
+- 36 hauler S6 (rev 4): the bin's emitter had become a large saucer firing a light beam. Old render moved to rejected/19-hauler-s6-rev3.png. Redrawn: the bin carries the SMALL finned QUANTUM LINK DISH of the sheet 13 storage bin, about 0.6 m across on a short stub, the same size as the S1; NO beam, NO glow, NO light column, NOT a saucer or parabolic bowl. Everything else as before. Kept after side-by-side check.
+- Open for the lead engineer: the hauler S1 still draws the thin rising beam from its dish. The S6 now has none, so the two differ on that one detail. Not changed in this pass.
+
+REVISION 5 (lead-engineer decision: no beam on any piece on sheet 19; the hauler S1 matches the revised S6):
+- 36 hauler S1 (rev 5, first attempt): the beam was removed, but the dish became a large parabolic bowl on a tall pedestal and the bin a faceted hexagon, not the S6 design. Moved to rejected/19-hauler-s1-rev2.png.
+- 36 hauler S1 (rev 5, second attempt, kept): the bin is a plain RECTANGULAR BOX with square corners and one small square hatch, not hexagonal; the emitter is the SMALL FLAT FINNED DISH on a short stub, about 0.6 m across, the same dish as the revised S6; NO beam, NO glow, NO light column, NOT a parabolic bowl. Cab, six wheels, steps, tow hitch, hazard band and clear deck as before. Kept after side-by-side check against the S6.
+- The earlier S1 with the rising beam is moved to rejected/19-hauler-s1-rev1.png.
+- Sheet 19 now has no beam on any piece. The crawler's beam-drill head keeps its pale lens, which is the drill's emitter, not a beam.

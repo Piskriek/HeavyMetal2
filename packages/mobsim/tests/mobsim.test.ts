@@ -23,3 +23,14 @@ test('shotgun: damage range, pain or death, cooldown, corpses stay, deterministi
   assert.deepEqual([run(k, open, { x: 2, z: 2 }, 60).mobs[0]!.x, run(k, open, { x: 2, z: 2 }, 60).mobs[0]!.z], pos);
   assert.equal(hashSim(fire(spawn(createSim(3), open, 'ogro', 10, 20), [10, 1.8, 10], [0, 0, 1]).sim), hashSim(shot.sim));
 });
+
+test('fire takes the weapon: SHOTGUN is the default, other parts change pellets, damage, range and cooldown', async () => {
+  const { SHOTGUN } = await import('../src/index');
+  const s = spawn(createSim(3), open, 'ogro', 10, 20), from: [number, number, number] = [10, 1.8, 10], dir: [number, number, number] = [0, 0, 1];
+  assert.equal(hashSim(fire(s, from, dir).sim), hashSim(fire(s, from, dir, SHOTGUN).sim), 'the default is SHOTGUN');
+  const long = fire(s, from, dir, { pellets: 1, damage: [27, 39], spread: 0.006, range: 90, cooldown: 0.52 });
+  assert.equal(long.hits, 1); assert.ok(long.damage >= 27 && long.damage <= 39, String(long.damage));
+  assert.equal(fire(s, from, dir, { ...SHOTGUN, range: 5 }).hits, 0, 'the ogro at 10 m is out of a 5 m range');
+  const beam = fire(s, from, dir, { pellets: 1, damage: [6, 8], spread: 0, range: 60, cooldown: 0.1 });
+  assert.ok(Math.abs(beam.sim.cooldown - 0.1) < 1e-9 && beam.damage >= 6 && beam.damage <= 8);
+});

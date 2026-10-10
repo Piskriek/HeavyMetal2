@@ -223,10 +223,28 @@ export function spawnNear(
   return { ...s, rng };
 }
 
+/**
+ * One trigger pull's ballistics. The weapon's parts (apps/web/src/base/weapons.ts weaponStats) give these numbers;
+ * SHOTGUN is today's gun (semi core, scatter barrel, iron sight). A burst is the caller firing again after
+ * `cooldown` = the burst gap; a beam is 1 pellet, 0 spread and a short cooldown per damage tick.
+ */
+export interface Shot {
+  readonly pellets: number;
+  /** Damage per pellet, min and max inclusive. */
+  readonly damage: readonly [number, number];
+  /** Half-angle spread on each axis, radians. */
+  readonly spread: number;
+  readonly range: number;
+  /** Seconds before the next shot. */
+  readonly cooldown: number;
+}
+export const SHOTGUN: Shot = { pellets: PELLETS, damage: [20, 29], spread: PELLET_SPREAD, range: PELLET_RANGE, cooldown: FIRE_INTERVAL };
+
 export function fire(
   sim: Sim,
   origin: [number, number, number],
   dir: [number, number, number],
+  shot: Shot = SHOTGUN,
 ): { sim: Sim; hits: number; damage: number; killed: number[] } {
   const s0 = asSimInt(sim);
   const noop = { sim: sim, hits: 0, damage: 0, killed: [] as number[] };
@@ -260,13 +278,15 @@ export function fire(
   const dmgByMob = new Map<number, number>();
   let hits = 0;
   let damage = 0;
-  for (let i = 0; i < PELLETS; i++) {
+  // three draws per pellet whatever the weapon, so the default shot replays exactly as before
+  const span = Math.max(0, Math.floor(shot.damage[1]) - Math.floor(shot.damage[0])) + 1;
+  for (let i = 0; i < shot.pellets; i++) {
     rng = nextRng(rng);
-    const s1 = (2 * unit(rng) - 1) * PELLET_SPREAD;
+    const s1 = (2 * unit(rng) - 1) * shot.spread;
     rng = nextRng(rng);
-    const s2 = (2 * unit(rng) - 1) * PELLET_SPREAD;
+    const s2 = (2 * unit(rng) - 1) * shot.spread;
     rng = nextRng(rng);
-    const dmg = 20 + Math.floor(unit(rng) * 10);
+    const dmg = Math.floor(shot.damage[0]) + Math.floor(unit(rng) * span);
     const px = nx + e1x * s1 + e2x * s2;
     const py = ny + e1y * s1 + e2y * s2;
     const pz = nz + e1z * s1 + e2z * s2;
@@ -289,7 +309,7 @@ export function fire(
       if (d2 > kd.radius * kd.radius) continue;
       const entry = tca - Math.sqrt(kd.radius * kd.radius - d2);
       const t = entry < 0 ? 0 : entry;
-      if (t > PELLET_RANGE) continue;
+      if (t > shot.range) continue;
       if (target === null || t < bestT) {
         bestT = t;
         target = m;
@@ -313,7 +333,7 @@ export function fire(
     }
     return { ...m, hp, state: 'pain', timer: PAIN_TIME };
   });
-  const out: SimInt = { ...s0, cooldown: FIRE_INTERVAL, rng, mobs };
+  const out: SimInt = { ...s0, cooldown: shot.cooldown, rng, mobs };
   return { sim: out, hits, damage, killed };
 }
 

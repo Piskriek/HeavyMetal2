@@ -351,6 +351,9 @@
       "@hm/mobsim": [
         "packages/mobsim/src/index.ts"
       ],
+      "@hm/batcher": [
+        "packages/batcher/src/index.ts"
+      ],
       "@hm/basekit": [
         "packages/basekit/src/index.ts"
       ],

@@ -129,6 +129,7 @@ export default defineConfig(({ mode }) => ({
       '@hm/basekit2': p('../../packages/basekit2/src/index.ts'),
       '@hm/navpath': p('../../packages/navpath/src/index.ts'),
       '@hm/mobsim': p('../../packages/mobsim/src/index.ts'),
+      '@hm/batcher': p('../../packages/batcher/src/index.ts'),
       '@hm/basekit': p('../../packages/basekit/src/index.ts'),
       '@hm/fieldkit': p('../../packages/fieldkit/src/index.ts'),
       '@hm/cartlab': p('../../packages/cartlab/src/index.ts'),

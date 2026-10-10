@@ -31,7 +31,8 @@ const valid = (b: Base) => {
 test('codec: round trip, canonical, small, hostile-safe', () => {
   const b = sample(1000), t = encode(b), d = decode(t);
   assert.ok(d); assert.equal(encode(d), t); assert.equal(d.pieces.length, 1000); assert.ok(t.length <= 12000, `${t.length}`);
-  assert.ok(Math.abs(d.structures[0]!.x - 12.3456) <= 0.005 && Math.abs(d.structures[0]!.yaw - 0.7) <= 0.0005);
+  const s0 = b.structures[0]!, d0 = d.structures[0]!; // found() takes the slab centre; a structure keeps its corner
+  assert.ok(Math.abs(d0.x - s0.x) <= 0.00051 && Math.abs(d0.z - s0.z) <= 0.00051 && Math.abs(d0.yaw - s0.yaw) <= 0.000051);
   assert.deepEqual(d.pieces.map((p) => [p.id, p.kind, p.i, p.j, p.k, p.r, p.mat, p.open ?? false]), b.pieces.map((p) => [p.id, p.kind, p.i, p.j, p.k, p.r, p.mat, p.open ?? false]));
   assert.equal(decode(encode(empty()))?.pieces.length, 0);
   for (const bad of ['', '!!', t + 'A', t.slice(0, -3), 'A'.repeat(LIMITS.maxChars + 1)]) assert.equal(decode(bad), null);

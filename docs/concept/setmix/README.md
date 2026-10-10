@@ -20,6 +20,8 @@ decisions outrank everything; `gdd.ts` names are an undecided idea menu).
 | 10 | `10-plot-stage-6-hero.png` | scene — the finished plot, golden hour |
 | 11 | `11-desolate-horizon.png` | scene — day one on the plot |
 | 12 | `12-sheet-field-machines.png` | design sheet — 8 candidate field machines, S1/S6 |
+| 13 | `13-sheet-base-construction.png` | design sheet — 11 base pieces, S1 low poly / S6 full PBR, same design at both stages |
+| 14 | `14-outpost-stage-3.png` | scene — a sealed four-cell outpost at stage 3, mill on its pad, cables in floor covers, gate on the horizon |
 | — | `contact-sheet.jpg` | all 12, numbered |
 
 Supporting material (tracked for reproducibility): `panels/12/` — the 16 panel
@@ -848,3 +850,33 @@ in 04/05).
    three" tolerance; nudge or accept?
 3. **Machine shortlist:** which of the eight field machines (sheet 12) and
    which lab machines (sheet 07) get built first?
+
+---
+
+## 13 · sheet-base-construction — the base construction kit
+
+**For:** the art direction for freeform base building on the moon plot (Valheim / Dune: Awakening style). Eleven pieces. Each piece is one design, drawn twice: stage 1 (chunky low poly, flat-shaded, about 16 flat colours) and stage 6 (the same design at full PBR resolution, clean and in service, on the lush terraformed plot). Fidelity stages raise the resolution of one world; they are not time passing, so no rust, decay or ruin. A hazmat scientist (1.8 m) stands in the wall panels for scale. The heavy terraformer hardpoint is a 2 x 2 pad of slabs (8 x 8 m) with a short socket cylinder, power and data glands; the heavy texture mill is about twice the height of the field mill on sheet 12, spews only from a rear vent grille, and runs on cables in floor covers.
+
+**Pieces:** 1 heavy foundation (4 x 4 m, about 0.5 m thick, levelling skirt sunk into the ground, anchor bolts, hazard-striped edge) · 2 structural wall (4 m x 3 m) · 3 pillar (corner post) · 4 floor / roof (4 x 4 m deck on four posts) · 5 ramp (one storey over one cell) · 6 airlock (wall piece with a sealed door, pressure seal, status light, gauge) · 7 hardpoint (empty) · 8 hardpoint + heavy texture mill · 9 quantum storage bin (link emitter on top) · 10 quantum repeater pylon (tower, extends the link range) · 11 drafting table (a primitive and a material swatch on the bench, a blueprint plate between them).
+
+**Prompts:** verbatim in `panels/13/prompts.txt`. Wrapper W1 (stage 1), wrapper W6 (rev 3: the same piece at full PBR, no rust, no decay) and the clause that forbids any lettering, logos, labels or signs on any surface (rev 3b) are recorded there, with each piece paragraph and the revisions.
+
+**Panels:** `panels/13/13-<piece>-s1.png` and `13-<piece>-s6.png`. `panels/13/rejected/` keeps the renders that failed review (split-screen and baked-text versions), for the record. Composed by `tools/compose13.sh`.
+
+**Review notes:** no chimneys or stacks in any kept panel; pixels leave only from rear vent grilles; every piece is grounded, with skirts, plinths or bolts visible; no text baked into any kept image.
+
+---
+
+## 14 · outpost-stage-3 — a sealed four-cell outpost at stage 3
+
+**For:** a small sealed outpost on the plot at stage 3 (real hills, normal detail, haze, soft shadows; see sheet 08). Four cells in a 2 x 2 block, each enclosed by walls on every side, roof panels on top, and one airlock door as the only way in. One heavy texture mill stands on its 2 x 2 pad, pouring pixels from its rear vent. A quantum storage bin with a link emitter sits inside. Every cable runs in low ribbed steel floor covers. The gate stands far off on the left horizon, and Earth is in the sky.
+
+**Prompt (verbatim):**
+
+> A realtime 3D GAME ENGINE SCREENSHOT at stage-3 fidelity: real rolling hills, normal-detail textures, soft shadows, a light haze at the horizon, a dark blue-grey sky with a small alien planet visible: irregular continents of deep green and warm ochre in shapes that match no real-world landmass, wrapped in swirling white cloud bands, NO blue oceans. Scene: a small SEALED OUTPOST on uneven desert ground: four grey 4-metre cells in a 2 by 2 block, each cell enclosed by 3-metre steel walls on every side, a flat roof panel on top of every cell, and a single reinforced airlock door in one outer wall as the only way in; the base sits on grey foundation slabs with levelling skirts sunk into the regolith and hazard-striped edges. Beside the base, one heavy texture mill on a 2 by 2 pad of slabs, about 4 metres tall, with a top feed hopper of dark ore and a rear vent grille pouring a plume of small crisp SQUARE hot-pink pixels (no chimney, no stack, no smoke). A quantum storage bin with a link emitter stands inside the base. Every cable runs inside low ribbed steel floor cable covers, never loose on the ground: from the mill back across the ground in covers toward a repeater pylon mast and a junction box, and from the far gate's junction box. Far off on the left horizon, a chunky steel door frame gate standing free, with ribbed amber coil blocks. Desolate, not lit like a stage: dim low sun from frame right, no spotlights, no glow, no people, no goblins. No text, no UI, no watermark. ONE single image, one camera, not a split-screen.
+
+**Review notes:** the slabs, walls, roof panels, airlock, bin and mill are grounded; the pixels leave the rear vent; cables run in covers; the sky and planet follow the sheet-08 stage-3 look (dark blue-grey, small planet, no blue oceans). No people or goblins.
+
+---
+
+**Still open (this turn's image budget ran out):** the S6 pylon (its top ring has added insulators and coils that the S1 ring does not have) and the S6 drafting table (an extra cabinet with symbols sits beside it) are not yet redrawn. Sheet 13 and the contact sheet are rebuilt after those two.

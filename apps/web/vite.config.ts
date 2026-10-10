@@ -122,6 +122,7 @@ export default defineConfig(({ mode }) => ({
       '@hm/labkit': p('../../packages/labkit/src/index.ts'),
       '@hm/plotsim': p('../../packages/plotsim/src/index.ts'),
       '@hm/structure': p('../../packages/structure/src/index.ts'),
+      '@hm/lattice': p('../../packages/lattice/src/index.ts'),
       '@hm/fieldkit': p('../../packages/fieldkit/src/index.ts'),
       '@hm/cartlab': p('../../packages/cartlab/src/index.ts'),
       '@hm/plotcodec': p('../../packages/plotcodec/src/index.ts'),

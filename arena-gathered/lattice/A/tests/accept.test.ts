@@ -1,7 +1,7 @@
 // Hidden landing suite for the @hm/lattice battle (docs/prompts/battle/lattice.txt). Run against each answer before landing.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { box, deposit, withdraw, count, links, totals, pull, store, type Box } from '../src/index';
+import { box, deposit, withdraw, kg, count, links, totals, pull, store, type Box } from '../src/index';
 
 const defs = { ore: { stack: 50, kg: 1 }, map: { stack: 10, kg: 0.5 } };
 const B = (id: number, x: number, slots: Box['slots'], maxKg = 1e6): Box => ({ id, x, z: 0, slots, maxKg });

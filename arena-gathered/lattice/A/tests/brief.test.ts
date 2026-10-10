@@ -1,0 +1,22 @@
+import test from 'node:test'; import assert from 'node:assert/strict';
+import { box, deposit, withdraw, kg, count, links, totals, pull, store, type Box } from '../src/index';
+const defs = { ore: { stack: 50, kg: 1 }, map: { stack: 10, kg: 0.5 } };
+const B = (id: number, x: number, slots: Box['slots']): Box => ({ id, x, z: 0, slots, maxKg: 1e6 });
+test('boxes, networks, pull, store', () => {
+  let r = deposit(box(1, 0, 0, 4, 1000), defs, 'ore', 120);
+  assert.deepEqual(r.box.slots.map((s) => s?.n ?? 0), [50, 50, 20, 0]); r = deposit(r.box, defs, 'ore', 90);
+  assert.equal(r.left, 10); assert.equal(kg(r.box, defs), 200); assert.equal(deposit(box(2, 0, 0, 10, 25), defs, 'ore', 40).left, 15);
+  const w = withdraw(B(1, 0, [{ item: 'ore', n: 50 }, { item: 'ore', n: 20 }, { item: 'map', n: 5 }, { item: 'ore', n: 50 }]), 'ore', 30);
+  assert.deepEqual(w.box.slots, [{ item: 'ore', n: 40 }, null, { item: 'map', n: 5 }, { item: 'ore', n: 50 }]);
+  const bs = [B(1, 10, [{ item: 'ore', n: 30 }]), B(2, 55, [{ item: 'ore', n: 50 }, { item: 'map', n: 3 }]), B(3, 200, [])];
+  const r1 = { id: 1, x: 0, z: 0, range: 30 }, r2 = { id: 2, x: 50, z: 0, range: 20 };
+  assert.deepEqual(links(bs, [r1, r2]), [[1], [2], [3]]); assert.deepEqual(links(bs, [r1, r2, { id: 3, x: 25, z: 0, range: 30 }]), [[1, 2], [3]]);
+  const copy = JSON.stringify(bs), at = { x: 50, z: 0 };
+  const p = pull(bs, [1, 2], at, [{ item: 'ore', n: 40 }, { item: 'map', n: 2 }, { item: 'ore', n: 20 }]);
+  assert.ok(p.ok); assert.deepEqual(p.taken, [{ box: 2, item: 'ore', n: 50 }, { box: 1, item: 'ore', n: 10 }, { box: 2, item: 'map', n: 2 }]);
+  assert.equal(count(p.boxes[0]!, 'ore'), 20); assert.equal(p.boxes[2], bs[2]);
+  assert.deepEqual(pull(bs, [1, 2], at, [{ item: 'map', n: 5 }, { item: 'ore', n: 1 }]), { ok: false, short: [{ item: 'map', n: 2 }] });
+  assert.equal(JSON.stringify(bs), copy); assert.deepEqual(totals(bs, [1, 2]), { ore: 80, map: 3 });
+  const s = store([B(1, 0, [null, null]), B(2, 90, [{ item: 'map', n: 3 }, null])], [1, 2], { x: 0, z: 0 }, defs, [{ item: 'map', n: 4 }, { item: 'ore', n: 10 }]);
+  assert.deepEqual(s.left, []); assert.deepEqual(s.boxes[1]!.slots[0], { item: 'map', n: 7 }); assert.equal(count(s.boxes[0]!, 'ore'), 10);
+});

@@ -330,6 +330,9 @@
       "@hm/structure": [
         "packages/structure/src/index.ts"
       ],
+      "@hm/lattice": [
+        "packages/lattice/src/index.ts"
+      ],
       "@hm/fieldkit": [
         "packages/fieldkit/src/index.ts"
       ],

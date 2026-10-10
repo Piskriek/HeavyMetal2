@@ -22,3 +22,8 @@ REVIEW (side-by-side, S1 vs S6):
 - 29 heavy light projector: kept as drawn (same armoured mast, faceted lamp head with fins, amber pixels from the rear rim, lens emits nothing).
 - 28 heavy shape press: first S6 was an enclosed cabinet, not the open frame of the S1. Rejected (panels/17/rejected/17-press-s6-rev1.png); redrawn open-frame with the S1 as reference. Kept.
 - 30 heavy water maker: first S6 had the gravel hopper on top of the tank, the S1 has it low on the front end. Rejected (panels/17/rejected/17-watermaker-s6-rev1.png); redrawn with the hopper low on the front end. Kept.
+
+REVISION (projector S6, review of 17-projector-s6-rev1):
+- The first S6 had a second amber plume coming off the front of the lamp at the lens rim. Brief: pixels come only from the vents at the back, never from the lens. Old render moved to panels/17/rejected/17-projector-s6-rev1.png.
+- Redrawn with the same design, pad and lighting, as the S1 reference: the lens and rim emit nothing; amber pixels drift only from the gaps between the REAR heat-sink fins; the pad has ONE low ribbed steel floor cable cover where the power and data cables run.
+- Prompt: the same W6 wrapper and PAD and P-29 text as the rest of sheet 17, plus: "THE LENS IS CLEAN AND SILENT ... The ONLY pixel source is the set of heat-sink FINS on the REAR of the lamp head ... ONE LOW RIBBED STEEL FLOOR CABLE COVER ... the ONLY cable cover on the pad." References: 17-projector-s1, 12-lamp-s6, 13-hardpoint-mill-s6. Kept after side-by-side check.

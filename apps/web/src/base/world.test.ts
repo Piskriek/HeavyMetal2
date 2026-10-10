@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as L from '@hm/lattice';
 import { ITEMS, STARTER } from './catalog';
-import { BRIDGE_STORE, apply, createWorld, hashWorld, networkAt, preview, replay, withBridgeStore, type BaseCommand, type BaseWorld, type WorldEnv } from './world';
+import * as S from '@hm/structure';
+import { BRIDGE_STORE, SHELTER, apply, createWorld, hashWorld, layoutPieces, networkAt, planGhosts, preview, replay, withBridgeStore, type BaseCommand, type BaseWorld, type WorldEnv } from './world';
 
 const env: WorldEnv = { heightAt: () => 0, bridge: { x: 0, z: 0, range: 60 } };
 const at = { x: 2, z: 2 };
@@ -180,4 +181,48 @@ test('the bridge store stands at the gate on the network, and building pulls fro
   const w1 = run(w0, found);
   assert.equal(L.count(w1.player, 'ore'), 0);
   assert.equal(L.totals(w1.boxes, [BRIDGE_STORE])['ore'] ?? 0, 30);
+});
+
+test('the starter shelter: free, sealed, once per world; it saves as a layout that rebuilds elsewhere as you pay', () => {
+  const stock = [{ item: 'ore', n: 200 }, { item: 'prim-chassis', n: 1 }, { item: 'map-basalt', n: 2 }];
+  let w = run(withBridgeStore(createWorld(), env, stock), { t: 'shelter', cx: 2, cz: 2, yaw: 0 });
+  assert.equal(w.shelter, true);
+  assert.deepEqual(S.rooms(w.base).map((r) => [r.k, r.sealed]), [[0, true]]);
+  assert.equal(apply(w, env, { t: 'shelter', cx: 30, cz: 30, yaw: 0 }).events[0]!.type, 'refused');
+  assert.equal(L.totals(w.boxes, [BRIDGE_STORE])['ore'], 200, 'the shelter is free');
+
+  const s = w.base.structures[0]!.id;
+  assert.deepEqual(apply(w, env, { t: 'saveLayout', at: { x: 40, z: 40 }, structure: s, name: 'Hut' }).events, [{ type: 'refused', cmd: 'saveLayout', why: 'no-bench' }]);
+  w = run(w, { t: 'saveLayout', at: { x: 2, z: 2 }, structure: s, name: '  Hut ' });
+  const layout = w.layouts[0]!;
+  assert.equal(layout.name, 'Hut');
+  assert.equal(layoutPieces(layout.code)!.length, SHELTER.length);
+  assert.equal(apply(w, env, { t: 'saveLayout', at: { x: 2, z: 2 }, structure: s, name: 'Hut 2' }).events[0]!.type, 'refused', 'same layout twice');
+
+  w = run(w, { t: 'plan', layout: layout.id, cx: 40, cz: 2, yaw: 0.5 });
+  const ghosts = planGhosts(w, env, 1);
+  assert.equal(ghosts.length, SHELTER.length);
+  assert.ok(Math.abs(ghosts[0]!.at.x - 40) < 1e-9 && Math.abs(ghosts[0]!.at.z - 2) < 1e-9);
+
+  // the starter kit builds everything but the airlock: six pieces go up, paid from the bridge store
+  const at = { x: 38, z: 2 };
+  const first = apply(w, env, { t: 'fill', at, plan: 1 });
+  const filled = first.events.find((e) => e.type === 'filled');
+  assert.deepEqual(filled && { ...filled, built: filled.built.length }, { type: 'filled', plan: 1, built: 6, left: 1, blocked: 1 });
+  w = first.world;
+  assert.equal(L.totals(w.boxes, [BRIDGE_STORE])['ore'], 200 - (20 + 3 * 12 + 10 + 25));
+  assert.equal(planGhosts(w, env, 1).length, 1);
+  assert.equal(apply(w, env, { t: 'fill', at, plan: 1 }).events[0]!.type, 'refused', 'nothing new to build');
+
+  // a basalt chassis blueprint builds the airlock (the piece takes basalt): the plan completes and the copy seals
+  w = run(w, { t: 'draft', at: { x: 2, z: 2 }, primitive: 'chassis', map: 'basalt' }, { t: 'fill', at, plan: 1 });
+  assert.deepEqual(w.plans, []);
+  assert.equal(w.base.pieces.filter((p) => p.kind === 'airlock' && p.mat === 'basalt').length, 1);
+  assert.deepEqual(S.rooms(w.base).map((r) => r.sealed), [true, true]);
+
+  // shared layouts come back to the same id; garbage is refused
+  const other = run(createWorld(2), { t: 'importLayout', code: layout.code, name: 'From a friend' });
+  assert.equal(other.layouts[0]!.id, layout.id);
+  assert.equal(apply(createWorld(), env, { t: 'importLayout', code: 'not-a-layout', name: 'x' }).events[0]!.type, 'refused');
+  assert.equal(apply(createWorld(), env, { t: 'importLayout', code: layout.code, name: '' }).events[0]!.type, 'refused');
 });

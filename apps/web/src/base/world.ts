@@ -14,7 +14,7 @@ import { hashValue } from '@hm/kernel';
 import * as L from '@hm/lattice';
 import * as S from '@hm/structure';
 import * as F from '@hm/substrate';
-import { DRAFT_ORE, EQUIP, FIELD_RADIUS, HEAVY, HEAVY_BILL, ITEMS, MAPS, MATERIALS, PIECE_EXTRA, PIECE_ORE, PRIMITIVES, QUEUE_MAX, RECIPE_BY_ID, STARTER, blueprint, blueprintId, pieceCost, type HeavyKind, type MapId, type PrimitiveId } from './catalog';
+import { DRAFT_ORE, EQUIP, FIELD_RADIUS, HEAVY, HEAVY_BILL, ITEMS, MAPS, MATERIALS, PIECE_EXTRA, PIECE_ORE, PRIMITIVES, QUEUE_MAX, RECIPE_BY_ID, STARTER, blueprint, blueprintId, pieceCost, type Blueprint, type HeavyKind, type MapId, type PrimitiveId } from './catalog';
 import { EQUIP_SLOTS, type EquipSlot, type SlotRef } from './view';
 
 export const PLAYER = -1;
@@ -34,7 +34,7 @@ export const BEAM_RANGE = 12;
 export interface Point { readonly x: number; readonly z: number }
 
 export interface BaseWorld {
-  readonly v: 2;
+  readonly v: 3;
   /** Commands applied so far: the position in the command log. */
   readonly tick: number;
   readonly base: S.Base;
@@ -50,7 +50,21 @@ export interface BaseWorld {
   readonly field: F.Field;
   /** Heavy machines, one per hardpoint (id = the hardpoint piece's id). */
   readonly machines: readonly Machine[];
+  /** Saved structure layouts (D13), oldest first. */
+  readonly layouts: readonly Layout[];
+  /** Layouts placed as ghosts, filling in as the player pays (D13). */
+  readonly plans: readonly Plan[];
+  /** Whether the free starter shelter (D15) has been placed. */
+  readonly shelter: boolean;
 }
+
+/** A saved structure: the @hm/structure codec of one structure at the origin, its first foundation at cell (0, 0) first. */
+export interface Layout { readonly id: string; readonly name: string; readonly code: string }
+/**
+ * A layout placed as a ghost: its first foundation's cell centre and yaw, the structure once that foundation stands
+ * (null before), and the layout pieces still to build (indices into the layout, in build order).
+ */
+export interface Plan { readonly id: number; readonly layout: string; readonly cx: number; readonly cz: number; readonly yaw: number; readonly s: number | null; readonly left: readonly number[] }
 
 export interface Job { readonly recipe: string; readonly done: number }
 export interface Machine {
@@ -84,7 +98,18 @@ export type BaseCommand =
   | { readonly t: 'stage'; readonly stage: number }
   | { readonly t: 'install'; readonly at: Point; readonly hardpoint: number; readonly kind: HeavyKind }
   | { readonly t: 'craft'; readonly at: Point; readonly machine: number; readonly recipe: string }
-  | { readonly t: 'collect'; readonly machine: number };
+  | { readonly t: 'collect'; readonly machine: number }
+  /** Saves one of the player's structures as a layout, at a Drafting Table (D13). */
+  | { readonly t: 'saveLayout'; readonly at: Point; readonly structure: number; readonly name: string }
+  /** Adds a layout shared by another player (its codec text, hostile until checked). */
+  | { readonly t: 'importLayout'; readonly code: string; readonly name: string }
+  /** Places a layout as a ghost: (cx, cz) is its first foundation's cell centre. */
+  | { readonly t: 'plan'; readonly layout: string; readonly cx: number; readonly cz: number; readonly yaw: number }
+  /** Builds a plan's next pieces in order, paying as it goes, until something is short. */
+  | { readonly t: 'fill'; readonly at: Point; readonly plan: number }
+  | { readonly t: 'dropPlan'; readonly plan: number }
+  /** Places the free starter shelter (D15), once per world. */
+  | { readonly t: 'shelter'; readonly cx: number; readonly cz: number; readonly yaw: number };
 
 export type BaseEvent =
   | { readonly type: 'refused'; readonly cmd: BaseCommand['t']; readonly why: string; readonly short?: readonly L.Stack[] }
@@ -100,7 +125,13 @@ export type BaseEvent =
   | { readonly type: 'installed'; readonly machine: number; readonly kind: HeavyKind }
   | { readonly type: 'queued'; readonly machine: number; readonly recipe: string }
   | { readonly type: 'collected'; readonly machine: number; readonly n: number }
-  | { readonly type: 'stage'; readonly stage: number };
+  | { readonly type: 'stage'; readonly stage: number }
+  | { readonly type: 'layout'; readonly id: string }
+  | { readonly type: 'planned'; readonly plan: number }
+  /** A fill: the pieces it built, how many are still to build, and how many of those the rules refused this time. */
+  | { readonly type: 'filled'; readonly plan: number; readonly built: readonly number[]; readonly left: number; readonly blocked: number }
+  | { readonly type: 'dropped'; readonly plan: number }
+  | { readonly type: 'shelter'; readonly structure: number };
 
 export interface Applied { readonly world: BaseWorld; readonly events: readonly BaseEvent[] }
 
@@ -111,7 +142,7 @@ export function createWorld(seed = 1): BaseWorld {
   const slots: (L.Stack | null)[] = Array.from({ length: PLAYER_SLOTS }, () => null);
   slots[0] = { item: STARTER, n: 1 };
   return {
-    v: 2, tick: 0, base: S.empty(), boxes: [],
+    v: 3, tick: 0, base: S.empty(), boxes: [], layouts: [], plans: [], shelter: false,
     player: { id: PLAYER, x: 0, z: 0, slots, maxKg: PLAYER_KG },
     equipment: { ...NO_EQUIPMENT, beam: { item: 'tool-beam', n: 1 }, visor: { item: 'eq-visor', n: 1 } },
     hotbar: 0,
@@ -144,7 +175,11 @@ export const structureEnv = (env: WorldEnv): S.Env => ({ heightAt: (x, z) => env
 /** The world point of a piece: its cell centre (cells and fixtures), edge middle, or corner, on its floor. */
 export function pieceAt(base: S.Base, p: S.Piece): { x: number; y: number; z: number } | null {
   const st = base.structures.find((s) => s.id === p.s);
-  if (!st) return null;
+  return st ? pieceAtIn(st, p) : null;
+}
+
+/** pieceAt for a structure pose that may not be in the base yet (a plan's ghost). */
+export function pieceAtIn(st: S.Structure, p: Pick<S.Piece, 'kind' | 'i' | 'j' | 'k' | 'r'>): { x: number; y: number; z: number } {
   const C = S.CELL;
   const local = p.kind === 'wall' || p.kind === 'airlock'
     ? (p.r === 0 ? [(p.i + 0.5) * C, p.j * C] : [p.i * C, (p.j + 0.5) * C])
@@ -232,6 +267,19 @@ export function apply(w: BaseWorld, env: WorldEnv, cmd: BaseCommand): Applied {
       return craft(w, env, cmd);
     case 'collect':
       return collect(w, cmd.machine);
+    case 'saveLayout':
+      return saveLayout(w, cmd);
+    case 'importLayout':
+      return importLayout(w, cmd);
+    case 'plan':
+      return plan(w, cmd);
+    case 'fill':
+      return fill(w, env, cmd);
+    case 'dropPlan':
+      if (!w.plans.some((p) => p.id === cmd.plan)) return refuse(w, cmd.t, 'no-plan');
+      return next(w, { plans: w.plans.filter((p) => p.id !== cmd.plan) }, [{ type: 'dropped', plan: cmd.plan }]);
+    case 'shelter':
+      return shelter(w, env, cmd);
   }
 }
 
@@ -379,12 +427,7 @@ function draft(w: BaseWorld, env: WorldEnv, cmd: Extract<BaseCommand, { t: 'draf
   if (!(PRIMITIVES as readonly string[]).includes(cmd.primitive) || !(MAPS as readonly string[]).includes(cmd.map)) return refuse(w, 'draft', 'bad-recipe');
   const id = blueprintId(cmd.primitive as PrimitiveId, cmd.map as MapId);
   if (owns(w, id)) return refuse(w, 'draft', 'known');
-  const bench = w.base.pieces.some((p) => {
-    if (p.kind !== 'bench') return false;
-    const at = pieceAt(w.base, p);
-    return !!at && Math.hypot(at.x - cmd.at.x, at.z - cmd.at.z) <= BENCH_REACH;
-  });
-  if (!bench) return refuse(w, 'draft', 'no-bench');
+  if (!benchNear(w, cmd.at)) return refuse(w, 'draft', 'no-bench');
   const paid = pay(w, env, cmd.at, [{ item: `prim-${cmd.primitive}`, n: 1 }, { item: `map-${cmd.map}`, n: 1 }, { item: 'ore', n: DRAFT_ORE }]);
   if (!paid.ok) return refuse(w, 'draft', 'short', paid.short);
   const d = L.deposit(paid.patch.player, ITEMS, id, 1);
@@ -501,4 +544,181 @@ function collect(w: BaseWorld, id: number): Applied {
   }
   if (n === 0) return refuse(w, 'collect', 'too-heavy');
   return next(w, { player, machines: w.machines.map((x) => (x.id === id ? { ...x, out: left } : x)) }, [{ type: 'collected', machine: id, n }]);
+}
+
+// ---------------------------------------------------------------------------------------------- layouts and the starter shelter
+export const MAX_LAYOUTS = 32;
+export const MAX_PLANS = 4;
+const NAME_MAX = 32;
+
+/** Whether a Drafting Table (a bench piece) stands within reach of `at`. */
+function benchNear(w: BaseWorld, at: Point): boolean {
+  return w.base.pieces.some((p) => {
+    if (p.kind !== 'bench') return false;
+    const q = pieceAt(w.base, p);
+    return !!q && Math.hypot(q.x - at.x, q.z - at.z) <= BENCH_REACH;
+  });
+}
+
+/**
+ * One structure as a layout base: a single structure at the origin, its pieces renumbered in build (id) order with the
+ * first ground-level foundation moved to the front and to cell (0, 0), doors shut. Null when it has no such foundation.
+ */
+function layoutBase(base: S.Base, s: number): S.Base | null {
+  const own = base.pieces.filter((p) => p.s === s);
+  const first = own.find((p) => p.kind === 'foundation' && p.k === 0);
+  if (!first) return null;
+  const order = [first, ...own.filter((p) => p !== first)];
+  const pieces = order.map((p, n): S.Piece => {
+    const { open: _shut, ...rest } = p;
+    return { ...rest, id: n + 1, s: 0, i: p.i - first.i, j: p.j - first.j };
+  });
+  return { v: 1, structures: [{ id: 0, x: 0, y: 0, z: 0, yaw: 0 }], pieces, nextId: pieces.length + 1 };
+}
+
+const layoutCode = (b: S.Base): string | null => { try { return S.encode(b); } catch { return null; } };
+const layoutId = (code: string): string => `layout:${hashValue(code).slice(0, 16)}`;
+
+/** The pieces of a layout's code in build order (the first is its ground foundation at cell (0, 0)), or null if it is not one. */
+export function layoutPieces(code: string): readonly S.Piece[] | null {
+  const b = S.decode(code);
+  if (!b || b.structures.length !== 1 || b.pieces.length === 0) return null;
+  const first = b.pieces[0]!;
+  return first.kind === 'foundation' && first.i === 0 && first.j === 0 && first.k === 0 ? b.pieces : null;
+}
+
+function addLayout(w: BaseWorld, cmd: BaseCommand['t'], b: S.Base | null, name: string): Applied {
+  const label = typeof name === 'string' ? name.trim() : '';
+  if (label.length === 0 || label.length > NAME_MAX) return refuse(w, cmd, 'bad-name');
+  const code = b ? layoutCode(b) : null;
+  if (!code || !layoutPieces(code)) return refuse(w, cmd, 'bad-code');
+  const id = layoutId(code);
+  if (w.layouts.some((l) => l.id === id)) return refuse(w, cmd, 'known');
+  if (w.layouts.length >= MAX_LAYOUTS) return refuse(w, cmd, 'full');
+  return next(w, { layouts: [...w.layouts, { id, name: label, code }] }, [{ type: 'layout', id }]);
+}
+
+function saveLayout(w: BaseWorld, cmd: Extract<BaseCommand, { t: 'saveLayout' }>): Applied {
+  if (!benchNear(w, cmd.at)) return refuse(w, cmd.t, 'no-bench');
+  if (!w.base.structures.some((s) => s.id === cmd.structure)) return refuse(w, cmd.t, 'no-structure');
+  return addLayout(w, cmd.t, layoutBase(w.base, cmd.structure), cmd.name);
+}
+
+function importLayout(w: BaseWorld, cmd: Extract<BaseCommand, { t: 'importLayout' }>): Applied {
+  if (typeof cmd.code !== 'string' || cmd.code.length > S.LIMITS.maxChars) return refuse(w, cmd.t, 'bad-code');
+  const b = S.decode(cmd.code), s = b && b.structures.length === 1 ? b.structures[0]!.id : null;
+  // re-normalised, so the same layout always gets the same id whoever shared it
+  return addLayout(w, cmd.t, b && s !== null ? layoutBase(b, s) : null, cmd.name);
+}
+
+function plan(w: BaseWorld, cmd: Extract<BaseCommand, { t: 'plan' }>): Applied {
+  const l = w.layouts.find((x) => x.id === cmd.layout), pieces = l ? layoutPieces(l.code) : null;
+  if (!pieces) return refuse(w, cmd.t, 'no-layout');
+  if (![cmd.cx, cmd.cz, cmd.yaw].every(Number.isFinite)) return refuse(w, cmd.t, 'bad-slot');
+  if (w.plans.length >= MAX_PLANS) return refuse(w, cmd.t, 'full');
+  const id = w.plans.reduce((m, p) => Math.max(m, p.id), 0) + 1;
+  const p: Plan = { id, layout: cmd.layout, cx: cmd.cx, cz: cmd.cz, yaw: cmd.yaw, s: null, left: pieces.map((_, n) => n) };
+  return next(w, { plans: [...w.plans, p] }, [{ type: 'planned', plan: id }]);
+}
+
+/**
+ * The blueprint a layout piece is built from: one the player carries that builds `kind` in the layout's `mat`, else any
+ * carried blueprint that builds `kind` (the piece takes that blueprint's material). Starter first, then pack order.
+ */
+function blueprintFor(w: BaseWorld, kind: S.Kind, mat: string): Blueprint | null {
+  const held = [STARTER, ...w.player.slots.flatMap((s) => (s && s.item.startsWith('bp:') ? [s.item] : []))]
+    .filter((id) => owns(w, id)).flatMap((id) => { const bp = blueprint(id); return bp && bp.kinds.includes(kind) ? [bp] : []; });
+  return held.find((bp) => bp.mat === mat) ?? held[0] ?? null;
+}
+
+/** Places one plan piece by the rules (no payment); the first one founds the structure. */
+function placePlanned(base: S.Base, env: WorldEnv, p: Plan, piece: S.Piece): S.Result {
+  const senv = structureEnv(env);
+  if (p.s === null) return S.found(base, senv, p.cx, p.cz, p.yaw, piece.mat);
+  return S.place(base, senv, { s: p.s, kind: piece.kind, i: piece.i, j: piece.j, k: piece.k, r: piece.r, mat: piece.mat });
+}
+
+function addBox(boxes: readonly L.Box[], base: S.Base, id: number): readonly L.Box[] {
+  const piece = base.pieces.find((q) => q.id === id)!, at = pieceAt(base, piece)!;
+  return [...boxes, L.box(id, at.x, at.z, BIN_SLOTS, BIN_KG)];
+}
+
+function fill(w: BaseWorld, env: WorldEnv, cmd: Extract<BaseCommand, { t: 'fill' }>): Applied {
+  const p0 = w.plans.find((x) => x.id === cmd.plan);
+  const l = p0 ? w.layouts.find((x) => x.id === p0.layout) : undefined, pieces = l ? layoutPieces(l.code) : null;
+  if (!p0 || !pieces) return refuse(w, cmd.t, 'no-plan');
+  let world = w, p = p0, short: readonly L.Stack[] | null = null, blocked = 0;
+  const built: number[] = [], left: number[] = [];
+  for (const n of p0.left) {
+    const piece = pieces[n]!;
+    if (short) { left.push(n); continue; }
+    const bp = blueprintFor(world, piece.kind, piece.mat), bill = bp ? pieceCost(bp, piece.kind) : null;
+    const r = bp && bill ? placePlanned(world.base, env, p, { ...piece, mat: bp.mat }) : null;
+    if (!bill || !r || !r.ok) {
+      // the first foundation founds the structure: nothing else can stand before it does
+      if (p.s === null) return refuse(w, cmd.t, bill ? (r?.why ?? 'blocked') : 'no-blueprint');
+      blocked += 1; left.push(n); continue;
+    }
+    const paid = pay(world, env, cmd.at, bill);
+    if (!paid.ok) { short = paid.short; left.push(n); continue; }
+    const boxes = piece.kind === 'bin' ? addBox(paid.patch.boxes, r.base, r.id) : paid.patch.boxes;
+    if (p.s === null) p = { ...p, s: r.base.pieces.find((q) => q.id === r.id)!.s };
+    world = { ...world, base: r.base, player: paid.patch.player, boxes };
+    built.push(r.id);
+  }
+  if (built.length === 0) return short ? refuse(w, cmd.t, 'short', short) : refuse(w, cmd.t, 'blocked');
+  const done = p;
+  const plans = left.length === 0 ? w.plans.filter((x) => x.id !== done.id) : w.plans.map((x) => (x.id === done.id ? { ...done, left } : x));
+  const events: BaseEvent[] = [
+    ...built.map((id): BaseEvent => ({ type: 'placed', id, kind: world.base.pieces.find((q) => q.id === id)!.kind })),
+    { type: 'filled', plan: done.id, built, left: left.length, blocked },
+  ];
+  return next(w, { base: world.base, player: world.player, boxes: world.boxes, plans }, events);
+}
+
+/** Where a plan's unbuilt pieces stand, for the ghost; before founding, on the highest ground under its first cell. */
+export function planGhosts(w: BaseWorld, env: WorldEnv, planId: number): readonly { readonly index: number; readonly piece: S.Piece; readonly at: { x: number; y: number; z: number }; readonly yaw: number }[] {
+  const p = w.plans.find((x) => x.id === planId), l = p ? w.layouts.find((x) => x.id === p.layout) : undefined;
+  const pieces = l ? layoutPieces(l.code) : null;
+  if (!p || !pieces) return [];
+  let st = p.s === null ? undefined : w.base.structures.find((s) => s.id === p.s);
+  if (!st) {
+    const c = Math.cos(p.yaw), sn = Math.sin(p.yaw), h = S.CELL / 2;
+    const x = p.cx - h * c + h * sn, z = p.cz - h * sn - h * c;
+    const corners = [[0, 0], [S.CELL, 0], [0, S.CELL], [S.CELL, S.CELL]] as const;
+    const y = Math.max(...corners.map(([u, v]) => env.heightAt(x + u * c - v * sn, z + u * sn + v * c)));
+    st = { id: -1, x, y, z, yaw: p.yaw };
+  }
+  const pose = st;
+  return p.left.map((index) => ({ index, piece: pieces[index]!, at: pieceAtIn(pose, pieces[index]!), yaw: pose.yaw }));
+}
+
+/**
+ * The starter shelter (D15): one sealed regolith cell (foundation, three walls, an airlock to the front at +z, a ceiling
+ * and a Drafting Table inside), free, placed in one action and once per world. Its ceiling becomes a low roof, and a
+ * life-support unit joins it, when @hm/structure gains those kinds.
+ */
+export const SHELTER: readonly Omit<S.Piece, 'id' | 's' | 'mat'>[] = [
+  { kind: 'foundation', i: 0, j: 0, k: 0, r: 0 },
+  { kind: 'wall', i: 0, j: 0, k: 0, r: 0 },
+  { kind: 'wall', i: 0, j: 0, k: 0, r: 1 },
+  { kind: 'wall', i: 1, j: 0, k: 0, r: 1 },
+  { kind: 'airlock', i: 0, j: 1, k: 0, r: 0 },
+  { kind: 'floor', i: 0, j: 0, k: 1, r: 0 },
+  { kind: 'bench', i: 0, j: 0, k: 0, r: 2 },
+];
+
+function shelter(w: BaseWorld, env: WorldEnv, cmd: Extract<BaseCommand, { t: 'shelter' }>): Applied {
+  if (w.shelter) return refuse(w, cmd.t, 'known');
+  const senv = structureEnv(env), mat = 'regolith';
+  const f = S.found(w.base, senv, cmd.cx, cmd.cz, cmd.yaw, mat);
+  if (!f.ok) return refuse(w, cmd.t, f.why);
+  const s = f.base.pieces.find((q) => q.id === f.id)!.s;
+  let base = f.base;
+  for (const piece of SHELTER.slice(1)) {
+    const r = S.place(base, senv, { ...piece, s, mat });
+    if (!r.ok) return refuse(w, cmd.t, r.why);
+    base = r.base;
+  }
+  return next(w, { base, shelter: true }, [{ type: 'shelter', structure: s }]);
 }

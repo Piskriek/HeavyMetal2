@@ -879,4 +879,4 @@ in 04/05).
 
 ---
 
-**Still open (lead engineer review, 2026-10-10):** the S6 pylon and drafting table were redrawn in 22ee19a8 and now match S1. One gap remains: the S6 hardpoint is a drum on one slab, while S1 is a flat mounting ring with cable glands on a 2 x 2 slab pad. The basekit mesh brief takes its geometry from S1.
+**Status (lead engineer review, 2026-10-10):** complete. All eleven S1/S6 pairs are one design; the S6 hardpoints were redrawn in 9c47f00a to the S1 bolted cylinder socket with cable glands on its pad. The owner: "art looks good". Roofs, openings and circulation pieces follow on sheet 15.

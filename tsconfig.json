@@ -336,6 +336,9 @@
       "@hm/substrate": [
         "packages/substrate/src/index.ts"
       ],
+      "@hm/basegear": [
+        "packages/basegear/src/index.ts"
+      ],
       "@hm/fieldkit": [
         "packages/fieldkit/src/index.ts"
       ],

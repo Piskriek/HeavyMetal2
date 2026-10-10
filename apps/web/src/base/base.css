@@ -328,12 +328,49 @@
   background: rgba(255, 255, 255, 0.08);
   border-radius: 3px;
   overflow: hidden;
+  box-sizing: border-box;
+}
+
+.hm-weight-bar-track.overloaded {
+  border: 1px solid rgba(239, 68, 68, 0.5);
+}
+
+.hm-weight-bar-track.warning {
+  border: 1px solid rgba(245, 158, 11, 0.4);
 }
 
 .hm-weight-bar-fill {
   height: 100%;
   background: linear-gradient(90deg, #00f0ff, #10b981);
   transition: width 0.3s ease;
+}
+
+.hm-overload-badge {
+  font-family: 'Oxanium', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 2px;
+  text-transform: uppercase;
+}
+
+.hm-overload-badge.amber {
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #fbbf24;
+}
+
+.hm-overload-badge.red {
+  background: rgba(239, 68, 68, 0.22);
+  border: 1px solid rgba(239, 68, 68, 0.55);
+  color: #f87171;
+  animation: hmPulseRed 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes hmPulseRed {
+  from { opacity: 0.85; }
+  to { opacity: 1; box-shadow: 0 0 6px rgba(239, 68, 68, 0.4); }
 }
 
 button.hm-quick-stack-btn,

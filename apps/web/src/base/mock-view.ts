@@ -219,28 +219,28 @@ export class MockBaseViewSource implements BaseViewSource {
   constructor() {
     this.slots = Array.from({ length: 36 }, () => ({ item: null, n: 0 }));
 
-    // Initial loadout
-    this.slots[0] = { item: MOCK_ITEMS.weap_shotgun!, n: 1 };
-    this.slots[1] = { item: MOCK_ITEMS.tool_beam!, n: 1 };
-    this.slots[2] = { item: MOCK_ITEMS.bp_found_basalt!, n: 8 };
-    this.slots[3] = { item: MOCK_ITEMS.bp_wall_obsidian!, n: 12 };
-    this.slots[4] = { item: MOCK_ITEMS.bp_airlock_seal!, n: 2 };
-    this.slots[5] = { item: MOCK_ITEMS.ore!, n: 145 };
-    this.slots[6] = { item: MOCK_ITEMS.pxd_cyan!, n: 250 };
-    this.slots[7] = { item: MOCK_ITEMS.vtx_quartz!, n: 80 };
+    // Initial loadout (Under 120 kg cap)
+    this.slots[0] = { item: MOCK_ITEMS.weap_shotgun!, n: 1 }; // 4.2 kg
+    this.slots[1] = { item: MOCK_ITEMS.tool_beam!, n: 1 }; // 3.5 kg
+    this.slots[2] = { item: MOCK_ITEMS.bp_found_basalt!, n: 8 }; // 0.0 kg
+    this.slots[3] = { item: MOCK_ITEMS.bp_wall_obsidian!, n: 12 }; // 0.0 kg
+    this.slots[4] = { item: MOCK_ITEMS.bp_airlock_seal!, n: 2 }; // 0.0 kg
+    this.slots[5] = { item: MOCK_ITEMS.ore!, n: 20 }; // 20.0 kg
+    this.slots[6] = { item: MOCK_ITEMS.pxd_cyan!, n: 45 }; // 9.0 kg
+    this.slots[7] = { item: MOCK_ITEMS.vtx_quartz!, n: 30 }; // 9.0 kg
     this.slots[8] = { item: null, n: 0 };
 
-    this.slots[9] = { item: MOCK_ITEMS.map_basalt!, n: 6 };
-    this.slots[10] = { item: MOCK_ITEMS.map_obsidian!, n: 4 };
-    this.slots[11] = { item: MOCK_ITEMS.prim_cube!, n: 15 };
-    this.slots[12] = { item: MOCK_ITEMS.prim_col!, n: 8 };
-    this.slots[13] = { item: MOCK_ITEMS.pxd_magenta!, n: 120 };
+    this.slots[9] = { item: MOCK_ITEMS.map_basalt!, n: 4 }; // 4.0 kg
+    this.slots[10] = { item: MOCK_ITEMS.map_obsidian!, n: 2 }; // 2.0 kg
+    this.slots[11] = { item: MOCK_ITEMS.prim_cube!, n: 2 }; // 16.0 kg
+    this.slots[12] = { item: MOCK_ITEMS.prim_col!, n: 2 }; // 12.0 kg
+    this.slots[13] = { item: MOCK_ITEMS.pxd_magenta!, n: 20 }; // 4.0 kg
 
     this.equipment = {
-      visor: { item: MOCK_ITEMS.equip_visor!, n: 1 },
-      shield: { item: MOCK_ITEMS.equip_shield!, n: 1 },
-      rebreather: { item: MOCK_ITEMS.equip_rebreather!, n: 1 },
-      beam: { item: MOCK_ITEMS.tool_beam!, n: 1 },
+      visor: { item: MOCK_ITEMS.equip_visor!, n: 1 }, // 1.0 kg
+      shield: { item: MOCK_ITEMS.equip_shield!, n: 1 }, // 2.5 kg
+      rebreather: { item: MOCK_ITEMS.equip_rebreather!, n: 1 }, // 1.8 kg
+      beam: { item: MOCK_ITEMS.tool_beam!, n: 1 }, // 3.5 kg
       sidearm: { item: null, n: 0 },
     };
   }

@@ -46,6 +46,9 @@ export const InventoryWindow: React.FC<InventoryWindowProps> = ({
     return false;
   };
 
+  const isOverloaded = inventory.kg > inventory.maxKg;
+  const isNearCap = inventory.kg >= inventory.maxKg * 0.85 && !isOverloaded;
+  const excessKg = isOverloaded ? Math.round((inventory.kg - inventory.maxKg) * 10) / 10 : 0;
   const weightRatio = Math.min(100, Math.round((inventory.kg / inventory.maxKg) * 100));
 
   return (
@@ -151,19 +154,42 @@ export const InventoryWindow: React.FC<InventoryWindowProps> = ({
                 <span>QUICK STACK TO GRID</span>
               </button>
 
-              <div style={{ width: 220 }} className="hm-weight-bar-container">
+              <div style={{ width: 250 }} className="hm-weight-bar-container">
                 <div className="hm-weight-label">
-                  <span>CARGO MASS</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>CARGO MASS</span>
+                    {isOverloaded && (
+                      <span className="hm-overload-badge red">
+                        OVERLOADED (+{excessKg} kg)
+                      </span>
+                    )}
+                    {isNearCap && (
+                      <span className="hm-overload-badge amber">
+                        NEAR CAP
+                      </span>
+                    )}
+                  </div>
                   <span>
-                    <strong>{inventory.kg}</strong> / {inventory.maxKg} kg
+                    <strong
+                      style={{
+                        color: isOverloaded ? '#f87171' : isNearCap ? '#fbbf24' : 'inherit',
+                      }}
+                    >
+                      {inventory.kg}
+                    </strong>{' '}
+                    / {inventory.maxKg} kg
                   </span>
                 </div>
-                <div className="hm-weight-bar-track">
+                <div className={`hm-weight-bar-track ${isOverloaded ? 'overloaded' : isNearCap ? 'warning' : ''}`}>
                   <div
                     className="hm-weight-bar-fill"
                     style={{
                       width: `${weightRatio}%`,
-                      background: weightRatio > 90 ? '#ef4444' : 'linear-gradient(90deg, #00f0ff, #10b981)',
+                      background: isOverloaded
+                        ? 'linear-gradient(90deg, #f59e0b, #ef4444)'
+                        : isNearCap
+                          ? 'linear-gradient(90deg, #38bdf8, #fbbf24)'
+                          : 'linear-gradient(90deg, #00f0ff, #10b981)',
                     }}
                   />
                 </div>

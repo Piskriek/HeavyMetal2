@@ -1,4 +1,4 @@
-Follow-up, same chat: keep src/index.ts and its tests unchanged. Add src/mobsim.ts (import navigator from ./index) and tests/mobsim.test.ts, then STOP. Same rules: strict TS, pure, deterministic, no DOM/Date/Math.random; no Math.sin/cos/atan2 in step (vectors and Math.sqrt), so replays match everywhere.
+Follow-up: keep src/index.ts and its tests unchanged. Add src/mobsim.ts (import navigator from ./index) and tests/mobsim.test.ts, then STOP. Same rules: strict TS, pure, deterministic, no DOM/Date/Math.random; no Math.sin/cos/atan2 in step (vectors and Math.sqrt), so replays match everywhere.
 TASK: deterministic Monster Mash mobs (a synced world replays them). Keep today:
 - Ogro (hp 100, 2.8 m/s) and Demon (hp 80, 3.2 m/s) chase the player, attack within 2.2 m and chase again beyond 2.8 m.
 - A hit that doesn't kill makes them flinch ('pain', 0.3 s). The dead stay where they fell.

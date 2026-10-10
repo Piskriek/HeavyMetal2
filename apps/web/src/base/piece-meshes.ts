@@ -19,6 +19,9 @@ interface ActivePieceEntry {
   kind: S.Kind;
   pos: { x: number; y: number; z: number };
   yaw: number;
+  parts?: Record<string, THREE.Object3D>;
+  doorAngle?: number;
+  targetDoorAngle?: number;
 }
 
 interface CollapsingPiece {
@@ -68,13 +71,42 @@ export class PieceMeshManager {
       if (!pos || !st) continue;
 
       let extraAngle = 0;
-      if (piece.kind === 'wall' || piece.kind === 'airlock') {
+      if (
+        piece.kind === 'wall' ||
+        piece.kind === 'airlock' ||
+        piece.kind === 'halfWall' ||
+        piece.kind === 'windowWall' ||
+        piece.kind === 'doorframe' ||
+        piece.kind === 'door' ||
+        piece.kind === 'railing' ||
+        piece.kind === 'ladder'
+      ) {
         if (piece.r === 1) extraAngle = -Math.PI / 2;
+      } else if (piece.kind === 'gable') {
+        const roof = S.roofOf(world.base, piece);
+        if (roof) {
+          const highSides = S.roofSidesOf(roof.kind, roof.r).high;
+          const highSide = highSides[0];
+          if (piece.r === 0) {
+            extraAngle = highSide === '-x' ? Math.PI : 0;
+          } else {
+            extraAngle = highSide === '+z' ? -Math.PI / 2 : Math.PI / 2;
+          }
+        }
+      } else if (piece.deg !== undefined) {
+        extraAngle = -(piece.deg * Math.PI) / 180;
       } else if (
         piece.kind === 'ramp' ||
+        piece.kind === 'stairs' ||
         piece.kind === 'bench' ||
         piece.kind === 'bin' ||
-        piece.kind === 'repeater'
+        piece.kind === 'repeater' ||
+        piece.kind === 'lifeSupport' ||
+        piece.kind === 'roof' ||
+        piece.kind === 'lowRoof' ||
+        piece.kind === 'roofOuter' ||
+        piece.kind === 'roofInner' ||
+        piece.kind === 'ridgeCap'
       ) {
         extraAngle = -piece.r * (Math.PI / 2);
       }
@@ -95,6 +127,12 @@ export class PieceMeshManager {
 
         this.root.add(instance.group);
 
+        const isDoor = piece.kind === 'door';
+        const doorAngle = isDoor && piece.open ? (-100 * Math.PI) / 180 : 0;
+        if (isDoor && instance.parts?.leaf) {
+          instance.parts.leaf.rotation.y = doorAngle;
+        }
+
         entry = {
           group: instance.group,
           colliders: instance.colliders,
@@ -102,6 +140,9 @@ export class PieceMeshManager {
           kind: piece.kind,
           pos,
           yaw: totalYaw,
+          parts: instance.parts,
+          doorAngle,
+          targetDoorAngle: doorAngle,
         };
         this.pieceMap.set(piece.id, entry);
       } else {
@@ -111,6 +152,9 @@ export class PieceMeshManager {
         entry.group.updateMatrixWorld(true);
         entry.pos = pos;
         entry.yaw = totalYaw;
+        if (piece.kind === 'door') {
+          entry.targetDoorAngle = piece.open ? (-100 * Math.PI) / 180 : 0;
+        }
       }
 
       placedForWalk.push({
@@ -223,6 +267,21 @@ export class PieceMeshManager {
           }
         });
         this.collapsing.splice(i, 1);
+      }
+    }
+
+    // Door swing ease over 0.4s
+    for (const entry of this.pieceMap.values()) {
+      if (entry.kind === 'door' && entry.parts?.leaf && entry.targetDoorAngle !== undefined) {
+        const cur = entry.doorAngle ?? 0;
+        const target = entry.targetDoorAngle;
+        if (Math.abs(cur - target) > 0.001) {
+          const maxStep = ((Math.PI * 100) / 180 / 0.4) * dt;
+          const diff = target - cur;
+          const next = Math.abs(diff) <= maxStep ? target : cur + Math.sign(diff) * maxStep;
+          entry.doorAngle = next;
+          entry.parts.leaf.rotation.y = next;
+        }
       }
     }
   }

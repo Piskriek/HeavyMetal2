@@ -351,6 +351,9 @@
       "@hm/mobsim": [
         "packages/mobsim/src/index.ts"
       ],
+      "@hm/rover": [
+        "packages/rover/src/index.ts"
+      ],
       "@hm/batcher": [
         "packages/batcher/src/index.ts"
       ],

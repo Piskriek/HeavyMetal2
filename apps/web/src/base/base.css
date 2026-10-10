@@ -738,3 +738,252 @@ button.hm-quick-stack-btn:active,
   }
 }
 
+/* -------------------------------------------------------------
+   Drafting Window Layouts Tab & Plan HUD
+   ------------------------------------------------------------- */
+.hm-draft-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--base-border-subtle);
+  padding-bottom: 12px;
+}
+
+.hm-draft-tab-btn {
+  background: var(--base-bg-surface);
+  border: 1px solid var(--base-border-subtle);
+  color: var(--base-text-secondary);
+  font-family: 'Oxanium', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 8px 16px;
+  border-radius: var(--base-radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.15s ease;
+}
+
+.hm-draft-tab-btn:hover {
+  background: var(--base-bg-slot-hover);
+  color: #fff;
+  border-color: var(--base-cyan-hairline);
+}
+
+.hm-draft-tab-btn.active {
+  background: rgba(0, 240, 255, 0.12);
+  border-color: var(--base-cyan);
+  color: var(--base-cyan);
+  box-shadow: 0 0 10px var(--base-cyan-glow);
+}
+
+.hm-layouts-tab-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.hm-layout-section {
+  background: var(--base-bg-surface);
+  border: 1px solid var(--base-border-subtle);
+  border-radius: var(--base-radius-md);
+  padding: 14px 16px;
+}
+
+.hm-layout-input {
+  background: rgba(10, 15, 26, 0.85);
+  border: 1px solid var(--base-border-subtle);
+  border-radius: var(--base-radius-sm);
+  color: #f8fafc;
+  font-family: 'Oxanium', monospace;
+  font-size: 13px;
+  padding: 8px 12px;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.hm-layout-input:focus {
+  border-color: var(--base-cyan);
+  box-shadow: 0 0 8px var(--base-cyan-glow);
+}
+
+.hm-layout-btn {
+  font-family: 'Oxanium', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 8px 16px;
+  border-radius: var(--base-radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.hm-layout-btn.primary {
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.25), rgba(14, 165, 233, 0.35));
+  border: 1px solid var(--base-cyan);
+  color: #fff;
+}
+
+.hm-layout-btn.primary:hover {
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.4), rgba(14, 165, 233, 0.5));
+  box-shadow: 0 0 12px var(--base-cyan-glow);
+}
+
+.hm-layout-btn.secondary {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--base-border-subtle);
+  color: var(--base-text-secondary);
+}
+
+.hm-layout-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.hm-layout-card-btn {
+  font-family: 'Oxanium', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--base-radius-xs, 4px);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.hm-layout-card-btn.place {
+  background: rgba(0, 240, 255, 0.15);
+  border: 1px solid var(--base-cyan-hairline);
+  color: var(--base-cyan);
+}
+
+.hm-layout-card-btn.place:hover {
+  background: rgba(0, 240, 255, 0.3);
+  border-color: var(--base-cyan);
+  color: #fff;
+  box-shadow: 0 0 8px var(--base-cyan-glow);
+}
+
+.hm-layout-card-btn.share {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--base-border-subtle);
+  color: var(--base-text-muted);
+}
+
+.hm-layout-card-btn.share:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* -------------------------------------------------------------
+   Active Plan List HUD & Prompts
+   ------------------------------------------------------------- */
+.hm-plans-hud-card {
+  position: absolute;
+  top: 76px;
+  right: 20px;
+  background: rgba(8, 13, 20, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--base-cyan-hairline);
+  border-radius: var(--base-radius-md);
+  padding: 10px 14px;
+  min-width: 220px;
+  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hm-plan-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.hm-plan-item-row:last-child {
+  border-bottom: none;
+}
+
+.hm-plan-drop-btn {
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  font-family: 'Oxanium', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.hm-plan-drop-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+}
+
+.hm-plan-build-prompt {
+  background: rgba(0, 240, 255, 0.15);
+  border: 1px solid var(--base-cyan);
+  box-shadow: 0 0 12px var(--base-cyan-glow);
+  color: #f8fafc;
+  font-family: 'Oxanium', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: var(--base-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  animation: hmPulseCyan 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes hmPulseCyan {
+  from { box-shadow: 0 0 6px var(--base-cyan-glow); }
+  to { box-shadow: 0 0 16px var(--base-cyan-glow); }
+}
+
+/* -------------------------------------------------------------
+   Pressure & Shelter Chips
+   ------------------------------------------------------------- */
+.hm-shelter-chip {
+  font-family: 'Oxanium', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  margin-left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hm-shelter-chip.pressurized {
+  background: rgba(56, 189, 248, 0.16);
+  border: 1px solid #38bdf8;
+  color: #38bdf8;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.35);
+}
+
+.hm-shelter-chip.unpowered {
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #94a3b8;
+}
+
+

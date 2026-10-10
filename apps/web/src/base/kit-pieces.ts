@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import * as basekit from '@hm/basekit';
+import * as basekit2 from '@hm/basekit2';
 import * as basegear from '@hm/basegear';
 import type { Kind } from '@hm/structure';
 import * as S from '@hm/structure';
@@ -14,6 +15,7 @@ export interface KitPieceResult {
   readonly colliders: readonly Box[];
   readonly lamps: readonly THREE.Mesh[];
   readonly sockets?: readonly Socket[];
+  readonly parts?: Record<string, THREE.Object3D>;
 }
 
 export interface KitPieceInstance {
@@ -21,48 +23,39 @@ export interface KitPieceInstance {
   readonly colliders: readonly Box[];
   readonly lamps: readonly THREE.Mesh[];
   readonly sockets?: readonly Socket[];
+  readonly parts?: Record<string, THREE.Object3D>;
 }
 
-// 5-step Integrity Materials (R3)
+// 5-step Integrity Materials (R3) - bright unlit overlay colors on dark steel
 export const INTEGRITY_5_MATERIALS = {
-  blue: new THREE.MeshStandardMaterial({
+  blue: new THREE.MeshBasicMaterial({
     color: 0x38bdf8,
-    roughness: 0.35,
-    metalness: 0.1,
     transparent: true,
-    opacity: 0.88,
+    opacity: 0.75,
   }),
-  green: new THREE.MeshStandardMaterial({
+  green: new THREE.MeshBasicMaterial({
     color: 0x22c55e,
-    roughness: 0.35,
-    metalness: 0.1,
     transparent: true,
-    opacity: 0.88,
+    opacity: 0.75,
   }),
-  yellow: new THREE.MeshStandardMaterial({
+  yellow: new THREE.MeshBasicMaterial({
     color: 0xeab308,
-    roughness: 0.35,
-    metalness: 0.1,
     transparent: true,
-    opacity: 0.88,
+    opacity: 0.75,
   }),
-  orange: new THREE.MeshStandardMaterial({
+  orange: new THREE.MeshBasicMaterial({
     color: 0xf97316,
-    roughness: 0.35,
-    metalness: 0.1,
     transparent: true,
-    opacity: 0.88,
+    opacity: 0.75,
   }),
-  red: new THREE.MeshStandardMaterial({
+  red: new THREE.MeshBasicMaterial({
     color: 0xef4444,
-    roughness: 0.35,
-    metalness: 0.1,
     transparent: true,
-    opacity: 0.88,
+    opacity: 0.75,
   }),
 };
 
-export function integrityMaterialForSupport(support: number): THREE.MeshStandardMaterial {
+export function integrityMaterialForSupport(support: number): THREE.Material {
   if (support >= 0.999) return INTEGRITY_5_MATERIALS.blue;
   if (support >= 0.6) return INTEGRITY_5_MATERIALS.green;
   if (support >= 0.4) return INTEGRITY_5_MATERIALS.yellow;
@@ -109,7 +102,7 @@ export function computeSkirt(
 }
 
 /** Pivot offsets for kit pieces so origin matches pieceAt() cell center. */
-export const KIT_PIVOT_OFFSETS: Partial<Record<Kind, [number, number, number]>> = {
+export const KIT_PIVOT_OFFSETS: Record<Kind, [number, number, number]> = {
   foundation: [-2, 0, -2],
   floor: [-2, 0, -2],
   ramp: [-2, 0, -2],
@@ -120,6 +113,26 @@ export const KIT_PIVOT_OFFSETS: Partial<Record<Kind, [number, number, number]>> 
   bin: [-2, 0, -2],
   bench: [-2, 0, -2],
   repeater: [-2, 0, -2],
+
+  // Roof kinds (cell pivot [-2, 0, -2])
+  roof: [-2, 0, -2],
+  lowRoof: [-2, 0, -2],
+  roofOuter: [-2, 0, -2],
+  roofInner: [-2, 0, -2],
+  // Edge pivot [-2, 0, 0]
+  ridgeCap: [-2, 0, 0],
+  gable: [-2, 0, 0],
+
+  // 4a kinds
+  halfWall: [-2, 0, 0],
+  windowWall: [-2, 0, 0],
+  doorframe: [-2, 0, 0],
+  door: [-2, 0, 0],
+  railing: [-2, 0, 0],
+  ladder: [-2, 0, 0],
+  stairs: [-2, 0, -2],
+  lifeSupport: [-2, 0, -2],
+  weaponBench: [-2, 0, -2],
 };
 
 /**
@@ -228,6 +241,115 @@ export class KitPieceCache {
         rawSockets = res.sockets;
         break;
       }
+      case 'roof': {
+        const res = basekit.pitchedRoof(bkm, { stage });
+        rawGroup = res.group;
+        rawColliders = res.colliders;
+        rawLamps = res.lamps;
+        break;
+      }
+      case 'lowRoof': {
+        const res = basekit.lowRoof(bkm, { stage });
+        rawGroup = res.group;
+        rawColliders = res.colliders;
+        rawLamps = res.lamps;
+        break;
+      }
+      case 'roofOuter': {
+        const res = basekit.roofOuterCorner(bkm, { stage });
+        rawGroup = res.group;
+        rawColliders = res.colliders;
+        rawLamps = res.lamps;
+        break;
+      }
+      case 'roofInner': {
+        const res = basekit.roofInnerCorner(bkm, { stage });
+        rawGroup = res.group;
+        rawColliders = res.colliders;
+        rawLamps = res.lamps;
+        break;
+      }
+      case 'ridgeCap': {
+        const res = basekit.ridgeCap(bkm, { stage });
+        rawGroup = res.group;
+        rawColliders = res.colliders;
+        rawLamps = res.lamps;
+        break;
+      }
+      case 'gable': {
+        const res = basekit.gable(bkm, { stage });
+        rawGroup = res.group;
+        rawColliders = res.colliders;
+        rawLamps = res.lamps;
+        break;
+      }
+      case 'halfWall': {
+        const res = basekit2.halfWall(bkm, { stage });
+        rawGroup = res.group;
+        rawColliders = res.colliders;
+        rawLamps = res.lamps;
+        break;
+      }
+      case 'windowWall': {
+        const res = basekit2.windowWall(bkm, { stage });
+        rawGroup = res.group;
+        rawColliders = res.colliders;
+        rawLamps = res.lamps;
+        break;
+      }
+      case 'doorframe': {
+        const res = basekit2.doorframe(bkm, { stage });
+        rawGroup = res.group;
+        rawColliders = res.colliders;
+        rawLamps = res.lamps;
+        break;
+      }
+      case 'door': {
+        const res = basekit2.door(bkm, { stage });
+        rawGroup = res.group;
+        rawColliders = res.colliders;
+        rawLamps = res.lamps;
+        break;
+      }
+      case 'railing': {
+        const res = basekit2.railing(bkm, { stage });
+        rawGroup = res.group;
+        rawColliders = res.colliders;
+        rawLamps = res.lamps;
+        break;
+      }
+      case 'ladder': {
+        const res = basekit2.ladder(bkm, { stage });
+        rawGroup = res.group;
+        rawColliders = res.colliders;
+        rawLamps = res.lamps;
+        break;
+      }
+      case 'stairs': {
+        const res = basekit2.stairs(bkm, { stage });
+        rawGroup = res.group;
+        rawColliders = res.colliders;
+        rawLamps = res.lamps;
+        break;
+      }
+      case 'lifeSupport': {
+        const res = basekit2.lifeSupport(bkm, { stage });
+        rawGroup = res.group;
+        rawColliders = res.colliders;
+        rawLamps = res.lamps;
+        break;
+      }
+      case 'weaponBench': {
+        const res = basegear.draftingTable(bgm, { stage });
+        rawGroup = res.group;
+        rawColliders = res.colliders;
+        rawLamps = res.lamps;
+        rawSockets = res.sockets;
+        break;
+      }
+      default: {
+        throw new Error(`Unknown structural kind: ${kind}`);
+      }
     }
 
     // Mark lamps in raw template so clones can be identified
@@ -282,11 +404,16 @@ export class KitPieceCache {
       }
     });
 
+    const parts: Record<string, THREE.Object3D> = {};
+    const leaf = clonedGroup.getObjectByName('door-leaf');
+    if (leaf) parts.leaf = leaf;
+
     return {
       group: clonedGroup,
       colliders: template.colliders,
       lamps,
       sockets: template.sockets,
+      parts: Object.keys(parts).length > 0 ? parts : undefined,
     };
   }
 

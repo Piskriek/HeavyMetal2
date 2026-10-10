@@ -105,7 +105,7 @@ export interface WorldViewSourceOptions {
 }
 
 export class WorldViewSource implements BaseViewSource {
-  private readonly getWorld: () => BaseWorld;
+  public readonly getWorld: () => BaseWorld;
   private readonly envOption: WorldEnv | (() => WorldEnv);
   private get env(): WorldEnv {
     return typeof this.envOption === 'function' ? this.envOption() : this.envOption;

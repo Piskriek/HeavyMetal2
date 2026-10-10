@@ -23,6 +23,8 @@ import { loadScientistAnimations, type ClipName } from '../avatar/scientist/anim
 import { createScientistAnimator, type OneShotKind, type ScientistAnimator } from '../avatar/scientist/animator';
 import { createMonsterMashCombat, type MonsterMashCombatManager } from './monster-mash-combat';
 import * as F from '@hm/substrate';
+import type { Kind } from '@hm/structure';
+import { globalKitPieceCache } from '../base/kit-pieces';
 import { beamEffect, type BeamFx, type BeamMode } from '@hm/beamkit';
 import { BEAM_RANGE } from '../base/world';
 import type { WalkWorld } from '../base/walk';
@@ -124,6 +126,9 @@ export interface PlayScene {
   setPieces(group: THREE.Group | null): void;
   setWalkWorld(walkWorld: WalkWorld | null): void;
   setSocketRings(poses: readonly { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }[]): void;
+  setPlanGhosts(ghosts: readonly { readonly kind: Kind; readonly at: { readonly x: number; readonly y: number; readonly z: number }; readonly yaw: number }[]): void;
+  setSheltered(sheltered: boolean): void;
+  isSheltered(): boolean;
   heightAt(x: number, z: number): number;
   aimPoint(): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null;
   /** Sets or updates the field's anomaly node instanced markers. Rebuilds instances only when field updates. */
@@ -512,6 +517,17 @@ export function createPlayScene(o: {
   let piecesGroup: THREE.Group | null = null;
   let activeWalkWorld: WalkWorld | null = null;
   let altCamPos: THREE.Vector3 | null = null;
+  let isSheltered = false;
+
+  const planGhostMat = keep(new THREE.MeshBasicMaterial({
+    color: 0x00f0ff,
+    transparent: true,
+    opacity: 0.38,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  }));
+  const planGhostsGroup = keep(new THREE.Group());
+  planetScene.add(planGhostsGroup);
 
   // Single InstancedMesh capped at 48 for pulsing cyan socket glow
   const socketRingGeo = keep(new THREE.RingGeometry(0.35, 0.45, 24));
@@ -1021,6 +1037,29 @@ export function createPlayScene(o: {
       }
       socketRingMesh.instanceMatrix.needsUpdate = true;
     },
+    setPlanGhosts(ghosts) {
+      while (planGhostsGroup.children.length > 0) {
+        const child = planGhostsGroup.children[0]!;
+        planGhostsGroup.remove(child);
+      }
+      for (const g of ghosts) {
+        const instance = globalKitPieceCache.instantiate(g.kind, 1, 0);
+        instance.group.traverse((obj) => {
+          if ((obj as THREE.Mesh).isMesh) {
+            (obj as THREE.Mesh).material = planGhostMat;
+          }
+        });
+        instance.group.position.set(g.at.x, g.at.y, g.at.z);
+        instance.group.rotation.y = g.yaw;
+        planGhostsGroup.add(instance.group);
+      }
+    },
+    setSheltered(sheltered) {
+      isSheltered = sheltered;
+    },
+    isSheltered() {
+      return isSheltered;
+    },
     heightAt: (x, z) => groundAt(x, z),
     aimPoint: () => aimPointFn(),
     setNodes(field) {
@@ -1259,7 +1298,7 @@ export function createPlayScene(o: {
       // ---- sync
       let nearMachine = false;
       if (shown >= 1 && waveTo < 0) for (const v of views.values()) if (v.running > 0.05 && Math.hypot(v.m.x - pos.x, v.m.z - pos.z) < MACHINE_FIELD) { nearMachine = true; break; }
-      sync = stepSync(sync, dt, { onPlanet: where === 'planet', stage, nearMachine });
+      sync = stepSync(sync, dt, { onPlanet: where === 'planet', stage, nearMachine, sheltered: isSheltered });
       if (where === 'planet' && sync > 0 && sync < 0.3) sfx('sync-warning', { minGapMs: 1400, volume: 0.6 });
       if (where === 'planet' && sync <= 0) {
         sfx('sync-lost');
@@ -1599,6 +1638,7 @@ export function createPlayScene(o: {
       renderer.dispose();
       mash.dispose();
       beamFx.dispose();
+      planetScene.remove(planGhostsGroup);
       beamCoreGeom.dispose();
       beamCoreMat.dispose();
       beamSparkGeom.dispose();

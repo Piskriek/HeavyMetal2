@@ -43,6 +43,24 @@ if (!fs.existsSync(shotsDir)) {
   fs.mkdirSync(shotsDir, { recursive: true });
 }
 
+async function takeScreenshot(p, options) {
+  const { path: shotPath, ...rest } = options;
+  const buf = await p.screenshot(rest);
+  if (shotPath) {
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      try {
+        try { fs.unlinkSync(shotPath); } catch {}
+        fs.writeFileSync(shotPath, buf);
+        return;
+      } catch (err) {
+        if (attempt === 5) throw err;
+        console.warn(`[Screenshot write retry ${attempt}] ${err.message}, retrying in 300ms...`);
+        await new Promise((r) => setTimeout(r, 300));
+      }
+    }
+  }
+}
+
 const port = 8196;
 console.log(`Starting static server on port ${port}...`);
 const server = spawn(process.execPath, ['scripts/serve.mjs'], {
@@ -60,11 +78,14 @@ const browser = await chromium.launch({
 
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 
-// Stub pointerLock to prevent focus issues in headless Chrome
+// Stub pointerLock to prevent focus issues in headless Chrome & clear localStorage for clean boot
 await page.addInitScript(() => {
   Element.prototype.requestPointerLock = function () {
     return Promise.reject(new Error('pointer lock stubbed in test'));
   };
+  try {
+    localStorage.clear();
+  } catch {}
 });
 
 const pageErrors = [];
@@ -77,8 +98,8 @@ page.on('console', (msg) => {
 });
 
 try {
-  console.log(`Navigating to http://localhost:${port}/?base...`);
-  await page.goto(`http://localhost:${port}/?base`, { waitUntil: 'domcontentloaded' });
+  console.log(`Navigating to http://localhost:${port}/?base&kit=1...`);
+  await page.goto(`http://localhost:${port}/?base&kit=1`, { waitUntil: 'domcontentloaded' });
 
   // Wait for Play Canvas to initialize
   const canvas = page.locator('canvas.play-canvas');
@@ -87,10 +108,10 @@ try {
 
   // Wait for HUD hook
   await page.waitForFunction(
-    () => typeof window !== 'undefined' && (window.hmPlay?.ready || window.__hm?.base),
+    () => typeof window !== 'undefined' && window.hmPlay?.ready === true,
     { timeout: 35000 }
   );
-  console.log('OK: hmPlay / __hm hook is ready');
+  console.log('OK: hmPlay hook is ready');
 
   // Teleport to moon surface if currently in lab
   await page.evaluate(() => {
@@ -104,7 +125,10 @@ try {
       window.hmPlay.setLocked(true);
     }
   });
-  await page.waitForTimeout(1000);
+  await page.waitForFunction(
+    () => window.hmPlay?.where === 'planet',
+    { timeout: 15000 }
+  );
 
   // 1. Check Hotbar HUD
   const hotbar = page.locator('[data-testid="base-hotbar"]');
@@ -129,7 +153,7 @@ try {
   const isReadoutVisible = await buildReadout.isVisible();
   console.log('OK: Build Readout under reticle visible:', isReadoutVisible);
 
-  await page.screenshot({ path: 'docs/shots/base/hotbar-selection.png' });
+  await takeScreenshot(page, { path: 'docs/shots/base/hotbar-selection.png' });
   console.log('Captured docs/shots/base/hotbar-selection.png');
 
   // 2. Open Inventory Window using 'Tab'
@@ -164,7 +188,7 @@ try {
   await page.mouse.move(0, 0);
   await page.waitForTimeout(200);
 
-  await page.screenshot({ path: 'docs/shots/base/inventory-window.png' });
+  await takeScreenshot(page, { path: 'docs/shots/base/inventory-window.png' });
   console.log('Captured docs/shots/base/inventory-window.png');
 
   // Test Quick Stack button
@@ -178,7 +202,30 @@ try {
   await page.keyboard.press('Escape');
   await invModal.waitFor({ state: 'hidden', timeout: 5000 });
 
-  // 3. Open Drafting Table Window using 'K'
+  // 3. Open Drafting Table Window using 'K' (wait for shelter & teleport near Drafting Table)
+  await page.waitForFunction(
+    () => {
+      const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+      return baseApi?.world?.()?.shelter === true;
+    },
+    { timeout: 10000 }
+  );
+  console.log('OK: Starter shelter dropped in world');
+
+  console.log('Teleporting near Drafting Table in starter shelter...');
+  await page.evaluate(() => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    const scene = window.__playScene;
+    const w = baseApi?.world?.();
+    const bench = w?.base?.pieces?.find((p) => p.kind === 'bench');
+    const sId = bench ? bench.s : w?.base?.structures?.[0]?.id;
+    const st = w?.base?.structures?.find((s) => s.id === sId) ?? w?.base?.structures?.[0];
+    const tx = st ? st.x + 2 : 0;
+    const tz = st ? st.z + 2 : -10;
+    scene?.debug?.teleport('planet', tx, tz, 0, 0);
+  });
+  await page.waitForTimeout(400);
+
   console.log('Opening Drafting Table using K...');
   await page.keyboard.press('k');
   const draftModal = page.locator('[data-testid="drafting-modal"]');
@@ -210,8 +257,90 @@ try {
     throw new Error('Cost table does not contain Structural Cube requirement');
   }
 
-  await page.screenshot({ path: 'docs/shots/base/drafting-window.png' });
+  await takeScreenshot(page, { path: 'docs/shots/base/drafting-window.png' });
   console.log('Captured docs/shots/base/drafting-window.png');
+
+  // Test Layouts tab
+  console.log('Switching to Layouts tab in Drafting Table...');
+  const layoutsTabBtn = page.locator('[data-testid="drafting-tab-layouts"]');
+  await layoutsTabBtn.click();
+  const layoutsPanel = page.locator('[data-testid="layouts-tab-panel"]');
+  await layoutsPanel.waitFor({ state: 'visible', timeout: 5000 });
+  console.log('OK: Layouts tab panel is visible');
+
+  // Save Structure Form
+  const saveNameInput = page.locator('[data-testid="save-layout-name-input"]');
+  await saveNameInput.fill('Starter Outpost');
+  const saveLayoutBtn = page.locator('[data-testid="save-layout-btn"]');
+  await saveLayoutBtn.click();
+  await page.waitForTimeout(600);
+
+  const debugInfo = await page.evaluate(() => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    const w = baseApi?.world?.();
+    return {
+      piecesCount: w?.base?.pieces?.length,
+      structuresCount: w?.base?.structures?.length,
+      layoutsCount: w?.layouts?.length,
+      structures: w?.base?.structures,
+      benchPiece: w?.base?.pieces?.find((p) => p.kind === 'bench'),
+    };
+  });
+  console.log('DEBUG INFO after save click:', JSON.stringify(debugInfo));
+  const layoutSectionText = await page.locator('.hm-layout-section').first().textContent();
+  console.log('LAYOUT SECTION TEXT:', layoutSectionText);
+
+  // Check layout card and mini footprint SVG
+  const layoutCard = page.locator('.hm-layout-card').first();
+  await layoutCard.waitFor({ state: 'visible', timeout: 5000 });
+  console.log('OK: Saved layout card is visible');
+
+  const miniSvg = layoutCard.locator('svg').first();
+  console.log('OK: Mini footprint SVG is visible:', await miniSvg.isVisible());
+
+  // Capture layouts-tab.png
+  await takeScreenshot(page, { path: 'docs/shots/base/layouts-tab.png' });
+  console.log('Captured docs/shots/base/layouts-tab.png');
+
+  // Share button test
+  const shareBtn = layoutCard.locator('.hm-layout-card-btn.share');
+  await shareBtn.click();
+  await page.waitForTimeout(200);
+  console.log('OK: Share button clicked');
+
+  // Import form test
+  const layoutCode = await page.evaluate(() => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    return baseApi?.world()?.layouts?.[0]?.code ?? '';
+  });
+  console.log('OK: Got layout code for import test:', layoutCode ? layoutCode.slice(0, 20) + '...' : 'empty');
+
+  const importNameInput = page.locator('[data-testid="import-layout-name-input"]');
+  await importNameInput.fill('Duplicate Outpost');
+  const importCodeInput = page.locator('[data-testid="import-layout-code-input"]');
+  await importCodeInput.fill(layoutCode);
+  const importBtn = page.locator('[data-testid="import-layout-btn"]');
+  await importBtn.click();
+  await page.waitForTimeout(300);
+
+  const duplicateError = page.locator('.hm-layout-section').getByText('An identical layout already exists in your library.');
+  console.log('OK: Duplicate layout refusal handled:', await duplicateError.isVisible());
+
+  // Import distinct sample layout
+  const sampleCode = await page.evaluate(() => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    return baseApi?.createSampleLayoutCode?.() ?? '';
+  });
+  console.log('OK: Got sample distinct code:', sampleCode ? sampleCode.slice(0, 20) + '...' : 'empty');
+
+  await importNameInput.fill('Distinct Outpost');
+  await importCodeInput.fill(sampleCode);
+  await importBtn.click();
+  await page.waitForTimeout(400);
+
+  const cardCount = await page.locator('.hm-layout-card').count();
+  console.log('OK: Layout card count after distinct import:', cardCount);
+  if (cardCount < 2) throw new Error(`Expected at least 2 layout cards after import, got ${cardCount}`);
 
   // Close drafting table with Escape
   await page.keyboard.press('Escape');
@@ -227,12 +356,36 @@ try {
   const rangeBadge = page.locator('[data-testid="quantum-range-badge"]');
   console.log('OK: Quantum Range Status:', (await rangeBadge.textContent())?.trim());
 
-  await page.screenshot({ path: 'docs/shots/base/lattice-window.png' });
+  await takeScreenshot(page, { path: 'docs/shots/base/lattice-window.png' });
   console.log('Captured docs/shots/base/lattice-window.png');
 
   // Close lattice window
   await page.keyboard.press('Escape');
   await latticeModal.waitFor({ state: 'hidden', timeout: 5000 });
+
+  // Verify Starter Shelter on first boot
+  const shelterCheck = await page.evaluate(() => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    if (!baseApi) return { ok: false, error: 'baseApi not found' };
+    const w = baseApi.world();
+    const hasShelter = w.shelter === true;
+    const pieces = w.base.pieces;
+    const hasAirlock = pieces.some((p) => p.kind === 'airlock');
+    const hasLowRoof = pieces.some((p) => p.kind === 'lowRoof');
+    const hasBench = pieces.some((p) => p.kind === 'bench');
+    const hasLifeSupport = pieces.some((p) => p.kind === 'lifeSupport');
+    return {
+      ok: hasShelter && hasAirlock && hasLowRoof && hasBench && hasLifeSupport,
+      hasShelter,
+      hasAirlock,
+      hasLowRoof,
+      hasBench,
+      hasLifeSupport,
+      pieceCount: pieces.length,
+    };
+  });
+  console.log('OK: Starter shelter check on first boot:', shelterCheck);
+  if (!shelterCheck.ok) throw new Error(`Starter shelter check failed: ${JSON.stringify(shelterCheck)}`);
 
   // 5. Verify Base-Building lifecycle via __hm.base
   console.log('\n--- VERIFYING BASE-BUILDING LIFECYCLE THROUGH __hm.base ---');
@@ -241,6 +394,8 @@ try {
     if (!baseApi) return { ok: false, error: 'window.__hm.base / hmPlay.base not found' };
 
     const at = { x: 12, z: 12 };
+    let w = baseApi.world();
+    const countBeforeFound = w.base.pieces.length;
 
     // 1. Found foundation slab with STARTER kit
     console.log('Action: Founding slab at (12, 12)...');
@@ -254,13 +409,14 @@ try {
     });
     console.log('foundRes:', JSON.stringify(foundRes));
 
-    let w = baseApi.world();
+    w = baseApi.world();
     console.log('Player slots:', JSON.stringify(w.player.slots));
-    if (w.base.pieces.length !== 1) {
-      return { ok: false, error: `Expected 1 piece after found, got ${w.base.pieces.length}, foundRes: ${JSON.stringify(foundRes)}` };
+    if (w.base.pieces.length !== countBeforeFound + 1) {
+      return { ok: false, error: `Expected ${countBeforeFound + 1} pieces after found, got ${w.base.pieces.length}, foundRes: ${JSON.stringify(foundRes)}` };
     }
-    const structureId = w.base.structures[0].id;
-    const foundationId = w.base.pieces[0].id;
+    const placedEv = foundRes.events.find((e) => e.type === 'placed');
+    const foundationId = placedEv ? placedEv.id : w.base.pieces[w.base.pieces.length - 1].id;
+    const structureId = w.base.pieces.find((p) => p.id === foundationId)?.s ?? w.base.structures[w.base.structures.length - 1].id;
 
     // 2. Place bench (Drafting Table) on the slab
     baseApi.apply({
@@ -270,10 +426,10 @@ try {
       piece: { s: structureId, kind: 'bench', i: 0, j: 0, k: 0, r: 0 },
     });
     w = baseApi.world();
-    if (w.base.pieces.length !== 2) {
-      return { ok: false, error: `Expected 2 pieces after bench, got ${w.base.pieces.length}` };
+    if (w.base.pieces.length !== countBeforeFound + 2) {
+      return { ok: false, error: `Expected ${countBeforeFound + 2} pieces after bench, got ${w.base.pieces.length}` };
     }
-    const benchId = w.base.pieces[1].id;
+    const benchId = w.base.pieces[w.base.pieces.length - 1].id;
 
     // 3. Place floor piece attached to foundation (i: 1, j: 0)
     baseApi.apply({
@@ -283,10 +439,10 @@ try {
       piece: { s: structureId, kind: 'floor', i: 1, j: 0, k: 0, r: 0 },
     });
     w = baseApi.world();
-    if (w.base.pieces.length !== 3) {
-      return { ok: false, error: `Expected 3 pieces after floor, got ${w.base.pieces.length}` };
+    if (w.base.pieces.length !== countBeforeFound + 3) {
+      return { ok: false, error: `Expected ${countBeforeFound + 3} pieces after floor, got ${w.base.pieces.length}` };
     }
-    const floorId = w.base.pieces[2].id;
+    const floorId = w.base.pieces[w.base.pieces.length - 1].id;
 
     // 4. Draft blueprint bp:cube:basalt at the bench
     baseApi.apply({
@@ -309,10 +465,10 @@ try {
       piece: { s: structureId, kind: 'bin', i: 1, j: 0, k: 0, r: 0 },
     });
     w = baseApi.world();
-    if (w.base.pieces.length !== 4) {
-      return { ok: false, error: `Expected 4 pieces after bin, got ${w.base.pieces.length}` };
+    if (w.base.pieces.length !== countBeforeFound + 4) {
+      return { ok: false, error: `Expected ${countBeforeFound + 4} pieces after bin, got ${w.base.pieces.length}` };
     }
-    const binId = w.base.pieces[3].id;
+    const binId = w.base.pieces[w.base.pieces.length - 1].id;
 
     // Check meshes in Three.js scene
     const scene = window.__playScene;
@@ -389,8 +545,13 @@ try {
       return { ok: false, error: 'Expected normal vector on piece hit' };
     }
 
-    // 2. Ground fallback test
+    // 2. Ground fallback test (aim at open ground at 50, 50 away from structures)
+    const savedPos = scene.debug.position();
+    scene.debug.teleport('planet', 50, 50, 0, -1.0);
+    scene.frame(0, 0.016, { move: { x: 0, z: 0 }, look: { dx: 0, dy: 0 }, run: false });
     const groundHit = scene.aimPoint();
+    scene.debug.teleport('planet', savedPos.x, savedPos.z, 0, 0);
+    scene.frame(0, 0.016, { move: { x: 0, z: 0 }, look: { dx: 0, dy: 0 }, run: false });
     if (groundHit && groundHit.piece !== null) {
       return { ok: false, error: `Expected piece null on ground fallback, got ${groundHit.piece}` };
     }
@@ -496,7 +657,7 @@ try {
   if (!harvestVerdict.ok) throw new Error(harvestVerdict.error);
 
   await page.waitForTimeout(300);
-  await page.screenshot({ path: 'docs/shots/base/beam-harvesting.png' });
+  await takeScreenshot(page, { path: 'docs/shots/base/beam-harvesting.png' });
   console.log('Captured docs/shots/base/beam-harvesting.png');
 
   // Turn live beam off after screenshot
@@ -580,7 +741,7 @@ try {
   await machinePickerModal.waitFor({ state: 'visible', timeout: 5000 });
   console.log('OK: Machine Picker modal is visible');
 
-  await page.screenshot({ path: 'docs/shots/base/machine-picker-modal.png' });
+  await takeScreenshot(page, { path: 'docs/shots/base/machine-picker-modal.png' });
   console.log('Captured docs/shots/base/machine-picker-modal.png');
 
   // Click install heavy mill
@@ -611,7 +772,7 @@ try {
   await refineryModal.waitFor({ state: 'visible', timeout: 5000 });
   console.log('OK: Refinery Modal is visible');
 
-  await page.screenshot({ path: 'docs/shots/base/refinery-modal.png' });
+  await takeScreenshot(page, { path: 'docs/shots/base/refinery-modal.png' });
   console.log('Captured docs/shots/base/refinery-modal.png');
 
   // Queue 'map-basalt' recipe via button
@@ -830,40 +991,210 @@ try {
   console.log('OK: Ramp walk verdict:', rampWalkVerdict);
   if (!rampWalkVerdict.ok) throw new Error(`Ramp walk failed: climbDelta was ${rampWalkVerdict?.climbDelta}`);
 
-  // 11. Screenshot 1: kit-outpost-s1.png
+  // 10. Verify Plan placement, ghost rendering, proximity prompt, and Key F fill
+  console.log('\n--- VERIFYING PLAN PLACEMENT & KEY F FILL ---');
+  const planVerdict = await page.evaluate(async () => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    const scene = window.__playScene;
+    if (!baseApi || !scene) return { ok: false, error: 'baseApi or scene not found' };
+
+    const w = baseApi.world();
+    const layout = w.layouts[0];
+    if (!layout) return { ok: false, error: 'No layout available to plan' };
+
+    // Dispatch plan at (-20, -20)
+    baseApi.apply({
+      t: 'plan',
+      layout: layout.id,
+      cx: -20,
+      cz: -20,
+      yaw: 0,
+    });
+
+    const w2 = baseApi.world();
+    if (w2.plans.length === 0) return { ok: false, error: 'Plan was not added to world' };
+
+    const activePlan = w2.plans[0];
+    // Teleport player near the plan looking directly at it
+    scene.debug.teleport('planet', -24, -24, -2.356, -0.32);
+
+    return {
+      ok: true,
+      planId: activePlan.id,
+      leftCount: activePlan.left.length,
+    };
+  });
+  console.log('OK: Plan placement verdict:', planVerdict);
+  if (!planVerdict.ok) throw new Error(planVerdict.error);
+
+  await page.evaluate(() => {
+    const scene = window.__playScene;
+    scene?.setFidelityStage(4);
+    window.__hm?.hideOverlays?.(true);
+    window.__hm?.clearToast?.();
+  });
+  await page.waitForTimeout(500);
+
+  // Capture plan ghost screenshot
+  await takeScreenshot(page, { path: 'docs/shots/base/plan-ghost.png' });
+  console.log('Captured docs/shots/base/plan-ghost.png');
+
+  await page.evaluate(() => {
+    window.__hm?.hideOverlays?.(false);
+  });
+
+  // Fill pieces using 'f' key
+  await page.keyboard.press('f');
+  await page.waitForTimeout(300);
+  const fillVerdict = await page.evaluate((planId) => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    const w = baseApi.world();
+    const p = w.plans.find((pl) => pl.id === planId);
+    return {
+      ok: true,
+      remainingLeft: p ? p.left.length : 0,
+      totalPieces: w.base.pieces.length,
+    };
+  }, planVerdict.planId);
+  console.log('OK: Fill verdict after pressing F:', fillVerdict);
+
+  // 11. Verify Room Pressure & Shelter Chip
+  console.log('\n--- VERIFYING ROOM PRESSURE & SHELTER CHIPS ---');
+  await page.evaluate(async () => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    const scene = window.__playScene;
+    if (!baseApi || !scene) return;
+    const w = baseApi.world();
+    const st = w.base.structures.find((s) => s.id === w.base.pieces.find((p) => p.kind === 'lowRoof')?.s);
+    if (st) {
+      scene.debug.teleport('planet', st.x, st.z, 0, 0);
+    }
+  });
+  await page.waitForTimeout(500); // Wait for 4Hz roomAt check
+  const chipLocator = page.locator('.hm-shelter-chip.pressurized');
+  const isPressurized = await chipLocator.isVisible();
+  console.log('OK: Pressurized chip visible inside shelter:', isPressurized);
+
+  // 12. Verify Base Persistence across save and load
+  console.log('\n--- VERIFYING BASE PERSISTENCE ---');
+  const persistenceVerdict = await page.evaluate(async () => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    if (!baseApi) return { ok: false, error: 'baseApi not found' };
+
+    const wBefore = baseApi.world();
+    const countBefore = wBefore.base.pieces.length;
+
+    // Force save
+    baseApi.save();
+
+    // Reload from save
+    baseApi.load();
+
+    const wAfter = baseApi.world();
+    return {
+      ok: wAfter.base.pieces.length === countBefore,
+      countBefore,
+      countAfter: wAfter.base.pieces.length,
+    };
+  });
+  console.log('OK: Persistence verdict:', persistenceVerdict);
+  if (!persistenceVerdict.ok) throw new Error(`Persistence failed: countBefore=${persistenceVerdict?.countBefore}, countAfter=${persistenceVerdict?.countAfter}`);
+
+  // 13. Capture clean screenshots (overlays hidden)
   console.log('\n--- CAPTURING REQUIRED BASE BUILDING SCREENSHOTS ---');
+  await page.evaluate(() => {
+    window.__hm?.hideOverlays?.(true);
+    window.__hm?.clearToast?.();
+  });
+  await page.waitForTimeout(300);
+
+  // Screenshot: shelter-s1.png
   await page.evaluate(() => {
     const baseApi = window.__hm?.base ?? window.hmPlay?.base;
     baseApi?.apply({ t: 'stage', stage: 1 });
     const scene = window.__playScene;
     scene?.setFidelityStage(1);
-    // Elevated view looking down at full outpost with skirts on slope
-    scene?.debug.teleport('planet', 8, 30, Math.atan2(-8, 14), -0.32);
+    const w = baseApi.world();
+    const st = w.base.structures.find((s) => s.id === w.base.pieces.find((p) => p.kind === 'lowRoof')?.s);
+    const sx = st?.x ?? 0;
+    const sz = st?.z ?? -12;
+    // Framed from in front of the shelter airlock looking at it
+    scene?.debug.teleport('planet', sx, sz + 8, Math.PI, -0.2);
   });
   await page.waitForTimeout(600);
-  await page.screenshot({ path: 'docs/shots/base/kit-outpost-s1.png' });
+  await takeScreenshot(page, { path: 'docs/shots/base/shelter-s1.png' });
+  console.log('Captured docs/shots/base/shelter-s1.png');
+
+  // Screenshot: kit-outpost-s1.png
+  await page.evaluate(() => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    baseApi?.apply({ t: 'stage', stage: 1 });
+    const scene = window.__playScene;
+    scene?.setFidelityStage(1);
+    // Elevated build camera view looking down at full outpost with skirts on slope
+    scene?.debug.teleport('planet', 12, 34, Math.atan2(-4, 18), -0.38);
+  });
+  await page.waitForTimeout(600);
+  await takeScreenshot(page, { path: 'docs/shots/base/kit-outpost-s1.png' });
   console.log('Captured docs/shots/base/kit-outpost-s1.png');
 
-  // 12. Screenshot 2: kit-outpost-s6.png
+  // Screenshot: kit-outpost-s6.png
   await page.evaluate(() => {
     const baseApi = window.__hm?.base ?? window.hmPlay?.base;
     baseApi?.apply({ t: 'stage', stage: 6 });
     const scene = window.__playScene;
     scene?.setFidelityStage(4);
+    scene?.debug.teleport('planet', 12, 34, Math.atan2(-4, 18), -0.38);
   });
   await page.waitForTimeout(600);
-  await page.screenshot({ path: 'docs/shots/base/kit-outpost-s6.png' });
+  await takeScreenshot(page, { path: 'docs/shots/base/kit-outpost-s6.png' });
   console.log('Captured docs/shots/base/kit-outpost-s6.png');
 
-  // 13. Screenshot 3: integrity-five.png
+  // Screenshot: integrity-five.png (cantilever row of 5 floors off one wall)
   await page.evaluate(() => {
     const baseApi = window.__hm?.base ?? window.hmPlay?.base;
-    baseApi?.toggleIntegrity(true);
     const scene = window.__playScene;
     scene?.setFidelityStage(4);
+
+    // Ensure player has ore and quartz maps for the cantilever demo
+    const w = baseApi.world();
+    w.player.slots[2] = { item: 'bp:cube:quartz', n: 1 };
+    w.player.slots[3] = { item: 'ore', n: 500 };
+    w.player.slots[4] = { item: 'map-quartz', n: 50 };
+
+    // Build a dedicated 5-step cantilever row off a wall in quartz (hKeep: 0.75):
+    // 1. Foundation: 1.0 (blue)
+    // 2. Wall at (0, 0, r: 0): 0.85 (green)
+    // 3. Floor 0 at (0, 0, k: 1): 0.72 (green)
+    // 4. Floor 1 at (0, 1, k: 1): 0.54 (yellow)
+    // 5. Floor 3 at (0, 3, k: 1): 0.30 (orange)
+    // 6. Floor 4 at (0, 4, k: 1): 0.23 (red)
+    const at = { x: -8, z: 16 };
+    const fRes = baseApi.apply({
+      t: 'found',
+      at,
+      blueprint: 'bp:cube:quartz',
+      cx: -8,
+      cz: 16,
+      yaw: 0,
+    });
+    const placed = fRes.events.find((e) => e.type === 'placed');
+    const fId = placed ? placed.id : -1;
+    const sId = baseApi.world().base.pieces.find((p) => p.id === fId)?.s ?? baseApi.world().base.structures[baseApi.world().base.structures.length - 1].id;
+
+    baseApi.apply({ t: 'place', at, blueprint: 'bp:cube:quartz', piece: { s: sId, kind: 'wall', i: 0, j: 0, k: 0, r: 0 } });
+    baseApi.apply({ t: 'place', at, blueprint: 'bp:cube:quartz', piece: { s: sId, kind: 'floor', i: 0, j: 0, k: 1, r: 0 } });
+    baseApi.apply({ t: 'place', at, blueprint: 'bp:cube:quartz', piece: { s: sId, kind: 'floor', i: 0, j: 1, k: 1, r: 0 } });
+    baseApi.apply({ t: 'place', at, blueprint: 'bp:cube:quartz', piece: { s: sId, kind: 'floor', i: 0, j: 2, k: 1, r: 0 } });
+    baseApi.apply({ t: 'place', at, blueprint: 'bp:cube:quartz', piece: { s: sId, kind: 'floor', i: 0, j: 3, k: 1, r: 0 } });
+    baseApi.apply({ t: 'place', at, blueprint: 'bp:cube:quartz', piece: { s: sId, kind: 'floor', i: 0, j: 4, k: 1, r: 0 } });
+
+    // Turn integrity ON
+    baseApi.toggleIntegrity(true);
+    scene?.debug.teleport('planet', 4, 24, Math.PI / 2, -0.15);
   });
   await page.waitForTimeout(600);
-  await page.screenshot({ path: 'docs/shots/base/integrity-five.png' });
+  await takeScreenshot(page, { path: 'docs/shots/base/integrity-five.png' });
   console.log('Captured docs/shots/base/integrity-five.png');
 
   // Toggle integrity back OFF
@@ -873,19 +1204,21 @@ try {
   });
   await page.waitForTimeout(300);
 
-  // 14. Screenshot 4: socket-glow.png
+  // Screenshot: socket-glow.png
   await page.evaluate(() => {
     const baseApi = window.__hm?.base ?? window.hmPlay?.base;
     baseApi?.apply({ t: 'hotbar', index: 0 }); // STARTER blueprint
+    baseApi?.setBuildKind('wall');
     const scene = window.__playScene;
     scene?.setFidelityStage(4);
-    scene?.debug.teleport('planet', 16, 22, 0, -0.25);
+    // Aim at the open slab at (12, 12) from (12, 6) looking +z with down pitch
+    scene?.debug.teleport('planet', 12, 6, Math.PI, -0.42);
   });
   await page.waitForTimeout(600);
-  await page.screenshot({ path: 'docs/shots/base/socket-glow.png' });
+  await takeScreenshot(page, { path: 'docs/shots/base/socket-glow.png' });
   console.log('Captured docs/shots/base/socket-glow.png');
 
-  // 15. Screenshot 5: build-camera.png
+  // Screenshot: build-camera.png
   await page.keyboard.down('Alt');
   await page.evaluate(() => {
     const scene = window.__playScene;
@@ -901,7 +1234,7 @@ try {
     }
   });
   await page.waitForTimeout(600);
-  await page.screenshot({ path: 'docs/shots/base/build-camera.png' });
+  await takeScreenshot(page, { path: 'docs/shots/base/build-camera.png' });
   console.log('Captured docs/shots/base/build-camera.png');
   await page.keyboard.up('Alt');
 

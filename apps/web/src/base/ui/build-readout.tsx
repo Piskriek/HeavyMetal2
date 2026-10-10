@@ -48,7 +48,7 @@ export const BuildReadout: React.FC<BuildReadoutProps> = ({
 
   return (
     <div className="hm-build-readout-hud" data-testid="build-readout-hud">
-      {hoverSupport && (
+      {hoverSupport && (!build.blueprint || !isOk) && (
         <div
           className="hm-build-hover-badge"
           data-testid="build-hover-support"
@@ -84,7 +84,7 @@ export const BuildReadout: React.FC<BuildReadoutProps> = ({
             </div>
           )}
 
-          {verdict && (
+          {verdict && isOk && (
             <div className="hm-support-meter-container">
               <span style={{ fontFamily: 'Oxanium', fontSize: 10, color: 'var(--base-text-muted)' }}>
                 SUPPORT:

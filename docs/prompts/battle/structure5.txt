@@ -1,0 +1,44 @@
+Follow-up, same chat, same package `@hm/structure`: keep rounds 1-4 (all their tests must still pass) and add ROOFS. Reply with the two full files again, src/index.ts and tests/structure.test.ts, then STOP. Same rules as before.
+APPEND to Kind: 'roof' | 'lowRoof' | 'roofOuter' | 'roofInner' | 'gable' | 'ridgeCap'.
+ROOF CELLS (roof, lowRoof, roofOuter, roofInner) take the cell slot (i,j,k). Their eave sits on the floor top of level k, so they rest on the storey below: they are held up exactly as a floor at (i,j,k) is (carrying edges and pillars of level k-1 under them, neighbouring cells beside them).
+- Which way they rise is set by r, as with ramps. For roof and lowRoof, the HIGH edge is +z (j+1) for r = 0, -x (i) for r = 1, -z (j) for r = 2 and +x (i+1) for r = 3. The LOW (eave) edge is the opposite one, and the other two are SIDE edges.
+- roofOuter (hip corner): for r = 0 the LOW edges are -z (j) and -x (i), rising to the corner (i+1, j+1). roofInner (valley): no low edge; for r = 0 it rises from the corner (i, j) to HIGH edges +z and +x. Other r turn these as above, a quarter turn per step.
+- Nothing may take an edge slot at level k on a roof cell's LOW edge(s): refuse with 'occupied'. The roof's slope meets the eave line there.
+- RIDGE: two roof or lowRoof cells side by side whose HIGH edges are the same edge are back to back. Each gives the other VERTICAL support (vKeep, not hKeep), so a roof only needs walls under one side of the ridge.
+- rooms(): roof cells are cell pieces, so they close the top of the room below, like a floor. Roof cells are never room cells themselves.
+GABLE: an edge piece at level k that closes the end of a pitched roof. r is 0..3, the slot is r % 2 (one piece per edge), and r selects the triangle's HIGH end: +x for r = 0, +z for r = 1, -x for r = 2, -z for r = 3. It is valid only on a SIDE edge of a 'roof' cell beside it whose HIGH edge is at the same end; otherwise refuse with 'no-roof'.
+- It is held up vertically by the carrying edge under it (level k-1) and by that roof.
+- It gives that roof vertical support.
+- It seals like a wall, but no room uses that: the roof is the ceiling.
+RIDGE CAP: an edge piece at level k (r 0|1, the wall's slot). It is valid only on the HIGH edge of a roof or lowRoof cell beside it ('no-roof' otherwise), and it is held up vertically by those roofs. It carries nothing and seals nothing.
+CODEC: append the six kinds; gable keeps r 0..3. v1 and v2 texts still decode.
+Keep this test unchanged too; add your own:
+```ts
+import { empty, found, place, rooms, supports, type Base, type Env, type Piece } from '../src/index';
+const R: Env = { heightAt: () => 0, materials: { reg: { vKeep: 0.9, hKeep: 0.6 } } };
+const add = (b: Base, p: Omit<Piece, 'id' | 'mat'>): Base => { const r = place(b, R, { ...p, mat: 'reg' }); assert.ok(r.ok, `${p.kind} ${p.i},${p.j},${p.k}: ${r.why}`); return r.base; };
+const why = (b: Base, p: Omit<Piece, 'id' | 'mat'>) => place(b, R, { ...p, mat: 'reg' }).why;
+test('round 4b: roofs rest on walls, cap rooms, meet at the ridge; gables and caps need their roof', () => {
+  let b = found(empty(), R, 0, 0, 0, 'reg').base; const s = b.structures[0]!.id;
+  b = add(b, { s, kind: 'foundation', i: 0, j: 1, k: 0, r: 0 });
+  for (const [i, j, r] of [[0, 0, 0], [0, 2, 0], [0, 0, 1], [0, 1, 1], [1, 0, 1], [1, 1, 1]] as const) b = add(b, { s, kind: 'wall', i, j, k: 0, r });
+  assert.equal(why(b, { s, kind: 'roof', i: 5, j: 0, k: 1, r: 0 }), 'unsupported');
+  b = add(b, { s, kind: 'roof', i: 0, j: 0, k: 1, r: 0 }); b = add(b, { s, kind: 'roof', i: 0, j: 1, k: 1, r: 2 });
+  const room = rooms(b).filter((rm) => rm.k === 0); assert.equal(room.length, 1); assert.equal(room[0]!.sealed, true); assert.equal(room[0]!.cells.length, 2);
+  assert.equal(rooms(b).some((rm) => rm.k === 1), false);
+  assert.equal(why(b, { s, kind: 'wall', i: 0, j: 0, k: 1, r: 0 }), 'occupied');
+  b = add(b, { s, kind: 'ridgeCap', i: 0, j: 1, k: 1, r: 0 });
+  assert.equal(why(b, { s, kind: 'wall', i: 0, j: 1, k: 1, r: 0 }), 'occupied');
+  b = add(b, { s, kind: 'gable', i: 0, j: 0, k: 1, r: 1 });
+  assert.equal(why(b, { s, kind: 'gable', i: 1, j: 0, k: 1, r: 3 }), 'no-roof');
+  b = add(b, { s, kind: 'gable', i: 0, j: 1, k: 1, r: 3 });
+  assert.equal(why(b, { s, kind: 'ridgeCap', i: 1, j: 1, k: 1, r: 1 }), 'no-roof');
+  // back to back: the second roof needs no walls of its own
+  let c = found(empty(), R, 40, 0, 0, 'reg').base; const t = c.structures[0]!.id;
+  c = add(c, { s: t, kind: 'foundation', i: 0, j: 1, k: 0, r: 0 });
+  for (const [i, j, r] of [[0, 0, 0], [0, 0, 1], [1, 0, 1]] as const) c = add(c, { s: t, kind: 'wall', i, j, k: 0, r });
+  c = add(c, { s: t, kind: 'roof', i: 0, j: 0, k: 1, r: 0 }); c = add(c, { s: t, kind: 'roof', i: 0, j: 1, k: 1, r: 2 });
+  const sup = supports(c, R), [a, d] = c.pieces.filter((p) => p.kind === 'roof');
+  assert.ok(Math.abs(sup.get(a!.id)! - 0.81) < 1e-9 && Math.abs(sup.get(d!.id)! - 0.729) < 1e-9);
+});
+```

@@ -1,0 +1,44 @@
+SHEET 15 — roofs, openings and circulation (pieces 12 to 27, continuing sheet 13). Source brief: docs/prompts/art/base-construction-sheet15.md. Research: docs/BASE_BUILDING_RESEARCH.md, finding F1.
+
+Rules for every panel: one design drawn twice. S1 and S6 use the SAME piece description below; only the wrapper differs. Lattice 4 m cells, 3 m storeys. Nothing floats. Every machine has a cable in a low ribbed floor cover. No lettering anywhere. No chimneys, no stacks. Review each pair side by side before keeping it.
+
+W1 (stage-1 wrapper, every 15 panel):
+A realtime 3D GAME ENGINE SCREENSHOT, Blender/Unity style render at stage-1 low-poly fidelity: flat-shaded triangle meshes, a restricted palette of about 16 flat colours, soft physically-based lighting, gentle ambient occlusion, clean anti-aliased edges — STRICTLY a 3D render, absolutely NO line art, NO black contour outlines, NO cel shading, NOT a cartoon or illustration. No text, no UI, no watermark, NO lettering or markings on any surface. ONE single image: one render, one camera, NOT a split-screen, NOT a diptych, NOT a multi-view sheet. Design-sheet panel: ONE base-building piece alone, three-quarter view, filling about two thirds of frame height, standing on a small patch of low-poly regolith (tan and grey flat facets); black starless sky behind; soft key light from frame right, one soft shadow.
+
+W6 (stage-6 wrapper, every 15 panel):
+Photorealistic 3D render — a videogame base-building design study at STAGE 6 fidelity: full PBR materials, clean painted steel and ceramic, crisp decals, light honest wear at most; in service and freshly maintained — NO rust, NO peeling, NO ruin, NO decay. The ground is a lush terraformed plot: green grass and small wildflowers at the feet of the piece; soft blue sky with a few thin clouds; warm low sun from frame right. Design-sheet panel: ONE base-building piece alone, three-quarter view, filling about two thirds of frame height. ONE single image: one render, one camera, NOT a split-screen, NOT a diptych, NOT a multi-view sheet. No text, no UI, no watermark, NO lettering, NO markings on any surface. NOT a cartoon, NOT low poly.
+
+P-12 PITCHED ROOF: a single 4 by 4 metre pitched roof panel, a flat steel standing-seam roof sloping about 37 degrees and rising 3 metres (one storey) from its LOW edge to its HIGH edge; the low edge rests on the top plate of a 3 metre structural wall panel, a gutter runs along the low edge; the high edge is carried by a steel post at 6 metres; bolted corner brackets.
+
+P-13 LOW ROOF: a single 4 by 4 metre low roof panel, the same standing-seam steel, sloping about 21 degrees and rising 1.5 metres (half a storey) from its LOW edge to its HIGH edge; the low edge rests on the top of a 1.5 metre half wall, a gutter on the low edge; the high edge is held on a steel post 3 metres tall; bolted corners.
+
+P-14 OUTER CORNER (HIP): a hip roof corner piece for the 37-degree roof: the outer corner where two pitched roof slopes meet along a diagonal hip line, one sloped steel standing-seam facet, gutters on both low edges, its corner carried on a steel post at 3 metres; the hip seam runs from the eave corner up to the ridge point; bolted.
+
+P-15 INNER CORNER (VALLEY): a valley roof piece for the 37-degree roof: two pitched steel roof facets meeting in an inside corner, forming a V-shaped valley gutter that runs down the inside seam to the low edge; the piece is bolted to the wall tops of both sides.
+
+P-16 RIDGE CAP: a steel ridge cap, 4 metres long: a standing capped ridge where two pitched 37-degree roofs meet at the top, a bolted steel cap sitting on the peak of two roof panels.
+
+P-17 GABLE WALL: a gable wall: a triangular structural wall panel, 4 metres wide at its base and 3 metres tall to the peak, closing the end of a 37-degree pitched roof; panelled like the structural wall, flat boxed steel panels with thin seams, bolted corner brackets; a hazard-striped foot band on its base, anchor bolts into a foundation slab.
+
+P-18 HALF WALL: a half wall: a structural wall panel 4 metres wide and 1.5 metres tall, the same flat boxed steel panels with thin seams and bolted corner brackets, a hazard-striped foot band, anchor bolts into a foundation slab; a hazmat scientist 1.8 metres tall in a white suit and helmet stands beside it for scale.
+
+P-19 WINDOW WALL: a window wall: a structural wall panel 4 metres wide and 3 metres tall with one heavy framed viewport, a thick steel-framed pressure window about 1.5 by 1.2 metres with dark thick glass and a soft reflection, bolted frame with a sealing gasket; flat boxed steel panels with thin seams, a hazard-striped foot band.
+
+P-20 DOORFRAME: a doorframe: a structural wall panel 4 metres wide and 3 metres tall with an OPEN rectangular passage 1.5 metres wide and 2.4 metres tall through it, a heavy steel frame around the opening, a hazard-striped threshold; NO door: the opening is empty, a dark interior visible beyond.
+
+P-21 INTERIOR DOOR: an interior door: a structural wall panel 4 metres wide and 3 metres tall with a light SLIDING DOOR, 1.5 by 2.4 metres, set in a steel frame, shown SHUT, the door panel running on a top track; a small handle plate and one status light; thinner and lighter than an airlock, NO round wheel, NO rubber seal ring.
+
+P-22 STAIRS: a staircase, one storey (3 metres) over one 4 metre cell: steel treads, a side stringer and a handrail on each side, rising from a foundation slab at the foot to a landing deck at 3 metres; bolted stringer feet; a hazmat scientist 1.8 metres tall in a white suit stands at its foot for scale.
+
+P-23 LADDER: a ladder, one storey (3 metres) on a wall face: a steel vertical ladder bolted to the face of a structural wall panel, rungs, safety hoops every metre, a foot plate on a foundation slab at the bottom and a top plate bolted to a deck edge at 3 metres; a hazmat scientist 1.8 metres tall in a white suit stands at its foot for scale.
+
+P-24 RAILING: a railing: a half-height steel rail about 1 metre high along one 4 metre cell edge, posts bolted to the foundation slab with base plates and anchor bolts, a top rail and a mid rail; no barrier panels.
+
+P-25 DIAGONAL BRACE: a diagonal brace: a steel strut running from a wall face at ground level up to the underside of a floor deck 3 metres above, bolted at both ends with gusset plates; a foundation slab at its foot.
+
+P-26 LIFE-SUPPORT UNIT: a life-support unit: a floor-standing steel cabinet about 1.5 metres tall and 1 metre wide on a bolted base plate on a foundation slab, two intake vent grilles on its front, one round green status light, and a cable gland on its base where a thick cable runs into a low ribbed steel floor cover; no chimney, no stack, no pipes going up.
+
+P-27 AIRLOCK VESTIBULE: an airlock vestibule: a short sealed corridor, one 4 metre cell long and 3 metres tall, with walls on both sides and a roof panel; two airlock doors, one at each end, both facing into the corridor, each a thick sealed round-cornered door with a dark rubber pressure seal ring and a small green status light above; hazard-striped threshold steps bolted to a foundation slab; the near wall is cut away so both doors are visible.
+
+FILE NAMES: 15-<key>-s1.png and 15-<key>-s6.png, keys: roof-pitched (12), roof-low (13), corner-outer (14), corner-inner (15), ridge-cap (16), gable (17), half-wall (18), window-wall (19), doorframe (20), door-interior (21), stairs (22), ladder (23), railing (24), brace (25), lifesupport (26), vestibule (27).
+Each generation: W1 or W6, then the P-text. offer_options = false (assets inside a build).

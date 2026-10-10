@@ -24,6 +24,8 @@ export const PLAYER_KG = 120;
 export const BIN_SLOTS = 24;
 export const BIN_KG = 2000;
 export const REPEATER_RANGE = 40;
+/** The lab quantum bridge reaches this far from the gate (metres): the base network every new player starts with. */
+export const BRIDGE_RANGE = 60;
 /** How close the player must stand to a Drafting Table (a bench piece) to draft, metres. */
 export const BENCH_REACH = 5;
 /** How far the Extraction Beam reaches, metres. */

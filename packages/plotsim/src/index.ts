@@ -23,9 +23,13 @@
 export type Metric = 'pxd' | 'vtx' | 'lx' | 'aq';
 export const METRICS: readonly Metric[] = ['pxd', 'vtx', 'lx', 'aq'];
 
-export type MachineKind = 'drill' | 'mill' | 'pylon' | 'press' | 'power' | 'projector' | 'water';
+export type MachineKind = 'drill' | 'mill' | 'pylon' | 'press' | 'power' | 'projector' | 'water' | HeavyKind;
 
-/** The kinds in the order they unlock. */
+/** Heavy terraformers (docs/BASE_BUILDING_ARCHITECTURE.md D3): built only on a base hardpoint, paid in refined parts by the base (so 0 ore here), about 20x the output of their field twin for 4x the power. */
+export type HeavyKind = 'heavy-mill' | 'heavy-press' | 'heavy-projector' | 'heavy-water';
+export const HEAVY_KINDS: readonly HeavyKind[] = ['heavy-mill', 'heavy-press', 'heavy-projector', 'heavy-water'];
+
+/** The field kinds in the order they unlock (heavy kinds come from the base, see HEAVY_KINDS). */
 export const MACHINE_KINDS: readonly MachineKind[] = ['drill', 'mill', 'pylon', 'press', 'power', 'projector', 'water'];
 
 export interface KindSpec {
@@ -51,6 +55,10 @@ export const KINDS: Readonly<Record<MachineKind, KindSpec>> = {
   power: { kind: 'power', name: 'Power unit', cost: 60, draw: -16, oreUse: 1, mine: 0, emits: null, rate: 0, reach: 30, unlock: 1, slot: false, radius: 2.5 },
   projector: { kind: 'projector', name: 'Light projector', cost: 90, draw: 8, oreUse: 0, mine: 0, emits: 'lx', rate: 3, reach: 0, unlock: 2, slot: true, radius: 1.5 },
   water: { kind: 'water', name: 'Water maker', cost: 110, draw: 5, oreUse: 0.8, mine: 0, emits: 'aq', rate: 2, reach: 0, unlock: 3, slot: true, radius: 2 },
+  'heavy-mill': { kind: 'heavy-mill', name: 'Heavy texture mill', cost: 0, draw: 16, oreUse: 1.2, mine: 0, emits: 'pxd', rate: 40, reach: 0, unlock: 0, slot: true, radius: 4 },
+  'heavy-press': { kind: 'heavy-press', name: 'Heavy shape press', cost: 0, draw: 16, oreUse: 1.4, mine: 0, emits: 'vtx', rate: 40, reach: 0, unlock: 1, slot: true, radius: 4 },
+  'heavy-projector': { kind: 'heavy-projector', name: 'Heavy light projector', cost: 0, draw: 32, oreUse: 0, mine: 0, emits: 'lx', rate: 60, reach: 0, unlock: 2, slot: true, radius: 4 },
+  'heavy-water': { kind: 'heavy-water', name: 'Heavy water maker', cost: 0, draw: 20, oreUse: 1.6, mine: 0, emits: 'aq', rate: 40, reach: 0, unlock: 3, slot: true, radius: 4 },
 };
 
 /** The gate's junction box: kW it supplies, metres it reaches, metres of bare pad around the gate. */

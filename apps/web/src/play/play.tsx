@@ -96,6 +96,11 @@ const BLURB: Readonly<Record<MachineKind, string>> = {
   mill: 'Grinds ore into texture detail: pink pixels.', drill: 'Mines ore from the ground, best on rock and scree.', pylon: 'Carries power further out.',
   press: 'Stamps the plot\'s shapes finer: green pixels.', power: 'Burns ore to make more power.', projector: 'Raises the light: amber pixels.',
   water: 'Condenses water from gravel: cyan pixels.',
+  // heavy kinds are installed on a base hardpoint, never from this menu (BUILD_ORDER leaves them out)
+  'heavy-mill': 'Refines raw pixels into texture maps and floods the plot with pink pixels.',
+  'heavy-press': 'Presses raw vertices into primitives and floods the plot with green pixels.',
+  'heavy-projector': 'Floods the plot with amber light pixels.',
+  'heavy-water': 'Floods the plot with cyan water pixels.',
 };
 const signed = (v: number): string => `${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
 const KEYS: readonly [string, string][] = [['W A S D', 'walk'], ['Mouse', 'look'], ['Shift', 'run'], ['V', 'view'], ['E', 'use'], ['B', 'build'], ['Esc', 'pause']];

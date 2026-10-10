@@ -1,4 +1,5 @@
-export const KINDS = ['drill', 'mill', 'pylon', 'press', 'power', 'projector', 'water'] as const;
+// heavy kinds appended (one byte per kind index), so codes written before them still decode
+export const KINDS = ['drill', 'mill', 'pylon', 'press', 'power', 'projector', 'water', 'heavy-mill', 'heavy-press', 'heavy-projector', 'heavy-water'] as const;
 export type MachineKind = (typeof KINDS)[number];
 
 export const METRICS = ['pxd', 'vtx', 'lx', 'aq'] as const;

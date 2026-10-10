@@ -23,7 +23,17 @@ export interface MachineProp {
 }
 
 /** The metric a machine's pixels raise (null: it pours none). */
-export const PIXELS_OF: Readonly<Record<MachineKind, Metric | null>> = { drill: null, mill: 'pxd', pylon: null, press: 'vtx', power: null, projector: 'lx', water: 'aq' };
+export const PIXELS_OF: Readonly<Record<MachineKind, Metric | null>> = {
+  drill: null, mill: 'pxd', pylon: null, press: 'vtx', power: null, projector: 'lx', water: 'aq',
+  'heavy-mill': 'pxd', 'heavy-press': 'vtx', 'heavy-projector': 'lx', 'heavy-water': 'aq',
+};
+
+/** Stand-in for a heavy terraformer until its own mesh lands (after the base-construction concept art): its field twin at 1.9x, sockets moved with it. */
+const HEAVY_SCALE = 1.9;
+function heavy(p: MachineProp): MachineProp {
+  p.group.scale.multiplyScalar(HEAVY_SCALE);
+  return { ...p, power: p.power.clone().multiplyScalar(HEAVY_SCALE), vent: p.vent ? p.vent.clone().multiplyScalar(HEAVY_SCALE) : null, top: p.top ? p.top.clone().multiplyScalar(HEAVY_SCALE) : null };
+}
 
 const at = (sockets: readonly { readonly name: string; readonly at: readonly [number, number, number] }[], ...names: string[]): THREE.Vector3 | null => {
   for (const n of names) { const s = sockets.find((x) => x.name === n); if (s) return new THREE.Vector3(...s.at); }
@@ -35,6 +45,10 @@ export function machineProp(m: lab.LabMaterials, kind: MachineKind, stage: numbe
   const st = stage <= 1 ? 1 : 6;
   const still = (): void => undefined;
   switch (kind) {
+    case 'heavy-mill': return heavy(machineProp(m, 'mill', stage));
+    case 'heavy-press': return heavy(machineProp(m, 'press', stage));
+    case 'heavy-projector': return heavy(machineProp(m, 'projector', stage));
+    case 'heavy-water': return heavy(machineProp(m, 'water', stage));
     case 'mill': {
       const p = consoleMillTextureMill(m, { stage: st });
       return { group: p.group, power: at(p.sockets, 'power')!, vent: at(p.sockets, 'stack'), top: null, lamps: p.lamps, animate: still, light: (g) => p.lamps.forEach((l) => setConsoleMillLamp(l, g)) };

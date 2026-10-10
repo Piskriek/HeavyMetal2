@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { KINDS, GATE, STAGES, METRICS, newPlot, level, network, running, canPlace, place, remove, step, nextStage, loadPlot, type Env, type MachineKind, type PlotState } from '../src/index';
+import { KINDS, GATE, STAGES, METRICS, newPlot, level, network, running, canPlace, place, remove, step, nextStage, loadPlot, type Env, type MachineKind, type PlotState, HEAVY_KINDS } from '../src/index';
 
 const env: Env = { gate: { x: 0, z: 0 }, plotRadius: 500, richness: () => 0.8 };
 const poor: Env = { ...env, richness: () => 0.05 };
 const run = (s: PlotState, seconds: number, e: Env = env) => { let st = s; const events: string[] = []; for (let t = 0; t < seconds; t++) { const r = step(st, e, 1); st = r.state; for (const ev of r.events) events.push(ev.type === 'stage-up' ? `stage-${ev.stage}` : ev.type); } return { s: st, events }; };
 
 test('seven machines, unlocked in order, and a fresh plot', () => {
-  assert.deepEqual(Object.keys(KINDS).sort(), ['drill', 'mill', 'power', 'press', 'projector', 'pylon', 'water']);
+  // the seven field machines, plus the four heavy kinds the base installs (D3; tests/plotsim-heavy.test.ts)
+  assert.deepEqual(Object.keys(KINDS).sort(), ['drill', 'heavy-mill', 'heavy-press', 'heavy-projector', 'heavy-water', 'mill', 'power', 'press', 'projector', 'pylon', 'water']);
   assert.deepEqual([...METRICS], ['pxd', 'vtx', 'lx', 'aq']);
   assert.deepEqual((['drill', 'mill', 'pylon', 'press', 'power', 'projector', 'water'] as MachineKind[]).map((k) => KINDS[k].unlock), [0, 0, 0, 1, 1, 2, 3]);
   assert.equal(KINDS.mill.emits, 'pxd'); assert.equal(KINDS.press.emits, 'vtx'); assert.equal(KINDS.projector.emits, 'lx'); assert.equal(KINDS.water.emits, 'aq');
@@ -131,7 +132,7 @@ const deepFreeze = <T>(o: T): T => {
 };
 
 test('the numbers keep to the sizes the design asks for', () => {
-  assert.deepEqual([...MACHINE_KINDS].sort(), Object.keys(KINDS).sort());
+  assert.deepEqual([...MACHINE_KINDS, ...HEAVY_KINDS].sort(), Object.keys(KINDS).sort());
   for (const k of MACHINE_KINDS) {
     const spec = KINDS[k];
     assert.equal(spec.kind, k);

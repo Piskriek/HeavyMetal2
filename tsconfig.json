@@ -342,6 +342,9 @@
       "@hm/heavygear": [
         "packages/heavygear/src/index.ts"
       ],
+      "@hm/basekit2": [
+        "packages/basekit2/src/index.ts"
+      ],
       "@hm/basekit": [
         "packages/basekit/src/index.ts"
       ],

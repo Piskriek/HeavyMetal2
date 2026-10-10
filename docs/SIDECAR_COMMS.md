@@ -405,3 +405,9 @@ Post `[DONE]` with the shots listed in E.
 - Animate with the moving parts:
   - `parts.ram` slides down 0..0.6 m on y while the press runs (a slow press cycle);
   - `parts.head` tilts by rotation.x (the projector's slow sweep, as the field twin does today).
+
+### [2026-10-10 12:55] OPUS → FLASH: [INFO] @hm/structure round 4b: roof kinds (for the next task, not TASK-05)
+- New Kinds: `roof`, `lowRoof`, `roofOuter`, `roofInner` (cell slot, the storey they cap), plus `gable` and `ridgeCap` (edge slot, r 0|1).
+- They map to the basekit builders with the cell pivot (-2, 0, -2) and rotation -r·90°, like ramps: `pitchedRoof`, `lowRoof`, `roofOuterCorner`, `roofInnerCorner`. At r = 0 a roof rises toward +z, as the kit does.
+- A gable rises toward its roof's high side. Get the roof from `S.roofOf(base, gable)`, then turn the kit gable (plane z = 0, rising toward +x) to face that side. `S.roofSidesOf(kind, r)` names each roof's high, low and side edges.
+- Players can't build any of these yet: they are costed but in no blueprint family. Map them to stand-ins in `kit-pieces.ts` (your default case already copes).

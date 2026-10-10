@@ -945,6 +945,24 @@ export function place(base: Base, env: Env, piece: Omit<Piece, 'id'>): Result {
   return { ok: true, why: '', base: nextBase, id: placed.id };
 }
 
+/**
+ * The roof a gable or ridge cap belongs to (the renderer turns a gable to rise toward its roof's high side), and a roof
+ * cell's sides: which of '+z' | '-x' | '-z' | '+x' are its high edges, its eaves and its rising sides for its kind and r.
+ */
+export function roofOf(base: Base, piece: Piece): Piece | null {
+  if (piece.kind !== 'gable' && piece.kind !== 'ridgeCap') return null;
+  for (const [ci, cj] of edgeCells(piece.i, piece.j, piece.r)) {
+    for (const p of base.pieces) {
+      if (p.s !== piece.s || p.k !== piece.k || p.i !== ci || p.j !== cj) continue;
+      const list = piece.kind === 'gable' ? (p.kind === 'roof' ? roofSides(p.kind, p.r).sides : []) : p.kind === 'roof' || p.kind === 'lowRoof' ? roofSides(p.kind, p.r).high : [];
+      if (list.some((side) => isEdge(sideEdge(ci, cj, side), piece.i, piece.j, piece.r))) return p;
+    }
+  }
+  return null;
+}
+
+export const roofSidesOf = (kind: Kind, r: number): { readonly high: readonly string[]; readonly low: readonly string[]; readonly sides: readonly string[] } => roofSides(kind, r);
+
 export function supports(base: Base, env: Env): ReadonlyMap<number, number> {
   const values = supportValues(base.pieces, base.structures, env);
   const result = new Map<number, number>();

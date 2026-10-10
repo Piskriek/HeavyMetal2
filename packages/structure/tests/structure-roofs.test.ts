@@ -79,3 +79,12 @@ test('every edge kind snaps to an edge, in both directions; roofs snap with the 
   const turnedTo = (yaw: number) => { const s = snap(b, R, 'roof', { x: 2, y: 3, z: 2, yaw }, 'reg'); return s?.mode === 'place' ? s.piece.r : -1; };
   assert.equal(new Set([0, Math.PI / 2, Math.PI, -Math.PI / 2].map(turnedTo)).size, 4, 'four aims, four turns');
 });
+
+test('roofOf finds the roof a gable or ridge cap belongs to', async () => {
+  const { roofOf } = await import('../src/index');
+  const w = walled(); let b = add(w.b, { s: w.s, kind: 'roof', i: 0, j: 0, k: 1, r: 0 });
+  b = add(b, { s: w.s, kind: 'gable', i: 0, j: 0, k: 1, r: 1 }); b = add(b, { s: w.s, kind: 'ridgeCap', i: 0, j: 1, k: 1, r: 0 });
+  const roof = b.pieces.find((p) => p.kind === 'roof')!;
+  for (const kind of ['gable', 'ridgeCap'] as const) assert.equal(roofOf(b, b.pieces.find((p) => p.kind === kind)!)?.id, roof.id, kind);
+  assert.equal(roofOf(b, roof), null);
+});

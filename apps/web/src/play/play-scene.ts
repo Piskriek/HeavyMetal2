@@ -185,6 +185,8 @@ export interface PlayScene {
     plumeGlowCount(): number;
     pixelLightCount(): number;
     testPieceAim(pieceId: number): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null;
+    setAltCam?: (eye: { readonly x: number; readonly y: number; readonly z: number }, pitch: number, yaw: number) => void;
+    clearAltCam?: () => void;
   };
   dispose(): void;
 }
@@ -518,30 +520,38 @@ export function createPlayScene(o: {
   let activeWalkWorld: WalkWorld | null = null;
   let altCamPos: THREE.Vector3 | null = null;
   let isSheltered = false;
+  let debugAltCam = false;
 
   const planGhostMat = keep(new THREE.MeshBasicMaterial({
     color: 0x00f0ff,
     transparent: true,
-    opacity: 0.38,
+    opacity: 0.18,
     depthWrite: false,
     side: THREE.DoubleSide,
+  }));
+  const planGhostEdgeMat = keep(new THREE.LineBasicMaterial({
+    color: 0x38bdf8,
+    transparent: true,
+    opacity: 0.85,
   }));
   const planGhostsGroup = keep(new THREE.Group());
   planetScene.add(planGhostsGroup);
 
   // Single InstancedMesh capped at 48 for pulsing cyan socket glow
-  const socketRingGeo = keep(new THREE.RingGeometry(0.35, 0.45, 24));
+  const socketRingGeo = keep(new THREE.RingGeometry(0.45, 0.65, 32));
   socketRingGeo.rotateX(-Math.PI / 2);
   const socketRingMat = keep(new THREE.MeshBasicMaterial({
-    color: 0x22d3ee,
+    color: 0x00f0ff,
     transparent: true,
-    opacity: 0.85,
+    opacity: 0.95,
     side: THREE.DoubleSide,
     depthWrite: false,
+    depthTest: false,
   }));
   const socketRingMesh = keep(new THREE.InstancedMesh(socketRingGeo, socketRingMat, 48));
   socketRingMesh.count = 0;
   socketRingMesh.visible = false;
+  socketRingMesh.renderOrder = 999;
   planetScene.add(socketRingMesh);
 
   // Stand-in anomaly node markers awaiting concept art
@@ -1044,11 +1054,23 @@ export function createPlayScene(o: {
       }
       for (const g of ghosts) {
         const instance = globalKitPieceCache.instantiate(g.kind, 1, 0);
+        const lines: THREE.LineSegments[] = [];
         instance.group.traverse((obj) => {
           if ((obj as THREE.Mesh).isMesh) {
-            (obj as THREE.Mesh).material = planGhostMat;
+            const mesh = obj as THREE.Mesh;
+            mesh.material = planGhostMat;
+            if (mesh.geometry) {
+              const edges = new THREE.LineSegments(
+                new THREE.EdgesGeometry(mesh.geometry, 24),
+                planGhostEdgeMat
+              );
+              lines.push(edges);
+            }
           }
         });
+        for (const l of lines) {
+          instance.group.add(l);
+        }
         instance.group.position.set(g.at.x, g.at.y, g.at.z);
         instance.group.rotation.y = g.yaw;
         planGhostsGroup.add(instance.group);
@@ -1236,7 +1258,9 @@ export function createPlayScene(o: {
       const speed = (c.run ? RUN : WALK) * dt;
       const before = pos.clone();
 
-      if (c.altCam && where === 'planet') {
+      if (debugAltCam && altCamPos) {
+        // Locked by debug.setAltCam
+      } else if (c.altCam && where === 'planet') {
         if (!altCamPos) {
           altCamPos = (cameraView === 'third' ? camera.position.clone() : pos.clone());
         }
@@ -1620,6 +1644,19 @@ export function createPlayScene(o: {
         geom.dispose();
         mat.dispose();
         return hit;
+      },
+      setAltCam(eye, p, y) {
+        debugAltCam = true;
+        altCamPos = new THREE.Vector3(eye.x, eye.y, eye.z);
+        pitch = p;
+        yaw = y;
+        camera.position.copy(altCamPos);
+        camera.rotation.set(pitch, yaw, 0, 'YXZ');
+        camera.updateMatrixWorld(true);
+      },
+      clearAltCam() {
+        debugAltCam = false;
+        altCamPos = null;
       },
     },
     dispose() {

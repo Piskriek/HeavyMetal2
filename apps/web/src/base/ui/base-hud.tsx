@@ -136,7 +136,7 @@ export const BaseHud: React.FC<BaseHudProps> = ({
           style={{ bottom: harvestCounter ? 134 : 84 }}
           data-testid="base-placed-counter"
         >
-          <span className="hm-count-pill">+{placedCounter.count}</span>
+          <span className="hm-count-pill">{placedCounter.count > 0 ? `+${placedCounter.count}` : placedCounter.count}</span>
           <span className="hm-count-name">{placedCounter.name}</span>
         </div>
       )}

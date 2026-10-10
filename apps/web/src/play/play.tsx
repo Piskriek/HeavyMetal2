@@ -16,7 +16,7 @@ import { CreateScientist } from '../avatar/create-scientist';
 import type { ClipName } from '../avatar/scientist/anims-loader';
 import type { OneShotKind } from '../avatar/scientist/animator';
 import { createPlayScene, type Detail, type FrameOut, type LabMachineKind, type PlayScene } from './play-scene';
-import { canPlace, KINDS, level, METRICS, network, place, rates, remove as removeMachine, running, setCartridge, setOn, step as stepPlot, type Env, type MachineKind, type Metric, type PlotState } from '@hm/plotsim';
+import { canPlace, KINDS, level, METRICS, network, place, rates, remove as removeMachine, running, setCartridge, setOn, step as stepPlot, type Env, type Machine, type MachineKind, type Metric, type PlotState } from '@hm/plotsim';
 import {
   activity as labActivity,
   affinityOf as cartlabAffinityOf,
@@ -162,7 +162,30 @@ export function PlayScreen(props: {
   const [toast, setToast] = useState<{ readonly text: string; readonly sub: string; readonly id: number } | null>(null);
   const isMashTest = typeof location !== 'undefined' && (new URLSearchParams(location.search).has('mash') || new URLSearchParams(location.search).has('monstermash'));
   const isBase = typeof location !== 'undefined' && (new URLSearchParams(location.search).has('base') || new URLSearchParams(location.search).has('building'));
+  const isDevSeed = typeof location !== 'undefined' && new URLSearchParams(location.search).get('kit') === '1';
   const creating = state.step === 'create' && !isMashTest;
+
+  useEffect(() => {
+    if (isBase && isDevSeed && plotRef.current.machines.length === 0) {
+      plotRef.current = {
+        ...plotRef.current,
+        ore: Math.max(plotRef.current.ore, 600),
+        machines: [
+          {
+            id: 1,
+            kind: 'power',
+            x: 0,
+            z: -6,
+            yaw: 0,
+            on: true,
+            cartridge: null,
+            built: 0,
+          },
+        ],
+        nextId: 2,
+      };
+    }
+  }, [isBase, isDevSeed]);
 
   const commit = useCallback((next: PlayState) => { stateRef.current = next; setState(next); save(next); }, []);
   const say = useCallback((text: string, sub = '') => setToast({ text, sub, id: Date.now() }), []);
@@ -205,9 +228,6 @@ export function PlayScreen(props: {
     }
     hasSaveOnBootRef.current = false;
     const fresh = createWorld(seed);
-    const isDevSeed =
-      typeof window !== 'undefined' &&
-      (import.meta.env.DEV || new URLSearchParams(window.location.search).get('kit') === '1');
     const defaultEnv: WorldEnv = {
       heightAt: () => 0,
       bridge: { x: 0, z: 0, range: BRIDGE_RANGE },
@@ -274,10 +294,10 @@ export function PlayScreen(props: {
   const shelterAttemptedRef = useRef(false);
   const baseViewSourceRef = useRef<any>(null);
 
-  const incrementPlacedCounter = useCallback((n: number) => {
+  const incrementPlacedCounter = useCallback((n: number, name = 'pieces') => {
     setPlacedCounter((prev) => ({
       count: (prev ? prev.count : 0) + n,
-      name: 'pieces',
+      name,
       fading: false,
     }));
     if (placedCounterTimerRef.current !== null) {
@@ -433,10 +453,7 @@ export function PlayScreen(props: {
       } else if (ev.type === 'placed') {
         incrementPlacedCounter(1);
       } else if (ev.type === 'removed') {
-        say(
-          'Piece deconstructed.',
-          ev.collapsed.length > 0 ? `${ev.collapsed.length} piece(s) collapsed.` : ''
-        );
+        incrementPlacedCounter(-(1 + ev.collapsed.length), 'deconstructed');
         pieceManagerRef.current.handleRemoval(ev.id, ev.collapsed);
       } else if (ev.type === 'drafted') {
         say(`Drafted Blueprint: ${ev.blueprint}`);
@@ -700,6 +717,25 @@ export function PlayScreen(props: {
         env = { gate: scene.debug.gatePlanet(), plotRadius: 500, richness: (x, z) => scene.richness(x, z), affinity: (id, metric) => cartlabAffinityOf(labRef.current, id, metric) };
         envRef.current = env;
         plotRef.current = stateRef.current.plot;
+        if (isBase && isDevSeed && plotRef.current.machines.length === 0) {
+          const powerUnit: Machine = {
+            id: 1,
+            kind: 'power',
+            x: env.gate.x,
+            z: env.gate.z - 6,
+            yaw: 0,
+            on: true,
+            cartridge: null,
+            built: 0,
+          };
+          plotRef.current = {
+            ...plotRef.current,
+            ore: Math.max(plotRef.current.ore, 600),
+            machines: [powerUnit],
+            nextId: 2,
+          };
+          commit(withPlot(stateRef.current, plotRef.current));
+        }
         scene.restore({ gateOn: stateRef.current.gateOn, plot: plotRef.current, running: running(plotRef.current, env), connected: network(plotRef.current, env).connected });
         if (isBase) {
           const gate = scene.debug.gatePlanet();

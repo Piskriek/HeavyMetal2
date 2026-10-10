@@ -1115,11 +1115,32 @@ try {
     const scene = window.__playScene;
     scene?.setFidelityStage(1);
     const w = baseApi.world();
-    const st = w.base.structures.find((s) => s.id === w.base.pieces.find((p) => p.kind === 'lowRoof')?.s);
-    const sx = st?.x ?? 0;
-    const sz = st?.z ?? -12;
-    // Framed from in front of the shelter airlock looking at it
-    scene?.debug.teleport('planet', sx, sz + 8, Math.PI, -0.2);
+    const shelterRoof = w.base.pieces.find((p) => p.kind === 'lowRoof');
+    const st = w.base.structures.find((s) => s.id === shelterRoof?.s);
+    if (st) {
+      const shelterPieces = w.base.pieces.filter((p) => p.s === st.id);
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      const cosY = Math.cos(st.yaw), sinY = Math.sin(st.yaw);
+      for (const p of shelterPieces) {
+        const lx = (p.i + 0.5) * 4;
+        const lz = (p.j + 0.5) * 4;
+        const wx = st.x + lx * cosY - lz * sinY;
+        const wz = st.z + lx * sinY + lz * cosY;
+        minX = Math.min(minX, wx); maxX = Math.max(maxX, wx);
+        minZ = Math.min(minZ, wz); maxZ = Math.max(maxZ, wz);
+      }
+      const cx = (minX + maxX) / 2;
+      const cz = (minZ + maxZ) / 2;
+      const cy = st.y;
+      const eyeX = cx + 5.5;
+      const eyeZ = cz + 6.5;
+      const eyeY = cy + 6.5;
+      const dx = cx - eyeX, dz = cz - eyeZ;
+      const lookYaw = Math.atan2(-dx, -dz);
+      const lookPitch = -0.58;
+      scene?.debug.setAltCam?.({ x: eyeX, y: eyeY, z: eyeZ }, lookPitch, lookYaw);
+      scene?.frame(0, 0.016, { move: { x: 0, z: 0 }, look: { dx: 0, dy: 0 }, run: false, altCam: true });
+    }
   });
   await page.waitForTimeout(600);
   await takeScreenshot(page, { path: 'docs/shots/base/shelter-s1.png' });
@@ -1131,8 +1152,33 @@ try {
     baseApi?.apply({ t: 'stage', stage: 1 });
     const scene = window.__playScene;
     scene?.setFidelityStage(1);
-    // Elevated build camera view looking down at full outpost with skirts on slope
-    scene?.debug.teleport('planet', 12, 34, Math.atan2(-4, 18), -0.38);
+    const w = baseApi.world();
+    const rampPiece = w.base.pieces.find((p) => p.kind === 'ramp');
+    const st = w.base.structures.find((s) => s.id === rampPiece?.s);
+    if (st) {
+      const outpostPieces = w.base.pieces.filter((p) => p.s === st.id);
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      const cosY = Math.cos(st.yaw), sinY = Math.sin(st.yaw);
+      for (const p of outpostPieces) {
+        const lx = (p.i + 0.5) * 4;
+        const lz = (p.j + 0.5) * 4;
+        const wx = st.x + lx * cosY - lz * sinY;
+        const wz = st.z + lx * sinY + lz * cosY;
+        minX = Math.min(minX, wx); maxX = Math.max(maxX, wx);
+        minZ = Math.min(minZ, wz); maxZ = Math.max(maxZ, wz);
+      }
+      const cx = (minX + maxX) / 2;
+      const cz = (minZ + maxZ) / 2;
+      const cy = st.y;
+      const eyeX = cx;
+      const eyeZ = maxZ + 11;
+      const eyeY = cy + 13;
+      const dx = cx - eyeX, dz = cz - eyeZ;
+      const lookYaw = Math.atan2(-dx, -dz);
+      const lookPitch = -0.55;
+      scene?.debug.setAltCam?.({ x: eyeX, y: eyeY, z: eyeZ }, lookPitch, lookYaw);
+      scene?.frame(0, 0.016, { move: { x: 0, z: 0 }, look: { dx: 0, dy: 0 }, run: false, altCam: true });
+    }
   });
   await page.waitForTimeout(600);
   await takeScreenshot(page, { path: 'docs/shots/base/kit-outpost-s1.png' });
@@ -1144,11 +1190,40 @@ try {
     baseApi?.apply({ t: 'stage', stage: 6 });
     const scene = window.__playScene;
     scene?.setFidelityStage(4);
-    scene?.debug.teleport('planet', 12, 34, Math.atan2(-4, 18), -0.38);
+    const w = baseApi.world();
+    const rampPiece = w.base.pieces.find((p) => p.kind === 'ramp');
+    const st = w.base.structures.find((s) => s.id === rampPiece?.s);
+    if (st) {
+      const outpostPieces = w.base.pieces.filter((p) => p.s === st.id);
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      const cosY = Math.cos(st.yaw), sinY = Math.sin(st.yaw);
+      for (const p of outpostPieces) {
+        const lx = (p.i + 0.5) * 4;
+        const lz = (p.j + 0.5) * 4;
+        const wx = st.x + lx * cosY - lz * sinY;
+        const wz = st.z + lx * sinY + lz * cosY;
+        minX = Math.min(minX, wx); maxX = Math.max(maxX, wx);
+        minZ = Math.min(minZ, wz); maxZ = Math.max(maxZ, wz);
+      }
+      const cx = (minX + maxX) / 2;
+      const cz = (minZ + maxZ) / 2;
+      const cy = st.y;
+      const eyeX = cx;
+      const eyeZ = maxZ + 11;
+      const eyeY = cy + 13;
+      const dx = cx - eyeX, dz = cz - eyeZ;
+      const lookYaw = Math.atan2(-dx, -dz);
+      const lookPitch = -0.55;
+      scene?.debug.setAltCam?.({ x: eyeX, y: eyeY, z: eyeZ }, lookPitch, lookYaw);
+      scene?.frame(0, 0.016, { move: { x: 0, z: 0 }, look: { dx: 0, dy: 0 }, run: false, altCam: true });
+    }
   });
   await page.waitForTimeout(600);
   await takeScreenshot(page, { path: 'docs/shots/base/kit-outpost-s6.png' });
   console.log('Captured docs/shots/base/kit-outpost-s6.png');
+  await page.evaluate(() => {
+    window.__playScene?.debug.clearAltCam?.();
+  });
 
   // Screenshot: integrity-five.png (cantilever row of 5 floors off one wall)
   await page.evaluate(() => {
@@ -1211,12 +1286,26 @@ try {
     baseApi?.setBuildKind('wall');
     const scene = window.__playScene;
     scene?.setFidelityStage(4);
-    // Aim at the open slab at (12, 12) from (12, 6) looking +z with down pitch
-    scene?.debug.teleport('planet', 12, 6, Math.PI, -0.42);
+    const w = baseApi.world();
+    const st = w.base.structures[0];
+    const cy = st ? st.y : 0;
+    const cx = st ? st.x : 12;
+    const cz = st ? st.z : 12;
+    const eyeX = cx + 2.5;
+    const eyeZ = cz - 5.5;
+    const eyeY = cy + 4.0;
+    const dx = cx - eyeX, dz = cz - eyeZ;
+    const lookYaw = Math.atan2(-dx, -dz);
+    const lookPitch = -0.45;
+    scene?.debug.setAltCam?.({ x: eyeX, y: eyeY, z: eyeZ }, lookPitch, lookYaw);
+    scene?.frame(0, 0.016, { move: { x: 0, z: 0 }, look: { dx: 0, dy: 0 }, run: false, altCam: true });
   });
   await page.waitForTimeout(600);
   await takeScreenshot(page, { path: 'docs/shots/base/socket-glow.png' });
   console.log('Captured docs/shots/base/socket-glow.png');
+  await page.evaluate(() => {
+    window.__playScene?.debug.clearAltCam?.();
+  });
 
   // Screenshot: build-camera.png
   await page.keyboard.down('Alt');

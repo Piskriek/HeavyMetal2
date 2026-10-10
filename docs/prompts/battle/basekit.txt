@@ -1,0 +1,37 @@
+Write ONE TypeScript module for three.js: the six structural pieces of a moon base-building game, built procedurally as believable industrial construction. Reply with two full code blocks, src/index.ts then tests/basekit.test.ts; if you can, also a small preview page (three.js from a CDN) with all six at stage 1 and stage 6 on sandy ground, slowly turning. Then STOP.
+THE LOOK IS THE JOB: a reviewer renders yours beside the concept art; plain boxes lose even when tests pass. Chamfer large edges, add panel seams, bolts, hazard stripes, gussets: what a fabricator would weld.
+RULES: strict TS (noUncheckedIndexedAccess), no any, no DOM, no Date, no Math.random. Imports only `three` and `mergeGeometries` from 'three/examples/jsm/utils/BufferGeometryUtils.js'. Merge geometry per material (at most 6 meshes per piece). No transmission or refraction. stage 0-1 = CHUNKY LOW POLY, flat shaded, same silhouette, no small parts; stage 6 = full detail.
+FRAME (metres, y up): the base lattice is 4 m cells and 3 m storeys. A cell piece's origin is its cell corner: it spans x 0..4, z 0..4, and its floor top is y = 0.
+- foundation(m,{stage,skirt}): a 4 x 4 slab, top y=0, 0.5 m thick, chamfered top edge with a yellow/black hazard band, anchor bolts at the corners; a levelling SKIRT of ribbed steel plate hangs from the slab down to y=-(0.5+skirt) on all four sides (skirt 0..3, default 1), so the slab never floats on slopes.
+- wall(m,{stage}): runs x 0..4 along z=0 (0.25 thick, centred), y 0..3: framed panels with seams, a hazard foot strip, a top rail.
+- pillar(m,{stage}): a square box column 0.4 x 0.4 at x=z=0, y 0..3, with a hazard band at 1 m, base plate and four gussets.
+- floor(m,{stage}): an upper deck 4 x 4, top y=0, 0.3 thick, plate texture lines, an edge lip; it rests on walls and pillars below (no legs of its own).
+- ramp(m,{stage}): rises from y=0 at z=0 to y=3 at z=4 across x 0..4: grated deck, side stringers, handrails on both sides.
+- airlock(m,{stage}): a wall (same frame as wall) with a round-cornered pressure door 1.4 wide x 2.3 high centred at x=2, a thick frame, a status lamp and a gauge; door shut.
+Materials: export interface LabMaterials{gunmetal,darkSteel,paint,copper,rubber,hazard:THREE.MeshStandardMaterial;glass:THREE.MeshPhysicalMaterial;concrete:THREE.MeshStandardMaterial} and createMaterials(). Stage 1 uses flat-shaded copies.
+API: export interface Box{min:[number,number,number];max:[number,number,number]} export interface Piece{group:THREE.Group;colliders:Box[];lamps:THREE.Mesh[]} export function triangles(p:Piece):number; plus the six functions above, each returning a Piece. Colliders: boxes for walking on and bumping into; the airlock's doorway stays clear of colliders (the game opens the door).
+BUDGETS (triangles): stage 1 <= 400 per piece; stage 6 <= 4000 per piece. Building any piece takes < 30 ms.
+Keep this test unchanged; add your own:
+```ts
+import test from 'node:test'; import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { createMaterials, foundation, wall, pillar, floor, ramp, airlock, triangles, type Piece } from '../src/index';
+const m = createMaterials();
+const box = (p: Piece) => new THREE.Box3().setFromObject(p.group);
+const near = (a: number, b: number, e = 0.03) => assert.ok(Math.abs(a - b) <= e, `${a} vs ${b}`);
+test('pieces fit the lattice, stay in budget, and nothing floats', () => {
+  for (const stage of [1, 6]) {
+    const all = { foundation: foundation(m, { stage, skirt: 2 }), wall: wall(m, { stage }), pillar: pillar(m, { stage }), floor: floor(m, { stage }), ramp: ramp(m, { stage }), airlock: airlock(m, { stage }) };
+    for (const [k, p] of Object.entries(all)) { const t = triangles(p); assert.ok(t > 0 && t <= (stage === 1 ? 400 : 4000), `${k} s${stage}: ${t}`); assert.ok(p.group.children.length <= 6, k); }
+    const f = box(all.foundation); near(f.min.x, 0); near(f.max.x, 4); near(f.min.z, 0); near(f.max.z, 4); near(f.max.y, 0, 0.06); near(f.min.y, -2.5, 0.06);
+    const w = box(all.wall); near(w.min.x, 0); near(w.max.x, 4); near(w.min.y, 0); near(w.max.y, 3, 0.1); assert.ok(w.max.z - w.min.z <= 0.45);
+    const pl = box(all.pillar); near(pl.min.y, 0); near(pl.max.y, 3, 0.1); assert.ok(pl.max.x - pl.min.x <= 0.9);
+    const fl = box(all.floor); near(fl.max.y, 0, 0.06); near(fl.max.x, 4); near(fl.max.z, 4);
+    const r = box(all.ramp); near(r.min.y, 0, 0.1); near(r.max.z, 4, 0.1); assert.ok(r.max.y >= 2.9 && r.max.y <= 4.2);
+    const a = box(all.airlock); near(a.max.x, 4); near(a.max.y, 3, 0.1);
+    for (const c of all.airlock.colliders) assert.ok(!(c.min[0] < 2 && c.max[0] > 2 && c.min[1] < 1.2 && c.max[1] > 1.2 && c.min[2] < 0 && c.max[2] > 0), 'doorway clear');
+    assert.ok(all.wall.colliders.length > 0 && all.foundation.colliders.length > 0);
+  }
+  const t0 = performance.now(); airlock(m, { stage: 6 }); assert.ok(performance.now() - t0 < 200);
+});
+```

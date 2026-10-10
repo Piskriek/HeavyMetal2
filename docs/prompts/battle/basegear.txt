@@ -1,0 +1,36 @@
+Write ONE TypeScript three.js module: the fixtures and heavy machine of a moon base builder, procedural and real. Reply with two full code blocks, src/index.ts then tests/basegear.test.ts (and a preview page of all pieces at stage 1 and 6 if you can). Then STOP.
+THE LOOK IS THE JOB: judged beside concept art; bare boxes lose even if tests pass. Chamfers, seams, bolts, grilles, cable glands.
+RULES: strict TS (noUncheckedIndexedAccess), no any/DOM/Date/Math.random. Imports only `three` and `mergeGeometries` from 'three/examples/jsm/utils/BufferGeometryUtils.js'. Merge geometry per material (at most 8 meshes per piece, lamps included). No transmission or refraction. stage 0-1 = CHUNKY LOW POLY, flat shaded, same silhouette; stage 6 = full detail. NO chimneys or stacks.
+FRAME (m, y up): 4 m cells, 3 m storeys; pieces stand on slab tops at y=0 (never below), origin at the cell corner.
+- hardpoint(m,{stage}): the heavy-machine socket on a 2 x 2 pad (spans x,z 0..8): a short bolted CYLINDER SOCKET (~2.6 m across, 0.6 m tall) with a raised top ring and wide flange at (4,0,4); two thick cables (orange, green) leave through glands into low RIBBED FLOOR CABLE COVERS to the pad edge. Sockets 'mount' (ring top centre), 'power' (covers at the pad edge).
+- heavyMill(m,{stage}): origin = the ring top centre: a TALL square body ~3.2 m wide and 4 m tall, chamfered vertical edges, a recessed service door in front, an open square HOPPER on top heaped with dark ore, a louvred REAR VENT GRILLE on one side (pink pixels pour from it), feet on a bolted base plate. Sockets: 'vent' (vent centre), 'hopper', 'power'. Lamps: two status lamps.
+- bin(m,{stage}): quantum storage, centred at (2,0,2): a 1.6 m steel cabinet on four feet, keypad and handle in front, a small DISH EMITTER on top sending the link beam up. Socket 'link' (dish focus). Lamp: the emitter glow.
+- repeater(m,{stage}): centred: a tapering LATTICE TOWER ~7 m tall on a 1.6 m concrete base with anchor bolts, a RING of emitters on top, a distribution box at the foot, a red top lamp. Sockets 'top' and 'box'. Lamps: the red lamp and the ring.
+- draftingTable(m,{stage}): centred: a 2.4 x 1.2 m workbench, 0.95 m high on braced legs, a glowing blue DRAFTING SCREEN inset in the top, a small cube and a material swatch on it, a side cabinet. Socket 'screen'. Lamp: the screen.
+Materials (export): LabMaterials{gunmetal,darkSteel,paint,copper,rubber,hazard:THREE.MeshStandardMaterial;glass:THREE.MeshPhysicalMaterial;concrete:THREE.MeshStandardMaterial}; createMaterials(); setLamp(lamp:THREE.Mesh, glow:number) (emissive 0..1).
+API: export interface Box{min:[number,number,number];max:[number,number,number]} export interface Socket{name:string;at:[number,number,number]} export interface Gear{group:THREE.Group;colliders:Box[];sockets:Socket[];lamps:THREE.Mesh[]} export function triangles(g:Gear):number; plus the five functions above, each returning a Gear.
+BUDGETS (triangles): stage 1 <= 900 each; stage 6 <= 8000 each (heavyMill <= 10000).
+Keep this test unchanged, add your own:
+```ts
+import test from 'node:test'; import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { createMaterials, hardpoint, heavyMill, bin, repeater, draftingTable, setLamp, triangles, type Gear } from '../src/index';
+const m = createMaterials(), bb = (g: Gear) => new THREE.Box3().setFromObject(g.group);
+const has = (g: Gear, ...names: string[]) => names.forEach((n) => assert.ok(g.sockets.some((s) => s.name === n), n));
+test('gear fits its cells, stands on the slab, has its sockets and lamps', () => {
+  for (const stage of [1, 6]) {
+    const all = { hardpoint: hardpoint(m, { stage }), heavyMill: heavyMill(m, { stage }), bin: bin(m, { stage }), repeater: repeater(m, { stage }), draftingTable: draftingTable(m, { stage }) };
+    for (const [k, g] of Object.entries(all)) {
+      const t = triangles(g), cap = stage === 1 ? 900 : k === 'heavyMill' ? 10000 : 8000;
+      assert.ok(t > 0 && t <= cap, `${k} s${stage}: ${t}`); assert.ok(g.group.children.length <= 8, k);
+      assert.ok(bb(g).min.y >= -0.02, `${k} sinks`); assert.ok(g.colliders.length > 0, k);
+    }
+    const h = bb(all.hardpoint); assert.ok(h.min.x >= -0.01 && h.max.x <= 8.01 && h.min.z >= -0.01 && h.max.z <= 8.01 && h.max.y <= 1.2);
+    const mill = bb(all.heavyMill); assert.ok(mill.max.y >= 3.6 && mill.max.y <= 5.5 && mill.max.x - mill.min.x <= 6);
+    for (const k of ['bin', 'repeater', 'draftingTable'] as const) { const b = bb(all[k]); assert.ok(b.min.x >= -0.01 && b.max.x <= 4.01 && b.min.z >= -0.01 && b.max.z <= 4.01, k); }
+    assert.ok(bb(all.repeater).max.y >= 6 && bb(all.draftingTable).max.y <= 1.6);
+    has(all.hardpoint, 'mount', 'power'); has(all.heavyMill, 'vent', 'hopper', 'power'); has(all.bin, 'link'); has(all.repeater, 'top', 'box'); has(all.draftingTable, 'screen');
+    for (const g of [all.heavyMill, all.bin, all.repeater, all.draftingTable]) { assert.ok(g.lamps.length > 0); setLamp(g.lamps[0]!, 1); }
+  }
+});
+```

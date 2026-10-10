@@ -35,3 +35,22 @@ P-HARDPOINT-MILL (rev 2): the same heavy terraformer hardpoint, its 2 by 2 pad o
 P-PYLON (rev 2): a quantum repeater pylon, a tapered steel LATTICE tower about 6 metres tall (two storeys) on a square concrete footing pad with four anchor bolts, ending in a ring-shaped repeater array at its top, a distribution box with cable glands at its foot, and one thick cable running in a floor cover to the ground. A tower, not a lamp post: no lamps, no cups.
 
 WRAPPER ADDITION (rev 2, every panel): "ONE single image: one render, one camera, NOT a split-screen, NOT a diptych, NOT a multi-view sheet." Used for the pylon redo (13-pylon-s1 rev 2).
+
+REVISION 3 (lead-engineer review of 185e9d7e). Fidelity stages raise the RESOLUTION of one world; they are not time passing. S6 is the same piece in the same condition, at full PBR. S1 is the low-poly version of the S6 design. Where the pair differed, the S1 design was kept as the one design and S6 was redrawn to match it.
+
+W6 (rev 3, replaces W6 for every 13 panel):
+Photorealistic 3D render — a videogame base-building design study: the SAME piece as its stage-1 version, identical silhouette, parts and proportions, rendered at STAGE 6 resolution: full PBR materials, clean painted steel and ceramic, crisp decals, light honest wear at most; in service and freshly maintained — NO rust sheets, NO peeling, NO ruin, NO decay. It stands on the lush terraformed plot: green grass, clover and small wildflowers at its feet, moss on the stone; soft blue sky with a few thin clouds; warm low sun from frame right. Design-sheet panel: ONE base-building piece alone, three-quarter view, filling about two thirds of frame height. No text, no UI, no watermark. NOT a cartoon, NOT low poly. ONE single image, not a split-screen.
+
+P-MILL (rev 3, S1 design kept; S6 redrawn to match): a boxy grinding mill about 4 metres tall on four bolted feet: at the FRONT top, a FEED HOPPER heaped with dark, still ore chunks; on the RIGHT flank a wide flat REAR VENT GRILLE pouring a plume of small crisp SQUARE hot-pink pixels that spread and thin as they rise (no chimney, no stack); a simple side service hatch; thick power cables leave its base through low ribbed steel floor cable covers across the 2 by 2 pad of slabs.
+
+P-PILLAR (rev 3, S1 design kept): a corner pillar post, a square box-section steel column about 3 metres tall with a capped square top plate, a hazard-striped band near the base, a bolted base plate with four anchor bolts and two triangular bracing gussets at its foot.
+
+P-HARDPOINT (rev 3, S1 design kept): a heavy terraformer hardpoint: a square 2 by 2 pad of four grounded slabs (8 by 8 metres), a SHORT round socket cylinder on a bolted mounting ring with visible bolts, a POWER GLAND (orange) and a DATA GLAND (green) on the socket's side, each with a cable running along a low ribbed steel floor cable cover; the socket is empty and capped with a flat cover plate.
+
+P-BIN (rev 3, S1 design kept): a quantum storage bin, a squat steel box container about 2 metres square on four bolted feet, a hatch with a keypad, and a small finned QUANTUM LINK EMITTER dish on its top with a pale white-violet lens and a thin beam of light rising from it; one cable from a low ribbed steel floor cable cover into its side.
+
+SCENE 14 (rev 3): the four-cell sealed outpost, see README section 14 (verbatim there).
+
+REVISION 3b (review of rev-3 S6 renders): five S6 renders came back with baked text (labels, unit codes, logos, "STAGE 6", "LOAD CAP"). Every S6 prompt now also carries this clause, verbatim, after the W6 wrapper:
+"NO lettering, NO words, NO numbers, NO logos, NO stencils, NO labels, NO signs anywhere on any surface: plain blank painted steel and ceramic only."
+Rejected rev-3 files are kept in rejected/ (*-rev3-baked-text.png). Still to redraw with the clause: hardpoint-empty-s6, pylon-s6 (top ring as in S1, no label on the distribution box), foundation-s6, wall-s6, floor-s6, and bin-s6 (its dish must match the S1 dish: no fins).

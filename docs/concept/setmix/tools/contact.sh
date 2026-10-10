@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build contact-sheet.jpg from the 14 deliverable PNGs. Usage: bash tools/contact.sh
+# Build contact-sheet.jpg from the 12 deliverable PNGs. Usage: bash tools/contact.sh
 set -e
 D="$(cd "$(dirname "$0")/.." && pwd)"; T="$D/scratch/contact"; mkdir -p "$T"
 BG="#14161a"; FG="#e8eaee"; FONT=DejaVu-Sans; BOLD=DejaVu-Sans-Bold
@@ -17,8 +17,7 @@ convert -size 2620x1800 xc:"$BG" "$T/base.png"
 for i in "${!files[@]}"; do
   col=$(( i % 4 )); row=$(( i / 4 ))
   x=$(( 40 + col * 640 )); y=$(( 40 + row * 432 ))
-  src="$D/${files[$i]}.png"; [ -f "$src" ] || src="$D/${files[$i]}.jpg"
-  convert "$src" -resize 600x338^ -gravity center -extent 600x338 "$T/t$i.png"
+  convert "$D/${files[$i]}.png" -resize 600x338^ -gravity center -extent 600x338 "$T/t$i.png"
   convert "$T/base.png" \
     \( "$T/t$i.png" \) -gravity northwest -geometry +${x}+$(( y + 34 )) -composite \
     -font $BOLD -pointsize 22 -fill "$FG" -gravity northwest -annotate +$(( x + 2 ))+$(( y + 4 )) "${names[$i]}" \

@@ -195,9 +195,13 @@ export const SYNC_SECONDS = 60;
 export const MACHINE_FIELD = 28;
 
 /** Sync after `dt` seconds: it refills in the lab, drains on the planet, and from stage 1 recovers near a running machine. 0..1. */
-export function stepSync(level: number, dt: number, o: { readonly onPlanet: boolean; readonly stage: number; readonly nearMachine: boolean }): number {
+/** Sync refill per second inside a pressurised room on the planet (D14): slower than the lab, so the lab stays home. */
+export const SHELTER_REFILL = 0.25;
+
+export function stepSync(level: number, dt: number, o: { readonly onPlanet: boolean; readonly stage: number; readonly nearMachine: boolean; readonly sheltered?: boolean }): number {
   let rate: number;
   if (!o.onPlanet) rate = 0.5;
+  else if (o.sheltered === true) rate = SHELTER_REFILL;
   else if (o.stage >= 1 && o.nearMachine) rate = 0.2;
   else rate = -1 / (SYNC_SECONDS * (o.stage >= 1 ? 1.5 : 1));
   return Math.min(1, Math.max(0, level + rate * dt));

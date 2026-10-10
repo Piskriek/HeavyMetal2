@@ -199,6 +199,28 @@ export function relays(w: BaseWorld, env: WorldEnv): L.Relay[] {
   return out;
 }
 
+/**
+ * The room a point stands in (feet at `at.y`), and whether it is pressurised (D14): sealed (every door and airlock
+ * shut) with a powered life-support unit inside. A unit is powered while a relay reaches it: the lab bridge or a
+ * repeater carries power and data alike. It walks the rooms of the whole base, so call it a few times a second at most.
+ */
+export function roomAt(w: BaseWorld, env: WorldEnv, at: { readonly x: number; readonly y: number; readonly z: number }): { readonly room: S.Room | null; readonly pressurized: boolean } {
+  const all = S.rooms(w.base);
+  for (const st of w.base.structures) {
+    const dx = at.x - st.x, dz = at.z - st.z, c = Math.cos(st.yaw), s = Math.sin(st.yaw);
+    const i = Math.floor((dx * c + dz * s) / S.CELL), j = Math.floor((-dx * s + dz * c) / S.CELL), k = Math.floor((at.y - st.y + 0.5) / S.LEVEL);
+    const room = all.find((rm) => rm.s === st.id && rm.k === k && rm.cells.some(([a, b]) => a === i && b === j));
+    if (!room) continue;
+    const reach = relays(w, env);
+    const powered = room.lifeSupport.some((id) => {
+      const p = w.base.pieces.find((q) => q.id === id), q = p ? pieceAt(w.base, p) : null;
+      return !!q && reach.some((r) => Math.hypot(r.x - q.x, r.z - q.z) <= r.range);
+    });
+    return { room, pressurized: room.sealed && powered };
+  }
+  return { room: null, pressurized: false };
+}
+
 /** The box ids of the network the player stands in (ascending), or [] out of every relay's range. */
 export function networkAt(w: BaseWorld, env: WorldEnv, at: Point): number[] {
   const probe: L.Box = { id: PLAYER, x: at.x, z: at.z, slots: [], maxKg: 0 };

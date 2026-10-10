@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as L from '@hm/lattice';
 import { ITEMS, STARTER } from './catalog';
 import * as S from '@hm/structure';
-import { BRIDGE_STORE, SHELTER, apply, createWorld, hashWorld, layoutPieces, networkAt, planGhosts, preview, replay, withBridgeStore, type BaseCommand, type BaseWorld, type WorldEnv } from './world';
+import { BRIDGE_STORE, SHELTER, apply, createWorld, hashWorld, layoutPieces, networkAt, planGhosts, preview, replay, roomAt, withBridgeStore, type BaseCommand, type BaseWorld, type WorldEnv } from './world';
 
 const env: WorldEnv = { heightAt: () => 0, bridge: { x: 0, z: 0, range: 60 } };
 const at = { x: 2, z: 2 };
@@ -225,4 +225,23 @@ test('the starter shelter: free, sealed, once per world; it saves as a layout th
   assert.equal(other.layouts[0]!.id, layout.id);
   assert.equal(apply(createWorld(), env, { t: 'importLayout', code: 'not-a-layout', name: 'x' }).events[0]!.type, 'refused');
   assert.equal(apply(createWorld(), env, { t: 'importLayout', code: layout.code, name: '' }).events[0]!.type, 'refused');
+});
+
+test('pressure (D14): a sealed room with a powered life-support unit inside; an open airlock or no power breaks it', () => {
+  const senv = { heightAt: () => 0, materials: { regolith: { vKeep: 0.85, hKeep: 0.5 } } };
+  let base = S.found(S.empty(), senv, 2, 2, 0, 'regolith').base; const s = base.structures[0]!.id;
+  const put = (p: Omit<S.Piece, 'id' | 's' | 'mat'>) => { const r = S.place(base, senv, { ...p, s, mat: 'regolith' }); assert.ok(r.ok, `${p.kind}: ${r.why}`); base = r.base; };
+  put({ kind: 'wall', i: 0, j: 0, k: 0, r: 0 }); put({ kind: 'wall', i: 0, j: 0, k: 0, r: 1 }); put({ kind: 'wall', i: 1, j: 0, k: 0, r: 1 });
+  put({ kind: 'airlock', i: 0, j: 1, k: 0, r: 0 }); put({ kind: 'lowRoof', i: 0, j: 0, k: 1, r: 2 });
+  const bare: BaseWorld = { ...createWorld(), base };
+  assert.deepEqual(roomAt(bare, env, { x: 2, y: 0, z: 2 }).pressurized, false, 'no life support yet');
+  put({ kind: 'lifeSupport', i: 0, j: 0, k: 0, r: 0 });
+  const w: BaseWorld = { ...createWorld(), base };
+  const inside = roomAt(w, env, { x: 2, y: 0, z: 2 });
+  assert.ok(inside.room && inside.room.sealed); assert.equal(inside.pressurized, true);
+  assert.equal(roomAt(w, env, { x: 9, y: 0, z: 2 }).room, null, 'outside');
+  assert.equal(roomAt(w, env, { x: 2, y: 3, z: 2 }).room, null, 'on the roof');
+  assert.equal(roomAt(w, { ...env, bridge: { x: 500, z: 500, range: 60 } }, { x: 2, y: 0, z: 2 }).pressurized, false, 'no relay reaches it');
+  const lock = w.base.pieces.find((p) => p.kind === 'airlock')!;
+  assert.equal(roomAt(run(w, { t: 'door', id: lock.id, open: true }), env, { x: 2, y: 0, z: 2 }).pressurized, false, 'the airlock is open');
 });

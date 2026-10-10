@@ -49,6 +49,14 @@ Add a **Layouts** tab beside Blueprints in `drafting-window.tsx`. Keep the estab
   - When short, show the missing items, as the build readout does.
 - A small plan list in the HUD has a drop button that dispatches `dropPlan`.
 
+## G. Pressure (D14)
+
+- About 4 times a second while on the planet, call `roomAt(world, env, { x, y: feetY, z })` and pass `sheltered: pressurized` to `stepSync` in `play-scene.ts`.
+  - A pressurised room refills sync at `SHELTER_REFILL` (0.25/s).
+  - Sealed means every door and airlock is shut, and powered means a relay reaches the life-support unit.
+- HUD: a small "PRESSURISED" chip beside the sync meter while it holds. When a room is sealed but has no powered unit, a dim "SEALED · NO LIFE SUPPORT" chip instead.
+- Life support can't be built yet: it is in no blueprint family, and the shelter's single fixture slot holds the Drafting Table. Test it with a debug hook that places one.
+
 ## F. Done means
 
 - Typecheck shows 0 errors, `npm test` is green, and `npm run build` succeeds.

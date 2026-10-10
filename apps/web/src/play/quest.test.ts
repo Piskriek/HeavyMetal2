@@ -131,6 +131,7 @@ test('sync drains on the planet in about a minute and refills in the lab', () =>
   assert.equal(stepSync(0.2, 10, { onPlanet: false, stage: 0, nearMachine: false }), 1);
   // from stage 1 a running machine holds your sync up; away from one it drains, more slowly
   assert.ok(stepSync(0.5, 1, { onPlanet: true, stage: 1, nearMachine: true }) > 0.5);
+  assert.ok(Math.abs(stepSync(0.5, 1, { onPlanet: true, stage: 0, nearMachine: false, sheltered: true }) - 0.75) < 1e-9, 'a pressurised room refills');
   const away = 0.5 - stepSync(0.5, 1, { onPlanet: true, stage: 1, nearMachine: false });
   assert.ok(away > 0 && away < 1 / SYNC_SECONDS);
 });

@@ -15,7 +15,7 @@ import { fx as sfx } from '../maker/feedback';
 import * as kit from '@hm/labkit';
 import { createLabRoom, GATE_AT, POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, ROOM, type LabRoom } from './lab-room';
 import { createPlotHolo, type PlotHolo } from './plot-holo';
-import { COLOUR_MARK_FRAGMENT, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX } from './portal-shaders';
+import { COLOUR_MARK_FRAGMENT, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX } from './portal-shaders';
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
 import { disposeProp, lineSpan, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
 import { createScientistInstance } from '../avatar/scientist/scientist-model';
@@ -113,7 +113,9 @@ export interface PlayScene {
   /** Generic ghost for base building pieces. */
   setPieceGhost(group: THREE.Group | null): void;
   placePieceGhost(pose: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number } | null, tint: 'grounded' | 'ok' | 'weak' | 'bad'): void;
-  aimPoint(): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number } | null;
+  /** Placed base pieces group for aim raycasting. */
+  setPieces(group: THREE.Group | null): void;
+  aimPoint(): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null;
   /** The plot reached a stage: a wave from `from` (ground x, z) brings its look across the plot, out to the horizon and up the sky. */
   raiseStage(to: number, from: { readonly x: number; readonly z: number }): void;
   frame(now: number, dt: number, c: Controls): FrameOut;
@@ -159,6 +161,7 @@ export interface PlayScene {
     twinStage(): number;
     plumeGlowCount(): number;
     pixelLightCount(): number;
+    testPieceAim(pieceId: number): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null;
   };
   dispose(): void;
 }
@@ -481,12 +484,14 @@ export function createPlayScene(o: {
   let building = false, ghostVerdict: { ok: boolean; why: string } = { ok: false, why: '' };
   const ghostAt = new THREE.Vector3();
 
-  // piece build ghost for Valheim/Dune base-building
-  const pieceGhostGrounded = keep(new THREE.ShaderMaterial({ vertexShader: MARK_VERTEX, fragmentShader: COLOUR_MARK_FRAGMENT, blending: THREE.NoBlending, uniforms: { uColour: { value: new THREE.Color('#38bdf8') }, uLit: { value: 1 } } }));
-  const pieceGhostOk = keep(new THREE.ShaderMaterial({ vertexShader: MARK_VERTEX, fragmentShader: COLOUR_MARK_FRAGMENT, blending: THREE.NoBlending, uniforms: { uColour: { value: new THREE.Color('#34d399') }, uLit: { value: 1 } } }));
-  const pieceGhostWeak = keep(new THREE.ShaderMaterial({ vertexShader: MARK_VERTEX, fragmentShader: COLOUR_MARK_FRAGMENT, blending: THREE.NoBlending, uniforms: { uColour: { value: new THREE.Color('#fbbf24') }, uLit: { value: 1 } } }));
-  const pieceGhostBad = keep(new THREE.ShaderMaterial({ vertexShader: MARK_VERTEX, fragmentShader: COLOUR_MARK_FRAGMENT, blending: THREE.NoBlending, uniforms: { uColour: { value: new THREE.Color('#ef4444') }, uLit: { value: 1 } } }));
+  // piece build ghost for Valheim/Dune base-building (Hologram with Fresnel, scanlines, slow pulse)
+  const holoUniforms = { uTime: { value: 0 } };
+  const pieceGhostGrounded = keep(new THREE.ShaderMaterial({ vertexShader: PIECE_HOLO_VERTEX, fragmentShader: PIECE_HOLO_FRAGMENT, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uColour: { value: new THREE.Color('#38bdf8') }, uTime: holoUniforms.uTime } }));
+  const pieceGhostOk = keep(new THREE.ShaderMaterial({ vertexShader: PIECE_HOLO_VERTEX, fragmentShader: PIECE_HOLO_FRAGMENT, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uColour: { value: new THREE.Color('#34d399') }, uTime: holoUniforms.uTime } }));
+  const pieceGhostWeak = keep(new THREE.ShaderMaterial({ vertexShader: PIECE_HOLO_VERTEX, fragmentShader: PIECE_HOLO_FRAGMENT, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uColour: { value: new THREE.Color('#fbbf24') }, uTime: holoUniforms.uTime } }));
+  const pieceGhostBad = keep(new THREE.ShaderMaterial({ vertexShader: PIECE_HOLO_VERTEX, fragmentShader: PIECE_HOLO_FRAGMENT, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uColour: { value: new THREE.Color('#ef4444') }, uTime: holoUniforms.uTime } }));
   let pieceGhost: THREE.Group | null = null;
+  let piecesGroup: THREE.Group | null = null;
 
   // ---- the post pass (planet picture by stage)
   const postUniforms = {
@@ -692,6 +697,50 @@ export function createPlayScene(o: {
 
   let lastAimedBoulder: number | null = null;
 
+  const aimPointFn = (): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null => {
+    // 1. Raycast placed pieces group first
+    if (piecesGroup && piecesGroup.children.length > 0) {
+      const raycaster = new THREE.Raycaster();
+      const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      raycaster.set(camera.position, dir);
+      raycaster.far = 36;
+      const hits = raycaster.intersectObjects(piecesGroup.children, true);
+      if (hits.length > 0 && hits[0]) {
+        const first = hits[0];
+        let pieceId: number | null = null;
+        let curr: THREE.Object3D | null = first.object;
+        while (curr && curr !== piecesGroup) {
+          if (curr.userData?.pieceId !== undefined) {
+            pieceId = curr.userData.pieceId;
+            break;
+          }
+          curr = curr.parent;
+        }
+        const norm = first.face ? first.face.normal.clone().transformDirection(first.object.matrixWorld) : new THREE.Vector3(0, 1, 0);
+        return {
+          x: first.point.x,
+          y: first.point.y,
+          z: first.point.z,
+          yaw,
+          normal: { x: norm.x, y: norm.y, z: norm.z },
+          piece: pieceId,
+        };
+      }
+    }
+
+    // 2. Fallback to ground
+    const hit = aimGround();
+    if (!hit) return null;
+    return {
+      x: hit.x,
+      y: hit.y,
+      z: hit.z,
+      yaw,
+      normal: { x: 0, y: 1, z: 0 },
+      piece: null,
+    };
+  };
+
   const api: PlayScene = {
     setPlanet(base, plot, neighbours) {
       if (world) return;
@@ -836,16 +885,10 @@ export function createPlayScene(o: {
         if (mesh.isMesh) mesh.material = mat;
       });
     },
-    aimPoint() {
-      const hit = aimGround();
-      if (!hit) return null;
-      return {
-        x: hit.x,
-        y: hit.y,
-        z: hit.z,
-        yaw,
-      };
+    setPieces(group) {
+      piecesGroup = group;
     },
+    aimPoint: () => aimPointFn(),
     raiseStage(to, from) {
       if (to <= stage) return;
       scientistAnimator?.playOneShot('cheer');
@@ -1004,6 +1047,7 @@ export function createPlayScene(o: {
       plume.setWave([wc.x, wc.y, wc.z], waveTo >= 0 ? Math.min(r, RACER_REACH) : -1);
       plume.update(now);
       labPlume.update(now);
+      holoUniforms.uTime.value = now;
       if (where === 'planet') {
         const isMoving = Math.abs(c.move.x) > 0.01 || Math.abs(c.move.z) > 0.01;
         mash.update(dt, pos, isMoving);
@@ -1220,6 +1264,24 @@ export function createPlayScene(o: {
         let count = 0;
         for (const v of views.values()) if (v.light && v.light.visible) count++;
         return count;
+      },
+      testPieceAim(pieceId: number) {
+        const g = new THREE.Group();
+        const geom = new THREE.BoxGeometry(2, 2, 2);
+        const mat = new THREE.MeshBasicMaterial();
+        const mesh = new THREE.Mesh(geom, mat);
+        const dir = new THREE.Vector3(0, 0, -3).applyQuaternion(camera.quaternion);
+        mesh.position.copy(camera.position).add(dir);
+        mesh.userData.pieceId = pieceId;
+        g.add(mesh);
+        g.updateMatrixWorld(true);
+        const prevGroup = piecesGroup;
+        piecesGroup = g;
+        const hit = aimPointFn();
+        piecesGroup = prevGroup;
+        geom.dispose();
+        mat.dispose();
+        return hit;
       },
     },
     dispose() {

@@ -28,7 +28,7 @@ export const MOCK_ITEMS: Record<string, ItemView> = {
     kind: 'raw-pxd',
     tint: '#00f0ff',
     stack: 999,
-    kg: 0.01,
+    kg: 0.2,
   },
   pxd_magenta: {
     id: 'pxd_magenta',
@@ -36,7 +36,7 @@ export const MOCK_ITEMS: Record<string, ItemView> = {
     kind: 'raw-pxd',
     tint: '#ff00aa',
     stack: 999,
-    kg: 0.01,
+    kg: 0.2,
   },
   pxd_yellow: {
     id: 'pxd_yellow',
@@ -44,7 +44,7 @@ export const MOCK_ITEMS: Record<string, ItemView> = {
     kind: 'raw-pxd',
     tint: '#ffd700',
     stack: 999,
-    kg: 0.01,
+    kg: 0.2,
   },
   vtx_quartz: {
     id: 'vtx_quartz',
@@ -52,7 +52,7 @@ export const MOCK_ITEMS: Record<string, ItemView> = {
     kind: 'raw-vtx',
     tint: '#e0f7fa',
     stack: 500,
-    kg: 0.05,
+    kg: 0.3,
   },
   map_basalt: {
     id: 'map_basalt',
@@ -60,7 +60,7 @@ export const MOCK_ITEMS: Record<string, ItemView> = {
     kind: 'map',
     tint: '#475569',
     stack: 20,
-    kg: 0.5,
+    kg: 1.0,
   },
   map_obsidian: {
     id: 'map_obsidian',
@@ -68,7 +68,7 @@ export const MOCK_ITEMS: Record<string, ItemView> = {
     kind: 'map',
     tint: '#1e293b',
     stack: 20,
-    kg: 0.5,
+    kg: 1.0,
   },
   map_quartz: {
     id: 'map_quartz',
@@ -76,7 +76,7 @@ export const MOCK_ITEMS: Record<string, ItemView> = {
     kind: 'map',
     tint: '#94a3b8',
     stack: 20,
-    kg: 0.5,
+    kg: 1.0,
   },
   map_moss: {
     id: 'map_moss',
@@ -84,31 +84,31 @@ export const MOCK_ITEMS: Record<string, ItemView> = {
     kind: 'map',
     tint: '#10b981',
     stack: 20,
-    kg: 0.5,
+    kg: 1.0,
   },
   prim_cube: {
     id: 'prim_cube',
-    name: 'Structural Cube (4m)',
+    name: 'Structural Cube',
     kind: 'primitive',
     tint: '#64748b',
     stack: 50,
-    kg: 2.0,
+    kg: 8.0,
   },
   prim_col: {
     id: 'prim_col',
-    name: 'Cylinder Column (3m)',
+    name: 'Cylinder Column',
     kind: 'primitive',
     tint: '#78716c',
     stack: 50,
-    kg: 1.5,
+    kg: 6.0,
   },
   prim_beam: {
     id: 'prim_beam',
-    name: 'Chamfered Beam (4m)',
+    name: 'Chamfered Beam',
     kind: 'primitive',
     tint: '#475569',
     stack: 50,
-    kg: 1.2,
+    kg: 5.0,
   },
   prim_frame: {
     id: 'prim_frame',
@@ -116,7 +116,7 @@ export const MOCK_ITEMS: Record<string, ItemView> = {
     kind: 'primitive',
     tint: '#3b82f6',
     stack: 20,
-    kg: 3.0,
+    kg: 12.0,
   },
   bp_found_basalt: {
     id: 'bp_found_basalt',
@@ -124,7 +124,7 @@ export const MOCK_ITEMS: Record<string, ItemView> = {
     kind: 'blueprint',
     tint: '#38bdf8',
     stack: 10,
-    kg: 0.1,
+    kg: 0.0,
   },
   bp_wall_obsidian: {
     id: 'bp_wall_obsidian',
@@ -132,7 +132,7 @@ export const MOCK_ITEMS: Record<string, ItemView> = {
     kind: 'blueprint',
     tint: '#818cf8',
     stack: 10,
-    kg: 0.1,
+    kg: 0.0,
   },
   bp_airlock_seal: {
     id: 'bp_airlock_seal',
@@ -140,7 +140,7 @@ export const MOCK_ITEMS: Record<string, ItemView> = {
     kind: 'blueprint',
     tint: '#34d399',
     stack: 5,
-    kg: 0.2,
+    kg: 0.0,
   },
   tool_beam: {
     id: 'tool_beam',
@@ -312,17 +312,17 @@ export class MockBaseViewSource implements BaseViewSource {
 
   private getDraftView(): DraftView {
     const primitives: SlotView[] = [
-      { item: MOCK_ITEMS.prim_cube!, n: this.countItemInInv('prim_cube') },
-      { item: MOCK_ITEMS.prim_col!, n: this.countItemInInv('prim_col') },
-      { item: MOCK_ITEMS.prim_beam!, n: this.countItemInInv('prim_beam') },
-      { item: MOCK_ITEMS.prim_frame!, n: this.countItemInInv('prim_frame') },
+      { item: MOCK_ITEMS.prim_cube!, n: this.countItemInNetworkOrInv('prim_cube') },
+      { item: MOCK_ITEMS.prim_col!, n: this.countItemInNetworkOrInv('prim_col') },
+      { item: MOCK_ITEMS.prim_beam!, n: this.countItemInNetworkOrInv('prim_beam') },
+      { item: MOCK_ITEMS.prim_frame!, n: this.countItemInNetworkOrInv('prim_frame') },
     ];
 
     const maps: SlotView[] = [
-      { item: MOCK_ITEMS.map_basalt!, n: this.countItemInInv('map_basalt') },
-      { item: MOCK_ITEMS.map_obsidian!, n: this.countItemInInv('map_obsidian') },
-      { item: MOCK_ITEMS.map_quartz!, n: this.countItemInInv('map_quartz') },
-      { item: MOCK_ITEMS.map_moss!, n: this.countItemInInv('map_moss') },
+      { item: MOCK_ITEMS.map_basalt!, n: this.countItemInNetworkOrInv('map_basalt') },
+      { item: MOCK_ITEMS.map_obsidian!, n: this.countItemInNetworkOrInv('map_obsidian') },
+      { item: MOCK_ITEMS.map_quartz!, n: this.countItemInNetworkOrInv('map_quartz') },
+      { item: MOCK_ITEMS.map_moss!, n: this.countItemInNetworkOrInv('map_moss') },
     ];
 
     let result = null;

@@ -159,3 +159,37 @@ export const PLUME_GLOW_FRAGMENT = /* glsl */ `
     gl_FragColor = vec4(uColour * intensity, 1.0);
   }
 `;
+
+/** Piece hologram shader: additive, fresnel rim, world-space scanlines, slow pulse (1.2s) */
+export const PIECE_HOLO_VERTEX = /* glsl */ `
+  varying vec3 vNormal;
+  varying vec3 vWorldPos;
+  varying vec3 vViewDir;
+
+  void main() {
+    vNormal = normalize(normalMatrix * normal);
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vWorldPos = worldPos.xyz;
+    vViewDir = normalize(cameraPosition - worldPos.xyz);
+    gl_Position = projectionMatrix * viewMatrix * worldPos;
+  }
+`;
+
+export const PIECE_HOLO_FRAGMENT = /* glsl */ `
+  uniform vec3 uColour;
+  uniform float uTime;
+  varying vec3 vNormal;
+  varying vec3 vWorldPos;
+  varying vec3 vViewDir;
+
+  void main() {
+    float rim = 1.0 - max(dot(vViewDir, vNormal), 0.0);
+    rim = pow(rim, 2.0);
+    float scanline = sin(vWorldPos.y * 20.0 + uTime * 4.0) * 0.15 + 0.85;
+    float pulse = 0.85 + 0.15 * sin(uTime * 5.236);
+    float alpha = (rim * 0.65 + 0.35) * scanline * pulse;
+    vec3 col = uColour * (1.0 + rim * 0.8);
+    gl_FragColor = vec4(col, alpha * 0.75);
+  }
+`;
+

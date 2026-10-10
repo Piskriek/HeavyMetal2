@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import type { BaseActions, InventoryView } from '../view';
+import { ItemGlyph } from './item-glyph';
 
 interface HotbarProps {
   inventory: InventoryView;
@@ -42,13 +43,9 @@ export const Hotbar: React.FC<HotbarProps> = ({ inventory, actions }) => {
             <span className="hm-slot-keybind">{idx + 1}</span>
 
             {item && (
-              <div
-                className="hm-slot-icon-box"
-                style={{
-                  background: item.tint,
-                  boxShadow: `0 0 8px ${item.tint}66`,
-                }}
-              />
+              <div className="hm-slot-icon-box">
+                <ItemGlyph item={item} size={32} />
+              </div>
             )}
 
             {item && slot.n > 1 && (

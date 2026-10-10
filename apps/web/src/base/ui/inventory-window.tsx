@@ -1,12 +1,22 @@
 import React, { useState } from 'react';
-import type { BaseActions, InventoryView, SlotRef } from '../view';
+import type { BaseActions, InventoryView, SlotRef, EquipSlot } from '../view';
 import { EQUIP_SLOTS } from '../view';
+import { Backpack, Crosshair, Eye, Shield, Wind, X, Zap } from 'lucide-react';
+import { ItemGlyph } from './item-glyph';
 
 interface InventoryWindowProps {
   inventory: InventoryView;
   actions: BaseActions;
   onClose: () => void;
 }
+
+const EQUIP_PLACEHOLDER_ICONS: Record<EquipSlot, React.ReactNode> = {
+  visor: <Eye size={16} opacity={0.3} color="var(--base-cyan)" />,
+  shield: <Shield size={16} opacity={0.3} color="var(--base-cyan)" />,
+  rebreather: <Wind size={16} opacity={0.3} color="var(--base-cyan)" />,
+  beam: <Zap size={16} opacity={0.3} color="var(--base-cyan)" />,
+  sidearm: <Crosshair size={16} opacity={0.3} color="var(--base-cyan)" />,
+};
 
 export const InventoryWindow: React.FC<InventoryWindowProps> = ({
   inventory,
@@ -44,11 +54,12 @@ export const InventoryWindow: React.FC<InventoryWindowProps> = ({
         {/* Header */}
         <div className="hm-window-header">
           <div className="hm-window-title">
-            <span>🎒 HAZMAT RESEARCH INVENTORY</span>
+            <Backpack size={18} style={{ color: 'var(--base-cyan)' }} />
+            <span>HAZMAT RESEARCH INVENTORY</span>
             <span style={{ fontSize: 12, opacity: 0.6, textTransform: 'none' }}>[Tab / I to toggle]</span>
           </div>
           <button className="hm-window-close-btn" onClick={onClose} data-testid="inventory-close-btn">
-            ✕ ESC
+            <X size={14} /> ESC
           </button>
         </div>
 
@@ -72,13 +83,13 @@ export const InventoryWindow: React.FC<InventoryWindowProps> = ({
                   title={eqSlot.item ? `${eqSlot.item.name} (${eqSlot.item.kg}kg)` : `Empty ${eqKey}`}
                   data-testid={`equip-slot-${eqKey}`}
                 >
-                  <div
-                    className="hm-slot-icon-box"
-                    style={{
-                      background: eqSlot.item ? eqSlot.item.tint : 'rgba(255,255,255,0.05)',
-                      boxShadow: eqSlot.item ? `0 0 6px ${eqSlot.item.tint}66` : 'none',
-                    }}
-                  />
+                  <div className={`hm-slot-icon-box ${!eqSlot.item ? 'empty-equip' : ''}`}>
+                    {eqSlot.item ? (
+                      <ItemGlyph item={eqSlot.item} size={20} />
+                    ) : (
+                      EQUIP_PLACEHOLDER_ICONS[eqKey]
+                    )}
+                  </div>
                   <span className="hm-equip-label">{eqKey}</span>
                 </div>
               );
@@ -115,13 +126,9 @@ export const InventoryWindow: React.FC<InventoryWindowProps> = ({
                     )}
 
                     {item && (
-                      <div
-                        className="hm-slot-icon-box"
-                        style={{
-                          background: item.tint,
-                          boxShadow: `0 0 6px ${item.tint}66`,
-                        }}
-                      />
+                      <div className="hm-slot-icon-box">
+                        <ItemGlyph item={item} size={26} />
+                      </div>
                     )}
 
                     {item && slot.n > 1 && (
@@ -140,7 +147,8 @@ export const InventoryWindow: React.FC<InventoryWindowProps> = ({
                 data-testid="quick-stack-btn"
                 title="Deposits all matching items into quantum lattice storage"
               >
-                ⚡ QUICK STACK TO GRID
+                <Zap size={13} />
+                <span>QUICK STACK TO GRID</span>
               </button>
 
               <div style={{ width: 220 }} className="hm-weight-bar-container">

@@ -1,5 +1,6 @@
 import React from 'react';
 import type { BuildView } from '../view';
+import { Compass } from 'lucide-react';
 
 interface BuildReadoutProps {
   build: BuildView;
@@ -40,7 +41,8 @@ export const BuildReadout: React.FC<BuildReadoutProps> = ({ build }) => {
   return (
     <div className="hm-build-readout-hud" data-testid="build-readout-hud">
       <div className="hm-build-blueprint-pill">
-        📐 {build.blueprint.name}
+        <Compass size={12} style={{ color: 'var(--base-cyan)' }} />
+        <span>{build.blueprint.name}</span>
       </div>
 
       <div

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import type { BaseActions, LatticeView } from '../view';
+import { Network, Radio, X, Zap } from 'lucide-react';
+import { ItemGlyph } from './item-glyph';
 
 interface LatticeWindowProps {
   lattice: LatticeView;
@@ -27,13 +29,14 @@ export const LatticeWindow: React.FC<LatticeWindowProps> = ({
         {/* Header */}
         <div className="hm-window-header">
           <div className="hm-window-title">
-            <span>🌐 QUANTUM LATTICE STORAGE BRIDGE</span>
+            <Network size={18} style={{ color: 'var(--base-cyan)' }} />
+            <span>QUANTUM LATTICE STORAGE BRIDGE</span>
             <span style={{ fontSize: 12, opacity: 0.6, textTransform: 'none' }}>
               Inter-Dimensional Linked Base Inventory
             </span>
           </div>
           <button className="hm-window-close-btn" onClick={onClose} data-testid="lattice-close-btn">
-            ✕ ESC
+            <X size={14} /> ESC
           </button>
         </div>
 
@@ -61,7 +64,7 @@ export const LatticeWindow: React.FC<LatticeWindowProps> = ({
                   }}
                   data-testid={`lattice-network-tab-${net.id}`}
                 >
-                  NETWORK #{net.id} {isHere && '★ [NEARBY]'}
+                  NETWORK #{net.id} {isHere && ' [NEARBY]'}
                 </button>
               );
             })}
@@ -72,7 +75,7 @@ export const LatticeWindow: React.FC<LatticeWindowProps> = ({
               className={`hm-quantum-status-badge ${isInRange ? 'in-range' : 'out-of-range'}`}
               data-testid="quantum-range-badge"
             >
-              <span style={{ fontSize: 10 }}>●</span>
+              <Radio size={12} />
               <span>{isInRange ? 'QUANTUM BRIDGE LINKED' : 'OUT OF RELAY RANGE'}</span>
             </div>
             {isInRange && (
@@ -82,7 +85,8 @@ export const LatticeWindow: React.FC<LatticeWindowProps> = ({
                 onClick={() => actions.quickStack()}
                 data-testid="lattice-quick-stack-btn"
               >
-                QUICK DEPOSIT
+                <Zap size={11} />
+                <span>QUICK DEPOSIT</span>
               </button>
             )}
           </div>
@@ -126,15 +130,9 @@ export const LatticeWindow: React.FC<LatticeWindowProps> = ({
           <div className="hm-lattice-totals-grid" data-testid="lattice-totals-grid">
             {activeNetwork?.totals.map((t) => (
               <div key={t.item.id} className="hm-lattice-item-tile" title={t.item.name}>
-                <div
-                  className="hm-slot-icon-box"
-                  style={{
-                    background: t.item.tint,
-                    width: 24,
-                    height: 24,
-                    boxShadow: `0 0 6px ${t.item.tint}66`,
-                  }}
-                />
+                <div className="hm-slot-icon-box">
+                  <ItemGlyph item={t.item} size={22} />
+                </div>
                 <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                   <span
                     style={{

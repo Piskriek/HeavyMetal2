@@ -1,19 +1,25 @@
 import React, { useState } from 'react';
-import type { BaseActions, DraftView } from '../view';
+import type { BaseActions, DraftView, LatticeView } from '../view';
+import { Compass, Hammer, X } from 'lucide-react';
+import { ItemGlyph } from './item-glyph';
 
 interface DraftingWindowProps {
   draft: DraftView;
+  lattice?: LatticeView;
   actions: BaseActions;
   onClose: () => void;
 }
 
 export const DraftingWindow: React.FC<DraftingWindowProps> = ({
   draft,
+  lattice,
   actions,
   onClose,
 }) => {
   const [selectedPrim, setSelectedPrim] = useState<string | null>('prim_cube');
   const [selectedMap, setSelectedMap] = useState<string | null>('map_basalt');
+
+  const isOutOfRange = lattice ? lattice.here === null : false;
 
   const handlePickPrim = (id: string) => {
     setSelectedPrim(id);
@@ -27,7 +33,7 @@ export const DraftingWindow: React.FC<DraftingWindowProps> = ({
 
   const result = draft.result;
 
-  const canAfford = result
+  const canAfford = !isOutOfRange && result
     ? result.cost.every((c) => c.have >= c.n)
     : false;
 
@@ -37,13 +43,21 @@ export const DraftingWindow: React.FC<DraftingWindowProps> = ({
         {/* Header */}
         <div className="hm-window-header">
           <div className="hm-window-title">
-            <span>📐 ARCHITECTURAL DRAFTING TABLE</span>
-            <span style={{ fontSize: 12, opacity: 0.6, textTransform: 'none' }}>
-              Synthesize Primitives & Texture Maps into Building Blueprints
-            </span>
+            <Compass size={18} style={{ color: 'var(--base-cyan)', flexShrink: 0 }} />
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, gap: 2 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>ARCHITECTURAL DRAFTING TABLE</span>
+                {isOutOfRange && (
+                  <span className="hm-range-badge out">OUT OF RANGE</span>
+                )}
+              </div>
+              <span className="hm-window-subtitle">
+                Synthesize Primitives & Texture Maps into Building Blueprints
+              </span>
+            </div>
           </div>
           <button className="hm-window-close-btn" onClick={onClose} data-testid="drafting-close-btn">
-            ✕ ESC
+            <X size={14} /> ESC
           </button>
         </div>
 
@@ -64,10 +78,9 @@ export const DraftingWindow: React.FC<DraftingWindowProps> = ({
                   data-testid={`prim-pick-${slot.item.id}`}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div
-                      className="hm-slot-icon-box"
-                      style={{ background: slot.item.tint, width: 22, height: 22 }}
-                    />
+                    <div className="hm-slot-icon-box">
+                      <ItemGlyph item={slot.item} size={22} />
+                    </div>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontSize: 13, fontWeight: 600 }}>{slot.item.name}</span>
                       <span style={{ fontSize: 11, color: 'var(--base-text-muted)' }}>
@@ -75,9 +88,13 @@ export const DraftingWindow: React.FC<DraftingWindowProps> = ({
                       </span>
                     </div>
                   </div>
-                  <span style={{ fontFamily: 'Oxanium', fontSize: 12, color: 'var(--base-cyan)' }}>
-                    x{slot.n}
-                  </span>
+                  {isOutOfRange ? (
+                    <span className="hm-out-of-range-tag">out of range</span>
+                  ) : (
+                    <span style={{ fontFamily: 'Oxanium', fontSize: 12, color: 'var(--base-cyan)' }}>
+                      x{slot.n}
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -98,10 +115,9 @@ export const DraftingWindow: React.FC<DraftingWindowProps> = ({
                   data-testid={`map-pick-${slot.item.id}`}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div
-                      className="hm-slot-icon-box"
-                      style={{ background: slot.item.tint, width: 22, height: 22 }}
-                    />
+                    <div className="hm-slot-icon-box">
+                      <ItemGlyph item={slot.item} size={22} />
+                    </div>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontSize: 13, fontWeight: 600 }}>{slot.item.name}</span>
                       <span style={{ fontSize: 11, color: 'var(--base-text-muted)' }}>
@@ -109,9 +125,13 @@ export const DraftingWindow: React.FC<DraftingWindowProps> = ({
                       </span>
                     </div>
                   </div>
-                  <span style={{ fontFamily: 'Oxanium', fontSize: 12, color: 'var(--base-cyan)' }}>
-                    x{slot.n}
-                  </span>
+                  {isOutOfRange ? (
+                    <span className="hm-out-of-range-tag">out of range</span>
+                  ) : (
+                    <span style={{ fontFamily: 'Oxanium', fontSize: 12, color: 'var(--base-cyan)' }}>
+                      x{slot.n}
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -181,7 +201,7 @@ export const DraftingWindow: React.FC<DraftingWindowProps> = ({
                     REQUIRED SUBSTRATE (NETWORK PULLED)
                   </span>
                   {result.cost.map((c) => {
-                    const hasEnough = c.have >= c.n;
+                    const hasEnough = !isOutOfRange && c.have >= c.n;
                     return (
                       <div
                         key={c.item.id}
@@ -189,12 +209,12 @@ export const DraftingWindow: React.FC<DraftingWindowProps> = ({
                           display: 'flex',
                           justifyContent: 'space-between',
                           fontSize: 12,
-                          color: hasEnough ? '#cbd5e1' : '#f87171',
+                          color: isOutOfRange ? '#f87171' : hasEnough ? '#cbd5e1' : '#f87171',
                         }}
                       >
                         <span>{c.item.name}</span>
                         <span style={{ fontFamily: 'Oxanium' }}>
-                          {c.have} / {c.n}
+                          {isOutOfRange ? 'out of range' : `${c.have} / ${c.n}`}
                         </span>
                       </div>
                     );
@@ -207,7 +227,14 @@ export const DraftingWindow: React.FC<DraftingWindowProps> = ({
                   onClick={() => actions.draft()}
                   data-testid="synthesize-draft-btn"
                 >
-                  {canAfford ? '⚙️ SYNTHESIZE BLUEPRINT' : 'INSUFFICIENT SUBSTRATE'}
+                  <Hammer size={14} />
+                  <span>
+                    {isOutOfRange
+                      ? 'OUT OF RANGE'
+                      : canAfford
+                        ? 'SYNTHESIZE BLUEPRINT'
+                        : 'INSUFFICIENT SUBSTRATE'}
+                  </span>
                 </button>
               </>
             ) : (

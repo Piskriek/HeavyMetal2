@@ -84,6 +84,7 @@ export const BaseHud: React.FC<BaseHudProps> = ({ source, onOpenChange }) => {
       {openWindow === 'drafting' && (
         <DraftingWindow
           draft={view.draft}
+          lattice={view.lattice}
           actions={source.actions}
           onClose={() => setOpenWindow('none')}
         />

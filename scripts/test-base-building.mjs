@@ -160,7 +160,17 @@ try {
 
   // Check synthesize button
   const synthBtn = page.locator('[data-testid="synthesize-draft-btn"]');
-  console.log('OK: Synthesize button text:', (await synthBtn.textContent())?.trim());
+  const synthText = (await synthBtn.textContent())?.trim();
+  console.log('OK: Synthesize button text:', synthText);
+
+  // Validate the one-count rule: primitive card count matches have in preview
+  const primCardText = (await primCube.textContent())?.trim();
+  const previewText = (await previewPanel.textContent())?.trim();
+  console.log('OK: Primitive card text:', primCardText);
+  console.log('OK: Cost preview text:', previewText);
+  if (!previewText?.includes('Structural Cube') || !previewText?.includes('/ 1')) {
+    throw new Error('Cost table does not contain Structural Cube requirement');
+  }
 
   await page.screenshot({ path: 'docs/shots/base/drafting-window.png' });
   console.log('Captured docs/shots/base/drafting-window.png');
@@ -188,6 +198,36 @@ try {
   // Close lattice window
   await page.keyboard.press('Escape');
   await latticeModal.waitFor({ state: 'hidden', timeout: 5000 });
+
+  // 5. Verify aimPoint() with piece hit and ground fallback
+  console.log('Verifying aimPoint() piece hit and ground fallback via window.__playScene...');
+  const aimVerdict = await page.evaluate(() => {
+    const scene = window.__playScene;
+    if (!scene) return { ok: false, error: 'window.__playScene is missing' };
+
+    // 1. Piece hit test
+    const pieceHit = scene.debug.testPieceAim(42);
+    if (!pieceHit || pieceHit.piece !== 42) {
+      return { ok: false, error: `Expected pieceId 42, got ${pieceHit?.piece}` };
+    }
+    if (!pieceHit.normal || typeof pieceHit.normal.y !== 'number') {
+      return { ok: false, error: 'Expected normal vector on piece hit' };
+    }
+
+    // 2. Ground fallback test
+    const groundHit = scene.aimPoint();
+    if (groundHit && groundHit.piece !== null) {
+      return { ok: false, error: `Expected piece null on ground fallback, got ${groundHit.piece}` };
+    }
+
+    return {
+      ok: true,
+      pieceHit: { piece: pieceHit.piece, normal: pieceHit.normal },
+      groundHit: groundHit ? { piece: groundHit.piece, hasNormal: !!groundHit.normal } : null,
+    };
+  });
+  console.log('OK: aimPoint verification passed:', aimVerdict);
+  if (!aimVerdict.ok) throw new Error(aimVerdict.error);
 
   console.log('\nALL FIDELITY BASE-BUILDING HUD & WINDOW CHECKS PASSED!');
 } catch (err) {

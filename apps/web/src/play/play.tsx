@@ -262,6 +262,9 @@ export function PlayScreen(props: {
       return undefined;
     }
     sceneRef.current = scene;
+    if (typeof window !== 'undefined') {
+      (window as any).__playScene = scene;
+    }
     const size = (): void => {
       const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
       scene.resize(w, h, pixelRatioFor(graphics, w, h, window.devicePixelRatio || 1));

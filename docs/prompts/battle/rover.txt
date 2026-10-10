@@ -1,0 +1,56 @@
+Follow-up: keep src/index.ts, src/mobsim.ts and their tests unchanged. Add src/rover.ts and tests/rover.test.ts, then STOP. Same rules: strict TS, pure, deterministic, no DOM/Date/Math.random, no sin/cos/tan/atan2 in step (vectors, quaternions, sqrt).
+TASK: driving physics for a moon game's three catalog rovers. It must be arcade-stable: never explode, tunnel, or jitter at rest. Fixed DT = 1/60, y up, forward = local +z, right = local -x.
+ROVERS (export it, with the numbers as fields: mass, topSpeed and so on):
+- scout: 4 wheels, 400 kg, wheelbase 2.2, track 1.6, wheel radius 0.45, topSpeed 14 m/s, front wheels steer up to 0.5 rad.
+- hauler: 6 wheels (3 axles), 1600 kg, wheelbase 3.6, track 2.0, radius 0.55, topSpeed 9, the front axle steers 0.4 rad.
+- crawler: tracked, 2 x 4 contact points, 4000 kg, length 4.4, track 2.4, topSpeed 4, skid steer (with throttle 0 and steer +-1 it turns on the spot).
+MODEL:
+- each wheel or contact point is a raycast spring-damper suspension (rest 0.5 m, about 1 Hz, damping ratio 0.6);
+- longitudinal drive and brake, plus lateral grip;
+- gravity g from the Ground (the Moon is 1.62);
+- angular damping;
+- the body box is pushed out of the Ground's optional oriented boxes.
+API:
+export const DT = 1 / 60; export type RoverKind = 'scout' | 'hauler' | 'crawler';
+export interface RoverState { kind: RoverKind; p: [number, number, number]; q: [number, number, number, number]; v: [number, number, number]; w: [number, number, number] } // plain data, add what you need
+export interface Ground { height(x: number, z: number): number; g: number; boxes?: { cx: number; cz: number; hx: number; hz: number; yaw: number; top: number }[] }
+export interface Input { throttle: number; steer: number; brake: boolean } // -1..1; steer +1 turns right
+export function spawn(kind: RoverKind, x: number, z: number, heading: [number, number], ground: Ground): RoverState; // heading: unit forward in xz; resting on its suspension
+export function step(s: RoverState, input: Input, ground: Ground): RoverState; // one DT, never mutates s
+export function speed(s: RoverState): number; // signed forward m/s
+export function hashRover(s: RoverState): string;
+Keep this test unchanged; add your own:
+```ts
+import test from 'node:test'; import assert from 'node:assert/strict';
+import { spawn, step, speed, hashRover, ROVERS, DT, type Ground, type RoverState, type Input } from '../src/rover';
+const flat: Ground = { height: () => 0, g: 1.62 };
+const run = (s: RoverState, i: Input, n: number, g = flat) => { for (let k = 0; k < n; k++) s = step(s, i, g); return s; };
+const idle: Input = { throttle: 0, steer: 0, brake: false };
+const fwd = (s: RoverState) => { const [x, y, z, w] = s.q; return [2 * (x * z + w * y), 1 - 2 * (x * x + y * y)] as const; };
+test('settles at rest, no jitter', () => {
+  for (const k of ['scout', 'hauler', 'crawler'] as const) {
+    let s = run(spawn(k, 0, 0, [0, 1], flat), idle, 600); const y = s.p[1]; s = run(s, idle, 60);
+    assert.ok(Math.abs(s.p[1] - y) < 1e-3 && Math.hypot(...s.v) < 1e-2 && y > 0.2 && y < 2, `${k} ${y}`);
+  }
+});
+test('top speed, +steer turns right (toward -x), brakes', () => {
+  let s = run(run(spawn('scout', 0, 0, [0, 1], flat), idle, 120), { throttle: 1, steer: 0, brake: false }, 720);
+  assert.ok(speed(s) > ROVERS.scout.topSpeed * 0.85 && speed(s) <= ROVERS.scout.topSpeed * 1.05, `${speed(s)}`);
+  const t = run(s, { throttle: 0.6, steer: 1, brake: false }, 60); assert.ok(fwd(t)[0] < fwd(s)[0] - 0.05, 'turned right');
+  s = run(s, { throttle: 0, steer: 0, brake: true }, 900); assert.ok(Math.abs(speed(s)) < 0.3);
+});
+test('the crawler turns on the spot; a braked hauler holds a 20 degree slope', () => {
+  let c = run(spawn('crawler', 0, 0, [0, 1], flat), idle, 300); const p = [...c.p];
+  c = run(c, { throttle: 0, steer: 1, brake: false }, 120); assert.ok(Math.hypot(c.p[0] - p[0]!, c.p[2] - p[2]!) < 1 && Math.abs(fwd(c)[0]) > 0.2);
+  const slope: Ground = { height: (x) => x * 0.364, g: 1.62 };
+  const h = run(spawn('hauler', 0, 0, [0, 1], slope), { throttle: 0, steer: 0, brake: true }, 600, slope);
+  assert.ok(h.p[1] > slope.height(h.p[0], h.p[2]) + 0.1 && Math.abs(h.p[0]) < 1.5);
+});
+test('deterministic, pure, stopped by a wall', () => {
+  const go = () => run(spawn('scout', 0, 0, [0, 1], flat), { throttle: 1, steer: 0.3, brake: false }, 900);
+  assert.equal(hashRover(go()), hashRover(go()));
+  const s0 = spawn('scout', 0, 0, [0, 1], flat), copy = JSON.stringify(s0); step(s0, { throttle: 1, steer: 0, brake: false }, flat); assert.equal(JSON.stringify(s0), copy);
+  const walled: Ground = { ...flat, boxes: [{ cx: 0, cz: 12, hx: 6, hz: 0.25, yaw: 0, top: 3 }] };
+  assert.ok(run(spawn('scout', 0, 0, [0, 1], walled), { throttle: 1, steer: 0, brake: false }, 480, walled).p[2] < 12); assert.ok(DT > 0.016 && DT < 0.017);
+});
+```

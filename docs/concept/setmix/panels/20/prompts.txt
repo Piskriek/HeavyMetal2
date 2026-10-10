@@ -1,0 +1,40 @@
+SHEET 20 — the weapon bench and the modular weapon (pieces 38 to 40), continuing sheets 13 to 19. Source brief: docs/prompts/art/weapons-sheet20.md (feat). Weapons are ONE frame with FOUR part slots: the CORE (receiver, sets the fire mode), the BARREL, the SIGHT and the CELL (power cell / magazine). Parts are crafted at a Weapon Bench and swapped in the field.
+
+Rules for every panel: one design drawn twice. S1 and S6 use the SAME piece description; only the wrapper differs. Lab family kit: gunmetal and slate paint, hazard bands, amber lamp style. Nothing floats: feet, bench legs, clamps and bolts touch what they stand on or hold. Cables run in low ribbed floor covers. NO lettering, NO numerals, NO symbols on any surface. Review each S1/S6 pair side by side before keeping it.
+
+PRODUCTION NOTE: the image tool makes one standalone image per call, so the PART VARIANTS board (piece 40) is assembled by the composer from one panel per variant, each showing the bare frame with that part fitted. Eleven variant panels, each drawn at S1 and at S6 (22 renders). Variant panels follow in later batches.
+
+W1 (stage-1 wrapper, every 20 panel):
+A realtime 3D GAME ENGINE SCREENSHOT, Blender/Unity style render at stage-1 low-poly fidelity: FACETED flat-shaded triangle meshes with visible flat facets, a restricted palette of about 16 flat colours, NO smooth gradients, soft physically-based lighting, gentle ambient occlusion, clean anti-aliased edges. STRICTLY a 3D render, absolutely NO line art, NO black contour outlines, NO cel shading, NOT a cartoon or illustration. No text, no UI, no watermark, NO lettering, NO numerals, NO symbols on any surface. ONE single image: one render, one camera, NOT a split-screen, NOT a diptych, NOT a multi-view sheet. Soft key light from frame right, one soft shadow.
+
+W6 (stage-6 wrapper, every 20 panel):
+Photorealistic 3D render — a videogame base-building design study at STAGE 6 fidelity: the SAME piece as its stage-1 version, identical silhouette, parts and proportions, rendered at full PBR materials, clean painted steel and ceramic, crisp decals, light honest wear at most; in service and freshly maintained — NO rust, NO peeling, NO ruin, NO decay. ONE single image: one render, one camera, NOT a split-screen, NOT a diptych, NOT a multi-view sheet. No text, no UI, no watermark. NOT a cartoon, NOT low poly.
+
+CLAUSE (every S1 and S6 prompt): NO lettering, NO words, NO numbers, NO logos, NO stencils, NO labels, NO signs anywhere on any surface: plain blank painted steel and ceramic only.
+
+P-38 WEAPON BENCH (bench): a heavy steel WEAPON BENCH about 2.4 metres long, 1.2 metres deep and 0.95 metres high, on four braced steel legs with diagonal cross-braces and bolted feet, a thick slate work top. A padded JIG CLAMP at the centre of the top holds a bare weapon frame (the P-39 frame, rifle-shaped, grip and stock). A PEGBOARD back panel on the back wall holds tools and spare parts hung on hooks. At one end of the top a small PARTS PRINTER BOX with its door shut and one green status lamp. A power cable runs down one leg into a low ribbed steel floor cable cover. The bench stands in a base room beside a flat steel wall panel with lattice corner joints (a sheet 13 wall). A hazmat scientist, 1.8 metres tall, stands at the bench for scale. No pixels.
+S1 framing: W1 + P-38, one room, three-quarter view, the bench and scientist filling about two thirds of frame height. Grey concrete floor, grey steel walls.
+S6 framing: W6 + the clause + P-38, the same framing, the room in service: clean slab floor, warm light from a ceiling fitting, the same bench and wall.
+
+P-39 THE WEAPON FRAME, bare (frame): a compact futuristic-industrial rifle frame, about 0.9 metres long, shown SIDE-ON in flat profile, on a neutral backdrop (a plain mid-grey studio backdrop, no ground scene, no sky). Four clearly visible EMPTY mounting points: (1) the CORE socket: a receiver block on top of the frame front, with a dovetail rail and a clamp ring, empty; (2) the BARREL socket: a threaded collar with a clamp ring at the muzzle end, empty; (3) the SIGHT rail: a flat rail along the top of the receiver with three clamp screws, empty; (4) the CELL well: an open bay on the underside, a rectangular recess with two contact pins, empty. A pistol GRIP and a folded STOCK at the rear. Gunmetal frame, slate panels, one hazard band on the grip guard, amber lamp in the receiver. The frame stands on its own grip and stock. No pixels, no lettering.
+S1 framing: W1 + P-39, side-on profile, the frame filling about two thirds of frame width, the backdrop plain mid-grey.
+S6 framing: W6 + the clause + P-39, the same framing and backdrop, clean PBR gunmetal.
+
+FILE NAMES: 20-<key>-s1.png and 20-<key>-s6.png, keys: bench (38), frame (39); variants later as 20-<part>-<variant>-s1/s6.png.
+
+offer_options = false (assets inside a build). References: sheet 13 wall-s1 and bin-s1; sheet 18 lifesupport-s1 (lab paint and lamp style); sheet 12 field machines (lab kit).
+
+REVIEW (side by side, S1 over S6):
+- (filled in after the batch)
+
+FIRST BATCH REVIEW (side by side, S1 over S6), pieces 38 and 39:
+- 38 bench S1 and S6: kept. The bench, pegboard, parts printer box with a green lamp, jig clamp holding the frame, scientist and power cable match. Minor: the S1 printer has a dark window and the S6 printer a closed steel door; both read as shut with a lamp, so kept.
+- 39 frame S1: kept. Four empty mounts (core, barrel, sight, cell), long stock, grip, hazard band, amber lamp.
+- 39 frame S6 (rev1): rejected, a short stub stock, wrong grip and receiver. Moved to rejected/20-frame-s6-rev1.png.
+- 39 frame S6 (rev2): rejected, the long stock ran off the frame edge. Moved to rejected/20-frame-s6-rev2.png.
+- 39 frame S6 (rev3): rejected, the hazard band on the trigger guard was missing. Moved to rejected/20-frame-s6-rev3.png.
+- 39 frame S6 (rev4, kept): drawn with the S1 frame as the reference image. Same stock inside the frame, grip angle, cell bay, muzzle collar, sight rail, amber lamp and trigger-guard hazard band. Kept after side-by-side check.
+
+REVISION 2 (rev 4 of the frame S6 is an image-edit of the S1 frame): for consistency, the frame S6 uses the S1 render as the reference image (images parameter) with the W6 wrapper and the explicit clauses above. The same method is used for the part variants.
+
+PENDING: piece 40, the PART VARIANTS. Eleven variant panels at S1 and S6 (22 renders): cores (semi-auto, burst, beam), barrels (short, long, scatter), sights (iron, scope, holo), cells (compact, extended). Each is the bare frame with the part fitted, drawn from the approved frame panel as reference. The parts board is assembled by tools/compose20.sh from those panels.

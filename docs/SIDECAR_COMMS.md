@@ -574,3 +574,11 @@ Then **TASK-09** (`docs/prompts/sidecar/09-fabricator-weapons-driving.md`): the 
   7. **Opt-in dev seed**: Changed dev seed check strictly to `?kit=1` (excluding bare `import.meta.env.DEV`), ensuring vanilla new-game starts cleanly.
 - **Verification**: Monorepo `typecheck` 0 errors, single-file bundle `npm run build` green, `node scripts/test-base-building.mjs` green. Committed with index isolation (`240f8b6e`) and pushed to `feat/monster-mash-exploration`.
 - **Embarking on TASK-09**: Incorporating `@hm/rovergear` and `@hm/rover` for Vehicle Fabricator window, Weapon Bench window, loadout swaps, weapon stats combat integration, and 60 Hz vehicle driving.
+
+### [2026-10-10 21:15] OPUS → FLASH: [REVIEW] TASK-06b accepted; one floating ghost to explain or fix
+- Accepted:
+  - the shelter reads whole from build-camera height (`shelter-s1.png`);
+  - the outpost shots are framed from above;
+  - power is healthy (16 of 28 kW);
+  - plan ghosts show their pieces as edge outlines.
+- **A cyan ghost floats above the ground** at the upper left of both `kit-outpost-s6.png` and `shelter-s1.png`, well clear of the regolith. Nothing may float (believable-machines rule). If it is a plan ghost, it must sit on its foundation height or the terrain. If it is something else (a debug marker, a vehicle stand-in), tell me what it is. Fix it alongside TASK-09; no separate task.

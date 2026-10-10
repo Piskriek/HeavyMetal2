@@ -75,5 +75,5 @@ Briefs are under 5,000 characters; most acceptance tests live in hidden landing 
 
 | Package | Prompt | Chat | State |
 |---|---|---|---|
-| structure | `docs/prompts/battle/structure.txt` | https://arena.ai/c/01a123cd-c9d6-7b02-be16-c303f6f117b7 | running (sent 2026-10-10 05:35; a first send at https://arena.ai/c/01a12381-8a10-75d4-a39f-198dc89de62b failed on both sides with "Something went wrong") |
-| lattice | `docs/prompts/battle/lattice.txt` | https://arena.ai/c/01a123ce-3ea1-7a78-82c7-27faa8ab3a06 | running (sent 2026-10-10 05:36) |
+| structure | `docs/prompts/battle/structure.txt` | https://arena.ai/c/01a123cd-c9d6-7b02-be16-c303f6f117b7 | **A** landed as `packages/structure` (model unrevealed, no vote). Sent about 05:13 (a first send, https://arena.ai/c/01a12381-8a10-75d4-a39f-198dc89de62b, failed on both sides). A pasted its code: own 4 + the brief test + the hidden suite 5/5 (the 900-slab speed test in 1.7 s of 3), strict clean, no imports, a dedicated support solver. B: strict clean but fails the hidden terrain test and its own: it never refuses terrain poking through a slab ('ground'). Landed with the hidden suite as `tests/structure-accept.test.ts`. |
+| lattice | `docs/prompts/battle/lattice.txt` | https://arena.ai/c/01a123ce-3ea1-7a78-82c7-27faa8ab3a06 | running (sent about 05:14) |

@@ -1,0 +1,36 @@
+One three.js moon-base module: `src/index.ts` (package @hm/heavygear) and `tests/heavygear.test.ts` (node:test). Then STOP.
+RULES: strict TS (noUncheckedIndexedAccess), no any/DOM/Date/Math.random. Imports only `three` and `mergeGeometries` from 'three/examples/jsm/utils/BufferGeometryUtils.js'. Merge per material (<= 8 top-level children, lamps included). No transmission. Stage 1 = CHUNKY LOW POLY, flat, few segments, same silhouette; stage 6 = full detail. NO chimneys or stacks: pixels are the only emission. BUILD QUALITY: every part touches or slightly sinks into the part holding it (nothing floats); nothing pokes through another except at a weld; no coplanar faces; every part non-indexed with position, normal and uv before merging.
+THE FAMILY: three HEAVY TERRAFORMERS that bolt onto a heavy-machine socket (a bolted cylinder ring) in the middle of an 8 x 8 m concrete pad. Grounded: a heavy base plate bolted to the ring, cable glands at the foot (orange power, green data), chamfered steel, hazard bands, two status lamps each. FRAME (m, y up): origin = ring top centre, front = +z, all within x and z -4..4.
+- heavyPress(m,{stage}): about 4 m tall. An open press frame (two thick columns, a crown beam), two hydraulic rams hanging from the crown over a die bed, a feed chute on top holding a few crystalline shards, and a louvred vent grille on the REAR face (-z) where green pixels pour out. Sockets 'vent' (grille centre), 'chute', 'power'. parts.ram: a group with the rams' moving pistons and the press plate (the game slides it down 0..0.6 m).
+- heavyProjector(m,{stage}): about 5 m tall. A short armoured octagonal mast, a yoke on top, and a big faceted lamp head in the yoke, its lens facing +z and tilted up about 25 degrees. Heat-sink fins wrap the back of the head; amber pixels leave vents round the BACK rim, NEVER the lens. Sockets 'vent' (back rim), 'lens' (lens centre), 'power'. parts.head: a group whose origin is the yoke's tilt axis (the game sets rotation.x). The lens is a lamp.
+- heavyWater(m,{stage}): about 3.5 m tall, 6 m long along x. A ribbed condenser tank lying in a two-saddle cradle, a gravel intake hopper low on the +x end (full of grey gravel), pipe runs along the tank, a round pressure gauge on the front (+z), and a louvred vent box on the TOP REAR where cyan pixels rise. Sockets 'vent' (vent box top), 'hopper', 'power'.
+API: export interface Box{min:[number,number,number];max:[number,number,number]} Socket{name:string;at:[number,number,number]} Gear{group:THREE.Group;colliders:Box[];sockets:Socket[];lamps:THREE.Mesh[];parts?:Record<string,THREE.Object3D>}; export interface LabMaterials{gunmetal,darkSteel,paint,copper,rubber,hazard,concrete:THREE.MeshStandardMaterial;glass:THREE.MeshPhysicalMaterial}; createMaterials(); setLamp(lamp:THREE.Mesh, glow:number) (emissive 0..1); triangles(g:Gear):number (counts nested groups); the three builders return Gear. Colliders: a few boxes.
+BUDGETS (triangles): stage 1 <= 900 each; stage 6 <= 10000 each.
+Keep this test unchanged; add yours:
+```ts
+import test from 'node:test'; import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { createMaterials, heavyPress, heavyProjector, heavyWater, setLamp, triangles, type Gear } from '../src/index';
+const m = createMaterials(), bb = (g: Gear) => new THREE.Box3().setFromObject(g.group);
+const has = (g: Gear, ...names: string[]) => names.forEach((n) => assert.ok(g.sockets.some((s) => s.name === n), n));
+test('heavy press, projector and water maker stand on the ring, keep to the pad, vent at the back', () => {
+  for (const stage of [1, 6]) {
+    const o = { stage }, all = { heavyPress: heavyPress(m, o), heavyProjector: heavyProjector(m, o), heavyWater: heavyWater(m, o) };
+    for (const [k, g] of Object.entries(all)) {
+      const t = triangles(g); assert.ok(t > 0 && t <= (stage === 1 ? 900 : 10000), `${k} s${stage}: ${t}`);
+      assert.ok(g.group.children.length <= 8, k); const b = bb(g);
+      assert.ok(b.min.y >= -0.02, `${k} sinks`); assert.ok(b.min.x >= -4 && b.max.x <= 4 && b.min.z >= -4 && b.max.z <= 4, `${k} leaves the pad`);
+      assert.ok(g.colliders.length > 0 && g.lamps.length > 0, k); setLamp(g.lamps[0]!, 1);
+    }
+    const hp = bb(all.heavyPress).max.y, pj = bb(all.heavyProjector).max.y, wm = bb(all.heavyWater);
+    assert.ok(hp >= 3.6 && hp <= 5.5); assert.ok(pj >= 4.2 && pj <= 6.5);
+    assert.ok(wm.max.y >= 2.8 && wm.max.y <= 4.5 && wm.max.x - wm.min.x >= 5);
+    has(all.heavyPress, 'vent', 'chute', 'power'); has(all.heavyProjector, 'vent', 'lens', 'power'); has(all.heavyWater, 'vent', 'hopper', 'power');
+    const at = (g: Gear, n: string) => g.sockets.find((s) => s.name === n)!.at;
+    assert.ok(at(all.heavyPress, 'vent')[2] < 0);
+    assert.ok(at(all.heavyProjector, 'vent')[2] < at(all.heavyProjector, 'lens')[2] - 0.5);
+    assert.ok(at(all.heavyWater, 'vent')[1] > 2.5);
+    assert.ok(all.heavyPress.parts?.['ram'] && all.heavyProjector.parts?.['head']);
+  }
+});
+```

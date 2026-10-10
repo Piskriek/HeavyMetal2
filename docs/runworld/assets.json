@@ -115,7 +115,7 @@
       "size": 2,
       "axis": "length",
       "view": "three-quarter",
-      "subject": "the projector's big faceted lamp head on its own, about 2 metres across: the front lens (unlit, emitting nothing), the heat-sink fins on its back, the louvred vents round its back rim, and the two pivot bosses on its sides",
+      "subject": "the projector's big faceted lamp head on its own, about 2 metres across: its front face is a FLAT, SOLID frosted-glass lens disc set flush in a thick bezel (NO deep opening, NO cavity, unlit), heat-sink fins on its back, louvred vents round its back rim, and two pivot bosses on its sides",
       "class": "moving-part"
     },
     {
@@ -865,6 +865,7 @@
     "2026-10-10 owner: \"the scout can have a roll cage but built into panels so no more tubes/cages\". The scout body is an enclosed panelled cab shell.",
     "2026-10-10 review: structure palette fixed in the prompts (warm light-grey wall panels with dark grey trim and hazard plinths; dark slate-grey standing-seam roofs); roof pieces are the roof surface only (two came back with walls under them); the ladder lost its safety cage and the stairs their open railings.",
     "2026-10-10 owner: \"the wheels will cover the axel/dics, we dont need those, we can have empty cabins and pop in seprate chairs and steering wheels\". Vehicle bodies are re-prompted with empty cabs and empty wheel arches; vehicle-seat and steering-wheel are separate assets placed at each body's seat sockets.",
-    "2026-10-10 owner: use the LOCAL 3D model (the 3080 Hunyuan3D pipeline) for every model: it is free, so anything that does not reduce well is re-imaged without the problem part and run again; \"if we wont ever realy see it its just a waste of polygons\" (e.g. the seat belts). RUN.world stays for source images, narration, music and effects."
+    "2026-10-10 owner: use the LOCAL 3D model (the 3080 Hunyuan3D pipeline) for every model: it is free, so anything that does not reduce well is re-imaged without the problem part and run again; \"if we wont ever realy see it its just a waste of polygons\" (e.g. the seat belts). RUN.world stays for source images, narration, music and effects.",
+    "2026-10-10 review: the projector head was re-imaged with a flat frosted lens (the first had a deep cavity with lumpy geometry inside); generated meshes also get floating debris dropped before decimating (scripts/lod-bake.py)."
   ]
 }

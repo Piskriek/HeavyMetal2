@@ -1,0 +1,29 @@
+SHEET 17 — the three remaining heavy terraformers (28 to 30), continuing sheet 13. Source brief: docs/prompts/art/heavy-machines-sheet17.md (feat). Each heavy machine grows from its sheet 12 field twin and sits on the sheet 13 hardpoint.
+
+Rules for every panel: one design drawn twice. S1 and S6 use the SAME machine description; only the wrapper differs. Pad and socket identical to the sheet 13 hardpoint. Nothing floats. Every machine takes power and data through cable glands into low ribbed steel floor covers. Pixels are the only emission: NO chimneys, NO stacks, NO smokestacks, NO exhaust pipes. No lettering, numerals or symbols on any surface. Review each S1/S6 pair side by side before keeping it.
+
+W1 (stage-1 wrapper, every 17 panel):
+A realtime 3D GAME ENGINE SCREENSHOT, Blender/Unity style render at stage-1 low-poly fidelity: flat-shaded triangle meshes, a restricted palette of about 16 flat colours, soft physically-based lighting, gentle ambient occlusion, clean anti-aliased edges — STRICTLY a 3D render, absolutely NO line art, NO black contour outlines, NO cel shading, NOT a cartoon or illustration. No text, no UI, no watermark, NO lettering, NO numerals, NO symbols on any surface. ONE single image: one render, one camera, NOT a split-screen, NOT a diptych, NOT a multi-view sheet. Design-sheet panel: ONE machine alone on its pad, three-quarter view, filling about two thirds of frame height; black starless sky behind; soft key light from frame right, one soft shadow.
+
+W6 (stage-6 wrapper, every 17 panel):
+Photorealistic 3D render — a videogame base-building design study at STAGE 6 fidelity: full PBR materials, clean painted steel and ceramic, crisp decals, light honest wear at most; in service and freshly maintained — NO rust, NO peeling, NO ruin, NO decay. The ground is a lush terraformed plot: green grass and small wildflowers at the feet of the piece; soft blue sky with a few thin clouds; warm low sun from frame right. Design-sheet panel: ONE machine alone on its pad, three-quarter view, filling about two thirds of frame height. ONE single image: one render, one camera, NOT a split-screen, NOT a diptych, NOT a multi-view sheet. No text, no UI, no watermark, NO lettering, NO numerals, NO symbols, NO logos on any surface. NOT a cartoon, NOT low poly.
+
+PAD (shared, from sheet 13): a square 2 by 2 pad of four grounded slabs (8 by 8 metres in total, seams visible), a round SOCKET on a bolted mounting RING with visible bolts; a POWER GLAND (orange) and a DATA GLAND (green) on the socket's side, each with a black cable running along a low ribbed steel floor cable cover set in a slab seam.
+
+P-28 HEAVY SHAPE PRESS (grows from the field press on sheet 12): on the socket, a massive press frame about 4 metres tall: a heavy square steel frame with two big hydraulic RAMS (thick cylinders) stacked over a flat DIE BED at the base; on the top a feed CHUTE that carries raw crystalline shards into the press; at the rear a louvred VENT grille pouring a plume of small crisp SQUARE GREEN pixels that spread and thin as they rise. Nothing else.
+
+P-29 HEAVY LIGHT PROJECTOR (grows from the field projector on sheet 12): on the socket, a short armoured MAST about 3 metres tall carrying at its top a big faceted LAMP HEAD about 2 metres across, able to tilt, with heat-sink FINS on its back; the total height is about 5 metres. The lamp's front LENS faces forward and emits nothing. From louvred vents round the BACK RIM of the lamp head, small square AMBER pixels drift out and fade. Nothing else.
+
+P-30 HEAVY WATER MAKER (grows from the field water maker on sheet 12): a ribbed CONDENSER TANK about 6 metres long and 1.5 metres across, lying horizontally in a heavy steel CRADLE bolted onto the socket ring; a gravel INTAKE HOPPER on one end, pipe runs along the tank, a round pressure GAUGE with a needle and no numerals; at the top-rear a louvred VENT grille pouring small square CYAN pixels that spread and thin as they rise. Overall about 3.5 metres tall and 6 metres long.
+
+FILE NAMES: 17-<key>-s1.png and 17-<key>-s6.png, keys: press (28), projector (29), watermaker (30). Each generation: W1 or W6, then the PAD, then the P-text. offer_options = false (assets inside a build). Reference images used: sheet 12 field twin (12-press, 12-lamp, 12-water) and sheet 13 hardpoint mill (13-hardpoint-mill).
+
+REVIEW (side-by-side, S1 vs S6):
+- 29 heavy light projector: kept as drawn (same armoured mast, faceted lamp head with fins, amber pixels from the rear rim, lens emits nothing).
+- 28 heavy shape press: first S6 was an enclosed cabinet, not the open frame of the S1. Rejected (panels/17/rejected/17-press-s6-rev1.png); redrawn open-frame with the S1 as reference. Kept.
+- 30 heavy water maker: first S6 had the gravel hopper on top of the tank, the S1 has it low on the front end. Rejected (panels/17/rejected/17-watermaker-s6-rev1.png); redrawn with the hopper low on the front end. Kept.
+
+REVISION (projector S6, review of 17-projector-s6-rev1):
+- The first S6 had a second amber plume coming off the front of the lamp at the lens rim. Brief: pixels come only from the vents at the back, never from the lens. Old render moved to panels/17/rejected/17-projector-s6-rev1.png.
+- Redrawn with the same design, pad and lighting, as the S1 reference: the lens and rim emit nothing; amber pixels drift only from the gaps between the REAR heat-sink fins; the pad has ONE low ribbed steel floor cable cover where the power and data cables run.
+- Prompt: the same W6 wrapper and PAD and P-29 text as the rest of sheet 17, plus: "THE LENS IS CLEAN AND SILENT ... The ONLY pixel source is the set of heat-sink FINS on the REAR of the lamp head ... ONE LOW RIBBED STEEL FLOOR CABLE COVER ... the ONLY cable cover on the pad." References: 17-projector-s1, 12-lamp-s6, 13-hardpoint-mill-s6. Kept after side-by-side check.

@@ -1,0 +1,25 @@
+Follow-up, same chat, same module: keep all six round-1 pieces and their test, and add the ROOF set from concept sheet 15. Reply with both full files again (src/index.ts, tests/basekit.test.ts), then STOP. Same rules: strict TS, merge per material (<= 6 meshes per piece), no transmission, stage 1 chunky and flat, stage 6 full detail. BUILD QUALITY: every part touches or slightly sinks into the part holding it (nothing floats); no part pokes through another except at a weld; no coplanar overlapping faces; every part non-indexed with position, normal and uv before merging.
+FRAME: a cell piece's origin is its cell corner, spanning x 0..4 and z 0..4; its level's floor top is y = 0, and the wall tops it rests on are at y = 0 (a roof sits on the walls of the storey below, so its low eave is at y = 0).
+- pitchedRoof(m,{stage}): a 37-degree standing-seam steel roof over one cell, rising from the eave at z=0 (y=0) to y=3 at z=4, with a gutter along the low eave, a 0.15 m fascia, and seams running downhill. Underside: purlins resting on the eave line.
+- lowRoof(m,{stage}): the same at 21 degrees, rising to y=1.5 at z=4.
+- roofOuterCorner(m,{stage}): the hip corner. Its surface height is y = 3*min(x,z)/4: two triangular faces rising from the eaves along x=0 and z=0 meet in a hip along the diagonal from (0,0,0) to (4,3,4), with a hip cap along it.
+- roofInnerCorner(m,{stage}): the valley corner. Its surface height is y = 3*max(x,z)/4: two faces rising from the low point (0,0,0) to high edges along x=4 and z=4 (y=3) meet in a valley along the diagonal, with a valley gutter along it.
+- ridgeCap(m,{stage}): a capping strip along x 0..4 at z=0, y=3, covering the joint where two pitched roofs from neighbouring cells meet back to back. About 0.5 m wide, with end caps.
+- gable(m,{stage}): an edge piece closing the open end of a pitched roof: a right-triangle wall in the plane z=0, with its base along x 0..4 at y=0 and its top edge rising from y=0 at x=0 to y=3 at x=4. It has the structural wall's panels and hazard foot, 0.25 m thick.
+Colliders: one or two boxes per roof face are enough (players walk on roofs).
+BUDGETS (triangles): stage 1 <= 400; stage 6 <= 4000 per piece.
+Keep this test unchanged (add it beside round 1's):
+```ts
+test('roof set fits the cell, meets its eaves and peaks, stays in budget', () => {
+  for (const stage of [1, 6]) {
+    const r = { pitchedRoof: pitchedRoof(m, { stage }), lowRoof: lowRoof(m, { stage }), roofOuterCorner: roofOuterCorner(m, { stage }), roofInnerCorner: roofInnerCorner(m, { stage }), ridgeCap: ridgeCap(m, { stage }), gable: gable(m, { stage }) };
+    for (const [k, p] of Object.entries(r)) { const t = triangles(p); assert.ok(t > 0 && t <= (stage === 1 ? 400 : 4000), `${k} s${stage}: ${t}`); assert.ok(p.group.children.length <= 6, k); assert.ok(p.colliders.length > 0, k); }
+    for (const k of ['pitchedRoof', 'lowRoof', 'roofOuterCorner', 'roofInnerCorner'] as const) { const b = box(r[k]); assert.ok(b.min.x >= -0.35 && b.max.x <= 4.35 && b.min.z >= -0.35 && b.max.z <= 4.35, `${k} spills out of its cell`); assert.ok(b.min.y >= -0.4, `${k} hangs too low`); }
+    const pr = box(r.pitchedRoof); assert.ok(pr.max.y >= 2.9 && pr.max.y <= 3.5); const lr = box(r.lowRoof); assert.ok(lr.max.y >= 1.4 && lr.max.y <= 2);
+    const oc = box(r.roofOuterCorner); assert.ok(oc.max.y >= 2.9 && oc.max.y <= 3.5); const ic = box(r.roofInnerCorner); assert.ok(ic.max.y >= 2.9 && ic.max.y <= 3.5);
+    const g = box(r.gable); near(g.min.x, 0); near(g.max.x, 4); near(g.min.y, 0); assert.ok(g.max.y >= 2.9 && g.max.y <= 3.2 && g.max.z - g.min.z <= 0.45);
+    const rc = box(r.ridgeCap); near(rc.min.x, 0, 0.1); near(rc.max.x, 4, 0.1); assert.ok(rc.min.y >= 2.7 && rc.max.y <= 3.6);
+  }
+});
+```
+Import the six new builders in your test file alongside the round-1 ones.

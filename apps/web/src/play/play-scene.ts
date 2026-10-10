@@ -22,6 +22,9 @@ import { createScientistInstance } from '../avatar/scientist/scientist-model';
 import { loadScientistAnimations, type ClipName } from '../avatar/scientist/anims-loader';
 import { createScientistAnimator, type OneShotKind, type ScientistAnimator } from '../avatar/scientist/animator';
 import { createMonsterMashCombat, type MonsterMashCombatManager } from './monster-mash-combat';
+import * as F from '@hm/substrate';
+import { beamEffect, type BeamFx, type BeamMode } from '@hm/beamkit';
+import { BEAM_RANGE } from '../base/world';
 
 export type Where = 'lab' | 'planet';
 /** What the screen gives the scene each frame. */
@@ -117,6 +120,14 @@ export interface PlayScene {
   setPieces(group: THREE.Group | null): void;
   heightAt(x: number, z: number): number;
   aimPoint(): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null;
+  /** Sets or updates the field's anomaly node instanced markers. Rebuilds instances only when field updates. */
+  setNodes(field: F.Field | null): void;
+  /** Finds the anomaly node aimed at within reach (metres). */
+  aimNode(field: F.Field | null, reach?: number): F.Node | null;
+  /** Sets the extraction beam VFX state. */
+  setBeam(from: { readonly x: number; readonly y: number; readonly z: number } | null, to: { readonly x: number; readonly y: number; readonly z: number } | null, mode: BeamMode, colour: string, on: boolean): void;
+  /** Returns the world position of the extraction tool muzzle. */
+  beamMuzzle(): { readonly x: number; readonly y: number; readonly z: number };
   /** The plot reached a stage: a wave from `from` (ground x, z) brings its look across the plot, out to the horizon and up the sky. */
   raiseStage(to: number, from: { readonly x: number; readonly z: number }): void;
   frame(now: number, dt: number, c: Controls): FrameOut;
@@ -494,6 +505,32 @@ export function createPlayScene(o: {
   let pieceGhost: THREE.Group | null = null;
   let piecesGroup: THREE.Group | null = null;
 
+  // Stand-in anomaly node markers awaiting concept art
+  const nodeGeometries: Record<F.Kind, THREE.BufferGeometry> = {
+    dither: keep(new THREE.DodecahedronGeometry(0.5, 0)),
+    fold: keep(new THREE.TorusGeometry(0.42, 0.16, 8, 16)),
+    chroma: keep(new THREE.IcosahedronGeometry(0.55, 0)),
+    spire: keep(new THREE.ConeGeometry(0.35, 1.4, 5)),
+  };
+  const nodeMaterials: Record<F.Kind, THREE.Material> = {
+    dither: keep(new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.8, metalness: 0.1, emissive: '#222222' })),
+    fold: keep(new THREE.MeshStandardMaterial({ color: '#ffffff', wireframe: true, roughness: 0.4 })),
+    chroma: keep(new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.2, metalness: 0.3, emissive: '#331122' })),
+    spire: keep(new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.1, metalness: 0.8, emissive: '#0a2233' })),
+  };
+  const nodeBaseColours: Record<F.Kind, THREE.Color> = {
+    dither: new THREE.Color('#d9d9d9'),
+    fold: new THREE.Color('#7dd3fc'),
+    chroma: new THREE.Color('#ff4fd8'),
+    spire: new THREE.Color('#22d3ee'),
+  };
+  const nodeMeshes: Partial<Record<F.Kind, THREE.InstancedMesh>> = {};
+
+  // ---- Extraction Beam VFX (@hm/beamkit)
+  const beamFx: BeamFx = beamEffect({ pixels: detail.plumes === 'dither' || detail.plumeDensity <= 0.5 ? 80 : 160 });
+  planetScene.add(beamFx.object);
+  beamFx.object.visible = false;
+
   // ---- the post pass (planet picture by stage)
   const postUniforms = {
     uColour: { value: planetRT.texture as THREE.Texture }, uDepth: { value: planetRT.depthTexture as THREE.Texture | null }, uLab: { value: labRT.texture as THREE.Texture },
@@ -870,6 +907,10 @@ export function createPlayScene(o: {
     setPieceGhost(group) {
       if (pieceGhost) {
         planetScene.remove(pieceGhost);
+        pieceGhost.traverse((obj) => {
+          const mesh = obj as THREE.Mesh;
+          if (mesh.isMesh) mesh.geometry?.dispose();
+        });
         pieceGhost = null;
       }
       if (group) {
@@ -911,6 +952,106 @@ export function createPlayScene(o: {
     },
     heightAt: (x, z) => groundAt(x, z),
     aimPoint: () => aimPointFn(),
+    setNodes(field) {
+      if (!field) {
+        for (const k of (['dither', 'fold', 'chroma', 'spire'] as const)) {
+          const m = nodeMeshes[k];
+          if (m) m.visible = false;
+        }
+        return;
+      }
+      const mat4 = new THREE.Matrix4();
+      const scaleV = new THREE.Vector3();
+      const rotQ = new THREE.Quaternion();
+      const posV = new THREE.Vector3();
+      const col = new THREE.Color();
+
+      for (const kind of (['dither', 'fold', 'chroma', 'spire'] as const)) {
+        const list = field.nodes.filter((n) => n.kind === kind);
+        let mesh = nodeMeshes[kind];
+        if (!mesh || mesh.count !== list.length) {
+          if (mesh) {
+            planetScene.remove(mesh);
+            mesh.dispose();
+          }
+          mesh = new THREE.InstancedMesh(nodeGeometries[kind], nodeMaterials[kind], list.length);
+          mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+          nodeMeshes[kind] = mesh;
+          planetScene.add(mesh);
+        }
+        mesh.visible = true;
+        const maxVal = F.MAX[kind];
+        const baseCol = nodeBaseColours[kind];
+
+        for (let i = 0; i < list.length; i++) {
+          const n = list[i]!;
+          const ratio = Math.max(0, Math.min(1, n.reserve / maxVal));
+          if (n.reserve <= 0.001) {
+            scaleV.set(0, 0, 0);
+          } else {
+            const s = 0.4 + 0.6 * ratio;
+            scaleV.set(s, s, s);
+          }
+          const ny = groundAt(n.x, n.z) + (kind === 'spire' ? 0.7 : 0.35);
+          posV.set(n.x, ny, n.z);
+          if (kind === 'fold') {
+            rotQ.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+          } else {
+            rotQ.identity();
+          }
+          mat4.compose(posV, rotQ, scaleV);
+          mesh.setMatrixAt(i, mat4);
+
+          col.copy(baseCol).multiplyScalar(0.35 + 0.65 * ratio);
+          mesh.setColorAt(i, col);
+        }
+        mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      }
+    },
+    aimNode(field, reach = BEAM_RANGE) {
+      if (!field || where !== 'planet') return null;
+      const p = pos;
+      const camPos = camera.position;
+      const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      let bestNode: F.Node | null = null;
+      let bestDist = Infinity;
+
+      for (const node of field.nodes) {
+        if (node.reserve <= 0) continue;
+        const dx = node.x - p.x;
+        const dz = node.z - p.z;
+        if (Math.hypot(dx, dz) > reach) continue;
+
+        const ny = groundAt(node.x, node.z) + 0.5;
+        const nodePos = new THREE.Vector3(node.x, ny, node.z);
+        const toNode = nodePos.clone().sub(camPos);
+        const proj = toNode.dot(dir);
+        if (proj <= 0) continue;
+
+        const rayPoint = camPos.clone().addScaledVector(dir, proj);
+        const distToRay = rayPoint.distanceTo(nodePos);
+        if (distToRay < 1.6 && distToRay < bestDist) {
+          bestDist = distToRay;
+          bestNode = node;
+        }
+      }
+      return bestNode;
+    },
+    setBeam(from, to, mode, colour, on) {
+      if (on && from && to) {
+        beamFx.set(new THREE.Vector3(from.x, from.y, from.z), new THREE.Vector3(to.x, to.y, to.z), mode, colour, true);
+      } else {
+        beamFx.object.visible = false;
+      }
+    },
+    beamMuzzle() {
+      const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      const rgt = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+      const m = camera.position.clone().add(fwd.multiplyScalar(0.4)).add(rgt.multiplyScalar(0.2)).add(up.multiplyScalar(-0.15));
+      return { x: m.x, y: m.y, z: m.z };
+    },
     raiseStage(to, from) {
       if (to <= stage) return;
       scientistAnimator?.playOneShot('cheer');
@@ -935,6 +1076,7 @@ export function createPlayScene(o: {
     },
     frame(now, dt, c) {
       clock = now;
+      beamFx.update(clock);
       holoUniforms.uTime.value = now;
       // ---- the power-on sequence
       if (powerT >= 0) {
@@ -1322,6 +1464,16 @@ export function createPlayScene(o: {
       for (const mat of Object.values(m)) (mat as THREE.Material).dispose();
       renderer.dispose();
       mash.dispose();
+      beamFx.dispose();
+      for (const k of (['dither', 'fold', 'chroma', 'spire'] as const)) {
+        nodeGeometries[k]?.dispose();
+        nodeMaterials[k]?.dispose();
+        const m = nodeMeshes[k];
+        if (m) {
+          planetScene.remove(m);
+          m.dispose();
+        }
+      }
     },
     mash,
   };

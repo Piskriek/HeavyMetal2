@@ -129,6 +129,11 @@ export class PieceMeshManager {
       if (!activeIds.has(id)) {
         this.root.remove(grp);
         this.pieceMap.delete(id);
+        grp.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.geometry?.dispose();
+          }
+        });
       }
     }
   }
@@ -139,6 +144,11 @@ export class PieceMeshManager {
     if (removedGrp) {
       this.root.remove(removedGrp);
       this.pieceMap.delete(removedId);
+      removedGrp.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry?.dispose();
+        }
+      });
     }
 
     // Collapsed pieces animate: drop 0.5m, tilt, and fade over 0.6s
@@ -182,6 +192,15 @@ export class PieceMeshManager {
 
       if (progress >= 1) {
         this.root.remove(col.group);
+        col.group.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.geometry?.dispose();
+            if (child.material) {
+              if (Array.isArray(child.material)) child.material.forEach((m) => m.dispose());
+              else child.material.dispose();
+            }
+          }
+        });
         this.collapsing.splice(i, 1);
       }
     }

@@ -15,6 +15,8 @@
 | **POL-05** | **47-Tile Blob Transition Set** | Terrain Specification | Replace raw 4x4 Bayer transition dither with curated 47-tile autotile blob set for smooth terrain block neighbours. | Texture pipeline pass. |
 | **POL-17** | **Twin Gate Detail on the Planet** | Claude Opus (2026-10-07) | The planet's twin gate is built once at stage-1 detail; rebuild it at full detail when the plot reaches stage 2. | **Done in TASK-08** (Sidecar, 2026-10-08): `rebuildTwin` rebuilds twin gate at stage 6 on reaching stage 2. |
 | **POL-06** | **Console & Mill Visual Upgrades** | Arena Battle `console-mill` | Richer 3D operator console and texture mill props from concept sheet 12. | **Done in TASK-08** (Sidecar, 2026-10-08): swapped `@hm/consolemill` operator console into lab room and texture mill into machine props. |
+| **POL-23** | **Anomaly Field Node Concept Models** | Sidecar TASK-04 | Stand-in node geometries (dodecahedron, torus, icosahedron, cone) await dedicated concept art pass from Arena Codex/Art agents. | Concept Art pass. |
+| **POL-24** | **Heavy Terraformer Industrial Models** | Sidecar TASK-04 | Heavy terraformer machines currently use 1.9x scaled stand-in props on 8m hardpoints. Await multi-tier industrial modular models. | 3D Asset pass. |
 
 ---
 

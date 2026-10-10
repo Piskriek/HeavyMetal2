@@ -97,7 +97,7 @@ export function formatRefusalToast(event: Extract<BaseEvent, { type: 'refused' }
 
 export interface WorldViewSourceOptions {
   getWorld(): BaseWorld;
-  env: WorldEnv;
+  env: WorldEnv | (() => WorldEnv);
   getAt(): Point;
   dispatch(cmd: BaseCommand): void;
   getBuildKind?: () => Kind | null;
@@ -106,7 +106,10 @@ export interface WorldViewSourceOptions {
 
 export class WorldViewSource implements BaseViewSource {
   private readonly getWorld: () => BaseWorld;
-  private readonly env: WorldEnv;
+  private readonly envOption: WorldEnv | (() => WorldEnv);
+  private get env(): WorldEnv {
+    return typeof this.envOption === 'function' ? this.envOption() : this.envOption;
+  }
   private readonly getAt: () => Point;
   private readonly dispatchFn: (cmd: BaseCommand) => void;
   private readonly getBuildKind?: () => Kind | null;
@@ -121,7 +124,7 @@ export class WorldViewSource implements BaseViewSource {
 
   constructor(opts: WorldViewSourceOptions) {
     this.getWorld = opts.getWorld;
-    this.env = opts.env;
+    this.envOption = opts.env;
     this.getAt = opts.getAt;
     this.dispatchFn = opts.dispatch;
     this.getBuildKind = opts.getBuildKind;

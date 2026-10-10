@@ -339,6 +339,9 @@
       "@hm/fieldkit": [
         "packages/fieldkit/src/index.ts"
       ],
+      "@hm/beamkit": [
+        "packages/beamkit/src/index.ts"
+      ],
       "@hm/fidelity": [
         "packages/fidelity/src/index.ts"
       ],

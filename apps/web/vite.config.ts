@@ -129,6 +129,7 @@ export default defineConfig(({ mode }) => ({
       '@hm/plotcodec': p('../../packages/plotcodec/src/index.ts'),
       '@hm/consolemill': p('../../packages/consolemill/src/index.ts'),
       '@hm/shareware': p('../../packages/shareware/src/index.ts'),
+      '@hm/beamkit': p('../../packages/beamkit/src/index.ts'),
     },
   },
   assetsInclude: ['**/*.fbx', '**/*.bin'],

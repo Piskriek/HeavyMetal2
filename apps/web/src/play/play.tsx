@@ -44,10 +44,12 @@ import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { BaseHud } from '../base/ui/base-hud';
 import { mockBaseViewSource } from '../base/mock-view';
 import { createWorldViewSource, WorldViewSource, formatRefusalToast } from '../base/world-view';
-import { createWorld, apply, pieceAt, preview, type BaseWorld, type BaseCommand, type WorldEnv } from '../base/world';
+import { createWorld, apply, pieceAt, preview, BRIDGE_RANGE, BEAM_RANGE, type BaseWorld, type BaseCommand, type WorldEnv } from '../base/world';
 import { PieceMeshManager } from '../base/piece-meshes';
 import { createStandInPiece } from '../base/stand-in-pieces';
 import { blueprint, STARTER, ITEMS } from '../base/catalog';
+import { MachinePickerModal } from '../base/ui/machine-picker-modal';
+import { RefineryModal } from '../base/ui/refinery-modal';
 import * as S from '@hm/structure';
 import type { Kind } from '@hm/structure';
 import * as L from '@hm/lattice';
@@ -167,15 +169,29 @@ export function PlayScreen(props: {
     const w = createWorld();
     const slots = w.player.slots.slice();
     slots[0] = { item: STARTER, n: 1 };
-    slots[1] = { item: 'ore', n: 200 };
-    slots[2] = { item: 'prim-cube', n: 3 };
-    slots[3] = { item: 'map-basalt', n: 3 };
-    slots[4] = { item: 'prim-chassis', n: 1 };
+    slots[1] = { item: 'ore', n: 50 };
+    slots[2] = { item: 'ore', n: 50 };
+    slots[3] = { item: 'ore', n: 50 };
+    slots[4] = { item: 'ore', n: 50 };
+    slots[5] = { item: 'ore', n: 50 };
+    slots[6] = { item: 'ore', n: 50 };
+    slots[7] = { item: 'prim-cube', n: 15 };
+    slots[8] = { item: 'prim-chassis', n: 8 };
+    slots[9] = { item: 'map-basalt', n: 10 };
+    slots[10] = { item: 'pxd-mono', n: 80 };
+    slots[11] = { item: 'vtx-rough', n: 80 };
+    slots[12] = { item: 'prim-beam', n: 8 };
+    slots[13] = { item: 'ore', n: 50 };
+    slots[14] = { item: 'ore', n: 50 };
+    slots[15] = { item: 'ore', n: 50 };
+    slots[16] = { item: 'ore', n: 50 };
+    slots[17] = { item: 'ore', n: 50 };
+    slots[18] = { item: 'ore', n: 50 };
     return {
       ...w,
       player: {
         ...w.player,
-        maxKg: 300,
+        maxKg: 1200,
         slots,
       },
     };
@@ -193,15 +209,34 @@ export function PlayScreen(props: {
   } | null>(null);
   const dispatchBaseRef = useRef<(cmd: BaseCommand) => void>(() => {});
   const tryPlaceBaseRef = useRef<() => boolean>(() => false);
+  const [machinePickerHardpoint, setMachinePickerHardpoint] = useState<number | null>(null);
+  const [refineryMachineId, setRefineryMachineId] = useState<number | null>(null);
+  const hardpointToPlotMachineRef = useRef<Map<number, number>>(new Map());
+  const isLmbDownRef = useRef(false);
+  const harvestAccRef = useRef(0);
+  const baseEnvRef = useRef<WorldEnv | null>(null);
+
+  const lastPreviewTickRef = useRef(-1);
+  const lastPreviewBpRef = useRef<string | null>(null);
+  const lastPreviewKindRef = useRef<string | null>(null);
+  const lastPreviewAimRef = useRef<{ x: number; y: number; z: number; yaw: number } | null>(null);
+
+  const getBaseEnv = useCallback((): WorldEnv => {
+    if (baseEnvRef.current) return baseEnvRef.current;
+    const gate = sceneRef.current?.debug.gatePlanet() ?? { x: 0, z: 0 };
+    const env: WorldEnv = {
+      heightAt: (x, z) => sceneRef.current?.heightAt(x, z) ?? 0,
+      bridge: { x: gate.x, z: gate.z, range: BRIDGE_RANGE },
+    };
+    baseEnvRef.current = env;
+    return env;
+  }, []);
 
   const baseViewSource = useMemo(() => {
     if (!isBase) return mockBaseViewSource;
     return createWorldViewSource({
       getWorld: () => baseWorldRef.current,
-      env: {
-        heightAt: (x, z) => sceneRef.current?.heightAt(x, z) ?? 0,
-        bridge: { x: 0, z: 0, range: 60 },
-      },
+      env: () => getBaseEnv(),
       getAt: () => {
         const p = sceneRef.current?.aimPoint();
         if (p) return { x: p.x, z: p.z };
@@ -211,14 +246,12 @@ export function PlayScreen(props: {
       getBuildKind: () => buildKindRef.current,
       getPreview: () => lastPreviewRef.current?.prev ?? null,
     });
-  }, [isBase]);
+  }, [isBase, getBaseEnv]);
 
   const dispatchBase = useCallback((cmd: BaseCommand) => {
     const scene = sceneRef.current;
-    const bEnv: WorldEnv = {
-      heightAt: (x, z) => scene?.heightAt(x, z) ?? 0,
-      bridge: { x: 0, z: 0, range: 60 },
-    };
+    const bEnv = getBaseEnv();
+    const prevField = baseWorldRef.current.field;
     const res = apply(baseWorldRef.current, bEnv, cmd);
     baseWorldRef.current = res.world;
 
@@ -239,13 +272,50 @@ export function PlayScreen(props: {
         say(`Deposited ${ev.n} item(s) to Quantum Lattice.`);
       } else if (ev.type === 'door') {
         say(ev.open ? 'Airlock opened.' : 'Airlock closed.');
+      } else if (ev.type === 'harvested') {
+        const itemSummary = ev.items.map((s) => `${s.n}x ${ITEMS[s.item]?.name ?? s.item}`).join(', ');
+        say(`+${itemSummary}`, 'Stored in pack/lattice');
+        fx('relay-click', { minGapMs: 80 });
+        if (ev.lost.length > 0) {
+          say('Pack full', 'Storage lost: cannot fit cargo');
+        }
+      } else if (ev.type === 'finished') {
+        say(`Refined: ${ev.n}x ${ITEMS[ev.item]?.name ?? ev.item}`, 'Ready for collection');
+        fx('snap');
+      } else if (ev.type === 'installed') {
+        const pad = baseWorldRef.current.base.pieces.find((p) => p.id === ev.machine);
+        if (pad && envRef.current) {
+          const padCenter = pieceAt(baseWorldRef.current.base, pad);
+          if (padCenter) {
+            try {
+              const nextPlot = place(plotRef.current, envRef.current, ('heavy-' + ev.kind) as any, padCenter.x, padCenter.z, 0);
+              plotRef.current = nextPlot;
+              commit(withPlot(stateRef.current, nextPlot));
+              const placed = nextPlot.machines[nextPlot.machines.length - 1];
+              if (placed) hardpointToPlotMachineRef.current.set(ev.machine, placed.id);
+              scene?.setPlot(nextPlot, running(nextPlot, envRef.current), network(nextPlot, envRef.current).connected);
+              say(`Heavy ${ev.kind.toUpperCase()} installed!`, 'Operational on hardpoint grid.');
+            } catch (err: any) {
+              console.warn('Plotsim placement refusal:', err?.message ?? err);
+              say(`Installed ${ev.kind.toUpperCase()}`, err?.message ?? 'Installed on base hardpoint');
+            }
+          }
+        }
+      } else if (ev.type === 'queued') {
+        say('Queued refinement job');
+      } else if (ev.type === 'collected') {
+        say(`Collected ${ev.n} refined item(s)`);
       }
+    }
+
+    if (res.world.field !== prevField || res.events.some((e) => e.type === 'harvested' || e.type === 'stage')) {
+      scene?.setNodes(res.world.field);
     }
 
     const integrity = (baseViewSource as WorldViewSource).get?.()?.build?.integrity ?? false;
     pieceManagerRef.current.sync(baseWorldRef.current, bEnv, integrity);
     (baseViewSource as WorldViewSource).notify?.();
-  }, [say, baseViewSource]);
+  }, [say, baseViewSource, getBaseEnv, commit]);
 
   dispatchBaseRef.current = dispatchBase;
 
@@ -423,9 +493,24 @@ export function PlayScreen(props: {
         plotRef.current = stateRef.current.plot;
         scene.restore({ gateOn: stateRef.current.gateOn, plot: plotRef.current, running: running(plotRef.current, env), connected: network(plotRef.current, env).connected });
         if (isBase) {
+          const gate = scene.debug.gatePlanet();
+          const bEnv = { heightAt: (x: number, z: number) => scene.heightAt(x, z), bridge: { x: gate.x, z: gate.z, range: BRIDGE_RANGE } };
+          baseEnvRef.current = bEnv;
           scene.setPieces(pieceManagerRef.current.getMeshes());
-          const bEnv = { heightAt: (x: number, z: number) => scene.heightAt(x, z), bridge: { x: 0, z: 0, range: 60 } };
+          scene.setNodes(baseWorldRef.current.field);
           pieceManagerRef.current.sync(baseWorldRef.current, bEnv, false);
+          for (const m of baseWorldRef.current.machines) {
+            const piece = baseWorldRef.current.base.pieces.find((p) => p.id === m.id);
+            if (piece) {
+              const center = pieceAt(baseWorldRef.current.base, piece);
+              if (center) {
+                const match = plotRef.current.machines.find(
+                  (pm) => pm.kind === ('heavy-' + m.kind) && Math.hypot(pm.x - center.x, pm.z - center.z) < 2
+                );
+                if (match) hardpointToPlotMachineRef.current.set(m.id, match.id);
+              }
+            }
+          }
         }
       }],
       ['Compiling shaders', () => { scene.warm(); }],
@@ -468,15 +553,26 @@ export function PlayScreen(props: {
     };
     const onMouseDown = (e: MouseEvent): void => {
       if (e.button === 0 && document.pointerLockElement === canvas) {
+        isLmbDownRef.current = true;
         if (scene.mash.isEquipped()) {
           fireWeapon();
         } else if (isBase) {
-          tryPlaceBaseRef.current();
+          const w = baseWorldRef.current;
+          const slot = w.player.slots[w.hotbar];
+          const activeBp = slot && slot.n > 0 ? blueprint(slot.item) : null;
+          if (activeBp) {
+            tryPlaceBaseRef.current();
+          }
         }
       }
     };
+    const onMouseUp = (e: MouseEvent): void => {
+      if (e.button === 0) {
+        isLmbDownRef.current = false;
+      }
+    };
     window.addEventListener('keydown', kd); window.addEventListener('keyup', ku); window.addEventListener('mousemove', onMove);
-    window.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousedown', onMouseDown); window.addEventListener('mouseup', onMouseUp);
     const loop = (ms: number): void => {
       if (cancelled) return;
       const frameMs = ms - last;
@@ -485,6 +581,48 @@ export function PlayScreen(props: {
       if (isBase) {
         pieceManagerRef.current.update(dt);
         const w = baseWorldRef.current;
+        const playerPos = scene.debug.position();
+
+        // 1. Tick accumulator for 100ms ticks (node regrowth, beam extraction, machine refinement)
+        harvestAccRef.current += dt;
+        const aimedNode = scene.aimNode(w.field, BEAM_RANGE);
+        const hasBeam = w.equipment.beam?.item === 'tool-beam';
+        const isMining = isLmbDownRef.current && hasBeam && aimedNode !== null && !scene.mash.isEquipped();
+
+        if (harvestAccRef.current >= 0.1) {
+          const powerMap: Record<number, number> = {};
+          if (envRef.current) {
+            const runMap = running(plotRef.current, envRef.current);
+            for (const m of w.machines) {
+              const pId = hardpointToPlotMachineRef.current.get(m.id);
+              if (pId !== undefined) {
+                powerMap[m.id] = runMap.get(pId) ?? 0;
+              }
+            }
+          }
+          while (harvestAccRef.current >= 0.1) {
+            harvestAccRef.current -= 0.1;
+            dispatchBaseRef.current({
+              t: 'tick',
+              at: { x: playerPos.x, z: playerPos.z },
+              dt: 0.1,
+              beam: isMining && aimedNode ? { node: aimedNode.id, power: 1 } : null,
+              power: powerMap,
+            });
+          }
+        }
+
+        // 2. Beam VFX update
+        if (isMining && aimedNode) {
+          const muzzle = scene.beamMuzzle();
+          const target = { x: aimedNode.x, y: scene.heightAt(aimedNode.x, aimedNode.z) + 0.35, z: aimedNode.z };
+          const col = aimedNode.kind === 'dither' ? '#d9d9d9' : aimedNode.kind === 'fold' ? '#7dd3fc' : aimedNode.kind === 'chroma' ? '#ff4fd8' : '#22d3ee';
+          scene.setBeam(muzzle, target, 'extract', col, true);
+        } else {
+          scene.setBeam(null, null, 'extract', '#ffffff', false);
+        }
+
+        // 3. Throttled preview for build ghost
         const slot = w.player.slots[w.hotbar];
         const activeBp = slot && slot.n > 0 ? blueprint(slot.item) : null;
         if (activeBp) {
@@ -497,18 +635,30 @@ export function PlayScreen(props: {
           }
           const aim = scene.aimPoint();
           if (aim) {
-            const bEnv: WorldEnv = {
-              heightAt: (x, z) => scene.heightAt(x, z),
-              bridge: { x: 0, z: 0, range: 60 },
-            };
-            const playerPos = scene.debug.position();
-            const prev = preview(w, bEnv, { x: playerPos.x, z: playerPos.z }, activeBp.id, curKind, {
-              x: aim.x,
-              y: aim.y,
-              z: aim.z,
-              yaw: aim.yaw,
-            });
-            lastPreviewRef.current = { prev, aim, bp: activeBp, kind: curKind };
+            const bEnv = getBaseEnv();
+            const shouldRecompute =
+              !lastPreviewRef.current ||
+              w.tick !== lastPreviewTickRef.current ||
+              activeBp.id !== lastPreviewBpRef.current ||
+              curKind !== lastPreviewKindRef.current ||
+              !lastPreviewAimRef.current ||
+              Math.hypot(aim.x - lastPreviewAimRef.current.x, aim.z - lastPreviewAimRef.current.z) > 0.25 ||
+              Math.abs(aim.yaw - lastPreviewAimRef.current.yaw) > (5 * Math.PI / 180);
+
+            let prev = lastPreviewRef.current?.prev;
+            if (shouldRecompute || !prev) {
+              prev = preview(w, bEnv, { x: playerPos.x, z: playerPos.z }, activeBp.id, curKind, {
+                x: aim.x,
+                y: aim.y,
+                z: aim.z,
+                yaw: aim.yaw,
+              });
+              lastPreviewRef.current = { prev, aim, bp: activeBp, kind: curKind };
+              lastPreviewTickRef.current = w.tick;
+              lastPreviewBpRef.current = activeBp.id;
+              lastPreviewKindRef.current = curKind;
+              lastPreviewAimRef.current = { x: aim.x, y: aim.y, z: aim.z, yaw: aim.yaw };
+            }
             const snap = prev.snap;
             if (snap) {
               if (snap.mode === 'place') {
@@ -638,7 +788,10 @@ export function PlayScreen(props: {
         const r = stepPlot(plotRef.current, env, dt);
         plotRef.current = r.state;
         for (const e of r.events) {
-          if (e.type === 'stage-up' && e.stage >= 2 && !visitingRef.current) scene.raiseStage(e.stage, env.gate);
+          if (e.type === 'stage-up' && !visitingRef.current) {
+            if (e.stage >= 2) scene.raiseStage(e.stage, env.gate);
+            if (isBase) dispatchBaseRef.current({ t: 'stage', stage: e.stage });
+          }
           if (e.type === 'ore-out' && !visitingRef.current) say('Out of ore', 'Hold E on a boulder, or build a rock drill.');
           if (e.type === 'underpowered' && !visitingRef.current) say('Not enough power', 'Build a power unit, or switch a machine off.');
         }
@@ -799,6 +952,14 @@ export function PlayScreen(props: {
       base: {
         world: () => baseWorldRef.current,
         apply: (cmd: BaseCommand) => dispatchBaseRef.current(cmd),
+        openMachinePicker: (hardpointId: number) => {
+          setMachinePickerHardpoint(hardpointId);
+          freeMouse();
+        },
+        openRefinery: (machineId: number) => {
+          setRefineryMachineId(machineId);
+          freeMouse();
+        },
       },
       teleportPlanet: () => scene.debug.teleport('planet', 0, 10, 0),
     });
@@ -807,6 +968,14 @@ export function PlayScreen(props: {
         base: {
           world: () => baseWorldRef.current,
           apply: (cmd: BaseCommand) => dispatchBaseRef.current(cmd),
+          openMachinePicker: (hardpointId: number) => {
+            setMachinePickerHardpoint(hardpointId);
+            freeMouse();
+          },
+          openRefinery: (machineId: number) => {
+            setRefineryMachineId(machineId);
+            freeMouse();
+          },
         },
       };
     }
@@ -820,7 +989,7 @@ export function PlayScreen(props: {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', size);
       window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mousedown', onMouseDown); window.removeEventListener('mouseup', onMouseUp);
       sceneRef.current = null;
       scene.dispose();
     };
@@ -872,6 +1041,8 @@ export function PlayScreen(props: {
     const onKey = (e: KeyboardEvent): void => {
       if (!ready || creating) return;
       if (e.code === 'Escape') {
+        if (machinePickerHardpoint !== null) { setMachinePickerHardpoint(null); return; }
+        if (refineryMachineId !== null) { setRefineryMachineId(null); return; }
         if (building) { stopBuilding(); return; }
         if (mashOpen) { setMashOpen(false); return; }
         if (menu) { setMenu(false); return; }
@@ -939,6 +1110,21 @@ export function PlayScreen(props: {
             if (p && p.kind === 'airlock') {
               dispatchBase({ t: 'door', id: p.id, open: !p.open });
               return;
+            }
+            if (p && p.kind === 'hardpoint') {
+              const m = baseWorldRef.current.machines.find((x) => x.id === p.id);
+              if (!m) {
+                setMachinePickerHardpoint(p.id);
+                freeMouse();
+                return;
+              } else if (m.kind === 'mill' || m.kind === 'press') {
+                setRefineryMachineId(m.id);
+                freeMouse();
+                return;
+              } else {
+                say(`Heavy ${m.kind.toUpperCase()} operational`, 'Pouring pixels into atmospheric plume.');
+                return;
+              }
             }
           }
           if (tryPlaceBase()) return;
@@ -1791,6 +1977,47 @@ export function PlayScreen(props: {
               }}
             />
           ) : null}
+          {machinePickerHardpoint !== null && isBase && (
+            <MachinePickerModal
+              hardpointId={machinePickerHardpoint}
+              world={baseWorldRef.current}
+              env={getBaseEnv()}
+              at={sceneRef.current?.debug.position() ?? { x: 0, z: 0 }}
+              onInstall={(hpId, kind) => {
+                dispatchBase({
+                  t: 'install',
+                  at: sceneRef.current?.debug.position() ?? { x: 0, z: 0 },
+                  hardpoint: hpId,
+                  kind,
+                });
+                setMachinePickerHardpoint(null);
+              }}
+              onClose={() => setMachinePickerHardpoint(null)}
+            />
+          )}
+          {refineryMachineId !== null && isBase && (
+            <RefineryModal
+              machineId={refineryMachineId}
+              world={baseWorldRef.current}
+              env={getBaseEnv()}
+              at={sceneRef.current?.debug.position() ?? { x: 0, z: 0 }}
+              onCraft={(machId, recipeId) => {
+                dispatchBase({
+                  t: 'craft',
+                  at: sceneRef.current?.debug.position() ?? { x: 0, z: 0 },
+                  machine: machId,
+                  recipe: recipeId,
+                });
+              }}
+              onCollect={(machId) => {
+                dispatchBase({
+                  t: 'collect',
+                  machine: machId,
+                });
+              }}
+              onClose={() => setRefineryMachineId(null)}
+            />
+          )}
           {toast ? <div key={toast.id} className={`play-toast${toast.text === 'Sync lost' ? ' lost' : ''}`} role="status"><b>{toast.text}</b>{toast.sub ? <span>{toast.sub}</span> : null}</div> : null}
         </>
       ) : null}

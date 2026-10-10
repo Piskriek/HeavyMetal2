@@ -231,16 +231,16 @@ try {
     const baseApi = window.__hm?.base ?? window.hmPlay?.base;
     if (!baseApi) return { ok: false, error: 'window.__hm.base / hmPlay.base not found' };
 
-    const at = { x: 2, z: 2 };
+    const at = { x: 12, z: 12 };
 
     // 1. Found foundation slab with STARTER kit
-    console.log('Action: Founding slab at (2, 2)...');
+    console.log('Action: Founding slab at (12, 12)...');
     baseApi.apply({
       t: 'found',
       at,
       blueprint: 'bp:starter',
-      cx: 2,
-      cz: 2,
+      cx: 12,
+      cz: 12,
       yaw: 0,
     });
 
@@ -262,6 +262,7 @@ try {
     if (w.base.pieces.length !== 2) {
       return { ok: false, error: `Expected 2 pieces after bench, got ${w.base.pieces.length}` };
     }
+    const benchId = w.base.pieces[1].id;
 
     // 3. Place floor piece attached to foundation (i: 1, j: 0)
     baseApi.apply({
@@ -341,6 +342,8 @@ try {
 
     return {
       ok: true,
+      structureId,
+      benchId,
       initialPieces: 4,
       remainingPieces: w.base.pieces.length,
       oreRefunded,
@@ -383,6 +386,251 @@ try {
   });
   console.log('OK: aimPoint verification passed:', aimVerdict);
   if (!aimVerdict.ok) throw new Error(aimVerdict.error);
+
+  // 7. Verify Anomaly Node Harvesting via Beam Tick (Part B)
+  console.log('\n--- VERIFYING ANOMALY NODE HARVESTING VIA BEAM TICK ---');
+  const harvestVerdict = await page.evaluate(async () => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    if (!baseApi) return { ok: false, error: 'baseApi not found' };
+    const w = baseApi.world();
+    if (!w.field || !w.field.nodes || w.field.nodes.length === 0) {
+      return { ok: false, error: 'No anomaly nodes found in world.field' };
+    }
+    const node0 = w.field.nodes[0];
+    const initialReserve = node0.reserve;
+    const countItems = (slots, prefix) => slots.reduce((acc, s) => acc + (s && s.item.startsWith(prefix) ? s.n : 0), 0);
+    const pxdBefore = countItems(w.player.slots, 'pxd');
+    const vtxBefore = countItems(w.player.slots, 'vtx');
+
+    // Teleport or position at node0 and send 1s beam tick
+    const at = { x: node0.x + 0.5, z: node0.z + 0.5 };
+    baseApi.apply({
+      t: 'tick',
+      at,
+      dt: 1.0,
+      beam: { node: node0.id, power: 1 },
+      power: {},
+    });
+
+    const wAfter = baseApi.world();
+    const node0After = wAfter.field.nodes.find((n) => n.id === node0.id);
+    const pxdAfter = countItems(wAfter.player.slots, 'pxd');
+    const vtxAfter = countItems(wAfter.player.slots, 'vtx');
+
+    if (!node0After || node0After.reserve >= initialReserve) {
+      return { ok: false, error: `Node reserve did not decrease (before: ${initialReserve}, after: ${node0After?.reserve})` };
+    }
+    const gained = (pxdAfter - pxdBefore) + (vtxAfter - vtxBefore);
+    if (gained <= 0) {
+      return { ok: false, error: `Player did not receive raw pxd/vtx harvest (gained ${gained})` };
+    }
+
+    // Set visual beam for screenshot
+    const scene = window.__playScene;
+    if (scene) {
+      const muzzle = scene.beamMuzzle();
+      const target = { x: node0.x, y: scene.heightAt(node0.x, node0.z) + 0.35, z: node0.z };
+      scene.setBeam(muzzle, target, 'extract', '#d9d9d9', true);
+    }
+
+    return {
+      ok: true,
+      nodeId: node0.id,
+      kind: node0.kind,
+      initialReserve,
+      afterReserve: node0After.reserve,
+      gained,
+    };
+  });
+  console.log('OK: Harvest verification verdict:', harvestVerdict);
+  if (!harvestVerdict.ok) throw new Error(harvestVerdict.error);
+
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: 'docs/shots/base/beam-harvesting.png' });
+  console.log('Captured docs/shots/base/beam-harvesting.png');
+
+  // Turn beam visual off after screenshot
+  await page.evaluate(() => {
+    window.__playScene?.setBeam(null, null, 'extract', '#ffffff', false);
+  });
+
+  // 8. Verify Heavy Machine Hardpoint, Install & Refinery Lifecycle (Part C)
+  console.log('\n--- VERIFYING HEAVY MACHINE INSTALL & REFINERY ---');
+  const machinePrepVerdict = await page.evaluate(async (ids) => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    if (!baseApi) return { ok: false, error: 'baseApi not found' };
+
+    const at = { x: 12, z: 12 };
+    const structureId = ids.structureId;
+
+    // 1. Draft chassis:basalt at the bench before removing it
+    baseApi.apply({
+      t: 'draft',
+      at,
+      primitive: 'chassis',
+      map: 'basalt',
+    });
+
+    // 2. Remove the bench so the 4 cells are clear for the hardpoint
+    baseApi.apply({
+      t: 'remove',
+      at,
+      id: ids.benchId,
+    });
+
+    // 3. Place remaining 3 foundations at (1, 0), (0, 1), (1, 1)
+    baseApi.apply({
+      t: 'place',
+      at,
+      blueprint: 'bp:starter',
+      piece: { s: structureId, kind: 'foundation', i: 1, j: 0, k: 0, r: 0 },
+    });
+    baseApi.apply({
+      t: 'place',
+      at,
+      blueprint: 'bp:starter',
+      piece: { s: structureId, kind: 'foundation', i: 0, j: 1, k: 0, r: 0 },
+    });
+    baseApi.apply({
+      t: 'place',
+      at,
+      blueprint: 'bp:starter',
+      piece: { s: structureId, kind: 'foundation', i: 1, j: 1, k: 0, r: 0 },
+    });
+
+    // 4. Place hardpoint pad using drafted bp:chassis:basalt
+    baseApi.apply({
+      t: 'place',
+      at,
+      blueprint: 'bp:chassis:basalt',
+      piece: { s: structureId, kind: 'hardpoint', i: 0, j: 0, k: 0, r: 0 },
+    });
+
+    const w = baseApi.world();
+    const hardpoint = w.base.pieces.find((p) => p.kind === 'hardpoint');
+    if (!hardpoint) {
+      return { ok: false, error: 'Failed to place hardpoint pad' };
+    }
+
+    // Open machine picker modal
+    baseApi.openMachinePicker(hardpoint.id);
+
+    return {
+      ok: true,
+      hardpointId: hardpoint.id,
+    };
+  }, { structureId: lifecycleResult.structureId, benchId: lifecycleResult.benchId });
+
+  console.log('OK: Machine preparation verdict:', machinePrepVerdict);
+  if (!machinePrepVerdict.ok) throw new Error(machinePrepVerdict.error);
+
+  // Wait for Machine Picker Modal
+  const machinePickerModal = page.locator('[data-testid="machine-picker-modal"]');
+  await machinePickerModal.waitFor({ state: 'visible', timeout: 5000 });
+  console.log('OK: Machine Picker modal is visible');
+
+  await page.screenshot({ path: 'docs/shots/base/machine-picker-modal.png' });
+  console.log('Captured docs/shots/base/machine-picker-modal.png');
+
+  // Click install heavy mill
+  const installMillBtn = page.locator('[data-testid="install-btn-mill"]');
+  await installMillBtn.waitFor({ state: 'visible', timeout: 5000 });
+  await installMillBtn.click();
+  await machinePickerModal.waitFor({ state: 'hidden', timeout: 5000 });
+  console.log('OK: Machine Picker closed after mill install');
+
+  // Verify heavy mill installed
+  const verifyInstallVerdict = await page.evaluate((hpId) => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    const w = baseApi.world();
+    const mach = w.machines.find((m) => m.id === hpId);
+    if (!mach || mach.kind !== 'mill') {
+      return { ok: false, error: `Machine not installed on hardpoint ${hpId}` };
+    }
+    // Open refinery window
+    baseApi.openRefinery(hpId);
+    return { ok: true, machineKind: mach.kind };
+  }, machinePrepVerdict.hardpointId);
+
+  console.log('OK: Heavy mill install verified:', verifyInstallVerdict);
+  if (!verifyInstallVerdict.ok) throw new Error(verifyInstallVerdict.error);
+
+  // Wait for Refinery Modal
+  const refineryModal = page.locator('[data-testid="refinery-modal"]');
+  await refineryModal.waitFor({ state: 'visible', timeout: 5000 });
+  console.log('OK: Refinery Modal is visible');
+
+  await page.screenshot({ path: 'docs/shots/base/refinery-modal.png' });
+  console.log('Captured docs/shots/base/refinery-modal.png');
+
+  // Queue 'map-basalt' recipe via button
+  const queueMapBtn = page.locator('[data-testid="queue-btn-map-basalt"]');
+  await queueMapBtn.waitFor({ state: 'visible', timeout: 5000 });
+  await queueMapBtn.click();
+  await page.waitForTimeout(300);
+
+  // Step 40 seconds at full power (1.0)
+  const refineStepVerdict = await page.evaluate(async (hpId) => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    const at = { x: 12, z: 12 };
+
+    let w = baseApi.world();
+    let mach = w.machines.find((m) => m.id === hpId);
+    if (!mach || mach.jobs.length === 0) {
+      return { ok: false, error: 'Job was not queued in heavy mill' };
+    }
+
+    // Step 40 seconds at power 1 (recipe takes 30s)
+    baseApi.apply({
+      t: 'tick',
+      at,
+      dt: 40,
+      beam: null,
+      power: { [hpId]: 1 },
+    });
+
+    w = baseApi.world();
+    mach = w.machines.find((m) => m.id === hpId);
+    if (!mach || mach.out.length === 0 || mach.out[0].item !== 'map-basalt') {
+      return { ok: false, error: `Expected finished map-basalt in out hopper, got: ${JSON.stringify(mach?.out)}` };
+    }
+
+    return { ok: true, outputStack: mach.out[0] };
+  }, machinePrepVerdict.hardpointId);
+
+  console.log('OK: Refinery step verdict:', refineStepVerdict);
+  if (!refineStepVerdict.ok) throw new Error(refineStepVerdict.error);
+
+  // Collect output via modal button
+  const collectBtn = page.locator('[data-testid="refinery-collect-btn"]');
+  await collectBtn.waitFor({ state: 'visible', timeout: 5000 });
+  await collectBtn.click();
+  await page.waitForTimeout(300);
+
+  // Verify map-basalt collected into inventory
+  const verifyCollectVerdict = await page.evaluate((hpId) => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    const w = baseApi.world();
+    const countItems = (slots, item) => slots.reduce((acc, s) => acc + (s && s.item === item ? s.n : 0), 0);
+    const maps = countItems(w.player.slots, 'map-basalt');
+    const mach = w.machines.find((m) => m.id === hpId);
+    if ((mach?.out?.length ?? 0) !== 0) {
+      return { ok: false, error: 'Output hopper not emptied after collect' };
+    }
+    return { ok: true, playerBasaltMaps: maps };
+  }, machinePrepVerdict.hardpointId);
+
+  console.log('OK: Output collect verified:', verifyCollectVerdict);
+  if (!verifyCollectVerdict.ok) throw new Error(verifyCollectVerdict.error);
+
+  // Close refinery modal
+  const refineryCloseBtn = page.locator('[data-testid="refinery-close-btn"]');
+  if (await refineryCloseBtn.isVisible()) {
+    await refineryCloseBtn.click();
+  } else {
+    await page.keyboard.press('Escape');
+  }
+  await refineryModal.waitFor({ state: 'hidden', timeout: 5000 });
 
   console.log('\nALL FIDELITY BASE-BUILDING HUD, REAL WORLD & LIFECYCLE CHECKS PASSED!');
 } catch (err) {

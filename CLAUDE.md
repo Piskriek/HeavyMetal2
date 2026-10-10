@@ -62,7 +62,10 @@
 3. **NO FEATURE CREEP / OBEY OWNER ASKS**:
    - Check features against verbatim owner words in [`docs/OWNER_ASKS.md`](file:///c:/MarbleGp/docs/OWNER_ASKS.md).
    - No unrequested chimneys or floating abstract objects. Machines must be grounded and spew colorful pixel plumes while operating.
-4. **SAVE REASONING FOR ARCHITECTURE & INTEGRATION**:
+4. **RESEARCH BEFORE YOU DESIGN (SOP, owner 2026-10-10)**:
+   - Before designing any feature, system, piece list, rule set or UI, research it first: how the closest comparable games do it; what players praise and complain about (Steam threads, feature-request boards, and popular mods, which show unmet needs); and the newest releases and techniques. *"These days there is always a new innovation and we are pushing the frontier."*
+   - Write the findings with sources as a research doc (pattern: [`docs/BASE_BUILDING_RESEARCH.md`](docs/BASE_BUILDING_RESEARCH.md)), then brief Arena, the art agent or the sidecar. Anything beyond the owner's words is a proposal for the owner.
+5. **SAVE REASONING FOR ARCHITECTURE & INTEGRATION**:
    - Delegate heavy self-contained modules to Arena AI battles; save Claude reasoning tokens for high-level architecture, glue, and review.
 
 ---

@@ -121,6 +121,21 @@ export function createWorld(seed = 1): BaseWorld {
   };
 }
 
+/** The lab bridge's own store: one bin's worth of linked storage at the gate, on the network from the first minute. */
+export const BRIDGE_STORE = -2;
+
+/**
+ * The world with the bridge store standing at the gate, holding `stock` (what does not fit is dropped). Applied once to a new
+ * world before its log, like createWorld, so a replay starts from `withBridgeStore(createWorld(seed), env, stock)`. A world that
+ * already has the store is returned unchanged.
+ */
+export function withBridgeStore(w: BaseWorld, env: WorldEnv, stock: readonly L.Stack[] = []): BaseWorld {
+  if (w.boxes.some((b) => b.id === BRIDGE_STORE)) return w;
+  const at = { x: env.bridge.x, z: env.bridge.z };
+  const s = L.store([L.box(BRIDGE_STORE, at.x, at.z, BIN_SLOTS, BIN_KG)], [BRIDGE_STORE], at, ITEMS, stock);
+  return { ...w, boxes: [...s.boxes, ...w.boxes] };
+}
+
 /** The deterministic id of a world state (stable key order). */
 export const hashWorld = (w: BaseWorld): string => hashValue(w);
 

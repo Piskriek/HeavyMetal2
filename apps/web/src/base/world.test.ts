@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as L from '@hm/lattice';
 import { ITEMS, STARTER } from './catalog';
-import { apply, createWorld, hashWorld, networkAt, preview, replay, type BaseCommand, type BaseWorld, type WorldEnv } from './world';
+import { BRIDGE_STORE, apply, createWorld, hashWorld, networkAt, preview, replay, withBridgeStore, type BaseCommand, type BaseWorld, type WorldEnv } from './world';
 
 const env: WorldEnv = { heightAt: () => 0, bridge: { x: 0, z: 0, range: 60 } };
 const at = { x: 2, z: 2 };
@@ -171,4 +171,13 @@ test('the beam harvests nodes in reach; a heavy mill on a hardpoint refines at i
   const got = run(done.world, { t: 'collect', machine: pad });
   assert.equal(L.count(got.player, 'map-basalt'), maps + 2);
   assert.deepEqual(apply(got, env, { t: 'remove', at, id: pad }).events, [{ type: 'refused', cmd: 'remove', why: 'has-machine' }]);
+});
+
+test('the bridge store stands at the gate on the network, and building pulls from it with an empty pack', () => {
+  const w0 = withBridgeStore(createWorld(), env, [{ item: 'ore', n: 50 }]);
+  assert.equal(withBridgeStore(w0, env, [{ item: 'ore', n: 50 }]), w0);
+  assert.deepEqual(networkAt(w0, env, at), [BRIDGE_STORE]);
+  const w1 = run(w0, found);
+  assert.equal(L.count(w1.player, 'ore'), 0);
+  assert.equal(L.totals(w1.boxes, [BRIDGE_STORE])['ore'] ?? 0, 30);
 });

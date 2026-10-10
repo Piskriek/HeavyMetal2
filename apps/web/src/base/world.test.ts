@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as L from '@hm/lattice';
 import { ITEMS, STARTER } from './catalog';
-import { apply, createWorld, hashWorld, networkAt, replay, type BaseCommand, type BaseWorld, type WorldEnv } from './world';
+import { apply, createWorld, hashWorld, networkAt, preview, replay, type BaseCommand, type BaseWorld, type WorldEnv } from './world';
 
 const env: WorldEnv = { heightAt: () => 0, bridge: { x: 0, z: 0, range: 60 } };
 const at = { x: 2, z: 2 };
@@ -114,4 +114,22 @@ test('a command log replays to the same hash', () => {
   assert.equal(hashWorld(a.world), hashWorld(b.world));
   assert.notEqual(hashWorld(a.world), hashWorld(start));
   assert.equal(a.world.hotbar, 3);
+});
+
+test('airlock doors open and close; the ghost preview says where and whether you can pay', () => {
+  let w = run(give(createWorld(), 'ore', 120), found);
+  const s = w.base.structures[0]!.id;
+  w = run(give(give(w, 'prim-chassis', 1), 'map-basalt', 2), { t: 'place', at, blueprint: STARTER, piece: piece('bench', 0, 0, s) }, { t: 'draft', at, primitive: 'chassis', map: 'basalt' });
+  w = run(w, { t: 'place', at, blueprint: 'bp:chassis:basalt', piece: { s, kind: 'airlock', i: 0, j: 0, k: 0, r: 0 } });
+  const lock = w.base.pieces.find((p) => p.kind === 'airlock')!.id;
+  const open = apply(w, env, { t: 'door', id: lock, open: true });
+  assert.deepEqual(open.events, [{ type: 'door', id: lock, open: true }]);
+  assert.equal(open.world.base.pieces.find((p) => p.id === lock)!.open, true);
+  assert.equal(apply(w, env, { t: 'door', id: w.base.pieces[0]!.id, open: true }).events[0]!.type, 'refused');
+  const ghost = preview(w, env, at, STARTER, 'floor', { x: 6, y: 0, z: 2, yaw: 0 });
+  assert.ok(ghost.snap && ghost.snap.mode === 'place' && ghost.snap.ok);
+  assert.deepEqual(ghost.short, []);
+  const broke = preview({ ...w, player: { ...w.player, slots: w.player.slots.map((q) => (q?.item === 'ore' ? null : q)) } }, env, at, STARTER, 'floor', { x: 6, y: 0, z: 2, yaw: 0 });
+  assert.deepEqual(broke.short, [{ item: 'ore', n: 10 }]);
+  assert.equal(preview(w, env, at, STARTER, 'bin', { x: 6, y: 0, z: 2, yaw: 0 }).snap, null);
 });

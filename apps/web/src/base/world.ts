@@ -53,6 +53,7 @@ export type BaseCommand =
   | { readonly t: 'found'; readonly at: Point; readonly blueprint: string; readonly cx: number; readonly cz: number; readonly yaw: number }
   | { readonly t: 'place'; readonly at: Point; readonly blueprint: string; readonly piece: PieceSpec }
   | { readonly t: 'remove'; readonly at: Point; readonly id: number }
+  | { readonly t: 'door'; readonly id: number; readonly open: boolean }
   | { readonly t: 'move'; readonly at: Point; readonly from: SlotRef; readonly to: SlotRef; readonly n: number }
   | { readonly t: 'quickStack'; readonly at: Point }
   | { readonly t: 'draft'; readonly at: Point; readonly primitive: string; readonly map: string }
@@ -65,7 +66,8 @@ export type BaseEvent =
   | { readonly type: 'drafted'; readonly blueprint: string }
   | { readonly type: 'moved'; readonly n: number }
   | { readonly type: 'stacked'; readonly n: number }
-  | { readonly type: 'hotbar'; readonly index: number };
+  | { readonly type: 'hotbar'; readonly index: number }
+  | { readonly type: 'door'; readonly id: number; readonly open: boolean };
 
 export interface Applied { readonly world: BaseWorld; readonly events: readonly BaseEvent[] }
 
@@ -155,6 +157,11 @@ export function apply(w: BaseWorld, env: WorldEnv, cmd: BaseCommand): Applied {
       return build(w, env, cmd);
     case 'remove':
       return takeDown(w, env, cmd.at, cmd.id);
+    case 'door': {
+      const base = S.setOpen(w.base, cmd.id, cmd.open);
+      if (base === w.base) return refuse(w, cmd.t, 'not-a-door');
+      return next(w, { base }, [{ type: 'door', id: cmd.id, open: cmd.open }]);
+    }
     case 'move':
       return move(w, env, cmd);
     case 'quickStack':
@@ -316,4 +323,16 @@ function draft(w: BaseWorld, env: WorldEnv, cmd: Extract<BaseCommand, { t: 'draf
   const d = L.deposit(paid.patch.player, ITEMS, id, 1);
   if (d.left > 0) return refuse(w, 'draft', 'no-room');
   return next(w, { player: d.box, boxes: paid.patch.boxes }, [{ type: 'drafted', blueprint: id }]);
+}
+
+/**
+ * What the build ghost shows for a blueprint piece aimed at `aim`: where it snaps (or a new structure for a foundation),
+ * whether the rules allow it, and whether the player can pay for it right now (D9). The HUD's verdict reads this.
+ */
+export function preview(w: BaseWorld, env: WorldEnv, at: Point, bpId: string, kind: S.Kind, aim: Point & { readonly y: number; readonly yaw: number }): { readonly snap: S.Snap | null; readonly cost: readonly L.Stack[]; readonly short: readonly L.Stack[] } {
+  const bp = blueprint(bpId), bill = bp ? pieceCost(bp, kind) : null;
+  if (!bp || !bill) return { snap: null, cost: [], short: [] };
+  const snap = S.snap(w.base, structureEnv(env), kind, aim, bp.mat);
+  const paid = pay(w, env, at, bill);
+  return { snap, cost: bill, short: paid.ok ? [] : paid.short };
 }

@@ -10,11 +10,11 @@
 import * as L from '@hm/lattice';
 import * as S from '@hm/structure';
 import * as F from '@hm/substrate';
-import { FIELD_RADIUS, HEAVY, ITEMS, QUEUE_MAX, RECIPE_BY_ID, type HeavyKind } from './catalog';
+import { FIELD_RADIUS, FORGE_BY_ID, HEAVY, ITEMS, PART_SLOTS, QUEUE_MAX, RECIPE_BY_ID, VEHICLE, VEHICLES, type PartSlot, type StationKind, type VehicleKind } from './catalog';
 import { EQUIP_SLOTS, type EquipSlot } from './view';
 import {
   BIN_KG, BIN_SLOTS, BRIDGE_STORE, MAX_LAYOUTS, MAX_PLANS, PLAYER, PLAYER_KG, PLAYER_SLOTS,
-  createWorld, layoutPieces, pieceAt, type BaseWorld, type Job, type Layout, type Machine, type Plan,
+  NO_LOADOUT, createWorld, layoutPieces, pieceAt, vehicleBox, type BaseWorld, type Job, type Layout, type Machine, type Plan, type Vehicle,
 } from './world';
 
 /** The storage key for the base save (next to quest.ts's SAVE_KEY). */
@@ -58,8 +58,8 @@ function field(v: unknown, fresh: F.Field, stage: number): F.Field {
 
 function machine(v: unknown, pads: ReadonlySet<number>): Machine | null {
   if (!isRec(v)) return null;
-  const id = int(v['id'], 0, Number.MAX_SAFE_INTEGER), kind = v['kind'] as HeavyKind;
-  if (id === null || !pads.has(id) || !(HEAVY as readonly string[]).includes(kind)) return null;
+  const id = int(v['id'], 0, Number.MAX_SAFE_INTEGER), kind = v['kind'] as StationKind;
+  if (id === null || !pads.has(id) || (!(HEAVY as readonly string[]).includes(kind) && kind !== 'fabricator')) return null;
   const jobs: Job[] = [];
   for (const j of Array.isArray(v['jobs']) ? v['jobs'].slice(0, QUEUE_MAX) : []) {
     const r = isRec(j) && typeof j['recipe'] === 'string' ? RECIPE_BY_ID[j['recipe']] : undefined, done = isRec(j) ? num(j['done']) : null;
@@ -74,7 +74,8 @@ export function loadWorld(text: string | null, seed = 1): BaseWorld {
   const fresh = createWorld(seed);
   let raw: unknown;
   try { raw = text ? JSON.parse(text) : null; } catch { return fresh; }
-  if (!isRec(raw) || raw['v'] !== 3) return fresh;
+  // v3 saves (before vehicles and the weapon loadout) load with none of either
+  if (!isRec(raw) || (raw['v'] !== 3 && raw['v'] !== 4)) return fresh;
   const base = typeof raw['base'] === 'string' ? S.decode(raw['base']) : null;
   if (!base) return fresh;
 
@@ -82,14 +83,24 @@ export function loadWorld(text: string | null, seed = 1): BaseWorld {
   const bins = new Map(base.pieces.filter((p) => p.kind === 'bin').map((p) => [p.id, p] as const));
   const pads = new Set(base.pieces.filter((p) => p.kind === 'hardpoint').map((p) => p.id));
 
-  // boxes: the bridge store and one per bin piece, each kept once; a bin without its box gets an empty one
+  // vehicles: a known kind, a finite pose, unique ids; a hauler's box id is its vehicle's
+  const vehicles: Vehicle[] = [];
+  for (const v of Array.isArray(raw['vehicles']) ? raw['vehicles'].slice(0, 64) : []) {
+    if (!isRec(v)) continue;
+    const id = int(v['id'], 1, 1_000_000), kind = v['kind'] as VehicleKind, x = num(v['x']), z = num(v['z']), yaw = num(v['yaw']);
+    if (id === null || !(VEHICLES as readonly string[]).includes(kind) || x === null || z === null || yaw === null || vehicles.some((o) => o.id === id)) continue;
+    vehicles.push({ id, kind, x, z, yaw, box: VEHICLE[kind].cargo ? vehicleBox(id) : null });
+  }
+  const vehicleBoxes = new Set(vehicles.flatMap((v) => (v.box === null ? [] : [v.box])));
+  // boxes: the bridge store, one per bin piece and one per hauler, each kept once; a missing one comes back empty
   const boxes: L.Box[] = [];
   for (const b of Array.isArray(raw['boxes']) ? raw['boxes'] : []) {
     if (!isRec(b)) continue;
     const id = int(b['id'], -2, Number.MAX_SAFE_INTEGER), x = num(b['x']), z = num(b['z']);
-    if (id === null || x === null || z === null || boxes.some((o) => o.id === id) || (id !== BRIDGE_STORE && !bins.has(id))) continue;
+    if (id === null || x === null || z === null || boxes.some((o) => o.id === id) || (id !== BRIDGE_STORE && !bins.has(id) && !vehicleBoxes.has(id))) continue;
     boxes.push({ id, x, z, slots: slots(b['slots'], BIN_SLOTS), maxKg: BIN_KG });
   }
+  for (const v of vehicles) if (v.box !== null && !boxes.some((b) => b.id === v.box)) boxes.push(L.box(v.box, v.x, v.z, BIN_SLOTS, BIN_KG));
   for (const [id, p] of bins) {
     const at = pieceAt(base, p);
     if (at && !boxes.some((b) => b.id === id)) boxes.push(L.box(id, at.x, at.z, BIN_SLOTS, BIN_KG));
@@ -127,7 +138,7 @@ export function loadWorld(text: string | null, seed = 1): BaseWorld {
   }
 
   return {
-    v: 3,
+    v: 4,
     tick: int(raw['tick'], 0, Number.MAX_SAFE_INTEGER) ?? 0,
     base,
     boxes,
@@ -140,5 +151,16 @@ export function loadWorld(text: string | null, seed = 1): BaseWorld {
     layouts,
     plans,
     shelter: raw['shelter'] === true,
+    vehicles,
+    nextVehicle: Math.max(int(raw['nextVehicle'], 1, 1_000_000) ?? 1, ...vehicles.map((v) => v.id + 1)),
+    loadout: loadout(raw['loadout']),
   };
+}
+
+/** The weapon's fitted parts: each slot empty or a part made for that slot. */
+function loadout(v: unknown): Record<PartSlot, string | null> {
+  const out: Record<PartSlot, string | null> = { ...NO_LOADOUT };
+  if (!isRec(v)) return out;
+  for (const slot of PART_SLOTS) { const id = v[slot]; if (typeof id === 'string' && FORGE_BY_ID[id]?.slot === slot) out[slot] = id; }
+  return out;
 }

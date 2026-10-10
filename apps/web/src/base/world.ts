@@ -14,7 +14,7 @@ import { hashValue } from '@hm/kernel';
 import * as L from '@hm/lattice';
 import * as S from '@hm/structure';
 import * as F from '@hm/substrate';
-import { DRAFT_ORE, EQUIP, FIELD_RADIUS, HEAVY, HEAVY_BILL, ITEMS, MAPS, MATERIALS, PIECE_EXTRA, PIECE_ORE, PRIMITIVES, QUEUE_MAX, RECIPE_BY_ID, STARTER, blueprint, blueprintId, pieceCost, type Blueprint, type HeavyKind, type MapId, type PrimitiveId } from './catalog';
+import { DRAFT_ORE, EQUIP, FIELD_RADIUS, HEAVY, HEAVY_BILL, ITEMS, MAPS, MATERIALS, PIECE_EXTRA, PIECE_ORE, PRIMITIVES, QUEUE_MAX, RECIPE_BY_ID, STARTER, blueprint, blueprintId, pieceCost, FABRICATOR_BILL, FORGE_BY_ID, PART_SLOTS, VEHICLE, type Blueprint, type MapId, type PartSlot, type PrimitiveId, type StationKind, type VehicleKind } from './catalog';
 import { EQUIP_SLOTS, type EquipSlot, type SlotRef } from './view';
 
 export const PLAYER = -1;
@@ -34,7 +34,7 @@ export const BEAM_RANGE = 12;
 export interface Point { readonly x: number; readonly z: number }
 
 export interface BaseWorld {
-  readonly v: 3;
+  readonly v: 4;
   /** Commands applied so far: the position in the command log. */
   readonly tick: number;
   readonly base: S.Base;
@@ -56,7 +56,18 @@ export interface BaseWorld {
   readonly plans: readonly Plan[];
   /** Whether the free starter shelter (D15) has been placed. */
   readonly shelter: boolean;
+  /** Vehicles printed at a fabricator, parked where they were last left. */
+  readonly vehicles: readonly Vehicle[];
+  readonly nextVehicle: number;
+  /** The parts fitted to the weapon frame (the frame itself sits in the sidearm slot), by slot; null = empty. */
+  readonly loadout: Readonly<Record<PartSlot, string | null>>;
 }
+
+/** A printed vehicle: its pose, and for a hauler the id of its storage box on the linked network. */
+export interface Vehicle { readonly id: number; readonly kind: VehicleKind; readonly x: number; readonly z: number; readonly yaw: number; readonly box: number | null }
+/** A vehicle's storage box id: below every piece, bin and the bridge store's. */
+export const vehicleBox = (vehicleId: number): number => -100 - vehicleId;
+export const NO_LOADOUT: Readonly<Record<PartSlot, string | null>> = { core: null, barrel: null, sight: null, cell: null };
 
 /** A saved structure: the @hm/structure codec of one structure at the origin, its first foundation at cell (0, 0) first. */
 export interface Layout { readonly id: string; readonly name: string; readonly code: string }
@@ -69,7 +80,7 @@ export interface Plan { readonly id: number; readonly layout: string; readonly c
 export interface Job { readonly recipe: string; readonly done: number }
 export interface Machine {
   readonly id: number;
-  readonly kind: HeavyKind;
+  readonly kind: StationKind;
   /** The running job first, then the waiting ones. */
   readonly jobs: readonly Job[];
   /** Finished output the network had no room for; the player collects it. */
@@ -96,7 +107,7 @@ export type BaseCommand =
   /** One frame (logged, so replays match): the field regrows, the beam harvests, machines work at their power share (0..1, from plotsim). */
   | { readonly t: 'tick'; readonly at: Point; readonly dt: number; readonly beam: { readonly node: number; readonly power: number } | null; readonly power: Readonly<Record<number, number>> }
   | { readonly t: 'stage'; readonly stage: number }
-  | { readonly t: 'install'; readonly at: Point; readonly hardpoint: number; readonly kind: HeavyKind }
+  | { readonly t: 'install'; readonly at: Point; readonly hardpoint: number; readonly kind: StationKind }
   | { readonly t: 'craft'; readonly at: Point; readonly machine: number; readonly recipe: string }
   | { readonly t: 'collect'; readonly machine: number }
   /** Saves one of the player's structures as a layout, at a Drafting Table (D13). */
@@ -109,7 +120,13 @@ export type BaseCommand =
   | { readonly t: 'fill'; readonly at: Point; readonly plan: number }
   | { readonly t: 'dropPlan'; readonly plan: number }
   /** Places the free starter shelter (D15), once per world. */
-  | { readonly t: 'shelter'; readonly cx: number; readonly cz: number; readonly yaw: number };
+  | { readonly t: 'shelter'; readonly cx: number; readonly cz: number; readonly yaw: number }
+  /** Leaves a vehicle where the player parked it (logged, so a replay parks it there too). */
+  | { readonly t: 'park'; readonly vehicle: number; readonly x: number; readonly z: number; readonly yaw: number }
+  /** Crafts a weapon frame or part at a Weapon Bench within reach. */
+  | { readonly t: 'forge'; readonly at: Point; readonly item: string }
+  /** Fits a part from the pack into its slot (the part there goes back to the pack), or empties a slot (item null). */
+  | { readonly t: 'fit'; readonly slot: PartSlot; readonly item: string | null };
 
 export type BaseEvent =
   | { readonly type: 'refused'; readonly cmd: BaseCommand['t']; readonly why: string; readonly short?: readonly L.Stack[] }
@@ -122,7 +139,7 @@ export type BaseEvent =
   | { readonly type: 'door'; readonly id: number; readonly open: boolean }
   | { readonly type: 'harvested'; readonly items: readonly L.Stack[]; readonly lost: readonly L.Stack[] }
   | { readonly type: 'finished'; readonly machine: number; readonly item: string; readonly n: number }
-  | { readonly type: 'installed'; readonly machine: number; readonly kind: HeavyKind }
+  | { readonly type: 'installed'; readonly machine: number; readonly kind: StationKind }
   | { readonly type: 'queued'; readonly machine: number; readonly recipe: string }
   | { readonly type: 'collected'; readonly machine: number; readonly n: number }
   | { readonly type: 'stage'; readonly stage: number }
@@ -131,7 +148,11 @@ export type BaseEvent =
   /** A fill: the pieces it built, how many are still to build, and how many of those the rules refused this time. */
   | { readonly type: 'filled'; readonly plan: number; readonly built: readonly number[]; readonly left: number; readonly blocked: number }
   | { readonly type: 'dropped'; readonly plan: number }
-  | { readonly type: 'shelter'; readonly structure: number };
+  | { readonly type: 'shelter'; readonly structure: number }
+  | { readonly type: 'printed'; readonly machine: number; readonly vehicle: number; readonly kind: VehicleKind }
+  | { readonly type: 'parked'; readonly vehicle: number }
+  | { readonly type: 'forged'; readonly item: string }
+  | { readonly type: 'fitted'; readonly slot: PartSlot; readonly item: string | null };
 
 export interface Applied { readonly world: BaseWorld; readonly events: readonly BaseEvent[] }
 
@@ -142,7 +163,7 @@ export function createWorld(seed = 1): BaseWorld {
   const slots: (L.Stack | null)[] = Array.from({ length: PLAYER_SLOTS }, () => null);
   slots[0] = { item: STARTER, n: 1 };
   return {
-    v: 3, tick: 0, base: S.empty(), boxes: [], layouts: [], plans: [], shelter: false,
+    v: 4, tick: 0, base: S.empty(), boxes: [], layouts: [], plans: [], shelter: false, vehicles: [], nextVehicle: 1, loadout: NO_LOADOUT,
     player: { id: PLAYER, x: 0, z: 0, slots, maxKg: PLAYER_KG },
     equipment: { ...NO_EQUIPMENT, beam: { item: 'tool-beam', n: 1 }, visor: { item: 'eq-visor', n: 1 } },
     hotbar: 0,
@@ -302,6 +323,12 @@ export function apply(w: BaseWorld, env: WorldEnv, cmd: BaseCommand): Applied {
       return next(w, { plans: w.plans.filter((p) => p.id !== cmd.plan) }, [{ type: 'dropped', plan: cmd.plan }]);
     case 'shelter':
       return shelter(w, env, cmd);
+    case 'park':
+      return park(w, cmd);
+    case 'forge':
+      return forge(w, env, cmd);
+    case 'fit':
+      return fit(w, cmd);
   }
 }
 
@@ -507,15 +534,27 @@ function tick(w: BaseWorld, env: WorldEnv, cmd: Extract<BaseCommand, { t: 'tick'
     ({ player, boxes } = split(w, s.boxes));
     events.push({ type: 'harvested', items: f.items, lost: s.left });
   }
+  let vehicles = w.vehicles, nextVehicle = w.nextVehicle;
   const machines = w.machines.map((m) => {
     if (m.jobs.length === 0) return m;
-    const share = Math.max(0, Math.min(1, cmd.power[m.id] ?? 0));
+    // terraformers get their share from the plot's power grid; the fabricator runs while a relay reaches it
+    const share = m.kind === 'fabricator' ? (reached(w, env, m.id) ? 1 : 0) : Math.max(0, Math.min(1, cmd.power[m.id] ?? 0));
     const r = runQueue(m.jobs, cmd.dt * share);
     if (r.finished.length === 0) return { ...m, jobs: r.jobs };
     let out = m.out.slice();
     const at = machineAt(w, m.id);
     for (const rid of r.finished) {
       const o = RECIPE_BY_ID[rid]!.output;
+      if (o.item.startsWith('vehicle:')) {
+        // a printed vehicle rolls off the bed, parked on the pad, facing along the structure
+        const kind = o.item.slice('vehicle:'.length) as VehicleKind, id = nextVehicle++, p = at ?? cmd.at;
+        const pad = w.base.pieces.find((q) => q.id === m.id), st = pad ? w.base.structures.find((x) => x.id === pad.s) : undefined;
+        const box = VEHICLE[kind].cargo ? vehicleBox(id) : null;
+        vehicles = [...vehicles, { id, kind, x: p.x, z: p.z, yaw: st?.yaw ?? 0, box }];
+        if (box !== null) boxes = [...boxes, L.box(box, p.x, p.z, BIN_SLOTS, BIN_KG)];
+        events.push({ type: 'printed', machine: m.id, vehicle: id, kind });
+        continue;
+      }
       events.push({ type: 'finished', machine: m.id, item: o.item, n: o.n });
       // finished parts go straight into the machine's network; what does not fit waits in the machine
       const net = at ? networkAt({ ...w, boxes }, env, at) : [];
@@ -528,15 +567,15 @@ function tick(w: BaseWorld, env: WorldEnv, cmd: Extract<BaseCommand, { t: 'tick'
     }
     return { ...m, jobs: r.jobs, out };
   });
-  return next(w, { field: f.field, player, boxes, machines }, events);
+  return next(w, { field: f.field, player, boxes, machines, vehicles, nextVehicle }, events);
 }
 
 function install(w: BaseWorld, env: WorldEnv, cmd: Extract<BaseCommand, { t: 'install' }>): Applied {
-  if (!(HEAVY as readonly string[]).includes(cmd.kind)) return refuse(w, 'install', 'bad-kind');
+  if (!(HEAVY as readonly string[]).includes(cmd.kind) && cmd.kind !== 'fabricator') return refuse(w, 'install', 'bad-kind');
   const pad = w.base.pieces.find((p) => p.id === cmd.hardpoint);
   if (!pad || pad.kind !== 'hardpoint') return refuse(w, 'install', 'no-hardpoint');
   if (w.machines.some((m) => m.id === pad.id)) return refuse(w, 'install', 'occupied');
-  const paid = pay(w, env, cmd.at, HEAVY_BILL[cmd.kind]);
+  const paid = pay(w, env, cmd.at, cmd.kind === 'fabricator' ? FABRICATOR_BILL : HEAVY_BILL[cmd.kind]);
   if (!paid.ok) return refuse(w, 'install', 'short', paid.short);
   return next(w, { ...paid.patch, machines: [...w.machines, { id: pad.id, kind: cmd.kind, jobs: [], out: [] }] }, [{ type: 'installed', machine: pad.id, kind: cmd.kind }]);
 }
@@ -545,6 +584,7 @@ function craft(w: BaseWorld, env: WorldEnv, cmd: Extract<BaseCommand, { t: 'craf
   const m = w.machines.find((x) => x.id === cmd.machine), r = RECIPE_BY_ID[cmd.recipe];
   if (!m) return refuse(w, 'craft', 'no-machine');
   if (!r || r.machine !== m.kind) return refuse(w, 'craft', 'bad-recipe');
+  if ((r.stage ?? 0) > w.stage) return refuse(w, 'craft', 'locked');
   if (m.jobs.length >= QUEUE_MAX) return refuse(w, 'craft', 'queue-full');
   const paid = pay(w, env, cmd.at, r.inputs);
   if (!paid.ok) return refuse(w, 'craft', 'short', paid.short);
@@ -745,4 +785,52 @@ function shelter(w: BaseWorld, env: WorldEnv, cmd: Extract<BaseCommand, { t: 'sh
     base = r.base;
   }
   return next(w, { base, shelter: true }, [{ type: 'shelter', structure: s }]);
+}
+
+// ---------------------------------------------------------------------------------------------- fabrication (owner, 2026-10-10)
+/** Whether a relay (the lab bridge or a repeater) reaches a station: power and data run on the same network. */
+function reached(w: BaseWorld, env: WorldEnv, stationId: number): boolean {
+  const at = machineAt(w, stationId);
+  return !!at && relays(w, env).some((r) => Math.hypot(r.x - at.x, r.z - at.z) <= r.range);
+}
+
+function park(w: BaseWorld, cmd: Extract<BaseCommand, { t: 'park' }>): Applied {
+  const v = w.vehicles.find((x) => x.id === cmd.vehicle);
+  if (!v) return refuse(w, cmd.t, 'no-vehicle');
+  if (![cmd.x, cmd.z, cmd.yaw].every(Number.isFinite)) return refuse(w, cmd.t, 'bad-pose');
+  const vehicles = w.vehicles.map((x) => (x.id === v.id ? { ...x, x: cmd.x, z: cmd.z, yaw: cmd.yaw } : x));
+  // a hauler's bin goes where the hauler goes, so the network finds it there
+  const boxes = v.box === null ? w.boxes : w.boxes.map((b) => (b.id === v.box ? { ...b, x: cmd.x, z: cmd.z } : b));
+  return next(w, { vehicles, boxes }, [{ type: 'parked', vehicle: v.id }]);
+}
+
+function forge(w: BaseWorld, env: WorldEnv, cmd: Extract<BaseCommand, { t: 'forge' }>): Applied {
+  const spec = FORGE_BY_ID[cmd.item];
+  if (!spec) return refuse(w, cmd.t, 'bad-recipe');
+  if (spec.stage > w.stage) return refuse(w, cmd.t, 'locked');
+  const bench = w.base.pieces.some((p) => { if (p.kind !== 'weaponBench') return false; const q = pieceAt(w.base, p); return !!q && Math.hypot(q.x - cmd.at.x, q.z - cmd.at.z) <= BENCH_REACH; });
+  if (!bench) return refuse(w, cmd.t, 'no-bench');
+  const paid = pay(w, env, cmd.at, spec.bill);
+  if (!paid.ok) return refuse(w, cmd.t, 'short', paid.short);
+  const d = L.deposit(paid.patch.player, ITEMS, spec.id, 1);
+  if (d.left > 0) return refuse(w, cmd.t, 'no-room');
+  return next(w, { player: d.box, boxes: paid.patch.boxes }, [{ type: 'forged', item: spec.id }]);
+}
+
+function fit(w: BaseWorld, cmd: Extract<BaseCommand, { t: 'fit' }>): Applied {
+  if (!(PART_SLOTS as readonly string[]).includes(cmd.slot)) return refuse(w, cmd.t, 'bad-slot');
+  const old = w.loadout[cmd.slot];
+  let player = w.player;
+  if (cmd.item !== null) {
+    const spec = FORGE_BY_ID[cmd.item];
+    if (!spec || spec.slot !== cmd.slot) return refuse(w, cmd.t, 'wrong-slot');
+    if (L.count(player, cmd.item) < 1) return refuse(w, cmd.t, 'not-carried');
+    player = L.withdraw(player, cmd.item, 1).box;
+  }
+  if (old !== null) {
+    const d = L.deposit(player, ITEMS, old, 1);
+    if (d.left > 0) return refuse(w, cmd.t, 'no-room');
+    player = d.box;
+  }
+  return next(w, { player, loadout: { ...w.loadout, [cmd.slot]: cmd.item } }, [{ type: 'fitted', slot: cmd.slot, item: cmd.item }]);
 }

@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import * as L from '@hm/lattice';
 import { ITEMS, STARTER } from './catalog';
 import * as S from '@hm/structure';
+import { loadWorld, saveWorld } from './save';
+import { weaponStats } from './weapons';
 import { BRIDGE_STORE, SHELTER, apply, createWorld, hashWorld, layoutPieces, networkAt, planGhosts, preview, replay, roomAt, withBridgeStore, type BaseCommand, type BaseWorld, type WorldEnv } from './world';
 
 const env: WorldEnv = { heightAt: () => 0, bridge: { x: 0, z: 0, range: 60 } };
@@ -245,4 +247,47 @@ test('pressure (D14): a sealed room with a powered life-support unit inside; an 
   assert.equal(roomAt(w, { ...env, bridge: { x: 500, z: 500, range: 60 } }, { x: 2, y: 0, z: 2 }).pressurized, false, 'no relay reaches it');
   const lock = w.base.pieces.find((p) => p.kind === 'airlock')!;
   assert.equal(roomAt(run(w, { t: 'door', id: lock.id, open: true }), env, { x: 2, y: 0, z: 2 }).pressurized, false, 'the airlock is open');
+});
+
+test('fabrication: the fabricator prints rovers as the stage allows; the weapon bench forges parts; fitting swaps them', () => {
+  const senv = { heightAt: () => 0, materials: { regolith: { vKeep: 0.85, hKeep: 0.5 }, basalt: { vKeep: 0.9, hKeep: 0.6 } } };
+  let base = S.found(S.empty(), senv, 2, 2, 0, 'regolith').base; const s = base.structures[0]!.id;
+  const put = (p: Omit<S.Piece, 'id' | 's' | 'mat'>) => { const r = S.place(base, senv, { ...p, s, mat: 'regolith' }); assert.ok(r.ok, `${p.kind}: ${r.why}`); base = r.base; return r.id; };
+  for (const [i, j] of [[1, 0], [0, 1], [1, 1], [2, 0]] as const) put({ kind: 'foundation', i, j, k: 0, r: 0 });
+  const pad = put({ kind: 'hardpoint', i: 0, j: 0, k: 0, r: 0 });
+  put({ kind: 'weaponBench', i: 2, j: 0, k: 0, r: 0 });
+  // one bin's worth (24 slots); ore is topped up between steps
+  const stock = [{ item: 'ore', n: 450 }, { item: 'prim-beam', n: 20 }, { item: 'prim-column', n: 20 }, { item: 'prim-chassis', n: 20 }, { item: 'prim-cube', n: 20 }, { item: 'map-basalt', n: 20 }, { item: 'map-quartz', n: 10 }];
+  const topUp = (x: BaseWorld): BaseWorld => ({ ...x, boxes: x.boxes.map((b) => (b.id === BRIDGE_STORE ? L.deposit(b, ITEMS, 'ore', 450 - (L.totals([b], [BRIDGE_STORE])['ore'] ?? 0)).box : b)) });
+  let w: BaseWorld = withBridgeStore({ ...createWorld(), base }, env, stock);
+  const at = { x: 4, z: 4 };
+  w = run(w, { t: 'install', at, hardpoint: pad, kind: 'fabricator' });
+  assert.equal(apply(w, env, { t: 'craft', at, machine: pad, recipe: 'vehicle-scout' }).events[0]!.type, 'refused', 'the scout opens at stage 2');
+  w = run(w, { t: 'stage', stage: 2 }, { t: 'craft', at, machine: pad, recipe: 'vehicle-scout' });
+  const printed = apply(w, env, { t: 'tick', at, dt: 130, beam: null, power: {} });
+  assert.ok(printed.events.some((e) => e.type === 'printed' && e.kind === 'scout'), 'it runs on relay power, not the plot grid');
+  w = printed.world;
+  assert.equal(w.vehicles.length, 1); assert.ok(Math.hypot(w.vehicles[0]!.x - 4, w.vehicles[0]!.z - 4) < 1e-6, 'parked on the pad');
+  // the hauler carries a bin on the linked network, and the bin goes where the hauler is parked
+  w = run(topUp(w), { t: 'stage', stage: 4 }, { t: 'craft', at, machine: pad, recipe: 'vehicle-hauler' });
+  w = apply(w, env, { t: 'tick', at, dt: 250, beam: null, power: {} }).world;
+  const hauler = w.vehicles.find((v) => v.kind === 'hauler')!;
+  assert.ok(hauler.box !== null && w.boxes.some((b) => b.id === hauler.box));
+  w = run(w, { t: 'park', vehicle: hauler.id, x: 30, z: -12, yaw: 1.2 });
+  const bin = w.boxes.find((b) => b.id === hauler.box)!; assert.deepEqual([bin.x, bin.z], [30, -12]);
+  assert.ok(networkAt(w, env, { x: 30, z: -12 }).includes(hauler.box!), 'the hauler bin is linked where it stands');
+  // the weapon bench: tiers by stage, parts into the pack, fitting swaps through the pack
+  const bench = { x: 10, z: 2 };
+  w = topUp(w);
+  assert.equal(apply(w, env, { t: 'forge', at: { x: 40, z: 40 }, item: 'wpn-frame' }).events[0]!.type, 'refused', 'no bench in reach');
+  w = run(w, { t: 'forge', at: bench, item: 'wpn-frame' }, { t: 'forge', at: bench, item: 'core-semi' }, { t: 'forge', at: bench, item: 'barrel-scatter' }, { t: 'forge', at: bench, item: 'sight-iron' }, { t: 'forge', at: bench, item: 'cell-compact' }, { t: 'forge', at: bench, item: 'barrel-long' });
+  assert.equal(apply(w, env, { t: 'forge', at: bench, item: 'core-beam' }).events[0]!.type, 'refused', 'the beam core opens at stage 5');
+  w = run(w, { t: 'fit', slot: 'core', item: 'core-semi' }, { t: 'fit', slot: 'barrel', item: 'barrel-scatter' }, { t: 'fit', slot: 'sight', item: 'sight-iron' }, { t: 'fit', slot: 'cell', item: 'cell-compact' });
+  assert.deepEqual(weaponStats(w.loadout), { mode: 'semi', burst: 1, burstGap: 0, cooldown: 0.52, pellets: 7, damage: [20, 29], spread: 0.0275, range: 60, zoom: 1, magazine: 8 }, "today's shotgun");
+  assert.equal(apply(w, env, { t: 'fit', slot: 'core', item: 'barrel-long' }).events[0]!.type, 'refused', 'a barrel is not a core');
+  w = run(w, { t: 'fit', slot: 'barrel', item: 'barrel-long' });
+  assert.equal(L.count(w.player, 'barrel-scatter'), 1, 'the swapped part is back in the pack');
+  assert.equal(weaponStats(w.loadout)!.pellets, 1); assert.equal(weaponStats({ ...w.loadout, cell: null }), null);
+  // it all saves and loads back
+  assert.equal(hashWorld(loadWorld(saveWorld(w), 1)), hashWorld(w));
 });

@@ -28,12 +28,13 @@
 <main>
   <div class="card">
     <h1>MENTOR RADIO · AUDITION</h1>
-    <p class="sub">The clean voice file through a field-radio chain, over the static and music beds. Music ducks under her lines.</p>
+    <p class="sub">The clean voice file blended with a field-radio chain (Radio sets how much), over the static and music beds. Music ducks under her lines.</p>
     <label class="check">Line <select id="line"></select></label>
     <label>Voice <input id="vo" type="range" min="0" max="100" value="80" /><output id="vo-v"></output></label>
+    <label>Radio <input id="blend" type="range" min="0" max="100" value="65" /><output id="blend-v"></output></label>
     <label>Static <input id="static" type="range" min="0" max="100" value="30" /><output id="static-v"></output></label>
     <label>Music <input id="music" type="range" min="0" max="100" value="45" /><output id="music-v"></output></label>
-    <label>Overdrive <input id="drive" type="range" min="0" max="100" value="25" /><output id="drive-v"></output></label>
+    <label>Overdrive <input id="drive" type="range" min="0" max="100" value="12" /><output id="drive-v"></output></label>
     <label class="check">Radio filter <span><input id="radio" type="checkbox" checked /></span></label>
     <div class="row"><button id="play">▶ PLAY</button><button id="stop" class="ghost">■ STOP</button></div>
     <div id="state"></div>

@@ -38,17 +38,22 @@ async function play(): Promise<void> {
   const [vo, st, mu] = await Promise.all([buffer(c, line), buffer(c, 'bed-static.mp3'), buffer(c, 'bed-music.mp3')]);
   const t0 = c.currentTime + 0.1, lead = 1.6;
 
-  // the voice: band-limited like a field radio, a little overdriven, compressed
+  // the voice: a field-radio band blended with the clean voice by the Radio fader (owner: the full filter is
+  // "a touch too heavy ... a bit harsh on the ear", but it "sounds wrong without it"). The band is wider than a
+  // phone line and the 2.5-4 kHz region that grates is cut instead of boosted; the presence lift sits lower.
   const voSrc = c.createBufferSource(); voSrc.buffer = vo;
-  const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 320;
-  const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3600;
-  const mid = c.createBiquadFilter(); mid.type = 'peaking'; mid.frequency.value = 1800; mid.Q.value = 0.9; mid.gain.value = 4;
-  const sh = c.createWaveShaper(); sh.curve = drive(fader('drive')) as unknown as Float32Array<ArrayBuffer>; sh.oversample = '2x';
-  const comp = c.createDynamicsCompressor(); comp.threshold.value = -22; comp.ratio.value = 4;
+  const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 240; hp.Q.value = 0.6;
+  const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 4800; lp.Q.value = 0.5;
+  const mid = c.createBiquadFilter(); mid.type = 'peaking'; mid.frequency.value = 1300; mid.Q.value = 0.8; mid.gain.value = 2.5;
+  const deHarsh = c.createBiquadFilter(); deHarsh.type = 'peaking'; deHarsh.frequency.value = 3200; deHarsh.Q.value = 1.2; deHarsh.gain.value = -3;
+  const sh = c.createWaveShaper(); sh.curve = drive(fader('drive')) as unknown as Float32Array<ArrayBuffer>; sh.oversample = '4x';
+  const comp = c.createDynamicsCompressor(); comp.threshold.value = -20; comp.ratio.value = 3; comp.attack.value = 0.008; comp.release.value = 0.18;
+  const wet = c.createGain(), dry = c.createGain(), amount = $<HTMLInputElement>('radio').checked ? fader('blend') : 0;
+  // equal-power blend, so the level holds as the fader moves
+  wet.gain.value = Math.sin((amount * Math.PI) / 2); dry.gain.value = Math.cos((amount * Math.PI) / 2);
   const voGain = c.createGain(); voGain.gain.value = fader('vo') * 1.4;
-  const radio = $<HTMLInputElement>('radio').checked;
-  if (radio) voSrc.connect(hp).connect(lp).connect(mid).connect(sh).connect(comp).connect(voGain);
-  else voSrc.connect(voGain);
+  voSrc.connect(hp).connect(lp).connect(mid).connect(deHarsh).connect(sh).connect(comp).connect(wet).connect(voGain);
+  voSrc.connect(dry).connect(voGain);
   voGain.connect(c.destination);
 
   // the static bed, looped, filtered to sit behind the voice
@@ -79,7 +84,7 @@ async function play(): Promise<void> {
 for (const [file, label] of Object.entries(LINES)) {
   const o = document.createElement('option'); o.value = file; o.textContent = label; $<HTMLSelectElement>('line').appendChild(o);
 }
-for (const id of ['vo', 'static', 'music', 'drive']) {
+for (const id of ['vo', 'blend', 'static', 'music', 'drive']) {
   const input = $<HTMLInputElement>(id), out = $(`${id}-v`);
   const show = (): void => { out.textContent = input.value; };
   input.addEventListener('input', show); show();

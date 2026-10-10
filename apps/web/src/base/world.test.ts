@@ -133,3 +133,42 @@ test('airlock doors open and close; the ghost preview says where and whether you
   assert.deepEqual(broke.short, [{ item: 'ore', n: 10 }]);
   assert.equal(preview(w, env, at, STARTER, 'bin', { x: 6, y: 0, z: 2, yaw: 0 }).snap, null);
 });
+
+test('the beam harvests nodes in reach; a heavy mill on a hardpoint refines at its power share', () => {
+  const big = (w: BaseWorld): BaseWorld => ({ ...w, player: { ...w.player, maxKg: 1e6 } });
+  let w = big(createWorld(7));
+  const n0 = w.field.nodes[0]!, near = { x: n0.x, z: n0.z };
+  const item = n0.kind === 'dither' ? 'pxd-mono' : 'vtx-rough';
+  const h = apply(w, env, { t: 'tick', at: near, dt: 10, beam: { node: n0.id, power: 1 }, power: {} });
+  assert.deepEqual(h.events, [{ type: 'harvested', items: [{ item, n: 14 }], lost: [] }]);
+  assert.equal(L.count(h.world.player, item), 14);
+  assert.deepEqual(apply(w, env, { t: 'tick', at: { x: n0.x + 50, z: n0.z }, dt: 10, beam: { node: n0.id, power: 1 }, power: {} }).events, []);
+  const bare = { ...w, equipment: { ...w.equipment, beam: null } };
+  assert.deepEqual(apply(bare, env, { t: 'tick', at: near, dt: 10, beam: { node: n0.id, power: 1 }, power: {} }).events, []);
+  // a pad, a mill, a basalt map job: 30 s of work
+  w = ['ore:900', 'prim-chassis:5', 'prim-beam:4', 'prim-cube:6', 'map-basalt:5', 'pxd-mono:40'].reduce((x, s) => { const [k, n] = s.split(':'); return give(x, k!, Number(n)); }, w);
+  w = run(w, found);
+  const s = w.base.structures[0]!.id;
+  w = run(w, { t: 'place', at, blueprint: STARTER, piece: piece('bench', 0, 0, s) }, { t: 'draft', at, primitive: 'chassis', map: 'basalt' });
+  // the pad needs every fixture spot of its four cells, so the bench comes down once the blueprint is drafted
+  w = run(w, { t: 'remove', at, id: w.base.pieces.find((p) => p.kind === 'bench')!.id });
+  for (const [i, j] of [[1, 0], [0, 1], [1, 1]] as const) w = run(w, { t: 'place', at, blueprint: STARTER, piece: piece('foundation', i, j, s) });
+  w = run(w, { t: 'place', at, blueprint: 'bp:chassis:basalt', piece: { s, kind: 'hardpoint', i: 0, j: 0, k: 0, r: 0 } });
+  const pad = w.base.pieces.find((p) => p.kind === 'hardpoint')!.id;
+  assert.equal(apply(w, env, { t: 'craft', at, machine: pad, recipe: 'map-basalt' }).events[0]!.type, 'refused');
+  w = run(w, { t: 'install', at, hardpoint: pad, kind: 'mill' });
+  assert.equal(apply(w, env, { t: 'install', at, hardpoint: pad, kind: 'press' }).events[0]!.type, 'refused');
+  assert.equal(apply(w, env, { t: 'craft', at, machine: pad, recipe: 'prim-cube' }).events[0]!.type, 'refused');
+  w = run(w, { t: 'craft', at, machine: pad, recipe: 'map-basalt' }, { t: 'craft', at, machine: pad, recipe: 'map-basalt' });
+  const maps = L.count(w.player, 'map-basalt');
+  // half power for 20 s is 10 s of work; then 50 s at full power finishes both jobs (20 + 30)
+  w = run(w, { t: 'tick', at, dt: 20, beam: null, power: { [pad]: 0.5 } });
+  assert.deepEqual(w.machines[0]!.jobs, [{ recipe: 'map-basalt', done: 10 }, { recipe: 'map-basalt', done: 0 }]);
+  const done = apply(w, env, { t: 'tick', at, dt: 50, beam: null, power: { [pad]: 1 } });
+  assert.deepEqual(done.events.filter((e) => e.type === 'finished').length, 2);
+  // no bin in the network: the maps wait in the machine until collected
+  assert.deepEqual(done.world.machines[0]!.out, [{ item: 'map-basalt', n: 2 }]);
+  const got = run(done.world, { t: 'collect', machine: pad });
+  assert.equal(L.count(got.player, 'map-basalt'), maps + 2);
+  assert.deepEqual(apply(got, env, { t: 'remove', at, id: pad }).events, [{ type: 'refused', cmd: 'remove', why: 'has-machine' }]);
+});

@@ -8,7 +8,15 @@ export type Kind =
   | 'hardpoint'
   | 'bin'
   | 'bench'
-  | 'repeater';
+  | 'repeater'
+  | 'halfWall'
+  | 'windowWall'
+  | 'doorframe'
+  | 'door'
+  | 'railing'
+  | 'ladder'
+  | 'stairs'
+  | 'lifeSupport';
 
 export interface Material {
   readonly vKeep: number;
@@ -60,6 +68,8 @@ export interface Room {
   readonly cells: [number, number][];
   readonly sealed: boolean;
   readonly airlocks: number[];
+  readonly doors: number[];
+  readonly lifeSupport: number[];
 }
 
 export interface Aim {
@@ -100,9 +110,31 @@ export const LIMITS = {
   maxLevel: 63,
 } as const;
 
-const CELL_KINDS: readonly Kind[] = ['foundation', 'floor', 'ramp'];
-const EDGE_KINDS: readonly Kind[] = ['wall', 'airlock'];
-const FIXTURE_KINDS: readonly Kind[] = ['hardpoint', 'bin', 'bench', 'repeater'];
+const CELL_KINDS: readonly Kind[] = ['foundation', 'floor', 'ramp', 'stairs'];
+const EDGE_KINDS: readonly Kind[] = [
+  'wall',
+  'airlock',
+  'halfWall',
+  'windowWall',
+  'doorframe',
+  'door',
+  'railing',
+  'ladder',
+];
+const FIXTURE_KINDS: readonly Kind[] = [
+  'hardpoint',
+  'bin',
+  'bench',
+  'repeater',
+  'lifeSupport',
+];
+const CARRYING_EDGE_KINDS: readonly Kind[] = [
+  'wall',
+  'airlock',
+  'windowWall',
+  'doorframe',
+  'door',
+];
 
 interface Extents {
   readonly lowest: number;
@@ -125,7 +157,15 @@ function isKind(value: unknown): value is Kind {
     value === 'hardpoint' ||
     value === 'bin' ||
     value === 'bench' ||
-    value === 'repeater'
+    value === 'repeater' ||
+    value === 'halfWall' ||
+    value === 'windowWall' ||
+    value === 'doorframe' ||
+    value === 'door' ||
+    value === 'railing' ||
+    value === 'ladder' ||
+    value === 'stairs' ||
+    value === 'lifeSupport'
   );
 }
 
@@ -440,7 +480,14 @@ function supportValues(
     k: number,
     r: number,
     vertical: boolean,
-  ): void => addDependency(targetIndex, edges.get(edgeKey(s, i, j, k, r)), vertical);
+  ): void => {
+    const sourceIndex = edges.get(edgeKey(s, i, j, k, r));
+    if (sourceIndex === undefined) return;
+    const source = pieces[sourceIndex];
+    if (source !== undefined && CARRYING_EDGE_KINDS.includes(source.kind)) {
+      addDependency(targetIndex, sourceIndex, vertical);
+    }
+  };
 
   const addPillarSupport = (
     targetIndex: number,
@@ -573,6 +620,8 @@ function validSlot(base: Base, piece: Omit<Piece, 'id'>): boolean {
     !Number.isInteger(piece.k) ||
     !Number.isInteger(piece.r) ||
     piece.k < 0 ||
+    piece.r < 0 ||
+    piece.r > 3 ||
     !isKind(piece.kind)
   ) {
     return false;
@@ -693,11 +742,14 @@ export function check(
   if (
     piece.kind === 'bin' ||
     piece.kind === 'bench' ||
-    piece.kind === 'repeater'
+    piece.kind === 'repeater' ||
+    piece.kind === 'lifeSupport'
   ) {
     const hasFloor = base.pieces.some(
       (existing) =>
-        isCellKind(existing.kind) &&
+        (piece.kind === 'lifeSupport'
+          ? existing.kind === 'foundation' || existing.kind === 'floor'
+          : isCellKind(existing.kind)) &&
         existing.s === piece.s &&
         existing.i === piece.i &&
         existing.j === piece.j &&
@@ -761,7 +813,7 @@ export function place(base: Base, env: Env, piece: Omit<Piece, 'id'>): Result {
   const verdict = check(base, env, piece);
   if (!verdict.ok) return { ok: false, why: verdict.why, base, id: -1 };
 
-  const placed: Piece = piece.kind === 'airlock'
+  const placed: Piece = piece.kind === 'airlock' || piece.kind === 'door'
     ? { ...piece, id: base.nextId }
     : {
         id: base.nextId,
@@ -793,7 +845,7 @@ export function supports(base: Base, env: Env): ReadonlyMap<number, number> {
 
 export function setOpen(base: Base, id: number, open: boolean): Base {
   const piece = base.pieces.find((item) => item.id === id);
-  if (piece === undefined || piece.kind !== 'airlock') return base;
+  if (piece === undefined || (piece.kind !== 'airlock' && piece.kind !== 'door')) return base;
   if ((piece.open === true) === open) return base;
 
   const pieces = base.pieces.map((item): Piece => {
@@ -869,8 +921,10 @@ export function rooms(base: Base): Room[] {
   const piecesAtSide = (cell: RoomCell, side: RoomSide): readonly Piece[] =>
     edgePieces.get(edgeKey(cell.s, side.edgeI, side.edgeJ, cell.k, side.r)) ?? [];
   const isBarrier = (cell: RoomCell, side: RoomSide): boolean =>
-    piecesAtSide(cell, side).some(
-      (piece) => piece.kind === 'wall' || (piece.kind === 'airlock' && piece.open !== true),
+    piecesAtSide(cell, side).some((piece) =>
+      piece.kind === 'wall' ||
+      piece.kind === 'windowWall' ||
+      ((piece.kind === 'airlock' || piece.kind === 'door') && piece.open !== true),
     );
 
   for (const seed of orderedCells) {
@@ -897,12 +951,14 @@ export function rooms(base: Base): Room[] {
 
     const groupKeys = new Set(group.map((cell) => cellKey(cell.s, cell.i, cell.j, cell.k)));
     const airlockIds = new Set<number>();
+    const doorIds = new Set<number>();
     let sealed = true;
     for (const cell of group) {
       for (const side of roomSides(cell)) {
         const edge = piecesAtSide(cell, side);
         for (const piece of edge) {
           if (piece.kind === 'airlock') airlockIds.add(piece.id);
+          if (piece.kind === 'door') doorIds.add(piece.id);
         }
         const neighborKey = cellKey(cell.s, side.i, side.j, cell.k);
         if (!isBarrier(cell, side) && !groupKeys.has(neighborKey)) sealed = false;
@@ -910,13 +966,28 @@ export function rooms(base: Base): Room[] {
     }
 
     group.sort((a, b) => a.i - b.i || a.j - b.j);
-    result.push({
-      s: seed.s,
-      k: seed.k,
-      cells: group.map((cell): [number, number] => [cell.i, cell.j]),
-      sealed,
-      airlocks: [...airlockIds].sort((a, b) => a - b),
-    });
+    const lifeSupportIds = base.pieces
+      .filter(
+        (piece) =>
+          piece.kind === 'lifeSupport' &&
+          groupKeys.has(cellKey(piece.s, piece.i, piece.j, piece.k)),
+      )
+      .map((piece) => piece.id)
+      .sort((a, b) => a - b);
+    const room = Object.defineProperties(
+      {
+        s: seed.s,
+        k: seed.k,
+        cells: group.map((cell): [number, number] => [cell.i, cell.j]),
+        sealed,
+        airlocks: [...airlockIds].sort((a, b) => a - b),
+      },
+      {
+        doors: { value: [...doorIds].sort((a, b) => a - b), enumerable: false },
+        lifeSupport: { value: lifeSupportIds, enumerable: false },
+      },
+    ) as Room;
+    result.push(room);
   }
 
   result.sort((a, b) => {
@@ -1013,7 +1084,7 @@ export function snap(
         } else if (kind === 'hardpoint') {
           append(i, j, rotation, (i + 1) * CELL, (j + 1) * CELL);
         } else {
-          const r = kind === 'ramp' || isFixtureKind(kind) ? rotation : 0;
+          const r = kind === 'ramp' || kind === 'stairs' || isFixtureKind(kind) ? rotation : 0;
           append(i, j, r, (i + 0.5) * CELL, (j + 0.5) * CELL);
         }
       }
@@ -1116,7 +1187,8 @@ export function remove(
 
 const CODEC_MAGIC_0 = 0x48;
 const CODEC_MAGIC_1 = 0x4d;
-const CODEC_VERSION = 1;
+const CODEC_VERSION_V1 = 1;
+const CODEC_VERSION_V2 = 2;
 const CODEC_MAX_ID = 2 ** 31;
 const CODEC_MAX_ID_DELTA = CODEC_MAX_ID - 1;
 const CODEC_MAX_UVARINT = 2 ** 32 - 1;
@@ -1124,7 +1196,7 @@ const CODEC_MAX_COORD_MM = LIMITS.coord * 1000;
 const CODEC_MAX_YAW_Q = Math.floor(Math.PI * 10000);
 const BASE64URL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 const MATERIAL_PATTERN = /^[a-z0-9-]{1,24}$/;
-const CODEC_KINDS: readonly Kind[] = [
+const CODEC_KINDS_V1: readonly Kind[] = [
   'foundation',
   'floor',
   'ramp',
@@ -1136,8 +1208,22 @@ const CODEC_KINDS: readonly Kind[] = [
   'bench',
   'repeater',
 ];
+const CODEC_KINDS: readonly Kind[] = [
+  ...CODEC_KINDS_V1,
+  'halfWall',
+  'windowWall',
+  'doorframe',
+  'door',
+  'railing',
+  'ladder',
+  'stairs',
+  'lifeSupport',
+];
 
-function codecValidationError(base: Base): string {
+function codecValidationError(
+  base: Base,
+  allowedKinds: readonly Kind[] = CODEC_KINDS,
+): string {
   if (typeof base !== 'object' || base === null) return 'bad-base';
   if (base.v !== 1) return 'bad-version';
   if (!Array.isArray(base.structures) || !Array.isArray(base.pieces)) return 'bad-arrays';
@@ -1195,7 +1281,7 @@ function codecValidationError(base: Base): string {
     if (ids.has(piece.id)) return 'duplicate-id';
     ids.add(piece.id);
     if (!Number.isInteger(piece.s) || !structureIds.has(piece.s)) return 'bad-structure-id';
-    if (!isKind(piece.kind)) return 'bad-kind';
+    if (!isKind(piece.kind) || !allowedKinds.includes(piece.kind)) return 'bad-kind';
     if (
       !Number.isInteger(piece.i) ||
       !Number.isInteger(piece.j) ||
@@ -1211,7 +1297,7 @@ function codecValidationError(base: Base): string {
     if (!Number.isInteger(piece.r) || piece.r < 0 || piece.r > maxRotation) {
       return 'bad-rotation';
     }
-    if (piece.kind === 'airlock') {
+    if (piece.kind === 'airlock' || piece.kind === 'door') {
       if (piece.open !== undefined && typeof piece.open !== 'boolean') return 'bad-open';
     } else if (piece.open !== undefined) {
       return 'bad-open';
@@ -1323,8 +1409,9 @@ function base64UrlDecode(text: string): number[] | null {
     const b = BASE64URL.indexOf(text.charAt(offset + 1));
     const c = BASE64URL.indexOf(text.charAt(offset + 2));
     if (a < 0 || b < 0 || c < 0) return null;
+    // three characters carry 18 bits: two bytes and two zero bits (the re-encode check refuses non-zero ones)
     const block = a * 4096 + b * 64 + c;
-    bytes.push(Math.floor(block / 256), block % 256);
+    bytes.push(Math.floor(block / 1024), Math.floor(block / 4) % 256);
   }
   return bytes;
 }
@@ -1334,11 +1421,12 @@ function quantizedYaw(yaw: number): number {
   return Math.max(-CODEC_MAX_YAW_Q, Math.min(CODEC_MAX_YAW_Q, rounded));
 }
 
-function encodeBase(base: Base): string {
-  const why = codecValidationError(base);
+function encodeBaseVersion(base: Base, version: 1 | 2): string {
+  const allowedKinds = version === CODEC_VERSION_V1 ? CODEC_KINDS_V1 : CODEC_KINDS;
+  const why = codecValidationError(base, allowedKinds);
   if (why !== '') throw new Error(why);
 
-  const bytes: number[] = [CODEC_MAGIC_0, CODEC_MAGIC_1, CODEC_VERSION];
+  const bytes: number[] = [CODEC_MAGIC_0, CODEC_MAGIC_1, version];
   writeUnsigned(bytes, base.nextId);
   writeUnsigned(bytes, base.structures.length);
 
@@ -1376,7 +1464,8 @@ function encodeBase(base: Base): string {
   for (const piece of base.pieces) {
     const structureIndex = structureIndices.get(piece.s);
     const materialIndex = materialIndices.get(piece.mat);
-    const kindIndex = CODEC_KINDS.indexOf(piece.kind);
+    const kinds = version === CODEC_VERSION_V1 ? CODEC_KINDS_V1 : CODEC_KINDS;
+    const kindIndex = kinds.indexOf(piece.kind);
     if (structureIndex === undefined || materialIndex === undefined || kindIndex < 0) {
       throw new Error('bad-piece-reference');
     }
@@ -1384,7 +1473,12 @@ function encodeBase(base: Base): string {
     writeSigned(bytes, piece.id - previousPieceId);
     previousPieceId = piece.id;
     writeUnsigned(bytes, structureIndex);
-    bytes.push(kindIndex + piece.r * 16 + (piece.open === true ? 64 : 0));
+    if (version === CODEC_VERSION_V1) {
+      bytes.push(kindIndex + piece.r * 16 + (piece.open === true ? 64 : 0));
+    } else {
+      writeUnsigned(bytes, kindIndex);
+      bytes.push(piece.r + (piece.open === true ? 4 : 0));
+    }
     writeSigned(bytes, piece.i);
     writeSigned(bytes, piece.j);
     writeUnsigned(bytes, piece.k);
@@ -1394,6 +1488,10 @@ function encodeBase(base: Base): string {
   const text = base64UrlEncode(bytes);
   if (text.length > LIMITS.maxChars) throw new Error('too-many-characters');
   return text;
+}
+
+function encodeBase(base: Base): string {
+  return encodeBaseVersion(base, CODEC_VERSION_V2);
 }
 
 export function encode(base: Base): string {
@@ -1411,11 +1509,12 @@ export function decode(text: string): Base | null {
     if (!/^[A-Za-z0-9_-]*$/.test(text)) return null;
     const bytes = base64UrlDecode(text);
     if (bytes === null || base64UrlEncode(bytes) !== text) return null;
+    const version = bytes[2];
     if (
       bytes.length < 3 ||
       bytes[0] !== CODEC_MAGIC_0 ||
       bytes[1] !== CODEC_MAGIC_1 ||
-      bytes[2] !== CODEC_VERSION
+      (version !== CODEC_VERSION_V1 && version !== CODEC_VERSION_V2)
     ) {
       return null;
     }
@@ -1499,7 +1598,22 @@ export function decode(text: string): Base | null {
     for (let index = 0; index < pieceCount; index += 1) {
       const delta = readSigned(CODEC_MAX_ID_DELTA);
       const structureIndex = readUnsigned(structureCount - 1);
-      const metadata = readByte();
+      let kindIndex: number | undefined;
+      let rotation: number | undefined;
+      let isOpen = false;
+      if (version === CODEC_VERSION_V1) {
+        const metadata = readByte();
+        if (metadata === undefined || metadata >= 128) return null;
+        kindIndex = metadata % 16;
+        rotation = Math.floor(metadata / 16) % 4;
+        isOpen = Math.floor(metadata / 64) % 2 === 1;
+      } else {
+        kindIndex = readUnsigned(CODEC_KINDS.length - 1);
+        const flags = readByte();
+        if (flags === undefined || flags >= 8) return null;
+        rotation = flags % 4;
+        isOpen = flags >= 4;
+      }
       const i = readSigned(LIMITS.cell);
       const j = readSigned(LIMITS.cell);
       const k = readUnsigned(LIMITS.maxLevel);
@@ -1507,8 +1621,8 @@ export function decode(text: string): Base | null {
       if (
         delta === undefined ||
         structureIndex === undefined ||
-        metadata === undefined ||
-        metadata >= 128 ||
+        kindIndex === undefined ||
+        rotation === undefined ||
         i === undefined ||
         j === undefined ||
         k === undefined ||
@@ -1517,10 +1631,8 @@ export function decode(text: string): Base | null {
         return null;
       }
 
-      const kindIndex = metadata % 16;
-      const rotation = Math.floor(metadata / 16) % 4;
-      const isOpen = Math.floor(metadata / 64) % 2 === 1;
-      const kind = CODEC_KINDS[kindIndex];
+      const kinds = version === CODEC_VERSION_V1 ? CODEC_KINDS_V1 : CODEC_KINDS;
+      const kind = kinds[kindIndex];
       const structure = structures[structureIndex];
       const mat = materials[materialIndex];
       const id = previousPieceId + delta;
@@ -1531,7 +1643,7 @@ export function decode(text: string): Base | null {
         !Number.isInteger(id) ||
         id < 0 ||
         id >= CODEC_MAX_ID ||
-        (isOpen && kind !== 'airlock') ||
+        (isOpen && kind !== 'airlock' && kind !== 'door') ||
         (isEdgeKind(kind) && rotation > 1)
       ) {
         return null;
@@ -1544,8 +1656,9 @@ export function decode(text: string): Base | null {
 
     if (offset !== bytes.length) return null;
     const base: Base = { v: 1, structures, pieces, nextId };
-    if (codecValidationError(base) !== '') return null;
-    return encodeBase(base) === text ? base : null;
+    const allowedKinds = version === CODEC_VERSION_V1 ? CODEC_KINDS_V1 : CODEC_KINDS;
+    if (codecValidationError(base, allowedKinds) !== '') return null;
+    return encodeBaseVersion(base, version) === text ? base : null;
   } catch {
     return null;
   }

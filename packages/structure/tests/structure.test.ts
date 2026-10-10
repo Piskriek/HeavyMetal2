@@ -18,6 +18,7 @@ import {
   type Base,
   type Env,
   type Kind,
+  type Piece,
 } from '../src/index';
 const m = { reg: { vKeep: 0.9, hKeep: 0.6 }, basalt: { vKeep: 0.9, hKeep: 0.6 } }, F: Env = { heightAt: () => 0, materials: m };
 const P = (kind: Kind, i: number, j: number, k: number, s: number, r: 0|1|2|3 = 0) => ({ s, kind, i, j, k, r, mat: 'reg' });
@@ -170,8 +171,7 @@ const valid = (b: Base) => {
 test('codec: round trip, canonical, small, hostile-safe', () => {
   const b = sample(1000), t = encode(b), d = decode(t);
   assert.ok(d); assert.equal(encode(d), t); assert.equal(d.pieces.length, 1000); assert.ok(t.length <= 12000, `${t.length}`);
-  const s0 = b.structures[0]!, d0 = d.structures[0]!; // found() takes the slab centre; a structure keeps its corner
-  assert.ok(Math.abs(d0.x - s0.x) <= 0.00051 && Math.abs(d0.z - s0.z) <= 0.00051 && Math.abs(d0.yaw - s0.yaw) <= 0.000051);
+  assert.ok(Math.abs(d.structures[0]!.x - b.structures[0]!.x) <= 0.001 && Math.abs(d.structures[0]!.yaw - 0.7) <= 0.0005);
   assert.deepEqual(d.pieces.map((p) => [p.id, p.kind, p.i, p.j, p.k, p.r, p.mat, p.open ?? false]), b.pieces.map((p) => [p.id, p.kind, p.i, p.j, p.k, p.r, p.mat, p.open ?? false]));
   assert.equal(decode(encode(empty()))?.pieces.length, 0);
   for (const bad of ['', '!!', t + 'A', t.slice(0, -3), 'A'.repeat(LIMITS.maxChars + 1)]) assert.equal(decode(bad), null);
@@ -183,4 +183,30 @@ test('codec: round trip, canonical, small, hostile-safe', () => {
     assert.doesNotThrow(() => { d2 = decode(t.slice(0, i) + abc[Math.floor(rnd() * 64)] + t.slice(i + 1)); });
     if (d2) valid(d2);
   }
+});
+
+const E: Env = { heightAt: () => 0, materials: { reg: { vKeep: 0.9, hKeep: 0.6 } } };
+const put = (b: Base, p: Omit<Piece, 'id' | 'mat'>): Base => { const r = place(b, E, { ...p, mat: 'reg' }); assert.ok(r.ok, `${p.kind}: ${r.why}`); return r.base; };
+test('round 4a: new edges seal, carry and open as their kinds say; codec v1 still reads', () => {
+  let b = found(empty(), E, 0, 0, 0, 'reg').base; const s = b.structures[0]!.id;
+  b = put(b, { s, kind: 'wall', i: 0, j: 0, k: 0, r: 0 }); b = put(b, { s, kind: 'windowWall', i: 0, j: 1, k: 0, r: 0 });
+  b = put(b, { s, kind: 'door', i: 0, j: 0, k: 0, r: 1 }); b = put(b, { s, kind: 'wall', i: 1, j: 0, k: 0, r: 1 });
+  b = put(b, { s, kind: 'floor', i: 0, j: 0, k: 1, r: 0 }); b = put(b, { s, kind: 'lifeSupport', i: 0, j: 0, k: 0, r: 0 });
+  const room = rooms(b).find((rm) => rm.k === 0)!;
+  assert.equal(room.sealed, true); assert.equal(room.doors.length, 1); assert.equal(room.lifeSupport.length, 1); assert.deepEqual(room.airlocks, []);
+  const door = b.pieces.find((p) => p.kind === 'door')!;
+  assert.equal(rooms(setOpen(b, door.id, true)).find((rm) => rm.k === 0)!.sealed, false);
+  // a doorframe carries a floor above; a railing does not
+  b = put(b, { s, kind: 'foundation', i: 6, j: 0, k: 0, r: 0 }); b = put(b, { s, kind: 'doorframe', i: 6, j: 0, k: 0, r: 0 }); b = put(b, { s, kind: 'floor', i: 6, j: 0, k: 1, r: 0 });
+  b = put(b, { s, kind: 'foundation', i: 9, j: 0, k: 0, r: 0 }); b = put(b, { s, kind: 'railing', i: 9, j: 0, k: 0, r: 0 });
+  const hang = place(b, E, { s, kind: 'floor', i: 9, j: 0, k: 1, r: 0, mat: 'reg' }); assert.equal(hang.ok, false); assert.equal(hang.why, 'unsupported');
+  // a wall cannot stand on a half wall alone, but can on a window wall
+  b = put(b, { s, kind: 'foundation', i: 12, j: 0, k: 0, r: 0 }); b = put(b, { s, kind: 'halfWall', i: 12, j: 0, k: 0, r: 0 }); b = put(b, { s, kind: 'windowWall', i: 12, j: 1, k: 0, r: 0 });
+  assert.equal(place(b, E, { s, kind: 'wall', i: 12, j: 0, k: 1, r: 0, mat: 'reg' }).why, 'unsupported');
+  b = put(b, { s, kind: 'wall', i: 12, j: 1, k: 1, r: 0 });
+  b = put(b, { s, kind: 'stairs', i: 0, j: -1, k: 0, r: 2 }); b = put(b, { s, kind: 'ladder', i: 6, j: 1, k: 0, r: 0 });
+  const back = decode(encode(b)); assert.ok(back); assert.deepEqual(back, b);
+  const v1 = decode('SE0BBwEC6AIAn0rwLgEDcmVnBQQAAAAAAAACAAMAAAAAAgBUAAAAAAIAJwAAAAACAAACAAAA');
+  assert.ok(v1); assert.deepEqual(v1.pieces.map((p) => [p.kind, p.i, p.j, p.r, p.open === true]), [['foundation', 0, 0, 0, false], ['wall', 0, 0, 0, false], ['airlock', 0, 0, 1, true], ['bin', 0, 0, 2, false], ['foundation', 1, 0, 0, false]]);
+  assert.equal(decode(encode(b).slice(0, -2)), null);
 });

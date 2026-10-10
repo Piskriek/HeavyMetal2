@@ -1,8 +1,5 @@
-# Scientist Avatar 3D Asset
+# Player character
 
-- **Title**: ["Scientist"](https://skfb.ly/pGVYq)
-- **Author**: Scarecrow_original
-- **Source**: Sketchfab (https://sketchfab.com/3d-models/scientist-990620a0d6874e0b854345605de4b477)
-- **License**: [Creative Commons Attribution (CC BY 4.0)](http://creativecommons.org/licenses/by/4.0/)
-- **Rig**: Standard Adobe Mixamo humanoid skeleton (66 bones, 9 skinned meshes).
-- **Attribution**: "Scientist by Scarecrow_original, CC BY 4.0" (included in `CREDITS.md` and in-game avatar creator).
+The player character is **Astro** (the "Armored Space Suit"). The owner generated it with Meshy AI, and it is Mixamo-rigged (28 joints).
+- The model: `../astro/astro-model.ts` and `../astro/astro-{low,mid,high}.glb`, packed by `scripts/pack-character.mjs`.
+- This folder keeps the animation set (`anims.bin`, 14 Mixamo clips) and the animator. `adaptClipsForAstro` fits the clips to Astro's rig.

@@ -66,7 +66,7 @@ function ScientistTurntable(props: {
     const visorMaterials: THREE.MeshStandardMaterial[] = [];
     let cancelled = false;
 
-    void Promise.all([createScientistInstance(props.visor), loadScientistAnimations()]).then(
+    void Promise.all([createScientistInstance(props.visor, 'high'), loadScientistAnimations()]).then(
       ([{ group, visorMaterials: vMats }, clips]) => {
         if (cancelled) return;
         scientistGroup = group;
@@ -384,17 +384,6 @@ export function CreateScientist(props: {
           {customKey ? <p className="hint" style={{ color: '#7cff4d' }}>Custom model active</p> : null}
         </div>
 
-        <p className="cg-credits" style={{ fontSize: '11px', color: 'rgba(232, 238, 241, .6)', marginTop: '12px' }}>
-          Scientist by Scarecrow_original,{' '}
-          <a
-            href="http://creativecommons.org/licenses/by/4.0/"
-            target="_blank"
-            rel="noreferrer"
-            style={{ color: 'var(--power)' }}
-          >
-            CC BY 4.0
-          </a>
-        </p>
 
         <div className="btns">
           <button type="button" onClick={props.onBack}>Back</button>

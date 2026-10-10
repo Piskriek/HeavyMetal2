@@ -152,3 +152,8 @@
 - Weapons: "Frame + 4 part slots".
 - Imported rover skins: "Local only".
 - On the research: "your research on fabricators seems solid".
+
+## 2026-10-10: the new player character
+- "i found a better model for our main character guy on meshy, there is a 3k/9k/30k triangle maixamo rigged versions in zipsModelsiggedAstro, can we add add it when you have a moment and remove the old one and its artist credits the flash model put in somewhere in the repo"
+- "ill make texture we can overlay to add color to the suit for customization once you have it the texture down and i can open one"
+- Asset tools: yes, install glTF-Transform and sharp. Levels: all three, with Auto picking.

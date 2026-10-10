@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { type ClipName } from './anims-loader';
+import { adaptClipsForAstro } from './scientist-model';
 
 export type OneShotKind = 'lever' | 'button' | 'plant' | 'wave' | 'cheer' | 'point';
 
@@ -48,8 +49,10 @@ export function createScientistAnimator(
 ): ScientistAnimator {
   const mixer = new THREE.AnimationMixer(root);
   const actions = new Map<ClipName, THREE.AnimationAction>();
+  // an Astro instance gets its own walk and run, and the set's hips motion in its scale
+  const fitted = root.userData.astroClips ? adaptClipsForAstro(root, clips) : clips;
 
-  for (const [name, clip] of clips.entries()) {
+  for (const [name, clip] of fitted.entries()) {
     const act = mixer.clipAction(clip);
     actions.set(name as ClipName, act);
   }

@@ -179,8 +179,7 @@ Rather than trapping players in a complex 150-slider micro-morph character edito
 ### Audit & Rigging: Hazmat / Biohazard Scientist Model (`zips/Models/`)
 
 - **Attribution & License**:
-  - Model: ["Scientist"](https://skfb.ly/pGVYq) by Scarecrow_original
-  - License: [Creative Commons Attribution (CC BY 4.0)](http://creativecommons.org/licenses/by/4.0/)
+  - Model: replaced on 2026-10-10 by Astro (the owner's own Meshy generation, no attribution required; see `CREDITS.md`).
   - Documented in project [`CREDITS.md`](file:///c:/MarbleGp/CREDITS.md) and [`zips/Models/CREDITS.md`](file:///c:/MarbleGp/zips/Models/CREDITS.md).
 
 - **Source Assets**:

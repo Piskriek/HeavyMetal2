@@ -24,6 +24,8 @@ import { SettingsBody } from './settings-body';
 import { ManageProfilesModal } from './manage-profiles-modal';
 import { GoblinFront, SetMixHome } from './goblin-front';
 import { LabHome } from '../lab/lab';
+import { astroLevelFor } from '../avatar/astro/astro-model';
+import { setScientistLevel } from '../avatar/scientist/scientist-model';
 import { captureMouse } from './capture-mouse';
 import { CreateGoblin } from '../avatar/create-goblin';
 import { player } from '../build/player';
@@ -116,6 +118,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   const createForRef = useRef(createFor);
   createForRef.current = createFor;
   const [profile, setProfile] = useState<Profile>(() => loadProfile());
+  // the player character's detail follows the Graphics quality (6k triangles on Low, 19k on Medium, 55k on High)
+  useEffect(() => { setScientistLevel(astroLevelFor(profile.quality)); }, [profile.quality]);
   const [manageProfilesOpen, setManageProfilesOpen] = useState(false);
   const [switchingProfile, setSwitchingProfile] = useState<string | null>(null);
   const [session, setSession] = useState(false); // you have been on your island this visit

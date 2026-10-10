@@ -28,7 +28,8 @@ test('terrain, overlap, yaw', () => {
   assert.equal(found(empty(), { heightAt: (x) => x, materials: mats }, 2, 2, 0, 'reg').why, 'steep');
   const one = start().b; assert.equal(found(one, flat, 5, 2, 0, 'reg').why, 'overlap'); assert.ok(found(one, flat, 6, 2, 0, 'reg').ok);
   assert.equal(found(one, flat, 2, 6.5, Math.PI / 4, 'reg').why, 'overlap');
-  const t = found(empty(), flat, 0, 0, Math.PI / 2, 'reg').base.structures[0]!, w = toWorld(t, 4, 0, 1); near(w.x, 2); near(w.y, 3); near(w.z, 2);
+  // poses sit on the codec grid (0.0001 rad), so a quarter turn lands within a millimetre, not 1e-9
+  const t = found(empty(), flat, 0, 0, Math.PI / 2, 'reg').base.structures[0]!, w = toWorld(t, 4, 0, 1), mmNear = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-3, `${a} vs ${b}`); mmNear(w.x, 2); near(w.y, 3); mmNear(w.z, 2);
 });
 test('fixtures and pads', () => {
   let { b, s } = start(); assert.equal(check(b, flat, P('bin', 1, 0, 0, s)).why, 'needs-floor');

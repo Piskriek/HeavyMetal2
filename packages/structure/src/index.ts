@@ -754,6 +754,9 @@ export function toWorld(
   };
 }
 
+/** A quantised value as the codec decodes it: the integer count over its scale. */
+const mm = (count: number, scale: number): number => count / scale;
+
 export function found(
   base: Base,
   env: Env,
@@ -769,20 +772,22 @@ export function found(
     return { ok: false, why: 'material', base, id: -1 };
   }
 
-  const cosine = Math.cos(yaw);
-  const sine = Math.sin(yaw);
+  // the pose is kept on the codec's grid (1 mm, 0.0001 rad, yaw in [-PI, PI]), so decode(encode(base)) is exact
+  const turn = mm(Math.max(-CODEC_MAX_YAW_Q, Math.min(CODEC_MAX_YAW_Q, Math.round(Math.atan2(Math.sin(yaw), Math.cos(yaw)) * 10000))), 10000);
+  const cosine = Math.cos(turn);
+  const sine = Math.sin(turn);
   const structure: Structure = {
     id: base.nextId,
-    x: cx - (CELL / 2) * cosine + (CELL / 2) * sine,
+    x: mm(Math.round((cx - (CELL / 2) * cosine + (CELL / 2) * sine) * 1000), 1000),
     y: 0,
-    z: cz - (CELL / 2) * sine - (CELL / 2) * cosine,
-    yaw,
+    z: mm(Math.round((cz - (CELL / 2) * sine - (CELL / 2) * cosine) * 1000), 1000),
+    yaw: turn,
   };
   const extents = extentsAtCell(env, structure, 0, 0);
   if (extents.highest - extents.lowest > SKIRT) {
     return { ok: false, why: 'steep', base, id: -1 };
   }
-  const placedStructure: Structure = { ...structure, y: extents.highest };
+  const placedStructure: Structure = { ...structure, y: mm(Math.round(extents.highest * 1000), 1000) };
   if (hasCellOverlap(base, placedStructure, 0, 0)) {
     return { ok: false, why: 'overlap', base, id: -1 };
   }

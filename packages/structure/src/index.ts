@@ -22,7 +22,8 @@ export type Kind =
   | 'roofOuter'
   | 'roofInner'
   | 'gable'
-  | 'ridgeCap';
+  | 'ridgeCap'
+  | 'weaponBench';
 
 export interface Material {
   readonly vKeep: number;
@@ -145,6 +146,7 @@ const FIXTURE_KINDS: readonly Kind[] = [
   'bench',
   'repeater',
   'lifeSupport',
+  'weaponBench',
 ];
 const CARRYING_EDGE_KINDS: readonly Kind[] = [
   'wall',
@@ -189,7 +191,8 @@ function isKind(value: unknown): value is Kind {
     value === 'roofOuter' ||
     value === 'roofInner' ||
     value === 'gable' ||
-    value === 'ridgeCap'
+    value === 'ridgeCap' ||
+    value === 'weaponBench'
   );
 }
 
@@ -260,6 +263,7 @@ const FOOTPRINT: Readonly<Partial<Record<Kind, readonly [number, number]>>> = {
   bench: [2.4, 1.2],
   repeater: [1.6, 1.6],
   lifeSupport: [1.1, 0.7],
+  weaponBench: [2.4, 1.2],
 };
 export const PLACE_LIMIT_CM = 150;
 const CELL_MARGIN = 0.05;
@@ -1421,6 +1425,7 @@ const CODEC_KINDS: readonly Kind[] = [
   'roofInner',
   'gable',
   'ridgeCap',
+  'weaponBench',
 ];
 
 function codecValidationError(

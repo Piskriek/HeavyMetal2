@@ -7,7 +7,7 @@
  */
 
 /** What an item is, for its icon, colour and where it may go. */
-export type ItemKind = 'bulk' | 'raw-pxd' | 'raw-vtx' | 'map' | 'primitive' | 'blueprint' | 'tool' | 'weapon' | 'equip';
+export type ItemKind = 'bulk' | 'raw-pxd' | 'raw-vtx' | 'map' | 'primitive' | 'blueprint' | 'tool' | 'weapon' | 'equip' | 'part';
 
 export interface ItemView {
   readonly id: string;

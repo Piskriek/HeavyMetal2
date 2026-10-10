@@ -19,7 +19,7 @@ import * as S from '@hm/structure';
 const EDGE_HALF = 0.125;
 const DOOR_FROM = 1.3, DOOR_TO = 2.7;
 /** Fixture footprints (width along x, depth along z), as in @hm/structure. */
-const FIXTURE: Readonly<Partial<Record<S.Kind, readonly [number, number]>>> = { bin: [1.2, 0.9], bench: [2.4, 1.2], repeater: [1.6, 1.6], lifeSupport: [1.1, 0.7] };
+const FIXTURE: Readonly<Partial<Record<S.Kind, readonly [number, number]>>> = { bin: [1.2, 0.9], bench: [2.4, 1.2], repeater: [1.6, 1.6], lifeSupport: [1.1, 0.7], weaponBench: [2.4, 1.2] };
 const WALLS: ReadonlySet<S.Kind> = new Set<S.Kind>(['wall', 'windowWall', 'halfWall', 'railing', 'airlock', 'door', 'doorframe']);
 
 /** A rectangle in a structure's (u, v) frame: centre, half sizes and its u axis (unit). */

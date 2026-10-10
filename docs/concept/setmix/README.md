@@ -913,3 +913,5 @@ in 04/05).
 **Review notes:** no chimneys, stacks or smokestacks; no smoke; the fabricator's print is the only glow on the station; every piece is grounded (wheels, tracks, pads and bolts touch the ground); cables run in low ribbed floor covers; no text baked into any kept image; the scientist (1.8 m) stands beside each piece for scale. The hauler S6 emitter matches the S1 mushroom cap, slightly larger in the S6.
 
 **Revision 4 (lead-engineer review):** the fabricator S6 now shows the half-printed scout resting on the bed, wheels and lower chassis solid, only the roll cage wireframe. The hauler S6 emitter is the small sheet 13 link dish, with no beam or glow. Old renders are in `panels/19/rejected/` (`19-fabricator-s6-rev1`, `19-hauler-s6-rev3`). Open point: the hauler S1 still draws its thin beam.
+
+**Revision 5:** the hauler S1 is redrawn to the revised S6 design: a rectangular storage bin with the small finned link dish, and no beam. No piece on sheet 19 now has a beam. Old S1 renders are in `panels/19/rejected/` (`19-hauler-s1-rev1`, `19-hauler-s1-rev2`).

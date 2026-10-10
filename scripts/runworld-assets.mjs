@@ -84,6 +84,9 @@ if (cmd === 'status') {
     if (!r.ok) { console.log(`  failed: ${r.out.slice(-300)}`); if (fatal(r.out)) process.exit(5); }
   }
 } else if (cmd === 'models') {
+  // a provider that runs past the CLI's 600 s timeout still bills the call and the result is lost: stop after two
+  // timeouts in a row rather than bleed credits (2026-10-10: Hunyuan slowed past 10 min, three calls lost)
+  let timeouts = 0;
   for (const a of manifest.assets.filter(pick)) {
     const d = path.join(OUT, a.id), glb = path.join(d, 'model.glb'), meta = path.join(d, 'source.png.json');
     if (fs.existsSync(glb) || !fs.existsSync(path.join(d, 'approved')) || !fs.existsSync(meta)) continue;
@@ -95,6 +98,8 @@ if (cmd === 'status') {
     if (modelUrl) fs.writeFileSync(path.join(d, 'model.json'), JSON.stringify({ modelUrl, imageUrl: url }, null, 2));
     log({ id: a.id, step: 'model', ok: r.ok && fs.existsSync(glb), before, modelUrl, tail: r.out.slice(-300) });
     if (!r.ok) { console.log(`  failed: ${r.out.slice(-300)}`); if (fatal(r.out)) process.exit(5); }
+    timeouts = /TaskCanceledException|Timeout/i.test(r.out) ? timeouts + 1 : 0;
+    if (timeouts >= 2) { console.log('STOP: two 3D timeouts in a row; the provider is slow. Retry later.'); process.exit(6); }
   }
 } else {
   console.log('usage: node scripts/runworld-assets.mjs images|models|status [id ...]');

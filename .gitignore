@@ -30,3 +30,6 @@ zips/
 # E2E test screenshots
 docs/shots/
 
+
+# the local Hunyuan3D pipeline's bearer token (owner's RTX 3080 PC); never commit it
+.local3d-token

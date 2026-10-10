@@ -43,6 +43,14 @@ import type { MobStatus, CombatStats } from './monster-mash-combat';
 import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { BaseHud } from '../base/ui/base-hud';
 import { mockBaseViewSource } from '../base/mock-view';
+import { createWorldViewSource, WorldViewSource, formatRefusalToast } from '../base/world-view';
+import { createWorld, apply, pieceAt, preview, type BaseWorld, type BaseCommand, type WorldEnv } from '../base/world';
+import { PieceMeshManager } from '../base/piece-meshes';
+import { createStandInPiece } from '../base/stand-in-pieces';
+import { blueprint, STARTER, ITEMS } from '../base/catalog';
+import * as S from '@hm/structure';
+import type { Kind } from '@hm/structure';
+import * as L from '@hm/lattice';
 import '../base/base.css';
 import './play.css';
 
@@ -149,6 +157,129 @@ export function PlayScreen(props: {
     const t = window.setTimeout(() => setToast((x) => (x?.id === toast.id ? null : x)), 3200);
     return () => window.clearTimeout(t);
   }, [toast]);
+
+  const createSeededBaseWorld = (): BaseWorld => {
+    const w = createWorld();
+    const slots = w.player.slots.slice();
+    slots[0] = { item: STARTER, n: 1 };
+    slots[1] = { item: 'ore', n: 200 };
+    slots[2] = { item: 'prim-cube', n: 3 };
+    slots[3] = { item: 'map-basalt', n: 3 };
+    slots[4] = { item: 'prim-chassis', n: 1 };
+    return {
+      ...w,
+      player: {
+        ...w.player,
+        maxKg: 300,
+        slots,
+      },
+    };
+  };
+
+  const baseWorldRef = useRef<BaseWorld>(isBase ? createSeededBaseWorld() : createWorld());
+  const pieceManagerRef = useRef<PieceMeshManager>(new PieceMeshManager());
+  const buildKindRef = useRef<Kind | null>(null);
+  const ghostKindRef = useRef<Kind | null>(null);
+  const lastPreviewRef = useRef<{
+    prev: { snap: S.Snap | null; cost: readonly L.Stack[]; short: readonly L.Stack[] };
+    aim: { x: number; y: number; z: number; yaw: number };
+    bp: { id: string; name: string };
+    kind: Kind;
+  } | null>(null);
+  const dispatchBaseRef = useRef<(cmd: BaseCommand) => void>(() => {});
+  const tryPlaceBaseRef = useRef<() => boolean>(() => false);
+
+  const baseViewSource = useMemo(() => {
+    if (!isBase) return mockBaseViewSource;
+    return createWorldViewSource({
+      getWorld: () => baseWorldRef.current,
+      env: {
+        heightAt: (x, z) => sceneRef.current?.heightAt(x, z) ?? 0,
+        bridge: { x: 0, z: 0, range: 60 },
+      },
+      getAt: () => {
+        const p = sceneRef.current?.aimPoint();
+        if (p) return { x: p.x, z: p.z };
+        return { x: 0, z: 0 };
+      },
+      dispatch: (cmd) => dispatchBaseRef.current(cmd),
+      getBuildKind: () => buildKindRef.current,
+      getPreview: () => lastPreviewRef.current?.prev ?? null,
+    });
+  }, [isBase]);
+
+  const dispatchBase = useCallback((cmd: BaseCommand) => {
+    const scene = sceneRef.current;
+    const bEnv: WorldEnv = {
+      heightAt: (x, z) => scene?.heightAt(x, z) ?? 0,
+      bridge: { x: 0, z: 0, range: 60 },
+    };
+    const res = apply(baseWorldRef.current, bEnv, cmd);
+    baseWorldRef.current = res.world;
+
+    for (const ev of res.events) {
+      if (ev.type === 'refused') {
+        say(formatRefusalToast(ev));
+      } else if (ev.type === 'placed') {
+        say(`${ev.kind.toUpperCase()} constructed.`);
+      } else if (ev.type === 'removed') {
+        say(
+          'Piece deconstructed.',
+          ev.collapsed.length > 0 ? `${ev.collapsed.length} piece(s) collapsed.` : ''
+        );
+        pieceManagerRef.current.handleRemoval(ev.id, ev.collapsed);
+      } else if (ev.type === 'drafted') {
+        say(`Drafted Blueprint: ${ev.blueprint}`);
+      } else if (ev.type === 'stacked') {
+        say(`Deposited ${ev.n} item(s) to Quantum Lattice.`);
+      } else if (ev.type === 'door') {
+        say(ev.open ? 'Airlock opened.' : 'Airlock closed.');
+      }
+    }
+
+    const integrity = (baseViewSource as WorldViewSource).get?.()?.build?.integrity ?? false;
+    pieceManagerRef.current.sync(baseWorldRef.current, bEnv, integrity);
+    (baseViewSource as WorldViewSource).notify?.();
+  }, [say, baseViewSource]);
+
+  dispatchBaseRef.current = dispatchBase;
+
+  const tryPlaceBase = useCallback((): boolean => {
+    const lp = lastPreviewRef.current;
+    if (!lp || !lp.prev.snap) return false;
+    const { snap, short } = lp.prev;
+    if (!snap.ok || short.length > 0) {
+      if (short.length > 0) {
+        say(`Missing: ${short.map((s) => `${s.n} ${ITEMS[s.item]?.name ?? s.item}`).join(', ')}`);
+      } else if (snap.why) {
+        say(`Cannot place: ${snap.why}`);
+      }
+      return false;
+    }
+    if (snap.mode === 'place') {
+      const { mat, id, ...pieceSpec } = snap.piece as any;
+      dispatchBase({
+        t: 'place',
+        at: { x: lp.aim.x, z: lp.aim.z },
+        blueprint: lp.bp.id,
+        piece: pieceSpec,
+      });
+      return true;
+    } else if (snap.mode === 'found') {
+      dispatchBase({
+        t: 'found',
+        at: { x: lp.aim.x, z: lp.aim.z },
+        blueprint: lp.bp.id,
+        cx: snap.cx,
+        cz: snap.cz,
+        yaw: snap.yaw,
+      });
+      return true;
+    }
+    return false;
+  }, [dispatchBase, say]);
+
+  tryPlaceBaseRef.current = tryPlaceBase;
 
   // ---- Monster Mash combat states & firing action
   const [mashOpen, setMashOpen] = useState(false);
@@ -286,6 +417,11 @@ export function PlayScreen(props: {
         envRef.current = env;
         plotRef.current = stateRef.current.plot;
         scene.restore({ gateOn: stateRef.current.gateOn, plot: plotRef.current, running: running(plotRef.current, env), connected: network(plotRef.current, env).connected });
+        if (isBase) {
+          scene.setPieces(pieceManagerRef.current.getMeshes());
+          const bEnv = { heightAt: (x: number, z: number) => scene.heightAt(x, z), bridge: { x: 0, z: 0, range: 60 } };
+          pieceManagerRef.current.sync(baseWorldRef.current, bEnv, false);
+        }
       }],
       ['Compiling shaders', () => { scene.warm(); }],
     ];
@@ -329,6 +465,8 @@ export function PlayScreen(props: {
       if (e.button === 0 && document.pointerLockElement === canvas) {
         if (scene.mash.isEquipped()) {
           fireWeapon();
+        } else if (isBase) {
+          tryPlaceBaseRef.current();
         }
       }
     };
@@ -339,6 +477,92 @@ export function PlayScreen(props: {
       const frameMs = ms - last;
       const dt = Math.min(0.1, frameMs / 1000);
       last = ms;
+      if (isBase) {
+        pieceManagerRef.current.update(dt);
+        const w = baseWorldRef.current;
+        const slot = w.player.slots[w.hotbar];
+        const activeBp = slot && slot.n > 0 ? blueprint(slot.item) : null;
+        if (activeBp) {
+          const curKind = (buildKindRef.current && activeBp.kinds.includes(buildKindRef.current)
+            ? buildKindRef.current
+            : activeBp.kinds[0]!) as Kind;
+          if (ghostKindRef.current !== curKind) {
+            scene.setPieceGhost(createStandInPiece(curKind, 'ok'));
+            ghostKindRef.current = curKind;
+          }
+          const aim = scene.aimPoint();
+          if (aim) {
+            const bEnv: WorldEnv = {
+              heightAt: (x, z) => scene.heightAt(x, z),
+              bridge: { x: 0, z: 0, range: 60 },
+            };
+            const playerPos = scene.debug.position();
+            const prev = preview(w, bEnv, { x: playerPos.x, z: playerPos.z }, activeBp.id, curKind, {
+              x: aim.x,
+              y: aim.y,
+              z: aim.z,
+              yaw: aim.yaw,
+            });
+            lastPreviewRef.current = { prev, aim, bp: activeBp, kind: curKind };
+            const snap = prev.snap;
+            if (snap) {
+              if (snap.mode === 'place') {
+                const st = w.base.structures.find((s) => s.id === snap.piece.s);
+                const pPos = pieceAt(w.base, { ...snap.piece, id: -1, mat: '' });
+                let extraAngle = 0;
+                if (snap.piece.kind === 'wall' || snap.piece.kind === 'airlock') {
+                  if (snap.piece.r === 1) extraAngle = -Math.PI / 2;
+                } else if (
+                  snap.piece.kind === 'ramp' ||
+                  snap.piece.kind === 'bench' ||
+                  snap.piece.kind === 'bin' ||
+                  snap.piece.kind === 'repeater' ||
+                  snap.piece.kind === 'hardpoint'
+                ) {
+                  extraAngle = -snap.piece.r * (Math.PI / 2);
+                }
+                const yaw = (st ? -st.yaw : 0) + extraAngle;
+                const pose = pPos ? { x: pPos.x, y: pPos.y, z: pPos.z, yaw } : null;
+                let tint: 'grounded' | 'ok' | 'weak' | 'bad' = 'ok';
+                if (!snap.ok || prev.short.length > 0) tint = 'bad';
+                else if (snap.support >= 0.99) tint = 'grounded';
+                else if (snap.support >= 0.5) tint = 'ok';
+                else tint = 'weak';
+                scene.placePieceGhost(pose, tint);
+              } else if (snap.mode === 'found') {
+                const cosine = Math.cos(snap.yaw);
+                const sine = Math.sin(snap.yaw);
+                const C = 4;
+                const pts = [
+                  { x: snap.cx - (C / 2) * cosine + (C / 2) * sine, z: snap.cz - (C / 2) * sine - (C / 2) * cosine },
+                  { x: snap.cx + (C / 2) * cosine + (C / 2) * sine, z: snap.cz + (C / 2) * sine - (C / 2) * cosine },
+                  { x: snap.cx - (C / 2) * cosine - (C / 2) * sine, z: snap.cz - (C / 2) * sine + (C / 2) * cosine },
+                  { x: snap.cx + (C / 2) * cosine - (C / 2) * sine, z: snap.cz + (C / 2) * sine + (C / 2) * cosine },
+                  { x: snap.cx, z: snap.cz },
+                ];
+                let highest = -Infinity;
+                for (const pt of pts) {
+                  const h = scene.heightAt(pt.x, pt.z);
+                  if (h > highest) highest = h;
+                }
+                const pose = { x: snap.cx, y: highest, z: snap.cz, yaw: -snap.yaw };
+                const tint: 'grounded' | 'ok' | 'weak' | 'bad' = (!snap.ok || prev.short.length > 0) ? 'bad' : 'grounded';
+                scene.placePieceGhost(pose, tint);
+              }
+            } else {
+              scene.placePieceGhost(null, 'bad');
+            }
+          } else {
+            scene.placePieceGhost(null, 'bad');
+          }
+        } else {
+          if (ghostKindRef.current !== null) {
+            scene.setPieceGhost(null);
+            ghostKindRef.current = null;
+          }
+          lastPreviewRef.current = null;
+        }
+      }
       const live = !pausedRef.current && stateRef.current.step !== 'create';
       // the governor judges only the frames you play (the creator draws its own turntable over the lab)
       const next = live ? adaptive.frame(frameMs) : null;
@@ -567,14 +791,26 @@ export function PlayScreen(props: {
       spawnDemon: (count = 1) => scene.mash.spawnDemon(count),
       equipShotgun: (on = true) => { scene.mash.equip(on); setMashEquipped(on); },
       fireShotgun: () => fireWeapon(),
-      base: () => mockBaseViewSource,
+      base: {
+        world: () => baseWorldRef.current,
+        apply: (cmd: BaseCommand) => dispatchBaseRef.current(cmd),
+      },
       teleportPlanet: () => scene.debug.teleport('planet', 0, 10, 0),
     });
+    if (typeof window !== 'undefined') {
+      (window as unknown as { __hm?: unknown }).__hm = {
+        base: {
+          world: () => baseWorldRef.current,
+          apply: (cmd: BaseCommand) => dispatchBaseRef.current(cmd),
+        },
+      };
+    }
     setLoading(steps[0]![0]);
     timer = window.setTimeout(step, 30);
     return () => {
       cancelled = true;
       delete (window as unknown as { hmPlay?: unknown }).hmPlay;
+      delete (window as unknown as { __hm?: unknown }).__hm;
       window.clearTimeout(timer);
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', size);
@@ -641,6 +877,35 @@ export function PlayScreen(props: {
         return;
       }
       if (paused) return;
+      if (isBase) {
+        if (e.code === 'KeyR') {
+          const w = baseWorldRef.current;
+          const slot = w.player.slots[w.hotbar];
+          if (slot && slot.n > 0) {
+            const bp = blueprint(slot.item);
+            if (bp && bp.kinds.length > 1) {
+              const curKind = buildKindRef.current ?? bp.kinds[0]!;
+              const curIdx = bp.kinds.indexOf(curKind);
+              const nextIdx = (curIdx + 1) % bp.kinds.length;
+              buildKindRef.current = bp.kinds[nextIdx]!;
+              (baseViewSource as WorldViewSource).notify?.();
+              say(`Selected: ${buildKindRef.current.toUpperCase()}`);
+              return;
+            }
+          }
+        }
+        if (e.code === 'KeyX') {
+          const hit = sceneRef.current?.aimPoint();
+          if (hit && hit.piece !== null) {
+            dispatchBase({
+              t: 'remove',
+              at: { x: hit.x, z: hit.z },
+              id: hit.piece,
+            });
+            return;
+          }
+        }
+      }
       if (e.code === 'KeyM') {
         setMashOpen((m) => {
           const next = !m;
@@ -662,6 +927,17 @@ export function PlayScreen(props: {
         return;
       }
       if (e.code === 'KeyE') {
+        if (isBase) {
+          const hit = sceneRef.current?.aimPoint();
+          if (hit && hit.piece !== null) {
+            const p = baseWorldRef.current.base.pieces.find((q) => q.id === hit.piece);
+            if (p && p.kind === 'airlock') {
+              dispatchBase({ t: 'door', id: p.id, open: !p.open });
+              return;
+            }
+          }
+          if (tryPlaceBase()) return;
+        }
         if (building) placeNow();
         else if (hud.atLever) sceneRef.current?.pullLever();
         else if (hud.atDial && !dialOpen) {
@@ -1499,7 +1775,7 @@ export function PlayScreen(props: {
           ) : null}
           {isBase && hud.where === 'planet' ? (
             <BaseHud
-              source={mockBaseViewSource}
+              source={baseViewSource}
               onOpenChange={(isOpen) => {
                 if (isOpen) {
                   quietRef.current = true;

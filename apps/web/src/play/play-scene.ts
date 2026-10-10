@@ -115,6 +115,7 @@ export interface PlayScene {
   placePieceGhost(pose: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number } | null, tint: 'grounded' | 'ok' | 'weak' | 'bad'): void;
   /** Placed base pieces group for aim raycasting. */
   setPieces(group: THREE.Group | null): void;
+  heightAt(x: number, z: number): number;
   aimPoint(): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null;
   /** The plot reached a stage: a wave from `from` (ground x, z) brings its look across the plot, out to the horizon and up the sky. */
   raiseStage(to: number, from: { readonly x: number; readonly z: number }): void;
@@ -900,8 +901,15 @@ export function createPlayScene(o: {
       });
     },
     setPieces(group) {
+      if (piecesGroup && piecesGroup !== group) {
+        planetScene.remove(piecesGroup);
+      }
       piecesGroup = group;
+      if (piecesGroup && !planetScene.children.includes(piecesGroup)) {
+        planetScene.add(piecesGroup);
+      }
     },
+    heightAt: (x, z) => groundAt(x, z),
     aimPoint: () => aimPointFn(),
     raiseStage(to, from) {
       if (to <= stage) return;
@@ -927,6 +935,7 @@ export function createPlayScene(o: {
     },
     frame(now, dt, c) {
       clock = now;
+      holoUniforms.uTime.value = now;
       // ---- the power-on sequence
       if (powerT >= 0) {
         const before = powerT;
@@ -1316,6 +1325,7 @@ export function createPlayScene(o: {
     },
     mash,
   };
+  (api as any).planetScene = planetScene;
   return api;
 }
 

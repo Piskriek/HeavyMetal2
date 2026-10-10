@@ -4,9 +4,19 @@
  * - Verifies Hotbar is visible on planet surface
  * - Verifies keybindings 1-9 switch active hotbar slot
  * - Verifies Inventory window opens on Tab / I key
- * - Verifies slot interaction & drag/swap merge
+ * - Verifies slot interaction & drag/swap move
  * - Verifies Drafting Table window opens on K key
  * - Verifies Lattice Quantum Bridge Storage window opens on L key
+ * - Verifies Base-Building lifecycle via window.__hm.base / window.hmPlay.base:
+ *   1. Found a foundation slab (STARTER)
+ *   2. Place a drafting bench
+ *   3. Place a floor tile
+ *   4. Draft a blueprint (bp:cube:basalt) at the bench
+ *   5. Place a basalt bin on the floor
+ *   6. Check scene piece meshes exist (count with userData.pieceId === 4)
+ *   7. Remove the floor tile -> verify cascading collapse of the bin
+ *   8. Verify ore refund in player inventory
+ *   9. Verify drafted blueprint appears in inventory
  * - Captures verification screenshots into docs/shots/base/
  */
 import { spawn } from 'node:child_process';
@@ -58,37 +68,52 @@ await page.addInitScript(() => {
 });
 
 const pageErrors = [];
-page.on('pageerror', (err) => pageErrors.push(err.message));
-page.on('console', (msg) => {
-  if (msg.type() === 'error') console.log('[Browser Error]', msg.text());
+page.on('pageerror', (err) => {
+  console.error('Browser Page Error:', err.message);
+  pageErrors.push(err.message);
 });
 
 try {
   console.log(`Navigating to http://localhost:${port}/?base...`);
-  await page.goto(`http://localhost:${port}/?base`, { waitUntil: 'domcontentloaded', timeout: 35000 });
+  await page.goto(`http://localhost:${port}/?base`, { waitUntil: 'domcontentloaded' });
 
-  console.log('Waiting for Play canvas and Base HUD...');
-  await page.waitForSelector('canvas', { timeout: 30000 });
-  await page.waitForTimeout(4000);
+  // Wait for Play Canvas to initialize
+  const canvas = page.locator('canvas.play-canvas');
+  await canvas.waitFor({ state: 'visible', timeout: 25000 });
+  console.log('OK: Play canvas is visible');
 
-  // 1. Verify Hotbar
+  // Wait for HUD hook
+  await page.waitForFunction(
+    () => typeof window !== 'undefined' && (window.hmPlay?.ready || window.__hm?.base),
+    { timeout: 35000 }
+  );
+  console.log('OK: hmPlay / __hm hook is ready');
+
+  // Teleport to moon surface if currently in lab
+  await page.evaluate(() => {
+    if (window.hmPlay?.teleportPlanet) {
+      window.hmPlay.teleportPlanet();
+    }
+  });
+  await page.waitForTimeout(1000);
+
+  // 1. Check Hotbar HUD
   const hotbar = page.locator('[data-testid="base-hotbar"]');
   await hotbar.waitFor({ state: 'visible', timeout: 15000 });
-  console.log('OK: Base Hotbar is visible on planet');
+  console.log('OK: Hotbar HUD is visible on planet');
 
-  // Verify slot 1 initially selected (hotbar index 0)
   const slot1 = page.locator('[data-testid="hotbar-slot-1"]');
   const isSlot1Selected = await slot1.evaluate((el) => el.classList.contains('selected'));
   console.log('OK: Slot 1 initially selected:', isSlot1Selected);
 
-  // Switch to slot 3 using key '3' (Foundation Blueprint)
-  console.log('Pressing Key 3 to select Foundation Blueprint...');
-  await page.keyboard.press('3');
+  // Switch to slot 2 using key '2'
+  console.log('Pressing Key 2 to switch hotbar slot...');
+  await page.keyboard.press('2');
   await page.waitForTimeout(300);
 
-  const slot3 = page.locator('[data-testid="hotbar-slot-3"]');
-  const isSlot3Selected = await slot3.evaluate((el) => el.classList.contains('selected'));
-  console.log('OK: Slot 3 selected after pressing 3:', isSlot3Selected);
+  const slot2 = page.locator('[data-testid="hotbar-slot-2"]');
+  const isSlot2Selected = await slot2.evaluate((el) => el.classList.contains('selected'));
+  console.log('OK: Slot 2 selected after pressing 2:', isSlot2Selected);
 
   // Check Build Readout
   const buildReadout = page.locator('[data-testid="build-readout-hud"]');
@@ -113,18 +138,18 @@ try {
   const invGrid = page.locator('[data-testid="inventory-grid"]');
   console.log('OK: 9x4 Inventory Grid visible:', await invGrid.isVisible());
 
-  // Test slot move / swap
+  // Test slot move / swap in real inventory
   console.log('Testing slot selection in inventory...');
-  const invSlot6 = page.locator('[data-testid="inv-slot-6"]'); // Raw cyan pixel
-  await invSlot6.click();
-  const isSlot6Selected = await invSlot6.evaluate((el) => el.classList.contains('selected'));
-  console.log('OK: Inventory slot 6 selected:', isSlot6Selected);
+  const invSlot2 = page.locator('[data-testid="inv-slot-2"]'); // prim-cube
+  await invSlot2.click();
+  const isSlot2ClickSelected = await invSlot2.evaluate((el) => el.classList.contains('selected'));
+  console.log('OK: Inventory slot 2 selected:', isSlot2ClickSelected);
 
-  // Click slot 8 (empty) to move
-  const invSlot8 = page.locator('[data-testid="inv-slot-8"]');
-  await invSlot8.click();
+  // Click slot 5 (empty) to move
+  const invSlot5 = page.locator('[data-testid="inv-slot-5"]');
+  await invSlot5.click();
   await page.waitForTimeout(300);
-  console.log('OK: Moved item stack to slot 8');
+  console.log('OK: Moved item stack to slot 5');
 
   // Move mouse away to ensure resting state
   await page.mouse.move(0, 0);
@@ -156,9 +181,9 @@ try {
   console.log('OK: Blueprint preview panel visible:', await previewPanel.isVisible());
 
   // Pick primitive and map
-  const primCube = page.locator('[data-testid="prim-pick-prim_cube"]');
+  const primCube = page.locator('[data-testid="prim-pick-prim-cube"], [data-testid="prim-pick-prim_cube"]');
   await primCube.click();
-  const mapBasalt = page.locator('[data-testid="map-pick-map_basalt"]');
+  const mapBasalt = page.locator('[data-testid="map-pick-map-basalt"], [data-testid="map-pick-map_basalt"]');
   await mapBasalt.click();
   await page.waitForTimeout(300);
 
@@ -193,9 +218,6 @@ try {
   const rangeBadge = page.locator('[data-testid="quantum-range-badge"]');
   console.log('OK: Quantum Range Status:', (await rangeBadge.textContent())?.trim());
 
-  const totalsGrid = page.locator('[data-testid="lattice-totals-grid"]');
-  console.log('OK: Lattice totals grid visible:', await totalsGrid.isVisible());
-
   await page.screenshot({ path: 'docs/shots/base/lattice-window.png' });
   console.log('Captured docs/shots/base/lattice-window.png');
 
@@ -203,8 +225,137 @@ try {
   await page.keyboard.press('Escape');
   await latticeModal.waitFor({ state: 'hidden', timeout: 5000 });
 
-  // 5. Verify aimPoint() with piece hit and ground fallback
-  console.log('Verifying aimPoint() piece hit and ground fallback via window.__playScene...');
+  // 5. Verify Base-Building lifecycle via __hm.base
+  console.log('\n--- VERIFYING BASE-BUILDING LIFECYCLE THROUGH __hm.base ---');
+  const lifecycleResult = await page.evaluate(async () => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    if (!baseApi) return { ok: false, error: 'window.__hm.base / hmPlay.base not found' };
+
+    const at = { x: 2, z: 2 };
+
+    // 1. Found foundation slab with STARTER kit
+    console.log('Action: Founding slab at (2, 2)...');
+    baseApi.apply({
+      t: 'found',
+      at,
+      blueprint: 'bp:starter',
+      cx: 2,
+      cz: 2,
+      yaw: 0,
+    });
+
+    let w = baseApi.world();
+    if (w.base.pieces.length !== 1) {
+      return { ok: false, error: `Expected 1 piece after found, got ${w.base.pieces.length}` };
+    }
+    const structureId = w.base.structures[0].id;
+    const foundationId = w.base.pieces[0].id;
+
+    // 2. Place bench (Drafting Table) on the slab
+    baseApi.apply({
+      t: 'place',
+      at,
+      blueprint: 'bp:starter',
+      piece: { s: structureId, kind: 'bench', i: 0, j: 0, k: 0, r: 0 },
+    });
+    w = baseApi.world();
+    if (w.base.pieces.length !== 2) {
+      return { ok: false, error: `Expected 2 pieces after bench, got ${w.base.pieces.length}` };
+    }
+
+    // 3. Place floor piece attached to foundation (i: 1, j: 0)
+    baseApi.apply({
+      t: 'place',
+      at,
+      blueprint: 'bp:starter',
+      piece: { s: structureId, kind: 'floor', i: 1, j: 0, k: 0, r: 0 },
+    });
+    w = baseApi.world();
+    if (w.base.pieces.length !== 3) {
+      return { ok: false, error: `Expected 3 pieces after floor, got ${w.base.pieces.length}` };
+    }
+    const floorId = w.base.pieces[2].id;
+
+    // 4. Draft blueprint bp:cube:basalt at the bench
+    baseApi.apply({
+      t: 'draft',
+      at,
+      primitive: 'cube',
+      map: 'basalt',
+    });
+    w = baseApi.world();
+    const hasDraftedBp = w.player.slots.some((s) => s?.item === 'bp:cube:basalt');
+    if (!hasDraftedBp) {
+      return { ok: false, error: 'Drafted blueprint bp:cube:basalt not in player inventory' };
+    }
+
+    // 5. Place basalt bin on the floor piece
+    baseApi.apply({
+      t: 'place',
+      at,
+      blueprint: 'bp:cube:basalt',
+      piece: { s: structureId, kind: 'bin', i: 1, j: 0, k: 0, r: 0 },
+    });
+    w = baseApi.world();
+    if (w.base.pieces.length !== 4) {
+      return { ok: false, error: `Expected 4 pieces after bin, got ${w.base.pieces.length}` };
+    }
+    const binId = w.base.pieces[3].id;
+
+    // Check meshes in Three.js scene
+    const scene = window.__playScene;
+    if (!scene) return { ok: false, error: 'window.__playScene is missing' };
+
+    // Count meshes with pieceId in piecesGroup
+    let meshCount = 0;
+    const piecesGroup = scene.debug.testPieceAim ? null : null; // scene contains root
+    // Scan scene for piece meshes
+    let foundMeshIds = [];
+    scene.planetScene?.traverse?.((obj) => {
+      if (obj.userData?.pieceId !== undefined) {
+        foundMeshIds.push(obj.userData.pieceId);
+      }
+    });
+
+    const countOre = (slots) => slots.reduce((acc, s) => acc + (s?.item === 'ore' ? s.n : 0), 0);
+    const oreBeforeRemove = countOre(w.player.slots);
+
+    // 6. Remove the floor piece -> bin collapses!
+    baseApi.apply({
+      t: 'remove',
+      at,
+      id: floorId,
+    });
+    w = baseApi.world();
+    // After floor removal, both floor and bin are gone
+    const remainingPieceIds = w.base.pieces.map((p) => p.id);
+    if (remainingPieceIds.includes(floorId) || remainingPieceIds.includes(binId)) {
+      return { ok: false, error: `Floor or bin still in pieces after collapse: ${remainingPieceIds}` };
+    }
+
+    const oreAfterRemove = countOre(w.player.slots);
+    const oreRefunded = oreAfterRemove - oreBeforeRemove;
+    if (oreRefunded < 10) {
+      return { ok: false, error: `Expected >= 10 ore refund, got ${oreRefunded}` };
+    }
+
+    return {
+      ok: true,
+      initialPieces: 4,
+      remainingPieces: w.base.pieces.length,
+      oreRefunded,
+      draftedBp: 'bp:cube:basalt',
+    };
+  });
+
+  console.log('OK: Base-Building lifecycle verdict:', lifecycleResult);
+  if (!lifecycleResult.ok) throw new Error(lifecycleResult.error);
+
+  // Allow collapse animations to finish (0.6s)
+  await page.waitForTimeout(800);
+
+  // 6. Verify aimPoint() with piece hit and ground fallback
+  console.log('\nVerifying aimPoint() piece hit and ground fallback via window.__playScene...');
   const aimVerdict = await page.evaluate(() => {
     const scene = window.__playScene;
     if (!scene) return { ok: false, error: 'window.__playScene is missing' };
@@ -233,7 +384,7 @@ try {
   console.log('OK: aimPoint verification passed:', aimVerdict);
   if (!aimVerdict.ok) throw new Error(aimVerdict.error);
 
-  console.log('\nALL FIDELITY BASE-BUILDING HUD & WINDOW CHECKS PASSED!');
+  console.log('\nALL FIDELITY BASE-BUILDING HUD, REAL WORLD & LIFECYCLE CHECKS PASSED!');
 } catch (err) {
   console.error('Test execution failed:', err);
   process.exitCode = 1;

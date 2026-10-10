@@ -1,0 +1,60 @@
+W1 (stage-1 wrapper, every 13 panel):
+A realtime 3D GAME ENGINE SCREENSHOT, Blender/Unity style render at stage-1 low-poly fidelity: flat-shaded triangle meshes, a restricted palette of about 16 flat colours, soft physically-based lighting, gentle ambient occlusion, clean anti-aliased edges — STRICTLY a 3D render, absolutely NO line art, NO black contour outlines, NO cel shading, NOT a cartoon or illustration. No text, no UI, no watermark. Design-sheet panel: ONE base-building piece alone, three-quarter view, filling about two thirds of frame height, standing on a small patch of low-poly regolith (tan and grey flat facets); black starless sky behind; soft key light from frame right, one soft shadow.
+
+W6 (stage-6 wrapper, every 13 panel):
+Photorealistic 3D render — a videogame base-building design study at STAGE 6 fidelity: full PBR materials, worn painted steel, rust at seams, grease, dust and patina; it has stood for decades and is weathered, with moss patches and small wildflowers at its feet and creeping onto the regolith; soft blue sky with a few thin clouds; warm low sun from frame right. Design-sheet panel: ONE base-building piece alone, three-quarter view, filling about two thirds of frame height, standing on regolith. No text, no UI, no watermark. NOT a cartoon, NOT low poly.
+
+P-FOUNDATION: a heavy foundation slab, 4 metres by 4 metres and about 0.5 metres thick, sitting on sloped regolith; a LEVELLING SKIRT on all four sides drops down into the ground so no edge floats, with dirt against the skirt; four ANCHOR BOLTS with hex nuts visible on the top face; a thick black-and-yellow HAZARD-STRIPED edge band around the perimeter; one thick cable entering through a low ribbed steel floor cable cover.
+
+P-WALL: a structural wall panel, 4 metres wide and 3 metres tall, standing upright on a hazard-striped plinth bolted to the ground with anchor bolts; flat boxed steel panel with thin seams, bolted corner brackets at both ends, one small status light; a hazmat scientist 1.8 metres tall in a white suit, helmet and dark visor stands at its foot beside it for scale.
+
+P-PILLAR: a corner pillar post, a square box-section steel column about 3 metres tall, standing on a bolted base plate with anchor bolts, a capped top plate and a bracing gusset at its foot; a hazard-striped band near the base.
+
+P-FLOOR: an upper floor and roof panel, a flat steel deck 4 metres by 4 metres, seated on the top plates of four short steel posts that stand on the ground at its corners; hazard-striped edge, a small drain grate, bolts through the corner joints.
+
+P-RAMP: a ramp, a sloped steel plate that rises exactly one storey (3 metres) over one 4-metre cell; its foot rests on the ground on a bolted foundation edge, its top meets a raised deck; ribbed grip tread, side rails, hazard-striped edges, bolts.
+
+P-AIRLOCK: a reinforced airlock, a wall piece 4 metres wide and 3 metres tall with a SEALED thick round-cornered DOOR centred in it, a dark rubber PRESSURE SEAL ring around the door edge, a green STATUS LIGHT lit above the door, a small pressure gauge with its needle in the green, a hazard-striped threshold step bolted to a foundation slab.
+
+P-HARDPOINT-EMPTY: a heavy terraformer hardpoint: a square 2 by 2 pad of four grounded foundation slabs (8 by 8 metres in total), with a central round SOCKET raised on a bolted mounting RING with visible bolts, a POWER GLAND and a DATA GLAND on the socket's side, each with a thick cable running along a low ribbed steel floor cable cover; the socket is empty and capped with a steel cover plate.
+
+P-HARDPOINT-MILL: the same heavy terraformer hardpoint on its 2 by 2 pad of grounded slabs, now with a HEAVY TEXTURE MILL bolted to the socket ring: a massive boxy grinding mill about twice the height of a field texture mill, roughly 4 metres tall, with a top FEED HOPPER heaped with dark, still ore chunks, a wide REAR VENT GRILLE (no chimney, no stack) pouring a plume of small crisp SQUARE hot-pink pixels that spread and thin as they rise; thick power cables run from the glands along low ribbed steel floor cable covers to the ground.
+
+P-BIN: a quantum storage bin, a squat heavy steel box container about 2 metres wide and 2 metres high on four bolted feet, a hatch with a keypad, and a visible QUANTUM LINK EMITTER on its top: a finned dish with a pale white-violet glowing lens aimed up, a thin beam of light rising from the lens; one cable from a low ribbed steel floor cable cover into its side.
+
+P-PYLON: a quantum repeater pylon, a slim tapered steel mast about 6 metres tall (two storeys) on a square concrete footing pad with four anchor bolts, carrying a ring of emitter cups at its top, a distribution box with cable glands at its foot, and one thick cable running in a floor cover to the ground.
+
+P-DRAFTING: a drafting table, a sturdy waist-high steel workbench on four bolted legs with a sloped top; on its surface a geometric primitive (a rough-cut solid steel cube, sitting in a bench cradle) beside a MATERIAL SWATCH, a flat square speckled regolith-basalt texture tile inlaid in the bench top, and a small glowing blueprint plate between them; one cable from a floor cover into the table's leg.
+
+REVISIONS (after review of the first stage-1 batch; these replace the paragraphs above):
+
+P-FOUNDATION (rev 2): a heavy foundation slab, 4 metres by 4 metres and about 0.5 metres thick, its top at ground level; a LEVELLING SKIRT on all four sides sinks below the surface, so the regolith is piled up against the skirt and no edge floats; four ANCHOR BOLTS with hex nuts visible on the top face; a thick black-and-yellow HAZARD-STRIPED edge band on the top perimeter; one thick cable entering through a low ribbed steel floor cable cover.
+
+P-HARDPOINT-MILL (rev 2): the same heavy terraformer hardpoint, its 2 by 2 pad of four grounded foundation slabs (8 by 8 metres) clearly visible, with a HEAVY TEXTURE MILL bolted to the central socket ring: a massive boxy grinding mill about twice the height of a field texture mill, roughly 4 metres tall, with a top FEED HOPPER heaped with dark, still ore chunks, a wide REAR VENT GRILLE (no chimney, no stack) pouring a plume of small crisp SQUARE hot-pink pixels that spread and thin as they rise; thick power cables run from the glands along low ribbed steel floor cable covers across the pad.
+
+P-PYLON (rev 2): a quantum repeater pylon, a tapered steel LATTICE tower about 6 metres tall (two storeys) on a square concrete footing pad with four anchor bolts, ending in a ring-shaped repeater array at its top, a distribution box with cable glands at its foot, and one thick cable running in a floor cover to the ground. A tower, not a lamp post: no lamps, no cups.
+
+WRAPPER ADDITION (rev 2, every panel): "ONE single image: one render, one camera, NOT a split-screen, NOT a diptych, NOT a multi-view sheet." Used for the pylon redo (13-pylon-s1 rev 2).
+
+REVISION 3 (lead-engineer review of 185e9d7e). Fidelity stages raise the RESOLUTION of one world; they are not time passing. S6 is the same piece in the same condition, at full PBR. S1 is the low-poly version of the S6 design. Where the pair differed, the S1 design was kept as the one design and S6 was redrawn to match it.
+
+W6 (rev 3, replaces W6 for every 13 panel):
+Photorealistic 3D render — a videogame base-building design study: the SAME piece as its stage-1 version, identical silhouette, parts and proportions, rendered at STAGE 6 resolution: full PBR materials, clean painted steel and ceramic, crisp decals, light honest wear at most; in service and freshly maintained — NO rust sheets, NO peeling, NO ruin, NO decay. It stands on the lush terraformed plot: green grass, clover and small wildflowers at its feet, moss on the stone; soft blue sky with a few thin clouds; warm low sun from frame right. Design-sheet panel: ONE base-building piece alone, three-quarter view, filling about two thirds of frame height. No text, no UI, no watermark. NOT a cartoon, NOT low poly. ONE single image, not a split-screen.
+
+P-MILL (rev 3, S1 design kept; S6 redrawn to match): a boxy grinding mill about 4 metres tall on four bolted feet: at the FRONT top, a FEED HOPPER heaped with dark, still ore chunks; on the RIGHT flank a wide flat REAR VENT GRILLE pouring a plume of small crisp SQUARE hot-pink pixels that spread and thin as they rise (no chimney, no stack); a simple side service hatch; thick power cables leave its base through low ribbed steel floor cable covers across the 2 by 2 pad of slabs.
+
+P-PILLAR (rev 3, S1 design kept): a corner pillar post, a square box-section steel column about 3 metres tall with a capped square top plate, a hazard-striped band near the base, a bolted base plate with four anchor bolts and two triangular bracing gussets at its foot.
+
+P-HARDPOINT (rev 3, S1 design kept): a heavy terraformer hardpoint: a square 2 by 2 pad of four grounded slabs (8 by 8 metres), a SHORT round socket cylinder on a bolted mounting ring with visible bolts, a POWER GLAND (orange) and a DATA GLAND (green) on the socket's side, each with a cable running along a low ribbed steel floor cable cover; the socket is empty and capped with a flat cover plate.
+
+P-BIN (rev 3, S1 design kept): a quantum storage bin, a squat steel box container about 2 metres square on four bolted feet, a hatch with a keypad, and a small finned QUANTUM LINK EMITTER dish on its top with a pale white-violet lens and a thin beam of light rising from it; one cable from a low ribbed steel floor cable cover into its side.
+
+SCENE 14 (rev 3): the four-cell sealed outpost, see README section 14 (verbatim there).
+
+REVISION 3b (review of rev-3 S6 renders): five S6 renders came back with baked text (labels, unit codes, logos, "STAGE 6", "LOAD CAP"). Every S6 prompt now also carries this clause, verbatim, after the W6 wrapper:
+"NO lettering, NO words, NO numbers, NO logos, NO stencils, NO labels, NO signs anywhere on any surface: plain blank painted steel and ceramic only."
+Rejected rev-3 files are kept in rejected/ (*-rev3-baked-text.png). Still to redraw with the clause: hardpoint-empty-s6, pylon-s6 (top ring as in S1, no label on the distribution box), foundation-s6, wall-s6, floor-s6, and bin-s6 (its dish must match the S1 dish: no fins).
+
+REVISION 3c (redraw pass). Every S6 prompt = W6 (rev 3) + the no-lettering clause (rev 3b) + the piece paragraph. Pieces redrawn: hardpoint-empty-s6, pylon-s6, bin-s6 (plain dish, NO fins, to match S1), foundation-s6, wall-s6, floor-s6, ramp-s6 (clean, no rust), airlock-s6 (clean wall, no rust, light wear at most), drafting-s6 (flat horizontal top, to match S1).
+
+REVISION 3d (last two redraws). pylon-s6: the ring top is a PLAIN flat ring, the same as the low-poly version: NO insulators, NO coils, NO hex housings, NO antennas, NO rods, NO cables on the ring. drafting-s6: the table and its items only: NO extra cabinet, NO machine, NO other objects, NO symbols.

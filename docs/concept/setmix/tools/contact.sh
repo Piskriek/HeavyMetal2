@@ -6,12 +6,14 @@ BG="#14161a"; FG="#e8eaee"; FONT=DejaVu-Sans; BOLD=DejaVu-Sans-Bold
 names=( "01 · lab-first-play" "02 · gate-power-on" "03 · gate-on-your-plot"
         "04 · menu-setmix" "05 · menu-goblin-racing" "06 · sheet-gate"
         "07 · sheet-lab-power-and-machines" "08 · plot-stage-ladder" "09 · sheet-coverage-growth"
-        "10 · plot-stage-6-hero" "11 · desolate-horizon" "12 · sheet-field-machines" )
+        "10 · plot-stage-6-hero" "11 · desolate-horizon" "12 · sheet-field-machines"
+        "13 · sheet-base-construction" "14 · outpost-stage-3" )
 files=( 01-lab-first-play 02-gate-power-on 03-gate-on-your-plot
         04-menu-setmix 05-menu-goblin-racing 06-sheet-gate
         07-sheet-lab-power-and-machines 08-plot-stage-ladder 09-sheet-coverage-growth
-        10-plot-stage-6-hero 11-desolate-horizon 12-sheet-field-machines )
-convert -size 2620x1336 xc:"$BG" "$T/base.png"
+        10-plot-stage-6-hero 11-desolate-horizon 12-sheet-field-machines
+        13-sheet-base-construction 14-outpost-stage-3 )
+convert -size 2620x1800 xc:"$BG" "$T/base.png"
 for i in "${!files[@]}"; do
   col=$(( i % 4 )); row=$(( i / 4 ))
   x=$(( 40 + col * 640 )); y=$(( 40 + row * 432 ))

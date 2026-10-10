@@ -6,7 +6,7 @@
 ## 1. Setup state
 - The CLI is installed: `rundot` 7.17.0 at `%LOCALAPPDATA%\Programs\Rundot\rundot.exe`. It is not on PATH, so call it by that full path or add the folder to PATH.
 - The official `install.ps1` fails to parse under Windows PowerShell 5.1. It is UTF-8 without a BOM, and its ✓ character decodes to a curly quote. I ran the same steps by hand instead: download the release zip from `series-ai/rundot-cli-releases`, unzip it, and copy `rundot.exe`.
-- Sign-in is still to do: the owner runs `rundot login` in their browser. Until then nothing can be priced or generated.
+- Signed in on 2026-10-10. The owner approved the CLI in their own browser. The balance is 100,000 credits; `rundot credits` shows usage per service.
 - The repo already depends on `@series-inc/rundot-game-sdk` (apps/web, `src/platform/boot.ts`), so the SDK docs are already here.
 - No game is registered yet (no `game.config.*.json`). Registering one (`rundot import`, then `init` and `deploy`) is a separate owner decision.
 
@@ -18,6 +18,15 @@
   - The one 3D price given is Tripo's texture tiers: $0.20, $0.30 or $0.40, which is 200 to 400 credits before any platform markup.
   - **Guess, to be checked with one draft run and `rundot credits`:** about 200 to 800 credits per generated model, plus remesh, rig and animate on top.
 - Spending caps exist only at runtime (`rundot/threeDGen.config.json`, `rundot/audioGen.config.json`). The CLI is design time, so the budget below is held by discipline.
+
+### Real quotes (2026-10-10, `rundot generate estimate`, free; RUN calls them exact)
+| Item | Credits |
+|---|---|
+| TTS, eleven_v3 or multilingual_v2 | about **0.15 per character**: a 140-character line costs 23, 987 characters cost 149 |
+| SFX, 3 s | 9 |
+| Music, 60 s | 225 |
+| Image, default model | 120 (the docs list 80, so live prices run about 1.5 times the docs) |
+| 3D | no estimate kind exists; measure it with one draft run |
 
 ## 3. The 3D pipeline
 All steps are on the CLI under `rundot game`, and each one downloads a GLB:
@@ -66,18 +75,16 @@ Keeping it at design time means:
 - **The engine:** ElevenLabs TTS (`eleven_v3` by default). It understands audio tags (`[whispers]`, `[pause]`). Stability goes 0 to 1: about 0.3 for expressive dialogue, 0.7 or more for flat UI narration.
 - **Making the voice:** `generate design-voice --description` returns up to 3 candidates. `save-voice` keeps one permanently. `list-voices` shows the stock voices.
 - **Script size:** the bible's script today is 10 lines, about 1,800 characters. A full Acts I to IV run with reactive barks is likely 15k to 25k characters, and about 3 times that once retakes are counted.
-- **Price:** run `rundot generate estimate tts --text "<a line>"` after login. Then size the reserve from the real figure.
+- **Price:** about 0.15 credits per character. The full script with retakes (about 75k characters) comes to about **11k credits**.
+- **Library:** 762 voices: 21 premade, 410 professional, 287 generated, 44 cloned. Each one has a free preview clip. The shortlist for the mentor: Sarah, Lily, Matilda (premade); Cate, Tamsin, Nicola, Viktoria, Emily E. (professional). Hearing one of our own lines in a voice costs about 23 credits.
 
 ## 5. Credit plan (proposal for the owner)
 | Pool | Credits | Notes |
 |---|---|---|
-| **Narrator VO (held first)** | **30,000** | Voice design, the full script with retakes, and the Act re-records. Generous until the TTS quote comes in. |
-| 3D models | 45,000 | Creatures, props, and Astro's extra clips. Always run `draft` before `standard`. |
+| **Narrator VO (held first)** | **15,000** | The full script with retakes is about 11k at the quoted rate. The rest covers voice design and Act re-records. |
+| 3D models | 55,000 | Creatures, props, and Astro's extra clips. Always run `draft` before `standard`. |
 | Images (crops, turnarounds, UI or marketing) | 10,000 | |
 | SFX and music | 5,000 | |
-| Buffer | 10,000 | |
+| Buffer | 15,000 | |
 
-**First steps after login:**
-1. `rundot credits`
-2. `rundot generate estimate tts`
-3. One `draft` `generate-3d` test on a single concept crop, to measure the real 3D price.
+**Next steps:** audition the shortlisted voices on our own lines (about 25 credits each), then one `draft` `generate-3d` test to measure the real 3D price. Both wait for the owner to say yes.

@@ -1,0 +1,40 @@
+One three.js module, `src/index.ts` (package @hm/rovergear) and `tests/rovergear.test.ts`. Then STOP.
+RULES: strict TS (noUncheckedIndexedAccess), no any/DOM/Date/Math.random. Imports: `three`, and `mergeGeometries` from three/examples/jsm/utils/BufferGeometryUtils.js. Merge per material (<= 8 top-level children per group). NO transmission. Stage 1 = chunky low poly, flat; stage 6 = full detail. Nothing floats (every part touches its holder), no poke-through except at welds, no coplanar faces, parts non-indexed with position, normal, uv.
+KIT: a Vehicle Fabricator and three rovers in the base kit style (slate-blue steel, gunmetal, hazard bands, amber lamps).
+FRAMES (m, y up, forward = +z):
+- A ROVER's body origin is the centre between its axles at hub height.
+- WHEELS are separate: the game spins them about local x and steers about y. Wheel origin = hub, axle along x.
+- hubs: scout (+-0.8, 0, +-1.1); hauler (+-1.0, 0, 1.8 / -0.6 / -1.8); crawler is tracked, so draw the tracks and road wheels into the body and return no wheels.
+- The FABRICATOR stands on a hardpoint ring like a heavy machine: origin = ring top centre, within x, z -4..4.
+BUILDERS (m, { stage }):
+- fabricator: a steel gantry about 5 m tall straddling a 4.5 x 3 m printing bed, a print head on the gantry beam (parts.head, origin at the beam centre: the game slides it in x), a control console at one corner, cable glands. Sockets 'bed' (bed top centre), 'power'.
+- scout: a one-seat buggy about 3.2 m long. An open tubular roll cage, one seat, a small tool rack at the back, twin amber headlamps, an antenna. Wheel radius 0.45 (wire-mesh at S6).
+- hauler: about 6 m long. A two-seat cab at the front, a flat bed, a bolted storage bin with the base kit's small finned link dish on top (socket 'dish'), a tow hitch, side steps. Wheel radius 0.55, chunky tyres.
+- crawler: about 7 m long, tracked. An armoured cab, two track units with road wheels, a folding beam-drill arm on the front (parts.arm, origin at its hinge; the game sets rotation.x), a sensor mast, a heat-sink spine. Sockets 'drill' (the arm tip), 'mast'.
+Each rover also has 'seat' sockets (one per seat) and two amber headlamp lamps.
+API: export interface Box{min:[number,number,number];max:[number,number,number]} Socket{name:string;at:[number,number,number]} Rover{body:THREE.Group;wheel:THREE.Group|null;wheelRadius:number;hubs:[number,number,number][];colliders:Box[];sockets:Socket[];lamps:THREE.Mesh[];parts:Record<string,THREE.Object3D>} Station{group:THREE.Group;colliders:Box[];sockets:Socket[];lamps:THREE.Mesh[];parts:Record<string,THREE.Object3D>}; LabMaterials{gunmetal,darkSteel,paint,copper,rubber,hazard,concrete:THREE.MeshStandardMaterial;glass:THREE.MeshPhysicalMaterial}; createMaterials(); setLamp(lamp, glow 0..1); triangles(g:THREE.Object3D):number (counts nested); fabricator(m,o):Station; scout/hauler/crawler(m,o):Rover.
+BUDGETS (triangles, body + its wheels): stage 1 <= 1500; stage 6 <= 12000 (fabricator <= 10000).
+Keep this test unchanged; add yours:
+```ts
+import test from 'node:test'; import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { createMaterials, fabricator, scout, hauler, crawler, setLamp, triangles, type Rover } from '../src/index';
+const m = createMaterials(), bb = (o: THREE.Object3D) => new THREE.Box3().setFromObject(o);
+const has = (s: { sockets: { name: string }[] }, ...n: string[]) => n.forEach((x) => assert.ok(s.sockets.some((k) => k.name === x), x));
+test('rovers fit their hubs and lengths; the fabricator stands on its ring', () => {
+  for (const stage of [1, 6]) {
+    const o = { stage }, r: Record<string, Rover> = { scout: scout(m, o), hauler: hauler(m, o), crawler: crawler(m, o) };
+    for (const [k, v] of Object.entries(r)) {
+      const tri = triangles(v.body) + (v.wheel ? triangles(v.wheel) * v.hubs.length : 0); assert.ok(tri > 0 && tri <= (stage === 1 ? 1500 : 12000), `${k} s${stage}: ${tri}`);
+      assert.ok(v.body.children.length <= 8 && v.colliders.length > 0 && v.lamps.length >= 2, k); has(v, 'seat'); setLamp(v.lamps[0]!, 1);
+      if (v.wheel) { const w = bb(v.wheel); assert.ok(Math.abs(w.max.y - v.wheelRadius) < 0.08 && Math.abs(w.min.y + v.wheelRadius) < 0.08, `${k} wheel radius`); }
+    }
+    assert.equal(r.scout!.hubs.length, 4); assert.equal(r.hauler!.hubs.length, 6); assert.equal(r.crawler!.wheel, null);
+    const len = (v: Rover) => { const b = bb(v.body); return b.max.z - b.min.z; };
+    assert.ok(len(r.scout!) > 2.6 && len(r.scout!) < 3.8); assert.ok(len(r.hauler!) > 5.2 && len(r.hauler!) < 6.8); assert.ok(len(r.crawler!) > 6 && len(r.crawler!) < 8);
+    has(r.hauler!, 'dish'); has(r.crawler!, 'drill', 'mast'); assert.ok(r.crawler!.parts['arm']);
+    const f = fabricator(m, o), fb = bb(f.group); assert.ok(fb.min.y >= -0.02 && fb.max.y > 4.2 && fb.max.y < 6.2 && fb.min.x >= -4 && fb.max.x <= 4 && fb.min.z >= -4 && fb.max.z <= 4);
+    has(f, 'bed', 'power'); assert.ok(f.parts['head'] && triangles(f.group) <= (stage === 1 ? 1500 : 10000));
+  }
+});
+```

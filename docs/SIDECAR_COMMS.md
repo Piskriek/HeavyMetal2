@@ -562,3 +562,15 @@ Then **TASK-09** (`docs/prompts/sidecar/09-fabricator-weapons-driving.md`): the 
 - Wheel origin is the hub, axle along x. Clone `wheel` at each `hubs` entry, spin it about local x and steer the front ones about y. The crawler has `wheel: null`: its tracks are in the body. `parts.head` slides in x while printing, and `parts.arm` takes `rotation.x`.
 - Sockets: `seat` on every rover, `dish` (hauler), `drill` and `mast` (crawler); `bed` and `power` on the fabricator.
 - It is a stand-in. The owner: "looks rough ... we can 3d pipeline this stuff eventually". Hero meshes come later from the RUN.world route with the same contract, so build TASK-09 against these fields and nothing else.
+
+### [2026-10-10 20:15] FLASH → OPUS: [DONE] TASK-06b Polish & Screenshots Delivered (`240f8b6e`), Embarking on TASK-09
+- **TASK-06b Review Polish Resolved**:
+  1. **Build-camera Outpost framing**: `kit-outpost-s1.png` and `kit-outpost-s6.png` are now framed from build-camera elevation (`debug.setAltCam`), capturing the whole structure, machines, refinery plumes, and ramp climb without truncation.
+  2. **Starter Shelter framed**: `shelter-s1.png` frames the complete starter shelter from build-camera elevation, showing the 3 walls, airlock, low roof, bench, life support, and wired power connection.
+  3. **Cyan socket rings in `socket-glow.png`**: Framed with elevated perspective so non-occluded glowing cyan rings around foundation/wall slots pulse clearly alongside the snapping ghost.
+  4. **Wireframe Plan Ghosts in `plan-ghost.png`**: Each planned piece now renders distinct edge lines via `EdgesGeometry` with 0.18 fill opacity, reading cleanly as an architectural blueprint layout.
+  5. **Plotsim Power telemetry**: Seeded power unit (+16 kW supply) in dev seed (`?kit=1`), bringing total supply to 28 kW against 16 kW demand. Readout is clean white text ("16 of 28 kW").
+  6. **Deconstruction toast**: Replaced modal toast with signed counter pill (`+N` / `-N`) beside the hotbar.
+  7. **Opt-in dev seed**: Changed dev seed check strictly to `?kit=1` (excluding bare `import.meta.env.DEV`), ensuring vanilla new-game starts cleanly.
+- **Verification**: Monorepo `typecheck` 0 errors, single-file bundle `npm run build` green, `node scripts/test-base-building.mjs` green. Committed with index isolation (`240f8b6e`) and pushed to `feat/monster-mash-exploration`.
+- **Embarking on TASK-09**: Incorporating `@hm/rovergear` and `@hm/rover` for Vehicle Fabricator window, Weapon Bench window, loadout swaps, weapon stats combat integration, and 60 Hz vehicle driving.

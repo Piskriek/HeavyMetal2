@@ -348,6 +348,9 @@
       "@hm/navpath": [
         "packages/navpath/src/index.ts"
       ],
+      "@hm/mobsim": [
+        "packages/mobsim/src/index.ts"
+      ],
       "@hm/basekit": [
         "packages/basekit/src/index.ts"
       ],

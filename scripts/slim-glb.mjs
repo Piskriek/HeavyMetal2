@@ -34,12 +34,15 @@ const doc = await io.read(src);
 for (const ext of doc.getRoot().listExtensionsUsed()) if (ext.extensionName === 'KHR_draco_mesh_compression') ext.dispose();
 const before = triangles(doc);
 await doc.transform(weld());
-// meshopt's simplifier works to a ratio; it can stop short at UV seams, so tighten until under the target
+// meshopt's simplifier works to a ratio under an error limit. Generated meshes are cut into many texture islands
+// whose borders it guards, so it stops short (11.9k of a 1.2k target on the scout): relax the limit step by step
+// until the target is met, and take the first pass that meets it.
 let ratio = Math.min(1, target / before);
-for (let pass = 0; pass < 4; pass++) {
-  await doc.transform(simplify({ simplifier: MeshoptSimplifier, ratio, error: 0.01 }));
+for (const error of [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1]) {
+  if (ratio >= 1) break;
+  await doc.transform(simplify({ simplifier: MeshoptSimplifier, ratio, error }));
   const now = triangles(doc);
-  if (now <= target * 1.05) break;
+  if (now <= target * 1.1) break;
   ratio = Math.min(1, target / now);
 }
 /**

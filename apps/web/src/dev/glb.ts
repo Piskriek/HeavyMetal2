@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
@@ -55,7 +56,7 @@ async function main(): Promise<void> {
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
 
   const draco = new DRACOLoader(); draco.setDecoderPath('/src/dev/tmp/draco/');
-  const loader = new GLTFLoader(); loader.setDRACOLoader(draco);
+  const loader = new GLTFLoader(); loader.setDRACOLoader(draco); loader.setMeshoptDecoder(MeshoptDecoder);
   const models: THREE.Object3D[] = [], lines: string[] = [];
   let x = 0;
   for (const [i, src] of srcs.entries()) {

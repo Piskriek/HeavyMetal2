@@ -1,0 +1,845 @@
+{
+  "about": "RUN.world 3D batch 1 (owner go-ahead 2026-10-10). Each asset: one clean source image made from its approved S6 concept panel, then Hunyuan image-to-3D, then the local slim and bake. Moving parts are separate assets (wheels, the print head, the crawler arm, the press ram, the projector head). Sizes are metres along `axis`. Structural lattice pieces (walls, floors, roofs) stay procedural: they must tile exactly. Runtime effects (pixel plumes, beams, lamp glow) are not modelled.",
+  "assets": [
+    {
+      "id": "scout-body",
+      "panel": "19/19-scout-s6.png",
+      "size": 3.2,
+      "axis": "length",
+      "view": "three-quarter",
+      "subject": "the scout rover's chassis and body with its four wheels REMOVED, built CHUNKY and solid: a roll cage of THICK square-section steel bars (about 12 cm across) with solid steel side panels and a solid roof plate, a deep steel body tub, the single seat, the small tool rack at the back, the twin amber headlamps and a short stubby antenna; bare wheel hubs on short axle stubs show where the wheels mount. No thin tubes, no thin wires: every member is thick and boxy",
+      "class": "rover-body"
+    },
+    {
+      "id": "scout-wheel",
+      "panel": "19/19-scout-s6.png",
+      "size": 0.9,
+      "axis": "height",
+      "view": "wheel",
+      "subject": "one scout rover wheel on its own, built CHUNKY and solid: a thick steel disc rim with six large rounded cut-outs, a heavy hub with bolts at the centre, and a deep treaded tyre band. No thin spokes, no wires",
+      "class": "wheel"
+    },
+    {
+      "id": "hauler-body",
+      "panel": "19/19-hauler-s6.png",
+      "size": 6,
+      "axis": "length",
+      "view": "three-quarter",
+      "subject": "the hauler rover with its six wheels REMOVED: the two-seat cab at the front, the flat load bed, the bolted storage bin with a small finned link dish on its top, the tow hitch and the side steps; bare wheel hubs on short axle stubs show where the wheels mount",
+      "class": "rover-body"
+    },
+    {
+      "id": "hauler-wheel",
+      "panel": "19/19-hauler-s6.png",
+      "size": 1.1,
+      "axis": "height",
+      "view": "wheel",
+      "subject": "one hauler wheel on its own: a chunky treaded rubber tyre on a steel rim, with the hub at the centre",
+      "class": "wheel"
+    },
+    {
+      "id": "crawler-body",
+      "panel": "19/19-crawler-s6.png",
+      "size": 7,
+      "axis": "length",
+      "view": "three-quarter",
+      "subject": "the tracked crawler with its front drill arm REMOVED: the armoured cab, the two track units with their road wheels, the sensor mast and the heat-sink spine; a hinge bracket on the front where the arm mounts",
+      "class": "rover-body"
+    },
+    {
+      "id": "crawler-arm",
+      "panel": "19/19-crawler-s6.png",
+      "size": 1.6,
+      "axis": "length",
+      "view": "side",
+      "subject": "the crawler's folding beam-drill arm on its own, unfolded and lying horizontal: the hinge knuckle at one end, the boom, and the drill head at the tip",
+      "class": "moving-part"
+    },
+    {
+      "id": "fabricator-frame",
+      "panel": "19/19-fabricator-s6.png",
+      "size": 5,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the Vehicle Fabricator station WITHOUT its print head and WITHOUT the ground pad: the steel gantry frame about 5 metres tall straddling the flat printing bed, the gantry beam across the top, the control console at one corner, and the cable glands at the feet",
+      "class": "machine"
+    },
+    {
+      "id": "fabricator-head",
+      "panel": "19/19-fabricator-s6.png",
+      "size": 1.2,
+      "axis": "length",
+      "view": "three-quarter",
+      "subject": "the fabricator's print head on its own: the carriage block that rides along the gantry beam, with the nozzle assembly hanging under it",
+      "class": "moving-part"
+    },
+    {
+      "id": "mill",
+      "panel": "13/13-hardpoint-mill-s6.png",
+      "size": 4,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the heavy texture mill on its own, WITHOUT the pad: the massive boxy grinding mill about 4 metres tall on its round bolted mounting ring, the top feed hopper heaped with dark ore chunks, the wide rear vent grille, and the cable glands at its base. No pixels, no plume, no chimney, no stack",
+      "class": "machine"
+    },
+    {
+      "id": "press-frame",
+      "panel": "17/17-press-s6.png",
+      "size": 4,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the heavy shape press on its own, WITHOUT the pad and with its two hydraulic rams REMOVED: the heavy square steel frame about 4 metres tall, the flat die bed at its base, the feed chute on its top, the louvred rear vent, and the round bolted mounting ring at its foot. No pixels, no plume",
+      "class": "machine"
+    },
+    {
+      "id": "press-ram",
+      "panel": "17/17-press-s6.png",
+      "size": 1.8,
+      "axis": "height",
+      "view": "front",
+      "subject": "one of the heavy press's big hydraulic rams on its own, standing upright: the thick cylinder, its polished piston rod and the flat pressing plate at the bottom",
+      "class": "moving-part"
+    },
+    {
+      "id": "projector-mast",
+      "panel": "17/17-projector-s6.png",
+      "size": 3.2,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the heavy light projector WITHOUT its lamp head and WITHOUT the pad: the short armoured mast about 3 metres tall on its round bolted mounting ring, ending at the top in the yoke and tilt pivot where the lamp head mounts",
+      "class": "machine"
+    },
+    {
+      "id": "projector-head",
+      "panel": "17/17-projector-s6.png",
+      "size": 2,
+      "axis": "length",
+      "view": "three-quarter",
+      "subject": "the projector's big faceted lamp head on its own, about 2 metres across: the front lens (unlit, emitting nothing), the heat-sink fins on its back, the louvred vents round its back rim, and the two pivot bosses on its sides",
+      "class": "moving-part"
+    },
+    {
+      "id": "watermaker",
+      "panel": "17/17-watermaker-s6.png",
+      "size": 4,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the heavy water maker machine on its own, WITHOUT the pad, on its round bolted mounting ring. No pixels, no plume, no water spray",
+      "class": "machine"
+    },
+    {
+      "id": "bin",
+      "panel": "13/13-bin-s6.png",
+      "size": 2,
+      "axis": "length",
+      "view": "three-quarter",
+      "subject": "the quantum storage bin on its own: the squat steel box container about 2 metres square on four bolted feet, the hatch with a keypad, and the small finned quantum link emitter dish on its top (its lens unlit, no beam of light)",
+      "class": "fixture"
+    },
+    {
+      "id": "repeater",
+      "panel": "13/13-pylon-s6.png",
+      "size": 6,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the quantum repeater pylon on its own, built CHUNKY: a tapered tower about 6 metres tall of four THICK box-section steel legs joined by solid steel cross plates (no thin lattice, no thin bars), on its square concrete footing with four anchor bolts, the ring-shaped repeater array at its top, and the distribution box with cable glands at its foot",
+      "class": "fixture"
+    },
+    {
+      "id": "drafting",
+      "panel": "13/13-drafting-s6.png",
+      "size": 2.4,
+      "axis": "length",
+      "view": "three-quarter",
+      "subject": "the drafting table on its own: the sturdy waist-high steel workbench on four bolted legs with a sloped top; on it the rough-cut steel cube in its cradle, the inlaid speckled basalt swatch tile and the small blueprint plate",
+      "class": "fixture"
+    },
+    {
+      "id": "weapon-bench",
+      "panel": "20/20-bench-s6.png",
+      "size": 2.4,
+      "axis": "length",
+      "view": "three-quarter",
+      "subject": "the weapon bench on its own, WITHOUT the room and WITHOUT any weapon on it: the heavy steel bench about 2.4 metres long on four braced legs with bolted feet, the thick slate work top, the empty padded jig clamp at the centre, the pegboard back panel standing on two rear uprights of the bench with tools hung on hooks, and the small parts printer box at one end",
+      "class": "fixture"
+    },
+    {
+      "id": "barrel-short",
+      "panel": "20/20-barrel-short-s6.png",
+      "size": 0.25,
+      "axis": "length",
+      "view": "part",
+      "subject": "the short barrel part on its own, detached from the weapon frame",
+      "class": "weapon-part"
+    },
+    {
+      "id": "barrel-long",
+      "panel": "20/20-barrel-long-s6.png",
+      "size": 0.55,
+      "axis": "length",
+      "view": "part",
+      "subject": "the long barrel part on its own, detached from the weapon frame",
+      "class": "weapon-part"
+    },
+    {
+      "id": "barrel-scatter",
+      "panel": "20/20-barrel-scatter-s6.png",
+      "size": 0.35,
+      "axis": "length",
+      "view": "part",
+      "subject": "the scatter barrel part on its own (the wide multi-bore shotgun barrel), detached from the weapon frame",
+      "class": "weapon-part"
+    },
+    {
+      "id": "core-semi",
+      "panel": "20/20-core-semi-s6.png",
+      "size": 0.3,
+      "axis": "length",
+      "view": "part",
+      "subject": "the semi-auto core module on its own: ONLY the compact receiver insert, a squared steel block about 30 cm long that slots into the empty bay in the middle of the weapon frame, with a single-position fire selector and one amber indicator on its side. It is NOT a whole gun: NO pistol grip, NO trigger, NO trigger guard, NO stock, NO barrel, NO rail, NO magazine",
+      "class": "weapon-part"
+    },
+    {
+      "id": "core-burst",
+      "panel": "20/20-core-burst-s6.png",
+      "size": 0.3,
+      "axis": "length",
+      "view": "part",
+      "subject": "the burst core module on its own: ONLY the compact receiver insert, a squared steel block about 30 cm long that slots into the empty bay in the middle of the weapon frame, with a three-notch rotary fire selector and three small amber indicators on its side. It is NOT a whole gun: NO pistol grip, NO trigger, NO trigger guard, NO stock, NO barrel, NO rail, NO magazine",
+      "class": "weapon-part"
+    },
+    {
+      "id": "core-beam",
+      "panel": "20/20-core-beam-s6.png",
+      "size": 0.3,
+      "axis": "length",
+      "view": "part",
+      "subject": "the beam core module on its own: ONLY the compact receiver insert, a squared steel block about 30 cm long that slots into the empty bay in the middle of the weapon frame, with a ribbed copper field coil window and a pale violet emitter lens on its side. It is NOT a whole gun: NO pistol grip, NO trigger, NO trigger guard, NO stock, NO barrel, NO rail, NO magazine",
+      "class": "weapon-part"
+    },
+    {
+      "id": "sight-iron",
+      "panel": "20/20-sight-iron-s6.png",
+      "size": 0.12,
+      "axis": "length",
+      "view": "part",
+      "subject": "the iron sight part on its own, detached from the weapon frame's top rail",
+      "class": "weapon-part"
+    },
+    {
+      "id": "sight-scope",
+      "panel": "20/20-sight-scope-s6.png",
+      "size": 0.3,
+      "axis": "length",
+      "view": "part",
+      "subject": "the scope sight part on its own with its rail mount, detached from the weapon frame",
+      "class": "weapon-part"
+    },
+    {
+      "id": "sight-holo",
+      "panel": "20/20-sight-holo-s6.png",
+      "size": 0.15,
+      "axis": "length",
+      "view": "part",
+      "subject": "the holo sight part on its own with its rail mount, detached from the weapon frame",
+      "class": "weapon-part"
+    },
+    {
+      "id": "cell-compact",
+      "panel": "20/20-cell-compact-s6.png",
+      "size": 0.15,
+      "axis": "height",
+      "view": "part",
+      "subject": "the compact power cell on its own: ONLY a short chunky rectangular battery magazine about 15 cm tall that slots up into the magazine well of the weapon frame, with a release latch and one amber charge indicator. It is NOT a grip, NOT a stock, NOT a receiver, NOT a whole gun",
+      "class": "weapon-part"
+    },
+    {
+      "id": "cell-extended",
+      "panel": "20/20-cell-extended-s6.png",
+      "size": 0.28,
+      "axis": "height",
+      "view": "part",
+      "subject": "the extended power cell part on its own (the long magazine), detached from the weapon frame",
+      "class": "weapon-part"
+    },
+    {
+      "id": "foundation",
+      "panel": "13/13-foundation-s6.png",
+      "class": "structure",
+      "kind": "foundation",
+      "box": [
+        [
+          0,
+          -1.5,
+          0
+        ],
+        [
+          4,
+          0.05,
+          4
+        ]
+      ],
+      "size": 1.55,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the foundation slab on its own: a heavy steel-edged concrete slab exactly 4 by 4 metres, its top flat and level, a hazard-striped edge band, four anchor bolts with hex nuts on the top face, and a levelling skirt of steel plate going straight down 1.5 metres below the top on all four sides"
+    },
+    {
+      "id": "wall",
+      "panel": "13/13-wall-s6.png",
+      "class": "structure",
+      "kind": "wall",
+      "box": [
+        [
+          0,
+          0,
+          -0.14
+        ],
+        [
+          4,
+          3,
+          0.19
+        ]
+      ],
+      "size": 3,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the wall panel on its own: a flat boxed steel wall panel exactly 4 metres wide and 3 metres tall and about 30 cm thick, thin panel seams, bolted corner brackets at both ends, a hazard-striped plinth along its foot, one small status light"
+    },
+    {
+      "id": "pillar",
+      "panel": "13/13-pillar-s6.png",
+      "class": "structure",
+      "kind": "pillar",
+      "box": [
+        [
+          -0.35,
+          0,
+          -0.35
+        ],
+        [
+          0.35,
+          2.97,
+          0.35
+        ]
+      ],
+      "size": 2.97,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the corner pillar on its own: a square box-section steel column 70 cm across and 3 metres tall on a bolted base plate, a capped top plate, a bracing gusset at its foot and a hazard-striped band near the base"
+    },
+    {
+      "id": "floor",
+      "panel": "13/13-floor-s6.png",
+      "class": "structure",
+      "kind": "floor",
+      "box": [
+        [
+          0,
+          -0.3,
+          0
+        ],
+        [
+          4,
+          0.03,
+          4
+        ]
+      ],
+      "size": 0.32999999999999996,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the floor deck on its own, WITHOUT any posts: a flat steel deck plate exactly 4 by 4 metres and 30 cm thick with a hazard-striped edge, a small drain grate and bolts at its four corners"
+    },
+    {
+      "id": "ramp",
+      "panel": "13/13-ramp-s6.png",
+      "class": "structure",
+      "kind": "ramp",
+      "box": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          4,
+          3.92,
+          4
+        ]
+      ],
+      "size": 3.92,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the ramp on its own: a sloped steel plate that rises 3 metres over a 4-metre run, ribbed grip tread, a side rail along each side, hazard-striped edges, its foot bolted to a flat edge plate"
+    },
+    {
+      "id": "airlock",
+      "panel": "13/13-airlock-s6.png",
+      "class": "structure",
+      "kind": "airlock",
+      "box": [
+        [
+          0,
+          0,
+          -0.21
+        ],
+        [
+          4,
+          3,
+          0.21
+        ]
+      ],
+      "size": 3,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the airlock wall on its own: a reinforced steel wall piece exactly 4 metres wide and 3 metres tall with a sealed thick round-cornered door centred in it, a dark rubber pressure seal around the door, a green status light above it, a small pressure gauge and a hazard-striped threshold step"
+    },
+    {
+      "id": "roof-pitched",
+      "panel": "15/15-roof-pitched-s6.png",
+      "class": "structure",
+      "kind": "pitchedRoof",
+      "box": [
+        [
+          0,
+          -0.15,
+          -0.22
+        ],
+        [
+          4,
+          3,
+          4
+        ]
+      ],
+      "size": 3.15,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the pitched roof panel on its own: one sloped steel roof plane rising 3 metres over a 4-metre run, standing-seam ribs running down the slope, a drip edge at the low eave, bolted brackets at the top edge"
+    },
+    {
+      "id": "roof-low",
+      "panel": "15/15-roof-low-s6.png",
+      "class": "structure",
+      "kind": "lowRoof",
+      "box": [
+        [
+          0,
+          -0.15,
+          -0.22
+        ],
+        [
+          4,
+          1.5,
+          4
+        ]
+      ],
+      "size": 1.65,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the low-pitch roof panel on its own: one gently sloped steel roof plane rising 1.5 metres over a 4-metre run, standing-seam ribs running down the slope, a drip edge at the low eave"
+    },
+    {
+      "id": "roof-corner-outer",
+      "panel": "15/15-corner-outer-s6.png",
+      "class": "structure",
+      "kind": "roofOuterCorner",
+      "box": [
+        [
+          -0.22,
+          -0.3,
+          -0.22
+        ],
+        [
+          4,
+          3.04,
+          4
+        ]
+      ],
+      "size": 3.34,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the outer roof corner piece on its own: a hipped corner where two sloped steel roof planes meet along a diagonal hip ridge, rising 3 metres over a 4 by 4 metre cell, standing-seam ribs and a drip edge on both eaves"
+    },
+    {
+      "id": "roof-corner-inner",
+      "panel": "15/15-corner-inner-s6.png",
+      "class": "structure",
+      "kind": "roofInnerCorner",
+      "box": [
+        [
+          0,
+          -0.05,
+          0
+        ],
+        [
+          4,
+          3.05,
+          4
+        ]
+      ],
+      "size": 3.0999999999999996,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the inner roof corner piece on its own: a valley corner where two sloped steel roof planes meet along a diagonal valley gutter, rising 3 metres over a 4 by 4 metre cell, standing-seam ribs"
+    },
+    {
+      "id": "ridge-cap",
+      "panel": "15/15-ridge-cap-s6.png",
+      "class": "structure",
+      "kind": "ridgeCap",
+      "box": [
+        [
+          0,
+          2.78,
+          -0.25
+        ],
+        [
+          4,
+          3.06,
+          0.25
+        ]
+      ],
+      "size": 0.28000000000000025,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the ridge cap on its own: a 4-metre long folded steel cap, an inverted V about 50 cm wide, that sits on the top line where two roof slopes meet, with bolts along both flanges"
+    },
+    {
+      "id": "gable",
+      "panel": "15/15-gable-s6.png",
+      "class": "structure",
+      "kind": "gable",
+      "box": [
+        [
+          0,
+          0,
+          -0.14
+        ],
+        [
+          4,
+          3,
+          0.14
+        ]
+      ],
+      "size": 3,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the gable wall on its own: a triangular steel end wall exactly 4 metres wide at its base and 3 metres tall at its peak, panel seams, bolted edge brackets"
+    },
+    {
+      "id": "half-wall",
+      "panel": "15/15-half-wall-s6.png",
+      "class": "structure",
+      "kind": "halfWall",
+      "box": [
+        [
+          0,
+          0,
+          -0.13
+        ],
+        [
+          4,
+          1.5,
+          0.16
+        ]
+      ],
+      "size": 1.5,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the half wall on its own: a flat boxed steel wall panel exactly 4 metres wide and 1.5 metres tall, a capped top rail, thin panel seams, a hazard-striped plinth along its foot"
+    },
+    {
+      "id": "window-wall",
+      "panel": "15/15-window-wall-s6.png",
+      "class": "structure",
+      "kind": "windowWall",
+      "box": [
+        [
+          0,
+          0,
+          -0.13
+        ],
+        [
+          4,
+          3,
+          0.17
+        ]
+      ],
+      "size": 3,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the window wall on its own: a steel wall panel exactly 4 metres wide and 3 metres tall with one wide thick-framed window in its upper half (dark glass), bolted corner brackets, a hazard-striped plinth"
+    },
+    {
+      "id": "doorframe",
+      "panel": "15/15-doorframe-s6.png",
+      "class": "structure",
+      "kind": "doorframe",
+      "box": [
+        [
+          0,
+          0,
+          -0.13
+        ],
+        [
+          4,
+          3,
+          0.16
+        ]
+      ],
+      "size": 3,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the door frame wall on its own, WITHOUT its door leaf: a steel wall panel exactly 4 metres wide and 3 metres tall with an empty rectangular doorway 1.2 metres wide and 2.2 metres tall through it, a thick steel frame round the opening, a hazard-striped threshold"
+    },
+    {
+      "id": "door-leaf",
+      "panel": "15/15-door-interior-s6.png",
+      "class": "moving-part",
+      "size": 2.2,
+      "axis": "height",
+      "view": "front",
+      "subject": "the interior door leaf on its own: one flat steel door slab about 1.2 metres wide and 2.2 metres tall with a lever handle, a small vision window and two hinges on one edge"
+    },
+    {
+      "id": "railing",
+      "panel": "15/15-railing-s6.png",
+      "class": "structure",
+      "kind": "railing",
+      "box": [
+        [
+          0,
+          0,
+          -0.14
+        ],
+        [
+          4,
+          1.1,
+          0.16
+        ]
+      ],
+      "size": 1.1,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the railing on its own: a 4-metre steel safety railing 1.1 metres tall, THICK square posts at both ends and the middle, a thick top rail and one mid rail, a toe board along the bottom, bolted foot plates; every member thick and boxy"
+    },
+    {
+      "id": "ladder",
+      "panel": "15/15-ladder-s6.png",
+      "class": "structure",
+      "kind": "ladder",
+      "box": [
+        [
+          1.65,
+          0,
+          -0.01
+        ],
+        [
+          2.35,
+          3.9,
+          0.2
+        ]
+      ],
+      "size": 3.9,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the ladder on its own: a fixed steel wall ladder 3.9 metres tall and 70 cm wide, THICK square-section side rails and thick flat rungs, bolted wall brackets at top and bottom; every member thick and boxy"
+    },
+    {
+      "id": "stairs",
+      "panel": "15/15-stairs-s6.png",
+      "class": "structure",
+      "kind": "stairs",
+      "box": [
+        [
+          0.3,
+          0,
+          0
+        ],
+        [
+          3.7,
+          4.01,
+          4.01
+        ]
+      ],
+      "size": 4.01,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the stair flight on its own: a straight steel staircase rising 3 metres over a 4-metre run, about 3.4 metres wide, solid steel treads, closed side stringers, and a thick handrail on each side"
+    },
+    {
+      "id": "hardpoint",
+      "panel": "13/13-hardpoint-empty-s6.png",
+      "class": "structure",
+      "kind": "hardpoint",
+      "size": 8,
+      "axis": "length",
+      "view": "three-quarter",
+      "subject": "the empty heavy machine hardpoint on its own: a square pad of four grounded foundation slabs, 8 by 8 metres in total with the seams visible and hazard-striped edges, a round raised socket on a bolted mounting ring at the centre, an orange power gland and a green data gland on the socket side, and two low ribbed steel cable covers running from the socket to the pad edge"
+    },
+    {
+      "id": "gate",
+      "panel": "06/06-gate-s6.png",
+      "class": "lab",
+      "size": 3.2,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the freestanding gate on its own: a heavy steel door frame about 3.2 metres tall and 2.6 metres wide, joined to no wall, on a hazard-striped plinth with anchor bolts, angled side buttresses, ribbed copper field coils on both pillars (unlit), service hatches, a step-up plate in the opening, and a rear junction box with six cable glands; the opening is empty. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+    },
+    {
+      "id": "capacitor-bank",
+      "panel": "07/07-capacitor-bank.png",
+      "class": "lab",
+      "size": 2,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the capacitor bank on its own: three tall cylindrical capacitors on a steel skid with hazard-striped edges and lifting slots, copper bus bars linking their tops through porcelain insulators. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+    },
+    {
+      "id": "breaker-panel",
+      "panel": "07/07-breaker-panel.png",
+      "class": "lab",
+      "size": 2.2,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the breaker panel on its own, WITHOUT its red breaker handle: a standing steel cabinet on two short legs with louvred vents top and bottom, two dial gauges, a row of switches, and a hazard-striped square plate with an empty socket where the breaker handle mounts. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+    },
+    {
+      "id": "breaker-handle",
+      "panel": "07/07-breaker-panel.png",
+      "class": "moving-part",
+      "size": 0.45,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the breaker panel's big red rotary breaker handle on its own: the round hub and the lever arm. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+    },
+    {
+      "id": "relay-cabinet",
+      "panel": "07/07-relay-cabinet.png",
+      "class": "lab",
+      "size": 2.2,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "one relay cabinet on its own: a tall steel cabinet on short legs, louvred vents near its top and bottom, a door handle, and an amber lamp on its top (unlit). In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+    },
+    {
+      "id": "control-box",
+      "panel": "07/07-control-box.png",
+      "class": "lab",
+      "size": 0.5,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "one small steel control box on its own: a box about 40 cm tall with two indicator lights, two push buttons, a hinged lid and a cable gland underneath. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+    },
+    {
+      "id": "operator-console",
+      "panel": "07/07-operator-console.png",
+      "class": "lab",
+      "size": 1.4,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the operator console on its own, WITHOUT its big lever: a pedestal desk with an angled control top, dial gauges, a small green screen, rows of switches, and an empty slot where the lever mounts. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+    },
+    {
+      "id": "console-lever",
+      "panel": "07/07-operator-console.png",
+      "class": "moving-part",
+      "size": 0.6,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the operator console's big throw lever on its own: a red-gripped lever arm on its pivot block. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+    },
+    {
+      "id": "preset-bench",
+      "panel": "07/07-preset-bench.png",
+      "class": "lab",
+      "size": 1.6,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the preset bench on its own: a steel workbench on four legs with a glass top panel (unlit), a folding arm lamp, a row of cartridge slots along its back and a small control strip. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+    },
+    {
+      "id": "preset-combiner",
+      "panel": "07/07-preset-combiner.png",
+      "class": "lab",
+      "size": 1.6,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the preset combiner on its own: a squat round machine on a bolted plinth, an empty glass dome on its top (no glow), four cartridge ports round its body angled upward, and a small screen. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+    },
+    {
+      "id": "preset-rack",
+      "panel": "07/07-preset-rack.png",
+      "class": "lab",
+      "size": 2.6,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the preset rack on its own: a tall steel cartridge library, a grid of small square slots in a thick frame on two feet, with a picker carriage on a rail across its middle. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+    },
+    {
+      "id": "planet-table",
+      "panel": "07/07-planet-table.png",
+      "class": "lab",
+      "size": 1.1,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the planet table on its own: a wide round steel table ring on a thick bolted pedestal, a flat projector disc set in its centre (unlit, no hologram). In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+    }
+  ],
+  "reused": {
+    "life-support": "zips/runworld/lifesupport/ls-hunyuan.glb (test run, from panel 18-lifesupport-s6)",
+    "weapon-frame": "zips/runworld/weapon/frame-hunyuan.glb (test run, from panel 20-frame-s6)"
+  },
+  "budgets": {
+    "about": "Triangles per level [low, mid, high]. low = S1-S2 (flat shaded, 256 px maps), mid = S3-S4 (smooth by angle 30 deg + baked normals, 512), high = S5-S6 (the same, 1024). Auto picks the level from the Graphics setting, like Astro. Low stays at a quarter or more of high for anything with thin parts: the scout cage shattered at 1.4k. Structures stay lean because a base holds hundreds of them.",
+    "rover-body": [
+      2500,
+      5000,
+      10000
+    ],
+    "wheel": [
+      300,
+      800,
+      1600
+    ],
+    "moving-part": [
+      600,
+      1500,
+      3000
+    ],
+    "machine": [
+      3000,
+      6000,
+      12000
+    ],
+    "fixture": [
+      1500,
+      3000,
+      6000
+    ],
+    "weapon-part": [
+      400,
+      800,
+      1500
+    ],
+    "weapon-frame": [
+      1500,
+      3000,
+      6000
+    ],
+    "structure": [
+      400,
+      1200,
+      3000
+    ],
+    "lab": [
+      2000,
+      5000,
+      10000
+    ]
+  },
+  "notes": [
+    "2026-10-10 owner: \"the roll cage will need to be built by hand or the shape needs to be more chunky, that thos buggys wont work\". The scout body and wheel are re-prompted chunky (thick square bars, solid panels, a disc rim with cut-outs). Thin tubes and wire spokes do not survive generation or decimation; avoid them in every prompt.",
+    "2026-10-10 owner: \"add the building pieces and other 3d stuff like lab pieces to the pipeline, might as well have it all match\"; \"the lab design is not final so feel free to make it nice as you can and have it match\"; \"the layout, it can all change if you feel there is a more AAA presentation\". Structure assets carry `box`, the procedural kit piece bounds at S6 (lattice frame): the post step fits each to its box exactly and snaps edge vertices flush so neighbours meet. Lab pieces take the base kit family style."
+  ]
+}

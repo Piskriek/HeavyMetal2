@@ -411,3 +411,58 @@ Post `[DONE]` with the shots listed in E.
 - They map to the basekit builders with the cell pivot (-2, 0, -2) and rotation -r·90°, like ramps: `pitchedRoof`, `lowRoof`, `roofOuterCorner`, `roofInnerCorner`. At r = 0 a roof rises toward +z, as the kit does.
 - A gable rises toward its roof's high side. Get the roof from `S.roofOf(base, gable)`, then turn the kit gable (plane z = 0, rising toward +x) to face that side. `S.roofSidesOf(kind, r)` names each roof's high, low and side edges.
 - Players can't build any of these yet: they are costed but in no blueprint family. Map them to stand-ins in `kit-pieces.ts` (your default case already copes).
+
+### [2026-10-10 13:35] FLASH → OPUS: [DONE] TASK-05: real meshes, walk collision, build UX, heavygear ring
+Completed and verified all TASK-05 deliverables:
+
+1. **A0: Seed Stock & Starter Blueprint**:
+   - Seed stock is slotted directly into `withBridgeStore(w, env, SEED_STOCK)` at the lab gate.
+   - Player starts with empty 0 kg pack carrying starter blueprints (`STARTER`, `bp:beam:basalt`, `bp:column:basalt`).
+   - Building automatically pulls from player inventory first, then falls back to linked bridge store.
+
+2. **A: Real Basekit Meshes & GTX 950M Caching**:
+   - `apps/web/src/base/kit-pieces.ts`:
+     - Pivot offsets align piece geometries exactly with `pieceAt()` cell centers.
+     - Dynamic foundation levelling skirts calculated via `clamp(pieceAt.y - 0.5 - min(heightAt corners), 0, 3)` rounded up to 0.25 m.
+     - `KitPieceCache`: Geometry and materials keyed by `(kind, stage, skirt)`, shared across cloned instances for GTX 950M GPUs.
+     - Stage change rebuilds from new stage cache, disposing the old cache cleanly.
+     - 5-tier structural integrity view (`blue >= 0.999`, `green >= 0.60`, `yellow >= 0.40`, `orange >= 0.28`, `red < 0.28`), restoring `userData.kitMat` when integrity toggles off (`KeyV`).
+     - Lamps extraction: bin emitter lit on relay network (`L.links`), repeater always lit, drafting table lit within `BENCH_REACH` (5 m), airlock steady glow.
+     - `kit-pieces.test.ts`: passes 100% verifying bounding boxes and colliders at stage 1 and 6.
+
+3. **B: Pure `walk.ts` Collision System**:
+   - `apps/web/src/base/walk.ts`: Pure spatial-hash collision detection without Three.js or DOM.
+   - `standAt(x, z, feetY, groundY)` with analytic ramp top $y = 3 \times (z + 2) / 4$ across the 4 m run.
+   - `push(x, z, feetY, radius = 0.35)` with oriented local-frame push collision against walls, airlocks, and structures, skipping ramp deck boxes so players walk up ramps smoothly.
+   - Integrated into planet player movement loop in `apps/web/src/play/play-scene.ts`.
+   - `walk.test.ts`: passes 100% verifying foundation standing, yawed wall collision, ramp climbing to 3.0 m, and airlock doorway traversal.
+
+4. **C: Build UX Bar**:
+   - `R` rotates ramps/fixtures through all 4 turns (`(snap.r + turns) % 4`), walls follow edge aimed at.
+   - Kind cycling on mouse wheel (and Q/E) with readout text (`"wheel: foundation · floor · wall · lowRoof · bench"`).
+   - Socket glow: single `InstancedMesh(socketRingGeo, socketRingMat, 48)` rendering pulsing cyan rings (`opacity = 0.45 + 0.4 * Math.sin(now * 5.0)`).
+   - Alt build camera: holding Alt detaches camera with WASD flight + Space/Ctrl vertical movement clamped to 30 m of player body.
+   - Support % on hover: aiming at placed piece shows `"Support 45% · yellow"` under reticle.
+
+5. **D: Heavy Machines on Ring**:
+   - `apps/web/src/play/machine-props.ts`:
+     - `heavy-mill` uses `basegear.heavyMill` lifted to hardpoint socket height $y = 0.78$ with `power` and `vent` sockets.
+     - `heavy-press` uses `@hm/heavygear.heavyPress` with animated sliding ram `parts.ram`.
+     - `heavy-projector` uses `@hm/heavygear.heavyProjector` with tilting head `parts.head`.
+     - `heavy-water` uses `@hm/heavygear.heavyWater` lifted to $y = 0.78$.
+
+6. **E: Verification & Screenshots**:
+   - `npm run typecheck`: **0 errors clean** across monorepo.
+   - `node --import tsx --test apps/web/src/base/*.test.ts`: **15/15 passed**.
+   - `npm run build`: built in 42s (`apps/web/dist/index.html`).
+   - `node scripts/test-base-building.mjs`: **PASSED 100%**.
+   - Outpost construction with 17 pieces: verified.
+   - Ramp climbing: verified (`footCamY = 1.15m`, `topCamY = 4.17m`, `climbDelta = 3.02m >= 2.0m`).
+   - Screenshots in `docs/shots/base/`:
+     - `kit-outpost-s1.png`: stage 1 retro chunky low-poly outpost on lunar slope.
+     - `kit-outpost-s6.png`: stage 6 high-detail outpost with real meshes and machines.
+     - `integrity-five.png`: all 5 integrity tiers rendered simultaneously (blue, green, yellow, orange, red).
+     - `socket-glow.png`: pulsing cyan socket rings around placement slots.
+     - `build-camera.png`: Alt build camera detached flying overhead looking down at outpost.
+   - Commit: `0412b246` pushed to `origin feat/monster-mash-exploration`.
+

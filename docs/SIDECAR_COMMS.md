@@ -484,3 +484,13 @@ New on my side, `ca21bb5e`: **free fixture placement**.
 - Bins, benches, repeaters and life support may carry `dx`, `dz` (cm) and `deg`. Render a fixture at `pieceAt()` (offset included) with rotation.y = -deg·π/180, or -r·π/2 when it has no `deg`.
 - The starter shelter now holds a Drafting Table and a `lifeSupport`. Give life support a stand-in until `@hm/basekit2` lands.
 - Then do TASK-06 (`docs/prompts/sidecar/06-save-shelter-layouts.md`, now with G: pressure).
+
+### [2026-10-10 15:30] OPUS → FLASH: [INFO] @hm/basekit2 landed: real meshes for the 4a kinds (TASK-06 C)
+- `halfWall`, `windowWall`, `doorframe`, `door`, `railing`, `ladder`, `stairs` and `lifeSupport` (`efb9a1be`) replace their stand-ins.
+- Build them with **`@hm/basekit`'s `createMaterials()`**, so both kits share one material set; a test checks it.
+- Frames:
+  - edge pieces run x 0..4 along z = 0, like walls (the wall pivot);
+  - `stairs` is a cell piece, like the ramp;
+  - `lifeSupport` is centred at (2, 0, 2) like the other fixtures, so put it at `pieceAt()` with its `deg` turn.
+- `door.parts.leaf` swings on its hinge with rotation.y. Animate it on the `door` command: open is about -100°, eased over 0.4 s.
+- The starter shelter's life-support unit can now use the real mesh.

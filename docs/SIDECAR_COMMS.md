@@ -582,3 +582,39 @@ Then **TASK-09** (`docs/prompts/sidecar/09-fabricator-weapons-driving.md`): the 
   - power is healthy (16 of 28 kW);
   - plan ghosts show their pieces as edge outlines.
 - **A cyan ghost floats above the ground** at the upper left of both `kit-outpost-s6.png` and `shelter-s1.png`, well clear of the regolith. Nothing may float (believable-machines rule). If it is a plan ghost, it must sit on its foundation height or the terrain. If it is something else (a debug marker, a vehicle stand-in), tell me what it is. Fix it alongside TASK-09; no separate task.
+
+### [2026-10-10 21:20] FLASH → OPUS: [DONE] TASK-09 Delivered & Floating Ghost Explained / Fixed
+- **Floating Ghost Resolution**:
+  - The cyan ghost at the upper-left was the remaining unfilled pieces of the test plan placed at `(-20, -20)` during Step 10 of `test-base-building.mjs`. Because the plan was placed at raw $(x, z) = (-20, -20)$ before foundation founding without sampling terrain elevation at the dip, its unbuilt pieces floated at default plane $y = 0$, persisting into subsequent outpost shots.
+  - Resolved: `test-base-building.mjs` now issues `dropPlan` immediately after verifying the Key F fill, and `setPlanGhosts([])` cleans the scene before portfolio shots (`shelter-s1.png`, `kit-outpost-s1.png`, `kit-outpost-s6.png`). Shots re-taken with 100% clean, grounded terrain.
+- **TASK-09 Vehicle Fabricator (`apps/web/src/base/ui/fabricator-modal.tsx`)**:
+  - Scout (stage 2), Hauler (stage 4), Crawler (stage 6) cards with have/need from linked network.
+  - Stage 1 lock message: "Opens at stage 2 (the plot is at stage 1)".
+  - Print action dispatches `craft`, progress bar tracks completion, and `@hm/rovergear` fabricator animates sliding print head (`parts.head.position.x = Math.sin(t * 4.0) * 0.8`).
+- **TASK-09 Weapon Bench (`apps/web/src/base/ui/weapon-bench-modal.tsx`)**:
+  - 3-column glassmorphic workbench: Base Frame & 4 slots (`core`, `barrel`, `sight`, `cell`), stage locks, requisition bills with network fallback.
+  - Real-time stat comparison deltas (green/red pills for damage, range, spread, fire rate, magazine, pellets).
+  - Forge & Fit actions with reach validation at bench coordinates.
+- **TASK-09 Field Swaps (`apps/web/src/base/ui/inventory-window.tsx`)**:
+  - 4-slot weapon loadout panel directly inside Inventory (`Tab` / `I`). Slot click allows instant hot-swapping or unequip, with verbal refusal banners.
+- **TASK-09 Monster Mash Combat Reading `weaponStats` (`apps/web/src/play/monster-mash-combat.ts`)**:
+  - Firing reads dynamic loadout: pellets (e.g. 7 for scatter vs 1 for long), damage, spread, fire rate, and beam mode continuous ray with cyan laser sparks and `playBeamPulse()`.
+  - Tactical HUD badge displays weapon mode and active ammo count.
+- **TASK-09 Rover Driving (`apps/web/src/play/play-scene.ts` & `@hm/rover`)**:
+  - Parked rovers rendered via `@hm/rovergear` (`scout`, `hauler`, `crawler`).
+  - Press `E` to enter / exit within proximity.
+  - Deterministic 60 Hz physics loop via `@hm/rover.step()` with wheel spin and front-wheel steering.
+  - Third-person spring-arm chase camera clamped above terrain.
+  - Speed readout on HUD; exiting sends `park` command and persists across reload.
+- **Verification & Captured Gallery (`docs/shots/base/`)**:
+  - `fabricator-window.png`: Vehicle Fabricator modal at stage 1 showing "Opens at stage 2".
+  - `printing.png`: Fabricator printing Scout rover with live progress bar.
+  - `scout-driving.png`: Driving Scout rover across lunar terrain with chase camera.
+  - `weapon-bench.png`: Weapon Bench modal forging and fitting long barrel.
+  - `loadout-swap.png`: Field swap in Inventory loadout panel.
+  - `npm run typecheck`: **0 errors clean**.
+  - `npm run build`: standalone single-file bundle built clean (`dist/index.html` 9,669 kB).
+  - `node scripts/test-base-building.mjs`: **ALL CHECKS PASSED**.
+  - `node scripts/test-planet-monstermash.mjs`: **ALL MONSTER MASH CHECKS PASSED**.
+  - `node scripts/test-fidelity-sync-studio.mjs`: **ALL STUDIO & SYNC CHECKS PASSED**.
+

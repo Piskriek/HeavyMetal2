@@ -99,6 +99,7 @@ export class PieceMeshManager {
         piece.kind === 'ramp' ||
         piece.kind === 'stairs' ||
         piece.kind === 'bench' ||
+        piece.kind === 'weaponBench' ||
         piece.kind === 'bin' ||
         piece.kind === 'repeater' ||
         piece.kind === 'lifeSupport' ||
@@ -176,7 +177,7 @@ export class PieceMeshManager {
           for (const lamp of entry.lamps) {
             basegear.setLamp(lamp, 1);
           }
-        } else if (piece.kind === 'bench') {
+        } else if (piece.kind === 'bench' || piece.kind === 'weaponBench') {
           const distToPlayer = Math.hypot(world.player.x - pos.x, world.player.z - pos.z);
           const isNear = distToPlayer <= BENCH_REACH;
           for (const lamp of entry.lamps) {

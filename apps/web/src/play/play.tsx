@@ -54,10 +54,13 @@ import {
 import { PieceMeshManager } from '../base/piece-meshes';
 import { globalKitPieceCache, integrityColorName } from '../base/kit-pieces';
 
-const isFixture = (kind: Kind): boolean => kind === 'bin' || kind === 'bench' || kind === 'repeater' || kind === 'lifeSupport';
+const isFixture = (kind: Kind): boolean => kind === 'bin' || kind === 'bench' || kind === 'repeater' || kind === 'lifeSupport' || kind === 'weaponBench';
 import { blueprint, STARTER, ITEMS } from '../base/catalog';
 import { MachinePickerModal } from '../base/ui/machine-picker-modal';
 import { RefineryModal } from '../base/ui/refinery-modal';
+import { FabricatorModal } from '../base/ui/fabricator-modal';
+import { WeaponBenchModal } from '../base/ui/weapon-bench-modal';
+import { weaponStats } from '../base/weapons';
 import * as S from '@hm/structure';
 import type { Kind } from '@hm/structure';
 import * as L from '@hm/lattice';
@@ -217,8 +220,20 @@ export function PlayScreen(props: {
       console.warn('[base save load error]', e);
     }
     const seed = 1;
+    const ensureLoadout = (w: BaseWorld): BaseWorld => {
+      return {
+        ...w,
+        loadout: {
+          core: w.loadout.core ?? 'core-semi',
+          barrel: w.loadout.barrel ?? 'barrel-scatter',
+          sight: w.loadout.sight ?? 'sight-iron',
+          cell: w.loadout.cell ?? 'cell-compact',
+        },
+      };
+    };
+
     if (rawSave) {
-      const loaded = loadWorld(rawSave, seed);
+      const loaded = ensureLoadout(loadWorld(rawSave, seed));
       if (loaded.shelter) {
         hasSaveOnBootRef.current = true;
         return loaded;
@@ -227,7 +242,7 @@ export function PlayScreen(props: {
       return loaded;
     }
     hasSaveOnBootRef.current = false;
-    const fresh = createWorld(seed);
+    const fresh = ensureLoadout(createWorld(seed));
     const defaultEnv: WorldEnv = {
       heightAt: () => 0,
       bridge: { x: 0, z: 0, range: BRIDGE_RANGE },
@@ -337,11 +352,15 @@ export function PlayScreen(props: {
   const tryPlaceBaseRef = useRef<() => boolean>(() => false);
   const [machinePickerHardpoint, setMachinePickerHardpoint] = useState<number | null>(null);
   const [refineryMachineId, setRefineryMachineId] = useState<number | null>(null);
+  const [fabricatorMachineId, setFabricatorMachineId] = useState<number | null>(null);
+  const [weaponBenchOpen, setWeaponBenchOpen] = useState(false);
+  const [drivingSpeed, setDrivingSpeed] = useState<number | null>(null);
+  const [baseWorldVersion, setBaseWorldVersion] = useState(0);
   const [baseWindowOpen, setBaseWindowOpen] = useState(false);
   const [beamHarvest, setBeamHarvest] = useState<{ count: number; name: string; fading?: boolean } | null>(null);
   const beamHarvestTimerRef = useRef<number | null>(null);
   const forceBeamRef = useRef<number | null>(null);
-  const isAnyBaseWindowOpen = baseWindowOpen || machinePickerHardpoint !== null || refineryMachineId !== null;
+  const isAnyBaseWindowOpen = baseWindowOpen || machinePickerHardpoint !== null || refineryMachineId !== null || fabricatorMachineId !== null || weaponBenchOpen;
   const hardpointToPlotMachineRef = useRef<Map<number, number>>(new Map());
   const isLmbDownRef = useRef(false);
   const harvestAccRef = useRef(0);
@@ -444,6 +463,7 @@ export function PlayScreen(props: {
     const bEnv = getBaseEnv();
     const prevField = baseWorldRef.current.field;
     const res = apply(baseWorldRef.current, bEnv, cmd);
+    if (!res || !res.world) return;
     baseWorldRef.current = res.world;
 
     for (const ev of res.events) {
@@ -528,7 +548,22 @@ export function PlayScreen(props: {
     const integrity = (baseViewSource as WorldViewSource).get?.()?.build?.integrity ?? false;
     pieceManagerRef.current.sync(baseWorldRef.current, bEnv, integrity);
     scene?.setWalkWorld(pieceManagerRef.current.walkWorld);
+    scene?.setVehicles(res.world.vehicles);
+    const fabs = res.world.machines.filter((m) => m.kind === 'fabricator').map((m) => {
+      const hp = res.world.base.pieces.find((p) => p.id === m.id);
+      const pt = hp ? pieceAt(res.world.base, hp) : null;
+      return {
+        id: m.id,
+        x: pt?.x ?? 0,
+        z: pt?.z ?? 0,
+        yaw: 0,
+        printing: m.jobs.length > 0,
+      };
+    });
+    scene?.setFabricators(fabs);
+    scene?.mash.setWeaponStats(weaponStats(res.world.loadout));
     (baseViewSource as WorldViewSource).notify?.();
+    setBaseWorldVersion((v) => v + 1);
     persistBaseWorld(false);
     return res;
   }, [say, baseViewSource, getBaseEnv, commit, incrementPlacedCounter, persistBaseWorld]);
@@ -750,6 +785,20 @@ export function PlayScreen(props: {
           scene.setNodes(baseWorldRef.current.field);
           pieceManagerRef.current.sync(baseWorldRef.current, bEnv, false);
           scene.setWalkWorld(pieceManagerRef.current.walkWorld);
+          scene.setVehicles(baseWorldRef.current.vehicles);
+          const initFabs = baseWorldRef.current.machines.filter((m) => m.kind === 'fabricator').map((m) => {
+            const hp = baseWorldRef.current.base.pieces.find((p) => p.id === m.id);
+            const pt = hp ? pieceAt(baseWorldRef.current.base, hp) : null;
+            return {
+              id: m.id,
+              x: pt?.x ?? 0,
+              z: pt?.z ?? 0,
+              yaw: 0,
+              printing: m.jobs.length > 0,
+            };
+          });
+          scene.setFabricators(initFabs);
+          scene.mash.setWeaponStats(weaponStats(baseWorldRef.current.loadout));
           for (const m of baseWorldRef.current.machines) {
             const piece = baseWorldRef.current.base.pieces.find((p) => p.id === m.id);
             if (piece) {
@@ -1255,6 +1304,12 @@ export function PlayScreen(props: {
       const isAltCam = isBase && (keys.has('AltLeft') || keys.has('AltRight'));
       const flyUp = (keys.has('Space') ? 1 : 0) - (keys.has('ControlLeft') || keys.has('ControlRight') ? 1 : 0);
       const axis = (a: string[], b: string[]) => (a.some((k) => keys.has(k)) ? 1 : 0) - (b.some((k) => keys.has(k)) ? 1 : 0);
+      const drivingVehicle = scene.getDrivingVehicle();
+      const vehicleInput = drivingVehicle ? {
+        throttle: axis(['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']),
+        steer: axis(['KeyA', 'ArrowLeft'], ['KeyD', 'ArrowRight']),
+        brake: keys.has('Space'),
+      } : undefined;
       const out = scene.frame(ms / 1000, dt, live
         ? {
             move: { x: axis(['KeyD', 'ArrowRight'], ['KeyA', 'ArrowLeft']), z: axis(['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']) },
@@ -1262,8 +1317,14 @@ export function PlayScreen(props: {
             run: keys.has('ShiftLeft') || keys.has('ShiftRight'),
             altCam: isAltCam,
             flyUp,
+            vehicleInput,
           }
         : { move: { x: 0, z: 0 }, look: { dx: 0, dy: 0 }, run: false });
+      if (out.drivingVehicle) {
+        setDrivingSpeed(out.drivingVehicle.speed);
+      } else if (drivingSpeed !== null) {
+        setDrivingSpeed(null);
+      }
       dx = 0; dy = 0;
       let s = stateRef.current;
       if (out.event === 'powered') { s = poweredOn(s); say('Lunar Portal Online', 'Bridge technology stable. Step onto the moon to begin restoring the fidelity.'); }
@@ -1518,7 +1579,33 @@ export function PlayScreen(props: {
           baseWorldRef.current = initBaseWorld();
           pieceManagerRef.current.sync(baseWorldRef.current, getBaseEnv(), false);
           scene.setWalkWorld(pieceManagerRef.current.walkWorld);
+          scene.setVehicles(baseWorldRef.current.vehicles);
+          const fabs = baseWorldRef.current.machines.filter((m) => m.kind === 'fabricator').map((m) => {
+            const hp = baseWorldRef.current.base.pieces.find((p) => p.id === m.id);
+            const pt = hp ? pieceAt(baseWorldRef.current.base, hp) : null;
+            return {
+              id: m.id,
+              x: pt?.x ?? 0,
+              z: pt?.z ?? 0,
+              yaw: 0,
+              printing: m.jobs.length > 0,
+            };
+          });
+          scene.setFabricators(fabs);
+          scene.mash.setWeaponStats(weaponStats(baseWorldRef.current.loadout));
         },
+        enterVehicle: (id: number) => scene.enterVehicle(id),
+        exitVehicle: () => {
+          const parked = scene.exitVehicle();
+          if (parked) {
+            dispatchBaseRef.current({ t: 'park', vehicle: parked.id, x: parked.x, z: parked.z, yaw: parked.yaw });
+            setDrivingSpeed(null);
+          }
+          return parked;
+        },
+        driving: () => scene.getDrivingVehicle(),
+        openFabricator: (id: number) => { setFabricatorMachineId(id); document.exitPointerLock?.(); },
+        openWeaponBench: () => { setWeaponBenchOpen(true); document.exitPointerLock?.(); },
         placeShelter: (cx: number, cz: number, yaw: number) => {
           return dispatchBaseRef.current({ t: 'shelter', cx, cz, yaw });
         },
@@ -1720,7 +1807,7 @@ export function PlayScreen(props: {
         });
         return;
       }
-      if (e.code === 'Space' && locked && mashEquipped) {
+      if (e.code === 'Space' && locked && mashEquipped && !sceneRef.current?.getDrivingVehicle()) {
         fireWeapon();
         return;
       }
@@ -1734,11 +1821,34 @@ export function PlayScreen(props: {
       }
       if (e.code === 'KeyE') {
         if (isBase) {
+          const driving = sceneRef.current?.getDrivingVehicle();
+          if (driving) {
+            const parked = sceneRef.current?.exitVehicle();
+            if (parked) {
+              dispatchBase({ t: 'park', vehicle: parked.id, x: parked.x, z: parked.z, yaw: parked.yaw });
+              setDrivingSpeed(null);
+              say('Vehicle parked.');
+            }
+            return;
+          }
+          const nearV = sceneRef.current?.getNearVehicle(3.5);
+          if (nearV) {
+            const entered = sceneRef.current?.enterVehicle(nearV.id);
+            if (entered) {
+              say(`Driving ${nearV.kind.toUpperCase()}`, 'WASD to drive, Space to brake, E to exit.');
+            }
+            return;
+          }
           const hit = sceneRef.current?.aimPoint();
           if (hit && hit.piece !== null) {
             const p = baseWorldRef.current.base.pieces.find((q) => q.id === hit.piece);
             if (p && p.kind === 'airlock') {
               dispatchBase({ t: 'door', id: p.id, open: !p.open });
+              return;
+            }
+            if (p && p.kind === 'weaponBench') {
+              setWeaponBenchOpen(true);
+              freeMouse();
               return;
             }
             if (p && p.kind === 'hardpoint') {
@@ -1749,6 +1859,10 @@ export function PlayScreen(props: {
                 return;
               } else if (m.kind === 'mill' || m.kind === 'press') {
                 setRefineryMachineId(m.id);
+                freeMouse();
+                return;
+              } else if (m.kind === 'fabricator') {
+                setFabricatorMachineId(m.id);
                 freeMouse();
                 return;
               } else {
@@ -2637,6 +2751,9 @@ export function PlayScreen(props: {
               at={sceneRef.current?.debug.position() ?? { x: 0, z: 0 }}
               currentStructureId={currentAimedStructureIdRef.current}
               planPrompt={planPrompt}
+              weaponStats={weaponStats(baseWorldRef.current.loadout)}
+              ammo={mashAmmo}
+              drivingSpeed={drivingSpeed}
               onDispatch={(cmd) => dispatchBase(cmd)}
               onPlaceLayout={(layoutId) => {
                 setPlacingLayoutId(layoutId);
@@ -2700,7 +2817,41 @@ export function PlayScreen(props: {
               onClose={() => setRefineryMachineId(null)}
             />
           )}
+          {fabricatorMachineId !== null && isBase && (
+            <FabricatorModal
+              machineId={fabricatorMachineId}
+              world={baseWorldRef.current}
+              env={getBaseEnv()}
+              at={sceneRef.current?.debug.position() ?? { x: 0, z: 0 }}
+              onCraft={(mId, rId) => {
+                dispatchBase({ t: 'craft', at: sceneRef.current?.debug.position() ?? { x: 0, z: 0 }, machine: mId, recipe: rId });
+              }}
+              onClose={() => setFabricatorMachineId(null)}
+            />
+          )}
+          {weaponBenchOpen && isBase && (
+            <WeaponBenchModal
+              world={baseWorldRef.current}
+              env={getBaseEnv()}
+              at={(() => {
+                const wb = baseWorldRef.current.base.pieces.find((p) => p.kind === 'weaponBench');
+                const pt = wb ? pieceAt(baseWorldRef.current.base, wb) : null;
+                return pt ? { x: pt.x, z: pt.z } : (sceneRef.current?.debug.position() ?? { x: 0, z: 0 });
+              })()}
+              onForge={(item) => {
+                const wb = baseWorldRef.current.base.pieces.find((p) => p.kind === 'weaponBench');
+                const pt = wb ? pieceAt(baseWorldRef.current.base, wb) : null;
+                const forgeAt = pt ? { x: pt.x, z: pt.z } : (sceneRef.current?.debug.position() ?? { x: 0, z: 0 });
+                dispatchBase({ t: 'forge', at: forgeAt, item });
+              }}
+              onFit={(slot, item) => {
+                dispatchBase({ t: 'fit', slot, item });
+              }}
+              onClose={() => setWeaponBenchOpen(false)}
+            />
+          )}
           {toast && !isAnyBaseWindowOpen && !hideOverlays ? <div key={toast.id} className={`play-toast${toast.text === 'Sync lost' ? ' lost' : ''}`} role="status"><b>{toast.text}</b>{toast.sub ? <span>{toast.sub}</span> : null}</div> : null}
+          {baseWorldVersion > 0 && <span style={{ display: 'none' }} data-base-version={baseWorldVersion} />}
         </>
       ) : null}
     </div>

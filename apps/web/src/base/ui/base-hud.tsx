@@ -7,6 +7,7 @@ import { InventoryWindow } from './inventory-window';
 import { DraftingWindow } from './drafting-window';
 import { LatticeWindow } from './lattice-window';
 import { BuildReadout } from './build-readout';
+import type { WeaponStats } from '../weapons';
 
 interface BaseHudProps {
   source: BaseViewSource;
@@ -26,6 +27,9 @@ interface BaseHudProps {
   onPlaceLayout?: (layoutId: string) => void;
   onDropPlan?: (planId: number) => void;
   onToast?: (title: string, sub?: string) => void;
+  weaponStats?: WeaponStats | null;
+  ammo?: { current: number; max: number } | null;
+  drivingSpeed?: number | null;
 }
 
 export type OpenWindow = 'none' | 'inventory' | 'drafting' | 'lattice';
@@ -48,6 +52,9 @@ export const BaseHud: React.FC<BaseHudProps> = ({
   onPlaceLayout,
   onDropPlan,
   onToast,
+  weaponStats = null,
+  ammo = null,
+  drivingSpeed = null,
 }) => {
   const [view, setView] = useState<BaseView>(() => source.get());
   const [openWindow, setOpenWindow] = useState<OpenWindow>('none');
@@ -58,6 +65,16 @@ export const BaseHud: React.FC<BaseHudProps> = ({
     });
     return unsubscribe;
   }, [source]);
+
+  useEffect(() => {
+    (window as any).__hmHud = {
+      openInventory: () => setOpenWindow('inventory'),
+      close: () => setOpenWindow('none'),
+    };
+    return () => {
+      delete (window as any).__hmHud;
+    };
+  }, []);
 
   useEffect(() => {
     onOpenChange?.(openWindow !== 'none');
@@ -178,11 +195,69 @@ export const BaseHud: React.FC<BaseHudProps> = ({
       {/* Hotbar */}
       <Hotbar inventory={view.inventory} actions={source.actions} />
 
+      {/* Weapon readout beside hotbar */}
+      {weaponStats && !paused && openWindow === 'none' && !modalOpen && (
+        <div className="hm-weapon-hud-badge" data-testid="weapon-hud-badge" style={{
+          position: 'fixed',
+          bottom: 24,
+          left: 'calc(50% + 280px)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          background: 'rgba(15, 23, 42, 0.85)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(56, 189, 248, 0.3)',
+          borderRadius: 8,
+          padding: '6px 12px',
+          fontFamily: 'Oxanium, sans-serif',
+          zIndex: 100,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+        }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--base-cyan, #38bdf8)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            {weaponStats.mode.toUpperCase()}
+          </span>
+          <span style={{ fontSize: 13, fontWeight: 800, color: '#f8fafc', letterSpacing: '0.05em' }}>
+            {ammo ? `${ammo.current}/${ammo.max}` : `${weaponStats.magazine}/${weaponStats.magazine}`}
+          </span>
+        </div>
+      )}
+
+      {/* Driving speed readout */}
+      {drivingSpeed !== null && drivingSpeed !== undefined && !paused && openWindow === 'none' && !modalOpen && (
+        <div className="hm-speed-hud-badge" data-testid="speed-hud-badge" style={{
+          position: 'fixed',
+          bottom: 24,
+          right: 'calc(50% + 280px)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 2,
+          background: 'rgba(15, 23, 42, 0.85)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(245, 158, 11, 0.4)',
+          borderRadius: 8,
+          padding: '6px 14px',
+          fontFamily: 'Oxanium, sans-serif',
+          zIndex: 100,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+        }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            SPEED
+          </span>
+          <span style={{ fontSize: 15, fontWeight: 800, color: '#f8fafc', letterSpacing: '0.05em' }}>
+            {Math.abs(drivingSpeed).toFixed(1)} <span style={{ fontSize: 10, color: '#94a3b8' }}>m/s</span>
+          </span>
+          <span style={{ fontSize: 9, color: '#cbd5e1', marginTop: 2 }}>[E] EXIT</span>
+        </div>
+      )}
+
       {/* Modal Windows */}
       {openWindow === 'inventory' && (
         <InventoryWindow
           inventory={view.inventory}
           actions={source.actions}
+          loadout={world?.loadout}
+          onFit={(slot, item) => onDispatch?.({ t: 'fit', slot, item })}
           onClose={() => setOpenWindow('none')}
         />
       )}

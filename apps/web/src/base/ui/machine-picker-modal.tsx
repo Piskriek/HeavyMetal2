@@ -1,9 +1,9 @@
 import React, { useEffect } from 'react';
 import type { BaseWorld, WorldEnv, Point } from '../world';
 import { networkAt } from '../world';
-import { HEAVY, HEAVY_BILL, ITEMS, type HeavyKind } from '../catalog';
+import { HEAVY, HEAVY_BILL, FABRICATOR_BILL, ITEMS, type StationKind } from '../catalog';
 import * as L from '@hm/lattice';
-import { Cpu, Droplets, Flame, Layers, SunMedium, Wrench, X } from 'lucide-react';
+import { Cpu, Droplets, Flame, Layers, SunMedium, Truck, Wrench, X } from 'lucide-react';
 import { ItemGlyph } from './item-glyph';
 import { toItemView } from '../world-view';
 
@@ -12,11 +12,13 @@ export interface MachinePickerModalProps {
   world: BaseWorld;
   env: WorldEnv;
   at: Point;
-  onInstall: (hardpointId: number, kind: HeavyKind) => void;
+  onInstall: (hardpointId: number, kind: StationKind) => void;
   onClose: () => void;
 }
 
-const MACHINE_META: Record<HeavyKind, {
+const STATION_KINDS: readonly StationKind[] = ['fabricator', ...HEAVY];
+
+const MACHINE_META: Record<StationKind, {
   name: string;
   role: string;
   desc: string;
@@ -26,6 +28,16 @@ const MACHINE_META: Record<HeavyKind, {
   icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>;
   accentColor: string;
 }> = {
+  fabricator: {
+    name: 'Vehicle Fabricator',
+    role: 'Surface Rover Printing Bay',
+    desc: 'Prints complete surface exploration and cargo rovers (Scout, Hauler, Crawler) using linked storage.',
+    metric: 'Print Bay',
+    rate: '1 Rover',
+    draw: 'Relay Power',
+    icon: Truck,
+    accentColor: '#38bdf8',
+  },
   mill: {
     name: 'Heavy Texture Mill',
     role: 'Massive Surface Refinement',
@@ -135,10 +147,10 @@ export const MachinePickerModal: React.FC<MachinePickerModalProps> = ({
             maxHeight: 'calc(80vh - 120px)',
           }}
         >
-          {HEAVY.map((kind) => {
+          {STATION_KINDS.map((kind) => {
             const meta = MACHINE_META[kind];
             const Icon = meta.icon;
-            const bill = HEAVY_BILL[kind];
+            const bill = kind === 'fabricator' ? FABRICATOR_BILL : HEAVY_BILL[kind];
 
             const billItems = bill.map((b) => {
               const have = getItemCount(b.item);

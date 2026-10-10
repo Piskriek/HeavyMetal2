@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { parseMd2, createMd2Mesh, type Md2ParsedModel } from '@hm/shareware';
 import { parseWad, extractPatch, extractPlaypal } from '@hm/shareware';
 import { createFidelityMobMaterial, type FidelityStage } from '@hm/shareware';
+import type { WeaponStats } from '../base/weapons';
 
 export type MobKind = 'ogro' | 'demon';
 export type MobState = 'idle' | 'chase' | 'attack' | 'pain' | 'death';
@@ -33,7 +34,9 @@ export interface CombatStats {
 export interface MonsterMashCombatManager {
   isEquipped(): boolean;
   equip(on: boolean): void;
-  fire(playerPos?: THREE.Vector3, cameraDir?: THREE.Vector3): { fired: boolean; hits: number; damage: number; killed: number };
+  fire(playerPos?: THREE.Vector3, cameraDir?: THREE.Vector3): { fired: boolean; hits: number; damage: number; killed: number; reason?: string };
+  setWeaponStats(stats: WeaponStats | null): void;
+  getWeaponStats(): WeaponStats | null;
   spawnOgro(count?: number, customPos?: { x: number; z: number }): Promise<void>;
   spawnDemon(count?: number, customPos?: { x: number; z: number }): Promise<void>;
   clearMobs(): void;
@@ -223,6 +226,23 @@ class CombatAudio {
     gain.connect(ctx.destination);
     osc.start(now);
     osc.stop(now + 0.28);
+  }
+
+  playBeamPulse(): void {
+    const ctx = this.init();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(880, now);
+    osc.frequency.exponentialRampToValueAtTime(440, now + 0.12);
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.15);
   }
 }
 
@@ -499,7 +519,8 @@ export function createMonsterMashCombat(options: {
   let stage: FidelityStage = (options.initialStage ?? 1) as FidelityStage;
   let equipped = false;
   let currentAmmo = 8;
-  const maxAmmo = 8;
+  let maxAmmo = 8;
+  let activeWeaponStats: WeaponStats | null = null;
   let cooldownTimer = 0;
   let nextMobId = 1;
 
@@ -653,12 +674,25 @@ export function createMonsterMashCombat(options: {
     return equipped;
   }
 
+  function setWeaponStats(statsObj: WeaponStats | null): void {
+    activeWeaponStats = statsObj;
+    if (statsObj) {
+      maxAmmo = statsObj.magazine;
+      currentAmmo = Math.min(currentAmmo, maxAmmo);
+      if (currentAmmo <= 0) currentAmmo = maxAmmo;
+    }
+  }
+
+  function getWeaponStats(): WeaponStats | null {
+    return activeWeaponStats;
+  }
+
   function getAmmo(): { current: number; max: number } {
-    return { current: currentAmmo, max: maxAmmo };
+    return { current: currentAmmo, max: activeWeaponStats?.magazine ?? maxAmmo };
   }
 
   function reload(): void {
-    currentAmmo = maxAmmo;
+    currentAmmo = activeWeaponStats?.magazine ?? maxAmmo;
     audio.playEquip();
   }
 
@@ -820,9 +854,13 @@ export function createMonsterMashCombat(options: {
   function fire(
     playerPos?: THREE.Vector3,
     cameraDir?: THREE.Vector3
-  ): { fired: boolean; hits: number; damage: number; killed: number } {
+  ): { fired: boolean; hits: number; damage: number; killed: number; reason?: string } {
     if (!equipped || cooldownTimer > 0) {
       return { fired: false, hits: 0, damage: 0, killed: 0 };
+    }
+
+    if (!activeWeaponStats) {
+      return { fired: false, hits: 0, damage: 0, killed: 0, reason: 'Weapon loadout incomplete' };
     }
 
     if (currentAmmo <= 0) {
@@ -832,22 +870,38 @@ export function createMonsterMashCombat(options: {
 
     currentAmmo--;
     stats.shotsFired++;
-    cooldownTimer = 0.52; // Cooldown between shotgun blasts
+    cooldownTimer = activeWeaponStats.cooldown;
+
+    const isBeam = activeWeaponStats.mode === 'beam';
 
     // Audio & Recoil
-    audio.playShotgunBlast();
-    recoilOffset.z = 0.14;
-    recoilPitch = 0.08;
-    flashTimer = 0.07;
-    flashMesh.visible = true;
-    flashLight.intensity = 3.5;
+    if (isBeam) {
+      audio.playBeamPulse();
+      recoilOffset.z = 0.04;
+      recoilPitch = 0.02;
+      flashTimer = 0.05;
+      flashMesh.visible = true;
+      flashLight.color.setHex(0x06b6d4);
+      flashLight.intensity = 2.5;
+    } else {
+      audio.playShotgunBlast();
+      recoilOffset.z = 0.14;
+      recoilPitch = 0.08;
+      flashTimer = 0.07;
+      flashMesh.visible = true;
+      flashLight.color.setHex(0xff7711);
+      flashLight.intensity = 3.5;
+    }
 
     let hits = 0;
     let totalDamage = 0;
     let killed = 0;
 
-    // Shotgun fires 7 pellets in tight spread cone
-    const PELLET_COUNT = 7;
+    const PELLET_COUNT = activeWeaponStats.pellets;
+    const spreadRad = activeWeaponStats.spread;
+    const maxRange = activeWeaponStats.range;
+    const [minDmg, maxDmg] = activeWeaponStats.damage;
+
     const raycaster = new THREE.Raycaster();
     const rayOrigin = playerPos?.clone() ?? camera.position.clone();
     const baseDir = cameraDir?.clone() ?? new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -856,8 +910,8 @@ export function createMonsterMashCombat(options: {
     const camUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
 
     for (let p = 0; p < PELLET_COUNT; p++) {
-      const spreadX = (Math.random() - 0.5) * 0.055;
-      const spreadY = (Math.random() - 0.5) * 0.055;
+      const spreadX = spreadRad > 0 ? (Math.random() - 0.5) * 2 * spreadRad : 0;
+      const spreadY = spreadRad > 0 ? (Math.random() - 0.5) * 2 * spreadRad : 0;
       const pelletDir = baseDir.clone()
         .addScaledVector(camRight, spreadX)
         .addScaledVector(camUp, spreadY)
@@ -877,7 +931,7 @@ export function createMonsterMashCombat(options: {
 
         if (distToRay <= mob.hitRadius) {
           const hitDist = rayOrigin.distanceTo(rayPoint);
-          if (hitDist < 60 && (!closestHit || hitDist < closestHit.dist)) {
+          if (hitDist <= maxRange && (!closestHit || hitDist < closestHit.dist)) {
             closestHit = { mob, dist: hitDist, point: rayPoint };
           }
         }
@@ -886,7 +940,7 @@ export function createMonsterMashCombat(options: {
       if (closestHit) {
         hits++;
         stats.pelletsHit++;
-        const pelletDmg = 20 + Math.floor(Math.random() * 10);
+        const pelletDmg = Math.floor(minDmg + Math.random() * (maxDmg - minDmg + 1));
         totalDamage += pelletDmg;
         stats.damageDealt += pelletDmg;
 
@@ -896,7 +950,7 @@ export function createMonsterMashCombat(options: {
         mob.healthBar.update(mob.hp, mob.maxHp, `${mob.kind.toUpperCase()} #${mob.id}`);
 
         // Blood / spark burst at hit point
-        particles.burst(closestHit.point, 6, 0xff3b30, 4.5);
+        particles.burst(closestHit.point, 6, isBeam ? 0x06b6d4 : 0xff3b30, 4.5);
 
         if (mob.hp <= 0 && mob.state !== 'death') {
           // Death!
@@ -955,11 +1009,11 @@ export function createMonsterMashCombat(options: {
         }
       } else {
         // Check ground impact
-        for (let d = 2; d < 45; d += 0.8) {
+        for (let d = 2; d < Math.min(45, maxRange); d += 0.8) {
           const pt = rayOrigin.clone().addScaledVector(pelletDir, d);
           const gy = groundHeightAt(pt.x, pt.z);
           if (pt.y <= gy) {
-            particles.burst(new THREE.Vector3(pt.x, gy + 0.05, pt.z), 3, 0xf59e0b, 2.5);
+            particles.burst(new THREE.Vector3(pt.x, gy + 0.05, pt.z), 3, isBeam ? 0x06b6d4 : 0xf59e0b, 2.5);
             break;
           }
         }
@@ -1185,6 +1239,8 @@ export function createMonsterMashCombat(options: {
     getStats,
     getAmmo,
     reload,
+    setWeaponStats,
+    getWeaponStats,
     update,
     dispose,
   };

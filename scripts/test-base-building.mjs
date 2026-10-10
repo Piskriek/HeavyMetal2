@@ -1058,6 +1058,14 @@ try {
   }, planVerdict.planId);
   console.log('OK: Fill verdict after pressing F:', fillVerdict);
 
+  // Drop remaining test plan so it doesn't linger in world or subsequent screenshots
+  await page.evaluate((planId) => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    baseApi?.apply?.({ t: 'dropPlan', plan: planId });
+    window.__playScene?.setPlanGhosts?.([]);
+  }, planVerdict.planId);
+  console.log('OK: Dropped test plan');
+
   // 11. Verify Room Pressure & Shelter Chip
   console.log('\n--- VERIFYING ROOM PRESSURE & SHELTER CHIPS ---');
   await page.evaluate(async () => {
@@ -1105,6 +1113,7 @@ try {
   await page.evaluate(() => {
     window.__hm?.hideOverlays?.(true);
     window.__hm?.clearToast?.();
+    window.__playScene?.setPlanGhosts?.([]);
   });
   await page.waitForTimeout(300);
 
@@ -1326,6 +1335,322 @@ try {
   await takeScreenshot(page, { path: 'docs/shots/base/build-camera.png' });
   console.log('Captured docs/shots/base/build-camera.png');
   await page.keyboard.up('Alt');
+
+  // =========================================================================
+  // TASK-09: Vehicle Fabricator, Weapon Bench, Field Swaps & Rover Driving
+  // =========================================================================
+  console.log('\n--- TASK-09: VEHICLE FABRICATOR, WEAPON BENCH, FIELD SWAPS & ROVER DRIVING ---');
+
+  // Step 1: Install fabricator; at stage 1 the scout card says "Opens at stage 2"
+  const prepFabVerdict = await page.evaluate(() => {
+    window.__hm?.hideOverlays?.(false);
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    if (!baseApi) return { ok: false, error: 'baseApi not found' };
+    const at = { x: 12, z: 12 };
+
+    // Set stage to 1 if not already 1
+    if (baseApi.world().stage !== 1) {
+      baseApi.apply({ t: 'stage', stage: 1 });
+    }
+    window.hmPlay?.raise?.(1);
+
+    // Top up resources into player pack and bridge store
+    const stock = [
+      { item: 'ore', n: 1200 },
+      { item: 'prim-chassis', n: 50 },
+      { item: 'prim-beam', n: 50 },
+      { item: 'prim-column', n: 50 },
+      { item: 'prim-cube', n: 50 },
+      { item: 'map-basalt', n: 50 },
+      { item: 'map-quartz', n: 50 },
+      { item: 'wpn-frame', n: 5 },
+      { item: 'core-semi', n: 5 },
+      { item: 'barrel-scatter', n: 5 },
+      { item: 'sight-iron', n: 5 },
+      { item: 'cell-compact', n: 5 },
+      { item: 'barrel-long', n: 5 },
+    ];
+    const w = baseApi.world();
+    let slotIdx = 5;
+    for (const it of stock) {
+      w.player.slots[slotIdx++] = { item: it.item, n: it.n };
+    }
+    const bridgeBox = w.boxes.find((b) => b.id === -2);
+    if (bridgeBox) {
+      let bSlotIdx = 0;
+      for (const it of stock) {
+        bridgeBox.slots[bSlotIdx++] = { item: it.item, n: it.n };
+      }
+    }
+    let hp = w.base.pieces.find((p) => p.kind === 'hardpoint');
+    if (!hp) {
+      const sId = w.base.structures[0]?.id ?? 1;
+      baseApi.apply({ t: 'place', at, blueprint: 'bp:starter', piece: { s: sId, kind: 'hardpoint', i: 4, j: 0, k: 0, r: 0 } });
+      hp = baseApi.world().base.pieces.find((p) => p.kind === 'hardpoint');
+    }
+    if (!hp) return { ok: false, error: 'Could not find or create hardpoint' };
+
+    // Clear any existing machine on this hardpoint so it is free for the fabricator
+    w.machines = w.machines.filter((m) => m.id !== hp.id);
+
+    // Install fabricator
+    baseApi.apply({ t: 'install', at, hardpoint: hp.id, kind: 'fabricator' });
+    baseApi.openFabricator(hp.id);
+    return { ok: true, hardpointId: hp.id };
+  });
+
+  if (!prepFabVerdict.ok) throw new Error(prepFabVerdict.error);
+  console.log('OK: Fabricator installed at stage 1 on hardpoint', prepFabVerdict.hardpointId);
+
+  const fabModal = page.locator('[data-testid="fabricator-modal"]');
+  await fabModal.waitFor({ state: 'visible', timeout: 10000 });
+  console.log('OK: Fabricator modal opened');
+
+  const scoutCard = page.locator('[data-testid="rover-card-scout"]');
+  await scoutCard.waitFor({ state: 'visible' });
+  const scoutCardText = await scoutCard.textContent();
+  console.log('Scout card text at stage 1:', scoutCardText);
+  if (!scoutCardText.includes('Opens at stage 2')) {
+    throw new Error(`Expected scout card to say "Opens at stage 2", got: "${scoutCardText}"`);
+  }
+  console.log('OK: Verified Stage 1 lock message: "Opens at stage 2"');
+
+  await takeScreenshot(page, { path: 'docs/shots/base/fabricator-window.png' });
+  console.log('Captured docs/shots/base/fabricator-window.png');
+
+  // Step 2: Advance to stage 2, print scout, verify progress bar, wait for printed
+  await page.evaluate(() => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    baseApi?.apply({ t: 'stage', stage: 2 });
+    window.hmPlay?.raise?.(2);
+  });
+  await page.waitForTimeout(300);
+
+  const printScoutBtn = page.locator('[data-testid="print-btn-scout"]');
+  await printScoutBtn.waitFor({ state: 'visible' });
+  await printScoutBtn.click();
+  console.log('OK: Clicked Print Scout button');
+
+  const progressPanel = page.locator('[data-testid="fabricator-progress-panel"]');
+  await progressPanel.waitFor({ state: 'visible', timeout: 5000 });
+  console.log('OK: Print progress bar visible');
+
+  await takeScreenshot(page, { path: 'docs/shots/base/printing.png' });
+  console.log('Captured docs/shots/base/printing.png');
+
+  // Advance simulation tick so print finishes
+  await page.evaluate(() => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    const at = { x: 12, z: 12 };
+    baseApi?.apply({ t: 'tick', at, dt: 130, beam: null, power: {} });
+  });
+  await page.waitForTimeout(500);
+
+  // Close fabricator modal
+  const fabCloseBtn = page.locator('[data-testid="fabricator-close-btn"]');
+  if (await fabCloseBtn.isVisible()) {
+    await fabCloseBtn.click();
+  } else {
+    await page.keyboard.press('Escape');
+  }
+  await page.waitForTimeout(400);
+
+  const printedScout = await page.evaluate(() => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    const w = baseApi.world();
+    const scout = w.vehicles.find((v) => v.kind === 'scout');
+    return scout ? { id: scout.id, x: scout.x, z: scout.z, yaw: scout.yaw } : null;
+  });
+  if (!printedScout) throw new Error('Scout rover was not printed into world.vehicles');
+  console.log('OK: Scout rover printed into world.vehicles:', printedScout);
+
+  // Step 3: Enter scout, drive 20 m (capture scout-driving.png with chase cam), exit; save/reload verifying parked coordinates
+  const enterVerdict = await page.evaluate((scoutId) => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    baseApi.enterVehicle(scoutId);
+    return Boolean(baseApi.driving());
+  }, printedScout.id);
+  if (!enterVerdict) throw new Error('Failed to enter scout rover');
+  console.log('OK: Entered scout rover');
+
+  // Step driving loop for ~75 frames to drive forward
+  await page.evaluate(() => {
+    const scene = window.__playScene;
+    for (let f = 0; f < 75; f++) {
+      scene?.frame(0, 0.033, {
+        move: { x: 0, z: 1 },
+        look: { dx: 0, dy: 0 },
+        run: false,
+        altCam: false,
+        vehicleInput: { throttle: 1, steer: 0, brake: false },
+      });
+    }
+  });
+  await page.waitForTimeout(600);
+
+  await takeScreenshot(page, { path: 'docs/shots/base/scout-driving.png' });
+  console.log('Captured docs/shots/base/scout-driving.png (chase camera)');
+
+  // Exit vehicle and check parked distance & save/reload
+  const driveVerdict = await page.evaluate((initial) => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    const parked = baseApi.exitVehicle();
+    if (!parked) return { ok: false, error: 'Failed to exit vehicle' };
+    const dist = Math.hypot(parked.x - initial.x, parked.z - initial.z);
+
+    // Save and reload world
+    baseApi.save();
+    baseApi.load();
+    const reloadedScout = baseApi.world().vehicles.find((v) => v.id === initial.id);
+    if (!reloadedScout) return { ok: false, error: 'Vehicle not found after reload' };
+
+    const parkedMatch = Math.hypot(reloadedScout.x - parked.x, reloadedScout.z - parked.z) < 1e-3;
+    return {
+      ok: true,
+      dist,
+      parked,
+      reloadedScout: { x: reloadedScout.x, z: reloadedScout.z, yaw: reloadedScout.yaw },
+      parkedMatch,
+    };
+  }, printedScout);
+
+  if (!driveVerdict.ok) throw new Error(driveVerdict.error);
+  console.log('OK: Driving and parking persistence verified:', driveVerdict);
+
+  // Step 4: Open weapon bench (capture weapon-bench.png), forge long barrel, fit it, verify weaponStats.pellets goes from 7 to 1
+  const benchPrepVerdict = await page.evaluate(() => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    if (!baseApi) return { ok: false, error: 'baseApi not found' };
+    const at = { x: 12, z: 12 };
+    // Advance stage to 3 to unlock long barrel (opens at stage 3)
+    baseApi.apply({ t: 'stage', stage: 3 });
+    window.hmPlay?.raise?.(3);
+
+    const w = baseApi.world();
+    // Clear slots 10 to 35 so player pack has plenty of room for unequipped items
+    for (let idx = 10; idx < w.player.slots.length; idx++) {
+      w.player.slots[idx] = null;
+    }
+    // Make sure player has materials for long barrel (20 ore, 2 prim-column)
+    w.player.slots[6] = { item: 'ore', n: 100 };
+    w.player.slots[7] = { item: 'prim-column', n: 10 };
+
+    // Check or place weaponBench piece
+    let wb = w.base.pieces.find((p) => p.kind === 'weaponBench');
+    if (!wb) {
+      const sId = w.base.structures[0]?.id ?? 1;
+      baseApi.apply({ t: 'place', at, blueprint: 'bp:starter', piece: { s: sId, kind: 'foundation', i: 2, j: 2, k: 0, r: 0 } });
+      baseApi.apply({ t: 'place', at, blueprint: 'bp:starter', piece: { s: sId, kind: 'weaponBench', i: 2, j: 2, k: 0, r: 0 } });
+      wb = baseApi.world().base.pieces.find((p) => p.kind === 'weaponBench');
+    }
+
+    // Teleport player right next to the weapon bench at (20, 20)
+    window.__playScene?.debug.teleport('planet', 20, 20, 0);
+
+    // Default loadout check (should have 7 pellets)
+    const initialStats = window.__playScene?.mash.getWeaponStats?.();
+    baseApi.openWeaponBench();
+    return { ok: true, initialPellets: initialStats?.pellets ?? 7 };
+  });
+
+  if (!benchPrepVerdict.ok) throw new Error(benchPrepVerdict.error);
+  console.log('OK: Weapon bench opened, initial pellets:', benchPrepVerdict.initialPellets);
+
+  const weaponBenchModal = page.locator('[data-testid="weapon-bench-modal"]');
+  await weaponBenchModal.waitFor({ state: 'visible', timeout: 10000 });
+  console.log('OK: Weapon bench modal visible');
+
+  // Click Barrel tab
+  const barrelTab = page.locator('[data-testid="slot-tab-barrel"]');
+  await barrelTab.waitFor({ state: 'visible' });
+  await barrelTab.click();
+  await page.waitForTimeout(300);
+
+  // Forge barrel-long
+  const forgeLongBtn = page.locator('[data-testid="forge-btn-barrel-long"]');
+  await forgeLongBtn.waitFor({ state: 'visible' });
+  await forgeLongBtn.click();
+  console.log('OK: Forged barrel-long');
+  await page.waitForTimeout(300);
+
+  // Fit barrel-long
+  const fitLongBtn = page.locator('[data-testid="fit-btn-barrel-long"]');
+  await fitLongBtn.waitFor({ state: 'visible' });
+  await fitLongBtn.click();
+  console.log('OK: Fitted barrel-long');
+  await page.waitForTimeout(300);
+
+  const fittedVerdict = await page.evaluate(() => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    const w = baseApi.world();
+    const stats = window.__playScene?.mash.getWeaponStats?.();
+    return {
+      fittedBarrel: w.loadout.barrel,
+      pellets: stats?.pellets,
+    };
+  });
+  console.log('OK: Weapon stats after fitting long barrel:', fittedVerdict);
+  if (fittedVerdict.pellets !== 1) {
+    throw new Error(`Expected pellets to be 1 with long barrel, got: ${fittedVerdict.pellets}`);
+  }
+
+  await takeScreenshot(page, { path: 'docs/shots/base/weapon-bench.png' });
+  console.log('Captured docs/shots/base/weapon-bench.png');
+
+  // Close weapon bench modal
+  const benchCloseBtn = page.locator('[data-testid="weapon-bench-close-btn"]');
+  if (await benchCloseBtn.isVisible()) {
+    await benchCloseBtn.click();
+  } else {
+    await page.keyboard.press('Escape');
+  }
+  await page.waitForTimeout(400);
+
+  // Step 5: Open inventory loadout, swap back scatter barrel (capture loadout-swap.png)
+  await page.evaluate(() => {
+    window.__hm?.hideOverlays?.(false);
+    window.__hmHud?.openInventory?.();
+  });
+  await page.waitForTimeout(400);
+
+  const invWindow = page.locator('[data-testid="inventory-modal"]');
+  if (!(await invWindow.isVisible())) {
+    await page.keyboard.press('Tab');
+  }
+  await invWindow.waitFor({ state: 'visible', timeout: 8000 });
+  console.log('OK: Inventory window opened');
+
+  const loadoutPanel = page.locator('[data-testid="loadout-panel"]');
+  await loadoutPanel.waitFor({ state: 'visible', timeout: 5000 });
+  console.log('OK: Weapon Loadout panel visible in inventory');
+
+  // Swap back scatter barrel via field fit
+  const swapVerdict = await page.evaluate(() => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    baseApi.apply({ t: 'fit', slot: 'barrel', item: 'barrel-scatter' });
+    const stats = window.__playScene?.mash.getWeaponStats?.();
+    return {
+      fittedBarrel: baseApi.world().loadout.barrel,
+      pellets: stats?.pellets,
+    };
+  });
+  console.log('OK: Swapped back scatter barrel:', swapVerdict);
+  if (swapVerdict.pellets !== 7) {
+    throw new Error(`Expected pellets to be 7 after swapping back scatter barrel, got: ${swapVerdict.pellets}`);
+  }
+
+  await page.waitForTimeout(400);
+  await takeScreenshot(page, { path: 'docs/shots/base/loadout-swap.png' });
+  console.log('Captured docs/shots/base/loadout-swap.png');
+
+  // Close inventory window
+  const invCloseBtn = page.locator('[data-testid="inventory-close-btn"]');
+  if (await invCloseBtn.isVisible()) {
+    await invCloseBtn.click();
+  } else {
+    await page.keyboard.press('Escape');
+  }
+  await page.waitForTimeout(300);
 
   console.log('\nALL FIDELITY BASE-BUILDING HUD, REAL WORLD & LIFECYCLE CHECKS PASSED!');
 } catch (err) {

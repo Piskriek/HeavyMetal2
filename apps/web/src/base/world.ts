@@ -329,6 +329,8 @@ export function apply(w: BaseWorld, env: WorldEnv, cmd: BaseCommand): Applied {
       return forge(w, env, cmd);
     case 'fit':
       return fit(w, cmd);
+    default:
+      return refuse(w, (cmd as any).t ?? 'unknown', 'unknown-cmd');
   }
 }
 

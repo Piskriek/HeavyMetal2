@@ -65,3 +65,10 @@ BRANCH RECONCILIATION (rebase onto d7e1643, the owner's review commit):
 - Window wall (19): KEPT the batch-2 pair (3x2 panels, viewport, hazard foot, no markings). Passed side-by-side in both stages. The owner's copy in rejected/ is kept as the record of that review.
 - Outer corner (14), gable (17), doorframe (20): kept as drawn in batches 3-4.
 - Owner's rejected/ folder restored to d7e1643. My older rejects are in rejected/review-batch/.
+
+REVIEW (batch 5, S6 redraws): 
+- 21 interior door S6 (wall with the sliding door set in it, like S1): kept.
+- 23 ladder S6 (single wall panel with hazard bands, no building): kept.
+- 25 brace S6: first redraw had a railing on the deck (not in S1); redrawn with the deck bare and the hazard strut as S1: kept.
+- 26 life-support unit S1 and S6: kept.
+- 27 airlock vestibule S6: first redraw had interior fittings and a grate floor (not in S1); redrawn with a bare interior: kept.

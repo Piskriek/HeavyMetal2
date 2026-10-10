@@ -168,13 +168,12 @@
 .hm-window-subtitle {
   font-family: 'Inter', sans-serif;
   font-size: 12px;
+  line-height: 1.4;
   font-weight: 400;
   color: var(--base-text-secondary);
   text-transform: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 500px;
+  white-space: normal;
+  max-width: 620px;
   display: block;
 }
 

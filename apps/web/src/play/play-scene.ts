@@ -478,6 +478,13 @@ export function createPlayScene(o: {
     for (const lamp of view.lamps) setRoverLamp(lamp, 1);
     currentSpeed = 0;
     vehicleAcc = 0;
+    const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(view.group.quaternion);
+    const camDist = view.kind === 'scout' ? 4.6 : view.kind === 'hauler' ? 6.2 : 7.8;
+    const camHeight = view.kind === 'scout' ? 1.8 : view.kind === 'hauler' ? 2.4 : 3.0;
+    const lookHeight = view.kind === 'scout' ? 0.7 : view.kind === 'hauler' ? 1.0 : 1.3;
+    const initialCamPos = view.group.position.clone().addScaledVector(fwd, -camDist).add(new THREE.Vector3(0, camHeight, 0));
+    camera.position.copy(initialCamPos);
+    camera.lookAt(view.group.position.clone().add(new THREE.Vector3(0, lookHeight, 0)));
     return true;
   }
 
@@ -1613,14 +1620,15 @@ export function createPlayScene(o: {
           const roverQuat = vView.group.quaternion;
           const roverPos = vView.group.position;
           const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(roverQuat);
-          const camDist = vView.kind === 'scout' ? 6.5 : vView.kind === 'hauler' ? 8.2 : 10.0;
-          const camHeight = vView.kind === 'scout' ? 2.5 : vView.kind === 'hauler' ? 3.2 : 4.0;
+          const camDist = vView.kind === 'scout' ? 4.6 : vView.kind === 'hauler' ? 6.2 : 7.8;
+          const camHeight = vView.kind === 'scout' ? 1.8 : vView.kind === 'hauler' ? 2.4 : 3.0;
+          const lookHeight = vView.kind === 'scout' ? 0.7 : vView.kind === 'hauler' ? 1.0 : 1.3;
           const idealCamPos = roverPos.clone().addScaledVector(fwd, -camDist).add(new THREE.Vector3(0, camHeight, 0));
-          const minCamY = groundAt(idealCamPos.x, idealCamPos.z) + 0.8;
+          const minCamY = groundAt(idealCamPos.x, idealCamPos.z) + 0.6;
           if (idealCamPos.y < minCamY) idealCamPos.y = minCamY;
 
-          camera.position.lerp(idealCamPos, Math.min(1, dt * 10));
-          camera.lookAt(roverPos.clone().add(new THREE.Vector3(0, 1.2, 0)));
+          camera.position.lerp(idealCamPos, Math.min(1, dt * 12));
+          camera.lookAt(roverPos.clone().add(new THREE.Vector3(0, lookHeight, 0)));
         }
       } else if (cameraView === 'third') {
         const camRot = new THREE.Euler(pitch, yaw, 0, 'YXZ');

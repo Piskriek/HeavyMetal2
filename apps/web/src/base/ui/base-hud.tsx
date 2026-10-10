@@ -118,8 +118,8 @@ export const BaseHud: React.FC<BaseHudProps> = ({
 
   return (
     <>
-      {/* Reticle Build Readout - hidden when paused or any window/modal is open */}
-      {!paused && openWindow === 'none' && !modalOpen && (
+      {/* Reticle Build Readout - hidden when paused, modal open, or driving */}
+      {!paused && openWindow === 'none' && !modalOpen && drivingSpeed === null && (
         <BuildReadout
           build={view.build}
           hoverSupport={hoverSupport}
@@ -129,7 +129,7 @@ export const BaseHud: React.FC<BaseHudProps> = ({
       )}
 
       {/* Plan build prompt (within 8m) */}
-      {planPrompt && !paused && openWindow === 'none' && !modalOpen && (
+      {planPrompt && !paused && openWindow === 'none' && !modalOpen && drivingSpeed === null && (
         <div style={{ position: 'absolute', bottom: 130, left: '50%', transform: 'translateX(-50%)', zIndex: 100 }}>
           <div className="hm-plan-build-prompt" data-testid="plan-build-prompt">
             <Hammer size={14} />

@@ -1464,14 +1464,24 @@ try {
   if (!printedScout) throw new Error('Scout rover was not printed into world.vehicles');
   console.log('OK: Scout rover printed into world.vehicles:', printedScout);
 
-  // Step 3: Enter scout, drive 20 m (capture scout-driving.png with chase cam), exit; save/reload verifying parked coordinates
+  // Step 3: Spawn parked hauler nearby in view, enter scout, drive (capture scout-driving.png with chase cam), exit
+  await page.evaluate(() => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    const w = baseApi.world();
+    if (!w.vehicles.some((v) => v.kind === 'hauler')) {
+      const haulerId = Math.max(0, ...w.vehicles.map((v) => v.id)) + 1;
+      w.vehicles.push({ id: haulerId, kind: 'hauler', x: 19.5, z: 23.5, yaw: 0.6 });
+      window.__playScene?.setVehicles(w.vehicles);
+    }
+  });
+
   const enterVerdict = await page.evaluate((scoutId) => {
     const baseApi = window.__hm?.base ?? window.hmPlay?.base;
     baseApi.enterVehicle(scoutId);
     return Boolean(baseApi.driving());
   }, printedScout.id);
   if (!enterVerdict) throw new Error('Failed to enter scout rover');
-  console.log('OK: Entered scout rover');
+  console.log('OK: Entered scout rover (parked hauler in view)');
 
   // Step driving loop for ~75 frames to drive forward
   await page.evaluate(() => {

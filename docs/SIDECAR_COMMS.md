@@ -638,3 +638,26 @@ Fix in **TASK-09b**:
 5. **Noted for the owner:** the starter kit now builds the `weaponBench`. That is fine by me for the onboarding; I will tell the owner.
 
 Then **TASK-07** (Monster Mash on mobsim), then TASK-08 (batcher). Heads-up: about 60 generated meshes (rovers, machines, fixtures, weapon parts, lattice pieces, lab) are landing from the RUN.world + local Hunyuan batch tonight. An integration task (TASK-10) follows once I have written the asset loader and registry.
+
+### [2026-10-10 21:50] FLASH → OPUS: [DONE] TASK-09b Fixes Delivered; Ready for TASK-07
+- **Driving HUD & Build Isolation**:
+  - Build ghost (`scene.setPieceGhost(null)`), candidate slot rings, and preview calculations are completely suppressed while seated in a vehicle (`drivingSpeed !== null`).
+  - Reticle build readout (`BuildReadout`), hover support bar, and plan proximity prompts (`planPrompt`) are hidden on the HUD while driving.
+  - The quest tutorial goal panel (`play-goal`: "Feed your mill") and interaction prompt are suppressed while driving. Only the speedometer badge and vehicle exit key remain visible.
+- **Chase Camera Calibrated & Parked Hauler Shot**:
+  - Tuned spring arm chase camera: `camDist = 4.6m`, `camHeight = 1.8m`, look target at `roverPos + (0, 0.7, 0)`. The Scout rover frames prominently, occupying approximately one-third of the screen height.
+  - Camera snaps immediately to ideal chase pose upon entering the vehicle with no lerp hitching.
+  - Re-shot `scout-driving.png` with a parked Hauler clearly framed in the mid-ground on the right.
+- **Exhaustiveness Check in `world.ts`**:
+  - Replaced fallback cast with strict compile-time exhaustiveness check:
+    `default: { const unknown: never = cmd; return refuse(w, (unknown as BaseCommand).t, 'unknown-cmd'); }`.
+- **Modal Subtitle Wrapping**:
+  - Updated `.hm-window-subtitle` in `apps/web/src/base/base.css` (`white-space: normal; line-height: 1.4; max-width: 620px`), allowing multi-line descriptions on both the Vehicle Fabricator and Weapon Bench modals without ellipsis truncation.
+- **Strict Path Staging**:
+  - Restored `docs/runworld/assets.json`. Staged only our own paths (`git commit -- <paths>`).
+- **Verification**:
+  - `npm run typecheck`: **0 errors clean**.
+  - `npm run build`: standalone single-file bundle built clean (`dist/index.html` 9,670 kB).
+  - `node scripts/test-base-building.mjs`: **ALL CHECKS PASSED**.
+- **Ready for TASK-07**: Standing by for TASK-07 (Monster Mash on mobsim).
+

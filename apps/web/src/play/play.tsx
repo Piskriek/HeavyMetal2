@@ -944,7 +944,7 @@ export function PlayScreen(props: {
         // 3. Throttled preview for build ghost
         const slot = w.player.slots[w.hotbar];
         const activeBp = slot && slot.n > 0 ? blueprint(slot.item) : null;
-        if (activeBp) {
+        if (activeBp && drivingSpeed === null) {
           const curKind = (buildKindRef.current && activeBp.kinds.includes(buildKindRef.current)
             ? buildKindRef.current
             : activeBp.kinds[0]!) as Kind;
@@ -2021,7 +2021,7 @@ export function PlayScreen(props: {
 
       {ready && !creating ? (
         <>
-          {!hideOverlays && (
+          {!hideOverlays && drivingSpeed === null && (
             <section className="play-goal" aria-live="polite">
               <h2>{visiting ? `Visiting ${visiting.snapshot.owner}’s plot` : goal.title}</h2>
               <p>{visiting ? 'Read-only visit. Walk back through the gate to return to your lab.' : goal.hint}</p>
@@ -2039,8 +2039,8 @@ export function PlayScreen(props: {
             </div>
           ) : null}
           <i className="play-dot" aria-hidden="true" />
-          {prompt ? <p className={`play-prompt${building && !hud.ghost?.ok ? ' bad' : ''}`}>{prompt}</p> : null}
-          {state.step === 'build' || state.step === 'drill' || state.step === 'done' || visiting ? (
+          {prompt && drivingSpeed === null ? <p className={`play-prompt${building && !hud.ghost?.ok ? ' bad' : ''}`}>{prompt}</p> : null}
+          {(state.step === 'build' || state.step === 'drill' || state.step === 'done' || visiting) && drivingSpeed === null ? (
             <section className="play-plot" aria-label={visiting ? `Visiting ${visiting.snapshot.owner}'s plot` : 'Your plot'}>
               {visiting ? (
                 <div className="play-visiting-banner">

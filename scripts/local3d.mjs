@@ -2,6 +2,7 @@
 //   node scripts/local3d.mjs health
 //   node scripts/local3d.mjs model <id> [--no-texture]     one asset from docs/runworld/assets.json
 //   node scripts/local3d.mjs models [id ...] [--no-texture] every approved asset without a local model
+//   add --views to send the four turnaround crops as a multi-view job (writes model-mv.glb)
 // Jobs are submitted and polled (POST /jobs, GET /jobs/{id}), so a slow job never hits a client timeout, unlike the
 // RUN CLI's 600 s cap. Each request has its own timeout; if the pipeline stops answering (PC off or restarting) the
 // client waits, checking every minute, and resubmits a job the restarted server no longer knows. The source image is sent as base64 from zips/runworld/assets/<id>/source.png; the result
@@ -39,12 +40,30 @@ async function waitForServer() {
   }
 }
 
+// --views: the multi-view job (Hunyuan3D-2mv shape, then the 2.0 paint stage; docs/prompts/local3d/01-...): the
+// four crops from `runworld-assets.mjs views` go up as `views`, and the result is model-mv.glb, kept beside the
+// single-view model-local.glb so the two can be compared; the post step prefers model-mv.glb when it exists
+const multiView = args.includes('--views');
+const SIDES = ['front', 'left', 'back', 'right'];
+
 async function one(id) {
-  const d = path.join(OUT, id), png = path.join(d, 'source.png'), out = path.join(d, 'model-local.glb');
-  if (!fs.existsSync(png)) { console.log(`${id}: no source.png`); return; }
+  const d = path.join(OUT, id), png = path.join(d, 'source.png'), out = path.join(d, multiView ? 'model-mv.glb' : 'model-local.glb');
+  const b64 = (f) => fs.readFileSync(f).toString('base64');
+  let body;
+  if (multiView) {
+    // `mvSkip` drops views reviewed as wrong (a flat chassis's "back" came out as a copy of its front)
+    const skip = manifest.assets.find((x) => x.id === id)?.mvSkip ?? [];
+    const sides = SIDES.filter((s) => !skip.includes(s));
+    const files = sides.map((s) => path.join(d, 'views', `${s}.png`));
+    if (!sides.includes('front') || !files.every((f) => fs.existsSync(f))) { console.log(`${id}: no views (run runworld-assets.mjs views ${id})`); return; }
+    body = { views: Object.fromEntries(sides.map((s, i) => [s, b64(files[i])])), texture };
+  } else {
+    if (!fs.existsSync(png)) { console.log(`${id}: no source.png`); return; }
+    body = { image_base64: b64(png), texture };
+  }
   const t0 = Date.now();
   await waitForServer();
-  const job = await api('POST', '/jobs', { image_base64: fs.readFileSync(png).toString('base64'), texture }, 120000);
+  const job = await api('POST', '/jobs', body, 120000);
   const jobId = job.job_id ?? job.id ?? job.jobId;
   if (!jobId) throw new Error(`no job id in ${JSON.stringify(job).slice(0, 200)}`);
   console.log(`${id}: job ${jobId} submitted`);
@@ -73,7 +92,7 @@ else if (cmd === 'model' && ids[0]) await one(ids[0]);
 else if (cmd === 'models') {
   for (const a of manifest.assets.filter((x) => ids.length === 0 || ids.includes(x.id))) {
     const d = path.join(OUT, a.id);
-    if (!fs.existsSync(path.join(d, 'approved')) || fs.existsSync(path.join(d, 'model-local.glb'))) continue;
+    if (!fs.existsSync(path.join(d, 'approved')) || fs.existsSync(path.join(d, multiView ? 'model-mv.glb' : 'model-local.glb'))) continue;
     try { await one(a.id); } catch (e) { console.log(String(e.message ?? e)); }
   }
 } else { console.log('usage: node scripts/local3d.mjs health | model <id> | models [id ...] [--no-texture]'); process.exit(2); }

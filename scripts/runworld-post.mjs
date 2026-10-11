@@ -117,12 +117,13 @@ async function normalize(src, dst, a) {
 }
 
 for (const a of manifest.assets.filter((x) => only.length === 0 || only.includes(x.id))) {
-  // RUN's Hunyuan 3.1 Pro model if there is one, else the local 3080 pipeline's (scripts/local3d.mjs); a derived
+  // the local multi-view model if there is one (local3d.mjs --views), else RUN's Hunyuan 3.1 Pro model, else the
+  // local single-view one (scripts/local3d.mjs); a derived
   // piece (`derive: {from, op}`) is made from another asset's fitted mesh instead, every run, so it follows that
   // asset's regenerations: 'fit' reuses it as is (the per-axis fit below reshapes it, as roof-low is the pitched
   // roof at half the rise), 'hip' and 'valley' cut and mirror it into a roof corner (scripts/derive-roof.py)
   const d = path.join(OUT, a.id);
-  let model = ['model.glb', 'model-local.glb'].map((f) => path.join(d, f)).find((f) => fs.existsSync(f));
+  let model = ['model-mv.glb', 'model.glb', 'model-local.glb'].map((f) => path.join(d, f)).find((f) => fs.existsSync(f));
   if (a.derive) {
     const from = path.join(OUT, a.derive.from, 'norm.glb');
     if (!fs.existsSync(from)) { console.log(`${a.id}: waiting for ${a.derive.from}`); continue; }

@@ -1,6 +1,8 @@
 // Runs the RUN.world asset batch in docs/runworld/assets.json, one call at a time, resumable.
 //   node scripts/runworld-assets.mjs images [id ...]      clean source image per asset (about 120 credits each)
 //   node scripts/runworld-assets.mjs models [id ...]      Hunyuan image-to-3D for every APPROVED image (about 1,013 each)
+//   node scripts/runworld-assets.mjs views [id ...]       a 2 x 2 turnaround sheet per approved asset, cropped into
+//                                                          views/{front,left,back,right}.png (the multi-view input)
 //   node scripts/runworld-assets.mjs status
 // Outputs go to zips/runworld/assets/<id>/ (git-ignored): source.png (+ .json with its URL), model.glb.
 // An image is approved by creating zips/runworld/assets/<id>/approved (after reviewing source.png).
@@ -40,6 +42,46 @@ const prompt = (a) => [
   'Any tubing, piping, suspension, axles or undercarriage is set into solid bodies or covered by armour plates, skirts and a solid belly pan; nothing spindly is left exposed.',
   'NO lettering, NO numbers, NO logos, NO labels on any surface.',
 ].join(' ');
+
+// the 2 x 2 turnaround sheet (cells: front, left / back, right), for the multi-view shape stage
+const SIDES = ['front', 'left', 'back', 'right'];
+const turnaround = (a) => [
+  `Turnaround reference sheet of ${a.subject}: exactly the object in the reference image, the same design, colours and details.`,
+  'Four views of the same object in a 2 by 2 grid of four equal square cells on plain pure white, with wide white space between the cells and nothing crossing from one cell into another:',
+  "top-left the straight front view, top-right the straight left side view (the camera on the object's own left), bottom-left the straight back view (the side opposite the front, which looks different from the front), bottom-right the straight right side view.",
+  'Every view at eye level: the camera at the height of the middle of the object, looking horizontally, never from above, so the top surface is not seen.',
+  'Orthographic, the same scale and the same height in every cell, each view centred in its cell with a margin; soft even studio lighting, no cast shadows, no ground, no text, no labels, no numbers, no grid lines, no borders, no dividing lines.',
+].join(' ');
+
+/**
+ * Crops the sheet's four cells (inset 3%, past any divider lines the image model drew anyway), trims the white
+ * around each view, and pads it square on white with a margin. A left-right symmetric part (`symmetric: true`)
+ * takes its right view as the mirror of its left: the image model tends to repeat the left view there.
+ */
+async function cropViews(sheet, dir, symmetric = false) {
+  const sharp = (await import('sharp')).default;
+  const { width: w = 0, height: h = 0 } = await sharp(sheet).metadata();
+  fs.mkdirSync(dir, { recursive: true });
+  const cw = Math.floor(w / 2), ch = Math.floor(h / 2), m = Math.round(0.03 * cw), iw = cw - 2 * m, ih = ch - 2 * m;
+  for (const [i, side] of SIDES.entries()) {
+    if (symmetric && side === 'right') {
+      await sharp(path.join(dir, 'left.png')).flop().png().toFile(path.join(dir, 'right.png'));
+      console.log('  right: the left view, mirrored');
+      continue;
+    }
+    const cell = await sharp(sheet).extract({ left: (i % 2) * cw + m, top: Math.floor(i / 2) * ch + m, width: cw - 2 * m, height: ch - 2 * m }).png().toBuffer();
+    const { data, info } = await sharp(cell).trim({ background: '#ffffff', threshold: 24 }).png().toBuffer({ resolveWithObject: true });
+    const l = -(info.trimOffsetLeft ?? 0), t = -(info.trimOffsetTop ?? 0);
+    const touches = l <= 1 || t <= 1 || l + info.width >= iw - 1 || t + info.height >= ih - 1;
+    const side2 = Math.round(Math.max(info.width, info.height) * 1.15);
+    await sharp(data).extend({
+      top: Math.floor((side2 - info.height) / 2), bottom: Math.ceil((side2 - info.height) / 2),
+      left: Math.floor((side2 - info.width) / 2), right: Math.ceil((side2 - info.width) / 2),
+      background: '#ffffff',
+    }).flatten({ background: '#ffffff' }).png().toFile(path.join(dir, `${side}.png`));
+    console.log(`  ${side}: ${info.width} x ${info.height} px${touches ? ' (touches the cell edge: check the sheet)' : ''}`);
+  }
+}
 
 function rundot(args) {
   for (let attempt = 0; attempt < 8; attempt++) {
@@ -85,6 +127,22 @@ if (cmd === 'status') {
     const r = rundot(['generate', 'image', '--prompt', prompt(a), '--reference-image', ref, '--aspect-ratio', '1:1', '--out', png, '--json']);
     log({ id: a.id, step: 'image', ok: r.ok && fs.existsSync(png), before, tail: r.out.slice(-300) });
     if (!r.ok) { console.log(`  failed: ${r.out.slice(-300)}`); if (fatal(r.out)) process.exit(5); }
+  }
+} else if (cmd === 'views') {
+  // The multi-view input for the local pipeline's Hunyuan3D-2mv shape stage (owner 2026-10-11: "give the 3d agent
+  // more angles to work from"). One turnaround sheet per approved asset, its own source.png as the reference (one
+  // image keeps the four views consistent with each other, where four calls drift), cropped into views/<side>.png.
+  for (const a of manifest.assets.filter(pick)) {
+    const d = path.join(OUT, a.id), sheet = path.join(d, 'views.png');
+    if (!fs.existsSync(path.join(d, 'approved'))) continue;
+    if (!fs.existsSync(sheet)) {
+      const before = guard(COST.image, a.id);
+      console.log(`views ${a.id} (balance ${before})`);
+      const r = rundot(['generate', 'image', '--prompt', turnaround(a), '--reference-image', path.join(d, 'source.png'), '--aspect-ratio', '1:1', '--out', sheet, '--json']);
+      log({ id: a.id, step: 'views', ok: r.ok && fs.existsSync(sheet), before, tail: r.out.slice(-300) });
+      if (!r.ok) { console.log(`  failed: ${r.out.slice(-300)}`); if (fatal(r.out)) process.exit(5); continue; }
+    }
+    await cropViews(sheet, path.join(d, 'views'), a.symmetric === true);
   }
 } else if (cmd === 'models') {
   // a provider that runs past the CLI's 600 s timeout still bills the call and the result is lost: stop after two

@@ -5,10 +5,8 @@
 import { MENTOR_MIX, driveCurve, radioBlend } from '../audio/mentor-mix';
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
-const LINES: Record<string, string> = {
-  'mentor-act3.mp3': 'Act III: "Stage zero..." (eleven_v3 with tags)',
-  'mentor-C.mp3': 'Act II: "Look outside..." (the design preview)',
-};
+// every voiced line of docs/NARRATION_SCRIPT.md (public/vo/index.json, written beside the files)
+const LINES: Record<string, string> = {};
 // fader ids on the page, and the mix level each one starts at
 const FADERS = { vo: 'voice', blend: 'radio', static: 'static', music: 'music', drive: 'overdrive' } as const;
 
@@ -19,7 +17,9 @@ const buffers = new Map<string, AudioBuffer>();
 async function buffer(c: AudioContext, name: string): Promise<AudioBuffer> {
   const hit = buffers.get(name);
   if (hit) return hit;
-  const b = await c.decodeAudioData(await (await fetch(`/src/dev/tmp/${name}`)).arrayBuffer());
+  // narration lines are vo:<ID> (public/vo); the test beds stay in the dev tmp folder
+  const url = name.startsWith('vo:') ? `/vo/${name.slice(3)}.mp3` : `/src/dev/tmp/${name}`;
+  const b = await c.decodeAudioData(await (await fetch(url)).arrayBuffer());
   buffers.set(name, b);
   return b;
 }
@@ -75,6 +75,12 @@ async function play(): Promise<void> {
   };
 }
 
+try {
+  const index = (await (await fetch('/vo/index.json')).json()) as { id: string; when: string; text: string }[];
+  for (const l of index) {
+    LINES[`vo:${l.id}`] = `${l.id} · ${l.when ? `${l.when}: ` : ''}${l.text.slice(0, 70)}${l.text.length > 70 ? '…' : ''}`;
+  }
+} catch { /* no index: the select stays empty */ }
 for (const [file, label] of Object.entries(LINES)) {
   const o = document.createElement('option'); o.value = file; o.textContent = label; $<HTMLSelectElement>('line').appendChild(o);
 }

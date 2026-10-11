@@ -1,0 +1,187 @@
+[
+ {
+  "id": "A1-01",
+  "when": "On wake-up",
+  "text": "Careful with that relay... You're the only one left in the shielded zone who can still do something about this. Power up the lab before the pocket collapses."
+ },
+ {
+  "id": "A1-02",
+  "when": "Looking at the dark power wall (proposal)",
+  "text": "[breathes] Follow the cables. Capacitors, breaker, relays. Power runs left to right, same as reading."
+ },
+ {
+  "id": "A1-03",
+  "when": "Breaker thrown, relays still cold (proposal)",
+  "text": "Good. Now the relays. One at a time... they're older than both of us."
+ },
+ {
+  "id": "A1-04",
+  "when": "After pulling the emergency relay",
+  "text": "Power's holding... Barely. Look out the observation window."
+ },
+ {
+  "id": "A2-01",
+  "when": "Looking out at the void storm",
+  "text": "Look outside. That storm? That's what happens when reality runs out of compute. A simulation can't sustain simulations running inside of it... We fed too much power to our digital creations, and now our creations are no longer bound to their simulated chains."
+ },
+ {
+  "id": "A2-02",
+  "when": "Activating the portal",
+  "text": "The good news is you figured out a way to fix it. This lab is shielded, and using the bridge technology we punched a portal straight to the moon. Pull the lever and let's see if the link holds."
+ },
+ {
+  "id": "A2-03",
+  "when": "Lever pulled, gate spooling up (proposal)",
+  "text": "[pause] Coils are warming... bottom up, like they should. Don't stand in the frame until it settles."
+ },
+ {
+  "id": "A2-04",
+  "when": "Gate open (proposal)",
+  "text": "[relieved] It's holding. That's the Moon on the other side. Well. What's left of it."
+ },
+ {
+  "id": "A3-01",
+  "when": "Entering the stage 0 Moon",
+  "text": "Stage 0. Black and white, 1-bit Bayer dither, barely holding together. In these conditions your sync will drain fast. Get that first Shape Press down and start feeding the resolution loop."
+ },
+ {
+  "id": "A3-02",
+  "when": "Sync below 30% (proposal, a repeatable bark)",
+  "text": "Your sync's dropping. Head back through the gate before it bottoms out."
+ },
+ {
+  "id": "A3-03",
+  "when": "Placing the first machine",
+  "text": "Lattice stabilized! Resolution is bumping up to Stage 1. Now come back into the lab and grab the extraction tool from the armory rack."
+ },
+ {
+  "id": "A4-01",
+  "when": "Picking up the extraction rifle",
+  "text": "You need a tool cartridge to use it for anything other than mining. Step outside, mine 50 units of dirt, and bring it back to build the Dirt-to-Ore processor."
+ },
+ {
+  "id": "A4-02",
+  "when": "Processing the dirt",
+  "text": "It's not really dirt, you get that right? We're just calling it that for your sake—we can change it at any time we want."
+ },
+ {
+  "id": "A4-03",
+  "when": "The studio and consensus sync",
+  "text": "Open up the studio terminal. See those variables? That's the simulation schema. If you change a name or tweak a setting, you can submit it to the weekly consensus queue. Out there, it's majority rules. If you walk into a sector where others have a different sync, you can merge with them or branch off into a solo desynced expedition."
+ },
+ {
+  "id": "A4-04",
+  "when": "First colour bloom",
+  "text": "The Light Amplifier is online. Look at that crater—the wave is spreading! Color is returning. If we push this all the way to Stage 4, reality stabilizes for good."
+ },
+ {
+  "id": "B-01",
+  "when": "First foundation placed",
+  "text": "Foundations first. Everything you build out there leans on something. Make it lean on that."
+ },
+ {
+  "id": "B-02",
+  "when": "A piece refused for support",
+  "text": "That won't hold. Give it something to stand on."
+ },
+ {
+  "id": "B-03",
+  "when": "First collapse",
+  "text": "[pause] ...Yeah. Gravity's still running at full resolution."
+ },
+ {
+  "id": "B-04",
+  "when": "First beam harvest of raw pixels",
+  "text": "Raw pixels. Feed them to a mill and they'll come out as textures you can build with."
+ },
+ {
+  "id": "B-05",
+  "when": "First linked bin",
+  "text": "That bin's on the bridge. Anything you put in it, every bench on your base can reach. Don't ask me how; I built it and I'm still not sure."
+ },
+ {
+  "id": "B-06",
+  "when": "Drafting table, first primitive and map combined",
+  "text": "Shape and finish. That's a blueprint. You're basically writing reality now. Neatly, I hope."
+ },
+ {
+  "id": "B-07",
+  "when": "First sealed, pressurised room",
+  "text": "Seal holding, life support green. You've got air in there. Breathe while you can."
+ },
+ {
+  "id": "F-01",
+  "when": "The fabricator installed",
+  "text": "A vehicle fabricator. The scout opens once this plot hits stage two. Keep the wave moving."
+ },
+ {
+  "id": "F-02",
+  "when": "First scout printed",
+  "text": "[dry] It's small, it's loud, and it's yours. Try not to roll it."
+ },
+ {
+  "id": "F-03",
+  "when": "First weapon part swapped",
+  "text": "Same frame, new part. The bench makes them; you can swap them anywhere."
+ },
+ {
+  "id": "F-04",
+  "when": "Hauler unlocked (stage 4)",
+  "text": "Hauler's printable. Its bin rides on the bridge too, so your storage goes where you drive."
+ },
+ {
+  "id": "F-05",
+  "when": "Crawler unlocked (stage 6)",
+  "text": "Stage six. The crawler's yours. That drill on the front isn't for decoration."
+ },
+ {
+  "id": "M-01",
+  "when": "First shareware entity seen",
+  "text": "That's... a sprite. A real one. They broke loose when the simulation cracked. Keep your distance."
+ },
+ {
+  "id": "M-02",
+  "when": "First kill",
+  "text": "It came apart in pixels. Whatever they are, they're not alive the way we are."
+ },
+ {
+  "id": "M-03",
+  "when": "Player health low (repeatable bark)",
+  "text": "[quietly] You're hurt. Back off and patch up."
+ },
+ {
+  "id": "S-2",
+  "when": "",
+  "text": "Stage two. Sixteen colours. Never thought I'd be happy to see EGA again."
+ },
+ {
+  "id": "S-3",
+  "when": "",
+  "text": "Two hundred and fifty-six colours. It's starting to look like somewhere."
+ },
+ {
+  "id": "S-4",
+  "when": "",
+  "text": "Smooth shading. The light's bending right again. Reality's stabilising here."
+ },
+ {
+  "id": "S-5",
+  "when": "",
+  "text": "Almost there. Can you hear that? Neither can I. The noise is going."
+ },
+ {
+  "id": "S-6",
+  "when": "",
+  "text": "[breathes] Full resolution. That's how the Moon is supposed to look. One plot down."
+ },
+ {
+  "id": "N-01",
+  "when": "First switch to Synced",
+  "text": "You're on the shared grid now. What the majority builds, everyone sees."
+ },
+ {
+  "id": "N-02",
+  "when": "First switch to Solo",
+  "text": "Solo branch. Your Moon, your rules. Nobody else's changes reach you here."
+ }
+]

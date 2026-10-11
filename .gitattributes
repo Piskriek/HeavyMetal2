@@ -2,3 +2,4 @@
 apps/web/src/assets/gen/*.glb filter=lfs diff=lfs merge=lfs -text
 apps/web/public/hd/**/*.bin filter=lfs diff=lfs merge=lfs -text
 apps/web/public/hd/**/*.webp filter=lfs diff=lfs merge=lfs -text
+apps/web/public/vo/*.mp3 filter=lfs diff=lfs merge=lfs -text

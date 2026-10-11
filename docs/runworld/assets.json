@@ -40,11 +40,12 @@
     {
       "id": "crawler-body",
       "panel": "19/19-crawler-s6.png",
-      "size": 7,
+      "size": 6.2,
       "axis": "length",
       "view": "three-quarter",
-      "subject": "the tracked crawler with its front drill arm REMOVED: the armoured cab, the two track units, the sensor mast and the heat-sink spine; armoured side skirts cover the upper run of each track and its road wheels; a solid belly pan; a hinge bracket on the front where the arm mounts. The cab interior is EMPTY: NO seats, NO controls inside (those are added separately)",
-      "class": "rover-body"
+      "subject": "the tracked crawler with its drill arm and sensor mast REMOVED: a long low armoured tracked vehicle about 6.2 metres long, 2.4 metres wide and 2.2 metres tall; two track units fully covered by flat armoured side skirts down to the ground (no exposed road wheels), a square armoured cab at the front with a flat windscreen, a flat engine deck behind it with square heat-sink fin blocks, a solid flat belly pan, and a square hinge bracket on the front where the drill arm mounts; square sections, nothing round",
+      "class": "rover-body",
+      "note": "remade 2026-10-11 at the kit crawler proportions (about 6.2 x 2.4 m); the first was 7 x 4.6 x 4.9 m and had to be squashed to 53% width"
     },
     {
       "id": "crawler-arm",
@@ -416,8 +417,9 @@
       "size": 3.15,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the pitched roof panel on its own: one sloped steel roof plane rising 3 metres over a 4-metre run, standing-seam ribs running down the slope, a drip edge at the low eave, bolted brackets at the top edge",
-      "high": "+z"
+      "subject": "the pitched roof panel on its own: one sloped steel roof plane rising 3 metres over a 4-metre run, standing-seam ribs running down the slope, a drip edge at the low eave, and a clean straight top edge (NO brackets, NO tabs, NO fittings along the top edge or anywhere on the roof plane)",
+      "high": "+z",
+      "note": "re-imaged 2026-10-11: the first one had bolted brackets along its top edge, which showed as tabs mid-roof where pieces meet; roof-low and both corners derive from this one"
     },
     {
       "id": "roof-low",

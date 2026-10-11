@@ -1006,31 +1006,23 @@ export function controlBox(m: LabMaterials): Prop {
   const sockets: Socket[] = [];
   const lamps: THREE.Mesh[] = [];
 
-  const flangeGeo = createChamferBox(0.26, 0.02, 0.26, 0.01, 1);
-  flangeGeo.translate(0, 0.01, 0);
-  builder.add(flangeGeo, m.darkSteel);
-
-  for (const bx of [-0.09, 0.09]) {
-    for (const bz of [-0.09, 0.09]) {
+  // Wall-mounted (sheet 21): a mounting plate flat on the wall at the group's origin, the box on it, four bolts. No stand
+  // and no post; the box centre is the origin, and the lab places the group at about 1.4 m.
+  const plateGeo = createChamferBox(0.44, 0.62, 0.02, 0.008, 1);
+  builder.add(plateGeo, m.darkSteel);
+  for (const bx of [-0.17, 0.17]) {
+    for (const by of [-0.24, 0.24]) {
       const bolt = createBoltGeo(0.012, 0.015, 6);
-      bolt.translate(bx, 0.02, bz);
+      bolt.rotateX(Math.PI / 2);
+      bolt.translate(bx, by, 0.012);
       builder.add(bolt, m.gunmetal);
     }
   }
 
-  const postH = 0.95;
-  const postGeo = new THREE.CylinderGeometry(0.04, 0.04, postH, 20);
-  postGeo.translate(0, 0.02 + postH / 2, 0);
-  builder.add(postGeo, m.gunmetal);
-
-  const brkGeo = new THREE.BoxGeometry(0.18, 0.12, 0.12);
-  brkGeo.translate(0, 0.02 + postH, 0);
-  builder.add(brkGeo, m.darkSteel);
-
   const boxW = 0.35;
   const boxH = 0.45;
   const boxD = 0.2;
-  const boxY = 1.2;
+  const boxY = 0;
 
   const boxGeo = createChamferBox(boxW, boxH, boxD, 0.015, 2);
   boxGeo.translate(0, boxY, 0.04);
@@ -1085,10 +1077,10 @@ export function controlBox(m: LabMaterials): Prop {
   builder.add(gland, m.copper);
   sockets.push({ name: 'cable', at: [0, boxY - boxH / 2 - 0.04, 0.04] });
 
-  colliders.push({ min: [-boxW / 2, 0, -boxD / 2], max: [boxW / 2, boxY + boxH / 2, boxD / 2 + 0.04] });
+  colliders.push({ min: [-boxW / 2, boxY - boxH / 2, -boxD / 2], max: [boxW / 2, boxY + boxH / 2, boxD / 2 + 0.04] });
 
+  // Not grounded: the wall mount keeps its height (groundProp would drop it to the floor).
   builder.build(group);
-  groundProp(group, sockets, colliders);
   return { group, colliders, sockets, lamps };
 }
 

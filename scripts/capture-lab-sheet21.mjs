@@ -135,11 +135,11 @@ try {
     // Set power OFF (emergency amber only, storm is brightest thing)
     room.setPower({ relays: 0, pulse: 0, coils: 0, main: 0, emergency: 1, static: 1 });
     room.setStorm(0);
-    // Camera at cot eye level looking north at gate and storm
+    // From the spawn by the cot, at eye height, looking north at the gate and the storm (panel 42's camera)
     ps.debug.setAltCam(
       { x: room.spawn.x, y: 1.65, z: room.spawn.z },
       0, 0,
-      { x: 0, y: 1.8, z: -9.0 }
+      { x: -0.8, y: 1.7, z: -9.0 }
     );
   });
   await new Promise((r) => setTimeout(r, 400));
@@ -226,12 +226,12 @@ try {
 
   // --- 6. Window Storm Progress Meters (0, 0.5, 1.0)
   console.log('--- CAPTURING WINDOW STORM PROGRESS SHOTS (0, 0.5, 1.0) ---');
-  // Camera centered facing north at the window through the gate
+  // Camera about 4 m from the north wall, north of the gate (the gate stands behind it): the window fills the frame
   const aimWindow = () => {
     window.__playScene.debug.setAltCam(
-      { x: 0, y: 1.8, z: 1.6 },
+      { x: -1.5, y: 1.6, z: -5.0 },
       0, 0,
-      { x: 0, y: 2.0, z: -9.0 }
+      { x: 0, y: 1.95, z: -9.0 }
     );
   };
 

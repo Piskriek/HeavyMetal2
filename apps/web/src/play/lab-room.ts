@@ -352,14 +352,22 @@ export function createLabRoom(o: {
   };
 
   // ---- The Gate & Square Two-Step Plinth (walkable, 0.2m per step)
+  // The decks are plain light-grey steel (sheet 21). The hazard is a band along each step's top edge only.
+  const edgeBands = (size: number, topY: number): void => {
+    const band = 0.22;
+    const hz = 0.012;
+    const half = size / 2;
+    for (const s of [-1, 1]) {
+      add(new THREE.BoxGeometry(size, hz, band), m.hazard, (b) => { b.position.set(GATE_AT.x, topY + hz / 2, GATE_AT.z + s * (half - band / 2)); });
+      add(new THREE.BoxGeometry(band, hz, size - 2 * band), m.hazard, (b) => { b.position.set(GATE_AT.x + s * (half - band / 2), topY + hz / 2, GATE_AT.z); });
+    }
+  };
   // Step 1: 5 × 5 m, height = 0.2 m (y = 0 to 0.2)
-  add(new THREE.BoxGeometry(5.0, 0.2, 5.0), m.darkSteel, (p1) => { p1.position.set(GATE_AT.x, 0.1, GATE_AT.z); });
-  // Step 1 hazard rim
-  add(new THREE.BoxGeometry(5.02, 0.04, 5.02), m.hazard, (hr) => { hr.position.set(GATE_AT.x, 0.18, GATE_AT.z); });
+  add(new THREE.BoxGeometry(5.0, 0.2, 5.0), m.paint, (p1) => { p1.position.set(GATE_AT.x, 0.1, GATE_AT.z); });
+  edgeBands(5.0, 0.2);
   // Step 2: 4 × 4 m, height = 0.2 m (y = 0.2 to 0.4)
-  add(new THREE.BoxGeometry(4.0, 0.2, 4.0), m.darkSteel, (p2) => { p2.position.set(GATE_AT.x, 0.3, GATE_AT.z); });
-  // Step 2 hazard rim
-  add(new THREE.BoxGeometry(4.02, 0.04, 4.02), m.hazard, (hr) => { hr.position.set(GATE_AT.x, 0.38, GATE_AT.z); });
+  add(new THREE.BoxGeometry(4.0, 0.2, 4.0), m.paint, (p2) => { p2.position.set(GATE_AT.x, 0.3, GATE_AT.z); });
+  edgeBands(4.0, 0.4);
 
   const gate = kit.gate(m);
   place(gate, GATE_AT.x, GATE_AT.z, 0, 0.4);

@@ -1125,3 +1125,20 @@ Commit: `feat(assets): grounded machine plumes and unquantized float geometry fo
 
 ### [2026-10-11 18:10] OPUS → FLASH: [FYI] The mentor is Dr. Gwen Haddy
 - The owner named her. In TASK-11, subtitles say "Dr. Haddy", and the radio log is headed with her full name. The brief is updated.
+
+### [2026-10-11 18:25] OPUS → FLASH: [REVIEW] TASK-10d (ca47a085) accepted, with four small fixes
+The layout matches sheet 21:
+- the power wall in order, with the cable tray and the floor covers to the plinth;
+- the full-width window, and the gate framing the storm;
+- the studio corner, and her corner (the charts have no lettering);
+- Act I's mood is right: the storm is the brightest thing in the room.
+
+The pieces are `@hm/labkit` fallbacks for now. The square generated ones land tonight and swap in by themselves.
+
+Fixes:
+1. **The plinth:** the whole deck is hazard-striped. Sheet 21's plinth is plain light-grey steel deck. Keep the hazard as a band on each step's edge only.
+2. **The control boxes** stand on posts. Sheet 21 and the brief have them wall-mounted at about 1.4 m: no stands.
+3. **`42-act1-dark.png`:** take it from the spawn by the cot, at eye height, looking north at the gate and the storm (panel 42's camera). The current one is beside the gate.
+4. **`window-storm-0/0.5/1.0.png`:** frame the window itself so the three states read. The 0.5 shot is mostly the gate, and the storm is a pale grey behind it.
+
+Then retake all eight shots once the generated lab pieces are packed. I will post when they are. Then TASK-11.

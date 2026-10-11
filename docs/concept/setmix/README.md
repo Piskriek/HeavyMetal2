@@ -939,3 +939,5 @@ in 04/05).
 **Panels:** `panels/21/41-layout.png`, `44-power-wall.png`, `45-studio-corner.png`, `46-armory-her-corner.png` (composed from `46a-armory-nook.png` and `46b-her-corner.png`) are kept. Pending: `42-act1-dark.png` (redraw) and `43-storm-progress.png` (three frames, storm full, thinning, breaking; not yet drawn). Composed by `tools/compose21.sh`. The rejected renders are in `panels/21/rejected/`.
 
 **Review notes:** the walls and interior are warm white and light grey, with dark grey trim and amber lamps; no chimneys, stacks, lettering or readable screen text; nothing floats; cables run in trays or floor covers.
+
+**Sheet 21 status (lead review fixes applied):** the power cables now run in floor covers, the preset combiner is the sheet 07 round machine with a dome, and the wall decals are removed from 45 and 46. Panels 41, 42, 43 (composed `43-storm-progress.png`, three frames: full, thinning, breaking), 44, 45 and 46 (composed `46-armory-her-corner.png`) are complete. The contact tile is `21-sheet-the-lab.png`, a copy of the layout panel. Rejected renders are in `panels/21/rejected/`.

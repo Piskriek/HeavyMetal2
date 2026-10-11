@@ -46,3 +46,16 @@ BATCH 1 REVIEW (one render each, at full size or in review montages):
 
 COMPOSED: 46-armory-her-corner.png (2820x1000), by tools/compose21.sh from 46a and 46b.
 OPEN: 42-act1-dark (redraw), and 43a, 43b, 43c (three renders) with their composed 43-storm-progress.png. Sheet 21 is not complete.
+
+LEAD ENGINEER REVIEW OF BATCH 1, AND FIXES (2026-10-11):
+- Accepted: 44 power wall; 46 armory and her corner (then redrawn for decals, see below).
+- 41 layout: accepted as planned. FIX 1: the gate's power cables were loose on the floor. Redrawn: every power cable runs inside a low ribbed steel floor cable cover from the power wall's tray down to the gate's plinth; no loose cable anywhere. Old render: rejected/41-layout-rev1.png.
+- 45 studio corner: FIX 2: the preset combiner is the sheet 07 design, a squat ROUND machine on a bolted round plinth with a glass DOME on top and cartridge PORTS round its body, not a twin printer box. The bench, rack and planet table are kept. FIX 3: no icon decals or symbols on the wall panels. Old render: rejected/45-studio-corner-rev1.png.
+- 46a armory nook and 46b her corner: FIX 3: no icon decals or symbols on the wall panels. Both redrawn with plain blank walls. Old renders: rejected/46a-armory-nook-rev1.png, rejected/46b-her-corner-rev1.png. 46-armory-her-corner.png recomposed.
+- 42 act I dark (rev3, kept): the gate's door frame is now clearly in view in the middle distance, the room is dim, the power wall dead, amber emergency lamps only, and the storm light through the window is the brightest thing. The walls are the darker grey of the dark act, not the warm white of the lit room, by design.
+- 43a storm full (kept): the full storm through the window, the gate in front.
+- 43b storm thinning (kept on the third attempt): rev1 and rev2 (rejected/43b-storm-thinning-rev1.png, rejected/43b-storm-thinning-rev2.png) showed only dark static. The kept render shows sparse static in the upper window, and a clear band of flat grey regolith with low hills at the horizon.
+- 43c storm breaking (kept): a patch of real blue sky over grey ground, the gate in front.
+- 43-storm-progress.png composed from 43a, 43b, 43c by tools/compose21.sh (three frames, one image).
+
+CONTACT: the sheet 21 contact tile is 21-sheet-the-lab.png, a copy of panels/21/41-layout.png (the lab has no single composed sheet image yet).

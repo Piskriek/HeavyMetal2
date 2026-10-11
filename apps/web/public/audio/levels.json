@@ -1,0 +1,233 @@
+{
+ "about": "Per-file playback levels for apps/web/public/audio (measured 2026-10-11 by decoding each file). gain: dB to apply so effects sit near -20 dB RMS and the music at its target (the Moon score grows from -30 dB at stage 0 to -17 dB at stage 6, so presence rises with fidelity), limited so no peak passes -1 dB. start/end: the loop region in seconds, without the silence at the ends. rms: the measured level before gain.",
+ "levels": {
+  "music-lab": {
+   "gain": -3,
+   "rms": -17,
+   "start": 1.002,
+   "end": 58.541
+  },
+  "music-moon-s0": {
+   "gain": -17.7,
+   "rms": -12.3,
+   "start": 0.534,
+   "end": 59.974
+  },
+  "music-moon-s1": {
+   "gain": -13.3,
+   "rms": -12.7,
+   "start": 1.069,
+   "end": 58.484
+  },
+  "music-moon-s2": {
+   "gain": -5.2,
+   "rms": -17.8,
+   "start": 0.31,
+   "end": 59.783
+  },
+  "music-moon-s3": {
+   "gain": -4.5,
+   "rms": -15.5,
+   "start": 0.016,
+   "end": 60.025
+  },
+  "music-moon-s4": {
+   "gain": -2.6,
+   "rms": -16.4,
+   "start": 0.048,
+   "end": 60.026
+  },
+  "music-moon-s5": {
+   "gain": 0.2,
+   "rms": -18.4,
+   "start": 0.024,
+   "end": 59.228
+  },
+  "music-moon-s6": {
+   "gain": -0.1,
+   "rms": -17.2,
+   "start": 0.044,
+   "end": 59.547
+  },
+  "music-monster-mash": {
+   "gain": -5.1,
+   "rms": -12.9,
+   "start": 0.023,
+   "end": 89.186
+  },
+  "music-driving": {
+   "gain": -4.1,
+   "rms": -15.9,
+   "start": 0.044,
+   "end": 57.56
+  },
+  "sfx-breaker": {
+   "gain": 0.4,
+   "rms": -24.4
+  },
+  "sfx-relay": {
+   "gain": 11.1,
+   "rms": -40.9
+  },
+  "sfx-lever": {
+   "gain": 0.9,
+   "rms": -27.6
+  },
+  "sfx-capacitor-hum": {
+   "gain": -8.7,
+   "rms": -11.3,
+   "start": 0,
+   "end": 5
+  },
+  "sfx-gate-spool": {
+   "gain": -5.8,
+   "rms": -14.2
+  },
+  "sfx-gate-hum": {
+   "gain": -5.1,
+   "rms": -14.9,
+   "start": 0,
+   "end": 5
+  },
+  "sfx-storm": {
+   "gain": -2.4,
+   "rms": -17.6,
+   "start": 0,
+   "end": 10
+  },
+  "sfx-place": {
+   "gain": -0.9,
+   "rms": -21.4
+  },
+  "sfx-refuse": {
+   "gain": -2.1,
+   "rms": -17.9
+  },
+  "sfx-collapse": {
+   "gain": -7.3,
+   "rms": -12.7
+  },
+  "sfx-weld": {
+   "gain": -0.1,
+   "rms": -21
+  },
+  "sfx-door": {
+   "gain": 3.9,
+   "rms": -23.9
+  },
+  "sfx-airlock": {
+   "gain": -1.6,
+   "rms": -18.4
+  },
+  "sfx-mill": {
+   "gain": -1,
+   "rms": -20.1,
+   "start": 0,
+   "end": 5
+  },
+  "sfx-press": {
+   "gain": -2,
+   "rms": -18
+  },
+  "sfx-projector": {
+   "gain": -2.7,
+   "rms": -17.3,
+   "start": 0,
+   "end": 5
+  },
+  "sfx-watermaker": {
+   "gain": -3.6,
+   "rms": -16.4,
+   "start": 0,
+   "end": 5
+  },
+  "sfx-fabricator": {
+   "gain": -1.3,
+   "rms": -18.7,
+   "start": 0,
+   "end": 5
+  },
+  "sfx-beam": {
+   "gain": -0.2,
+   "rms": -20.7,
+   "start": 0,
+   "end": 4
+  },
+  "sfx-pickup-1": {
+   "gain": 1.3,
+   "rms": -21.3
+  },
+  "sfx-pickup-2": {
+   "gain": -4.5,
+   "rms": -15.5
+  },
+  "sfx-pickup-3": {
+   "gain": 0.6,
+   "rms": -20.9
+  },
+  "sfx-fire-semi": {
+   "gain": -10.3,
+   "rms": -9.7
+  },
+  "sfx-fire-burst": {
+   "gain": -10,
+   "rms": -10
+  },
+  "sfx-fire-beam": {
+   "gain": -8.1,
+   "rms": -11.9,
+   "start": 0,
+   "end": 3
+  },
+  "sfx-reload": {
+   "gain": -5.4,
+   "rms": -14.6
+  },
+  "sfx-empty": {
+   "gain": 5.3,
+   "rms": -33.4
+  },
+  "sfx-motor-scout": {
+   "gain": 1.8,
+   "rms": -21.8,
+   "start": 0,
+   "end": 4
+  },
+  "sfx-motor-hauler": {
+   "gain": -1.7,
+   "rms": -18.3,
+   "start": 0,
+   "end": 4
+  },
+  "sfx-motor-crawler": {
+   "gain": -7.9,
+   "rms": -12.1,
+   "start": 0,
+   "end": 4
+  },
+  "sfx-skid": {
+   "gain": -7.4,
+   "rms": -12.6
+  },
+  "sfx-impact": {
+   "gain": 4.2,
+   "rms": -26.5
+  },
+  "sfx-ui-hover": {
+   "gain": 12,
+   "rms": -38.1
+  },
+  "sfx-ui-select": {
+   "gain": 0,
+   "rms": -20
+  },
+  "sfx-ui-open": {
+   "gain": 8.4,
+   "rms": -28.4
+  },
+  "sfx-ui-close": {
+   "gain": -4,
+   "rms": -16
+  }
+ }
+}

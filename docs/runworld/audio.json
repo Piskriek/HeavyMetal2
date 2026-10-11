@@ -1,53 +1,237 @@
 {
-  "about": "Music and sound effects generated on RUN.world (scripts/runworld-audio.mjs), from the list in docs/NARRATION_SCRIPT.md (owner 2026-10-10: \"have the run.world cli do the narrations at some point and some music/effects\"). Files land in apps/web/public/audio/<id>.mp3 beside index.html, like vo/; the owner auditions them on the dev audio page before they are committed. Loops are generated long enough to loop and cut to a seamless loop at integration. The Moon's score gains fidelity with the stages: one track per stage, same key and tempo, crossfaded as a plot rises (S0 static, S1 PC-speaker, S2 EGA-era chiptune, S3 OPL FM synth, S4 sampled late-90s, S5 modern pads, S6 the full open score).",
+  "about": "Music and sound effects generated on RUN.world (scripts/runworld-audio.mjs), from the list in docs/NARRATION_SCRIPT.md (owner 2026-10-10: \"have the run.world cli do the narrations at some point and some music/effects\"). Files land in apps/web/public/audio/<id>.mp3 beside index.html, like vo/; the owner auditions them on the dev audio page before they are committed. Effects are at least 0.5 s (the service minimum; the game trims short ones). Loops are generated long enough to loop and cut to a seamless loop at integration. The Moon's score gains fidelity with the stages: one track per stage, same key and tempo, crossfaded as a plot rises (S0 static, S1 PC-speaker, S2 EGA-era chiptune, S3 OPL FM synth, S4 sampled late-90s, S5 modern pads, S6 the full open score).",
   "music": [
-    { "id": "music-lab", "duration": 60, "prompt": "Instrumental ambient score for a quiet shielded science lab at night while a storm rages outside: warm analog synth pads, a low sub drone, sparse glassy piano notes, faint tape hiss, slow, tense but hopeful, D minor, no drums, no vocals, seamless loop" },
-    { "id": "music-moon-s0", "duration": 60, "prompt": "Near silence for a broken low-resolution moon: a thin crackling static wash, a very low sine drone, occasional broken digital artefacts, desolate, D minor, no melody, no drums, no vocals, seamless loop" },
-    { "id": "music-moon-s1", "duration": 60, "prompt": "Desolate moon ambience in D minor: a thin static wash and low drone with a single 1-bit PC-speaker square-wave beep melody every few seconds, very sparse, lonely, no drums, no vocals, seamless loop" },
-    { "id": "music-moon-s2", "duration": 60, "prompt": "Slow sparse 1980s PC chiptune in D minor at 70 BPM: a simple square-wave arpeggio and a soft square-wave bass over a faint drone, lonely but curious, no drums, no vocals, seamless loop" },
-    { "id": "music-moon-s3", "duration": 60, "prompt": "Early 1990s FM synth sound card ambience (OPL3 style) in D minor at 70 BPM: soft FM pads, a gentle FM bass pulse and a slow bell melody, calm and hopeful, light drums, no vocals, seamless loop" },
-    { "id": "music-moon-s4", "duration": 60, "prompt": "Late 1990s sampled game score in D minor at 70 BPM: soft sampled strings, a warm electric piano, a gentle bass and light percussion, hopeful exploration, no vocals, seamless loop" },
-    { "id": "music-moon-s5", "duration": 60, "prompt": "Modern ambient exploration score in D minor at 70 BPM: warm wide synth pads, soft drums, a hopeful piano and string melody building gently, no vocals, seamless loop" },
-    { "id": "music-moon-s6", "duration": 60, "prompt": "Full open cinematic ambient score at 70 BPM resolving from D minor to D major: strings, piano, warm pads and soft percussion, the sky clearing, triumphant but calm, no vocals, seamless loop" },
-    { "id": "music-monster-mash", "duration": 90, "prompt": "Retro 1990s shareware PC game combat music, Sound Blaster FM synth (OPL), driving drums at 140 BPM, menacing distorted FM bass and lead riffs, E minor, no vocals, seamless loop" },
-    { "id": "music-driving", "duration": 60, "prompt": "Steady low-tempo synth pulse for driving a rover across the moon at 90 BPM: an analog bass arpeggio, soft pads and a light electronic beat, focused and calm, D minor, no vocals, seamless loop" }
+    {
+      "id": "music-lab",
+      "duration": 60,
+      "prompt": "Instrumental ambient score for a quiet shielded science lab at night while a storm rages outside: warm analog synth pads, a low sub drone, sparse glassy piano notes, faint tape hiss, slow, tense but hopeful, D minor, no drums, no vocals, seamless loop"
+    },
+    {
+      "id": "music-moon-s0",
+      "duration": 60,
+      "prompt": "Near silence for a broken low-resolution moon: a thin crackling static wash, a very low sine drone, occasional broken digital artefacts, desolate, D minor, no melody, no drums, no vocals, seamless loop"
+    },
+    {
+      "id": "music-moon-s1",
+      "duration": 60,
+      "prompt": "Desolate moon ambience in D minor: a thin static wash and low drone with a single 1-bit PC-speaker square-wave beep melody every few seconds, very sparse, lonely, no drums, no vocals, seamless loop"
+    },
+    {
+      "id": "music-moon-s2",
+      "duration": 60,
+      "prompt": "Slow sparse 1980s PC chiptune in D minor at 70 BPM: a simple square-wave arpeggio and a soft square-wave bass over a faint drone, lonely but curious, no drums, no vocals, seamless loop"
+    },
+    {
+      "id": "music-moon-s3",
+      "duration": 60,
+      "prompt": "Early 1990s FM synth sound card ambience (OPL3 style) in D minor at 70 BPM: soft FM pads, a gentle FM bass pulse and a slow bell melody, calm and hopeful, light drums, no vocals, seamless loop"
+    },
+    {
+      "id": "music-moon-s4",
+      "duration": 60,
+      "prompt": "Late 1990s sampled game score in D minor at 70 BPM: soft sampled strings, a warm electric piano, a gentle bass and light percussion, hopeful exploration, no vocals, seamless loop"
+    },
+    {
+      "id": "music-moon-s5",
+      "duration": 60,
+      "prompt": "Modern ambient exploration score in D minor at 70 BPM: warm wide synth pads, soft drums, a hopeful piano and string melody building gently, no vocals, seamless loop"
+    },
+    {
+      "id": "music-moon-s6",
+      "duration": 60,
+      "prompt": "Full open cinematic ambient score at 70 BPM resolving from D minor to D major: strings, piano, warm pads and soft percussion, the sky clearing, triumphant but calm, no vocals, seamless loop"
+    },
+    {
+      "id": "music-monster-mash",
+      "duration": 90,
+      "prompt": "Retro 1990s shareware PC game combat music, Sound Blaster FM synth (OPL), driving drums at 140 BPM, menacing distorted FM bass and lead riffs, E minor, no vocals, seamless loop"
+    },
+    {
+      "id": "music-driving",
+      "duration": 60,
+      "prompt": "Steady low-tempo synth pulse for driving a rover across the moon at 90 BPM: an analog bass arpeggio, soft pads and a light electronic beat, focused and calm, D minor, no vocals, seamless loop"
+    }
   ],
   "sfx": [
-    { "id": "sfx-breaker", "duration": 1.0, "description": "A heavy industrial circuit breaker lever thrown: a deep metallic clunk with a short electrical buzz" },
-    { "id": "sfx-relay", "duration": 0.6, "description": "A single heavy electrical relay clacking shut, crisp metallic click with a tiny spark" },
-    { "id": "sfx-lever", "duration": 1.2, "description": "A big steel console throw lever pulled down hard and locking, heavy mechanical ratchet and clunk" },
-    { "id": "sfx-capacitor-hum", "duration": 5, "description": "A low steady electrical capacitor bank hum, 50 hertz, seamless loop" },
-    { "id": "sfx-gate-spool", "duration": 5, "description": "A large energy gate powering up: a rising electrical whine, coils charging, crackling arcs, ending in a deep resonant hum" },
-    { "id": "sfx-gate-hum", "duration": 5, "description": "A deep resonant energy portal hum with a soft shimmering texture, steady, seamless loop" },
-    { "id": "sfx-storm", "duration": 10, "description": "A distant digital storm heard through thick glass: low rumble, static crackles and glitchy broken thunder, seamless loop" },
-    { "id": "sfx-place", "duration": 0.8, "description": "A heavy steel building panel set down and locked into place: a metallic clank and a latch click" },
-    { "id": "sfx-refuse", "duration": 0.5, "description": "A short low sci-fi error buzz for an action that is not allowed" },
-    { "id": "sfx-collapse", "duration": 3, "description": "A steel structure collapsing: groaning metal, crashing panels and falling debris" },
-    { "id": "sfx-weld", "duration": 2, "description": "A short burst of electric arc welding: crackle and sizzle" },
-    { "id": "sfx-door", "duration": 1.5, "description": "A steel sliding door opening with a short pneumatic hiss and a soft thud" },
-    { "id": "sfx-airlock", "duration": 4, "description": "An airlock cycling: a pressure hiss, a heavy seal thunk, then a steel door rolling open" },
-    { "id": "sfx-mill", "duration": 5, "description": "An industrial grinding mill crushing rock steadily, rumbling and grinding, seamless loop" },
-    { "id": "sfx-press", "duration": 1.0, "description": "A heavy hydraulic press stamping down: hydraulic whoosh and a deep metallic slam" },
-    { "id": "sfx-projector", "duration": 5, "description": "A powerful light projector humming with a soft electrical buzz and a gentle cooling fan, seamless loop" },
-    { "id": "sfx-watermaker", "duration": 5, "description": "A machine pumping and filtering water: steady gurgling, bubbling and a low pump hum, seamless loop" },
-    { "id": "sfx-fabricator", "duration": 5, "description": "A large 3D printer working fast: stepper motor whine, quick clicks and a print head sliding back and forth, seamless loop" },
-    { "id": "sfx-beam", "duration": 4, "description": "A sci-fi extraction beam held on target: a steady crackling energy stream with a low hum, seamless loop" },
-    { "id": "sfx-pickup-1", "duration": 0.4, "description": "A soft low retro pickup chime, a single warm square-wave note" },
-    { "id": "sfx-pickup-2", "duration": 0.4, "description": "A bright retro pickup chime, two quick rising square-wave notes" },
-    { "id": "sfx-pickup-3", "duration": 0.5, "description": "A sparkling retro pickup chime, three quick rising notes with a shimmer" },
-    { "id": "sfx-fire-semi", "duration": 0.6, "description": "A futuristic energy rifle firing a single shot: a sharp punchy zap with a metallic snap" },
-    { "id": "sfx-fire-burst", "duration": 0.9, "description": "A futuristic energy rifle firing a quick three-round burst: three sharp zaps" },
-    { "id": "sfx-fire-beam", "duration": 3, "description": "A continuous energy beam weapon firing: a searing crackling ray, seamless loop" },
-    { "id": "sfx-reload", "duration": 1.5, "description": "A weapon power cell ejected and a fresh one slotted in: mechanical clicks and a rising charge whine" },
-    { "id": "sfx-empty", "duration": 0.3, "description": "A dry trigger click on an empty energy weapon" },
-    { "id": "sfx-motor-scout", "duration": 4, "description": "A small electric buggy driving steadily: a light electric motor whine and tyres on dust, seamless loop" },
-    { "id": "sfx-motor-hauler", "duration": 4, "description": "A heavy electric truck driving steadily: a deep motor hum and big tyres rolling on gravel, seamless loop" },
-    { "id": "sfx-motor-crawler", "duration": 4, "description": "A heavy tracked vehicle driving: a deep electric motor and clattering steel tracks, seamless loop" },
-    { "id": "sfx-skid", "duration": 1.5, "description": "Vehicle tyres skidding sideways on loose dust and gravel" },
-    { "id": "sfx-impact", "duration": 1.0, "description": "A vehicle hitting a rock: a heavy metal thud and a short rattle" },
-    { "id": "sfx-ui-hover", "duration": 0.2, "description": "A tiny soft sci-fi interface tick" },
-    { "id": "sfx-ui-select", "duration": 0.3, "description": "A clean sci-fi interface confirm blip" },
-    { "id": "sfx-ui-open", "duration": 0.5, "description": "A sci-fi interface panel opening with a short soft whoosh and a blip" },
-    { "id": "sfx-ui-close", "duration": 0.4, "description": "A sci-fi interface panel closing with a short soft reverse whoosh" }
+    {
+      "id": "sfx-breaker",
+      "duration": 1,
+      "description": "A heavy industrial circuit breaker lever thrown: a deep metallic clunk with a short electrical buzz"
+    },
+    {
+      "id": "sfx-relay",
+      "duration": 0.6,
+      "description": "A single heavy electrical relay clacking shut, crisp metallic click with a tiny spark"
+    },
+    {
+      "id": "sfx-lever",
+      "duration": 1.2,
+      "description": "A big steel console throw lever pulled down hard and locking, heavy mechanical ratchet and clunk"
+    },
+    {
+      "id": "sfx-capacitor-hum",
+      "duration": 5,
+      "description": "A low steady electrical capacitor bank hum, 50 hertz, seamless loop"
+    },
+    {
+      "id": "sfx-gate-spool",
+      "duration": 5,
+      "description": "A large energy gate powering up: a rising electrical whine, coils charging, crackling arcs, ending in a deep resonant hum"
+    },
+    {
+      "id": "sfx-gate-hum",
+      "duration": 5,
+      "description": "A deep resonant energy portal hum with a soft shimmering texture, steady, seamless loop"
+    },
+    {
+      "id": "sfx-storm",
+      "duration": 10,
+      "description": "A distant digital storm heard through thick glass: low rumble, static crackles and glitchy broken thunder, seamless loop"
+    },
+    {
+      "id": "sfx-place",
+      "duration": 0.8,
+      "description": "A heavy steel building panel set down and locked into place: a metallic clank and a latch click"
+    },
+    {
+      "id": "sfx-refuse",
+      "duration": 0.5,
+      "description": "A short low sci-fi error buzz for an action that is not allowed"
+    },
+    {
+      "id": "sfx-collapse",
+      "duration": 3,
+      "description": "A steel structure collapsing: groaning metal, crashing panels and falling debris"
+    },
+    {
+      "id": "sfx-weld",
+      "duration": 2,
+      "description": "A short burst of electric arc welding: crackle and sizzle"
+    },
+    {
+      "id": "sfx-door",
+      "duration": 1.5,
+      "description": "A steel sliding door opening with a short pneumatic hiss and a soft thud"
+    },
+    {
+      "id": "sfx-airlock",
+      "duration": 4,
+      "description": "An airlock cycling: a pressure hiss, a heavy seal thunk, then a steel door rolling open"
+    },
+    {
+      "id": "sfx-mill",
+      "duration": 5,
+      "description": "An industrial grinding mill crushing rock steadily, rumbling and grinding, seamless loop"
+    },
+    {
+      "id": "sfx-press",
+      "duration": 1,
+      "description": "A heavy hydraulic press stamping down: hydraulic whoosh and a deep metallic slam"
+    },
+    {
+      "id": "sfx-projector",
+      "duration": 5,
+      "description": "A powerful light projector humming with a soft electrical buzz and a gentle cooling fan, seamless loop"
+    },
+    {
+      "id": "sfx-watermaker",
+      "duration": 5,
+      "description": "A machine pumping and filtering water: steady gurgling, bubbling and a low pump hum, seamless loop"
+    },
+    {
+      "id": "sfx-fabricator",
+      "duration": 5,
+      "description": "A large 3D printer working fast: stepper motor whine, quick clicks and a print head sliding back and forth, seamless loop"
+    },
+    {
+      "id": "sfx-beam",
+      "duration": 4,
+      "description": "A sci-fi extraction beam held on target: a steady crackling energy stream with a low hum, seamless loop"
+    },
+    {
+      "id": "sfx-pickup-1",
+      "duration": 0.5,
+      "description": "A soft low retro pickup chime, a single warm square-wave note"
+    },
+    {
+      "id": "sfx-pickup-2",
+      "duration": 0.5,
+      "description": "A bright retro pickup chime, two quick rising square-wave notes"
+    },
+    {
+      "id": "sfx-pickup-3",
+      "duration": 0.5,
+      "description": "A sparkling retro pickup chime, three quick rising notes with a shimmer"
+    },
+    {
+      "id": "sfx-fire-semi",
+      "duration": 0.6,
+      "description": "A futuristic energy rifle firing a single shot: a sharp punchy zap with a metallic snap"
+    },
+    {
+      "id": "sfx-fire-burst",
+      "duration": 0.9,
+      "description": "A futuristic energy rifle firing a quick three-round burst: three sharp zaps"
+    },
+    {
+      "id": "sfx-fire-beam",
+      "duration": 3,
+      "description": "A continuous energy beam weapon firing: a searing crackling ray, seamless loop"
+    },
+    {
+      "id": "sfx-reload",
+      "duration": 1.5,
+      "description": "A weapon power cell ejected and a fresh one slotted in: mechanical clicks and a rising charge whine"
+    },
+    {
+      "id": "sfx-empty",
+      "duration": 0.5,
+      "description": "A dry trigger click on an empty energy weapon"
+    },
+    {
+      "id": "sfx-motor-scout",
+      "duration": 4,
+      "description": "A small electric buggy driving steadily: a light electric motor whine and tyres on dust, seamless loop"
+    },
+    {
+      "id": "sfx-motor-hauler",
+      "duration": 4,
+      "description": "A heavy electric truck driving steadily: a deep motor hum and big tyres rolling on gravel, seamless loop"
+    },
+    {
+      "id": "sfx-motor-crawler",
+      "duration": 4,
+      "description": "A heavy tracked vehicle driving: a deep electric motor and clattering steel tracks, seamless loop"
+    },
+    {
+      "id": "sfx-skid",
+      "duration": 1.5,
+      "description": "Vehicle tyres skidding sideways on loose dust and gravel"
+    },
+    {
+      "id": "sfx-impact",
+      "duration": 1,
+      "description": "A vehicle hitting a rock: a heavy metal thud and a short rattle"
+    },
+    {
+      "id": "sfx-ui-hover",
+      "duration": 0.5,
+      "description": "A tiny soft sci-fi interface tick"
+    },
+    {
+      "id": "sfx-ui-select",
+      "duration": 0.5,
+      "description": "A clean sci-fi interface confirm blip"
+    },
+    {
+      "id": "sfx-ui-open",
+      "duration": 0.5,
+      "description": "A sci-fi interface panel opening with a short soft whoosh and a blip"
+    },
+    {
+      "id": "sfx-ui-close",
+      "duration": 0.5,
+      "description": "A sci-fi interface panel closing with a short soft reverse whoosh"
+    }
   ]
 }

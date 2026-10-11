@@ -51,6 +51,7 @@
 
   button { background: #0f1a16; color: var(--glow); border: 1px solid rgba(63, 220, 140, .4); border-radius: 6px; padding: 7px 11px; font: 600 12px Oxanium, ui-monospace, monospace; cursor: pointer; transition: background .15s, box-shadow .15s; }
   button:hover { background: #12271f; box-shadow: 0 0 12px rgba(63, 220, 140, .22); }
+  button:disabled { opacity: .6; cursor: progress; box-shadow: none; }
   button.quiet { color: var(--dim); border-color: var(--line); background: transparent; }
   button.quiet[aria-pressed="true"] { color: var(--ink); border-color: rgba(255, 255, 255, .35); }
   button.keep[aria-pressed="true"] { color: #08130d; background: var(--keep); border-color: var(--keep); }

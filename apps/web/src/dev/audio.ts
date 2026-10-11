@@ -13,6 +13,12 @@ const verdicts: Record<string, Verdict> = (() => {
 })();
 const save = (): void => { try { localStorage.setItem(KEY, JSON.stringify(verdicts)); } catch { /* private window: verdicts last this visit */ } };
 
+// per-file levels and loop regions (public/audio/levels.json), the same the game applies
+interface Level { readonly gain: number; readonly start?: number; readonly end?: number }
+let LEVELS: Record<string, Level> = {};
+const gainOf = (id: string): number => 10 ** ((LEVELS[id]?.gain ?? 0) / 20);
+const loopRegion = (src: AudioBufferSourceNode, id: string): void => { const l = LEVELS[id]; if (l?.start !== undefined && l.end !== undefined) { src.loopStart = l.start; src.loopEnd = l.end; } };
+
 let ctx: AudioContext | null = null;
 const audio = (): AudioContext => (ctx ??= new AudioContext());
 const buffers = new Map<string, Promise<AudioBuffer>>();
@@ -40,7 +46,9 @@ async function playEntry(e: Entry, li: HTMLLIElement, loop: boolean): Promise<vo
   stopScore();
   const c = audio(), buf = await load(e.id);
   const src = c.createBufferSource(); src.buffer = buf; src.loop = loop;
-  src.connect(c.destination);
+  loopRegion(src, e.id);
+  const level = c.createGain(); level.gain.value = gainOf(e.id);
+  src.connect(level).connect(c.destination);
   src.start();
   li.classList.add('playing');
   const playBtn = li.querySelector<HTMLButtonElement>('.play');
@@ -103,7 +111,7 @@ function placeHead(): void {
   $('now').innerHTML = `Stage <b>${v.toFixed(1)}</b>`;
   if (score) {
     const t = audio().currentTime;
-    score.gains.forEach((g, i) => g?.gain.setTargetAtTime(stageGain(v, i), t, 0.08));
+    score.gains.forEach((g, i) => g?.gain.setTargetAtTime(stageGain(v, i) * gainOf(`music-moon-s${i}`), t, 0.08));
   }
 }
 
@@ -113,7 +121,12 @@ function stopScore(): void {
   $('score-play').textContent = 'Play score';
 }
 
+let scoreLoading = false;
 async function playScore(have: Set<string>): Promise<void> {
+  if (scoreLoading) return;
+  scoreLoading = true;
+  const btn = $<HTMLButtonElement>('score-play');
+  btn.textContent = 'Loading the score…'; btn.disabled = true;
   current?.stop();
   const c = audio(), t0 = c.currentTime + 0.15, v = Number(scrub.value);
   const sources: AudioBufferSourceNode[] = [];
@@ -121,12 +134,14 @@ async function playScore(have: Set<string>): Promise<void> {
     const id = `music-moon-s${i}`;
     if (!have.has(id)) return null;
     const src = c.createBufferSource(); src.buffer = await load(id); src.loop = true;
-    const g = c.createGain(); g.gain.value = stageGain(v, i);
+    loopRegion(src, id);
+    const g = c.createGain(); g.gain.value = stageGain(v, i) * gainOf(id);
     src.connect(g).connect(c.destination);
     sources.push(src);
     return g;
   }));
-  for (const s of sources) s.start(t0);
+  scoreLoading = false; btn.disabled = false;
+  for (const s of sources) s.start(Math.max(t0, c.currentTime + 0.05));
   score = { gains, stop: () => { for (const s of sources) { try { s.stop(); } catch { /* ended */ } } } };
   $('score-play').textContent = 'Stop score';
 }
@@ -151,6 +166,7 @@ $('copy').addEventListener('click', () => {
 
 try {
   all = (await (await fetch('/audio/index.json')).json()) as Entry[];
+  try { LEVELS = ((await (await fetch('/audio/levels.json')).json()) as { levels: Record<string, Level> }).levels; } catch { /* no levels yet: play as generated */ }
 } catch { all = []; }
 const have = new Set(all.map((e) => e.id));
 for (const kind of ['music', 'sfx'] as const) {

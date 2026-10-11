@@ -117,8 +117,20 @@ async function normalize(src, dst, a) {
 }
 
 for (const a of manifest.assets.filter((x) => only.length === 0 || only.includes(x.id))) {
-  // RUN's Hunyuan 3.1 Pro model if there is one, else the local 3080 pipeline's (scripts/local3d.mjs)
-  const d = path.join(OUT, a.id), model = ['model.glb', 'model-local.glb'].map((f) => path.join(d, f)).find((f) => fs.existsSync(f));
+  // RUN's Hunyuan 3.1 Pro model if there is one, else the local 3080 pipeline's (scripts/local3d.mjs); a derived
+  // piece (`derive: {from, op}`) is made from another asset's fitted mesh instead, every run, so it follows that
+  // asset's regenerations: 'fit' reuses it as is (the per-axis fit below reshapes it, as roof-low is the pitched
+  // roof at half the rise), 'hip' and 'valley' cut and mirror it into a roof corner (scripts/derive-roof.py)
+  const d = path.join(OUT, a.id);
+  let model = ['model.glb', 'model-local.glb'].map((f) => path.join(d, f)).find((f) => fs.existsSync(f));
+  if (a.derive) {
+    const from = path.join(OUT, a.derive.from, 'norm.glb');
+    if (!fs.existsSync(from)) { console.log(`${a.id}: waiting for ${a.derive.from}`); continue; }
+    fs.mkdirSync(d, { recursive: true });
+    model = path.join(d, 'model-derived.glb');
+    if (a.derive.op === 'fit') fs.copyFileSync(from, model);
+    else run(BLENDER, ['-b', '--factory-startup', '-P', 'scripts/derive-roof.py', '--', from, model, a.derive.op]);
+  }
   if (!model) continue;
   if (fs.existsSync(path.join(d, 'high.glb')) && only.length === 0) continue;
   const [low, mid, high] = manifest.budgets[a.class];
@@ -126,12 +138,15 @@ for (const a of manifest.assets.filter((x) => only.length === 0 || only.includes
   const dims = await normalize(model, norm, a);
   // each level: Blender decimates (and for mid/high bakes the full-detail normals), then slim-glb packs it
   // (no further simplifying: --tris above the count; WebP maps at the level's size; meshopt).
-  // low is rebuilt rather than decimated in place (lod-bake.py --retopo=0: the welded surface is decimated with the
-  // generated UV islands dropped, unwrapped fresh, and the full model's colour baked on at 512 px, packed to 256).
-  // Tested 2026-10-11 on the scout wheel (a round tyre with its tread at 600 triangles, where in-place decimation
-  // made a faceted blob), the hauler body (no torn side panels), the weapon bench and the iron sight. The voxel
+  // low is a cage, rebuilt rather than decimated in place (lod-bake.py --retopo=0 --planar=4, smooth): the welded
+  // surface drops the generated UV islands, flat regions dissolve to a few clean faces, the collapse takes it to the
+  // budget, it is unwrapped fresh, its normals are softened by angle, and the full model's colour and tangent
+  // normals are baked on at 512 px (packed to 256). Owner 2026-10-11: "soften the normals on the cage then bake the
+  // details with normals and colors to the low poly cage model (cage with good uv layout that is your low)".
+  // Tested 2026-10-11: the scout wheel (a round tyre with its tread at 600 triangles, where in-place decimation
+  // made a faceted blob), the hauler body (no torn side panels), the scout body (clean panels and frames). The voxel
   // remesh variant (--retopo=160) broke the wheel apart (an open shell), so it is not used.
-  const plan = [['low', low, 256, 'flat', 512, ['--retopo=0']], ['mid', mid, 512, 'smooth', 512, []], ['high', high, 1024, 'smooth', 1024, []]];
+  const plan = [['low', low, 256, 'smooth', 512, ['--retopo=0', '--planar=4']], ['mid', mid, 512, 'smooth', 512, []], ['high', high, 1024, 'smooth', 1024, []]];
   for (const [name, tris, tex, mode, bakePx, extra] of plan.filter((p) => levels.includes(p[0]))) {
     const raw = path.join(d, `${name}-raw.glb`), done = path.join(d, `${name}.glb`);
     run(BLENDER, ['-b', '--factory-startup', '-P', 'scripts/lod-bake.py', '--', norm, raw, String(tris), String(bakePx), mode, ...extra]);

@@ -440,7 +440,12 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "ONLY the roof surface on its own, with NO walls, NO posts and NO box under it: one flat gently sloped steel roof plane, 4 by 4 metres, rising 1.5 metres from its low eave to its high edge, dark slate-grey standing-seam steel with ribs running down the slope and a drip edge at the low eave",
-      "high": "+z"
+      "high": "+z",
+      "derive": {
+        "from": "roof-pitched",
+        "op": "fit"
+      },
+      "note": "derived from roof-pitched (owner 2026-10-11 review: image-to-3D cannot see a corner piece back and made the outer corner a pyramid); its source image and Hunyuan model are kept for reference only"
     },
     {
       "id": "roof-corner-outer",
@@ -463,7 +468,12 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "the outer roof corner piece on its own: a hipped corner where two sloped steel roof planes meet along a diagonal hip ridge, rising 3 metres over a 4 by 4 metre cell, standing-seam ribs and a drip edge on both eaves",
-      "high": "+x+z"
+      "high": "+x+z",
+      "derive": {
+        "from": "roof-pitched",
+        "op": "hip"
+      },
+      "note": "derived from roof-pitched (owner 2026-10-11 review: image-to-3D cannot see a corner piece back and made the outer corner a pyramid); its source image and Hunyuan model are kept for reference only"
     },
     {
       "id": "roof-corner-inner",
@@ -486,7 +496,12 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "ONLY the roof surface on its own, with NO walls and NO box under it: an inner valley roof corner where two sloped dark slate-grey standing-seam steel roof planes meet along a diagonal valley gutter, covering a 4 by 4 metre cell and rising 3 metres",
-      "high": "+x+z"
+      "high": "+x+z",
+      "derive": {
+        "from": "roof-pitched",
+        "op": "valley"
+      },
+      "note": "derived from roof-pitched (owner 2026-10-11 review: image-to-3D cannot see a corner piece back and made the outer corner a pyramid); its source image and Hunyuan model are kept for reference only"
     },
     {
       "id": "ridge-cap",

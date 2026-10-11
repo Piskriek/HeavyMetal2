@@ -212,6 +212,55 @@ Sources:
 - [StraySpark: decimate vs remesh](https://www.strayspark.studio/blog/reduce-polycount-ai-3d-model-blender-decimate-vs-remesh)
 - [AIWiki: Hunyuan 3D (VRAM figures)](https://aiwiki.ai/wiki/hunyuan_3d)
 
+## 4f. Modular parts, multi-view and cages (owner suggestion, 2026-10-11)
+The owner's suggestion, in short:
+- "give the 3d agent more angles to work from";
+- "create modular detail seperately, add the details to the base shapes then build a cage around it";
+- "soften the normals on the cage then bake the details with normals and colors to the low poly cage model (cage with good uv layout that is your low)";
+- "if it cant be baked on to a texture like a headlight then it needs its own high and bake to cage and then it can be reused and attach snap to the vehicle";
+- "if the models did a chassis and a body and we combined that with head lights and ariels and what ever else to get the final model it should work better".
+
+**What the research says:**
+- **The industry route is high-poly first, then a clean low, then a bake.** The normal map baked from the high carries the visual detail. Texturing after retopology beats texturing the raw generated mesh (Customuse, Tripo).
+- **AI is weak at modular kits and exact mechanical parts.** Dimensions and snapping rules come from code or people (Wavect). For us that is the procedural kits: they already carry the dimensions, hubs, sockets and colliders (`packages/rovergear`: `hubs`, `sockets` such as `seat` and `dish`; `packages/basekit`).
+- **Multi-view shape is open source: Hunyuan3D-2mv** (front, left, back and right; shape only). Hunyuan3D 2.1's paint stage can texture any mesh, so 2mv for the shape plus 2.1 for the paint fits the 3080. The install prompt for the local agent is `docs/prompts/local3d/01-multiview-and-parts.md`.
+- **Hunyuan3D-Part (P3-SAM segmentation and X-Part completion) has open light weights.** It could split a generated mesh into parts automatically, which may be worth a test later.
+
+**The route (the pilot is the scout, from sheet 19):**
+1. **Parts, each generated on its own, with the parts list taken from the concept art:**
+   - base shapes: the chassis (floor pan, belly armour, hub mounts) and the body shell (the panelled cab, with the roll protection built into the panels);
+   - details: the headlight (one asset, mirrored), the rear tool rack, the cargo box, the seat and the steering wheel (both done);
+   - the aerial is procedural: a thin rod is what reduction cannot do.
+2. **More angles:**
+   - one turnaround sheet per part (front, left, back and right in one image, which keeps the views consistent), cropped into four views for 2mv;
+   - single-view 2.1 until 2mv is installed.
+3. **The cage (the low, with a clean UV layout):**
+   - built from the combined high: the welded copy is decimated with planar dissolve first (flat panels become a few clean faces), then collapse to the budget;
+   - unwrapped fresh;
+   - normals softened by angle.
+   - Where a procedural kit piece matches the shape, that piece can be the cage. It then fits the physics and the lattice exactly.
+4. **The bake:**
+   - colour and tangent normals from the combined high onto the cage, so baked-in detail (panel seams, bolts, vents, grilles) costs no triangles;
+   - this applies to every level, low included (low now softened plus a normal map, as the owner suggests);
+   - about 20 KB more per inlined asset.
+5. **Parts that change the silhouette** (headlights, the tool rack, mirrors, light bars):
+   - each gets its own high, cage and bake, and is reused across vehicles;
+   - each snaps on at a named socket on the base, as `rovergear` does for seats;
+   - the game assembles the vehicle from base, wheels and parts at their sockets.
+
+**Done when** the assembled scout reads like sheet 19 at every level. The test is the one that failed before: the lamps round, the aerial straight, the panels clean, at the same triangle totals as today's scout.
+
+Sources:
+- [Customuse: game-ready 3D models with AI](https://customuse.com/learn/making-game-ready-3d-models-with-ai)
+- [Tripo: AI texture baking, high to low](https://www.tripo3d.ai/blog/explore/texture-baking-from-ai-high-poly-to-low-poly)
+- [Tripo: AI asset pipeline for game studios](https://www.tripo3d.ai/blog/ai-3d-asset-pipeline-for-game-studios)
+- [Wavect: AI 3D generators for game development 2026](https://wavect.io/blog/ai-3d-model-generators-game-development-2026/)
+- [3D AI Studio: remesh and retopology](https://docs.3daistudio.com/processing/remesh)
+- [Replicate: Hunyuan3D-2mv](https://replicate.com/tencent/hunyuan3d-2mv)
+- [Comfy: Hunyuan3D 2 and 2mv](https://docs.comfy.org/tutorials/3d/hunyuan3D-2)
+- [Hunyuan3D 2.1 paper](https://arxiv.org/html/2506.15442v1)
+- [Hunyuan3D-Part](https://huggingface.co/tencent/Hunyuan3D-Part)
+
 ## 5. Credit plan (proposal for the owner)
 | Pool | Credits | Notes |
 |---|---|---|

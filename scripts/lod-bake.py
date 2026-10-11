@@ -144,6 +144,16 @@ if retopo:
         rm.voxel_size = max(low.dimensions) / vox
         rm.adaptivity = 0
         bpy.ops.object.modifier_apply(modifier=rm.name)
+    # --planar=D: dissolve near-flat regions first (faces within D degrees merge), so a panel becomes a few clean faces
+    # and the collapse spends the budget on edges and curves: the cage for hard-surface parts (owner 2026-10-11)
+    planar = next((a for a in argv if a.startswith('--planar=')), None)
+    if planar:
+        pd = low.modifiers.new('planar', 'DECIMATE')
+        pd.decimate_type = 'DISSOLVE'
+        pd.angle_limit = math.radians(float(planar.split('=')[1]))
+        bpy.ops.object.modifier_apply(modifier=pd.name)
+        tri = low.modifiers.new('tri', 'TRIANGULATE')
+        bpy.ops.object.modifier_apply(modifier=tri.name)
     dense = sum(len(p.vertices) - 2 for p in low.data.polygons)
     if target < dense:
         dec = low.modifiers.new('decimate', 'DECIMATE')

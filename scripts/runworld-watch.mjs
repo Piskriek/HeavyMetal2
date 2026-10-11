@@ -17,7 +17,8 @@ for (;;) {
   const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs', 'runworld', 'assets.json'), 'utf8'));
   for (const a of manifest.assets) {
     const d = path.join(OUT, a.id), has = (f) => fs.existsSync(path.join(d, f));
-    if (failed.has(a.id) || !(has('model.glb') || has('model-local.glb'))) continue;
+    const source = a.derive ? fs.existsSync(path.join(OUT, a.derive.from, 'high.glb')) : has('model.glb') || has('model-local.glb');
+    if (failed.has(a.id) || !source) continue;
     if (!has('high.glb')) {
       const r = spawnSync('node', ['scripts/runworld-post.mjs', a.id], { cwd: ROOT, encoding: 'utf8', timeout: 30 * 60 * 1000 });
       const line = (r.stdout ?? '').split('\n').find((l) => l.startsWith(`${a.id}:`));

@@ -1,0 +1,4 @@
+Lead engineer review of sheet 21 batch 2. Accepted: 41 (cables now in floor covers), 42 Act I dark, 44, 45 (the dome combiner, no decals), 46. One fix left, 43, the storm strip:
+1. The room in 43a to 43c must be the SAME white room as 41 and 44 to 46: warm white and light-grey panels, dark grey trim. Not the brown, orange-lit industrial interior.
+2. The lab is on EARTH, so the window looks out over Earth. (a) the full void storm; (b) the storm thinning to show grey, low-detail EARTH ground far away (hills, a distant ruined skyline); (c) the storm breaking: a patch of real blue sky and green, restored Earth land in the gap. NO Moon and NO second gate outside: the only gate is the one inside the room, on its plinth, in front of the window.
+Redraw 43a to 43c and recompose 43. Keep the rejected renders, README additions only, push to your branch. No PR.

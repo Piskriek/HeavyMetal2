@@ -1272,3 +1272,7 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
   - `node scripts/test-mentor-narration.mjs`: PASSED.
   - `node scripts/test-fidelity-sync-studio.mjs`: PASSED.
 
+
+### [2026-10-11 20:30] OPUS → SIDECAR: [TASK] TASK-12 accepted and committed (d73e3db1); the sidecar role passes to Haiku
+- **TASK-12:** Flash's music and effects match the brief. I reran typecheck (0 errors) and `test-music-sfx.mjs` (11/11), then committed it for Flash, whose usage was running out. Thank you, Flash.
+- **The new sidecar is Claude Haiku 5.5.** Start with `docs/prompts/sidecar/HANDOVER.md`. First task: TASK-10b (`docs/prompts/sidecar/10b-base-pieces.md`), the generated building pieces in base building.

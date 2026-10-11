@@ -736,5 +736,53 @@
       1.1,
       0.857
     ]
+  },
+  "scout-chassis": {
+    "class": "vehicle-part",
+    "size": [
+      1.688,
+      0.593,
+      2.999
+    ]
+  },
+  "headlight": {
+    "class": "detail",
+    "size": [
+      0.209,
+      0.3,
+      0.153
+    ]
+  },
+  "her-desk": {
+    "class": "lab",
+    "size": [
+      1.392,
+      0.78,
+      0.733
+    ]
+  },
+  "cot": {
+    "class": "lab",
+    "size": [
+      1.146,
+      0.655,
+      2
+    ]
+  },
+  "wall-radio": {
+    "class": "lab",
+    "size": [
+      0.6,
+      0.523,
+      0.331
+    ]
+  },
+  "armory-rail": {
+    "class": "lab",
+    "size": [
+      1.6,
+      0.623,
+      0.437
+    ]
   }
 }

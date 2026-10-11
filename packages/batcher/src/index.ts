@@ -206,6 +206,7 @@ class Batch {
     private createMesh(capacity: number): THREE.InstancedMesh {
         const mesh = new THREE.InstancedMesh(this.geometry, this.material, capacity);
         mesh.name = `${this.key}#${this.part}`;
+        mesh.userData.batch = this;
         // Instances carry their whole transform, so the batch itself never moves.
         mesh.matrixAutoUpdate = false;
         // Still pick up the root's transform on the first world matrix update.
@@ -360,6 +361,24 @@ export class Batcher {
     matrixOf(id: number): THREE.Matrix4 | null {
         const entry = this.entries.get(id);
         return entry === undefined ? null : entry.matrix;
+    }
+
+    /**
+     * The instance id at `slot` of `mesh`, or `null` when not found.
+     */
+    idAt(mesh: THREE.InstancedMesh, slot: number): number | null {
+        const batch = (mesh.userData as { batch?: Batch }).batch;
+        if (batch !== undefined) {
+            return slot >= 0 && slot < batch.count ? (batch.ids[slot] ?? null) : null;
+        }
+        for (const list of this.batches.values()) {
+            for (const b of list) {
+                if (b.mesh === mesh) {
+                    return slot >= 0 && slot < b.count ? (b.ids[slot] ?? null) : null;
+                }
+            }
+        }
+        return null;
     }
 
     /**

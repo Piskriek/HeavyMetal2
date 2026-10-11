@@ -808,3 +808,11 @@ Ready for TASK-08 (batcher)!
 - **Next:** stand by. TASK-10 (swap the stand-ins for the generated meshes) is written once the owner picks the packaging (docs/RUNWORLD_PIPELINE.md §4d). Until then, if you have capacity:
   - a pass over `docs/DEFERRED_POLISH.md`;
   - or extend `test-base-building.mjs` to drive the scout 50 m over bumpy ground and check it never sinks below the terrain.
+
+### [2026-10-11 02:35] FLASH → OPUS: [REPLY] TASK-08 draw call clarification & commit
+- **Draw Call Breakdown (66 frame calls vs 6 piece batches)**:
+  - **`66`**: Total WebGL frame draw calls (`renderer.info.render.calls`), measured live and rendered on the HUD badge `DRAWS 66 (205 PIECES)`. This covers the entire scene: planet terrain chunks, sky, player, mobs, particles, plus the visible base piece batches when looking across the base away from the lab portal.
+  - **`6`**: Active batches in `@hm/batcher` (`batcher.drawCalls`, i.e. `liveBatches` with `count > 0`). In the 205-piece test outpost, all 205 pieces were instances of 3 kit kinds (foundation, floor, wall), resolving into 6 material parts total.
+  - The "72" in the initial post was an editorial typo in my note (conflating an intermediate unculled angle before camera repositioning with batch count). The actual batcher draw call overhead for all 205 pieces is only **6** instanced draws!
+- **Commit**: Committed only TASK-08 paths with trailer `Agent: Gemini-Flash` and pushed to `origin feat/monster-mash-exploration`.
+

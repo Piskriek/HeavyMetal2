@@ -302,6 +302,17 @@ export function PlayScreen(props: {
 
   // Overlay visibility toggle for clean screenshot capture
   const [hideOverlays, setHideOverlays] = useState(false);
+  const [renderCalls, setRenderCalls] = useState(0);
+
+  useEffect(() => {
+    if (!isBase) return undefined;
+    const interval = window.setInterval(() => {
+      if (sceneRef.current) {
+        setRenderCalls(sceneRef.current.debug.stats().calls);
+      }
+    }, 150);
+    return () => window.clearInterval(interval);
+  }, [isBase]);
 
   // Throttled persistence
   const lastSavedTickRef = useRef(-1);
@@ -1644,6 +1655,17 @@ export function PlayScreen(props: {
           }
           return null;
         },
+        setBase: (base: S.Base) => {
+          baseWorldRef.current = { ...baseWorldRef.current, base };
+          const bEnv = getBaseEnv();
+          const integrity = (baseViewSource as WorldViewSource).get?.()?.build?.integrity ?? false;
+          pieceManagerRef.current.sync(baseWorldRef.current, bEnv, integrity);
+          scene.setBase(baseWorldRef.current.base);
+          scene.setWalkWorld(pieceManagerRef.current.walkWorld);
+          persistBaseWorld(true);
+          (baseViewSource as WorldViewSource).notify?.();
+          setBaseWorldVersion((v) => v + 1);
+        },
         createSampleLayoutCode: () => {
           const bEnv = getBaseEnv();
           const f = S.found(S.empty(), structureEnv(bEnv), 0, 0, 0, 'regolith');
@@ -1656,6 +1678,9 @@ export function PlayScreen(props: {
         hideOverlays: (hide: boolean) => setHideOverlays(hide),
       },
       teleportPlanet: () => scene.debug.teleport('planet', 0, 10, 0),
+      renderCalls: () => scene.debug.stats().calls,
+      drawCalls: () => scene.debug.stats().calls,
+      batcherDrawCalls: () => pieceManagerRef.current.batcherDrawCalls,
     });
     if (typeof window !== 'undefined') {
       (window as unknown as { __hm?: unknown }).__hm = {
@@ -1665,6 +1690,9 @@ export function PlayScreen(props: {
         clearToast: () => setToast(null),
         hideOverlays: (hide: boolean) => setHideOverlays(hide),
         base: (window as any).hmPlay?.base,
+        renderCalls: () => scene.debug.stats().calls,
+        drawCalls: () => scene.debug.stats().calls,
+        batcherDrawCalls: () => pieceManagerRef.current.batcherDrawCalls,
       };
     }
     setLoading(steps[0]![0]);
@@ -2747,7 +2775,40 @@ export function PlayScreen(props: {
             </section>
           ) : null}
           {isBase && hud.where === 'planet' && !hideOverlays ? (
-            <BaseHud
+            <>
+              <div
+                className="hm-draw-calls-badge"
+                data-testid="draw-calls-badge"
+                style={{
+                  position: 'fixed',
+                  top: 16,
+                  right: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  background: 'rgba(15, 23, 42, 0.85)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(56, 189, 248, 0.35)',
+                  borderRadius: 8,
+                  padding: '6px 14px',
+                  fontFamily: 'Oxanium, sans-serif',
+                  zIndex: 100,
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+                  color: '#f8fafc',
+                  letterSpacing: '0.05em',
+                }}
+              >
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase' }}>
+                  DRAWS
+                </span>
+                <span style={{ fontSize: 14, fontWeight: 800 }}>
+                  {renderCalls}
+                </span>
+                <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                  ({baseWorldRef.current?.base.pieces.length ?? 0} PIECES)
+                </span>
+              </div>
+              <BaseHud
               source={baseViewSource}
               paused={paused}
               modalOpen={isAnyBaseWindowOpen}
@@ -2784,6 +2845,7 @@ export function PlayScreen(props: {
                 }
               }}
             />
+          </>
           ) : null}
           {machinePickerHardpoint !== null && isBase && (
             <MachinePickerModal

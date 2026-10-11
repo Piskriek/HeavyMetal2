@@ -55,6 +55,22 @@ export const INTEGRITY_5_MATERIALS = {
   }),
 };
 
+export const INTEGRITY_COLORS = {
+  blue: new THREE.Color(0x38bdf8),
+  green: new THREE.Color(0x22c55e),
+  yellow: new THREE.Color(0xeab308),
+  orange: new THREE.Color(0xf97316),
+  red: new THREE.Color(0xef4444),
+};
+
+export function integrityColorForSupport(support: number): THREE.Color {
+  if (support >= 0.999) return INTEGRITY_COLORS.blue;
+  if (support >= 0.6) return INTEGRITY_COLORS.green;
+  if (support >= 0.4) return INTEGRITY_COLORS.yellow;
+  if (support >= 0.28) return INTEGRITY_COLORS.orange;
+  return INTEGRITY_COLORS.red;
+}
+
 export function integrityMaterialForSupport(support: number): THREE.Material {
   if (support >= 0.999) return INTEGRITY_5_MATERIALS.blue;
   if (support >= 0.6) return INTEGRITY_5_MATERIALS.green;

@@ -264,3 +264,18 @@ test('dispose removes the meshes but leaves the shared parts alone', () => {
   assert.equal(wallGeometry.attributes.position!.count, vertices); // not disposed
   assert.equal(wallGeometry, parts.wall![0]!.geometry);
 });
+
+test('idAt maps slot of an InstancedMesh back to live instance id', () => {
+  const root = new THREE.Group();
+  const b = new Batcher(root, (k) => parts[k]!);
+  b.set(101, 'wall', at(1, 1));
+  b.set(202, 'wall', at(2, 2));
+  const wallMesh = root.children.find((c) => c.name === 'wall#0') as THREE.InstancedMesh;
+  assert.ok(wallMesh);
+  assert.equal(b.idAt(wallMesh, 0), 101);
+  assert.equal(b.idAt(wallMesh, 1), 202);
+  assert.equal(b.idAt(wallMesh, 2), null);
+  b.remove(101);
+  assert.equal(b.idAt(wallMesh, 0), 202);
+  b.dispose();
+});

@@ -1050,13 +1050,19 @@ export function createPlayScene(o: {
         const first = hits[0];
         pieceDist = first.distance;
         let pieceId: number | null = null;
-        let curr: THREE.Object3D | null = first.object;
-        while (curr && curr !== piecesGroup) {
-          if (curr.userData?.pieceId !== undefined) {
-            pieceId = curr.userData.pieceId;
-            break;
+        const mgr = (piecesGroup.userData as { manager?: { pieceIdFromHit: (o: THREE.Object3D, inst?: number) => number | null } }).manager;
+        if (mgr) {
+          pieceId = mgr.pieceIdFromHit(first.object, first.instanceId);
+        }
+        if (pieceId === null) {
+          let curr: THREE.Object3D | null = first.object;
+          while (curr && curr !== piecesGroup) {
+            if (curr.userData?.pieceId !== undefined) {
+              pieceId = curr.userData.pieceId;
+              break;
+            }
+            curr = curr.parent;
           }
-          curr = curr.parent;
         }
         const norm = first.face ? first.face.normal.clone().transformDirection(first.object.matrixWorld) : new THREE.Vector3(0, 1, 0);
         pieceHit = {

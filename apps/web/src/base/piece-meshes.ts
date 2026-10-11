@@ -2,26 +2,31 @@ import * as THREE from 'three';
 import * as S from '@hm/structure';
 import * as L from '@hm/lattice';
 import * as basegear from '@hm/basegear';
+import { Batcher, type Part } from '@hm/batcher';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { BaseWorld, WorldEnv } from './world';
 import { pieceAt, structureEnv, BENCH_REACH, relays } from './world';
 import { WalkWorld, type PlacedPiece } from './walk';
 import {
   globalKitPieceCache,
   computeSkirt,
-  integrityMaterialForSupport,
+  integrityColorForSupport,
+  KIT_PIVOT_OFFSETS,
   type Box,
 } from './kit-pieces';
 
 interface ActivePieceEntry {
-  group: THREE.Group;
   colliders: readonly Box[];
+  dynamicRoot?: THREE.Group;
   lamps: readonly THREE.Mesh[];
   kind: S.Kind;
   pos: { x: number; y: number; z: number };
   yaw: number;
+  skirt: number;
   parts?: Record<string, THREE.Object3D>;
   doorAngle?: number;
   targetDoorAngle?: number;
+  isTinted?: boolean;
 }
 
 interface CollapsingPiece {
@@ -36,12 +41,22 @@ export class PieceMeshManager {
   readonly walkWorld: WalkWorld = new WalkWorld();
   private pieceMap: Map<number, ActivePieceEntry> = new Map();
   private collapsing: CollapsingPiece[] = [];
-  private lastIntegrity = false;
   private lastStage = 1;
+  private batcher: Batcher;
 
   constructor() {
     this.root = new THREE.Group();
     this.root.name = 'base-pieces-root';
+    (this.root.userData as Record<string, unknown>).manager = this;
+    this.batcher = new Batcher(this.root, (key) => this.getBatchParts(key));
+  }
+
+  get batcherDrawCalls(): number {
+    return this.batcher.drawCalls;
+  }
+
+  get batcherInstances(): number {
+    return this.batcher.instances;
   }
 
   sync(world: BaseWorld, env: WorldEnv, integrity: boolean): void {
@@ -52,9 +67,13 @@ export class PieceMeshManager {
     // Stage change: rebuild all pieces from new stage cache, then dispose old cache
     if (world.stage !== this.lastStage) {
       for (const entry of this.pieceMap.values()) {
-        this.root.remove(entry.group);
+        if (entry.dynamicRoot) {
+          this.root.remove(entry.dynamicRoot);
+        }
       }
       this.pieceMap.clear();
+      this.batcher.dispose();
+      this.batcher = new Batcher(this.root, (key) => this.getBatchParts(key));
       globalKitPieceCache.dispose();
       this.lastStage = world.stage;
     }
@@ -113,46 +132,87 @@ export class PieceMeshManager {
       }
       const totalYaw = -st.yaw + extraAngle;
 
+      const skirt = computeSkirt(world, env, piece);
+      const key = `${piece.kind}|${world.stage}|${skirt}`;
+      const matrix = new THREE.Matrix4().makeRotationY(totalYaw).setPosition(pos.x, pos.y, pos.z);
+
+      // Render static parts through @hm/batcher
+      this.batcher.set(piece.id, key, matrix);
+
       if (!entry) {
-        // Compute foundation skirt
-        const skirt = computeSkirt(world, env, piece);
-
-        // Instantiate clone from GTX 950M shared cache
-        const instance = globalKitPieceCache.instantiate(piece.kind, world.stage, skirt);
-        instance.group.userData.pieceId = piece.id;
-        instance.group.userData.pieceKind = piece.kind;
-
-        instance.group.position.set(pos.x, pos.y, pos.z);
-        instance.group.rotation.y = totalYaw;
-        instance.group.updateMatrixWorld(true);
-
-        this.root.add(instance.group);
-
+        let dynamicRoot: THREE.Group | undefined;
+        const activeLamps: THREE.Mesh[] = [];
+        const parts: Record<string, THREE.Object3D> = {};
         const isDoor = piece.kind === 'door';
         const doorAngle = isDoor && piece.open ? (-100 * Math.PI) / 180 : 0;
-        if (isDoor && instance.parts?.leaf) {
-          instance.parts.leaf.rotation.y = doorAngle;
+
+        const template = globalKitPieceCache.getTemplate(piece.kind, world.stage, skirt);
+
+        // Keep dynamic components (lamps and animated door leaves) as separate scene objects
+        if (template.lamps.length > 0 || isDoor) {
+          dynamicRoot = new THREE.Group();
+          dynamicRoot.name = `dynamic-${piece.kind}-${piece.id}`;
+          dynamicRoot.userData.pieceId = piece.id;
+          dynamicRoot.userData.pieceKind = piece.kind;
+
+          const [ox, oy, oz] = KIT_PIVOT_OFFSETS[piece.kind] ?? [0, 0, 0];
+          const offsetGroup = new THREE.Group();
+          offsetGroup.position.set(ox, oy, oz);
+          dynamicRoot.add(offsetGroup);
+
+          if (isDoor) {
+            const templateLeaf = template.group.getObjectByName('door-leaf');
+            if (templateLeaf) {
+              const leafClone = templateLeaf.clone(true);
+              leafClone.rotation.y = doorAngle;
+              offsetGroup.add(leafClone);
+              parts.leaf = leafClone;
+            }
+          }
+
+          if (template.lamps.length > 0) {
+            for (const lamp of template.lamps) {
+              const clonedLamp = new THREE.Mesh(
+                lamp.geometry,
+                (lamp.material as THREE.Material).clone(),
+              );
+              clonedLamp.userData.isLamp = true;
+              clonedLamp.position.copy(lamp.position);
+              clonedLamp.rotation.copy(lamp.rotation);
+              clonedLamp.scale.copy(lamp.scale);
+              offsetGroup.add(clonedLamp);
+              activeLamps.push(clonedLamp);
+            }
+          }
+
+          dynamicRoot.position.set(pos.x, pos.y, pos.z);
+          dynamicRoot.rotation.y = totalYaw;
+          dynamicRoot.updateMatrixWorld(true);
+          this.root.add(dynamicRoot);
         }
 
         entry = {
-          group: instance.group,
-          colliders: instance.colliders,
-          lamps: instance.lamps,
+          colliders: template.colliders,
+          dynamicRoot,
+          lamps: activeLamps,
           kind: piece.kind,
           pos,
           yaw: totalYaw,
-          parts: instance.parts,
+          skirt,
+          parts: Object.keys(parts).length > 0 ? parts : undefined,
           doorAngle,
           targetDoorAngle: doorAngle,
+          isTinted: false,
         };
         this.pieceMap.set(piece.id, entry);
       } else {
-        // Update transform if needed
-        entry.group.position.set(pos.x, pos.y, pos.z);
-        entry.group.rotation.y = totalYaw;
-        entry.group.updateMatrixWorld(true);
         entry.pos = pos;
         entry.yaw = totalYaw;
+        if (entry.dynamicRoot) {
+          entry.dynamicRoot.position.set(pos.x, pos.y, pos.z);
+          entry.dynamicRoot.rotation.y = totalYaw;
+          entry.dynamicRoot.updateMatrixWorld(true);
+        }
         if (piece.kind === 'door') {
           entry.targetDoorAngle = piece.open ? (-100 * Math.PI) / 180 : 0;
         }
@@ -166,7 +226,7 @@ export class PieceMeshManager {
         colliders: entry.colliders,
       });
 
-      // Update lamp lighting
+      // Update lamp emissive lighting
       if (entry.lamps.length > 0) {
         if (piece.kind === 'bin') {
           const isLinked = linkedGroups.some((g: readonly number[]) => g.includes(piece.id));
@@ -190,53 +250,71 @@ export class PieceMeshManager {
         }
       }
 
-      // Material assignment: 5-step integrity overlay vs restoring kit materials
+      // 5-tier structural integrity tinting via batcher.tint
       if (integrity && supportMap) {
         const sup = supportMap.get(piece.id) ?? 0;
-        const mat = integrityMaterialForSupport(sup);
-        this.applyOverlayMaterial(entry.group, mat);
-      } else if (this.lastIntegrity && !integrity) {
-        this.restoreKitMaterials(entry.group);
+        const color = integrityColorForSupport(sup);
+        this.batcher.tint(piece.id, color);
+        entry.isTinted = true;
+      } else if (entry.isTinted) {
+        this.batcher.tint(piece.id, null);
+        entry.isTinted = false;
       }
     }
 
-    this.lastIntegrity = integrity;
     this.walkWorld.setPieces(placedForWalk);
 
     // Remove any pieces that disappeared without collapse animation
     for (const [id, entry] of this.pieceMap.entries()) {
       if (!activeIds.has(id)) {
-        this.root.remove(entry.group);
+        this.batcher.remove(id);
+        if (entry.dynamicRoot) {
+          this.root.remove(entry.dynamicRoot);
+        }
         this.pieceMap.delete(id);
       }
     }
   }
 
   handleRemoval(removedId: number, collapsedIds: readonly number[]): void {
-    // The removed piece vanishes immediately
+    // The removed piece vanishes immediately from batcher and scene
+    this.batcher.remove(removedId);
     const removedEntry = this.pieceMap.get(removedId);
     if (removedEntry) {
-      this.root.remove(removedEntry.group);
+      if (removedEntry.dynamicRoot) {
+        this.root.remove(removedEntry.dynamicRoot);
+      }
       this.pieceMap.delete(removedId);
     }
 
-    // Collapsed pieces animate: drop 0.5m, tilt, and fade over 0.6s
+    // Collapsed pieces leave the batch and animate with a temporary cloned group
     for (const cId of collapsedIds) {
+      this.batcher.remove(cId);
       const entry = this.pieceMap.get(cId);
       if (entry) {
+        if (entry.dynamicRoot) {
+          this.root.remove(entry.dynamicRoot);
+        }
         this.pieceMap.delete(cId);
-        // Clone materials to allow fading
-        entry.group.traverse((child) => {
+
+        const tempInstance = globalKitPieceCache.instantiate(entry.kind, this.lastStage, entry.skirt);
+        tempInstance.group.position.set(entry.pos.x, entry.pos.y, entry.pos.z);
+        tempInstance.group.rotation.y = entry.yaw;
+        tempInstance.group.updateMatrixWorld(true);
+
+        tempInstance.group.traverse((child) => {
           if (child instanceof THREE.Mesh && child.material) {
             child.material = (child.material as THREE.Material).clone();
             child.material.transparent = true;
           }
         });
+
+        this.root.add(tempInstance.group);
         this.collapsing.push({
-          group: entry.group,
+          group: tempInstance.group,
           elapsed: 0,
           duration: 0.6,
-          initialY: entry.group.position.y,
+          initialY: tempInstance.group.position.y,
         });
       }
     }
@@ -287,20 +365,79 @@ export class PieceMeshManager {
     }
   }
 
-  private applyOverlayMaterial(group: THREE.Group, mat: THREE.Material): void {
-    group.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        child.material = mat;
-      }
-    });
+  pieceIdFromHit(object: THREE.Object3D, instanceId?: number): number | null {
+    if (object instanceof THREE.InstancedMesh && instanceId !== undefined) {
+      return this.batcher.idAt(object, instanceId);
+    }
+    return (object.userData?.pieceId as number | undefined) ?? null;
   }
 
-  private restoreKitMaterials(group: THREE.Group): void {
-    group.traverse((child) => {
-      if (child instanceof THREE.Mesh && child.userData.kitMat) {
-        child.material = child.userData.kitMat;
+  private getBatchParts(key: string): readonly Part[] {
+    const [kindStr, stageStr, skirtStr] = key.split('|');
+    const kind = kindStr as S.Kind;
+    const stage = Number(stageStr);
+    const skirt = Number(skirtStr || 0);
+
+    const template = globalKitPieceCache.getTemplate(kind, stage, skirt);
+    template.group.updateMatrixWorld(true);
+
+    const rootInv = template.group.matrixWorld.clone().invert();
+    const byMaterial = new Map<THREE.Material, THREE.BufferGeometry[]>();
+
+    template.group.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        // Skip dynamic elements: lamps and door leaf
+        if (child.userData.isLamp) return;
+        if (child.name === 'door-leaf' || this.isDescendantOf(child, 'door-leaf')) return;
+
+        // Static part: bake pivot and local transform into geometry
+        const relMat = child.matrixWorld.clone().premultiply(rootInv);
+        const geom = child.geometry.clone().applyMatrix4(relMat);
+        geom.computeBoundingBox();
+        geom.computeBoundingSphere();
+
+        const mat = child.material;
+        const list = byMaterial.get(mat);
+        if (list) {
+          list.push(geom);
+        } else {
+          byMaterial.set(mat, [geom]);
+        }
       }
     });
+
+    const parts: Part[] = [];
+    for (const [mat, geos] of byMaterial) {
+      if (geos.length === 1) {
+        parts.push({ geometry: geos[0]!, material: mat });
+      } else if (geos.length > 1) {
+        try {
+          const nonIndexed = geos.map((g) => (g.index ? g.toNonIndexed() : g));
+          const merged = mergeGeometries(nonIndexed, false);
+          if (merged) {
+            merged.computeBoundingBox();
+            merged.computeBoundingSphere();
+            parts.push({ geometry: merged, material: mat });
+            for (const g of geos) g.dispose();
+          } else {
+            for (const g of geos) parts.push({ geometry: g, material: mat });
+          }
+        } catch {
+          for (const g of geos) parts.push({ geometry: g, material: mat });
+        }
+      }
+    }
+
+    return parts;
+  }
+
+  private isDescendantOf(obj: THREE.Object3D, name: string): boolean {
+    let cur: THREE.Object3D | null = obj;
+    while (cur) {
+      if (cur.name === name) return true;
+      cur = cur.parent;
+    }
+    return false;
   }
 
   getMeshes(): THREE.Group {
@@ -309,13 +446,16 @@ export class PieceMeshManager {
 
   dispose(): void {
     for (const entry of this.pieceMap.values()) {
-      this.root.remove(entry.group);
+      if (entry.dynamicRoot) {
+        this.root.remove(entry.dynamicRoot);
+      }
     }
     this.pieceMap.clear();
     for (const col of this.collapsing) {
       this.root.remove(col.group);
     }
     this.collapsing = [];
+    this.batcher.dispose();
     globalKitPieceCache.dispose();
   }
 }

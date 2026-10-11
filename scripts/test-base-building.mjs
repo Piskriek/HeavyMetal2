@@ -1662,6 +1662,108 @@ try {
   }
   await page.waitForTimeout(300);
 
+  // Step 6: Sidecar TASK-08: 200-piece base batching & draw calls verification
+  console.log('\n--- Step 6: Sidecar TASK-08 @hm/batcher 200-Piece Base Verification ---');
+  await page.evaluate(() => {
+    window.__hm?.hideOverlays?.(false);
+  });
+  await page.waitForTimeout(200);
+
+  const batcherStats = await page.evaluate(async () => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    let w = baseApi.world();
+    const s = w.base.structures[0]?.id ?? 1;
+
+    let pieces = [...w.base.pieces];
+    let nextId = Math.max(1, ...pieces.map((p) => p.id)) + 1;
+
+    // Grid of foundations, floors, and walls to exceed 200 pieces
+    for (let i = -7; i <= 7 && pieces.length < 205; i++) {
+      for (let j = -7; j <= 7 && pieces.length < 205; j++) {
+        if (!pieces.some((p) => p.i === i && p.j === j && p.k === 0)) {
+          pieces.push({
+            id: nextId++,
+            s,
+            kind: 'foundation',
+            i,
+            j,
+            k: 0,
+            r: 0,
+            mat: 'regolith',
+          });
+        }
+      }
+    }
+
+    for (let i = -7; i <= 7 && pieces.length < 205; i++) {
+      pieces.push({
+        id: nextId++,
+        s,
+        kind: 'floor',
+        i,
+        j: 0,
+        k: 1,
+        r: 0,
+        mat: 'regolith',
+      });
+      pieces.push({
+        id: nextId++,
+        s,
+        kind: 'wall',
+        i,
+        j: 0,
+        k: 0,
+        r: 0,
+        mat: 'regolith',
+      });
+    }
+
+    const newBase = {
+      ...w.base,
+      nextId: nextId + 10,
+      pieces,
+    };
+
+    baseApi.setBase(newBase);
+    const updated = baseApi.world();
+
+    return {
+      piecesCount: updated.base.pieces.length,
+      drawCalls: window.hmPlay?.renderCalls?.() ?? window.__hm?.renderCalls?.() ?? 0,
+      batcherDrawCalls: window.hmPlay?.batcherDrawCalls?.() ?? window.__hm?.batcherDrawCalls?.() ?? 0,
+    };
+  });
+
+  console.log('OK: 200-Piece Base constructed:', batcherStats);
+  if (batcherStats.piecesCount < 200) {
+    throw new Error(`Expected >= 200 pieces, got ${batcherStats.piecesCount}`);
+  }
+
+  // Teleport player to look at the wide batched base away from the lab portal
+  await page.evaluate(() => {
+    window.hmPlay?.go?.('planet', 0, -16, 0, -0.3);
+  });
+  await page.waitForTimeout(600);
+
+  const drawCallsVerdict = await page.evaluate(() => {
+    return {
+      drawCalls: window.hmPlay?.renderCalls?.() ?? window.__hm?.renderCalls?.() ?? 0,
+      batcherDrawCalls: window.hmPlay?.batcherDrawCalls?.() ?? window.__hm?.batcherDrawCalls?.() ?? 0,
+      badgeText: document.querySelector('[data-testid="draw-calls-badge"]')?.textContent ?? '',
+    };
+  });
+
+  console.log('OK: Draw calls telemetry with >= 200 pieces:', drawCallsVerdict);
+  if (drawCallsVerdict.drawCalls >= 80) {
+    throw new Error(`Expected draw calls < 80 with 200 pieces, got: ${drawCallsVerdict.drawCalls}`);
+  }
+
+  const badge = page.locator('[data-testid="draw-calls-badge"]');
+  await badge.waitFor({ state: 'visible', timeout: 5000 });
+
+  await takeScreenshot(page, { path: 'docs/shots/base/batched-200.png' });
+  console.log('Captured docs/shots/base/batched-200.png');
+
   console.log('\nALL FIDELITY BASE-BUILDING HUD, REAL WORLD & LIFECYCLE CHECKS PASSED!');
 } catch (err) {
   console.error('Test execution failed:', err);

@@ -1,0 +1,4 @@
+# generated 3D assets (RUN.world images + local Hunyuan3D, scripts/runworld-pack.mjs): Git LFS (owner, 2026-10-11)
+apps/web/src/assets/gen/*.glb filter=lfs diff=lfs merge=lfs -text
+apps/web/public/hd/**/*.bin filter=lfs diff=lfs merge=lfs -text
+apps/web/public/hd/**/*.webp filter=lfs diff=lfs merge=lfs -text

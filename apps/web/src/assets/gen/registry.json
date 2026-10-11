@@ -1,0 +1,186 @@
+{
+  "scout-body": {
+    "class": "rover-body",
+    "size": [
+      1.629,
+      2.143,
+      3.2
+    ]
+  },
+  "scout-wheel": {
+    "class": "wheel",
+    "size": [
+      0.889,
+      0.901,
+      0.46
+    ]
+  },
+  "hauler-body": {
+    "class": "rover-body",
+    "size": [
+      2.867,
+      2.936,
+      6.002
+    ]
+  },
+  "hauler-wheel": {
+    "class": "wheel",
+    "size": [
+      1.097,
+      1.101,
+      0.521
+    ]
+  },
+  "crawler-body": {
+    "class": "rover-body",
+    "size": [
+      4.572,
+      4.878,
+      6.989
+    ]
+  },
+  "crawler-arm": {
+    "class": "moving-part",
+    "size": [
+      1.597,
+      0.786,
+      0.474
+    ]
+  },
+  "fabricator-frame": {
+    "class": "machine",
+    "size": [
+      7.492,
+      4.997,
+      6.499
+    ]
+  },
+  "fabricator-head": {
+    "class": "moving-part",
+    "size": [
+      1.2,
+      1.209,
+      0.67
+    ]
+  },
+  "mill": {
+    "class": "machine",
+    "size": [
+      3.81,
+      4,
+      3.879
+    ]
+  },
+  "press-frame": {
+    "class": "machine",
+    "size": [
+      3.446,
+      4,
+      3.437
+    ]
+  },
+  "press-ram": {
+    "class": "moving-part",
+    "size": [
+      0.995,
+      1.8,
+      0.492
+    ]
+  },
+  "projector-mast": {
+    "class": "machine",
+    "size": [
+      2.325,
+      3.199,
+      2.383
+    ]
+  },
+  "projector-head": {
+    "class": "moving-part",
+    "size": [
+      1.997,
+      2.007,
+      1.521
+    ]
+  },
+  "watermaker": {
+    "class": "machine",
+    "size": [
+      5.9,
+      4,
+      4.594
+    ]
+  },
+  "bin": {
+    "class": "fixture",
+    "size": [
+      2,
+      2.004,
+      1.995
+    ]
+  },
+  "repeater": {
+    "class": "fixture",
+    "size": [
+      3.412,
+      5.998,
+      3.092
+    ]
+  },
+  "drafting": {
+    "class": "fixture",
+    "size": [
+      2.399,
+      1.428,
+      1.233
+    ]
+  },
+  "weapon-bench": {
+    "class": "fixture",
+    "size": [
+      2.399,
+      1.643,
+      0.764
+    ]
+  },
+  "barrel-short": {
+    "class": "weapon-part",
+    "size": [
+      0.25,
+      0.077,
+      0.058
+    ]
+  },
+  "barrel-long": {
+    "class": "weapon-part",
+    "size": [
+      0.55,
+      0.115,
+      0.085
+    ]
+  },
+  "barrel-scatter": {
+    "class": "weapon-part",
+    "size": [
+      0.35,
+      0.202,
+      0.206
+    ]
+  },
+  "core-semi": {
+    "class": "weapon-part",
+    "size": [
+      0.3,
+      0.157,
+      0.053
+    ]
+  },
+  "core-burst": {
+    "class": "weapon-part",
+    "size": [
+      0.3,
+      0.13,
+      0.141
+    ]
+  }
+}

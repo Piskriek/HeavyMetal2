@@ -171,3 +171,15 @@
 - Git storage: "Git LFS" for the model files.
 - The lab redesign: "Yes, go to concept art" (the gate as the centrepiece, a compact room, the storm in the window as the progress meter).
 - The narration: "I'll review the lines first" (docs/NARRATION_SCRIPT.md), so nothing is voiced until the owner approves the lines.
+- The narration, after review: "naration looks fine, we will obviously need more later if things change but thats a solid base."
+- Generation rules (owner, from the asset reviews):
+  - "the reduce poly function does not like holes ... anything against a wall should be its own object ... separate out the things that have holes and pointy or tuby bits";
+  - "lets opt for square tubing or lights etc where we can";
+  - "thats alot of round tubing, and its mostly detached in the refrence shots, its gona be a nightmate to recuce, even the steering wheel can be a square [-u-] liek shape. round stuff will need to be seperate if you want them in".
+- The modular route (owner suggestion): parts generated separately, a clean low cage, colour and normals baked onto it, and silhouette parts snapped on at sockets (docs/RUNWORLD_PIPELINE.md §4f).
+- Sheet 21, the lab redesign: approved with the square rule. "square rule, ill get the 3d thing up and running, anything round is killing us atm". The lab is built from panels 41 to 46, adapted as follows:
+  - square capacitor cans, gauges, lamps and handles;
+  - every cable inside the overhead tray or flat square floor covers;
+  - a square planet table and combiner;
+  - the gate plinth square;
+  - any round part that must stay is its own object.

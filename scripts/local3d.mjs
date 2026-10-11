@@ -8,6 +8,7 @@
 // client waits, checking every minute, and resubmits a job the restarted server no longer knows. The source image is sent as base64 from zips/runworld/assets/<id>/source.png; the result
 // lands as model-local.glb beside it. The bearer token is read from .local3d-token (git-ignored) and never printed.
 // The 3080 runs one heavy GPU job at a time, so this submits one job and waits for it before the next.
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -63,7 +64,10 @@ async function one(id) {
   }
   const t0 = Date.now();
   await waitForServer();
-  const job = await api('POST', '/jobs', body, 120000);
+  // a stable reference for this exact input, so a resubmit after a restart can never start the same work twice
+  // (the server returns the existing job for a known client_ref once it supports it; until then it is ignored)
+  const client_ref = `${id}-${multiView ? 'mv' : 'sv'}-${createHash('sha1').update(JSON.stringify(body)).digest('hex').slice(0, 12)}`;
+  const job = await api('POST', '/jobs', { ...body, client_ref }, 120000);
   const jobId = job.job_id ?? job.id ?? job.jobId;
   if (!jobId) throw new Error(`no job id in ${JSON.stringify(job).slice(0, 200)}`);
   console.log(`${id}: job ${jobId} submitted`);

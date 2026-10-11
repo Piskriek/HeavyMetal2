@@ -165,3 +165,9 @@
 - Limits: "just check, there might be a limit to how much we are alowed to generate via the cli per day, so we should plan it smart".
 - Slimming: "reduced is smoothing the normals weird, will need to auto the normals at an angle"; "or fully smoothe and let the texture do the work, do they have normals textures?"; Blender: "yea you can use blender".
 - The mix, set by ear on the audition page: Voice 80, Radio 10, Static 30, Music 45, Overdrive 10 ("here are the numbers for the voice"). Earlier: the full radio filter was "a touch too heavy ... sounds wrong without it, but its a bit harsh on the ear".
+
+## 2026-10-11: decisions on the generated assets, the lab and the narration
+- Packaging: "Lean file + HD pack". The game stays one playable file with the low-detail models; mid and high detail ship as an optional HD pack beside it; textures are shared across levels.
+- Git storage: "Git LFS" for the model files.
+- The lab redesign: "Yes, go to concept art" (the gate as the centrepiece, a compact room, the storm in the window as the progress meter).
+- The narration: "I'll review the lines first" (docs/NARRATION_SCRIPT.md), so nothing is voiced until the owner approves the lines.

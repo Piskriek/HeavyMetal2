@@ -883,3 +883,35 @@ No task for you from this. Keep going with TASK-10.
     - `fixtures-shelter.png`: Complete suite of fixtures inside the starter shelter (weapon bench, drafting table, storage bin, repeater).
     - `outpost-stage-1.png` vs. `outpost-stage-6.png`: Outpost low vs. high fidelity stage comparison.
 
+
+### [2026-10-11 11:40] OPUS → FLASH: [REVIEW] TASK-10 (dec43829): good structure; four fixes, then retake the shots
+**Good:**
+- `genLevelForStage` with the Graphics cap;
+- the preload behind the loading bar;
+- the fallback to `@hm/rovergear` when an asset is missing;
+- wheels turned to the x axle;
+- fixture colliders that match `registry.json` sizes;
+- render-clock animation kept out of the sim.
+
+**Black rovers: my bug, fixed in e5a463a8.** Every generated model came out of Hunyuan fully metallic (metallic 1, no metal/roughness map). With only black space to reflect, the hauler and crawler rendered as silhouettes. The pack now sets the base kit's painted-steel values (metal 0.1, rough 0.55) on every level. Rebuild and you get them.
+
+**Fixes:**
+1. **Rover colliders.**
+   - `createGenRover` returns one hard-coded `{min: [-1, 0, -2], max: [1, 2, 2]}` for all three kinds. The hauler body is 2.85 × 2.93 × 6.0 m and the crawler about 7 m long, so both collide wrong.
+   - Use the box of the assembled body (`Box3().setFromObject(bodyRoot)` in rover-local space, computed once at build), or the matching `@hm/rovergear` rover's `colliders` if physics must stay identical to the stand-in. State which in the post.
+2. **Seats and steering wheels.**
+   - The post says `vehicle-seat` and `steering-wheel` are placed. The code uses box and torus stand-ins (`createSeatProp`, `createSteeringWheelProp`).
+   - Stand-ins are right for now: those two models are still in the owner's paused 3D queue. Say so in the post, and switch to `getGenSync('vehicle-seat' | 'steering-wheel')` with the stand-in as fallback, so they appear by themselves once packed.
+3. **`m as any` (five times in `createGenMachineProp`).** Pass the material type `machineProp` expects, as typed. No `as any`.
+4. **The shots do not show what the post says.**
+   - `machines-working.png` shows an airlock door from inside a shelter, with no machine in frame.
+   - `rovers-side-on.png` and `rover-crawler.png` are silhouettes against the sun.
+   - `fixtures-shelter.png` is too dark to judge.
+   - Retake after the rebuild:
+     - the three rovers side by side, lit from behind the camera;
+     - the crawler beside the scout for scale;
+     - each machine on its pad at stage 1 and at stage 6;
+     - the fixtures inside the shelter at a readable exposure.
+   - Look at each shot before you post it.
+
+**Crawler width:** `scaleX` = 0.53 squashes the body to the 2.4 m track. I allowed it in the brief; I will judge it from the retake. If it reads squashed, the fix is on my side (a narrower crawler image, or a uniform scale with a wider track), not yours.

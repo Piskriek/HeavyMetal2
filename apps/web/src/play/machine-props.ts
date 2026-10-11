@@ -8,6 +8,7 @@ import * as basegear from '@hm/basegear';
 import * as heavygear from '@hm/heavygear';
 import { textureMill as consoleMillTextureMill, setLamp as setConsoleMillLamp } from '@hm/consolemill';
 import type { MachineKind, Metric } from '@hm/plotsim';
+import { type GenLevel, getGenSync } from '../assets/gen';
 
 export interface MachineProp {
   readonly group: THREE.Group;
@@ -39,91 +40,101 @@ const at = (sockets: readonly { readonly name: string; readonly at: readonly [nu
 };
 
 /** The prop for a machine at a stage (0 or 1: chunky low poly; from 2: full detail). */
-export function machineProp(m: lab.LabMaterials, kind: MachineKind, stage: number): MachineProp {
+export function machineProp(m: lab.LabMaterials, kind: MachineKind, stage: number, genLevel: GenLevel = 'low'): MachineProp {
   const st = stage <= 1 ? 1 : 6;
   const still = (): void => undefined;
+  const lift = new THREE.Vector3(0, RING_TOP_Y, 0);
+
   switch (kind) {
-    case 'heavy-mill': {
-      const p = basegear.heavyMill(m as any, { stage: st });
-      p.group.position.y += RING_TOP_Y;
-      const lift = new THREE.Vector3(0, RING_TOP_Y, 0);
-      const rawPower = at(p.sockets, 'power') ?? new THREE.Vector3(0, 0.1, -1.58);
-      const rawVent = at(p.sockets, 'vent') ?? new THREE.Vector3(1.715, 2.28, -0.48);
-      return {
-        group: p.group,
-        power: rawPower.clone().add(lift),
-        vent: rawVent.clone().add(lift),
-        top: null,
-        lamps: p.lamps,
-        animate: still,
-        light: (g) => p.lamps.forEach((l) => basegear.setLamp(l, g)),
-      };
-    }
-    case 'heavy-press': {
-      const p = heavygear.heavyPress(m as any, { stage: st });
-      p.group.position.y += RING_TOP_Y;
-      const lift = new THREE.Vector3(0, RING_TOP_Y, 0);
-      const rawPower = at(p.sockets, 'power') ?? new THREE.Vector3(0, 0, 0.76);
-      const rawVent = at(p.sockets, 'vent') ?? new THREE.Vector3(0, 3.2, -0.56);
-      const ram = p.parts?.ram;
-      const restY = ram?.position.y ?? 0;
-      return {
-        group: p.group,
-        power: rawPower.clone().add(lift),
-        vent: rawVent.clone().add(lift),
-        top: null,
-        lamps: p.lamps,
-        animate: (t, run) => {
-          if (ram) ram.position.y = restY - Math.max(0, Math.sin(t * 2.0)) * 0.6 * run;
-        },
-        light: (g) => p.lamps.forEach((l) => heavygear.setLamp(l, g)),
-      };
-    }
-    case 'heavy-projector': {
-      const p = heavygear.heavyProjector(m as any, { stage: st });
-      p.group.position.y += RING_TOP_Y;
-      const lift = new THREE.Vector3(0, RING_TOP_Y, 0);
-      const rawPower = at(p.sockets, 'power') ?? new THREE.Vector3(0, 0, 0.6);
-      const rawVent = at(p.sockets, 'vent') ?? new THREE.Vector3(0, 4.1, -0.66);
-      const head = p.parts?.head;
-      const restRotX = head?.rotation.x ?? 0;
-      return {
-        group: p.group,
-        power: rawPower.clone().add(lift),
-        vent: rawVent.clone().add(lift),
-        top: null,
-        lamps: p.lamps,
-        animate: (t, run) => {
-          if (head) head.rotation.x = restRotX + Math.sin(t * 0.35) * 0.08 * run;
-        },
-        light: (g) => p.lamps.forEach((l) => heavygear.setLamp(l, g)),
-      };
-    }
-    case 'heavy-water': {
-      const p = heavygear.heavyWater(m as any, { stage: st });
-      p.group.position.y += RING_TOP_Y;
-      const lift = new THREE.Vector3(0, RING_TOP_Y, 0);
-      const rawPower = at(p.sockets, 'power') ?? new THREE.Vector3(0, 0, 0.6);
-      const rawVent = at(p.sockets, 'vent') ?? new THREE.Vector3(0, 3.155, -0.58);
-      return {
-        group: p.group,
-        power: rawPower.clone().add(lift),
-        vent: rawVent.clone().add(lift),
-        top: null,
-        lamps: p.lamps,
-        animate: still,
-        light: (g) => p.lamps.forEach((l) => heavygear.setLamp(l, g)),
-      };
-    }
+    case 'heavy-mill':
     case 'mill': {
+      const gen = getGenSync('mill', genLevel);
+      if (gen) {
+        const group = new THREE.Group();
+        group.name = `gen-${kind}`;
+        const isHeavy = kind === 'heavy-mill';
+        if (isHeavy) gen.position.copy(lift);
+        group.add(gen);
+        const vent = new THREE.Vector3(0, (isHeavy ? RING_TOP_Y : 0) + 4.0, 0);
+        const power = new THREE.Vector3(0, (isHeavy ? RING_TOP_Y : 0) + 0.2, -1.8);
+        return {
+          group,
+          power,
+          vent,
+          top: null,
+          lamps: [],
+          animate: still,
+          light: still,
+        };
+      }
+      if (kind === 'heavy-mill') {
+        const p = basegear.heavyMill(m as any, { stage: st });
+        p.group.position.y += RING_TOP_Y;
+        const rawPower = at(p.sockets, 'power') ?? new THREE.Vector3(0, 0.1, -1.58);
+        const rawVent = at(p.sockets, 'vent') ?? new THREE.Vector3(1.715, 2.28, -0.48);
+        return {
+          group: p.group,
+          power: rawPower.clone().add(lift),
+          vent: rawVent.clone().add(lift),
+          top: null,
+          lamps: p.lamps,
+          animate: still,
+          light: (g) => p.lamps.forEach((l) => basegear.setLamp(l, g)),
+        };
+      }
       const p = consoleMillTextureMill(m, { stage: st });
       return { group: p.group, power: at(p.sockets, 'power')!, vent: at(p.sockets, 'stack'), top: null, lamps: p.lamps, animate: still, light: (g) => p.lamps.forEach((l) => setConsoleMillLamp(l, g)) };
     }
-    case 'drill': {
-      const p = field.rockDrill(m, { stage: st });
-      return { group: p.group, power: at(p.sockets, 'power')!, vent: null, top: null, lamps: p.lamps, animate: (t, run) => { p.bit.rotation.y = t * 9 * run; }, light: (g) => p.lamps.forEach((l) => field.setLamp(l, g)) };
-    }
+    case 'heavy-press':
     case 'press': {
+      const frame = getGenSync('press-frame', genLevel);
+      const ram1 = getGenSync('press-ram', genLevel);
+      const ram2 = getGenSync('press-ram', genLevel);
+      if (frame && ram1 && ram2) {
+        const group = new THREE.Group();
+        group.name = `gen-${kind}`;
+        const isHeavy = kind === 'heavy-press';
+        const baseY = isHeavy ? RING_TOP_Y : 0;
+        frame.position.set(0, baseY, 0);
+        group.add(frame);
+        const restY = baseY + 2.1;
+        ram1.position.set(-0.55, restY, 0);
+        ram2.position.set(0.55, restY, 0);
+        group.add(ram1, ram2);
+        const vent = new THREE.Vector3(0, baseY + 4.0, 0);
+        const power = new THREE.Vector3(0, baseY + 0.2, 0.8);
+        return {
+          group,
+          power,
+          vent,
+          top: null,
+          lamps: [],
+          animate: (t, run) => {
+            ram1.position.y = restY - Math.max(0, Math.sin(t * 3.1)) * 0.35 * run;
+            ram2.position.y = restY - Math.max(0, Math.sin(t * 3.1 + Math.PI)) * 0.35 * run;
+          },
+          light: still,
+        };
+      }
+      if (kind === 'heavy-press') {
+        const p = heavygear.heavyPress(m as any, { stage: st });
+        p.group.position.y += RING_TOP_Y;
+        const rawPower = at(p.sockets, 'power') ?? new THREE.Vector3(0, 0, 0.76);
+        const rawVent = at(p.sockets, 'vent') ?? new THREE.Vector3(0, 3.2, -0.56);
+        const ram = p.parts?.ram;
+        const restY = ram?.position.y ?? 0;
+        return {
+          group: p.group,
+          power: rawPower.clone().add(lift),
+          vent: rawVent.clone().add(lift),
+          top: null,
+          lamps: p.lamps,
+          animate: (t, run) => {
+            if (ram) ram.position.y = restY - Math.max(0, Math.sin(t * 2.0)) * 0.6 * run;
+          },
+          light: (g) => p.lamps.forEach((l) => heavygear.setLamp(l, g)),
+        };
+      }
       const p = field.shapePress(m, { stage: st });
       const rest = p.rams.map((r) => r.position.y);
       return {
@@ -132,14 +143,100 @@ export function machineProp(m: lab.LabMaterials, kind: MachineKind, stage: numbe
         light: (g) => p.lamps.forEach((l) => field.setLamp(l, g)),
       };
     }
+    case 'heavy-projector':
     case 'projector': {
+      const mast = getGenSync('projector-mast', genLevel);
+      const head = getGenSync('projector-head', genLevel);
+      if (mast && head) {
+        const group = new THREE.Group();
+        group.name = `gen-${kind}`;
+        const isHeavy = kind === 'heavy-projector';
+        const baseY = isHeavy ? RING_TOP_Y : 0;
+        mast.position.set(0, baseY, 0);
+        group.add(mast);
+        const restY = baseY + 2.65;
+        head.position.set(0, restY, 0);
+        group.add(head);
+        const vent = new THREE.Vector3(0, baseY + 3.0, 0);
+        const power = new THREE.Vector3(0, baseY + 0.2, 0.8);
+        return {
+          group,
+          power,
+          vent,
+          top: null,
+          lamps: [],
+          animate: (t, run) => {
+            head.rotation.x = Math.sin(t * 0.35) * 0.08 * run;
+          },
+          light: still,
+        };
+      }
+      if (kind === 'heavy-projector') {
+        const p = heavygear.heavyProjector(m as any, { stage: st });
+        p.group.position.y += RING_TOP_Y;
+        const rawPower = at(p.sockets, 'power') ?? new THREE.Vector3(0, 0, 0.6);
+        const rawVent = at(p.sockets, 'vent') ?? new THREE.Vector3(0, 4.1, -0.66);
+        const head = p.parts?.head;
+        const restRotX = head?.rotation.x ?? 0;
+        return {
+          group: p.group,
+          power: rawPower.clone().add(lift),
+          vent: rawVent.clone().add(lift),
+          top: null,
+          lamps: p.lamps,
+          animate: (t, run) => {
+            if (head) head.rotation.x = restRotX + Math.sin(t * 0.35) * 0.08 * run;
+          },
+          light: (g) => p.lamps.forEach((l) => heavygear.setLamp(l, g)),
+        };
+      }
       const p = field.lightProjector(m, { stage: st });
       const tilt = p.head.rotation.x;
       return { group: p.group, power: at(p.sockets, 'power')!, vent: at(p.sockets, 'vent'), top: null, lamps: p.lamps, animate: (t, run) => { p.head.rotation.x = tilt + Math.sin(t * 0.35) * 0.08 * run; }, light: (g) => p.lamps.forEach((l) => field.setLamp(l, g)) };
     }
+    case 'heavy-water':
     case 'water': {
+      const gen = getGenSync('watermaker', genLevel);
+      if (gen) {
+        const group = new THREE.Group();
+        group.name = `gen-${kind}`;
+        const isHeavy = kind === 'heavy-water';
+        const baseY = isHeavy ? RING_TOP_Y : 0;
+        gen.position.set(0, baseY, 0);
+        group.add(gen);
+        const vent = new THREE.Vector3(0, baseY + 4.0, 0);
+        const power = new THREE.Vector3(0, baseY + 0.2, 0.8);
+        return {
+          group,
+          power,
+          vent,
+          top: null,
+          lamps: [],
+          animate: still,
+          light: still,
+        };
+      }
+      if (kind === 'heavy-water') {
+        const p = heavygear.heavyWater(m as any, { stage: st });
+        p.group.position.y += RING_TOP_Y;
+        const rawPower = at(p.sockets, 'power') ?? new THREE.Vector3(0, 0, 0.6);
+        const rawVent = at(p.sockets, 'vent') ?? new THREE.Vector3(0, 3.155, -0.58);
+        return {
+          group: p.group,
+          power: rawPower.clone().add(lift),
+          vent: rawVent.clone().add(lift),
+          top: null,
+          lamps: p.lamps,
+          animate: still,
+          light: (g) => p.lamps.forEach((l) => heavygear.setLamp(l, g)),
+        };
+      }
       const p = field.waterMaker(m, { stage: st });
       return { group: p.group, power: at(p.sockets, 'power')!, vent: at(p.sockets, 'vent'), top: null, lamps: p.lamps, animate: still, light: (g) => p.lamps.forEach((l) => field.setLamp(l, g)) };
+    }
+    case 'drill': {
+      const p = field.rockDrill(m, { stage: st });
+      return { group: p.group, power: at(p.sockets, 'power')!, vent: null, top: null, lamps: p.lamps, animate: (t, run) => { p.bit.rotation.y = t * 9 * run; }, light: (g) => p.lamps.forEach((l) => field.setLamp(l, g)) };
     }
     case 'power': {
       const p = field.powerUnit(m, { stage: st });

@@ -32,15 +32,26 @@ export function genLevelFor(quality: 'low' | 'medium' | 'high' | string): GenLev
 
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const cache = new Map<string, Promise<THREE.Group>>();
+const resolved = new Map<string, THREE.Group>();
+
+/**
+ * Returns a cached asset synchronously if already preloaded, or null.
+ */
+export function getGenSync(id: string, level: GenLevel = 'low'): THREE.Group | null {
+  const g = resolved.get(`${id}|${level}`) ?? resolved.get(`${id}|low`);
+  return g ? g.clone(true) : null;
+}
+
 let hdAvailable: Promise<boolean> | null = null;
 
 /** Whether the HD pack is reachable: one small probe, made once. */
-function probeHd(): Promise<boolean> {
+export function probeHd(): Promise<boolean> {
   hdAvailable ??= (async () => {
     const first = Object.keys(GEN)[0];
-    if (!first || location.protocol === 'file:') return false;
+    if (!first || (typeof location !== 'undefined' && location.protocol === 'file:')) return false;
     try {
-      const r = await fetch(new URL(`hd/${first}/high.gltf`, document.baseURI), { method: 'HEAD' });
+      const base = typeof document !== 'undefined' ? document.baseURI : 'http://localhost/';
+      const r = await fetch(new URL(`hd/${first}/high.gltf`, base), { method: 'HEAD' });
       return r.ok;
     } catch { return false; }
   })();
@@ -66,8 +77,11 @@ export async function loadGen(id: string, level: GenLevel = 'low'): Promise<THRE
   if (!p) {
     p = want === 'low'
       ? loadScene(low)
-      : loadScene(new URL(`hd/${id}/${want}.gltf`, document.baseURI).href).catch(() => loadScene(low));
+      : loadScene(new URL(`hd/${id}/${want}.gltf`, typeof document !== 'undefined' ? document.baseURI : 'http://localhost/').href).catch(() => loadScene(low));
     cache.set(key, p);
   }
-  return (await p).clone(true);
+  const loaded = await p;
+  resolved.set(key, loaded);
+  return loaded.clone(true);
 }
+

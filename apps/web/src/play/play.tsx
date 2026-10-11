@@ -53,6 +53,7 @@ import {
 } from '../base/world';
 import { PieceMeshManager } from '../base/piece-meshes';
 import { globalKitPieceCache, integrityColorName } from '../base/kit-pieces';
+import { preloadAllGenAssets, genLevelForStage } from '../assets/gen-props';
 
 const isFixture = (kind: Kind): boolean => kind === 'bin' || kind === 'bench' || kind === 'repeater' || kind === 'lifeSupport' || kind === 'weaponBench';
 import { blueprint, STARTER, ITEMS } from '../base/catalog';
@@ -753,7 +754,11 @@ export function PlayScreen(props: {
     window.addEventListener('resize', size);
 
     const look = (id: string, st: Stage) => bakeLookCached(VAULT_BY_ID.get(id)!, st, device, gridSpacing);
-    const steps: [string, () => void][] = [
+    const steps: [string, () => void | Promise<void>][] = [
+      ['Loading generated assets', async () => {
+        const s = stateRef.current.plot.stage || 1;
+        await preloadAllGenAssets(genLevelForStage(s, props.profile.quality));
+      }],
       ...SMOOTH_IDS.map((id): [string, () => void] => ['Shaping the boulders', () => { smoothModel(id); }]),
       ['Building your plot', () => { look(PLOT, 1); }],
       ...[...new Set(NEIGHBOURS.map((n) => `${n.cartridge}@${n.stage}`))].map((k): [string, () => void] => {
@@ -1465,9 +1470,10 @@ export function PlayScreen(props: {
       }
       raf = requestAnimationFrame(loop);
     };
-    const step = (): void => {
+    const step = async (): Promise<void> => {
       if (cancelled) return;
-      steps[at]![1]();
+      await steps[at]![1]();
+      if (cancelled) return;
       at += 1;
       if (at < steps.length) { setLoading(steps[at]![0]); timer = window.setTimeout(step, 0); return; }
       hook.ready = true;

@@ -6,6 +6,7 @@ import type { Kind } from '@hm/structure';
 import * as S from '@hm/structure';
 import type { BaseWorld, WorldEnv } from './world';
 import { pieceAt } from './world';
+import { createGenFixture, genLevelForStage } from '../assets/gen-props';
 
 export type Box = basekit.Box;
 export type Socket = basegear.Socket;
@@ -234,27 +235,51 @@ export class KitPieceCache {
         break;
       }
       case 'bin': {
-        const res = basegear.bin(bgm, { stage });
-        rawGroup = res.group;
-        rawColliders = res.colliders;
-        rawLamps = res.lamps;
-        rawSockets = res.sockets;
+        const gen = createGenFixture('bin', genLevelForStage(stage));
+        if (gen) {
+          rawGroup = gen.group;
+          rawColliders = gen.colliders as Box[];
+          rawLamps = gen.lamps as THREE.Mesh[];
+          rawSockets = gen.sockets as Socket[];
+        } else {
+          const res = basegear.bin(bgm, { stage });
+          rawGroup = res.group;
+          rawColliders = res.colliders;
+          rawLamps = res.lamps;
+          rawSockets = res.sockets;
+        }
         break;
       }
       case 'bench': {
-        const res = basegear.draftingTable(bgm, { stage });
-        rawGroup = res.group;
-        rawColliders = res.colliders;
-        rawLamps = res.lamps;
-        rawSockets = res.sockets;
+        const gen = createGenFixture('drafting', genLevelForStage(stage));
+        if (gen) {
+          rawGroup = gen.group;
+          rawColliders = gen.colliders as Box[];
+          rawLamps = gen.lamps as THREE.Mesh[];
+          rawSockets = gen.sockets as Socket[];
+        } else {
+          const res = basegear.draftingTable(bgm, { stage });
+          rawGroup = res.group;
+          rawColliders = res.colliders;
+          rawLamps = res.lamps;
+          rawSockets = res.sockets;
+        }
         break;
       }
       case 'repeater': {
-        const res = basegear.repeater(bgm, { stage });
-        rawGroup = res.group;
-        rawColliders = res.colliders;
-        rawLamps = res.lamps;
-        rawSockets = res.sockets;
+        const gen = createGenFixture('repeater', genLevelForStage(stage));
+        if (gen) {
+          rawGroup = gen.group;
+          rawColliders = gen.colliders as Box[];
+          rawLamps = gen.lamps as THREE.Mesh[];
+          rawSockets = gen.sockets as Socket[];
+        } else {
+          const res = basegear.repeater(bgm, { stage });
+          rawGroup = res.group;
+          rawColliders = res.colliders;
+          rawLamps = res.lamps;
+          rawSockets = res.sockets;
+        }
         break;
       }
       case 'roof': {
@@ -356,11 +381,19 @@ export class KitPieceCache {
         break;
       }
       case 'weaponBench': {
-        const res = basegear.draftingTable(bgm, { stage });
-        rawGroup = res.group;
-        rawColliders = res.colliders;
-        rawLamps = res.lamps;
-        rawSockets = res.sockets;
+        const gen = createGenFixture('weapon-bench', genLevelForStage(stage));
+        if (gen) {
+          rawGroup = gen.group;
+          rawColliders = gen.colliders as Box[];
+          rawLamps = gen.lamps as THREE.Mesh[];
+          rawSockets = gen.sockets as Socket[];
+        } else {
+          const res = basegear.draftingTable(bgm, { stage });
+          rawGroup = res.group;
+          rawColliders = res.colliders;
+          rawLamps = res.lamps;
+          rawSockets = res.sockets;
+        }
         break;
       }
       default: {

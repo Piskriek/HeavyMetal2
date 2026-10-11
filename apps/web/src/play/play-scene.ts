@@ -31,15 +31,16 @@ import { BEAM_RANGE } from '../base/world';
 import type { WalkWorld } from '../base/walk';
 import { spawn as spawnRover, step as stepRover, speed as roverSpeed, ROVERS, DT as ROVER_DT, type RoverState, type RoverKind } from '@hm/rover';
 import {
-  scout as createScout,
-  hauler as createHauler,
-  crawler as createCrawler,
-  fabricator as createFabricatorStation,
   createMaterials as createRovergearMaterials,
   setLamp as setRoverLamp,
   type Rover as RoverGearMesh,
   type Station as FabricatorStationMesh,
 } from '@hm/rovergear';
+import {
+  createGenRover,
+  createGenFabricator,
+  genLevelForStage,
+} from '../assets/gen-props';
 
 export type Where = 'lab' | 'planet';
 /** What the screen gives the scene each frame. */
@@ -207,7 +208,7 @@ export interface PlayScene {
     plumeGlowCount(): number;
     pixelLightCount(): number;
     testPieceAim(pieceId: number): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null;
-    setAltCam(eye: { readonly x: number; readonly y: number; readonly z: number }, pitch: number, yaw: number): void;
+    setAltCam(eye: { readonly x: number; readonly y: number; readonly z: number }, pitch: number, yaw: number, target?: { readonly x: number; readonly y: number; readonly z: number }): void;
     clearAltCam(): void;
     groundHeight(x: number, z: number): number;
   };
@@ -365,6 +366,9 @@ export function createPlayScene(o: {
 
   const vehicleViews = new Map<number, VehicleView>();
   const fabricatorViews = new Map<number, FabricatorView>();
+  let lastVehiclesList: readonly { readonly id: number; readonly kind: RoverKind; readonly x: number; readonly z: number; readonly yaw: number }[] = [];
+  let lastFabricatorsList: readonly { readonly id: number; readonly x: number; readonly z: number; readonly yaw: number; readonly printing: boolean }[] = [];
+  let currentQuality: string = 'high';
 
   let drivingVehicleId: number | null = null;
   let drivingState: RoverState | null = null;
@@ -372,10 +376,8 @@ export function createPlayScene(o: {
   let currentSpeed = 0;
 
   function buildVehicleView(v: { id: number; kind: RoverKind; x: number; z: number; yaw: number }): VehicleView {
-    let mesh: RoverGearMesh;
-    if (v.kind === 'scout') mesh = createScout(roverMaterials, { stage: Math.max(2, shown) });
-    else if (v.kind === 'hauler') mesh = createHauler(roverMaterials, { stage: Math.max(4, shown) });
-    else mesh = createCrawler(roverMaterials, { stage: Math.max(6, shown) });
+    const activeLevel = genLevelForStage(shown, currentQuality);
+    const mesh = createGenRover(v.kind, activeLevel, Math.max(2, shown), roverMaterials);
 
     const group = new THREE.Group();
     group.name = `vehicle-${v.id}-${v.kind}`;
@@ -419,6 +421,7 @@ export function createPlayScene(o: {
   }
 
   function setVehicles(list: readonly { readonly id: number; readonly kind: RoverKind; readonly x: number; readonly z: number; readonly yaw: number }[]): void {
+    lastVehiclesList = list;
     const keepIds = new Set<number>();
     for (const v of list) {
       keepIds.add(v.id);
@@ -444,12 +447,14 @@ export function createPlayScene(o: {
   }
 
   function setFabricators(list: readonly { readonly id: number; readonly x: number; readonly z: number; readonly yaw: number; readonly printing: boolean }[]): void {
+    lastFabricatorsList = list;
     const keepIds = new Set<number>();
     for (const f of list) {
       keepIds.add(f.id);
       let view = fabricatorViews.get(f.id);
       if (!view) {
-        const station = createFabricatorStation(roverMaterials, { stage: Math.max(2, shown) });
+        const activeLevel = genLevelForStage(shown, currentQuality);
+        const station = createGenFabricator(activeLevel, Math.max(2, shown), roverMaterials);
         station.group.position.set(f.x, groundAt(f.x, f.z), f.z);
         station.group.rotation.set(0, f.yaw, 0);
         fabricatorsGroup.add(station.group);
@@ -585,7 +590,7 @@ export function createPlayScene(o: {
     if (u['uTime']) u['uTime'].value = time;
   };
   const build = (mm: Machine): MachineView => {
-    const prop = machineProp(m, mm.kind, propStage);
+    const prop = machineProp(m, mm.kind, propStage, genLevelForStage(shown, currentQuality));
     prop.group.position.set(mm.x, groundAt(mm.x, mm.z) - 0.05, mm.z);
     prop.group.rotation.y = mm.yaw;
     planetScene.add(prop.group);
@@ -689,8 +694,8 @@ export function createPlayScene(o: {
   const rebuildProps = (stageShown: number): void => {
     const want = stageShown <= 1 ? 1 : 6;
     rebuildTwin(want);
-    if (want === propStage) return;
-    propStage = want;
+    if (stageShown === propStage) return;
+    propStage = stageShown;
     for (const [id, v] of views) {
       const running = v.running, emitter = v.emitter;
       v.emitter = null;
@@ -709,6 +714,25 @@ export function createPlayScene(o: {
       views.set(id, nv);
     }
     relay(lastConnected);
+
+    // Refresh vehicles and fabricators to match the new stage fidelity
+    if (lastVehiclesList.length > 0) {
+      for (const [id, view] of vehicleViews.entries()) {
+        if (drivingVehicleId !== id) {
+          vehiclesGroup.remove(view.group);
+          vehicleViews.delete(id);
+        }
+      }
+      setVehicles(lastVehiclesList);
+    }
+
+    if (lastFabricatorsList.length > 0) {
+      for (const [id, view] of fabricatorViews.entries()) {
+        fabricatorsGroup.remove(view.group);
+        fabricatorViews.delete(id);
+      }
+      setFabricators(lastFabricatorsList);
+    }
   };
   let lastConnected: ReadonlySet<number> = new Set();
 
@@ -1455,6 +1479,7 @@ export function createPlayScene(o: {
       ground?.setStage(Math.max(1, s));
       mash.setFidelityStage(s);
       fitLooks();
+      rebuildProps(s);
     },
     frame(now, dt, c) {
       clock = now;
@@ -1527,6 +1552,13 @@ export function createPlayScene(o: {
               }
               wheel.rotation.x = vView.wheelAngle;
             }
+          }
+
+          if (vView.mesh.parts['steeringWheel']) {
+            vView.mesh.parts['steeringWheel'].rotation.z = -steerAngle * 2.2;
+          }
+          if (vView.mesh.parts['arm']) {
+            vView.mesh.parts['arm'].rotation.x = -Math.PI / 8;
           }
 
           pos.x = drivingState.p[0];
@@ -1624,9 +1656,9 @@ export function createPlayScene(o: {
         });
       }
 
-      // ---- the camera (first person, third person, Alt build camera, or Rover chase camera)
       if (altCamPos) {
         camera.position.copy(altCamPos);
+        camera.rotation.set(pitch, yaw, 0, 'YXZ');
       } else if (drivingVehicleId !== null && drivingState) {
         const vView = vehicleViews.get(drivingVehicleId);
         if (vView) {
@@ -1654,10 +1686,9 @@ export function createPlayScene(o: {
           .addScaledVector(backVec, 2.2);
         const clampedPos = resolveThirdPersonCamera(pos, desiredPos, where);
         camera.position.copy(clampedPos);
+        camera.rotation.set(pitch, yaw, 0, 'YXZ');
       } else {
         camera.position.copy(pos);
-      }
-      if (drivingVehicleId === null && !altCamPos) {
         camera.rotation.set(pitch, yaw, 0, 'YXZ');
       }
       camera.updateMatrixWorld(true);
@@ -1968,13 +1999,19 @@ export function createPlayScene(o: {
         mat.dispose();
         return hit;
       },
-      setAltCam(eye, p, y) {
+      setAltCam(eye, p, y, target) {
         debugAltCam = true;
         altCamPos = new THREE.Vector3(eye.x, eye.y, eye.z);
-        pitch = p;
-        yaw = y;
         camera.position.copy(altCamPos);
-        camera.rotation.set(pitch, yaw, 0, 'YXZ');
+        if (target) {
+          camera.lookAt(target.x, target.y, target.z);
+          pitch = camera.rotation.x;
+          yaw = camera.rotation.y;
+        } else {
+          pitch = p;
+          yaw = y;
+          camera.rotation.set(pitch, yaw, 0, 'YXZ');
+        }
         camera.updateMatrixWorld(true);
       },
       clearAltCam() {

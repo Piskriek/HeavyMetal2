@@ -59,7 +59,10 @@ if '--keep-debris' not in argv:
         return Vector((min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts))), Vector((max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
     main = max(parts, key=lambda o: len(o.data.polygons))
     mlo, mhi = box(main)
-    grow = (mhi - mlo) * 0.02
+    # a uniform margin, 3% of the main part's diagonal: a per-axis 2% was under 3 mm across a thin wall, so a wall's
+    # separate back skin counted as "outside" and was deleted (the window wall lost its back half, TASK-10b review)
+    d = (mhi - mlo).length * 0.03
+    grow = Vector((d, d, d))
     mlo, mhi = mlo - grow, mhi + grow
     dropped, keep = 0, [main]
     for o in parts:

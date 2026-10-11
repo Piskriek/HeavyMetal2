@@ -7,7 +7,7 @@
     {
       "type": "SCALAR",
       "componentType": 5123,
-      "count": 9000,
+      "count": 8997,
       "normalized": false,
       "byteOffset": 0,
       "bufferView": 0
@@ -15,16 +15,16 @@
     {
       "type": "VEC3",
       "componentType": 5122,
-      "count": 3722,
+      "count": 4479,
       "max": [
         32767,
         24574,
-        1028
+        2456
       ],
       "min": [
         -32767,
         -24574,
-        -1028
+        -2456
       ],
       "normalized": true,
       "byteOffset": 0,
@@ -33,7 +33,7 @@
     {
       "type": "VEC3",
       "componentType": 5122,
-      "count": 3722,
+      "count": 4479,
       "normalized": true,
       "byteOffset": 0,
       "bufferView": 2
@@ -41,7 +41,7 @@
     {
       "type": "VEC2",
       "componentType": 5123,
-      "count": 3722,
+      "count": 4479,
       "normalized": true,
       "byteOffset": 0,
       "bufferView": 3
@@ -49,7 +49,7 @@
     {
       "type": "VEC4",
       "componentType": 5122,
-      "count": 3722,
+      "count": 4479,
       "normalized": true,
       "byteOffset": 0,
       "bufferView": 4
@@ -59,84 +59,84 @@
     {
       "buffer": 1,
       "byteOffset": 0,
-      "byteLength": 18000,
+      "byteLength": 17994,
       "target": 34963,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
           "byteOffset": 0,
-          "byteLength": 3182,
+          "byteLength": 3085,
           "mode": "TRIANGLES",
           "byteStride": 2,
-          "count": 9000
+          "count": 8997
         }
       }
     },
     {
       "buffer": 1,
-      "byteOffset": 18000,
-      "byteLength": 29776,
+      "byteOffset": 17996,
+      "byteLength": 35832,
       "target": 34962,
       "byteStride": 8,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 3184,
-          "byteLength": 17000,
+          "byteOffset": 3088,
+          "byteLength": 21226,
           "mode": "ATTRIBUTES",
           "byteStride": 8,
-          "count": 3722
+          "count": 4479
         }
       }
     },
     {
       "buffer": 1,
-      "byteOffset": 47776,
-      "byteLength": 29776,
+      "byteOffset": 53828,
+      "byteLength": 35832,
       "target": 34962,
       "byteStride": 8,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 20184,
-          "byteLength": 21835,
+          "byteOffset": 24316,
+          "byteLength": 25761,
           "mode": "ATTRIBUTES",
           "byteStride": 8,
-          "count": 3722
+          "count": 4479
         }
       }
     },
     {
       "buffer": 1,
-      "byteOffset": 77552,
-      "byteLength": 14888,
+      "byteOffset": 89660,
+      "byteLength": 17916,
       "target": 34962,
       "byteStride": 4,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 42020,
-          "byteLength": 11803,
+          "byteOffset": 50080,
+          "byteLength": 14974,
           "mode": "ATTRIBUTES",
           "byteStride": 4,
-          "count": 3722
+          "count": 4479
         }
       }
     },
     {
       "buffer": 1,
-      "byteOffset": 92440,
-      "byteLength": 29776,
+      "byteOffset": 107576,
+      "byteLength": 35832,
       "target": 34962,
       "byteStride": 8,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 53824,
-          "byteLength": 23073,
+          "byteOffset": 65056,
+          "byteLength": 27542,
           "mode": "ATTRIBUTES",
           "byteStride": 8,
-          "count": 3722
+          "count": 4479
         }
       }
     }
@@ -182,10 +182,10 @@
   "buffers": [
     {
       "uri": "high.bin",
-      "byteLength": 76900
+      "byteLength": 92600
     },
     {
-      "byteLength": 122216,
+      "byteLength": 143408,
       "extensions": {
         "EXT_meshopt_compression": {
           "fallback": true
@@ -232,7 +232,7 @@
       "translation": [
         2,
         1.5,
-        0.10732460208237171
+        0.020000003278255463
       ],
       "scale": [
         2,

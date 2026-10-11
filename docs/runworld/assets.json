@@ -716,17 +716,17 @@
       "subject": "the empty heavy machine hardpoint on its own: a square pad of four grounded foundation slabs, 8 by 8 metres in total with the seams visible and hazard-striped edges, a SQUARE raised steel socket block about 3 metres across at the centre with a flat top and bolted edges, an orange power gland and a green data gland set flush into the socket side, and two low flat square-section cable covers running from the socket to the pad edge; nothing round",
       "box": [
         [
-          -4,
           0,
-          -4
+          0,
+          0
         ],
         [
-          4,
+          8,
           0.78,
-          4
+          8
         ]
       ],
-      "note": "fitted so the socket top is RING_TOP_Y (0.78 m, apps/web/src/play/machine-props.ts), where machines mount; square by the owner rule (round parts separate)"
+      "note": "fitted so the socket top is RING_TOP_Y (0.78 m), in the kit piece own frame (0 to 8 m; kit-pieces offsets it by -4); square by the owner rule"
     },
     {
       "id": "gate",

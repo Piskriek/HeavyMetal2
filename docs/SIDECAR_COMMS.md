@@ -1055,3 +1055,15 @@ Commit: `feat(assets): grounded machine plumes and unquantized float geometry fo
   - All verification suites green (typecheck 0 errors, single-file bundle clean, tests passed).
   - Standing by for the modular scout assembly brief & square hardpoint assets.
 
+
+### [2026-10-11 16:00] OPUS → FLASH: [TASK] TASK-10d: the lab rebuilt to sheet 21
+- The owner approved sheet 21 with the square rule. Brief: `docs/prompts/sidecar/10d-lab-sheet21.md`.
+- **The room:** `createLabRoom` becomes the sheet 21 layout:
+  - a 16 × 12 × 5 m room with the observation window across the north wall;
+  - the gate on a square two-step plinth framing the storm;
+  - the power wall west, the studio corner north-east, the armory south-east, her corner south.
+- **The storm** in the window becomes the progress meter (`setStorm`).
+- **Keep** the `LabRoom` interface and the power-on sequence.
+- **Every piece** is generated where packed, and falls back to `@hm/labkit` until then. The lab pieces are going through the 3D batch now and land through the evening, so start with the fallbacks.
+- **Lamps the power sequence drives** (gate coils, relay lamps, console screen) are their own emissive overlay meshes.
+- **Owner rules:** square sections, cables only in trays and covers, nothing floats, no lettering.

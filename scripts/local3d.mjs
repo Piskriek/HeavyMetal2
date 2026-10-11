@@ -71,14 +71,19 @@ async function one(id) {
   const jobId = job.job_id ?? job.id ?? job.jobId;
   if (!jobId) throw new Error(`no job id in ${JSON.stringify(job).slice(0, 200)}`);
   console.log(`${id}: job ${jobId} submitted`);
+  if (!(await collect(id, jobId, out, t0))) { console.log(`  ${id}: job lost in a restart; resubmitting`); return one(id); }
+}
+
+/** Wait for a job to finish and download its GLB to `out`; false if the server no longer knows the job. */
+async function collect(id, jobId, out, t0 = Date.now()) {
   let last = '';
   for (;;) {
     await sleep(10000);
     let s;
-    try { s = await api('GET', `/jobs/${jobId}`); } catch (e) {
-      // the server went away mid-job: wait for it, then resubmit if it no longer knows the job
+    try { s = await api('GET', `/jobs/${jobId}`); } catch {
+      // the server went away mid-job: wait for it, then check whether it still knows the job
       await waitForServer();
-      try { s = await api('GET', `/jobs/${jobId}`); } catch { console.log(`  ${id}: job lost in a restart; resubmitting`); return one(id); }
+      try { s = await api('GET', `/jobs/${jobId}`); } catch { return false; }
     }
     const status = String(s.status ?? s.state ?? '');
     if (status !== last) { console.log(`  ${id}: ${status} (${Math.round((Date.now() - t0) / 1000)} s)`); last = status; }
@@ -89,6 +94,7 @@ async function one(id) {
   if (!r.ok) throw new Error(`${id}: download ${r.status}`);
   fs.writeFileSync(out, Buffer.from(await r.arrayBuffer()));
   console.log(`${id}: ${Math.round(fs.statSync(out).size / 1024)} KB in ${Math.round((Date.now() - t0) / 1000)} s -> ${path.relative(ROOT, out)}`);
+  return true;
 }
 
 if (cmd === 'health') console.log(JSON.stringify(await api('GET', '/health')));
@@ -101,6 +107,11 @@ else if (cmd === 'sync') {
   console.log(args.includes('--all') ? text : text.split('\n').slice(-60).join('\n'));
 } else if (cmd === 'log' && ids.length) console.log(JSON.stringify(await api('POST', '/sync', { entry: `[Claude, laptop 192.168.0.7] ${ids.join(' ')}` })));
 else if (cmd === 'model' && ids[0]) await one(ids[0]);
+// fetch <asset> <jobId>: collect a job submitted earlier (by a client since stopped) into the asset's model file
+else if (cmd === 'fetch' && ids[0] && ids[1]) {
+  const out = path.join(OUT, ids[0], multiView ? 'model-mv.glb' : 'model-local.glb');
+  if (!(await collect(ids[0], ids[1], out))) console.log(`${ids[0]}: the server no longer knows job ${ids[1]}`);
+}
 else if (cmd === 'models') {
   for (const a of manifest.assets.filter((x) => ids.length === 0 || ids.includes(x.id))) {
     const d = path.join(OUT, a.id);

@@ -42,7 +42,10 @@ const prompt = (a) => [
   'Any tubing, piping, suspension, axles or undercarriage is set into solid bodies or covered by armour plates, skirts and a solid belly pan; nothing spindly is left exposed.',
   // owner 2026-10-11: "lets opt for square tubing or lights etc where we can" (a box section keeps its shape when
   // reduced; a round one needs many sides or goes lumpy, as the round headlight did at 150 triangles)
-  'Square and rectangular box sections wherever the design allows: square tubing, rails, bars and frames, and square or rectangular lights, lamp housings, gauges and housings; round only where the part must be round to work (wheels, tyres, a steering wheel rim, a gun barrel).',
+  'Square and rectangular box sections wherever the design allows: square tubing, rails, bars and frames, and square or rectangular lights, lamp housings, gauges and housings; round only where the part must be round to work (wheels, tyres, a gun barrel).',
+  // owner 2026-10-11: "thats alot of round tubing, and its mostly detached in the refrence shots ... round stuff will
+  // need to be seperate if you want them in" (the concept panels used as references carry round pipes and cables)
+  'Leave out every round tube, pipe, hose and cable entirely, even where the reference image shows them: any round part is made as a separate object.',
   'NO lettering, NO numbers, NO logos, NO labels on any surface.',
 ].join(' ');
 

@@ -713,7 +713,20 @@
       "size": 8,
       "axis": "length",
       "view": "three-quarter",
-      "subject": "the empty heavy machine hardpoint on its own: a square pad of four grounded foundation slabs, 8 by 8 metres in total with the seams visible and hazard-striped edges, a round raised socket on a bolted mounting ring at the centre, an orange power gland and a green data gland on the socket side, and two low ribbed steel cable covers running from the socket to the pad edge"
+      "subject": "the empty heavy machine hardpoint on its own: a square pad of four grounded foundation slabs, 8 by 8 metres in total with the seams visible and hazard-striped edges, a SQUARE raised steel socket block about 3 metres across at the centre with a flat top and bolted edges, an orange power gland and a green data gland set flush into the socket side, and two low flat square-section cable covers running from the socket to the pad edge; nothing round",
+      "box": [
+        [
+          -4,
+          0,
+          -4
+        ],
+        [
+          4,
+          0.78,
+          4
+        ]
+      ],
+      "note": "fitted so the socket top is RING_TOP_Y (0.78 m, apps/web/src/play/machine-props.ts), where machines mount; square by the owner rule (round parts separate)"
     },
     {
       "id": "gate",
@@ -848,10 +861,11 @@
       "id": "steering-wheel",
       "panel": "19/19-scout-s6.png",
       "class": "moving-part",
-      "size": 0.45,
-      "axis": "height",
+      "size": 0.42,
+      "axis": "length",
       "view": "three-quarter",
-      "subject": "one rover steering wheel on its own: a chunky thick-rimmed steering wheel with three wide solid spokes and a centre hub, on a short thick steering column with a bolted mounting flange"
+      "subject": "one rover steering yoke on its own, shaped like [-u-]: a chunky SQUARE-SECTION yoke facing the viewer, with two short rectangular handgrips standing up at its left and right ends, joined by one straight rectangular crossbar, and a boxy centre hub in the middle of the bar; ONE short thick SQUARE steering column runs straight back from the hub, away from the viewer, ending in a bolted square mounting flange; NO other arms, NO floor post, NO round rim, nothing round",
+      "note": "owner 2026-10-11: \"even the steering wheel can be a square [-u-] like shape\""
     },
     {
       "id": "life-support",

@@ -181,7 +181,8 @@ export async function preloadMentorVo(
   // Preload static bed
   if (c && !staticBedBuffer) {
     try {
-      const r = await fetch('/src/dev/tmp/bed-static.mp3');
+      // the radio static the owner tuned the mix with (shipped beside index.html; the dev-only copy 404'd in builds)
+      const r = await fetch('/audio/radio-static.mp3');
       if (r.ok) {
         staticBedBuffer = await c.decodeAudioData(await r.arrayBuffer());
       }

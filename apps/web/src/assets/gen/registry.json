@@ -156,7 +156,7 @@
     "size": [
       0.55,
       0.115,
-      0.085
+      0.084
     ]
   },
   "barrel-scatter": {
@@ -181,6 +181,146 @@
       0.3,
       0.13,
       0.141
+    ]
+  },
+  "core-beam": {
+    "class": "weapon-part",
+    "size": [
+      0.3,
+      0.131,
+      0.127
+    ]
+  },
+  "sight-iron": {
+    "class": "weapon-part",
+    "size": [
+      0.12,
+      0.039,
+      0.032
+    ]
+  },
+  "sight-scope": {
+    "class": "weapon-part",
+    "size": [
+      0.3,
+      0.145,
+      0.071
+    ]
+  },
+  "sight-holo": {
+    "class": "weapon-part",
+    "size": [
+      0.15,
+      0.093,
+      0.067
+    ]
+  },
+  "cell-compact": {
+    "class": "weapon-part",
+    "size": [
+      0.15,
+      0.051,
+      0.072
+    ]
+  },
+  "cell-extended": {
+    "class": "weapon-part",
+    "size": [
+      0.28,
+      0.062,
+      0.091
+    ]
+  },
+  "wall": {
+    "class": "structure",
+    "size": [
+      4,
+      3,
+      0.33
+    ],
+    "box": [
+      [
+        0,
+        0,
+        -0.14
+      ],
+      [
+        4,
+        3,
+        0.19
+      ]
+    ],
+    "kind": "wall"
+  },
+  "pillar": {
+    "class": "structure",
+    "size": [
+      0.7,
+      2.97,
+      0.7
+    ],
+    "box": [
+      [
+        -0.35,
+        0,
+        -0.35
+      ],
+      [
+        0.35,
+        2.97,
+        0.35
+      ]
+    ],
+    "kind": "pillar"
+  },
+  "floor": {
+    "class": "structure",
+    "size": [
+      4,
+      0.33,
+      4
+    ],
+    "box": [
+      [
+        0,
+        -0.3,
+        0
+      ],
+      [
+        4,
+        0.03,
+        4
+      ]
+    ],
+    "kind": "floor"
+  },
+  "airlock": {
+    "class": "structure",
+    "size": [
+      4,
+      3,
+      0.42
+    ],
+    "box": [
+      [
+        0,
+        0,
+        -0.21
+      ],
+      [
+        4,
+        3,
+        0.21
+      ]
+    ],
+    "kind": "airlock"
+  },
+  "weapon-frame": {
+    "class": "weapon-frame",
+    "size": [
+      0.75,
+      0.267,
+      0.076
     ]
   }
 }

@@ -43,6 +43,37 @@ async function snap(file, box, eps = 0.03) {
   await io.write(file, doc);
 }
 
+/**
+ * The yaw that faces a sloped piece the way its kit piece rises: `high` names the side its top lies on ('+z' for a
+ * ramp, stair or pitched roof; '+x+z' for the roof corners), which the long-side rule cannot tell on a square cell.
+ * Each quarter turn that keeps the box's aspect is scored by where the top band of vertices lies along that side.
+ */
+function uphill(doc, high, base, dx, dz, tw, td) {
+  const want = [high.includes('+x') ? 1 : high.includes('-x') ? -1 : 0, high.includes('+z') ? 1 : high.includes('-z') ? -1 : 0];
+  const pts = [];
+  for (const mesh of doc.getRoot().listMeshes()) for (const prim of mesh.listPrimitives()) {
+    const arr = prim.getAttribute('POSITION').getArray();
+    for (let i = 0; i < arr.length; i += 3) pts.push(arr[i], arr[i + 1], arr[i + 2]);
+  }
+  let y0 = Infinity, y1 = -Infinity;
+  for (let i = 1; i < pts.length; i += 3) { y0 = Math.min(y0, pts[i]); y1 = Math.max(y1, pts[i]); }
+  const band = y1 - 0.15 * (y1 - y0);
+  const square = Math.abs(tw - td) < 0.05 * Math.max(tw, td) || Math.abs(dx - dz) < 0.05 * Math.max(dx, dz);
+  const tries = square ? [0, 90, 180, 270] : [base, base + 180];
+  let best = base, score = -Infinity;
+  for (const yaw of tries) {
+    const t = (yaw * Math.PI) / 180, c = Math.cos(t), sn = Math.sin(t);
+    let sum = 0, n = 0;
+    for (let i = 0; i < pts.length; i += 3) {
+      if (pts[i + 1] < band) continue;
+      const x = c * pts[i] + sn * pts[i + 2], z = -sn * pts[i] + c * pts[i + 2]; // as transformMesh turns it below
+      sum += want[0] * x + want[1] * z; n++;
+    }
+    if (n && sum / n > score) { score = sum / n; best = yaw; }
+  }
+  return best;
+}
+
 function run(cmd, args) {
   const r = spawnSync(cmd, args, { encoding: 'utf8', cwd: ROOT, timeout: 20 * 60 * 1000 });
   if (r.status !== 0) throw new Error(`${path.basename(cmd)} failed: ${(r.stdout + r.stderr).slice(-600)}`);
@@ -60,7 +91,8 @@ async function normalize(src, dst, a) {
     // a lattice piece: turn it so its long side matches the box (or by the asset's reviewed `yaw`), then fill the
     // kit piece's box exactly on each axis, so it sits in the lattice frame like the procedural piece it replaces
     const [lo, hi] = a.box, tw = hi[0] - lo[0], td = hi[2] - lo[2];
-    const yaw = a.yaw ?? ((dx >= dz) === (tw >= td) ? 0 : 90);
+    const base = (dx >= dz) === (tw >= td) ? 0 : 90;
+    const yaw = a.yaw ?? (a.high ? uphill(doc, a.high, base, dx, dz, tw, td) : base);
     if (yaw % 360 !== 0) {
       const t = (yaw * Math.PI) / 180, c = Math.cos(t), sn = Math.sin(t);
       for (const mesh of doc.getRoot().listMeshes()) transformMesh(mesh, [c, 0, -sn, 0, 0, 1, 0, 0, sn, 0, c, 0, 0, 0, 0, 1]);

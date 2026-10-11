@@ -282,7 +282,7 @@
       "size": 1.55,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the foundation slab on its own: a heavy steel-edged concrete slab exactly 4 by 4 metres, its top flat and level, a hazard-striped edge band, four anchor bolts with hex nuts on the top face, and a levelling skirt of steel plate going straight down 1.5 metres below the top on all four sides"
+      "subject": "the foundation slab on its own: a heavy steel-edged concrete slab exactly 4 by 4 metres, its top face perfectly flat, level and completely clear (no cables, no boxes, no raised bolts: four anchor bolts sit recessed flush in counterbores), a hazard-striped edge band, and a levelling skirt of steel plate going straight down 1.5 metres below the top on all four sides"
     },
     {
       "id": "wall",
@@ -363,14 +363,16 @@
         ],
         [
           4,
-          3.92,
+          3.06,
           4
         ]
       ],
       "size": 3.92,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the ramp on its own: a sloped steel plate that rises 3 metres over a 4-metre run, ribbed grip tread, a side rail along each side, hazard-striped edges, its foot bolted to a flat edge plate"
+      "subject": "the ramp on its own: a SOLID steel ramp wedge, one straight even slope from the ground at its front edge up to exactly 3 metres at its back edge over a 4-metre run, with NO flat landing at the top; both triangular sides are closed solid steel side plates down to the ground (a solid wedge: no legs, no open frame, no braces); shallow raised grip-tread strips on the deck, hazard-striped edges along both sides and the nose, bolted to a flat foot plate; NO handrails",
+      "note": "the procedural handrails stay, placed on the generated deck (owner rule: tubes are their own objects)",
+      "high": "+z"
     },
     {
       "id": "airlock",
@@ -414,7 +416,8 @@
       "size": 3.15,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the pitched roof panel on its own: one sloped steel roof plane rising 3 metres over a 4-metre run, standing-seam ribs running down the slope, a drip edge at the low eave, bolted brackets at the top edge"
+      "subject": "the pitched roof panel on its own: one sloped steel roof plane rising 3 metres over a 4-metre run, standing-seam ribs running down the slope, a drip edge at the low eave, bolted brackets at the top edge",
+      "high": "+z"
     },
     {
       "id": "roof-low",
@@ -436,7 +439,8 @@
       "size": 1.65,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "ONLY the roof surface on its own, with NO walls, NO posts and NO box under it: one flat gently sloped steel roof plane, 4 by 4 metres, rising 1.5 metres from its low eave to its high edge, dark slate-grey standing-seam steel with ribs running down the slope and a drip edge at the low eave"
+      "subject": "ONLY the roof surface on its own, with NO walls, NO posts and NO box under it: one flat gently sloped steel roof plane, 4 by 4 metres, rising 1.5 metres from its low eave to its high edge, dark slate-grey standing-seam steel with ribs running down the slope and a drip edge at the low eave",
+      "high": "+z"
     },
     {
       "id": "roof-corner-outer",
@@ -458,7 +462,8 @@
       "size": 3.34,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the outer roof corner piece on its own: a hipped corner where two sloped steel roof planes meet along a diagonal hip ridge, rising 3 metres over a 4 by 4 metre cell, standing-seam ribs and a drip edge on both eaves"
+      "subject": "the outer roof corner piece on its own: a hipped corner where two sloped steel roof planes meet along a diagonal hip ridge, rising 3 metres over a 4 by 4 metre cell, standing-seam ribs and a drip edge on both eaves",
+      "high": "+x+z"
     },
     {
       "id": "roof-corner-inner",
@@ -480,7 +485,8 @@
       "size": 3.0999999999999996,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "ONLY the roof surface on its own, with NO walls and NO box under it: an inner valley roof corner where two sloped dark slate-grey standing-seam steel roof planes meet along a diagonal valley gutter, covering a 4 by 4 metre cell and rising 3 metres"
+      "subject": "ONLY the roof surface on its own, with NO walls and NO box under it: an inner valley roof corner where two sloped dark slate-grey standing-seam steel roof planes meet along a diagonal valley gutter, covering a 4 by 4 metre cell and rising 3 metres",
+      "high": "+x+z"
     },
     {
       "id": "ridge-cap",
@@ -621,7 +627,8 @@
       "size": 1.1,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the railing on its own: a 4-metre steel safety railing 1.1 metres tall, THICK square posts at both ends and the middle, a thick top rail and one mid rail, a toe board along the bottom, bolted foot plates; every member thick and boxy"
+      "subject": "the railing on its own: a 4-metre steel safety railing 1.1 metres tall, THICK square posts at both ends and the middle, a thick top rail and one mid rail, a toe board along the bottom, bolted foot plates; every member thick and boxy",
+      "skip": "kept procedural: mostly holes and bars, which decimation tears (owner 2026-10-11); the procedural piece is clean boxes at every stage"
     },
     {
       "id": "ladder",
@@ -643,7 +650,8 @@
       "size": 3.9,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the ladder on its own: a fixed steel wall ladder 3.9 metres tall and 70 cm wide with THICK square-section side rails and thick flat rungs, bolted wall brackets at its top and bottom. NO safety cage, NO hoops, NO back guard"
+      "subject": "the ladder on its own: a fixed steel wall ladder 3.9 metres tall and 70 cm wide with THICK square-section side rails and thick flat rungs, bolted wall brackets at its top and bottom. NO safety cage, NO hoops, NO back guard",
+      "skip": "kept procedural: mostly holes and bars, which decimation tears (owner 2026-10-11); the procedural piece is clean boxes at every stage"
     },
     {
       "id": "stairs",
@@ -665,7 +673,8 @@
       "size": 4.01,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the stair flight on its own: a straight steel staircase rising 3 metres over a 4-metre run, about 3.4 metres wide, warm light-grey painted steel, SOLID closed side stringers that rise as solid side panels (a solid balustrade) with a thick rounded handrail cap on each, solid steel treads with hazard-striped nosings. NO open railings, NO thin bars"
+      "subject": "the stair flight on its own: a straight steel staircase rising 3 metres over a 4-metre run, about 3.4 metres wide, warm light-grey painted steel, SOLID closed side stringers that rise as solid side panels (a solid balustrade) with a thick rounded handrail cap on each, solid steel treads with hazard-striped nosings. NO open railings, NO thin bars",
+      "high": "+z"
     },
     {
       "id": "hardpoint",
@@ -811,7 +820,7 @@
       "size": 2,
       "axis": "height",
       "view": "front",
-      "subject": "(reused: the RUN.world Hunyuan 3.1 Pro test model from the 2026-10-10 trial)"
+      "subject": "the life support unit on its own: a chunky upright steel cabinet about 2 metres tall on a low plinth, a front window showing three thick filter cartridges, a louvred vent below it, a round pressure gauge set flush, a green status light strip near the top, a boxed fan housing built onto the top, and one gas bottle held inside an armoured recessed bay in the cabinet side; no loose hoses, every pipe runs inside the cabinet"
     },
     {
       "id": "weapon-frame",

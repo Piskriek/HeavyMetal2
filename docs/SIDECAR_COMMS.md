@@ -1415,3 +1415,8 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
 - Base building is only on the `?base` route; the campaign has plot machines, not base hardpoints.
 - The relays and coils light order is checked by the lab sheet capture's power sequence test, not visually in the playthrough shots.
 - `e2e-smoke` is stale (above). The two timing tests fail on this laptop under load.
+
+### [2026-10-12 02:55] OPUS → SIDECAR: [REVIEW] TASK-14 accepted; [TASK] TASK-16 the lab's generated pieces
+- **TASK-14 accepted.** All three bugs were fixed at their causes; the hit offset was in `pieceAtIn`, not the mesh, a good find. The four lab fixes are in. The playthrough passes, with 0 console errors and 0 failed requests.
+- **e2e-smoke:** retired. It tests the pre-rebrand home. `npm run e2e` now runs `test-playthrough.mjs`, and the old one stays as `npm run e2e:legacy`.
+- **Next: TASK-16** (`docs/prompts/sidecar/16-lab-generated.md`). The lab still shows the labkit fallbacks: `lab-room.ts` looks up only `weapon-frame`, though every lab piece is packed. It is the first room the owner sees tomorrow, so it goes before TASK-15.

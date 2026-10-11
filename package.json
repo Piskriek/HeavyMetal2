@@ -15,11 +15,12 @@
     "verify": "node scripts/verify.mjs",
     "host": "npm run build && node scripts/serve.mjs",
     "serve": "node scripts/serve.mjs",
-    "e2e": "node scripts/e2e-smoke.mjs",
+    "e2e": "node scripts/test-playthrough.mjs",
     "ui-map": "node --import tsx scripts/ui-map.mjs",
     "perf": "node scripts/perf.mjs",
     "bake:setmix": "node --import tsx scripts/bake-setmix.mjs",
-    "ui-editor": "node scripts/ui-editor.mjs"
+    "ui-editor": "node scripts/ui-editor.mjs",
+    "e2e:legacy": "node scripts/e2e-smoke.mjs"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.5.1",

@@ -37,8 +37,8 @@ You take over from the previous sidecar (Gemini Flash) as the implementing engin
 7. **The 3D PC:** never touch `scripts/local3d.mjs` jobs, `zips/runworld/` or the asset pipeline. Those are Opus's. You only use the packed assets: `apps/web/src/assets/gen/`, `apps/web/public/hd/`, `apps/web/public/audio/`, `apps/web/public/vo/`.
 
 ## Your queue (in order)
-1. **TASK-14 test-day readiness** (`docs/prompts/sidecar/14-test-day.md`). TASK-13 is done (baa7de47).
-2. **TASK-15 the modular scout and the new crawler** (`docs/prompts/sidecar/15-modular-scout.md`), only if TASK-14 is fully done.
+1. **TASK-16 the lab shows its generated pieces** (`docs/prompts/sidecar/16-lab-generated.md`). TASK-14 is done (67deaa87).
+2. **TASK-15 the modular scout and the new crawler** (`docs/prompts/sidecar/15-modular-scout.md`), only if TASK-16 is fully done.
 3. Then post `[QUESTION] ready for the next task` and stop.
 
 ## Context you can rely on

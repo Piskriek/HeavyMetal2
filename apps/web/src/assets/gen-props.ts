@@ -30,8 +30,10 @@ import {
   machineProp as fallbackMachineProp,
 } from '../play/machine-props';
 import type { Box, Socket, KitPieceResult } from '../base/kit-pieces';
+import { latticeGenAssets } from '../base/lattice-gen';
 
-export const CORE_GEN_ASSETS = [
+export const CORE_GEN_ASSETS: readonly string[] = [
+  ...latticeGenAssets(),
   'scout-body',
   'scout-wheel',
   'hauler-body',
@@ -50,9 +52,9 @@ export const CORE_GEN_ASSETS = [
   'repeater',
   'drafting',
   'weapon-bench',
-] as const;
+];
 
-export type CoreGenAsset = typeof CORE_GEN_ASSETS[number];
+export type CoreGenAsset = string;
 
 /**
  * Level selection rule (canon: "Terraforming IS graphical fidelity"):

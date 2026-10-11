@@ -7,6 +7,8 @@ import * as S from '@hm/structure';
 import type { BaseWorld, WorldEnv } from './world';
 import { pieceAt } from './world';
 import { createGenFixture, genLevelForStage } from '../assets/gen-props';
+import { getGenSync } from '../assets/gen';
+import { latticeGenId } from './lattice-gen';
 
 export type Box = basekit.Box;
 export type Socket = basegear.Socket;
@@ -116,6 +118,33 @@ export function computeSkirt(
   const clamped = Math.max(0, Math.min(3, raw));
   const rounded = Math.ceil(clamped / 0.25) * 0.25;
   return rounded;
+}
+
+/**
+ * TASK-10b: the lattice piece's visible mesh becomes its generated model, placed where the procedural mesh was
+ * (same group, before the pivot offset). Lamps, colliders and sockets stay procedural. Nothing changes when the
+ * kind stays procedural or the asset is not loaded yet.
+ */
+function swapLatticeMesh(
+  kind: Kind,
+  stage: number,
+  skirt: number,
+  group: THREE.Group,
+  lamps: readonly THREE.Mesh[],
+): void {
+  const id = latticeGenId(kind, skirt);
+  if (!id) return;
+  const gen = getGenSync(id, genLevelForStage(stage));
+  if (!gen) return;
+
+  for (const child of [...group.children]) {
+    if (child instanceof THREE.Mesh && !lamps.includes(child)) {
+      group.remove(child);
+      child.geometry.dispose();
+    }
+  }
+  gen.name = `gen-${id}`;
+  group.add(gen);
 }
 
 /** Pivot offsets for kit pieces so origin matches pieceAt() cell center. */
@@ -400,6 +429,8 @@ export class KitPieceCache {
         throw new Error(`Unknown structural kind: ${kind}`);
       }
     }
+
+    swapLatticeMesh(kind, stage, skirt, rawGroup, rawLamps);
 
     // Mark lamps in raw template so clones can be identified
     for (const lamp of rawLamps) {

@@ -42,7 +42,7 @@ interface CollapsingPiece {
  * quantized/normalized integer attributes (e.g. KHR_mesh_quantization Int16Array)
  * by writing floats directly into integer typed arrays without normalization.
  */
-function ensureFloatGeometry(geom: THREE.BufferGeometry): THREE.BufferGeometry {
+export function ensureFloatGeometry(geom: THREE.BufferGeometry): THREE.BufferGeometry {
   const res = geom.clone();
   for (const name of Object.keys(res.attributes)) {
     const attr = res.attributes[name]!;

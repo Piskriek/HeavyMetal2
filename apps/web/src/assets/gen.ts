@@ -21,9 +21,13 @@ export interface GenInfo {
 }
 export const GEN: Readonly<Record<string, GenInfo>> = registry as unknown as Record<string, GenInfo>;
 
-// the low GLBs, inlined by the single-file build (assetsInlineLimit)
-const LOW_URLS = import.meta.glob<string>('./gen/*.glb', { eager: true, query: '?url', import: 'default' });
-const lowUrl = (id: string): string | undefined => LOW_URLS[`./gen/${id}.glb`];
+// the low GLBs, inlined by the single-file build (assetsInlineLimit). Read on first use, so node tests can import
+// this module (import.meta.glob exists only under Vite).
+let lowUrls: Record<string, string> | null = null;
+const lowUrl = (id: string): string | undefined => {
+  lowUrls ??= import.meta.glob<string>('./gen/*.glb', { eager: true, query: '?url', import: 'default' });
+  return lowUrls[`./gen/${id}.glb`];
+};
 
 /** The level for a Graphics quality setting, like Astro's. */
 export function genLevelFor(quality: 'low' | 'medium' | 'high' | string): GenLevel {

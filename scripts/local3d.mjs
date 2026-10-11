@@ -88,6 +88,14 @@ async function one(id) {
 }
 
 if (cmd === 'health') console.log(JSON.stringify(await api('GET', '/health')));
+// the shared ledger with the 3D PC's agent (C:\Work\repo\ai-stack\PIPELINE-SYNC.md there), via GET/POST /sync:
+//   sync [--all]       its last 60 lines (or all of it)
+//   log <entry ...>    append a dated entry, signed as from this laptop
+else if (cmd === 'sync') {
+  const r = await api('GET', '/sync');
+  const text = typeof r === 'string' ? r : String(r.text ?? r.content ?? JSON.stringify(r, null, 2));
+  console.log(args.includes('--all') ? text : text.split('\n').slice(-60).join('\n'));
+} else if (cmd === 'log' && ids.length) console.log(JSON.stringify(await api('POST', '/sync', { entry: `[Claude, laptop 192.168.0.7] ${ids.join(' ')}` })));
 else if (cmd === 'model' && ids[0]) await one(ids[0]);
 else if (cmd === 'models') {
   for (const a of manifest.assets.filter((x) => ids.length === 0 || ids.includes(x.id))) {
@@ -95,4 +103,4 @@ else if (cmd === 'models') {
     if (!fs.existsSync(path.join(d, 'approved')) || fs.existsSync(path.join(d, multiView ? 'model-mv.glb' : 'model-local.glb'))) continue;
     try { await one(a.id); } catch (e) { console.log(String(e.message ?? e)); }
   }
-} else { console.log('usage: node scripts/local3d.mjs health | model <id> | models [id ...] [--no-texture]'); process.exit(2); }
+} else { console.log('usage: node scripts/local3d.mjs health | sync [--all] | log <entry> | model <id> | models [id ...] [--no-texture] [--views]'); process.exit(2); }

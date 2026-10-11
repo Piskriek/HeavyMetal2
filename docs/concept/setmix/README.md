@@ -933,3 +933,19 @@ in 04/05).
 **Sheet 20 status (complete):** `20-sheet-weapons.png` (3840x1960) shows the weapon bench (38) and the bare frame (39) at S1 and S6, then the part variants (40): three cores (semi-auto, burst, beam), three barrels (short, long, scatter), three sights (iron, scope, holo), two cells (compact, extended), each fitted to the kept S6 frame, and the S1 full set (semi-auto, long barrel, scope, compact cell). Rejected renders are in `panels/20/rejected/` (`20-core-semi-s6-rev1`, `20-core-beam-s6-rev1`, `20-barrel-scatter-s6-rev1`, `20-full-s1-rev1`, `20-frame-s6-rev1` to `-rev3`). Composed by `tools/compose20.sh`. Note: the S1 full set's compact cell sits slightly below the underside, where the S6 cell is flush.
 
 **Accepted (lead engineer, 2026-10-10):** sheet 20. Notes for the mesh brief: the burst core's top housing and the beam core's front shroud must read as receivers (seated in the core well), not as a rail accessory or a barrel shroud. The "S1 full set" panel renders closer to S6 than to chunky low poly; take the S1 look from 20-frame-s1.
+
+---
+
+## 21 · the lab — the new layout (panels 41 to 46)
+
+**For:** the owner-approved redesign of the shielded white-room lab (feat docs/LAB_LAYOUT_RESEARCH.md, proposals L1 to L6). One room, about 16 by 12 m, 5 m ceiling, north wall the observation window onto the void storm. The gate is the landmark on a raised round plinth in the south half, facing the window. The power wall is west (capacitors, breaker panel, relay cabinets, control boxes, the console with its lever, one cable tray to the gate). The studio corner is east (preset bench, combiner, cartridge rack, the planet table with its hologram). The armory nook is south-east (armory rack, weapon bench). Her corner is south-west (desk, cot, readings, radio grille). Every panel is drawn once at full PBR quality, as a set piece, not as an S1/S6 pair.
+
+**Panels:** `panels/21/41-layout.png`, `44-power-wall.png`, `45-studio-corner.png`, `46-armory-her-corner.png` (composed from `46a-armory-nook.png` and `46b-her-corner.png`) are kept. Pending: `42-act1-dark.png` (redraw) and `43-storm-progress.png` (three frames, storm full, thinning, breaking; not yet drawn). Composed by `tools/compose21.sh`. The rejected renders are in `panels/21/rejected/`.
+
+**Review notes:** the walls and interior are warm white and light grey, with dark grey trim and amber lamps; no chimneys, stacks, lettering or readable screen text; nothing floats; cables run in trays or floor covers.
+
+**Sheet 21 status (lead review fixes applied):** the power cables now run in floor covers, the preset combiner is the sheet 07 round machine with a dome, and the wall decals are removed from 45 and 46. Panels 41, 42, 43 (composed `43-storm-progress.png`, three frames: full, thinning, breaking), 44, 45 and 46 (composed `46-armory-her-corner.png`) are complete. The contact tile is `21-sheet-the-lab.png`, a copy of the layout panel. Rejected renders are in `panels/21/rejected/`.
+
+**Sheet 21, panel 43 (storm progress), final:** three frames in one image, `43-storm-progress.png`, from `43a-storm-full.png`, `43b-storm-thinning.png` and `43c-storm-breaking.png`. All three are in the same white lab room as panels 41 and 44 to 46. The window looks out over Earth: the storm, then grey ground and hills with a distant ruined skyline, then blue sky over restored green land. The only gate is the one inside the room. Superseded frames are in `panels/21/rejected/` (rev2 and rev3).
+
+**Accepted (lead engineer, 2026-10-11):** sheet 21 after reviews 1 and 2 (docs/prompts/art/lab-sheet21-review1.md, -review2.md). The storm strip (43) is the white room looking over Earth: storm, thinning to grey ground and a ruined skyline, then blue sky and green land. Known gap: in 43a the gate's cables lie on the floor; in the game they run in floor covers, as in 41.

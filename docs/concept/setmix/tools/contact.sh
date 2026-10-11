@@ -23,6 +23,8 @@ names+=( "19 · sheet-vehicle-fabricator" )
 files+=( 19-sheet-vehicle-fabricator )
 names+=( "20 · sheet-weapons" )
 files+=( 20-sheet-weapons )
+names+=( "21 · the lab layout" )
+files+=( 21-sheet-the-lab )
 convert -size 2620x1800 xc:"$BG" "$T/base.png"
 convert "$T/base.png" -background "$BG" -gravity northwest -extent 2620x2200 "$T/base.png"
 for i in "${!files[@]}"; do

@@ -1,0 +1,48 @@
+SHEET 21 — THE LAB, the new layout (panels 41 to 46). Source: docs/LAB_LAYOUT_RESEARCH.md (feat, proposals L1 to L6, owner-approved redesign) and the lead engineer's room brief. The lab is the last pristine, quantum-shielded white-room laboratory on Earth.
+
+ASSUMPTIONS RECORDED: sheet 21 is a set of scenes, not a stage pair, so every panel is drawn ONCE at full PBR quality (the stage-6 wrapper) with the lab's own lighting, not as an S1/S6 pair. Panels 43 (storm progress) and 46 (armory and her corner) are two or three separate renders composed side by side by the composer, because the image tool makes one image per call and the brief asks for one composed image.
+
+Rules for every panel: nothing floats (every machine, cabinet, plinth, step and cot stands on the floor); cables run in trays on the wall or in low ribbed floor covers; NO chimneys, NO stacks, NO smokestacks; NO lettering, NO words, NO numbers, NO symbols on any surface, and NO readable text on any screen (screens show waveforms, bars and plots only); the scientist (1.8 m) is included for scale where a figure is shown. Style: the base kit family: warm white and light-grey painted steel, dark grey trim, amber hazard bands and amber lamps; chunky and solid, no thin wires or spindly parts.
+
+WRAPPER (every 21 panel):
+A realtime 3D GAME ENGINE SCREENSHOT, Blender/Unity style, high-fidelity physically-based rendering at stage-6 resolution: clean painted warm-white and light-grey steel, dark grey trim, crisp decals with no words, soft physically-based interior lighting, realistic ambient occlusion. NOT a cartoon, NOT low poly, NOT line art. No text, no UI, no watermark, NO lettering, NO words, NO numerals, NO symbols on any surface. ONE single image, one render, one camera, NOT a split-screen, NOT a diptych, NOT a multi-view sheet.
+
+ROOM (every 21 panel; the room is one shared scene):
+A pristine quantum-shielded white-room laboratory, about 16 by 12 metres, with a 5 metre ceiling. NORTH WALL: one wide observation WINDOW, full width, floor to about 3.5 metres, thick framed glass. Outside the window: the void storm, reality running out of compute: dithered black-and-white static clouds and broken pixel lightning. CENTRE-SOUTH: THE GATE, a chunky steel door-frame gate standing on a raised round plinth with two steps, its opening facing the window so the gate frames the storm; ribbed amber coil blocks on its frame; thick power cables run to its plinth in low ribbed floor covers. WEST WALL, THE POWER WALL, read left to right: a capacitor bank, a breaker panel, four relay cabinets, two control boxes, then the operator console with a big throw lever facing into the room; one cable tray runs along the wall carrying the cables from the capacitors to the gate. EAST SIDE, THE STUDIO CORNER: a preset bench, a preset combiner, a preset rack of cartridges against the east wall, and in front of them a round planet table showing a small amber hologram of the Moon's plots (glowing abstract plots only, no text). SOUTH-EAST NOOK, THE ARMORY: an armory rack on the wall holding an extraction beam tool, and the weapon bench (sheet 20) beside it. SOUTH-WEST CORNER, WHERE SHE LIVES: a scientist's desk with stacked notes and a coffee mug, a folding cot with a blanket, readings taped to a wall panel, and a radio grille in the console.
+
+PANEL 41 · THE LAYOUT: a three-quarter cutaway of the whole room from above the south-east corner, the ceiling removed, every zone visible and readable: the gate dominant on its plinth, the power wall, the studio corner, the armory nook, her corner, the window and the storm beyond. Powered and lit. A hazmat scientist, 1.8 metres, stands at the gate's plinth for scale.
+
+PANEL 42 · ACT I, DARK: the same room from the scientist's eye height, standing near the cot. Only emergency amber lights are on: the power wall's lamps are dead, the gate is cold and unlit. The storm light from the window is the brightest thing in the room. No figure.
+
+PANEL 43 (three renders, composed side by side by the composer, the same window view each time, camera at the room's centre looking north at the window):
+- 43a · THE STORM, full: the void storm fills the window: dense dithered black-and-white static clouds and broken pixel lightning. Nothing else visible outside.
+- 43b · THE STORM THINNING: the same window; the static is thinner and sparser, the lightning rarer, and at the far horizon, through the gaps, the first grey ground is visible. No sky yet.
+- 43c · THE STORM BREAKING: the same window; a patch of real blue sky has opened in the storm, soft and clean, with a few thin clouds; the rest of the storm is thin.
+The interior is the same in all three: the gate cold and unlit in the foreground, the amber emergency lights.
+
+PANEL 44 · THE POWER WALL, close up, from the room's centre: the power wall left to right as listed (capacitor bank, breaker panel, four relay cabinets, two control boxes, the operator console with its big throw lever facing into the room); the cable tray along the wall visibly carries the cables from the capacitors toward the gate. The amber lamps are on.
+
+PANEL 45 · THE STUDIO CORNER, close up: the preset bench, the preset combiner, the preset rack of cartridges against the east wall, and the round planet table in front, its small amber hologram of the Moon's plots rising from it. Lit.
+
+PANEL 46 (two renders, composed side by side by the composer):
+- 46a · THE ARMORY NOOK, close up: the armory rack on the wall holding an extraction beam tool (a chunky handheld tool, not a toy), and the weapon bench beside it, with the bench's jig clamp and pegboard.
+- 46b · HER CORNER, close up: the scientist's desk with stacked notes and a coffee mug, the folding cot with a blanket, the readings taped to the wall panel, and the radio grille in the console beside it.
+
+ASSETS: sheet 06 (the gate), sheet 20 (the weapon bench and frame), sheet 13 (the wall kit and the foundation), sheet 18 (the life-support unit, lab paint and lamp style).
+
+REVIEW: each panel is reviewed as one render, one camera, at full size before it is kept. Rejected renders go to panels/21/rejected/ with a -rev1 suffix.
+
+PANELS AS USED (verbatim prompts are in the render log; each panel is the WRAPPER + ROOM + its PANEL text above):
+- 41-layout.png, 42-act1-dark.png, 43a-storm-full.png, 43b-storm-thinning.png, 43c-storm-breaking.png, 44-power-wall.png, 45-studio-corner.png, 46a-armory-nook.png, 46b-her-corner.png.
+
+BATCH 1 REVIEW (one render each, at full size or in review montages):
+- 41-layout: KEPT. Every zone reads: the gate on its plinth, the power wall with its tray, the studio corner and the hologram, the armory, her corner, the window and the storm. The scientist at the gate gives scale.
+- 44-power-wall: KEPT. Capacitor bank, breaker panel, relay cabinets, control boxes, the console with its throw lever and the cable tray along the wall.
+- 45-studio-corner: KEPT. Preset bench, combiner, cartridge rack and the round planet table with its amber hologram.
+- 46a-armory-nook: KEPT. The armory rack with the extraction beam tool, the weapon bench with jig and pegboard.
+- 46b-her-corner: KEPT. The desk with notes and mug, the cot, the taped readings, the radio grille.
+- 42-act1-dark: REJECTED twice. rev1 (rejected/42-act1-dark-rev1.png): the walls drifted to orange-brown and the room was too lit. rev2 (rejected/42-act1-dark-rev2.png): the palette and darkness are right, but the gate reads as a plain round ring; the door-frame gate is not visible from the cot. PENDING: redraw with the gate's door frame clearly in view.
+- 43a, 43b, 43c (storm progress): REJECTED (rev1, rejected/43a-storm-full-rev1.png, 43b-storm-thinning-rev1.png, 43c-storm-breaking-rev1.png): the walls drifted to orange-brown, the same palette fault as 42. PENDING: three new renders in the warm-white and light-grey palette, then composed into 43-storm-progress.png.
+
+COMPOSED: 46-armory-her-corner.png (2820x1000), by tools/compose21.sh from 46a and 46b.
+OPEN: 42-act1-dark (redraw), and 43a, 43b, 43c (three renders) with their composed 43-storm-progress.png. Sheet 21 is not complete.

@@ -929,3 +929,13 @@ in 04/05).
 **Batch 2 status:** the S1 full set and nine S6 part variants are drawn. Kept: barrel short (S6). Rejected: core beam (S6, `panels/20/rejected/20-core-beam-s6-rev1.png`). Pending full-size review: the other eight. Still to draw: the two cell variants. The sheet is not yet composed.
 
 **Sheet 20 status (complete):** `20-sheet-weapons.png` (3840x1960) shows the weapon bench (38) and the bare frame (39) at S1 and S6, then the part variants (40): three cores (semi-auto, burst, beam), three barrels (short, long, scatter), three sights (iron, scope, holo), two cells (compact, extended), each fitted to the kept S6 frame, and the S1 full set (semi-auto, long barrel, scope, compact cell). Rejected renders are in `panels/20/rejected/` (`20-core-semi-s6-rev1`, `20-core-beam-s6-rev1`, `20-barrel-scatter-s6-rev1`, `20-full-s1-rev1`, `20-frame-s6-rev1` to `-rev3`). Composed by `tools/compose20.sh`. Note: the S1 full set's compact cell sits slightly below the underside, where the S6 cell is flush.
+
+---
+
+## 21 · the lab — the new layout (panels 41 to 46)
+
+**For:** the owner-approved redesign of the shielded white-room lab (feat docs/LAB_LAYOUT_RESEARCH.md, proposals L1 to L6). One room, about 16 by 12 m, 5 m ceiling, north wall the observation window onto the void storm. The gate is the landmark on a raised round plinth in the south half, facing the window. The power wall is west (capacitors, breaker panel, relay cabinets, control boxes, the console with its lever, one cable tray to the gate). The studio corner is east (preset bench, combiner, cartridge rack, the planet table with its hologram). The armory nook is south-east (armory rack, weapon bench). Her corner is south-west (desk, cot, readings, radio grille). Every panel is drawn once at full PBR quality, as a set piece, not as an S1/S6 pair.
+
+**Panels:** `panels/21/41-layout.png`, `44-power-wall.png`, `45-studio-corner.png`, `46-armory-her-corner.png` (composed from `46a-armory-nook.png` and `46b-her-corner.png`) are kept. Pending: `42-act1-dark.png` (redraw) and `43-storm-progress.png` (three frames, storm full, thinning, breaking; not yet drawn). Composed by `tools/compose21.sh`. The rejected renders are in `panels/21/rejected/`.
+
+**Review notes:** the walls and interior are warm white and light grey, with dark grey trim and amber lamps; no chimneys, stacks, lettering or readable screen text; nothing floats; cables run in trays or floor covers.

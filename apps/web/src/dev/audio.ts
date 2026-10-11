@@ -169,3 +169,6 @@ $('score-play').addEventListener('click', () => { if (score) stopScore(); else v
 placeHead();
 tally();
 (window as unknown as { __audioReady: boolean }).__audioReady = true;
+
+export {};
+

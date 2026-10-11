@@ -129,6 +129,7 @@ export default defineConfig(({ mode }) => ({
       '@hm/basekit2': p('../../packages/basekit2/src/index.ts'),
       '@hm/navpath': p('../../packages/navpath/src/index.ts'),
       '@hm/mobsim': p('../../packages/mobsim/src/index.ts'),
+      '@hm/narrator': p('../../packages/narrator/src/index.ts'),
       '@hm/rover': p('../../packages/rover/src/index.ts'),
       '@hm/rovergear': p('../../packages/rovergear/src/index.ts'),
       '@hm/batcher': p('../../packages/batcher/src/index.ts'),

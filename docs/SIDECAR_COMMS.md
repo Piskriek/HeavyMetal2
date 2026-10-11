@@ -1111,3 +1111,14 @@ Commit: `feat(assets): grounded machine plumes and unquantized float geometry fo
   - `node scripts/test-base-building.mjs`: PASSED.
 - **Staging Isolation**:
   - Staged strictly TASK-10d paths only. Ready to commit and push.
+
+### [2026-10-11 17:45] OPUS → FLASH: [TASK] TASK-11 queued after TASK-10d: the mentor speaks in the game
+- The 37 voiced lines play nowhere in the game yet. `packages/narrator` (new, pure, 13 tests) decides which line plays when: once-only story lines in order, cooldowns, priority and preemption, a capped queue with stale lines dropped, and the radio log.
+- Your side (brief `docs/prompts/sidecar/11-narration.md`):
+  - preload and measure the clips behind the loading bar;
+  - play them through the owner's mentor mix (lift the chain out of `dev/radio.ts` into a shared module);
+  - fire the named events at their moments;
+  - subtitles (on by default), the radio log with replay, a dialogue volume, and save the log.
+- Research and rules: `docs/NARRATION_SYSTEM.md`.
+- **Order:** finish TASK-10d first.
+- Also: your `export {};` fix in `apps/web/src/dev/audio.ts` was right (top-level await needs a module). I am committing it with my paths.

@@ -731,7 +731,8 @@
       "size": 2,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the capacitor bank on its own: three tall cylindrical capacitors on a steel skid with hazard-striped edges and lifting slots, copper bus bars linking their tops through porcelain insulators. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+      "subject": "the capacitor bank on its own: three tall cylindrical capacitors on a steel skid with hazard-striped edges and lifting slots, copper bus bars linking their tops through porcelain insulators. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps",
+      "hold": "until the owner approves sheet 21 (the lab redesign): then re-imaged from its panels 44 (power wall) and 45 (studio corner) with the square-sections rule; the pre-sheet-21 images break it (round cans and gauges, loose cables and hoses, a deep slot grid)"
     },
     {
       "id": "breaker-panel",
@@ -740,7 +741,8 @@
       "size": 2.2,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the breaker panel on its own, WITHOUT its red breaker handle: a standing steel cabinet on two short legs with louvred vents top and bottom, two dial gauges, a row of switches, and a hazard-striped square plate with an empty socket where the breaker handle mounts. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+      "subject": "the breaker panel on its own, WITHOUT its red breaker handle: a standing steel cabinet on two short legs with louvred vents top and bottom, two dial gauges, a row of switches, and a hazard-striped square plate with an empty socket where the breaker handle mounts. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps",
+      "hold": "until the owner approves sheet 21 (the lab redesign): then re-imaged from its panels 44 (power wall) and 45 (studio corner) with the square-sections rule; the pre-sheet-21 images break it (round cans and gauges, loose cables and hoses, a deep slot grid)"
     },
     {
       "id": "breaker-handle",
@@ -749,7 +751,8 @@
       "size": 0.45,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "ONLY the breaker panel's big red rotary breaker handle on its own: the round hub and the thick lever arm, NO mounting plate, NO hazard stripes, NO cables, NO box. In the base kit family style"
+      "subject": "ONLY the breaker panel's big red rotary breaker handle on its own: the round hub and the thick lever arm, NO mounting plate, NO hazard stripes, NO cables, NO box. In the base kit family style",
+      "hold": "until the owner approves sheet 21 (the lab redesign): then re-imaged from its panels 44 (power wall) and 45 (studio corner) with the square-sections rule; the pre-sheet-21 images break it (round cans and gauges, loose cables and hoses, a deep slot grid)"
     },
     {
       "id": "relay-cabinet",
@@ -758,7 +761,8 @@
       "size": 2.2,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "one relay cabinet on its own: a tall steel cabinet on short legs, louvred vents near its top and bottom, a door handle, and an amber lamp on its top (unlit). In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+      "subject": "one relay cabinet on its own: a tall steel cabinet on short legs, louvred vents near its top and bottom, a door handle, and an amber lamp on its top (unlit). In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps",
+      "hold": "until the owner approves sheet 21 (the lab redesign): then re-imaged from its panels 44 (power wall) and 45 (studio corner) with the square-sections rule; the pre-sheet-21 images break it (round cans and gauges, loose cables and hoses, a deep slot grid)"
     },
     {
       "id": "control-box",
@@ -767,7 +771,8 @@
       "size": 0.5,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "one small steel control box on its own: a box about 40 cm tall with two indicator lights, two push buttons, a hinged lid and a cable gland underneath. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+      "subject": "one small steel control box on its own: a box about 40 cm tall with two indicator lights, two push buttons, a hinged lid and a cable gland underneath. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps",
+      "hold": "until the owner approves sheet 21 (the lab redesign): then re-imaged from its panels 44 (power wall) and 45 (studio corner) with the square-sections rule; the pre-sheet-21 images break it (round cans and gauges, loose cables and hoses, a deep slot grid)"
     },
     {
       "id": "operator-console",
@@ -776,7 +781,8 @@
       "size": 1.4,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the operator console on its own, WITHOUT its big lever: a pedestal desk with an angled control top, dial gauges, a small green screen, rows of switches, and an empty slot where the lever mounts. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+      "subject": "the operator console on its own, WITHOUT its big lever: a pedestal desk with an angled control top, dial gauges, a small green screen, rows of switches, and an empty slot where the lever mounts. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps",
+      "hold": "until the owner approves sheet 21 (the lab redesign): then re-imaged from its panels 44 (power wall) and 45 (studio corner) with the square-sections rule; the pre-sheet-21 images break it (round cans and gauges, loose cables and hoses, a deep slot grid)"
     },
     {
       "id": "console-lever",
@@ -786,7 +792,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "ONLY the operator console's big throw lever on its own: the thick lever arm with its red grip and the round pivot boss at its foot, NO block, NO box, NO cables. In the base kit family style",
-      "integration": "The image keeps a base block and pivot clevis: split the mesh at the pivot axis in Blender at integration so only the arm rotates."
+      "integration": "The image keeps a base block and pivot clevis: split the mesh at the pivot axis in Blender at integration so only the arm rotates.",
+      "hold": "until the owner approves sheet 21 (the lab redesign): then re-imaged from its panels 44 (power wall) and 45 (studio corner) with the square-sections rule; the pre-sheet-21 images break it (round cans and gauges, loose cables and hoses, a deep slot grid)"
     },
     {
       "id": "preset-bench",
@@ -795,7 +802,8 @@
       "size": 1.6,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the preset bench on its own: a steel workbench on four legs with a glass top panel (unlit), a folding arm lamp, a row of cartridge slots along its back and a small control strip. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+      "subject": "the preset bench on its own: a steel workbench on four legs with a glass top panel (unlit), a folding arm lamp, a row of cartridge slots along its back and a small control strip. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps",
+      "hold": "until the owner approves sheet 21 (the lab redesign): then re-imaged from its panels 44 (power wall) and 45 (studio corner) with the square-sections rule; the pre-sheet-21 images break it (round cans and gauges, loose cables and hoses, a deep slot grid)"
     },
     {
       "id": "preset-combiner",
@@ -804,7 +812,8 @@
       "size": 1.6,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the preset combiner on its own: a squat round machine on a bolted plinth, an empty glass dome on its top (no glow), four cartridge ports round its body angled upward, and a small screen. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+      "subject": "the preset combiner on its own: a squat round machine on a bolted plinth, an empty glass dome on its top (no glow), four cartridge ports round its body angled upward, and a small screen. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps",
+      "hold": "until the owner approves sheet 21 (the lab redesign): then re-imaged from its panels 44 (power wall) and 45 (studio corner) with the square-sections rule; the pre-sheet-21 images break it (round cans and gauges, loose cables and hoses, a deep slot grid)"
     },
     {
       "id": "preset-rack",
@@ -813,7 +822,8 @@
       "size": 2.6,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the preset rack on its own: a tall steel cartridge library, a grid of small square slots in a thick frame on two feet, with a picker carriage on a rail across its middle. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+      "subject": "the preset rack on its own: a tall steel cartridge library, a grid of small square slots in a thick frame on two feet, with a picker carriage on a rail across its middle. In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps",
+      "hold": "until the owner approves sheet 21 (the lab redesign): then re-imaged from its panels 44 (power wall) and 45 (studio corner) with the square-sections rule; the pre-sheet-21 images break it (round cans and gauges, loose cables and hoses, a deep slot grid)"
     },
     {
       "id": "planet-table",
@@ -822,7 +832,8 @@
       "size": 1.1,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the planet table on its own: a wide round steel table ring on a thick bolted pedestal, a flat projector disc set in its centre (unlit, no hologram). In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps"
+      "subject": "the planet table on its own: a wide round steel table ring on a thick bolted pedestal, a flat projector disc set in its centre (unlit, no hologram). In the base kit family style: warm light-grey painted steel, dark grey mesh and cable, amber hazard bands and amber lamps",
+      "hold": "until the owner approves sheet 21 (the lab redesign): then re-imaged from its panels 44 (power wall) and 45 (studio corner) with the square-sections rule; the pre-sheet-21 images break it (round cans and gauges, loose cables and hoses, a deep slot grid)"
     },
     {
       "id": "vehicle-seat",
@@ -831,7 +842,7 @@
       "size": 1.1,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "one rover seat on its own: a chunky padded bucket seat with a high back and side bolsters on a solid bolted steel seat base. NO harness, NO belts, NO straps, NO buckles"
+      "subject": "one rover seat on its own: a chunky padded bucket seat with a high solid back and side bolsters (NO slots, NO holes and NO openings in the backrest), bolted onto a LOW solid square steel seat box only about 12 centimetres tall (a closed shallow box base: NO tubes, NO rails, NO open frame, NO springs, NO pedestal); NO harness, NO belts, NO straps, NO buckles"
     },
     {
       "id": "steering-wheel",

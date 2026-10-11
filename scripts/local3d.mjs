@@ -115,7 +115,9 @@ else if (cmd === 'fetch' && ids[0] && ids[1]) {
 else if (cmd === 'models') {
   for (const a of manifest.assets.filter((x) => ids.length === 0 || ids.includes(x.id))) {
     const d = path.join(OUT, a.id);
-    if (!fs.existsSync(path.join(d, 'approved')) || fs.existsSync(path.join(d, multiView ? 'model-mv.glb' : 'model-local.glb'))) continue;
+    // skip an asset that already has a model of this kind (a single-view run also counts RUN's model.glb)
+    const have = multiView ? ['model-mv.glb'] : ['model-local.glb', 'model.glb'];
+    if (!fs.existsSync(path.join(d, 'approved')) || have.some((f) => fs.existsSync(path.join(d, f)))) continue;
     try { await one(a.id); } catch (e) { console.log(String(e.message ?? e)); }
   }
 } else { console.log('usage: node scripts/local3d.mjs health | sync [--all] | log <entry> | model <id> | models [id ...] [--no-texture] [--views]'); process.exit(2); }

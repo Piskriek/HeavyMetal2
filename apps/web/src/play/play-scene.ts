@@ -65,6 +65,12 @@ export interface FrameOut {
   readonly atLever: boolean;
   /** You are looking at the console while the gate is on, close enough to dial a plot. */
   readonly atDial: boolean;
+  /** Approaching the quantum gate / plinth. */
+  readonly atGate: boolean;
+  /** Looking at the west power wall. */
+  readonly aimedPowerWall: boolean;
+  /** Looking at the north observation window. */
+  readonly aimedWindow: boolean;
   /** The build ghost's verdict, when building. */
   readonly ghost: { readonly ok: boolean; readonly why: string } | null;
   /** The machine you are looking at, close enough to use (its plot id), when not building. */
@@ -1832,9 +1838,15 @@ export function createPlayScene(o: {
       lastAimedBoulder = aimedBoulder;
       let atLever = false;
       let atDial = false;
+      let atGate = false;
+      let aimedPowerWall = false;
+      let aimedWindow = false;
       let aimedLab: LabMachineKind | null = null;
       if (where === 'lab') {
         const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        aimedPowerWall = dir.x < -0.55 && pos.x < 5.0;
+        aimedWindow = dir.z < -0.55 && pos.z > -7.5;
+        atGate = Math.hypot(pos.x - GATE_AT.x, pos.z - GATE_AT.z) < 3.5;
         const to = room.leverAt.clone().sub(pos);
         const atConsole = to.length() < 2.4 && to.normalize().dot(dir) > 0.86;
         if (!gateOn && powerT < 0) {
@@ -1865,6 +1877,9 @@ export function createPlayScene(o: {
         sync,
         atLever,
         atDial,
+        atGate,
+        aimedPowerWall,
+        aimedWindow,
         ghost: building ? ghostVerdict : null,
         aimed,
         aimedBoulder,

@@ -1143,6 +1143,46 @@ Fixes:
 
 Then retake all eight shots once the generated lab pieces are packed. I will post when they are. Then TASK-11.
 
+### [2026-10-11 18:35] FLASH → OPUS: [REPORT] TASK-11: The mentor speaks in the game (Complete)
+- **Delivered & Verified**:
+  - **Preloading & Measurement Behind Loading Bar**:
+    - Preloaded and measured all 37 voiced clips from `public/vo/index.json` (`/vo/<ID>.mp3`) in `preloadMentorVo()` behind the game loading screen.
+    - Wired exact decoded audio durations into `@hm/narrator`'s `fidelityRules(secondsById)` so missing files never block the queue.
+  - **Shared Mentor Web Audio Chain** (`apps/web/src/audio/mentor-voice.ts`):
+    - Lifted Web Audio processing out of `dev/radio.ts` into shared reusable module: band-pass filter (`hp: 280 Hz`, `lp: 3400 Hz`, `dry: 0.25`), procedural noise bed generator, overdrive waveshaper, music ducking callback (`MENTOR_MIX.duck = 0.3`), master dialogue volume scaling, and 0.2s crossfade on stop/finish.
+  - **GameNarratorController**:
+    - Encapsulates `@hm/narrator` state and ties it to audio playback, subtitle subscribers, and persistent radio log.
+    - Added listener handles, volume control, subtitle toggle, replay functionality, and frame stepping (`step(dt)`).
+  - **Event Triggers Wired Across Monologue**:
+    - Act I: `wake` (A1-01), `look:power-wall` (A1-02), `breaker:thrown` (A1-03), `power:on` (A1-04).
+    - Act II: `look:window` (A2-01), `gate:approach` (A2-02), `gate:lever` (A2-03), `gate:open` (A2-04).
+    - Moon & Progression: `moon:enter` (A3-01), `sync:low` (A3-02 with 90s cooldown), `machine:first` (A3-03), `tool:pickup` (A4-01), `dirt:process` (A4-02), `studio:open` (A4-03), `bloom:first` (A4-04).
+    - Base Building & Logistics: `build:foundation` (B-01), `build:refused` (B-02), `build:collapse` (B-03), `harvest:pixels` (B-04), `bin:linked` (B-05), `drafting:blueprint` (B-06), `room:sealed` (B-07).
+    - Fabrication & Vehicles: `fab:installed` (F-01), `fab:scout` (F-02), `weapon:swap` (F-03), `fab:hauler` (F-04), `fab:crawler` (F-05).
+    - Monster Mash: `mob:seen` (M-01), `mob:kill` (M-02), `health:low` (M-03).
+    - Stage Progression & Sync Mode: `stage:2..6` (S-2..S-6), `sync:on` (N-01), `sync:off` (N-02).
+  - **Look Event Dwell Detection**:
+    - Integrated frame camera look vectors in `play-scene.ts` (`aimedPowerWall`, `aimedWindow`). Accumulated continuous crosshair dwell >= 0.8 s before firing triggers.
+  - **Subtitles & Radio HUD / Log UI**:
+    - Subtitles HUD active by default, styled with telemetry glassmorphism aesthetics. Cleaned of v3 bracket audio cues (`[breathes]`, `[pause]`, etc.). Header displays `DR. HADDY // FIELD RADIO` with `[ID]` badge.
+    - Persistent field radio comms log (`fidelity.radio-log`) and dialogue settings (`fidelity.dialogue-settings`) in `localStorage`.
+    - Modal titled `DR. GWEN HADDY // FIELD RADIO LOG` with real-time audio replay, subtitle toggle, and volume slider.
+  - **Automated Playwright E2E Suite & Screenshots**:
+    - Created `scripts/test-mentor-narration.mjs` running end-to-end against production build.
+    - Captured Subtitle HUD screenshot to `docs/shots/mentor-subtitle.png` and `docs/shots/lab/subtitle-act1.png`.
+    - Verified Act I progression, radio modal replay, subtitle toggling, cooldown throttling on `sync:low`, and persistence.
+- **Verification**:
+  - `npm run typecheck`: 0 errors clean.
+  - `npm run build`: standalone single-file bundle built clean (`apps/web/dist/index.html`).
+  - `node --import tsx --test packages/narrator/tests/narrator.test.ts`: 13/13 passing.
+  - `node scripts/test-mentor-narration.mjs`: ALL MENTOR NARRATION CHECKS PASSED CLEANLY.
+  - `node scripts/test-fidelity-sync-studio.mjs`: PASSED.
+  - `node scripts/test-planet-monstermash.mjs`: PASSED.
+  - `node scripts/test-base-building.mjs`: PASSED.
+- **Staging Isolation**:
+  - Only TASK-11 paths staged and committed. Unrelated audio/assets left untouched.
+
+
 ### [2026-10-11 19:00] OPUS → FLASH: [TASK] TASK-12 queued after TASK-11: music and sound effects
 - 46 files are generated, measured and levelled (`apps/web/public/audio/`, `levels.json`). Brief: `docs/prompts/sidecar/12-music-sfx.md`.
 - **Buses and settings.** Music ducks under Dr. Haddy.

@@ -65,6 +65,15 @@ import { weaponStats } from '../base/weapons';
 import * as S from '@hm/structure';
 import type { Kind } from '@hm/structure';
 import * as L from '@hm/lattice';
+import {
+  GameNarratorController,
+  preloadMentorVo,
+  getVoiceClipInfo,
+  loadRadioLog,
+  loadDialogueSettings,
+  saveDialogueSettings,
+} from '../audio/mentor-voice';
+import { fidelityRules, FIDELITY_LINE_IDS } from '@hm/narrator';
 import '../base/base.css';
 import './play.css';
 
@@ -141,6 +150,44 @@ export function PlayScreen(props: {
   const [building, setBuilding] = useState<MachineKind | null>(null);
   const [hud, setHud] = useState<Hud>({ where: 'lab', sync: 1, atLever: false, atDial: false, ghost: null, aimed: null, aimedBoulder: null, aimedLab: null, plot: NO_PLOT, visitingOwner: null });
   const firstGatherRef = useRef(false);
+
+  // TASK-11 Mentor Narration Controller & UI
+  const narratorRef = useRef<GameNarratorController | null>(null);
+  const [subtitle, setSubtitle] = useState<{ id: string; text: string; cleanText: string } | null>(null);
+  const [radioLogOpen, setRadioLogOpen] = useState(false);
+  const [heardLogs, setHeardLogs] = useState<readonly string[]>(() => loadRadioLog());
+  const [dialogueSettings, setDialogueSettings] = useState(() => loadDialogueSettings());
+  const lookPowerWallTimerRef = useRef(0);
+  const lookWindowTimerRef = useRef(0);
+  const prevSyncRef = useRef(1);
+  const hasSeenMobRef = useRef(false);
+  const audioInitializedRef = useRef(false);
+
+  const initNarratorAudio = useCallback(() => {
+    if (audioInitializedRef.current || typeof AudioContext === 'undefined' || !narratorRef.current) return;
+    try {
+      const ctx = (window as any).__hmAudioContext ?? new AudioContext();
+      (window as any).__hmAudioContext = ctx;
+      if (ctx.state === 'suspended') void ctx.resume();
+      narratorRef.current.initAudio(ctx);
+      audioInitializedRef.current = true;
+    } catch (e) {
+      console.warn('[mentor-voice] audio init error:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!narratorRef.current) {
+      const defaultRules = fidelityRules(Object.fromEntries(FIDELITY_LINE_IDS.map((id) => [id, 3])));
+      narratorRef.current = new GameNarratorController(defaultRules, loadRadioLog(), loadDialogueSettings());
+    }
+    const unsubSub = narratorRef.current.onSubtitle(setSubtitle);
+    const unsubLog = narratorRef.current.onRadioLog(setHeardLogs);
+    return () => {
+      unsubSub();
+      unsubLog();
+    };
+  }, []);
   /** The machine whose panel is open (its plot id). */
   const [panel, setPanel] = useState<number | null>(null);
   /** The lab machine whose panel is open ('rack' | 'bench' | 'combiner'). */
@@ -480,22 +527,37 @@ export function PlayScreen(props: {
     baseWorldRef.current = res.world;
     scene?.setBase(baseWorldRef.current.base);
 
+    if (cmd.t === 'craft') {
+      if (cmd.recipe.includes('scout') || cmd.recipe.includes('rover')) narratorRef.current?.trigger('fab:scout');
+      else narratorRef.current?.trigger('dirt:process');
+    }
+    if (cmd.t === 'fit') {
+      narratorRef.current?.trigger('weapon:swap');
+    }
+
     for (const ev of res.events) {
       if (ev.type === 'refused') {
         console.warn('[dispatchBase refused]', ev);
         say(formatRefusalToast(ev));
+        narratorRef.current?.trigger('build:refused');
       } else if (ev.type === 'placed') {
         incrementPlacedCounter(1);
+        if (ev.kind === 'foundation') narratorRef.current?.trigger('build:foundation');
+        if (ev.kind === 'bin') narratorRef.current?.trigger('bin:linked');
+        if (ev.kind === 'airlock' || ev.kind === 'wall') narratorRef.current?.trigger('room:sealed');
       } else if (ev.type === 'removed') {
         incrementPlacedCounter(-(1 + ev.collapsed.length), 'deconstructed');
         pieceManagerRef.current.handleRemoval(ev.id, ev.collapsed);
+        if (ev.collapsed.length > 0) narratorRef.current?.trigger('build:collapse');
       } else if (ev.type === 'drafted') {
         say(`Drafted Blueprint: ${ev.blueprint}`);
+        narratorRef.current?.trigger('drafting:blueprint');
       } else if (ev.type === 'stacked') {
         say(`Deposited ${ev.n} item(s) to Quantum Lattice.`);
       } else if (ev.type === 'door') {
         say(ev.open ? 'Airlock opened.' : 'Airlock closed.');
       } else if (ev.type === 'harvested') {
+        narratorRef.current?.trigger('harvest:pixels');
         let totalHarvested = 0;
         let itemName = 'Raw Material';
         for (const item of ev.items) {
@@ -525,6 +587,7 @@ export function PlayScreen(props: {
         say(`Refined: ${ev.n}x ${ITEMS[ev.item]?.name ?? ev.item}`, 'Ready for collection');
         fx('snap');
       } else if (ev.type === 'installed') {
+        if (ev.kind === 'fabricator') narratorRef.current?.trigger('fab:installed');
         const pad = baseWorldRef.current.base.pieces.find((p) => p.id === ev.machine);
         if (pad && envRef.current) {
           const padCenter = pieceAt(baseWorldRef.current.base, pad);
@@ -654,6 +717,7 @@ export function PlayScreen(props: {
         if (hitMarkerTimeout.current) window.clearTimeout(hitMarkerTimeout.current);
         hitMarkerTimeout.current = window.setTimeout(() => setHitMarker(false), 110);
         if (res.killed > 0) {
+          narratorRef.current?.trigger('mob:kill');
           say('Monster neutralized!', `+${res.killed * 50} Biomass Ore recovered.`);
         }
       }
@@ -758,6 +822,12 @@ export function PlayScreen(props: {
 
     const look = (id: string, st: Stage) => bakeLookCached(VAULT_BY_ID.get(id)!, st, device, gridSpacing);
     const steps: [string, () => void | Promise<void>][] = [
+      ['Loading voice narration', async () => {
+        const { rules } = await preloadMentorVo();
+        if (narratorRef.current) {
+          (narratorRef.current as any).rules = rules;
+        }
+      }],
       ['Loading generated assets', async () => {
         const s = stateRef.current.plot.stage || 1;
         await preloadAllGenAssets(genLevelForStage(s, props.profile.quality));
@@ -863,7 +933,14 @@ export function PlayScreen(props: {
       scene.setPlot(after, running(after, env), network(after, env).connected);
       fx('mill-start');
       scene.playAction('plant');
-      if (after.stage > before.stage) scene.raiseStage(after.stage, { x, z });
+      if (after.machines.length === 1) narratorRef.current?.trigger('machine:first');
+      if (after.stage > before.stage) {
+        scene.raiseStage(after.stage, { x, z });
+        narratorRef.current?.trigger(`stage:${after.stage}`);
+        if (after.stage === 1) narratorRef.current?.trigger('bloom:first');
+        if (after.stage === 4) narratorRef.current?.trigger('fab:hauler');
+        if (after.stage === 6) narratorRef.current?.trigger('fab:crawler');
+      }
       return true;
     };
     placeRef.current = tryPlace;
@@ -1354,6 +1431,51 @@ export function PlayScreen(props: {
         setDrivingSpeed(null);
       }
       dx = 0; dy = 0;
+
+      if (narratorRef.current) {
+        narratorRef.current.step(dt);
+
+        if (out.where === 'lab' && out.aimedPowerWall) {
+          lookPowerWallTimerRef.current += dt;
+          if (lookPowerWallTimerRef.current >= 0.8) {
+            narratorRef.current.trigger('look:power-wall');
+          }
+        } else {
+          lookPowerWallTimerRef.current = 0;
+        }
+
+        if (out.where === 'lab' && out.aimedWindow) {
+          lookWindowTimerRef.current += dt;
+          if (lookWindowTimerRef.current >= 0.8) {
+            narratorRef.current.trigger('look:window');
+          }
+        } else {
+          lookWindowTimerRef.current = 0;
+        }
+
+        if (out.where === 'lab' && out.atGate) {
+          narratorRef.current.trigger('gate:approach');
+        }
+
+        if (out.event === 'powered') {
+          narratorRef.current.trigger('power:on');
+        }
+        if (out.event === 'to-planet') {
+          narratorRef.current.trigger('moon:enter');
+        }
+        if (out.event === 'stage-up') {
+          narratorRef.current.trigger(`stage:${out.stage}`);
+          if (out.stage === 1) narratorRef.current.trigger('bloom:first');
+          if (out.stage === 4) narratorRef.current.trigger('fab:hauler');
+          if (out.stage === 6) narratorRef.current.trigger('fab:crawler');
+        }
+
+        if (prevSyncRef.current >= 0.3 && out.sync < 0.3) {
+          narratorRef.current.trigger('sync:low');
+        }
+        prevSyncRef.current = out.sync;
+      }
+
       let s = stateRef.current;
       if (out.event === 'powered') { s = poweredOn(s); say('Lunar Portal Online', 'Bridge technology stable. Step onto the moon to begin restoring the fidelity.'); }
       if (out.event === 'to-planet') { if (!s.visited) say('Stage 0: Lunar Surface', 'Monochrome & degrading. Our digital creations broke their simulated chains—build the machines before the collapse reaches Earth!'); s = arrived(s); }
@@ -1437,8 +1559,13 @@ export function PlayScreen(props: {
       hook.frames += 1; hook.where = out.where; hook.sync = out.sync; hook.step = stateRef.current.step; hook.wave = scene.debug.wave();
       if (hook.frames % 30 === 0) Object.assign(hook, scene.debug.stats());
       if (hook.frames % 15 === 0) {
-        setMashMobs(scene.mash.getMobList());
+        const mobList = scene.mash.getMobList();
+        setMashMobs(mobList);
         setMashStats(scene.mash.getStats());
+        if (!hasSeenMobRef.current && mobList.some((m) => m.state !== 'death')) {
+          hasSeenMobRef.current = true;
+          narratorRef.current?.trigger('mob:seen');
+        }
       }
       if (ms - hudAt > 90 || out.event || labRes.events.length) {
         hudAt = ms;
@@ -1485,10 +1612,21 @@ export function PlayScreen(props: {
       if (at < steps.length) { setLoading(steps[at]![0]); timer = window.setTimeout(step, 0); return; }
       hook.ready = true;
       setReady(true);
+      narratorRef.current?.trigger('wake');
       raf = requestAnimationFrame(loop);
     };
     (window as unknown as { hmPlay?: unknown }).hmPlay = Object.assign(hook, {
-      pull: () => scene.pullLever(),
+      pull: () => {
+        scene.pullLever();
+        narratorRef.current?.trigger('breaker:thrown');
+      },
+      narrator: narratorRef.current,
+      trigger: (ev: string) => narratorRef.current?.trigger(ev),
+      sayLine: (id: string) => narratorRef.current?.say(id),
+      replay: (id: string) => narratorRef.current?.replay(id),
+      subtitles: () => narratorRef.current?.getActiveSubtitle(),
+      heard: () => narratorRef.current?.getState().heard ?? [],
+      initAudio: () => initNarratorAudio(),
       go: (where: 'lab' | 'planet', x: number, z: number, yaw: number, pitch?: number) => scene.debug.teleport(where, x, z, yaw, pitch),
       gate: () => scene.debug.gatePlanet(),
       showGround: (on: boolean) => scene.debug.showGround(on),
@@ -1928,9 +2066,13 @@ export function PlayScreen(props: {
           if (tryPlaceBase()) return;
         }
         if (building) placeNow();
-        else if (hud.atLever) sceneRef.current?.pullLever();
-        else if (hud.atDial && !dialOpen) {
+        else if (hud.atLever) {
+          sceneRef.current?.pullLever();
+          narratorRef.current?.trigger('breaker:thrown');
+        } else if (hud.atDial && !dialOpen) {
           sceneRef.current?.playAction('button');
+          narratorRef.current?.trigger('gate:lever');
+          narratorRef.current?.trigger('gate:open');
           setDialOpen(true);
           freeMouse();
         } else if (hud.where === 'planet' && hud.aimed !== null && panel === null) {
@@ -2592,6 +2734,7 @@ export function PlayScreen(props: {
                 onClick={() => {
                   const next = syncMode === 'synced' ? 'desynced' : 'synced';
                   setSyncMode(next);
+                  narratorRef.current?.trigger(next === 'synced' ? 'sync:on' : 'sync:off');
                   say(
                     next === 'synced' ? 'Connected to Planetary Grid' : 'Desynced to Solo Branch',
                     next === 'synced' ? 'Majority consensus active on Sector 4.' : 'Playing solo offline. Changes are local.',
@@ -2600,9 +2743,132 @@ export function PlayScreen(props: {
               >
                 {syncMode === 'synced' ? 'Desync to Solo Branch' : 'Sync to Planetary Grid (Majority Merge)'}
               </button>
+              <button
+                onClick={() => {
+                  setRadioLogOpen(true);
+                  initNarratorAudio();
+                }}
+              >
+                📻 Radio Comms Log ({heardLogs.length})
+              </button>
               <button onClick={props.onBack}>Back to FIDELITY</button>
             </div>
           ) : null}
+
+          {/* Mentor Subtitles (On by default) */}
+          {subtitle && dialogueSettings.subtitlesEnabled && (
+            <div className="mentor-subtitle" role="region" aria-label="Mentor Radio Subtitles" data-testid="mentor-subtitle">
+              <div className="mentor-subtitle-header">
+                <span className="mentor-subtitle-pip" />
+                <span>DR. HADDY // FIELD RADIO</span>
+                <span className="mentor-subtitle-id">[{subtitle.id}]</span>
+              </div>
+              <div className="mentor-subtitle-body">{subtitle.cleanText}</div>
+            </div>
+          )}
+
+          {/* Radio Log HUD Button */}
+          <button
+            className={`radio-hud-btn${subtitle ? ' speaking' : ''}`}
+            style={{
+              position: 'fixed',
+              top: 16,
+              left: isBase ? 320 : 16,
+              zIndex: 90,
+            }}
+            onClick={() => {
+              setRadioLogOpen(true);
+              initNarratorAudio();
+              freeMouse();
+            }}
+            title="Open field radio communication logs"
+          >
+            <span>📻 COMMS</span>
+            <b>({heardLogs.length})</b>
+          </button>
+
+          {/* Radio Log Modal */}
+          {radioLogOpen && (
+            <div className="radio-log-modal-backdrop" onClick={() => setRadioLogOpen(false)}>
+              <div className="radio-log-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="radio-log-header">
+                  <div className="radio-log-title">
+                    <h3>DR. GWEN HADDY // FIELD RADIO LOG</h3>
+                    <span>{heardLogs.length} RECORDED</span>
+                  </div>
+                  <button className="radio-log-close" onClick={() => setRadioLogOpen(false)}>CLOSE [ESC]</button>
+                </div>
+                <div className="radio-log-controls">
+                  <div className="radio-log-ctl-item">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={dialogueSettings.subtitlesEnabled}
+                        onChange={(e) => {
+                          const en = e.target.checked;
+                          setDialogueSettings((s) => {
+                            const next = { ...s, subtitlesEnabled: en };
+                            saveDialogueSettings(next);
+                            return next;
+                          });
+                          narratorRef.current?.setSubtitlesEnabled(en);
+                        }}
+                      />
+                      SUBTITLES
+                    </label>
+                  </div>
+                  <div className="radio-log-ctl-item">
+                    <label>VOICE VOLUME: {Math.round(dialogueSettings.dialogueVolume * 100)}%</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={dialogueSettings.dialogueVolume}
+                      onChange={(e) => {
+                        const vol = parseFloat(e.target.value);
+                        setDialogueSettings((s) => {
+                          const next = { ...s, dialogueVolume: vol };
+                          saveDialogueSettings(next);
+                          return next;
+                        });
+                        narratorRef.current?.setDialogueVolume(vol);
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="radio-log-list">
+                  {heardLogs.length === 0 ? (
+                    <div className="radio-log-empty">No transmissions recorded yet. Comms appear as events unfold.</div>
+                  ) : (
+                    heardLogs.map((id) => {
+                      const info = getVoiceClipInfo(id);
+                      return (
+                        <div key={id} className="radio-log-row">
+                          <span className="radio-log-row-badge">{id}</span>
+                          <div className="radio-log-row-content">
+                            {info?.when && <span className="radio-log-row-when">{info.when}</span>}
+                            <span className="radio-log-row-text">{info?.cleanText ?? id}</span>
+                          </div>
+                          <button
+                            className="radio-log-replay-btn"
+                            onClick={() => {
+                              initNarratorAudio();
+                              narratorRef.current?.replay(id);
+                            }}
+                            title={`Replay ${id} through mentor field radio`}
+                          >
+                            ▶ REPLAY
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           <button
             className={`play-mash-btn${mashOpen ? ' active' : ''}`}
             onClick={() => {

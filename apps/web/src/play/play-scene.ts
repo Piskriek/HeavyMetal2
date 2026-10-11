@@ -199,6 +199,8 @@ export interface PlayScene {
   readonly debug: {
     groundTriangles(): number; showGround(on: boolean): void; where(): Where; position(): THREE.Vector3; teleport(where: Where, x: number, z: number, yaw: number, pitch?: number): void; sync(): number;
     stats(): { readonly triangles: number; readonly calls: number }; wave(): number; gatePlanet(): { x: number; z: number };
+    /** The drawn world bounds of one base piece (batched instances or its dynamic group), or null when not drawn. */
+    pieceBounds(id: number): { readonly min: readonly [number, number, number]; readonly max: readonly [number, number, number]; readonly leaf?: { readonly centre: readonly [number, number, number]; readonly normal: readonly [number, number, number] } } | null;
     /** The detail in use, the planet picture's size, and the pixels each machine pours now. */
     detail(): Detail & { readonly planet: readonly [number, number]; readonly pixels: number };
     /** Machines standing on the plot, and how many pour pixels now. */
@@ -2047,6 +2049,44 @@ export function createPlayScene(o: {
         where = w; pos.set(x, w === 'lab' ? EYE : groundAt(x, z) + EYE, z); yaw = y; if (p !== undefined) pitch = p;
       },
       sync: () => sync,
+      pieceBounds: (id) => {
+        // The drawn world bounds of one base piece (its batched instances, and its dynamic group: a door's leaf, lamps),
+        // and for a dynamic piece the first mesh of its group: that mesh's centre and face normal (its local +z).
+        const g = piecesGroup;
+        const mgr = (g?.userData as { manager?: { pieceIdFromHit: (o: THREE.Object3D, inst?: number) => number | null } } | undefined)?.manager;
+        if (!g || !mgr) return null;
+        g.updateMatrixWorld(true);
+        const box = new THREE.Box3();
+        const m = new THREE.Matrix4();
+        let found = false;
+        let leaf: { centre: [number, number, number]; normal: [number, number, number] } | undefined;
+        g.traverse((o) => {
+          if (o instanceof THREE.InstancedMesh) {
+            const geom = o.geometry;
+            if (!geom.boundingBox) geom.computeBoundingBox();
+            for (let s = 0; s < o.count; s++) {
+              if (mgr.pieceIdFromHit(o, s) !== id) continue;
+              o.getMatrixAt(s, m);
+              m.premultiply(o.matrixWorld);
+              box.union(geom.boundingBox!.clone().applyMatrix4(m));
+              found = true;
+            }
+          } else if (o.userData?.pieceId === id) {
+            box.union(new THREE.Box3().setFromObject(o));
+            found = true;
+            if (!leaf) {
+              o.traverse((c) => {
+                if (leaf || !(c instanceof THREE.Mesh) || !c.geometry) return;
+                if (!c.geometry.boundingBox) c.geometry.computeBoundingBox();
+                const lc = c.geometry.boundingBox!.getCenter(new THREE.Vector3()).applyMatrix4(c.matrixWorld);
+                const n = new THREE.Vector3(0, 0, 1).transformDirection(c.matrixWorld);
+                leaf = { centre: [lc.x, lc.y, lc.z], normal: [n.x, n.y, n.z] };
+              });
+            }
+          }
+        });
+        return found ? { min: [box.min.x, box.min.y, box.min.z], max: [box.max.x, box.max.y, box.max.z], leaf } : null;
+      },
       stats: () => ({ triangles: renderer.info.render.triangles, calls: renderer.info.render.calls }),
       wave: () => waveRadius(),
       gatePlanet: () => ({ x: twin.group.position.x, z: twin.group.position.z }),

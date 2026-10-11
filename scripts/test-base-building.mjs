@@ -1977,6 +1977,75 @@ try {
   console.log('OK: the house is placed through the real path, piece by piece:');
   for (const line of houseLog) console.log('   ' + line);
 
+  // Ray hits: aim at the drawn window wall's centre, and at the door leaf's centre, from 3 m on each face. The hit must
+  // land on that piece, within 0.3 m of the centre. The leaf is aimed at on its own (a swung door's piece bounds are
+  // the whole frame, and a ray through the open doorway hits behind it, which is right).
+  const rayCheck = async (label) => {
+    for (const kind of ['windowWall', 'door']) {
+      const piece = (await pieceList()).find((p) => p.kind === kind);
+      if (!piece) throw new Error(`house: no ${kind} to aim at`);
+      const b = await page.evaluate((id) => window.__playScene.debug.pieceBounds(id), piece.id);
+      if (!b) throw new Error(`house: the ${kind} has no drawn bounds`);
+      let c, sides;
+      if (kind === 'door') {
+        if (!b.leaf) throw new Error('house: the door has no drawn leaf');
+        c = b.leaf.centre;
+        const [nx, , nz] = b.leaf.normal;
+        // a swung door's far face can stand behind the house wall at 3 m: the check then aims from the near face only
+        sides = [['leaf +n', Math.atan2(nx, nz)]];
+        if (label === 'stage 1') sides.push(['leaf -n', Math.atan2(-nx, -nz)]);
+      } else {
+        c = [0, 1, 2].map((a) => (b.min[a] + b.max[a]) / 2);
+        const normalAlongX = b.max[0] - b.min[0] < b.max[2] - b.min[2];
+        // from the outside face only: a camera 3 m inside the room is pushed out by the house's colliders, so it does not aim
+        sides = normalAlongX ? [['+x', Math.PI / 2]] : [['+z', 0]];
+      }
+      for (const [side, yaw] of sides) {
+        await standAim({ x: c[0], y: c[1], z: c[2] }, yaw, 3, false);
+        await settle();
+        await page.waitForTimeout(250);
+        const hit = await page.evaluate(() => {
+          const a = window.__playScene.aimPoint();
+          return a ? { x: a.x, y: a.y, z: a.z, piece: a.piece } : null;
+        });
+        const off = hit ? Math.hypot(hit.x - c[0], hit.y - c[1], hit.z - c[2]) : Infinity;
+        console.log(`ray (${label}): ${kind} #${piece.id} from ${side}: hit piece ${hit?.piece ?? 'none'}, ${off.toFixed(2)} m from the centre`);
+        if (hit?.piece !== piece.id || off > 0.3) {
+          const other = hit?.piece == null ? null : (await pieceList()).find((p) => p.id === hit.piece);
+          console.log('   hit piece:', JSON.stringify(other), 'bounds of it:', JSON.stringify(await page.evaluate((id) => window.__playScene.debug.pieceBounds(id), hit?.piece ?? -1)));
+          console.log('   camera at', JSON.stringify(await page.evaluate(() => window.__playScene.debug.position())), 'aim centre', JSON.stringify(c), 'bounds', JSON.stringify(b));
+          throw new Error(`house: the ${kind} ray from ${side} (${label}) hit piece ${hit?.piece ?? 'none'} ${off.toFixed(2)} m from its centre (want #${piece.id} within 0.3 m)`);
+        }
+      }
+    }
+    console.log(`OK (${label}): aimed rays at the window wall and the door leaf land on those pieces, within 0.3 m of the centre`);
+  };
+  await rayCheck('stage 1');
+  // The window and the door sit on the wall line, like the walls around them (they were 2 m inside it at the cell centre).
+  // Drawn centres, the door shut: the window's on its row's wall line (z), the door's on the line of the r1 walls (x).
+  {
+    const plist = await pieceList();
+    const centreOf = async (id) => {
+      const bb = await page.evaluate((pid) => window.__playScene.debug.pieceBounds(pid), id);
+      if (!bb) throw new Error(`house: piece ${id} has no drawn bounds`);
+      return [0, 1, 2].map((a) => (bb.min[a] + bb.max[a]) / 2);
+    };
+    const win = plist.find((p) => p.kind === 'windowWall' && p.s === houseSid);
+    const door = plist.find((p) => p.kind === 'door' && p.s === houseSid);
+    const rowWall = plist.find((p) => p.kind === 'wall' && p.s === houseSid && p.r === 0 && p.j === win.j);
+    const sideWall = plist.find((p) => p.kind === 'wall' && p.s === houseSid && p.r === 1);
+    if (!win || !door || !rowWall || !sideWall) throw new Error('house: the wall-line check has no window, door or walls');
+    const [wx, , wz] = await centreOf(win.id);
+    const [rwx, , rwz] = await centreOf(rowWall.id);
+    const [dx, , dz] = await centreOf(door.id);
+    const [swx, , swz] = await centreOf(sideWall.id);
+    const winOff = Math.abs(wz - rwz);
+    const doorLine = swx + 4 * (door.i - sideWall.i) - dx;
+    console.log(`wall line: window z ${wz.toFixed(2)} vs its row wall z ${rwz.toFixed(2)} (off ${winOff.toFixed(2)} m); door x ${dx.toFixed(2)} vs its line ${(swx + 4 * (door.i - sideWall.i)).toFixed(2)} (off ${doorLine.toFixed(2)} m)`);
+    if (winOff > 0.1 || Math.abs(doorLine) > 0.1) throw new Error('house: the window or the door is not on its wall line');
+    console.log('OK: the window and the door sit on the wall line');
+  }
+
   // Build mode: the cube blueprint is still on the hotbar, so E on the aimed (closed) door must not toggle it.
   const doorOrigin = await structureOriginOf(houseSid);
   const doorAim = { x: doorOrigin.x + 2, y: 1.2, z: doorOrigin.z };
@@ -2050,6 +2119,19 @@ try {
     await takeScreenshot(page, { path: `docs/shots/base/house-stage${st}.png` });
     console.log(`Captured docs/shots/base/house-stage${st}.png`);
   }
+  // the screenshot loop left the debug alt camera on: release it, or the aim ray starts from the alt eye
+  await page.evaluate(() => window.__playScene.debug.clearAltCam());
+  // the door is open from the step above: shut it for this check (the leaf is drawn from the HD model at stage 6), then open it again
+  const doorId = (await pieceList()).find((p) => p.kind === 'door' && p.s === houseSid).id;
+  const setDoor = (open) => page.evaluate(([id, open]) => {
+    const api = window.__hm?.base ?? window.hmPlay?.base;
+    api.apply({ t: 'door', id, open });
+  }, [doorId, open]);
+  await setDoor(false);
+  await page.waitForTimeout(900);
+  await rayCheck('stage 6');
+  await setDoor(true);
+  await page.waitForTimeout(900);
   await page.evaluate(() => window.__hm?.hideOverlays?.(true));
   await altLook({ x: doorOrigin.x + 10, y: doorOrigin.y + 2.2, z: doorOrigin.z - 1 }, { x: doorOrigin.x + 2, y: doorOrigin.y + 1.2, z: doorOrigin.z });
   await page.waitForTimeout(700);

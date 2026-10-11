@@ -202,7 +202,9 @@ export function pieceAt(base: S.Base, p: S.Piece): { x: number; y: number; z: nu
 /** pieceAt for a structure pose that may not be in the base yet (a plan's ghost). */
 export function pieceAtIn(st: S.Structure, p: Pick<S.Piece, 'kind' | 'i' | 'j' | 'k' | 'r' | 'dx' | 'dz'>): { x: number; y: number; z: number } {
   const C = S.CELL;
-  const local = p.kind === 'wall' || p.kind === 'airlock'
+  // Wall-type pieces sit on the cell edge (their kit pivot spans the cell from there). The window, door, doorframe and
+  // half wall are wall-type too: at the cell centre they stood 2 m inside the wall line, so aimed rays hit the wall behind.
+  const local = p.kind === 'wall' || p.kind === 'airlock' || p.kind === 'halfWall' || p.kind === 'windowWall' || p.kind === 'doorframe' || p.kind === 'door'
     ? (p.r === 0 ? [(p.i + 0.5) * C, p.j * C] : [p.i * C, (p.j + 0.5) * C])
     : p.kind === 'pillar' ? [p.i * C, p.j * C]
       : p.kind === 'hardpoint' ? [(p.i + 1) * C, (p.j + 1) * C]

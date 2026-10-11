@@ -857,6 +857,7 @@ export function PlayScreen(props: {
         const s = stateRef.current.plot.stage || 1;
         await preloadAllGenAssets(genLevelForStage(s, props.profile.quality));
       }],
+      ['Fitting the lab', async () => { await scene.preloadLabGenerated(); }],
       ...SMOOTH_IDS.map((id): [string, () => void] => ['Shaping the boulders', () => { smoothModel(id); }]),
       ['Building your plot', () => { look(PLOT, 1); }],
       ...[...new Set(NEIGHBOURS.map((n) => `${n.cartridge}@${n.stage}`))].map((k): [string, () => void] => {

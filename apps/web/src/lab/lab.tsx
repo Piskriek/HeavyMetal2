@@ -60,11 +60,12 @@ export function LabHome(props: { readonly profile: Profile }): ReactElement {
     const look = (id: string) => bakeLookCached(VAULT_BY_ID.get(id)!, LAST, device, gridSpacing);
     const cartridges = [...new Set([FINISHED, ...NEIGHBOURS.map((n) => n.cartridge)])];
     // each step in its own task, so the bar keeps moving; the label names what comes next
-    const steps: [string, () => void][] = [
+    const steps: [string, () => void | Promise<void>][] = [
       ...SMOOTH_IDS.map((id): [string, () => void] => ['Growing the trees', () => { smoothModel(id); }]),
       ['Waking the goblin', () => { smoothModel('goblin'); }],
       ...(['MOON_STRIDER', 'CRYSTAL_TORTOISE', 'SKY_MANTA'] as const).map((id): [string, () => void] => ['Waking the animals', () => { animalBody(id); }]),
       ...cartridges.map((id): [string, () => void] => ['Finishing the planet', () => { look(id); }]),
+      ['Fitting the lab', () => scene.preloadLabGenerated()],
       ['Powering the gate', () => { scene.setVista(look(FINISHED), look(FINISHED), NEIGHBOURS.map((plot) => ({ plot, look: look(plot.cartridge) }))); }],
     ];
     let cancelled = false, raf = 0, at = 0, timer = 0, last = performance.now();
@@ -77,9 +78,10 @@ export function LabHome(props: { readonly profile: Profile }): ReactElement {
       if (hook.frames % 30 === 0) Object.assign(hook, scene.stats());
       raf = requestAnimationFrame(loop);
     };
-    const step = (): void => {
+    const step = async (): Promise<void> => {
       if (cancelled) return;
-      steps[at]![1]();
+      await steps[at]![1]();
+      if (cancelled) return;
       at += 1;
       if (at < steps.length) { setLoading(steps[at]![0]); timer = window.setTimeout(step, 0); return; }
       hook.ready = true;

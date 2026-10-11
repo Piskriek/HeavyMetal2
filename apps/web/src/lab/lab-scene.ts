@@ -5,7 +5,8 @@
 // - SetMix: the lush sunlit terraformed planet (docs/concept/setmix/04-menu-setmix.png)
 // - Goblin Racing: the goblin planet in deep space (docs/concept/setmix/05-menu-goblin-racing.png)
 import * as THREE from 'three';
-import { createLabRoom, GATE_AT, PLANET_TABLE_AT, type LabRoom } from '../play/lab-room';
+import { createLabRoom, GATE_AT, PLANET_TABLE_AT, preloadLabGenerated, type LabRoom } from '../play/lab-room';
+import { genLevelFor } from '../assets/gen';
 import { createPlotHolo, type PlotHolo } from '../play/plot-holo';
 import type { PlotGround } from '../play/plot-ground';
 import type { PlotState } from '@hm/plotsim';
@@ -190,6 +191,8 @@ const PORTAL_FRAGMENT = /* glsl */ `
 export interface LabScene {
   /** Configures or enriches the gate vista */
   setVista(base: StageLook, plot: StageLook, neighbours: readonly Neighbour[]): void;
+  /** Loads the lab's generated models (behind the loading bar) and puts them in the lab in place of the labkit fallbacks. */
+  preloadLabGenerated(): Promise<void>;
   frame(now: number, dt: number): void;
   /** What the last frame drew (for test hooks) */
   stats(): { readonly triangles: number; readonly calls: number };
@@ -300,6 +303,11 @@ export function createLabScene(o: {
   return {
     setVista() {
       // Menu vista is driven cleanly by procedural portal shader
+    },
+
+    async preloadLabGenerated() {
+      await preloadLabGenerated(genLevelFor('high')); // the room above is built at the default (high) quality
+      room.adoptGenerated();
     },
 
     lean(x, y) {

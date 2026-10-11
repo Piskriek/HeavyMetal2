@@ -14,7 +14,7 @@ import { createPlotGround, type BoulderInfo, type PlotGround } from './plot-grou
 import { fx as sfx } from '../maker/feedback';
 import { gameAudio } from '../audio/game-audio';
 import * as kit from '@hm/labkit';
-import { createLabRoom, GATE_AT, PLANET_TABLE_AT, POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, ROOM, type LabRoom } from './lab-room';
+import { createLabRoom, GATE_AT, PLANET_TABLE_AT, POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, preloadLabGenerated, ROOM, type LabRoom } from './lab-room';
 import { createPlotHolo, type PlotHolo } from './plot-holo';
 import { COLOUR_MARK_FRAGMENT, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX } from './portal-shaders';
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
@@ -42,6 +42,7 @@ import {
   createGenFabricator,
   genLevelForStage,
 } from '../assets/gen-props';
+import { genLevelFor } from '../assets/gen';
 
 export type Where = 'lab' | 'planet';
 /** What the screen gives the scene each frame. */
@@ -185,6 +186,8 @@ export interface PlayScene {
    * display governor would read as a slow machine (and the owner's rule is never to start a screen choppy).
    */
   warm(): void;
+  /** Loads the lab's generated models (behind the loading bar) and puts them in the lab in place of the labkit fallbacks. */
+  preloadLabGenerated(): Promise<void>;
   /** Monster Mash retro mob spawning and weapon combat system. */
   readonly mash: MonsterMashCombatManager;
   /** Immediately sets the world and mob visual fidelity stage (0 to 4). */
@@ -2012,6 +2015,10 @@ export function createPlayScene(o: {
     },
     gatherBoulder(id, amount) {
       return ground?.gather(id, amount) ?? 0;
+    },
+    async preloadLabGenerated() {
+      await preloadLabGenerated(genLevelFor(currentQuality));
+      room.adoptGenerated();
     },
     warm() {
       // each scene for each place it draws to (the screen's colour space differs from the targets'), hidden things included (the

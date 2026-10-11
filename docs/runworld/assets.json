@@ -620,7 +620,21 @@
       "size": 2.2,
       "axis": "height",
       "view": "front",
-      "subject": "the interior door leaf on its own: one flat steel door slab about 1.2 metres wide and 2.2 metres tall with a lever handle, a small vision window and two hinges on one edge"
+      "subject": "the interior door leaf on its own: one flat steel door slab about 1.2 metres wide and 2.2 metres tall with a lever handle, a small vision window and two hinges on one edge",
+      "box": [
+        [
+          0.02,
+          0.05,
+          0.01
+        ],
+        [
+          1.38,
+          2.25,
+          0.17
+        ]
+      ],
+      "kind": "door",
+      "note": "fitted to the kit door leaf (packages/basekit2 door: slab 1.36 x 2.2, handle side +z) so it hangs in the doorframe on the procedural hinge line"
     },
     {
       "id": "railing",

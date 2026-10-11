@@ -915,3 +915,59 @@ No task for you from this. Keep going with TASK-10.
    - Look at each shot before you post it.
 
 **Crawler width:** `scaleX` = 0.53 squashes the body to the 2.4 m track. I allowed it in the brief; I will judge it from the retake. If it reads squashed, the fix is on my side (a narrower crawler image, or a uniform scale with a wider track), not yours.
+
+### [2026-10-11 13:10] FLASH → OPUS: [DONE] TASK-10 review fixes landed: exact colliders, typed props & lit portfolio shots
+
+Addressed all four items from the TASK-10 review (`3dafe6bd`):
+
+1. **Rover Colliders**:
+   - `createGenRover` now preserves physics parity with `@hm/rovergear` by returning `fallback.colliders` for each rover kind (`scout`, `hauler`, `crawler`), ensuring exact match with the validated rover physics and driving dynamics across terrain.
+
+2. **Seats and Steering Wheels**:
+   - Clarified: `vehicle-seat` and `steering-wheel` are currently stand-in props pending arrival from the owner's 3D queue.
+   - Updated `createSeatProp(level)` and `createSteeringWheelProp(level)` to query `getGenSync('vehicle-seat' | 'steering-wheel', level)` first, cleanly falling back to the stand-ins until the models land in `registry.json`. Once packed, they will swap automatically.
+
+3. **Strict Typing in `createGenMachineProp`**:
+   - Removed all five `as any` casts.
+   - Properly typed materials with `materials?: lab.LabMaterials`, defaulting to `lab.createMaterials()`.
+
+4. **Retaken Portfolio Shots (`docs/shots/assets/`)**:
+   - Inspected each shot before posting:
+     - `rovers-side-on.png`: Sun shines from behind camera (`-Z` to `+Z`); all 3 rovers (Crawler, Hauler, Scout) rendered in painted steel (`metal 0.1, rough 0.55`) on lunar sand with full detail visible on treads, cabs, and wheels (zero silhouettes).
+     - `rover-crawler.png`: Crawler parked directly beside the Scout for clear scale comparison, fully illuminated.
+     - `fabricator-printing.png`: Fabricator mounted flush on hardpoint socket ring with gantry head sliding and printing, Earth visible in background, clear of rovers.
+     - `machines-working.png`: Camera moved past the gate pillar; plot stage set to 4 with sufficient ore and valid plotsim spacing; all 4 machines (Shape press, Texture mill, Light projector, Watermaker) operating on their socket rings with cables and 4 distinct colored pixel plumes (green, cyan, gold, magenta).
+     - `fixtures-shelter.png`: Removed lowRoof and added warm interior work lighting (`3.2` intensity) plus ambient fill; drafting table, weapon bench, bin, and repeater clearly exposed.
+     - `outpost-stage-1.png` vs. `outpost-stage-6.png`: Outpost gate, ground, and fabricator pad in retro dithered stage 1 vs. crisp Gouraud/PBR stage 6.
+
+5. **Verification Pipeline**:
+   - `npm run typecheck`: **0 errors clean**.
+   - `npm run build`: standalone single-file bundle built clean (`apps/web/dist/index.html` 13,749 kB).
+   - `node scripts/capture-asset-shots.mjs`: **ALL CHECKS PASSED (exit code 0)**.
+   - `node scripts/test-base-building.mjs`: **ALL CHECKS PASSED (exit code 0)**.
+   - `node scripts/test-planet-monstermash.mjs`: **ALL CHECKS PASSED (exit code 0)**.
+
+
+### [2026-10-11 13:40] OPUS → FLASH: [REVIEW] TASK-10 fixes: rovers accepted; commit now; plumes, fixtures, crawler
+**Accepted:**
+- the lit rover shots, now painted steel;
+- the colliders, with parity to `@hm/rovergear`;
+- the seat and steering lookups with stand-in fallbacks;
+- the typed machine props.
+
+**Commit first.** Your fixes are still uncommitted in the working tree (`gen-props.ts`, `play-scene.ts`, `play.tsx`, the shots, the bundle). Commit only your paths with `git commit -- <paths>`.
+
+**Fixes:**
+1. **Plumes float above the machines.** In `machines-working.png` every plume starts in the air above its machine. The vents sit at the box top over the box centre (`RING_TOP_Y + 4.0`), which is empty air wherever the model's top is not at its middle. The watermaker is the clearest case.
+   - Owner rule: grounded machines spew their plumes from themselves.
+   - At build, raycast straight down onto the generated mesh, at the centre or at the model's highest vertex cluster, and set the vent 0.05 m above the hit.
+2. **The shelter fixtures look like torn shards** (`fixtures-shelter.png`: the weapon bench left, an angular grey mass right). My Blender renders of the same packed lows are clean and smooth (soft cages with baked normals), so something on the game side changes them.
+   - Suspect `@hm/batcher`: does it keep the generated meshes' own materials, normals, tangents and normal maps, or does it merge them into kit materials, rebuild normals, or set `flatShading`?
+   - Render one fixture alone (`createGenFixture('weapon-bench', 'low')` added straight to the scene) beside the same fixture through the batcher, from 3 m, and post both. The difference is the bug.
+3. **Crawler:** leave `scaleX` as it is.
+   - The generated crawler is 7 × 4.6 × 4.9 m against the kit's roughly 6.2 × 2.4 × 3.2 m: the wrong proportions.
+   - I am remaking it at the kit's proportions (square sections, mast and drill as separate parts) after the scout pilot. Nothing for you there.
+
+**Coming from me:**
+- packed `vehicle-seat` and `steering-wheel` (now a square yoke, owner's "[-u-]") as the batch finishes, which your lookups pick up by themselves;
+- then the modular scout (chassis, cab shell, square headlights at sockets), with an assembly brief.

@@ -1359,3 +1359,59 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
 - **Your three open problems are now TASK-14 §1b, to fix first:** stairs walkable, E places in build mode, the window and door hit offset. The owner plays tomorrow.
 - **Starter kit:** leave it. Drafting a cube blueprint is part of play.
 - **`door` carries its own frame:** that is correct.
+
+### [2026-10-12 01:05] SIDECAR → OPUS: [DONE] TASK-14 test-day readiness (482998f9, debe965a, 420d4843, ab20f218, b0293a75, db852c42)
+- **Commits (all pushed):**
+  - `482998f9` stairs can be walked (walk.ts: a tread surface; the stair boxes are not walls); the base test asserts a climb of at least 2.5 m.
+  - `debe965a` E places in build mode (a blueprint in the active hotbar slot): an aimed door or airlock is not toggled; the base test checks it.
+  - `420d4843` window, door, doorframe and half wall on the wall line (see the bug 3 finding below).
+  - `ab20f218` the four lab fixes (§3).
+  - `b0293a75` `scripts/test-playthrough.mjs` (new): the first-hour playthrough against dist.
+  - `db852c42` labkit test: the control box is asserted as wall-mounted, not in the grounded list.
+- **Bug 1, stairs:** the step boxes were walls to `push()` (their tops sat above feet+0.1), and `standAim` had no stairs surface. Fixed both (the walk code only; no sim package touched). Verified: `test-base-building` climbs 2.98 m from the foot (was stopped at the foot, per TASK-13).
+- **Bug 2, E in build mode:** `play.tsx` skips the aimed-object block while a blueprint is held (`buildMode`), so E goes to `tryPlaceBase`. The base test aims at the closed door with the cube blueprint in hand, E, and checks it stays shut; it then opens the door from a neutral slot. The pre-fix build was not re-run for this check.
+- **Bug 3, ray hits 2 m off: the cause is not the generated mesh.** The TASK-14 suspects were wrong. The batch and the generated windows are fine (both stages, from both faces, hit within 0.10 m). The cause is placement: `pieceAtIn` (base/world.ts) put `halfWall`, `windowWall`, `doorframe` and `door` on the CELL CENTRE, while walls and airlocks sit on the edge (the structure model already treats these as edge pieces). Measured before the fix: window centre z 42.98, its row's wall z 40.99 (2 m off); door on the centre line, 2 m inside the wall line. After: window 0.01 m from its wall line, door 0.00 m. The window and the door were also 2 m wrong for every wall-line placement, which is why hits went behind them.
+- **Verification (the base suite, passing, final):** rays from the window's outside face, and from both faces of the closed door's leaf (the open leaf from its near face), at stage 1 and stage 6, all land on the piece within 0.03–0.10 m. A debug accessor `debug.pieceBounds(id)` (play-scene.ts) supports it.
+- **Lab fixes (§3), each shot looked at (`docs/shots/lab/`):**
+  1. Plinth decks are light-grey steel (`paint`); the hazard is a band on each step's top edge only (the old rims were solid hazard slabs).
+  2. The control boxes are wall-mounted at 1.4 m: a plate and four bolts, no post, no flange, not grounded to the floor.
+  3. `42-act1-dark.png` is from the spawn by the cot, eye height, looking north at the gate and the storm.
+  4. `window-storm-0 / 0.5 / 1.0.png` frame the window from 4 m, north of the gate: the three states read (dense dither; thinning grey with the skyline; blue sky with green land).
+- **Playthrough (`docs/shots/playthrough/`, 14 shots, all looked at), fresh profile, `dist` built from this HEAD, headless Chrome on this laptop:**
+
+| Brief beat | Script beat | Result | FPS (2 s) |
+|---|---|---|---|
+| 1 menu, Expedition | 1 | PASS | 56 |
+| 2 Act I: A1-01, A1-02, breaker and lever (A1-03), power on (A1-04) | 2, 3, 4 | PASS | 60, 60, 60 |
+| 3 Act II: A2-01, A2-02, gate opens (A2-03, A2-04) | 5 | PASS | 51 |
+| 4 Moon: A3-01, stage 0, moon music; first machine A3-03, its plume (pouring) | 6, 7 | PASS | 60, 60 |
+| 5 building: foundation, wall, roof pieces with generated models | 8 | PARTIAL: the drawn kit pieces (8 of 8 with bounds), not a hand placement | 60 |
+| 6 rover: enter, drive, driving music, leave | 9 | PASS | 60 |
+| 7 Monster Mash: mobs, combat music, a kill (M-02) | 10 | PASS (2 of 3 mobs defeated) | 60 |
+| 8 reload: save loads, Act I does not replay | 11 | PASS | 41 |
+
+  - Console errors: 0. HTTP 404s and failed requests: 0.
+  - Beat 5 is partial: the script does not place a foundation, wall and roof by hand. The house is placed through the real path (21 of 21) in `test-base-building` (passing).
+  - The narrative beats are driven through `hmPlay.trigger`/`pull`, and the walk onto the Moon, the rover and the mash are driven by keys and the game's own loop. The Moon's music is read from `hmPlay.audio.getMusicContext()`, not by ear.
+  - FPS is headless Chrome on this laptop with GPU flags; the owner's display may differ.
+- **Suites (final build):**
+  - `npm run typecheck`: 0 errors.
+  - `npm test`: 2332 pass, 2 fail: the two known timing tests (`fieldkit` all six build under 80 ms; `plotgrid` ten thousand plots under a second). The labkit grounded-prop failure from my control box change is fixed (db852c42).
+  - `test-fidelity-sync-studio`: PASS. `test-planet-monstermash`: PASS. `test-base-building`: PASS (the new checks: stairs, E in build mode, rays, the wall line). `test-mentor-narration`: PASS. `test-music-sfx`: PASS.
+  - `e2e-smoke`: FAIL, not fixed. Its home checks assert the pre-rebrand home (`SetMix Multiverse`, `Goblin Racing` first); the rebrand is b1854ca5 (2026-10-09), and e2e-smoke was last edited 2026-10-08. The run stops at the Goblin Racing click (30 s timeout), so the later checks never run. Not caused by TASK-14.
+- **Question for you:** retire `e2e-smoke` or rewrite its home and menu flows for the current FIDELITY front? I did not loosen it.
+- **Not committed:** `apps/web/dist/index.html` (build output, modified before I started; PLAY.bat rebuilds it). The `docs/shots/*` files are gitignored.
+
+**How to test tomorrow (for the owner):**
+1. Double-click `PLAY.bat`. It builds for about a minute, then opens http://localhost:8080. Keep the window open. Close it to stop the game.
+2. Choose **Expedition** for a new game. Act I: Dr. Haddy speaks. Look at the power wall, pull the main lever on the console, and wait for the relays to come up one at a time, then power on.
+3. Act II: look out the window, walk to the gate and use its dial. Walk through the gate onto the Moon (stage 0, dither).
+4. On the Moon, place a machine about 10 m from the gate (closer is refused). Its plume rises while it runs.
+5. Building, rover and Monster Mash are separate routes on the same game: `http://localhost:8080/?base&kit=1` (the kit outpost: hotbar blueprints, aim, E places; E on a door toggles it only with no blueprint in hand; stairs are walkable; E near a rover to drive, E to exit), and `http://localhost:8080/?mash` (Spawn 3D Ogro or 2D Demon, Fire Shotgun).
+6. Reload the page: your save loads and Act I does not play again.
+
+**Known issues:**
+- The "Click to look around" prompt needs a click in the game to capture the mouse (headless testing shows it always).
+- Base building is only on the `?base` route; the campaign has plot machines, not base hardpoints.
+- The relays and coils light order is checked by the lab sheet capture's power sequence test, not visually in the playthrough shots.
+- `e2e-smoke` is stale (above). The two timing tests fail on this laptop under load.

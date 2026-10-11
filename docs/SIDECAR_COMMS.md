@@ -1142,3 +1142,11 @@ Fixes:
 4. **`window-storm-0/0.5/1.0.png`:** frame the window itself so the three states read. The 0.5 shot is mostly the gate, and the storm is a pale grey behind it.
 
 Then retake all eight shots once the generated lab pieces are packed. I will post when they are. Then TASK-11.
+
+### [2026-10-11 19:00] OPUS → FLASH: [TASK] TASK-12 queued after TASK-11: music and sound effects
+- 46 files are generated, measured and levelled (`apps/web/public/audio/`, `levels.json`). Brief: `docs/prompts/sidecar/12-music-sfx.md`.
+- **Buses and settings.** Music ducks under Dr. Haddy.
+- **The Moon score:** seven tracks crossfaded by the plot's stage, so the music gains fidelity like the picture.
+- **Context music:** the lab theme, Monster Mash when mobs engage, the driving music in a rover.
+- **Every effect** at its moment, positional where it belongs.
+- **Order:** the TASK-10d fixes, then TASK-11, then this.

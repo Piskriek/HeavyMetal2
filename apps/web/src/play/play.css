@@ -464,12 +464,12 @@
    ========================================================================== */
 .play-sync-indicator {
   position: absolute;
-  top: clamp(14px, 3vh, 24px);
-  right: clamp(16px, 3vw, 36px);
+  top: 14px;
+  right: 175px;
   display: flex;
   align-items: center;
   gap: 10px;
-  z-index: 10;
+  z-index: 40;
   pointer-events: auto;
 }
 .sync-badge {

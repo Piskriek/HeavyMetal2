@@ -123,8 +123,11 @@ try {
   console.log(`OK: Subtitle header: "${headerText?.trim()}"`);
   console.log(`OK: Subtitle body: "${bodyText?.trim()}"`);
 
-  if (!headerText?.includes('DR. HADDY') || !headerText?.includes('A1-01')) {
-    throw new Error(`Expected header to contain 'DR. HADDY' and 'A1-01', got: ${headerText}`);
+  if (!headerText?.includes('DR. HADDY')) {
+    throw new Error(`Expected header to contain 'DR. HADDY', got: ${headerText}`);
+  }
+  if (headerText?.includes('A1-01')) {
+    throw new Error('Line id badge should not be displayed in caption header');
   }
   if (!bodyText?.includes('Careful with that relay') && !bodyText?.includes('shielded zone')) {
     throw new Error(`Expected body to contain 'Careful with that relay', got: ${bodyText}`);

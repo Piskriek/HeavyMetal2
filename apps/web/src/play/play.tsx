@@ -152,10 +152,11 @@ export function PlayScreen(props: {
   const firstGatherRef = useRef(false);
 
   // TASK-11 Mentor Narration Controller & UI
+  const slotKey = state.avatar ? (state.avatar.kind === 'custom' ? state.avatar.key : state.avatar.name) : 'campaign';
   const narratorRef = useRef<GameNarratorController | null>(null);
   const [subtitle, setSubtitle] = useState<{ id: string; text: string; cleanText: string } | null>(null);
   const [radioLogOpen, setRadioLogOpen] = useState(false);
-  const [heardLogs, setHeardLogs] = useState<readonly string[]>(() => loadRadioLog());
+  const [heardLogs, setHeardLogs] = useState<readonly string[]>(() => (state.step === 'create' ? [] : loadRadioLog(slotKey)));
   const [dialogueSettings, setDialogueSettings] = useState(() => loadDialogueSettings());
   const lookPowerWallTimerRef = useRef(0);
   const lookWindowTimerRef = useRef(0);
@@ -179,7 +180,8 @@ export function PlayScreen(props: {
   useEffect(() => {
     if (!narratorRef.current) {
       const defaultRules = fidelityRules(Object.fromEntries(FIDELITY_LINE_IDS.map((id) => [id, 3])));
-      narratorRef.current = new GameNarratorController(defaultRules, loadRadioLog(), loadDialogueSettings());
+      const initialLogs = state.step === 'create' ? [] : loadRadioLog(slotKey);
+      narratorRef.current = new GameNarratorController(defaultRules, initialLogs, loadDialogueSettings(), slotKey);
     }
     const unsubSub = narratorRef.current.onSubtitle(setSubtitle);
     const unsubLog = narratorRef.current.onRadioLog(setHeardLogs);
@@ -187,7 +189,7 @@ export function PlayScreen(props: {
       unsubSub();
       unsubLog();
     };
-  }, []);
+  }, [slotKey]);
   /** The machine whose panel is open (its plot id). */
   const [panel, setPanel] = useState<number | null>(null);
   /** The lab machine whose panel is open ('rack' | 'bench' | 'combiner'). */
@@ -2207,6 +2209,8 @@ export function PlayScreen(props: {
         <div className="play-create">
           <CreateScientist inLab title="Who are you?" doneLabel="Done: into the lab"
             onDone={(avatar) => {
+              narratorRef.current?.resetLog();
+              narratorRef.current?.trigger('wake');
               commit(created(stateRef.current, avatar));
               sceneRef.current?.setAvatar(avatar);
               say('Simulation Bridge Alert', 'The lab is shielded. A nested simulation broke down—pull the console lever to open the portal to the moon.');
@@ -2761,7 +2765,6 @@ export function PlayScreen(props: {
               <div className="mentor-subtitle-header">
                 <span className="mentor-subtitle-pip" />
                 <span>DR. HADDY // FIELD RADIO</span>
-                <span className="mentor-subtitle-id">[{subtitle.id}]</span>
               </div>
               <div className="mentor-subtitle-body">{subtitle.cleanText}</div>
             </div>
@@ -2772,9 +2775,9 @@ export function PlayScreen(props: {
             className={`radio-hud-btn${subtitle ? ' speaking' : ''}`}
             style={{
               position: 'fixed',
-              top: 16,
-              left: isBase ? 320 : 16,
-              zIndex: 90,
+              top: 14,
+              right: 380,
+              zIndex: 40,
             }}
             onClick={() => {
               setRadioLogOpen(true);

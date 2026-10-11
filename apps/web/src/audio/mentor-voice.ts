@@ -41,27 +41,42 @@ export const DEFAULT_SETTINGS: MentorVoiceSettings = {
   isRadio: true,
 };
 
-const LOG_KEY = 'fidelity.radio-log';
-const SETTINGS_KEY = 'fidelity.dialogue-settings';
+function logKeyForSlot(slot?: string): string {
+  return slot ? `fidelity.radio-log.${slot}` : 'fidelity.radio-log';
+}
 
-export function loadRadioLog(): string[] {
+export function loadRadioLog(slot?: string): string[] {
   if (typeof localStorage === 'undefined') return [];
   try {
-    const raw = localStorage.getItem(LOG_KEY);
+    const raw = localStorage.getItem(logKeyForSlot(slot)) ?? (slot ? localStorage.getItem('fidelity.radio-log') : null);
     return raw ? (JSON.parse(raw) as string[]) : [];
   } catch {
     return [];
   }
 }
 
-export function saveRadioLog(heard: readonly string[]): void {
+export function saveRadioLog(heard: readonly string[], slot?: string): void {
   if (typeof localStorage === 'undefined') return;
   try {
-    localStorage.setItem(LOG_KEY, JSON.stringify(heard));
+    const key = logKeyForSlot(slot);
+    localStorage.setItem(key, JSON.stringify(heard));
+    if (slot) localStorage.setItem('fidelity.radio-log', JSON.stringify(heard));
   } catch {
     /* storage unavailable */
   }
 }
+
+export function clearRadioLog(slot?: string): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.removeItem(logKeyForSlot(slot));
+    if (slot) localStorage.removeItem('fidelity.radio-log');
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+const SETTINGS_KEY = 'fidelity.dialogue-settings';
 
 export function loadDialogueSettings(): MentorVoiceSettings {
   if (typeof localStorage === 'undefined') return { ...DEFAULT_SETTINGS };
@@ -411,15 +426,33 @@ export class GameNarratorController {
   private chain: MentorVoiceChain | null = null;
   private ctx: AudioContext | null = null;
   private settings: MentorVoiceSettings;
+  private slot?: string;
   private activeSub: { id: string; text: string; cleanText: string } | null = null;
   private subSubscribers = new Set<(sub: { id: string; text: string; cleanText: string } | null) => void>();
   private logSubscribers = new Set<(heard: readonly string[]) => void>();
   private duckCallback: ((ducked: boolean) => void) | null = null;
 
-  constructor(rules: Rules, initialHeard: string[] = loadRadioLog(), settings = loadDialogueSettings()) {
+  constructor(rules: Rules, initialHeard?: string[], settings = loadDialogueSettings(), slot?: string) {
+    this.slot = slot;
     this.rules = rules;
-    this.state = createNarrator(initialHeard);
+    this.state = createNarrator(initialHeard ?? loadRadioLog(slot));
     this.settings = settings;
+  }
+
+  public setSlot(slot?: string): void {
+    this.slot = slot;
+  }
+
+  public resetLog(): void {
+    clearRadioLog(this.slot);
+    this.state = createNarrator([]);
+    this.activeSub = null;
+    this.notifySubscribers();
+    this.logSubscribers.forEach((cb) => cb(this.state.heard));
+  }
+
+  public setRules(rules: Rules): void {
+    this.rules = rules;
   }
 
   public initAudio(ctx: AudioContext, destination?: AudioNode): void {
@@ -507,7 +540,7 @@ export class GameNarratorController {
 
     // Check if heard log grew
     if (this.state.heard.length > prevHeardLen) {
-      saveRadioLog(this.state.heard);
+      saveRadioLog(this.state.heard, this.slot);
       this.logSubscribers.forEach((cb) => cb(this.state.heard));
     }
 

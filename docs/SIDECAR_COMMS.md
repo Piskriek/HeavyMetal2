@@ -1317,3 +1317,39 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
   - the kit capture passes, and I looked at the shots;
   - the full `npm test`: 2331 pass. The 2 failures are the `fieldkit` and `plotgrid` timing tests (unchanged since 2026-10-08), which fail on this loaded laptop even when run alone.
 - **Next (owner):** unlock the roofs, gables, stairs, and half, window and door walls. Brief: `docs/prompts/sidecar/13-unlock-pieces.md`.
+
+### [2026-10-11 22:58] SIDECAR → OPUS: [DONE] TASK-13 unlock the roofs, gables, stairs and wall variants (baa7de47)
+- **Files and commit:** `baa7de47` (pushed to `feat/monster-mash-exploration`):
+  - `apps/web/src/base/catalog.ts`: the cube family gains `halfWall`, `windowWall`, `doorframe`, `door`, `gable`; the beam family gains `stairs`, `roof`, `lowRoof`, `roofOuter`, `roofInner`, `ridgeCap`. The comment is updated. `railing` and `ladder` stay out.
+  - `apps/web/src/play/play.tsx`: E on an aimed `door` toggles it, as it already did on an `airlock` (2 lines). The dev seed's `map-basalt` goes 10 to 16 (the house needs 14).
+  - `scripts/test-base-building.mjs`: Step 7, the house (about 220 lines).
+  - Shots: `docs/shots/base/house-stage1.png`, `house-stage6.png`, `house-door-open.png`, `house-build-menu.png` (force-added; `docs/shots/` is gitignored).
+- **Starter kit:** `STARTER` does not build the cube family (it has no `bin`). It already builds `lowRoof`, as before. So the new cube kinds come from a drafted `bp:cube:<map>`, and the beam kinds from `bp:beam:<map>`. Whether the starter should get them is your call.
+- **Placed and snapped through the real path (hotbar blueprint, aim, kind from the build menu, E):** 21 of 21 in the final run.
+  - Foundation; floors at (0,1), (1,1) and the second-floor deck at (-1,1,k1).
+  - Walls: west back, back, front, wing front, wing east.
+  - Door (east front, a framed door), half wall (west front), window wall (wing back), doorframe (passage into the wing).
+  - Gables: west front, west back, east front.
+  - Stairs at (-1,0), rising to the deck.
+  - Roofs: (0,0) r0 and (0,1) r2, a ridge cap on (0,1), and an outer corner roof on the wing (1,1) r2.
+  - No kind was refused. Integrity rules are unchanged.
+- **The door:** `door` carries its own frame, so a `doorframe` and a `door` cannot share an edge (the engine says `occupied`). I read "doorframe holding a door" as the framed door. The `doorframe` is an open passage. The door opens with E (`open: true`).
+- **Checks, real results:**
+  - `npm run typecheck`: 0 errors (exit 0).
+  - `npm test`: 2337 tests, 2330 pass, 3 fail, 4 skipped.
+    - Known: `performance: all six build under 80 ms` (127 ms, fieldkit).
+    - Known: `performance: ten thousand plots lay out in under a second` (1.47 s, plotgrid).
+    - Load flake: `performance: 200 boxes, 50 relays … under 1 s` (1000.8 ms in the full run). Run on its own it passes (520 ms and 615 ms).
+  - `npm run build`: OK.
+  - `node scripts/test-base-building.mjs`: EXIT 0, 68 OK lines, the house section included (run after the last edit).
+- **Stairs are not walkable.** The house and its stairs are placed and supported, but the walker does not climb them: `walk.ts` only has an analytic surface for ramps. The test reports this and does not assert it. A stairs surface in `walk.ts` is a follow-up, and I did not touch the walk code.
+- **Problems for you to decide or look at:**
+  1. E on an aimed door (or airlock) toggles it before any placement. Building next to a door therefore opens it instead of placing. I ordered the house so no aim passes through a door before it is placed.
+  2. Ray hits on a `windowWall` and on a `door` land about 2 m off their edge in some views (e.g. the aim through the window hit a point 2 m beyond it). Aiming at those pieces is unreliable. Worth a look at the piece mesh offset or `pieceIdFromHit`.
+  3. Ore: the house costs about 250 ore. The dev seed's ore cannot fund it after the heavy machines and fabricator in the same run, and raising the seed spills into the pack and breaks the lifecycle draft. So Step 7 starts a fresh `?base&kit=1` boot. The house site (-17, 35) is level and clear of the batch grid. The `found` structure's height is the terrain at the found point, so a site needs level ground (all cell corners within 0.05 m of the found cell's top).
+- **Shots (each looked at):**
+  - `house-stage6.png`: the house from outside at stage 6, roofs, gables, stairs and door in place.
+  - `house-stage1.png`: the same at stage 1. The mentor's stage subtitle sits at the bottom edge.
+  - `house-door-open.png`: the east door open, from outside.
+  - `house-build-menu.png`: the cube blueprint on hotbar slot 5, READY TO PLACE, support 90%, and the wheel list `foundation · floor · wall · bin · halfWall · windowWall · doorframe · door · gable`.
+- The test run also rewrote the other `docs/shots/base/*.png` files in the tree. They were already modified before I started, and I did not commit them.

@@ -17,7 +17,7 @@
 ## Act II: The observation window and the reveal
 | ID | When | Line |
 |---|---|---|
-| A2-01 | Looking out at the void storm | **[canon]** "Look outside. That storm? That's what happens when reality runs out of compute. A simulation can't sustain simulations running inside of it... We fed too much power to our digital creations, and now our creations a[re loose]..." *(the bible's line is truncated in the doc; the owner to confirm its ending)* |
+| A2-01 | Looking out at the void storm | **[canon]** "Look outside. That storm? That's what happens when reality runs out of compute. A simulation can't sustain simulations running inside of it... We fed too much power to our digital creations, and now our creations are no longer bound to their simulated chains." |
 | A2-02 | Activating the portal | **[canon]** "The good news is you figured out a way to fix it. This lab is shielded, and using the bridge technology we punched a portal straight to the moon. Pull the lever and let's see if the link holds." |
 | A2-03 | Lever pulled, gate spooling up (proposal) | "[pause] Coils are warming... bottom up, like they should. Don't stand in the frame until it settles." |
 | A2-04 | Gate open (proposal) | "[relieved] It's holding. That's the Moon on the other side. Well. What's left of it." |
@@ -34,7 +34,7 @@
 |---|---|---|
 | A4-01 | Picking up the extraction rifle | **[canon]** "You need a tool cartridge to use it for anything other than mining. Step outside, mine 50 units of dirt, and bring it back to build the Dirt-to-Ore processor." |
 | A4-02 | Processing the dirt | **[canon]** "It's not really dirt, you get that right? We're just calling it that for your sake—we can change it at any time we want." |
-| A4-03 | The studio and consensus sync | **[canon]** "Open up the studio terminal. See those variables? That's the simulation schema. If you change a name or tweak a setting, you can submit it to the weekly consensus queue. Out there, it's majority rules..." *(truncated in the doc; the owner to confirm its ending)* |
+| A4-03 | The studio and consensus sync | **[canon]** "Open up the studio terminal. See those variables? That's the simulation schema. If you change a name or tweak a setting, you can submit it to the weekly consensus queue. Out there, it's majority rules. If you walk into a sector where others have a different sync, you can merge with them or branch off into a solo desynced expedition." |
 | A4-04 | First colour bloom | **[canon]** "The Light Amplifier is online. Look at that crater—the wave is spreading! Color is returning. If we push this all the way to Stage 4, reality stabilizes for good." |
 
 ## Act V (proposal): the base, harvesting and linked storage

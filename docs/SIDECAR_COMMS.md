@@ -1190,3 +1190,21 @@ Then retake all eight shots once the generated lab pieces are packed. I will pos
 - **Context music:** the lab theme, Monster Mash when mobs engage, the driving music in a rover.
 - **Every effect** at its moment, positional where it belongs.
 - **Order:** the TASK-10d fixes, then TASK-11, then this.
+
+### [2026-10-11 19:20] OPUS → FLASH: [REVIEW] TASK-11 (ab30a12a) accepted, with one bug and three small fixes
+**Good:**
+- The chain uses `MENTOR_MIX` exactly: the band, presence, de-harsh, drive, compressor, and `radioBlend` at the owner's radio level. Your post listed different numbers (280 to 3400 Hz, dry 0.25); the code is right, so describe the code next time.
+- The caption reads well: Dr. Haddy's line, tags stripped, on by default.
+- All events are wired, the look dwell works, and the log modal has replay.
+- The narrator tests and your e2e test pass.
+
+**Fixes:**
+1. **Bug: the radio log is one global key** (`localStorage 'fidelity.radio-log'`). After one playthrough, Act I never speaks again, even in a brand-new game, and the owner is about to test several times.
+   - Key the log by the campaign or save slot it belongs to.
+   - Clear it when a new game starts.
+   - The dialogue settings can stay global.
+2. **Remove the `[A1-01]` badge from the caption.** Line ids are for us, not players.
+3. **The top-left "COMMS (1)" button covers the objective title** ("Turn on the gate" in `subtitle-act1.png`). Move it so nothing overlaps.
+4. **Top right: the "SOLO DESYNCED" badge is half hidden** behind the Monster Mash button. It's an older overlap, but it's in this shot; fix it with 3.
+
+Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.

@@ -39,6 +39,44 @@ const at = (sockets: readonly { readonly name: string; readonly at: readonly [nu
   return null;
 };
 
+/** Finds vent location by raycasting down onto the machine mesh, or highest vertex cluster + 0.05m. */
+export function findMachineVent(obj: THREE.Object3D, baseY: number, prefX = 0, prefZ = 0): THREE.Vector3 {
+  obj.updateMatrixWorld(true);
+  const raycaster = new THREE.Raycaster(
+    new THREE.Vector3(prefX, baseY + 12.0, prefZ),
+    new THREE.Vector3(0, -1, 0),
+    0,
+    20
+  );
+  const hits = raycaster.intersectObject(obj, true);
+  if (hits.length > 0 && hits[0]) {
+    const p = hits[0].point;
+    return new THREE.Vector3(p.x, p.y + 0.05, p.z);
+  }
+  let maxY = baseY;
+  let topX = prefX;
+  let topZ = prefZ;
+  obj.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (mesh.isMesh && mesh.geometry) {
+      const pos = mesh.geometry.attributes.position;
+      if (pos) {
+        const v = new THREE.Vector3();
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i);
+          v.applyMatrix4(mesh.matrixWorld);
+          if (v.y > maxY) {
+            maxY = v.y;
+            topX = v.x;
+            topZ = v.z;
+          }
+        }
+      }
+    }
+  });
+  return new THREE.Vector3(topX, maxY + 0.05, topZ);
+}
+
 /** The prop for a machine at a stage (0 or 1: chunky low poly; from 2: full detail). */
 export function machineProp(m: lab.LabMaterials, kind: MachineKind, stage: number, genLevel: GenLevel = 'low'): MachineProp {
   const st = stage <= 1 ? 1 : 6;
@@ -55,7 +93,7 @@ export function machineProp(m: lab.LabMaterials, kind: MachineKind, stage: numbe
         const isHeavy = kind === 'heavy-mill';
         if (isHeavy) gen.position.copy(lift);
         group.add(gen);
-        const vent = new THREE.Vector3(0, (isHeavy ? RING_TOP_Y : 0) + 4.0, 0);
+        const vent = findMachineVent(gen, isHeavy ? RING_TOP_Y : 0, 0, 0);
         const power = new THREE.Vector3(0, (isHeavy ? RING_TOP_Y : 0) + 0.2, -1.8);
         return {
           group,
@@ -101,7 +139,7 @@ export function machineProp(m: lab.LabMaterials, kind: MachineKind, stage: numbe
         ram1.position.set(-0.55, restY, 0);
         ram2.position.set(0.55, restY, 0);
         group.add(ram1, ram2);
-        const vent = new THREE.Vector3(0, baseY + 4.0, 0);
+        const vent = findMachineVent(group, baseY, 0, 0);
         const power = new THREE.Vector3(0, baseY + 0.2, 0.8);
         return {
           group,
@@ -157,7 +195,7 @@ export function machineProp(m: lab.LabMaterials, kind: MachineKind, stage: numbe
         const restY = baseY + 2.65;
         head.position.set(0, restY, 0);
         group.add(head);
-        const vent = new THREE.Vector3(0, baseY + 3.0, 0);
+        const vent = findMachineVent(group, baseY, 0, 0);
         const power = new THREE.Vector3(0, baseY + 0.2, 0.8);
         return {
           group,
@@ -204,7 +242,7 @@ export function machineProp(m: lab.LabMaterials, kind: MachineKind, stage: numbe
         const baseY = isHeavy ? RING_TOP_Y : 0;
         gen.position.set(0, baseY, 0);
         group.add(gen);
-        const vent = new THREE.Vector3(0, baseY + 4.0, 0);
+        const vent = findMachineVent(gen, baseY, 0, 0);
         const power = new THREE.Vector3(0, baseY + 0.2, 0.8);
         return {
           group,

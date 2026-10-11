@@ -53,7 +53,7 @@ import {
 } from '../base/world';
 import { PieceMeshManager } from '../base/piece-meshes';
 import { globalKitPieceCache, integrityColorName } from '../base/kit-pieces';
-import { preloadAllGenAssets, genLevelForStage } from '../assets/gen-props';
+import { preloadAllGenAssets, genLevelForStage, createGenFixture } from '../assets/gen-props';
 
 const isFixture = (kind: Kind): boolean => kind === 'bin' || kind === 'bench' || kind === 'repeater' || kind === 'lifeSupport' || kind === 'weaponBench';
 import { blueprint, STARTER, ITEMS } from '../base/catalog';
@@ -745,6 +745,9 @@ export function PlayScreen(props: {
     sceneRef.current = scene;
     if (typeof window !== 'undefined') {
       (window as any).__playScene = scene;
+      (window as any).__createGenFixture = createGenFixture;
+      (window as any).__globalKitPieceCache = globalKitPieceCache;
+      (window as any).__pieceManager = pieceManagerRef.current;
     }
     const size = (): void => {
       const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;

@@ -54,7 +54,7 @@ await page.addInitScript(() => {
 const pageErrors = [];
 page.on('pageerror', (err) => pageErrors.push(err.message));
 page.on('console', (msg) => {
-  if (msg.type() === 'error') console.log('[Browser Error]', msg.text());
+  console.log(`[Browser ${msg.type()}]:`, msg.text());
 });
 
 try {
@@ -64,11 +64,10 @@ try {
   // Wait for the Play screen to initialize
   console.log('Waiting for Play canvas and Monster Mash panel...');
   await page.waitForSelector('canvas', { timeout: 30000 });
-  await page.waitForTimeout(4000);
 
   // Check if Monster Mash button or panel is visible
   const mashBtn = page.locator('.play-mash-btn');
-  await mashBtn.waitFor({ state: 'visible', timeout: 15000 });
+  await mashBtn.waitFor({ state: 'visible', timeout: 35000 });
   console.log('OK: Monster Mash button is visible');
 
   // Ensure panel is open

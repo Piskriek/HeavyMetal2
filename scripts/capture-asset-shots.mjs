@@ -273,44 +273,37 @@ try {
     const st = w.base.structures[0];
 
     if (st) {
-      // Keep shelter walls and airlock, remove lowRoof for open interior lighting
-      const nextId = Math.max(100, ...w.base.pieces.map((p) => p.id)) + 1;
-      const basePieces = w.base.pieces.filter((p) => p.kind !== 'lowRoof');
-
-      const fixturesToAdd = [
-        { kind: 'bin', i: 0, j: 0, k: 0, r: 0, dx: 110, dz: -80, deg: 90, mat: 'regolith' },
-        { kind: 'repeater', i: 0, j: 0, k: 0, r: 0, dx: 110, dz: 60, deg: 90, mat: 'regolith' },
-        { kind: 'weaponBench', i: 0, j: 0, k: 0, r: 0, dx: -110, dz: -30, deg: 270, mat: 'regolith' },
-        { kind: 'bench', i: 0, j: 0, k: 0, r: 0, dx: -110, dz: 60, deg: 270, mat: 'regolith' },
-      ];
-      let idCounter = nextId;
-      for (const f of fixturesToAdd) {
-        if (!basePieces.some((p) => p.s === st.id && p.kind === f.kind)) {
-          basePieces.push({ id: idCounter++, s: st.id, ...f });
-        }
-      }
-      baseApi.setBase({ ...w.base, pieces: basePieces });
+      // Keep shelter walls, airlock, and foundation; replace roof/fixtures with the 4 fixtures
+      let idCounter = Math.max(100, ...w.base.pieces.map((p) => p.id)) + 1;
+      const basePieces = w.base.pieces.filter((p) => p.kind !== 'lowRoof' && p.kind !== 'bench' && p.kind !== 'lifeSupport');
+      basePieces.push(
+        { id: idCounter++, s: st.id, kind: 'weaponBench', i: 0, j: 0, k: 0, r: 0, dx: -105, dz: 0, deg: 90, mat: 'regolith' },
+        { id: idCounter++, s: st.id, kind: 'bench', i: 0, j: 0, k: 0, r: 0, dx: 105, dz: 0, deg: 270, mat: 'regolith' },
+        { id: idCounter++, s: st.id, kind: 'repeater', i: 0, j: 0, k: 0, r: 0, dx: -110, dz: -110, deg: 90, mat: 'regolith' },
+        { id: idCounter++, s: st.id, kind: 'bin', i: 0, j: 0, k: 0, r: 0, dx: 110, dz: -110, deg: 270, mat: 'regolith' },
+      );
+      baseApi.setBase({ ...w.base, nextId: idCounter, pieces: basePieces });
 
       // Add warm interior work light plus ambient light for clean, readable exposure
       if (scene.THREE) {
-        const roomLight = new scene.THREE.PointLight(0xfff2e0, 3.2, 16, 1.0);
+        const roomLight = new scene.THREE.PointLight(0xfff2e0, 3.5, 16, 1.0);
         roomLight.position.set(st.x + 2, st.y + 2.6, st.z + 2);
         scene.planetScene.add(roomLight);
 
-        const ambLight = new scene.THREE.AmbientLight(0xffffff, 0.85);
+        const ambLight = new scene.THREE.AmbientLight(0xffffff, 0.9);
         scene.planetScene.add(ambLight);
       }
 
-      // Inside cell (0, 0): center is (2.0, 2.0). Airlock threshold is at v=3.5, back wall at v=0.0.
+      // Inside cell (0, 0): center is (2.0, 2.0). Airlock threshold is at v=3.6, back wall at v=0.0.
       const cos = Math.cos(st.yaw);
       const sin = Math.sin(st.yaw);
-      const eyeX = st.x + 2.0 * cos - 3.4 * sin;
-      const eyeZ = st.z + 2.0 * sin + 3.4 * cos;
+      const eyeX = st.x + 2.0 * cos - 3.6 * sin;
+      const eyeZ = st.z + 2.0 * sin + 3.6 * cos;
 
-      const targetX = st.x + 2.0 * cos - 1.0 * sin;
-      const targetZ = st.z + 2.0 * sin + 1.0 * cos;
+      const targetX = st.x + 2.0 * cos - 0.5 * sin;
+      const targetZ = st.z + 2.0 * sin + 0.5 * cos;
 
-      window.__aimAndTeleport(eyeX, eyeZ, targetX, targetZ, -0.14);
+      window.__aimAndTeleport(eyeX, eyeZ, targetX, targetZ, -0.10);
     }
   });
   await page.waitForTimeout(1000);

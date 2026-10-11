@@ -36,6 +36,29 @@ interface CollapsingPiece {
   initialY: number;
 }
 
+/**
+ * Ensures all geometry attributes are unquantized Float32BufferAttributes.
+ * Three.js BufferGeometry.applyMatrix4 and normal/tangent operations corrupt
+ * quantized/normalized integer attributes (e.g. KHR_mesh_quantization Int16Array)
+ * by writing floats directly into integer typed arrays without normalization.
+ */
+function ensureFloatGeometry(geom: THREE.BufferGeometry): THREE.BufferGeometry {
+  const res = geom.clone();
+  for (const name of Object.keys(res.attributes)) {
+    const attr = res.attributes[name]!;
+    if (!(attr.array instanceof Float32Array)) {
+      const f32 = new Float32Array(attr.count * attr.itemSize);
+      for (let i = 0; i < attr.count; i++) {
+        for (let c = 0; c < attr.itemSize; c++) {
+          f32[i * attr.itemSize + c] = attr.getComponent(i, c);
+        }
+      }
+      res.setAttribute(name, new THREE.BufferAttribute(f32, attr.itemSize, false));
+    }
+  }
+  return res;
+}
+
 export class PieceMeshManager {
   readonly root: THREE.Group;
   readonly walkWorld: WalkWorld = new WalkWorld();
@@ -392,7 +415,7 @@ export class PieceMeshManager {
 
         // Static part: bake pivot and local transform into geometry
         const relMat = child.matrixWorld.clone().premultiply(rootInv);
-        const geom = child.geometry.clone().applyMatrix4(relMat);
+        const geom = ensureFloatGeometry(child.geometry).applyMatrix4(relMat);
         geom.computeBoundingBox();
         geom.computeBoundingSphere();
 

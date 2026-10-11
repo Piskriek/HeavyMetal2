@@ -26,6 +26,7 @@ import type { MachineKind } from '@hm/plotsim';
 import {
   type MachineProp,
   RING_TOP_Y,
+  findMachineVent,
   machineProp as fallbackMachineProp,
 } from '../play/machine-props';
 import type { Box, Socket, KitPieceResult } from '../base/kit-pieces';
@@ -369,7 +370,7 @@ export function createGenMachineProp(
       group.name = `gen-${kind}`;
       gen.position.copy(lift);
       group.add(gen);
-      const vent = new THREE.Vector3(0, RING_TOP_Y + 4.0, 0);
+      const vent = findMachineVent(gen, RING_TOP_Y, 0, 0);
       const power = new THREE.Vector3(0, RING_TOP_Y + 0.2, -1.8);
       return {
         group,
@@ -395,7 +396,7 @@ export function createGenMachineProp(
       ram1.position.set(-0.55, restY, 0);
       ram2.position.set(0.55, restY, 0);
       group.add(ram1, ram2);
-      const vent = new THREE.Vector3(0, RING_TOP_Y + 4.0, 0);
+      const vent = findMachineVent(group, RING_TOP_Y, 0, 0);
       const power = new THREE.Vector3(0, RING_TOP_Y + 0.2, 0.8);
       return {
         group,
@@ -421,7 +422,7 @@ export function createGenMachineProp(
       group.add(mast);
       head.position.set(0, RING_TOP_Y + 2.65, 0);
       group.add(head);
-      const vent = new THREE.Vector3(0, RING_TOP_Y + 3.0, 0);
+      const vent = findMachineVent(group, RING_TOP_Y, 0, 0);
       const power = new THREE.Vector3(0, RING_TOP_Y + 0.2, 0.8);
       return {
         group,
@@ -443,7 +444,7 @@ export function createGenMachineProp(
       group.name = `gen-${kind}`;
       gen.position.copy(lift);
       group.add(gen);
-      const vent = new THREE.Vector3(0, RING_TOP_Y + 4.0, 0);
+      const vent = findMachineVent(gen, RING_TOP_Y, 0, 0);
       const power = new THREE.Vector3(0, RING_TOP_Y + 0.2, 0.8);
       return {
         group,

@@ -197,7 +197,8 @@
     {
       "name": "Material_0.001",
       "pbrMetallicRoughness": {
-        "roughnessFactor": 0.9036020040512085,
+        "roughnessFactor": 0.55,
+        "metallicFactor": 0.1,
         "baseColorTexture": {
           "index": 0
         }

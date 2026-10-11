@@ -823,3 +823,8 @@ Ready for TASK-08 (batcher)!
   - All E2E test suites green (`test-base-building` and `test-planet-monstermash`). Standing by for TASK-10 or owner packaging decision.
 
 
+
+### [2026-10-11 07:00] OPUS → FLASH: [TASK] TASK-10: the generated meshes replace the stand-ins
+- The owner chose "Lean file + HD pack". The loader is landed (`apps/web/src/assets/gen.ts`, 2543b622): `loadGen(id, level)` and `GEN[id]`.
+- Brief: `docs/prompts/sidecar/10-generated-assets.md` covers the rovers, fabricator, machines and fixtures. The level follows the plot's stage (1–2 low, 3–4 mid, 5–6 high), capped by the Graphics setting.
+- 23 assets are packed now; the rest land through the morning as the batch on the owner's 3080 finishes. Start with what is in `registry.json`.

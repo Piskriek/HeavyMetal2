@@ -152,6 +152,66 @@ About 1.1k credits per prop, so the 55k 3D pool covers about 45 to 50 props.
 - **My recommendation:** C plus D. The single file stays playable and lean (the faceted low level is the stage-1 look anyway), and the HD pack upgrades it when present. B plus C is the choice if one file is non-negotiable.
 - **Git:** about 33 MB of binary GLBs. Options: commit them (fine under GitHub's 100 MB per-file limit, but the repo grows with every regeneration), use Git LFS, or keep them in `zips/` and package from a release archive. My recommendation is Git LFS for `apps/web/src/assets/gen/**/*.glb`.
 
+## 4e. The low level is rebuilt, not decimated (2026-10-11)
+The owner asked: "are we reducing high poly meshes to produce low poly's? can the local 3d agent not generate low poly's models that look better than a reduced model?"
+
+**Why the old lows looked bad.**
+- The old lows were the 40k-triangle model decimated in place.
+- Decimation had to keep the generated UV layout, which is thousands of small texture islands, because the colour map is laid out on it.
+- Every island border pins the collapse, so thin, holed and treaded parts tore or went to blobs.
+- The fault was keeping the generated UVs, not the reduction itself.
+
+**The route now (`lod-bake.py --retopo=0`, low level only).** This is the usual high-to-low game-art route, done headless in Blender on the laptop, at about 1 minute per asset:
+1. Weld a copy of the full model and drop its UV islands, so nothing pins the collapse.
+2. Decimate it to the budget.
+3. Unwrap it fresh (Smart UV Project).
+4. Bake the full model's colour onto it at 512 px; it is packed to 256.
+
+The generated models all carry metallic 1, which has no diffuse colour to bake. The bake reads a non-metal copy, and the low keeps metallic 1.
+
+| Tested at the same budget | Decimated in place (old) | Rebuilt and rebaked (now) |
+|---|---|---|
+| Scout wheel, 600 tris | a faceted blob | a round tyre, the tread readable in the bake |
+| Hauler body, 2,500 | torn side panels | closed panels; mirrors and cab intact |
+| Wall, 400 | soft | crisp; rivet line and status lamp read |
+| Iron sight, 900; weapon bench, 1,500 | fine | as good or crisper (the bench's pegboard tools blur in both: they are a split job, see the split rule) |
+
+- **A voxel-remesh variant (`--retopo=160`) was rejected.** It makes one closed surface, but it broke the wheel apart, because the wheel is an open shell.
+- **Mid and high still decimate in place.** At 1.5k triangles and up they hold, and they share one colour map in the HD pack. Rebuilding them would need a colour map per level, which is a later option.
+
+**Can the local model generate low poly directly? No.**
+- The 3080 runs Hunyuan3D 2.1. Its shape stage always makes a dense marching-cubes surface, which its own face reducer cuts to about 40k triangles. It has no low-poly mode.
+
+**Native low-poly generation, as researched 2026-10-11:**
+- **Hosted and closed:**
+  - **Hunyuan:** Tencent's API has a `LowPoly` generate type ("intelligent polygon reduction", triangles or quads). Most sources say it runs on Hunyuan 3.0 and not on 3.1, which is what RUN hosts. Tencent's separate retopology model, Polygen 1.5, is suggested for 3.1 output.
+  - **Meshy 6:** Low Poly mode (now "Topology Mesh") is a dedicated pipeline with a target face count. RUN exposes it as the `meshy` provider (`model_type: lowpoly`, `target_polycount`). Its own tutorial says it "solves the polygon budget, not the look".
+  - **Tripo:** it claims native low-poly budgets.
+- **Open research models:** MeshAnything V2, BPT, DeepMesh, FastMesh, and the 2026 papers (MeshRipple, PolyFlow, MeshFlow, QuadGPT, Nexus). These generate artist-style low-poly topology from a point cloud.
+  - Third-party tests disagree with the papers. One 2026 retopology benchmark had DeepMesh finish 28.7% of runs; another reports BPT and FastMesh "frequently produce meshes with broken geometry, missing parts".
+  - Their output is untextured, so it would still need the unwrap and bake above.
+  - Hunyuan3D 2.1's texture stage already fills the 3080 (about 21 GB is quoted for texturing), so a second model there is a separate install for the owner's PC.
+- **Not recommended for now:** a side-by-side of Meshy 6 Low Poly against the rebuilt low through RUN.
+  - It costs about 1,800 credits a model.
+  - Our one Meshy call through the CLI ran past the 600 s timeout and was lost, though billed (§4b).
+  - It becomes worth a test if RUN lifts that timeout, or with a Meshy account used directly.
+
+Sources:
+- [Meshy: can AI generate low-poly assets, or should you decimate?](https://www.meshy.ai/topics/ai-low-poly-generate-or-decimate)
+- [Meshy: make low poly 3D models](https://www.meshy.ai/tutorials/make-low-poly-3d-models)
+- [Scenario: Hunyuan 3D models, the essentials](https://help.scenario.com/articles/5967392966-hunyuan-3d-models-the-essentials)
+- [Tencent Cloud Hunyuan 3D API](https://intl.cloud.tencent.com/document/api/1284/75540)
+- [Comfy: Tencent text-to-model node](https://docs.comfy.org/built-in-nodes/TencentTextToModelNode)
+- [Runware: Hunyuan 3D 3.1 Pro](https://runware.ai/docs/models/tencent-hunyuan-3d-3-1-pro.md)
+- [MeshRipple](https://arxiv.org/html/2512.07514v2)
+- [FastMesh](https://arxiv.org/html/2508.19188v3)
+- [DeepMesh](https://www.alphaxiv.org/overview/2503.15265)
+- [PolyFlow](https://arxiv.org/pdf/2606.30673)
+- [QuadGPT](https://arxiv.org/html/2509.21420v1)
+- [Meshy T2 benchmark](https://arxiv.org/html/2607.28675)
+- [StraySpark: decimate vs remesh](https://www.strayspark.studio/blog/reduce-polycount-ai-3d-model-blender-decimate-vs-remesh)
+- [AIWiki: Hunyuan 3D (VRAM figures)](https://aiwiki.ai/wiki/hunyuan_3d)
+
 ## 5. Credit plan (proposal for the owner)
 | Pool | Credits | Notes |
 |---|---|---|

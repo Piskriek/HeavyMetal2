@@ -1,5 +1,5 @@
 // Turns each generated model in zips/runworld/assets/<id>/model.glb into the game's three detail levels.
-//   node scripts/runworld-post.mjs [id ...]
+//   node scripts/runworld-post.mjs [id ...] [--levels=low,mid,high]   (--levels redoes only those levels)
 // For each asset (docs/runworld/assets.json):
 //  1. norm.glb: decode Draco, bake node transforms into the mesh, scale it to its real size in metres (`size` along
 //     `axis`: height = y, length = the longer of x and z), and stand it on the ground, centred (bottom-centre origin);
@@ -23,7 +23,10 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const OUT = path.join(ROOT, 'zips', 'runworld', 'assets');
 const BLENDER = 'C:/Program Files/Blender Foundation/Blender 5.2/blender.exe';
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs', 'runworld', 'assets.json'), 'utf8'));
-const only = process.argv.slice(2);
+const argv = process.argv.slice(2);
+const only = argv.filter((x) => !x.startsWith('--'));
+const levelsArg = argv.find((x) => x.startsWith('--levels='));
+const levels = levelsArg ? levelsArg.slice('--levels='.length).split(',') : ['low', 'mid', 'high'];
 await Promise.all([MeshoptEncoder.ready, MeshoptDecoder.ready]);
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'draco3d.decoder': await draco3d.createDecoderModule(), 'meshopt.encoder': MeshoptEncoder, 'meshopt.decoder': MeshoptDecoder });
 
@@ -46,9 +49,10 @@ async function snap(file, box, eps = 0.03) {
 /**
  * The yaw that faces a sloped piece the way its kit piece rises: `high` names the side its top lies on ('+z' for a
  * ramp, stair or pitched roof; '+x+z' for the roof corners), which the long-side rule cannot tell on a square cell.
- * Each quarter turn that keeps the box's aspect is scored by where the top band of vertices lies along that side.
+ * All four quarter turns are scored by where the top band of vertices lies along that side (the per-axis fit absorbs
+ * the aspect; an overhang makes a near-square cell look oblong, so the long-side rule is no guide here).
  */
-function uphill(doc, high, base, dx, dz, tw, td) {
+function uphill(doc, high) {
   const want = [high.includes('+x') ? 1 : high.includes('-x') ? -1 : 0, high.includes('+z') ? 1 : high.includes('-z') ? -1 : 0];
   const pts = [];
   for (const mesh of doc.getRoot().listMeshes()) for (const prim of mesh.listPrimitives()) {
@@ -58,10 +62,8 @@ function uphill(doc, high, base, dx, dz, tw, td) {
   let y0 = Infinity, y1 = -Infinity;
   for (let i = 1; i < pts.length; i += 3) { y0 = Math.min(y0, pts[i]); y1 = Math.max(y1, pts[i]); }
   const band = y1 - 0.15 * (y1 - y0);
-  const square = Math.abs(tw - td) < 0.05 * Math.max(tw, td) || Math.abs(dx - dz) < 0.05 * Math.max(dx, dz);
-  const tries = square ? [0, 90, 180, 270] : [base, base + 180];
-  let best = base, score = -Infinity;
-  for (const yaw of tries) {
+  let best = 0, score = -Infinity;
+  for (const yaw of [0, 90, 180, 270]) {
     const t = (yaw * Math.PI) / 180, c = Math.cos(t), sn = Math.sin(t);
     let sum = 0, n = 0;
     for (let i = 0; i < pts.length; i += 3) {
@@ -91,8 +93,7 @@ async function normalize(src, dst, a) {
     // a lattice piece: turn it so its long side matches the box (or by the asset's reviewed `yaw`), then fill the
     // kit piece's box exactly on each axis, so it sits in the lattice frame like the procedural piece it replaces
     const [lo, hi] = a.box, tw = hi[0] - lo[0], td = hi[2] - lo[2];
-    const base = (dx >= dz) === (tw >= td) ? 0 : 90;
-    const yaw = a.yaw ?? (a.high ? uphill(doc, a.high, base, dx, dz, tw, td) : base);
+    const yaw = a.yaw ?? (a.high ? uphill(doc, a.high) : (dx >= dz) === (tw >= td) ? 0 : 90);
     if (yaw % 360 !== 0) {
       const t = (yaw * Math.PI) / 180, c = Math.cos(t), sn = Math.sin(t);
       for (const mesh of doc.getRoot().listMeshes()) transformMesh(mesh, [c, 0, -sn, 0, 0, 1, 0, 0, sn, 0, c, 0, 0, 0, 0, 1]);
@@ -124,10 +125,16 @@ for (const a of manifest.assets.filter((x) => only.length === 0 || only.includes
   const norm = path.join(d, 'norm.glb'), slim = 'scripts/slim-glb.mjs';
   const dims = await normalize(model, norm, a);
   // each level: Blender decimates (and for mid/high bakes the full-detail normals), then slim-glb packs it
-  // (no further simplifying: --tris above the count; WebP maps at the level's size; meshopt)
-  for (const [name, tris, tex, mode] of [['low', low, 256, 'flat'], ['mid', mid, 512, 'smooth'], ['high', high, 1024, 'smooth']]) {
+  // (no further simplifying: --tris above the count; WebP maps at the level's size; meshopt).
+  // low is rebuilt rather than decimated in place (lod-bake.py --retopo=0: the welded surface is decimated with the
+  // generated UV islands dropped, unwrapped fresh, and the full model's colour baked on at 512 px, packed to 256).
+  // Tested 2026-10-11 on the scout wheel (a round tyre with its tread at 600 triangles, where in-place decimation
+  // made a faceted blob), the hauler body (no torn side panels), the weapon bench and the iron sight. The voxel
+  // remesh variant (--retopo=160) broke the wheel apart (an open shell), so it is not used.
+  const plan = [['low', low, 256, 'flat', 512, ['--retopo=0']], ['mid', mid, 512, 'smooth', 512, []], ['high', high, 1024, 'smooth', 1024, []]];
+  for (const [name, tris, tex, mode, bakePx, extra] of plan.filter((p) => levels.includes(p[0]))) {
     const raw = path.join(d, `${name}-raw.glb`), done = path.join(d, `${name}.glb`);
-    run(BLENDER, ['-b', '--factory-startup', '-P', 'scripts/lod-bake.py', '--', norm, raw, String(tris), String(tex), mode]);
+    run(BLENDER, ['-b', '--factory-startup', '-P', 'scripts/lod-bake.py', '--', norm, raw, String(tris), String(bakePx), mode, ...extra]);
     if (a.box) await snap(raw, a.box);
     run('node', [slim, raw, done, '--tris', '100000000', '--tex', String(tex), '--meshopt']);
     fs.rmSync(raw);

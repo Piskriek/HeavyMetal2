@@ -88,7 +88,91 @@ low.data = high.data.copy()
 low.name = 'low'
 bpy.context.collection.objects.link(low)
 tris = sum(len(p.vertices) - 2 for p in low.data.polygons)
-if target < tris:
+
+
+def bake_target(name, colorspace):
+    """A new image on the low copy's material, made the active node so the next bake writes into it."""
+    nodes = low.active_material.node_tree.nodes
+    img = bpy.data.images.new(name, size, size, alpha=False)
+    img.colorspace_settings.name = colorspace
+    tex = nodes.new('ShaderNodeTexImage')
+    tex.image = img
+    for n in nodes:
+        n.select = False
+    tex.select = True
+    nodes.active = tex
+    return img, tex
+
+
+def bake(kind, **kw):
+    dims = low.dimensions
+    diag = (dims.x ** 2 + dims.y ** 2 + dims.z ** 2) ** 0.5
+    scene = bpy.context.scene
+    scene.render.engine = 'CYCLES'
+    scene.cycles.device = 'CPU'
+    scene.cycles.samples = 4
+    b = scene.render.bake
+    b.use_selected_to_active = True
+    b.cage_extrusion = 0.01 * diag
+    b.max_ray_distance = 0.03 * diag
+    b.normal_space = 'TANGENT'
+    b.margin = 8
+    bpy.ops.object.select_all(action='DESELECT')
+    high.select_set(True)
+    low.select_set(True)
+    bpy.context.view_layer.objects.active = low
+    bpy.ops.object.bake(type=kind, **kw)
+
+
+# --retopo[=N]: rebuild the surface instead of decimating the generated one. Collapse decimation has to keep the
+# generated UV islands (the colour map is laid out on them), so every island border is a constraint it can only
+# bend, and thin or holed parts tear. Here the copy is voxel-remeshed into one closed seamless surface (N voxels
+# across its longest side), decimated freely, unwrapped fresh, and the full model's colour is baked onto it: the
+# usual high-to-low game-art route. Parts thinner than about two voxels are filled or dropped (they tore anyway).
+retopo = next((a for a in argv if a.startswith('--retopo')), None)
+if retopo:
+    # N = 0 skips the remesh: the welded surface is decimated with its UV islands dropped (nothing to guard)
+    vox = int(retopo.split('=')[1]) if '=' in retopo else 160
+    bpy.ops.object.select_all(action='DESELECT')
+    low.select_set(True)
+    bpy.context.view_layer.objects.active = low
+    while low.data.uv_layers:
+        low.data.uv_layers.remove(low.data.uv_layers[0])
+    if vox > 0:
+        rm = low.modifiers.new('remesh', 'REMESH')
+        rm.mode = 'VOXEL'
+        rm.voxel_size = max(low.dimensions) / vox
+        rm.adaptivity = 0
+        bpy.ops.object.modifier_apply(modifier=rm.name)
+    dense = sum(len(p.vertices) - 2 for p in low.data.polygons)
+    if target < dense:
+        dec = low.modifiers.new('decimate', 'DECIMATE')
+        dec.decimate_type = 'COLLAPSE'
+        dec.ratio = target / dense
+        dec.use_collapse_triangulate = True
+        bpy.ops.object.modifier_apply(modifier=dec.name)
+    low.data.uv_layers.new(name='UVMap')
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.01)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    src_bsdf = next(n for n in high.active_material.node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
+    mat = bpy.data.materials.new('baked')
+    mat.use_nodes = True
+    bsdf = next(n for n in mat.node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
+    for k in ('Metallic', 'Roughness'):
+        bsdf.inputs[k].default_value = src_bsdf.inputs[k].default_value
+    low.data.materials.clear()
+    low.data.materials.append(mat)
+    img, tex = bake_target('color', 'sRGB')
+    # a fully metallic surface has no diffuse colour to bake (the generated models are all metallic 1): bake the
+    # albedo from a non-metal copy of the source; the low keeps the source's metallic value
+    src_bsdf.inputs['Metallic'].default_value = 0
+    bake('DIFFUSE', pass_filter={'COLOR'})
+    mat.node_tree.links.new(tex.outputs['Color'], bsdf.inputs['Base Color'])
+    img.pack()
+    print(f'retopo: voxel {vox} -> {dense} triangles')
+elif target < tris:
     dec = low.modifiers.new('decimate', 'DECIMATE')
     dec.decimate_type = 'COLLAPSE'
     dec.ratio = target / tris
@@ -113,34 +197,13 @@ if mode == 'flat':
 else:
     bpy.ops.object.shade_smooth_by_angle(angle=math.radians(30))
     # the low copy shares the high mesh's material: give it its own before adding the bake target
-    mat = mat.copy()
-    low.active_material = mat
+    if not retopo:
+        mat = mat.copy()
+        low.active_material = mat
     nodes, links = mat.node_tree.nodes, mat.node_tree.links
     bsdf = next(n for n in nodes if n.type == 'BSDF_PRINCIPLED')
-    img = bpy.data.images.new('normal', size, size, alpha=False)
-    img.colorspace_settings.name = 'Non-Color'
-    tex = nodes.new('ShaderNodeTexImage')
-    tex.image = img
-    for n in nodes:
-        n.select = False
-    tex.select = True
-    nodes.active = tex
-    dims = low.dimensions
-    diag = (dims.x ** 2 + dims.y ** 2 + dims.z ** 2) ** 0.5
-    scene = bpy.context.scene
-    scene.render.engine = 'CYCLES'
-    scene.cycles.device = 'CPU'
-    scene.cycles.samples = 4
-    bake = scene.render.bake
-    bake.use_selected_to_active = True
-    bake.cage_extrusion = 0.01 * diag
-    bake.max_ray_distance = 0.03 * diag
-    bake.normal_space = 'TANGENT'
-    bake.margin = 8
-    high.select_set(True)
-    low.select_set(True)
-    bpy.context.view_layer.objects.active = low
-    bpy.ops.object.bake(type='NORMAL')
+    img, tex = bake_target('normal', 'Non-Color')
+    bake('NORMAL')
     nmap = nodes.new('ShaderNodeNormalMap')
     links.new(tex.outputs['Color'], nmap.inputs['Color'])
     links.new(nmap.outputs['Normal'], bsdf.inputs['Normal'])

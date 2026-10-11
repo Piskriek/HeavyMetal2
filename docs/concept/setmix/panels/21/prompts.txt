@@ -59,3 +59,12 @@ LEAD ENGINEER REVIEW OF BATCH 1, AND FIXES (2026-10-11):
 - 43-storm-progress.png composed from 43a, 43b, 43c by tools/compose21.sh (three frames, one image).
 
 CONTACT: the sheet 21 contact tile is 21-sheet-the-lab.png, a copy of panels/21/41-layout.png (the lab has no single composed sheet image yet).
+
+LEAD ENGINEER REVIEW OF BATCH 2, SHEET 21 FIX (43 storm strip):
+- Rejected (second rejection): rejected/43a-storm-full-rev2.png, rejected/43b-storm-thinning-rev3.png, rejected/43c-storm-breaking-rev2.png, and the old composite rejected/43-storm-progress-rev2.png. Reasons: the room was brown and orange-lit, not the warm-white and light-grey lab; and the window showed an off-Earth horizon.
+- Redrawn (one render each, one camera, same room as 41 and 44 to 46: warm white and light-grey panels, dark grey trim, amber lamps only):
+  - 43a full storm: dense dithered static and broken pixel lightning filling the window; nothing else outside.
+  - 43b thinning: sparse static over the upper window; the lower third shows grey, low-detail EARTH ground, low hills, and the faint silhouette of a distant ruined skyline.
+  - 43c breaking: a patch of real blue sky with a few thin clouds; green restored Earth land and the skyline overgrown with green below it; a little static at the edges.
+- No Moon and no second gate outside. The only gate is the one inside the room on its raised round plinth, in front of the window.
+- Kept all three after review. 43-storm-progress.png recomposed from 43a, 43b, 43c by tools/compose21.sh.

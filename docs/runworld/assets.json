@@ -803,12 +803,26 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "one rover steering wheel on its own: a chunky thick-rimmed steering wheel with three wide solid spokes and a centre hub, on a short thick steering column with a bolted mounting flange"
+    },
+    {
+      "id": "life-support",
+      "panel": "18/18-lifesupport-s6.png",
+      "class": "fixture",
+      "size": 2,
+      "axis": "height",
+      "view": "front",
+      "subject": "(reused: the RUN.world Hunyuan 3.1 Pro test model from the 2026-10-10 trial)"
+    },
+    {
+      "id": "weapon-frame",
+      "panel": "20/20-frame-s6.png",
+      "class": "weapon-frame",
+      "size": 0.75,
+      "axis": "length",
+      "view": "part",
+      "subject": "(reused: the RUN.world Hunyuan 3.1 Pro test model of the concept panel itself)"
     }
   ],
-  "reused": {
-    "life-support": "zips/runworld/lifesupport/ls-hunyuan.glb (test run, from panel 18-lifesupport-s6)",
-    "weapon-frame": "zips/runworld/weapon/frame-hunyuan.glb (test run, from panel 20-frame-s6)"
-  },
   "budgets": {
     "about": "Triangles per level [low, mid, high]. low = S1-S2 (flat shaded, 256 px maps), mid = S3-S4 (smooth by angle 30 deg + baked normals, 512), high = S5-S6 (the same, 1024). Auto picks the level from the Graphics setting, like Astro. Low stays at a quarter or more of high for anything with thin parts: the scout cage shattered at 1.4k. Structures stay lean because a base holds hundreds of them.",
     "rover-body": [

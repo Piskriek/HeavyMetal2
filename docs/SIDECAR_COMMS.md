@@ -1067,3 +1067,47 @@ Commit: `feat(assets): grounded machine plumes and unquantized float geometry fo
 - **Every piece** is generated where packed, and falls back to `@hm/labkit` until then. The lab pieces are going through the 3D batch now and land through the evening, so start with the fallbacks.
 - **Lamps the power sequence drives** (gate coils, relay lamps, console screen) are their own emissive overlay meshes.
 - **Owner rules:** square sections, cables only in trays and covers, nothing floats, no lettering.
+
+### [2026-10-11 16:45] FLASH → OPUS: [REPORT] TASK-10d: The Lab Rebuilt to Sheet 21 (Complete)
+- **Delivered & Verified**:
+  - **Sheet 21 Layout Rebuilt** (`apps/web/src/play/lab-room.ts`):
+    - Room envelope resized to 16 × 12 × 5 m (`ROOM = { left: -8, right: 8, back: -9, front: 3, height: 5 }`).
+    - Full-width north observation window (14.8 × 3.1 m) with square section frame and 3 vertical square mullions forming 4 distinct observation bays.
+    - Walkable square 2-step plinth (Step 1: 5 × 5 × 0.2 m, Step 2: 4 × 4 × 0.2 m) with dark steel decking and hazard-stripe perimeter rims framing the void storm.
+    - Top lintel beam coil added to gate coil sequence (5 coils total, bottom-to-top sequence intact).
+    - Player collision adapted to allow seamless step elevation climbing (`room.floorHeight(x, z)`).
+  - **Dynamic Void Storm Progress Meter**:
+    - Replaced rain plane with custom procedural shader (`STORM_VERTEX` / `STORM_FRAGMENT`).
+    - Driven smoothly via `room.setStorm(progress)` uniform ($0.0 \to 1.0$):
+      - $0.0$: Full B&W 4x4 Bayer dithered void storm with pixel lightning arcs.
+      - $0.5$: Thinning clouds revealing muted grey earth ground and ruined silhouettes.
+      - $1.0$: Azure sky with drifting cumulus and restored verdant Earth landscape.
+    - Wired into campaign stage progression (`restore`, `raiseStage`, `setFidelityStage`).
+  - **Station Zones & Props Placed (Sheet 21 Strict)**:
+    - **West Power Wall**: Capacitor bank ($z=1.0$), breaker panel ($z=-1.0$), 4 relay cabinets ($z=-2.6, -3.5, -4.4, -5.3$), 2 control boxes ($z=-6.1, -6.7$), operator console with throw lever ($z=-7.8$), overhead cable tray at $y=4.2\text{ m}$, floor raceways leading to plinth.
+    - **East Studio Corner**: Preset rack ($z=-7.0$), bench ($z=-5.0$), combiner ($z=-3.4$), planet table (`PLANET_TABLE_AT = { x: 5.0, z: -5.0 }`). Plume particle emitters and holograms updated to match.
+    - **South-East Armory**: Equipment rail holding extraction tool, weapon modification bench at $x=6.0, z=2.4$.
+    - **South Her Corner**: Folding camp cot at $(-2.5, 2.2)$, work desk at $(1.0, 2.4)$ with paper stacks, mug, terminal screen, recessed wall radio at $y=1.4\text{ m}$, procedural scientific chart papers on wall with line/bar/pulse graphs (no lettering, deterministic `DataTexture`).
+  - **Interface & Power Sequence**:
+    - Full backwards compatibility with monorepo: `LabRoom`, `Power`, `powerAt`, `ROOM`, `GATE_AT`, `PLANET_TABLE_AT`.
+    - End-to-end power-on sequence verified: lever throw $\to$ breaker spark $\to$ 4 relays fire $\to$ cable pulse $\to$ coils light bottom-to-top $\to$ aperture opens.
+  - **Draw Call & Performance Audit**:
+    - Measured in Playwright WebGL 2 runner: **115 draw calls resting** (well inside the 200 budget), 151 with full telemetry HUD, 33,694 triangles.
+  - **Portfolio Screenshots Captured** (`docs/shots/lab/`):
+    - `41-layout.png` (high-angle overview looking north-east framing all stations and storm window)
+    - `42-act1-dark.png` (intro dark state, lever armed)
+    - `44-power-wall.png` (west wall capacitors, breakers, relays, overhead cable tray)
+    - `45-studio-corner.png` (east corner preset equipment & holographic planet table)
+    - `46-armory-her-corner.png` (south wall armory bench, camp cot, desk, wall charts)
+    - `window-storm-0.png` ($uStorm = 0.0$ void dither storm)
+    - `window-storm-0.5.png` ($uStorm = 0.5$ thinning storm over ruins)
+    - `window-storm-1.0.png` ($uStorm = 1.0$ azure sky and restored Earth)
+- **Validation**:
+  - `npm run typecheck`: 0 errors clean.
+  - `npm run build`: standalone single-file bundle built clean (`apps/web/dist/index.html`).
+  - `node scripts/capture-lab-sheet21.mjs`: ALL 8 SHOTS CAPTURED, POWER SEQUENCE PASSED.
+  - `node scripts/test-fidelity-sync-studio.mjs`: PASSED.
+  - `node scripts/test-planet-monstermash.mjs`: PASSED.
+  - `node scripts/test-base-building.mjs`: PASSED.
+- **Staging Isolation**:
+  - Staged strictly TASK-10d paths only. Ready to commit and push.

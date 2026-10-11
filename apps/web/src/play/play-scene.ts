@@ -13,7 +13,7 @@ import { GATE, KINDS, type Machine, type MachineKind, type PlotState } from '@hm
 import { createPlotGround, type BoulderInfo, type PlotGround } from './plot-ground';
 import { fx as sfx } from '../maker/feedback';
 import * as kit from '@hm/labkit';
-import { createLabRoom, GATE_AT, POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, ROOM, type LabRoom } from './lab-room';
+import { createLabRoom, GATE_AT, PLANET_TABLE_AT, POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, ROOM, type LabRoom } from './lab-room';
 import { createPlotHolo, type PlotHolo } from './plot-holo';
 import { COLOUR_MARK_FRAGMENT, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX } from './portal-shaders';
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
@@ -239,16 +239,17 @@ export function createPlayScene(o: {
   };
   let planetRT = target(16, 16, true, true), viewRT = target(16, 16, false, true), labRT = target(16, 16, false, false);
   const screen = new THREE.Vector2(1, 1);
+  let currentQuality: string = 'high';
 
   // ---- the lab
   const openingUniforms = { uView: { value: viewRT.texture as THREE.Texture }, uScreen: { value: screen }, uStatic: { value: 1 }, uTime: { value: 0 } };
   const openingMat = keep(new THREE.ShaderMaterial({ vertexShader: OPENING_VERTEX, fragmentShader: OPENING_FRAGMENT, uniforms: openingUniforms, side: THREE.DoubleSide }));
   const labScene = new THREE.Scene();
-  const room: LabRoom = createLabRoom({ textureSize: o.textureSize, portalMaterial: openingMat });
+  const room: LabRoom = createLabRoom({ textureSize: o.textureSize, portalMaterial: openingMat, quality: currentQuality });
   labScene.add(room.group);
   const holo: PlotHolo = createPlotHolo();
   room.group.add(holo.group);
-  holo.group.position.set(-3.6, 0, -5.2);
+  holo.group.position.set(PLANET_TABLE_AT.x, 0, PLANET_TABLE_AT.z);
   const pmrem = keep(new THREE.PMREMGenerator(renderer));
   const roomEnv = new RoomEnvironment();
   labScene.environment = keep(pmrem.fromScene(roomEnv, 0.04).texture);
@@ -267,23 +268,23 @@ export function createPlayScene(o: {
   let rackEmitter: number | null = null;
 
   const setLabActivity = (act: { readonly bench: number; readonly combiner: number; readonly rack: number }): void => {
-    // bench pours pink (#ff3d8a) while writing
+    // bench pours pink (#ff3d8a) while writing (east wall, z ≈ -5)
     if (act.bench > 0 && benchEmitter === null) {
-      benchEmitter = labPlume.add({ at: [9.25, 0.9, -3.4], colour: '#ff3d8a', count: 140, height: 2.2, spread: 0.9, life: 1.8 });
+      benchEmitter = labPlume.add({ at: [7.5, 0.9, -5.0], colour: '#ff3d8a', count: 140, height: 2.2, spread: 0.9, life: 1.8 });
     } else if (act.bench <= 0 && benchEmitter !== null) {
       labPlume.remove(benchEmitter);
       benchEmitter = null;
     }
-    // combiner pours violet (#b46bff) while mixing
+    // combiner pours violet (#b46bff) while mixing (east wall, z ≈ -3.4)
     if (act.combiner > 0 && combinerEmitter === null) {
-      combinerEmitter = labPlume.add({ at: [9.1, 1.25, -0.6], colour: '#b46bff', count: 150, height: 2.4, spread: 1.1, life: 2.0 });
+      combinerEmitter = labPlume.add({ at: [7.5, 1.25, -3.4], colour: '#b46bff', count: 150, height: 2.4, spread: 1.1, life: 2.0 });
     } else if (act.combiner <= 0 && combinerEmitter !== null) {
       labPlume.remove(combinerEmitter);
       combinerEmitter = null;
     }
-    // rack shows faint violet wisp at its indexer while cataloguing
+    // rack shows faint violet wisp at its indexer while cataloguing (east wall, z ≈ -7)
     if (act.rack > 0 && rackEmitter === null) {
-      rackEmitter = labPlume.add({ at: [-9.35, 1.4, -5.5], colour: '#b46bff', count: 35, height: 1.0, spread: 0.4, life: 1.2 });
+      rackEmitter = labPlume.add({ at: [7.5, 1.4, -7.0], colour: '#b46bff', count: 80, height: 1.6, spread: 0.6, life: 1.5 });
     } else if (act.rack <= 0 && rackEmitter !== null) {
       labPlume.remove(rackEmitter);
       rackEmitter = null;
@@ -368,7 +369,6 @@ export function createPlayScene(o: {
   const fabricatorViews = new Map<number, FabricatorView>();
   let lastVehiclesList: readonly { readonly id: number; readonly kind: RoverKind; readonly x: number; readonly z: number; readonly yaw: number }[] = [];
   let lastFabricatorsList: readonly { readonly id: number; readonly x: number; readonly z: number; readonly yaw: number; readonly printing: boolean }[] = [];
-  let currentQuality: string = 'high';
 
   let drivingVehicleId: number | null = null;
   let drivingState: RoverState | null = null;
@@ -1140,6 +1140,7 @@ export function createPlayScene(o: {
       if (gateOn) room.lever.rotation.x = -1.1;
       openingUniforms.uStatic.value = gateOn ? 0 : 1;
       stage = shown = s.plot.stage;
+      room.setStorm(Math.min(1, Math.max(0, stage / 6)));
       waveTo = -1;
       ground?.setStage(Math.max(1, stage));
       fitLooks();
@@ -1464,6 +1465,7 @@ export function createPlayScene(o: {
       // a wave still running is overtaken: the stage it was bringing shows at once
       if (waveTo >= 0) shown = waveTo;
       stage = to;
+      room.setStorm(Math.min(1, Math.max(0, to / 6)));
       waveTo = to;
       waveStart = clock + (shown === 0 ? 2.0 : 0.8);
       postUniforms.uWaveCentre.value.set(from.x, groundAt(from.x, from.z), from.z);
@@ -1475,6 +1477,7 @@ export function createPlayScene(o: {
       const s = Math.max(0, Math.min(4, Math.floor(to)));
       stage = s;
       shown = s;
+      room.setStorm(Math.min(1, Math.max(0, s / 6)));
       waveTo = -1;
       ground?.setStage(Math.max(1, s));
       mash.setFidelityStage(s);
@@ -1598,7 +1601,8 @@ export function createPlayScene(o: {
 
       if (where === 'lab') {
         collide(pos);
-        pos.y = EYE;
+        const fh = room.floorHeight(pos.x, pos.z);
+        pos.y = fh + EYE;
       } else if (drivingVehicleId === null) {
         // keep to your plot's surroundings; stand on the ground or base
         const r = Math.hypot(pos.x, pos.z);
@@ -1839,9 +1843,9 @@ export function createPlayScene(o: {
           atDial = atConsole;
         }
         const targets: [LabMachineKind, THREE.Vector3, number, number][] = [
-          ['rack', new THREE.Vector3(-9.55, 1.2, -5.5), 1.6, 4.0],
-          ['bench', new THREE.Vector3(9.25, 0.85, -3.4), 1.2, 3.8],
-          ['combiner', new THREE.Vector3(9.1, 0.9, -0.6), 1.0, 3.5],
+          ['rack', new THREE.Vector3(7.5, 1.2, -7.0), 1.6, 4.0],
+          ['bench', new THREE.Vector3(7.5, 0.85, -5.0), 1.2, 3.8],
+          ['combiner', new THREE.Vector3(7.5, 0.9, -3.4), 1.0, 3.5],
         ];
         let bestLab = 4.5;
         for (const [kind, targetPos, radius, maxDist] of targets) {
@@ -2071,6 +2075,10 @@ export function createPlayScene(o: {
     getNearVehicle,
   };
   (api as any).planetScene = planetScene;
+  (api as any).labScene = labScene;
+  (api as any).room = room;
+  (api as any).renderer = renderer;
+  (api as any).camera = camera;
   (api as any).THREE = THREE;
   return api;
 }

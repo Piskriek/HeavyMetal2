@@ -5,7 +5,7 @@
 // - SetMix: the lush sunlit terraformed planet (docs/concept/setmix/04-menu-setmix.png)
 // - Goblin Racing: the goblin planet in deep space (docs/concept/setmix/05-menu-goblin-racing.png)
 import * as THREE from 'three';
-import { createLabRoom, GATE_AT, type LabRoom } from '../play/lab-room';
+import { createLabRoom, GATE_AT, PLANET_TABLE_AT, type LabRoom } from '../play/lab-room';
 import { createPlotHolo, type PlotHolo } from '../play/plot-holo';
 import type { PlotGround } from '../play/plot-ground';
 import type { PlotState } from '@hm/plotsim';
@@ -233,12 +233,13 @@ export function createLabScene(o: {
   labScene.add(room.group);
   // Dim lab where the open gate is the brightest thing (matches 04-menu-setmix.png)
   room.setPower({ relays: 1, pulse: 1, coils: 1, main: 0.35, emergency: 0, static: 0 });
+  room.setStorm(0.5);
   room.lever.rotation.x = -1.1;
 
   // ---- Amber hologram planet table in the menu
   const holo: PlotHolo = createPlotHolo();
   room.group.add(holo.group);
-  holo.group.position.set(-3.6, 0, -5.2);
+  holo.group.position.set(PLANET_TABLE_AT.x, 0, PLANET_TABLE_AT.z);
   const mockGround = {
     heightAt: (x: number, z: number) => 15 + 4 * Math.sin(x * 0.015) + 3 * Math.cos(z * 0.015),
   } as unknown as PlotGround;

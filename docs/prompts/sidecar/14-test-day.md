@@ -25,6 +25,15 @@ Throughout:
 - Collect `console.error` messages and failed requests (404s). The goal is zero; list any that remain.
 - Measure FPS at each beat at the default Graphics setting (this laptop is the minimum spec: i7-6700HQ, GTX 950M). Report it per beat.
 
+## 1b. Three bugs found in TASK-13 (`docs/SIDECAR_COMMS.md`, b21fb7eb): fix these first; the owner will hit them
+1. **Stairs cannot be walked.** `apps/web/src/base/walk.ts` has an analytic surface for ramps only, so the player stops at the foot of the stairs.
+   - Add a stairs surface. Its rise follows the treads: 3 m over 4 m, the same slope as the ramp, so a smooth incline at the stairs' slope is acceptable if steps are hard.
+   - Assert in the test that the camera climbs at least 2.5 m up the flight. TASK-13's test currently only reports it.
+2. **E on an aimed door toggles it while building.** In build mode E must place the piece; a door toggles only outside build mode. Building next to a door currently opens the door instead.
+3. **Ray hits on `windowWall` and `door` land about 2 m off in some views:** aiming through a window hits behind it.
+   - Find the cause. Suspects: the generated mesh's placement inside the piece group from TASK-10b (an offset applied twice?), or `pieceIdFromHit` / the batcher's `idAt`.
+   - Test it: aim at the centre of a placed window wall and a door from 3 m, and assert the hit lands on that piece within 0.3 m.
+
 ## 2. Fix what breaks
 Fix any beat that fails, any error and any 404, at its cause. A fix outside your understanding (the sim packages, the asset pipeline): post a `[QUESTION]` instead.
 

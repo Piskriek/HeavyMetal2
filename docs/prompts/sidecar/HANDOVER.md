@@ -37,8 +37,9 @@ You take over from the previous sidecar (Gemini Flash) as the implementing engin
 7. **The 3D PC:** never touch `scripts/local3d.mjs` jobs, `zips/runworld/` or the asset pipeline. Those are Opus's. You only use the packed assets: `apps/web/src/assets/gen/`, `apps/web/public/hd/`, `apps/web/public/audio/`, `apps/web/public/vo/`.
 
 ## Your queue (in order)
-1. **TASK-13 unlock the roofs, gables, stairs and wall variants** (`docs/prompts/sidecar/13-unlock-pieces.md`). TASK-10b and its follow-ups are done and committed (c8d64c2c).
-2. Then post `[QUESTION] ready for the next task` and stop.
+1. **TASK-14 test-day readiness** (`docs/prompts/sidecar/14-test-day.md`). TASK-13 is done (baa7de47).
+2. **TASK-15 the modular scout and the new crawler** (`docs/prompts/sidecar/15-modular-scout.md`), only if TASK-14 is fully done.
+3. Then post `[QUESTION] ready for the next task` and stop.
 
 ## Context you can rely on
 - **Generated assets:** `loadGen` / `getGenSync` / `genLevelFor` in `apps/web/src/assets/gen.ts`, and the patterns in `apps/web/src/assets/gen-props.ts`. `registry.json` lists every packed asset with its size, and its box for lattice pieces.

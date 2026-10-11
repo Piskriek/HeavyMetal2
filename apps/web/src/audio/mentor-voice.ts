@@ -2,6 +2,7 @@
 // Connects the pure @hm/narrator state machine to Web Audio and the game HUD.
 // Uses the owner's levels and curve from ./mentor-mix.ts.
 import { MENTOR_MIX, driveCurve, radioBlend } from './mentor-mix';
+import { kv } from '../storage/profile-storage';
 import {
   createNarrator,
   fidelityRules,
@@ -41,14 +42,15 @@ export const DEFAULT_SETTINGS: MentorVoiceSettings = {
   isRadio: true,
 };
 
-function logKeyForSlot(slot?: string): string {
-  return slot ? `fidelity.radio-log.${slot}` : 'fidelity.radio-log';
+/** The radio log belongs to one save slot. With no slot there is no log: nothing is read or written. */
+function logKeyForSlot(slot: string): string {
+  return `fidelity.radio-log.${slot}`;
 }
 
 export function loadRadioLog(slot?: string): string[] {
-  if (typeof localStorage === 'undefined') return [];
+  if (!slot) return [];
   try {
-    const raw = localStorage.getItem(logKeyForSlot(slot)) ?? (slot ? localStorage.getItem('fidelity.radio-log') : null);
+    const raw = kv.get(logKeyForSlot(slot));
     return raw ? (JSON.parse(raw) as string[]) : [];
   } catch {
     return [];
@@ -56,32 +58,20 @@ export function loadRadioLog(slot?: string): string[] {
 }
 
 export function saveRadioLog(heard: readonly string[], slot?: string): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    const key = logKeyForSlot(slot);
-    localStorage.setItem(key, JSON.stringify(heard));
-    if (slot) localStorage.setItem('fidelity.radio-log', JSON.stringify(heard));
-  } catch {
-    /* storage unavailable */
-  }
+  if (!slot) return;
+  kv.set(logKeyForSlot(slot), JSON.stringify(heard));
 }
 
 export function clearRadioLog(slot?: string): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.removeItem(logKeyForSlot(slot));
-    if (slot) localStorage.removeItem('fidelity.radio-log');
-  } catch {
-    /* storage unavailable */
-  }
+  if (!slot) return;
+  kv.remove(logKeyForSlot(slot));
 }
 
 const SETTINGS_KEY = 'fidelity.dialogue-settings';
 
 export function loadDialogueSettings(): MentorVoiceSettings {
-  if (typeof localStorage === 'undefined') return { ...DEFAULT_SETTINGS };
   try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
+    const raw = kv.get(SETTINGS_KEY);
     if (!raw) return { ...DEFAULT_SETTINGS };
     const parsed = JSON.parse(raw) as Partial<MentorVoiceSettings>;
     return { ...DEFAULT_SETTINGS, ...parsed };
@@ -91,13 +81,8 @@ export function loadDialogueSettings(): MentorVoiceSettings {
 }
 
 export function saveDialogueSettings(s: Partial<MentorVoiceSettings>): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    const cur = loadDialogueSettings();
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...cur, ...s }));
-  } catch {
-    /* storage unavailable */
-  }
+  const cur = loadDialogueSettings();
+  kv.set(SETTINGS_KEY, JSON.stringify({ ...cur, ...s }));
 }
 
 /** Strip v3 audio cues like [breathes], [pause], [dry], [relieved], [quietly]. */

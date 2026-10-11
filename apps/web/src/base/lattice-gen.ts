@@ -27,10 +27,11 @@ export const LATTICE_GEN_IDS: Readonly<Partial<Record<Kind, string>>> = {
 };
 
 /**
- * Kinds whose generated mesh misses the procedural box by more than 2% on an axis (lattice-gen.test.ts measures it).
- * They keep the procedural mesh until the asset is re-fitted. The test fails when this list and the measurement disagree.
+ * Kinds whose generated mesh misses its registry box, so they stay procedural. Empty: every generated mesh fits its
+ * box (lattice-gen.test.ts measures it against registry.json). The test fails if this list and the measurement disagree.
+ * The ramp keeps its procedural handrails on top of the generated deck; the door keeps its hinge knuckles.
  */
-export const LATTICE_GEN_HELD: readonly Kind[] = ['ramp', 'hardpoint', 'windowWall', 'door'];
+export const LATTICE_GEN_HELD: readonly Kind[] = [];
 
 /** Largest skirt (m) the generated foundation fits: its ribs reach 1 m below the slab. */
 export const LATTICE_GEN_FOUNDATION_SKIRT = 1;

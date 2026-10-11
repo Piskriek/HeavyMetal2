@@ -3,15 +3,16 @@
 // on the clipboard to paste back. The Moon score scrubber crossfades the seven stage tracks (music-moon-s0..s6) live,
 // the way a plot's score is meant to gain fidelity with its stage.
 //   /audio.html
+import { kv } from '../storage/profile-storage';
 interface Entry { readonly id: string; readonly kind: 'music' | 'sfx'; readonly duration: number; readonly text: string; readonly loop: boolean }
 type Verdict = 'keep' | 'redo';
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const KEY = 'fidelity.audio-verdicts';
 const verdicts: Record<string, Verdict> = (() => {
-  try { return JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, Verdict>; } catch { return {}; }
+  try { return JSON.parse(kv.get(KEY) ?? '{}') as Record<string, Verdict>; } catch { return {}; }
 })();
-const save = (): void => { try { localStorage.setItem(KEY, JSON.stringify(verdicts)); } catch { /* private window: verdicts last this visit */ } };
+const save = (): void => kv.set(KEY, JSON.stringify(verdicts));
 
 // per-file levels and loop regions (public/audio/levels.json), the same the game applies
 interface Level { readonly gain: number; readonly start?: number; readonly end?: number }

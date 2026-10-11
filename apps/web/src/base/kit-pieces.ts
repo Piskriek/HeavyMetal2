@@ -120,10 +120,24 @@ export function computeSkirt(
   return rounded;
 }
 
+/** The door's hinge knuckles, procedural: they reach past the leaf's box, so the generated leaf does not carry them. */
+function doorKnuckles(m: basekit.LabMaterials): THREE.Mesh[] {
+  const out: THREE.Mesh[] = [];
+  for (const y of [0.35, 1.15, 1.95]) {
+    const plate = new THREE.BoxGeometry(0.055, 0.15, 0.04);
+    plate.translate(0.02, y, 0.05);
+    const pin = new THREE.CylinderGeometry(0.026, 0.026, 0.18, 12);
+    pin.translate(0, y, 0.05);
+    out.push(new THREE.Mesh(plate, m.copper), new THREE.Mesh(pin, m.gunmetal));
+  }
+  return out;
+}
+
 /**
  * TASK-10b: the lattice piece's visible mesh becomes its generated model, placed where the procedural mesh was
- * (same group, before the pivot offset). Lamps, colliders and sockets stay procedural. Nothing changes when the
- * kind stays procedural or the asset is not loaded yet.
+ * (same group, before the pivot offset). Lamps, colliders and sockets stay procedural. Two kinds keep their own
+ * procedural parts: the ramp keeps its paint (handrails, posts, mid rails) on the generated deck, and the door leaf
+ * keeps its hinge knuckles. Nothing changes when the kind stays procedural or the asset is not loaded yet.
  */
 function swapLatticeMesh(
   kind: Kind,
@@ -131,19 +145,35 @@ function swapLatticeMesh(
   skirt: number,
   group: THREE.Group,
   lamps: readonly THREE.Mesh[],
+  m: basekit.LabMaterials,
 ): void {
   const id = latticeGenId(kind, skirt);
   if (!id) return;
   const gen = getGenSync(id, genLevelForStage(stage));
   if (!gen) return;
-
-  for (const child of [...group.children]) {
-    if (child instanceof THREE.Mesh && !lamps.includes(child)) {
-      group.remove(child);
-      child.geometry.dispose();
-    }
-  }
   gen.name = `gen-${id}`;
+
+  if (kind === 'door') {
+    const leaf = group.getObjectByName('door-leaf');
+    if (!(leaf instanceof THREE.Group)) return;
+    for (const child of [...leaf.children]) {
+      if (child instanceof THREE.Mesh) {
+        leaf.remove(child);
+        child.geometry.dispose();
+      }
+    }
+    leaf.add(gen, ...doorKnuckles(m));
+    return;
+  }
+
+  // the ramp's handrails and posts are paint; everything else on the ramp is the deck, which the generated model replaces
+  const keepPaint = kind === 'ramp';
+  for (const child of [...group.children]) {
+    if (!(child instanceof THREE.Mesh) || lamps.includes(child)) continue;
+    if (keepPaint && child.material === m.paint) continue;
+    group.remove(child);
+    child.geometry.dispose();
+  }
   group.add(gen);
 }
 
@@ -430,7 +460,7 @@ export class KitPieceCache {
       }
     }
 
-    swapLatticeMesh(kind, stage, skirt, rawGroup, rawLamps);
+    swapLatticeMesh(kind, stage, skirt, rawGroup, rawLamps, bkm);
 
     // Mark lamps in raw template so clones can be identified
     for (const lamp of rawLamps) {

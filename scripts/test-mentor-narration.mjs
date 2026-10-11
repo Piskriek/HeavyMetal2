@@ -265,13 +265,19 @@ try {
 
   // 8. Verify localStorage persistence
   console.log('Checking localStorage persistence...');
-  const persistedLog = await page.evaluate(() => localStorage.getItem('fidelity.radio-log'));
+  // the radio log is per save slot (fidelity.radio-log.<slot>); the global key must not exist
+  const persistedLog = await page.evaluate(() => {
+    const keys = Object.keys(localStorage).filter((k) => k.startsWith('fidelity.radio-log.'));
+    return keys.map((k) => localStorage.getItem(k)).find((v) => v && v.includes('A1-01')) ?? null;
+  });
+  const globalLog = await page.evaluate(() => localStorage.getItem('fidelity.radio-log'));
+  if (globalLog !== null) throw new Error('The global fidelity.radio-log key must not be written');
   const persistedSettings = await page.evaluate(() => localStorage.getItem('fidelity.dialogue-settings'));
   console.log('OK: Persisted radio log JSON length:', persistedLog?.length);
   console.log('OK: Persisted dialogue settings:', persistedSettings);
 
   if (!persistedLog || !persistedLog.includes('A1-01')) {
-    throw new Error('Expected fidelity.radio-log in localStorage to include A1-01');
+    throw new Error('Expected a fidelity.radio-log.<slot> entry in localStorage to include A1-01');
   }
   if (!persistedSettings || !persistedSettings.includes('dialogueVolume')) {
     throw new Error('Expected fidelity.dialogue-settings in localStorage');

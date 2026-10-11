@@ -10,6 +10,7 @@
 // - window.__audio debug inspection hook.
 
 import { MENTOR_MIX } from './mentor-mix';
+import { kv } from '../storage/profile-storage';
 
 export interface AudioLevel {
   readonly gain: number; // dB
@@ -43,9 +44,8 @@ export const DEFAULT_AUDIO_SETTINGS: AudioSettings = {
 const SETTINGS_KEY = 'fidelity.audio-settings';
 
 export function loadAudioSettings(): AudioSettings {
-  if (typeof localStorage === 'undefined') return { ...DEFAULT_AUDIO_SETTINGS };
   try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
+    const raw = kv.get(SETTINGS_KEY);
     if (!raw) return { ...DEFAULT_AUDIO_SETTINGS };
     const parsed = JSON.parse(raw) as Partial<AudioSettings>;
     return { ...DEFAULT_AUDIO_SETTINGS, ...parsed };
@@ -55,13 +55,8 @@ export function loadAudioSettings(): AudioSettings {
 }
 
 export function saveAudioSettings(s: Partial<AudioSettings>): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    const cur = loadAudioSettings();
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...cur, ...s }));
-  } catch {
-    /* storage unavailable */
-  }
+  const cur = loadAudioSettings();
+  kv.set(SETTINGS_KEY, JSON.stringify({ ...cur, ...s }));
 }
 
 export type MusicContext = 'silent' | 'lab' | 'moon' | 'monster-mash' | 'driving';

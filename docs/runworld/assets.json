@@ -845,6 +845,37 @@
       "axis": "length",
       "view": "part",
       "subject": "(reused: the RUN.world Hunyuan 3.1 Pro test model of the concept panel itself)"
+    },
+    {
+      "id": "scout-chassis",
+      "panel": "19/19-scout-s6.png",
+      "class": "vehicle-part",
+      "size": 3,
+      "axis": "length",
+      "view": "three-quarter",
+      "note": "modular pilot (owner 2026-10-11): parts generated alone, cage + bake per part, assembled at sockets; replaces scout-body when it passes",
+      "subject": "the flat rolling chassis that this cab shell sits on, on its own, WITHOUT the cab, wheels, seat, lights or aerial: NOTHING rises above its floor line except four hub housings; a low flat steel floor pan about 3 metres long and 1.4 metres wide, a solid armoured belly plate under it, four closed boxy armoured hub housings at its corners with the suspension hidden inside them (the wheels bolt on later), solid side sills with a hazard-striped band, a solid front bumper plate carrying two flat square mounting pads for headlights, and a solid rear bumper plate; NO roll cage, NO tubes, NO frame rails, NO arms, NO springs; the same warm light-grey painted steel and dark grey trim as the reference",
+      "ref": "asset:scout-shell"
+    },
+    {
+      "id": "scout-shell",
+      "panel": "19/19-scout-s6.png",
+      "class": "vehicle-part",
+      "size": 2.4,
+      "axis": "length",
+      "view": "three-quarter",
+      "note": "modular pilot (owner 2026-10-11): parts generated alone, cage + bake per part, assembled at sockets; replaces scout-body when it passes",
+      "subject": "the scout buggy cab shell on its own, WITHOUT the chassis under it and WITHOUT wheels, lights or aerial: a compact one-seat enclosed cab about 2.4 metres long, 1.4 metres wide and 1.4 metres tall, its roll protection BUILT INTO SOLID flat bolted steel panels, a wide windscreen opening and one side window opening on each side (empty openings, no glass), a flat roof panel, a short sloped nose panel and a short rear deck, its flat underside rim made to sit on a chassis; the cab is EMPTY inside: NO seat, NO steering wheel, NO controls, just a flat floor and smooth solid inner walls: NO tubes, NO bars and NO braces inside, and NO holes or cut-outs in any panel other than the windscreen and the two side windows; warm light-grey painted steel, dark grey trim, a hazard band along each lower side"
+    },
+    {
+      "id": "headlight",
+      "panel": "19/19-scout-s6.png",
+      "class": "detail",
+      "size": 0.3,
+      "axis": "height",
+      "view": "three-quarter",
+      "note": "modular pilot (owner 2026-10-11): parts generated alone, cage + bake per part, assembled at sockets; replaces scout-body when it passes; one asset, mirrored per side, shared by every vehicle",
+      "subject": "one vehicle headlight on its own: a chunky round amber glass lamp lens set in a deep cylindrical steel housing, on a short SOLID bolted bracket with a flat square mounting foot under it, the lens facing forward"
     }
   ],
   "budgets": {
@@ -893,6 +924,16 @@
       2000,
       5000,
       10000
+    ],
+    "vehicle-part": [
+      1100,
+      2400,
+      4800
+    ],
+    "detail": [
+      150,
+      400,
+      800
     ]
   },
   "notes": [

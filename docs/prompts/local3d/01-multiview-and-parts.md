@@ -17,12 +17,12 @@ House rules from your own notes still apply:
 - Extend POST /jobs to accept
   `{"views": {"front": b64, "left": b64, "back": b64, "right": b64}, "texture": true}`
   (any subset with front present).
-- When `views` is present, make the shape with 2mv, unload it, then texture with the 2.1 paint stage as now, using
+- When `views` is present, make the shape with 2mv, unload it, then texture with the existing Hunyuan3D-2.0 paint stage (the one :8082 runs now), using
   the front view as the paint reference (or all views, if the paint stage takes several).
-- With `image_base64` only, keep today's 2.1 path.
+- With `image_base64` only, keep today's path unchanged.
 
 2. TEXTURE A GIVEN MESH
-- Add `{"mesh_glb_base64": b64, "image_base64": b64}` (or `views`): run only the 2.1 paint stage on the supplied
+- Add `{"mesh_glb_base64": b64, "image_base64": b64}` (or `views`): run only the existing 2.0 paint stage on the supplied
   mesh and return the textured GLB.
 - We use it to paint parts we shape or fix ourselves.
 

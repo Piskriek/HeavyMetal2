@@ -223,7 +223,7 @@ The owner's suggestion, in short:
 **What the research says:**
 - **The industry route is high-poly first, then a clean low, then a bake.** The normal map baked from the high carries the visual detail. Texturing after retopology beats texturing the raw generated mesh (Customuse, Tripo).
 - **AI is weak at modular kits and exact mechanical parts.** Dimensions and snapping rules come from code or people (Wavect). For us that is the procedural kits: they already carry the dimensions, hubs, sockets and colliders (`packages/rovergear`: `hubs`, `sockets` such as `seat` and `dish`; `packages/basekit`).
-- **Multi-view shape is open source: Hunyuan3D-2mv** (front, left, back and right; shape only). Hunyuan3D 2.1's paint stage can texture any mesh, so 2mv for the shape plus 2.1 for the paint fits the 3080. The install prompt for the local agent is `docs/prompts/local3d/01-multiview-and-parts.md`.
+- **Multi-view shape is open source: Hunyuan3D-2mv** (front, left, back and right; shape only). The pipeline's paint stage is Hunyuan3D-2.0 Paint, which can texture any mesh; 2.1 Paint needs about 21 GB and does not fit the 3080, so 2mv for the shape plus the existing 2.0 paint is the route (answered for the local agent, 2026-10-11). The install prompt for the local agent is `docs/prompts/local3d/01-multiview-and-parts.md`.
 - **Hunyuan3D-Part (P3-SAM segmentation and X-Part completion) has open light weights.** It could split a generated mesh into parts automatically, which may be worth a test later.
 
 **The route (the pilot is the scout, from sheet 19):**

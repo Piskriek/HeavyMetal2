@@ -79,7 +79,10 @@ if (cmd === 'status') {
     fs.mkdirSync(d, { recursive: true });
     const before = guard(COST.image, a.id);
     console.log(`image ${a.id} (balance ${before})`);
-    const r = rundot(['generate', 'image', '--prompt', prompt(a), '--reference-image', path.join(PANELS, a.panel), '--aspect-ratio', '1:1', '--out', png, '--json']);
+    // a part of a modular set can take an approved sibling's image as its reference (`ref: "asset:<id>"`), so the
+    // set matches itself and a concept panel's other parts (the scout's tube cage) do not leak in
+    const ref = a.ref?.startsWith('asset:') ? path.join(OUT, a.ref.slice(6), 'source.png') : path.join(PANELS, a.panel);
+    const r = rundot(['generate', 'image', '--prompt', prompt(a), '--reference-image', ref, '--aspect-ratio', '1:1', '--out', png, '--json']);
     log({ id: a.id, step: 'image', ok: r.ok && fs.existsSync(png), before, tail: r.out.slice(-300) });
     if (!r.ok) { console.log(`  failed: ${r.out.slice(-300)}`); if (fatal(r.out)) process.exit(5); }
   }

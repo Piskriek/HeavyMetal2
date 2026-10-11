@@ -46,17 +46,20 @@ for (const e of entries) {
     : ['generate', 'sfx', '--description', e.description, '--duration', String(e.duration), '--out', file];
   const r = rundot(args);
   console.log(fs.existsSync(file) ? `${e.id}: ${Math.round(fs.statSync(file).size / 1024)} KB (balance before ${b})` : `${e.id}: FAILED ${r.out.slice(-240).replace(/\s+/g, ' ')}`);
+  writeIndex(); // the audition page lists each file as soon as it lands
   if (/QUOTA_EXCEEDED|CREDITS_EXHAUSTED|AI_POLICY_DENIED/i.test(r.out)) break;
 }
 
-// the CLI writes a <file>.json beside each file (its URL and generation id): keep those out of public/
-const META = path.join(ROOT, 'zips', 'runworld', 'audio-meta');
-fs.mkdirSync(META, { recursive: true });
-for (const f of fs.readdirSync(OUT).filter((n) => n.endsWith('.mp3.json'))) fs.renameSync(path.join(OUT, f), path.join(META, f));
-
-// the audition list: every generated file with its prompt, kind and length
-const index = [...manifest.music.map((e) => ({ ...e, kind: 'music' })), ...manifest.sfx.map((e) => ({ ...e, kind: 'sfx' }))]
-  .filter((e) => fs.existsSync(path.join(OUT, `${e.id}.mp3`)))
-  .map((e) => ({ id: e.id, kind: e.kind, duration: e.duration, text: e.prompt ?? e.description, loop: /seamless loop/i.test(e.prompt ?? e.description) }));
-fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(index, null, 2) + '\n');
-console.log(`index: ${index.length} files`);
+/** The audition list (every generated file with its prompt, kind and length); returns how many it lists. */
+function writeIndex() {
+  // the CLI writes a <file>.json beside each file (its URL and generation id): keep those out of public/
+  const META = path.join(ROOT, 'zips', 'runworld', 'audio-meta');
+  fs.mkdirSync(META, { recursive: true });
+  for (const f of fs.readdirSync(OUT).filter((n) => n.endsWith('.mp3.json'))) fs.renameSync(path.join(OUT, f), path.join(META, f));
+  const index = [...manifest.music.map((e) => ({ ...e, kind: 'music' })), ...manifest.sfx.map((e) => ({ ...e, kind: 'sfx' }))]
+    .filter((e) => fs.existsSync(path.join(OUT, `${e.id}.mp3`)))
+    .map((e) => ({ id: e.id, kind: e.kind, duration: e.duration, text: e.prompt ?? e.description, loop: /seamless loop/i.test(e.prompt ?? e.description) }));
+  fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(index, null, 2) + '\n');
+  return index.length;
+}
+console.log(`index: ${writeIndex()} files`);

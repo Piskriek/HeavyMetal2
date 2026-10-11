@@ -33,7 +33,6 @@ test('every prop stands on the floor and has a collider', () => {
     breakerPanel(m),
     capacitorBank(m),
     operatorConsole(m),
-    controlBox(m),
     planetTable(m),
     presetRack(m),
     presetBench(m),
@@ -45,6 +44,14 @@ test('every prop stands on the floor and has a collider', () => {
     assert.ok(near(box(p).min.y, 0, 0.002), `grounded (min y ${box(p).min.y})`);
     assert.ok(p.colliders.length >= 1);
   }
+});
+
+test('the control box is wall-mounted: a plate and the box on it, no stand, nothing reaching the floor', () => {
+  // the group's origin is the wall: the plate is 0.62 m tall about it, the box 0.45 m, and the lab hangs it at about 1.4 m
+  const p = controlBox(m);
+  const b = box(p);
+  assert.ok(b.min.y > -0.35 && b.max.y < 0.35, `plate spans ${b.min.y} to ${b.max.y} about the mount`);
+  assert.ok(p.colliders.length >= 1);
 });
 
 test('the gate: a 2.6 x 1.7 opening in a free-standing frame, six coils bottom to top', () => {

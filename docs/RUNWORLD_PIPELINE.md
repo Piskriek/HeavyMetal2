@@ -248,6 +248,11 @@ The owner's suggestion, in short:
    - each snaps on at a named socket on the base, as `rovergear` does for seats;
    - the game assembles the vehicle from base, wheels and parts at their sockets.
 
+**Later: thin parts by dimension.**
+- [CoDimRecon](https://shuzhaoxie.github.io/CoDimRecon/) (2026; code "soon") reconstructs a scene "by dimensionality": curves as centrelines with radii, surfaces as shells with thickness, volumes as solids, and articulated parts with explicit joints.
+- For us, a thin part detected in a generated mesh (a cable, aerial, rail or rung) would be replaced by a fitted centreline and radius, and built procedurally at each level instead of decimated. That is the owner's split rule, automated.
+- Until then it is done by hand: the aerial, railing and ladder stay procedural.
+
 **Done when** the assembled scout reads like sheet 19 at every level. The test is the one that failed before: the lamps round, the aerial straight, the panels clean, at the same triangle totals as today's scout.
 
 Sources:

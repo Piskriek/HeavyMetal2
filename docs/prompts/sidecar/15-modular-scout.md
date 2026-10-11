@@ -30,12 +30,12 @@
 - the cab interior from the driver's seat;
 - the scout driving on the Moon.
 
-## The crawler (a new , remade tonight)
+## The crawler (a new `crawler-body`, remade tonight)
 - **Its size:** the new body is 2.40 x 2.20 x 6.20 m. It is fitted to the kit crawler's box, centred on x and z, bottom at 0.
-  - In , drop  (no squash is needed now) and re-check the offset.
+  - In `VEHICLE_FIT.crawler`, drop `scaleX` (no squash is needed now) and re-check the offset.
 - **Its front is the end with the hinge bracket** (where the drill arm mounts); the cab sits at the rear. Check which way the GLB faces, and yaw it so the hinge points +z (forward).
 - **Re-place:**
-  - the drill arm () on the hinge bracket;
+  - the drill arm (`crawler-arm`) on the hinge bracket;
   - the seat in the cab;
   - the lamps (the body has square lamp housings by the hinge).
 - **Shot:** the crawler beside the scout and the hauler on the Moon, lit from behind the camera.

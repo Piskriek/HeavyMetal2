@@ -45,16 +45,19 @@ const PRIMITIVE_NAMES: Readonly<Record<PrimitiveId, readonly [string, number]>> 
 
 /** What each primitive's blueprints can build. */
 export const FAMILY: Readonly<Record<PrimitiveId, readonly Kind[]>> = {
-  cube: ['foundation', 'floor', 'wall', 'bin'],
+  // the cube family: slabs and panels, beside foundation, floor and wall (TASK-13)
+  cube: ['foundation', 'floor', 'wall', 'bin', 'halfWall', 'windowWall', 'doorframe', 'door', 'gable'],
   column: ['pillar', 'repeater'],
-  beam: ['ramp'],
+  // the beam family: the ramp and the stairs, and the roofs (sloped and long pieces, TASK-13)
+  beam: ['ramp', 'stairs', 'roof', 'lowRoof', 'roofOuter', 'roofInner', 'ridgeCap'],
   chassis: ['airlock', 'hardpoint', 'bench', 'lifeSupport', 'weaponBench'],
 };
 
 /** Ore per piece; blueprint pieces add one unit of their map. Heavy hardpoints also need refined beams and frames. */
 export const PIECE_ORE: Readonly<Record<Kind, number>> = {
   foundation: 20, floor: 10, ramp: 14, wall: 12, airlock: 20, pillar: 6, hardpoint: 60, bin: 15, bench: 25, repeater: 30,
-  // structure round 4a/4b kinds: costed, but in no blueprint family until the game renders them
+  // structure round 4a/4b kinds: rendered with generated models (TASK-10b) and in a blueprint family (TASK-13).
+  // Railing and ladder stay out of the families: the owner has not been asked about them.
   halfWall: 7, windowWall: 14, doorframe: 10, door: 14, railing: 4, ladder: 6, stairs: 16, lifeSupport: 30,
   roof: 14, lowRoof: 10, roofOuter: 12, roofInner: 12, gable: 8, ridgeCap: 3, weaponBench: 30,
 };

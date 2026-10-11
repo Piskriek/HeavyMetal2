@@ -259,7 +259,8 @@ export function PlayScreen(props: {
     { item: 'prim-chassis', n: 8 },
     { item: 'prim-beam', n: 8 },
     { item: 'prim-column', n: 8 },
-    { item: 'map-basalt', n: 10 },
+    // the TASK-13 house needs 14 basalt maps (one per cube and beam piece, and the draft); the seed carries 16
+    { item: 'map-basalt', n: 16 },
     { item: 'pxd-mono', n: 80 },
     { item: 'vtx-rough', n: 80 },
   ];
@@ -2075,7 +2076,7 @@ export function PlayScreen(props: {
           const hit = sceneRef.current?.aimPoint();
           if (hit && hit.piece !== null) {
             const p = baseWorldRef.current.base.pieces.find((q) => q.id === hit.piece);
-            if (p && p.kind === 'airlock') {
+            if (p && (p.kind === 'airlock' || p.kind === 'door')) {
               dispatchBase({ t: 'door', id: p.id, open: !p.open });
               return;
             }

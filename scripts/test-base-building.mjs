@@ -7,6 +7,8 @@
  * - Verifies slot interaction & drag/swap move
  * - Verifies Drafting Table window opens on K key
  * - Verifies Lattice Quantum Bridge Storage window opens on L key
+ * - Builds the TASK-13 house on a fresh kit boot through the real path (hotbar, aim, E, snap), opens its door,
+ *   and captures the house at stages 1 and 6, the open door and the build menu.
  * - Verifies Base-Building lifecycle via window.__hm.base / window.hmPlay.base:
  *   1. Found a foundation slab (STARTER)
  *   2. Place a drafting bench
@@ -1826,6 +1828,224 @@ try {
 
   await takeScreenshot(page, { path: 'docs/shots/base/batched-200.png' });
   console.log('Captured docs/shots/base/batched-200.png');
+
+  // Step 7: TASK-13 house, built through the real path: the blueprint on the hotbar, the aim (where the camera looks),
+  // the kind from the build menu (the mouse wheel names them), and E (the place key). No piece is written into the world directly.
+  console.log('\n--- Step 7: TASK-13 house through the blueprint, hotbar, aim, place and snap path ---');
+  // A fresh kit boot for the house: the earlier sections of this run spend the dev seed's ore (600) on the heavy machines and the fabricator.
+  await page.goto(`http://localhost:${port}/?base&kit=1`, { waitUntil: 'domcontentloaded' });
+  await canvas.waitFor({ state: 'visible', timeout: 25000 });
+  await page.waitForFunction(() => window.hmPlay?.ready === true, { timeout: 35000 });
+  await page.evaluate(() => {
+    window.hmPlay?.teleportPlanet?.();
+    window.hmPlay?.setPaused?.(false);
+    window.hmPlay?.setLocked?.(true);
+  });
+  await page.waitForFunction(() => window.hmPlay?.where === 'planet', { timeout: 15000 });
+  await page.waitForTimeout(800);
+  // The found point: a level site north of the batch grid (which spans x -28..28, z -40..16 around the shelter), with every stand inside the gate's 60 m network range.
+  const HOUSE_CX = -17, HOUSE_CZ = 35;
+
+  const hotbarSlot = (bp) => page.evaluate((bp) => {
+    const api = window.__hm?.base ?? window.hmPlay?.base;
+    const slots = api.world().player.slots;
+    return {
+      hot: slots.findIndex((s, k) => s?.item === bp && k < 9),
+      any: slots.findIndex((s) => s?.item === bp),
+      empty: slots.findIndex((s, k) => k < 9 && !s),
+    };
+  }, bp);
+  const pieceList = () => page.evaluate(() => {
+    const api = window.__hm?.base ?? window.hmPlay?.base;
+    return api.world().base.pieces.map((p) => ({ id: p.id, s: p.s, kind: p.kind, i: p.i, j: p.j, k: p.k, r: p.r, open: p.open ?? null }));
+  });
+  const structureOriginOf = (sid) => page.evaluate((sid) => {
+    const api = window.__hm?.base ?? window.hmPlay?.base;
+    const st = api.world().base.structures.find((x) => x.id === sid);
+    return st ? { x: st.x + 2, z: st.z + 2, y: st.y } : null;
+  }, sid);
+  const settle = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  // Stand so the camera looks along `yaw` with `target` `dist` ahead (yaw 0 looks along -z, as the game does), then aim.
+  const standAim = (target, yaw, dist, ground) => page.evaluate(([t, yaw, dist, ground]) => {
+    const scene = window.__playScene;
+    const y = ground ? scene.heightAt(t.x, t.z) : t.y;
+    const sx = t.x + dist * Math.sin(yaw), sz = t.z + dist * Math.cos(yaw);
+    scene.debug.teleport('planet', sx, sz, yaw, 0);
+    const p = scene.debug.position();
+    scene.debug.teleport('planet', sx, sz, yaw, Math.atan2(y - p.y, dist));
+  }, [target, yaw, dist, ground]);
+
+  // The blueprints the house needs: bp:starter, bp:beam:basalt (the dev seed) and bp:cube:basalt (drafted once at a bench,
+  // unless the player already owns it). Stand at the bench first: the pack's moves and the draft reach the network from there.
+  await page.evaluate(() => {
+    const api = window.__hm?.base ?? window.hmPlay?.base;
+    const w = api.world();
+    const bench = w.base.pieces.find((p) => p.kind === 'bench');
+    const st = w.base.structures.find((x) => x.id === bench?.s);
+    if (!st) throw new Error('no drafting bench for the house');
+    window.__playScene.debug.teleport('planet', st.x + 2, st.z + 3.5, 0, 0);
+  });
+  await page.waitForTimeout(300);
+  const whereIs = (bp) => page.evaluate((bp) => {
+    const api = window.__hm?.base ?? window.hmPlay?.base;
+    const w = api.world();
+    const inv = w.player.slots.findIndex((s) => s?.item === bp);
+    if (inv >= 0) return { at: 'inventory', index: inv };
+    for (const b of w.boxes) {
+      const i = b.slots.findIndex((s) => s?.item === bp);
+      if (i >= 0) return { at: 'box', box: b.id, index: i };
+    }
+    return null;
+  }, bp);
+  for (const bp of ['bp:starter', 'bp:beam:basalt', 'bp:cube:basalt']) {
+    if ((await hotbarSlot(bp)).hot >= 0) continue;
+    const from = await whereIs(bp);
+    if (!from && bp === 'bp:cube:basalt') {
+      await page.evaluate(() => {
+        const api = window.__hm?.base ?? window.hmPlay?.base;
+        const pos = window.__playScene.debug.position();
+        const applied = api.apply({ t: 'draft', at: { x: pos.x, z: pos.z }, primitive: 'cube', map: 'basalt' });
+        console.log('house draft:', JSON.stringify(applied?.events ?? applied));
+      });
+    }
+    // a blueprint in the pack or the bridge storage goes onto an empty hotbar slot (the inventory's move)
+    const slot = await hotbarSlot(bp);
+    const src = from ?? (await whereIs(bp));
+    if (src && slot.empty >= 0) {
+      await page.evaluate(([src, to]) => {
+        const api = window.__hm?.base ?? window.hmPlay?.base;
+        const w = api.world();
+        api.apply({ t: 'move', at: { x: w.player.x, z: w.player.z }, from: src.at === 'box' ? src : { at: 'inventory', index: src.index }, to: { at: 'inventory', index: to }, n: 1 });
+      }, [src, slot.empty]);
+    }
+  }
+
+  // The plan, in metres from the found point (u = +x, v = +z). `t` is where the aim ray must land; `yaw` is the camera
+  // yaw (roofs take their orientation from it, 0 = r0, PI = r2); `dist` is how far the camera stands from that point.
+  const HOUSE_PLAN = [
+    { name: 'foundation', bp: 'bp:starter', kind: 'foundation', at: [0, 0, 0, 0], t: [0, 0, 0], yaw: 0, dist: 6, found: true },
+    { name: 'floor (0,1)', bp: 'bp:starter', kind: 'floor', at: [0, 1, 0, 0], t: [0, 0, 4], yaw: 0, dist: 6 },
+    { name: 'floor (1,1)', bp: 'bp:starter', kind: 'floor', at: [1, 1, 0, 0], t: [4, 0, 4], yaw: 0, dist: 6 },
+    { name: 'wall (west back)', bp: 'bp:starter', kind: 'wall', at: [0, 1, 0, 1], t: [-3.5, 0, 4], yaw: -Math.PI / 2, dist: 6 },
+    { name: 'half wall (west front)', bp: 'bp:cube:basalt', kind: 'halfWall', at: [0, 0, 0, 1], t: [-3.5, 0, 0], yaw: -Math.PI / 2, dist: 6 },
+    { name: 'wall (back)', bp: 'bp:starter', kind: 'wall', at: [0, 2, 0, 0], t: [0, 0, 7.5], yaw: 0, dist: 6 },
+    { name: 'wall (front)', bp: 'bp:starter', kind: 'wall', at: [0, 0, 0, 0], t: [0, 0, -3.5], yaw: Math.PI, dist: 6 },
+    { name: 'roof (south slope)', bp: 'bp:beam:basalt', kind: 'roof', at: [0, 0, 1, 0], t: [0, 2.0, -2], yaw: 0, dist: 3 },
+    { name: 'roof (north slope)', bp: 'bp:beam:basalt', kind: 'roof', at: [0, 1, 1, 2], t: [0, 2.0, 5.85], yaw: Math.PI, dist: 7 },
+    { name: 'ridge cap', bp: 'bp:beam:basalt', kind: 'ridgeCap', at: [0, 1, 1, 0], t: [0.5, 3.7, 4.45], yaw: Math.PI / 2, dist: 7 },
+    { name: 'gable (west front)', bp: 'bp:cube:basalt', kind: 'gable', at: [0, 0, 1, 1], t: [-1.5, 3.7, 0], yaw: -Math.PI / 2, dist: 3 },
+    { name: 'gable (west back)', bp: 'bp:cube:basalt', kind: 'gable', at: [0, 1, 1, 1], t: [-1.5, 3.7, 4], yaw: -Math.PI / 2, dist: 3 },
+    { name: 'gable (east front)', bp: 'bp:cube:basalt', kind: 'gable', at: [1, 0, 1, 1], t: [1.5, 3.7, 0], yaw: Math.PI / 2, dist: 3 },
+    { name: 'door (east front)', bp: 'bp:cube:basalt', kind: 'door', at: [1, 0, 0, 1], t: [3.5, 0, 0], yaw: Math.PI / 2, dist: 6 },
+    { name: 'doorframe (passage to the wing)', bp: 'bp:cube:basalt', kind: 'doorframe', at: [1, 1, 0, 1], t: [2, 0, 4], yaw: -Math.PI / 2, dist: 1.5 },
+    { name: 'stairs (to the deck)', bp: 'bp:beam:basalt', kind: 'stairs', at: [-1, 0, 0, 0], t: [-4, 0, 0], yaw: 0, dist: 6 },
+    { name: 'wall (wing front)', bp: 'bp:starter', kind: 'wall', at: [1, 1, 0, 0], t: [5.5, 0, 0.47], yaw: Math.PI, dist: 6 },
+    { name: 'wing east', bp: 'bp:starter', kind: 'wall', at: [2, 1, 0, 1], t: [7.5, 0, 4], yaw: Math.PI / 2, dist: 6 },
+    { name: 'window wall (wing back)', bp: 'bp:cube:basalt', kind: 'windowWall', at: [1, 2, 0, 0], t: [4, 0, 7.5], yaw: 0, dist: 6 },
+    { name: 'outer roof corner (wing)', bp: 'bp:beam:basalt', kind: 'roofOuter', at: [1, 1, 1, 2], t: [6, 2.0, 4], yaw: 0.9 * Math.PI, dist: 5 },
+    { name: 'deck (second floor)', bp: 'bp:starter', kind: 'floor', at: [-1, 1, 1, 0], t: [-2.15, 2.0, 4], yaw: -Math.PI / 2, dist: 6 },
+  ];
+
+  let houseSid = null;
+  const houseLog = [];
+  for (const step of HOUSE_PLAN) {
+    const s = await hotbarSlot(step.bp);
+    if (s.hot < 0) throw new Error(`house: ${step.bp} is not on the hotbar (${JSON.stringify(s)})`);
+    await page.keyboard.press(String(s.hot + 1));
+    await page.evaluate((kind) => window.__hm.base.setBuildKind(kind), step.kind);
+    const origin = step.found ? { x: HOUSE_CX, z: HOUSE_CZ } : await structureOriginOf(houseSid);
+    if (!origin) throw new Error('house: the house structure is gone');
+    const target = { x: origin.x + step.t[0], y: step.t[1], z: origin.z + step.t[2] };
+    const before = (await pieceList()).length;
+    await standAim(target, step.yaw, step.dist, step.t[1] === 0);
+    await settle();
+    await page.waitForTimeout(400);
+    await page.keyboard.press('e');
+    await page.waitForTimeout(260);
+    const after = await pieceList();
+    const added = after.slice(before);
+    const got = added.at(-1);
+    const [wi, wj, wk, wr] = step.at;
+    const ok = added.length === 1 && got.kind === step.kind && got.i === wi && got.j === wj && got.k === wk && got.r === wr;
+    if (step.found && got) houseSid = got.s;
+    houseLog.push(`${step.name}: ${ok ? 'placed' : 'NOT placed'} (${got ? got.kind : 'none'} ${got ? [got.i, got.j, got.k, got.r].join(',') : ''})`);
+    if (!ok) {
+      const toast = await page.evaluate(() => document.querySelector('.play-toast')?.textContent ?? '');
+      throw new Error(`house: "${step.name}" was not placed as expected (added ${added.length}, got ${JSON.stringify(got)}) toast="${toast}"`);
+    }
+  }
+  console.log('OK: the house is placed through the real path, piece by piece:');
+  for (const line of houseLog) console.log('   ' + line);
+
+  // The door opens: aim at the east door from outside and press E (the same toggle the airlock uses).
+  const doorOrigin = await structureOriginOf(houseSid);
+  await standAim({ x: doorOrigin.x + 2, y: 1.2, z: doorOrigin.z }, Math.PI / 2, 6, false);
+  await settle();
+  await page.waitForTimeout(400);
+  await page.keyboard.press('e');
+  await page.waitForTimeout(300);
+  const doorPiece = (await pieceList()).find((p) => p.kind === 'door');
+  console.log('OK: the house door opens with E:', { open: doorPiece?.open });
+  if (doorPiece?.open !== true) throw new Error('house: the door did not open');
+
+  // Stairs: a walk up from the foot. walk.ts has an analytic surface for ramps only, so this is reported, not asserted.
+  const climb = await page.evaluate(([x, z]) => {
+    const scene = window.__playScene;
+    scene.debug.teleport('planet', x, z, Math.PI, 0);
+    const footY = scene.debug.position().y;
+    let t = performance.now() / 1000;
+    for (let f = 0; f < 320; f++) { t += 0.02; scene.frame(t, 0.02, { move: { x: 0, z: 1 }, look: { dx: 0, dy: 0 }, run: false }); }
+    const p = scene.debug.position();
+    return { rise: p.y - footY, z: p.z };
+  }, [doorOrigin.x - 4, doorOrigin.z - 6]);
+  console.log(`NOTE (not asserted): the stairs walk-up rose the camera ${climb.rise.toFixed(2)} m and stopped at z ${climb.z.toFixed(2)}`);
+
+  // Screenshots: the house at stage 1 and stage 6 from outside, the open door, and the build menu.
+  const outsideEye = { x: doorOrigin.x + 12, y: doorOrigin.y + 9, z: doorOrigin.z - 14 };
+  const houseCentre = { x: doorOrigin.x + 0.5, y: doorOrigin.y + 1.5, z: doorOrigin.z + 2 };
+  const altLook = (eye, t) => page.evaluate(([e, t]) => {
+    const dx = t.x - e.x, dz = t.z - e.z, h = Math.hypot(dx, dz);
+    const scene = window.__playScene;
+    scene.debug.setAltCam?.(e, Math.atan2(t.y - e.y, h), Math.atan2(-dx, -dz));
+    scene.frame(0, 0.016, { move: { x: 0, z: 0 }, look: { dx: 0, dy: 0 }, run: false, altCam: true });
+  }, [eye, t]);
+  for (const st of [1, 6]) {
+    await page.evaluate((st) => {
+      const api = window.__hm?.base ?? window.hmPlay?.base;
+      api.apply({ t: 'stage', stage: st });
+      window.__playScene.setFidelityStage(st);
+      window.__playScene.setSocketRings([]);
+    }, st);
+    // the mentor's stage line is a subtitle for several seconds: wait it out, then frame the house with the HUD off
+    await page.waitForTimeout(9000);
+    await page.evaluate(() => window.__hm?.hideOverlays?.(true));
+    await altLook(outsideEye, houseCentre);
+    await page.waitForTimeout(700);
+    await takeScreenshot(page, { path: `docs/shots/base/house-stage${st}.png` });
+    console.log(`Captured docs/shots/base/house-stage${st}.png`);
+  }
+  await page.evaluate(() => window.__hm?.hideOverlays?.(true));
+  await altLook({ x: doorOrigin.x + 10, y: doorOrigin.y + 2.2, z: doorOrigin.z - 1 }, { x: doorOrigin.x + 2, y: doorOrigin.y + 1.2, z: doorOrigin.z });
+  await page.waitForTimeout(700);
+  await takeScreenshot(page, { path: 'docs/shots/base/house-door-open.png' });
+  console.log('Captured docs/shots/base/house-door-open.png');
+
+  // The build menu: the cube blueprint on the hotbar; one mouse-wheel step cycles its kinds and the HUD names them.
+  await page.evaluate(() => window.__hm?.hideOverlays?.(false));
+  for (let d = 1; d <= 9; d++) {
+    await page.keyboard.press(String(d));
+    await page.waitForTimeout(120);
+    if ((await page.evaluate(() => document.querySelector('.hm-build-blueprint-pill')?.textContent ?? '')).includes('Structural Cube')) break;
+  }
+  await page.evaluate(() => window.__hm.base.setBuildKind('halfWall'));
+  await altLook({ x: doorOrigin.x + 6, y: doorOrigin.y + 2.2, z: doorOrigin.z + 10 }, { x: doorOrigin.x + 14, y: doorOrigin.y + 0.2, z: doorOrigin.z + 18 });
+  await page.evaluate(() => window.dispatchEvent(new WheelEvent('wheel', { deltaY: 100 })));
+  await page.waitForTimeout(4500);
+  const wheelText = await page.evaluate(() => document.querySelector('[data-testid="build-wheel-hint"]')?.textContent ?? '');
+  console.log('OK: the build menu lists the house kinds:', wheelText);
+  if (!/halfWall/.test(wheelText) || !/gable/.test(wheelText)) throw new Error('house: the build menu does not list the new kinds');
+  await takeScreenshot(page, { path: 'docs/shots/base/house-build-menu.png' });
+  console.log('Captured docs/shots/base/house-build-menu.png');
 
   console.log('\nALL FIDELITY BASE-BUILDING HUD, REAL WORLD & LIFECYCLE CHECKS PASSED!');
 } catch (err) {

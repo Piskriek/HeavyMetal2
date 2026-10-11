@@ -42,7 +42,7 @@ Rules for the events:
 ## 4. Subtitles and the radio log (load the frontend-design skill first)
 - **The caption:**
   - a radio caption at the bottom centre, styled as the game's telemetry HUD;
-  - "Mentor" as the speaker (she has no name yet; the owner decides);
+  - "Dr. Haddy" as the speaker (the owner named her Dr. Gwen Haddy; the full name heads the radio log);
   - the text from `vo/index.json` with the v3 tags (`[breathes]`, `[pause]`, `[dry]` and so on) stripped;
   - it appears when the line starts, holds for the clip, and fades.
 - **Subtitles are on by default,** and they show even at dialogue volume 0.

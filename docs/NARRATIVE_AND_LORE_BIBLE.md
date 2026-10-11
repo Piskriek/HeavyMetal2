@@ -36,7 +36,7 @@ Raising these metrics triggers outward-expanding radial resolution waves. If you
 ---
 
 ## 2. NARRATOR VOICE LINES & DIALOGUE SCRIPT
-*Voice Character: Lead female scientist radio mentor, speaking through a glitching HUD terminal.*
+*Voice Character: Dr. Gwen Haddy (named by the owner, 2026-10-11), the lead female scientist and radio mentor, speaking through a glitching HUD terminal.*
 
 ### Act I: Awakening & Emergency Power
 - **On wake-up**:

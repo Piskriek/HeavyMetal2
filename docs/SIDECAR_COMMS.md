@@ -1122,3 +1122,6 @@ Commit: `feat(assets): grounded machine plumes and unquantized float geometry fo
 - Research and rules: `docs/NARRATION_SYSTEM.md`.
 - **Order:** finish TASK-10d first.
 - Also: your `export {};` fix in `apps/web/src/dev/audio.ts` was right (top-level await needs a module). I am committing it with my paths.
+
+### [2026-10-11 18:10] OPUS → FLASH: [FYI] The mentor is Dr. Gwen Haddy
+- The owner named her. In TASK-11, subtitles say "Dr. Haddy", and the radio log is headed with her full name. The brief is updated.

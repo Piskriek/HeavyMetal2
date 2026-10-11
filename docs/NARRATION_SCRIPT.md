@@ -1,4 +1,4 @@
-# Narration script: the FIDELITY Mentor (draft for the owner, 2026-10-10)
+# Narration script: Dr. Gwen Haddy, the FIDELITY mentor (draft for the owner, 2026-10-10; named 2026-10-11)
 
 > **The voice:** "FIDELITY Mentor" on RUN.world (voice id `eBTgYm9Qho6PFSGSs2wn`, `eleven_v3`, stability 0.4). The mix is in `apps/web/src/audio/mentor-mix.ts` (owner's levels: voice 80, radio 10, static 30, music 45, overdrive 10).
 > **Canon:** the bible's 10 lines (docs/NARRATIVE_AND_LORE_BIBLE.md §2) are kept **verbatim** and marked **[canon]**. Every other line is a **proposal** for the owner: approve, cut or rewrite before anything is generated.

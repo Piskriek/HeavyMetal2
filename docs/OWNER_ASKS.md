@@ -183,3 +183,4 @@
   - a square planet table and combiner;
   - the gate plinth square;
   - any round part that must stay is its own object.
+- The mentor's name: "lets call the mentor \"Dr. Gwen Haddy\"". Subtitles say "Dr. Haddy"; the radio log and the credits use her full name.

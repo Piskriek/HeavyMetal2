@@ -41,7 +41,7 @@ The 37 lines in `docs/NARRATION_SCRIPT.md` are voiced (`apps/web/public/vo/<ID>.
 - **The radio log:** a list of heard lines with replay.
 - **Settings:** dialogue volume and subtitles on or off.
 
-**Her name:** the bible calls her the lead scientist; she has no name yet. Subtitles say "Mentor" until the owner names her.
+**Her name: Dr. Gwen Haddy** (the owner, 2026-10-11). Subtitles say "Dr. Haddy"; the radio log and the credits use her full name.
 
 Sources:
 - [Satisfactory: ADA discussion](https://steamcommunity.com/app/526870/discussions/0/4843148932556367531)

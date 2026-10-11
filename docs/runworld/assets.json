@@ -922,6 +922,46 @@
       "note": "modular pilot (owner 2026-10-11): parts generated alone, cage + bake per part, assembled at sockets; replaces scout-body when it passes; one asset, mirrored per side, shared by every vehicle",
       "subject": "one vehicle work light on its own: a chunky SQUARE lamp housing (a deep square steel box with softly bevelled edges) with a square amber glass lens filling its front face, on a short SOLID bolted bracket with a flat square mounting foot under it, the lens facing forward; NO cable, NO wire, NO hose: the wiring runs hidden inside the bracket; the mounting bolts sit flush",
       "symmetric": true
+    },
+    {
+      "id": "her-desk",
+      "panel": "21/46-armory-her-corner.png",
+      "class": "lab",
+      "size": 0.78,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the scientist's desk on its own, EMPTY: a plain steel desk about 1.5 metres wide with a flat dark steel top, four SQUARE-section legs and a square drawer box under one side; nothing on it (no papers, no mug, no lamp); NO tubes, nothing round. In the base kit family style: warm light-grey painted steel, dark grey trim, amber hazard bands",
+      "note": "sheet 21 panel 46 (owner approved with the square rule 2026-10-11)"
+    },
+    {
+      "id": "cot",
+      "panel": "21/46-armory-her-corner.png",
+      "class": "lab",
+      "size": 2,
+      "axis": "length",
+      "view": "three-quarter",
+      "subject": "a camp bed on its own: a low solid rectangular steel box frame about 2 metres long and 0.8 metres wide on four short SQUARE feet (NO folding X legs, NO tubes), a thick grey mattress pad and a rumpled dark grey blanket draped over it; nothing round. In the base kit family style: warm light-grey painted steel, dark grey trim, amber hazard bands",
+      "note": "sheet 21 panel 46 (owner approved with the square rule 2026-10-11)"
+    },
+    {
+      "id": "wall-radio",
+      "panel": "21/46-armory-her-corner.png",
+      "class": "lab",
+      "size": 0.6,
+      "axis": "length",
+      "view": "front",
+      "subject": "a wall-inset radio unit on its own: a square steel housing about 60 centimetres wide with a square speaker grille on one side, a small square scope screen showing an amber wave trace on the other, two square selector knobs and a square power lamp; NO cables, nothing round. In the base kit family style: warm light-grey painted steel, dark grey trim, amber hazard bands",
+      "note": "sheet 21 panel 46 (owner approved with the square rule 2026-10-11)"
+    },
+    {
+      "id": "armory-rail",
+      "panel": "21/46-armory-her-corner.png",
+      "class": "lab",
+      "size": 1.6,
+      "axis": "length",
+      "view": "three-quarter",
+      "subject": "a wall-mounted weapon rail on its own, EMPTY: a thick square-section steel rail about 1.6 metres long on two bolted square wall brackets, with three square padded cradles along it to hold a rifle and a holster; nothing on it, NO tubes, nothing round. In the base kit family style: warm light-grey painted steel, dark grey trim, amber hazard bands",
+      "note": "sheet 21 panel 46 (owner approved with the square rule 2026-10-11)"
     }
   ],
   "budgets": {

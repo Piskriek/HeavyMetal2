@@ -2071,6 +2071,7 @@ export function createPlayScene(o: {
     getNearVehicle,
   };
   (api as any).planetScene = planetScene;
+  (api as any).THREE = THREE;
   return api;
 }
 

@@ -4,6 +4,7 @@
  * generated models, respecting plot stage (1-2 low, 3-4 mid, 5-6 high) and Graphics tier.
  */
 import * as THREE from 'three';
+import * as lab from '@hm/labkit';
 import {
   type GenLevel,
   loadGen,
@@ -14,7 +15,7 @@ import type { RoverKind } from '@hm/rover';
 import {
   type Rover as RoverGearMesh,
   type Station as FabricatorStationMesh,
-  type LabMaterials,
+  type LabMaterials as RovergearMaterials,
   createMaterials as createRovergearMaterials,
   scout as fallbackScout,
   hauler as fallbackHauler,
@@ -173,7 +174,9 @@ function createLampDisc(pos: readonly [number, number, number]): THREE.Mesh {
   return mesh;
 }
 
-function createSeatProp(): THREE.Group {
+function createSeatProp(level: GenLevel = 'low'): THREE.Object3D {
+  const gen = getGenSync('vehicle-seat', level);
+  if (gen) return gen;
   const g = new THREE.Group();
   const mat = new THREE.MeshStandardMaterial({ color: 0x1f242b, roughness: 0.6, metalness: 0.2 });
   const base = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.5), mat);
@@ -184,7 +187,9 @@ function createSeatProp(): THREE.Group {
   return g;
 }
 
-function createSteeringWheelProp(): THREE.Group {
+function createSteeringWheelProp(level: GenLevel = 'low'): THREE.Object3D {
+  const gen = getGenSync('steering-wheel', level);
+  if (gen) return gen;
   const g = new THREE.Group();
   const mat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5, metalness: 0.3 });
   const col = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.35, 8), mat);
@@ -204,16 +209,20 @@ export function createGenRover(
   kind: RoverKind,
   level: GenLevel = 'low',
   stage: number = 6,
-  materials?: LabMaterials
+  materials?: RovergearMaterials
 ): RoverGearMesh {
   const m = materials ?? createRovergearMaterials();
   const fit = VEHICLE_FIT[kind];
   const bodyGen = getGenSync(`${kind}-body`, level);
 
+  const fallback = kind === 'scout'
+    ? fallbackScout(m, { stage })
+    : kind === 'hauler'
+      ? fallbackHauler(m, { stage })
+      : fallbackCrawler(m, { stage });
+
   if (!bodyGen) {
-    if (kind === 'scout') return fallbackScout(m, { stage });
-    if (kind === 'hauler') return fallbackHauler(m, { stage });
-    return fallbackCrawler(m, { stage });
+    return fallback;
   }
 
   const bodyRoot = new THREE.Group();
@@ -236,7 +245,7 @@ export function createGenRover(
   // Mount seats
   for (const s of fit.sockets) {
     if (s.name === 'seat') {
-      const seat = createSeatProp();
+      const seat = createSeatProp(level);
       seat.position.set(s.at[0], s.at[1], s.at[2]);
       bodyRoot.add(seat);
     }
@@ -246,7 +255,7 @@ export function createGenRover(
   const driverSeat = fit.sockets.find((s) => s.name === 'seat');
   const parts: Record<string, THREE.Object3D> = {};
   if (driverSeat) {
-    const sw = createSteeringWheelProp();
+    const sw = createSteeringWheelProp(level);
     sw.position.set(driverSeat.at[0], driverSeat.at[1] + 0.1, driverSeat.at[2] + 0.35);
     bodyRoot.add(sw);
     parts.steeringWheel = sw;
@@ -284,7 +293,7 @@ export function createGenRover(
     wheel: wheelRoot,
     wheelRadius: fit.wheelRadius,
     hubs: fit.hubs as [number, number, number][],
-    colliders: [{ min: [-1, 0, -2], max: [1, 2, 2] }],
+    colliders: fallback.colliders,
     sockets: fit.sockets as { name: string; at: [number, number, number] }[],
     lamps,
     parts,
@@ -298,7 +307,7 @@ export function createGenRover(
 export function createGenFabricator(
   level: GenLevel = 'low',
   stage: number = 6,
-  materials?: LabMaterials
+  materials?: RovergearMaterials
 ): FabricatorStationMesh {
   const m = materials ?? createRovergearMaterials();
   const frameGen = getGenSync('fabricator-frame', level);
@@ -345,9 +354,9 @@ export function createGenMachineProp(
   kind: MachineKind,
   level: GenLevel = 'low',
   stage: number = 6,
-  materials?: LabMaterials
+  materials?: lab.LabMaterials
 ): MachineProp {
-  const m = materials ?? createRovergearMaterials();
+  const m = materials ?? lab.createMaterials();
   const still = (): void => undefined;
   const lift = new THREE.Vector3(0, RING_TOP_Y, 0);
 
@@ -355,7 +364,7 @@ export function createGenMachineProp(
     case 'mill':
     case 'heavy-mill': {
       const gen = getGenSync('mill', level);
-      if (!gen) return fallbackMachineProp(m as any, kind, stage);
+      if (!gen) return fallbackMachineProp(m, kind, stage);
       const group = new THREE.Group();
       group.name = `gen-${kind}`;
       gen.position.copy(lift);
@@ -377,7 +386,7 @@ export function createGenMachineProp(
       const frame = getGenSync('press-frame', level);
       const ram1 = getGenSync('press-ram', level);
       const ram2 = getGenSync('press-ram', level);
-      if (!frame || !ram1 || !ram2) return fallbackMachineProp(m as any, kind, stage);
+      if (!frame || !ram1 || !ram2) return fallbackMachineProp(m, kind, stage);
       const group = new THREE.Group();
       group.name = `gen-${kind}`;
       frame.position.copy(lift);
@@ -405,7 +414,7 @@ export function createGenMachineProp(
     case 'heavy-projector': {
       const mast = getGenSync('projector-mast', level);
       const head = getGenSync('projector-head', level);
-      if (!mast || !head) return fallbackMachineProp(m as any, kind, stage);
+      if (!mast || !head) return fallbackMachineProp(m, kind, stage);
       const group = new THREE.Group();
       group.name = `gen-${kind}`;
       mast.position.copy(lift);
@@ -429,7 +438,7 @@ export function createGenMachineProp(
     case 'water':
     case 'heavy-water': {
       const gen = getGenSync('watermaker', level);
-      if (!gen) return fallbackMachineProp(m as any, kind, stage);
+      if (!gen) return fallbackMachineProp(m, kind, stage);
       const group = new THREE.Group();
       group.name = `gen-${kind}`;
       gen.position.copy(lift);
@@ -447,7 +456,7 @@ export function createGenMachineProp(
       };
     }
     default:
-      return fallbackMachineProp(m as any, kind, stage);
+      return fallbackMachineProp(m, kind, stage);
   }
 }
 

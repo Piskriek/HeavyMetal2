@@ -40,7 +40,16 @@ async function takeScreenshot(page, filepath) {
     window.hmPlay?.setLocked?.(true);
     window.hmPlay?.setPaused?.(false);
   });
-  const buf = await page.screenshot({ path: filepath });
+  const buf = await page.screenshot();
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      fs.writeFileSync(filepath, buf);
+      break;
+    } catch (err) {
+      if (attempt === 4) throw err;
+      await new Promise(r => setTimeout(r, 250));
+    }
+  }
   console.log(`Saved screenshot: ${filepath}`);
 }
 
@@ -73,7 +82,7 @@ await page.addInitScript(() => {
 page.on('pageerror', (err) => console.error('[Browser Page Error]:', err.message));
 page.on('console', (msg) => {
   const txt = msg.text();
-  if (msg.type() === 'error' || txt.includes('Failed to load') || txt.includes('unknown generated')) {
+  if (msg.type() === 'error' || txt.includes('Failed to load') || txt.includes('unknown generated') || txt.includes('canPlace refused')) {
     console.log(`[Browser ${msg.type()}]:`, txt);
   }
 });
@@ -116,7 +125,7 @@ try {
     };
   });
 
-  // 1. ROVERS SIDE-ON
+  // 1. ROVERS SIDE-ON (LIT FROM BEHIND THE CAMERA: SUN IS AT -Z SHINING TOWARD +Z)
   console.log('--- CAPTURING ROVERS SIDE-ON SHOTS ---');
   await page.evaluate(() => {
     const baseApi = window.hmPlay.base;
@@ -124,48 +133,63 @@ try {
     const g = scene.debug.gatePlanet();
     const w = baseApi.world();
 
-    // Park Scout, Hauler, Crawler facing +X so side-on is along Z
+    // Park Scout, Hauler, Crawler facing -X so side-on is lit from -Z (behind camera)
     w.vehicles = [
-      { id: 1, kind: 'scout', x: g.x - 7.5, z: g.z + 10, yaw: Math.PI / 2 },
-      { id: 2, kind: 'hauler', x: g.x, z: g.z + 10, yaw: Math.PI / 2 },
-      { id: 3, kind: 'crawler', x: g.x + 8.5, z: g.z + 10, yaw: Math.PI / 2 },
+      { id: 1, kind: 'scout', x: g.x - 7.5, z: g.z + 12, yaw: -Math.PI / 2 },
+      { id: 2, kind: 'hauler', x: g.x, z: g.z + 12, yaw: -Math.PI / 2 },
+      { id: 3, kind: 'crawler', x: g.x + 8.5, z: g.z + 12, yaw: -Math.PI / 2 },
     ];
     scene.setVehicles(w.vehicles);
 
-    // Scout side-on
-    window.__aimAndTeleport(g.x - 7.5, g.z + 14.5, g.x - 7.5, g.z + 10, -0.06);
+    // Scout side-on (lit from behind camera)
+    window.__aimAndTeleport(g.x - 7.5, g.z + 6.5, g.x - 7.5, g.z + 12, -0.06);
   });
   await page.waitForTimeout(600);
   await takeScreenshot(page, path.join(shotsDir, 'rover-scout.png'));
 
-  // Hauler side-on
+  // Hauler side-on (lit from behind camera)
   await page.evaluate(() => {
     const scene = window.__playScene;
     const g = scene.debug.gatePlanet();
-    window.__aimAndTeleport(g.x, g.z + 15.5, g.x, g.z + 10, -0.06);
+    window.__aimAndTeleport(g.x, g.z + 5.5, g.x, g.z + 12, -0.06);
   });
   await page.waitForTimeout(600);
   await takeScreenshot(page, path.join(shotsDir, 'rover-hauler.png'));
 
-  // Crawler side-on
+  // Crawler beside Scout for scale (lit from behind camera)
   await page.evaluate(() => {
+    const baseApi = window.hmPlay.base;
     const scene = window.__playScene;
     const g = scene.debug.gatePlanet();
-    window.__aimAndTeleport(g.x + 8.5, g.z + 16.5, g.x + 8.5, g.z + 10, -0.06);
+    const w = baseApi.world();
+    w.vehicles = [
+      { id: 1, kind: 'scout', x: g.x - 4.5, z: g.z + 12, yaw: -Math.PI / 2 },
+      { id: 3, kind: 'crawler', x: g.x + 3.5, z: g.z + 12, yaw: -Math.PI / 2 },
+    ];
+    scene.setVehicles(w.vehicles);
+    window.__aimAndTeleport(g.x - 0.5, g.z + 4.5, g.x - 0.5, g.z + 12, -0.08);
   });
   await page.waitForTimeout(600);
   await takeScreenshot(page, path.join(shotsDir, 'rover-crawler.png'));
 
   // All rovers together side-on
   await page.evaluate(() => {
+    const baseApi = window.hmPlay.base;
     const scene = window.__playScene;
     const g = scene.debug.gatePlanet();
-    window.__aimAndTeleport(g.x + 0.5, g.z + 20.5, g.x + 0.5, g.z + 10, -0.15);
+    const w = baseApi.world();
+    w.vehicles = [
+      { id: 1, kind: 'scout', x: g.x - 7.5, z: g.z + 12, yaw: -Math.PI / 2 },
+      { id: 2, kind: 'hauler', x: g.x, z: g.z + 12, yaw: -Math.PI / 2 },
+      { id: 3, kind: 'crawler', x: g.x + 8.5, z: g.z + 12, yaw: -Math.PI / 2 },
+    ];
+    scene.setVehicles(w.vehicles);
+    window.__aimAndTeleport(g.x + 0.5, g.z + 2.5, g.x + 0.5, g.z + 12, -0.12);
   });
   await page.waitForTimeout(600);
   await takeScreenshot(page, path.join(shotsDir, 'rovers-side-on.png'));
 
-  // 2. FABRICATOR PRINTING
+  // 2. FABRICATOR PRINTING (LIT FROM BEHIND CAMERA)
   console.log('--- CAPTURING FABRICATOR PRINTING SHOT ---');
   await page.evaluate(() => {
     const baseApi = window.hmPlay.base;
@@ -174,7 +198,7 @@ try {
     const w = baseApi.world();
 
     const fx = g.x + 10.0;
-    const fz = g.z - 3.0;
+    const fz = g.z + 6.0;
     const fy = scene.debug.groundHeight(fx + 2, fz + 2);
 
     // Structure with foundation and hardpoint socket ring
@@ -203,42 +227,53 @@ try {
     const cz = fz + 2.0;
     scene.setFabricators([{ id: 992, x: cx, z: cz, yaw: 0, printing: true }]);
 
-    // Aim camera front-three-quarters view at the fabricator
-    window.__aimAndTeleport(cx + 4.8, cz + 5.5, cx, cz, -0.06);
+    // Aim camera front-three-quarters view at the fabricator (lit from behind camera at z < cz)
+    window.__aimAndTeleport(cx + 4.5, cz - 5.5, cx, cz, -0.06);
   });
   await page.waitForTimeout(1000);
   await takeScreenshot(page, path.join(shotsDir, 'fabricator-printing.png'));
 
-  // 3. FOUR MACHINES WORKING ON THEIR PADS
+  // 3. FOUR MACHINES WORKING ON THEIR PADS (LIT FROM BEHIND CAMERA, CLEAR OF SHELTER)
   console.log('--- CAPTURING FOUR MACHINES WORKING SHOT ---');
   await page.evaluate(() => {
     const hm = window.hmPlay;
     const scene = window.__playScene;
     const g = scene.debug.gatePlanet();
+    const baseApi = hm.base;
+    const w = baseApi.world();
 
-    hm.give(4000);
-    // Place mill, press, projector, water around the gate within reach
-    hm.placeAt(g.x - 3.8, g.z - 4.5, 'mill');
-    hm.placeAt(g.x + 3.8, g.z - 4.5, 'press');
-    hm.placeAt(g.x - 3.8, g.z - 8.0, 'projector');
-    hm.placeAt(g.x + 3.8, g.z - 8.0, 'water');
+    // Clear vehicles so plain is completely clear
+    w.vehicles = [];
+    scene.setVehicles(w.vehicles);
 
-    // Stand back and look across the 4 machines
-    window.__aimAndTeleport(g.x, g.z - 13.5, g.x, g.z - 6.0, 0.12);
+    // Give ore and raise plot stage to 4 so press, projector, and water are unlocked
+    hm.give(10000);
+    hm.setStage(4);
+
+    // Place mill, press, projector, water at +Z in the sunlit open plain (away from shelter at -12)
+    // Distance from gate must be between 7.0m and 30m; pairwise distance >= 5.0m
+    const res1 = hm.placeAt(g.x - 4.5, g.z + 7.5, 'mill');
+    const res2 = hm.placeAt(g.x + 4.5, g.z + 7.5, 'press');
+    const res3 = hm.placeAt(g.x - 4.5, g.z + 13.5, 'projector');
+    const res4 = hm.placeAt(g.x + 4.5, g.z + 13.5, 'water');
+
+    // Stand back at Z < machines.Z, past the gate pillar, looking across the 4 machines toward +Z (lit from behind camera)
+    window.__aimAndTeleport(g.x, g.z + 2.0, g.x, g.z + 10.5, -0.07);
   });
   await page.waitForTimeout(1500);
   await takeScreenshot(page, path.join(shotsDir, 'machines-working.png'));
 
-  // 4. FIXTURES INSIDE SHELTER
+  // 4. FIXTURES INSIDE SHELTER (READABLE WARM INTERIOR EXPOSURE)
   console.log('--- CAPTURING FIXTURES IN SHELTER SHOT ---');
   await page.evaluate(() => {
     const hm = window.hmPlay;
     const baseApi = hm.base;
+    const scene = window.__playScene;
     const w = baseApi.world();
     const st = w.base.structures[0];
 
     if (st) {
-      // Keep shelter walls and airlock, remove lowRoof for sunlight illumination
+      // Keep shelter walls and airlock, remove lowRoof for open interior lighting
       const nextId = Math.max(100, ...w.base.pieces.map((p) => p.id)) + 1;
       const basePieces = w.base.pieces.filter((p) => p.kind !== 'lowRoof');
 
@@ -246,6 +281,7 @@ try {
         { kind: 'bin', i: 0, j: 0, k: 0, r: 0, dx: 110, dz: -80, deg: 90, mat: 'regolith' },
         { kind: 'repeater', i: 0, j: 0, k: 0, r: 0, dx: 110, dz: 60, deg: 90, mat: 'regolith' },
         { kind: 'weaponBench', i: 0, j: 0, k: 0, r: 0, dx: -110, dz: -30, deg: 270, mat: 'regolith' },
+        { kind: 'bench', i: 0, j: 0, k: 0, r: 0, dx: -110, dz: 60, deg: 270, mat: 'regolith' },
       ];
       let idCounter = nextId;
       for (const f of fixturesToAdd) {
@@ -254,6 +290,16 @@ try {
         }
       }
       baseApi.setBase({ ...w.base, pieces: basePieces });
+
+      // Add warm interior work light plus ambient light for clean, readable exposure
+      if (scene.THREE) {
+        const roomLight = new scene.THREE.PointLight(0xfff2e0, 3.2, 16, 1.0);
+        roomLight.position.set(st.x + 2, st.y + 2.6, st.z + 2);
+        scene.planetScene.add(roomLight);
+
+        const ambLight = new scene.THREE.AmbientLight(0xffffff, 0.85);
+        scene.planetScene.add(ambLight);
+      }
 
       // Inside cell (0, 0): center is (2.0, 2.0). Airlock threshold is at v=3.5, back wall at v=0.0.
       const cos = Math.cos(st.yaw);
@@ -270,13 +316,14 @@ try {
   await page.waitForTimeout(1000);
   await takeScreenshot(page, path.join(shotsDir, 'fixtures-shelter.png'));
 
-  // 5. OUTPOST STAGE 1 VS STAGE 6
+  // 5. OUTPOST STAGE 1 VS STAGE 6 (LIT FROM BEHIND CAMERA)
   console.log('--- CAPTURING OUTPOST STAGE 1 VS STAGE 6 SHOTS ---');
   await page.evaluate(() => {
     const scene = window.__playScene;
     const g = scene.debug.gatePlanet();
     scene.setFidelityStage(1);
-    window.__aimAndTeleport(g.x + 14, g.z + 18, g.x + 3, g.z, -0.25);
+    // Camera placed at z < target.z looking toward +Z so sun is behind camera
+    window.__aimAndTeleport(g.x + 10, g.z - 4, g.x + 3, g.z + 6, -0.12);
   });
   await page.waitForTimeout(1200);
   await takeScreenshot(page, path.join(shotsDir, 'outpost-stage-1.png'));
@@ -285,7 +332,8 @@ try {
     const scene = window.__playScene;
     const g = scene.debug.gatePlanet();
     scene.setFidelityStage(6);
-    window.__aimAndTeleport(g.x + 14, g.z + 18, g.x + 3, g.z, -0.25);
+    // Camera placed at z < target.z looking toward +Z so sun is behind camera
+    window.__aimAndTeleport(g.x + 10, g.z - 4, g.x + 3, g.z + 6, -0.12);
   });
   await page.waitForTimeout(1500);
   await takeScreenshot(page, path.join(shotsDir, 'outpost-stage-6.png'));

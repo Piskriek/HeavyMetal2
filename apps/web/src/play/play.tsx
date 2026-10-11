@@ -848,7 +848,11 @@ export function PlayScreen(props: {
       const before = plotRef.current;
       const isFree = isFreeDrill(stateRef.current, kind);
       const checkPlot = isFree ? { ...before, ore: Math.max(before.ore, KINDS[kind].cost) } : before;
-      if (!canPlace(checkPlot, env, kind, x, z).ok) return false;
+      const can = canPlace(checkPlot, env, kind, x, z);
+      if (!can.ok) {
+        console.warn(`[canPlace refused]: ${kind} at (${x.toFixed(1)}, ${z.toFixed(1)}): ${can.why}`);
+        return false;
+      }
       const placed = place(checkPlot, env, kind, x, z, yaw);
       const after = isFree ? { ...placed, ore: before.ore } : placed;
       plotRef.current = after;
@@ -1488,6 +1492,10 @@ export function PlayScreen(props: {
       placeAt: (x: number, z: number, kind: MachineKind = 'mill') => { const g = scene.debug.gatePlanet(); return tryPlace(kind, x, z, Math.atan2(x - g.x, z - g.z)); },
       plot: () => (visitingRef.current ? visitingRef.current.plot : plotRef.current),
       give: (ore: number) => { plotRef.current = { ...plotRef.current, ore: plotRef.current.ore + ore }; },
+      setStage: (stage: number) => {
+        plotRef.current = { ...plotRef.current, stage };
+        scene.raiseStage(stage, scene.debug.gatePlanet());
+      },
       drain: () => {
         plotRef.current = { ...plotRef.current, ore: 0 };
         setHud((h) => ({ ...h, plot: { ...h.plot, ore: 0 } }));

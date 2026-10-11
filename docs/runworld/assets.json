@@ -851,9 +851,9 @@
       6000
     ],
     "weapon-part": [
-      400,
-      800,
-      1500
+      900,
+      1500,
+      2500
     ],
     "weapon-frame": [
       1500,
@@ -881,6 +881,7 @@
     "2026-10-10 owner: \"the wheels will cover the axel/dics, we dont need those, we can have empty cabins and pop in seprate chairs and steering wheels\". Vehicle bodies are re-prompted with empty cabs and empty wheel arches; vehicle-seat and steering-wheel are separate assets placed at each body's seat sockets.",
     "2026-10-10 owner: use the LOCAL 3D model (the 3080 Hunyuan3D pipeline) for every model: it is free, so anything that does not reduce well is re-imaged without the problem part and run again; \"if we wont ever realy see it its just a waste of polygons\" (e.g. the seat belts). RUN.world stays for source images, narration, music and effects.",
     "2026-10-10 review: the projector head was re-imaged with a flat frosted lens (the first had a deep cavity with lumpy geometry inside); generated meshes also get floating debris dropped before decimating (scripts/lod-bake.py).",
-    "2026-10-11 owner: reduction fails on holes, deep grooves (tyre tread) and pointy or tubular bits. Anything against a wall is its own object (tools, a gun on a rack, cables). Split such parts out and place them, or turn them into texture, or remove them. Review every piece for torn holes, points and tubes; to check now: the weapon bench pegboard and tools, the preset rack slot grid, the wheel treads, the ladder, the railing, the repeater lattice."
+    "2026-10-11 owner: reduction fails on holes, deep grooves (tyre tread) and pointy or tubular bits. Anything against a wall is its own object (tools, a gun on a rack, cables). Split such parts out and place them, or turn them into texture, or remove them. Review every piece for torn holes, points and tubes; to check now: the weapon bench pegboard and tools, the preset rack slot grid, the wheel treads, the ladder, the railing, the repeater lattice.",
+    "2026-10-11 review: weapon parts are seen up close in first person and only one weapon is on screen, so their budgets rose to 900/1500/2500 (the sights shattered at 400)."
   ]
 }

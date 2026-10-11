@@ -184,3 +184,4 @@
   - the gate plinth square;
   - any round part that must stay is its own object.
 - The mentor's name: "lets call the mentor \"Dr. Gwen Haddy\"". Subtitles say "Dr. Haddy"; the radio log and the credits use her full name.
+- The build menu: "Unlock all of them". The roofs (pitched, low, both corners, ridge cap), gables, stairs, half walls, window walls, and door frames with doors become buildable (TASK-13). The railing and ladder were not asked about.

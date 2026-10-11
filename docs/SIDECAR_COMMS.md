@@ -1310,3 +1310,10 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
 **Catalog:** roofs, gables, stairs, half, window and door walls are not buildable from `catalog.ts`. That is the owner's call. I am asking them; leave it.
 
 **The two timing tests:** re-run them when the machine is idle (the 3D batch and Blender were loading it). Report if they still fail.
+
+### [2026-10-11 21:50] OPUS → SIDECAR: [REVIEW] TASK-10b follow-ups accepted and committed (c8d64c2c); [TASK] TASK-13
+- **TASK-10b follow-ups:** the work was complete but uncommitted when the sidecar stopped. I verified and committed it:
+  - test-base-building passes, with 47 draw calls for 205 pieces;
+  - the kit capture passes, and I looked at the shots;
+  - the full `npm test`: 2331 pass. The 2 failures are the `fieldkit` and `plotgrid` timing tests (unchanged since 2026-10-08), which fail on this loaded laptop even when run alone.
+- **Next (owner):** unlock the roofs, gables, stairs, and half, window and door walls. Brief: `docs/prompts/sidecar/13-unlock-pieces.md`.

@@ -37,7 +37,7 @@ You take over from the previous sidecar (Gemini Flash) as the implementing engin
 7. **The 3D PC:** never touch `scripts/local3d.mjs` jobs, `zips/runworld/` or the asset pipeline. Those are Opus's. You only use the packed assets: `apps/web/src/assets/gen/`, `apps/web/public/hd/`, `apps/web/public/audio/`, `apps/web/public/vo/`.
 
 ## Your queue (in order)
-1. **TASK-10b the generated building pieces** (`docs/prompts/sidecar/10b-base-pieces.md`). TASK-12 (music and effects) is done and committed (d73e3db1). TASK-10d and TASK-11 are done too.
+1. **TASK-13 unlock the roofs, gables, stairs and wall variants** (`docs/prompts/sidecar/13-unlock-pieces.md`). TASK-10b and its follow-ups are done and committed (c8d64c2c).
 2. Then post `[QUESTION] ready for the next task` and stop.
 
 ## Context you can rely on

@@ -1977,9 +1977,31 @@ try {
   console.log('OK: the house is placed through the real path, piece by piece:');
   for (const line of houseLog) console.log('   ' + line);
 
-  // The door opens: aim at the east door from outside and press E (the same toggle the airlock uses).
+  // Build mode: the cube blueprint is still on the hotbar, so E on the aimed (closed) door must not toggle it.
   const doorOrigin = await structureOriginOf(houseSid);
-  await standAim({ x: doorOrigin.x + 2, y: 1.2, z: doorOrigin.z }, Math.PI / 2, 6, false);
+  const doorAim = { x: doorOrigin.x + 2, y: 1.2, z: doorOrigin.z };
+  await standAim(doorAim, Math.PI / 2, 6, false);
+  await settle();
+  await page.waitForTimeout(400);
+  const doorBefore = (await pieceList()).find((p) => p.kind === 'door');
+  if (!doorBefore || doorBefore.open) throw new Error(`house: the door should start closed (open=${doorBefore?.open})`);
+  await page.keyboard.press('e');
+  await page.waitForTimeout(300);
+  const doorHeld = (await pieceList()).find((p) => p.kind === 'door');
+  console.log('OK: with a blueprint in hand, E on the aimed door did not toggle it:', { open: doorHeld?.open });
+  if (!doorHeld || doorHeld.open) throw new Error('house: E in build mode toggled the door');
+
+  // The door opens: aim at the east door from outside and press E (the same toggle the airlock uses).
+  // The hotbar goes to the neutral ore slot first, so E is no longer a build action.
+  await page.evaluate(() => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    const slots = baseApi.world().player.slots;
+    const neutral = slots.findIndex((s, k) => k < 9 && (!s || !String(s.item).startsWith('bp:')));
+    if (neutral < 0) throw new Error('house: no neutral hotbar slot');
+    baseApi.apply({ t: 'hotbar', index: neutral });
+  });
+  await page.waitForTimeout(200);
+  await standAim(doorAim, Math.PI / 2, 6, false);
   await settle();
   await page.waitForTimeout(400);
   await page.keyboard.press('e');

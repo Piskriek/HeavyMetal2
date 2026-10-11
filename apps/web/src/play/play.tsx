@@ -2073,7 +2073,11 @@ export function PlayScreen(props: {
             }
             return;
           }
-          const hit = sceneRef.current?.aimPoint();
+          // Build mode (a blueprint in the active hotbar slot): E places the piece, so nothing aimed is used or toggled.
+          const bw = baseWorldRef.current;
+          const heldSlot = bw.player.slots[bw.hotbar];
+          const buildMode = !!heldSlot && heldSlot.n > 0 && blueprint(heldSlot.item) !== null;
+          const hit = buildMode ? null : sceneRef.current?.aimPoint();
           if (hit && hit.piece !== null) {
             const p = baseWorldRef.current.base.pieces.find((q) => q.id === hit.piece);
             if (p && (p.kind === 'airlock' || p.kind === 'door')) {

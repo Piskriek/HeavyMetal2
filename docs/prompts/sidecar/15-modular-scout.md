@@ -30,11 +30,15 @@
 - the cab interior from the driver's seat;
 - the scout driving on the Moon.
 
-## The crawler (a new `crawler-body`, remade at the kit's proportions)
-- Opus remade `crawler-body` tonight, about 6.2 × 2.4 × 2.2 m (it lands in `registry.json`; check its size). The old one needed `scaleX = 0.53`.
-- In `VEHICLE_FIT.crawler`, drop the `scaleX`. Fit it uniformly, so its length matches the procedural crawler's track length (about 6.0 to 6.2 m). Report its width against the 2.4 m track. Over 10% off: report, do not squash.
-- Re-place the drill arm (`crawler-arm`) on the new body's front hinge bracket, and the seat at the cab, and re-check the lamp positions.
-- Shot: the crawler beside the scout and the hauler on the Moon, lit from behind the camera.
+## The crawler (a new , remade tonight)
+- **Its size:** the new body is 2.40 x 2.20 x 6.20 m. It is fitted to the kit crawler's box, centred on x and z, bottom at 0.
+  - In , drop  (no squash is needed now) and re-check the offset.
+- **Its front is the end with the hinge bracket** (where the drill arm mounts); the cab sits at the rear. Check which way the GLB faces, and yaw it so the hinge points +z (forward).
+- **Re-place:**
+  - the drill arm () on the hinge bracket;
+  - the seat in the cab;
+  - the lamps (the body has square lamp housings by the hinge).
+- **Shot:** the crawler beside the scout and the hauler on the Moon, lit from behind the camera.
 
 ## Done when
 - The shots show the assembled scout reading as one vehicle: no floating parts, no wheel through the chassis, the lamps on their pads. And the crawler at the right size with its arm on the hinge.

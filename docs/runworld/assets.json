@@ -248,7 +248,7 @@
       "id": "cell-compact",
       "panel": "20/20-cell-compact-s6.png",
       "size": 0.15,
-      "axis": "height",
+      "axis": "length",
       "view": "part",
       "subject": "the compact power cell on its own: ONLY a short chunky rectangular battery magazine about 15 cm tall that slots up into the magazine well of the weapon frame, with a release latch and one amber charge indicator. It is NOT a grip, NOT a stock, NOT a receiver, NOT a whole gun",
       "class": "weapon-part"
@@ -257,7 +257,7 @@
       "id": "cell-extended",
       "panel": "20/20-cell-extended-s6.png",
       "size": 0.28,
-      "axis": "height",
+      "axis": "length",
       "view": "part",
       "subject": "the extended power cell part on its own (the long magazine), detached from the weapon frame",
       "class": "weapon-part"

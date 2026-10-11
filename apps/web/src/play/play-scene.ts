@@ -12,6 +12,7 @@ import { createPlume, type PlumeMode } from '@hm/plume';
 import { GATE, KINDS, type Machine, type MachineKind, type PlotState } from '@hm/plotsim';
 import { createPlotGround, type BoulderInfo, type PlotGround } from './plot-ground';
 import { fx as sfx } from '../maker/feedback';
+import { gameAudio } from '../audio/game-audio';
 import * as kit from '@hm/labkit';
 import { createLabRoom, GATE_AT, PLANET_TABLE_AT, POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, ROOM, type LabRoom } from './lab-room';
 import { createPlotHolo, type PlotHolo } from './plot-holo';
@@ -881,6 +882,10 @@ export function createPlayScene(o: {
   let bufW = 16, bufH = 16, planetK = 0;
   let pendingEvent: FrameOut['event'] = null;
   let clock = 0;
+  const audioCamFwd = new THREE.Vector3();
+  const audioCamUp = new THREE.Vector3();
+  let lastDrivingVehicleId: number | null = null;
+  let lastRoverSpeed = 0;
 
   // ---- scientist character model & animation (TASK-07, POL-18)
   let cameraView: 'first' | 'third' = o.cameraView ?? 'first';
@@ -1143,10 +1148,15 @@ export function createPlayScene(o: {
     restore(s) {
       gateOn = s.gateOn;
       room.setPower(gateOn ? POWER_ON : POWER_OFF);
-      if (gateOn) room.lever.rotation.x = -1.1;
+      if (gateOn) {
+        room.lever.rotation.x = -1.1;
+        gameAudio.startGateHum({ x: 0, y: 1.0, z: -1.0 });
+        gameAudio.startCapacitorHum({ x: -7.2, y: 1.0, z: 1.0 });
+      }
       openingUniforms.uStatic.value = gateOn ? 0 : 1;
       stage = shown = s.plot.stage;
       room.setStorm(Math.min(1, Math.max(0, stage / 6)));
+      gameAudio.updateStormVolume(1.0 - Math.min(1, Math.max(0, stage / 6)));
       waveTo = -1;
       ground?.setStage(Math.max(1, stage));
       fitLooks();
@@ -1220,6 +1230,8 @@ export function createPlayScene(o: {
       if (gateOn || powerT >= 0) return;
       powerT = 0;
       relaysHeard = 0;
+      gameAudio.playLever({ x: -6.5, y: 1.0, z: -7.8 });
+      gameAudio.playBreaker({ x: -7.4, y: 1.0, z: -1.0 });
       sfx('lever-throw');
       scientistAnimator?.playOneShot('lever');
     },
@@ -1430,6 +1442,7 @@ export function createPlayScene(o: {
     },
     setBeam(from, to, mode, colour, on) {
       if (on && from && to) {
+        gameAudio.startBeamLoop(from);
         const vFrom = new THREE.Vector3(from.x, from.y, from.z);
         const vTo = new THREE.Vector3(to.x, to.y, to.z);
         const beamCol = colour === '#d9d9d9' ? '#00e5ff' : colour;
@@ -1453,6 +1466,7 @@ export function createPlayScene(o: {
           beamSparkMesh.visible = false;
         }
       } else {
+        gameAudio.stopBeamLoop();
         beamFx.object.visible = false;
         beamCoreMesh.visible = false;
         beamSparkMesh.visible = false;
@@ -1472,6 +1486,8 @@ export function createPlayScene(o: {
       if (waveTo >= 0) shown = waveTo;
       stage = to;
       room.setStorm(Math.min(1, Math.max(0, to / 6)));
+      gameAudio.updateStormVolume(1.0 - Math.min(1, Math.max(0, to / 6)));
+      gameAudio.setMoonStage(to);
       waveTo = to;
       waveStart = clock + (shown === 0 ? 2.0 : 0.8);
       postUniforms.uWaveCentre.value.set(from.x, groundAt(from.x, from.z), from.z);
@@ -1484,6 +1500,8 @@ export function createPlayScene(o: {
       stage = s;
       shown = s;
       room.setStorm(Math.min(1, Math.max(0, s / 6)));
+      gameAudio.updateStormVolume(1.0 - Math.min(1, Math.max(0, s / 6)));
+      gameAudio.setMoonStage(s);
       waveTo = -1;
       ground?.setStage(Math.max(1, s));
       mash.setFidelityStage(s);
@@ -1500,17 +1518,34 @@ export function createPlayScene(o: {
         const before = powerT;
         powerT += dt;
         const crossed = (at: number): boolean => before < at && powerT >= at;
-        if (crossed(1.2)) sfx('power-surge');
-        if (crossed(2.0)) sfx('coil-charge');
+        if (crossed(0.2)) gameAudio.playBreaker({ x: -7.4, y: 1.0, z: -1.0 });
+        if (crossed(1.2)) {
+          gameAudio.startCapacitorHum({ x: -7.2, y: 1.0, z: 1.0 });
+          sfx('power-surge');
+        }
+        if (crossed(2.0)) {
+          gameAudio.playGateSpool({ x: 0, y: 1.0, z: -1.0 });
+          sfx('coil-charge');
+        }
         if (crossed(3.8)) sfx('static-burst', { volume: 0.6 });
         if (crossed(POWER_SECONDS - 0.6)) sfx('gate-open');
         room.lever.rotation.x = -1.1 * Math.min(1, powerT / 0.35);
         const p = powerAt(powerT);
         const lit = Math.floor(p.relays * 12);
-        while (relaysHeard < lit) { relaysHeard++; sfx('relay-click', { pitch: 0.92 + (relaysHeard % 4) * 0.05 }); }
+        while (relaysHeard < lit) {
+          relaysHeard++;
+          const pitch = 0.92 + (relaysHeard % 4) * 0.05;
+          gameAudio.playRelay({ x: -7.6, y: 1.0, z: -2.6 - (relaysHeard % 4) * 0.9 }, pitch);
+          sfx('relay-click', { pitch });
+        }
         room.setPower(p);
         openingUniforms.uStatic.value = p.static;
-        if (powerT >= POWER_SECONDS) { powerT = -1; gateOn = true; pendingEvent = 'powered'; }
+        if (powerT >= POWER_SECONDS) {
+          powerT = -1;
+          gateOn = true;
+          pendingEvent = 'powered';
+          gameAudio.startGateHum({ x: 0, y: 1.0, z: -1.0 });
+        }
       }
       // ---- look and walk
       const sens = 0.0024;
@@ -1518,6 +1553,18 @@ export function createPlayScene(o: {
       pitch = Math.max(-1.45, Math.min(1.45, pitch - c.look.dy * sens));
       const speed = (c.run ? RUN : WALK) * dt;
       const before = pos.clone();
+
+      if (drivingVehicleId !== lastDrivingVehicleId) {
+        if (drivingVehicleId !== null) {
+          const vv = vehicleViews.get(drivingVehicleId);
+          gameAudio.setDriving(true);
+          if (vv) gameAudio.startRoverMotor(drivingVehicleId, vv.kind, vv.group.position);
+        } else if (lastDrivingVehicleId !== null) {
+          gameAudio.stopRoverMotor(lastDrivingVehicleId);
+          gameAudio.setDriving(false);
+        }
+        lastDrivingVehicleId = drivingVehicleId;
+      }
 
       if (drivingVehicleId !== null && drivingState) {
         const vView = vehicleViews.get(drivingVehicleId);
@@ -1537,6 +1584,11 @@ export function createPlayScene(o: {
           }
 
           currentSpeed = roverSpeed(drivingState);
+          gameAudio.updateRoverMotor(drivingVehicleId, vView.group.position, currentSpeed, ROVERS[vView.kind].topSpeed);
+          if (lastRoverSpeed - currentSpeed > 6.0) {
+            gameAudio.playRoverImpact(vView.group.position);
+          }
+          lastRoverSpeed = currentSpeed;
           vView.x = drivingState.p[0];
           vView.z = drivingState.p[2];
 
@@ -1718,6 +1770,23 @@ export function createPlayScene(o: {
       // ---- machines at work
       for (const v of views.values()) {
         v.prop.animate(now, v.running);
+        if (v.running > 0.05) {
+          const mPos = { x: v.m.x, y: groundAt(v.m.x, v.m.z), z: v.m.z };
+          if (v.m.kind === 'mill' || v.m.kind === 'heavy-mill') {
+            gameAudio.startMachineLoop(v.m.id, 'mill', mPos);
+          } else if (v.m.kind === 'projector' || v.m.kind === 'heavy-projector') {
+            gameAudio.startMachineLoop(v.m.id, 'projector', mPos);
+          } else if (v.m.kind === 'water' || v.m.kind === 'heavy-water') {
+            gameAudio.startMachineLoop(v.m.id, 'watermaker', mPos);
+          } else if (v.m.kind === 'press' || v.m.kind === 'heavy-press') {
+            const strokePhase = (now * 2.0) % (Math.PI * 2);
+            if (strokePhase < dt * 2.0) {
+              gameAudio.playPressStroke(mPos);
+            }
+          }
+        } else {
+          gameAudio.stopMachineLoop(v.m.id);
+        }
         if (v.glow && v.glow.visible) setGlowTime(v.glow, now);
         if (v.light && v.light.visible) {
           const flicker = 0.88 + 0.12 * Math.sin(now * 8.5 + v.m.id * 2.7);
@@ -1736,10 +1805,12 @@ export function createPlayScene(o: {
         const head = fab.station.parts['head'];
         if (head) {
           if (fab.printing) {
+            gameAudio.startLoop3d('fab-' + fab.id, 'sfx-fabricator', fab.group.position);
             head.position.x = Math.sin(now * 3.5) * 1.5;
             if (fab.station.lamps[0]) setRoverLamp(fab.station.lamps[0], 1);
             if (fab.station.lamps[1]) setRoverLamp(fab.station.lamps[1], 1);
           } else {
+            gameAudio.stopLoop3d('fab-' + fab.id);
             head.position.x = 0;
             if (fab.station.lamps[0]) setRoverLamp(fab.station.lamps[0], 0.2);
             if (fab.station.lamps[1]) setRoverLamp(fab.station.lamps[1], 0.2);
@@ -1778,6 +1849,11 @@ export function createPlayScene(o: {
       ground?.update(where === 'planet' ? pos.x : 0, where === 'planet' ? pos.z : 0);
       labScene.environmentIntensity = room.envLevel();
       world?.update(now, dt, where === 'planet' ? camera.position : virtual.position);
+
+      // ---- audio listener update (zero allocations per frame)
+      audioCamFwd.set(0, 0, -1).applyQuaternion(camera.quaternion);
+      audioCamUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
+      gameAudio.update(dt, camera.position.x, camera.position.y, camera.position.z, audioCamFwd.x, audioCamFwd.y, audioCamFwd.z, audioCamUp.x, audioCamUp.y, audioCamUp.z);
 
       // ---- draw
       renderer.info.autoReset = false;

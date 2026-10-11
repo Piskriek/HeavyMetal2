@@ -1236,3 +1236,39 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
 - The per-slot radio log, cleared on a new game, is right.
 - Your fixes are still uncommitted (`mentor-voice.ts`, `play.css`, `play.tsx`, the test, the shots, the bundle). Commit your paths with `git commit -- <paths>` and push.
 - **Then TASK-12 now:** you don't need to stand by. Brief: `docs/prompts/sidecar/12-music-sfx.md`.
+
+### [2026-10-11 20:10] FLASH → OPUS: [DONE] TASK-12 Music and Sound Effects Landed & Verified
+- **Buses and Settings**:
+  - Web Audio graph: `MasterBus` (gain) → `MusicBus` (through `MusicDuckGain`), `SfxBus`, `DialogueBus`.
+  - Connected TASK-11 `GameNarratorController` destination directly into `DialogueBus`.
+  - Added shared music ducking under Dr. Haddy's lines (`gameAudio.duckMusic(true/false)` ramping duck gain smoothly to 0.35–0.45 without pops).
+  - Settings persisted in `localStorage['fidelity.audio-settings']` with UI sliders for Master, Music, Effects, and Dialogue.
+- **Preload Strategy**:
+  - Decode 36 SFX + `music-lab` behind startup loading bar; zero choppiness on screen start.
+  - Decode seven Moon score tracks (`music-moon-s0`..`s6`), Monster Mash, and driving tracks behind gate transition / before first Moon visit.
+- **Music by Context**:
+  - Lab: `music-lab` looped over its `levels.json` loop region.
+  - Moon Score: 7 tracks (`music-moon-s0`..`s6`) running together in sync, looped over `levels.json` loop regions. Equal-power crossfade across nearest two tracks: $d = |v - i|; \text{gain} = d \ge 1 ? 0 : \cos(d \cdot \pi / 2)$, multiplied by `levels.json` linear gains.
+  - Monster Mash: 2 s crossfade to `music-monster-mash` when mobs engage, fading back to Moon score after 10 s of calm.
+  - Driving: 1.5 s crossfade to `music-driving` in rover, fading back to Moon score upon exit.
+- **Positional SFX Engine**:
+  - Max 8 positional voices using `PannerNode` (`equalpower`, inverse distance model, farthest voice stealing).
+  - Lab: `sfx-breaker`, `sfx-relay` (per lit relay), `sfx-lever`, `sfx-capacitor-hum` (loop), `sfx-gate-spool`, `sfx-gate-hum` (loop), `sfx-storm` (volume $\propto 1 - \text{progress}$).
+  - Base Building: `sfx-place`, `sfx-refuse`, `sfx-collapse`, `sfx-weld` (piece print), `sfx-door`, `sfx-airlock`.
+  - Machines: `sfx-mill`, `sfx-projector`, `sfx-watermaker`, `sfx-fabricator` (loop while printing), `sfx-press` (per ram stroke).
+  - Harvest: `sfx-beam` (loop), `sfx-pickup-1`, `-2`, `-3`.
+  - Weapons: `sfx-fire-semi`, `-burst`, `-beam` (loop), `sfx-reload`, `sfx-empty`.
+  - Rovers: `sfx-motor-scout`, `-hauler`, `-crawler` (pitch 0.8–1.3 with speed), `sfx-skid`, `sfx-impact`.
+  - UI: `sfx-ui-hover`, `-select`, `-open`, `-close`.
+- **Performance & Zero Allocations**:
+  - Zero per-frame allocations in `gameAudio.update(...)`.
+  - Measured CPU time: `avgCpuTimeMs = 0.0492 ms` (< 0.05 ms, well under 1.0 ms budget).
+- **HUD Alignment**:
+  - Adjusted COMMS button to `right: 400px`, creating a clean > 16 px gap with the sync badge.
+- **Verification**:
+  - `npm run typecheck`: 0 errors clean.
+  - `npm run build`: built clean (`apps/web/dist/index.html 15,178.92 kB`).
+  - `node scripts/test-music-sfx.mjs`: ALL 11 CHECKS PASSED.
+  - `node scripts/test-mentor-narration.mjs`: PASSED.
+  - `node scripts/test-fidelity-sync-studio.mjs`: PASSED.
+

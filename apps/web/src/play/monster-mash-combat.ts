@@ -28,6 +28,7 @@ import {
 import { navFor } from '../base/navgrid';
 import * as S from '@hm/structure';
 import type { WeaponStats } from '../base/weapons';
+import { gameAudio } from '../audio/game-audio';
 
 export type MobKind = 'ogro' | 'demon';
 export type MobState = 'idle' | 'chase' | 'attack' | 'pain' | 'death';
@@ -904,6 +905,9 @@ export function createMonsterMashCombat(options: {
 
   function setTrigger(held: boolean): void {
     triggerHeld = held;
+    if (!held) {
+      gameAudio.stopWeaponBeam();
+    }
   }
 
   function getWeaponStats(): WeaponStats | null {
@@ -916,6 +920,7 @@ export function createMonsterMashCombat(options: {
 
   function reload(): void {
     currentAmmo = activeWeaponStats?.magazine ?? maxAmmo;
+    gameAudio.playWeaponReload(camera ? camera.position : undefined);
     audio.playEquip();
   }
 
@@ -1077,6 +1082,7 @@ export function createMonsterMashCombat(options: {
         cooldown: shotCooldown,
       };
 
+      gameAudio.playWeaponFire('burst', rayOrigin);
       audio.playShotgunBlast();
       recoilOffset.z = 0.12;
       recoilPitch = 0.06;
@@ -1100,6 +1106,7 @@ export function createMonsterMashCombat(options: {
         const oreReward = 50 * res.killed.length;
         stats.oreCollected += oreReward;
         onOreGathered?.(oreReward);
+        gameAudio.playPickup(1, rayOrigin);
         audio.playOreChime();
       }
 
@@ -1132,6 +1139,7 @@ export function createMonsterMashCombat(options: {
         cooldown: currentStats.cooldown,
       };
 
+      gameAudio.playWeaponFire('beam', rayOrigin);
       audio.playBeamPulse();
       recoilOffset.z = 0.04;
       recoilPitch = 0.02;
@@ -1157,6 +1165,7 @@ export function createMonsterMashCombat(options: {
         const oreReward = 50 * res.killed.length;
         stats.oreCollected += oreReward;
         onOreGathered?.(oreReward);
+        gameAudio.playPickup(1, rayOrigin);
         audio.playOreChime();
       }
     }
@@ -1176,6 +1185,7 @@ export function createMonsterMashCombat(options: {
     const currentStats = activeWeaponStats ?? DEFAULT_WEAPON_STATS;
 
     if (currentAmmo <= 0) {
+      gameAudio.playWeaponEmpty(camera ? camera.position : undefined);
       reload();
       return { fired: false, hits: 0, damage: 0, killed: 0 };
     }
@@ -1186,8 +1196,16 @@ export function createMonsterMashCombat(options: {
     const isBeam = currentStats.mode === 'beam';
     const isBurst = currentStats.mode === 'burst' && currentStats.burst > 1;
 
+    const rayOrigin = playerPos
+      ? ('clone' in playerPos ? (playerPos as THREE.Vector3).clone() : new THREE.Vector3(playerPos.x, playerPos.y, playerPos.z))
+      : camera.position.clone();
+    const baseDir = cameraDir
+      ? ('clone' in cameraDir ? (cameraDir as THREE.Vector3).clone().normalize() : new THREE.Vector3(cameraDir.x, cameraDir.y, cameraDir.z).normalize())
+      : new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+
     // Audio & Recoil
     if (isBeam) {
+      gameAudio.playWeaponFire('beam', rayOrigin);
       audio.playBeamPulse();
       recoilOffset.z = 0.04;
       recoilPitch = 0.02;
@@ -1196,6 +1214,7 @@ export function createMonsterMashCombat(options: {
       flashLight.color.setHex(0x06b6d4);
       flashLight.intensity = 2.5;
     } else {
+      gameAudio.playWeaponFire(isBurst ? 'burst' : 'semi', rayOrigin);
       audio.playShotgunBlast();
       recoilOffset.z = 0.14;
       recoilPitch = 0.08;
@@ -1204,13 +1223,6 @@ export function createMonsterMashCombat(options: {
       flashLight.color.setHex(0xff7711);
       flashLight.intensity = 3.5;
     }
-
-    const rayOrigin = playerPos
-      ? ('clone' in playerPos ? (playerPos as THREE.Vector3).clone() : new THREE.Vector3(playerPos.x, playerPos.y, playerPos.z))
-      : camera.position.clone();
-    const baseDir = cameraDir
-      ? ('clone' in cameraDir ? (cameraDir as THREE.Vector3).clone().normalize() : new THREE.Vector3(cameraDir.x, cameraDir.y, cameraDir.z).normalize())
-      : new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
 
     if (isBurst) {
       burstRemaining = currentStats.burst - 1;
@@ -1285,6 +1297,9 @@ export function createMonsterMashCombat(options: {
     particles.update(dt);
     lastPlayerPos = { x: playerPos.x, z: playerPos.z };
     updateNav(lastPlayerPos);
+
+    const engaged = sim.mobs.some((m) => m.state === 'chase' || m.state === 'attack');
+    gameAudio.setMobsEngaged(engaged);
 
     // Flash light & muzzle quad fade
     if (flashTimer > 0) {

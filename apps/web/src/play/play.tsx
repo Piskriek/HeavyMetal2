@@ -73,6 +73,11 @@ import {
   loadDialogueSettings,
   saveDialogueSettings,
 } from '../audio/mentor-voice';
+import {
+  gameAudio,
+  loadAudioSettings,
+  type AudioSettings,
+} from '../audio/game-audio';
 import { fidelityRules, FIDELITY_LINE_IDS } from '@hm/narrator';
 import '../base/base.css';
 import './play.css';
@@ -158,6 +163,7 @@ export function PlayScreen(props: {
   const [radioLogOpen, setRadioLogOpen] = useState(false);
   const [heardLogs, setHeardLogs] = useState<readonly string[]>(() => (state.step === 'create' ? [] : loadRadioLog(slotKey)));
   const [dialogueSettings, setDialogueSettings] = useState(() => loadDialogueSettings());
+  const [audioSettings, setAudioSettings] = useState<AudioSettings>(() => loadAudioSettings());
   const lookPowerWallTimerRef = useRef(0);
   const lookWindowTimerRef = useRef(0);
   const prevSyncRef = useRef(1);
@@ -167,10 +173,9 @@ export function PlayScreen(props: {
   const initNarratorAudio = useCallback(() => {
     if (audioInitializedRef.current || typeof AudioContext === 'undefined' || !narratorRef.current) return;
     try {
-      const ctx = (window as any).__hmAudioContext ?? new AudioContext();
-      (window as any).__hmAudioContext = ctx;
-      if (ctx.state === 'suspended') void ctx.resume();
-      narratorRef.current.initAudio(ctx);
+      const ctx = gameAudio.getContext();
+      narratorRef.current.initAudio(ctx, gameAudio.getDialogueBus());
+      narratorRef.current.setDuckCallback((ducked) => gameAudio.duckMusic(ducked));
       audioInitializedRef.current = true;
     } catch (e) {
       console.warn('[mentor-voice] audio init error:', e);
@@ -541,25 +546,34 @@ export function PlayScreen(props: {
       if (ev.type === 'refused') {
         console.warn('[dispatchBase refused]', ev);
         say(formatRefusalToast(ev));
+        gameAudio.playRefuse();
         narratorRef.current?.trigger('build:refused');
       } else if (ev.type === 'placed') {
         incrementPlacedCounter(1);
+        gameAudio.playPlace({ x: 0, y: 0, z: 0 });
         if (ev.kind === 'foundation') narratorRef.current?.trigger('build:foundation');
         if (ev.kind === 'bin') narratorRef.current?.trigger('bin:linked');
         if (ev.kind === 'airlock' || ev.kind === 'wall') narratorRef.current?.trigger('room:sealed');
       } else if (ev.type === 'removed') {
         incrementPlacedCounter(-(1 + ev.collapsed.length), 'deconstructed');
         pieceManagerRef.current.handleRemoval(ev.id, ev.collapsed);
-        if (ev.collapsed.length > 0) narratorRef.current?.trigger('build:collapse');
+        if (ev.collapsed.length > 0) {
+          gameAudio.playCollapse({ x: 0, y: 0, z: 0 });
+          narratorRef.current?.trigger('build:collapse');
+        }
       } else if (ev.type === 'drafted') {
         say(`Drafted Blueprint: ${ev.blueprint}`);
+        gameAudio.playUiSelect();
         narratorRef.current?.trigger('drafting:blueprint');
       } else if (ev.type === 'stacked') {
         say(`Deposited ${ev.n} item(s) to Quantum Lattice.`);
+        gameAudio.playPickup(1);
       } else if (ev.type === 'door') {
         say(ev.open ? 'Airlock opened.' : 'Airlock closed.');
+        gameAudio.playDoor({ x: 0, y: 0, z: 0 });
       } else if (ev.type === 'harvested') {
         narratorRef.current?.trigger('harvest:pixels');
+        gameAudio.playPickup(2);
         let totalHarvested = 0;
         let itemName = 'Raw Material';
         for (const item of ev.items) {
@@ -587,6 +601,7 @@ export function PlayScreen(props: {
         }
       } else if (ev.type === 'finished') {
         say(`Refined: ${ev.n}x ${ITEMS[ev.item]?.name ?? ev.item}`, 'Ready for collection');
+        gameAudio.playPickup(1);
         fx('snap');
       } else if (ev.type === 'installed') {
         if (ev.kind === 'fabricator') narratorRef.current?.trigger('fab:installed');
@@ -614,6 +629,7 @@ export function PlayScreen(props: {
         say(`Collected ${ev.n} refined item(s)`);
       } else if (ev.type === 'filled') {
         incrementPlacedCounter(ev.built.length);
+        gameAudio.playWeld({ x: 0, y: 0, z: 0 });
         if (ev.left === 0) {
           say('Plan completed!', 'All blueprint pieces have been constructed.');
         }
@@ -828,6 +844,12 @@ export function PlayScreen(props: {
         const { rules } = await preloadMentorVo();
         if (narratorRef.current) {
           (narratorRef.current as any).rules = rules;
+        }
+      }],
+      ['Loading audio & sound effects', async () => {
+        await gameAudio.preloadStartupAudio();
+        if (stateRef.current.visited || isMashTest || isBase) {
+          await gameAudio.preloadMoonAudio();
         }
       }],
       ['Loading generated assets', async () => {
@@ -1461,12 +1483,19 @@ export function PlayScreen(props: {
 
         if (out.event === 'powered') {
           narratorRef.current.trigger('power:on');
+          void gameAudio.preloadMoonAudio();
         }
         if (out.event === 'to-planet') {
           narratorRef.current.trigger('moon:enter');
+          gameAudio.setMusicContext('moon');
+          gameAudio.setMoonStage(plotRef.current.stage);
+        }
+        if (out.event === 'to-lab' || out.event === 'sync-lost') {
+          gameAudio.setMusicContext('lab');
         }
         if (out.event === 'stage-up') {
           narratorRef.current.trigger(`stage:${out.stage}`);
+          gameAudio.setMoonStage(out.stage);
           if (out.stage === 1) narratorRef.current.trigger('bloom:first');
           if (out.stage === 4) narratorRef.current.trigger('fab:hauler');
           if (out.stage === 6) narratorRef.current.trigger('fab:crawler');
@@ -1614,10 +1643,20 @@ export function PlayScreen(props: {
       if (at < steps.length) { setLoading(steps[at]![0]); timer = window.setTimeout(step, 0); return; }
       hook.ready = true;
       setReady(true);
+      if (scene.debug.where() === 'planet') {
+        gameAudio.setMusicContext('moon');
+        gameAudio.setMoonStage(stateRef.current.plot.stage || 0);
+      } else {
+        gameAudio.setMusicContext('lab');
+      }
       narratorRef.current?.trigger('wake');
       raf = requestAnimationFrame(loop);
     };
     (window as unknown as { hmPlay?: unknown }).hmPlay = Object.assign(hook, {
+      audio: gameAudio,
+      setMoonStage: (stage: number) => gameAudio.setMoonStage(stage),
+      setMusicContext: (ctx: any) => gameAudio.setMusicContext(ctx),
+      duckMusic: (d: boolean) => gameAudio.duckMusic(d),
       pull: () => {
         scene.pullLever();
         narratorRef.current?.trigger('breaker:thrown');
@@ -2776,10 +2815,11 @@ export function PlayScreen(props: {
             style={{
               position: 'fixed',
               top: 14,
-              right: 380,
+              right: 400,
               zIndex: 40,
             }}
             onClick={() => {
+              gameAudio.playUiOpen();
               setRadioLogOpen(true);
               initNarratorAudio();
               freeMouse();
@@ -2792,14 +2832,14 @@ export function PlayScreen(props: {
 
           {/* Radio Log Modal */}
           {radioLogOpen && (
-            <div className="radio-log-modal-backdrop" onClick={() => setRadioLogOpen(false)}>
+            <div className="radio-log-modal-backdrop" onClick={() => { gameAudio.playUiClose(); setRadioLogOpen(false); }}>
               <div className="radio-log-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="radio-log-header">
                   <div className="radio-log-title">
                     <h3>DR. GWEN HADDY // FIELD RADIO LOG</h3>
                     <span>{heardLogs.length} RECORDED</span>
                   </div>
-                  <button className="radio-log-close" onClick={() => setRadioLogOpen(false)}>CLOSE [ESC]</button>
+                  <button className="radio-log-close" onClick={() => { gameAudio.playUiClose(); setRadioLogOpen(false); }}>CLOSE [ESC]</button>
                 </div>
                 <div className="radio-log-controls">
                   <div className="radio-log-ctl-item">
@@ -2821,20 +2861,67 @@ export function PlayScreen(props: {
                     </label>
                   </div>
                   <div className="radio-log-ctl-item">
-                    <label>VOICE VOLUME: {Math.round(dialogueSettings.dialogueVolume * 100)}%</label>
+                    <label>MASTER: {Math.round(audioSettings.master * 100)}%</label>
                     <input
                       type="range"
                       min="0"
                       max="1"
                       step="0.05"
-                      value={dialogueSettings.dialogueVolume}
+                      value={audioSettings.master}
                       onChange={(e) => {
                         const vol = parseFloat(e.target.value);
+                        setAudioSettings((s) => ({ ...s, master: vol }));
+                        gameAudio.setMasterVolume(vol);
+                      }}
+                    />
+                  </div>
+                  <div className="radio-log-ctl-item">
+                    <label>MUSIC: {Math.round(audioSettings.music * 100)}%</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={audioSettings.music}
+                      onChange={(e) => {
+                        const vol = parseFloat(e.target.value);
+                        setAudioSettings((s) => ({ ...s, music: vol }));
+                        gameAudio.setMusicVolume(vol);
+                      }}
+                    />
+                  </div>
+                  <div className="radio-log-ctl-item">
+                    <label>EFFECTS: {Math.round(audioSettings.effects * 100)}%</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={audioSettings.effects}
+                      onChange={(e) => {
+                        const vol = parseFloat(e.target.value);
+                        setAudioSettings((s) => ({ ...s, effects: vol }));
+                        gameAudio.setEffectsVolume(vol);
+                      }}
+                    />
+                  </div>
+                  <div className="radio-log-ctl-item">
+                    <label>VOICE: {Math.round(audioSettings.dialogue * 100)}%</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={audioSettings.dialogue}
+                      onChange={(e) => {
+                        const vol = parseFloat(e.target.value);
+                        setAudioSettings((s) => ({ ...s, dialogue: vol }));
                         setDialogueSettings((s) => {
                           const next = { ...s, dialogueVolume: vol };
                           saveDialogueSettings(next);
                           return next;
                         });
+                        gameAudio.setDialogueVolume(vol);
                         narratorRef.current?.setDialogueVolume(vol);
                       }}
                     />

@@ -209,6 +209,7 @@ export interface PlayScene {
     testPieceAim(pieceId: number): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null;
     setAltCam(eye: { readonly x: number; readonly y: number; readonly z: number }, pitch: number, yaw: number): void;
     clearAltCam(): void;
+    groundHeight(x: number, z: number): number;
   };
   dispose(): void;
 }
@@ -1980,6 +1981,7 @@ export function createPlayScene(o: {
         debugAltCam = false;
         altCamPos = null;
       },
+      groundHeight: (x, z) => groundAt(x, z),
     },
     dispose() {
       scientistAnimator?.dispose();

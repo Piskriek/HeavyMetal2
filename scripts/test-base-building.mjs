@@ -1501,6 +1501,69 @@ try {
   await takeScreenshot(page, { path: 'docs/shots/base/scout-driving.png' });
   console.log('Captured docs/shots/base/scout-driving.png (chase camera)');
 
+  // Continue driving for at least 50m over bumpy ground and verify the scout never sinks below terrain
+  console.log('\n--- Driving Scout Rover 50m over Bumpy Ground & Terrain Clearance Verification ---');
+  const bumpyTerrainVerdict = await page.evaluate((initial) => {
+    const scene = window.__playScene;
+    if (!scene) return { ok: false, error: 'window.__playScene is missing' };
+
+    let totalDist = 0;
+    let minGround = Infinity;
+    let maxGround = -Infinity;
+    let minChassisClearance = Infinity;
+    let sunkFrames = 0;
+    let framesRun = 0;
+
+    // Advance driving simulation until at least 50m traveled from initial spawn
+    while (totalDist < 50 && framesRun < 350) {
+      scene.frame(0, 0.033, {
+        move: { x: 0, z: 1 },
+        look: { dx: 0, dy: 0 },
+        run: false,
+        altCam: false,
+        vehicleInput: { throttle: 1, steer: 0, brake: false },
+      });
+      framesRun++;
+
+      const p = scene.debug.position();
+      // p.y is pos.y = drivingState.p[1] + EYE (EYE is 1.6)
+      const chassisY = p.y - 1.6;
+      const gh = scene.debug.groundHeight(p.x, p.z);
+
+      minGround = Math.min(minGround, gh);
+      maxGround = Math.max(maxGround, gh);
+
+      // Chassis clearance above ground: chassis should stay above the ground height
+      const clearance = chassisY - gh;
+      minChassisClearance = Math.min(minChassisClearance, clearance);
+
+      // Sinking condition: chassis drops below ground level with a small tolerance for suspension bottoming
+      if (clearance < -0.05) {
+        sunkFrames++;
+      }
+
+      totalDist = Math.hypot(p.x - initial.x, p.z - initial.z);
+    }
+
+    const groundVariation = maxGround - minGround;
+
+    return {
+      ok: totalDist >= 50 && sunkFrames === 0,
+      totalDist,
+      framesRun,
+      minGround,
+      maxGround,
+      groundVariation,
+      minChassisClearance,
+      sunkFrames,
+    };
+  }, printedScout);
+
+  console.log('OK: Scout 50m bumpy terrain drive verdict:', bumpyTerrainVerdict);
+  if (!bumpyTerrainVerdict.ok) {
+    throw new Error(`Scout driving 50m test failed: ${JSON.stringify(bumpyTerrainVerdict)}`);
+  }
+
   // Exit vehicle and check parked distance & save/reload
   const driveVerdict = await page.evaluate((initial) => {
     const baseApi = window.__hm?.base ?? window.hmPlay?.base;

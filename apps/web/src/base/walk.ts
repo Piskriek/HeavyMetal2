@@ -9,6 +9,11 @@ export interface PlacedPiece {
   readonly colliders: readonly Box[];
 }
 
+const STAIR_TREADS = 12;
+const STAIR_RUN = 4 / STAIR_TREADS;
+const STAIR_RISE = 0.25;
+const STAIR_HALF_WIDTH = 1.7;
+
 export class WalkWorld {
   private pieces: PlacedPiece[] = [];
   private grid = new Map<string, PlacedPiece[]>();
@@ -86,6 +91,16 @@ export class WalkWorld {
             bestY = candY;
           }
         }
+      } else if (p.kind === 'stairs') {
+        // 12 treads, each 0.333 m deep and 0.25 m up: the 3 m rise over the 4 m run, in the ramp's frame
+        // (the treads run along +z from -2 to +2; the flight is 3.4 m wide, -1.7 to +1.7)
+        if (lx >= -STAIR_HALF_WIDTH && lx <= STAIR_HALF_WIDTH && lz >= -2 && lz <= 2) {
+          const tread = Math.min(STAIR_TREADS - 1, Math.floor((lz + 2) / STAIR_RUN));
+          const candY = p.pos.y + (tread + 1) * STAIR_RISE;
+          if (candY <= maxStepUp && candY > bestY) {
+            bestY = candY;
+          }
+        }
       } else if (p.kind === 'hardpoint') {
         if (lx >= -4 && lx <= 4 && lz >= -4 && lz <= 4) {
           // Ring mount top is at +0.78, base concrete pad at +0.16
@@ -135,7 +150,8 @@ export class WalkWorld {
 
           // For ramps, the deck boxes follow the slope for standing/raycasting,
           // but do not act as horizontal barrier walls. Only the side handrails push.
-          if (p.kind === 'ramp' && (c.max[0] - c.min[0]) > 1.0) continue;
+          // The stairs' step boxes are solid under each tread: they are climbed, not walls, so they are skipped too.
+          if ((p.kind === 'ramp' || p.kind === 'stairs') && (c.max[0] - c.min[0]) > 1.0) continue;
 
           // Transform curX, curZ into piece local frame
           const dx = curX - p.pos.x;

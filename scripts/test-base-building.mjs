@@ -1988,7 +1988,7 @@ try {
   console.log('OK: the house door opens with E:', { open: doorPiece?.open });
   if (doorPiece?.open !== true) throw new Error('house: the door did not open');
 
-  // Stairs: a walk up from the foot. walk.ts has an analytic surface for ramps only, so this is reported, not asserted.
+  // Stairs: a walk up from the foot. walk.ts has a surface for the treads; the camera must climb at least 2.5 m (the flight is 3 m).
   const climb = await page.evaluate(([x, z]) => {
     const scene = window.__playScene;
     scene.debug.teleport('planet', x, z, Math.PI, 0);
@@ -1998,7 +1998,11 @@ try {
     const p = scene.debug.position();
     return { rise: p.y - footY, z: p.z };
   }, [doorOrigin.x - 4, doorOrigin.z - 6]);
-  console.log(`NOTE (not asserted): the stairs walk-up rose the camera ${climb.rise.toFixed(2)} m and stopped at z ${climb.z.toFixed(2)}`);
+  console.log(`stairs walk-up: the camera rose ${climb.rise.toFixed(2)} m and stopped at z ${climb.z.toFixed(2)}`);
+  if (!(climb.rise >= 2.5)) {
+    throw new Error(`house: the stairs were not walked (camera rose ${climb.rise.toFixed(2)} m, stopped at z ${climb.z.toFixed(2)})`);
+  }
+  console.log('OK: the stairs can be walked up (camera climbed at least 2.5 m)');
 
   // Screenshots: the house at stage 1 and stage 6 from outside, the open door, and the build menu.
   const outsideEye = { x: doorOrigin.x + 12, y: doorOrigin.y + 9, z: doorOrigin.z - 14 };

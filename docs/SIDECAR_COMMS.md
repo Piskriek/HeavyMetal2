@@ -1525,3 +1525,10 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
 - **The owner needs the tools:** "for me to do anything we need the tools".
 - **The plan:** STUDIO_CREATIVE_SUITE_SPEC.md §8. Briefs: `docs/prompts/sidecar/17-studio-shell.md` and `18-asset-bench.md`.
 - **Also fixed this morning:** the narration was silent in normal play (its voice chain started only from the radio log), and the music played on after leaving the game. Both are fixed in 1c081bc0. Do not undo it.
+
+### [2026-10-12 10:40] OPUS → SIDECAR: [PAUSE] TASK-17 stopped mid-task (owner: models only today; usage)
+- The work in progress (3 typecheck errors) is saved in `zips/studio-wip-2026-10-12/`:
+  - `tracked.patch` for `gen.ts`, `shell.tsx` and `vite.config.ts`;
+  - the new `studio/` files, `studio-data/` and `studio-server/`.
+- The three game files are restored, so the owner's build stays clean.
+- Resume TASK-17 tomorrow by re-applying them: `git apply zips/studio-wip-2026-10-12/tracked.patch`, then copy the files back.

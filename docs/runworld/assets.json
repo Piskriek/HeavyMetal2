@@ -95,7 +95,7 @@
       "size": 4,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the heavy texture mill on its own: a massive boxy grinding mill about 4 metres tall standing on a SQUARE bolted steel base plate about 3 metres across (it sits on a square machine socket), a square top feed hopper heaped with dark ore chunks, a wide flush rear vent grille; every cable and pipe runs inside the machine (NO hoses, NO pipes outside); nothing round. No pixels, no plume, no chimney, no stack",
+      "subject": "the heavy texture mill on its own: a massive boxy grinding mill about 4 metres tall standing on a SQUARE bolted steel base plate about 3 metres across (it sits on a square machine socket), a square top feed hopper heaped with dark ore chunks, a wide flush rear vent grille; every cable and pipe runs inside the machine (NO hoses, NO pipes outside); nothing round. No pixels, no plume, no chimney, no stack The base is a FLAT SQUARE steel plate with bolts at its corners: NO round plinth, NO round ring, NO turntable, NO circular base. The walls are flat and plain: NO pipes, NO tubes and NO conduits on the outside, anywhere.",
       "class": "machine",
       "note": "redone 2026-10-12 under the owner rules (square, no holes, no hoses, nothing round unless it must be)"
     },
@@ -105,7 +105,7 @@
       "size": 4,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the heavy shape press on its own with its two rams REMOVED: a heavy square steel frame about 4 metres tall standing on a SQUARE bolted steel base plate about 3 metres across (it sits on a square machine socket), the flat die bed at its foot, a square feed chute on its top, and a flush louvred rear vent; NO hoses, nothing round. No pixels, no plume",
+      "subject": "the heavy shape press on its own with its two rams REMOVED: a heavy square steel frame about 4 metres tall standing on a SQUARE bolted steel base plate about 3 metres across (it sits on a square machine socket), the flat die bed at its foot, a square feed chute on its top, and a flush louvred rear vent; NO hoses, nothing round. No pixels, no plume The base is a FLAT SQUARE steel plate with bolts at its corners: NO round plinth, NO round ring, NO turntable, NO circular base. NO cables, NO glands, NO boxes on the floor plate.",
       "class": "machine",
       "note": "redone 2026-10-12 under the owner rules (square, no holes, no hoses, nothing round unless it must be)"
     },
@@ -145,7 +145,7 @@
       "size": 4,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the heavy water maker machine on its own standing on a SQUARE bolted steel base plate about 3 metres across (it sits on a square machine socket): a long SQUARE-section condenser tank with bevelled edges lying horizontal, a square intake hopper on one end, a square outlet trough on the other, two flush square gauges and a square status lamp on its side; every pipe runs inside the machine (NO hoses, NO round tank); nothing round. No water spray, no plume",
+      "subject": "the heavy water maker machine on its own standing on a SQUARE bolted steel base plate about 3 metres across (it sits on a square machine socket): a long SQUARE-section condenser tank with bevelled edges lying horizontal, a square intake hopper on one end, a square outlet trough on the other, two flush square gauges and a square status lamp on its side; every pipe runs inside the machine (NO hoses, NO round tank); nothing round. No water spray, no plume The base is a FLAT SQUARE steel plate with bolts at its corners: NO round plinth, NO round ring, NO turntable, NO circular base. The tank sits directly on two square block supports.",
       "class": "machine",
       "note": "redone 2026-10-12 under the owner rules (square, no holes, no hoses, nothing round unless it must be)"
     },
@@ -902,7 +902,7 @@
       "size": 2,
       "axis": "height",
       "view": "front",
-      "subject": "the life support unit on its own: a chunky upright steel cabinet about 2 metres tall on a low square plinth, a front window showing three thick SQUARE filter cartridges, a louvred vent below it, a flush SQUARE pressure gauge, a green status light strip near the top, a SQUARE boxed fan housing with a flat grille built onto the top, and a square gas tank held inside an armoured recessed bay in the cabinet side; no hoses, nothing round",
+      "subject": "the life support unit on its own: a chunky upright steel cabinet about 2 metres tall on a low square plinth; a front window showing three thick SQUARE filter cartridges, a louvred vent below it, a green status light strip near the top, a flat SQUARE gauge panel with a digital readout; on its top a SQUARE fan housing whose front is a flat square louvred grille (the fan is hidden behind louvres, NO visible round fan blades); a square gas tank held inside an armoured recessed bay in the cabinet side; no hoses, NOTHING round anywhere",
       "note": "redone 2026-10-12 under the owner rules (square, no holes, no hoses, nothing round unless it must be)"
     },
     {

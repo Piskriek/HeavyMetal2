@@ -13,3 +13,4 @@ if errorlevel 1 (
 )
 start "" "http://localhost:8080"
 node scripts\serve.mjs
+pause

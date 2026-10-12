@@ -24,6 +24,10 @@ createServer(async (req, res) => {
     if (!body) { res.writeHead(404).end('not found'); return; }
     res.writeHead(200, { 'content-type': types[extname(file)] ?? 'application/octet-stream', 'cache-control': 'no-cache' }).end(body);
   } catch { res.writeHead(500).end('error'); }
+}).on('error', (e) => {
+  // PLAY.bat on a PC where the game is already being served (an earlier window): that server serves the same fresh build
+  if (e.code === 'EADDRINUSE') { console.log(`FIDELITY is already being served on http://localhost:${port} by another window: the browser tab shows the new build.`); process.exit(0); }
+  throw e;
 }).listen(port, '0.0.0.0', () => {
   console.log(`Serving ${root}`);
   for (const list of Object.values(networkInterfaces())) for (const n of list ?? []) if (n.family === 'IPv4' && !n.internal) console.log(`  open on the laptop:  http://${n.address}:${port}`);

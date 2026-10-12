@@ -32,8 +32,55 @@ import {
 import type { Box, Socket, KitPieceResult } from '../base/kit-pieces';
 import { latticeGenAssets } from '../base/lattice-gen';
 
+// ---------------------------------------------------------------------------
+// THE SCOUT, ASSEMBLED FROM PARTS (TASK-15)
+// ---------------------------------------------------------------------------
+
+/**
+ * The assembled scout is OFF: players get the one-piece `scout-body` until Opus reviews the shots and flips this.
+ * `?scout=modular` turns it on for testing (read when the page loads, so the preload includes its parts).
+ */
+export const USE_MODULAR_SCOUT = false;
+
+/** Whether the assembled scout is on: the switch above, or the ?scout=modular URL override. */
+export function modularScoutOn(): boolean {
+  if (USE_MODULAR_SCOUT) return true;
+  return typeof location !== 'undefined' && new URLSearchParams(location.search).get('scout') === 'modular';
+}
+
+/** The packed parts of the assembled scout. The steering wheel is not packed: its procedural yoke is used. */
+const SCOUT_PART_ASSETS: readonly string[] = ['scout-chassis', 'scout-shell', 'headlight', 'vehicle-seat'];
+
+/**
+ * Every offset and scale of the assembled scout, in metres, in the rover frame: the origin at the hub height, +y up,
+ * +z forward, +x across. The hubs stay at x ±0.8, z ±1.1 (@hm/rover: track 1.6, wheelbase 2.2), so the physics does not
+ * change. The part sizes are measured from the packed GLBs' own vertices (world bounds, metres):
+ *   scout-chassis  1.688 x 0.584 x 2.996: x ±0.843, y 0.005..0.589, z ±1.498; its hub housings sit at z ±1.005
+ *   scout-shell    1.290 x 1.180 x 2.398: x ±0.645, y 0.003..1.183, z ±1.199
+ *   headlight      0.206 x 0.298 x 0.147
+ *   vehicle-seat   0.765 x 1.098 x 0.853
+ *   scout-wheel    0.865 x 0.891 x 0.423 (the registry says 0.46 wide; the file measures 0.423)
+ * Each scale is per axis; the ones that differ from 1 are listed in the report.
+ */
+export const SCOUT_ASSEMBLY = {
+  // the wheel's inner faces: 0.8 - 0.423 / 2 = 0.5885. The chassis width fits between them (x ±0.5885), and its
+  // length puts the housings on the hubs (z ±1.005 scaled to ±1.1). Its y puts the housings' centre on the hub height.
+  chassis: { offset: [0, -0.297, 0], scale: [0.6977, 1, 1.0945] },
+  // the cab sits on the deck (the chassis top 0.589 less 0.297 = 0.292, and the cab's floor is 0.003 above its origin),
+  // its width fitted to the deck (x ±0.5885); its length (2.4) fits the 3.28 m deck between the bumpers
+  shell: { offset: [0, 0.289, 0], scale: [0.9124, 1, 1] },
+  // work lamps on the two front-bumper pads (z at the front end of the chassis, +z is forward), the second one mirrored
+  headlight: { x: 0.394, y: -0.1, z: 1.55 },
+  // the driver's seat on the cab floor (y 0.289) at the centre, and the yoke at hand height in front of it
+  seat: { y: 0.286, z: -0.25 },
+  yoke: { at: [0, 0.98, 0.2] },
+  // a thin square mast on a small square base, on the roof at the rear-right (facing +z, the right hand is -x)
+  aerial: { x: -0.3, z: -0.8, roofY: 1.472, baseSize: 0.14, mastWidth: 0.035, mastHeight: 1.2 },
+} as const;
+
 export const CORE_GEN_ASSETS: readonly string[] = [
   ...latticeGenAssets(),
+  ...(modularScoutOn() ? SCOUT_PART_ASSETS : []),
   'scout-body',
   'scout-wheel',
   'hauler-body',
@@ -89,7 +136,6 @@ export async function preloadAllGenAssets(level: GenLevel = 'low'): Promise<void
 export interface VehicleFit {
   readonly offset: readonly [number, number, number];
   readonly yaw: number;
-  readonly scaleX?: number;
   readonly wheelOffset: readonly [number, number, number];
   readonly wheelRadius: number;
   readonly hubs: readonly (readonly [number, number, number])[];
@@ -143,21 +189,24 @@ export const VEHICLE_FIT: Record<'scout' | 'hauler' | 'crawler', VehicleFit> = {
     ],
   },
   crawler: {
-    // Crawler body size [4.567, 4.855, 6.974], physics track is 2.4m
-    offset: [0, -0.25, 0],
+    // Crawler body (TASK-15): 2.40 x 2.20 x 6.20 m, centred on x and z, bottom at 0 in its own frame, no squash.
+    // The GLB already faces +z: the low nose (the hinge bracket, the drill arm and the lamps) is at +z, the tall cab
+    // at -z, so yaw is 0. The rover's origin is wheelRadius above the ground, so the body's bottom sits on the
+    // ground at -wheelRadius. Body frame y = rover y + 0.45.
+    offset: [0, -0.45, 0],
     yaw: 0,
-    scaleX: 2.4 / 4.567,
     wheelOffset: [0, 0, 0],
     wheelRadius: 0.45,
     hubs: [],
     lamps: [
-      [-0.7 * (2.4 / 4.567), 0.45, 3.25],
-      [0.7 * (2.4 / 4.567), 0.45, 3.25],
+      [-0.7, 0.45, 3.0],
+      [0.7, 0.45, 3.0],
     ],
     sockets: [
-      { name: 'seat', at: [0, 1.0, 1.6] },
-      { name: 'drill', at: [0, 0.4, 4.46] },
-      { name: 'mast', at: [0.6 * (2.4 / 4.567), 3.15, 1.3] },
+      // the cab: its floor on the deck (body y 1.0), at the centre of the cab (x 0.35, z -1.5)
+      { name: 'seat', at: [0.35, 0.55, -1.5] },
+      { name: 'drill', at: [0, 0.45, 3.6] },
+      { name: 'mast', at: [0.4, 1.75, -1.5] },
     ],
   },
 };
@@ -205,25 +254,132 @@ function createSteeringWheelProp(level: GenLevel = 'low'): THREE.Object3D {
   return g;
 }
 
+/** The aerial: a square mast on a square base, built here (it is not a packed asset: the owner's rule, no thin rods). */
+function scoutAerial(a: typeof SCOUT_ASSEMBLY.aerial): THREE.Group {
+  const g = new THREE.Group();
+  g.name = 'scout-aerial';
+  const mat = new THREE.MeshStandardMaterial({ color: 0x2a2f36, roughness: 0.45, metalness: 0.55 });
+  const base = new THREE.Mesh(new THREE.BoxGeometry(a.baseSize, 0.05, a.baseSize), mat);
+  base.position.set(a.x, a.roofY + 0.025, a.z);
+  const mast = new THREE.Mesh(new THREE.BoxGeometry(a.mastWidth, a.mastHeight, a.mastWidth), mat);
+  mast.position.set(a.x, a.roofY + 0.05 + a.mastHeight / 2, a.z);
+  g.add(base, mast);
+  return g;
+}
+
+/**
+ * The scout body assembled from its parts (chassis, cab, two headlights, seat, yoke, aerial), placed by
+ * SCOUT_ASSEMBLY. Returns null when a packed part is missing, so the caller falls back to the one-piece body.
+ */
+function assembleScoutBody(level: GenLevel): { body: THREE.Group; lamps: THREE.Mesh[]; yoke: THREE.Object3D } | null {
+  const chassisGen = getGenSync('scout-chassis', level);
+  const shellGen = getGenSync('scout-shell', level);
+  const lampGen = getGenSync('headlight', level);
+  if (!chassisGen || !shellGen || !lampGen) return null;
+  const A = SCOUT_ASSEMBLY;
+
+  const body = new THREE.Group();
+  body.name = 'gen-rover-body-scout-modular';
+
+  const chassis = new THREE.Group();
+  chassis.name = 'scout-chassis';
+  chassis.position.set(A.chassis.offset[0], A.chassis.offset[1], A.chassis.offset[2]);
+  chassis.scale.set(A.chassis.scale[0], A.chassis.scale[1], A.chassis.scale[2]);
+  chassis.add(chassisGen);
+  body.add(chassis);
+
+  const shell = new THREE.Group();
+  shell.name = 'scout-shell';
+  shell.position.set(A.shell.offset[0], A.shell.offset[1], A.shell.offset[2]);
+  shell.scale.set(A.shell.scale[0], A.shell.scale[1], A.shell.scale[2]);
+  shell.add(shellGen);
+  body.add(shell);
+
+  // each lamp is its own mesh with its own material, so setRoverLamp lights one lamp only
+  const lamps: THREE.Mesh[] = [];
+  for (const side of [1, -1]) {
+    const lampRoot = getGenSync('headlight', level) ?? lampGen.clone(true);
+    const holder = new THREE.Group();
+    holder.name = side > 0 ? 'scout-headlight-r' : 'scout-headlight-l';
+    holder.position.set(side * A.headlight.x, A.headlight.y, A.headlight.z);
+    if (side < 0) holder.scale.x = -1;
+    const meshes: THREE.Mesh[] = [];
+    lampRoot.traverse((o) => { if (o instanceof THREE.Mesh) meshes.push(o); });
+    const lens = meshes[0];
+    if (lens) {
+      lens.material = (lens.material as THREE.Material).clone();
+      lens.userData.isRoverLamp = true;
+      lamps.push(lens);
+    }
+    holder.add(lampRoot);
+    body.add(holder);
+  }
+
+  const seat = getGenSync('vehicle-seat', level) ?? createSeatProp(level);
+  seat.position.set(0, A.seat.y, A.seat.z);
+  body.add(seat);
+
+  const yoke = createSteeringWheelProp(level);
+  yoke.position.set(A.yoke.at[0], A.yoke.at[1], A.yoke.at[2]);
+  body.add(yoke);
+
+  body.add(scoutAerial(A.aerial));
+  return { body, lamps, yoke };
+}
+
+/** The rover's wheel, turned so its axle runs along x (the wheels are the same at every stage). Null for a crawler. */
+function wheelRootFor(kind: RoverKind, fit: VehicleFit, level: GenLevel): THREE.Group | null {
+  if (kind === 'crawler') return null;
+  const wheelGen = getGenSync(`${kind}-wheel`, level);
+  if (!wheelGen) return null;
+  const wheelRoot = new THREE.Group();
+  wheelRoot.name = `gen-wheel-${kind}`;
+  const inner = wheelGen.clone(true);
+  inner.position.set(fit.wheelOffset[0], fit.wheelOffset[1], fit.wheelOffset[2]);
+  const orient = new THREE.Group();
+  // Turn wheel so axle (z in GLB) aligns along x
+  orient.rotation.set(0, Math.PI / 2, 0);
+  orient.add(inner);
+  wheelRoot.add(orient);
+  return wheelRoot;
+}
+
 /**
  * Builds a rover model using generated assets if preloaded, or falling back to @hm/rovergear.
+ * The scout is assembled from its parts when modularScoutOn() (or opts.modular) and every part is loaded.
  */
 export function createGenRover(
   kind: RoverKind,
   level: GenLevel = 'low',
   stage: number = 6,
-  materials?: RovergearMaterials
+  materials?: RovergearMaterials,
+  opts: { readonly modular?: boolean } = {}
 ): RoverGearMesh {
   const m = materials ?? createRovergearMaterials();
   const fit = VEHICLE_FIT[kind];
-  const bodyGen = getGenSync(`${kind}-body`, level);
-
   const fallback = kind === 'scout'
     ? fallbackScout(m, { stage })
     : kind === 'hauler'
       ? fallbackHauler(m, { stage })
       : fallbackCrawler(m, { stage });
 
+  if (kind === 'scout' && (opts.modular ?? modularScoutOn())) {
+    const assembled = assembleScoutBody(level);
+    if (assembled) {
+      return {
+        body: assembled.body,
+        wheel: wheelRootFor(kind, fit, level),
+        wheelRadius: fit.wheelRadius,
+        hubs: fit.hubs as [number, number, number][],
+        colliders: fallback.colliders,
+        sockets: [{ name: 'seat', at: [0, SCOUT_ASSEMBLY.seat.y + 0.6, SCOUT_ASSEMBLY.seat.z] }],
+        lamps: assembled.lamps,
+        parts: { steeringWheel: assembled.yoke },
+      };
+    }
+  }
+
+  const bodyGen = getGenSync(`${kind}-body`, level);
   if (!bodyGen) {
     return fallback;
   }
@@ -234,7 +390,6 @@ export function createGenRover(
   // Position body inside rover frame
   bodyGen.position.set(fit.offset[0], fit.offset[1], fit.offset[2]);
   if (fit.yaw !== 0) bodyGen.rotation.y = fit.yaw;
-  if (fit.scaleX) bodyGen.scale.x = fit.scaleX;
   bodyRoot.add(bodyGen);
 
   // Mount lamps
@@ -268,28 +423,15 @@ export function createGenRover(
   if (kind === 'crawler') {
     const armGen = getGenSync('crawler-arm', level);
     if (armGen) {
-      armGen.position.set(0, 0.4, 3.35);
+      // on the hinge bracket: its back face at the nose (z 3.1), at the nose's height
+      armGen.position.set(0, 0.0, 3.35);
       bodyRoot.add(armGen);
       parts.arm = armGen;
     }
   }
 
   // Wheels
-  let wheelRoot: THREE.Group | null = null;
-  if (kind !== 'crawler') {
-    const wheelGen = getGenSync(`${kind}-wheel`, level);
-    if (wheelGen) {
-      wheelRoot = new THREE.Group();
-      wheelRoot.name = `gen-wheel-${kind}`;
-      const inner = wheelGen.clone(true);
-      inner.position.set(fit.wheelOffset[0], fit.wheelOffset[1], fit.wheelOffset[2]);
-      const orient = new THREE.Group();
-      // Turn wheel so axle (z in GLB) aligns along x
-      orient.rotation.set(0, Math.PI / 2, 0);
-      orient.add(inner);
-      wheelRoot.add(orient);
-    }
-  }
+  const wheelRoot = wheelRootFor(kind, fit, level);
 
   return {
     body: bodyRoot,

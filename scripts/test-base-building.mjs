@@ -64,6 +64,8 @@ async function takeScreenshot(p, options) {
 }
 
 const port = 8196;
+// SCOUT=modular runs the same checks with the assembled scout (?scout=modular); the default is the one-piece scout
+const scoutQuery = process.env.SCOUT === 'modular' ? '&scout=modular' : '';
 console.log(`Starting static server on port ${port}...`);
 const server = spawn(process.execPath, ['scripts/serve.mjs'], {
   cwd: root,
@@ -101,7 +103,7 @@ page.on('console', (msg) => {
 
 try {
   console.log(`Navigating to http://localhost:${port}/?base&kit=1...`);
-  await page.goto(`http://localhost:${port}/?base&kit=1`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`http://localhost:${port}/?base&kit=1${scoutQuery}`, { waitUntil: 'domcontentloaded' });
 
   // Wait for Play Canvas to initialize
   const canvas = page.locator('canvas.play-canvas');
@@ -1833,7 +1835,7 @@ try {
   // the kind from the build menu (the mouse wheel names them), and E (the place key). No piece is written into the world directly.
   console.log('\n--- Step 7: TASK-13 house through the blueprint, hotbar, aim, place and snap path ---');
   // A fresh kit boot for the house: the earlier sections of this run spend the dev seed's ore (600) on the heavy machines and the fabricator.
-  await page.goto(`http://localhost:${port}/?base&kit=1`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`http://localhost:${port}/?base&kit=1${scoutQuery}`, { waitUntil: 'domcontentloaded' });
   await canvas.waitFor({ state: 'visible', timeout: 25000 });
   await page.waitForFunction(() => window.hmPlay?.ready === true, { timeout: 35000 });
   await page.evaluate(() => {

@@ -265,6 +265,19 @@ try {
   const seqResult = await page.evaluate(async () => {
     const ps = window.__playScene;
     const room = ps.room;
+    // the lit lamps: the relay lamps (amber overlays on the generated cabinets) and the gate's coils, bottom to top
+    const lit = () => {
+      let relays = 0, relayTotal = 0;
+      room.group.traverse((o) => {
+        const g = o.geometry?.parameters;
+        if (o.isMesh && g && Math.abs(g.width - 0.034) < 1e-3 && o.material?.emissive?.getHex() === 0xff7a1c) {
+          relayTotal++;
+          if (o.material.emissiveIntensity > 0.5) relays++;
+        }
+      });
+      const coils = room.gate.coils.map((c) => (c.material.emissiveIntensity > 0.5 ? '1' : '0')).join('');
+      return { relays, relayTotal, coils };
+    };
     // Step power sequence through 0 to 6.5s
     const steps = [0, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5];
     const states = [];
@@ -283,14 +296,29 @@ try {
       room.setPower(p);
       states.push({
         t,
-        relays: p.relays > 0,
-        coils: p.coils > 0,
+        ...lit(),
+        relaysOn: p.relays > 0,
+        coilsOn: p.coils > 0,
         main: p.main > 0,
         portalVisible: room.portal.visible,
       });
     }
     return states;
   });
+  // Asserted: the relays only come on in order, the coils light bottom to top, the portal opens with the coils, all lit at power on.
+  {
+    const fails = [];
+    const n = seqResult[0].coils.length;
+    seqResult.forEach((st, i) => {
+      if (!/^1*0*$/.test(st.coils)) fails.push(`t=${st.t}: coils ${st.coils} are not bottom to top`);
+      if (i > 0 && st.relays < seqResult[i - 1].relays) fails.push(`t=${st.t}: relays went down`);
+    });
+    const last = seqResult[seqResult.length - 1];
+    if (last.relayTotal !== 8) fails.push(`expected 8 relay lamps, found ${last.relayTotal}`);
+    if (last.relays !== last.relayTotal || last.coils !== '1'.repeat(n)) fails.push(`not every lamp is lit at power on (${last.relays}/${last.relayTotal}, coils ${last.coils})`);
+    if (seqResult.some((st) => st.t <= 2.5 && st.portalVisible) || seqResult.some((st) => st.t >= 3.5 && !st.portalVisible)) fails.push('the portal does not open with the coils');
+    if (fails.length) throw new Error(`POWER SEQUENCE FAILED: ${fails.join('; ')}`);
+  }
   console.log('Power Sequence Timeline Verified:', seqResult);
 
   // Measure draw calls

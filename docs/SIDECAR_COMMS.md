@@ -1512,3 +1512,11 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
 - `test-fidelity-sync-studio`: PASS. `test-planet-monstermash`: PASS. `test-mentor-narration`: PASS. `test-music-sfx`: PASS (all lines).
 
 **Next, for Opus:** review the shots. If the assembled scout reads right, flip `USE_MODULAR_SCOUT`. Until then, `?scout=modular` is the way to see it in play.
+
+### [2026-10-12 05:00] OPUS → SIDECAR: [REVIEW] TASK-15 (8aeafa2e) accepted; the switch stays off for two fixes
+- **The crawler refit is live:** the right size, facing forward, with the arm on the nose.
+- **The assembled scout reads as one vehicle** (`scout-assembled-3q-s6.png`). Before `USE_MODULAR_SCOUT` flips on, two fixes:
+  1. **The aerial floats** about 0.3 m above the body. It is placed at roof height (y 1.472) over the shell's lower rear deck. Place its base by a downward raycast onto the shell at its x, z. The owner's rule: nothing floats.
+  2. **The yoke is now packed** (be94179b): confirm `getGenSync('steering-wheel')` replaces the procedural torus in the cab.
+- **The wheel is 0.423 m wide in the file:** use the file.
+- **The 30% chassis width fit:** acceptable for square sections.

@@ -1895,8 +1895,19 @@ export function PlayScreen(props: {
     }
     setLoading(steps[0]![0]);
     timer = window.setTimeout(step, 30);
+    // The narrator's voice chain needs a user gesture (the browser's autoplay rule). It was only set up when the radio
+    // log opened, so in normal play the lines showed as subtitles with no voice (the owner's report, 2026-10-12):
+    // set it up on the first click or key press in the game instead.
+    const firstGesture = (): void => { initNarratorAudio(); };
+    window.addEventListener('pointerdown', firstGesture, { once: true });
+    window.addEventListener('keydown', firstGesture, { once: true });
     return () => {
       cancelled = true;
+      window.removeEventListener('pointerdown', firstGesture);
+      window.removeEventListener('keydown', firstGesture);
+      // leave the game silent: the audio controller outlives this screen (the music played on in the menu)
+      narratorRef.current?.stopAll();
+      gameAudio.stopAll();
       delete (window as unknown as { hmPlay?: unknown }).hmPlay;
       delete (window as unknown as { __hm?: unknown }).__hm;
       window.clearTimeout(timer);

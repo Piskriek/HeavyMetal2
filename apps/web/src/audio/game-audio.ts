@@ -412,6 +412,30 @@ export class GameAudioController {
     return this.moonWeights;
   }
 
+  /**
+   * Silence everything the game started: every music source, every looping and positional effect, the duck.
+   * Called when the game screen closes. The controller is a singleton that outlives the screen, so without this
+   * the music played on in the menu (the owner's report, 2026-10-12). The buffers stay cached for the next visit.
+   */
+  public stopAll(): void {
+    const stop = (s: AudioBufferSourceNode | null): void => { if (!s) return; try { s.stop(); } catch { /* already stopped */ } s.disconnect(); };
+    stop(this.labMusicSource); this.labMusicSource = null;
+    stop(this.mashMusicSource); this.mashMusicSource = null;
+    stop(this.drivingMusicSource); this.drivingMusicSource = null;
+    for (const s of this.moonSources) stop(s);
+    this.moonSources = [];
+    this.moonScorePlaying = false;
+    for (const v of this.activePositionalVoices) stop(v.source);
+    this.activePositionalVoices = [];
+    for (const v of this.keyedLoops.values()) stop(v.source);
+    this.keyedLoops.clear();
+    this.currentContext = 'silent';
+    this.mobsEngaged = false;
+    this.isDriving = false;
+    this.calmTimer = 0;
+    if (this.ctx && this.musicDuckGain) this.musicDuckGain.gain.setValueAtTime(1, this.ctx.currentTime);
+  }
+
   public setMusicContext(context: MusicContext, crossfadeSeconds = 1.5): void {
     if (this.currentContext === context) return;
     this.currentContext = context;

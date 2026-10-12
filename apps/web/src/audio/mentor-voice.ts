@@ -429,6 +429,13 @@ export class GameNarratorController {
     this.slot = slot;
   }
 
+  /** Stop her current line and clear its subtitle (the game screen is closing). The radio log is kept. */
+  public stopAll(): void {
+    this.chain?.stop();
+    this.activeSub = null;
+    this.notifySubscribers();
+  }
+
   public resetLog(): void {
     clearRadioLog(this.slot);
     this.state = createNarrator([]);

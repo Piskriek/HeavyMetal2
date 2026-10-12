@@ -74,3 +74,16 @@ The context a new Opus session needs on its first message. Keep it current: upda
 - **Arena:** never vote; at most 2 tabs.
 - **Art and research:** concept art comes only from the art agent; research before you design (CLAUDE.md §3.4).
 - **Commit trailer:** `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+
+## 7. Live log (newest last)
+- 2026-10-12, about 13:00: TASK-19's first pass was pushed (68f59686, 064a7f9e, bce7282d). It has the wiring, the setting and the tests, at 29 calls and 65k triangles. Shots are in docs/shots/window/. **REVIEW 1 was sent** (on the board):
+  - the scale and distances are wrong (boxes crowd the glass);
+  - no ground or horizon, and no fog depth;
+  - the Breach must be the hero, a third from the left, rising past the top of the glass, glitch-sliced;
+  - the pockets must float as full spheres, rendering their S inside;
+  - storm clouds, not a starfield;
+  - a crate through a pocket;
+  - a fallback plane through the gate.
+  
+  The Haiku sidecar is working on it. If it stopped, re-dispatch TASK-19 with REVIEW 1 from the board.
+- The vista models: datacentre-hall, chiller-block, shipping-container and pylon-tower are posted. Overpass-segment and rubble-slab were running (job bgd3yzmzw). Then render the angles, pack, commit.

@@ -63,7 +63,7 @@ try {
   await page.goto(URL_ROOT, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.sm-menu button', { timeout: 60000 });
   await page.locator('.sm-menu button', { hasText: 'Play' }).first().click();
-  await page.waitForFunction(() => window.hmPlay?.ready === true, { timeout: 90000 });
+  await page.waitForFunction(() => window.hmPlay?.ready === true, null, { timeout: 120000, polling: 250 });
   await page.evaluate(() => {
     const done = [...document.querySelectorAll('.play-create .btns button')].find((b) => b.textContent.startsWith('Done'));
     done?.click();
@@ -113,9 +113,24 @@ try {
     await shot('flash-mid.png');
   }
 
-  // a pocket close-up through the window: the camera inside the lab at the glass, looking at the first pocket's home
-  await cam({ x: 0, y: 1.7, z: -7.8 }, { x: -14, y: 0.5, z: -70 });
+  // a pocket close-up through the window: the camera inside the lab at the glass, looking up at pocket 1's centre (it floats)
+  const pk = await page.evaluate(() => window.__playScene.room.vista.debugPockets()[0]);
+  console.log('pocket 1:', JSON.stringify(pk));
+  await cam({ x: -1.5, y: 1.7, z: -7.8 }, { x: pk.centre[0], y: pk.centre[1], z: pk.centre[2] });
   await shot('pocket-close.png');
+  // the crate that flies through pocket 1 (lane 0), shot mid-pocket: wait until it is inside the pocket's core
+  if (!only || only === 'pocket-crate') {
+    const inside = await page.waitForFunction(() => {
+      const v = window.__playScene.room.vista;
+      const pp = v.debugPockets()[0];
+      const f = v.debugFlyers().find((q) => q.lane === 0);
+      return !!f && Math.hypot(f.x - pp.centre[0], f.y - pp.centre[1], f.z - pp.centre[2]) < 0.6 * pp.radius;
+    }, null, { timeout: 150000, polling: 100 }).then(() => true, () => false);
+    console.log('crate inside pocket 1:', inside);
+    const c = await page.evaluate(() => { const f = window.__playScene.room.vista.debugFlyers().find((q) => q.lane === 0); return [f.x, f.y, f.z]; });
+    await cam({ x: -1.5, y: 1.7, z: -7.8 }, { x: c[0], y: c[1], z: c[2] });
+    await shot('pocket-crate.png');
+  }
 
   // the storm's progress again, from the spawn: Lite and Static
   await setView(0.5, 'lite');

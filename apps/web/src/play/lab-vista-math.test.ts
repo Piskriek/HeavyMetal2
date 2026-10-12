@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   BASE_S, BURST_SECONDS, CALM_S, EGA16, MAX_POCKETS, POCKET_KINDS, burstLook, burstSchedule, clipRect, fidelityAt, lookAt, lxWeights,
-  mulberry32, nearestEga, polar, pocketFrame, pocketLifetime, pxdMode, quantise332, strongestPocket, vtxGrid,
+  mulberry32, nearestEga, polar, pocketFrame, pocketHome, pocketLifetime, pxdMode, quantise332, strongestPocket, vtxGrid,
 } from './lab-vista-math';
 
 test('mulberry32 repeats for one seed and stays in [0, 1)', () => {
@@ -14,20 +14,36 @@ test('mulberry32 repeats for one seed and stays in [0, 1)', () => {
   assert.notDeepEqual(xs.slice(0, 5), Array.from({ length: 5 }, () => mulberry32(43)()));
 });
 
-test('each pocket lives 20 to 40 seconds, and there are at most six of them', () => {
+test('each pocket lives 20 to 40 seconds (slot 0 never collapses: the crate lane flies through it), and there are at most six of them', () => {
   assert.equal(MAX_POCKETS, 6);
-  for (let slot = 0; slot < MAX_POCKETS; slot++) {
+  assert.equal(pocketLifetime(0) > 1e8, true);
+  for (let slot = 1; slot < MAX_POCKETS; slot++) {
     const life = pocketLifetime(slot);
     assert.ok(life >= 20 && life <= 40, `slot ${slot}: ${life}`);
   }
 });
 
 test('a pocket is empty at the start of its life, full in the middle, and gone at the end of it', () => {
-  const life = pocketLifetime(0);
-  assert.equal(pocketFrame(0, 0).radius, 0, 'forms from nothing');
-  assert.ok(pocketFrame(0, 6).radius > 5, 'a pocket in its prime is big');
-  assert.equal(pocketFrame(0, life - 0.0001).radius < 0.01, true, 'collapses by the end of its life');
+  const life = pocketLifetime(1);
+  assert.equal(pocketFrame(1, 0).radius, 0, 'forms from nothing');
+  assert.ok(pocketFrame(1, 6).radius > 5, 'a pocket in its prime is big');
+  assert.equal(pocketFrame(1, life - 0.0001).radius < 0.01, true, 'collapses by the end of its life');
   assert.ok(pocketFrame(0, 6, 1.5).radius > pocketFrame(0, 6, 1).radius, 'progress grows the pocket');
+});
+
+test('the pockets float: 9 to 25 m across (slot 0 is 14), 40 to 300 m out, their centres 1.2 to 2 radii above the ground', () => {
+  for (let slot = 0; slot < MAX_POCKETS; slot++) {
+    for (const t of [0, 7, 19, 33]) {
+      const f = pocketFrame(slot, t);
+      const home = pocketHome(slot);
+      const out = Math.hypot(f.centre[0] - home[0], f.centre[2] - home[2]);
+      assert.ok(out < 60, 'drift stays near the home');
+      assert.ok(Math.hypot(home[0] + 2.5, home[2] - 1) >= 40 + 10 - 1 && Math.hypot(home[0] + 2.5, home[2] - 1) <= 300 + 10 + 1, `home ${slot} is 40 to 300 m out`);
+      if (f.radius > 1) assert.ok(f.centre[1] >= 1.2 * f.radius * 0.8, 'a pocket that is out sits 1.2 radii or more above the ground (breath and collapse taken into account)');
+      assert.ok(f.centre[1] >= 0, 'never below the ground');
+    }
+  }
+  assert.ok(pocketFrame(2, 40).centre[1] > 9, 'a pocket is well above the ground');
 });
 
 test('a pocket drifts at one to three metres a second, and its frame repeats for one time', () => {

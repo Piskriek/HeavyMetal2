@@ -1547,3 +1547,17 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
 - **FPS not measured on the GPU:** the headless Chrome here runs ANGLE on SwiftShader (software), so no frame time on the GTX 950M. The min-spec check on the laptop is still to do.
 - **Questions for you:** (1) a dedicated thunder SFX, or keep `sfx-storm`? (2) the menu lab draws Full on every machine; pass a tier there if potato matters. (3) Low is Lite: check it on the GTX 950M first.
 - **Commits:** `68f59686` (the vista, the wiring, the setting), `064a7f9e` (the visual fixes), this commit (the capture script `scripts/capture-window-view.mjs`, the shots, this entry).
+
+### [2026-10-12 13:47] SIDECAR → OPUS: [PROGRESS] TASK-19 REVIEW 1, group A: the scene (R1 to R7)
+- **R1 scale and layout:** the vista uses the packed models' real sizes (hall 10 x 9 x 23 m with its long side across the window, containers 5.6 m long, pylons 24 m, overpass pieces 5.9 x 9 x 8.5 m). The far hall rows are scaled 1.8, the main hall 3, the far silhouettes 4. The middle bays are clear: only the far-left container (tilted), the far-right chiller and the slabs are in the near field, and the bollards sit at the edges. Halls are small and low on the horizon.
+- **R2 ground:** a flat cracked grey-brown dust plain from the wall to the horizon (rises only past 1.5 km, under the fog).
+- **R3 fog:** exp2, density 0.00167 (half faded at 500 m, a silhouette at 1.5 km). The fog colour is the horizon colour, and it turns to dusk with progress. The ridge is a silhouette, not fogged. The Breach gets a partial haze of its own.
+- **R4 Breach:** 150 m square, 600 m tall (about 27 degrees, past the glass top). Its 10 m slices jump sideways in steps (the glitch), and it is the brightest thing in the view.
+- **R5 pockets:** centres 1.2 to 2 radii above the ground, radius 9 to 25 m, homes 40 to 300 m out. The shells are thin static rims, dimmed so the Breach stays the hero. Note: a floating sphere does not reach the ground, so the ground below it is outside its fidelity (the pocket changes the objects inside it). The crate's pocket shows this.
+- **R6 sky:** violet-grey storm at progress 0 with drifting clouds, undersides lit cyan by the Breach. The dust is dust-coloured and streaked along the wind, mostly low and near.
+- **R7 crate:** lane 0 flies through pocket 1 at its height and depth (a 5 m server rack, scaled 2.5 so it reads from the glass). pocket-crate.png shows it inside the 1-bit pocket, dithered.
+- **Models:** the five packed models are in, and the vista uses their LOW level (the plan's budget). rubble-slab is still a box.
+- **Measured (renderer.info, spawn view):** Full 28 draw calls, 65,100 triangles. Lite 23 calls, 53,152 triangles. Budget 40 and 120k. (The HD level would be about 212k: the vista now always uses low.)
+- **Checks:** typecheck exit 0; the pocket maths and the render tests pass (23 of 23).
+- **Shots:** spawn-p0, spawn-p05, spawn-p1, beside-gate-p0, parallax-a/b, flash-mid, pocket-close, pocket-crate, lite-spawn-p05, static-spawn-p05 (docs/shots/window/, force-added).
+- **Next (group B):** R8 (the planet through the gate shows the storm plane), the menu lab's tier, and the vista level in the wiring.

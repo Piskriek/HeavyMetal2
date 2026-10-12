@@ -34,6 +34,17 @@ export function smoothstep(e0: number, e1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
+/** The spawn point (lab metres): the bearings are measured from it (north is -z, east is +x). */
+export const SPAWN_XZ: readonly [number, number] = [-2.5, 1.0];
+/** The distance from the spawn to the window's plane, metres. */
+export const WINDOW_DIST = 10;
+
+/** A point on a bearing from `origin` (x, z), in the lab frame: 0 degrees is north (-z), 90 east (+x). */
+export function polar(origin: readonly [number, number], bearingDeg: number, dist: number): readonly [number, number] {
+  const a = (bearingDeg * Math.PI) / 180;
+  return [origin[0] + Math.sin(a) * dist, origin[1] - Math.cos(a) * dist];
+}
+
 /** The starting pockets (plan §5). `tint` multiplies the ground and the props inside; `sky` is what the shell's back faces show. */
 export interface PocketKind {
   readonly name: string;
@@ -43,63 +54,83 @@ export interface PocketKind {
 }
 export const POCKET_KINDS: readonly PocketKind[] = [
   { name: 'Old Earth', s: [1, 1, 1, 0], tint: [0.62, 1.0, 0.5], sky: [0.36, 0.6, 0.9] },
-  { name: '1-bit', s: [0, 0.2, 0, 0], tint: [1, 1, 1], sky: [0.02, 0.02, 0.03] },
+  { name: '1-bit', s: [0, 0.2, 0, 0], tint: [1, 1, 1], sky: [0.05, 0.05, 0.06] },
   { name: 'EGA', s: [0.25, 0.4, 0.5, 0], tint: [1.0, 0.7, 1.0], sky: [0.25, 0.85, 0.95] },
   { name: 'Drowned', s: [0.7, 0.8, 0.8, 1], tint: [0.55, 0.9, 1.0], sky: [0.06, 0.3, 0.36] },
   { name: 'Wire-crunch', s: [0.5, 0, 0.6, 0], tint: [1, 1, 1], sky: [0.28, 0.28, 0.32] },
 ];
 
-/** The shader's view of one pocket at one moment. `radius` 0 means the slot is empty. */
+/** The shader's view of one pocket at one moment. `radius` 0 means the slot is empty; `centre` is above the ground (y). */
 export interface PocketFrame {
   readonly centre: Vec3;
   readonly radius: number;
   readonly kind: number;
 }
 
-/** Plan §5: each pocket lives for 20 to 40 s, then collapses in a burst and forms again somewhere else. */
+/** The slots' homes: [bearing from the spawn, distance beyond the window]. Every home is 40 to 300 m out (plan §5, the brief). */
+export const POCKET_HOME_SPEC: readonly (readonly [number, number])[] = [
+  [-9, 46],
+  [20, 90],
+  [-20, 150],
+  [8, 280],
+  [34, 60],
+  [-14, 200],
+];
+
+/** The home of a slot, in the lab frame (x, ground, z). */
+export function pocketHome(slot: number): Vec3 {
+  const [bearing, w] = POCKET_HOME_SPEC[slot % POCKET_HOME_SPEC.length]!;
+  const [x, z] = polar(SPAWN_XZ, bearing, WINDOW_DIST + w);
+  return [x, 0, z];
+}
+
+/**
+ * Plan §5: each pocket lives for 20 to 40 s, then collapses in a burst and forms again somewhere else. Slot 0 never collapses: it is
+ * the 1-bit pocket that the crosswind's lane 0 flies through (the crate shot), so it stays where it is.
+ */
 export function pocketLifetime(slot: number): number {
+  if (slot === 0) return 1e9;
   return 20 + 20 * mulberry32(0x9e37 + slot * 131)();
 }
 
-/** The home of each slot, in the view (metres, lab frame: -z is out past the window). Chosen so every pocket sits in the window's view. */
-export const POCKET_HOMES: readonly Vec3[] = [
-  [-14, 0, -70],
-  [22, 0, -120],
-  [-44, 0, -210],
-  [8, 0, -330],
-  [52, 0, -54],
-  [-80, 0, -150],
-];
-
-/** Where a pocket drifts (plan §5: 1 to 3 m/s on a seeded Lissajous path). */
-function drift(slot: number, cycle: number, t: number): Vec3 {
-  const r = mulberry32(0x51f1 + slot * 977 + cycle * 7919);
-  const ax = 14 + 10 * r(), az = 10 + 8 * r();
-  const wx = 0.07 + 0.05 * r(), wz = 0.05 + 0.05 * r();
-  const px = r() * 6.28, pz = r() * 6.28;
-  const home = POCKET_HOMES[slot % POCKET_HOMES.length]!;
-  const jitter = 18;
-  const jx = (r() * 2 - 1) * jitter, jz = (r() * 2 - 1) * jitter;
-  return [home[0] + jx + ax * Math.sin(wx * t + px), 0, home[2] + jz + az * Math.sin(wz * t + pz)];
+/** The base radius of a slot, metres (9 to 25 m; the brief). Slot 0 is 14 m. */
+function baseRadiusOf(slot: number, cycle: number): number {
+  if (slot === 0) return 14;
+  return 9 + 16 * mulberry32(0x1d0c + slot * 613 + cycle * 1009)();
 }
 
 /**
  * The pocket in slot `slot` at time `t` (seconds). `scale` grows the pockets with the storm's progress (plan §8).
  * The radius breathes ±10% and shrinks to nothing over the last 1.2 s of its life and grows back over the first 1.2 s of the next.
+ * The centre sits 1.2 to 2 radii above the ground, so every pocket floats: no sphere is cut by the ground.
  */
 export function pocketFrame(slot: number, t: number, scale = 1): PocketFrame {
   const life = pocketLifetime(slot);
   const cycle = Math.max(0, Math.floor(t / life));
   const phase = t - cycle * life;
   const r = mulberry32(0x1d0c + slot * 613 + cycle * 1009);
-  const kind = Math.floor(r() * POCKET_KINDS.length) % POCKET_KINDS.length;
-  const baseRadius = 8 + 10 * r();
+  const kind = slot === 0 ? 1 : Math.floor(r() * POCKET_KINDS.length) % POCKET_KINDS.length;
+  const base = baseRadiusOf(slot, cycle);
   const edge = 1.2;
   const grow = smoothstep(0, edge, phase);
   const shrink = 1 - smoothstep(life - edge, life, phase);
   const breath = 1 + 0.1 * Math.sin(t * 0.9 + slot * 1.7);
-  const radius = baseRadius * scale * breath * Math.min(grow, shrink);
-  return { centre: drift(slot, cycle, t), radius, kind };
+  const radius = base * scale * breath * Math.min(grow, shrink);
+  const lift = slot === 0 ? 1.3 : 1.2 + 0.8 * r();
+  const home = pocketHome(slot);
+  const [dx, dz] = drift(slot, cycle, t);
+  return { centre: [home[0] + dx, base * scale * lift, home[2] + dz], radius, kind };
+}
+
+/** Where a pocket drifts (plan §5: 1 to 3 m/s on a seeded Lissajous path). Slot 0 drifts only a little in x (the crate lane is fixed). */
+function drift(slot: number, cycle: number, t: number): readonly [number, number] {
+  if (slot === 0) return [4 * Math.sin(0.06 * t), 0];
+  const r = mulberry32(0x51f1 + slot * 977 + cycle * 7919);
+  const ax = 14 + 10 * r(), az = 10 + 8 * r();
+  const wx = 0.07 + 0.05 * r(), wz = 0.05 + 0.05 * r();
+  const px = r() * 6.28, pz = r() * 6.28;
+  const jx = (r() * 2 - 1) * 12, jz = (r() * 2 - 1) * 12;
+  return [jx + ax * Math.sin(wx * t + px), jz + az * Math.sin(wz * t + pz)];
 }
 
 /** A burst of static (plan §6): the bolt, the burst shell, the light and the ring, all from one event. */
@@ -185,7 +216,7 @@ export function lookAt(progress: number): VistaLook {
   const p = clamp01(progress);
   return {
     baseS: [lerp(BASE_S[0], CALM_S[0], p), lerp(BASE_S[1], CALM_S[1], p), lerp(BASE_S[2], CALM_S[2], p), lerp(BASE_S[3], CALM_S[3], p)],
-    pocketScale: 0.6 + 0.6 * p,
+    pocketScale: 0.85 + 0.35 * p,
     breachHeight: 1 - 0.92 * p,
     breachGlow: 1 - 0.85 * p,
     dust: 1 - 0.7 * p,
@@ -268,10 +299,4 @@ export function clipRect(points: readonly { readonly x: number; readonly y: numb
   const cx1 = Math.min(width, Math.ceil(x1)), cy1 = Math.min(height, Math.ceil(y1));
   if (cx1 <= cx0 || cy1 <= cy0) return null;
   return { x: cx0, y: cy0, w: cx1 - cx0, h: cy1 - cy0 };
-}
-
-/** A point on a bearing from `origin` (x, z), in the lab frame: 0 degrees is north (-z), 90 east (+x). */
-export function polar(origin: readonly [number, number], bearingDeg: number, dist: number): readonly [number, number] {
-  const a = (bearingDeg * Math.PI) / 180;
-  return [origin[0] + Math.sin(a) * dist, origin[1] - Math.cos(a) * dist];
 }

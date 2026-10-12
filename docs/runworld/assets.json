@@ -1035,7 +1035,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "two square steel crates stacked on top of each other, the top one smaller, both under a heavy off-white canvas dust cover pulled tight, so the whole thing reads as one chunky soft-edged square block; a few broad shallow folds only; the hem tucked flat against the floor all round; NO loose flaps, NO crumpled pile on the floor, NO sharp creases, NO dark cloth, a little of the lower crate's grey steel corner showing at one bottom edge, lightly dusty from years out of use",
-      "note": "lab clutter (owner 2026-10-12: boxes that clutter the lab, out of use for so long, which the player clears to place new machines)"
+      "note": "lab clutter (owner 2026-10-12: boxes that clutter the lab, out of use for so long, which the player clears to place new machines)",
+      "hold": "dropped 2026-10-12, owner: cloth and many small parts in a heap are a no-no for the 3D agent (natural shapes do not reduce well)"
     },
     {
       "id": "machine-under-sheet",
@@ -1045,7 +1046,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a boxy lab machine about 1.8 metres tall completely hidden under a heavy off-white canvas dust cover pulled tight, so the whole thing reads as one chunky soft-edged square block; a few broad shallow folds only; the hem tucked flat against the floor all round; NO loose flaps, NO crumpled pile on the floor, NO sharp creases, NO dark cloth, only its square shape and one square control box on top showing as shapes under the canvas, lightly dusty from years out of use",
-      "note": "lab clutter (owner 2026-10-12: boxes that clutter the lab, out of use for so long, which the player clears to place new machines)"
+      "note": "lab clutter (owner 2026-10-12: boxes that clutter the lab, out of use for so long, which the player clears to place new machines)",
+      "hold": "dropped 2026-10-12, owner: cloth and many small parts in a heap are a no-no for the 3D agent (natural shapes do not reduce well)"
     },
     {
       "id": "cardboard-stack",
@@ -1066,7 +1068,8 @@
       "view": "three-quarter",
       "subject": "a square open steel parts bin about 70 centimetres tall heaped to the top with chunky square spare parts: small square housings, flat brackets and block connectors, lightly dusty from years out of use",
       "note": "lab clutter (owner 2026-10-12: boxes that clutter the lab, out of use for so long, which the player clears to place new machines)",
-      "reach": 3
+      "reach": 3,
+      "hold": "dropped 2026-10-12, owner: cloth and many small parts in a heap are a no-no for the 3D agent (natural shapes do not reduce well)"
     },
     {
       "id": "filing-cabinet",
@@ -1130,7 +1133,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a pile of fallen flat square ceiling panels lying on the floor at angles on top of each other, lightly dusty from years out of use",
-      "note": "lab clutter (owner 2026-10-12: boxes that clutter the lab, out of use for so long, which the player clears to place new machines)"
+      "note": "lab clutter (owner 2026-10-12: boxes that clutter the lab, out of use for so long, which the player clears to place new machines)",
+      "hold": "dropped 2026-10-12, owner: cloth and many small parts in a heap are a no-no for the 3D agent (natural shapes do not reduce well)"
     },
     {
       "id": "sample-case",

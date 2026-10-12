@@ -884,5 +884,45 @@
       0.5,
       0.429
     ]
+  },
+  "datacentre-hall": {
+    "class": "vista",
+    "size": [
+      10.1,
+      9.01,
+      23.266
+    ]
+  },
+  "chiller-block": {
+    "class": "vista",
+    "size": [
+      3.132,
+      2.991,
+      3.124
+    ]
+  },
+  "shipping-container": {
+    "class": "vista",
+    "size": [
+      2.361,
+      2.598,
+      5.598
+    ]
+  },
+  "pylon-tower": {
+    "class": "vista",
+    "size": [
+      6.367,
+      24,
+      11.122
+    ]
+  },
+  "overpass-segment": {
+    "class": "vista",
+    "size": [
+      5.946,
+      8.996,
+      8.511
+    ]
   }
 }

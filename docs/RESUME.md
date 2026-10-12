@@ -87,3 +87,8 @@ The context a new Opus session needs on its first message. Keep it current: upda
   
   The Haiku sidecar is working on it. If it stopped, re-dispatch TASK-19 with REVIEW 1 from the board.
 - The vista models: five are packed (510f2314): hall, chiller (its own budgets, 1.5k low), container, pylon and overpass. rubble-slab was running (job bgd3yzmzw); when it lands, render the angles, then `node scripts/runworld-pack.mjs rubble-slab`, and commit.
+- 2026-10-12 afternoon: all six vista models are packed (the rubble slab in 991968e1).
+- **The overnight batch is running:** 40 subjects × 2 options (`<id>-a`, `<id>-b`), about 80 models, about 14 h. The ids are listed in `zips/runworld/overnight-ids.txt`, and the log is `zips/runworld/overnight.log` (POSTED, FAILED or NOIMG per id; "OVERNIGHT DONE" at the end).
+  - The images were AUTO-approved, unreviewed.
+  - **Next session:** render the angles of each pair, keep the better option (or neither), and pack the keepers.
+  - **If the batch stopped:** re-run the same loop. It skips ids that already have high.glb (see the shell history in this file's commit message, or re-create it: for each id, images, then touch approved, then local3d model, then runworld-post).

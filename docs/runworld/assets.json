@@ -1155,6 +1155,66 @@
       "view": "three-quarter",
       "subject": "an old boxy square CRT computer monitor on a square block stand, its dark screen off, lightly dusty from years out of use",
       "note": "lab clutter (owner 2026-10-12: boxes that clutter the lab, out of use for so long, which the player clears to place new machines)"
+    },
+    {
+      "id": "datacentre-hall",
+      "panel": "21/41-layout.png",
+      "class": "vista",
+      "size": 9,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "a long windowless datacentre hall seen from outside: a flat-roofed rectangular concrete-and-steel building about 9 metres tall and four times as long as it is tall, a row of chunky square cooling units standing on the roof, flush square louvre panels along the walls (solid slats, NO holes), one big shut square roller door, weathered grey with dust drifted against its base, abandoned, no lettering",
+      "note": "outside the lab window (owner 2026-10-12: a planned 3D wasteland scene, docs/WINDOW_SCENE_PLAN.md); seen from 20 m to 2 km, so the low level is what shows"
+    },
+    {
+      "id": "chiller-block",
+      "panel": "21/41-layout.png",
+      "class": "vista",
+      "size": 3,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "a chunky square industrial chiller unit about 3 metres tall on a square concrete pad, flat louvred side panels (solid slats, NO holes), square top vents set flush, NO pipes, NO round fans, weathered pale grey steel, abandoned, no lettering",
+      "note": "outside the lab window (owner 2026-10-12: a planned 3D wasteland scene, docs/WINDOW_SCENE_PLAN.md); seen from 20 m to 2 km, so the low level is what shows"
+    },
+    {
+      "id": "shipping-container",
+      "panel": "21/41-layout.png",
+      "class": "vista",
+      "size": 2.6,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "a steel shipping container about 12 metres long and 2.6 metres tall, shallow square corrugated sides, shut flush doors at one end with flat square lock bars set into the doors (NO round bars), weathered rust-orange paint, dented, NO lettering, NO logos",
+      "note": "outside the lab window (owner 2026-10-12: a planned 3D wasteland scene, docs/WINDOW_SCENE_PLAN.md); seen from 20 m to 2 km, so the low level is what shows"
+    },
+    {
+      "id": "pylon-tower",
+      "panel": "21/41-layout.png",
+      "class": "vista",
+      "size": 24,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "a tall SOLID square steel power pylon about 24 metres tall: a tapering square box-section column (NOT a lattice, NO open frame, NO holes) with two thick square cross-arms near the top and square insulator blocks under the arm ends, NO cables, standing on a square concrete footing, weathered grey steel, abandoned",
+      "note": "outside the lab window (owner 2026-10-12: a planned 3D wasteland scene, docs/WINDOW_SCENE_PLAN.md); seen from 20 m to 2 km, so the low level is what shows"
+    },
+    {
+      "id": "overpass-segment",
+      "panel": "21/41-layout.png",
+      "class": "vista",
+      "size": 9,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "a broken section of an elevated concrete highway: one thick square concrete pier holding a chunky flat deck slab whose far end is snapped off in a clean jagged break, square concrete barrier blocks along the deck edges, NO rebar, NO railings, NO lamps, weathered grey concrete with dust, abandoned",
+      "note": "outside the lab window (owner 2026-10-12: a planned 3D wasteland scene, docs/WINDOW_SCENE_PLAN.md); seen from 20 m to 2 km, so the low level is what shows"
+    },
+    {
+      "id": "rubble-slab",
+      "panel": "21/41-layout.png",
+      "class": "vista",
+      "size": 1.5,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "one big broken slab of grey concrete lying tilted on the ground, thick and chunky with a clean jagged broken edge, two big square chunks broken off and touching it, NO rebar, NO gravel, NO small pieces, dusty",
+      "note": "outside the lab window (owner 2026-10-12: a planned 3D wasteland scene, docs/WINDOW_SCENE_PLAN.md); seen from 20 m to 2 km, so the low level is what shows"
     }
   ],
   "budgets": {
@@ -1218,6 +1278,11 @@
       300,
       700,
       1500
+    ],
+    "vista": [
+      600,
+      1500,
+      3000
     ]
   },
   "notes": [

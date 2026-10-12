@@ -92,3 +92,6 @@ The context a new Opus session needs on its first message. Keep it current: upda
   - The images were AUTO-approved, unreviewed.
   - **Next session:** render the angles of each pair, keep the better option (or neither), and pack the keepers.
   - **If the batch stopped:** re-run the same loop. It skips ids that already have high.glb (see the shell history in this file's commit message, or re-create it: for each id, images, then touch approved, then local3d model, then runworld-post).
+- **The owner's new feature idea (2026-10-12, see OWNER_ASKS):** junked or broken models become "containment leaks". An object looks janky; the player seals the leak and uses a fidelity tool to restore it.
+  - **The ladder:** broken junk, then our pack, then a RUN.world tier, then a max tier via the Meshy.ai API (its credits reset at the end of the month).
+  - **NEVER delete junked models.** Next: research, then a plan doc, then the owner's sign-off.

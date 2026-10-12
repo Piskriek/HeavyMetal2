@@ -93,11 +93,33 @@ bpy.context.collection.objects.link(low)
 tris = sum(len(p.vertices) - 2 for p in low.data.polygons)
 
 
-def bake_target(name, colorspace):
-    """A new image on the low copy's material, made the active node so the next bake writes into it."""
+def source_colour():
+    """The full model's main colour (the average of its colour map, linear), the fill behind the colour bake."""
+    bsdf = next(n for n in high.active_material.node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
+    col = tuple(bsdf.inputs['Base Color'].default_value)
+    link = bsdf.inputs['Base Color'].links
+    if link and link[0].from_node.type == 'TEX_IMAGE' and link[0].from_node.image:
+        px = link[0].from_node.image.pixels[:]
+        n = len(px) // 4
+        step = max(1, n // 4096)
+        acc, k = [0.0, 0.0, 0.0], 0
+        for i in range(0, n, step):
+            for c in range(3):
+                acc[c] += px[i * 4 + c]
+            k += 1
+        lin = lambda c: c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+        col = (lin(acc[0] / k), lin(acc[1] / k), lin(acc[2] / k), 1.0)
+    return col
+
+
+def bake_target(name, colorspace, fill):
+    """A new image on the low copy's material, made the active node so the next bake writes into it. It starts as
+    `fill`, not black: a texel whose ray misses the full model (a recess deeper than the ray reach) keeps the fill,
+    so a miss shows as plain colour or a flat normal, not the black patches the props review found (2026-10-12)."""
     nodes = low.active_material.node_tree.nodes
     img = bpy.data.images.new(name, size, size, alpha=False)
     img.colorspace_settings.name = colorspace
+    img.generated_color = fill
     tex = nodes.new('ShaderNodeTexImage')
     tex.image = img
     for n in nodes:
@@ -116,8 +138,11 @@ def bake(kind, **kw):
     scene.cycles.samples = 4
     b = scene.render.bake
     b.use_selected_to_active = True
-    b.cage_extrusion = 0.01 * diag
-    b.max_ray_distance = 0.03 * diag
+    # --reach=K: K times the usual ray reach, for pieces with deep recesses (a lid set into a crate's top)
+    reach = next((float(a.split('=')[1]) for a in argv if a.startswith('--reach=')), 1.0)
+    b.cage_extrusion = 0.01 * diag * reach
+    b.max_ray_distance = 0.03 * diag * reach
+    b.use_clear = False
     b.normal_space = 'TANGENT'
     b.margin = 8
     bpy.ops.object.select_all(action='DESELECT')
@@ -177,10 +202,14 @@ if retopo:
         bsdf.inputs[k].default_value = src_bsdf.inputs[k].default_value
     low.data.materials.clear()
     low.data.materials.append(mat)
-    img, tex = bake_target('color', 'sRGB')
+    img, tex = bake_target('color', 'sRGB', source_colour())
     # a fully metallic surface has no diffuse colour to bake (the generated models are all metallic 1): bake the
     # albedo from a non-metal copy of the source; the low keeps the source's metallic value
-    src_bsdf.inputs['Metallic'].default_value = 0
+    # every material, not just the first: a `fix` plain-back material stayed metallic and baked black
+    for m in high.data.materials:
+        for n in m.node_tree.nodes if m and m.use_nodes else []:
+            if n.type == 'BSDF_PRINCIPLED':
+                n.inputs['Metallic'].default_value = 0
     bake('DIFFUSE', pass_filter={'COLOR'})
     mat.node_tree.links.new(tex.outputs['Color'], bsdf.inputs['Base Color'])
     img.pack()
@@ -215,7 +244,7 @@ else:
         low.active_material = mat
     nodes, links = mat.node_tree.nodes, mat.node_tree.links
     bsdf = next(n for n in nodes if n.type == 'BSDF_PRINCIPLED')
-    img, tex = bake_target('normal', 'Non-Color')
+    img, tex = bake_target('normal', 'Non-Color', (0.5, 0.5, 1.0, 1.0))
     bake('NORMAL')
     nmap = nodes.new('ShaderNodeNormalMap')
     links.new(tex.outputs['Color'], nmap.inputs['Color'])

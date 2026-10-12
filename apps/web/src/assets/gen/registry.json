@@ -804,5 +804,85 @@
       0.198,
       0.349
     ]
+  },
+  "crate-large": {
+    "class": "prop",
+    "size": [
+      1.284,
+      1.195,
+      1.23
+    ]
+  },
+  "crate-small": {
+    "class": "prop",
+    "size": [
+      0.524,
+      0.5,
+      0.516
+    ]
+  },
+  "cardboard-stack": {
+    "class": "prop",
+    "size": [
+      0.587,
+      0.9,
+      0.604
+    ]
+  },
+  "filing-cabinet": {
+    "class": "prop",
+    "size": [
+      0.664,
+      1.3,
+      0.663
+    ]
+  },
+  "server-rack": {
+    "class": "prop",
+    "size": [
+      1.022,
+      2,
+      0.962
+    ]
+  },
+  "locker": {
+    "class": "prop",
+    "size": [
+      0.866,
+      1.9,
+      0.809
+    ]
+  },
+  "toolbox": {
+    "class": "prop",
+    "size": [
+      0.394,
+      0.35,
+      0.393
+    ]
+  },
+  "coolant-can": {
+    "class": "prop",
+    "size": [
+      0.471,
+      0.5,
+      0.474
+    ]
+  },
+  "sample-case": {
+    "class": "prop",
+    "size": [
+      0.497,
+      0.449,
+      0.497
+    ]
+  },
+  "old-monitor": {
+    "class": "prop",
+    "size": [
+      0.423,
+      0.5,
+      0.429
+    ]
   }
 }

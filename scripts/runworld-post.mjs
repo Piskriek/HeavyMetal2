@@ -150,9 +150,11 @@ for (const a of manifest.assets.filter((x) => only.length === 0 || only.includes
   // made a faceted blob), the hauler body (no torn side panels), the scout body (clean panels and frames). The voxel
   // remesh variant (--retopo=160) broke the wheel apart (an open shell), so it is not used.
   const plan = [['low', low, 256, 'smooth', 512, ['--retopo=0', '--planar=4']], ['mid', mid, 512, 'smooth', 512, []], ['high', high, 1024, 'smooth', 1024, []]];
+  // `reach`: a longer bake ray for pieces with deep recesses (lod-bake.py --reach=K)
+  const reach = a.reach ? [`--reach=${a.reach}`] : [];
   for (const [name, tris, tex, mode, bakePx, extra] of plan.filter((p) => levels.includes(p[0]))) {
     const raw = path.join(d, `${name}-raw.glb`), done = path.join(d, `${name}.glb`);
-    run(BLENDER, ['-b', '--factory-startup', '-P', 'scripts/lod-bake.py', '--', norm, raw, String(tris), String(bakePx), mode, ...extra]);
+    run(BLENDER, ['-b', '--factory-startup', '-P', 'scripts/lod-bake.py', '--', norm, raw, String(tris), String(bakePx), mode, ...extra, ...reach]);
     if (a.box) await snap(raw, a.box);
     run('node', [slim, raw, done, '--tris', '100000000', '--tex', String(tex), '--meshopt']);
     fs.rmSync(raw);

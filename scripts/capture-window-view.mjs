@@ -99,9 +99,11 @@ try {
   await cam({ x: 2.6, y: 1.65, z: -0.6 }, { x: 0, y: 1.9, z: -9 });
   await shot('beside-gate-p0.png');
 
-  // parallax: the same view moved 2 m sideways
-  await cam({ x: spawn.x + 2, y: spawn.y, z: spawn.z }, windowLook);
-  await shot('spawn-plus2m.png');
+  // parallax: two views 2 m apart, west of the gate's plinth (x -2.5 to 2.5), looking at the window
+  await cam({ x: -5.5, y: 1.65, z: -0.4 }, windowLook);
+  await shot('parallax-a.png');
+  await cam({ x: -3.5, y: 1.65, z: -0.4 }, windowLook);
+  await shot('parallax-b.png');
 
   // a flash: wait for a burst to be lit, then shoot it at once
   if (!only || only === 'flash') {
@@ -125,7 +127,31 @@ try {
   await setView(0.5, 'full');
 
   const stats = await page.evaluate(() => window.__playScene.room.vista.stats());
-  console.log('vista stats (full):', JSON.stringify(stats));
+  console.log('vista stats (full, counted from the visible objects):', JSON.stringify(stats));
+  // the real draw calls and triangles: renderer.info around the vista's own draw, from the spawn view
+  await setView(0.5, 'full');
+  await cam(spawn, windowLook);
+  const measured = await page.evaluate(() => {
+    const ps = window.__playScene;
+    const r = ps.renderer;
+    const c = document.querySelector('canvas.play-canvas') ?? ps.renderer.domElement;
+    r.info.autoReset = false;
+    r.info.reset();
+    const drawn = ps.room.vista.render(r, ps.camera, c.clientWidth, c.clientHeight);
+    return { drawn, calls: r.info.render.calls, triangles: r.info.render.triangles };
+  });
+  console.log('vista renderer.info (full, spawn view):', JSON.stringify(measured));
+  await setView(0.5, 'lite');
+  const measuredLite = await page.evaluate(() => {
+    const ps = window.__playScene;
+    const r = ps.renderer;
+    const c = document.querySelector('canvas.play-canvas') ?? ps.renderer.domElement;
+    r.info.reset();
+    ps.room.vista.render(r, ps.camera, c.clientWidth, c.clientHeight);
+    return { calls: r.info.render.calls, triangles: r.info.render.triangles };
+  });
+  console.log('vista renderer.info (lite, spawn view):', JSON.stringify(measuredLite));
+  await setView(0.5, 'full');
   const errors = await page.evaluate(() => (window.__playScene ? 'ok' : 'no scene'));
   console.log('scene:', errors);
 } finally {

@@ -86,4 +86,4 @@ The context a new Opus session needs on its first message. Keep it current: upda
   - a fallback plane through the gate.
   
   The Haiku sidecar is working on it. If it stopped, re-dispatch TASK-19 with REVIEW 1 from the board.
-- The vista models: datacentre-hall, chiller-block, shipping-container and pylon-tower are posted. Overpass-segment and rubble-slab were running (job bgd3yzmzw). Then render the angles, pack, commit.
+- The vista models: five are packed (510f2314): hall, chiller (its own budgets, 1.5k low), container, pylon and overpass. rubble-slab was running (job bgd3yzmzw); when it lands, render the angles, then `node scripts/runworld-pack.mjs rubble-slab`, and commit.

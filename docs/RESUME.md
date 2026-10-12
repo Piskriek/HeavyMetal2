@@ -11,7 +11,7 @@ The context a new Opus session needs on its first message. Keep it current: upda
 - **Run it:**
   - `PLAY.bat` builds and serves http://localhost:8080.
   - `npm run typecheck`, `npm test` (the fieldkit and plotgrid timing tests fail on this laptop; known), `npm run build`, and `npm run e2e` (the playthrough).
-- **The 3D PC:** Hunyuan3D at 192.168.0.5:8082. The token is in `.local3d-token`; never print or commit it.
+- **The 3D PC:** Hunyuan3D at 192.168.0.9:8082 (changed from .0.5 on 2026-10-12). The token is in `.local3d-token`; never print or commit it.
   - Single image only. Multi-view crashes, so leave it OFF.
   - About 10 minutes per model, one job at a time.
 - **Images:** the RUN.world CLI (`docs/runworld` and memory note runworld-setup), about 120 credits per image, balance about 66.4k. Keep the voice reserve (RUNWORLD_FLOOR 16000).

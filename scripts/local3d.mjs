@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const BASE = process.env.LOCAL3D_URL ?? 'http://192.168.0.5:8082';
+const BASE = process.env.LOCAL3D_URL ?? 'http://192.168.0.9:8082';
 const OUT = path.join(ROOT, 'zips', 'runworld', 'assets');
 const tokenFile = path.join(ROOT, '.local3d-token');
 if (!fs.existsSync(tokenFile)) { console.log('missing .local3d-token (the pipeline\'s bearer token, one line)'); process.exit(2); }

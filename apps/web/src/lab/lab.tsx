@@ -31,7 +31,7 @@ export function LabHome(props: { readonly profile: Profile }): ReactElement {
     const device = deviceFor(tier), gridSpacing = low ? 1 : 0.5;
     let scene: LabScene;
     try {
-      scene = createLabScene({ canvas, gridSpacing, antialias: !low, powerPreference: powerPreferenceOf(props.profile.gpu), reducedMotion: reduced, textureSize: low ? 512 : 1024 });
+      scene = createLabScene({ canvas, gridSpacing, antialias: !low, powerPreference: powerPreferenceOf(props.profile.gpu), reducedMotion: reduced, textureSize: low ? 512 : 1024, windowView: resolveGraphics(tier, props.profile.graphics).windowView });
     } catch {
       setFailed(true);
       return undefined;

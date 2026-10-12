@@ -14,7 +14,7 @@ import * as kit from '@hm/labkit';
 import type { Box, Prop } from '@hm/labkit';
 import { operatorConsole as consoleMillOperatorConsole } from '@hm/consolemill';
 import { type GenLevel, genLevelFor, getGenSync, loadGen } from '../assets/gen';
-import { createLabVista, type LabVista, type WindowView } from './lab-vista';
+import { createLabVista, VISTA_LEVEL, type LabVista, type WindowView } from './lab-vista';
 
 export const ROOM = { left: -8, right: 8, back: -9, front: 3, height: 5 } as const;
 const WINDOW = { x0: -7.4, x1: 7.4, y0: 0.4, y1: 3.5 } as const;
@@ -284,6 +284,8 @@ export interface LabRoom {
   setStorm(progress: number): void;
   /** What the window shows (plan §9: Full, Lite or Static). */
   setWindowView(view: WindowView): void;
+  /** Shows the flat storm plane in the window's opening whatever the view (the planet seen through the gate: no hole, R8). */
+  setPlaneFallback(on: boolean): void;
   /** The view through the window: the 3D wasteland (drawn by the play scene before the lab, see lab-vista.ts). */
   readonly vista: LabVista;
   floorHeight(x: number, z: number): number;
@@ -431,7 +433,7 @@ export function createLabRoom(o: {
   const vista = createLabVista({
     view: o.windowView ?? 'full',
     window: { x0: WINDOW.x0, x1: WINDOW.x1, y0: WINDOW.y0, y1: WINDOW.y1, z: ROOM.back },
-    level: genLevel,
+    level: VISTA_LEVEL,
   });
   stormPlane.visible = vista.view === 'static';
   // Observation window glass
@@ -860,9 +862,15 @@ export function createLabRoom(o: {
     vista.setProgress(progress);
   };
   setStorm(0);
+  let planeFallback = false;
+  const syncPlane = (): void => { stormPlane.visible = planeFallback || vista.view === 'static'; };
   const setWindowView = (view: WindowView): void => {
     vista.setView(view);
-    stormPlane.visible = view === 'static';
+    syncPlane();
+  };
+  const setPlaneFallback = (on: boolean): void => {
+    planeFallback = on;
+    syncPlane();
   };
 
   const leverAt = desk.lever.getWorldPosition(new THREE.Vector3());
@@ -888,6 +896,7 @@ export function createLabRoom(o: {
     adoptGenerated,
     setStorm,
     setWindowView,
+    setPlaneFallback,
     vista,
     floorHeight,
     update(now, dt) {

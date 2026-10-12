@@ -6,7 +6,7 @@
 // - Goblin Racing: the goblin planet in deep space (docs/concept/setmix/05-menu-goblin-racing.png)
 import * as THREE from 'three';
 import { createLabRoom, GATE_AT, PLANET_TABLE_AT, preloadLabGenerated, type LabRoom } from '../play/lab-room';
-import { preloadVista } from '../play/lab-vista';
+import { preloadVista, VISTA_LEVEL, type WindowView } from '../play/lab-vista';
 import { genLevelFor } from '../assets/gen';
 import { createPlotHolo, type PlotHolo } from '../play/plot-holo';
 import type { PlotGround } from '../play/plot-ground';
@@ -212,6 +212,8 @@ export function createLabScene(o: {
   readonly powerPreference: WebGLPowerPreference;
   readonly reducedMotion: boolean;
   readonly textureSize: number;
+  /** What the window shows (the Graphics setting of the tier drawing; full by default). */
+  readonly windowView?: WindowView;
 }): LabScene {
   const renderer = new THREE.WebGLRenderer({ canvas: o.canvas, antialias: o.antialias, powerPreference: o.powerPreference });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -233,7 +235,7 @@ export function createLabScene(o: {
   }));
 
   const labScene = new THREE.Scene();
-  const room: LabRoom = createLabRoom({ textureSize: o.textureSize, portalMaterial: portalMat });
+  const room: LabRoom = createLabRoom({ textureSize: o.textureSize, portalMaterial: portalMat, windowView: o.windowView });
   labScene.add(room.group);
   // Dim lab where the open gate is the brightest thing (matches 04-menu-setmix.png)
   room.setPower({ relays: 1, pulse: 1, coils: 1, main: 0.35, emergency: 0, static: 0 });
@@ -308,7 +310,7 @@ export function createLabScene(o: {
 
     async preloadLabGenerated() {
       await preloadLabGenerated(genLevelFor('high')); // the room above is built at the default (high) quality
-      await preloadVista(genLevelFor('high'));
+      await preloadVista(VISTA_LEVEL);
       room.adoptGenerated();
     },
 

@@ -15,7 +15,7 @@ import { fx as sfx } from '../maker/feedback';
 import { gameAudio } from '../audio/game-audio';
 import * as kit from '@hm/labkit';
 import { createLabRoom, GATE_AT, PLANET_TABLE_AT, POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, preloadLabGenerated, ROOM, type LabRoom } from './lab-room';
-import { preloadVista, type WindowView } from './lab-vista';
+import { preloadVista, VISTA_LEVEL, type WindowView } from './lab-vista';
 import { createPlotHolo, type PlotHolo } from './plot-holo';
 import { COLOUR_MARK_FRAGMENT, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX } from './portal-shaders';
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
@@ -1895,9 +1895,12 @@ export function createPlayScene(o: {
           virtual.matrixWorld.decompose(virtual.position, virtual.quaternion, virtual.scale);
           virtual.updateMatrixWorld(true);
           room.gate.group.visible = false;
+          // seen from the planet through the gate, the window shows the flat storm plane (no hole in the lab's wall, R8)
+          room.setPlaneFallback(true);
           renderer.setRenderTarget(labRT);
           renderer.clear();
           renderer.render(labScene, virtual);
+          room.setPlaneFallback(false);
           room.gate.group.visible = true;
         }
         drawPlanet(camera, null, false);
@@ -2035,7 +2038,7 @@ export function createPlayScene(o: {
     },
     async preloadLabGenerated() {
       await preloadLabGenerated(genLevelFor(currentQuality));
-      await preloadVista(genLevelFor(currentQuality));
+      await preloadVista(VISTA_LEVEL);
       room.adoptGenerated();
     },
     warm() {

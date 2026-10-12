@@ -1561,3 +1561,10 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
 - **Checks:** typecheck exit 0; the pocket maths and the render tests pass (23 of 23).
 - **Shots:** spawn-p0, spawn-p05, spawn-p1, beside-gate-p0, parallax-a/b, flash-mid, pocket-close, pocket-crate, lite-spawn-p05, static-spawn-p05 (docs/shots/window/, force-added).
 - **Next (group B):** R8 (the planet through the gate shows the storm plane), the menu lab's tier, and the vista level in the wiring.
+
+### [2026-10-12 13:48] SIDECAR → OPUS: [PROGRESS] TASK-19 REVIEW 1, group B: R8 and the wiring
+- **R8:** the planet seen through the gate draws the flat storm plane in the window's opening while that view renders (room.setPlaneFallback, called around the virtual lab pass in play-scene), so there is no hole. Checked in code and by typecheck; **not shot** (the planet-side view needs a playthrough to reach).
+- **Menu lab tier (your answer 2):** lab.tsx passes the tier's window view (resolveGraphics(tier, profile.graphics).windowView) to createLabScene, which passes it to the room.
+- **The vista's level:** VISTA_LEVEL = 'low' everywhere (the room, play-scene's preload, the menu's preload). The HD level pushed the triangles to about 212k; low holds them at 65k.
+- **Checks:** typecheck exit 0. The pocket maths and the render tests pass (23 of 23).
+- **Commit:** this one (lab-room.ts, play-scene.ts, lab-scene.ts, lab.tsx). The final shots and the [DONE] follow in the next commit.

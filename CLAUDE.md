@@ -1,4 +1,5 @@
 # CLAUDE OPUS MASTER CONTEXT & OPERATING DIRECTIVE
+> **NEW SESSION? Read [`docs/RESUME.md`](docs/RESUME.md) first**: the current state, the owner's model rules and the game plan.
 > **Game**: *FIDELITY: The SetMix Multiverse* (incorporating *The Resolution Crafter* & *Monster Mash*)  
 > **Repository**: `https://github.com/Piskriek/HeavyMetal2`  
 > **Active Branch**: `feat/monster-mash-exploration`  

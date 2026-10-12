@@ -43,18 +43,24 @@ The context a new Opus session needs on its first message. Keep it current: upda
   - the Studio plan and briefs (TASK-17 and 18);
   - the four-angle review of every model, with the hidden sides fixed (ab224da5);
   - 14 rule-breaking models redone and packed (5a8c098f).
-- **Lab clutter props, accepted and waiting to pack:** crate-large, crate-small, cardboard-stack, filing-cabinet, server-rack, locker, toolbox, coolant-can, sample-case, plus old-monitor (still modelling when this was written).
-- **Dropped** (`hold` set): crate-stack-sheet, machine-under-sheet, fallen-panels, parts-bin.
+- **10 lab clutter props, packed and pushed (fa3395fb):** crate-large, crate-small, cardboard-stack, filing-cabinet, server-rack, locker, toolbox, coolant-can, sample-case and old-monitor. The re-baked operator-console and preset-bench lows went in with them. **They are not yet placed in the lab.**
+- **Dropped** (`hold` set): crate-stack-sheet, machine-under-sheet, fallen-panels and parts-bin. The owner's rule: no cloth, no heaps.
 - **lod-bake.py, fixed today:**
   - a ray miss fills with the model's colour instead of black;
-  - `--reach`;
-  - every material is de-metalled for the colour bake, because the plain-back lows baked black.
-  - **Check:** the operator-console, preset-bench and server-rack lows need re-baking and packing (a job was running).
+  - `--reach` (`reach` in the manifest);
+  - every material is de-metalled for the colour bake, because the plain-back lows had baked black.
+- **The window scene:** the plan is `docs/WINDOW_SCENE_PLAN.md` and the brief `docs/prompts/sidecar/19-window-scene.md` (TASK-19, not yet dispatched).
+- **Six vista pieces:** datacentre-hall, chiller-block, shipping-container, pylon-tower, overpass-segment and rubble-slab.
+  - Images approved; the models were running on the 3D PC.
+  - **If they are not packed yet:** for each id, check that `zips/runworld/assets/<id>/low.glb` exists (if not, `node scripts/local3d.mjs model <id>`, then `node scripts/runworld-post.mjs <id>`). Then render the angles, review, `node scripts/runworld-pack.mjs <ids>`, and commit.
 - **TASK-17 (Studio shell) is PAUSED.** Its WIP is in `zips/studio-wip-2026-10-12/`: `git apply tracked.patch`, then copy the files back.
 
 ## 5. The game plan, in order
 1. **Finish the props:** pack the accepted ids above and commit the gen and hd folders. Wiring them into the lab as clearable clutter (clear one to free floor for a machine, and it yields salvage) is a brief still to write.
-2. **The window scene (the owner's current ask):** the plan is `docs/WINDOW_SCENE_PLAN.md` and the brief `docs/prompts/sidecar/19-window-scene.md`. Its outside props go through the pipeline (`class: vista` in the manifest).
+2. **The window scene (the owner's current ask, top priority):**
+   - Pack the vista pieces.
+   - Dispatch TASK-19 to a Haiku sidecar, or build steps 1 and 2 yourself if they need the architect: the vista render pass and the S-space pocket shader are the risky parts.
+   - Review the shots against plan §3 (composition) and §9 (budget).
 3. **The Studio:** resume TASK-17 from the zip, then TASK-18 (the asset bench and one-click redo; the weapon bench is the test case).
 4. **Smaller items:**
    - Turn on `USE_MODULAR_SCOUT` once the aerial is raycast onto the shell and the packed yoke shows.

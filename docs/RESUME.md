@@ -102,3 +102,6 @@ The context a new Opus session needs on its first message. Keep it current: upda
   - The dust motes should be about 2× bigger.
   - R8 (the planet side through the gate) needs a shot.
   - Frame time on the GTX 950M is still unmeasured.
+- **Overnight failures** (redo next session):
+  - generator-small-a; server-crate-a/b (no image or model; they hit the IP change);
+  - barrier-block-a/b: the model is there, but the low bake wrote no low-raw.glb. Try `runworld-post.mjs <id>` with `budgets` raised, or `lowInPlace`.

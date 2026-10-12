@@ -6,6 +6,7 @@
 // - Goblin Racing: the goblin planet in deep space (docs/concept/setmix/05-menu-goblin-racing.png)
 import * as THREE from 'three';
 import { createLabRoom, GATE_AT, PLANET_TABLE_AT, preloadLabGenerated, type LabRoom } from '../play/lab-room';
+import { preloadVista } from '../play/lab-vista';
 import { genLevelFor } from '../assets/gen';
 import { createPlotHolo, type PlotHolo } from '../play/plot-holo';
 import type { PlotGround } from '../play/plot-ground';
@@ -307,6 +308,7 @@ export function createLabScene(o: {
 
     async preloadLabGenerated() {
       await preloadLabGenerated(genLevelFor('high')); // the room above is built at the default (high) quality
+      await preloadVista(genLevelFor('high'));
       room.adoptGenerated();
     },
 
@@ -349,6 +351,8 @@ export function createLabScene(o: {
       renderer.info.autoReset = false;
       renderer.info.reset();
       renderer.clear();
+      // the view through the window first (lab-vista.ts), then the lab over it after a depth clear (autoClear is off here)
+      if (room.vista.render(renderer, camera, o.canvas.clientWidth || o.canvas.width, o.canvas.clientHeight || o.canvas.height)) renderer.clearDepth();
       renderer.render(labScene, camera);
     },
 

@@ -59,3 +59,10 @@ test('the pixel lights: off on potato, low, medium and high, on on ultra; your o
   assert.equal(resolveGraphics('low', { pixelLights: true }).pixelLights, true);
   assert.equal(resolveGraphics('ultra', { pixelLights: false }).pixelLights, false);
 });
+
+test('the window view: static on potato, lite on low, full from medium up; your own choice wins; junk is ignored', () => {
+  assert.deepEqual(['potato', 'low', 'medium', 'high', 'ultra'].map((x) => GRAPHICS_TIERS[x as 'low'].windowView), ['static', 'lite', 'full', 'full', 'full']);
+  assert.equal(resolveGraphics('ultra', { windowView: 'static' }).windowView, 'static');
+  assert.equal(resolveGraphics('high', { windowView: 'lite' }).windowView, 'lite');
+  assert.equal(resolveGraphics('high', { windowView: 'fancy' }).windowView, 'full', 'an unknown view is junk');
+});

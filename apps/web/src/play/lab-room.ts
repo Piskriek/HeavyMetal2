@@ -14,6 +14,7 @@ import * as kit from '@hm/labkit';
 import type { Box, Prop } from '@hm/labkit';
 import { operatorConsole as consoleMillOperatorConsole } from '@hm/consolemill';
 import { type GenLevel, genLevelFor, getGenSync, loadGen } from '../assets/gen';
+import { createLabVista, type LabVista, type WindowView } from './lab-vista';
 
 export const ROOM = { left: -8, right: 8, back: -9, front: 3, height: 5 } as const;
 const WINDOW = { x0: -7.4, x1: 7.4, y0: 0.4, y1: 3.5 } as const;
@@ -279,7 +280,12 @@ export interface LabRoom {
   setPower(p: Power): void;
   /** Puts the generated models in place of the labkit fallbacks for every piece that is loaded now (call again after a preload). */
   adoptGenerated(): void;
+  /** The storm as progress 0 to 1 (the flat picture in Static; the vista's progress in Full and Lite). */
   setStorm(progress: number): void;
+  /** What the window shows (plan §9: Full, Lite or Static). */
+  setWindowView(view: WindowView): void;
+  /** The view through the window: the 3D wasteland (drawn by the play scene before the lab, see lab-vista.ts). */
+  readonly vista: LabVista;
   floorHeight(x: number, z: number): number;
   update(now: number, dt: number): void;
   dispose(): void;
@@ -289,6 +295,8 @@ export function createLabRoom(o: {
   readonly textureSize: number;
   readonly portalMaterial: THREE.Material;
   readonly quality?: 'low' | 'medium' | 'high' | string;
+  /** The window's view (the Graphics setting): full by default. */
+  readonly windowView?: WindowView;
 }): LabRoom {
   const genLevel: GenLevel = genLevelFor(o.quality ?? 'high');
   const group = new THREE.Group();
@@ -418,7 +426,14 @@ export function createLabRoom(o: {
     uniforms: stormUniforms,
     toneMapped: false,
   }));
-  add(new THREE.PlaneGeometry(50, 24), stormMat, (p) => { p.position.set(wx, wy + 2.0, ROOM.back - 8.0); });
+  const stormPlane = add(new THREE.PlaneGeometry(50, 24), stormMat, (p) => { p.position.set(wx, wy + 2.0, ROOM.back - 8.0); });
+  // The 3D view outside the window (lab-vista.ts). The flat storm plane stays only in Static.
+  const vista = createLabVista({
+    view: o.windowView ?? 'full',
+    window: { x0: WINDOW.x0, x1: WINDOW.x1, y0: WINDOW.y0, y1: WINDOW.y1, z: ROOM.back },
+    level: genLevel,
+  });
+  stormPlane.visible = vista.view === 'static';
   // Observation window glass
   add(new THREE.PlaneGeometry(ww, wh), m.glass, (p) => { p.position.set(wx, wy, ROOM.back + 0.02); });
 
@@ -842,8 +857,13 @@ export function createLabRoom(o: {
 
   const setStorm = (progress: number): void => {
     stormUniforms.uStorm.value = Math.max(0, Math.min(1, progress));
+    vista.setProgress(progress);
   };
   setStorm(0);
+  const setWindowView = (view: WindowView): void => {
+    vista.setView(view);
+    stormPlane.visible = view === 'static';
+  };
 
   const leverAt = desk.lever.getWorldPosition(new THREE.Vector3());
   /** Swaps in the generated models that are loaded now, then re-applies the power state to their lamps. */
@@ -851,6 +871,7 @@ export function createLabRoom(o: {
     swaps = swaps.filter((run) => !run());
     desk.lever.getWorldPosition(leverAt);
     setPower(lastPower);
+    vista.adoptGenerated();
   };
   adoptGenerated(); // a model loaded by an earlier visit is used at once; the rest wait for the preload
 
@@ -866,12 +887,18 @@ export function createLabRoom(o: {
     setPower,
     adoptGenerated,
     setStorm,
+    setWindowView,
+    vista,
     floorHeight,
-    update(now) {
+    update(now, dt) {
       pulseUniforms.uTime.value = now;
       stormUniforms.uTime.value = now;
+      vista.update(now, dt);
+      // the bursts flash the window light, capped: the floor lights up, the room never whites out
+      windowLight.intensity = 3.5 + 6 * vista.flashLight;
     },
     dispose() {
+      vista.dispose();
       for (const x of owned) x.dispose();
       group.traverse((o) => {
         const mesh = o as THREE.Mesh;

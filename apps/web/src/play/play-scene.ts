@@ -15,6 +15,7 @@ import { fx as sfx } from '../maker/feedback';
 import { gameAudio } from '../audio/game-audio';
 import * as kit from '@hm/labkit';
 import { createLabRoom, GATE_AT, PLANET_TABLE_AT, POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, preloadLabGenerated, ROOM, type LabRoom } from './lab-room';
+import { preloadVista, type WindowView } from './lab-vista';
 import { createPlotHolo, type PlotHolo } from './plot-holo';
 import { COLOUR_MARK_FRAGMENT, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX } from './portal-shaders';
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
@@ -97,6 +98,8 @@ export interface Detail {
   readonly plumeGlow: boolean;
   /** Pouring pixels cast dynamic light on their surroundings (Ultra only). */
   readonly pixelLights: boolean;
+  /** What the lab window shows (full: the 3D wasteland; lite: fewer parts; static: the flat storm picture). */
+  readonly windowView: WindowView;
 }
 
 const EYE = 1.68, RADIUS = 0.3, WALK = 3.0, RUN = 5.6;
@@ -257,8 +260,16 @@ export function createPlayScene(o: {
   const openingUniforms = { uView: { value: viewRT.texture as THREE.Texture }, uScreen: { value: screen }, uStatic: { value: 1 }, uTime: { value: 0 } };
   const openingMat = keep(new THREE.ShaderMaterial({ vertexShader: OPENING_VERTEX, fragmentShader: OPENING_FRAGMENT, uniforms: openingUniforms, side: THREE.DoubleSide }));
   const labScene = new THREE.Scene();
-  const room: LabRoom = createLabRoom({ textureSize: o.textureSize, portalMaterial: openingMat, quality: currentQuality });
+  const room: LabRoom = createLabRoom({ textureSize: o.textureSize, portalMaterial: openingMat, quality: currentQuality, windowView: o.detail.windowView });
   labScene.add(room.group);
+  // a burst of static (lab-vista.ts) is heard after its distance divided by the speed of sound
+  let sceneAlive = true;
+  room.vista.flash.onFlash((e) => {
+    const dist = Math.hypot(e.x - camera.position.x, e.z - camera.position.z);
+    setTimeout(() => {
+      if (sceneAlive) gameAudio.play3d('sfx-storm', { x: e.x, y: 40, z: e.z }, { volume: 0.2 + 0.5 * e.strength, maxDistance: 4000 });
+    }, (dist / 343) * 1000);
+  });
   const holo: PlotHolo = createPlotHolo();
   room.group.add(holo.group);
   holo.group.position.set(PLANET_TABLE_AT.x, 0, PLANET_TABLE_AT.z);
@@ -1872,7 +1883,12 @@ export function createPlayScene(o: {
         }
         renderer.setRenderTarget(null);
         renderer.clear();
+        // the view through the window first (its own scissor), then the lab over it after a depth clear
+        const viewDrawn = room.vista.render(renderer, camera, o.canvas.clientWidth || o.canvas.width, o.canvas.clientHeight || o.canvas.height);
+        renderer.autoClear = false;
+        if (viewDrawn) renderer.clearDepth();
         renderer.render(labScene, camera);
+        renderer.autoClear = true;
       } else {
         if (gateOn && visible(twinOpening, camera)) {
           virtual.matrixWorld.copy(camera.matrixWorld).premultiply(toLab);
@@ -1987,6 +2003,7 @@ export function createPlayScene(o: {
     },
     setDetail(d) {
       detail = d;
+      room.setWindowView(d.windowView);
       fitLooks();
       ground?.setBudget(d.groundBudget);
       plume.setMode(d.plumes);
@@ -2018,6 +2035,7 @@ export function createPlayScene(o: {
     },
     async preloadLabGenerated() {
       await preloadLabGenerated(genLevelFor(currentQuality));
+      await preloadVista(genLevelFor(currentQuality));
       room.adoptGenerated();
     },
     warm() {
@@ -2163,6 +2181,7 @@ export function createPlayScene(o: {
       groundHeight: (x, z) => groundAt(x, z),
     },
     dispose() {
+      sceneAlive = false;
       scientistAnimator?.dispose();
       labScene.remove(scientistHolder);
       planetScene.remove(scientistHolder);

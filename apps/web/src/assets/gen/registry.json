@@ -18,9 +18,9 @@
   "hauler-body": {
     "class": "rover-body",
     "size": [
-      2.867,
-      2.936,
-      6.002
+      2.579,
+      2.321,
+      5.998
     ]
   },
   "hauler-wheel": {
@@ -54,17 +54,17 @@
   "crawler-arm": {
     "class": "moving-part",
     "size": [
-      1.597,
-      0.786,
-      0.474
+      1.6,
+      0.35,
+      0.238
     ]
   },
   "fabricator-frame": {
     "class": "machine",
     "size": [
-      7.492,
-      4.997,
-      6.499
+      6.369,
+      4.998,
+      6.363
     ]
   },
   "fabricator-head": {
@@ -78,65 +78,65 @@
   "mill": {
     "class": "machine",
     "size": [
-      3.81,
-      4,
-      3.879
+      4.008,
+      3.998,
+      4.004
     ]
   },
   "press-frame": {
     "class": "machine",
     "size": [
-      3.446,
-      4,
-      3.437
+      3.999,
+      4.001,
+      3.839
     ]
   },
   "press-ram": {
     "class": "moving-part",
     "size": [
-      0.995,
+      1.239,
       1.8,
-      0.492
+      1.068
     ]
   },
   "projector-mast": {
     "class": "machine",
     "size": [
-      2.325,
-      3.199,
-      2.383
+      2.865,
+      3.2,
+      2.898
     ]
   },
   "projector-head": {
     "class": "moving-part",
     "size": [
-      1.997,
-      2.007,
-      1.521
+      1.999,
+      1.478,
+      1.38
     ]
   },
   "watermaker": {
     "class": "machine",
     "size": [
-      5.9,
-      4,
-      4.594
+      7.737,
+      3.998,
+      6.301
     ]
   },
   "bin": {
     "class": "fixture",
     "size": [
-      2,
-      2.004,
-      1.995
+      1.999,
+      1.949,
+      1.997
     ]
   },
   "repeater": {
     "class": "fixture",
     "size": [
-      3.412,
-      5.998,
-      3.092
+      2.466,
+      6,
+      2.445
     ]
   },
   "drafting": {
@@ -215,8 +215,8 @@
     "class": "weapon-part",
     "size": [
       0.3,
-      0.145,
-      0.071
+      0.14,
+      0.127
     ]
   },
   "sight-holo": {
@@ -239,8 +239,8 @@
     "class": "weapon-part",
     "size": [
       0.28,
-      0.062,
-      0.091
+      0.077,
+      0.099
     ]
   },
   "wall": {
@@ -548,9 +548,9 @@
   "life-support": {
     "class": "fixture",
     "size": [
-      1.355,
-      2,
-      0.882
+      1.193,
+      1.999,
+      1.02
     ]
   },
   "scout-shell": {

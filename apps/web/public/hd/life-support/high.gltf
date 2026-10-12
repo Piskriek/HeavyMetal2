@@ -13,35 +13,35 @@
       "bufferView": 0
     },
     {
-      "type": "VEC2",
-      "componentType": 5126,
-      "count": 6893,
-      "normalized": false,
+      "type": "VEC3",
+      "componentType": 5122,
+      "count": 7883,
+      "max": [
+        19558,
+        32767,
+        16722
+      ],
+      "min": [
+        -19558,
+        -32767,
+        -16722
+      ],
+      "normalized": true,
       "byteOffset": 0,
       "bufferView": 1
     },
     {
       "type": "VEC3",
       "componentType": 5122,
-      "count": 6893,
-      "max": [
-        22202,
-        32767,
-        14445
-      ],
-      "min": [
-        -22202,
-        -32767,
-        -14445
-      ],
+      "count": 7883,
       "normalized": true,
       "byteOffset": 0,
       "bufferView": 2
     },
     {
-      "type": "VEC3",
-      "componentType": 5122,
-      "count": 6893,
+      "type": "VEC2",
+      "componentType": 5123,
+      "count": 7883,
       "normalized": true,
       "byteOffset": 0,
       "bufferView": 3
@@ -49,7 +49,7 @@
     {
       "type": "VEC4",
       "componentType": 5122,
-      "count": 6893,
+      "count": 7883,
       "normalized": true,
       "byteOffset": 0,
       "bufferView": 4
@@ -65,7 +65,7 @@
         "EXT_meshopt_compression": {
           "buffer": 0,
           "byteOffset": 0,
-          "byteLength": 6346,
+          "byteLength": 6234,
           "mode": "TRIANGLES",
           "byteStride": 2,
           "count": 18000
@@ -75,68 +75,68 @@
     {
       "buffer": 1,
       "byteOffset": 36000,
-      "byteLength": 55144,
+      "byteLength": 63064,
       "target": 34962,
       "byteStride": 8,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 6348,
-          "byteLength": 41113,
+          "byteOffset": 6236,
+          "byteLength": 37261,
           "mode": "ATTRIBUTES",
           "byteStride": 8,
-          "count": 6893
+          "count": 7883
         }
       }
     },
     {
       "buffer": 1,
-      "byteOffset": 91144,
-      "byteLength": 55144,
+      "byteOffset": 99064,
+      "byteLength": 63064,
       "target": 34962,
       "byteStride": 8,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 47464,
-          "byteLength": 33182,
+          "byteOffset": 43500,
+          "byteLength": 46854,
           "mode": "ATTRIBUTES",
           "byteStride": 8,
-          "count": 6893
+          "count": 7883
         }
       }
     },
     {
       "buffer": 1,
-      "byteOffset": 146288,
-      "byteLength": 55144,
+      "byteOffset": 162128,
+      "byteLength": 31532,
       "target": 34962,
-      "byteStride": 8,
+      "byteStride": 4,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 80648,
-          "byteLength": 41015,
+          "byteOffset": 90356,
+          "byteLength": 25428,
           "mode": "ATTRIBUTES",
-          "byteStride": 8,
-          "count": 6893
+          "byteStride": 4,
+          "count": 7883
         }
       }
     },
     {
       "buffer": 1,
-      "byteOffset": 201432,
-      "byteLength": 55144,
+      "byteOffset": 193660,
+      "byteLength": 63064,
       "target": 34962,
       "byteStride": 8,
       "extensions": {
         "EXT_meshopt_compression": {
           "buffer": 0,
-          "byteOffset": 121664,
-          "byteLength": 42313,
+          "byteOffset": 115784,
+          "byteLength": 48563,
           "mode": "ATTRIBUTES",
           "byteStride": 8,
-          "count": 6893
+          "count": 7883
         }
       }
     }
@@ -182,10 +182,10 @@
   "buffers": [
     {
       "uri": "high.bin",
-      "byteLength": 163980
+      "byteLength": 164348
     },
     {
-      "byteLength": 256576,
+      "byteLength": 256724,
       "extensions": {
         "EXT_meshopt_compression": {
           "fallback": true
@@ -210,13 +210,13 @@
   ],
   "meshes": [
     {
-      "name": "tmpt6xxm9sp.ply.001",
+      "name": "tmp9c1ucx8j.ply.001",
       "primitives": [
         {
           "attributes": {
-            "TEXCOORD_0": 1,
-            "POSITION": 2,
-            "NORMAL": 3,
+            "POSITION": 1,
+            "NORMAL": 2,
+            "TEXCOORD_0": 3,
             "TANGENT": 4
           },
           "mode": 4,
@@ -230,14 +230,14 @@
     {
       "name": "low",
       "translation": [
-        0.00018262863159179688,
-        1.0000578183462494,
-        -0.000311926007270813
+        -0.000027418136596679688,
+        0.9995922108100785,
+        -0.0000661015510559082
       ],
       "scale": [
-        0.9998298865029938,
-        0.9998298865029938,
-        0.9998298865029938
+        0.9996918181968795,
+        0.9996918181968795,
+        0.9996918181968795
       ],
       "mesh": 0
     }

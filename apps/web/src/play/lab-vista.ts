@@ -291,14 +291,14 @@ ${NOISE_GLSL}
 void main() {
   vec3 d = normalize(vDir);
   float up = clamp(d.y, 0.0, 1.0);
-  vec3 stormHorizon = vec3(0.30, 0.26, 0.33), stormZenith = vec3(0.07, 0.07, 0.11);
+  vec3 stormHorizon = vec3(0.13, 0.12, 0.15), stormZenith = vec3(0.025, 0.025, 0.04);
   vec3 duskHorizon = vec3(0.92, 0.52, 0.30), duskZenith = vec3(0.17, 0.18, 0.32);
   vec3 col = mix(mix(stormHorizon, duskHorizon, uDusk), mix(stormZenith, duskZenith, uDusk), pow(up, 0.6));
   vec2 cuv = d.xz / (d.y + 0.12) * 0.9 + vec2(uTime * 0.012, 0.0);
   float cl = smoothstep(0.42, 0.78, vfbm(cuv * 1.6));
   col = mix(col, col * 0.55 + vec3(0.05, 0.05, 0.07), cl * (1.0 - uDusk * 0.5) * 0.8);
-  float glow = pow(max(dot(d, normalize(uBreachDir)), 0.0), 10.0);
-  col += vec3(0.35, 0.85, 1.0) * glow * uGlow * 0.7;
+  float glow = pow(max(dot(d, normalize(uBreachDir)), 0.0), 90.0);
+  col += vec3(0.35, 0.85, 1.0) * glow * uGlow * 0.6;
   float fl = pow(max(dot(d, normalize(uFlashDir)), 0.0), 6.0);
   col += vec3(0.8, 0.95, 1.0) * fl * uFlash * 0.5;
   gl_FragColor = vec4(col, 1.0);
@@ -372,7 +372,7 @@ varying vec2 vUv;
 varying float vA;
 void main() {
   float r = length(vUv - 0.5) * 2.0;
-  float a = (1.0 - smoothstep(0.4, 1.0, r)) * vA * 0.5;
+  float a = (1.0 - smoothstep(0.4, 1.0, r)) * vA * 0.35;
   gl_FragColor = vec4(vec3(0.66, 0.6, 0.5), a);
 }
 `;
@@ -519,9 +519,9 @@ export function createLabVista(o: LabVistaOptions): LabVista {
   const keep = <T extends { dispose(): void }>(x: T): T => { owned.push(x); return x; };
 
   // ---- Lights: a cold hemisphere, and the Breach as the key light (cyan-white) that rim-lights the silhouettes
-  scene.add(new THREE.HemisphereLight('#7d8594', '#2b2622', 1.1));
+  scene.add(new THREE.HemisphereLight('#7d8594', '#2b2622', 0.55));
   const sunDir = new THREE.Vector3(BREACH[0] - SPAWN[0], 260, BREACH[1] - SPAWN[1]).normalize();
-  const key = new THREE.DirectionalLight('#bfe9ff', 1.6);
+  const key = new THREE.DirectionalLight('#bfe9ff', 0.9);
   key.position.copy(sunDir).multiplyScalar(400);
   key.target.position.set(SPAWN[0], 0, SPAWN[1]);
   scene.add(key, key.target);
@@ -548,8 +548,8 @@ export function createLabVista(o: LabVistaOptions): LabVista {
   const apronTex = keep(crack.clone());
   apronTex.repeat.set(10, 5);
   groundTex.needsUpdate = apronTex.needsUpdate = true;
-  const groundMat = keep(new THREE.MeshStandardMaterial({ map: groundTex, roughness: 0.92, metalness: 0, color: '#8a8478' }));
-  const apronMat = keep(new THREE.MeshStandardMaterial({ map: apronTex, roughness: 0.8, metalness: 0, color: '#9d9890' }));
+  const groundMat = keep(new THREE.MeshStandardMaterial({ map: groundTex, roughness: 0.92, metalness: 0, color: '#5f5a53' }));
+  const apronMat = keep(new THREE.MeshStandardMaterial({ map: apronTex, roughness: 0.8, metalness: 0, color: '#6e6a63' }));
   patchMaterial(groundMat, shared);
   patchMaterial(apronMat, shared);
   const groundGeo = keep(new THREE.PlaneGeometry(GROUND * 2, GROUND * 2, GRID, GRID));
@@ -604,8 +604,8 @@ export function createLabVista(o: LabVistaOptions): LabVista {
 
   // ---- The Breach: a square column, glitch-sliced, that rises from the split main hall into the clouds
   const breachU = { uTime: { value: 0 }, uH: { value: 1 }, uGlow: { value: 1 } };
-  const breachGeo = keep(new THREE.BoxGeometry(70, 600, 70));
-  breachGeo.translate(0, 300, 0);
+  const breachGeo = keep(new THREE.BoxGeometry(150, 900, 150));
+  breachGeo.translate(0, 450, 0);
   const breach = new THREE.Mesh(breachGeo, keep(new THREE.ShaderMaterial({
     vertexShader: BREACH_VERT, fragmentShader: BREACH_FRAG, uniforms: breachU, toneMapped: false,
   })));
@@ -698,8 +698,8 @@ export function createLabVista(o: LabVistaOptions): LabVista {
   }));
   const shells = new THREE.InstancedMesh(keep(new THREE.SphereGeometry(1, 40, 24)), shellMat, MAX_POCKETS);
   shells.frustumCulled = false;
-  for (let i = 0; i < MAX_POCKETS; i++) shells.setColorAt(i, new THREE.Color(...POCKET_KINDS[i % POCKET_KINDS.length]!.sky));
-  if (shells.instanceColor) shells.instanceColor.needsUpdate = true;
+  const SKY_COLOURS = POCKET_KINDS.map((k) => new THREE.Color(...k.sky));
+  for (let i = 0; i < MAX_POCKETS; i++) shells.setColorAt(i, SKY_COLOURS[0]!);
   scene.add(shells);
 
   // ---- The dust: 900 motes, advected on the GPU (one draw call); the lite view draws half
@@ -719,7 +719,7 @@ export function createLabVista(o: LabVistaOptions): LabVista {
       seedArr[i * 4 + 1] = 0.5 + r() * 9;
       seedArr[i * 4 + 2] = WALL_Z - 4 - [6, 26, 60][band]! * (0.6 + r());
       seedArr[i * 4 + 3] = r();
-      sizeArr[i] = [0.5, 0.9, 1.6][band]! * (0.7 + 0.6 * r());
+      sizeArr[i] = [0.18, 0.3, 0.55][band]! * (0.7 + 0.6 * r());
     }
   }
   moteGeo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seedArr, 4));
@@ -778,7 +778,7 @@ export function createLabVista(o: LabVistaOptions): LabVista {
   const strikeBolt = (e: BurstEvent): void => {
     const r = mulberry32(Math.floor(e.t * 1000) + 17);
     const pos = boltGeo.attributes.position as THREE.BufferAttribute;
-    const top = 620, halfW = 4 + 3 * e.strength;
+    const top = 900, halfW = 6 + 4 * e.strength;
     for (let i = 0; i <= BOLT_STEPS; i++) {
       const f = i / BOLT_STEPS;
       const y = top * (1 - f);
@@ -926,8 +926,10 @@ export function createLabVista(o: LabVistaOptions): LabVista {
       shared.uPocketTint.value[i]!.set(kind.tint[0], kind.tint[1], kind.tint[2]);
       const sc = Math.max(pf.radius, 0.001);
       shells.setMatrixAt(i, tmpM.compose(tmpP.set(pf.centre[0], pf.centre[1] + 0.5, pf.centre[2]), IDENTITY_Q, tmpS.set(sc, sc, sc)));
+      shells.setColorAt(i, SKY_COLOURS[pf.kind]!);
     }
     shells.instanceMatrix.needsUpdate = true;
+    if (shells.instanceColor) shells.instanceColor.needsUpdate = true;
     updateFlyers(t);
   };
 
@@ -942,7 +944,9 @@ export function createLabVista(o: LabVistaOptions): LabVista {
     const w = o.window;
     for (const [x, y] of [[w.x0, w.y0], [w.x1, w.y0], [w.x1, w.y1], [w.x0, w.y1]] as const) {
       tmpV.set(x, y, w.z).applyMatrix4(lab.matrixWorldInverse);
-      if (tmpV.z >= -0.05) return null; // a corner behind the camera: the window is not in view
+      // a corner behind the camera (the lab camera close to the glass, turned to one side): the screen cannot be clipped to the
+      // window, so the view covers the whole screen; the walls still cover everything outside the window's opening
+      if (tmpV.z >= -0.05) return { x: 0, y: 0, w: width, h: height };
       tmpV.set(x, y, w.z).project(lab);
       pts.push({ x: ((tmpV.x + 1) / 2) * width, y: ((1 - tmpV.y) / 2) * height });
     }

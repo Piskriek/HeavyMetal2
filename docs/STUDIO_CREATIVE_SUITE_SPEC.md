@@ -191,3 +191,57 @@ Every phase works the same way:
 5. **AI assistant:** in S5. It needs a server and its costs settled with RUN. Until then, a built-in help layer: every preset and parameter explains itself in place, searchable.
 
 The owner can change any of these at a word; they are recorded in `docs/OWNER_ASKS.md`.
+
+## 8. Update, 2026-10-12: what exists, new research, and the order
+**The owner (2026-10-12, verbatim):** "the studio is the one stop shop with the latest and greatest most favoured editing tools in the industry, its should be easy to use with loads of presets and depth so the player can build games from the example were building ... there is already code lying around for those tools we can use, someone also cloned the whole entire adobe suite using "you"(opus 5.5) and made it opensource a week ago so there are no excuses". Asked who it is for now: "Me first, players later".
+
+**Why now:** the game is full of generated models (70 packed) that need touch-ups: a size, a position, a colour, a part that floats. Today the only way to touch one up is a session with Claude. The Studio is how the owner does it himself.
+
+### 8a. What exists (inventory, 2026-10-12)
+- **The S0 modules are landed:** `@hm/scenedoc` (849 lines: the document, selection, a command stack with undo) and `@hm/presetcodec` (541 lines). They are not wired to any UI yet.
+- **Tool packages ready to surface:**
+  - `gizmo` (move, rotate, scale);
+  - `particles`, `plume`, `tooljuice` (VFX);
+  - `keyframes`, `camtrack` (timeline, cameras);
+  - `lightplace` (light placement);
+  - `texgraph` (1,311 lines: texture graphs), `vault` (50 material presets), `decals`;
+  - terrain: `plotterrain`, `terrain`, `terrainops`, `erosion`, `groundshader`, `coverage`, `hydro`;
+  - `treegen`, `flora`;
+  - props: `labkit`, `fieldkit`, `consolemill`, `smoothvox`, `remesh`, `hull`, `schematic`, `primitives`;
+  - characters: `puppet`, `ragdoll`, `kinematic`, `toolanims`;
+  - logic: `questline`, `machines`, `market`, `plotsim`, `npcbrain`, `navgrid`;
+  - audio: `musicbox`, plus the new `narrator` and audio engine.
+- **Dev pages to fold in:** `/glb.html` (model viewer), `/gallery.html` (vehicle assembly), `/audio.html` (sound audition and levels), `/radio.html` (the mentor mix).
+- **The generated-asset pipeline** (RUNWORLD_PIPELINE.md) is scriptable end to end: images, the local 3D model, levels, pack.
+- **Still to build:** the editor shell itself, write-back to the project, and every workspace UI. The current `studio-screen.tsx` is a prototype: its sliders drive only its own preview and save nothing.
+
+### 8b. New research (2026-10-12)
+- **Write-back is what makes a tuning tool worth using.**
+  - Unreal's Hot Tuner sends tuned values back to the editor as a diff grouped by object, which you accept or reject row by row ([Hot Tuner](https://forums.unrealengine.com/t/gdworks-hot-tuner/2745106)).
+  - Godot's GDTuner "Bake to Source" rewrites the defaults in the source files ([GDTuner](https://www.godotengine.org/asset-library/asset/4969)).
+  - Panels that only change values while the game runs, or save to player prefs, never reach the project ([Runtime Debug Panel](https://dmykytenko.itch.io/runtime-debug-panel-for-unity)).
+  - **Ours:** every Studio edit is a command on the `scenedoc` stack. A **Changes** panel lists the pending diff, grouped by object; accept per row, then it is written into the project's preset JSON through a dev-only endpoint. No hand-editing code.
+- **Edit in place, then share the build.**
+  - Space Engineers 2's official editor has dynamic gizmo transforms, block templates, auto-generated mount points and Blender integration ([Space Engineers 2 modding](https://gamespress.westeu-v2.propressroom.com/Space-Engineers-2-receives-Modding-Support-with-Vertical-Slice-15)).
+  - Valheim's most praised building mods move a placed piece along x, y and z after placing it, and save a build as a shareable blueprint ([PlanBuild](https://github.com/sirskunkalot/PlanBuild), [Windows Central](https://windowscentral.com/best-valheim-mods-every-viking-should-try)).
+- **AI-generated models get touched up in three layers:** clean up and fit, an AI retexture pass for the overall look, then hand fixes in Blender or Substance for the hard cases. Dense AI meshes and fragmented UVs are the known debt ([3D AI Studio on texturing](https://www.3daistudio.com/blog/best-ai-texture-and-pbr-generators-2026), [on Blender](https://www.3daistudio.com/blog/best-ai-tools-for-blender-2026), [Ludo.ai](https://ludo.ai/compare/best-ai-game-makers)). Our pipeline already handles the debt (soft baked cages); the Studio adds the three layers.
+- **AI inside the editor is now expected.** Roblox Studio's Assistant writes Luau and edits scenes; Unity's assistant reads the project; the Babylon.js Editor exposes an MCP so agents drive the live scene. Creators find packaged AI output weak, and experienced developers use a coding agent driving a real engine ([Ludo.ai](https://ludo.ai/compare/best-ai-game-makers), [Ropilot](https://ropilot.ai/blog/best-ai-game-builders), [Babylon.js Editor](https://editor.babylonjs.com/documentation)).
+  - **Ours:** the Studio exposes its document and commands as an MCP-style API, so Claude can drive it (S5 assistant). The owner's own agents get the same hooks.
+- **Open-source editors to borrow from:**
+  - PlayCanvas Editor frontend (MIT): a mature browser editor, with glTF and an editor API ([PlayCanvas](https://blog.playcanvas.com/playcanvas-editor-frontend-is-now-open-source));
+  - the three.js editor (MIT): simple, the same engine as ours ([three.js editor](https://www.svilenkovic.com/3d/three-js-editor));
+  - Blockbench (GPL, web version): UV editing and texture painting on models. Patterns only; we do not copy GPL code ([Blockbench](https://www.techspot.com/downloads/5931-blockbench.html)).
+- **ArtCraft (owner's tip):** Brandon Thomas's open-source clean-room clones of seven Adobe apps, written with Claude Opus 5.5, in Rust with WebAssembly builds.
+  - Photocraft (Photoshop), Vectorcraft (Illustrator), Filmcraft (Premiere), Lightcraft (Lightroom), Effectcraft (After Effects), Designcraft (InDesign), Printcraft (Acrobat).
+  - Dual MIT/Apache 2.0 licence. A "super early alpha", buggy by reviews, first commit 2026-09-30 ([PetaPixel](https://petapixel.com/2026/10/07/someone-rebuilt-free-open-source-versions-of-photoshop-premiere-and-lightroom-using-ai/), [Yahoo Tech](https://tech.yahoo.com/ai/claude/articles/solo-developer-rebuilds-adobe-creative-100000538.html), [Vice](https://www.vice.com/en/article/everything-we-know-about-the-free-adobe-clones-built-with-ai-do-they-actually-work/), [pasqualepillitteri.it](https://pasqualepillitteri.it/news/21618/cloni-gratuiti-adobe-artcraft-claude-opus-5-5)).
+  - **Ours:** evaluate Photocraft's WebAssembly build as the "Overhaul in Photoshop-style" path for a model's colour map (layers, brushes), opened from the asset bench with the texture round-tripped. If its alpha is not good enough, our own layer painter (Substance-style, section 3) stays the plan. Read the LICENSE files before taking code.
+
+### 8c. The order (revised for "me first", replacing section 5's S0 to S1 start)
+1. **S0 the shell and write-back.** The Studio menu opens a desktop editor layout: viewport, outliner, a details panel generated from schemas, a content browser over the packed assets and presets, the Changes panel, and the keymap toggle. Plus `scenedoc` undo and redo, and a dev-only write endpoint.
+2. **S1a the asset bench:** the owner's touch-ups, first. Every generated model, at low, mid and high side by side:
+   - **Tune:** fit (offset, scale, yaw), material (tint, metal, rough, emissive) and its level budget, saved as an override preset the game reads by asset id.
+   - **Regenerate:** edit the description, a new image, the local 3D model, levels and pack, all from one panel, with progress.
+   - **Overhaul:** "Edit in Blender" through the Blender MCP or a headless round trip, and "Paint the texture" (Photocraft if it passes evaluation, else our painter).
+3. **S1b tune the game in place:** click any object in the lab, a base or a vehicle in Play, move it with the gizmo, and tune the stage looks, lighting and audio levels (the presets refactor). Everything goes through the Changes panel.
+4. **S1c onwards:** the look workspaces (materials, lighting and post, VFX), then S2 to S5 as in section 5.
+5. **Players later:** the same tools, saving to the player's profile and sharing by code (`presetcodec`), once the owner has used them.

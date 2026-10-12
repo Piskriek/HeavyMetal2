@@ -134,7 +134,8 @@ for (const a of manifest.assets.filter((x) => only.length === 0 || only.includes
   }
   if (!model) continue;
   if (fs.existsSync(path.join(d, 'high.glb')) && only.length === 0) continue;
-  const [low, mid, high] = manifest.budgets[a.class];
+  // `budgets` on an asset overrides its class (a louvred chiller needs more low triangles than a plain box)
+  const [low, mid, high] = a.budgets ?? manifest.budgets[a.class];
   const norm = path.join(d, 'norm.glb'), slim = 'scripts/slim-glb.mjs';
   const dims = await normalize(model, norm, a);
   // `fix`: the hidden side the image model invented, repaired on norm.glb before the levels (scripts/model-fix.py)
@@ -149,7 +150,8 @@ for (const a of manifest.assets.filter((x) => only.length === 0 || only.includes
   // Tested 2026-10-11: the scout wheel (a round tyre with its tread at 600 triangles, where in-place decimation
   // made a faceted blob), the hauler body (no torn side panels), the scout body (clean panels and frames). The voxel
   // remesh variant (--retopo=160) broke the wheel apart (an open shell), so it is not used.
-  const plan = [['low', low, 256, 'smooth', 512, ['--retopo=0', '--planar=4']], ['mid', mid, 512, 'smooth', 512, []], ['high', high, 1024, 'smooth', 1024, []]];
+  // `lowInPlace`: decimate the low in place instead (the chiller's many louvre slats collapsed the cage to a wedge)
+  const plan = [['low', low, 256, 'smooth', 512, a.lowInPlace ? [] : ['--retopo=0', '--planar=4']], ['mid', mid, 512, 'smooth', 512, []], ['high', high, 1024, 'smooth', 1024, []]];
   // `reach`: a longer bake ray for pieces with deep recesses (lod-bake.py --reach=K)
   const reach = a.reach ? [`--reach=${a.reach}`] : [];
   for (const [name, tris, tex, mode, bakePx, extra] of plan.filter((p) => levels.includes(p[0]))) {

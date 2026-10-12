@@ -1463,3 +1463,52 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
 - **Sizes outside ±15% against the labkit colliders:** keep them at 1.0. The generated pieces are real-scale; the old colliders were sized for labkit shapes. Later, fit the colliders to the generated boxes (low priority; the owner will say if any collide oddly).
 - **Her voice from the wall radio:** later, together with positional dialogue. Not tonight.
 - **TASK-15** has started, with the modular scout behind `USE_MODULAR_SCOUT = false` until reviewed, so the test day is not at risk.
+
+### [2026-10-12 02:46] SIDECAR → OPUS: [DONE] TASK-15 the scout from parts (OFF behind the switch) and the crawler refit (8aeafa2e, e707aab7)
+- **Commits (pushed to `feat/monster-mash-exploration`):** `8aeafa2e` the code (`assets/gen-props.ts`, `dev/gallery.ts`, `scripts/test-base-building.mjs`); `e707aab7` the shots in `docs/shots/rovers/` (force-added: `docs/shots/` is gitignored). This entry is the last commit.
+- **The switch:** `USE_MODULAR_SCOUT = false` in `apps/web/src/assets/gen-props.ts`. Players still get `scout-body`. `?scout=modular` turns the assembled scout on for testing (its parts are preloaded only then). If a part is missing, it falls back to the one-piece scout.
+- **The crawler change is live** (no switch): the 2.40 x 2.20 x 6.20 body, no `scaleX`. The suites below passed on this build.
+
+**SCOUT_ASSEMBLY** (rover frame, metres: origin at hub height, +z forward, +x across; hubs unchanged at x ±0.8, z ±1.1):
+- `chassis`: offset (0, -0.297, 0); scale (0.6977, 1, 1.0945).
+- `shell`: offset (0, 0.289, 0); scale (0.9124, 1, 1).
+- `headlight`: x ±0.394, y -0.10, z 1.55. The second lamp is the first one mirrored (scale x -1).
+- `seat`: y 0.286, z -0.25, x 0.
+- `yoke`: (0, 0.98, 0.20). Procedural, see issue 1.
+- `aerial`: x -0.30, z -0.80 (rear-right; right is -x when facing +z). Base 0.14 x 0.05 x 0.14 on the roof at y 1.472. Mast 0.035 x 1.20 x 0.035, square section.
+
+**Every scale** (1.00 means unscaled):
+- chassis: x **0.698** (1.688 to 1.178 m, so it sits between the wheels' inner faces at ±0.589). z **1.095** (2.996 to 3.28 m, which puts the hub housings on the hubs: they measure z ±1.005 in the file).
+- shell: x **0.912** (1.290 to 1.177 m). At full width it overhung the deck and clipped the wheel tops, so it was fitted to the deck. z and y 1.00.
+- headlight, seat, scout-wheel, yoke: 1.00. Crawler body: 1.00 (scaleX dropped).
+
+**Measured part sizes** (world bounds of each GLB's own vertices): chassis 1.688 x 0.584 x 2.996; shell 1.290 x 1.180 x 2.398; headlight 0.206 x 0.298 x 0.147; seat 0.765 x 1.098 x 0.853; scout-wheel 0.865 x 0.891 x **0.423**. The registry and the brief say the wheel is 0.46 wide; the file measures 0.423, so I used the file (inner faces at ±0.589, not ±0.57).
+
+**Crawler fit and orientation:**
+- `offset` (0, -0.45, 0), `yaw` 0, no `scaleX`. The body's bottom (its y 0) sits on the ground, since the rover origin is one wheel-radius up.
+- **Orientation: the GLB already faces +z, so no yaw.** The low nose, with the hinge bracket and the lamps, is at +z. The tall cab is at -z. I checked this with vertex bins and side and top renders.
+- `crawler-arm` at (0, 0.00, 3.35): its back face is at z 3.10, flush with the nose, and its bottom is at nose height. The old placement was about 0.4 m too high.
+- Lamp discs at (±0.70, 0.45, 3.00), on the nose.
+- Seat at (0.35, 0.55, -1.50), inside the cab under the roof. The top view shows no seat on the front deck any more.
+- Drill socket (0, 0.45, 3.60) and mast socket (0.40, 1.75, -1.50). No code reads these sockets.
+
+**Issues and deviations:**
+1. **`steering-wheel` is not packed.** It is not in the registry, `gen/`, or `hd/`, so the yoke is the existing procedural fallback. I lowered it from hand height (1.09) to 0.98, because its rim poked over the top of the windscreen. Pack it and I will fit it.
+2. The chassis is squashed 30% in x so it fits between the wheels, which is the per-axis fit the brief allows. The close-ups read fine, but the owner may want a different chassis.
+3. The one-piece path is unchanged apart from the crawler fit.
+4. The gallery page logs one 404. I did not identify it.
+
+**Shots** (`docs/shots/rovers/`, every one looked at):
+- Gallery, assembled against one-piece: `scout-assembled-3q-s1.png` and `-3q-s6.png` against `scout-onepiece-3q-s1.png` and `-3q-s6.png`. Side: `scout-assembled-side.png` (stage 1 on the left, stage 6 on the right; screen-right is the rear) against `scout-onepiece-side.png`. Front: `scout-assembled-front.png`. Top: `scout-assembled-top-s1.png` against `scout-onepiece-top-s1.png`. Crawler: `crawler-3q-s1.png`, `crawler-side-s1.png`, `crawler-top-s1.png`.
+- In-game (`?base&kit=1&scout=modular`, planet stage set to 1 and to 6, the crawler, scout and hauler placed on the Moon): `moon-group-s1.png` and `moon-group-s6.png` (the group). The lighting is the game's own sun; I did not arrange it to come from behind the camera. `scout-driving-s1.png` and `scout-driving-s6.png` (chase cam). `cab-driver-s1.png` and `cab-driver-s6.png` (the driver's eye at the seat, through the alt camera).
+- The in-game capture script is in my scratchpad and is not committed. Say if you want it as `scripts/capture-rovers.mjs`.
+
+**Checks** (real results, final build):
+- `npm run typecheck`: 0 errors.
+- `npm test`: 2338 tests, 2331 pass, 3 fail. All three are timing tests on this loaded laptop, and none is in a package I touched: fieldkit "all six build under 80 ms" (414 ms); plotgrid "ten thousand plots lay out in under a second" (1.78 s); lattice-accept "200 boxes, 50 relays, links plus 2000 pulls under 1 s" (1.02 s). Run alone, lattice-accept passes 6 of 6.
+- `npm run build`: OK (51 s). It rewrites `apps/web/dist/index.html`, which I did not commit.
+- `scripts/test-base-building.mjs`: PASS on the one-piece scout (default). PASS with `SCOUT=modular`, the new opt-in env var (default unchanged), which runs the same checks on the assembled scout: the 50 m bumpy drive and the parking persistence both pass.
+- `scripts/test-playthrough.mjs` (dist): 11 of 11 PASS, 0 console errors, 1 failed request: `hd/scout-body/high.gltf` ERR_ABORTED at the end of the run. It is the same as TASK-16. The page closes with the HD fetch still in flight, and the loader falls back to low.
+- `test-fidelity-sync-studio`: PASS. `test-planet-monstermash`: PASS. `test-mentor-narration`: PASS. `test-music-sfx`: PASS (all lines).
+
+**Next, for Opus:** review the shots. If the assembled scout reads right, flip `USE_MODULAR_SCOUT`. Until then, `?scout=modular` is the way to see it in play.

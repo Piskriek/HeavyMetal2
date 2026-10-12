@@ -95,3 +95,10 @@ The context a new Opus session needs on its first message. Keep it current: upda
 - **The owner's new feature idea (2026-10-12, see OWNER_ASKS):** junked or broken models become "containment leaks". An object looks janky; the player seals the leak and uses a fidelity tool to restore it.
   - **The ladder:** broken junk, then our pack, then a RUN.world tier, then a max tier via the Meshy.ai API (its credits reset at the end of the month).
   - **NEVER delete junked models.** Next: research, then a plan doc, then the owner's sign-off.
+- **TASK-19 review 1 is done** (b1a5173a). The view now has depth: a horizon, fog, moving storm clouds, floating pockets and a crate dithering inside a pocket. It runs at 28 calls and 65k triangles. **Still open (review 2, next session):**
+  - The Breach doesn't read as a tall column from beside the gate; make it taller, brighter and wider.
+  - My ruling on pockets: each one projects its fidelity straight down onto the ground below as a soft disc, so the ground under it changes too.
+  - The rubble-slab low doesn't load at runtime (still the box fallback).
+  - The dust motes should be about 2× bigger.
+  - R8 (the planet side through the gate) needs a shot.
+  - Frame time on the GTX 950M is still unmeasured.

@@ -25,8 +25,9 @@
       "size": 6,
       "axis": "length",
       "view": "three-quarter",
-      "subject": "the hauler rover with its six wheels REMOVED: the two-seat cab at the front, the flat load bed, the bolted storage bin with a small finned link dish on its top, the tow hitch and the side steps; solid armoured side skirts run the full length below the cab and the bed with three wheel arches cut in each side, and a solid belly pan underneath. The cab interior is EMPTY: NO seats, NO steering wheel, NO controls inside (those are added separately). The wheel arches are EMPTY: NO hubs, NO axles, NO brake discs, NO suspension visible in them (the wheels cover that)",
-      "class": "rover-body"
+      "subject": "the hauler rover with its six wheels REMOVED: the two-seat cab at the front with SQUARE flush mirrors built into the cab corners (NO mirrors on poles), the flat load bed, a bolted square storage bin with a flat square link panel on its top, the tow hitch and the side steps; solid armoured side skirts run the full length below the cab and the bed with three wheel arches cut in each side, and a solid belly pan underneath. The cab interior is EMPTY: NO seats, NO steering wheel, NO controls inside. The wheel arches are EMPTY: NO hubs, NO axles, NO suspension visible; nothing round except the arch openings",
+      "class": "rover-body",
+      "note": "redone 2026-10-12 under the owner rules (square, no holes, no hoses, nothing round unless it must be)"
     },
     {
       "id": "hauler-wheel",
@@ -65,8 +66,9 @@
       "size": 1.6,
       "axis": "length",
       "view": "side",
-      "subject": "the crawler's folding beam-drill arm on its own, unfolded and lying horizontal: the hinge knuckle at one end, the boom, and the drill head at the tip",
-      "class": "moving-part"
+      "subject": "the crawler drill arm on its own, unfolded and lying horizontal: a square hinge knuckle block at one end, a thick SQUARE box-section boom with a square hydraulic housing set flush along it (NO exposed tubes, NO round cylinders), and a drill head at the tip (the drill bit cone is the only round part)",
+      "class": "moving-part",
+      "note": "redone 2026-10-12 under the owner rules (square, no holes, no hoses, nothing round unless it must be)"
     },
     {
       "id": "fabricator-frame",
@@ -74,8 +76,9 @@
       "size": 5,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the Vehicle Fabricator station WITHOUT its print head and WITHOUT the ground pad: the steel gantry frame about 5 metres tall straddling the flat printing bed, the gantry beam across the top, the control console at one corner, and the cable glands at the feet",
-      "class": "machine"
+      "subject": "the Vehicle Fabricator station WITHOUT its print head: a heavy steel gantry frame about 5 metres tall made of THICK SQUARE box-section uprights and a thick square gantry beam across the top, straddling a flat square printing bed, a square control console at one corner; every cable runs inside the uprights (NO cables outside, NO thin rails, NO round tubes)",
+      "class": "machine",
+      "note": "redone 2026-10-12 under the owner rules (square, no holes, no hoses, nothing round unless it must be)"
     },
     {
       "id": "fabricator-head",
@@ -92,8 +95,9 @@
       "size": 4,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the heavy texture mill on its own, WITHOUT the pad: the massive boxy grinding mill about 4 metres tall on its round bolted mounting ring, the top feed hopper heaped with dark ore chunks, the wide rear vent grille, and the cable glands at its base. No pixels, no plume, no chimney, no stack",
-      "class": "machine"
+      "subject": "the heavy texture mill on its own: a massive boxy grinding mill about 4 metres tall standing on a SQUARE bolted steel base plate about 3 metres across (it sits on a square machine socket), a square top feed hopper heaped with dark ore chunks, a wide flush rear vent grille; every cable and pipe runs inside the machine (NO hoses, NO pipes outside); nothing round. No pixels, no plume, no chimney, no stack",
+      "class": "machine",
+      "note": "redone 2026-10-12 under the owner rules (square, no holes, no hoses, nothing round unless it must be)"
     },
     {
       "id": "press-frame",
@@ -101,8 +105,9 @@
       "size": 4,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the heavy shape press on its own, WITHOUT the pad and with its two hydraulic rams REMOVED: the heavy square steel frame about 4 metres tall, the flat die bed at its base, the feed chute on its top, the louvred rear vent, and the round bolted mounting ring at its foot. No pixels, no plume",
-      "class": "machine"
+      "subject": "the heavy shape press on its own with its two rams REMOVED: a heavy square steel frame about 4 metres tall standing on a SQUARE bolted steel base plate about 3 metres across (it sits on a square machine socket), the flat die bed at its foot, a square feed chute on its top, and a flush louvred rear vent; NO hoses, nothing round. No pixels, no plume",
+      "class": "machine",
+      "note": "redone 2026-10-12 under the owner rules (square, no holes, no hoses, nothing round unless it must be)"
     },
     {
       "id": "press-ram",
@@ -110,8 +115,9 @@
       "size": 1.8,
       "axis": "height",
       "view": "front",
-      "subject": "one of the heavy press's big hydraulic rams on its own, standing upright: the thick cylinder, its polished piston rod and the flat pressing plate at the bottom",
-      "class": "moving-part"
+      "subject": "one of the heavy press rams on its own, standing upright: a thick SQUARE hydraulic housing with bevelled edges, a square piston column below it and a flat square pressing plate at the bottom; nothing round",
+      "class": "moving-part",
+      "note": "redone 2026-10-12 under the owner rules (square, no holes, no hoses, nothing round unless it must be)"
     },
     {
       "id": "projector-mast",
@@ -119,8 +125,9 @@
       "size": 3.2,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the heavy light projector WITHOUT its lamp head and WITHOUT the pad: the short armoured mast about 3 metres tall on its round bolted mounting ring, ending at the top in the yoke and tilt pivot where the lamp head mounts",
-      "class": "machine"
+      "subject": "the light projector WITHOUT its lamp head: a short armoured SQUARE mast about 3 metres tall standing on a SQUARE bolted steel base plate about 3 metres across (it sits on a square machine socket), ending at the top in a square U-shaped yoke with square pivot blocks where the lamp head mounts; every cable runs inside the mast; NO hoses, nothing round",
+      "class": "machine",
+      "note": "redone 2026-10-12 under the owner rules (square, no holes, no hoses, nothing round unless it must be)"
     },
     {
       "id": "projector-head",
@@ -128,8 +135,9 @@
       "size": 2,
       "axis": "length",
       "view": "three-quarter",
-      "subject": "the projector's big faceted lamp head on its own, about 2 metres across: its front face is a FLAT, SOLID frosted-glass lens disc set flush in a thick bezel (NO deep opening, NO cavity, unlit), heat-sink fins on its back, louvred vents round its back rim, and two pivot bosses on its sides",
-      "class": "moving-part"
+      "subject": "the projector lamp head on its own, about 2 metres across: a deep SQUARE lamp housing with bevelled edges, its whole front face a FLAT frosted square lens set flush in a thick square bezel (unlit), a solid flat back with recessed square vents (NO fins, NO round parts), and two square pivot blocks on its sides",
+      "class": "moving-part",
+      "note": "redone 2026-10-12 under the owner rules (square, no holes, no hoses, nothing round unless it must be)"
     },
     {
       "id": "watermaker",
@@ -137,8 +145,9 @@
       "size": 4,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the heavy water maker machine on its own, WITHOUT the pad, on its round bolted mounting ring. No pixels, no plume, no water spray",
-      "class": "machine"
+      "subject": "the heavy water maker machine on its own standing on a SQUARE bolted steel base plate about 3 metres across (it sits on a square machine socket): a long SQUARE-section condenser tank with bevelled edges lying horizontal, a square intake hopper on one end, a square outlet trough on the other, two flush square gauges and a square status lamp on its side; every pipe runs inside the machine (NO hoses, NO round tank); nothing round. No water spray, no plume",
+      "class": "machine",
+      "note": "redone 2026-10-12 under the owner rules (square, no holes, no hoses, nothing round unless it must be)"
     },
     {
       "id": "bin",
@@ -146,8 +155,9 @@
       "size": 2,
       "axis": "length",
       "view": "three-quarter",
-      "subject": "the quantum storage bin on its own: the squat steel box container about 2 metres square on four bolted feet, the hatch with a keypad, and the small finned quantum link emitter dish on its top (its lens unlit, no beam of light)",
-      "class": "fixture"
+      "subject": "the quantum storage bin on its own: a squat steel box container about 2 metres square on four square bolted feet, a hatch with a square keypad, and a small FLAT SQUARE link antenna panel on a short square post on its top (NO dish, nothing round, unlit)",
+      "class": "fixture",
+      "note": "redone 2026-10-12 under the owner rules (square, no holes, no hoses, nothing round unless it must be)"
     },
     {
       "id": "repeater",
@@ -155,8 +165,9 @@
       "size": 6,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the quantum repeater pylon on its own, built CHUNKY: a tapered tower about 6 metres tall of four THICK box-section steel legs joined by solid steel cross plates (no thin lattice, no thin bars), on its square concrete footing with four anchor bolts, the ring-shaped repeater array at its top, and the distribution box with cable glands at its foot",
-      "class": "fixture"
+      "subject": "the quantum repeater pylon on its own: a SOLID tapered SQUARE steel mast about 6 metres tall (one closed box section, NO lattice, NO open frame, NO holes, NO legs with gaps), on a square concrete footing with four anchor bolts flush, a SQUARE flat antenna panel array box on its top, and a square distribution box set flush into the mast foot; nothing round",
+      "class": "fixture",
+      "note": "redone 2026-10-12 under the owner rules (square, no holes, no hoses, nothing round unless it must be)"
     },
     {
       "id": "drafting",
@@ -245,8 +256,9 @@
       "size": 0.3,
       "axis": "length",
       "view": "part",
-      "subject": "the scope sight part on its own with its rail mount, detached from the weapon frame",
-      "class": "weapon-part"
+      "subject": "a weapon scope sight on its own with its rail mount: a long BOXY SQUARE-section optic housing with bevelled edges (NOT a round tube), a square front lens and a square rear eyepiece set flush, two square adjustment blocks on top and side, on a flat square rail clamp",
+      "class": "weapon-part",
+      "note": "redone 2026-10-12 under the owner rules (square, no holes, no hoses, nothing round unless it must be)"
     },
     {
       "id": "sight-holo",
@@ -272,8 +284,9 @@
       "size": 0.28,
       "axis": "length",
       "view": "part",
-      "subject": "the extended power cell part on its own (the long magazine), detached from the weapon frame",
-      "class": "weapon-part"
+      "subject": "the extended power cell on its own (the long magazine): a long SQUARE-section energy cell block with bevelled edges, a recessed square charge window showing a glowing amber strip (unlit), and square contact pads at one end; nothing round",
+      "class": "weapon-part",
+      "note": "redone 2026-10-12 under the owner rules (square, no holes, no hoses, nothing round unless it must be)"
     },
     {
       "id": "foundation",
@@ -889,7 +902,8 @@
       "size": 2,
       "axis": "height",
       "view": "front",
-      "subject": "the life support unit on its own: a chunky upright steel cabinet about 2 metres tall on a low plinth, a front window showing three thick filter cartridges, a louvred vent below it, a round pressure gauge set flush, a green status light strip near the top, a boxed fan housing built onto the top, and one gas bottle held inside an armoured recessed bay in the cabinet side; no loose hoses, every pipe runs inside the cabinet"
+      "subject": "the life support unit on its own: a chunky upright steel cabinet about 2 metres tall on a low square plinth, a front window showing three thick SQUARE filter cartridges, a louvred vent below it, a flush SQUARE pressure gauge, a green status light strip near the top, a SQUARE boxed fan housing with a flat grille built onto the top, and a square gas tank held inside an armoured recessed bay in the cabinet side; no hoses, nothing round",
+      "note": "redone 2026-10-12 under the owner rules (square, no holes, no hoses, nothing round unless it must be)"
     },
     {
       "id": "weapon-frame",

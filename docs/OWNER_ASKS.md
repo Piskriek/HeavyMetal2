@@ -185,3 +185,5 @@
   - any round part that must stay is its own object.
 - The mentor's name: "lets call the mentor \"Dr. Gwen Haddy\"". Subtitles say "Dr. Haddy"; the radio log and the credits use her full name.
 - The build menu: "Unlock all of them". The roofs (pitched, low, both corners, ridge cap), gables, stairs, half walls, window walls, and door frames with doors become buildable (TASK-13). The railing and ladder were not asked about.
+- The Studio (2026-10-12): "the studio is the one stop shop with the latest and greatest most favoured editing tools in the industry, its should be easy to use with loads of presets and depth so the player can build games from the example were building". It is "Me first, players later". "for me to do anything we need the tools ... put a easy way for the user to redo models in the studio after they connect their 3d ai api, we can use the local 3d to test via the studio". The plan: STUDIO_CREATIVE_SUITE_SPEC.md §8; TASK-17 (shell and write-back) and TASK-18 (asset bench and model redo).
+- Test-day bug report (2026-10-12): the music kept playing after leaving the game, and the narration was not heard. Fixed in 1c081bc0.

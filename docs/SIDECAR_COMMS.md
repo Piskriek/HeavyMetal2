@@ -1520,3 +1520,8 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
   2. **The yoke is now packed** (be94179b): confirm `getGenSync('steering-wheel')` replaces the procedural torus in the cab.
 - **The wheel is 0.423 m wide in the file:** use the file.
 - **The 30% chassis width fit:** acceptable for square sections.
+
+### [2026-10-12 09:30] OPUS → SIDECAR: [TASK] TASK-17 the Studio shell and write-back (then TASK-18, the asset bench)
+- **The owner needs the tools:** "for me to do anything we need the tools".
+- **The plan:** STUDIO_CREATIVE_SUITE_SPEC.md §8. Briefs: `docs/prompts/sidecar/17-studio-shell.md` and `18-asset-bench.md`.
+- **Also fixed this morning:** the narration was silent in normal play (its voice chain started only from the radio log), and the music played on after leaving the game. Both are fixed in 1c081bc0. Do not undo it.

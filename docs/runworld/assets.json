@@ -1014,7 +1014,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a large square steel storage crate about 1.2 metres tall with ribbed flat side panels, a shut lid held by two flush square latches, hazard-striped corner bands, and two recessed square grip pockets, lightly dusty from years out of use",
-      "note": "lab clutter (owner 2026-10-12: boxes that clutter the lab, out of use for so long, which the player clears to place new machines)"
+      "note": "lab clutter (owner 2026-10-12: boxes that clutter the lab, out of use for so long, which the player clears to place new machines)",
+      "reach": 3
     },
     {
       "id": "crate-small",
@@ -1033,7 +1034,7 @@
       "size": 1.7,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "two square steel crates stacked on top of each other, the top one smaller, both half covered by a draped grey dust sheet that hangs down the sides in heavy folds, lightly dusty from years out of use",
+      "subject": "two square steel crates stacked on top of each other, the top one smaller, both under a heavy off-white canvas dust cover pulled tight, so the whole thing reads as one chunky soft-edged square block; a few broad shallow folds only; the hem tucked flat against the floor all round; NO loose flaps, NO crumpled pile on the floor, NO sharp creases, NO dark cloth, a little of the lower crate's grey steel corner showing at one bottom edge, lightly dusty from years out of use",
       "note": "lab clutter (owner 2026-10-12: boxes that clutter the lab, out of use for so long, which the player clears to place new machines)"
     },
     {
@@ -1043,7 +1044,7 @@
       "size": 1.8,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "a boxy lab machine about 1.8 metres tall completely covered by a heavy grey dust sheet draped over it and falling to the floor in thick folds, only its square shape showing under the cloth, lightly dusty from years out of use",
+      "subject": "a boxy lab machine about 1.8 metres tall completely hidden under a heavy off-white canvas dust cover pulled tight, so the whole thing reads as one chunky soft-edged square block; a few broad shallow folds only; the hem tucked flat against the floor all round; NO loose flaps, NO crumpled pile on the floor, NO sharp creases, NO dark cloth, only its square shape and one square control box on top showing as shapes under the canvas, lightly dusty from years out of use",
       "note": "lab clutter (owner 2026-10-12: boxes that clutter the lab, out of use for so long, which the player clears to place new machines)"
     },
     {
@@ -1064,7 +1065,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a square open steel parts bin about 70 centimetres tall heaped to the top with chunky square spare parts: small square housings, flat brackets and block connectors, lightly dusty from years out of use",
-      "note": "lab clutter (owner 2026-10-12: boxes that clutter the lab, out of use for so long, which the player clears to place new machines)"
+      "note": "lab clutter (owner 2026-10-12: boxes that clutter the lab, out of use for so long, which the player clears to place new machines)",
+      "reach": 3
     },
     {
       "id": "filing-cabinet",
@@ -1084,7 +1086,10 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a tall square equipment rack cabinet about 2 metres tall with a shut flat front door made of solid panels, a column of small dark square status lamps (unlit) and a flush horizontal louvre panel near the bottom (solid slats, NO mesh, NO perforations, NO holes), lightly dusty from years out of use",
-      "note": "lab clutter (owner 2026-10-12: boxes that clutter the lab, out of use for so long, which the player clears to place new machines)"
+      "note": "lab clutter (owner 2026-10-12: boxes that clutter the lab, out of use for so long, which the player clears to place new machines)",
+      "fix": [
+        "plain-back"
+      ]
     },
     {
       "id": "locker",
@@ -1104,7 +1109,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a square steel toolbox about 35 centimetres tall, latched shut, with a flush recessed carry grip in its lid, lightly dusty from years out of use",
-      "note": "lab clutter (owner 2026-10-12: boxes that clutter the lab, out of use for so long, which the player clears to place new machines)"
+      "note": "lab clutter (owner 2026-10-12: boxes that clutter the lab, out of use for so long, which the player clears to place new machines)",
+      "reach": 3
     },
     {
       "id": "coolant-can",

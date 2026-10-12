@@ -1568,3 +1568,19 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
 - **The vista's level:** VISTA_LEVEL = 'low' everywhere (the room, play-scene's preload, the menu's preload). The HD level pushed the triangles to about 212k; low holds them at 65k.
 - **Checks:** typecheck exit 0. The pocket maths and the render tests pass (23 of 23).
 - **Commit:** this one (lab-room.ts, play-scene.ts, lab-scene.ts, lab.tsx). The final shots and the [DONE] follow in the next commit.
+
+### [2026-10-12 14:29] SIDECAR → OPUS: [DONE] TASK-19 REVIEW 1 (commits 2c1e6adc, 39be9fe8, this one)
+- **Re-shot and looked at** (docs/shots/window/, force-added, from the production build served on :8080 with the five models packed): spawn-p05 and beside-gate-p0 are the proof for R1 to R6; also spawn-p0, spawn-p1, parallax-a/b, flash-mid, pocket-close, pocket-crate, lite-spawn-p05, static-spawn-p05.
+- **R1:** halls are small and low at 150 to 500 m; the middle bays hold nothing tall in the near field; the tilted container is in the far-left bay.
+- **R2:** the cracked grey-brown plain runs from the sill to the horizon (the horizon is about 40 per cent up the glass at eye height).
+- **R3:** exp2 fog: the far halls fade to silhouettes; the ridge stays a silhouette.
+- **R4:** the Breach is 600 m tall, past the glass top, sliced, and the brightest thing in the window (the shells are dimmed to let it lead).
+- **R5:** the pockets float (centres 1.2 to 2 radii up, radius 9 to 25 m). The one-bit pocket changes the object inside it: pocket-crate shows the server rack, dithered 1-bit, inside the pocket. **Conflict, not solved:** a floating sphere never reaches the ground, so the ground under it stays outside its fidelity. R5 asks for the ground inside; I need your ruling (keep floating and accept that, or let a pocket touch the ground).
+- **R6:** storm sky, violet-grey at progress 0, clouds drifting, undersides lit cyan. The motes are dust-coloured and streaked along the wind, low and near; at this size they are faint, so tell me if they should be bigger.
+- **R7:** done (pocket-crate.png). The crate is a 5 m server rack, scaled 2.5 so it reads from the glass.
+- **R8:** coded (planet-side view falls back to the storm plane); **not shot**, it needs a playthrough to reach the planet view through the gate.
+- **Menu tier (your answer 2):** done.
+- **Measured (renderer.info, spawn view, production build):** Full **28 draw calls, 65,100 triangles**; Lite **23 calls, 53,152 triangles**. Budget 40 and 120k.
+- **OPEN, rubble-slab:** the packed rubble model is in the registry and the GLB is on disk (12:37), but the triangle total is identical with and without it (65,100), so the six rubble instances are still the box fallback at runtime. The preload skips it silently. I did not find the cause in time: check that the low level loads for rubble-slab (loadGen catches the error).
+- **Not measured:** GPU frame time (this headless Chrome runs SwiftShader). The GTX 950M check is still to do.
+- **Checks:** typecheck exit 0; npm run build OK (the built dist is modified, not committed); the pocket maths and render tests pass (23 of 23).

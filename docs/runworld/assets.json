@@ -36,7 +36,10 @@
       "axis": "height",
       "view": "wheel",
       "subject": "one hauler wheel on its own: a chunky treaded rubber tyre on a steel rim, with the hub at the centre",
-      "class": "wheel"
+      "class": "wheel",
+      "fix": [
+        "mirror-z"
+      ]
     },
     {
       "id": "crawler-body",
@@ -420,7 +423,10 @@
       "size": 3,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the airlock wall on its own: a reinforced steel wall piece exactly 4 metres wide and 3 metres tall with a sealed thick round-cornered door centred in it, a dark rubber pressure seal around the door, a green status light above it, a small pressure gauge and a hazard-striped threshold step"
+      "subject": "the airlock wall on its own: a reinforced steel wall piece exactly 4 metres wide and 3 metres tall with a sealed thick round-cornered door centred in it, a dark rubber pressure seal around the door, a green status light above it, a small pressure gauge and a hazard-striped threshold step",
+      "fix": [
+        "mirror-z"
+      ]
     },
     {
       "id": "roof-pitched",
@@ -661,7 +667,10 @@
         ]
       ],
       "kind": "door",
-      "note": "fitted to the kit door leaf (packages/basekit2 door: slab 1.36 x 2.2, handle side +z) so it hangs in the doorframe on the procedural hinge line"
+      "note": "fitted to the kit door leaf (packages/basekit2 door: slab 1.36 x 2.2, handle side +z) so it hangs in the doorframe on the procedural hinge line",
+      "fix": [
+        "mirror-z"
+      ]
     },
     {
       "id": "railing",
@@ -823,7 +832,10 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "the operator console on its own, WITHOUT its throw lever: a heavy steel desk console with a sloped control top, a dark rectangular screen in a square housing, a rectangular speaker grille, rows of square buttons and an empty square slot where the lever mounts, on a solid boxy base; NO round gauges, NO cables. In the base kit family style: warm light-grey painted steel, dark grey trim, amber hazard bands",
-      "note": "sheet 21 approved with the square rule (owner 2026-10-11)"
+      "note": "sheet 21 approved with the square rule (owner 2026-10-11)",
+      "fix": [
+        "plain-back"
+      ]
     },
     {
       "id": "console-lever",
@@ -844,7 +856,10 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "the preset bench on its own: a solid steel workbench with closed boxy legs and a back hood that holds a built-in strip light (unlit), a small angled square screen on the worktop, and a row of shallow square cartridge slots along the back edge; NO arm lamp, NO cables, NO open frame. In the base kit family style: warm light-grey painted steel, dark grey trim, amber hazard bands",
-      "note": "sheet 21 approved with the square rule (owner 2026-10-11)"
+      "note": "sheet 21 approved with the square rule (owner 2026-10-11)",
+      "fix": [
+        "plain-back"
+      ]
     },
     {
       "id": "preset-combiner",

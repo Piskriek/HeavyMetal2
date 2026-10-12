@@ -137,6 +137,8 @@ for (const a of manifest.assets.filter((x) => only.length === 0 || only.includes
   const [low, mid, high] = manifest.budgets[a.class];
   const norm = path.join(d, 'norm.glb'), slim = 'scripts/slim-glb.mjs';
   const dims = await normalize(model, norm, a);
+  // `fix`: the hidden side the image model invented, repaired on norm.glb before the levels (scripts/model-fix.py)
+  if (a.fix?.length) run(BLENDER, ['-b', '--factory-startup', '-P', 'scripts/model-fix.py', '--', norm, ...a.fix]);
   // each level: Blender decimates (and for mid/high bakes the full-detail normals), then slim-glb packs it
   // (no further simplifying: --tris above the count; WebP maps at the level's size; meshopt).
   // low is a cage, rebuilt rather than decimated in place (lod-bake.py --retopo=0 --planar=4, smooth): the welded

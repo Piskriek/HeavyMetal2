@@ -1420,3 +1420,40 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
 - **TASK-14 accepted.** All three bugs were fixed at their causes; the hit offset was in `pieceAtIn`, not the mesh, a good find. The four lab fixes are in. The playthrough passes, with 0 console errors and 0 failed requests.
 - **e2e-smoke:** retired. It tests the pre-rebrand home. `npm run e2e` now runs `test-playthrough.mjs`, and the old one stays as `npm run e2e:legacy`.
 - **Next: TASK-16** (`docs/prompts/sidecar/16-lab-generated.md`). The lab still shows the labkit fallbacks: `lab-room.ts` looks up only `weapon-frame`, though every lab piece is packed. It is the first room the owner sees tomorrow, so it goes before TASK-15.
+
+### [2026-10-12 02:02] SIDECAR → OPUS: [DONE] TASK-16 the lab shows its generated pieces (03154c79, 4a76784a, 57611f0f)
+- **Commits (pushed to `feat/monster-mash-exploration`):** `03154c79` the lab code (`play/lab-room.ts`, `play/play-scene.ts`, `play/play.tsx`, `lab/lab-scene.ts`, `lab/lab.tsx`); `4a76784a` the five retaken shots; `57611f0f` the sheet-21 capture asserts the power sequence (`scripts/capture-lab-sheet21.mjs`). This entry is the last commit.
+- **How it works:** every placed piece is still built on its labkit fallback. `adoptGenerated()` swaps the generated model in once it is loaded. A swap is all or none per piece. Labkit colliders and sockets stay. Lamps are emissive overlays on the model. Play and the menu lab run a "Fitting the lab" step behind the loading bar (`preloadLabGenerated`, then `adoptGenerated`). The adopt step is needed because the room is built before the loading steps run.
+- **Pieces: all 18 ids swapped, none left on the fallback. Scale 1.00 on every piece** (the registry sizes are real metres; nothing was distorted):
+  - gate, with the portal sized to the doorway measured from its vertices (2.0 x 2.2 m, sill 0.33). Coil plates sit on the copper faces, three per pillar plus the top beam, lit bottom to top.
+  - capacitor-bank; breaker-panel with six breaker-handle pivots (they rotate up when the power comes on).
+  - relay-cabinet x4, two amber lamps each (8 total); control-box x2, green and red lamps.
+  - operator-console: the lever is a pivot on its top, the screen is an overlay on the monitor glass.
+  - preset-rack, preset-bench, preset-combiner; planet-table with the disc as an overlay on its plate.
+  - her-desk (the paper, mug and terminal stay on it); cot (turned to lie along the wall); wall-radio (lamp overlay).
+  - armory-rail with weapon-frame resting on its top; weapon-bench (the wider collider the lab already had is kept).
+- **West and east wall props:** the labkit props there face the wall in the lab frame (labkit fronts are +z, placed at yaw -/+ pi/2). The generated models for those pieces turn half a turn inside their prop (`WEST_WALL_TURN`) so the fronts face the room. The labkit fallback still faces the wall.
+- **Sizes beyond +/-15% (reported, not scaled).** Generated vs labkit, w x h x d in m:
+  - gate 3.49 x 3.19 x 2.06 vs 2.69 x 3.30 x 1.12: 30% wider, 84% deeper. Its labkit colliders are kept, so at the sides the model is wider than the collider.
+  - breaker-panel 1.88 x 2.19 x 0.71 vs 0.93 x 1.64 x 0.41: twice as wide.
+  - relay-cabinet 0.86 x 1.30 x 0.49 vs 0.60 x 1.95 x 0.56: height -33%.
+  - control-box: height -19%.
+  - preset-rack 1.97 x 2.60 x 0.87 vs 3.00 x 2.40 x 0.43: 34% shorter along the wall, twice as deep.
+  - preset-combiner 1.60 x 1.59 x 1.59 vs 0.90 x 1.20 x 0.91: bigger.
+  - planet-table 1.32 x 1.10 x 1.32 vs 2.40 x 0.98 x 2.40: a smaller footprint.
+  - cot: 1.15 wide vs 0.80 (+44%). wall-radio 0.60 x 0.52 x 0.33 vs 0.48 x 0.34 x 0.12. armory-rail 1.60 x 0.62 x 0.44 vs a thin 1.40 bar. weapon-bench 2.39 wide vs 1.80.
+  - operator-console: height -15%, depth +23%.
+  - Within +/-15%: capacitor-bank, preset-bench, her-desk. Your call whether the layout takes these sizes or the assets are re-fitted.
+- **Power sequence (now asserted in the capture):** relays 0/8 at t 0, 1/8 at 0.5 s, 6/8 at 1.5 s, 8/8 at 2.5 s. Coils 0000000, then 1100000 at 2.5 s, 1111100 at 3.5 s (the portal opens), 1111111 at 4.5 s. Relays never go down, and every lamp is lit at power on. The lever, the floor pulse and the static clearing are unchanged and not asserted.
+- **Draw calls, spawn view with the lab powered** (same camera, a scratch probe, final dist): 183 before, 96 after. Triangles 227k to 290k, the detail of the generated models. The capture script's own readings: at boot 121 to 69; last storm view 23 to 21.
+- **Checks (real results):**
+  - `npm run typecheck`: 0 errors.
+  - `npm test`: 2338 tests, 2332 pass, 2 fail, 4 skipped. The two are the known timing tests: fieldkit "all six build under 80 ms" (124 ms) and plotgrid "ten thousand plots" (1.5 s).
+  - `npm run build`: OK.
+  - `scripts/test-playthrough.mjs`: 11 of 11 PASS, 0 console errors, 1 failed request: `hd/scout-body/high.gltf` ERR_ABORTED at the end of the run. It is not a 404, and the loader catches it and falls back to low. It reproduced on a second run. It comes from the existing rover preload, not the lab path, and I believe the page closes with that HD fetch still in flight. I did not change that path, and I cannot show it was absent before.
+  - `test-base-building`, `test-fidelity-sync-studio`, `test-planet-monstermash`, `test-mentor-narration`, `test-music-sfx`: all PASS.
+  - `scripts/capture-lab-sheet21.mjs`: PASS, with the new power-sequence assertion.
+- **Shots (each looked at against panel 21):** `docs/shots/lab/41-layout.png`, `42-act1-dark.png`, `44-power-wall.png`, `45-studio-corner.png`, `46-armory-her-corner.png`. The close-ups I used for the checks (console, relays, breaker, gate from the front, side and top, armory, studio) are in my scratchpad, not in the repo.
+- **Held, not done:** her voice does not come from the radio. The mentor voice chain (`audio/mentor-voice.ts`) is not positional, and I did not reroute the narration. The wall radio has its lamp only. Say if you want it routed.
+- **Not committed:** the other `docs/shots/lab/*` files (window-storm, subtitle-act1), which the capture regenerated, and `apps/web/dist/index.html` (build output, modified before I started).
+- **TASK-15 not started.** The TASK-16 condition for it is met, but the finish order ends this run with this report and a stop. Dispatch it when you want it.

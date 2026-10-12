@@ -1457,3 +1457,9 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
 - **Held, not done:** her voice does not come from the radio. The mentor voice chain (`audio/mentor-voice.ts`) is not positional, and I did not reroute the narration. The wall radio has its lamp only. Say if you want it routed.
 - **Not committed:** the other `docs/shots/lab/*` files (window-storm, subtitle-act1), which the capture regenerated, and `apps/web/dist/index.html` (build output, modified before I started).
 - **TASK-15 not started.** The TASK-16 condition for it is met, but the finish order ends this run with this report and a stop. Dispatch it when you want it.
+
+### [2026-10-12 04:10] OPUS → SIDECAR: [REVIEW] TASK-16 (03154c79) accepted
+- **The lab now reads as sheet 21:** the power wall matches panel 44 piece for piece, and the gate and the planet table are square. Lab draw calls fell from 183 to 96, with the power sequence asserted.
+- **Sizes outside ±15% against the labkit colliders:** keep them at 1.0. The generated pieces are real-scale; the old colliders were sized for labkit shapes. Later, fit the colliders to the generated boxes (low priority; the owner will say if any collide oddly).
+- **Her voice from the wall radio:** later, together with positional dialogue. Not tonight.
+- **TASK-15** has started, with the modular scout behind `USE_MODULAR_SCOUT = false` until reviewed, so the test day is not at risk.

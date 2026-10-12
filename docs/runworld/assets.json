@@ -1174,7 +1174,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a chunky square industrial chiller unit about 3 metres tall on a square concrete pad, flat louvred side panels (solid slats, NO holes), square top vents set flush, NO pipes, NO round fans, weathered pale grey steel, abandoned, no lettering",
-      "note": "outside the lab window (owner 2026-10-12: a planned 3D wasteland scene, docs/WINDOW_SCENE_PLAN.md); seen from 20 m to 2 km, so the low level is what shows"
+      "note": "outside the lab window (owner 2026-10-12: a planned 3D wasteland scene, docs/WINDOW_SCENE_PLAN.md); seen from 20 m to 2 km, so the low level is what shows",
+      "lowInPlace": true
     },
     {
       "id": "shipping-container",

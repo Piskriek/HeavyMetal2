@@ -70,11 +70,31 @@ function thinTrack(times, values, stride, isQuat, tol) {
   return { times: outTimes, values: outValues };
 }
 
-export function packAnimations(animsDir, outFilePath) {
+/** The rifle set (TASK-21): the extraction rifle's clips, in place, packed to their own binary (not the scientist's). */
+export const RIFLE_CLIPS = [
+  'rifle-idle',
+  'rifle-aiming-idle',
+  'firing-rifle',
+  'rifle-walk',
+  'rifle-run',
+  'backwards-rifle-walk',
+  'strafe-left',
+  'strafe-right',
+  'rifle-pull-out',
+  'rifle-put-away',
+  'reloading',
+];
+
+/**
+ * Packs the clips. `opts.inPlace` removes the root's drift (the hips' X and Z stay at their first key, so a walk does not travel);
+ * `opts.sample` is the clip whose track list is the file's dictionary (every clip in a set shares the rig).
+ */
+export function packAnimations(animsDir, outFilePath, opts = {}) {
+  const clipNames = opts.clipNames ?? CLIP_NAMES;
   const loader = new FBXLoader();
 
   // Find sample tracks to establish track name dictionary
-  const sampleBuf = fs.readFileSync(path.join(animsDir, 'breathing-idle.fbx'));
+  const sampleBuf = fs.readFileSync(path.join(animsDir, `${opts.sample ?? 'breathing-idle'}.fbx`));
   const sampleFbx = loader.parse(sampleBuf.buffer.slice(sampleBuf.byteOffset, sampleBuf.byteOffset + sampleBuf.byteLength), '');
   const TRACK_NAMES = sampleFbx.animations[0].tracks.map((t) => t.name);
 
@@ -82,7 +102,7 @@ export function packAnimations(animsDir, outFilePath) {
   let totalOrigKeys = 0;
   let totalThinnedKeys = 0;
 
-  for (const name of CLIP_NAMES) {
+  for (const name of clipNames) {
     const fbxPath = path.join(animsDir, `${name}.fbx`);
     if (!fs.existsSync(fbxPath)) {
       throw new Error(`Animation file not found: ${fbxPath}`);
@@ -91,6 +111,16 @@ export function packAnimations(animsDir, outFilePath) {
     const fbx = loader.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), '');
     const clip = fbx.animations[0];
     const tracks = [];
+    if (opts.inPlace) {
+      for (const t of clip.tracks) {
+        if (!/Hips.position$/.test(t.name)) continue;
+        const v = t.values;
+        for (let i = 0; i < t.times.length; i++) {
+          v[i * 3] = v[0];
+          v[i * 3 + 2] = v[2];
+        }
+      }
+    }
 
     for (let tIdx = 0; tIdx < TRACK_NAMES.length; tIdx++) {
       const tName = TRACK_NAMES[tIdx];
@@ -192,7 +222,11 @@ export function packAnimations(animsDir, outFilePath) {
 }
 
 if (process.argv[1] && process.argv[1].endsWith('pack-anims.mjs')) {
-  const animsDir = path.resolve('zips/Models/rigged/anims');
-  const outFile = path.resolve('apps/web/src/avatar/scientist/anims.bin');
-  packAnimations(animsDir, outFile);
+  if (process.argv.includes('--rifle')) {
+    packAnimations(path.resolve('zips/Models/rigged/anims/rifle'), path.resolve('apps/web/src/avatar/astro/rifle-anims.bin'), { clipNames: RIFLE_CLIPS, sample: 'rifle-idle', inPlace: true });
+  } else {
+    const animsDir = path.resolve('zips/Models/rigged/anims');
+    const outFile = path.resolve('apps/web/src/avatar/scientist/anims.bin');
+    packAnimations(animsDir, outFile);
+  }
 }

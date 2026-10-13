@@ -1,14 +1,38 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
+import { existsSync, statSync } from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { studioWriteBack } from './studio-server/vite-plugin';
 
 const p = (rel: string) => fileURLToPath(new URL(rel, import.meta.url));
 
+/**
+ * The single file's cap (Argo's DEC-10, approved by the owner on 13 October 2026), in MB of 1024² bytes as POL-27 measures.
+ * Above it the build fails after writing, so the file can still be inspected. Room comes from moving detail levels or
+ * vista-only props to the HD pack or a fetched side file, never from raising the cap without the owner.
+ */
+const MAX_MB = 16;
+function sizeGate(): Plugin {
+  let file = '';
+  return {
+    name: 'hm-size-gate',
+    apply: 'build',
+    configResolved(c) { file = path.resolve(c.root, c.build.outDir, 'index.html'); },
+    closeBundle() {
+      if (!existsSync(file)) return;
+      const mb = statSync(file).size / 1024 / 1024;
+      const line = `single file ${mb.toFixed(2)} MB of the ${MAX_MB} MB cap`;
+      if (mb > MAX_MB) throw new Error(`${line}: move detail levels or vista-only props out to the HD pack or a side file (POL-27).`);
+      console.log(`\n  ${line}`);
+    },
+  };
+}
+
 /** The deployable app: ONE static html file (RUN loads a static build; no server). base './' so it works from a sub-path. */
 export default defineConfig(({ mode }) => ({
   base: './',
-  plugins: [viteSingleFile(), studioWriteBack()],
+  plugins: [viteSingleFile(), studioWriteBack(), sizeGate()],
   // which game this build is (src/edition.ts): `HM_EDITION=goblin-racing npm run build` for the Goblin Racing launch; SetMix by default
   define: { __HM_EDITION__: JSON.stringify(process.env.HM_EDITION ?? 'setmix') },
   resolve: {

@@ -13,6 +13,7 @@ import path from 'node:path';
 import { NodeIO, getBounds } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
+import { lumGate } from './surface-luminance.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const SRC = path.join(ROOT, 'zips', 'runworld', 'assets');
@@ -53,9 +54,14 @@ function paint(doc) {
 const registryPath = path.join(LOW, 'registry.json');
 const registry = fs.existsSync(registryPath) ? JSON.parse(fs.readFileSync(registryPath, 'utf8')) : {};
 let packed = 0;
+const refused = [];
 for (const a of manifest.assets.filter((x) => only.length === 0 || only.includes(x.id))) {
   const d = path.join(SRC, a.id), has = (f) => fs.existsSync(path.join(d, f));
   if (!has('low.glb') || !has('mid.glb') || !has('high.glb')) continue;
+  // the luminance gate (Argo's fifth acceptance check, scripts/surface-luminance.mjs), measured on the files packed now.
+  // `lumOk` in the manifest is a reviewed exception for a model that is dark by design.
+  const lum = await lumGate(d);
+  if (!lum.ok && !a.lumOk) { console.log(`${a.id}: NOT PACKED, luminance (${lum.why})`); refused.push(a.id); continue; }
   const low = await io.read(path.join(d, 'low.glb'));
   paint(low);
   await io.write(path.join(LOW, `${a.id}.glb`), low);
@@ -80,3 +86,7 @@ for (const a of manifest.assets.filter((x) => only.length === 0 || only.includes
 }
 fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2) + '\n');
 console.log(`packed ${packed}; registry has ${Object.keys(registry).length} assets`);
+if (refused.length) {
+  console.log(`refused by the luminance gate: ${refused.join(', ')} (re-bake with a longer reach or lowInPlace, or review and set lumOk)`);
+  process.exitCode = 1;
+}

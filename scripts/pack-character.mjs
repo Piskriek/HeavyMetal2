@@ -5,7 +5,8 @@
 //  - resample the animation curves and drop tangents (three.js derives them for the normal map);
 //  - re-encode the three 4096² textures as 1024² WebP;
 //  - compress the geometry with meshopt (the game loads it through three's MeshoptDecoder).
-// The game bundle stays one file, so every kilobyte here ships to every player.
+// Only the low level is inlined into the single file, so every kilobyte of it ships to every player. Mid and high go to the
+// HD pack beside index.html (hd/astro/), which keeps the file under its 16 MB cap. An out dir puts all three there instead.
 import fs from 'node:fs';
 import path from 'node:path';
 import { NodeIO } from '@gltf-transform/core';
@@ -16,13 +17,14 @@ import sharp from 'sharp';
 
 const [src, outArg] = process.argv.slice(2);
 if (!src) { console.error('usage: node scripts/pack-character.mjs <extracted folder> [out dir]'); process.exit(2); }
-const out = outArg ?? 'apps/web/src/avatar/astro';
+/** Where the game loads each level from (apps/web/src/avatar/astro/astro-model.ts; scripts/retarget-astro.ts reads the same). */
+const DEST = { low: 'apps/web/src/avatar/astro/astro-low.glb', mid: 'apps/web/public/hd/astro/mid.glb', high: 'apps/web/public/hd/astro/high.glb' };
+const fileFor = (label) => (outArg ? path.join(outArg, `astro-${label}.glb`) : DEST[label]);
 const LEVELS = [['3k', 'low'], ['9k', 'mid'], ['30k', 'high']];
 const NAME = 'Meshy_AI_Armored_Space_Suit_biped';
 
 await MeshoptEncoder.ready; await MeshoptDecoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder, 'meshopt.decoder': MeshoptDecoder });
-fs.mkdirSync(out, { recursive: true });
 
 for (const [level, label] of LEVELS) {
   const dir = path.join(src, level, NAME);
@@ -49,7 +51,8 @@ for (const [level, label] of LEVELS) {
     textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [1024, 1024], quality: 82 }),
     meshopt({ encoder: MeshoptEncoder, level: 'medium' }),
   );
-  const file = path.join(out, `astro-${label}.glb`);
+  const file = fileFor(label);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
   await io.write(file, walk);
   const anims = walk.getRoot().listAnimations().map((a) => a.getName());
   const tris = walk.getRoot().listMeshes().flatMap((m) => m.listPrimitives()).reduce((n, p) => n + (p.getIndices()?.getCount() ?? 0) / 3, 0);

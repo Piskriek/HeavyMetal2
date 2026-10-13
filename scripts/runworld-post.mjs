@@ -18,6 +18,7 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { clearNodeTransform, prune, transformMesh } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 import draco3d from 'draco3dgltf';
+import { lumGate } from './surface-luminance.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const OUT = path.join(ROOT, 'zips', 'runworld', 'assets');
@@ -189,6 +190,9 @@ for (const a of manifest.assets.filter((x) => only.length === 0 || only.includes
     fs.rmSync(raw);
   }
   const kb = (f) => Math.round(fs.statSync(path.join(d, f)).size / 1024);
-  console.log(`${a.id}: ${dims.w.toFixed(2)} x ${dims.h.toFixed(2)} x ${dims.d.toFixed(2)} m${dims.yaw ? ` (turned ${dims.yaw} deg)` : ''}; low ${kb('low.glb')} KB, mid ${kb('mid.glb')} KB, high ${kb('high.glb')} KB`);
+  // the luminance gate (scripts/surface-luminance.mjs): reported here for the review; the pack step refuses a failure
+  const lum = await lumGate(d);
+  console.log(`${a.id}: ${dims.w.toFixed(2)} x ${dims.h.toFixed(2)} x ${dims.d.toFixed(2)} m${dims.yaw ? ` (turned ${dims.yaw} deg)` : ''}; low ${kb('low.glb')} KB, mid ${kb('mid.glb')} KB, high ${kb('high.glb')} KB; luminance low ${lum.low.toFixed(2)}, high ${lum.high.toFixed(2)}`);
+  if (!lum.ok) console.log(`${a.id}: LUMINANCE FAIL (${lum.why}). Re-bake with a longer reach or lowInPlace; the pack refuses it unless a review sets lumOk.`);
   releaseLock(d);
 }

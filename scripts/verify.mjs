@@ -35,4 +35,5 @@ if (!existsSync(html)) {
   console.error('FAILED: apps/web/dist/index.html is missing');
   process.exit(1);
 }
-console.log(`\nOK: apps/web/dist/index.html is ${(statSync(html).size / 1024).toFixed(0)} KB (one file). Deployable.`);
+// the build itself fails above the 16 MB cap (vite.config.ts, sizeGate)
+console.log(`\nOK: apps/web/dist/index.html is ${(statSync(html).size / 1024 / 1024).toFixed(2)} MB (one file, under the 16 MB cap). Deployable.`);

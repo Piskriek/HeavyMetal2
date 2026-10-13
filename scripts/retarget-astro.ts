@@ -26,7 +26,10 @@ const args = process.argv.slice(2);
 const rifleMode = args.includes('--rifle');
 const [fbxPath, dirArg] = args.filter((a) => a !== '--rifle');
 if (!fbxPath) { console.error('usage: node --import tsx scripts/retarget-astro.ts <scientist.fbx> [astro dir | --rifle]'); process.exit(2); }
-const dir = dirArg ?? 'apps/web/src/avatar/astro';
+/** Where each level lives, as scripts/pack-character.mjs writes them: low inline in the single file, mid and high in the HD pack. */
+const ASTRO_FILES: Record<string, string> = { low: 'apps/web/src/avatar/astro/astro-low.glb', mid: 'apps/web/public/hd/astro/mid.glb', high: 'apps/web/public/hd/astro/high.glb' };
+/** An astro dir argument holds all three levels as astro-<level>.glb instead. */
+const astroFile = (level: string): string => (dirArg ? path.join(dirArg, `astro-${level}.glb`) : ASTRO_FILES[level]!);
 const RIFLE_DIR = 'zips/Models/rigged/anims/rifle';
 const RIFLE_OUT = 'apps/web/src/avatar/astro/rifle-anims.bin';
 const FPS = 30;
@@ -257,7 +260,7 @@ async function main(): Promise<void> {
 
   if (rifleMode) {
     // Astro's rig is the same in every level: the mid GLB stands for it (its textures are not needed)
-    const bare = await io.read(path.join(dir, 'astro-mid.glb'));
+    const bare = await io.read(astroFile('mid'));
     for (const t of bare.getRoot().listTextures()) t.dispose();
     const parsed = await new GLTFLoader().setMeshoptDecoder(ThreeMeshoptDecoder).parseAsync(toArrayBuffer(Buffer.from(await io.writeBinary(bare))), '');
     rifleSet(src, buildTarget(parsed.scene, src));
@@ -265,7 +268,7 @@ async function main(): Promise<void> {
   }
 
   for (const level of ['low', 'mid', 'high']) {
-    const file = path.join(dir, `astro-${level}.glb`);
+    const file = astroFile(level);
     const doc: Document = await io.read(file);
     // the target rig as three.js objects: parse a copy without textures (node has no image decoder)
     const bare = await io.read(file);

@@ -2150,3 +2150,31 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
   - test-beam-tool passes 28 of 28.
 - **For TASK-22b:** decide whether a kit boot carries A4-01. If it does, drop test-beam-tool's seed. The typecheck error in `campaign-chain.test.ts` (unused syncChain) is yours to clear.
 - **For later:** two-hand IK on the foregrip is logged as POL-28.
+
+### [2026-10-13 21:02] OPUS → SIDECAR: [TASK] TASK-23b split: 23b-1 (the monster renderers and the window walkers) now, 23b-2 (wiring into play) after TASK-22b
+**TASK-23b-1** (beside TASK-22b; no `play.tsx`, no `play-scene.ts`, no `base/`). Read `docs/MONSTERS_PLAN.md`, `docs/prompts/sidecar/23-monsters.md`, `docs/monsters/packed.json` and `packages/leaksim`.
+1. **A monster render module** in `apps/web/src/monsters/`: `createMonsterRenderer(scene, manifest, { budget })` with `sync(mobs, skinOf)`, `update(dt, camera)` and `dispose()`. One renderer per era:
+   - **sprites:** instanced billboards, one draw call per skin; the 8-direction frame picked from the camera angle, with the mirror flag; walk, attack, pain and death frames by the mob's phase;
+   - **early 3D** (the MDL GLBs): morph-target clips;
+   - **modern 3D** (Quaternius): skinned clips with an AnimationMixer, capped by the budget.
+   
+   A pure adapter maps a leaksim archetype plus a leak's era to a skin id, seeded and deterministic.
+   
+   Load from the inline core plus `public/monsters/` behind the loading bar. Every skin needs a fallback if it fails to load.
+2. **The window walkers** (owner: "put some walking outside the window"): 3 to 6 monsters roam the window view in `lab-vista.ts` through the renderer, mid to far, inside the vista budget (40 calls, 120k triangles).
+3. **A preview page** (`apps/web/monsters.html`, dev only): every skin in a row per era; a leaksim world drives a few mobs so walk, attack, pain and death all play.
+   
+   Shoot it with `scripts/test-monsters-render.mjs`, and add a window shot with the walkers. Look at every shot.
+4. **Tests:**
+   - unit tests for the adapter, the direction pick and the frame timing;
+   - the shots;
+   - typecheck, build, and the vista maths tests.
+   
+   Commit with explicit paths, then post [DONE].
+
+**TASK-23b-2** (after TASK-22b): the rest of `23-monsters.md`.
+- Leaks at wreck sites on the plot, sealing with the beam.
+- leaksim's events to the HUD, and TASK-22's narration hooks (monsterSeen, monsterKilled, playerLow).
+- Player HP and the death hook, the Monsters setting, the drops, the guns' raycast and the budgets.
+- Remove `doom1.wad`, the Ogro and `weapon.md2` from the shipped build.
+- `test-planet-monsters.mjs` and the campaign's monster beats.

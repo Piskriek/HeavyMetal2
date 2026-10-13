@@ -122,13 +122,15 @@ export const VISTA_MONSTER_BUDGET: MonsterRenderBudget = { animated: 6, perSkin:
  * The walkers (plan: "some walking outside the window"): six patrols over the wasteland, mid to far, one from each of the three eras
  * where the shape fits. Each walker wears the adapter's skin for its archetype and era. The bearings keep clear of the Breach column.
  */
+// The bearings and distances keep to the open ground between the props (the apron's rubble and bollards, the container stack at 26 degrees,
+// the farm halls, the pylon line running out at 10 to 16 degrees and the overpass on the left): a walker behind a prop is hidden by it.
 const WALKER_PATROLS: readonly { readonly kind: Archetype; readonly era: Era; readonly from: readonly [number, number]; readonly to: readonly [number, number]; readonly speed: number; readonly offset: number }[] = [
-  { kind: 'charger', era: 'sprite', from: [-22, 60], to: [-16, 95], speed: 1.5, offset: 0 },
-  { kind: 'spitter', era: 'sprite', from: [18, 80], to: [26, 70], speed: 1.2, offset: 0.3 },
-  { kind: 'brute', era: 'sprite', from: [-22, 200], to: [-14, 230], speed: 1.0, offset: 0.6 },
-  { kind: 'charger', era: 'early3d', from: [12, 60], to: [16, 110], speed: 1.6, offset: 0.15 },
-  { kind: 'brute', era: 'early3d', from: [36, 180], to: [30, 220], speed: 1.1, offset: 0.45 },
-  { kind: 'charger', era: 'modern3d', from: [40, 90], to: [34, 120], speed: 1.7, offset: 0.8 },
+  { kind: 'charger', era: 'sprite', from: [4, 14], to: [7, 20], speed: 1.2, offset: 0 },
+  { kind: 'spitter', era: 'sprite', from: [16, 30], to: [17, 38], speed: 1.0, offset: 0.3 },
+  { kind: 'brute', era: 'sprite', from: [20, 70], to: [22, 85], speed: 1.0, offset: 0.6 },
+  { kind: 'charger', era: 'early3d', from: [34, 50], to: [33, 62], speed: 1.5, offset: 0.15 },
+  { kind: 'brute', era: 'early3d', from: [6, 40], to: [8, 55], speed: 1.1, offset: 0.45 },
+  { kind: 'charger', era: 'modern3d', from: [30, 95], to: [33, 110], speed: 1.6, offset: 0.8 },
 ];
 const WALKERS: readonly (WalkerSpec & { readonly skin: string })[] = WALKER_PATROLS.map((p, i) => {
   const id = 1000 + i;

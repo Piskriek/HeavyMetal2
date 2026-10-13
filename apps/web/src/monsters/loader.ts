@@ -115,13 +115,43 @@ async function loadSprite(skin: SkinInfo): Promise<SpriteAsset> {
   return { kind: 'sprite', id: skin.id, texture, width: json.width, height: json.height, mpp: json.mpp, groups: json.groups };
 }
 
+/**
+ * The box a model is fitted by. For morph-target models each frame (base plus one target's delta) gives a box; the fit uses the
+ * median frame, so a single odd frame cannot shrink or grow the whole model (the LibreQuake frames vary, and the union of all of
+ * them was three times the height of a walk frame). A model without morphs is fitted by its own box.
+ */
+export function animatedBox(root: THREE.Object3D): THREE.Box3 {
+  root.updateMatrixWorld(true);
+  const frames: THREE.Box3[] = [];
+  const v = new THREE.Vector3();
+  const d = new THREE.Vector3();
+  root.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    const targets = m.geometry.morphAttributes.position;
+    const base = m.geometry.attributes.position as THREE.BufferAttribute | undefined;
+    if (!targets?.length || !base) return;
+    for (const target of targets) {
+      const frame = new THREE.Box3();
+      for (let i = 0; i < base.count; i++) {
+        v.fromBufferAttribute(base, i).add(d.fromBufferAttribute(target, i)).applyMatrix4(m.matrixWorld);
+        frame.expandByPoint(v);
+      }
+      frames.push(frame);
+    }
+  });
+  if (frames.length === 0) return new THREE.Box3().setFromObject(root);
+  frames.sort((a, b) => (a.max.y - a.min.y) - (b.max.y - b.min.y));
+  return frames[Math.floor(frames.length / 2)]!;
+}
+
 async function loadModel(skin: SkinInfo): Promise<ModelAsset> {
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   const gltf = await loader.loadAsync(urlOf(skin, 'model.glb'));
   const scene = gltf.scene;
   scene.updateMatrixWorld(true);
   // fit to the real height: the feet on y = 0, the body centred on the origin (the models come in their own units)
-  const box = new THREE.Box3().setFromObject(scene);
+  const box = animatedBox(scene);
   const size = box.getSize(new THREE.Vector3());
   const centre = box.getCenter(new THREE.Vector3());
   const s = size.y > 0 ? skin.heightM / size.y : 1;

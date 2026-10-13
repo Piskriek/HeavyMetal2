@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Monster bench (dev)</title>
+<link rel="icon" href="data:," />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #07090c;
+    --panel: rgba(14, 18, 24, 0.72);
+    --edge: rgba(120, 220, 255, 0.18);
+    --ink: #e7f1f7;
+    --dim: #8aa0ad;
+    --signal: #5fe3ff;
+    --warm: #ffb457;
+    --bad: #ff6b7a;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) { --bg: #07090c; }
+  }
+  :root[data-theme="dark"] { --bg: #07090c; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 400 14px/1.45 Inter, system-ui, sans-serif; overflow: hidden; }
+  canvas#bench { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  .strip {
+    position: fixed; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--edge);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 4;
+  }
+  .strip h1 { margin: 0; font: 700 16px/1 Oxanium, sans-serif; letter-spacing: 0.02em; color: var(--ink); }
+  .strip .tabs { display: flex; gap: 6px; }
+  .strip a {
+    font: 600 12px/1 Oxanium, sans-serif; color: var(--dim); text-decoration: none; padding: 7px 10px;
+    border: 1px solid transparent; border-radius: 6px;
+  }
+  .strip a:hover { color: var(--ink); border-color: var(--edge); }
+  .strip a[aria-current="page"] { color: var(--signal); border-color: var(--signal); box-shadow: 0 0 12px rgba(95, 227, 255, 0.25); }
+  .strip a:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+  .readout { margin-left: auto; display: flex; gap: 14px; font: 500 12px/1 Oxanium, sans-serif; color: var(--dim); }
+  .readout b { color: var(--signal); font-weight: 600; }
+  .loader { position: fixed; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255, 255, 255, 0.06); z-index: 5; }
+  .loader i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--signal), var(--warm)); box-shadow: 0 0 10px var(--signal); transition: width 0.2s ease; }
+  .loader.done { opacity: 0; transition: opacity 0.6s ease 0.2s; }
+  .labels { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+  .chip {
+    position: absolute; transform: translate(-50%, -100%); white-space: nowrap; padding: 5px 8px;
+    background: rgba(10, 14, 20, 0.6); border: 1px solid var(--edge); border-radius: 6px;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); font: 500 11px/1.2 Oxanium, sans-serif; color: var(--ink);
+  }
+  .chip span { color: var(--dim); }
+  .chip em { font-style: normal; color: var(--warm); }
+  .note {
+    position: fixed; left: 16px; bottom: 16px; max-width: 420px; padding: 12px 14px; z-index: 3;
+    background: var(--panel); border: 1px solid var(--edge); border-radius: 10px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); color: var(--dim); font-size: 13px;
+  }
+  .note strong { color: var(--ink); font: 600 13px/1.2 Oxanium, sans-serif; display: block; margin-bottom: 4px; }
+  .error { position: fixed; top: 64px; left: 16px; color: var(--bad); font: 500 13px/1.4 Inter, sans-serif; z-index: 6; }
+  @media (max-width: 720px) {
+    .readout { margin-left: 0; width: 100%; flex-wrap: wrap; }
+    .note { right: 16px; max-width: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .loader i, .loader.done { transition: none; } }
+</style>
+</head>
+<body>
+<canvas id="bench" aria-label="Monster preview"></canvas>
+<header class="strip">
+  <h1>Monster bench</h1>
+  <nav class="tabs" aria-label="Preview modes">
+    <a href="?mode=roster&era=sprite" data-mode="roster-sprite">Sprite roster</a>
+    <a href="?mode=roster&era=early3d" data-mode="roster-early3d">Early 3D roster</a>
+    <a href="?mode=roster&era=modern3d" data-mode="roster-modern3d">Modern 3D roster</a>
+    <a href="?mode=turn&skin=flesh-worm" data-mode="turn">Eight views</a>
+    <a href="?mode=live&era=mixed" data-mode="live">Live arena</a>
+    <a href="?mode=window" data-mode="window">Window walkers</a>
+  </nav>
+  <div class="readout" id="readout" aria-live="polite"></div>
+</header>
+<div class="labels" id="labels"></div>
+<div class="note" id="note" hidden></div>
+<div class="error" id="error" hidden></div>
+<div class="loader" id="loader" aria-hidden="true"><i id="loaderBar"></i></div>
+<script type="module" src="/src/monsters/preview.ts"></script>
+</body>
+</html>

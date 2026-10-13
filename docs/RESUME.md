@@ -132,3 +132,8 @@ The context a new Opus session needs on its first message. Keep it current: upda
   - TASK-19 is accepted after review 3: the Breach is a glitch-sliced column and the storm reads dark. POL-25 and POL-26 are logged.
   - 17 batch-2 props are packed (cb5d569e).
   - **TASK-23a** (the monster art pipeline, `docs/prompts/sidecar/23a-monster-art.md`) is dispatched beside TASK-20. Both run in Haiku sidecars and never share files.
+- **Batch 2, finished (2026-10-13):**
+  - 28 props are packed from the overnight sets (cb5d569e and fe265bd7). The registry holds 114 assets.
+  - **Held for a re-bake** (dark patches in the low): drum-square-b, generator-small-a, battery-pack-a, cable-reel-square-a, container-crushed-a, terminal-old-a. Try `reach: 3` or `fix: ['plain-back']`, then check lod-bake.py's colour bake for shadowed interiors.
+  - **Dropped or held:** cart-flatbed and pallet-crates (crumpled lows); server-crate and transformer-box (no clean low); chimney-square (the owner's rule); crater-rim-chunk.
+  - **Not yet placed in the game.** The lab clutter and vista placement brief is still to write. The window vista can use the wasteland ones now.

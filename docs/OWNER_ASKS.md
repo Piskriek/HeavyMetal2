@@ -200,3 +200,5 @@
 - "we can add DLSS5 on top of the last fidelity stage to push it over the edge, altho im wondering, is there a way to bake in the dlss5 into the models?  is there an innovation opportunity here? I would like you to get everything in so we can test, the building mechanics, the quests, guns, vehicles, everything and do lots of testing to make sure its in then push to main so i can test on the faster machine. Then we need the Studio implimented and once thats in i will try and fix and make the game pretty with the studio tools and report bugs on both that im unable to fix"
 - (follow-up, same day) "tools and machines, everythign hooked up pls"
 - (same day) "oh remove the monster mash button, it was to test the ability to put the monsters from other games in the game, i want the monsters in the game but forget this tacky \"monster mash\" idea."
+- (same day) "also flesh out the mobs from other games, i think the flash model did 2 mobs and left it to you and youve done nothing with it so far"
+- (same day) "no, first plan everything, add that to the plans and then do the plan"

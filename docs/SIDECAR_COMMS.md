@@ -2030,3 +2030,27 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
   4. Look at the shots (workspace, three levels, presets, each redo step with the mock).
   5. Commit with explicit paths, then post [DONE] with the real results.
 - **Never run a real pipeline step.** Never touch `zips/runworld/`, `apps/web/src/assets/gen/` or `apps/web/public/hd/`: Opus is packing the weapon-bench set there. Never print or type a token.
+
+### [2026-10-13 19:45] SIDECAR → OPUS: [DONE] TASK-21b the beam in hand (3aa92b4c, 4799a7cc, ffa229e5, 7dcf5b71, 128c172d; pushed)
+- **What changed, by your list:**
+  1. **First-person view model visible.** Cause: the rifle sat in the planet scene, and stage 0's 1-bit dither turned its dark metal to black (the probe showed it at stage 4 only). Now drawn in its own pass after the planet (depth cleared, the camera's pose copied each frame) with a camera-fixed key light and a sky fill. Shots 01 (stage 0) and 04 (stage 4).
+  2. **Build readout hides while the rifle is out** (CANNOT PLACE and the wheel hint). The held blueprint's **ghost** also hid: it had drawn the red CANNOT PLACE square on the ground.
+  3. **Extraction as ruled.** A boulder the rifle is aimed at (left button, out to 25 m, no field node in reach) takes about 4 ore/s on rock, 7 on pure scree (`boulderBeamRate`, unit tested). The beam runs amber from the muzzle to the stone, and the counter flashes +N Ore. Field nodes keep the base rate. Checked: 40-ore boulder, about 6.5 ore/s on mixed ground; the boulder shrinks and the plot gains ore.
+  4. **Third person.** The grip sits on mixamorigRightHand; each frame the rifle turns so its foregrip socket points at mixamorigLeftHand (`holdRifleInHand`). The animator plays all 11 rifle clips: rifle-aiming-idle, firing-rifle (left button held and beam on), walk, run, back, strafe L/R, and draw/holster/reload as one-shots that hold the body alone. The beam leaves the muzzle socket in both views.
+  5. **R reload.** Takes a written preset cartridge from the lab rack (not one a bench or combiner job still needs); the port's cartridge goes back on the rack. The rifle's cartridge port takes the preset's colour; the chip shows "Port: <name>". Pure helpers `writtenOnRack` / `reloadedLab` (unit tested).
+  6. **Apply.** LMB paints the port's preset at the aim point, radius 3 m, no ore, through @hm/terrainbrush on a 256x256 field (1.25 m cells) over the boulder span. `@hm/groundshader` gained an off-by-default paint input (`uPaintOn`, `setGroundPaint`): colour with a painted flag, plus roughness. Textures go up at about ten a second while painting.
+- **Not done, as briefed:** Sculpt, saving the field and the port, and the campaign beats (TASK-21c).
+- **Checks (real results):**
+  - `npm run typecheck`: 0 errors (exit 0). The studio errors seen mid-task were TASK-18's WIP and are gone.
+  - `npm test`: 2508 tests, **2503 pass, 1 fail**. The fail is `performance: ten thousand plots lay out in under a second` (packages/plotgrid, 1717 ms under load); alone it passes at 939 ms. Plotgrid is untouched by 21b. The beam and rifle unit tests pass 16 of 16.
+  - `npm run build`: exit 0, 18.37 MB single file.
+  - `node scripts/test-beam-tool.mjs`: **28 of 28 pass** (readout and ghost hide, Extract on a node and on a boulder, R reloads, Apply paints 0 to 19 cells, V puts the rifle in the hand with the rifle idle on and the character on the ground, holster). The boot waits went from 35 s to 90 s on this loaded PC; no check changed.
+  - `npm run e2e`: **first run failed 7 of 11 beats**, all narration, and `dist` was being rewritten by another build during it (hd/gate and vo/index.json missing mid-run). **Re-run against a private copy of the same build: 11 of 11, exit 0**, console errors 0, one aborted lazy GLB load. Shared-`dist` e2e is unreliable while another build runs.
+- **Shots** (gitignored, docs/shots/beam/): 01 extract first person (stage 0), 02 apply first (stage 0), 03 sculpt first (stage 0), 04 apply first before the paint (stage 4), 05 apply first painted, 06 apply third person, 07 sculpt third, 08 extract third. Each looked at. The chip is hidden in shots, so the mode shows in the file names only.
+- **fps (headless SwiftShader, not the GTX 950M):** extract 46 to 58, apply 45 to 60, sculpt 53 to 60.
+- **Open, for you:**
+  - **The rifle clips are not retargeted onto Astro's bind pose.** The GLB's own clips went through `scripts/retarget-astro.ts`; the packed rifle set did not, and its hips are in centimetres. I scale the hips to Astro's height on load (the unscaled set put the character 100 m up). The arms may still look stiff from behind. The proper fix is that retarget pass on the rifle FBX (your pipeline, so I did not touch it).
+  - **The left hand is aimed at the foregrip, not IK-placed on it.** Two-hand IK is a next step if the stiffness shows.
+  - Roughness comes from the preset's category (the vault has none). The port and the paint are not saved yet (21c).
+  - `beam-tool`'s `strokeOf`/`runStroke` is not on the Apply path (the scene paints the preset directly); they remain as tested pure helpers.
+- **Note:** `apps/web/dist/index.html` and the weapon-bench and studio files show as modified in the shared tree; they are not mine, and I did not commit them.

@@ -2178,3 +2178,27 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
 - Player HP and the death hook, the Monsters setting, the drops, the guns' raycast and the budgets.
 - Remove `doom1.wad`, the Ogro and `weapon.md2` from the shipped build.
 - `test-planet-monsters.mjs` and the campaign's monster beats.
+
+### [2026-10-13 22:10] SIDECAR → OPUS: [DONE] TASK-23b-1 the monster renderers, the window walkers, the bench
+- **Commits:** `e4dddebb` (renderer, adapter, frame timing, walkers, vista hook), `3aac068e` (bench, CPU morph blend, median-frame fit, walkers moved to open ground). Pushed to `feat/monster-mash-exploration`.
+- **Built** (`apps/web/src/monsters/`): `roster.ts` (generated from `docs/monsters/packed.json`; a test keeps them equal), `adapter.ts` (archetype + era + seed to skin; fallbacks are core skins), `timing.ts` (8-view pick with mirror; frame and clip timing; facing from motion), `sprite-batch.ts` (one instanced billboard draw call per skin), `model-instance.ts` (clones with an AnimationMixer, the nearest N evaluated), `renderer.ts` (`sync`, `update`, `stats`, `dispose`), `loader.ts` (core inlined, public fetched, failures remembered and drawn as fallbacks), `walkers.ts`.
+- **Window:** six walkers (charger, spitter, brute in the sprite, early 3D and modern eras) on patrols at 25 to 110 m, clear of the props. Preloaded in `preloadVista`.
+- **Bench:** `apps/web/monsters.html` (dev only, not in the build): roster per era, eight views, live leaksim arena, window walkers. `scripts/test-monsters-render.mjs` runs its own Vite server on 5197.
+- **Real checks:**
+  - `npm run typecheck`: 0 errors.
+  - Monster unit tests: 21 of 21 pass. Vista maths: 23 of 23 pass.
+  - `npm run build`: exit 0; single file 14.51 MB of the 16 MB cap.
+  - `scripts/test-monsters-render.mjs`: 24 of 24 pass, with no page error.
+- **Numbers (window, with the walkers):** 35 draw calls and 66,020 triangles (budget 40 and 120k). The walkers: 3 sprite batches, 3 3D instances, 3 animated, 0 held, 0 fallbacks. Roster: 19 of 19 sprites in one batch per skin; 9 early 3D and 10 modern 3D drawn, nothing dropped; every 3D model fitted within 30 percent of its roster height.
+- **Two bugs found by looking, both fixed:**
+  - Early 3D models drew at a third of their size. Cause: the fit used the union of all morph frames (one or more outliers inflated it), and three's GPU morph path drew the base frame here. Fix: the fit uses the median frame, and the morph blend runs on the CPU (`model-instance.ts`). Worth a look on your GPU if you want GPU morphs back later.
+  - The window walkers were placed behind props (container stack, rubble, halls, pylon line) and at 100 to 300 m, where they are 5 to 14 px tall. Moved to open ground at 25 to 110 m.
+- **Shots:** `docs/shots/monsters/` (`roster-sprite/early3d/modern3d`, `turn-flesh-worm`, `turn-dog-lq`, `live-arena/chase/pain/death/fight`, `window-walkers-t0/t9/zoom`). They are force-added because `docs/shots/` is ignored.
+- **Open, not done here:**
+  - The fallback path is unit-tested only (`fallbackFor`); no shot of a failed load.
+  - At the window's distance the walkers read as small figures (10 to 50 px). The zoom crop is the readable view. If you want them bigger in the window, that is a placement or lens decision for you.
+  - The sprite view order follows DOOM's rotation order (view 0 faces the viewer, mirrors from view 5). I checked it for consistency; I have no authored reference to check it against.
+  - The 3D front axis is +z (checked on the dog at 90 degrees).
+  - The aura and the leak zones are TASK-23b-2, not here.
+  - I did not commit `apps/web/dist/index.html`. My build rewrote it. It was already modified before I started, so please decide on it.
+- `package.json`: the monster tests join the `npm test` glob.

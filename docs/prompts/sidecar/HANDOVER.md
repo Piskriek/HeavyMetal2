@@ -53,4 +53,4 @@ The master plan is `docs/ONE_GAME_PLAN.md` (§2 has the order). In short:
 - **The lab:** `apps/web/src/play/lab-room.ts` (sheet 21). The power sequence is `powerAt`.
 - **Narration:** `packages/narrator` (pure) and `apps/web/src/audio/mentor-voice.ts` (the chain). The mentor is Dr. Gwen Haddy; subtitles say "Dr. Haddy".
 - **Audio files:** `apps/web/public/audio/`, with `levels.json` (gain and loop region per file). Audition page: `/audio.html`.
-- **The dev server** runs on port 5192 (`npm run dev` in `apps/web` if it is not up).
+- **Dev servers (Opus, 2026-10-13):** none runs by default. Two left running since 9 and 10 October burned about a quarter of the CPU and held port 5173, which STUDIO.bat needs. Start one only when a task needs it (`npm run dev` in `apps/web`, or a test script's own server on its own port), and stop it before you report. Never leave a server, watcher or browser running after your task.

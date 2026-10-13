@@ -143,3 +143,14 @@ The context a new Opus session needs on its first message. Keep it current: upda
   - **TASK-21 part 1 accepted:** G draws and holsters the beam; Q or the wheel cycles its modes; the rifle clips are packed.
   - **Running side by side:** TASK-21b (beam: view model, third person, reload, Apply paint) and TASK-18 (Studio asset bench plus the weapon-bench model redo, with a scoped pipeline exception on the board).
   - **Next:** TASK-21c (Sculpt, saving, the campaign beats), then TASK-22, 23b, 23c and 24, then main.
+- **2026-10-13 about 19:00, stale processes stopped** (owner: "turn off what you gotta turn off"):
+  - the dev servers from 9 and 10 October (ports 5173 and 5192), a leftover Studio server on 5201, the Flash board watcher, the 5 October ui-editor;
+  - the overnight asset watcher (`scripts/runworld-watch.mjs`). Restart it with `node scripts/runworld-watch.mjs` for a long unattended batch; the per-asset lock keeps it safe beside a loop.
+  - HANDOVER now says sidecars stop their own servers.
+- **The weapon-bench set** (owner: "model individual tools ... the bench and the tools cant be one object"):
+  - nine assets: weapon-bench (empty, `yaw: 90`), bench-jig, bench-printer, tool-wall, tool-drill, tool-wrench, tool-mallet, tool-scanner, tool-screwdriver;
+  - images reviewed; the printer was redone without a cable;
+  - models running in `zips/runworld/bench-set.log`;
+  - the bench and the jig are reviewed (four angles) and good;
+  - pack the set when the rest pass review. TASK-23c places it.
+- **Studio:** TASK-18 and 18b work committed as WIP (6f1f4ee9); TASK-18c finishes the last check.

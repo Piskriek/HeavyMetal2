@@ -55,7 +55,25 @@ await page.addInitScript(() => {
     configurable: true,
     get() { return document.querySelector('canvas.play-canvas'); },
   });
-  try { localStorage.clear(); } catch {}
+  // a fresh profile on the first load only; the reload below keeps the save it made
+  try {
+    if (!sessionStorage.getItem('beam-test-booted')) {
+      localStorage.clear();
+      sessionStorage.setItem('beam-test-booted', '1');
+    }
+    // the rifle is racked until its campaign step (A4-01, the cartridge rack) is done: the test marks that step done in the save
+    // (the counter, the quest and the step), so G takes the rifle out
+    const raw = localStorage.getItem('hm.setmix.play');
+    if (raw && !sessionStorage.getItem('beam-test-a4')) {
+      const r = JSON.parse(raw);
+      r.chain.counts['tool:pickup'] = 1;
+      r.chain.counts['drill:running'] = 1;
+      r.chain.progress.quest = 'act4';
+      r.chain.progress.step = 1;
+      localStorage.setItem('hm.setmix.play', JSON.stringify(r));
+      sessionStorage.setItem('beam-test-a4', '1');
+    }
+  } catch {}
 });
 const pageErrors = [];
 page.on('pageerror', (err) => pageErrors.push(err.message));
@@ -106,6 +124,10 @@ try {
   await page.goto(`http://localhost:${port}/?base&kit=1`, { waitUntil: 'domcontentloaded' });
   await page.locator('canvas.play-canvas').waitFor({ state: 'visible', timeout: 60000 });
   // the boot is slow on a loaded PC (the build is one 18 MB file): give it time before the checks start
+  await page.waitForFunction(() => window.hmPlay?.ready === true, null, { timeout: 90000 });
+  // the first load wrote the save; reload so the init script marks the rifle's step done in it
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.locator('canvas.play-canvas').waitFor({ state: 'visible', timeout: 60000 });
   await page.waitForFunction(() => window.hmPlay?.ready === true, null, { timeout: 90000 });
   await page.evaluate(() => {
     window.hmPlay?.teleportPlanet?.();

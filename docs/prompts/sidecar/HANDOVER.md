@@ -43,6 +43,7 @@ The master plan is `docs/ONE_GAME_PLAN.md` (§2 has the order). In short:
 3. **TASK-21 the beam tool** (`21-beam-tool.md`).
 4. **TASK-22 the campaign chain** (`22-campaign-chain.md`).
 5. **TASK-23 the monsters** (`23-monsters.md`; waits for `@hm/leaksim` and the art).
+5b. **TASK-23c the props in the world** (`23c-props-in-world.md`).
 6. **TASK-24 test everything, fix, report** (`24-campaign-e2e.md`). Opus then pushes main.
 7. **TASK-17 Studio shell** (resume the WIP in `zips/studio-wip-2026-10-12/`), then **TASK-18 the asset bench**, then **TASK-25 the Workshop** (bring your own monsters).
 8. Then post `[QUESTION] ready for the next task` and stop.

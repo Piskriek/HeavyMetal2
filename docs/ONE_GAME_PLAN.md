@@ -33,6 +33,7 @@ The owner, 13 October:
 | 2 | Haiku | **TASK-21 the beam tool:** a rifle with the rifle clips; Extract, Apply (cartridges) and Sculpt (terrainbrush); racked in the lab until Act IV | `21-beam-tool.md` | |
 | 3 | Haiku | **TASK-22 the campaign chain:** Acts IV to VI as quests; unlocks; the narration; vehicles at stages 2, 4 and 6; the first gun from the weapon bench | `22-campaign-chain.md` | |
 | 4 | Haiku | **TASK-23 the monsters:** six archetypes with many skins (Freedoom, Blasphemer, LibreQuake, Quaternius); leaks; some walking outside the lab window; seal leaks with the beam; a Monsters Off/Calm/Normal/Hard setting; drops into the substrate chain; `doom1.wad` and the Ogro removed | `23-monsters.md`, `docs/MONSTERS_PLAN.md` | `@hm/leaksim` landed (the battle runs: arena.ai/c/01a1350f-024b-7a13-8962-014239f39525); the art is downloaded |
+| 4c | Haiku | **TASK-23c the props in the world:** lab clutter you clear for salvage, wreck sites at the leaks (restored when sealed), the batch-2 wasteland pieces in the window view (28 props packed 13 Oct, plus the 10 lab clutter props) | `23c-props-in-world.md` | TASK-23b |
 | 5 | Haiku | **TASK-24 test everything, fix, report:** every e2e, the campaign three times in a row, a bug sweep, fps on the real GPU | `24-campaign-e2e.md` | |
 | 6 | Opus | **Review, then push `main`** (a fast-forward: main is an ancestor of the branch) | | TASK-24 green |
 | 7 | Haiku | **TASK-17 the Studio shell and write-back** (resume the WIP) | `17-studio-shell.md` | |

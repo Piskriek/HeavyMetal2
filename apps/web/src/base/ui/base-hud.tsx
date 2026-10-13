@@ -30,6 +30,8 @@ interface BaseHudProps {
   weaponStats?: WeaponStats | null;
   ammo?: { current: number; max: number } | null;
   drivingSpeed?: number | null;
+  /** The held extraction rifle takes the mouse: the build readout (CANNOT PLACE, the wheel hint) is hidden while it is out. */
+  buildHidden?: boolean;
 }
 
 export type OpenWindow = 'none' | 'inventory' | 'drafting' | 'lattice';
@@ -55,6 +57,7 @@ export const BaseHud: React.FC<BaseHudProps> = ({
   weaponStats = null,
   ammo = null,
   drivingSpeed = null,
+  buildHidden = false,
 }) => {
   const [view, setView] = useState<BaseView>(() => source.get());
   const [openWindow, setOpenWindow] = useState<OpenWindow>('none');
@@ -120,7 +123,7 @@ export const BaseHud: React.FC<BaseHudProps> = ({
   return (
     <>
       {/* Reticle Build Readout - hidden when paused, modal open, or driving */}
-      {!paused && openWindow === 'none' && !modalOpen && drivingSpeed === null && (
+      {!paused && openWindow === 'none' && !modalOpen && drivingSpeed === null && !buildHidden && (
         <BuildReadout
           build={view.build}
           hoverSupport={hoverSupport}

@@ -3153,6 +3153,7 @@ export function PlayScreen(props: {
               hoverSupport={hoverSupport}
               wheelCycleText={wheelCycleText}
               rotationText={rotationText}
+              buildHidden={beamHud.held}
               world={baseWorldRef.current}
               at={sceneRef.current?.debug.position() ?? { x: 0, z: 0 }}
               currentStructureId={currentAimedStructureIdRef.current}

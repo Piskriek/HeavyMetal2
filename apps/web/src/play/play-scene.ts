@@ -849,14 +849,22 @@ export function createPlayScene(o: {
   planetScene.add(beamFx.object);
   beamFx.object.visible = false;
 
-  // The held rifle (TASK-21): a first-person view model on the camera, right of centre. It sits on layer 1, which only the
-  // main camera enables, so the gate's far-side camera never draws a rifle floating in its view.
+  // The held rifle (TASK-21): a first-person view model, right of centre. It is not in the planet scene: it is drawn in its
+  // own pass after the planet (see drawViewModel), with its own lights, so the stage's look (the 1-bit dither at stage 0,
+  // which turns dark metal to black) never hides it. The rig copies the main camera's pose each frame.
   const heldBeam: BeamTool = extractionBeam(createMaterials(), { stage: 1 });
-  heldBeam.group.position.set(0.22, -0.2, -0.46);
-  heldBeam.group.traverse((o) => o.layers.set(1));
+  heldBeam.group.position.set(0.2, -0.24, -0.6);
   heldBeam.group.visible = false;
-  camera.layers.enable(1);
-  camera.add(heldBeam.group);
+  const viewModelScene = new THREE.Scene();
+  const viewRig = new THREE.Group();
+  viewRig.add(heldBeam.group);
+  // a key light fixed to the camera, up and to the right of the rifle, and a sky fill: the rifle reads at every stage
+  const viewKey = new THREE.PointLight('#ffffff', 2.4, 6, 1.6);
+  viewKey.position.set(0.7, 0.55, 0.1);
+  viewRig.add(viewKey);
+  const viewFill = new THREE.HemisphereLight('#dfe9ff', '#3a3a40', 1.6);
+  viewModelScene.add(viewFill);
+  viewModelScene.add(viewRig);
   planetScene.add(camera);
 
   const beamCoreGeom = keep(new THREE.CylinderGeometry(0.04, 0.07, 1, 10));
@@ -1053,6 +1061,18 @@ export function createPlayScene(o: {
     postUniforms.uCamWorld.value.copy(cam.matrixWorld);
     renderer.setRenderTarget(to);
     renderer.render(postScene, postCam);
+  };
+
+  /** The held rifle over the picture: its own pass, depth cleared so no wall or ground cuts it, its own lights (TASK-21). */
+  const drawViewModel = (cam: THREE.PerspectiveCamera): void => {
+    if (!heldBeam.group.visible) return;
+    viewRig.position.copy(cam.position);
+    viewRig.quaternion.copy(cam.quaternion);
+    renderer.autoClear = false;
+    renderer.setRenderTarget(null);
+    renderer.clearDepth();
+    renderer.render(viewModelScene, cam);
+    renderer.autoClear = true;
   };
 
   /** The front on the ground (metres; -1 none, 1e7 done) and on the sky (the sine of the elevation it has climbed to). */
@@ -1918,6 +1938,7 @@ export function createPlayScene(o: {
           room.gate.group.visible = true;
         }
         drawPlanet(camera, null, false);
+        drawViewModel(camera);
       }
       // ---- what you are looking at: a machine on the planet within reach of your hand, a boulder with ore, the lab's main lever, or lab machines
       let aimed: number | null = null;

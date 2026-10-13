@@ -150,9 +150,9 @@
   "weapon-bench": {
     "class": "fixture",
     "size": [
-      2.399,
-      1.643,
-      0.764
+      2.4,
+      1.138,
+      1.002
     ]
   },
   "barrel-short": {
@@ -1203,6 +1203,70 @@
       3.031,
       2.504,
       2.493
+    ]
+  },
+  "bench-jig": {
+    "class": "fixture",
+    "size": [
+      0.106,
+      0.187,
+      0.45
+    ]
+  },
+  "bench-printer": {
+    "class": "fixture",
+    "size": [
+      0.399,
+      0.45,
+      0.392
+    ]
+  },
+  "tool-wall": {
+    "class": "fixture",
+    "size": [
+      1.6,
+      1.164,
+      0.149
+    ]
+  },
+  "tool-drill": {
+    "class": "detail",
+    "size": [
+      0.303,
+      0.278,
+      0.095
+    ]
+  },
+  "tool-wrench": {
+    "class": "detail",
+    "size": [
+      0.4,
+      0.095,
+      0.099
+    ]
+  },
+  "tool-mallet": {
+    "class": "detail",
+    "size": [
+      0.176,
+      0.111,
+      0.35
+    ]
+  },
+  "tool-scanner": {
+    "class": "detail",
+    "size": [
+      0.115,
+      0.22,
+      0.05
+    ]
+  },
+  "tool-screwdriver": {
+    "class": "detail",
+    "size": [
+      0.066,
+      0.067,
+      0.25
     ]
   }
 }

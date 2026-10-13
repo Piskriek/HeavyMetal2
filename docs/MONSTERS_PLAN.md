@@ -37,6 +37,27 @@ The owner: "i want the monsters in the game but forget this tacky \"monster mash
   | Flyer | sprite, Freedoom (its large floater) | Hovers and strafes, ignores walls. |
   | Brute | early 3D, LibreQuake | Slow tank; ground slam with a long wind-up. |
   | Sapper **(P)** | early 3D, LibreQuake, or our own generated model | Ignores you and drains a machine's output (it glitches) until killed. It never destroys anything. |
+- **Many monsters, not one type.** The owner: "dont get stuck on on type of moster, there must be loads out there we can use". Each archetype wears many skins from three eras. A leak has an era theme and spawns that era's monsters. Downloaded on 13 October (the owner: "download whatever you need") into `zips/monsters/`:
+
+  | Source (licence) | Era | Monsters |
+  |---|---|---|
+  | Freedoom 0.13.0 (BSD-3, checksum verified) | sprite, 8 directions | 17: the zombie trio and the soldier, the Serpentipede, the Flesh Worm, the floater, the small skull flier, the pain floater, both lords, the skeleton, the fat one, the two technospiders, the cyber boss, the healer (`freedoom2.wad` prefixes POSS SPOS CPOS SSWV TROO SARG HEAD SKUL PAIN BOS2 BOSS SKEL FATT BSPI SPID CYBR VILE) |
+  | Blasphemer 0.1.8 (BSD-3) | sprite, Heretic style | 11 (BEAS CHKN CLNK IMPX KNIG MNTR MUMM SNKE SOR2 SRCR WZRD) |
+  | LibreQuake 0.09 lite (BSD-3) | early 3D (`.mdl` in `pak0`/`pak1`) | about 15: dog, zombie, soldier, enforcer, knight, hell knight, ogre, scrag, fiend, shambler, vore, spawn, fish, and two bosses |
+  | Quaternius Ultimate Monsters (CC0) | modern low-poly glTF, skinned | 50, with walk, run, attack, hit and death animations (Big, Blob, Flying) |
+
+  Optional later: Quaternius Cute Animated Monsters (21, CC0), OpenGameArt's CC0 Doom-style sprite monsters, and our own generated monsters (the 3D PC) for any gap.
+
+  **Proposed mapping to the archetypes (the sidecar may refine it):**
+  - charger: Flesh Worm, dog, Orc;
+  - spitter: Serpentipede, IMPX, enforcer;
+  - swarmer: skull flier, CHKN, Blob monsters;
+  - flyer: floater, WZRD, scrag, Quaternius Flying;
+  - brute: both lords, MNTR, ogre, shambler, Yeti;
+  - sapper: technospider, spawn, CLNK.
+
+  The cyber boss, the spider boss and LibreQuake's bosses are kept for a boss archetype later.
+- **Some walking outside the lab window** (the owner: "put some walking outside the window if you want"). Three to six monsters roam the wasteland in the window view, from mid to far distance: instanced, in their era's look, inside the vista's budget. TASK-23 does this once the art is packed.
 - **Leaks (the owner's idea) are where they come from:**
   - A leak is a janky zone around a junked model (we keep every junked model).
   - Hold the beam on it to seal it **(P: Extract held on the leak, or a "seal" cartridge in Apply)**. A sealed leak stays sealed and its junk model is restored up the fidelity ladder.
@@ -64,10 +85,9 @@ The owner: "i want the monsters in the game but forget this tacky \"monster mash
 
 ## 4. How it gets built
 1. **The Arena battle `@hm/leaksim`** (brief: `docs/prompts/battle/leaksim.txt`): the pure, deterministic brain. Archetypes, telegraphed attacks, bolts, machine-draining sappers, leaks with waves and sealing, the aggression levels, safe zones, drops, encode and decode. It replaces `@hm/mobsim` in the game; mobsim stays for its own tests.
-2. **The assets (needs the owner's OK to download):**
-   - the Freedoom release (freedoom1 and freedoom2 WADs, BSD) from its GitHub releases;
-   - the LibreQuake release (BSD) from its GitHub;
-   - a Quake `.mdl` parser beside the existing WAD and MD2 parsers in `@hm/shareware`.
-   - Only the frames we use are packed (sprite sheets and baked vertex animations), with the BSD notices in the credits.
+2. **The assets: downloaded** (`zips/monsters/`, see §3).
+   - Add a Quake `.mdl` parser beside the existing WAD and MD2 parsers in `@hm/shareware`.
+   - Pack only the frames we use: sprite sheets, baked vertex animations, and the glTF clips we need.
+   - Put the BSD notices and the CC0 thanks in the credits.
 3. **TASK-23 (sidecar):** wire leaksim into the planet: the renderers per era, the leak zones on junked models, the seal, the aura, the drops, the setting, the warnings, and the budgets. Remove `doom1.wad` and the Ogro from the shipped build. The `?mash` fixture then uses Freedoom.
 4. **The Workshop's bring-your-own import:** TASK-25, after main, alongside the Studio. It reuses the parsers.

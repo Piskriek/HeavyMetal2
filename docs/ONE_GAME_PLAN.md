@@ -31,7 +31,7 @@ The owner, 13 October:
 | 1 | Haiku | **TASK-20 one game:** the base systems always on in the campaign; one build menu, interact key and save; old saves migrated; the Monster Mash button and name removed (the monsters stay); starts `scripts/test-campaign.mjs` | `docs/prompts/sidecar/20-one-game.md` | |
 | 2 | Haiku | **TASK-21 the beam tool:** a rifle with the rifle clips; Extract, Apply (cartridges) and Sculpt (terrainbrush); racked in the lab until Act IV | `21-beam-tool.md` | |
 | 3 | Haiku | **TASK-22 the campaign chain:** Acts IV to VI as quests; unlocks; the narration; vehicles at stages 2, 4 and 6; the first gun from the weapon bench | `22-campaign-chain.md` | |
-| 4 | Haiku | **TASK-23 the monsters:** six archetypes from leaks; legal Freedoom and LibreQuake art; seal leaks with the beam; a Monsters Off/Calm/Normal/Hard setting; drops into the substrate chain; `doom1.wad` and the Ogro removed | `23-monsters.md`, `docs/MONSTERS_PLAN.md` | `@hm/leaksim` landed; the art downloaded (owner OK) |
+| 4 | Haiku | **TASK-23 the monsters:** six archetypes with many skins (Freedoom, Blasphemer, LibreQuake, Quaternius); leaks; some walking outside the lab window; seal leaks with the beam; a Monsters Off/Calm/Normal/Hard setting; drops into the substrate chain; `doom1.wad` and the Ogro removed | `23-monsters.md`, `docs/MONSTERS_PLAN.md` | `@hm/leaksim` landed (the battle runs: arena.ai/c/01a1350f-024b-7a13-8962-014239f39525); the art is downloaded |
 | 5 | Haiku | **TASK-24 test everything, fix, report:** every e2e, the campaign three times in a row, a bug sweep, fps on the real GPU | `24-campaign-e2e.md` | |
 | 6 | Opus | **Review, then push `main`** (a fast-forward: main is an ancestor of the branch) | | TASK-24 green |
 | 7 | Haiku | **TASK-17 the Studio shell and write-back** (resume the WIP) | `17-studio-shell.md` | |
@@ -43,7 +43,7 @@ The owner, 13 October:
 - the Arena battle `@hm/leaksim` (`docs/prompts/battle/leaksim.txt`, tests typechecked): send it, collect the answers, land the better one;
 - review each task's commits and shots;
 - batch 2 of the 3D models: review a, b and c per subject, then pack the keepers;
-- the DLSS 5 "neural bake" pilot, if the owner says yes (`docs/DLSS5_NEURAL_BAKE_RESEARCH.md`).
+- the DLSS 5 "neural bake" pilot is parked (the owner, 13 October).
 
 **Running two sidecars at once:** TASK-19 owns the lab-vista files. Tasks 20 to 24 own `play.tsx`, `quest.ts`, `base/` and the test scripts. They never edit the same file at the same time.
 
@@ -55,11 +55,12 @@ The owner, 13 October:
 - **Shots without overlays**, every shot looked at.
 - **Never delete or weaken a check.**
 
-## 4. The owner's calls (asked 13 October)
-1. **Download the Freedoom and LibreQuake releases** (BSD-3, from their GitHub releases) for the built-in monsters?
-2. **Remove `doom1.wad` and the Ogro** from the shipped game (recommended: id's licence forbids using its art in another game)?
-3. **The proposals marked (P)** in `docs/MONSTERS_PLAN.md`: the sapper; sealing with the beam's Extract; Calm mode.
-4. **The DLSS 5 neural-bake pilot** on 3 assets. And which GPU is in the faster machine? Native DLSS 5 needs an RTX 50.
+## 4. The owner's calls (answered 13 October)
+- **Downloads:** "download whatever you need". Freedoom, Blasphemer, LibreQuake and Quaternius Ultimate Monsters are in `zips/monsters/` (about 93 monsters; `docs/MONSTERS_PLAN.md` §3).
+- **Many monsters:** "dont get stuck on on type of moster". Each archetype gets many skins across eras.
+- **Monsters outside the window:** "put some walking outside the window if you want" (TASK-23 step 4).
+- **DLSS:** "leave the dlss for now, local machine is rtx3080". Parked: the RTX 3080 has no DLSS 5 (RTX 50 only); the neural-bake pilot waits.
+- **Removing `doom1.wad` and the Ogro from the shipped game, and the (P) proposals:** going ahead as planned (the owner: "continue").
 
 ## 5. DLSS 5
 See `docs/DLSS5_NEURAL_BAKE_RESEARCH.md`. In short:

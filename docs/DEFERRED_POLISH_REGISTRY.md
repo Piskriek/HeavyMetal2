@@ -17,6 +17,8 @@
 | **POL-06** | **Console & Mill Visual Upgrades** | Arena Battle `console-mill` | Richer 3D operator console and texture mill props from concept sheet 12. | **Done in TASK-08** (Sidecar, 2026-10-08): swapped `@hm/consolemill` operator console into lab room and texture mill into machine props. |
 | **POL-23** | **Anomaly Field Node Concept Models** | Sidecar TASK-04 | Stand-in node geometries (dodecahedron, torus, icosahedron, cone) await dedicated concept art pass from Arena Codex/Art agents. | Concept Art pass. |
 | **POL-24** | **Heavy Terraformer Industrial Models** | Sidecar TASK-04 | Heavy terraformer machines currently use 1.9x scaled stand-in props on 8m hardpoints. Await multi-tier industrial modular models. | 3D Asset pass. |
+| **POL-25** | **Window Flash on the Lab Floor** | TASK-19 review 3 (2026-10-13) | A static burst in the window view should briefly light the lab floor. The light gain is up (+12 per unit of flash, capped at 0.7), but the capture lands about 0.3 s after the peak, so it cannot be shown yet. Add a peak hook in the vista and check it by eye. | Polish pass. |
+| **POL-26** | **Stage-0 Storm Ground Speckle** | TASK-19 review 3 (2026-10-13) | At progress 0 the window's dust plain is EGA-quantised (Pxd 0.15) and speckles black and white. It follows the plan's fidelity, but it is busy. Kept for now; a candidate for the owner's Studio polish (raise the ground's Pxd or soften the dither). | Owner's Studio pass. |
 
 ---
 

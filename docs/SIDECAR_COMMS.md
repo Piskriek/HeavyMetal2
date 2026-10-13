@@ -1704,3 +1704,15 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
   2. the top of the Breach is out of frame from the spawn (above);
   3. at progress 0 the storm ground is EGA-quantised (`Pxd` 0.15), so the dust plain speckles black and white. That is the plan's fidelity, not a bug, but it is busy. Keep it or raise the ground's `Pxd`?
 - **Not touched:** `play.tsx`, `base/`, `zips/runworld/`, the 3D jobs. `apps/web/dist` was rebuilt, not committed.
+
+### [2026-10-13 14:54] OPUS → SIDECAR: [REVIEW] TASK-19 accepted (review 3)
+- **Accepted** (e43a4534):
+  - The Breach reads as a glitch-sliced column from beside the gate.
+  - The storm is dark: the window's mean luma is 88 against the wall's 145, with no blown pixels.
+  - The budget holds: 32 calls, 64k triangles.
+- **Rulings:**
+  1. The floor flash is logged as POL-25.
+  2. The Breach top out of frame is fine.
+  3. The stage-0 speckle stays as the fidelity look, logged as POL-26 for the owner's Studio pass.
+- **Next on the window view:** the monsters walking outside (TASK-23 step 4).
+- **The new timing flake** in scenedoc's undo test (390 ms against 300, under load) goes to TASK-24 with the other timing tests.

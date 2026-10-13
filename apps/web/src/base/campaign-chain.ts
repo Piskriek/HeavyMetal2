@@ -85,9 +85,10 @@ export const CHAIN: Questline = {
       requires: { done: 'act4' },
       steps: [
         { id: 'B-01', text: STEP_TEXT['B-01']!.title, until: at(placedKey('foundation'), 1) },
-        { id: 'B-05', text: STEP_TEXT['B-05']!.title, until: at(placedKey('bin'), 1) },
         { id: 'B-04', text: STEP_TEXT['B-04']!.title, until: at(COUNT.harvestPxd, 1) },
+        // the drafting table before the bin: a bin is a cube-family piece, and only a drafted blueprint builds it
         { id: 'B-06', text: STEP_TEXT['B-06']!.title, until: at(COUNT.drafted, 1) },
+        { id: 'B-05', text: STEP_TEXT['B-05']!.title, until: at(placedKey('bin'), 1) },
         { id: 'B-07', text: STEP_TEXT['B-07']!.title, until: every(at(placedKey('airlock'), 1), at(placedKey('lifeSupport'), 1)) },
       ],
       reward: {},
@@ -126,11 +127,12 @@ export function chainProblems(): string[] {
 }
 
 /**
- * The bridge stock Act V starts with (TASK-22). A fresh player has no primitives, and a hardpoint and a heavy press need
- * them, so this kit covers one hardpoint (beam 4, chassis 2) and one heavy press (cube 4, beam 4, chassis 2). The press
- * makes every other primitive from harvested vertices, so the base never stalls.
+ * The bridge stock Act V starts with (TASK-22). A fresh player has no primitives, and the first hardpoint, the first heavy
+ * press and the first two drafts (a cube, then a chassis for the airlock and life support) all need them. The kit covers
+ * one hardpoint (beam 4, chassis 2), one heavy press (cube 4, beam 4, chassis 2) and the drafts (cube 1, chassis 1), and
+ * the maps for the drafts and the first pieces. The press makes every other primitive from harvested vertices.
  */
-export const ACT_V_KIT: readonly Stack[] = [{ item: 'prim-beam', n: 8 }, { item: 'prim-chassis', n: 4 }, { item: 'prim-cube', n: 4 }];
+export const ACT_V_KIT: readonly Stack[] = [{ item: 'prim-beam', n: 8 }, { item: 'prim-chassis', n: 6 }, { item: 'prim-cube', n: 6 }, { item: 'map-basalt', n: 10 }];
 
 // ---------------------------------------------------------------------------------------------------------- the state
 /** Chain progress: the questline's progress, the counters, and the monsters' unlock flag (after F-03). */
@@ -255,8 +257,6 @@ export const isOpen = (feature: Feature, c: Chain, stage: number): boolean => ga
 export interface Evidence {
   readonly stage: number;
   readonly drillsRunning: number;
-  /** Piece kinds standing in the base (one entry per piece). */
-  readonly pieceKinds: readonly string[];
   /** Heavy machine kinds on the hardpoints. */
   readonly machineKinds: readonly string[];
   /** Vehicle kinds parked or driven. */
@@ -266,7 +266,11 @@ export interface Evidence {
   readonly itemIds: readonly string[];
 }
 
-/** The counters the world already proves. Used by the sync, so an old save keeps the credit it earned. */
+/**
+ * The counters the world already proves. Used by the sync, so an old save keeps the credit it earned. Pieces are NOT
+ * derived: the starter shelter (free, placed at first boot) already holds a foundation, an airlock and life support, so a
+ * piece counts only when the player places it (the place event bumps it). An old save re-does those steps.
+ */
 export function evidence(e: Evidence): Record<string, number> {
   const out: Record<string, number> = {
     [COUNT.stage]: e.stage,
@@ -275,7 +279,6 @@ export function evidence(e: Evidence): Record<string, number> {
     [COUNT.installedFabricator]: e.machineKinds.includes('fabricator') ? 1 : 0,
     [COUNT.printedScout]: e.vehicleKinds.includes('scout') ? 1 : 0,
   };
-  for (const k of e.pieceKinds) out[placedKey(k)] = (out[placedKey(k)] ?? 0) + 1;
   if (e.itemIds.some((id) => id.startsWith('pxd-'))) out[COUNT.harvestPxd] = 1;
   if (e.itemIds.some((id) => id.startsWith('bp:') && id !== 'bp:starter')) out[COUNT.drafted] = 1;
   return out;

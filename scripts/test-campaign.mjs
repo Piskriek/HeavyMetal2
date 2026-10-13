@@ -5,9 +5,19 @@
  * The beats, in order:
  *   1 menu, then the expedition (a new profile starts in the lab),
  *   2-7 Acts I to III as in test-playthrough.mjs (the wake, the power, the window, the gate, the Moon, the first machine),
- *   8 on the planet, B opens the one build menu, its Structures tab holds the foundation, E places it,
+ *   8 on the planet, B opens the one build menu; Structures is locked until the first colour bloom, and says why,
  *   9 the inventory (Tab) opens and holds the starter kit,
- *   10 reload: the foundation and the inventory persist, and Act I does not replay.
+ *   10 reload: the inventory and the chain persist, and Act I does not replay.
+ * TASK-22, Acts IV to VI (each step is the game's own action; only the plot's stage (__dev.setStage) and 50 units of mining
+ * (hmPlay.grindCount) are skipped as grinding):
+ *   11 A4-01 starts once the drill runs; G refuses the rifle until it is taken,
+ *   12 the journal lists the act, the step and its hint,
+ *   13 the armory rack hands over the rifle; G draws it,
+ *   14 A4-02: 50 units mined and 10 s of the mill; its line plays,
+ *   15 A4-03: the Studio opens from the journal; the line plays on the way back,
+ *   16 A4-04: stage 2 ends Act IV; the Structures tab opens; the bridge kit arrives,
+ *   17 B-01 the foundation, 18 B-04 a real harvest of raw pixels, 19 B-06 a drafted blueprint, 20 B-05 the bin,
+ *   21 B-07 a chassis blueprint, an airlock and life support.
  *
  * Every beat: a shot in docs/shots/campaign/, the FPS over two seconds, and a pass or fail. Console errors and HTTP errors
  * are collected across the whole run. Exit code 1 when any beat fails.
@@ -268,7 +278,35 @@ await beat('7 the first machine on the Moon: A3-03, its plume rises from the mac
 const foundations = () => page.evaluate(() => window.hmPlay.base.world().base.pieces.filter((p) => p.kind === 'foundation').length);
 const slotsJson = () => page.evaluate(() => JSON.stringify(window.hmPlay.base.world().player.slots));
 
-await beat('8 on the planet: B opens the one build menu, Structures holds the foundation, E places it', async (row) => {
+const chainState = () => page.evaluate(() => window.hmPlay.chainState());
+const chainCur = () => page.evaluate(() => window.hmPlay.chain().current?.id ?? null);
+const toastText = () => page.evaluate(() => document.querySelector('.play-toast b')?.textContent ?? '');
+const pauseOn = () => page.evaluate(() => window.hmPlay.setPaused(true));
+const pauseOff = () => page.evaluate(() => window.hmPlay.setPaused(false));
+const toPlanet = async () => {
+  await page.evaluate(() => {
+    const g = window.__playScene.debug.gatePlanet();
+    window.hmPlay.go('planet', g.x + 3, g.z + 5, Math.PI, -0.6);
+    window.hmPlay.setPaused?.(false);
+    window.hmPlay.setLocked?.(true);
+  });
+  await page.waitForFunction(() => window.hmPlay?.where === 'planet', null, { timeout: 20000 });
+};
+const openBuildTab = async (tab) => {
+  await page.keyboard.press('KeyB');
+  await page.locator(`#bm-tab-${tab}`).click();
+};
+const placeFromStructures = async (kindLabel) => {
+  await openBuildTab('structures');
+  await page.locator('.bm-chip', { hasText: kindLabel }).first().click();
+  await page.waitForTimeout(600);
+  await page.evaluate(() => window.__hm.hideOverlays(true));
+  await page.keyboard.press('KeyE');
+  await page.waitForTimeout(900);
+  await page.evaluate(() => window.__hm.hideOverlays(false));
+};
+
+await beat('8 on the planet: B opens the one build menu; Structures is locked until the first colour bloom, and says why', async (row) => {
   await quiet();
   await page.evaluate(() => {
     const g = window.__playScene.debug.gatePlanet();
@@ -280,24 +318,16 @@ await beat('8 on the planet: B opens the one build menu, Structures holds the fo
   await page.waitForFunction(() => window.hmPlay?.where === 'planet', null, { timeout: 20000 });
   // 100 ore is 60 kg of the 120 kg carry limit (a foundation costs 20): the shot stays out of the overloaded state
   await page.evaluate(() => window.__dev.grant('ore', 100));
-  const before = await foundations();
   await page.keyboard.press('KeyB');
   const menuOpen = await page.locator('section.bm').isVisible().catch(() => false);
-  await page.locator('#bm-tab-structures').click();
   const tabs = await page.locator('.bm-tab').allTextContents();
-  await shot('build-menu-structures');
-  await page.locator('.bm-chip', { hasText: 'Foundation' }).first().click();
+  await page.locator('#bm-tab-structures').click();
+  const lock = (await page.locator('.bm-locked').first().textContent().catch(() => '')) ?? '';
+  await shot('build-menu-structures-locked');
+  await page.locator('.bm-close').click();
   const menuClosed = !(await page.locator('section.bm').isVisible().catch(() => false));
-  await page.waitForTimeout(600);
-  await page.evaluate(() => window.__hm.hideOverlays(true));
-  await page.keyboard.press('KeyE');
-  await page.waitForTimeout(900);
-  const after = await foundations();
-  // the placed foundation without the HUD (the overlays come back after the shot)
-  row.shot = await shot('foundation-placed');
-  await page.evaluate(() => window.__hm.hideOverlays(false));
-  const ok = menuOpen && tabs.length === 4 && menuClosed && after === before + 1;
-  return { ok, detail: `menu=${menuOpen} tabs=${tabs.join('/')} closed=${menuClosed} foundations ${before}->${after}` };
+  const ok = menuOpen && tabs.length === 4 && /Needs stage 2/.test(lock) && menuClosed;
+  return { ok, detail: `menu=${menuOpen} tabs=${tabs.length} closed=${menuClosed} lock="${lock}"` };
 });
 
 await beat('9 the inventory (Tab) opens and holds the starter kit', async (row) => {
@@ -311,11 +341,11 @@ await beat('9 the inventory (Tab) opens and holds the starter kit', async (row) 
   return { ok: open && hasKit, detail: `inventory open=${open} starter-kit=${hasKit}` };
 });
 
-await beat('10 reload: the foundation and the inventory persist, and Act I does not replay', async (row) => {
+await beat('10 reload: the inventory and the chain persist, and Act I does not replay', async (row) => {
   await page.waitForTimeout(2500);
-  const beforeFoundations = await foundations();
   const beforeSlots = await slotsJson();
   const beforeStep = await page.evaluate(() => window.hmPlay.state?.()?.step ?? null);
+  const beforeChain = JSON.stringify(await chainState());
   await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
   // a reload opens the main menu: Continue loads the saved profile
   await page.waitForFunction(() => !!window.hmPlay?.ready || !!document.querySelector('.sm-menu button'), null, { timeout: 25000 });
@@ -327,14 +357,196 @@ await beat('10 reload: the foundation and the inventory persist, and Act I does 
   }
   await page.waitForFunction(() => !!window.hmPlay?.ready, null, { timeout: 60000 });
   await page.waitForTimeout(800);
-  const afterFoundations = await foundations();
   const afterSlots = await slotsJson();
   const afterStep = await page.evaluate(() => window.hmPlay.state?.()?.step ?? null);
+  const afterChain = JSON.stringify(await chainState());
   const replayed = await waitSub('A1-01', 2500);
   row.shot = await shot('after-reload');
-  const persisted = afterFoundations === beforeFoundations && afterFoundations >= 1 && afterSlots === beforeSlots;
+  const persisted = afterSlots === beforeSlots && afterChain === beforeChain;
   const noReplay = afterStep === beforeStep && afterStep !== 'create' && !replayed;
-  return { ok: persisted && noReplay, detail: `foundations ${beforeFoundations}->${afterFoundations} inventory same=${afterSlots === beforeSlots} step ${beforeStep}->${afterStep} A1-01 replayed=${replayed}` };
+  return { ok: persisted && noReplay, detail: `inventory same=${afterSlots === beforeSlots} chain same=${afterChain === beforeChain} step ${beforeStep}->${afterStep} A1-01 replayed=${replayed}` };
+});
+
+// ----------------------------------------------------------------------------------------------------------------------
+// Acts IV to VI (TASK-22). Every action is the game's own: a placement, a click, a command through the base. The only
+// skips are __dev.setStage (the plot's stage is grinding) and hmPlay.grindCount (50 units of mining is grinding).
+// ----------------------------------------------------------------------------------------------------------------------
+await beat('11 Act IV starts once the drill runs (A4-01); G refuses the rifle until it is taken', async (row) => {
+  await quiet();
+  await toPlanet();
+  await page.evaluate(() => window.__dev.grant('ore', 40));
+  let drilled = false;
+  for (const [dx, dz] of [[-12, 6], [12, -6], [-14, -4], [8, 12], [-6, 14], [16, 4]]) {
+    drilled = await page.evaluate(([dx, dz]) => {
+      const g = window.__playScene.debug.gatePlanet();
+      return window.hmPlay.placeAt(g.x + dx, g.z + dz, 'drill');
+    }, [dx, dz]);
+    if (drilled) break;
+  }
+  await page.waitForTimeout(900);
+  const cur = await chainCur();
+  await page.keyboard.press('KeyG');
+  await page.waitForTimeout(400);
+  const toast = await toastText();
+  row.shot = await shot('a4-01-start');
+  return { ok: drilled && cur === 'A4-01' && toast.includes('armory'), detail: `drill placed=${drilled} current=${cur} G toast="${toast}"` };
+});
+
+await beat('12 the journal (Esc menu) lists the acts, the current step and its hint', async (row) => {
+  await pauseOn();
+  await page.locator('.play-pause button', { hasText: 'Journal' }).click();
+  const journal = page.locator('[data-testid="journal"]');
+  await journal.waitFor({ state: 'visible', timeout: 5000 });
+  const text = (await journal.textContent()) ?? '';
+  row.shot = await shot('journal-act4');
+  await page.locator('.journal-close').click();
+  await pauseOff();
+  const ok = text.includes('Act IV') && text.includes('Take the extraction rifle') && text.includes('armory rack');
+  return { ok, detail: `journal act IV=${text.includes('Act IV')} step=${text.includes('Take the extraction rifle')} hint=${text.includes('armory rack')}` };
+});
+
+await beat('13 A4-01: the armory rack hands over the rifle (the button is the action); G draws it on the planet', async (row) => {
+  await page.evaluate(() => window.hmPlay.go('lab', 0, 3, 0, 0));
+  await page.waitForTimeout(600);
+  await page.evaluate(() => window.hmPlay.openLabPanel('rack'));
+  const btn = page.locator('.play-pickup');
+  const visible = await btn.waitFor({ state: 'visible', timeout: 6000 }).then(() => true).catch(() => false);
+  row.shot = await shot('rifle-pickup');
+  if (visible) await btn.click();
+  await page.waitForTimeout(500);
+  const cur = await chainCur();
+  const sub = await waitSub('A4-01', 8000);
+  await page.evaluate(() => window.hmPlay.openLabPanel(null));
+  await toPlanet();
+  await page.keyboard.press('KeyG');
+  await page.waitForTimeout(400);
+  const drawn = (await toastText()).includes('Extraction beam');
+  return { ok: visible && cur === 'A4-02' && sub && drawn, detail: `button=${visible} current=${cur} A4-01 line=${sub} G draws=${drawn}` };
+});
+
+await beat('14 A4-02: 50 units mined (grinding skipped) and the texture mill runs 10 s: its line plays', async (row) => {
+  await page.evaluate(() => window.hmPlay.grindCount('mined:beam', 50));
+  const t0 = Date.now();
+  let milled = 0;
+  while (Date.now() - t0 < 30000) {
+    milled = (await chainState()).counts.milled ?? 0;
+    if (milled >= 10) break;
+    await page.waitForTimeout(500);
+  }
+  const cur = await chainCur();
+  const sub = await waitSub('A4-02', 9000);
+  row.shot = await shot('a4-02-milled');
+  return { ok: milled >= 10 && cur === 'A4-03' && sub, detail: `milled=${milled} current=${cur} A4-02 line=${sub}` };
+});
+
+await beat('15 A4-03: the Studio opens from the journal; the Act IV line plays on the way back', async (row) => {
+  await pauseOn();
+  await page.locator('.play-pause button', { hasText: 'Journal' }).click();
+  const btn = page.locator('.journal-studio');
+  await btn.waitFor({ state: 'visible', timeout: 5000 });
+  row.shot = await shot('journal-a4-03');
+  await btn.click();
+  await page.waitForTimeout(2500);
+  const leftPlay = (await page.locator('.play').count()) === 0;
+  await shot('studio-opened');
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.waitForFunction(() => !!window.hmPlay?.ready || !!document.querySelector('.sm-menu button'), null, { timeout: 25000 });
+  if (!(await page.evaluate(() => !!window.hmPlay?.ready))) {
+    const labels = await page.locator('.sm-menu button').allTextContents();
+    const want = labels.some((l) => l.includes('Continue')) ? 'Continue' : 'Expedition';
+    await page.locator('.sm-menu button', { hasText: want }).first().click();
+  }
+  await page.waitForFunction(() => !!window.hmPlay?.ready, null, { timeout: 60000 });
+  await page.waitForTimeout(600);
+  const studioCount = (await chainState()).counts['studio:open'] ?? 0;
+  const cur = await chainCur();
+  const sub = await waitSub('A4-03', 9000);
+  return { ok: leftPlay && studioCount >= 1 && cur === 'A4-04' && sub, detail: `left the game=${leftPlay} studio:open=${studioCount} current=${cur} A4-03 line=${sub}` };
+});
+
+await beat('16 A4-04: stage 2 (the bloom) ends Act IV; the Structures tab opens and the bridge kit arrives', async (row) => {
+  await quiet();
+  await page.evaluate(() => window.__dev.setStage(2));
+  await page.waitForTimeout(800);
+  const cur = await chainCur();
+  const kit = await page.evaluate(() => {
+    const b = window.hmPlay.base.world().boxes.find((x) => x.id === -2);
+    const c = {};
+    for (const st of b?.slots ?? []) if (st) c[st.item] = (c[st.item] ?? 0) + st.n;
+    return c;
+  });
+  await toPlanet();
+  await openBuildTab('structures');
+  const locks = await page.locator('.bm-locked').count();
+  row.shot = await shot('structures-open');
+  await page.locator('.bm-close').click();
+  const ok = cur === 'B-01' && (kit['prim-cube'] ?? 0) >= 4 && locks === 0;
+  return { ok, detail: `current=${cur} bridge cube=${kit['prim-cube'] ?? 0} beam=${kit['prim-beam'] ?? 0} maps=${kit['map-basalt'] ?? 0} tab locks=${locks}` };
+});
+
+await beat('17 B-01: a foundation placed from the Structures tab with E', async (row) => {
+  await quiet();
+  const before = await foundations();
+  await placeFromStructures('Foundation');
+  const after = await foundations();
+  row.shot = await shot('foundation-placed');
+  const cur = await chainCur();
+  const sub = await waitSub('B-01', 6000);
+  return { ok: after === before + 1 && cur === 'B-04' && sub, detail: `foundations ${before}->${after} current=${cur} B-01 line=${sub}` };
+});
+
+await beat('18 B-04: raw pixels harvested with the beam from a field node (a real harvest through the base)', async (row) => {
+  const node = await page.evaluate(() => {
+    const w = window.hmPlay.base.world();
+    const n = w.field.nodes.find((x) => x.kind === 'chroma' || x.kind === 'dither') ?? w.field.nodes[0];
+    return n ? { id: n.id, x: n.x, z: n.z } : null;
+  });
+  if (!node) return { ok: false, detail: 'no field node' };
+  await page.evaluate((n) => window.hmPlay.go('planet', n.x + 2, n.z + 2, 0, -0.5), node);
+  await page.waitForTimeout(500);
+  for (let i = 0; i < 60; i++) {
+    const hit = await page.evaluate((n) => {
+      const p = window.__playScene.debug.position();
+      window.hmPlay.base.apply({ t: 'tick', at: { x: p.x, z: p.z }, dt: 0.1, beam: { node: n.id, power: 1 }, power: {} });
+      return (window.hmPlay.chainState().counts['harvest:pxd'] ?? 0) >= 1;
+    }, node);
+    if (hit) break;
+  }
+  const counts = (await chainState()).counts;
+  const cur = await chainCur();
+  row.shot = await shot('b04-harvest');
+  return { ok: (counts['harvest:pxd'] ?? 0) >= 1 && cur === 'B-06', detail: `harvest:pxd=${counts['harvest:pxd'] ?? 0} current=${cur}` };
+});
+
+await beat('19 B-06: a cube blueprint drafted at the drafting table (a real draft command)', async (row) => {
+  await toPlanet();
+  const drafted = await page.evaluate(() => {
+    const api = window.hmPlay.base;
+    api.apply({ t: 'draft', at: window.__playScene.debug.position(), primitive: 'cube', map: 'basalt' });
+    return api.world().player.slots.some((s) => s?.item === 'bp:cube:basalt');
+  });
+  const cur = await chainCur();
+  row.shot = await shot('b06-drafted');
+  return { ok: drafted && cur === 'B-05', detail: `blueprint in pack=${drafted} current=${cur}` };
+});
+
+await beat('20 B-05: a linked bin on the foundation (its contents join the bridge storage)', async (row) => {
+  const before = await page.evaluate(() => window.hmPlay.base.world().base.pieces.filter((p) => p.kind === 'bin').length);
+  await placeFromStructures('Bin');
+  const after = await page.evaluate(() => window.hmPlay.base.world().base.pieces.filter((p) => p.kind === 'bin').length);
+  const cur = await chainCur();
+  row.shot = await shot('b05-bin');
+  return { ok: after === before + 1 && cur === 'B-07', detail: `bins ${before}->${after} current=${cur}` };
+});
+
+await beat('21 B-07: a chassis blueprint is drafted; an airlock and life support seal a room (placed from the Structures tab)', async (row) => {
+  await toPlanet();
+  await page.evaluate(() => window.hmPlay.base.apply({ t: 'draft', at: window.__playScene.debug.position(), primitive: 'chassis', map: 'basalt' }));
+  await placeFromStructures('Airlock');
+  await placeFromStructures('Life support');
+  const cur = await chainCur();
+  row.shot = await shot('b07-sealed');
+  return { ok: cur === 'F-01', detail: `current=${cur}` };
 });
 
 // ----------------------------------------------------------------------------------------------------------------------

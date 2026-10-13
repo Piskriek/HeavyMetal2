@@ -14,14 +14,14 @@ function satisfy(cond: Cond, counts: Record<string, number>): void {
   else if ('count' in cond) counts[cond.count] = Math.max(counts[cond.count] ?? 0, cond.atLeast);
 }
 
-const EMPTY: Evidence = { stage: 0, drillsRunning: 0, pieceKinds: [], machineKinds: [], vehicleKinds: [], sidearm: false, itemIds: [] };
+const EMPTY: Evidence = { stage: 0, drillsRunning: 0, machineKinds: [], vehicleKinds: [], sidearm: false, itemIds: [] };
 
 test('the chain data is sound: the questline validates and every step has its text', () => {
   assert.deepEqual(chainProblems(), []);
   assert.equal(CHAIN.quests.length, 3);
   assert.deepEqual(CHAIN_STEPS.map((s) => s.id), [
     'A4-01', 'A4-02', 'A4-03', 'A4-04',
-    'B-01', 'B-05', 'B-04', 'B-06', 'B-07',
+    'B-01', 'B-04', 'B-06', 'B-05', 'B-07',
     'F-01', 'F-02', 'F-03', 'F-04', 'F-05',
   ]);
 });
@@ -74,8 +74,8 @@ test('gates: a locked feature says why, in the order the player meets the reason
   assert.equal(gateReason('heavy', c, 2), 'Needs: Place a foundation (B-01)');
   assert.equal(gateReason('fabricator', c, 2), 'Needs: Seal a room (B-07)');
   assert.equal(gateReason('monsters', c, 6), 'Needs: Make your first gun (F-03)');
-  // the Act V steps before B-07 (in order): a foundation, a bin, raw pixels, a drafted blueprint, then the seal
-  c = syncChain(c, { ...EMPTY, stage: 6, pieceKinds: ['foundation', 'bin', 'airlock', 'lifeSupport', 'weaponBench'], itemIds: ['pxd-mono', 'bp:cube:basalt'] });
+  // the Act V steps before B-07 (in order): a foundation, a bin, raw pixels, a drafted blueprint, then the seal (placed by the player)
+  c = advanceChain({ ...c, counts: { ...c.counts, 'placed:foundation': 1, 'placed:bin': 1, 'harvest:pxd': 1, drafted: 1, 'placed:airlock': 1, 'placed:lifeSupport': 1, 'placed:weaponBench': 1, stage: 6 } });
   assert.equal(stepDone(c, 'B-07'), true);
   assert.equal(gateReason('fabricator', c, 6), null);
   assert.equal(gateReason('weaponBench', c, 6), 'Needs: Install the fabricator (F-01)');
@@ -120,9 +120,10 @@ test('the journal reads progress: "12 / 50" for the first unmet count of a step'
 
 test('old saves (version 5, no chain) migrate: a racked rifle starts at A4-01, with the world as evidence', () => {
   // a save past "Feed your mill": the drill runs, the rifle is still on the rack, one foundation stands
-  const raw = chainFromSave(undefined, { ...EMPTY, stage: 1, drillsRunning: 1, pieceKinds: ['foundation'] });
+  const raw = chainFromSave(undefined, { ...EMPTY, stage: 1, drillsRunning: 1 });
   assert.equal(chainView(raw).current?.id, 'A4-01');
-  assert.equal(raw.counts['placed:foundation'], 1);
+  // the starter shelter's own pieces are not credited (they are free, not placed)
+  assert.equal(raw.counts['placed:foundation'], undefined);
   // a save from before the drill: the chain waits
   assert.equal(chainView(chainFromSave(null, EMPTY)).current, null);
   // a saved chain is read back as it was saved
@@ -144,6 +145,7 @@ test('a damaged saved chain falls back without breaking: junk counts and unknown
 
 test('the world evidence counts drafted blueprints and raw pixels, but not the starter kit', () => {
   const e = evidence({ ...EMPTY, itemIds: ['bp:starter', 'pxd-mono'] });
+  assert.equal(e['placed:foundation'], undefined);
   assert.equal(e[COUNT.drafted], undefined);
   assert.equal(e[COUNT.harvestPxd], 1);
   assert.equal(evidence({ ...EMPTY, itemIds: ['bp:cube:basalt'] })[COUNT.drafted], 1);
@@ -153,9 +155,12 @@ test('the world evidence counts drafted blueprints and raw pixels, but not the s
 test('the Act V kit covers one hardpoint and one heavy press, so a fresh player is never stuck without primitives', () => {
   const need: Record<string, number> = {};
   // the kit holds primitives only: the ore comes from the drills, the maps from the mill
-  for (const bill of [PIECE_EXTRA.hardpoint ?? [], HEAVY_BILL.press]) {
+  const bills = [PIECE_EXTRA.hardpoint ?? [], HEAVY_BILL.press, [{ item: 'prim-cube', n: 1 }], [{ item: 'prim-chassis', n: 1 }]];
+  for (const bill of bills) {
     for (const { item, n } of bill) if (item.startsWith('prim-')) need[item] = (need[item] ?? 0) + n;
   }
   const kit = Object.fromEntries(ACT_V_KIT.map((st) => [st.item, st.n]));
   for (const [item, n] of Object.entries(need)) assert.ok((kit[item] ?? 0) >= n, `${item}: kit ${kit[item] ?? 0} needs ${n}`);
+  // the maps: one drafted blueprint each for the cube and the chassis, and a map per placed piece of those families
+  assert.ok((kit['map-basalt'] ?? 0) >= 6, 'the kit holds maps for the drafts and the first pieces');
 });

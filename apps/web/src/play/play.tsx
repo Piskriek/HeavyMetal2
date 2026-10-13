@@ -126,7 +126,6 @@ function worldEvidence(w: BaseWorld, plot: PlotState): Evidence {
   return {
     stage: plot.stage,
     drillsRunning: plot.machines.filter((m) => m.kind === 'drill' && m.on).length,
-    pieceKinds: w.base.pieces.map((p) => p.kind),
     machineKinds: w.machines.map((m) => m.kind),
     vehicleKinds: w.vehicles.map((v) => v.kind),
     sidearm: !!w.equipment.sidearm,
@@ -1016,6 +1015,7 @@ export function PlayScreen(props: {
       const after = isFree ? { ...placed, ore: before.ore } : placed;
       plotRef.current = after;
       commit(withPlot(stateRef.current, after));
+      updateChain((c) => c);
       scene.setPlot(after, running(after, env), network(after, env).connected);
       fx('mill-start');
       scene.playAction('plant');
@@ -1704,6 +1704,7 @@ export function PlayScreen(props: {
       if (plotChanged || labRes.events.length || ms - savedAt > 5000) {
         savedAt = ms;
         commit(withLab(withPlot(stateRef.current, plotRef.current), labRef.current));
+        updateChain((c) => c);
       }
       hook.frames += 1; hook.where = out.where; hook.sync = out.sync; hook.step = stateRef.current.step; hook.wave = scene.debug.wave();
       if (hook.frames % 30 === 0) Object.assign(hook, scene.debug.stats());
@@ -1767,6 +1768,8 @@ export function PlayScreen(props: {
         gameAudio.setMusicContext('lab');
       }
       updateChain((c) => c);
+      // a story line whose step finished while the player was away (the Studio): it plays on the return, once
+      if (finishedSteps(stateRef.current.chain.progress).includes('A4-03') && !narratorRef.current?.getState().heard.includes('A4-03')) narratorRef.current?.trigger('studio:open');
       narratorRef.current?.trigger('wake');
       raf = requestAnimationFrame(loop);
     };
@@ -1795,6 +1798,12 @@ export function PlayScreen(props: {
       setStage: (stage: number) => {
         plotRef.current = { ...plotRef.current, stage };
         scene.raiseStage(stage, scene.debug.gatePlanet());
+        // the stage-up lines a real stage change plays (the plot's own stage-up event is not raised by this skip)
+        narratorRef.current?.trigger(`stage:${stage}`);
+        if (stage === 1) narratorRef.current?.trigger('bloom:first');
+        if (stage === 4) narratorRef.current?.trigger('fab:hauler');
+        if (stage === 6) narratorRef.current?.trigger('fab:crawler');
+        updateChain((c) => c);
       },
       drain: () => {
         plotRef.current = { ...plotRef.current, ore: 0 };
@@ -1819,6 +1828,9 @@ export function PlayScreen(props: {
       state: () => stateRef.current,
       chain: () => chainView(stateRef.current.chain),
       chainState: () => stateRef.current.chain,
+      // a test opens a lab panel (the click on its button is the real action); and skips grinding only (mining 50 units)
+      openLabPanel: (kind: 'rack' | 'bench' | 'combiner' | null) => setLabPanel(kind),
+      grindCount: (key: string, n: number) => updateChain((c) => bump(c, key, n)),
       die: () => {
         // a death: the screen takes the player back to the gate; the inventory and the save stay (TASK-22)
         updateChain((c) => bump(c, COUNT.deaths));

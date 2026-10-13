@@ -1,0 +1,64 @@
+# TASK-27: the stage-0 dither glued to the world, the gate's amber pool, the rover camera, the modular scout (Wave B)
+
+After `main` (Wave A). The sources:
+- Argo's `14-lighting.md` (P0-LIGHT-02);
+- `19-vehicles-weapons.md` (P0-VEH-01, P0-VEH-03);
+- the master plan's DEC-06 (the gate's amber pool);
+- his reply `ARGO_MASTER_PLAN_REPLY.md` §3, brief 27. It wins where it differs: **stages stay 0 to 6 with five looks** (0 one-bit, 1 EGA, 2 VGA, 3 Gouraud, 4 to 6 full PBR, told apart by the water, coverage and forest blooms). Never renumber.
+
+The research: Lucas Pope's Obra Dinn devlog on stable 1-bit dither (`https://dukope.com/devlogs/obra-dinn/tig-32/`), and spring-arm cameras with sphere casts, in the plans' §3.
+
+## Where it lives
+- **The stage looks** are one post pass, `POST_FRAGMENT` in `apps/web/src/play/portal-shaders.ts`. Stage 0 is `lookAt()` with `look.w > 0.5`: a 4×4 Bayer threshold indexed by the **screen** cell (`floor(uv / look.xy)`), so the pattern swims when you turn. The pass already has the depth (`uDepth`), `uInvProj` and `uCamWorld` (`worldAt()`).
+- **The uniforms** are set in `apps/web/src/play/play-scene.ts` (`setLook`, about line 1205).
+- **The driving camera:** `play-scene.ts` about lines 1875 to 1905 (`roverPos`, `lookAt`).
+- **The modular scout:** `USE_MODULAR_SCOUT` in `apps/web/src/assets/gen-props.ts` (off; `?scout=modular` tests it).
+
+## Build
+1. **The dither glued to the world (P0-LIGHT-02, stage 0 only).**
+   - Keep sampling the colour at the screen cell (the picture stays pixelated on screen). Index the Bayer threshold by the **view direction** instead, Obra Dinn's way:
+     - take the ray through the pixel: from `uInvProj` and `uCamWorld`, without depth;
+     - its spherical angles are `atan(d.x, d.z)` and `asin(d.y)`;
+     - divide by the angular size of one look pixel (the field of view over the look's resolution).
+   - The pattern then holds still on the hills while you turn. A translation still moves it slightly, which is fine.
+   - Check the poles and the ±π seam for a visible line, and handle them.
+   - Add the two depth cues:
+     - a gentle distance gradient in the one-bit threshold;
+     - a one-pixel contour at depth breaks (neighbouring look cells whose linear depth differs by more than a ratio), so crater rims at 50, 150 and 500 m separate into planes.
+   - Stage 1 and above are unchanged.
+2. **The gate's amber pool (DEC-06, stage 0):** within 15 m of the gate, the dither's light tone is warm amber #ffc13d instead of white, fading out by 15 m (use `worldAt()` and a new gate-position uniform). The rest of the Moon stays stark black and white (#050608 and #e8eef5).
+3. **The rover camera (P0-VEH-01)** as a small pure module (`apps/web/src/play/rover-camera.ts`, unit-tested):
+   - **The arm:** from a pivot 1.4 m above the chassis to the wanted spot 5.5 m behind and 2.1 m up, cast a 0.35 m sphere against the terrain heightfield, boulders and placed pieces. On a hit, pull in to the hit minus 0.35 m: snap in within 25 ms, ease back out over 250 ms.
+   - **The floor clamp:** the camera never goes below the terrain height plus 0.65 m at its own x and z.
+   - **The horizon:** roll stays 0; pitch follows with a 0.12 s lag, so small bumps do not shake it.
+4. **The modular scout (P0-VEH-03).**
+   - Raycast the aerial's socket onto the rear shell (flush, no gap).
+   - Check the square yoke inside the empty cab.
+   - Re-check the hauler's `VEHICLE_FIT` (wheel wells and travel) for its redone body.
+   - Then set `USE_MODULAR_SCOUT = true` and show it from three sides. Opus reviews the shots at acceptance and will revert the switch if a part floats or clips.
+
+## Tests
+- **Unit:**
+  - the spherical dither index (the same world direction gives the same threshold after a yaw of the camera);
+  - the arm (a wall at 3 m pulls the camera to 2.65 m; the floor clamp holds on a crater lip; roll stays 0);
+  - the pool's falloff.
+- **A turn test** (extend `scripts/test-campaign.mjs` or a capture script): at stage 0, two frames 5° of yaw apart. Compare a 64×64 patch of the ground re-projected: under 5% of its pixels flip (today, most of them do).
+- **Rover:** drive into a crater and against a rock wall; the camera never shows the inside of geometry. Check by sampling the depth buffer at the screen centre: never under 0.3 m.
+- **Shots** (`?cleanShot=1`):
+  - the stage-0 arrival with the amber pool (tour shot 07's moment);
+  - two frames of a turn, side by side;
+  - the rover at a wall and in a crater;
+  - the modular scout from three sides.
+  
+  Look at every one.
+- **The usual green set,** with the build size and fps at stage 0 on Low (the pass must stay within the frame budget on the GTX 950M).
+
+## Report
+On the board:
+- the turn test's flip fraction, before and after;
+- the camera cases;
+- the scout shots;
+- fps;
+- the results.
+
+Opus refreshes Argo's tour shots 07 and 12.

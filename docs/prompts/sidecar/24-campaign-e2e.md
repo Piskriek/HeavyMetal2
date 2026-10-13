@@ -22,10 +22,10 @@ After TASK-23 (the monsters). The owner wants "lots of testing to make sure its 
 5. **Measure:** fps on Low and Medium at four places (the lab, the gate, the base, mid-fight). Use the GPU launch flags from TASK-19 review 2 (V7) and log the renderer string.
 
 ## Also, carried from the reviews
-- **The music 404s** in the base-building log: music-monster-mash, music-driving and music-moon-s6 exist in `public/audio`, so check the test server's root. Rename the music-monster-mash context to "monsters" while there.
+- **The music 404s** in the base-building log (music-monster-mash, music-driving, music-moon-s6): the audio was fetched from root paths, fixed by Opus in 4f9187a0 (it now resolves beside the page). Check that the log is clean now. Rename the music-monster-mash context to "monsters" while there.
 - **The step-7 stall** in `test-base-building.mjs` (seen once in TASK-20).
 - **Tracked shots rewritten by test runs:** make the test scripts write to gitignored folders, and commit one reviewed set per area.
-- **The timing tests** (fieldkit, plotgrid, lattice-accept, scenedoc undo): make them measure fairly under load (warm-up, best of three). Never just raise a limit without saying so in a comment.
+- **The timing tests:** `npm test` is now `scripts/test.mjs` (6e4b3ed4), which runs the `performance:` tests alone after the rest, and fieldkit and plotgrid pass there. For lattice-accept, scenedoc undo and any other timed test not named `performance: ...`, name it so, or make it measure fairly (warm-up, best of three). Never just raise a limit without saying so in a comment.
 - **The GTX 950M frame check** (TASK-19 V7's method).
 
 ## Report
@@ -39,5 +39,13 @@ Opus reviews it and pushes `main`.
 
 ## Additions from Argo's master plan (P0-PROD-01, owner-approved 13 October)
 - Give the HUD's overlays `data-hud-zone` attributes (title, build-hint, subtitle, quest, hotbar). At every e2e shot, assert zero overlap between the title, build-hint and subtitle boxes.
+- **To make that assertion pass now,** apply the three minimal rules from Argo's P0-UI-01. The full nine-zone grid is brief 25 (Wave B), not this task.
+  1. **The radio subtitle** pins at bottom 108 px, above the hotbar, never higher than 160 px. Today it runs under the hotbar: docs/shots/campaign/17-a4-02-milled.png.
+  2. **CANNOT PLACE** (base/ui/build-readout.tsx, base-hud.tsx) shows only while a placement ghost is shown, 36 px below the reticle.
+  3. **Title cards** (`say()` in play.tsx) sit at top 72 px for 3 s and hold any other banner until they fade.
+- **From TASK-22b:**
+  - with real input, walk to a freshly printed scout and press E; the test teleports, and lands the player 4 m away, outside E's 3.5 m reach;
+  - add beats for the N-01 and N-02 sync lines;
+  - beat 24 quick-stacks before forging, because the grants take the pack over 120 kg. Say whether the Act V kit should weigh less.
 - **A clean-shot flag** (`?cleanShot=1`) hides the pointer-lock prompt and the debug UI for review shots.
 - **Avatar luminance:** in the third-person Moon shot, the mean luminance of the avatar's pixel patch must be above 35/255, so a black-avatar regression fails the run.

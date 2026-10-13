@@ -92,7 +92,7 @@ Argo's chat is open in Opus's browser for questions (owner, 13 October).
   - Opus: done in 0e3a6f2e: the single file at 14.51 MB (Astro's mid and high in the HD pack, a duplicate QuickJS removed), the build gate at 16 MB, and the luminance gate in post and pack.
   
   Then main.
-- **Wave B:** briefs 25 to 27, with the reply's §3 adjustments:
+- **Wave B:** briefs 25 to 27, written 14 October (`docs/prompts/sidecar/25-hud-9zone-and-build-ribbon.md`, `26-foundation-frames-and-safe-dome.md`, `27-stage0-dither-and-rover-cam.md`), with the reply's §3 adjustments. 25 and 26 can run side by side; 27 touches the post pass and the driving camera:
   - 25: the HUD's 9 zones and the build ribbon, in play.tsx and base/ui; F fills a plan, X removes, H locks the hologram;
   - 26: industrial foundation frames, the safe dome (25 m at the gate, 15 m at a pylon), power brownout; the heavy machines mount on foundation hardpoints;
   - 27: world-locked stage-0 dither with the amber gate pool, the rover camera, the modular scout.

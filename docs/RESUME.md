@@ -154,3 +154,8 @@ The context a new Opus session needs on its first message. Keep it current: upda
   - the bench and the jig are reviewed (four angles) and good;
   - pack the set when the rest pass review. TASK-23c places it.
 - **Studio:** TASK-18 and 18b work committed as WIP (6f1f4ee9); TASK-18c finishes the last check.
+- **2026-10-13 evening, later:**
+  - **TASK-21b accepted:** the rifle in hand, first and third person, about 4 to 7 ore a second, R reload, Apply painting.
+  - **The Studio (TASK-17/18/18c) is done:** test-studio passes 74 of 74.
+  - **Running side by side:** TASK-21c (black character, rifle scale, rifle-clip retarget) and TASK-22 (the campaign chain). Next is TASK-21d (Sculpt, saving, the beats).
+  - **The game files hold the new empty weapon bench**, from TASK-18c's stray pack. It is reviewed, but **uncommitted** until the weapon-bench set is packed: commit `apps/web/src/assets/gen/weapon-bench.glb`, `registry.json` and `apps/web/public/hd/weapon-bench/` with the set.

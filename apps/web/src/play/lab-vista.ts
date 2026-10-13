@@ -5,8 +5,9 @@
 import * as THREE from 'three';
 import { getGenSync, GEN, loadGen, type GenLevel } from '../assets/gen';
 import {
-  BASE_S, BURST_SECONDS, EGA16, MAX_POCKETS, POCKET_KINDS, SPAWN_XZ, WINDOW_DIST, burstLook, burstSchedule, clipRect, lookAt, mulberry32,
-  polar, pocketFrame, pocketLifetime, type BurstEvent, type BurstLook, type PocketFrame, type VistaLook,
+  BASE_S, BREACH_XZ, BURST_SECONDS, CORRIDOR_DEG, EGA16, MAX_POCKETS, POCKET_KINDS, SPAWN_XZ, WINDOW_DIST, bearingFromSpawn, burstLook,
+  burstSchedule, clipRect, groundFade, inCorridor, lookAt, mulberry32, polar, pocketFrame, pocketLifetime, type BurstEvent, type BurstLook,
+  type PocketFrame, type VistaLook,
 } from './lab-vista-math';
 
 /** Full: the whole view. Lite: no curtains or pocket shells, half the dust. Static: the lab's flat storm plane (lab-room draws it). */
@@ -42,6 +43,8 @@ export interface LabVista {
   debugPockets(): readonly { readonly slot: number; readonly centre: readonly number[]; readonly radius: number; readonly kind: number }[];
   /** The crosswind props as they are now (world metres). */
   debugFlyers(): readonly { readonly lane: number; readonly x: number; readonly y: number; readonly z: number }[];
+  /** Each model set: its id, whether it is the generated model or the box, and its instances (for the checks). */
+  debugSets(): readonly { readonly key: string; readonly id: string; readonly source: 'gen' | 'box'; readonly instances: number }[];
   dispose(): void;
 }
 
@@ -52,15 +55,20 @@ export interface LabVistaOptions {
 }
 
 // ---- The layout (lab metres; the vista sits beyond the north wall, at z below the window's z)
-/** The Breach: a third of the window from the left as seen from the spawn, about 1.2 km out (plan §3). */
-const BREACH_BEARING = -2.5;
-const BREACH_DIST = 1200;
+/** The Breach (math: a third of the window from the left as seen from the spawn, 1.2 km out). */
+const BREACH = BREACH_XZ;
 const beyond = (bearing: number, w: number): readonly [number, number] => polar(SPAWN_XZ, bearing, WINDOW_DIST + w);
-const BREACH = polar(SPAWN_XZ, BREACH_BEARING, BREACH_DIST);
 /** The lab's north wall (the window's plane). */
 const WALL_Z = -9;
-/** The breach column: 150 m square, 600 m tall (about 27 degrees from the spawn: past the top of the glass into the clouds). */
-const BREACH_W = 150, BREACH_H = 600;
+/** The breach column: 300 m square, 600 m tall. From the spawn it stands 26.6 degrees high, above the glass top (10.5 degrees). */
+const BREACH_W = 300, BREACH_H = 600;
+/** The storm's cloud layer, 450 m up: the Breach's top rises through it (review 2, V1). */
+const CLOUD_H = 450;
+/** The glow sheath is twice the column's width: its alpha falls from the core's edge to nothing at the sheath's edge. */
+const SHEATH_W = BREACH_W * 2;
+/** The pocket shells' rim colours are the kinds' (math); the back faces take the kinds' sky. Padded to the shader's array length. */
+const SHELL_RIM = Array.from({ length: MAX_POCKETS }, (_, i) => POCKET_KINDS[i]?.rim ?? [0, 0, 0] as const);
+const SHELL_SKY = Array.from({ length: MAX_POCKETS }, (_, i) => POCKET_KINDS[i]?.sky ?? [0, 0, 0] as const);
 
 /** The horizon colour at the storm and at dusk (sRGB, as the sky shader writes it); the fog takes the same colour. */
 const HORIZON_STORM: Readonly<[number, number, number]> = [0.2, 0.19, 0.23];
@@ -87,9 +95,12 @@ export const VISTA_ASSETS: readonly string[] = ['datacentre-hall', 'chiller-bloc
 const CROSSWIND: readonly string[] = ['server-rack', 'cardboard-stack', 'toolbox', 'coolant-can', 'sample-case', 'old-monitor', 'filing-cabinet'];
 const VORTEX: readonly string[] = ['server-rack', 'crate-large', 'shipping-container'];
 
-/** Loads the vista's generated models at a level, behind the caller's loading bar. A model that fails stays a box. */
+/** Loads the vista's generated models at a level, behind the caller's loading bar. A model that fails stays a box (and is logged). */
 export async function preloadVista(level: GenLevel): Promise<void> {
-  await Promise.all([...VISTA_ASSETS, ...CROSSWIND, ...VORTEX].map((id) => loadGen(id, level).catch(() => null)));
+  await Promise.all([...VISTA_ASSETS, ...CROSSWIND, ...VORTEX].map((id) => loadGen(id, level).catch((err: unknown) => {
+    console.warn(`[window view] ${id} stays a box:`, err);
+    return null;
+  })));
 }
 
 // ---- Pose helpers
@@ -118,6 +129,7 @@ uniform vec3 uPocketPos[VISTA_POCKETS];
 uniform float uPocketRad[VISTA_POCKETS];
 uniform vec4 uPocketS[VISTA_POCKETS];
 uniform vec3 uPocketTint[VISTA_POCKETS];
+uniform float uPocketFade[VISTA_POCKETS];
 uniform vec4 uBaseS;
 uniform float uTime;
 uniform vec3 uSunDir;
@@ -125,16 +137,20 @@ uniform vec3 uFlashPos;
 uniform float uFlashAmt;
 varying vec3 vVistaW;
 
-// the fidelity at p: the storm base outside, the strongest pocket's S inside (soft over its last 15% of radius)
+// the fidelity at p: the storm base outside, the strongest pocket's S inside (soft over its last 15% of radius).
+// A point on the ground (under 0.5 m) takes the pocket's disc straight down, faded by the pocket's height (review 2, V2).
 vec4 vistaFidelity(vec3 p, out vec3 tint) {
   vec4 s = uBaseS;
   tint = vec3(1.0);
   float best = 0.0;
+  bool ground = p.y < 0.5;
   for (int i = 0; i < VISTA_POCKETS; i++) {
     float r = uPocketRad[i];
     if (r <= 0.0) continue;
-    float d = length(p - uPocketPos[i]);
+    vec3 dv = p - uPocketPos[i];
+    float d = ground ? length(dv.xz) : length(dv);
     float w = 1.0 - smoothstep(r * 0.85, r, d);
+    if (ground) w *= uPocketFade[i];
     if (w > best) {
       best = w;
       s = mix(uBaseS, uPocketS[i], w);
@@ -234,6 +250,7 @@ interface Shared {
   readonly uPocketRad: THREE.IUniform<number[]>;
   readonly uPocketS: THREE.IUniform<THREE.Vector4[]>;
   readonly uPocketTint: THREE.IUniform<THREE.Vector3[]>;
+  readonly uPocketFade: THREE.IUniform<number[]>;
   readonly uBaseS: THREE.IUniform<THREE.Vector4>;
   readonly uTime: THREE.IUniform<number>;
   readonly uSunDir: THREE.IUniform<THREE.Vector3>;
@@ -247,6 +264,7 @@ function makeShared(): Shared {
     uPocketRad: { value: new Array<number>(MAX_POCKETS).fill(0) },
     uPocketS: { value: Array.from({ length: MAX_POCKETS }, () => new THREE.Vector4()) },
     uPocketTint: { value: Array.from({ length: MAX_POCKETS }, () => new THREE.Vector3(1, 1, 1)) },
+    uPocketFade: { value: new Array<number>(MAX_POCKETS).fill(1) },
     uBaseS: { value: new THREE.Vector4(...BASE_S) },
     uTime: { value: 0 },
     uSunDir: { value: new THREE.Vector3(0.4, 0.7, 0.5).normalize() },
@@ -295,8 +313,9 @@ void main() {
 }
 `;
 const SKY_FRAG = /* glsl */ `
-uniform float uDusk, uGlow, uFlash, uTime;
-uniform vec3 uBreachDir, uFlashDir, uHorizon, uDuskHorizon;
+uniform float uDusk, uGlow, uFlash, uTime, uCloudH;
+uniform vec3 uBreachDir, uFlashDir, uHorizon, uDuskHorizon, uEye;
+uniform vec2 uBreachXZ;
 varying vec3 vDir;
 ${NOISE_GLSL}
 void main() {
@@ -305,15 +324,20 @@ void main() {
   vec3 hz = mix(uHorizon, uDuskHorizon, uDusk);
   vec3 zen = mix(vec3(0.05, 0.05, 0.08), vec3(0.17, 0.18, 0.32), uDusk);
   vec3 col = mix(hz, zen, smoothstep(0.0, 0.5, up));
-  // the storm clouds drift; their undersides take the Breach's cyan and the flashes' light
-  vec2 cuv = d.xz / (d.y + 0.08) * 0.9 + vec2(uTime * 0.015, uTime * 0.004);
-  float cl = smoothstep(0.42, 0.74, vfbm(cuv * 1.1));
-  vec2 bxz = normalize(uBreachDir.xz);
-  float bdir = max(dot(normalize(d.xz + vec2(1e-4)), bxz), 0.0);
-  float under = pow(bdir, 4.0) * (1.0 - smoothstep(0.05, 0.6, d.y));
+  // the storm clouds are a layer at uCloudH: the view ray meets it, the clouds drift on it, and their undersides within 1.5 km
+  // of the Breach take its cyan (cloudLitAt in the maths) and the flashes' light (review 2, V1)
+  float cl = 0.0;
+  float lit = 0.0;
+  if (d.y > 0.02) {
+    float t = (uCloudH - uEye.y) / d.y;
+    vec2 q = uEye.xz + d.xz * t;
+    cl = smoothstep(0.42, 0.74, vfbm(q * 0.0022 + vec2(uTime * 0.004, uTime * 0.0015)));
+    cl *= smoothstep(0.02, 0.12, d.y);
+    lit = 1.0 - smoothstep(200.0, 1500.0, length(q - uBreachXZ));
+  }
   vec3 cloudDark = mix(vec3(0.17, 0.16, 0.2), vec3(0.36, 0.22, 0.18), uDusk);
-  vec3 cloudLit = vec3(0.35, 0.85, 1.0) * uGlow;
-  vec3 cloudCol = mix(cloudDark, cloudLit, clamp(under * 1.4, 0.0, 1.0)) + vec3(0.8, 0.95, 1.0) * uFlash * 0.5 * (0.4 + 0.6 * bdir);
+  vec3 cloudLit = vec3(0.45, 0.92, 1.0) * uGlow;
+  vec3 cloudCol = mix(cloudDark, cloudLit, lit) + vec3(0.8, 0.95, 1.0) * uFlash * 0.5 * (0.3 + 0.7 * lit);
   col = mix(col, cloudCol, cl * 0.9);
   float glow = pow(max(dot(d, normalize(uBreachDir)), 0.0), 60.0);
   col += vec3(0.35, 0.85, 1.0) * glow * uGlow * 0.6;
@@ -351,12 +375,41 @@ void main() {
   float tick = floor(uTime * 18.0);
   vec2 cell = floor(vec2(vP.x + vP.z, vY) / vec2(5.0, 3.0));
   float n = bh2(cell + tick * 0.37);
-  vec3 hot = vec3(0.92, 1.0, 1.0);
-  vec3 cold = vec3(0.10, 0.40, 0.55);
+  // the core is white-cyan and the brightest thing in the view (review 2, V1); its cold cells are cyan, the hot ones white
+  vec3 hot = vec3(1.0, 1.0, 1.0);
+  vec3 cold = vec3(0.55, 0.95, 1.0);
   vec3 c = mix(cold, hot, step(0.32, n));
-  c *= 0.9 + 0.8 * uGlow;
-  c = mix(c, uHazeCol * 1.3, uHaze);
+  c *= 1.6 * (0.7 + 0.3 * uGlow);
+  c = mix(c, uHazeCol * 1.3, uHaze * 0.5);
   gl_FragColor = vec4(c, 1.0);
+}
+`;
+
+/** The glow sheath: a soft additive cylinder twice the column's width. Its front faces brighten toward the middle and fall off at the edge. */
+const SHEATH_VERT = /* glsl */ `
+uniform float uH;
+varying vec3 vN;
+varying vec3 vV;
+varying float vY;
+void main() {
+  vec3 p = position;
+  p.y *= uH;
+  vec4 wp = modelMatrix * vec4(p, 1.0);
+  vN = normalize(mat3(modelMatrix) * normal);
+  vV = normalize(cameraPosition - wp.xyz);
+  vY = p.y / ${BREACH_H.toFixed(1)};
+  gl_Position = projectionMatrix * viewMatrix * wp;
+}
+`;
+const SHEATH_FRAG = /* glsl */ `
+uniform float uGlow;
+varying vec3 vN;
+varying vec3 vV;
+varying float vY;
+void main() {
+  float facing = abs(dot(normalize(vN), normalize(vV)));
+  float a = pow(facing, 1.6) * 0.5 * uGlow * (1.0 - smoothstep(0.75, 1.0, vY));
+  gl_FragColor = vec4(vec3(0.35, 0.85, 1.0), a);
 }
 `;
 
@@ -405,33 +458,47 @@ void main() {
 `;
 
 /** The pocket shell: the back faces show the pocket's sky; only a thin fresnel line of scanned static lights the edge. */
+/**
+ * The pocket shell (review 2, V2): transparent, no depth write, and no dark fill. A thin fresnel rim of scanline static in the
+ * pocket's own colour; the back faces carry the pocket's sky at no more than 25% opacity. The kind rides in the instance colour.
+ */
 const SHELL_VERT = /* glsl */ `
+flat varying int vSlot;
 varying vec3 vN;
 varying vec3 vV;
 varying float vY;
-varying vec3 vCol;
 void main() {
   vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0);
   vN = normalize(mat3(modelMatrix * instanceMatrix) * normal);
   vV = normalize(cameraPosition - wp.xyz);
   vY = wp.y;
-  vCol = instanceColor;
+  vSlot = int(instanceColor.r + 0.5);
   gl_Position = projectionMatrix * viewMatrix * wp;
 }
 `;
 const SHELL_FRAG = /* glsl */ `
 uniform float uTime;
+uniform vec3 uShellRim[${MAX_POCKETS}];
+uniform vec3 uShellSky[${MAX_POCKETS}];
+flat varying int vSlot;
 varying vec3 vN;
 varying vec3 vV;
 varying float vY;
-varying vec3 vCol;
 float sh(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 void main() {
-  float rim = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 7.0);
+  float ndv = abs(dot(normalize(vN), normalize(vV)));
+  float rim = pow(1.0 - ndv, 3.0);
   float scan = 0.5 + 0.5 * sin(vY * 3.0 + uTime * 6.0);
   float grain = step(0.4, sh(floor(vec2(vY * 6.0, uTime * 20.0))));
-  vec3 c = vCol * 0.5 * (0.8 + 0.2 * scan) + vec3(0.7, 1.0, 1.0) * rim * (0.6 + 0.8 * grain);
-  gl_FragColor = vec4(c, 1.0);
+  vec3 rimCol = uShellRim[vSlot] * (0.55 + 0.45 * scan) * (0.6 + 0.8 * grain);
+  float a = clamp(rim * 1.6 * (0.5 + 0.5 * grain), 0.0, 0.9);
+  vec3 c = rimCol;
+  if (!gl_FrontFacing) {
+    // the back faces: the pocket's sky at 25% opacity, with the rim on top
+    c = mix(uShellSky[vSlot], rimCol, rim);
+    a = max(a, 0.25);
+  }
+  gl_FragColor = vec4(c, a);
 }
 `;
 
@@ -570,6 +637,7 @@ export function createLabVista(o: LabVistaOptions): LabVista {
     uTime: { value: 0 }, uDusk: { value: 0 }, uGlow: { value: 1 }, uFlash: { value: 0 },
     uBreachDir: { value: sunDir.clone() }, uFlashDir: { value: new THREE.Vector3(0, 1, 0) },
     uHorizon: { value: hexOf(HORIZON_STORM) }, uDuskHorizon: { value: hexOf(HORIZON_DUSK) },
+    uCloudH: { value: CLOUD_H }, uEye: { value: new THREE.Vector3() }, uBreachXZ: { value: new THREE.Vector2(BREACH[0], BREACH[1]) },
   };
   const sky = new THREE.Mesh(keep(new THREE.SphereGeometry(4500, 32, 16)), keep(new THREE.ShaderMaterial({
     vertexShader: SKY_VERT, fragmentShader: SKY_FRAG, uniforms: skyU, side: THREE.BackSide, depthWrite: false, toneMapped: false,
@@ -647,6 +715,17 @@ export function createLabVista(o: LabVistaOptions): LabVista {
   })));
   breach.position.set(BREACH[0], 0, BREACH[1]);
   scene.add(breach);
+  // the glow sheath: a soft additive cylinder of twice the column's width, the same height and the same slow scale
+  const sheathGeo = keep(new THREE.CylinderGeometry(SHEATH_W / 2, SHEATH_W / 2, BREACH_H, 40, 1, true));
+  sheathGeo.translate(0, BREACH_H / 2, 0);
+  const sheathMat = keep(new THREE.ShaderMaterial({
+    vertexShader: SHEATH_VERT, fragmentShader: SHEATH_FRAG, uniforms: { uH: breachU.uH, uGlow: breachU.uGlow },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
+  }));
+  const sheath = new THREE.Mesh(sheathGeo, sheathMat);
+  sheath.position.set(BREACH[0], 0, BREACH[1]);
+  sheath.renderOrder = 3;
+  scene.add(sheath);
 
   // ---- The sets: each model's instances, one InstancedMesh per part
   const sets: VistaSet[] = [];
@@ -687,27 +766,32 @@ export function createLabVista(o: LabVistaOptions): LabVista {
   // L1 the near field (30 to 120 m): a two-high container stack at the right bay's edge, three slabs, the first pylon far right
   hero['shipping-container']!.push(pose(...at(beyond(26, 62), 0), Math.PI / 2));
   hero['shipping-container']!.push(pose(...at(beyond(26, 62), 2.6), Math.PI / 2));
-  hero['rubble-slab']!.push(pose(...at(beyond(-4, 40), 0), 0.7));
+  hero['rubble-slab']!.push(pose(...at(beyond(-13, 40), 0), 0.7));
   hero['rubble-slab']!.push(pose(...at(beyond(12, 95), 0), 2.2));
   hero['rubble-slab']!.push(pose(...at(beyond(-18, 70), 0), -0.2));
   // L2 the farm (150 to 500 m): five halls low on the horizon, a chiller beside each one
-  for (const [b, w] of [[-20, 300], [-7, 170], [10, 230], [24, 330], [38, 260]] as const) {
+  // the halls sit clear of the Breach's corridor (review 2, V1): nothing stands in front of the column
+  for (const [b, w] of [[-20, 300], [-12, 170], [10, 230], [24, 330], [38, 260]] as const) {
     // the halls' long side (23 m) faces the window; the far rows are scaled up 1.8 (the real hall is 10 x 9 x 23 m)
     hero['datacentre-hall']!.push(pose(...at(beyond(b, w), 0), Math.PI / 2 + (b * Math.PI) / 180 * 0.1, 0, 0, 1.8));
-    hero['chiller-block']!.push(pose(...at(beyond(b + 4, w - 30), 0), 0.1));
+    hero['chiller-block']!.push(pose(...at(beyond(b - 3, w - 30), 0), 0.1));
   }
-  // the overpass: sixteen pier-and-deck pieces (5.9 x 9 x 8.5 m) in a line toward the Breach, with 9.5 m gaps between them
+  // the overpass: fourteen pier-and-deck pieces (5.9 x 9 x 8.5 m) in a line toward the Breach, 18 m apart; it stops short of the corridor
   const overStart = beyond(-22, 200);
   const overLen = Math.hypot(BREACH[0] - overStart[0], BREACH[1] - overStart[1]);
   const ux = (BREACH[0] - overStart[0]) / overLen, uz = (BREACH[1] - overStart[1]) / overLen;
-  for (let i = 0; i < 16; i++) {
+  for (let i = 0; i < 14; i++) {
     const d = 18 * i;
-    hero['overpass-segment']!.push(pose(overStart[0] + ux * d, 0, overStart[1] + uz * d, Math.atan2(ux, uz)));
+    const x = overStart[0] + ux * d, z = overStart[1] + uz * d;
+    if (inCorridor(bearingFromSpawn(x, z), CORRIDOR_DEG + 1)) continue;
+    hero['overpass-segment']!.push(pose(x, 0, z, Math.atan2(ux, uz)));
   }
-  // the pylon line: from the near right (60 m) diagonally to the Breach
+  // the pylon line: from the near right (60 m) toward the Breach's right edge; the pylons inside the corridor are left out
   const pylonStart = beyond(40, 60);
-  for (const t of [0, 0.12, 0.26, 0.42, 0.6, 0.8]) {
-    const x = pylonStart[0] + (BREACH[0] - pylonStart[0]) * t, z = pylonStart[1] + (BREACH[1] - pylonStart[1]) * t;
+  const pylonEnd = polar(SPAWN_XZ, 9, 1000);
+  for (const t of [0, 0.2, 0.4, 0.6, 0.8]) {
+    const x = pylonStart[0] + (pylonEnd[0] - pylonStart[0]) * t, z = pylonStart[1] + (pylonEnd[1] - pylonStart[1]) * t;
+    if (inCorridor(bearingFromSpawn(x, z), CORRIDOR_DEG + 1)) continue;
     hero['pylon-tower']!.push(pose(x, 0, z, 0));
   }
   // L3 the Breach (600 to 2000 m): the main hall the column rises from, and far silhouettes
@@ -735,12 +819,19 @@ export function createLabVista(o: LabVistaOptions): LabVista {
 
   // ---- The pocket shells: one instanced sphere; back faces show the pocket's sky, a thin static rim (plan §5, R5)
   const shellMat = keep(new THREE.ShaderMaterial({
-    vertexShader: SHELL_VERT, fragmentShader: SHELL_FRAG, uniforms: { uTime: { value: 0 } }, side: THREE.BackSide,
+    vertexShader: SHELL_VERT, fragmentShader: SHELL_FRAG, transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    uniforms: {
+      uTime: { value: 0 },
+      uShellRim: { value: SHELL_RIM.map((c) => new THREE.Vector3(c[0], c[1], c[2])) },
+      uShellSky: { value: SHELL_SKY.map((c) => new THREE.Vector3(c[0], c[1], c[2])) },
+    },
   }));
   const shells = new THREE.InstancedMesh(keep(new THREE.SphereGeometry(1, 40, 24)), shellMat, MAX_POCKETS);
   shells.frustumCulled = false;
-  const SKY_COLOURS = POCKET_KINDS.map((k) => new THREE.Color(...k.sky));
-  for (let i = 0; i < MAX_POCKETS; i++) shells.setColorAt(i, SKY_COLOURS[0]!);
+  shells.renderOrder = 2;
+  // the instance colour carries the pocket's kind in its red channel (the kind changes each cycle, the slot does not)
+  const KIND_IDS = POCKET_KINDS.map((_, k) => new THREE.Color(k, 0, 0));
+  for (let i = 0; i < MAX_POCKETS; i++) shells.setColorAt(i, KIND_IDS[0]!);
   scene.add(shells);
 
   // ---- The dust: 900 motes, advected on the GPU (one draw call); the lite view draws half. Low and near (R6).
@@ -760,7 +851,8 @@ export function createLabVista(o: LabVistaOptions): LabVista {
       seedArr[i * 4 + 1] = r() < 0.8 ? 0.3 + 2.4 * r() : 3 + 6 * r();
       seedArr[i * 4 + 2] = near ? WALL_Z - 4 - 46 * r() : WALL_Z - 50 - 120 * r();
       seedArr[i * 4 + 3] = r();
-      sizeArr[i] = (near ? 0.12 : 0.28) + 0.22 * r();
+      // twice the first size (review 2, V4): the motes read as dust from the glass
+      sizeArr[i] = 2 * ((near ? 0.12 : 0.28) + 0.22 * r());
     }
   }
   moteGeo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seedArr, 4));
@@ -979,9 +1071,10 @@ export function createLabVista(o: LabVistaOptions): LabVista {
       shared.uPocketRad.value[i] = pf.radius;
       shared.uPocketS.value[i]!.set(kind.s[0], kind.s[1], kind.s[2], kind.s[3]);
       shared.uPocketTint.value[i]!.set(kind.tint[0], kind.tint[1], kind.tint[2]);
+      shared.uPocketFade.value[i] = groundFade(pf.centre[1]);
       const sc = Math.max(pf.radius, 0.001);
       shells.setMatrixAt(i, tmpM.compose(tmpP.set(pf.centre[0], pf.centre[1], pf.centre[2]), IDENTITY_Q, tmpS.set(sc, sc, sc)));
-      shells.setColorAt(i, SKY_COLOURS[pf.kind]!);
+      shells.setColorAt(i, KIND_IDS[pf.kind]!);
     }
     shells.instanceMatrix.needsUpdate = true;
     if (shells.instanceColor) shells.instanceColor.needsUpdate = true;
@@ -1020,6 +1113,8 @@ export function createLabVista(o: LabVistaOptions): LabVista {
     camera.far = 9000;
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld(true);
+    // the sky's cloud layer is intersected from the eye, so the eye's place is needed (the sky dome itself is at the origin)
+    (skyU.uEye.value as THREE.Vector3).copy(camera.position);
     const prevAuto = renderer.autoClear;
     // three.js scales the scissor by the pixel ratio itself, so these are CSS pixels; the origin is the bottom-left
     renderer.setScissorTest(true);
@@ -1065,6 +1160,7 @@ export function createLabVista(o: LabVistaOptions): LabVista {
     stats,
     debugPockets: () => framePockets.map((f, slot) => ({ slot, centre: [...f.centre], radius: f.radius, kind: f.kind })),
     debugFlyers: () => flyerPos.map((f) => ({ ...f })),
+    debugSets: () => sets.map((s) => ({ key: s.key, id: s.id, source: s.source, instances: s.poses.length })),
     dispose() {
       for (const s of sets) {
         for (const m of s.meshes) { scene.remove(m); m.dispose(); }

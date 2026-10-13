@@ -125,6 +125,13 @@ async function normalize(src, dst, a) {
     await io.write(dst, doc);
     return { w: tw, h: hi[1] - lo[1], d: td, yaw };
   }
+  // a reviewed `yaw` (degrees) turns any asset about its up axis first: a redo can come back facing another way
+  // (the weapon bench's 2026-10-13 redo put its length along z)
+  if (a.yaw && a.yaw % 360 !== 0) {
+    const t = (a.yaw * Math.PI) / 180, c = Math.cos(t), sn = Math.sin(t);
+    for (const mesh of doc.getRoot().listMeshes()) transformMesh(mesh, [c, 0, -sn, 0, 0, 1, 0, 0, sn, 0, c, 0, 0, 0, 0, 1]);
+    b = getBounds(scene); dx = b.max[0] - b.min[0]; dy = b.max[1] - b.min[1]; dz = b.max[2] - b.min[2];
+  }
   const s = size / (axis === 'height' ? dy : Math.max(dx, dz));
   const cx = (b.min[0] + b.max[0]) / 2, cz = (b.min[2] + b.max[2]) / 2;
   // translate to bottom-centre, then scale: m = S * T
@@ -132,7 +139,7 @@ async function normalize(src, dst, a) {
   for (const mesh of doc.getRoot().listMeshes()) transformMesh(mesh, m);
   await doc.transform(prune());
   await io.write(dst, doc);
-  return { w: dx * s, h: dy * s, d: dz * s };
+  return { w: dx * s, h: dy * s, d: dz * s, ...(a.yaw ? { yaw: a.yaw } : {}) };
 }
 
 for (const a of manifest.assets.filter((x) => only.length === 0 || only.includes(x.id))) {

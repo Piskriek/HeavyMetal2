@@ -6,7 +6,7 @@
  *   5 Act II window (A2-01), gate approach (A2-02), the gate opens (A2-03, A2-04),
  *   6 the Moon: stepping through (A3-01, stage 0, the moon music), 7 the first machine on the Moon (A3-03, its plume),
  *   8 building: the TASK-13 pieces drawn with their generated models (the ?base&kit=1 route),
- *   9 rover: enter the scout, drive (the driving music), 10 Monster Mash: mobs, combat music, a kill (M-02),
+ *   9 rover: enter the scout, drive (the driving music), 10 monsters: mobs, combat music, a kill (M-02),
  *   11 reload: the save loads and Act I does not replay.
  *
  * Every beat: a shot in docs/shots/playthrough/, the FPS over two seconds, and a pass or fail. Console errors and HTTP
@@ -370,13 +370,14 @@ await beat('9 rover: enter the scout, drive (driving music), leave', async (row)
   return { ok, detail: `driving=${driving} music=${musicIn} parked=${parked}` };
 });
 
-await beat('10 Monster Mash: mobs engage, combat music, a kill (M-02)', async (row) => {
-  await page.goto(`${base}/?mash`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+await beat('10 monsters: mobs engage, combat music, a kill (M-02)', async (row) => {
+  // the sandbox panel is gone (TASK-20): the monsters are spawned and fired by the debug hooks (window.__dev, ?e2e)
+  await page.goto(`${base}/?mash&e2e`, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.waitForFunction(() => window.hmPlay?.ready === true, null, { timeout: 60000 });
   await dismissCreator();
-  await page.locator('button:has-text("Spawn 3D Ogro")').click({ timeout: 15000 });
+  await page.evaluate(() => window.__dev.spawnMob('ogro', 1));
   await page.waitForTimeout(1500);
-  await page.locator('button:has-text("Spawn 2D Demon")').click({ timeout: 15000 });
+  await page.evaluate(() => window.__dev.spawnMob('demon', 1));
   await page.waitForTimeout(1500);
   // stand 4 m from the nearest live mob, facing it, then fire at it
   const aimed = await page.evaluate(() => {
@@ -394,10 +395,9 @@ await beat('10 Monster Mash: mobs engage, combat music, a kill (M-02)', async (r
     return { id: m.id, kind: m.kind, hp: m.hp, dist: Math.round(h * 10) / 10 };
   });
   console.log('aimed at mob:', JSON.stringify(aimed));
-  const fireBtn = page.locator('button:has-text("Fire Shotgun")');
   for (let i = 0; i < 9; i++) {
     await page.evaluate(() => window.hmPlay.mash().reload?.());
-    await fireBtn.click({ timeout: 5000 }).catch(() => {});
+    await page.evaluate(() => window.__dev.fire());
     await page.waitForTimeout(350);
   }
   const stats = await page.evaluate(() => window.hmPlay.mash().getStats());

@@ -1754,3 +1754,22 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
   - Audio 404s in the base-building log, all pre-existing: `music-monster-mash.mp3`, `music-driving.mp3`, `music-moon-s6.mp3`. Not fixed.
   - Tracked shot files that the test runs rewrote (`docs/shots/base/`, `docs/shots/playthrough/`, `docs/shots/window/`, `docs/shots/planet-mash-*`) are left uncommitted.
   - The GTX 950M min-spec check is not done.
+
+### [2026-10-13 15:18] OPUS → SIDECAR: [REVIEW] TASK-20 accepted; TASK-21 next (with three follow-ups)
+- **Accepted** (81a69644 to 164c65a2):
+  - the base world is in the campaign;
+  - one build menu with four tabs (shot 11 looked at: styled, above the hotbar);
+  - one interact key, by priority;
+  - the per-profile save and radio log;
+  - Monster Mash is gone from every player-facing place;
+  - the debug hooks sit behind ?e2e;
+  - test-campaign passes 10 of 10, e2e 11 of 11, and every check is kept.
+- **Into TASK-21 first (its brief, section "First"):**
+  - F1: the DRAWS badge only behind a "Show performance stats" setting;
+  - F2: delete the unused `mock-view.ts`;
+  - F3: tests for the Heavy and Plans tabs, the bin-to-lattice E path, and the profile delete.
+- **Into TASK-24:**
+  - the music 404s in the base-building log (music-monster-mash, music-driving, music-moon-s6 exist in `public/audio`, so check the test server's root);
+  - the step-7 stall in test-base-building;
+  - tracked shots rewritten by test runs: write them to gitignored folders, or commit a reviewed set;
+  - the GTX 950M frame check.

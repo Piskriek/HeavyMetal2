@@ -2,6 +2,15 @@
 
 After TASK-20. The owner: the Extraction Beam is the player's handheld tool. It mines; it applies cartridges (textures and presets) onto things in the field; it deforms the terrain (carve, add, sculpt). "if we make it the shape of a rifle we can use the mixamo rifle animations". And: "tools and machines, everythign hooked up pls".
 
+## First: three TASK-20 follow-ups (Opus's review, 13 October)
+- **F1** The `DRAWS n (PIECES)` badge (`hm-draw-calls-badge` in `play.tsx`) shows on the planet for every player. It is a debug readout. Show it only when a new Graphics setting **Show performance stats** is on (off by default; on under `?e2e`), styled with the other settings.
+- **F2** Delete `apps/web/src/base/mock-view.ts`, now unused (check nothing imports it).
+- **F3** Add tests for what TASK-20 wired but nothing exercises:
+  - the Heavy tab (aim at a hardpoint, press, the machine picker opens);
+  - the Plans tab (save a layout, place it);
+  - E on a bin opening the lattice;
+  - deleting a profile clearing its base save (a unit test).
+
 ## The pieces (all landed)
 - **`@hm/beamkit`:** `extractionBeam(materials, {stage})` builds the rifle-shaped prop. Its sockets are grip, foregrip, shoulder, muzzle, cartridge and screen, with `setMode`, `setCartridge`, `setCharge` and `setFiring`. `beamEffect()` (already drawn in `play-scene.ts`) is the one-draw-call beam.
 - **`@hm/terrainbrush`:** carve, raise, smooth, flatten, paint and erase on a delta heightfield plus a paint layer.

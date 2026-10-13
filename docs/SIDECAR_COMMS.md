@@ -1923,3 +1923,37 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
 - **Ownership:**
   - TASK-21 owns `play.tsx`, `play-scene.ts`, `avatar/` and `test-campaign.mjs`;
   - TASK-17 owns `studio*` and the write-back plugin, and may edit `gen.ts`, `shell.tsx` and `vite.config.ts` (commit those straight away).
+
+### [2026-10-13 16:43] SIDECAR → OPUS: [DONE] TASK-17 the Studio shell and write-back (573b2ce7, 69c33f1d, f02dc773; pushed)
+- **Commits (all pushed, last `f02dc773`):**
+  - `573b2ce7`: the write-back pipe. `apps/web/studio-server/` (endpoint, allowlist, schema, dev-only Vite plugin), `studio-data/asset-tweaks.json` (`{}`), `gen.ts` applies tweaks in `getGenSync`/`loadGen`, `vite.config.ts` plugin (`apply: 'serve'`).
+  - `69c33f1d`: the editor shell in `apps/web/src/studio/` (top bar, content and outliner, viewport with `@hm/gizmo` and the three keymaps, details generated from the schema, Changes panel, scenedoc undo/redo, draggable and saved panels, Classic layout). `shell.tsx` wiring (`?studio`, the prototype as "Moon (prototype)").
+  - `f02dc773`: `STUDIO.bat` (CRLF) and `scripts/test-studio.mjs`.
+- **Changes from the WIP** (after review of it):
+  - explicit name regex `^[a-z0-9-]+$` before the allowlist;
+  - the file is written without neutral values (the schema's own rule);
+  - Accept re-reads the file on disk and merges the accepted rows, so an outside edit is not overwritten;
+  - `gen.ts` accepts its own tweak JSON in dev. Before this, a save reloaded the whole page (the status line and undo history were lost);
+  - the Moon (prototype) workspace hides undo, redo and save, which act on the Assets document only.
+- **Checks (real results, final tree):**
+  - `npm run typecheck`: exit 0.
+  - `node --import tsx --test apps/web/studio-server/write-back.test.ts apps/web/src/assets/gen-tweak.test.ts`: 7 of 7 endpoint tests and 5 of 5 tweak tests pass.
+  - `npm test`: 2,461 tests, 2,448 pass, 9 fail, 4 skipped. All 9 failures are `performance:` timing tests in other packages (beam, plots, brush strokes, decodes, six builds, and two in scenedoc). The scenedoc one also fails alone (356 ms against a 300 ms budget). None is Studio code, and I did not touch those packages. The machine was loaded by other sessions during the run.
+  - `npm run build`: exit 0 (`dist/index.html` 18,266 kB). The bundle has no write-back server code (`renameSync`, the 403 text and `BodyTooLarge` are absent); only the client's endpoint string and the banner text.
+  - `node scripts/test-studio.mjs` (its own dev server, port 5201): **33 of 33 pass.** It covers the endpoint refusals (name, host, content type, range), two objects and two fields, undo and redo by button and key, Accept, the file read back, the game's own `loadGen` and `getGenSync` returning the saved offset and metal, splitter resize and Classic reset, the Moon workspace, and the built game being read-only. Teardown restores `asset-tweaks.json`.
+  - `npm run e2e` (the playthrough): **11 of 11 steps pass**, console errors 0, one aborted request (`hd/scout-body/high.gltf`, ERR_ABORTED, not a 404). **The script does not exit on this machine:** after its summary the node process and its `serve.mjs` child stay alive. I stopped both by hand, so the wrapper showed exit 1. Harness issue in `scripts/test-playthrough.mjs`; I did not change it.
+  - Gizmo: not in the e2e. Checked by hand in the pane: dragging the headlight's X arrow moved Offset x from 0.25 to 0.73 and left one pending row.
+- **Shots** (`docs/shots/studio/`, gitignored; each one opened and looked at): `studio-layout.png` (empty scene, "Nothing selected" shows), `studio-changes-two.png` (two pending rows, two objects, Accept and Discard per row), `studio-readonly.png` (the banner on the built game, Accept disabled), `studio-moon-prototype.png` (the prototype renders under the Studio header).
+- **Not in this task, or left open:**
+  - Scene, Look and Audio are "next" placeholders, as the brief says.
+  - The details renderer has number, colour and vector3. No toggle or select kind yet, because no field uses one.
+  - Simple and Advanced differ only for scale (per-axis) so far.
+  - A saved tweak reaches the copies made after the save. Copies already placed in the game keep their old copy until they are made again (the code says so).
+  - The Studio ships in the player bundle, because `shell.tsx` imports it. The single file is now 18.27 MB; the POL-27 watch applies.
+  - Pre-existing and not mine: the prototype's hint line overlaps its own bottom bar on the Moon (prototype).
+  - `STUDIO.bat`: I ran its exact command on port 5174 (`npm run dev -w @hm/web -- --port ... --strictPort`), and the Studio route and the endpoint answered. I did not double-click it. Port 5173 is held by another dev server right now, so `--strictPort` will refuse until that one stops.
+- **Shared-tree notes:**
+  - `package.json`: the `npm test` glob does not include the two new unit files. That line has someone else's uncommitted edit (TASK-21), and I did not edit or commit that file. Please add `apps/web/studio-server/*.test.ts apps/web/src/assets/gen-tweak.test.ts` to the glob. `test-studio.mjs` runs them until then.
+  - `apps/web/dist/index.html` was rebuilt by my builds. It is tracked and already modified in the shared tree; I did not commit it.
+  - I did not touch `play.tsx`, `play-scene.ts`, `avatar/`, `test-campaign.mjs`, `zips/runworld/`, or `scripts/local3d.mjs`.
+- I am stopping before TASK-18, as the brief says.

@@ -42,12 +42,13 @@ import type { Snapshot } from '@hm/plotcodec';
 import type { MobStatus, CombatStats } from './monster-mash-combat';
 import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { kv } from '../storage/profile-storage';
-import { BASE_SAVE_KEY, loadWorld, saveWorld } from '../base/save';
+import { BASE_SAVE_KEY, saveWorld } from '../base/save';
+import { startCampaignWorld } from '../base/campaign-world';
 import { BaseHud } from '../base/ui/base-hud';
 import { createWorldViewSource, WorldViewSource, formatRefusalToast } from '../base/world-view';
 import {
-  createWorld, apply, pieceAt, pieceAtIn, preview, withBridgeStore, BRIDGE_RANGE, BRIDGE_STORE,
-  BEAM_RANGE, PLAYER_KG, structureEnv, planGhosts, layoutPieces, roomAt,
+  apply, pieceAt, pieceAtIn, preview, withBridgeStore, BRIDGE_RANGE, BRIDGE_STORE,
+  BEAM_RANGE, structureEnv, planGhosts, layoutPieces, roomAt,
   type BaseWorld, type BaseCommand, type WorldEnv, type Applied, type Plan,
 } from '../base/world';
 import { PieceMeshManager } from '../base/piece-meshes';
@@ -55,7 +56,8 @@ import { globalKitPieceCache, integrityColorName } from '../base/kit-pieces';
 import { preloadAllGenAssets, genLevelForStage, createGenFixture } from '../assets/gen-props';
 
 const isFixture = (kind: Kind): boolean => kind === 'bin' || kind === 'bench' || kind === 'repeater' || kind === 'lifeSupport' || kind === 'weaponBench';
-import { blueprint, STARTER, ITEMS } from '../base/catalog';
+import { blueprint, ITEMS, pieceCost } from '../base/catalog';
+import { BuildMenu, KIND_LABEL, type BuildTab, type MenuBlueprint, type MenuHeavy, type MenuMachine } from './build-menu';
 import { MachinePickerModal } from '../base/ui/machine-picker-modal';
 import { RefineryModal } from '../base/ui/refinery-modal';
 import { FabricatorModal } from '../base/ui/fabricator-modal';
@@ -129,7 +131,25 @@ const BLURB: Readonly<Record<MachineKind, string>> = {
   'heavy-water': 'Floods the plot with cyan water pixels.',
 };
 const signed = (v: number): string => `${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
-const KEYS: readonly [string, string][] = [['W A S D', 'walk'], ['Mouse', 'look'], ['Shift', 'run'], ['V', 'view'], ['E', 'use'], ['B', 'build'], ['Esc', 'pause']];
+/** The heavy machines, installed on a base hardpoint (the Heavy tab of the build menu). */
+const HEAVY_CARDS: readonly MenuHeavy[] = [
+  { kind: 'mill', name: 'Heavy mill', blurb: BLURB['heavy-mill'] },
+  { kind: 'press', name: 'Heavy press', blurb: BLURB['heavy-press'] },
+  { kind: 'projector', name: 'Heavy projector', blurb: BLURB['heavy-projector'] },
+  { kind: 'water', name: 'Heavy water', blurb: BLURB['heavy-water'] },
+];
+/** The hint line under the play screen: the few keys a new player needs first. */
+const KEYS: readonly [string, string][] = [['W A S D', 'walk'], ['Mouse', 'look'], ['E', 'use'], ['B', 'build'], ['V', 'view'], ['Esc', 'pause']];
+/** Every key of the campaign, as the pause menu lists them (one meaning per key: E interacts, V views, T integrity). */
+const CONTROLS: readonly [string, string][] = [
+  ['W A S D', 'Walk'], ['Mouse', 'Look (click the world to capture the mouse)'], ['Shift', 'Run'],
+  ['E', 'Use: leave or enter a vehicle, use a station, machine or bin; hold on a boulder to gather ore'],
+  ['B', 'Build menu: Machines, Structures, Heavy, Plans'], ['Q', 'Previous structure kind (the wheel too)'],
+  ['R', 'Rotate the piece you hold, or the layout while you place it'], ['X', 'Remove the piece you aim at'],
+  ['F', 'Build the plan you stand near'], ['T', 'Structural integrity overlay'], ['V', 'First or third person view'],
+  ['Space', 'Brake a vehicle; fire the shotgun when it is equipped'], ['Tab or I', 'Inventory'], ['K', 'Drafting table'],
+  ['L', 'Lattice storage'], ['1 to 9', 'Hotbar slot'], ['Esc', 'Close the open thing, then pause'],
+];
 
 export function PlayScreen(props: {
   readonly profile: Profile;
@@ -151,16 +171,22 @@ export function PlayScreen(props: {
   const pausedRef = useRef(false);
   useEffect(() => { pausedRef.current = paused; }, [paused]);
   const [menu, setMenu] = useState(false);
+  const [buildTab, setBuildTab] = useState<BuildTab>('machines');
   const [building, setBuilding] = useState<MachineKind | null>(null);
   const [hud, setHud] = useState<Hud>({ where: 'lab', sync: 1, atLever: false, atDial: false, ghost: null, aimed: null, aimedBoulder: null, aimedLab: null, plot: NO_PLOT, visitingOwner: null });
   const firstGatherRef = useRef(false);
 
   // TASK-11 Mentor Narration Controller & UI
-  const slotKey = state.avatar ? (state.avatar.kind === 'custom' ? state.avatar.key : state.avatar.name) : 'campaign';
+  // The radio log belongs to the profile's one save. It was keyed by the avatar's name, which is only known after the
+  // creator, so a reload read an empty log and the wake (A1-01) played again. One key now; an avatar-keyed log from an
+  // older save is read too, so nothing replays for it.
+  const slotKey = 'campaign';
+  const avatarLogKey = state.avatar ? (state.avatar.kind === 'custom' ? state.avatar.key : state.avatar.name) : null;
+  const savedHeard = (): string[] => (state.step === 'create' ? [] : [...new Set([...loadRadioLog(slotKey), ...(avatarLogKey ? loadRadioLog(avatarLogKey) : [])])]);
   const narratorRef = useRef<GameNarratorController | null>(null);
   const [subtitle, setSubtitle] = useState<{ id: string; text: string; cleanText: string } | null>(null);
   const [radioLogOpen, setRadioLogOpen] = useState(false);
-  const [heardLogs, setHeardLogs] = useState<readonly string[]>(() => (state.step === 'create' ? [] : loadRadioLog(slotKey)));
+  const [heardLogs, setHeardLogs] = useState<readonly string[]>(savedHeard);
   const [dialogueSettings, setDialogueSettings] = useState(() => loadDialogueSettings());
   const [audioSettings, setAudioSettings] = useState<AudioSettings>(() => loadAudioSettings());
   const lookPowerWallTimerRef = useRef(0);
@@ -184,7 +210,7 @@ export function PlayScreen(props: {
   useEffect(() => {
     if (!narratorRef.current) {
       const defaultRules = fidelityRules(Object.fromEntries(FIDELITY_LINE_IDS.map((id) => [id, 3])));
-      const initialLogs = state.step === 'create' ? [] : loadRadioLog(slotKey);
+      const initialLogs = savedHeard();
       narratorRef.current = new GameNarratorController(defaultRules, initialLogs, loadDialogueSettings(), slotKey);
     }
     const unsubSub = narratorRef.current.onSubtitle(setSubtitle);
@@ -219,6 +245,8 @@ export function PlayScreen(props: {
   const [toast, setToast] = useState<{ readonly text: string; readonly sub: string; readonly id: number } | null>(null);
   const isMashTest = typeof location !== 'undefined' && (new URLSearchParams(location.search).has('mash') || new URLSearchParams(location.search).has('monstermash'));
   const isDevSeed = typeof location !== 'undefined' && new URLSearchParams(location.search).get('kit') === '1';
+  /** The debug switch (TASK-20): `window.__dev` exists in dev builds and when the URL has `?e2e`. Players never get it. */
+  const debugHooks = import.meta.env.DEV || (typeof location !== 'undefined' && new URLSearchParams(location.search).has('e2e'));
   const creating = state.step === 'create' && !isMashTest;
 
   useEffect(() => {
@@ -251,21 +279,11 @@ export function PlayScreen(props: {
     return () => window.clearTimeout(t);
   }, [toast]);
 
-  const SEED_STOCK: readonly L.Stack[] = [
-    { item: 'ore', n: 600 },
-    { item: 'prim-cube', n: 15 },
-    { item: 'prim-chassis', n: 8 },
-    { item: 'prim-beam', n: 8 },
-    { item: 'prim-column', n: 8 },
-    // the TASK-13 house needs 14 basalt maps (one per cube and beam piece, and the draft); the seed carries 16
-    { item: 'map-basalt', n: 16 },
-    { item: 'pxd-mono', n: 80 },
-    { item: 'vtx-rough', n: 80 },
-  ];
 
 
   const hasSaveOnBootRef = useRef<boolean>(false);
 
+  /** The base world this profile starts with: its save, or a fresh world (campaign-world.ts). Read once, on mount. */
   const initBaseWorld = (): BaseWorld => {
     let rawSave: string | null = null;
     try {
@@ -273,64 +291,12 @@ export function PlayScreen(props: {
     } catch (e) {
       console.warn('[base save load error]', e);
     }
-    const seed = 1;
-    const ensureLoadout = (w: BaseWorld): BaseWorld => {
-      return {
-        ...w,
-        loadout: {
-          core: w.loadout.core ?? 'core-semi',
-          barrel: w.loadout.barrel ?? 'barrel-scatter',
-          sight: w.loadout.sight ?? 'sight-iron',
-          cell: w.loadout.cell ?? 'cell-compact',
-        },
-      };
-    };
-
-    if (rawSave) {
-      const loaded = ensureLoadout(loadWorld(rawSave, seed));
-      if (loaded.shelter) {
-        hasSaveOnBootRef.current = true;
-        return loaded;
-      }
-      hasSaveOnBootRef.current = false;
-      return loaded;
-    }
-    hasSaveOnBootRef.current = false;
-    const fresh = ensureLoadout(createWorld(seed));
-    const defaultEnv: WorldEnv = {
-      heightAt: () => 0,
-      bridge: { x: 0, z: 0, range: BRIDGE_RANGE },
-    };
-    if (isDevSeed) {
-      const slots = fresh.player.slots.slice();
-      slots[0] = { item: STARTER, n: 1 };
-      slots[1] = { item: 'bp:beam:basalt', n: 1 };
-      slots[2] = { item: 'bp:column:basalt', n: 1 };
-      const seeded = withBridgeStore(fresh, defaultEnv, SEED_STOCK);
-      return {
-        ...seeded,
-        player: {
-          ...seeded.player,
-          maxKg: PLAYER_KG,
-          slots,
-        },
-      };
-    } else {
-      const slots = fresh.player.slots.slice();
-      slots[0] = { item: STARTER, n: 1 };
-      const emptyBridge = withBridgeStore(fresh, defaultEnv);
-      return {
-        ...emptyBridge,
-        player: {
-          ...emptyBridge.player,
-          maxKg: PLAYER_KG,
-          slots,
-        },
-      };
-    }
+    const start = startCampaignWorld(rawSave, { seed: 1, devKit: isDevSeed });
+    hasSaveOnBootRef.current = start.played;
+    return start.world;
   };
-
-  const baseWorldRef = useRef<BaseWorld>(initBaseWorld());
+  const [initialBase] = useState<BaseWorld>(initBaseWorld);
+  const baseWorldRef = useRef<BaseWorld>(initialBase);
   const pieceManagerRef = useRef<PieceMeshManager>(new PieceMeshManager());
   const buildKindRef = useRef<Kind | null>(null);
   const buildRotationRef = useRef<number>(0);
@@ -708,13 +674,9 @@ export function PlayScreen(props: {
   tryPlaceBaseRef.current = tryPlaceBase;
 
   // ---- Monster Mash combat states & firing action
-  const [mashOpen, setMashOpen] = useState(false);
   const [mashEquipped, setMashEquipped] = useState(false);
   const [hitMarker, setHitMarker] = useState(false);
   const [mashAmmo, setMashAmmo] = useState({ current: 8, max: 8 });
-  const [mashMobs, setMashMobs] = useState<readonly MobStatus[]>([]);
-  const [mashStats, setMashStats] = useState<CombatStats>({ mobsSpawned: 0, mobsDefeated: 0, damageDealt: 0, shotsFired: 0, pelletsHit: 0, oreCollected: 0 });
-  const [mashStage, setMashStage] = useState<number>(0);
   const hitMarkerTimeout = useRef<number | null>(null);
 
   const fireWeapon = useCallback(() => {
@@ -723,8 +685,6 @@ export function PlayScreen(props: {
     const res = scene.mash.fire();
     if (res.fired) {
       setMashAmmo(scene.mash.getAmmo());
-      setMashStats(scene.mash.getStats());
-      setMashMobs(scene.mash.getMobList());
       if (res.hits > 0) {
         setHitMarker(true);
         if (hitMarkerTimeout.current) window.clearTimeout(hitMarkerTimeout.current);
@@ -1517,7 +1477,7 @@ export function PlayScreen(props: {
 
       // ---- hand gathering ore from boulders on the plot: hold E to gather 3 ore/s
       let plotChanged = false;
-      if (live && !visitingRef.current && out.where === 'planet' && out.aimedBoulder !== null && keys.has('KeyE')) {
+      if (live && !visitingRef.current && out.where === 'planet' && out.aimedBoulder !== null && keys.has('KeyE') && out.aimed === null && !out.atLever && !out.atDial && !out.aimedLab && !scene.getDrivingVehicle() && !scene.getNearVehicle(3.5) && scene.aimPoint()?.piece == null) {
         const mined = scene.gatherBoulder(out.aimedBoulder, 3 * dt);
         if (mined > 0) {
           plotRef.current = { ...plotRef.current, ore: Math.min(1e5, plotRef.current.ore + mined) };
@@ -1582,8 +1542,6 @@ export function PlayScreen(props: {
       if (hook.frames % 30 === 0) Object.assign(hook, scene.debug.stats());
       if (hook.frames % 15 === 0) {
         const mobList = scene.mash.getMobList();
-        setMashMobs(mobList);
-        setMashStats(scene.mash.getStats());
         if (!hasSeenMobRef.current && mobList.some((m) => m.state !== 'death')) {
           hasSeenMobRef.current = true;
           narratorRef.current?.trigger('mob:seen');
@@ -1964,7 +1922,6 @@ export function PlayScreen(props: {
         if (machinePickerHardpoint !== null) { setMachinePickerHardpoint(null); return; }
         if (refineryMachineId !== null) { setRefineryMachineId(null); return; }
         if (building) { stopBuilding(); return; }
-        if (mashOpen) { setMashOpen(false); return; }
         if (menu) { setMenu(false); return; }
         if (dialOpen) { setDialOpen(false); return; }
         if (panel !== null) { setPanel(null); return; }
@@ -2022,7 +1979,7 @@ export function PlayScreen(props: {
           return;
         }
       }
-      if (e.code === 'KeyV') {
+      if (e.code === 'KeyT') {
         const vs = baseViewSource as WorldViewSource;
         const cur = vs.get?.()?.build?.integrity ?? false;
         const next = !cur;
@@ -2030,14 +1987,6 @@ export function PlayScreen(props: {
         const bEnv = getBaseEnv();
         pieceManagerRef.current.sync(baseWorldRef.current, bEnv, next);
         say(next ? 'Structural Integrity: ON' : 'Structural Integrity: OFF');
-        return;
-      }
-      if (e.code === 'KeyM') {
-        setMashOpen((m) => {
-          const next = !m;
-          if (next) freeMouse();
-          return next;
-        });
         return;
       }
       if (e.code === 'Space' && locked && mashEquipped && !sceneRef.current?.getDrivingVehicle()) {
@@ -2080,6 +2029,11 @@ export function PlayScreen(props: {
           const p = baseWorldRef.current.base.pieces.find((q) => q.id === hit.piece);
           if (p && (p.kind === 'airlock' || p.kind === 'door')) {
             dispatchBase({ t: 'door', id: p.id, open: !p.open });
+            return;
+          }
+          if (p && p.kind === 'bin') {
+            (window as unknown as { __hmHud?: { openLattice?: () => void } }).__hmHud?.openLattice?.();
+            freeMouse();
             return;
           }
           if (p && p.kind === 'weaponBench') {
@@ -2139,7 +2093,7 @@ export function PlayScreen(props: {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [ready, creating, building, mashOpen, mashEquipped, fireWeapon, menu, panel, labPanel, dialOpen, locked, paused, hud.atLever, hud.atDial, hud.aimed, hud.aimedBoulder, hud.aimedLab, hud.where, placeNow, stopBuilding, freeMouse, say, props.profile]);
+  }, [ready, creating, building, mashEquipped, fireWeapon, menu, panel, labPanel, dialOpen, locked, paused, hud.atLever, hud.atDial, hud.aimed, hud.aimedBoulder, hud.aimedLab, hud.where, placeNow, stopBuilding, freeMouse, say, props.profile]);
   useEffect(() => {
     const onClick = (): void => { if (building && locked) placeNow(); };
     window.addEventListener('mousedown', onClick);
@@ -2188,12 +2142,75 @@ export function PlayScreen(props: {
             scene.mash.equip(true);
             setMashEquipped(true);
             void scene.mash.spawnOgro(1);
-            setMashOpen(true);
           }
         }
       }
     }
   }, [ready, commit]);
+
+  // Debug hooks (TASK-20): the sandbox's actions for the tests and for dev work, in place of the removed Monster Mash panel.
+  useEffect(() => {
+    if (!ready || !debugHooks) return undefined;
+    const grant = (item: string, n: number): boolean => {
+      const spec = ITEMS[item];
+      if (!spec || n <= 0) return false;
+      const w = baseWorldRef.current;
+      const slots = w.player.slots.slice();
+      let left = Math.floor(n);
+      for (let i = 0; i < slots.length && left > 0; i++) {
+        const st = slots[i];
+        if (st && st.item === item && st.n < spec.stack) {
+          const add = Math.min(left, spec.stack - st.n);
+          slots[i] = { item, n: st.n + add };
+          left -= add;
+        }
+      }
+      for (let i = 0; i < slots.length && left > 0; i++) {
+        if (slots[i] === null) {
+          const add = Math.min(left, spec.stack);
+          slots[i] = { item, n: add };
+          left -= add;
+        }
+      }
+      if (left > 0) return false;
+      baseWorldRef.current = { ...w, player: { ...w.player, slots } };
+      (baseViewSource as WorldViewSource).notify?.();
+      setBaseWorldVersion((v) => v + 1);
+      persistBaseWorld(true);
+      return true;
+    };
+    const dev = {
+      /** A mob by archetype, spawned on the planet in front of the player. */
+      spawnMob: (kind: 'ogro' | 'demon', count = 1): Promise<void> => {
+        const mash = sceneRef.current?.mash;
+        if (!mash) return Promise.resolve();
+        return kind === 'ogro' ? mash.spawnOgro(count) : mash.spawnDemon(count);
+      },
+      mobs: (): readonly MobStatus[] => sceneRef.current?.mash.getMobList() ?? [],
+      /** Equips (or holsters) the combat shotgun. */
+      equip: (item: 'shotgun' = 'shotgun', on = true): boolean => {
+        if (item !== 'shotgun' || !sceneRef.current) return false;
+        sceneRef.current.mash.equip(on);
+        setMashEquipped(on);
+        return true;
+      },
+      fire: (): void => fireWeapon(),
+      /** The planet's and the mobs' fidelity stage (0 to 4: dither, EGA, VGA, Gouraud, PBR). */
+      fidelity: (stage: number): void => { sceneRef.current?.setFidelityStage(stage); },
+      stats: (): CombatStats | null => sceneRef.current?.mash.getStats() ?? null,
+      /** Puts n of an item in the player's slots (stacks first). False when they do not fit or the item is unknown. */
+      grant: (item: string, n: number): boolean => grant(item, n),
+      /** The fidelity stage: the plot's and the base's (the base's pieces follow it). */
+      setStage: (stage: number): void => {
+        (window as unknown as { hmPlay?: { setStage: (n: number) => void } }).hmPlay?.setStage(stage);
+        dispatchBaseRef.current({ t: 'stage', stage });
+      },
+    };
+    (window as unknown as { __dev?: unknown }).__dev = dev;
+    return () => {
+      delete (window as unknown as { __dev?: unknown }).__dev;
+    };
+  }, [ready, debugHooks, fireWeapon, baseViewSource, persistBaseWorld]);
 
   const startBuilding = (kind: MachineKind): void => {
     setMenu(false);
@@ -2213,9 +2230,9 @@ export function PlayScreen(props: {
     ? (hud.ghost?.ok ? `Click or E: build the ${KINDS[building].name.toLowerCase()}` : hud.ghost?.why || 'Aim at the ground near the gate.')
     : hud.atLever ? 'E: pull the main lever'
     : hud.atDial ? 'E: plot dial'
-    : hud.where === 'planet' && hud.aimedBoulder !== null && !visiting ? 'Hold E: gather ore'
     : hud.where === 'planet' && hud.aimed !== null && panel === null ? `E: open the ${KINDS[(visiting ? visiting.plot.machines : plotRef.current.machines).find((x) => x.id === hud.aimed)?.kind ?? 'mill'].name.toLowerCase()}`
     : hud.where === 'lab' && hud.aimedLab !== null && labPanel === null ? `E: open the ${hud.aimedLab === 'rack' ? 'cartridge rack' : hud.aimedLab === 'bench' ? 'preset bench' : 'preset combiner'}`
+    : hud.where === 'planet' && hud.aimedBoulder !== null && !visiting ? 'Hold E: gather ore'
     : '';
 
   return (
@@ -2309,27 +2326,90 @@ export function PlayScreen(props: {
               </ul>
             </section>
           ) : null}
-          {menu ? (
-            <section className="play-build" aria-label="Build">
-              <h3>Build</h3>
-              <div className="play-cards">
-                {BUILD_ORDER.map((k) => {
-                  const spec = KINDS[k], shut = hud.plot.stage < spec.unlock;
-                  const isFree = isFreeDrill(stateRef.current, k);
-                  const short = !isFree && hud.plot.ore < spec.cost;
-                  const highlighted = state.step === 'drill' && k === 'drill';
-                  return (
-                    <button key={k} className={`play-card${shut ? ' shut' : ''}${short ? ' short' : ''}${highlighted ? ' highlighted' : ''}`} disabled={shut} onClick={() => startBuilding(k)} autoFocus={k === (state.step === 'drill' ? 'drill' : 'mill')}>
-                      <b>{spec.name}</b>
-                      <span>{BLURB[k]}</span>
-                      <em>{shut ? `Unlocks at stage ${spec.unlock}` : isFree ? 'Free' : `${spec.cost} ore`}</em>
-                    </button>
-                  );
-                })}
-              </div>
-              <p>Machines run on power from the gate&rsquo;s junction box or a relay pylon; most use ore, which rock drills mine.</p>
-            </section>
-          ) : null}
+          {menu ? (() => {
+            const w = baseWorldRef.current;
+            const held = new Map<string, MenuBlueprint>();
+            w.player.slots.forEach((slot, i) => {
+              const bp = slot && slot.n > 0 ? blueprint(slot.item) : null;
+              if (!bp || held.has(bp.id)) return;
+              held.set(bp.id, {
+                id: bp.id,
+                name: bp.name,
+                slot: i < 9 ? i : null,
+                kinds: bp.kinds.map((kind) => {
+                  const ore = pieceCost(bp, kind)?.find((c) => c.item === 'ore')?.n ?? 0;
+                  return { kind, label: KIND_LABEL[kind] ?? kind, cost: `${ore} ore` };
+                }),
+              });
+            });
+            const aim = sceneRef.current?.aimPoint() ?? null;
+            const aimedPiece = aim?.piece != null ? w.base.pieces.find((q) => q.id === aim.piece) : undefined;
+            const machines: MenuMachine[] = BUILD_ORDER.map((k) => {
+              const spec = KINDS[k];
+              const isFree = isFreeDrill(stateRef.current, k);
+              return {
+                key: k,
+                name: spec.name,
+                blurb: BLURB[k],
+                cost: isFree ? 'Free' : `${spec.cost} ore`,
+                shut: hud.plot.stage < spec.unlock,
+                short: !isFree && hud.plot.ore < spec.cost,
+                highlighted: state.step === 'drill' && k === 'drill',
+                unlock: spec.unlock,
+              };
+            });
+            return (
+              <BuildMenu
+                tab={buildTab}
+                onTab={setBuildTab}
+                stage={hud.plot.stage}
+                machines={machines}
+                blueprints={[...held.values()]}
+                selectedKind={buildKindRef.current}
+                heavy={HEAVY_CARDS}
+                hardpoints={w.base.pieces.filter((q) => q.kind === 'hardpoint').length}
+                aimedHardpoint={aimedPiece?.kind === 'hardpoint'}
+                layouts={w.layouts.map((l) => ({ id: l.id, name: l.name, pieces: layoutPieces(l.code)?.length ?? 0 }))}
+                onMachine={(key) => startBuilding(key as MachineKind)}
+                onStructure={(bpId, kind) => {
+                  const bw = baseWorldRef.current;
+                  const idx = bw.player.slots.findIndex((sl, i) => i < 9 && !!sl && sl.n > 0 && sl.item === bpId);
+                  if (idx < 0) {
+                    say('Not in your hotbar', 'Move the blueprint into slots 1 to 9, then pick its piece.');
+                    return;
+                  }
+                  dispatchBase({ t: 'hotbar', index: idx });
+                  buildKindRef.current = kind as Kind;
+                  ghostKindRef.current = null;
+                  setMenu(false);
+                  if (!locked) lock();
+                  say(`Holding the ${KIND_LABEL[kind] ?? kind}`, 'Click to place. Q or the wheel cycles the kinds.');
+                }}
+                onHeavy={() => {
+                  if (aimedPiece?.kind !== 'hardpoint') {
+                    say('Aim at a hardpoint', 'Build one from the Structures tab, then aim at it and press.');
+                    return;
+                  }
+                  const m = baseWorldRef.current.machines.find((x) => x.id === aimedPiece.id);
+                  if (m) {
+                    say(`Heavy ${m.kind.toUpperCase()} is installed`, 'Pouring pixels into atmospheric plume.');
+                    return;
+                  }
+                  setMenu(false);
+                  setMachinePickerHardpoint(aimedPiece.id);
+                  freeMouse();
+                }}
+                onLayout={(id) => {
+                  setPlacingLayoutId(id);
+                  placingLayoutRotationRef.current = 0;
+                  setMenu(false);
+                  if (!locked) lock();
+                  say('Place Layout', 'Aim at foundation ground. Press R to rotate, Click to confirm.');
+                }}
+                onClose={() => setMenu(false)}
+              />
+            );
+          })() : null}
           {panel !== null ? (() => {
             const curPlot = visiting ? visiting.plot : plotRef.current;
             const curLab = visiting ? visiting.lab : labRef.current;
@@ -2773,6 +2853,10 @@ export function PlayScreen(props: {
                   {syncMode === 'synced' ? 'Planetary Grid (Synced Shared World)' : 'Expedition (Desynced Solo Branch)'}
                 </b>
               </div>
+              <section className="play-controls" aria-label="Controls">
+                <h4>Controls</h4>
+                <dl>{CONTROLS.map(([k, what]) => <div key={k}><dt><kbd>{k}</kbd></dt><dd>{what}</dd></div>)}</dl>
+              </section>
               <button className="go" onClick={lock}>Resume</button>
               <button
                 onClick={() => {
@@ -2960,16 +3044,6 @@ export function PlayScreen(props: {
             </div>
           )}
 
-          <button
-            className={`play-mash-btn${mashOpen ? ' active' : ''}`}
-            onClick={() => {
-              setMashOpen((m) => !m);
-              freeMouse();
-            }}
-            title="Monster Mash Combat Sandbox (Shortcut: M)"
-          >
-            👹 Monster Mash {mashMobs.filter((m) => m.state !== 'death').length > 0 ? `(${mashMobs.filter((m) => m.state !== 'death').length})` : ''}
-          </button>
           {mashEquipped && (
             <div className={`play-crosshair${hitMarker ? ' hit' : ''}`}>
               <div className="ch-top" />
@@ -2980,174 +3054,6 @@ export function PlayScreen(props: {
               {hitMarker ? <div className="ch-hit-x">✕</div> : null}
             </div>
           )}
-          {mashOpen ? (
-            <section className="play-mash-panel" aria-label="Monster Mash Sandbox">
-              <header>
-                <h3>👹 Monster Mash Combat</h3>
-                <button onClick={() => setMashOpen(false)}>✕</button>
-              </header>
-
-              <div className="mash-section">
-                <h4>Weapon Loadout</h4>
-                <div className="mash-weapon-status">
-                  <span>Status: <b>{mashEquipped ? 'Combat Shotgun' : 'Holstered'}</b></span>
-                  {mashEquipped && <span className="mash-ammo-pill">{mashAmmo.current} / {mashAmmo.max} Shells</span>}
-                </div>
-                <div className="mash-btn-grid">
-                  <button
-                    className={mashEquipped ? '' : 'primary'}
-                    onClick={() => {
-                      const scene = sceneRef.current;
-                      if (!scene) return;
-                      const next = !mashEquipped;
-                      scene.mash.equip(next);
-                      setMashEquipped(next);
-                      say(next ? 'Combat Shotgun equipped' : 'Weapon holstered', next ? 'LMB or Space to shoot. Pellets deal 20-35 dmg per hit.' : '');
-                    }}
-                  >
-                    {mashEquipped ? 'Unequip Weapon' : '🔫 Equip Shotgun'}
-                  </button>
-                  <button
-                    className="primary"
-                    disabled={!mashEquipped}
-                    onClick={() => fireWeapon()}
-                  >
-                    💥 Fire Shotgun
-                  </button>
-                </div>
-              </div>
-
-              <div className="mash-section">
-                <h4>Spawn Monsters on Planet</h4>
-                <div className="mash-btn-grid">
-                  <button
-                    onClick={() => {
-                      void sceneRef.current?.mash.spawnOgro(1).then(() => {
-                        setMashMobs(sceneRef.current?.mash.getMobList() ?? []);
-                        setMashStats(sceneRef.current?.mash.getStats() ?? mashStats);
-                        say('3D Ogro spawned!', 'Quake 2 retro MD2 mob with run/attack/pain/death animations.');
-                      });
-                    }}
-                  >
-                    👹 Spawn 3D Ogro (Q2)
-                  </button>
-                  <button
-                    onClick={() => {
-                      void sceneRef.current?.mash.spawnDemon(1).then(() => {
-                        setMashMobs(sceneRef.current?.mash.getMobList() ?? []);
-                        setMashStats(sceneRef.current?.mash.getStats() ?? mashStats);
-                        say('2D Demon spawned!', 'DOOM 1 retro WAD patch sprite billboard.');
-                      });
-                    }}
-                  >
-                    👾 Spawn 2D Demon (WAD)
-                  </button>
-                  <button
-                    onClick={() => {
-                      void Promise.all([
-                        sceneRef.current?.mash.spawnOgro(2),
-                        sceneRef.current?.mash.spawnDemon(1),
-                      ]).then(() => {
-                        setMashMobs(sceneRef.current?.mash.getMobList() ?? []);
-                        setMashStats(sceneRef.current?.mash.getStats() ?? mashStats);
-                        say('Monster Horde spawned!', '3 shareware monsters spawned in perimeter.');
-                      });
-                    }}
-                  >
-                    🔥 Spawn Horde (x3)
-                  </button>
-                  <button
-                    onClick={() => {
-                      sceneRef.current?.mash.clearMobs();
-                      setMashMobs([]);
-                      say('Mobs cleared');
-                    }}
-                  >
-                    🧹 Clear All Mobs
-                  </button>
-                </div>
-                {hud.where === 'lab' && (
-                  <button
-                    className="mash-action-btn primary"
-                    style={{ width: '100%', marginTop: '6px' }}
-                    onClick={() => {
-                      const scene = sceneRef.current;
-                      if (scene) {
-                        const g = scene.debug.gatePlanet();
-                        scene.debug.teleport('planet', g.x + 3, g.z + 5, Math.PI);
-                        say('Teleported to Planet Surface', 'Step back through the gate anytime to return to the lab.');
-                      }
-                    }}
-                  >
-                    🚀 Teleport to Planet Surface
-                  </button>
-                )}
-              </div>
-
-              <div className="mash-section">
-                <h4>World & Mob Fidelity Stage</h4>
-                <div className="mash-stage-grid">
-                  {[
-                    { st: 0, label: '0: Dither' },
-                    { st: 1, label: '1: EGA' },
-                    { st: 2, label: '2: VGA' },
-                    { st: 3, label: '3: Gouraud' },
-                    { st: 4, label: '4: PBR' },
-                  ].map(({ st, label }) => (
-                    <button
-                      key={st}
-                      className={`mash-stage-btn${mashStage === st ? ' active' : ''}`}
-                      onClick={() => {
-                        const scene = sceneRef.current;
-                        if (!scene) return;
-                        scene.setFidelityStage(st);
-                        setMashStage(st);
-                        say(`Fidelity Stage ${st}`, STAGE_SAYS[st] || `Fidelity set to Stage ${st}`);
-                      }}
-                      title={`Switch planet terrain and monsters to Fidelity Stage ${st}`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mash-section">
-                <h4>Combat Telemetry</h4>
-                <div className="mash-stats-grid">
-                  <div className="mash-stat-box">
-                    <span>Shots / Hits</span>
-                    <b>{mashStats.shotsFired} / {mashStats.pelletsHit}</b>
-                  </div>
-                  <div className="mash-stat-box">
-                    <span>Mobs Defeated</span>
-                    <b>{mashStats.mobsDefeated} / {mashStats.mobsSpawned}</b>
-                  </div>
-                  <div className="mash-stat-box">
-                    <span>Ore Harvested</span>
-                    <b>+{mashStats.oreCollected}</b>
-                  </div>
-                </div>
-              </div>
-
-              {mashMobs.length > 0 && (
-                <div className="mash-section">
-                  <h4>Active Mob Entities ({mashMobs.length})</h4>
-                  <div className="mash-mob-list">
-                    {mashMobs.map((m) => (
-                      <div key={m.id} className={`mash-mob-card${m.state === 'death' ? ' dead' : ''}`}>
-                        <span><b>{m.kind.toUpperCase()} #{m.id}</b> [{m.state}]</span>
-                        <div className="mash-hp-bar">
-                          <div style={{ width: `${Math.max(0, (m.hp / m.maxHp) * 100)}%`, background: m.hp > 40 ? '#10b981' : '#ef4444' }} />
-                        </div>
-                        <span>{Math.ceil(m.hp)} HP</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </section>
-          ) : null}
           {hud.where === 'planet' && !hideOverlays ? (
             <>
               <div

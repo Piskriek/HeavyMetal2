@@ -69,6 +69,7 @@ export const BaseHud: React.FC<BaseHudProps> = ({
   useEffect(() => {
     (window as any).__hmHud = {
       openInventory: () => setOpenWindow('inventory'),
+      openLattice: () => setOpenWindow('lattice'),
       close: () => setOpenWindow('none'),
     };
     return () => {

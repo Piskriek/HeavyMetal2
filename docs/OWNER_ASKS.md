@@ -202,3 +202,4 @@
 - (same day) "oh remove the monster mash button, it was to test the ability to put the monsters from other games in the game, i want the monsters in the game but forget this tacky \"monster mash\" idea."
 - (same day) "also flesh out the mobs from other games, i think the flash model did 2 mobs and left it to you and youve done nothing with it so far"
 - (same day) "no, first plan everything, add that to the plans and then do the plan"
+- (same day, at the Arena sign-in prompt) "ill log in"

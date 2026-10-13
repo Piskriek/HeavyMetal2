@@ -278,7 +278,8 @@ await beat('8 on the planet: B opens the one build menu, Structures holds the fo
     window.hmPlay.setLocked?.(true);
   });
   await page.waitForFunction(() => window.hmPlay?.where === 'planet', null, { timeout: 20000 });
-  await page.evaluate(() => window.__dev.grant('ore', 200));
+  // 100 ore is 60 kg of the 120 kg carry limit (a foundation costs 20): the shot stays out of the overloaded state
+  await page.evaluate(() => window.__dev.grant('ore', 100));
   const before = await foundations();
   await page.keyboard.press('KeyB');
   const menuOpen = await page.locator('section.bm').isVisible().catch(() => false);

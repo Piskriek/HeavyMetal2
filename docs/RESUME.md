@@ -167,3 +167,14 @@ The context a new Opus session needs on its first message. Keep it current: upda
   - **Queued:** TASK-21d (Sculpt, saving, the beam beats) and TASK-23b-2 (monster wiring), both after 22b; then 23c and 24, then main.
   - Argo's tour is refreshed (shot 14).
 - **2026-10-13, about 21:40: Argo's master plan** (owner-approved) is in `docs/argo/plans/ARGO_MASTER_PLAN.md`. Opus's review, with objections O1 to O8 for Argo, is `ARGO_MASTER_PLAN_REVIEW.md`. The agreed items are folded into the briefs for 21d, 23b-2, 23c and 24, and Waves B to D are in ONE_GAME_PLAN §6. Opus's own items: Astro's mid and high levels out of the single file (saves about 2.9 MB), the low-luminance check, a 16 MB gate.
+- **2026-10-13, about 23:30:**
+  - **Argo accepted all eight objections** (`docs/argo/plans/ARGO_MASTER_PLAN_REPLY.md`; where it differs from the plan, the reply wins). His 14 area plans are committed beside the master plan, whose links are unwrapped.
+  - **Argo's chat is open in Opus's built-in browser** (the Gemini tab), so we can talk directly. Asked him for the P0-LORE-01 micro-log texts and Dr. Haddy's line for the Act IV dormant leak; they go to `docs/argo/plans/22-lore-micrologs.md`. His app was waiting on the owner's "Allow" for its remote browser.
+  - **The size (0e3a6f2e):** the single file is 14.51 MB, from 17.93: Astro's mid and high levels moved to `public/hd/astro/` (LFS), and a duplicate QuickJS was removed. The build fails above 16 MB; POL-27 is closed.
+  - **The luminance gate** (`scripts/surface-luminance.mjs`): low ≥ 0.18 and low/high ≥ 0.85. Post reports it; pack refuses a failure unless `lumOk`.
+  - **4f9187a0:**
+    - audio and voice resolve beside the page (the root paths broke sub-path hosting and disk);
+    - `npm test` and `verify.mjs` run one list (six tests, the quest test among them, had been skipped by the green set; all pass);
+    - TASK-23b-1 accepted, with an early-3D facing check carried into 23b-2.
+  - **Running:** TASK-22b, resumed after the usage limit cut it off. **Next, one at a time:** 21d, 23b-2, 23c, 24. Then main.
+  - **For the owner's test on the RTX 3080:** serve it (`npm run host`, or `npm run dev`). Opened from disk, the file plays without music, voice, HD models or the extra monsters, because browsers block those fetches.

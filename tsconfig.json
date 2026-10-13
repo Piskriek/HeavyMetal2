@@ -372,6 +372,9 @@
       "@hm/beamkit": [
         "packages/beamkit/src/index.ts"
       ],
+      "@hm/terrainbrush": [
+        "packages/terrainbrush/src/index.ts"
+      ],
       "@hm/fidelity": [
         "packages/fidelity/src/index.ts"
       ],

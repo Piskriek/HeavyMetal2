@@ -140,6 +140,7 @@ export default defineConfig(({ mode }) => ({
       '@hm/consolemill': p('../../packages/consolemill/src/index.ts'),
       '@hm/shareware': p('../../packages/shareware/src/index.ts'),
       '@hm/beamkit': p('../../packages/beamkit/src/index.ts'),
+      '@hm/terrainbrush': p('../../packages/terrainbrush/src/index.ts'),
     },
   },
   assetsInclude: ['**/*.fbx', '**/*.bin'],

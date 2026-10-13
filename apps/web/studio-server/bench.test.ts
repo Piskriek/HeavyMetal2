@@ -226,11 +226,13 @@ test('a model step needs an approved image and a connection', async () => {
   }
 });
 
-test('the real steps run the fixed scripts; the mock run keeps pack real', () => {
+test('the real steps run the fixed scripts; the mock run runs a fixture for every step, pack included', () => {
   assert.deepEqual(stagesFor('images', 'bin', false)[0]?.args, ['images', 'bin']);
   assert.equal(stagesFor('model', 'bin', false)[0]?.script, 'scripts/local3d.mjs');
-  assert.equal(stagesFor('post', 'bin', true)[0]?.script, 'scripts/studio-bench-mock.mjs');
-  assert.equal(stagesFor('pack', 'bin', true)[0]?.script, 'scripts/runworld-pack.mjs');
+  assert.equal(stagesFor('pack', 'bin', false)[0]?.script, 'scripts/runworld-pack.mjs');
+  for (const step of ['images', 'model', 'post', 'pack'] as const) {
+    assert.equal(stagesFor(step, 'bin', true)[0]?.script, 'scripts/studio-bench-mock.mjs', `${step} in the mock run`);
+  }
 });
 
 // ---------------------------------------------------------------- archives

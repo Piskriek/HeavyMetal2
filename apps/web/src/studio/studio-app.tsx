@@ -2,19 +2,25 @@
  * The FIDELITY Studio: a desktop editor for the game's assets. Dev-only writes (STUDIO.bat); read-only on the built game.
  *
  * Layout: a top bar (workspaces, undo and redo, keymap, Simple or Advanced, save), the content browser and outliner on
- * the left, the viewport in the centre, the details panel on the right, and the Changes panel under the viewport. Every
- * edit is a command on the scenedoc stack; Accept writes the file through the dev endpoint, and Vite's hot reload then
- * shows it in the game.
+ * the left, the viewport in the centre, and on the right the details panel and the Redo model panel (TASK-18). Every edit
+ * is a command on the scenedoc stack; Accept writes the file through the dev endpoint, and Vite's hot reload then shows
+ * it in the game.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
 import type { Group } from 'three';
 import { createHistory, redo, undo, type History, type Op } from '@hm/scenedoc';
+import { SPECS } from '@hm/vault';
 import { ASSET_TWEAKS, GEN, loadGenRaw, type GenLevel } from '../assets/gen';
 import { kv } from '../storage/profile-storage';
-import { fieldError, FIELDS, type Vec3 } from '../../studio-server/tweak-schema';
+import { fieldError, FIELDS, type AssetTweak, type Vec3 } from '../../studio-server/tweak-schema';
 import { ChangesPanel, ContentBrowser, Details, Outliner, fmtValue } from './studio-panels';
 import { acceptInto, ASSET, clampField, discardOps, EMPTY_HISTORY, fileText, pendingChanges, placeOp, propsOf, REGISTRY, step, tweakOf, type Change, type Props, type Saved } from './studio-data';
-import { KEYMAPS, StudioViewport, type Keymap, type Tool, type Transform } from './studio-viewport';
+import { KEYMAPS, StudioViewport, type Context, type Copy, type Keymap, type Overlay, type Tool, type Transform } from './studio-viewport';
+import { presetsFrom, type MaterialPreset } from './studio-presets';
+import { RedoPanel } from './studio-redo';
+import { fileUrl, getAsset, type AssetInfo } from './studio-api';
+import { forgetLevels, loadGlbUrl } from './studio-levels';
+import { forgetThumb } from './studio-thumbs';
 import './studio-app.css';
 
 const ENDPOINT = '/__studio/data/asset-tweaks';
@@ -27,6 +33,14 @@ const LIMITS = { left: [200, 480], right: [240, 520], changes: [120, 420] } as c
 
 type Workspace = 'assets' | 'moon';
 type Status = { readonly tone: 'ok' | 'warn' | 'err'; readonly text: string };
+/** The levels the viewport shows: one, or all three side by side. */
+type LevelChoice = GenLevel | 'all';
+type RightTab = 'details' | 'redo';
+
+const LEVEL_LABEL: Record<GenLevel, string> = { low: 'Low', mid: 'Mid', high: 'High' };
+const LEVELS: readonly GenLevel[] = ['low', 'mid', 'high'];
+/** The vault's material presets, once: the one-click looks of the Material section. */
+const PRESETS: readonly MaterialPreset[] = presetsFrom(SPECS);
 
 const readJson = <T,>(key: string, fallback: T): T => {
   try { const raw = kv.get(key); return raw ? (JSON.parse(raw) as T) : fallback; } catch { return fallback; }
@@ -60,6 +74,18 @@ function bootHistory(): History {
 
 const clamp = (n: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, n));
 
+/** A model the viewport wants: its cache key, what it is called, where it stands, and how to load it. */
+interface Want {
+  readonly cacheKey: string;
+  readonly key: string;
+  readonly label: string;
+  readonly slot: Vec3;
+  readonly tweak: AssetTweak | null;
+  readonly load: () => Promise<Group>;
+}
+
+const EMPTY_SHOW = { anchor: null, transform: null, overlay: 'solid', figure: false, context: 'none', size: [1, 1, 1], reframe: false } as const;
+
 export function StudioApp({ onBack, renderPrototype }: {
   readonly onBack: () => void;
   /** The old prototype (Moon editor), shown as the "Moon (prototype)" workspace. It is not deleted. */
@@ -77,19 +103,30 @@ export function StudioApp({ onBack, renderPrototype }: {
     return k === 'blender' || k === 'maya' ? k : 'setmix';
   });
   const [tool, setTool] = useState<Tool>('move');
-  const [level, setLevel] = useState<GenLevel>('low');
+  const [level, setLevel] = useState<LevelChoice>('low');
+  const [overlay, setOverlay] = useState<Overlay>('solid');
+  const [inContext, setInContext] = useState(false);
   const [query, setQuery] = useState('');
+  const [cls, setCls] = useState('');
   const [layout, setLayout] = useState(() => ({ ...DEFAULT_LAYOUT, ...readJson<Partial<typeof DEFAULT_LAYOUT>>(LAYOUT_KEY, {}) }));
-  const [stats, setStats] = useState({ meshes: 0, triangles: 0 });
+  const [copyStats, setCopyStats] = useState<{ readonly label: string; readonly triangles: number }[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status | null>(null);
   const [vpTick, setVpTick] = useState(0);
   const [rawTick, setRawTick] = useState(0);
+  const [rightTab, setRightTab] = useState<RightTab>('details');
+  const [comparing, setComparing] = useState<string | null>(null);
+  const [versions, setVersions] = useState<Record<string, number>>({});
+  /** The bench's record of the selected asset (its description, budgets): undefined while it loads, null off the dev server. */
+  const [benchInfo, setBenchInfo] = useState<AssetInfo | null | undefined>(undefined);
 
   const hostRef = useRef<HTMLDivElement>(null);
   const vpRef = useRef<StudioViewport | null>(null);
   const raws = useRef(new Map<string, Group>());
   const loading = useRef(new Set<string>());
+  const failed = useRef(new Set<string>());
+  const lastFrame = useRef('');
   const histRef = useRef(hist);
   histRef.current = hist;
   const selRef = useRef(selected);
@@ -122,6 +159,20 @@ export function StudioApp({ onBack, renderPrototype }: {
     const f = fieldFor(key);
     if (!id || !f) return;
     commit(`${f.label}: ${id}`, [{ op: 'set', id, props: { [key]: clampField(f, value) } }], `field:${id}:${key}`);
+  }, [commit]);
+
+  /** A material preset: base colour, metal and rough at once, one step on the Changes list. */
+  const applyPreset = useCallback((p: MaterialPreset) => {
+    const id = selRef.current;
+    if (!id) return;
+    commit(`Look: ${p.name}`, [{
+      op: 'set', id,
+      props: {
+        tint: clampField(fieldFor('tint')!, p.tint),
+        metalness: clampField(fieldFor('metalness')!, p.metalness),
+        roughness: clampField(fieldFor('roughness')!, p.roughness),
+      },
+    }]);
   }, [commit]);
 
   const place = useCallback((id: string) => {
@@ -162,6 +213,16 @@ export function StudioApp({ onBack, renderPrototype }: {
     commit(rows.length === 1 ? 'Discard a change' : 'Discard changes', discardOps(savedRef.current, rows));
   }, [commit]);
 
+  /** A redo finished for an asset: its files are new, so what the page shows of it is reloaded. */
+  const onAssetChanged = useCallback((id: string) => {
+    forgetLevels(id);
+    forgetThumb(id);
+    for (const k of [...raws.current.keys()]) if (k.startsWith(`${id}|`) || k.includes(`/file/${id}/`)) raws.current.delete(k);
+    failed.current.clear();
+    setVersions((v) => ({ ...v, [id]: (v[id] ?? 0) + 1 }));
+    setRawTick((n) => n + 1);
+  }, []);
+
   // ---- writability: the dev endpoint answers with JSON; the built game answers 404 ----
   useEffect(() => {
     let live = true;
@@ -170,6 +231,19 @@ export function StudioApp({ onBack, renderPrototype }: {
       .catch(() => { if (live) setWritable(false); });
     return () => { live = false; };
   }, []);
+
+  // ---- the bench's record of the selected asset (dev only): its description and budgets ----
+  const selVersion = selected ? versions[selected] ?? 0 : 0;
+  useEffect(() => {
+    if (!selected) { setBenchInfo(undefined); return undefined; }
+    let live = true;
+    setBenchInfo(undefined);
+    void getAsset(selected).then((r) => { if (live) setBenchInfo(r.ok ? r.value : null); });
+    return () => { live = false; };
+  }, [selected, selVersion]);
+
+  // a selection change leaves the comparison
+  useEffect(() => { setComparing(null); }, [selected]);
 
   // ---- the viewport: created for the Assets workspace, disposed when another one is open ----
   useEffect(() => {
@@ -188,7 +262,6 @@ export function StudioApp({ onBack, renderPrototype }: {
         commit(`${label}: ${id}`, [{ op: 'set', id, props }], `gizmo:${id}`);
       },
       onDragEnd: () => { /* nothing: the next step starts a new undo entry */ },
-      onStats: (s) => setStats(s),
     });
     vpRef.current = vp;
     setVpTick((n) => n + 1);
@@ -198,31 +271,82 @@ export function StudioApp({ onBack, renderPrototype }: {
   useEffect(() => { vpRef.current?.setKeymap(keymap); }, [keymap, vpTick]);
   useEffect(() => { vpRef.current?.setTool(tool); }, [tool, vpTick]);
 
-  // the model shown: the selected asset as its file has it, with the scene's (possibly unsaved) values on top
+  // ---- what the viewport shows: the selected asset at one level or all three, or the old against the new ----
   useEffect(() => {
     const vp = vpRef.current;
     if (!vp) return;
-    if (!selected || !selProps) { vp.show(null, null, null); return; }
+    if (!selected || !selProps) {
+      vp.show([], EMPTY_SHOW);
+      setCopyStats([]);
+      return;
+    }
+    const info = GEN[selected];
+    const size: [number, number, number] = info ? [info.size[0], info.size[1], info.size[2]] : [1, 1, 1];
     const transform: Transform = {
       offset: selProps.offset as Vec3,
       yaw: selProps.yaw as number,
       scale: (selProps.scale as Vec3)[0] ?? 1,
     };
-    const key = `${selected}|${level}`;
-    const raw = raws.current.get(key);
-    if (!raw) {
-      vp.show(null, null, transform);
-      if (!loading.current.has(key)) {
-        loading.current.add(key);
-        loadGenRaw(selected, level)
-          .then((g) => { raws.current.set(key, g); setRawTick((n) => n + 1); })
-          .catch(() => { /* an unknown asset stays empty */ })
-          .finally(() => loading.current.delete(key));
-      }
-      return;
+    const tweak = tweakOf(selProps);
+    const wants: Want[] = [];
+    let anchorKey: string | null = null;
+    let context: Context = 'none';
+    if (comparing) {
+      // the old model (archived) on the top row, the new one (packed now) on the bottom, the levels across
+      const span = Math.max(size[0], size[2]);
+      const col = span * 1.5 + 0.8, rowGap = span * 1.2 + 1.6;
+      LEVELS.forEach((l, ci) => {
+        const oldUrl = fileUrl(selected, `${l}.glb`, comparing);
+        const newUrl = fileUrl(selected, `${l}.glb`, undefined, selVersion);
+        wants.push({ cacheKey: oldUrl, key: `old-${l}`, label: `Old ${LEVEL_LABEL[l]}`, slot: [(ci - 1) * col, 0, rowGap / 2], tweak: null, load: () => loadGlbUrl(oldUrl) });
+        wants.push({ cacheKey: newUrl, key: `new-${l}`, label: `New ${LEVEL_LABEL[l]}`, slot: [(ci - 1) * col, 0, -rowGap / 2], tweak: null, load: () => loadGlbUrl(newUrl) });
+      });
+    } else {
+      const levels: readonly GenLevel[] = level === 'all' ? LEVELS : [level];
+      const anchorIndex = level === 'all' ? 1 : 0;
+      const spacing = Math.max(size[0], size[2]) * 1.35 + 0.6;
+      levels.forEach((l, i) => {
+        const k = `${selected}|${l}`;
+        wants.push({ cacheKey: k, key: l, label: LEVEL_LABEL[l], slot: [(i - anchorIndex) * spacing, 0, 0], tweak, load: () => loadGenRaw(selected, l) });
+      });
+      anchorKey = levels[anchorIndex] ?? null;
+      context = inContext ? (info?.box ? 'lattice' : info?.class === 'lab' ? 'wall' : 'floor') : 'none';
     }
-    vp.show(raw, tweakOf(selProps), transform);
-  }, [workspace, vpTick, selected, selProps, level, rawTick]);
+    // load what is missing; the viewport shows once everything it wants has come in (or has failed)
+    for (const w of wants) {
+      if (raws.current.has(w.cacheKey) || failed.current.has(w.cacheKey) || loading.current.has(w.cacheKey)) continue;
+      loading.current.add(w.cacheKey);
+      w.load()
+        .then((g) => { raws.current.set(w.cacheKey, g); })
+        .catch(() => { failed.current.add(w.cacheKey); })
+        .finally(() => { loading.current.delete(w.cacheKey); setRawTick((n) => n + 1); });
+    }
+    if (wants.some((w) => loading.current.has(w.cacheKey))) { setLoadingModels(true); return; }
+    setLoadingModels(false);
+    const copies: Copy[] = [];
+    const labels: string[] = [];
+    let anchor: number | null = null;
+    for (const w of wants) {
+      const raw = raws.current.get(w.cacheKey);
+      if (!raw) continue;
+      if (w.cacheKey === `${selected}|${anchorKey}`) anchor = copies.length;
+      copies.push({ key: w.key, label: w.label, raw, slot: w.slot, tweak: w.tweak });
+      labels.push(w.label);
+    }
+    const frame = `${selected}|${level}|${comparing ?? ''}`;
+    const stats = vp.show(copies, {
+      anchor: comparing ? null : anchor,
+      transform: comparing ? null : transform,
+      overlay,
+      figure: true,
+      context,
+      size,
+      box: info?.box,
+      reframe: frame !== lastFrame.current,
+    });
+    lastFrame.current = frame;
+    setCopyStats(stats.map((s, i): { label: string; triangles: number } => ({ label: labels[i] ?? s.key, triangles: s.triangles })));
+  }, [workspace, vpTick, selected, selProps, level, overlay, inContext, comparing, selVersion, rawTick]);
 
   // a draft of the scene survives a reload (per browser): what is placed and its values
   useEffect(() => {
@@ -279,8 +403,19 @@ export function StudioApp({ onBack, renderPrototype }: {
     return keys.toUpperCase();
   };
 
+  const budgetOf = (label: string): string => {
+    const b = benchInfo?.entry.budgets;
+    if (!b) return '';
+    const i = label.startsWith('Old ') || label.startsWith('New ') ? label.slice(4) : label;
+    const idx = i === 'Low' ? 0 : i === 'Mid' ? 1 : i === 'High' ? 2 : -1;
+    const v = idx >= 0 ? b[idx] : undefined;
+    return v === undefined ? '' : ` of ${v.toLocaleString('en-GB')} budget`;
+  };
+
   const selFields = selProps && selected ? (
-    <Details id={selected} props={selProps} simple={mode === 'simple'} onField={setField} />
+    <Details id={selected} props={selProps} simple={mode === 'simple'} onField={setField} onPick={applyPreset} presets={PRESETS}
+      subject={benchInfo === undefined ? undefined : benchInfo === null ? null : benchInfo.entry.subject}
+      budgets={benchInfo?.entry.budgets ?? null} />
   ) : null;
 
   const style = {
@@ -344,7 +479,8 @@ export function StudioApp({ onBack, renderPrototype }: {
           <aside className="sx-left sx-panel" aria-label="Content and outliner">
             <section className="sx-block">
               <h2>Content</h2>
-              <ContentBrowser query={query} onQuery={setQuery} placed={placed} onPlace={place} selected={selected} />
+              <ContentBrowser query={query} onQuery={setQuery} placed={placed} onPlace={place} selected={selected}
+                cls={cls} onClass={setCls} versions={versions} />
             </section>
             <section className="sx-block sx-outline">
               <h2>Scene <span className="sx-count">{doc.roots.length}</span></h2>
@@ -360,18 +496,35 @@ export function StudioApp({ onBack, renderPrototype }: {
               <div className="sx-tools" role="toolbar" aria-label="Tools">
                 <div className="sx-seg" role="group" aria-label="Transform tool">
                   {(['move', 'rotate', 'scale'] as const).map((t) => (
-                    <button key={t} type="button" aria-pressed={tool === t} onClick={() => setTool(t)} disabled={!selected}>
+                    <button key={t} type="button" aria-pressed={tool === t} onClick={() => setTool(t)} disabled={!selected || comparing !== null}>
                       {t === 'move' ? 'Move' : t === 'rotate' ? 'Turn' : 'Scale'} <kbd>{shortcut(t)}</kbd>
                     </button>
                   ))}
                 </div>
                 <div className="sx-seg" role="group" aria-label="Detail level">
-                  {(['low', 'mid', 'high'] as const).map((l) => (
-                    <button key={l} type="button" aria-pressed={level === l} onClick={() => setLevel(l)}>{l === 'low' ? 'Low' : l === 'mid' ? 'Mid' : 'High'}</button>
+                  {(['low', 'mid', 'high', 'all'] as const).map((l) => (
+                    <button key={l} type="button" aria-pressed={level === l} onClick={() => setLevel(l)} disabled={comparing !== null}>
+                      {l === 'all' ? 'All three' : LEVEL_LABEL[l]}
+                    </button>
                   ))}
                 </div>
+                <div className="sx-seg" role="group" aria-label="Surface">
+                  {(['solid', 'wire', 'normals'] as const).map((o) => (
+                    <button key={o} type="button" aria-pressed={overlay === o} onClick={() => setOverlay(o)}>
+                      {o === 'solid' ? 'Solid' : o === 'wire' ? 'Wireframe' : 'Normals'}
+                    </button>
+                  ))}
+                </div>
+                <button type="button" aria-pressed={inContext} onClick={() => setInContext((v) => !v)} disabled={!selected} title="Show the asset where the game uses it">In context</button>
                 <button type="button" onClick={() => vpRef.current?.focus()} disabled={!selected} title="Frame the selected asset (F)">Frame <kbd>F</kbd></button>
               </div>
+
+              {loadingModels ? (
+                <div className="sx-loading" role="status">
+                  <span>Loading the model</span>
+                  <i aria-hidden="true" />
+                </div>
+              ) : null}
 
               {!selected ? (
                 <div className="sx-empty-view">
@@ -382,15 +535,19 @@ export function StudioApp({ onBack, renderPrototype }: {
 
               {selected && selProps ? (
                 <div className="sx-telemetry" aria-label="Selected asset readout">
-                  <div className="sx-tm-head"><span>{selected}</span><span className="sx-dim">{GEN[selected]?.class}</span></div>
+                  <div className="sx-tm-head"><span>{comparing ? `${selected}, old against new` : selected}</span><span className="sx-dim">{GEN[selected]?.class}</span></div>
                   <dl>
-                    <div><dt>Offset</dt><dd>{fmtValue(fieldFor('offset')!, selProps.offset)}</dd></div>
-                    <div><dt>Turn</dt><dd>{fmtValue(fieldFor('yaw')!, selProps.yaw)}</dd></div>
-                    <div><dt>Scale</dt><dd>{fmtValue(fieldFor('scale')!, selProps.scale)}</dd></div>
-                    <div><dt>Meshes</dt><dd>{stats.meshes}</dd></div>
-                    <div><dt>Triangles</dt><dd>{stats.triangles.toLocaleString('en-GB')}</dd></div>
+                    {comparing ? null : <>
+                      <div><dt>Offset</dt><dd>{fmtValue(fieldFor('offset')!, selProps.offset)}</dd></div>
+                      <div><dt>Turn</dt><dd>{fmtValue(fieldFor('yaw')!, selProps.yaw)}</dd></div>
+                      <div><dt>Scale</dt><dd>{fmtValue(fieldFor('scale')!, selProps.scale)}</dd></div>
+                    </>}
+                    {copyStats.map((s) => (
+                      <div key={s.label}><dt>{s.label} triangles</dt><dd>{s.triangles.toLocaleString('en-GB')}<small>{budgetOf(s.label)}</small></dd></div>
+                    ))}
+                    <div><dt>Real size</dt><dd>{GEN[selected] ? `${GEN[selected]!.size[0].toFixed(2)} x ${GEN[selected]!.size[1].toFixed(2)} x ${GEN[selected]!.size[2].toFixed(2)} m` : '-'}</dd></div>
                   </dl>
-                  <p className="sx-dim">{KEYMAPS[keymap].nav}</p>
+                  <p className="sx-dim">{comparing ? 'Old is the archived model, new is the one packed now. Both are shown as they were made.' : KEYMAPS[keymap].nav}</p>
                 </div>
               ) : null}
             </div>
@@ -406,16 +563,23 @@ export function StudioApp({ onBack, renderPrototype }: {
             onPointerDown={startResize('right')} />
 
           <aside className="sx-right sx-panel" aria-label="Details">
-            <div className="sx-block-head">
-              <h2>Details</h2>
-              <span className="sx-dim">{mode === 'simple' ? 'Simple' : 'Advanced'}</span>
+            <div className="sx-right-tabs" role="tablist" aria-label="Right panel">
+              <button type="button" role="tab" aria-selected={rightTab === 'details'} onClick={() => setRightTab('details')}>Details</button>
+              <button type="button" role="tab" aria-selected={rightTab === 'redo'} onClick={() => setRightTab('redo')}>Redo model</button>
             </div>
-            {selFields ?? <p className="sx-dim sx-empty">Select an asset in Scene to see its values.</p>}
-            {selected && undoLabel ? <p className="sx-dim sx-last">Last edit: {undoLabel}</p> : null}
+            {rightTab === 'details' ? (<>
+              <div className="sx-block-head">
+                <h2>Details</h2>
+                <span className="sx-dim">{mode === 'simple' ? 'Simple' : 'Advanced'}</span>
+              </div>
+              {selFields ?? <p className="sx-dim sx-empty">Select an asset in Scene to see its values.</p>}
+              {selected && undoLabel ? <p className="sx-dim sx-last">Last edit: {undoLabel}</p> : null}
+            </>) : (
+              <RedoPanel id={selected} comparing={comparing} onCompare={setComparing} onChanged={onAssetChanged} />
+            )}
           </aside>
         </div>
       )}
     </div>
   );
 }
-

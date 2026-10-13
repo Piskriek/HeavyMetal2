@@ -2,8 +2,9 @@
  * Mounts the Studio's dev routes on the Vite dev server only (`apply: 'serve'`). `vite build` never includes them.
  *   /__studio/data/...   the tweak file (write-back.ts)
  *   /__studio/bench/...  the asset bench: the 3D AI connection and the redo steps (bench.ts)
- * Env, for the test run only: STUDIO_BENCH_MOCK=1 runs the long steps as fixtures, and STUDIO_SECRETS_FILE points the
- * connection at another file (so a test never touches the owner's .studio-secrets.json).
+ * Env, for the test run only: STUDIO_BENCH_MOCK=1 runs every step as a fixture, and STUDIO_BENCH_DIR moves the bench's
+ * files under a temporary folder (the mock cannot run without it: it would write to the real assets). STUDIO_SECRETS_FILE
+ * points the connection at another file (so a test never touches the owner's .studio-secrets.json).
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,9 +18,11 @@ const paths = {
   dataDir: path.join(here, '../src/studio-data'),
   registryFile: path.join(here, '../src/assets/gen/registry.json'),
 };
-const benchPaths = benchPathsFor(root, process.env.STUDIO_SECRETS_FILE || path.join(root, '.studio-secrets.json'));
-const jobs = new JobRunner(root);
 const mock = process.env.STUDIO_BENCH_MOCK === '1';
+const benchDir = process.env.STUDIO_BENCH_DIR || undefined;
+if (mock && !benchDir) throw new Error('STUDIO_BENCH_MOCK=1 needs STUDIO_BENCH_DIR (a temporary folder): the fixtures never run on the real assets');
+const benchPaths = benchPathsFor(root, process.env.STUDIO_SECRETS_FILE || path.join(root, '.studio-secrets.json'), benchDir);
+const jobs = new JobRunner(root);
 
 export function studioWriteBack(): Plugin {
   return {

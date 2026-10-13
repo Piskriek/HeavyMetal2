@@ -1,7 +1,9 @@
-import { type ReactElement, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { FIELDS, sameValue, type FieldDef, type TweakGroup } from '../../studio-server/tweak-schema';
 import { GEN } from '../assets/gen';
 import { clampField, type Change } from './studio-data';
+import { type MaterialPreset } from './studio-presets';
+import { thumbOf } from './studio-thumbs';
 
 export const GROUPS: readonly TweakGroup[] = ['Fit', 'Material', 'Glow'];
 
@@ -101,12 +103,47 @@ export function FieldRow({ field: f, value, simple, onChange }: RowProps): React
   );
 }
 
-/** The details panel for one placed asset: groups in order, generated from the schema. */
-export function Details({ id, props, simple, onField }: {
+/** Whether a preset is the look the asset has now (tint, metal and rough all equal, to the hundredth). */
+export function presetMatches(p: MaterialPreset, props: Readonly<Record<string, unknown>>): boolean {
+  const tint = typeof props.tint === 'string' ? props.tint.toLowerCase() : '';
+  const metal = typeof props.metalness === 'number' ? props.metalness : -1;
+  const rough = typeof props.roughness === 'number' ? props.roughness : -1;
+  return tint === p.tint.toLowerCase() && Math.abs(metal - p.metalness) < 0.005 && Math.abs(rough - p.roughness) < 0.005;
+}
+
+/** The one-click looks: a strip of the vault's material presets, each a swatch and its name. */
+function Presets({ presets, props, onPick }: {
+  readonly presets: readonly MaterialPreset[];
+  readonly props: Readonly<Record<string, unknown>>;
+  readonly onPick: (p: MaterialPreset) => void;
+}): ReactElement {
+  return (
+    <div className="sx-presets" role="group" aria-label="Material presets">
+      <div className="sx-field-head"><span className="sx-presets-title">Presets</span><span className="sx-dim">Sets base colour, metal and rough</span></div>
+      <div className="sx-strip">
+        {presets.map((p) => (
+          <button key={p.id} type="button" className="sx-preset" aria-pressed={presetMatches(p, props)} onClick={() => onPick(p)}
+            title={`${p.name}: base colour ${p.tint}, metal ${p.metalness.toFixed(2)}, rough ${p.roughness.toFixed(2)}`}>
+            <span className="sx-swatch" style={{ background: p.tint }} aria-hidden="true" />
+            <span className="sx-preset-name">{p.name}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** The details panel for one placed asset: groups in order, generated from the schema. Advanced adds the Info section. */
+export function Details({ id, props, simple, onField, onPick, presets, subject, budgets }: {
   readonly id: string;
   readonly props: Readonly<Record<string, unknown>>;
   readonly simple: boolean;
   readonly onField: (key: string, value: unknown) => void;
+  readonly onPick: (p: MaterialPreset) => void;
+  readonly presets: readonly MaterialPreset[];
+  /** The description from the bench: undefined while it loads, null when the dev bench is not there. */
+  readonly subject: string | null | undefined;
+  readonly budgets: readonly number[] | null | undefined;
 }): ReactElement {
   const info = GEN[id];
   return (
@@ -122,29 +159,78 @@ export function Details({ id, props, simple, onField }: {
             <FieldRow key={f.key} field={f} value={props[f.key]} simple={simple}
               onChange={(v) => onField(f.key, v)} />
           ))}
+          {g === 'Material' ? <Presets presets={presets} props={props} onPick={onPick} /> : null}
         </section>
       ))}
+      {simple ? null : (
+        <section className="sx-group sx-info" aria-label="Info">
+          <h4>Info</h4>
+          <dl className="sx-info-list">
+            <div><dt>Class</dt><dd>{info?.class ?? '-'}</dd></div>
+            <div><dt>Size</dt><dd>{info ? `${r2(info.size[0])} x ${r2(info.size[1])} x ${r2(info.size[2])} m` : '-'}</dd></div>
+            <div><dt>Triangles</dt><dd>{budgets ? `low ${budgets[0]?.toLocaleString('en-GB')}, mid ${budgets[1]?.toLocaleString('en-GB')}, high ${budgets[2]?.toLocaleString('en-GB')}` : '-'}</dd></div>
+          </dl>
+          <p className="sx-subject">{subject === undefined ? 'Reading the description' : subject === null ? 'The description is read in the dev Studio (STUDIO.bat).' : subject}</p>
+          <p className="sx-dim sx-help">Edit the description in the Redo panel.</p>
+        </section>
+      )}
     </div>
   );
 }
 
-/** The content browser: every packed asset, grouped by class, with a search box. */
-export function ContentBrowser({ query, onQuery, placed, onPlace, selected }: {
+/** A thumbnail, drawn when its row scrolls into view (the browser has a few hundred assets; most are never drawn). */
+function Thumb({ id }: { readonly id: string }): ReactElement {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    let live = true;
+    const io = new IntersectionObserver((entries) => {
+      if (!entries.some((e) => e.isIntersecting)) return;
+      io.disconnect();
+      void thumbOf(id).then((u) => { if (live) setUrl(u); });
+    });
+    io.observe(el);
+    return () => { live = false; io.disconnect(); };
+  }, [id]);
+  return <span ref={ref} className="sx-thumb" aria-hidden="true">{url ? <img src={url} alt="" draggable={false} /> : null}</span>;
+}
+
+/** The content browser: every packed asset, filtered by class and search, with a thumbnail per row. */
+export function ContentBrowser({ query, onQuery, placed, onPlace, selected, cls, onClass, versions }: {
   readonly query: string;
   readonly onQuery: (q: string) => void;
   readonly placed: ReadonlySet<string>;
   readonly onPlace: (id: string) => void;
   readonly selected: string | null;
+  /** The class filter: '' for every class. */
+  readonly cls: string;
+  readonly onClass: (c: string) => void;
+  /** A number per asset that changes after a redo, so its thumbnail is drawn again. */
+  readonly versions: Readonly<Record<string, number>>;
 }): ReactElement {
   const q = query.trim().toLowerCase();
-  const ids = Object.keys(GEN).filter((id) => q === '' || id.includes(q) || (GEN[id]?.class ?? '').includes(q)).sort((a, b) => {
-    const ca = GEN[a]?.class ?? '', cb = GEN[b]?.class ?? '';
-    return ca === cb ? a.localeCompare(b) : ca.localeCompare(cb);
-  });
+  const all = Object.keys(GEN);
+  const counts = new Map<string, number>();
+  for (const id of all) counts.set(GEN[id]?.class ?? 'other', (counts.get(GEN[id]?.class ?? 'other') ?? 0) + 1);
+  const classes = [...counts.keys()].sort((a, b) => a.localeCompare(b));
+  const ids = all
+    .filter((id) => (cls === '' || (GEN[id]?.class ?? 'other') === cls) && (q === '' || id.includes(q) || (GEN[id]?.class ?? '').includes(q)))
+    .sort((a, b) => {
+      const ca = GEN[a]?.class ?? '', cb = GEN[b]?.class ?? '';
+      return ca === cb ? a.localeCompare(b) : ca.localeCompare(cb);
+    });
   return (
     <div className="sx-browser">
       <input className="sx-search" type="search" placeholder="Search assets" value={query} onChange={(e) => onQuery(e.target.value)} aria-label="Search assets" />
-      <p className="sx-dim sx-count">{ids.length} of {Object.keys(GEN).length} assets. Double-click one to place it in the scene.</p>
+      <div className="sx-chips" role="group" aria-label="Filter by class">
+        <button type="button" className="sx-chip" aria-pressed={cls === ''} onClick={() => onClass('')}>All <b>{all.length}</b></button>
+        {classes.map((c) => (
+          <button key={c} type="button" className="sx-chip" aria-pressed={cls === c} onClick={() => onClass(c)}>{c} <b>{counts.get(c)}</b></button>
+        ))}
+      </div>
+      <p className="sx-dim sx-count">{ids.length} of {all.length} assets. Double-click one to place it in the scene.</p>
       <ul className="sx-list" role="listbox" aria-label="Assets">
         {ids.map((id) => {
           const info = GEN[id];
@@ -152,8 +238,11 @@ export function ContentBrowser({ query, onQuery, placed, onPlace, selected }: {
           return (
             <li key={id} className={`sx-row${selected === id ? ' on' : ''}`} onDoubleClick={() => onPlace(id)}>
               <button type="button" className="sx-row-main" onClick={() => onPlace(id)} aria-label={`Place ${id}`}>
-                <span className="sx-row-name">{id}</span>
-                <span className="sx-dim">{info?.class}</span>
+                <Thumb key={`${id}:${versions[id] ?? 0}`} id={id} />
+                <span className="sx-row-text">
+                  <span className="sx-row-name">{id}</span>
+                  <span className="sx-dim">{info?.class}</span>
+                </span>
               </button>
               {on ? <span className="sx-tag" title="In the scene">in scene</span> : null}
             </li>

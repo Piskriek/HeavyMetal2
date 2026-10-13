@@ -53,15 +53,21 @@ export interface BenchPaths {
   readonly legacyTokenFile: string;
 }
 
-export function benchPathsFor(root: string, secretsFile = path.join(root, '.studio-secrets.json')): BenchPaths {
+/**
+ * The bench's paths. `dataDir` moves every file the bench reads or writes (the manifest, the working folders, the
+ * packed outputs) under another folder with the same shape: the test run uses a temporary one, so no real asset is
+ * ever touched. The steps still run from `root`.
+ */
+export function benchPathsFor(root: string, secretsFile = path.join(root, '.studio-secrets.json'), dataDir?: string): BenchPaths {
+  const base = dataDir ?? root;
   return {
     root,
-    manifestFile: path.join(root, 'docs', 'runworld', 'assets.json'),
-    assetsDir: path.join(root, 'zips', 'runworld', 'assets'),
-    genDir: path.join(root, 'apps', 'web', 'src', 'assets', 'gen'),
-    hdDir: path.join(root, 'apps', 'web', 'public', 'hd'),
+    manifestFile: path.join(base, 'docs', 'runworld', 'assets.json'),
+    assetsDir: path.join(base, 'zips', 'runworld', 'assets'),
+    genDir: path.join(base, 'apps', 'web', 'src', 'assets', 'gen'),
+    hdDir: path.join(base, 'apps', 'web', 'public', 'hd'),
     secretsFile,
-    legacyTokenFile: path.join(root, '.local3d-token'),
+    legacyTokenFile: path.join(base, '.local3d-token'),
   };
 }
 
@@ -393,9 +399,12 @@ export function killTree(child: ChildProcess): void {
 
 // ---------------------------------------------------------------- the steps
 
-/** The script a step runs. In the test run (STUDIO_BENCH_MOCK=1) the long steps run a fixture script instead. */
+/**
+ * The script a step runs. In the test run (STUDIO_BENCH_MOCK=1) every step, the pack included, runs the fixture
+ * instead: the fixture writes only under STUDIO_BENCH_DIR, so the real pack never runs against the repository.
+ */
 export function stagesFor(step: Step, id: string, mock: boolean): Stage[] {
-  if (mock && step !== 'pack') return [{ label: `${step} (fixture)`, script: 'scripts/studio-bench-mock.mjs', args: [step, id] }];
+  if (mock) return [{ label: `${step} (fixture)`, script: 'scripts/studio-bench-mock.mjs', args: [step, id] }];
   switch (step) {
     case 'images': return [{ label: 'New image (RUN.world)', script: 'scripts/runworld-assets.mjs', args: ['images', id] }];
     case 'model': return [{ label: '3D model (local Hunyuan3D)', script: 'scripts/local3d.mjs', args: ['model', id] }];

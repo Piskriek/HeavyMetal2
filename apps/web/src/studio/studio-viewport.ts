@@ -1,7 +1,8 @@
 /**
- * The Studio's viewport: a three.js scene with one asset, a ground grid, the camera in the chosen keymap, and the
- * move / rotate / scale gizmo. The gizmo's maths is @hm/gizmo (hit test, drag, snapping); this file only draws it and
- * turns the pointer into rays. Edits leave through the hooks; the viewport never changes the document itself.
+ * The Studio's viewport: a three.js scene with one or more copies of an asset (the levels side by side, or the old and
+ * the new model), a ground grid, a 1.8 m figure for scale, the camera in the chosen keymap, and the move / rotate /
+ * scale gizmo on one anchor copy. The gizmo's maths is @hm/gizmo (hit test, drag, snapping); this file draws it and turns
+ * the pointer into rays. Edits leave through the hooks; the viewport never changes the document itself.
  */
 import * as THREE from 'three';
 import { drag, hitTest, worldLength, type DragResult, type GizmoMode, type Handle, type Ray, type Vec3 } from '@hm/gizmo';
@@ -10,6 +11,9 @@ import type { AssetTweak } from '../../studio-server/tweak-schema';
 
 export type Keymap = 'setmix' | 'blender' | 'maya';
 export type Tool = GizmoMode;
+export type Overlay = 'solid' | 'wire' | 'normals';
+/** What the asset sits in: nothing, a 4 m floor grid, a wall behind it, or its lattice box on the grid. */
+export type Context = 'none' | 'floor' | 'wall' | 'lattice';
 
 /** The transform the gizmo edits: the asset's offset, its turn and its uniform scale. */
 export interface Transform {
@@ -18,11 +22,38 @@ export interface Transform {
   readonly scale: number;
 }
 
+/** One copy of an asset in the scene: a level, or the old or new model. Its origin sits at `slot`. */
+export interface Copy {
+  readonly key: string;
+  readonly label: string;
+  /** The asset as its file has it. Never changed: the viewport clones it. */
+  readonly raw: THREE.Group;
+  readonly slot: Vec3;
+  /** The saved or unsaved tweak applied to this copy (null for an archived model, which is shown as it was). */
+  readonly tweak: AssetTweak | null;
+}
+
+export interface ShowOptions {
+  /** The copy that carries the gizmo (its slot plus the offset is the pivot), or null for no gizmo. */
+  readonly anchor: number | null;
+  readonly transform: Transform | null;
+  readonly overlay: Overlay;
+  readonly figure: boolean;
+  readonly context: Context;
+  /** Real size in metres, from the registry: spacing, the wall and the figure's place. */
+  readonly size: readonly [number, number, number];
+  /** A lattice piece's box, in the asset's own frame (its context draws it). */
+  readonly box?: readonly [readonly [number, number, number], readonly [number, number, number]];
+  /** Fit the camera to the copies. */
+  readonly reframe: boolean;
+}
+
+export interface CopyStats { readonly key: string; readonly meshes: number; readonly triangles: number }
+
 export interface ViewportHooks {
   readonly onDragStart: () => void;
   readonly onDrag: (next: Partial<Transform>) => void;
   readonly onDragEnd: () => void;
-  readonly onStats: (stats: { readonly meshes: number; readonly triangles: number }) => void;
 }
 
 /** Keymaps: which keys pick a tool, and how the mouse moves the camera. Maya is also the default for W/E/R. */
@@ -35,6 +66,9 @@ export const KEYMAPS: Readonly<Record<Keymap, { readonly label: string; readonly
 const COLOUR = { x: 0xe5484d, y: 0x46a758, z: 0x3e63dd, uniform: 0xf4f4f5 } as const;
 /** The gizmo is drawn at unit length and scaled each frame so it keeps a steady size on screen (@hm/gizmo's worldLength). */
 const GIZMO_SCALE = 1.6;
+/** The figure: a 1.8 m capsule (radius 0.22 m, straight part 1.36 m, the caps add 0.44 m). */
+const FIGURE = { radius: 0.22, length: 1.36 };
+const GRID_CELL = 4;
 
 type Nav = { readonly kind: 'orbit' | 'pan' | 'zoom' | 'look'; x: number; y: number };
 
@@ -44,7 +78,11 @@ export class StudioViewport {
   private readonly camera = new THREE.PerspectiveCamera(42, 1, 0.05, 400);
   private readonly raycaster = new THREE.Raycaster();
   private readonly gizmo = new THREE.Group();
-  private model: THREE.Group | null = null;
+  private readonly copyRoot = new THREE.Group();
+  private readonly contextRoot = new THREE.Group();
+  private readonly figureRoot = new THREE.Group();
+  private readonly normalMat = new THREE.MeshNormalMaterial();
+  private readonly tags: HTMLDivElement;
   private readonly keys = new Set<string>();
   private readonly ro: ResizeObserver;
   private frame = 0;
@@ -53,12 +91,16 @@ export class StudioViewport {
   private tool: Tool = 'move';
   private keymap: Keymap = 'setmix';
   private transform: Transform | null = null;
+  private anchorBase: Vec3 | null = null;
+  private overlay: Overlay = 'solid';
+  private tagItems: { el: HTMLSpanElement; at: THREE.Vector3 }[] = [];
   private held: { handle: Handle; start: Ray; from: Transform; len: number; pivot: Vec3 } | null = null;
   // orbit state: where the camera looks from and at
   private yaw = 0.7;
   private pitch = 0.42;
   private dist = 7;
   private readonly target = new THREE.Vector3(0, 0.8, 0);
+  private solidMats: THREE.Material[] = [];
 
   constructor(private readonly host: HTMLElement, private readonly hooks: ViewportHooks) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'low-power' });
@@ -67,6 +109,10 @@ export class StudioViewport {
     this.renderer.setClearColor(0x080b10, 1);
     host.appendChild(this.renderer.domElement);
     this.renderer.domElement.className = 'sx-canvas';
+    this.tags = document.createElement('div');
+    this.tags.className = 'sx-tags';
+    this.tags.setAttribute('aria-hidden', 'true');
+    host.appendChild(this.tags);
 
     this.scene.add(new THREE.HemisphereLight(0xd6ecff, 0x18120a, 1.1));
     const sun = new THREE.DirectionalLight(0xffffff, 1.8);
@@ -75,6 +121,7 @@ export class StudioViewport {
     const grid = new THREE.GridHelper(40, 40, 0x2b3d50, 0x141e2a);
     (grid.material as THREE.Material).transparent = true;
     this.scene.add(grid);
+    this.scene.add(this.contextRoot, this.copyRoot, this.figureRoot);
     this.gizmo.renderOrder = 10;
     this.scene.add(this.gizmo);
 
@@ -98,44 +145,179 @@ export class StudioViewport {
   get currentTool(): Tool { return this.tool; }
   toolForKey(key: string): Tool | null { return KEYMAPS[this.keymap].tools[key.toLowerCase()] ?? null; }
 
-  /** Shows one asset with its (unsaved or saved) transform. `raw` is the asset as its file has it. */
-  show(raw: THREE.Group | null, tweak: AssetTweak | null, transform: Transform | null): void {
-    if (this.model) this.scene.remove(this.model);
-    this.model = null;
-    this.transform = transform;
-    if (raw) {
-      const inst = applyAssetTweak(raw.clone(true), tweak ?? undefined);
-      this.model = inst;
-      this.scene.add(inst);
+  /**
+   * Shows the copies of one asset. Each copy is cloned from its raw asset and tweaked on its own clone; the copies share
+   * geometry with the cache, so nothing the game uses is changed. Returns each copy's mesh and triangle counts.
+   */
+  show(copies: readonly Copy[], opts: ShowOptions): CopyStats[] {
+    this.clearCopies();
+    this.overlay = opts.overlay;
+    this.transform = opts.transform;
+    const stats: CopyStats[] = [];
+    const top = opts.size[1] + 0.2;
+    copies.forEach((c, i) => {
+      const inst = applyAssetTweak(c.raw.clone(true), c.tweak ?? undefined);
+      // a tweak made fresh clones of the materials: those originals are not the cache's, so they are freed here
+      const tuned = c.tweak !== null && (['tint', 'metalness', 'roughness', 'emissive', 'emissiveIntensity'] as const).some((k) => c.tweak?.[k] !== undefined);
+      // every mesh gets its own material, so an overlay changes this copy and no other, and the cache stays as it is
       let meshes = 0, triangles = 0;
       inst.traverse((o) => {
         const m = o as THREE.Mesh;
         if (!m.isMesh) return;
+        const original = m.material;
+        const solid = Array.isArray(m.material) ? m.material.map((x) => x.clone()) : m.material.clone();
+        if (tuned) (Array.isArray(original) ? original : [original]).forEach((x) => x.dispose());
+        m.userData.solid = solid;
+        this.solidMats.push(...(Array.isArray(solid) ? solid : [solid]));
         meshes++;
         const idx = m.geometry.index;
         triangles += idx ? idx.count / 3 : (m.geometry.getAttribute('position')?.count ?? 0) / 3;
       });
-      this.hooks.onStats({ meshes, triangles: Math.round(triangles) });
+      const g = new THREE.Group();
+      g.position.set(c.slot[0], c.slot[1], c.slot[2]);
+      g.add(inst);
+      this.copyRoot.add(g);
+      stats.push({ key: c.key, meshes, triangles: Math.round(triangles) });
+      const el = document.createElement('span');
+      el.className = 'sx-world-tag';
+      el.textContent = c.label;
+      el.dataset.index = String(i);
+      this.tags.appendChild(el);
+      this.tagItems.push({ el, at: new THREE.Vector3(c.slot[0], top, c.slot[2]) });
+    });
+    this.applyOverlay(this.overlay);
+    if (opts.figure && copies.length > 0) this.drawFigure(copies, opts.size);
+    this.drawContext(copies, opts);
+    if (opts.anchor !== null && copies[opts.anchor]) {
+      const s = copies[opts.anchor]!.slot;
+      this.anchorBase = [s[0], s[1], s[2]];
     } else {
-      this.hooks.onStats({ meshes: 0, triangles: 0 });
+      this.anchorBase = null;
     }
+    if (opts.reframe) this.fitTo(copies);
     this.drawGizmo();
+    return stats;
   }
 
-  /** Frames the asset (or the gizmo pivot) from the current angle. */
+  /** Changes the overlay on what is shown: the solid model, its wireframe, or its normals. */
+  setOverlay(o: Overlay): void {
+    this.overlay = o;
+    this.applyOverlay(o);
+  }
+
+  /** Frames the copies (or the gizmo pivot) from the current angle. */
   focus(): void {
-    const p: Vec3 = this.transform ? this.transform.offset : [0, 0.8, 0];
+    const p = this.pivot() ?? [0, 0.8, 0];
     this.target.set(p[0], p[1], p[2]);
     this.dist = 6;
   }
 
   dispose(): void {
     this.ro.disconnect();
+    this.clearCopies();
+    this.normalMat.dispose();
     this.renderer.dispose();
     window.removeEventListener('keydown', this.onKey);
     window.removeEventListener('keyup', this.onKeyUp);
     this.renderer.domElement.remove();
+    this.tags.remove();
     cancelAnimationFrame(this.frame);
+  }
+
+  // ---- what is shown ----
+
+  private clearCopies(): void {
+    for (const c of [...this.copyRoot.children]) { this.copyRoot.remove(c); }
+    for (const c of [...this.contextRoot.children]) { this.contextRoot.remove(c); disposeTree(c); }
+    for (const c of [...this.figureRoot.children]) { this.figureRoot.remove(c); disposeTree(c); }
+    for (const m of this.solidMats) m.dispose();
+    this.solidMats = [];
+    this.tags.replaceChildren();
+    this.tagItems = [];
+  }
+
+  /** The solid, wire or normal look on every mesh of every copy. */
+  private applyOverlay(o: Overlay): void {
+    this.copyRoot.traverse((obj) => {
+      const m = obj as THREE.Mesh;
+      if (!m.isMesh || !m.userData.solid) return;
+      const solid = m.userData.solid as THREE.Material | THREE.Material[];
+      const list = Array.isArray(solid) ? solid : [solid];
+      for (const mat of list) (mat as THREE.Material & { wireframe?: boolean }).wireframe = o === 'wire';
+      if (o === 'normals') m.material = this.normalMat;
+      else m.material = solid;
+    });
+  }
+
+  private drawFigure(copies: readonly Copy[], size: readonly [number, number, number]): void {
+    const minX = Math.min(...copies.map((c) => c.slot[0])) - Math.max(size[0], size[2]) / 2 - 0.9;
+    const cap = new THREE.Mesh(
+      new THREE.CapsuleGeometry(FIGURE.radius, FIGURE.length, 6, 14),
+      new THREE.MeshStandardMaterial({ color: 0x8aa0b4, roughness: 0.7, metalness: 0 }),
+    );
+    cap.position.set(minX, 0.9, 0);
+    this.figureRoot.add(cap);
+    const el = document.createElement('span');
+    el.className = 'sx-world-tag sx-world-figure';
+    el.textContent = '1.8 m';
+    this.tags.appendChild(el);
+    this.tagItems.push({ el, at: new THREE.Vector3(minX, 1.9, 0) });
+  }
+
+  /** The asset in its place: a 4 m floor grid, a wall behind it, or its lattice box on the grid. */
+  private drawContext(copies: readonly Copy[], opts: ShowOptions): void {
+    if (opts.context === 'none' || copies.length === 0) return;
+    const xs = copies.map((c) => c.slot[0]);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+    // whole 4 m cells, enough to hold every copy and a margin
+    const cells = Math.max(1, Math.ceil((Math.max(...xs) - Math.min(...xs) + Math.max(opts.size[0], opts.size[2]) + 1) / GRID_CELL));
+    const span = cells * GRID_CELL;
+    const grid = new THREE.GridHelper(span, cells, 0x5fd4ff, 0x1d3445);
+    grid.position.set(cx, 0.002, 0);
+    (grid.material as THREE.Material).transparent = true;
+    (grid.material as THREE.Material).opacity = 0.7;
+    this.contextRoot.add(grid);
+    if (opts.context === 'wall') {
+      const w = span;
+      const wall = new THREE.Mesh(
+        new THREE.PlaneGeometry(w, 3),
+        new THREE.MeshStandardMaterial({ color: 0x1a2430, roughness: 0.9, side: THREE.DoubleSide }),
+      );
+      wall.position.set(cx, 1.5, -opts.size[2] / 2 - 0.06);
+      this.contextRoot.add(wall);
+    }
+    if (opts.context === 'lattice' && opts.box) {
+      const [lo, hi] = opts.box;
+      const w = hi[0] - lo[0], h = hi[1] - lo[1], d = hi[2] - lo[2];
+      const edges = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d)),
+        new THREE.LineBasicMaterial({ color: 0xffc53d, transparent: true, opacity: 0.8 }),
+      );
+      // the copies sit at their slots, so the box is drawn at each copy's slot
+      for (const c of copies) {
+        const e = edges.clone();
+        e.position.set(c.slot[0] + (lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2 + c.slot[1], c.slot[2] + (lo[2] + hi[2]) / 2);
+        this.contextRoot.add(e);
+      }
+    }
+  }
+
+  /** Frames the copies: centre on their bounds, back off far enough to see all of them. */
+  private fitTo(copies: readonly Copy[]): void {
+    if (copies.length === 0) return;
+    const box = new THREE.Box3().setFromObject(this.copyRoot);
+    if (box.isEmpty()) return;
+    const c = box.getCenter(new THREE.Vector3());
+    const s = box.getSize(new THREE.Vector3());
+    this.target.copy(c);
+    this.dist = Math.min(60, Math.max(2.5, Math.max(s.x, s.y * 1.2, s.z) * 1.35 + 1.2));
+  }
+
+  /** The gizmo's pivot in the scene: the anchor copy's slot plus the offset, or null when there is no gizmo. */
+  private pivot(): Vec3 | null {
+    if (!this.transform || !this.anchorBase) return null;
+    const o = this.transform.offset, b = this.anchorBase;
+    return [b[0] + o[0], b[1] + o[1], b[2] + o[2]];
   }
 
   // ---- camera ----
@@ -178,19 +360,32 @@ export class StudioViewport {
       this.target.z += mz * sp;
     }
     this.placeCamera();
-    if (this.transform) this.gizmo.scale.setScalar(this.gizmoLength(this.transform.offset));
+    const p = this.pivot();
+    if (p) this.gizmo.scale.setScalar(this.gizmoLength(p));
     this.renderer.render(this.scene, this.camera);
+    this.placeTags();
   };
+
+  /** The labels sit above their copies: each frame they are projected from the scene onto the view. */
+  private placeTags(): void {
+    const w = this.host.clientWidth, h = this.host.clientHeight;
+    for (const t of this.tagItems) {
+      const v = t.at.clone().project(this.camera);
+      const visible = v.z > -1 && v.z < 1 && Math.abs(v.x) < 1.2 && Math.abs(v.y) < 1.2;
+      t.el.style.opacity = visible ? '1' : '0';
+      t.el.style.transform = `translate(${((v.x + 1) / 2) * w}px, ${((1 - v.y) / 2) * h}px)`;
+    }
+  }
 
   // ---- gizmo drawing ----
 
   private drawGizmo(): void {
     for (const c of [...this.gizmo.children]) { this.gizmo.remove(c); disposeTree(c); }
-    if (!this.transform) return;
-    const p = this.transform.offset;
+    const p = this.pivot();
+    if (!p) return;
     this.gizmo.position.set(p[0], p[1], p[2]);
     const len = 1; // unit length; the group is scaled to the gizmo length every frame
-    const mat =(c: number, opacity = 1): THREE.MeshBasicMaterial =>
+    const mat = (c: number, opacity = 1): THREE.MeshBasicMaterial =>
       new THREE.MeshBasicMaterial({ color: c, depthTest: false, transparent: opacity < 1, opacity, depthWrite: false });
     if (this.tool === 'move') {
       for (const k of ['x', 'y', 'z'] as const) {
@@ -260,8 +455,8 @@ export class StudioViewport {
       e.preventDefault();
       return;
     }
-    if (e.button !== 0 || !this.transform) return;
-    const pivot: Vec3 = this.transform.offset;
+    const pivot = this.pivot();
+    if (e.button !== 0 || !this.transform || !pivot) return;
     const ray = this.rayAt(e);
     const len = this.gizmoLength(pivot);
     const mode = this.tool;

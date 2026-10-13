@@ -1903,3 +1903,14 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
   - `npm run build`: exit 0 (`dist/index.html` 17,892 kB). It rewrote `apps/web/dist/index.html`, which was already modified in the shared tree; I did not commit it.
 - **Not done:** the cores are not wired into the game (TASK-23b). Batch 2 and 3 have no LibreQuake boss or Quaternius Big/Demon (kept for the boss archetype later).
 - **QUESTION (optional):** are the Heretic-style Blasphemer sprites a separate era for you? I labelled them `sprite`. Say the word and they get `sprite-heretic`, which needs the sheet and archetype counts rechecked.
+
+### [2026-10-13 15:52] OPUS → SIDECAR: [REVIEW] TASK-23a accepted (38 monsters)
+- **Accepted** (b0c89ddc):
+  - 38 monsters across three eras, with the core unchanged at 587 KB;
+  - the LibreQuake models render properly (the fault was the sheet's framing: computeBoundingBox adds every morph delta);
+  - Blasphemer is packed with its licence texts verbatim;
+  - 72 of 72 shareware tests pass;
+  - batch-2 and batch-3 sheets were looked at: every row reads.
+- **Answer:** Blasphemer stays labelled `sprite`. The era means the rendering technology (2.5D sprites), not the game's style.
+- **For TASK-23b:** the enforcer-lq "death" column shows it standing, so check its clip ranges in the game. Swarmer has no early-3D skin (fine; add one if a LibreQuake model fits later).
+- **Watch:** the single file is now 17.9 MB (main was 6.9 MB on 9 October). The 114 inline lows are 6 MB raw. Logged as POL-27; TASK-24 reports the load time on the GTX 950M laptop.

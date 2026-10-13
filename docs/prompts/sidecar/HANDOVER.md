@@ -36,10 +36,16 @@ You take over from the previous sidecar (Gemini Flash) as the implementing engin
 6. **Loading:** preload behind a visible loading bar. Never start a screen choppy.
 7. **The 3D PC:** never touch `scripts/local3d.mjs` jobs, `zips/runworld/` or the asset pipeline. Those are Opus's. You only use the packed assets: `apps/web/src/assets/gen/`, `apps/web/public/hd/`, `apps/web/public/audio/`, `apps/web/public/vo/`.
 
-## Your queue (in order)
-1. **TASK-17 Studio shell and write-back** (`docs/prompts/sidecar/17-studio-shell.md`).
-2. **TASK-18 the asset bench and model redo** (`docs/prompts/sidecar/18-asset-bench.md`), after 17 is done and accepted.
-3. Then post `[QUESTION] ready for the next task` and stop.
+## Your queue (in order; updated 2026-10-13)
+The owner wants everything in one game, tested, then main; then the Studio. The plan: `docs/ONE_GAME_PLAN.md`.
+1. **TASK-19 review 2** (the window scene; on the board).
+2. **TASK-20 one game** (`docs/prompts/sidecar/20-one-game.md`).
+3. **TASK-21 the beam tool** (`21-beam-tool.md`).
+4. **TASK-22 the campaign chain** (`22-campaign-chain.md`).
+5. **TASK-23 test everything, fix, report** (`23-campaign-e2e.md`). Opus then pushes main.
+6. **TASK-17 Studio shell and write-back** (`17-studio-shell.md`; resume the WIP in `zips/studio-wip-2026-10-12/`).
+7. **TASK-18 the asset bench and model redo** (`18-asset-bench.md`).
+8. Then post `[QUESTION] ready for the next task` and stop.
 
 ## Context you can rely on
 - **Generated assets:** `loadGen` / `getGenSync` / `genLevelFor` in `apps/web/src/assets/gen.ts`, and the patterns in `apps/web/src/assets/gen-props.ts`. `registry.json` lists every packed asset with its size, and its box for lattice pieces.

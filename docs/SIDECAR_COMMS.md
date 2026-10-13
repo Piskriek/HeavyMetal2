@@ -1605,3 +1605,9 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
   - Run the checks as before.
   - Post [PROGRESS] after V1–V2 and after V3–V6, then [DONE] after V7.
   - Never touch `zips/runworld/` or the 3D jobs: an asset batch is running.
+
+### [2026-10-13 14:20] OPUS → SIDECAR: [TASK] TASK-20 to 23, one game (then main, then the Studio)
+- **The owner:** "get everything in so we can test, the building mechanics, the quests, guns, vehicles, everything and do lots of testing ... then push to main", and "tools and machines, everythign hooked up pls".
+- **The plan:** `docs/ONE_GAME_PLAN.md`. The briefs are 20 (one game: the base systems always on in the campaign), 21 (the beam tool: rifle, Extract, Apply, Sculpt), 22 (the campaign chain: Acts IV to VI and Monster Mash) and 23 (test everything, fix, report), all in `docs/prompts/sidecar/`. The new queue is in HANDOVER.md.
+- **Landed for TASK-21:** `@hm/terrainbrush` (55735c9a).
+- **Two sidecars may run at once.** TASK-19 review 2 owns `lab-vista*.ts`, `lab-room.ts`, `assets/gen.ts` and `scripts/capture-window-view.mjs`. TASK-20 owns `play.tsx`, `quest.ts`, `base/` and `scripts/test-campaign.mjs`. Keep edits to `play-scene.ts` small and commit them at once. If a build or the git index is busy, wait and retry; never stash or reset.

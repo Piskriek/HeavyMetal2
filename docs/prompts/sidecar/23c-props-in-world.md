@@ -15,7 +15,12 @@ The earlier plan (RESUME §5, item 1): lab clutter you can clear to free floor f
    - Sealing a leak restores its props one fidelity rung (the junk-model ladder).
    - A few sites without leaks are scenery, never within 30 m of the gate pad.
 3. **The window view.** Swap or add the batch-2 wasteland pieces into the vista: comms mast, silo, pump house, substation, cooling tower, warehouse, datacentre annex, office ruin, billboard, sign gantry. Use the low level and stay in the vista budget (40 calls, 120k triangles), instanced.
-4. **Budgets:** the lab within the frame budget on Low; report draw calls before and after.
+4. **The weapon-bench set** (owner 2026-10-13: "you need to model individual tools, the bench and the tools cant be one object"). Opus packs `weapon-bench` (now generated empty), `bench-jig`, `bench-printer`, `tool-wall`, `tool-drill`, `tool-wrench`, `tool-mallet`, `tool-scanner` and `tool-screwdriver` as separate models.
+   - Place the jig at the centre of the bench top and the printer at one end of it.
+   - The tool wall goes flat on the wall behind the bench, with the tools hung in its slots (each tool its own object, a little proud of the panel); the mallet and the wrench lie on the bench top.
+   - Every item rests on its surface: no gaps, nothing floating. Check with a shot from three sides.
+   - The weapon bench's E interaction still works (the bench piece itself).
+5. **Budgets:** the lab within the frame budget on Low; report draw calls before and after.
 
 ## Tests
 - **Unit:** the clutter-clear bookkeeping (the salvage yield, saved once, never twice).

@@ -1,5 +1,6 @@
 import { chromium } from 'playwright-core';
 import { spawn, spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -14,6 +15,10 @@ import { fileURLToPath } from 'node:url';
  * - opens the Moon (prototype) workspace;
  * - serves apps/web/dist and checks the production build opens the Studio read-only;
  * - restores asset-tweaks.json to the bytes it had before the run (teardown, also on failure).
+ * The asset bench (TASK-18) redoes weapon-bench in a TEMPORARY folder (STUDIO_BENCH_DIR), and every step is the
+ * fixture (scripts/studio-bench-mock.mjs), the revert's pack included. No real pipeline step runs. A check at the end
+ * proves the real packed files (the weapon-bench low level, its HD pack and registry.json) are byte-identical to the
+ * start of the run.
  * Shots go to docs/shots/studio/ (gitignored).
  */
 
@@ -145,6 +150,16 @@ try {
   // the unit tests for the endpoint, the tweak maths, the bench and the presets (the npm test glob is shared, so they run from here too)
   const unit = spawnSync(process.execPath, ['--import', 'tsx', '--test', 'apps/web/studio-server/write-back.test.ts', 'apps/web/studio-server/bench.test.ts', 'apps/web/src/assets/gen-tweak.test.ts', 'apps/web/src/studio/studio-presets.test.ts'], { cwd: root, encoding: 'utf8' });
   check('the write-back, bench, tweak and preset unit tests pass', unit.status === 0, `exit ${unit.status}`);
+
+  // the real packed files the bench could write (its low level, its HD pack, the registry): hashed now, compared at the end
+  const realGame = [
+    path.join(root, 'apps/web/src/assets/gen', `${benchId}.glb`),
+    path.join(root, 'apps/web/src/assets/gen/registry.json'),
+    path.join(root, 'apps/web/public/hd', benchId, 'high.gltf'),
+    path.join(root, 'apps/web/public/hd', benchId, 'mid.gltf'),
+  ];
+  const hashOf = (f) => (fs.existsSync(f) ? crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex') : 'missing');
+  const realBefore = realGame.map(hashOf);
 
   seedBench();
   setControl({ skip: [], fail: [] });
@@ -431,6 +446,11 @@ try {
   await page.locator('button', { hasText: 'All three' }).click();
   await sleep(1500);
   await page.screenshot({ path: path.join(shotsDir, 'bench-levels.png') });
+  const boxes = await page.evaluate(() => {
+    const b = (sel) => document.querySelector(sel)?.getBoundingClientRect();
+    return { viewRight: b('.sx-view')?.right ?? 0, panelLeft: b('.sx-right')?.left ?? 0 };
+  });
+  check('the viewport stays in its column (it does not run under the details panel)', boxes.viewRight <= boxes.panelLeft + 1, `view ends ${Math.round(boxes.viewRight)}, panel starts ${Math.round(boxes.panelLeft)}`);
   await page.locator('.sx-right-tabs button', { hasText: 'Details' }).click();
   await page.waitForSelector('.sx-presets', { timeout: 10_000 });
   await page.screenshot({ path: path.join(shotsDir, 'bench-presets.png') });
@@ -446,7 +466,8 @@ try {
     const g = m.getGenSync(id);
     let mat = null;
     g?.traverse((o) => { if (mat === null && o.isMesh) mat = Array.isArray(o.material) ? o.material[0] : o.material; });
-    return mat ? { hex: mat.color.getHexString(), metal: mat.metalness, rough: mat.roughness } : null;
+    const tweak = m.ASSET_TWEAKS[id] ?? null;
+    return mat ? { hex: mat.color.getHexString(), metal: mat.metalness, rough: mat.roughness, tweak } : null;
   }, benchId);
   check('the preset is seen in the game (colour, metal 0, rough)', look?.hex === '6b7280' && look?.metal === 0 && Math.abs((look?.rough ?? -1) - 0.87) < 0.01, JSON.stringify(look));
   await page.screenshot({ path: path.join(shotsDir, 'bench-preset.png') });
@@ -480,6 +501,8 @@ try {
   await built.waitForFunction(() => document.querySelectorAll('.sx-table tbody tr').length === 1, null, { timeout: 10_000 });
   await built.locator('.sx-changes-head button.sx-go').isDisabled().then((d) => check('Accept is disabled on the built game', d));
   await built.screenshot({ path: path.join(shotsDir, 'studio-readonly.png') });
+
+  check('the run left the real packed game files untouched', realGame.map(hashOf).every((h, i) => h === realBefore[i]), realGame.map((f) => path.relative(root, f)).join(', '));
 } catch (e) {
   check('the run completed', false, e instanceof Error ? e.message : String(e));
 } finally {

@@ -617,7 +617,8 @@ export async function handleBenchRequest(req: Request, paths: BenchPaths, jobs: 
     return startJob(jobs, {
       step: 'revert',
       assetId: k.id,
-      stages: [{ label: 'Pack into the game', script: 'scripts/runworld-pack.mjs', args: [k.id] }],
+      // the same pack step as the Redo panel's own pack (the fixture in the test run, so a test never packs the repository)
+      stages: stagesFor('pack', k.id, opts.mock),
       verify: () => (newer(path.join(paths.hdDir, k.id, 'high.gltf'), since) && newer(path.join(paths.genDir, `${k.id}.glb`), since) ? null : 'the pack after the revert wrote nothing'),
       logFile: path.join(dir, REDO_LOG),
       secrets: () => secretValues(paths),

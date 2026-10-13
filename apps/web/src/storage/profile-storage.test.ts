@@ -245,3 +245,18 @@ test('scanner: no source file in apps/web/src other than profile-storage.ts touc
   const violations = scanDir(srcDir);
   assert.deepEqual(violations, [], `Direct localStorage calls found in:\n${violations.join('\n')}`);
 });
+
+test('deleteProfile clears that profile\'s base save and leaves Main\'s (TASK-21 F3)', async () => {
+  const { BASE_SAVE_KEY } = await import('../base/save');
+  const mock = setupMockStorage();
+  const beta = createProfile('Beta');
+  writeRegistry({ ...readRegistry(), active: beta.id });
+  kv.set(BASE_SAVE_KEY, '{"owner":"beta"}');
+  writeRegistry({ ...readRegistry(), active: MAIN_PROFILE_ID });
+  kv.set(BASE_SAVE_KEY, '{"owner":"main"}');
+  assert.equal(mock.getItem(toStorageKey(BASE_SAVE_KEY, beta.id)), '{"owner":"beta"}', 'the base save is stored per profile');
+
+  assert.equal(deleteProfile(beta.id), true);
+  assert.equal(mock.getItem(toStorageKey(BASE_SAVE_KEY, beta.id)), null, 'the deleted profile\'s base save is gone');
+  assert.equal(kv.get(BASE_SAVE_KEY), '{"owner":"main"}', 'Main\'s base save is untouched');
+});

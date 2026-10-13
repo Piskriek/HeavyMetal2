@@ -309,6 +309,9 @@ export function PlayScreen(props: {
 
   // Layouts & Plans state
   const [placingLayoutId, setPlacingLayoutId] = useState<string | null>(null);
+  /** The scene's mouse handler is set up once, so it reads the layout being placed through this ref (not the state). */
+  const placingLayoutRef = useRef<string | null>(null);
+  placingLayoutRef.current = placingLayoutId;
   const placingLayoutRotationRef = useRef<number>(0);
   const [planPrompt, setPlanPrompt] = useState<string | null>(null);
   const nearestPlanRef = useRef<Plan | null>(null);
@@ -940,13 +943,13 @@ export function PlayScreen(props: {
           scene.mash.setTrigger(true);
           fireWeapon();
         } else {
-          if (placingLayoutId !== null) {
+          if (placingLayoutRef.current !== null) {
             const hit = scene.aimPoint();
             if (hit) {
               const yaw = (placingLayoutRotationRef.current * Math.PI) / 2;
               dispatchBase({
                 t: 'plan',
-                layout: placingLayoutId,
+                layout: placingLayoutRef.current,
                 cx: hit.x,
                 cz: hit.z,
                 yaw,

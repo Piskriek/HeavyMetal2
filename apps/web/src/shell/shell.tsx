@@ -35,6 +35,7 @@ import { PlayScreen } from '../play/play';
 import { exportIsland, importIsland } from '../islands/island-transfer';
 import { MonsterMashScreen } from '../monstermash/monstermash-screen';
 import { StudioScreen } from '../studio/studio-screen';
+import { StudioApp } from '../studio/studio-app';
 
 /**
  * The shell of **SetMix Multiverse** (first called SetMix Harness): a world of activities. It opens on the SetMix home: the galaxy, with Goblin Racing selected and its menu live
@@ -98,6 +99,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
     if (typeof location !== 'undefined') {
       const p = new URLSearchParams(location.search);
       if (p.has('monstermash')) return 'monstermash';
+      if (p.has('studio')) return 'studio';
       if (p.has('crafter')) return 'crafter';
       if (p.has('play') || p.has('mash') || p.has('base') || p.has('building')) return 'play';
     }
@@ -492,20 +494,25 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
       ) : null}
       {screen === 'studio' ? (
         <div className="shell-layer" style={{ zIndex: 4 }}>
-          <StudioScreen
-            profile={profile}
+          <StudioApp
             onBack={toHome}
-            onUpdateProfile={(fn) => update(fn)}
-            onPlayCampaign={() => {
-              origin.current = 'home';
-              setPlaySyncMode('desynced');
-              go('play');
-            }}
-            onPlayPlanet={(_planetId) => {
-              origin.current = 'home';
-              setPlaySyncMode('desynced');
-              go('play');
-            }}
+            renderPrototype={() => (
+              <StudioScreen
+                profile={profile}
+                onBack={toHome}
+                onUpdateProfile={(fn) => update(fn)}
+                onPlayCampaign={() => {
+                  origin.current = 'home';
+                  setPlaySyncMode('desynced');
+                  go('play');
+                }}
+                onPlayPlanet={(_planetId) => {
+                  origin.current = 'home';
+                  setPlaySyncMode('desynced');
+                  go('play');
+                }}
+              />
+            )}
           />
         </div>
       ) : null}

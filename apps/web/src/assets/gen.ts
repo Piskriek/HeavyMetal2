@@ -26,8 +26,19 @@ export interface GenInfo {
   readonly kind?: string;
 }
 export const GEN: Readonly<Record<string, GenInfo>> = registry as unknown as Record<string, GenInfo>;
-/** The saved tweak of each asset that has one. Baked into the build; the Studio writes this file in dev. */
-export const ASSET_TWEAKS = tweakFile as unknown as Readonly<Record<string, AssetTweak>>;
+/**
+ * The saved tweak of each asset that has one. Baked into the build; the Studio writes the file in dev. In dev, a saved
+ * change is taken in place (this module accepts its own JSON), so the page does not reload and the Studio keeps its
+ * undo history. Instances already placed in the game keep their old copy until they are made again.
+ */
+export const ASSET_TWEAKS: Record<string, AssetTweak> = { ...(tweakFile as unknown as Record<string, AssetTweak>) };
+if (import.meta.hot) {
+  import.meta.hot.accept('../studio-data/asset-tweaks.json', (mod) => {
+    const next = ((mod as { default?: unknown } | undefined)?.default ?? {}) as Record<string, AssetTweak>;
+    for (const id of Object.keys(ASSET_TWEAKS)) if (!(id in next)) delete ASSET_TWEAKS[id];
+    Object.assign(ASSET_TWEAKS, next);
+  });
+}
 
 // the low GLBs, inlined by the single-file build (assetsInlineLimit). Read on first use, so node tests can import
 // this module (import.meta.glob exists only under Vite).

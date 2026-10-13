@@ -1,6 +1,6 @@
 # TASK-25: the HUD in nine zones, the build ribbon, labels on aim, the hologram lock (Wave B)
 
-After `main` (Wave A). The source is Argo's UI plan, `docs/argo/plans/16-ui-ux.md` (P0-UI-01, P0-UI-02, P0-UI-03, and P2-UI-06, which his reply promotes), with the adjustments in `docs/argo/plans/ARGO_MASTER_PLAN_REPLY.md` §2 and §3 (brief 25). Where they differ, the reply wins. The research behind it (Dead Space's diegetic rig, Satisfactory's build drawer and hologram lock, Subnautica's and The Planet Crafter's corner telemetry) is in the plan's §3.
+After `main` (Wave A). The source is Argo's UI plan, `docs/argo/plans/16-ui-ux.md` (P0-UI-01, P0-UI-02, P0-UI-03, and P2-UI-06, which his reply promotes), plus P0-HOUR-02 from `12-first-hour.md`, with the adjustments in `docs/argo/plans/ARGO_MASTER_PLAN_REPLY.md` §2 and §3 (brief 25). Where they differ, the reply wins. The research behind it (Dead Space's diegetic rig, Satisfactory's build drawer and hologram lock, Subnautica's and The Planet Crafter's corner telemetry) is in the plan's §3.
 
 **Already done in TASK-24:**
 - the radio subtitle sits above the hotbar;
@@ -53,7 +53,8 @@ Keep that assertion green and widen it (see Tests).
 3. **Labels on aim (P0-UI-03):**
    - A machine's floating label shows only within 14 m **and** 8° of the crosshair, or while Alt is held (the tactical view).
    - Otherwise the machine shows its state on a small **square emissive LED on its housing**: green running, amber blinking for no ore or a brownout, red unpowered. It sits on the surface, never floating.
-4. **The hologram lock (P2-UI-06, promoted to this brief by the reply):**
+4. **The arrival's order (P0-HOUR-02, in the master plan's §0 for this brief):** on the first Moon arrival, Dr. Haddy's line waits until the "STAGE 0" title card has faded (about 2 s), so the title and the subtitle never compete. The queue in item 1 should give you this for free; test it.
+5. **The hologram lock (P2-UI-06, promoted to this brief by the reply):**
    - H freezes the ghost where it is, so you can walk round it.
    - The arrow keys nudge it 0.5 m, and the rotate key still turns it.
    - Left click commits it through the normal placement checks; H again or Esc releases it.

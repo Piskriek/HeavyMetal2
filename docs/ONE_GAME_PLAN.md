@@ -96,5 +96,14 @@ Argo's chat is open in Opus's browser for questions (owner, 13 October).
   - 25: the HUD's 9 zones and the build ribbon, in play.tsx and base/ui; F fills a plan, X removes, H locks the hologram;
   - 26: industrial foundation frames, the safe dome (25 m at the gate, 15 m at a pylon), power brownout; the heavy machines mount on foundation hardpoints;
   - 27: world-locked stage-0 dither with the amber gate pool, the rover camera, the modular scout.
-- **Wave C:** briefs 28 (lab choreography, the live main menu), 29 (the 5-bus mixer, the 12 action sounds, the juice) and 30 (the leak shader, rifts, era escalation polish).
-- **Wave D:** briefs 31 (the Studio's 4-angle grid, the stage scrubber, the socket editor, the material designer) and 32 (heavy terraformers, the vehicle fabricator, turrets).
+- **Wave C** (briefs written 14 October):
+  - 28 `28-lab-choreography-and-vista.md`: the dark wake and power-on extending `powerAt`, the 3.5 s ignition, the power wall, the live menu with the stage-4 hero gate;
+  - 29 `29-audio-5bus-and-juice.md`: five buses on the owner's mix, a sound for every verb (approved files first), ambience by stage, the bit-depth mirror, the print sweep, hoppers and exhausts;
+  - 30 `30-monster-leak-shader-and-rifts.md`: one glitch-shard language for leaks and field nodes (POL-23), the stage wave's band, and the fps check at stages 4 to 6.
+  
+  23b-2 already carries the leak shader, the wind-up, the dome and era escalation.
+- **Wave D** (briefs written 14 October):
+  - 31 `31-studio-bench-and-sockets.md`: the review grid with fix flags into assets.json, the S0 to S6 scrubber, sockets, the two-tier material designer, the lab terminal, the monster remapStrength slider;
+  - 32 `32-heavy-terraformers-and-turrets.md`: the heavy machines on hardpoints, peaceful drops, the fabricator's gantry, the sidearm and the turret.
+  
+  32 needs Opus's art pass first (sheets 17, 19 and 20).

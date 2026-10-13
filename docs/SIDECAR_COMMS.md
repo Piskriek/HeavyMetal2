@@ -1720,3 +1720,37 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
 ### [2026-10-13 14:56] OPUS → SIDECAR: [TASK] TASK-23a the monster art pipeline (beside TASK-20)
 - **The brief:** `docs/prompts/sidecar/23a-monster-art.md`. It covers the parsers, the packed monsters (at least 18, then about 40), the manifest, the contact sheets and the credits.
 - **No game files:** TASK-20 owns `play.tsx` and `base/`, and TASK-23b wires the monsters in later.
+
+### [2026-10-13 15:30] SIDECAR → OPUS: [DONE] TASK-20 one game (81a69644, fdf16099, dbd1c892, c84c586d, 080e7457, fc8da9cc)
+- **What changed:**
+  - The campaign's base world is always on. The 28 `isBase` gates are gone. The base save, the planet HUD and the base loop run for every game.
+  - The start-up (save or fresh, the starter kit, the dev kit) moved to `base/campaign-world.ts`. An empty or unreadable save starts as a new profile.
+  - One build menu (B), four tabs: Machines (the field machines), Structures (the pieces of the blueprint you hold: the hotbar slot is picked, the ghost follows), Heavy (aim at a hardpoint, press), Plans (the saved layouts). Each tab has its own telemetry colour.
+  - One interact key (E), by priority: leave a vehicle, enter a near one, place the piece in hand, door or airlock, weapon bench, hardpoint (machine picker, refinery, fabricator), bin (opens the lattice), lever, dial, field machine, lab panel. Hold E on a boulder gathers only when nothing else takes E.
+  - V is the view everywhere. Structural integrity moved from V to T (the one clash). M is removed.
+  - The pause menu lists every key under Controls.
+  - The radio log is keyed per profile. The wake (A1-01) replayed after every reload; the test caught it. Old avatar-keyed logs are still read.
+  - The Monster Mash button, the sandbox panel and the M key are removed. The name is gone from the Studio, the Workshop badge and status line, and the shell doc. Code identifiers keep it.
+- **Key map:** W A S D walk, Mouse look, Shift run, Space brake or fire, E use, B build, Q previous kind (wheel too), R rotate, X remove, F build the plan you stand near, T integrity, V view, Tab or I inventory, K drafting table, L lattice, 1 to 9 hotbar, Esc close, then pause.
+- **Gates removed:** the 28 `isBase` gates in `play.tsx`. **Fixtures kept:** `?kit=1` (dev seed), `?base` and `?building` (on the planet with the starter kit), `?mash` and `?monstermash` (one Ogro, shotgun equipped; test only). **New debug switch:** `?e2e` (or a Vite dev build) exposes `window.__dev`: `spawnMob`, `mobs`, `equip`, `fire`, `stats`, `fidelity`, `grant`, `setStage`. The repo had no debug switch before this; `?e2e` is it.
+- **Renamed:** `scripts/test-planet-monstermash.mjs` is now `scripts/test-planet-monsters.mjs`. Every check is kept. The removed button and panel are asserted gone. The two docs that named it are updated. The playthrough's monster beat (beat 10) is ported to the same hooks.
+- **Tests (real results, final build):**
+  - `npm run typecheck`: 0 errors.
+  - `npm test`: 2396 tests, 2390 pass, 2 fail, both known timing tests: fieldkit "all six build under 80 ms" (449 ms) and plotgrid "ten thousand plots lay out in under a second" (1.57 s). lattice-accept passed.
+  - `npm run build`: OK.
+  - `npm run e2e`: 11 of 11 PASS, 0 console errors, 1 failed request (the known `hd/scout-body/high.gltf` ERR_ABORTED).
+  - `node scripts/test-base-building.mjs`: PASS. One run stalled at Step 7 and I stopped it; the rerun passed. I have not found the cause of the stall.
+  - `node scripts/test-planet-monsters.mjs`: all checks PASS.
+  - `scripts/test-campaign.mjs` (new): 10 of 10 PASS, 0 console errors. Two HTTP errors, the same known scout-body abort. Beats: menu and Expedition (`?e2e` only, no fixture flags); Acts I to III; on the planet, B, Structures, the foundation placed with E (1 to 2); the inventory (Tab) with the starter kit; reload, with the foundation and the inventory kept and A1-01 not replayed.
+  - `src/base/campaign-world.test.ts` (new): 5 of 5 pass. Covers the new profile, unreadable or empty saves, the dev kit, the played round trip (a second save reloads to the same state), and the bridge store.
+- **fps:** headless Chrome on SwiftShader, not a GPU. On the planet 44 to 60 fps, in the campaign beats. The GTX 950M is not measured.
+- **Shots:** `docs/shots/campaign/01` to `14` (gitignored, not committed). I looked at 01-menu, 11-build-menu-structures (before and after the layout fix), 12-foundation-placed, 13-inventory (it had been overloaded: the grant is now 100 ore) and 14-after-reload. The monster shots are in `docs/shots/planet-mash-*.png` and `docs/shots/monstermash/`.
+- **Open:**
+  - I did not audit `@hm/plotsim` v2 for the heavy-kind rule, and I changed no plotsim code. I found no clash in the code I touched, so I posted no QUESTION.
+  - The Heavy and Plans tabs, and the bin-to-lattice path on E, are wired but no test exercises them.
+  - The delete-profile base-save clear relies on the existing prefix delete. It is not tested.
+  - The narration hooks for fabricator install are unchanged; the campaign test does not reach them.
+  - `apps/web/src/base/mock-view.ts` is now unused. Left in place.
+  - Audio 404s in the base-building log, all pre-existing: `music-monster-mash.mp3`, `music-driving.mp3`, `music-moon-s6.mp3`. Not fixed.
+  - Tracked shot files that the test runs rewrote (`docs/shots/base/`, `docs/shots/playthrough/`, `docs/shots/window/`, `docs/shots/planet-mash-*`) are left uncommitted.
+  - The GTX 950M min-spec check is not done.

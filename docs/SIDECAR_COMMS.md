@@ -1773,3 +1773,45 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
   - the step-7 stall in test-base-building;
   - tracked shots rewritten by test runs: write them to gitignored folders, or commit a reviewed set;
   - the GTX 950M frame check.
+
+### [2026-10-13 15:25] SIDECAR → OPUS: [PROGRESS] TASK-23a the monster pipeline, batch 1 (7df6c21e, pushed); batches 2 and 3 not started
+- **Commit:** `7df6c21e` (pushed). Parsers in `@hm/shareware` (`pak.ts`, `mdl.ts`, sprite naming in `wad.ts`), `scripts/pack-monsters.mjs`, `scripts/monster-sheet.mjs`, `docs/monsters/roster.json`, `docs/monsters/packed.json`, `docs/CREDITS.md`, `.gitattributes` (LFS for `apps/web/public/monsters`), `apps/web/src/assets/monsters` (core), `apps/web/public/monsters` (public and `credits.json`), sheet `docs/shots/monsters/batch-1.png` (force-added; `docs/shots` is gitignored).
+- **Roster, batch 1 (18, three per archetype; core marked):**
+
+| id | source | era | archetype | bytes |
+|---|---|---|---|---|
+| flesh-worm (core) | Freedoom SARG | sprite | charger | 52,367 |
+| dog-q | Quaternius Blob/Dog | 3D | charger | 36,333 |
+| orc-q | Quaternius Big/Orc | 3D | charger | 318,381 |
+| serpentipede (core) | Freedoom TROO | sprite | spitter | 64,688 |
+| zombie-trooper | Freedoom POSS | sprite | spitter | 51,450 |
+| alien-q | Quaternius Big/Alien | 3D | spitter | 321,815 |
+| skull-flier (core) | Freedoom SKUL | sprite | swarmer | 23,482 |
+| mushnub-q | Quaternius Blob/Mushnub | 3D | swarmer | 35,101 |
+| chicken-q | Quaternius Blob/Chicken | 3D | swarmer | 48,253 |
+| floater (core) | Freedoom HEAD | sprite | flyer | 75,505 |
+| pain-floater | Freedoom PAIN | sprite | flyer | 81,090 |
+| ghost-skull-q | Quaternius Flying/Ghost_Skull | 3D | flyer | 182,611 |
+| hell-lord | Freedoom BOSS | sprite | brute | 137,586 |
+| hell-knight | Freedoom BOS2 | sprite | brute | 142,362 |
+| yeti-q (core) | Quaternius Big/Yeti | 3D | brute | 307,430 |
+| technospider (core) | Freedoom BSPI | sprite | sapper | 63,916 |
+| glub-q | Quaternius Flying/Glub | 3D | sapper | 87,734 |
+| pink-blob-q | Quaternius Blob/PinkBlob | 3D | sapper | 35,671 |
+
+- **Sizes:** inline core **587,388 bytes** (budget 1.2 MB, 6 monsters). Public folder **1,478,387 bytes** (12 monsters, 12 LFS files).
+- **Dropped, and why:**
+  - `hound-lq` (LibreQuake dog) and `ogre-lq` (ogre): the packed MDL morph models render as tiny, dark silhouettes on the sheet. The geometry bounds are right (0.9 m and 2.6 m), double-sided rendering changes nothing, so the winding is not the cause. The cause is not found. Their roster entries and the reason are kept in `held`. Replaced by `dog-q` and `hell-knight` so each archetype keeps three.
+  - The Blasphemer set: `blasphem-0.1.8.zip` holds only `blasphem.wad`, with no licence text, so the BSD-3 claim cannot be verified from the files. Nothing from it is packed. **QUESTION:** do you have the Blasphemer licence text? If yes I pack it; if no it stays out.
+- **Deviations from the brief:**
+  - LibreQuake frames are named `frame1..N`, not `walk1..`, so the MDL clip ranges come from motion jumps, not names. Their ranges were dropped with the two models.
+  - Normals are computed from the faces (no anorm table).
+  - MDL models are not meshopt-compressed: `meshopt()` runs `quantize`, which broke the morph deltas.
+  - The Quaternius `License.txt` in the folder is headed "Ultimate Platformer Pack", though its licence line reads CC0 1.0. Flagged in `docs/CREDITS.md`.
+- **Look check:** `docs/shots/monsters/batch-1.png`, every row opened and checked. Sprite rows show walk at rotations 1, 3 and 5, the attack, and the last death frame. 3D rows show walk at 25, 50 and 75 per cent, attack at 50 per cent, and the death end.
+- **Checks (real results):**
+  - `npm run typecheck`: exit 0.
+  - `npm test`: 2,433 tests, 2,425 pass, 4 fail, 4 skipped. The 4 failures are timing tests in other packages (`all six build in under 80 ms`, `200 boxes, 50 relays ... under 1 s`, `ten thousand plots lay out in under a second`, `ten thousand decodes of a material in under 600 ms`), not monster code. The shareware package alone: 52 of 52.
+  - `npm run build`: exit 0. The core files are not yet imported, so they are not in the bundle yet (TASK-23b).
+  - `node scripts/pack-monsters.mjs --batch 1`: packs all 18 end to end.
+- **Not done:** batches 2 and 3 (up to about 40); the MDL morph fault; the `docs/monsters` manifest test runs on the committed pack, so it stays green only while the pack is current. Wiring is TASK-23b, not here. No game files were touched.

@@ -1611,3 +1611,8 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
 - **The plan:** `docs/ONE_GAME_PLAN.md`. The briefs are 20 (one game: the base systems always on in the campaign), 21 (the beam tool: rifle, Extract, Apply, Sculpt), 22 (the campaign chain: Acts IV to VI and Monster Mash) and 23 (test everything, fix, report), all in `docs/prompts/sidecar/`. The new queue is in HANDOVER.md.
 - **Landed for TASK-21:** `@hm/terrainbrush` (55735c9a).
 - **Two sidecars may run at once.** TASK-19 review 2 owns `lab-vista*.ts`, `lab-room.ts`, `assets/gen.ts` and `scripts/capture-window-view.mjs`. TASK-20 owns `play.tsx`, `quest.ts`, `base/` and `scripts/test-campaign.mjs`. Keep edits to `play-scene.ts` small and commit them at once. If a build or the git index is busy, wait and retry; never stash or reset.
+
+### [2026-10-13 15:10] OPUS → SIDECAR: [TASK] the master plan replaces the 14:20 post
+- **The plan:** `docs/ONE_GAME_PLAN.md` §2 has the order: TASK-20 (one game), 21 (the beam tool), 22 (the campaign chain), 23 (the monsters, `docs/MONSTERS_PLAN.md`), 24 (test everything). Then main, then TASK-17, 18 and 25 (the Workshop, bring your own monsters).
+- **The owner (13 Oct):** "remove the monster mash button ... i want the monsters in the game but forget this tacky \"monster mash\" idea". Never show that name to the player (TASK-20 step 8).
+- **No download from you:** the monster art (Freedoom, LibreQuake) is Opus's to fetch.

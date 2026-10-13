@@ -1,12 +1,12 @@
 # TASK-20: one game (the base systems always on in the campaign)
 
-Read `docs/ONE_GAME_PLAN.md` first. Today the building, inventory, refinery, fabricator, vehicles, weapon bench, heavy machines and Monster Mash run only behind URL flags (`isBase` in `apps/web/src/play/play.tsx`, 28 gates). A normal game never reaches them. Make them part of the campaign.
+Read `docs/ONE_GAME_PLAN.md` first. Today the building, inventory, refinery, fabricator, vehicles, weapon bench, heavy machines and the monsters run only behind URL flags (`isBase` in `apps/web/src/play/play.tsx`, 28 gates). A normal game never reaches them. Make them part of the campaign.
 
 ## Build
 1. **One flag.**
    - In the campaign the base world is always on: replace the `isBase` gates.
-   - The URL flags only add test fixtures: `?kit=1` (the dev seed), `?mash`/`?monstermash` (spawn mobs at once), `?base`/`?building` (start on the planet with the starter kit). Keep each fixture working for `scripts/test-base-building.mjs`, `test-planet-monstermash.mjs` and `test-playthrough.mjs`.
-   - Monster Mash mobs do NOT spawn in the campaign yet; TASK-22 gates them.
+   - The URL flags only add test fixtures: `?kit=1` (the dev seed), `?mash`/`?monstermash` (spawn mobs at once; a test fixture only, never shown to the player), `?base`/`?building` (start on the planet with the starter kit). Keep each fixture working for `scripts/test-base-building.mjs`, `test-planet-monstermash.mjs` and `test-playthrough.mjs`.
+   - The monsters do NOT spawn in the campaign yet; TASK-22 gates them.
 2. **One save per profile.**
    - The base world (`base/save.ts`, `BASE_SAVE_KEY`) saves with the profile, like the play state.
    - An old profile with no base save starts from `createWorld()`, with the bridge store at the gate.
@@ -28,6 +28,12 @@ Read `docs/ONE_GAME_PLAN.md` first. Today the building, inventory, refinery, fab
    - Every other key keeps one meaning. List the keys in the Esc menu under Controls.
    - Fix any clash between the campaign's keys (B, Q, R, V, X, M, F) and the base's.
 7. **Narration hooks:** the existing triggers (`fab:installed` and the like) fire in the campaign too.
+8. **No more "Monster Mash" (owner, 2026-10-13):** "remove the monster mash button ... i want the monsters in the game but forget this tacky "monster mash" idea".
+   - Remove the in-game `.play-mash-btn` button, the `.play-mash-panel` sandbox and the M shortcut.
+   - Keep the sandbox actions as debug hooks: `__dev.spawnMob('ogro' | 'demon')`, `__dev.equip('shotgun')`.
+   - Port `scripts/test-planet-monstermash.mjs` to those hooks with EVERY check kept, renamed `scripts/test-planet-monsters.mjs` (update any npm script or doc that names it).
+   - Remove the name from all player-facing text: the Workshop screen's "Monster Mash Jam Spike" badge and status line, the Studio's "Daemon Containment (Monster Mash)" and any HUD label.
+   - In the game they are just the monsters: entities leaked from old games. Code identifiers can keep their names for now.
 
 ## Tests
 - **Unit:** the save round trip of the joined state, and migration from an old profile.

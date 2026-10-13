@@ -1,11 +1,11 @@
-# TASK-23: test everything, fix, report (before main)
+# TASK-24: test everything, fix, report (before main)
 
-After TASK-22. The owner wants "lots of testing to make sure its in", then main, to test on a faster machine.
+After TASK-23 (the monsters). The owner wants "lots of testing to make sure its in", then main, to test on a faster machine.
 
 ## Do
 1. **Run everything from clean:**
    - `npm run typecheck`, `npm test`, `npm run build`;
-   - `npm run e2e`, `node scripts/test-base-building.mjs`, `test-planet-monstermash.mjs`, `test-mentor-narration.mjs`, `test-music-sfx.mjs`, `test-fidelity-sync-studio.mjs`;
+   - `npm run e2e`, `node scripts/test-base-building.mjs`, `test-planet-monsters.mjs`, `test-mentor-narration.mjs`, `test-music-sfx.mjs`, `test-fidelity-sync-studio.mjs`;
    - `node scripts/test-campaign.mjs` (the whole chain).
 
    Then run the campaign test 3 times in a row: it must pass every time (no flakes).

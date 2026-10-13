@@ -110,3 +110,9 @@ The context a new Opus session needs on its first message. Keep it current: upda
 - **Batch 2 running (2026-10-13):** option c for all 40 subjects, plus redos of 6 failures. The log is zips/runworld/overnight2.log, ending in 'BATCH2 DONE'. Review a/b/c as a set.
 - **2026-10-13, back on the first session (979660db):** the "FAILED ... low-raw.glb" lines were a race, not a bad bake. The overnight loop and `runworld-watch.mjs` posted the same id at once, and one deleted the other's temporary file. All the listed failures have their low, mid and high, except **server-crate-a** (no image or model yet). `runworld-post.mjs` now takes a per-asset `.posting` lock: a second run waits, then skips (or posts, if the first failed). That session's last compact summary is saved in `docs/sessions/compact-979660db.md`.
 - 2026-10-13 13:15: **TASK-19 review 2 posted** on the board (V1 to V7: the Breach as hero, clear pockets that cast their fidelity on the ground, rubble-slab, 2× motes, the R8 shot, shots without overlays, frame time on the real GPU) and **dispatched to a Haiku sidecar**. Batch 2 was still running (28 posted at 13:00).
+- **2026-10-13 afternoon, the master plan** (`docs/ONE_GAME_PLAN.md`; the owner: "first plan everything ... then do the plan"):
+  - TASK-20 to 24: one game with every system hooked up, the beam tool, the campaign chain, the monsters, test everything. Then main, then the Studio (TASK-17, 18, 25).
+  - Landed: `@hm/terrainbrush` (55735c9a).
+  - The Arena brief `docs/prompts/battle/leaksim.txt` (the monster brain) is ready, its tests typechecked.
+  - The research: `docs/MONSTERS_PLAN.md` and `docs/DLSS5_NEURAL_BAKE_RESEARCH.md`.
+  - The owner's calls are open: plan §4.

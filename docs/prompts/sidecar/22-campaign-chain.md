@@ -1,4 +1,4 @@
-# TASK-22: the campaign chain (Acts IV to VI, Monster Mash, the stage milestones)
+# TASK-22: the campaign chain (Acts IV to VI, the monsters, the stage milestones)
 
 After TASK-21. The quest (`apps/web/src/play/quest.ts`) stops at 'drill'/'done'. Continue it, in the order of the owner-approved narration (`docs/NARRATION_SCRIPT.md`). Build it on `@hm/questline` (landed, unused), with the quests as data: counts, conditions and unlocks. The game bumps counters on events (`placed:foundation`, `printed:scout`, `kill`, ...).
 
@@ -22,7 +22,7 @@ After TASK-21. The quest (`apps/web/src/play/quest.ts`) stops at 'drill'/'done'.
   3. **F-03** Build the weapon bench and make your first gun; equip it to the sidearm slot; swap one part.
   4. **F-04** The hauler unlocks at stage 4.
   5. **F-05** The crawler unlocks at stage 6.
-- **Monster Mash:** after F-03 (once you can fight).
+- **The monsters:** after F-03 (once you can fight). Entities leaked from old games. The owner dropped the "Monster Mash" name and mode (2026-10-13), so never show that name.
   - Mobs (`@hm/shareware`, `monster-mash-combat.ts`) spawn on the planet: never within 30 m of the gate pad or inside a sealed base; more with each stage.
   - M-01 plays at the first sighting, M-02 at the first kill, and M-03 is the low-health bark.
   - Death: respawn at the gate with the inventory kept and the save intact.

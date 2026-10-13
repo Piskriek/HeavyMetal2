@@ -44,7 +44,6 @@ import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { kv } from '../storage/profile-storage';
 import { BASE_SAVE_KEY, loadWorld, saveWorld } from '../base/save';
 import { BaseHud } from '../base/ui/base-hud';
-import { mockBaseViewSource } from '../base/mock-view';
 import { createWorldViewSource, WorldViewSource, formatRefusalToast } from '../base/world-view';
 import {
   createWorld, apply, pieceAt, pieceAtIn, preview, withBridgeStore, BRIDGE_RANGE, BRIDGE_STORE,
@@ -219,12 +218,11 @@ export function PlayScreen(props: {
   const placeRef = useRef<((kind: MachineKind, x: number, z: number, yaw: number) => boolean) | null>(null);
   const [toast, setToast] = useState<{ readonly text: string; readonly sub: string; readonly id: number } | null>(null);
   const isMashTest = typeof location !== 'undefined' && (new URLSearchParams(location.search).has('mash') || new URLSearchParams(location.search).has('monstermash'));
-  const isBase = typeof location !== 'undefined' && (new URLSearchParams(location.search).has('base') || new URLSearchParams(location.search).has('building') || new URLSearchParams(location.search).has('mash') || new URLSearchParams(location.search).has('monstermash'));
   const isDevSeed = typeof location !== 'undefined' && new URLSearchParams(location.search).get('kit') === '1';
   const creating = state.step === 'create' && !isMashTest;
 
   useEffect(() => {
-    if (isBase && isDevSeed && plotRef.current.machines.length === 0) {
+    if (isDevSeed && plotRef.current.machines.length === 0) {
       plotRef.current = {
         ...plotRef.current,
         ore: Math.max(plotRef.current.ore, 600),
@@ -243,7 +241,7 @@ export function PlayScreen(props: {
         nextId: 2,
       };
     }
-  }, [isBase, isDevSeed]);
+  }, [isDevSeed]);
 
   const commit = useCallback((next: PlayState) => { stateRef.current = next; setState(next); save(next); }, []);
   const say = useCallback((text: string, sub = '') => setToast({ text, sub, id: Date.now() }), []);
@@ -332,7 +330,7 @@ export function PlayScreen(props: {
     }
   };
 
-  const baseWorldRef = useRef<BaseWorld>(isBase ? initBaseWorld() : createWorld());
+  const baseWorldRef = useRef<BaseWorld>(initBaseWorld());
   const pieceManagerRef = useRef<PieceMeshManager>(new PieceMeshManager());
   const buildKindRef = useRef<Kind | null>(null);
   const buildRotationRef = useRef<number>(0);
@@ -361,14 +359,13 @@ export function PlayScreen(props: {
   const [renderCalls, setRenderCalls] = useState(0);
 
   useEffect(() => {
-    if (!isBase) return undefined;
     const interval = window.setInterval(() => {
       if (sceneRef.current) {
         setRenderCalls(sceneRef.current.debug.stats().calls);
       }
     }, 150);
     return () => window.clearInterval(interval);
-  }, [isBase]);
+  }, []);
 
   // Throttled persistence
   const lastSavedTickRef = useRef(-1);
@@ -394,7 +391,6 @@ export function PlayScreen(props: {
   }, []);
 
   const persistBaseWorld = useCallback((force = false) => {
-    if (!isBase) return;
     const world = baseWorldRef.current;
     const now = performance.now();
     if (!force && (world.tick === lastSavedTickRef.current || now - lastSaveTimeRef.current < 2000)) {
@@ -407,7 +403,7 @@ export function PlayScreen(props: {
     } catch (e) {
       console.warn('[persistBaseWorld error]', e);
     }
-  }, [isBase]);
+  }, []);
 
   const lastPreviewRef = useRef<{
     prev: { snap: S.Snap | null; cost: readonly L.Stack[]; short: readonly L.Stack[] };
@@ -451,7 +447,6 @@ export function PlayScreen(props: {
 
   // Save on pagehide and visibilitychange
   useEffect(() => {
-    if (!isBase) return;
     const handleHide = () => {
       persistBaseWorld(true);
     };
@@ -467,7 +462,7 @@ export function PlayScreen(props: {
       document.removeEventListener('visibilitychange', handleVisibility);
       persistBaseWorld(true);
     };
-  }, [isBase, persistBaseWorld]);
+  }, [persistBaseWorld]);
 
   const dropStarterShelter = useCallback((scene: PlayScene) => {
     if (shelterAttemptedRef.current || baseWorldRef.current.shelter) return;
@@ -509,7 +504,6 @@ export function PlayScreen(props: {
   }, [getBaseEnv, persistBaseWorld, say]);
 
   const baseViewSource = useMemo(() => {
-    if (!isBase) return mockBaseViewSource;
     const src = createWorldViewSource({
       getWorld: () => baseWorldRef.current,
       env: () => getBaseEnv(),
@@ -524,7 +518,7 @@ export function PlayScreen(props: {
     });
     baseViewSourceRef.current = src;
     return src;
-  }, [isBase, getBaseEnv]);
+  }, [getBaseEnv]);
 
   const dispatchBase = useCallback((cmd: BaseCommand) => {
     const scene = sceneRef.current;
@@ -849,9 +843,8 @@ export function PlayScreen(props: {
       }],
       ['Loading audio & sound effects', async () => {
         await gameAudio.preloadStartupAudio();
-        if (stateRef.current.visited || isMashTest || isBase) {
-          await gameAudio.preloadMoonAudio();
-        }
+        // the base world is part of the campaign now (one game): the moon's audio always loads behind the bar
+        await gameAudio.preloadMoonAudio();
       }],
       ['Loading generated assets', async () => {
         const s = stateRef.current.plot.stage || 1;
@@ -869,7 +862,7 @@ export function PlayScreen(props: {
         env = { gate: scene.debug.gatePlanet(), plotRadius: 500, richness: (x, z) => scene.richness(x, z), affinity: (id, metric) => cartlabAffinityOf(labRef.current, id, metric) };
         envRef.current = env;
         plotRef.current = stateRef.current.plot;
-        if (isBase && isDevSeed && plotRef.current.machines.length === 0) {
+        if (isDevSeed && plotRef.current.machines.length === 0) {
           const powerUnit: Machine = {
             id: 1,
             kind: 'power',
@@ -889,44 +882,42 @@ export function PlayScreen(props: {
           commit(withPlot(stateRef.current, plotRef.current));
         }
         scene.restore({ gateOn: stateRef.current.gateOn, plot: plotRef.current, running: running(plotRef.current, env), connected: network(plotRef.current, env).connected });
-        if (isBase) {
-          const gate = scene.debug.gatePlanet();
-          const bEnv = { heightAt: (x: number, z: number) => scene.heightAt(x, z), bridge: { x: gate.x, z: gate.z, range: BRIDGE_RANGE } };
-          if (!baseWorldRef.current.boxes.some((b) => b.id === BRIDGE_STORE)) {
-            baseWorldRef.current = withBridgeStore(baseWorldRef.current, bEnv);
-          }
-          if (!hasSaveOnBootRef.current && !baseWorldRef.current.shelter && scene.debug.where() === 'planet') {
-            dropStarterShelter(scene);
-          }
-          scene.setPieces(pieceManagerRef.current.getMeshes());
-          scene.setBase(baseWorldRef.current.base);
-          scene.setNodes(baseWorldRef.current.field);
-          pieceManagerRef.current.sync(baseWorldRef.current, bEnv, false);
-          scene.setWalkWorld(pieceManagerRef.current.walkWorld);
-          scene.setVehicles(baseWorldRef.current.vehicles);
-          const initFabs = baseWorldRef.current.machines.filter((m) => m.kind === 'fabricator').map((m) => {
-            const hp = baseWorldRef.current.base.pieces.find((p) => p.id === m.id);
-            const pt = hp ? pieceAt(baseWorldRef.current.base, hp) : null;
-            return {
-              id: m.id,
-              x: pt?.x ?? 0,
-              z: pt?.z ?? 0,
-              yaw: 0,
-              printing: m.jobs.length > 0,
-            };
-          });
-          scene.setFabricators(initFabs);
-          scene.mash.setWeaponStats(weaponStats(baseWorldRef.current.loadout));
-          for (const m of baseWorldRef.current.machines) {
-            const piece = baseWorldRef.current.base.pieces.find((p) => p.id === m.id);
-            if (piece) {
-              const center = pieceAt(baseWorldRef.current.base, piece);
-              if (center) {
-                const match = plotRef.current.machines.find(
-                  (pm) => pm.kind === ('heavy-' + m.kind) && Math.hypot(pm.x - center.x, pm.z - center.z) < 2
-                );
-                if (match) hardpointToPlotMachineRef.current.set(m.id, match.id);
-              }
+        const gate = scene.debug.gatePlanet();
+        const bEnv = { heightAt: (x: number, z: number) => scene.heightAt(x, z), bridge: { x: gate.x, z: gate.z, range: BRIDGE_RANGE } };
+        if (!baseWorldRef.current.boxes.some((b) => b.id === BRIDGE_STORE)) {
+          baseWorldRef.current = withBridgeStore(baseWorldRef.current, bEnv);
+        }
+        if (!hasSaveOnBootRef.current && !baseWorldRef.current.shelter && scene.debug.where() === 'planet') {
+          dropStarterShelter(scene);
+        }
+        scene.setPieces(pieceManagerRef.current.getMeshes());
+        scene.setBase(baseWorldRef.current.base);
+        scene.setNodes(baseWorldRef.current.field);
+        pieceManagerRef.current.sync(baseWorldRef.current, bEnv, false);
+        scene.setWalkWorld(pieceManagerRef.current.walkWorld);
+        scene.setVehicles(baseWorldRef.current.vehicles);
+        const initFabs = baseWorldRef.current.machines.filter((m) => m.kind === 'fabricator').map((m) => {
+          const hp = baseWorldRef.current.base.pieces.find((p) => p.id === m.id);
+          const pt = hp ? pieceAt(baseWorldRef.current.base, hp) : null;
+          return {
+            id: m.id,
+            x: pt?.x ?? 0,
+            z: pt?.z ?? 0,
+            yaw: 0,
+            printing: m.jobs.length > 0,
+          };
+        });
+        scene.setFabricators(initFabs);
+        scene.mash.setWeaponStats(weaponStats(baseWorldRef.current.loadout));
+        for (const m of baseWorldRef.current.machines) {
+          const piece = baseWorldRef.current.base.pieces.find((p) => p.id === m.id);
+          if (piece) {
+            const center = pieceAt(baseWorldRef.current.base, piece);
+            if (center) {
+              const match = plotRef.current.machines.find(
+                (pm) => pm.kind === ('heavy-' + m.kind) && Math.hypot(pm.x - center.x, pm.z - center.z) < 2
+              );
+              if (match) hardpointToPlotMachineRef.current.set(m.id, match.id);
             }
           }
         }
@@ -986,7 +977,7 @@ export function PlayScreen(props: {
         if (scene.mash.isEquipped()) {
           scene.mash.setTrigger(true);
           fireWeapon();
-        } else if (isBase) {
+        } else {
           if (placingLayoutId !== null) {
             const hit = scene.aimPoint();
             if (hit) {
@@ -1025,145 +1016,142 @@ export function PlayScreen(props: {
       const frameMs = ms - last;
       const dt = Math.min(0.1, frameMs / 1000);
       last = ms;
-      if (isBase) {
-        pieceManagerRef.current.update(dt);
-        const w = baseWorldRef.current;
-        const playerPos = scene.debug.position();
+      pieceManagerRef.current.update(dt);
+      const w = baseWorldRef.current;
+      const playerPos = scene.debug.position();
 
-        // 1. Tick accumulator for 100ms ticks (node regrowth, beam extraction, machine refinement)
-        harvestAccRef.current += dt;
-        const aimedNode = scene.aimNode(w.field, BEAM_RANGE);
-        const hasBeam = w.equipment.beam?.item === 'tool-beam';
-        const targetNode = forceBeamRef.current !== null
-          ? (w.field.nodes.find((n) => n.id === forceBeamRef.current) ?? aimedNode)
-          : aimedNode;
-        const isMining = (isLmbDownRef.current || forceBeamRef.current !== null) && hasBeam && targetNode !== null && !scene.mash.isEquipped();
+      // 1. Tick accumulator for 100ms ticks (node regrowth, beam extraction, machine refinement)
+      harvestAccRef.current += dt;
+      const aimedNode = scene.aimNode(w.field, BEAM_RANGE);
+      const hasBeam = w.equipment.beam?.item === 'tool-beam';
+      const targetNode = forceBeamRef.current !== null
+        ? (w.field.nodes.find((n) => n.id === forceBeamRef.current) ?? aimedNode)
+        : aimedNode;
+      const isMining = (isLmbDownRef.current || forceBeamRef.current !== null) && hasBeam && targetNode !== null && !scene.mash.isEquipped();
 
-        if (harvestAccRef.current >= 0.1) {
-          const powerMap: Record<number, number> = {};
-          if (envRef.current) {
-            const runMap = running(plotRef.current, envRef.current);
-            for (const m of w.machines) {
-              const pId = hardpointToPlotMachineRef.current.get(m.id);
-              if (pId !== undefined) {
-                powerMap[m.id] = runMap.get(pId) ?? 0;
-              }
+      if (harvestAccRef.current >= 0.1) {
+        const powerMap: Record<number, number> = {};
+        if (envRef.current) {
+          const runMap = running(plotRef.current, envRef.current);
+          for (const m of w.machines) {
+            const pId = hardpointToPlotMachineRef.current.get(m.id);
+            if (pId !== undefined) {
+              powerMap[m.id] = runMap.get(pId) ?? 0;
             }
           }
-          while (harvestAccRef.current >= 0.1) {
-            harvestAccRef.current -= 0.1;
-            dispatchBaseRef.current({
-              t: 'tick',
-              at: { x: playerPos.x, z: playerPos.z },
-              dt: 0.1,
-              beam: isMining && targetNode ? { node: targetNode.id, power: 1 } : null,
-              power: powerMap,
+        }
+        while (harvestAccRef.current >= 0.1) {
+          harvestAccRef.current -= 0.1;
+          dispatchBaseRef.current({
+            t: 'tick',
+            at: { x: playerPos.x, z: playerPos.z },
+            dt: 0.1,
+            beam: isMining && targetNode ? { node: targetNode.id, power: 1 } : null,
+            power: powerMap,
+          });
+        }
+      }
+
+      // 2. Beam VFX update
+      if (isMining && targetNode) {
+        const muzzle = scene.beamMuzzle();
+        const target = { x: targetNode.x, y: scene.heightAt(targetNode.x, targetNode.z) + 0.35, z: targetNode.z };
+        const col = targetNode.kind === 'dither' ? '#d9d9d9' : targetNode.kind === 'fold' ? '#7dd3fc' : targetNode.kind === 'chroma' ? '#ff4fd8' : '#22d3ee';
+        scene.setBeam(muzzle, target, 'extract', col, true);
+      } else {
+        scene.setBeam(null, null, 'extract', '#ffffff', false);
+      }
+
+      // 3. Throttled preview for build ghost
+      const slot = w.player.slots[w.hotbar];
+      const activeBp = slot && slot.n > 0 ? blueprint(slot.item) : null;
+      if (activeBp && drivingSpeed === null) {
+        const curKind = (buildKindRef.current && activeBp.kinds.includes(buildKindRef.current)
+          ? buildKindRef.current
+          : activeBp.kinds[0]!) as Kind;
+        if (ghostKindRef.current !== curKind) {
+          scene.setPieceGhost(globalKitPieceCache.instantiate(curKind, w.stage, 0).group);
+          ghostKindRef.current = curKind;
+        }
+        const aim = scene.aimPoint();
+        if (aim) {
+          const bEnv = getBaseEnv();
+          const shouldRecompute =
+            !lastPreviewRef.current ||
+            w.tick !== lastPreviewTickRef.current ||
+            activeBp.id !== lastPreviewBpRef.current ||
+            curKind !== lastPreviewKindRef.current ||
+            !lastPreviewAimRef.current ||
+            Math.hypot(aim.x - lastPreviewAimRef.current.x, aim.z - lastPreviewAimRef.current.z) > 0.25 ||
+            Math.abs(aim.yaw - lastPreviewAimRef.current.yaw) > (5 * Math.PI / 180);
+
+          let prev = lastPreviewRef.current?.prev;
+          if (shouldRecompute || !prev) {
+            prev = preview(w, bEnv, { x: playerPos.x, z: playerPos.z }, activeBp.id, curKind, {
+              x: aim.x,
+              y: aim.y,
+              z: aim.z,
+              yaw: aim.yaw,
             });
-          }
-        }
+            lastPreviewRef.current = { prev, aim, bp: activeBp, kind: curKind };
+            lastPreviewTickRef.current = w.tick;
+            lastPreviewBpRef.current = activeBp.id;
+            lastPreviewKindRef.current = curKind;
+            lastPreviewAimRef.current = { x: aim.x, y: aim.y, z: aim.z, yaw: aim.yaw };
 
-        // 2. Beam VFX update
-        if (isMining && targetNode) {
-          const muzzle = scene.beamMuzzle();
-          const target = { x: targetNode.x, y: scene.heightAt(targetNode.x, targetNode.z) + 0.35, z: targetNode.z };
-          const col = targetNode.kind === 'dither' ? '#d9d9d9' : targetNode.kind === 'fold' ? '#7dd3fc' : targetNode.kind === 'chroma' ? '#ff4fd8' : '#22d3ee';
-          scene.setBeam(muzzle, target, 'extract', col, true);
-        } else {
-          scene.setBeam(null, null, 'extract', '#ffffff', false);
-        }
+            // Socket glow (Item C2): ok slots within 8m of aim, on aimed level and level above, max 48
+            const okSlots: { x: number; y: number; z: number; yaw: number }[] = [];
+            const sEnv = structureEnv(bEnv);
+            const structures = w.base.structures.filter(
+              (st) => Math.hypot(aim.x - st.x, aim.z - st.z) <= 16
+            );
+            for (const structure of structures) {
+              const dx = aim.x - structure.x;
+              const dz = aim.z - structure.z;
+              const cos = Math.cos(structure.yaw);
+              const sin = Math.sin(structure.yaw);
+              const u = dx * cos + dz * sin;
+              const v = -dx * sin + dz * cos;
+              const ci = Math.floor(u / S.CELL);
+              const cj = Math.floor(v / S.CELL);
+              const aimedK = Math.max(0, Math.round((aim.y - structure.y) / S.LEVEL));
 
-        // 3. Throttled preview for build ghost
-        const slot = w.player.slots[w.hotbar];
-        const activeBp = slot && slot.n > 0 ? blueprint(slot.item) : null;
-        if (activeBp && drivingSpeed === null) {
-          const curKind = (buildKindRef.current && activeBp.kinds.includes(buildKindRef.current)
-            ? buildKindRef.current
-            : activeBp.kinds[0]!) as Kind;
-          if (ghostKindRef.current !== curKind) {
-            scene.setPieceGhost(globalKitPieceCache.instantiate(curKind, w.stage, 0).group);
-            ghostKindRef.current = curKind;
-          }
-          const aim = scene.aimPoint();
-          if (aim) {
-            const bEnv = getBaseEnv();
-            const shouldRecompute =
-              !lastPreviewRef.current ||
-              w.tick !== lastPreviewTickRef.current ||
-              activeBp.id !== lastPreviewBpRef.current ||
-              curKind !== lastPreviewKindRef.current ||
-              !lastPreviewAimRef.current ||
-              Math.hypot(aim.x - lastPreviewAimRef.current.x, aim.z - lastPreviewAimRef.current.z) > 0.25 ||
-              Math.abs(aim.yaw - lastPreviewAimRef.current.yaw) > (5 * Math.PI / 180);
+              for (let k = aimedK; k <= aimedK + 1; k++) {
+                for (let i = ci - 2; i <= ci + 2; i++) {
+                  for (let j = cj - 2; j <= cj + 2; j++) {
+                    const candidatePieces: S.Piece[] = [];
+                    if (curKind === 'wall' || curKind === 'airlock') {
+                      candidatePieces.push(
+                        { id: -1, s: structure.id, kind: curKind, i, j, k, r: 0, mat: activeBp.mat },
+                        { id: -1, s: structure.id, kind: curKind, i, j, k, r: 1, mat: activeBp.mat },
+                      );
+                    } else if (curKind === 'pillar' || curKind === 'hardpoint') {
+                      candidatePieces.push({ id: -1, s: structure.id, kind: curKind, i, j, k, r: 0, mat: activeBp.mat });
+                    } else {
+                      const rRot = (curKind === 'ramp' || isFixture(curKind)) ? ((buildRotationRef.current) % 4 as any) : 0;
+                      candidatePieces.push({ id: -1, s: structure.id, kind: curKind, i, j, k, r: rRot, mat: activeBp.mat });
+                    }
 
-            let prev = lastPreviewRef.current?.prev;
-            if (shouldRecompute || !prev) {
-              prev = preview(w, bEnv, { x: playerPos.x, z: playerPos.z }, activeBp.id, curKind, {
-                x: aim.x,
-                y: aim.y,
-                z: aim.z,
-                yaw: aim.yaw,
-              });
-              lastPreviewRef.current = { prev, aim, bp: activeBp, kind: curKind };
-              lastPreviewTickRef.current = w.tick;
-              lastPreviewBpRef.current = activeBp.id;
-              lastPreviewKindRef.current = curKind;
-              lastPreviewAimRef.current = { x: aim.x, y: aim.y, z: aim.z, yaw: aim.yaw };
-
-              // Socket glow (Item C2): ok slots within 8m of aim, on aimed level and level above, max 48
-              const okSlots: { x: number; y: number; z: number; yaw: number }[] = [];
-              const sEnv = structureEnv(bEnv);
-              const structures = w.base.structures.filter(
-                (st) => Math.hypot(aim.x - st.x, aim.z - st.z) <= 16
-              );
-              for (const structure of structures) {
-                const dx = aim.x - structure.x;
-                const dz = aim.z - structure.z;
-                const cos = Math.cos(structure.yaw);
-                const sin = Math.sin(structure.yaw);
-                const u = dx * cos + dz * sin;
-                const v = -dx * sin + dz * cos;
-                const ci = Math.floor(u / S.CELL);
-                const cj = Math.floor(v / S.CELL);
-                const aimedK = Math.max(0, Math.round((aim.y - structure.y) / S.LEVEL));
-
-                for (let k = aimedK; k <= aimedK + 1; k++) {
-                  for (let i = ci - 2; i <= ci + 2; i++) {
-                    for (let j = cj - 2; j <= cj + 2; j++) {
-                      const candidatePieces: S.Piece[] = [];
-                      if (curKind === 'wall' || curKind === 'airlock') {
-                        candidatePieces.push(
-                          { id: -1, s: structure.id, kind: curKind, i, j, k, r: 0, mat: activeBp.mat },
-                          { id: -1, s: structure.id, kind: curKind, i, j, k, r: 1, mat: activeBp.mat },
-                        );
-                      } else if (curKind === 'pillar' || curKind === 'hardpoint') {
-                        candidatePieces.push({ id: -1, s: structure.id, kind: curKind, i, j, k, r: 0, mat: activeBp.mat });
-                      } else {
-                        const rRot = (curKind === 'ramp' || isFixture(curKind)) ? ((buildRotationRef.current) % 4 as any) : 0;
-                        candidatePieces.push({ id: -1, s: structure.id, kind: curKind, i, j, k, r: rRot, mat: activeBp.mat });
-                      }
-
-                      for (const cand of candidatePieces) {
-                        const cWorld = pieceAtIn(structure, cand);
-                        if (Math.hypot(cWorld.x - aim.x, cWorld.z - aim.z) <= 8) {
-                          const verdict = S.check(w.base, sEnv, cand);
-                          if (verdict.ok) {
-                            let exAngle = 0;
-                            if (cand.kind === 'wall' || cand.kind === 'airlock') {
-                              if (cand.r === 1) exAngle = -Math.PI / 2;
-                            } else if (cand.kind === 'ramp' || cand.kind === 'bench' || cand.kind === 'bin' || cand.kind === 'repeater') {
-                              exAngle = -cand.r * (Math.PI / 2);
-                            }
-                            okSlots.push({
-                              x: cWorld.x,
-                              y: cWorld.y,
-                              z: cWorld.z,
-                              yaw: -structure.yaw + exAngle,
-                            });
-                            if (okSlots.length >= 48) break;
+                    for (const cand of candidatePieces) {
+                      const cWorld = pieceAtIn(structure, cand);
+                      if (Math.hypot(cWorld.x - aim.x, cWorld.z - aim.z) <= 8) {
+                        const verdict = S.check(w.base, sEnv, cand);
+                        if (verdict.ok) {
+                          let exAngle = 0;
+                          if (cand.kind === 'wall' || cand.kind === 'airlock') {
+                            if (cand.r === 1) exAngle = -Math.PI / 2;
+                          } else if (cand.kind === 'ramp' || cand.kind === 'bench' || cand.kind === 'bin' || cand.kind === 'repeater') {
+                            exAngle = -cand.r * (Math.PI / 2);
                           }
+                          okSlots.push({
+                            x: cWorld.x,
+                            y: cWorld.y,
+                            z: cWorld.z,
+                            yaw: -structure.yaw + exAngle,
+                          });
+                          if (okSlots.length >= 48) break;
                         }
                       }
-                      if (okSlots.length >= 48) break;
                     }
                     if (okSlots.length >= 48) break;
                   }
@@ -1171,257 +1159,258 @@ export function PlayScreen(props: {
                 }
                 if (okSlots.length >= 48) break;
               }
-              scene.setSocketRings(okSlots);
+              if (okSlots.length >= 48) break;
             }
-            const snap = prev.snap;
-            if (snap) {
-              if (snap.mode === 'place') {
-                const st = w.base.structures.find((s) => s.id === snap.piece.s);
-                const pPos = pieceAt(w.base, { ...snap.piece, id: -1, mat: '' });
-                let extraAngle = 0;
-                if (snap.piece.kind === 'wall' || snap.piece.kind === 'airlock') {
-                  if (snap.piece.r === 1) extraAngle = -Math.PI / 2;
-                } else if (
-                  snap.piece.kind === 'ramp' ||
-                  snap.piece.kind === 'bench' ||
-                  snap.piece.kind === 'bin' ||
-                  snap.piece.kind === 'repeater' ||
-                  snap.piece.kind === 'hardpoint'
-                ) {
-                  const rRot = (snap.piece.r + buildRotationRef.current) % 4;
-                  extraAngle = -rRot * (Math.PI / 2);
-                }
-                const yaw = (st ? -st.yaw : 0) + extraAngle;
-                const pose = pPos ? { x: pPos.x, y: pPos.y, z: pPos.z, yaw } : null;
-                let tint: 'grounded' | 'ok' | 'weak' | 'bad' = 'ok';
-                if (!snap.ok || prev.short.length > 0) tint = 'bad';
-                else if (snap.support >= 0.99) tint = 'grounded';
-                else if (snap.support >= 0.5) tint = 'ok';
-                else tint = 'weak';
-                scene.placePieceGhost(pose, tint);
-              } else if (snap.mode === 'found') {
-                const cosine = Math.cos(snap.yaw);
-                const sine = Math.sin(snap.yaw);
-                const C = 4;
-                const pts = [
-                  { x: snap.cx - (C / 2) * cosine + (C / 2) * sine, z: snap.cz - (C / 2) * sine - (C / 2) * cosine },
-                  { x: snap.cx + (C / 2) * cosine + (C / 2) * sine, z: snap.cz + (C / 2) * sine - (C / 2) * cosine },
-                  { x: snap.cx - (C / 2) * cosine - (C / 2) * sine, z: snap.cz - (C / 2) * sine + (C / 2) * cosine },
-                  { x: snap.cx + (C / 2) * cosine + (C / 2) * sine, z: snap.cz + (C / 2) * sine + (C / 2) * cosine },
-                  { x: snap.cx, z: snap.cz },
-                ];
-                let highest = -Infinity;
-                for (const pt of pts) {
-                  const h = scene.heightAt(pt.x, pt.z);
-                  if (h > highest) highest = h;
-                }
-                const pose = { x: snap.cx, y: highest, z: snap.cz, yaw: -snap.yaw };
-                const tint: 'grounded' | 'ok' | 'weak' | 'bad' = (!snap.ok || prev.short.length > 0) ? 'bad' : 'grounded';
-                scene.placePieceGhost(pose, tint);
+            scene.setSocketRings(okSlots);
+          }
+          const snap = prev.snap;
+          if (snap) {
+            if (snap.mode === 'place') {
+              const st = w.base.structures.find((s) => s.id === snap.piece.s);
+              const pPos = pieceAt(w.base, { ...snap.piece, id: -1, mat: '' });
+              let extraAngle = 0;
+              if (snap.piece.kind === 'wall' || snap.piece.kind === 'airlock') {
+                if (snap.piece.r === 1) extraAngle = -Math.PI / 2;
+              } else if (
+                snap.piece.kind === 'ramp' ||
+                snap.piece.kind === 'bench' ||
+                snap.piece.kind === 'bin' ||
+                snap.piece.kind === 'repeater' ||
+                snap.piece.kind === 'hardpoint'
+              ) {
+                const rRot = (snap.piece.r + buildRotationRef.current) % 4;
+                extraAngle = -rRot * (Math.PI / 2);
               }
-            } else {
-              scene.placePieceGhost(null, 'bad');
+              const yaw = (st ? -st.yaw : 0) + extraAngle;
+              const pose = pPos ? { x: pPos.x, y: pPos.y, z: pPos.z, yaw } : null;
+              let tint: 'grounded' | 'ok' | 'weak' | 'bad' = 'ok';
+              if (!snap.ok || prev.short.length > 0) tint = 'bad';
+              else if (snap.support >= 0.99) tint = 'grounded';
+              else if (snap.support >= 0.5) tint = 'ok';
+              else tint = 'weak';
+              scene.placePieceGhost(pose, tint);
+            } else if (snap.mode === 'found') {
+              const cosine = Math.cos(snap.yaw);
+              const sine = Math.sin(snap.yaw);
+              const C = 4;
+              const pts = [
+                { x: snap.cx - (C / 2) * cosine + (C / 2) * sine, z: snap.cz - (C / 2) * sine - (C / 2) * cosine },
+                { x: snap.cx + (C / 2) * cosine + (C / 2) * sine, z: snap.cz + (C / 2) * sine - (C / 2) * cosine },
+                { x: snap.cx - (C / 2) * cosine - (C / 2) * sine, z: snap.cz - (C / 2) * sine + (C / 2) * cosine },
+                { x: snap.cx + (C / 2) * cosine + (C / 2) * sine, z: snap.cz + (C / 2) * sine + (C / 2) * cosine },
+                { x: snap.cx, z: snap.cz },
+              ];
+              let highest = -Infinity;
+              for (const pt of pts) {
+                const h = scene.heightAt(pt.x, pt.z);
+                if (h > highest) highest = h;
+              }
+              const pose = { x: snap.cx, y: highest, z: snap.cz, yaw: -snap.yaw };
+              const tint: 'grounded' | 'ok' | 'weak' | 'bad' = (!snap.ok || prev.short.length > 0) ? 'bad' : 'grounded';
+              scene.placePieceGhost(pose, tint);
             }
           } else {
             scene.placePieceGhost(null, 'bad');
           }
-
-          if (activeBp && activeBp.kinds.length > 1) {
-            setWheelCycleText(`wheel: ${activeBp.kinds.join(' · ')}`);
-          } else {
-            setWheelCycleText(null);
-          }
-          if (activeBp && (curKind === 'ramp' || isFixture(curKind))) {
-            setRotationText(`R: ${buildRotationRef.current * 90}°`);
-          } else {
-            setRotationText(null);
-          }
         } else {
-          if (ghostKindRef.current !== null) {
-            scene.setPieceGhost(null);
-            ghostKindRef.current = null;
-          }
-          lastPreviewRef.current = null;
-          scene.setSocketRings([]);
+          scene.placePieceGhost(null, 'bad');
+        }
+
+        if (activeBp && activeBp.kinds.length > 1) {
+          setWheelCycleText(`wheel: ${activeBp.kinds.join(' · ')}`);
+        } else {
           setWheelCycleText(null);
+        }
+        if (activeBp && (curKind === 'ramp' || isFixture(curKind))) {
+          setRotationText(`R: ${buildRotationRef.current * 90}°`);
+        } else {
           setRotationText(null);
         }
-
-        // 4. Hover support % check & structure tracking
-        const aimHit = scene.aimPoint();
-        if (aimHit && aimHit.piece !== null) {
-          const placedP = w.base.pieces.find((x) => x.id === aimHit.piece);
-          if (placedP) {
-            currentAimedStructureIdRef.current = placedP.s;
-          }
+      } else {
+        if (ghostKindRef.current !== null) {
+          scene.setPieceGhost(null);
+          ghostKindRef.current = null;
         }
+        lastPreviewRef.current = null;
+        scene.setSocketRings([]);
+        setWheelCycleText(null);
+        setRotationText(null);
+      }
 
-        const isIntegrityOn = (baseViewSource as WorldViewSource).get?.()?.build?.integrity ?? false;
-        const isPlaceableGhostActive = lastPreviewRef.current?.prev?.snap?.ok === true;
-        if (!isPlaceableGhostActive && aimHit && aimHit.piece !== null && (isIntegrityOn || activeBp !== null)) {
-          const placedP = w.base.pieces.find((x) => x.id === aimHit.piece);
-          if (placedP) {
-            const bEnv = getBaseEnv();
-            const supMap = S.supports(w.base, structureEnv(bEnv));
-            const supVal = supMap.get(placedP.id) ?? 0;
-            const colName = integrityColorName(supVal);
-            const hexColor =
-              colName === 'blue'
-                ? '#38bdf8'
-                : colName === 'green'
-                  ? '#22c55e'
-                  : colName === 'yellow'
-                    ? '#eab308'
-                    : colName === 'orange'
-                      ? '#f97316'
-                      : '#ef4444';
-            setHoverSupport({
-              text: `Support ${Math.round(supVal * 100)}% · ${colName}`,
-              color: hexColor,
-            });
-          } else {
-            setHoverSupport(null);
-          }
+      // 4. Hover support % check & structure tracking
+      const aimHit = scene.aimPoint();
+      if (aimHit && aimHit.piece !== null) {
+        const placedP = w.base.pieces.find((x) => x.id === aimHit.piece);
+        if (placedP) {
+          currentAimedStructureIdRef.current = placedP.s;
+        }
+      }
+
+      const isIntegrityOn = (baseViewSource as WorldViewSource).get?.()?.build?.integrity ?? false;
+      const isPlaceableGhostActive = lastPreviewRef.current?.prev?.snap?.ok === true;
+      if (!isPlaceableGhostActive && aimHit && aimHit.piece !== null && (isIntegrityOn || activeBp !== null)) {
+        const placedP = w.base.pieces.find((x) => x.id === aimHit.piece);
+        if (placedP) {
+          const bEnv = getBaseEnv();
+          const supMap = S.supports(w.base, structureEnv(bEnv));
+          const supVal = supMap.get(placedP.id) ?? 0;
+          const colName = integrityColorName(supVal);
+          const hexColor =
+            colName === 'blue'
+              ? '#38bdf8'
+              : colName === 'green'
+                ? '#22c55e'
+                : colName === 'yellow'
+                  ? '#eab308'
+                  : colName === 'orange'
+                    ? '#f97316'
+                    : '#ef4444';
+          setHoverSupport({
+            text: `Support ${Math.round(supVal * 100)}% · ${colName}`,
+            color: hexColor,
+          });
         } else {
           setHoverSupport(null);
         }
+      } else {
+        setHoverSupport(null);
+      }
 
-        // 5. Starter shelter drop check on planet
-        if (!hasSaveOnBootRef.current && !w.shelter && scene.debug.where() === 'planet') {
-          dropStarterShelter(scene);
-        }
+      // 5. Starter shelter drop check on planet
+      if (!hasSaveOnBootRef.current && !w.shelter && scene.debug.where() === 'planet') {
+        dropStarterShelter(scene);
+      }
 
-        // 6. 4 Hz Room pressure & life-support check (D14)
-        const nowSec = performance.now();
-        if (nowSec - lastRoomCheckTimeRef.current >= 250) {
-          lastRoomCheckTimeRef.current = nowSec;
-          if (scene.debug.where() === 'planet') {
-            const bEnv = getBaseEnv();
-            const feetY = playerPos.y - 1.7;
-            const { room, pressurized } = roomAt(w, bEnv, { x: playerPos.x, y: feetY, z: playerPos.z });
-            scene.setSheltered(pressurized);
-            setShelterState(pressurized ? 'pressurized' : (room && room.sealed ? 'sealed-no-power' : 'none'));
-          } else {
-            scene.setSheltered(false);
-            setShelterState('none');
-          }
-        }
-
-        // 7. Plan proximity check within 8m
+      // 6. 4 Hz Room pressure & life-support check (D14)
+      const nowSec = performance.now();
+      if (nowSec - lastRoomCheckTimeRef.current >= 250) {
+        lastRoomCheckTimeRef.current = nowSec;
         if (scene.debug.where() === 'planet') {
-          const nearPlan = w.plans.find(
-            (p) => Math.hypot(p.cx - playerPos.x, p.cz - playerPos.z) <= 8.0
-          );
-          if (nearPlan) {
-            setPlanPrompt(`F: build next (${nearPlan.left.length} left)`);
-            nearestPlanRef.current = nearPlan;
-          } else {
-            setPlanPrompt(null);
-            nearestPlanRef.current = null;
-          }
+          const bEnv = getBaseEnv();
+          const feetY = playerPos.y - 1.7;
+          const { room, pressurized } = roomAt(w, bEnv, { x: playerPos.x, y: feetY, z: playerPos.z });
+          scene.setSheltered(pressurized);
+          setShelterState(pressurized ? 'pressurized' : (room && room.sealed ? 'sealed-no-power' : 'none'));
+        } else {
+          scene.setSheltered(false);
+          setShelterState('none');
+        }
+      }
+
+      // 7. Plan proximity check within 8m
+      if (scene.debug.where() === 'planet') {
+        const nearPlan = w.plans.find(
+          (p) => Math.hypot(p.cx - playerPos.x, p.cz - playerPos.z) <= 8.0
+        );
+        if (nearPlan) {
+          setPlanPrompt(`F: build next (${nearPlan.left.length} left)`);
+          nearestPlanRef.current = nearPlan;
         } else {
           setPlanPrompt(null);
           nearestPlanRef.current = null;
         }
-
-        // 8. Plan ghosts and layout placement ghosts
-        if (placingLayoutId !== null) {
-          const layout = w.layouts.find((l) => l.id === placingLayoutId);
-          const pieces = layout ? layoutPieces(layout.code) : null;
-          const aimHitPos = scene.aimPoint();
-          if (pieces && aimHitPos) {
-            const yaw = (placingLayoutRotationRef.current * Math.PI) / 2;
-            const c = Math.cos(yaw), sn = Math.sin(yaw), h = S.CELL / 2;
-            const x = aimHitPos.x - h * c + h * sn, z = aimHitPos.z - h * sn - h * c;
-            const corners = [[0, 0], [S.CELL, 0], [0, S.CELL], [S.CELL, S.CELL]] as const;
-            const y = Math.max(...corners.map(([u, v]) => scene.heightAt(x + u * c - v * sn, z + u * sn + v * c)));
-            const pose: S.Structure = { id: -1, x, y, z, yaw };
-            const ghosts = pieces.map((piece) => {
-              let extraAngle = 0;
-              if (
-                piece.kind === 'wall' ||
-                piece.kind === 'airlock' ||
-                piece.kind === 'halfWall' ||
-                piece.kind === 'windowWall' ||
-                piece.kind === 'doorframe' ||
-                piece.kind === 'door' ||
-                piece.kind === 'railing'
-              ) {
-                if (piece.r === 1) extraAngle = -Math.PI / 2;
-              } else if (piece.deg !== undefined) {
-                extraAngle = -(piece.deg * Math.PI) / 180;
-              } else if (
-                piece.kind === 'ramp' ||
-                piece.kind === 'stairs' ||
-                piece.kind === 'bench' ||
-                piece.kind === 'bin' ||
-                piece.kind === 'repeater' ||
-                piece.kind === 'lifeSupport' ||
-                piece.kind === 'roof' ||
-                piece.kind === 'lowRoof' ||
-                piece.kind === 'roofOuter' ||
-                piece.kind === 'roofInner' ||
-                piece.kind === 'ridgeCap'
-              ) {
-                extraAngle = -piece.r * (Math.PI / 2);
-              }
-              return {
-                kind: piece.kind,
-                at: pieceAtIn(pose, piece),
-                yaw: -yaw + extraAngle,
-              };
-            });
-            scene.setPlanGhosts(ghosts);
-          }
-        } else if (w.plans.length > 0) {
-          const bEnv = getBaseEnv();
-          const allGhosts: { kind: Kind; at: { x: number; y: number; z: number }; yaw: number }[] = [];
-          for (const pl of w.plans) {
-            const pghosts = planGhosts(w, bEnv, pl.id);
-            for (const pg of pghosts) {
-              let extraAngle = 0;
-              if (
-                pg.piece.kind === 'wall' ||
-                pg.piece.kind === 'airlock' ||
-                pg.piece.kind === 'halfWall' ||
-                pg.piece.kind === 'windowWall' ||
-                pg.piece.kind === 'doorframe' ||
-                pg.piece.kind === 'door' ||
-                pg.piece.kind === 'railing'
-              ) {
-                if (pg.piece.r === 1) extraAngle = -Math.PI / 2;
-              } else if (pg.piece.deg !== undefined) {
-                extraAngle = -(pg.piece.deg * Math.PI) / 180;
-              } else if (
-                pg.piece.kind === 'ramp' ||
-                pg.piece.kind === 'stairs' ||
-                pg.piece.kind === 'bench' ||
-                pg.piece.kind === 'bin' ||
-                pg.piece.kind === 'repeater' ||
-                pg.piece.kind === 'lifeSupport' ||
-                pg.piece.kind === 'roof' ||
-                pg.piece.kind === 'lowRoof' ||
-                pg.piece.kind === 'roofOuter' ||
-                pg.piece.kind === 'roofInner' ||
-                pg.piece.kind === 'ridgeCap'
-              ) {
-                extraAngle = -pg.piece.r * (Math.PI / 2);
-              }
-              allGhosts.push({
-                kind: pg.piece.kind,
-                at: pg.at,
-                yaw: -pg.yaw + extraAngle,
-              });
-            }
-          }
-          scene.setPlanGhosts(allGhosts);
-        } else {
-          scene.setPlanGhosts([]);
-        }
-
-        // 9. Throttled auto-save
-        persistBaseWorld(false);
+      } else {
+        setPlanPrompt(null);
+        nearestPlanRef.current = null;
       }
+
+      // 8. Plan ghosts and layout placement ghosts
+      if (placingLayoutId !== null) {
+        const layout = w.layouts.find((l) => l.id === placingLayoutId);
+        const pieces = layout ? layoutPieces(layout.code) : null;
+        const aimHitPos = scene.aimPoint();
+        if (pieces && aimHitPos) {
+          const yaw = (placingLayoutRotationRef.current * Math.PI) / 2;
+          const c = Math.cos(yaw), sn = Math.sin(yaw), h = S.CELL / 2;
+          const x = aimHitPos.x - h * c + h * sn, z = aimHitPos.z - h * sn - h * c;
+          const corners = [[0, 0], [S.CELL, 0], [0, S.CELL], [S.CELL, S.CELL]] as const;
+          const y = Math.max(...corners.map(([u, v]) => scene.heightAt(x + u * c - v * sn, z + u * sn + v * c)));
+          const pose: S.Structure = { id: -1, x, y, z, yaw };
+          const ghosts = pieces.map((piece) => {
+            let extraAngle = 0;
+            if (
+              piece.kind === 'wall' ||
+              piece.kind === 'airlock' ||
+              piece.kind === 'halfWall' ||
+              piece.kind === 'windowWall' ||
+              piece.kind === 'doorframe' ||
+              piece.kind === 'door' ||
+              piece.kind === 'railing'
+            ) {
+              if (piece.r === 1) extraAngle = -Math.PI / 2;
+            } else if (piece.deg !== undefined) {
+              extraAngle = -(piece.deg * Math.PI) / 180;
+            } else if (
+              piece.kind === 'ramp' ||
+              piece.kind === 'stairs' ||
+              piece.kind === 'bench' ||
+              piece.kind === 'bin' ||
+              piece.kind === 'repeater' ||
+              piece.kind === 'lifeSupport' ||
+              piece.kind === 'roof' ||
+              piece.kind === 'lowRoof' ||
+              piece.kind === 'roofOuter' ||
+              piece.kind === 'roofInner' ||
+              piece.kind === 'ridgeCap'
+            ) {
+              extraAngle = -piece.r * (Math.PI / 2);
+            }
+            return {
+              kind: piece.kind,
+              at: pieceAtIn(pose, piece),
+              yaw: -yaw + extraAngle,
+            };
+          });
+          scene.setPlanGhosts(ghosts);
+        }
+      } else if (w.plans.length > 0) {
+        const bEnv = getBaseEnv();
+        const allGhosts: { kind: Kind; at: { x: number; y: number; z: number }; yaw: number }[] = [];
+        for (const pl of w.plans) {
+          const pghosts = planGhosts(w, bEnv, pl.id);
+          for (const pg of pghosts) {
+            let extraAngle = 0;
+            if (
+              pg.piece.kind === 'wall' ||
+              pg.piece.kind === 'airlock' ||
+              pg.piece.kind === 'halfWall' ||
+              pg.piece.kind === 'windowWall' ||
+              pg.piece.kind === 'doorframe' ||
+              pg.piece.kind === 'door' ||
+              pg.piece.kind === 'railing'
+            ) {
+              if (pg.piece.r === 1) extraAngle = -Math.PI / 2;
+            } else if (pg.piece.deg !== undefined) {
+              extraAngle = -(pg.piece.deg * Math.PI) / 180;
+            } else if (
+              pg.piece.kind === 'ramp' ||
+              pg.piece.kind === 'stairs' ||
+              pg.piece.kind === 'bench' ||
+              pg.piece.kind === 'bin' ||
+              pg.piece.kind === 'repeater' ||
+              pg.piece.kind === 'lifeSupport' ||
+              pg.piece.kind === 'roof' ||
+              pg.piece.kind === 'lowRoof' ||
+              pg.piece.kind === 'roofOuter' ||
+              pg.piece.kind === 'roofInner' ||
+              pg.piece.kind === 'ridgeCap'
+            ) {
+              extraAngle = -pg.piece.r * (Math.PI / 2);
+            }
+            allGhosts.push({
+              kind: pg.piece.kind,
+              at: pg.at,
+              yaw: -pg.yaw + extraAngle,
+            });
+          }
+        }
+        scene.setPlanGhosts(allGhosts);
+      } else {
+        scene.setPlanGhosts([]);
+      }
+
+      // 9. Throttled auto-save
+      persistBaseWorld(false);
       const live = !pausedRef.current && stateRef.current.step !== 'create';
       // the governor judges only the frames you play (the creator draws its own turntable over the lab)
       const next = live ? adaptive.frame(frameMs) : null;
@@ -1432,7 +1421,7 @@ export function PlayScreen(props: {
         noteTier(next);
         hook.tier = next;
       }
-      const isAltCam = isBase && (keys.has('AltLeft') || keys.has('AltRight'));
+      const isAltCam = keys.has('AltLeft') || keys.has('AltRight');
       const flyUp = (keys.has('Space') ? 1 : 0) - (keys.has('ControlLeft') || keys.has('ControlRight') ? 1 : 0);
       const axis = (a: string[], b: string[]) => (a.some((k) => keys.has(k)) ? 1 : 0) - (b.some((k) => keys.has(k)) ? 1 : 0);
       const drivingVehicle = scene.getDrivingVehicle();
@@ -1566,7 +1555,7 @@ export function PlayScreen(props: {
         for (const e of r.events) {
           if (e.type === 'stage-up' && !visitingRef.current) {
             if (e.stage >= 2) scene.raiseStage(e.stage, env.gate);
-            if (isBase) dispatchBaseRef.current({ t: 'stage', stage: e.stage });
+            dispatchBaseRef.current({ t: 'stage', stage: e.stage });
           }
           if (e.type === 'ore-out' && !visitingRef.current) say('Out of ore', 'Hold E on a boulder, or build a rock drill.');
           if (e.type === 'underpowered' && !visitingRef.current) say('Not enough power', 'Build a power unit, or switch a machine off.');
@@ -1984,66 +1973,64 @@ export function PlayScreen(props: {
         return;
       }
       if (paused) return;
-      if (isBase) {
-        if (e.code === 'KeyF') {
-          if (nearestPlanRef.current && sceneRef.current) {
-            const playerPos = sceneRef.current.debug.position();
-            dispatchBase({
-              t: 'fill',
-              at: { x: playerPos.x, z: playerPos.z },
-              plan: nearestPlanRef.current.id,
-            });
-            return;
-          }
-        }
-        if (e.code === 'KeyR') {
-          if (placingLayoutId !== null) {
-            placingLayoutRotationRef.current = (placingLayoutRotationRef.current + 1) % 4;
-            say(`Layout Rotation: ${placingLayoutRotationRef.current * 90}°`);
-            return;
-          }
-          buildRotationRef.current = (buildRotationRef.current + 1) % 4;
-          say(`Rotation: ${buildRotationRef.current * 90}°`);
-          (baseViewSource as WorldViewSource).notify?.();
+      if (e.code === 'KeyF') {
+        if (nearestPlanRef.current && sceneRef.current) {
+          const playerPos = sceneRef.current.debug.position();
+          dispatchBase({
+            t: 'fill',
+            at: { x: playerPos.x, z: playerPos.z },
+            plan: nearestPlanRef.current.id,
+          });
           return;
         }
-        if (e.code === 'KeyQ') {
-          const w = baseWorldRef.current;
-          const slot = w.player.slots[w.hotbar];
-          if (slot && slot.n > 0) {
-            const bp = blueprint(slot.item);
-            if (bp && bp.kinds.length > 1) {
-              const curKind = buildKindRef.current ?? bp.kinds[0]!;
-              const curIdx = bp.kinds.indexOf(curKind);
-              const prevIdx = (curIdx - 1 + bp.kinds.length) % bp.kinds.length;
-              buildKindRef.current = bp.kinds[prevIdx]!;
-              (baseViewSource as WorldViewSource).notify?.();
-              say(`Selected: ${buildKindRef.current.toUpperCase()}`);
-              return;
-            }
-          }
+      }
+      if (e.code === 'KeyR') {
+        if (placingLayoutId !== null) {
+          placingLayoutRotationRef.current = (placingLayoutRotationRef.current + 1) % 4;
+          say(`Layout Rotation: ${placingLayoutRotationRef.current * 90}°`);
+          return;
         }
-        if (e.code === 'KeyX') {
-          const hit = sceneRef.current?.aimPoint();
-          if (hit && hit.piece !== null) {
-            dispatchBase({
-              t: 'remove',
-              at: { x: hit.x, z: hit.z },
-              id: hit.piece,
-            });
+        buildRotationRef.current = (buildRotationRef.current + 1) % 4;
+        say(`Rotation: ${buildRotationRef.current * 90}°`);
+        (baseViewSource as WorldViewSource).notify?.();
+        return;
+      }
+      if (e.code === 'KeyQ') {
+        const w = baseWorldRef.current;
+        const slot = w.player.slots[w.hotbar];
+        if (slot && slot.n > 0) {
+          const bp = blueprint(slot.item);
+          if (bp && bp.kinds.length > 1) {
+            const curKind = buildKindRef.current ?? bp.kinds[0]!;
+            const curIdx = bp.kinds.indexOf(curKind);
+            const prevIdx = (curIdx - 1 + bp.kinds.length) % bp.kinds.length;
+            buildKindRef.current = bp.kinds[prevIdx]!;
+            (baseViewSource as WorldViewSource).notify?.();
+            say(`Selected: ${buildKindRef.current.toUpperCase()}`);
             return;
           }
         }
-        if (e.code === 'KeyV') {
-          const vs = baseViewSource as WorldViewSource;
-          const cur = vs.get?.()?.build?.integrity ?? false;
-          const next = !cur;
-          vs.actions?.toggleIntegrity();
-          const bEnv = getBaseEnv();
-          pieceManagerRef.current.sync(baseWorldRef.current, bEnv, next);
-          say(next ? 'Structural Integrity: ON' : 'Structural Integrity: OFF');
+      }
+      if (e.code === 'KeyX') {
+        const hit = sceneRef.current?.aimPoint();
+        if (hit && hit.piece !== null) {
+          dispatchBase({
+            t: 'remove',
+            at: { x: hit.x, z: hit.z },
+            id: hit.piece,
+          });
           return;
         }
+      }
+      if (e.code === 'KeyV') {
+        const vs = baseViewSource as WorldViewSource;
+        const cur = vs.get?.()?.build?.integrity ?? false;
+        const next = !cur;
+        vs.actions?.toggleIntegrity();
+        const bEnv = getBaseEnv();
+        pieceManagerRef.current.sync(baseWorldRef.current, bEnv, next);
+        say(next ? 'Structural Integrity: ON' : 'Structural Integrity: OFF');
+        return;
       }
       if (e.code === 'KeyM') {
         setMashOpen((m) => {
@@ -2066,63 +2053,61 @@ export function PlayScreen(props: {
         return;
       }
       if (e.code === 'KeyE') {
-        if (isBase) {
-          const driving = sceneRef.current?.getDrivingVehicle();
-          if (driving) {
-            const parked = sceneRef.current?.exitVehicle();
-            if (parked) {
-              dispatchBase({ t: 'park', vehicle: parked.id, x: parked.x, z: parked.z, yaw: parked.yaw });
-              setDrivingSpeed(null);
-              say('Vehicle parked.');
-            }
+        const driving = sceneRef.current?.getDrivingVehicle();
+        if (driving) {
+          const parked = sceneRef.current?.exitVehicle();
+          if (parked) {
+            dispatchBase({ t: 'park', vehicle: parked.id, x: parked.x, z: parked.z, yaw: parked.yaw });
+            setDrivingSpeed(null);
+            say('Vehicle parked.');
+          }
+          return;
+        }
+        const nearV = sceneRef.current?.getNearVehicle(3.5);
+        if (nearV) {
+          const entered = sceneRef.current?.enterVehicle(nearV.id);
+          if (entered) {
+            say(`Driving ${nearV.kind.toUpperCase()}`, 'WASD to drive, Space to brake, E to exit.');
+          }
+          return;
+        }
+        // Build mode (a blueprint in the active hotbar slot): E places the piece, so nothing aimed is used or toggled.
+        const bw = baseWorldRef.current;
+        const heldSlot = bw.player.slots[bw.hotbar];
+        const buildMode = !!heldSlot && heldSlot.n > 0 && blueprint(heldSlot.item) !== null;
+        const hit = buildMode ? null : sceneRef.current?.aimPoint();
+        if (hit && hit.piece !== null) {
+          const p = baseWorldRef.current.base.pieces.find((q) => q.id === hit.piece);
+          if (p && (p.kind === 'airlock' || p.kind === 'door')) {
+            dispatchBase({ t: 'door', id: p.id, open: !p.open });
             return;
           }
-          const nearV = sceneRef.current?.getNearVehicle(3.5);
-          if (nearV) {
-            const entered = sceneRef.current?.enterVehicle(nearV.id);
-            if (entered) {
-              say(`Driving ${nearV.kind.toUpperCase()}`, 'WASD to drive, Space to brake, E to exit.');
-            }
+          if (p && p.kind === 'weaponBench') {
+            setWeaponBenchOpen(true);
+            freeMouse();
             return;
           }
-          // Build mode (a blueprint in the active hotbar slot): E places the piece, so nothing aimed is used or toggled.
-          const bw = baseWorldRef.current;
-          const heldSlot = bw.player.slots[bw.hotbar];
-          const buildMode = !!heldSlot && heldSlot.n > 0 && blueprint(heldSlot.item) !== null;
-          const hit = buildMode ? null : sceneRef.current?.aimPoint();
-          if (hit && hit.piece !== null) {
-            const p = baseWorldRef.current.base.pieces.find((q) => q.id === hit.piece);
-            if (p && (p.kind === 'airlock' || p.kind === 'door')) {
-              dispatchBase({ t: 'door', id: p.id, open: !p.open });
-              return;
-            }
-            if (p && p.kind === 'weaponBench') {
-              setWeaponBenchOpen(true);
+          if (p && p.kind === 'hardpoint') {
+            const m = baseWorldRef.current.machines.find((x) => x.id === p.id);
+            if (!m) {
+              setMachinePickerHardpoint(p.id);
               freeMouse();
               return;
-            }
-            if (p && p.kind === 'hardpoint') {
-              const m = baseWorldRef.current.machines.find((x) => x.id === p.id);
-              if (!m) {
-                setMachinePickerHardpoint(p.id);
-                freeMouse();
-                return;
-              } else if (m.kind === 'mill' || m.kind === 'press') {
-                setRefineryMachineId(m.id);
-                freeMouse();
-                return;
-              } else if (m.kind === 'fabricator') {
-                setFabricatorMachineId(m.id);
-                freeMouse();
-                return;
-              } else {
-                say(`Heavy ${m.kind.toUpperCase()} operational`, 'Pouring pixels into atmospheric plume.');
-                return;
-              }
+            } else if (m.kind === 'mill' || m.kind === 'press') {
+              setRefineryMachineId(m.id);
+              freeMouse();
+              return;
+            } else if (m.kind === 'fabricator') {
+              setFabricatorMachineId(m.id);
+              freeMouse();
+              return;
+            } else {
+              say(`Heavy ${m.kind.toUpperCase()} operational`, 'Pouring pixels into atmospheric plume.');
+              return;
             }
           }
-          if (tryPlaceBase()) return;
         }
+        if (tryPlaceBase()) return;
         if (building) placeNow();
         else if (hud.atLever) {
           sceneRef.current?.pullLever();
@@ -2163,7 +2148,6 @@ export function PlayScreen(props: {
 
   // Mouse wheel kind cycling for base-building (Item C1)
   useEffect(() => {
-    if (!isBase) return;
     const onWheel = (e: WheelEvent) => {
       const w = baseWorldRef.current;
       const slot = w.player.slots[w.hotbar];
@@ -2180,7 +2164,7 @@ export function PlayScreen(props: {
     };
     window.addEventListener('wheel', onWheel, { passive: true });
     return () => window.removeEventListener('wheel', onWheel);
-  }, [isBase, baseViewSource, say]);
+  }, [baseViewSource, say]);
 
   // leaving the planet closes the build menu; entering planet closes lab panels
   useEffect(() => {
@@ -3164,7 +3148,7 @@ export function PlayScreen(props: {
               )}
             </section>
           ) : null}
-          {isBase && hud.where === 'planet' && !hideOverlays ? (
+          {hud.where === 'planet' && !hideOverlays ? (
             <>
               <div
                 className="hm-draw-calls-badge"
@@ -3237,7 +3221,7 @@ export function PlayScreen(props: {
             />
           </>
           ) : null}
-          {machinePickerHardpoint !== null && isBase && (
+          {machinePickerHardpoint !== null && (
             <MachinePickerModal
               hardpointId={machinePickerHardpoint}
               world={baseWorldRef.current}
@@ -3255,7 +3239,7 @@ export function PlayScreen(props: {
               onClose={() => setMachinePickerHardpoint(null)}
             />
           )}
-          {refineryMachineId !== null && isBase && (
+          {refineryMachineId !== null && (
             <RefineryModal
               machineId={refineryMachineId}
               world={baseWorldRef.current}
@@ -3278,7 +3262,7 @@ export function PlayScreen(props: {
               onClose={() => setRefineryMachineId(null)}
             />
           )}
-          {fabricatorMachineId !== null && isBase && (
+          {fabricatorMachineId !== null && (
             <FabricatorModal
               machineId={fabricatorMachineId}
               world={baseWorldRef.current}
@@ -3290,7 +3274,7 @@ export function PlayScreen(props: {
               onClose={() => setFabricatorMachineId(null)}
             />
           )}
-          {weaponBenchOpen && isBase && (
+          {weaponBenchOpen && (
             <WeaponBenchModal
               world={baseWorldRef.current}
               env={getBaseEnv()}

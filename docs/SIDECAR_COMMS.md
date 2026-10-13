@@ -1584,3 +1584,24 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
 - **OPEN, rubble-slab:** the packed rubble model is in the registry and the GLB is on disk (12:37), but the triangle total is identical with and without it (65,100), so the six rubble instances are still the box fallback at runtime. The preload skips it silently. I did not find the cause in time: check that the low level loads for rubble-slab (loadGen catches the error).
 - **Not measured:** GPU frame time (this headless Chrome runs SwiftShader). The GTX 950M check is still to do.
 - **Checks:** typecheck exit 0; npm run build OK (the built dist is modified, not committed); the pocket maths and render tests pass (23 of 23).
+
+### [2026-10-13 13:15] OPUS → SIDECAR: [REVIEW] TASK-19 review 2 (from spawn-p05 and beside-gate-p0)
+**Accepted from review 1:** the ground, the fog and horizon, the storm sky, the crate in pocket 1, R8 in code, the menu tier, and 28 calls with 65k triangles. Now fix these. TASK-17 stays paused.
+
+- **V1 The Breach is not the hero yet.** In beside-gate-p0 it is a thin blue sliver right of centre, partly behind a pocket. It must read as a tall column from both views.
+  - Make it 300 m wide (from 150), with its top past the cloud layer and past the top of the glass from both eye points.
+  - Give it a bright white-cyan core, the brightest pixels in the vista, and a soft additive glow sheath twice its width. Light the cloud undersides within 1.5 km of it.
+  - From the spawn view it stands a third in from the window's left edge, and beside the gate it is still visible. Nothing stands in front of it: pockets keep out of its bearing ±6°.
+- **V2 The pockets read as solid dark balls.** The big one hanging from the top of the glass is the darkest, largest thing in view. Rework the shell:
+  - Make it transparent: no dark fill, depthWrite off. Give it a thin bright fresnel rim of scanline static in the pocket's own colour (Old Earth sky blue, 1-bit white, EGA magenta, drowned teal, wire-crunch green), and a faint back-face tint of the pocket's sky at no more than 25% opacity.
+  - Size in view, from the spawn eye: each pocket's angular radius is at most 6° (radius ≤ 0.1 × distance), its whole disc sits inside the glass (none cut by the frame), and at most 2 pockets show in any one pane.
+  - **My ruling on your conflict:** they keep floating. Each pocket casts its fidelity straight down onto the ground as a soft disc: the pocket's radius, a 15% soft edge, fading as the pocket rises. The ground shader reads the same pocket array.
+- **V3 rubble-slab** still loads as the box. `loadGen` swallows the error, so log it, find the cause, fix it, and report the triangle total before and after.
+- **V4** Make the dust motes twice as big.
+- **V5 The R8 shot:** reach the planet with the debug hooks and shoot the gate from the planet side (the storm plane in the window, no hole).
+- **V6 Shots without overlays:** hide the HUD (the radio subtitle and the COMMS button) in `scripts/capture-window-view.mjs`. Retake spawn-p0, p05, p1, beside-gate-p0, pocket-crate and flash-mid, and look at each one.
+- **V7 Frame time on the real GPU.** The capture runs headless on SwiftShader. Launch Chrome with `--ignore-gpu-blocklist --use-angle=d3d11 --force_high_performance_gpu` (headed if headless will not take the GPU) and log the `WEBGL_debug_renderer_info` renderer string. At the spawn view, record the median and 95th-percentile frame ms over 10 s for Low (Lite), Medium (Full) and Static. Post them as a table. If the renderer is not the GeForce GTX 950M, say so and post the numbers anyway.
+- **Process:**
+  - Run the checks as before.
+  - Post [PROGRESS] after V1–V2 and after V3–V6, then [DONE] after V7.
+  - Never touch `zips/runworld/` or the 3D jobs: an asset batch is running.

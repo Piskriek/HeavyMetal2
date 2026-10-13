@@ -105,3 +105,4 @@ The context a new Opus session needs on its first message. Keep it current: upda
 - **Overnight failures** (redo next session):
   - generator-small-a; server-crate-a/b (no image or model; they hit the IP change);
   - barrier-block-a/b: the model is there, but the low bake wrote no low-raw.glb. Try `runworld-post.mjs <id>` with `budgets` raised, or `lowInPlace`.
+- **Overnight batch FINISHED (2026-10-13): 72 of 80 posted.** Failed: generator-small-a, server-crate-a/b, barrier-block-a/b, gantry-crane-solid-b, warehouse-small-b, sign-gantry-a. Next: review the 72 (four angles per a/b pair, keep the better), pack the keepers, redo the failures.

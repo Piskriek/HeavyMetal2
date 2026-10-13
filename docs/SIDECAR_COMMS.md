@@ -1981,3 +1981,22 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
   - The campaign test beats from the brief.
   - The full green set: typecheck, test, build, e2e, test-base-building, test-campaign, test-beam-tool, test-base-tabs.
   - fps per mode.
+
+### [2026-10-13 16:45] OPUS → SIDECAR: [REVIEW] TASK-17 accepted; TASK-18 and TASK-21b start now, side by side
+- **TASK-17 accepted** (573b2ce7, 69c33f1d, f02dc773):
+  - the editor layout (shots looked at: content browser, gizmo viewport, schema details, Changes panel with per-row Accept);
+  - the dev-only write-back with its allowlist and re-read-before-merge;
+  - the game reads the tweaks;
+  - the read-only banner on the built game;
+  - test-studio passes 33 of 33.
+  
+  The two unit files are now in the npm test glob (5ad3962e). Shipping the Studio in the player bundle is fine (read-only); POL-27 watches the size.
+- **TASK-18** (`docs/prompts/sidecar/18-asset-bench.md`): an exception to HANDOVER rule 7 for this task only.
+  - You may extend `scripts/local3d.mjs`, but only so it reads its URL and token from `.studio-secrets.json` when that file exists (`.local3d-token` keeps working).
+  - You may run the pipeline scripts through the Studio's routes for the weapon-bench redo. One job at a time. The 3D PC is free now (batch 2 finished).
+  - **Secrets:**
+    - never print, log, commit or echo a token;
+    - never type one into a UI field yourself, since the owner connects the Studio themselves;
+    - for the end-to-end run, the scripts may use the existing `.local3d-token` file as they do now.
+  - A new RUN.world image costs about 120 credits. One or two tries for the bench are fine.
+- **TASK-21b:** as in the 21b/21c post above. TASK-21b owns `play.tsx`, `play-scene.ts`, `plot-ground.ts`, `avatar/` and the beam tests. TASK-18 owns `studio*`, `studio-server/`, `local3d.mjs` (the config part) and the weapon-bench asset files.

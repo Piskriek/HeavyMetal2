@@ -236,6 +236,8 @@ export interface PlayScene {
     rifleIn(): 'hand' | 'view' | 'none';
     /** How many plot cells carry a preset's paint. */
     paintedCells(): number;
+    /** Whether the held blueprint's ghost is shown on the ground (it is not while the rifle is out). */
+    pieceGhostShown(): boolean;
     /** The character: which scene it is in, whether it is shown, where it stands, and whether an alternate camera is on. */
     avatar(): { readonly in: string; readonly visible: boolean; readonly at: readonly number[]; readonly kids: number; readonly altCam: boolean };
     currentOneShot(): OneShotKind | null;
@@ -1366,7 +1368,8 @@ export function createPlayScene(o: {
     },
     placePieceGhost(pose, tint) {
       if (!pieceGhost) return;
-      if (!pose) {
+      // the held rifle takes the hand: the held blueprint's ghost (and its verdict colour) waits until the rifle is put away
+      if (!pose || heldBeam.group.visible) {
         pieceGhost.visible = false;
         return;
       }
@@ -2259,6 +2262,7 @@ export function createPlayScene(o: {
       clipWeight: (name: ClipName) => scientistAnimator?.getClipWeight(name) ?? 0,
       rifleIn: () => (!heldBeam.group.visible ? 'none' : heldBeam.group.parent === viewRig ? 'view' : rifleHand !== null && heldBeam.group.parent === rifleHand ? 'hand' : 'none'),
       paintedCells: () => ground?.paintedCells() ?? 0,
+      pieceGhostShown: () => pieceGhost !== null && pieceGhost.visible,
       avatar: () => {
         const box = new THREE.Box3().setFromObject(scientistHolder);
         return { in: scientistHolder.parent === planetScene ? 'planet' : scientistHolder.parent === labScene ? 'lab' : 'none', visible: scientistHolder.visible, at: scientistHolder.position.toArray().map((v) => +v.toFixed(2)), kids: scientistHolder.children.length, altCam: !!altCamPos, box: [box.min.toArray(), box.max.toArray()].map((p) => p.map((v) => +v.toFixed(2))) };

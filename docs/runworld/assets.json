@@ -2469,7 +2469,12 @@
       "view": "three-quarter",
       "subject": "a chunky cordless power drill on its own, about 30 centimetres long, a square-section body and grip, a square battery pack at the base of the grip, a short square chuck at the front, a square trigger",
       "note": "weapon-bench set, its own object (owner 2026-10-13: model the tools individually; the bench and its tools cannot be one object)",
-      "reach": 3
+      "reach": 3,
+      "budgets": [
+        700,
+        1400,
+        2800
+      ]
     },
     {
       "id": "tool-wrench",

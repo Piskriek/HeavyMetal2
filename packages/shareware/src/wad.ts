@@ -224,3 +224,71 @@ export function findSpriteLumps(wad: WadArchive, prefix: string): string[] {
     .filter((l) => l.name.startsWith(upper))
     .map((l) => l.name);
 }
+
+/**
+ * One sprite lump name, split into its parts. Sprite names are BASE (4 chars), FRAME (1 letter), ROTATION (0 to 8),
+ * then an optional second pair: `TROOA2A8` is frame A rotation 2, with rotation 8 drawn as its mirror image.
+ * Rotation 0 means one view for every direction (`H0`).
+ */
+export interface SpriteLumpName {
+  readonly base: string;
+  readonly frame: string;
+  readonly rotation: number;
+  readonly frame2?: string;
+  readonly rotation2?: number;
+}
+
+const SPRITE_NAME = /^([A-Z0-9_]{4})([A-Z[\\\]^_])([0-8])(?:([A-Z[\\\]^_])([0-8]))?$/;
+
+/** Parses a sprite lump name such as `TROOA1` or `SKULA8A2`. Returns undefined for any other name. */
+export function parseSpriteLumpName(name: string): SpriteLumpName | undefined {
+  const m = SPRITE_NAME.exec(name.toUpperCase());
+  if (!m) return undefined;
+  const base = m[1]!;
+  const frame = m[2]!;
+  const rotation = Number(m[3]);
+  if (m[4] === undefined) {
+    return { base, frame, rotation };
+  }
+  return { base, frame, rotation, frame2: m[4], rotation2: Number(m[5]) };
+}
+
+/** One of the eight views of a frame. `mirrored` means the lump is drawn flipped left to right. */
+export interface SpriteView {
+  readonly lump: string;
+  readonly mirrored: boolean;
+}
+
+/**
+ * The eight views (rotations 1 to 8, index 0 to 7) of one frame letter of one sprite base.
+ * A lump `A2A8` fills slot 2 normally and slot 8 mirrored, so the mirrored views are flagged instead of duplicated.
+ * A rotation 0 lump fills every slot. A slot with no lump is undefined (a missing view).
+ */
+export function spriteViewsForFrame(
+  wad: WadArchive,
+  base: string,
+  frame: string
+): (SpriteView | undefined)[] {
+  const slots: (SpriteView | undefined)[] = new Array(8).fill(undefined);
+  const b = base.toUpperCase();
+  const f = frame.toUpperCase();
+  for (const lump of wad.lumps) {
+    const parsed = parseSpriteLumpName(lump.name);
+    if (!parsed || parsed.base !== b) continue;
+    if (parsed.rotation === 0) {
+      if (parsed.frame === f) {
+        for (let i = 0; i < 8; i++) slots[i] ??= { lump: lump.name, mirrored: false };
+      }
+      continue;
+    }
+    if (parsed.frame === f) {
+      slots[parsed.rotation - 1] ??= { lump: lump.name, mirrored: false };
+    }
+    if (parsed.frame2 === f && parsed.rotation2 !== undefined && parsed.rotation2 > 0) {
+      // the second pair is a mirror of the first when it belongs to the same frame letter and rotation differs
+      const mirror = parsed.frame === f && parsed.rotation2 !== parsed.rotation;
+      slots[parsed.rotation2 - 1] ??= { lump: lump.name, mirrored: mirror };
+    }
+  }
+  return slots;
+}

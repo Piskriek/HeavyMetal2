@@ -1,0 +1,210 @@
+{
+  "sources": [
+    {
+      "id": "freedoom",
+      "name": "Freedoom 0.13.0 (freedoom2.wad sprites)",
+      "licence": "BSD-3-Clause",
+      "url": "https://freedoom.github.io/",
+      "notice": "Copyright © 2001-2024\r\nContributors to the Freedoom project.  All rights reserved.\r\n\r\nRedistribution and use in source and binary forms, with or without\r\nmodification, are permitted provided that the following conditions are\r\nmet:\r\n\r\n  * Redistributions of source code must retain the above copyright\r\n    notice, this list of conditions and the following disclaimer.\r\n  * Redistributions in binary form must reproduce the above copyright\r\n    notice, this list of conditions and the following disclaimer in the\r\n    documentation and/or other materials provided with the distribution.\r\n  * Neither the name of the Freedoom project nor the names of its\r\n    contributors may be used to endorse or promote products derived from\r\n    this software without specific prior written permission.\r\n\r\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS\r\nIS” AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED\r\nTO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A\r\nPARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER\r\nOR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,\r\nEXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,\r\nPROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR\r\nPROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF\r\nLIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING\r\nNEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS\r\nSOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\r\n\r\nFor a list of contributors to the Freedoom project, see the file\r\nCREDITS."
+    },
+    {
+      "id": "librequake",
+      "name": "LibreQuake (lite, id1 pak0/pak1: progs/*.mdl, gfx/palette.lmp)",
+      "licence": "BSD-3-Clause (the models, textures and sounds; the GPL-2 files are not used)",
+      "url": "https://github.com/lavenderdotpet/LibreQuake",
+      "notice": "Copyright © 2019-2023\nContributors to the LibreQuake project.  All rights reserved.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions are\nmet:\n\n  * Redistributions of source code must retain the above copyright\n    notice, this list of conditions and the following disclaimer.\n  * Redistributions in binary form must reproduce the above copyright\n    notice, this list of conditions and the following disclaimer in the\n    documentation and/or other materials provided with the distribution.\n  * Neither the name of the LibreQuake project nor the names of its\n    contributors may be used to endorse or promote products derived from\n    this software without specific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS\nIS” AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED\nTO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A\nPARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER\nOR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,\nEXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,\nPROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR\nPROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF\nLIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING\nNEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS\nSOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n\nFor a list of contributors to the LibreQuake project, see the file\nCREDITS.\n\nFor a list of resources used in the LibreQuake project, see the directory\ndocs"
+    },
+    {
+      "id": "quaternius",
+      "name": "Quaternius, Ultimate Monsters packs (Big, Blob, Flying)",
+      "licence": "CC0 1.0 Universal (public domain dedication)",
+      "url": "https://quaternius.com/",
+      "notice": "CC0 1.0 Universal. Thanks to Quaternius (quaternius.com) for the free monster packs.",
+      "note": "The License.txt inside the downloaded folder is headed \"Ultimate Platformer Pack\"; the CC0 status is taken from the brief and the pack owner. Check it before shipping."
+    }
+  ],
+  "monsters": [
+    {
+      "id": "alien-q",
+      "name": "alien-q",
+      "source": "quaternius",
+      "entry": "Big/Alien.gltf",
+      "era": "modern3d",
+      "archetype": "spitter",
+      "where": "public"
+    },
+    {
+      "id": "chicken-q",
+      "name": "chicken-q",
+      "source": "quaternius",
+      "entry": "Blob/Chicken.gltf",
+      "era": "modern3d",
+      "archetype": "swarmer",
+      "where": "public"
+    },
+    {
+      "id": "dog-q",
+      "name": "dog-q",
+      "source": "quaternius",
+      "entry": "Blob/Dog.gltf",
+      "era": "modern3d",
+      "archetype": "charger",
+      "where": "public"
+    },
+    {
+      "id": "flesh-worm",
+      "name": "flesh-worm",
+      "source": "freedoom",
+      "entry": "SARG",
+      "era": "sprite",
+      "archetype": "charger",
+      "where": "core"
+    },
+    {
+      "id": "floater",
+      "name": "floater",
+      "source": "freedoom",
+      "entry": "HEAD",
+      "era": "sprite",
+      "archetype": "flyer",
+      "where": "core"
+    },
+    {
+      "id": "ghost-skull-q",
+      "name": "ghost-skull-q",
+      "source": "quaternius",
+      "entry": "Flying/Ghost_Skull.gltf",
+      "era": "modern3d",
+      "archetype": "flyer",
+      "where": "public"
+    },
+    {
+      "id": "glub-q",
+      "name": "glub-q",
+      "source": "quaternius",
+      "entry": "Flying/Glub.gltf",
+      "era": "modern3d",
+      "archetype": "sapper",
+      "where": "public"
+    },
+    {
+      "id": "hell-knight",
+      "name": "hell-knight",
+      "source": "freedoom",
+      "entry": "BOS2",
+      "era": "sprite",
+      "archetype": "brute",
+      "where": "public"
+    },
+    {
+      "id": "hell-lord",
+      "name": "hell-lord",
+      "source": "freedoom",
+      "entry": "BOSS",
+      "era": "sprite",
+      "archetype": "brute",
+      "where": "public"
+    },
+    {
+      "id": "mushnub-q",
+      "name": "mushnub-q",
+      "source": "quaternius",
+      "entry": "Blob/Mushnub.gltf",
+      "era": "modern3d",
+      "archetype": "swarmer",
+      "where": "public"
+    },
+    {
+      "id": "orc-q",
+      "name": "orc-q",
+      "source": "quaternius",
+      "entry": "Big/Orc.gltf",
+      "era": "modern3d",
+      "archetype": "charger",
+      "where": "public"
+    },
+    {
+      "id": "pain-floater",
+      "name": "pain-floater",
+      "source": "freedoom",
+      "entry": "PAIN",
+      "era": "sprite",
+      "archetype": "flyer",
+      "where": "public"
+    },
+    {
+      "id": "pink-blob-q",
+      "name": "pink-blob-q",
+      "source": "quaternius",
+      "entry": "Blob/PinkBlob.gltf",
+      "era": "modern3d",
+      "archetype": "sapper",
+      "where": "public"
+    },
+    {
+      "id": "serpentipede",
+      "name": "serpentipede",
+      "source": "freedoom",
+      "entry": "TROO",
+      "era": "sprite",
+      "archetype": "spitter",
+      "where": "core"
+    },
+    {
+      "id": "skull-flier",
+      "name": "skull-flier",
+      "source": "freedoom",
+      "entry": "SKUL",
+      "era": "sprite",
+      "archetype": "swarmer",
+      "where": "core"
+    },
+    {
+      "id": "technospider",
+      "name": "technospider",
+      "source": "freedoom",
+      "entry": "BSPI",
+      "era": "sprite",
+      "archetype": "sapper",
+      "where": "core"
+    },
+    {
+      "id": "yeti-q",
+      "name": "yeti-q",
+      "source": "quaternius",
+      "entry": "Big/Yeti.gltf",
+      "era": "modern3d",
+      "archetype": "brute",
+      "where": "core"
+    },
+    {
+      "id": "zombie-trooper",
+      "name": "zombie-trooper",
+      "source": "freedoom",
+      "entry": "POSS",
+      "era": "sprite",
+      "archetype": "spitter",
+      "where": "public"
+    }
+  ],
+  "held": [
+    {
+      "id": "hound-lq",
+      "source": "librequake",
+      "entry": "progs/dog.mdl",
+      "reason": "Dropped at the look check (sheet batch-1): the packed MDL renders as a tiny, dark silhouette in three.js. The geometry bounds are correct (0.9 m) and the winding is not the cause (double-sided renders the same). Open: the MDL morph-target path (scripts/pack-monsters.mjs packMdl). The Quake clip ranges above are kept for when it is fixed."
+    },
+    {
+      "id": "ogre-lq",
+      "source": "librequake",
+      "entry": "progs/ogre.mdl",
+      "reason": "Dropped with hound-lq (the same MDL render fault). Its clip ranges are estimated and unverified."
+    },
+    {
+      "id": "blasphemer-set",
+      "source": "blasphemer",
+      "entries": "BEAS CHKN CLNK IMPX KNIG MNTR MUMM SNKE SOR2 SRCR WZRD",
+      "reason": "Not packed. The archive zips/monsters/blasphemer/blasphem-0.1.8.zip holds only blasphem.wad: no COPYING or licence text. The BSD-3 claim in the brief cannot be verified from the files, so nothing from it ships until the licence is confirmed."
+    }
+  ]
+}

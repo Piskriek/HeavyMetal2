@@ -1,0 +1,712 @@
+{
+  "version": 1,
+  "core": [
+    "flesh-worm",
+    "floater",
+    "serpentipede",
+    "skull-flier",
+    "technospider",
+    "yeti-q"
+  ],
+  "public": [
+    "alien-q",
+    "chicken-q",
+    "dog-q",
+    "ghost-skull-q",
+    "glub-q",
+    "hell-knight",
+    "hell-lord",
+    "mushnub-q",
+    "orc-q",
+    "pain-floater",
+    "pink-blob-q",
+    "zombie-trooper"
+  ],
+  "monsters": {
+    "flesh-worm": {
+      "id": "flesh-worm",
+      "name": "flesh-worm",
+      "batch": 1,
+      "source": "freedoom",
+      "entry": "SARG",
+      "era": "sprite",
+      "archetype": "charger",
+      "heightM": 1.5,
+      "where": "core",
+      "dir": "apps/web/src/assets/monsters/flesh-worm",
+      "files": {
+        "sprite.webp": 48926,
+        "sprite.json": 3441
+      },
+      "bytes": 52367,
+      "frames": 14,
+      "detail": {
+        "frames": 14,
+        "groups": {
+          "walk": 4,
+          "attack": 3,
+          "pain": 1,
+          "death": 6
+        },
+        "atlas": [
+          1012,
+          148
+        ]
+      },
+      "warnings": []
+    },
+    "orc-q": {
+      "id": "orc-q",
+      "name": "orc-q",
+      "batch": 1,
+      "source": "quaternius",
+      "entry": "Big/Orc.gltf",
+      "era": "modern3d",
+      "archetype": "charger",
+      "heightM": 1.9,
+      "where": "public",
+      "dir": "apps/web/public/monsters/orc-q",
+      "files": {
+        "model.glb": 318056,
+        "model.json": 325
+      },
+      "bytes": 318381,
+      "frames": 59,
+      "detail": {
+        "frames": 59,
+        "clips": {
+          "death": {
+            "keys": 24,
+            "seconds": 0.767
+          },
+          "pain": {
+            "keys": 2,
+            "seconds": 0.6
+          },
+          "attack": {
+            "keys": 2,
+            "seconds": 0.867
+          },
+          "walk": {
+            "keys": 31,
+            "seconds": 1
+          }
+        },
+        "scaleFromRaw": 0.592145
+      },
+      "warnings": []
+    },
+    "serpentipede": {
+      "id": "serpentipede",
+      "name": "serpentipede",
+      "batch": 1,
+      "source": "freedoom",
+      "entry": "TROO",
+      "era": "sprite",
+      "archetype": "spitter",
+      "heightM": 1.7,
+      "where": "core",
+      "dir": "apps/web/src/assets/monsters/serpentipede",
+      "files": {
+        "sprite.webp": 61654,
+        "sprite.json": 3034
+      },
+      "bytes": 64688,
+      "frames": 12,
+      "detail": {
+        "frames": 12,
+        "groups": {
+          "walk": 4,
+          "attack": 3,
+          "pain": 1,
+          "death": 4
+        },
+        "atlas": [
+          1013,
+          182
+        ]
+      },
+      "warnings": []
+    },
+    "zombie-trooper": {
+      "id": "zombie-trooper",
+      "name": "zombie-trooper",
+      "batch": 1,
+      "source": "freedoom",
+      "entry": "POSS",
+      "era": "sprite",
+      "archetype": "spitter",
+      "heightM": 1.8,
+      "where": "public",
+      "dir": "apps/web/public/monsters/zombie-trooper",
+      "files": {
+        "sprite.webp": 48344,
+        "sprite.json": 3106
+      },
+      "bytes": 51450,
+      "frames": 12,
+      "detail": {
+        "frames": 12,
+        "groups": {
+          "walk": 4,
+          "attack": 2,
+          "pain": 1,
+          "death": 5
+        },
+        "atlas": [
+          1018,
+          169
+        ]
+      },
+      "warnings": []
+    },
+    "alien-q": {
+      "id": "alien-q",
+      "name": "alien-q",
+      "batch": 1,
+      "source": "quaternius",
+      "entry": "Big/Alien.gltf",
+      "era": "modern3d",
+      "archetype": "spitter",
+      "heightM": 1.8,
+      "where": "public",
+      "dir": "apps/web/public/monsters/alien-q",
+      "files": {
+        "model.glb": 321484,
+        "model.json": 331
+      },
+      "bytes": 321815,
+      "frames": 59,
+      "detail": {
+        "frames": 59,
+        "clips": {
+          "death": {
+            "keys": 24,
+            "seconds": 0.767
+          },
+          "pain": {
+            "keys": 2,
+            "seconds": 0.6
+          },
+          "attack": {
+            "keys": 2,
+            "seconds": 0.867
+          },
+          "walk": {
+            "keys": 31,
+            "seconds": 1
+          }
+        },
+        "scaleFromRaw": 0.507501
+      },
+      "warnings": []
+    },
+    "skull-flier": {
+      "id": "skull-flier",
+      "name": "skull-flier",
+      "batch": 1,
+      "source": "freedoom",
+      "entry": "SKUL",
+      "era": "sprite",
+      "archetype": "swarmer",
+      "heightM": 0.5,
+      "where": "core",
+      "dir": "apps/web/src/assets/monsters/skull-flier",
+      "files": {
+        "sprite.webp": 20912,
+        "sprite.json": 2570
+      },
+      "bytes": 23482,
+      "frames": 10,
+      "detail": {
+        "frames": 10,
+        "groups": {
+          "walk": 2,
+          "attack": 1,
+          "pain": 1,
+          "death": 6
+        },
+        "atlas": [
+          945,
+          64
+        ]
+      },
+      "warnings": []
+    },
+    "mushnub-q": {
+      "id": "mushnub-q",
+      "name": "mushnub-q",
+      "batch": 1,
+      "source": "quaternius",
+      "entry": "Blob/Mushnub.gltf",
+      "era": "modern3d",
+      "archetype": "swarmer",
+      "heightM": 0.7,
+      "where": "public",
+      "dir": "apps/web/public/monsters/mushnub-q",
+      "files": {
+        "model.glb": 34760,
+        "model.json": 341
+      },
+      "bytes": 35101,
+      "frames": 38,
+      "detail": {
+        "frames": 38,
+        "clips": {
+          "attack": {
+            "keys": 2,
+            "seconds": 0.4
+          },
+          "death": {
+            "keys": 12,
+            "seconds": 0.367
+          },
+          "pain": {
+            "keys": 10,
+            "seconds": 0.3
+          },
+          "walk": {
+            "keys": 14,
+            "seconds": 0.433
+          }
+        },
+        "scaleFromRaw": 0.212376
+      },
+      "warnings": []
+    },
+    "chicken-q": {
+      "id": "chicken-q",
+      "name": "chicken-q",
+      "batch": 1,
+      "source": "quaternius",
+      "entry": "Blob/Chicken.gltf",
+      "era": "modern3d",
+      "archetype": "swarmer",
+      "heightM": 0.6,
+      "where": "public",
+      "dir": "apps/web/public/monsters/chicken-q",
+      "files": {
+        "model.glb": 47912,
+        "model.json": 341
+      },
+      "bytes": 48253,
+      "frames": 38,
+      "detail": {
+        "frames": 38,
+        "clips": {
+          "attack": {
+            "keys": 2,
+            "seconds": 0.4
+          },
+          "death": {
+            "keys": 12,
+            "seconds": 0.367
+          },
+          "pain": {
+            "keys": 10,
+            "seconds": 0.3
+          },
+          "walk": {
+            "keys": 14,
+            "seconds": 0.433
+          }
+        },
+        "scaleFromRaw": 0.255623
+      },
+      "warnings": []
+    },
+    "floater": {
+      "id": "floater",
+      "name": "floater",
+      "batch": 1,
+      "source": "freedoom",
+      "entry": "HEAD",
+      "era": "sprite",
+      "archetype": "flyer",
+      "heightM": 1.6,
+      "where": "core",
+      "dir": "apps/web/src/assets/monsters/floater",
+      "files": {
+        "sprite.webp": 72704,
+        "sprite.json": 2801
+      },
+      "bytes": 75505,
+      "frames": 11,
+      "detail": {
+        "frames": 11,
+        "groups": {
+          "walk": 2,
+          "attack": 1,
+          "pain": 1,
+          "death": 7
+        },
+        "atlas": [
+          1004,
+          173
+        ]
+      },
+      "warnings": []
+    },
+    "pain-floater": {
+      "id": "pain-floater",
+      "name": "pain-floater",
+      "batch": 1,
+      "source": "freedoom",
+      "entry": "PAIN",
+      "era": "sprite",
+      "archetype": "flyer",
+      "heightM": 1.5,
+      "where": "public",
+      "dir": "apps/web/public/monsters/pain-floater",
+      "files": {
+        "sprite.webp": 78038,
+        "sprite.json": 3052
+      },
+      "bytes": 81090,
+      "frames": 12,
+      "detail": {
+        "frames": 12,
+        "groups": {
+          "walk": 4,
+          "attack": 2,
+          "pain": 1,
+          "death": 5
+        },
+        "atlas": [
+          1017,
+          269
+        ]
+      },
+      "warnings": []
+    },
+    "ghost-skull-q": {
+      "id": "ghost-skull-q",
+      "name": "ghost-skull-q",
+      "batch": 1,
+      "source": "quaternius",
+      "entry": "Flying/Ghost_Skull.gltf",
+      "era": "modern3d",
+      "archetype": "flyer",
+      "heightM": 1,
+      "where": "public",
+      "dir": "apps/web/public/monsters/ghost-skull-q",
+      "files": {
+        "model.glb": 182256,
+        "model.json": 355
+      },
+      "bytes": 182611,
+      "frames": 98,
+      "detail": {
+        "frames": 98,
+        "clips": {
+          "death": {
+            "keys": 21,
+            "seconds": 0.667
+          },
+          "walk": {
+            "keys": 26,
+            "seconds": 0.833
+          },
+          "attack": {
+            "keys": 36,
+            "seconds": 1.167
+          },
+          "pain": {
+            "keys": 15,
+            "seconds": 0.467
+          }
+        },
+        "scaleFromRaw": 0.32249
+      },
+      "warnings": []
+    },
+    "hell-lord": {
+      "id": "hell-lord",
+      "name": "hell-lord",
+      "batch": 1,
+      "source": "freedoom",
+      "entry": "BOSS",
+      "era": "sprite",
+      "archetype": "brute",
+      "heightM": 3.2,
+      "where": "public",
+      "dir": "apps/web/public/monsters/hell-lord",
+      "files": {
+        "sprite.webp": 134042,
+        "sprite.json": 3544
+      },
+      "bytes": 137586,
+      "frames": 14,
+      "detail": {
+        "frames": 14,
+        "groups": {
+          "walk": 4,
+          "attack": 2,
+          "pain": 1,
+          "death": 7
+        },
+        "atlas": [
+          1025,
+          291
+        ]
+      },
+      "warnings": []
+    },
+    "yeti-q": {
+      "id": "yeti-q",
+      "name": "yeti-q",
+      "batch": 1,
+      "source": "quaternius",
+      "entry": "Big/Yeti.gltf",
+      "era": "modern3d",
+      "archetype": "brute",
+      "heightM": 2.4,
+      "where": "core",
+      "dir": "apps/web/src/assets/monsters/yeti-q",
+      "files": {
+        "model.glb": 307104,
+        "model.json": 326
+      },
+      "bytes": 307430,
+      "frames": 59,
+      "detail": {
+        "frames": 59,
+        "clips": {
+          "death": {
+            "keys": 24,
+            "seconds": 0.767
+          },
+          "pain": {
+            "keys": 2,
+            "seconds": 0.6
+          },
+          "attack": {
+            "keys": 2,
+            "seconds": 0.867
+          },
+          "walk": {
+            "keys": 31,
+            "seconds": 1
+          }
+        },
+        "scaleFromRaw": 0.848616
+      },
+      "warnings": []
+    },
+    "technospider": {
+      "id": "technospider",
+      "name": "technospider",
+      "batch": 1,
+      "source": "freedoom",
+      "entry": "BSPI",
+      "era": "sprite",
+      "archetype": "sapper",
+      "heightM": 2.2,
+      "where": "core",
+      "dir": "apps/web/src/assets/monsters/technospider",
+      "files": {
+        "sprite.webp": 61144,
+        "sprite.json": 2772
+      },
+      "bytes": 63916,
+      "frames": 10,
+      "detail": {
+        "frames": 10,
+        "groups": {
+          "walk": 4,
+          "attack": 2,
+          "pain": 1,
+          "death": 3
+        },
+        "atlas": [
+          903,
+          329
+        ]
+      },
+      "warnings": []
+    },
+    "glub-q": {
+      "id": "glub-q",
+      "name": "glub-q",
+      "batch": 1,
+      "source": "quaternius",
+      "entry": "Flying/Glub.gltf",
+      "era": "modern3d",
+      "archetype": "sapper",
+      "heightM": 0.9,
+      "where": "public",
+      "dir": "apps/web/public/monsters/glub-q",
+      "files": {
+        "model.glb": 87396,
+        "model.json": 338
+      },
+      "bytes": 87734,
+      "frames": 98,
+      "detail": {
+        "frames": 98,
+        "clips": {
+          "death": {
+            "keys": 21,
+            "seconds": 0.667
+          },
+          "walk": {
+            "keys": 26,
+            "seconds": 0.833
+          },
+          "attack": {
+            "keys": 36,
+            "seconds": 1.167
+          },
+          "pain": {
+            "keys": 15,
+            "seconds": 0.467
+          }
+        },
+        "scaleFromRaw": 0.382838
+      },
+      "warnings": []
+    },
+    "pink-blob-q": {
+      "id": "pink-blob-q",
+      "name": "pink-blob-q",
+      "batch": 1,
+      "source": "quaternius",
+      "entry": "Blob/PinkBlob.gltf",
+      "era": "modern3d",
+      "archetype": "sapper",
+      "heightM": 1,
+      "where": "public",
+      "dir": "apps/web/public/monsters/pink-blob-q",
+      "files": {
+        "model.glb": 35328,
+        "model.json": 343
+      },
+      "bytes": 35671,
+      "frames": 38,
+      "detail": {
+        "frames": 38,
+        "clips": {
+          "attack": {
+            "keys": 2,
+            "seconds": 0.4
+          },
+          "death": {
+            "keys": 12,
+            "seconds": 0.367
+          },
+          "pain": {
+            "keys": 10,
+            "seconds": 0.3
+          },
+          "walk": {
+            "keys": 14,
+            "seconds": 0.433
+          }
+        },
+        "scaleFromRaw": 0.497851
+      },
+      "warnings": []
+    },
+    "dog-q": {
+      "id": "dog-q",
+      "name": "dog-q",
+      "batch": 1,
+      "source": "quaternius",
+      "entry": "Blob/Dog.gltf",
+      "era": "modern3d",
+      "archetype": "charger",
+      "heightM": 0.8,
+      "where": "public",
+      "dir": "apps/web/public/monsters/dog-q",
+      "files": {
+        "model.glb": 36004,
+        "model.json": 329
+      },
+      "bytes": 36333,
+      "frames": 38,
+      "detail": {
+        "frames": 38,
+        "clips": {
+          "attack": {
+            "keys": 2,
+            "seconds": 0.4
+          },
+          "death": {
+            "keys": 12,
+            "seconds": 0.367
+          },
+          "pain": {
+            "keys": 10,
+            "seconds": 0.3
+          },
+          "walk": {
+            "keys": 14,
+            "seconds": 0.433
+          }
+        },
+        "scaleFromRaw": 0.437668
+      },
+      "warnings": []
+    },
+    "hell-knight": {
+      "id": "hell-knight",
+      "name": "hell-knight",
+      "batch": 1,
+      "source": "freedoom",
+      "entry": "BOS2",
+      "era": "sprite",
+      "archetype": "brute",
+      "heightM": 3,
+      "where": "public",
+      "dir": "apps/web/public/monsters/hell-knight",
+      "files": {
+        "sprite.webp": 138814,
+        "sprite.json": 3548
+      },
+      "bytes": 142362,
+      "frames": 14,
+      "detail": {
+        "frames": 14,
+        "groups": {
+          "walk": 4,
+          "attack": 2,
+          "pain": 1,
+          "death": 7
+        },
+        "atlas": [
+          1024,
+          291
+        ]
+      },
+      "warnings": []
+    }
+  },
+  "held": [
+    {
+      "id": "hound-lq",
+      "source": "librequake",
+      "entry": "progs/dog.mdl",
+      "reason": "Dropped at the look check (sheet batch-1): the packed MDL renders as a tiny, dark silhouette in three.js. The geometry bounds are correct (0.9 m) and the winding is not the cause (double-sided renders the same). Open: the MDL morph-target path (scripts/pack-monsters.mjs packMdl). The Quake clip ranges above are kept for when it is fixed."
+    },
+    {
+      "id": "ogre-lq",
+      "source": "librequake",
+      "entry": "progs/ogre.mdl",
+      "reason": "Dropped with hound-lq (the same MDL render fault). Its clip ranges are estimated and unverified."
+    },
+    {
+      "id": "blasphemer-set",
+      "source": "blasphemer",
+      "entries": "BEAS CHKN CLNK IMPX KNIG MNTR MUMM SNKE SOR2 SRCR WZRD",
+      "reason": "Not packed. The archive zips/monsters/blasphemer/blasphem-0.1.8.zip holds only blasphem.wad: no COPYING or licence text. The BSD-3 claim in the brief cannot be verified from the files, so nothing from it ships until the licence is confirmed."
+    }
+  ],
+  "totals": {
+    "coreBytes": 587388,
+    "publicBytes": 1478387,
+    "coreBudgetBytes": 1258291.2
+  },
+  "batches": {
+    "1": "18 monsters, three per archetype"
+  }
+}

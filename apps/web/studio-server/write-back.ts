@@ -38,16 +38,26 @@ export interface Request {
   readonly host: string | undefined;
   readonly origin: string | undefined;
   readonly contentType: string | undefined;
-  /** Reads the body, or rejects with a BodyTooLarge error past MAX_BODY bytes. */
-  readonly readBody: () => Promise<string>;
+  /** Reads the body, or rejects with a BodyTooLarge error past `max` bytes. */
+  readonly readBody: (max: number) => Promise<string>;
 }
 
-export interface Reply { readonly status: number; readonly body: string }
+/** A reply: JSON text by default; `type` and a byte body for the files the bench serves. */
+export interface Reply { readonly status: number; readonly body: string | Uint8Array; readonly type?: string }
 
 export class BodyTooLarge extends Error {}
 
 const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
 const json = (status: number, value: unknown): Reply => ({ status, body: JSON.stringify(value) });
+
+/** The refusal for a request that did not come from this machine, or null when it did. Shared by every Studio route. */
+export function localRefusal(req: Request): Reply | null {
+  if (!LOCAL.test(req.host ?? '')) return json(403, { ok: false, why: 'studio writes are local only' });
+  if (req.origin !== undefined && !/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(req.origin)) {
+    return json(403, { ok: false, why: 'cross-site request refused' });
+  }
+  return null;
+}
 
 function registryIds(file: string): Set<string> {
   const data = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
@@ -61,10 +71,8 @@ export async function handleStudioRequest(req: Request, paths: StudioPaths): Pro
   if (!NAME.test(name)) return json(404, { ok: false, why: 'no such studio file' });
   const entry =Object.prototype.hasOwnProperty.call(ALLOWED, name) ? ALLOWED[name] : undefined;
   if (!entry) return json(404, { ok: false, why: 'no such studio file' });
-  if (!LOCAL.test(req.host ?? '')) return json(403, { ok: false, why: 'studio writes are local only' });
-  if (req.origin !== undefined && !/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(req.origin)) {
-    return json(403, { ok: false, why: 'cross-site request refused' });
-  }
+  const refused = localRefusal(req);
+  if (refused) return refused;
   const file = path.join(paths.dataDir, entry.file);
 
   if (req.method === 'GET') {
@@ -78,7 +86,7 @@ export async function handleStudioRequest(req: Request, paths: StudioPaths): Pro
 
   let text: string;
   try {
-    text = await req.readBody();
+    text = await req.readBody(MAX_BODY);
   } catch (e) {
     if (e instanceof BodyTooLarge) return json(413, { ok: false, why: 'the file is over 2 MB' });
     throw e;

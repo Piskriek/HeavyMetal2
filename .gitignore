@@ -33,3 +33,6 @@ docs/shots/
 
 # the local Hunyuan3D pipeline's bearer token (owner's RTX 3080 PC); never commit it
 .local3d-token
+
+# the Studio's 3D AI connection (URL and token, written by the Redo panel); never commit it
+/.studio-secrets.json

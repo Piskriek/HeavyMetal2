@@ -6,18 +6,25 @@
 // Jobs are submitted and polled (POST /jobs, GET /jobs/{id}), so a slow job never hits a client timeout, unlike the
 // RUN CLI's 600 s cap. Each request has its own timeout; if the pipeline stops answering (PC off or restarting) the
 // client waits, checking every minute, and resubmits a job the restarted server no longer knows. The source image is sent as base64 from zips/runworld/assets/<id>/source.png; the result
-// lands as model-local.glb beside it. The bearer token is read from .local3d-token (git-ignored) and never printed.
+// lands as model-local.glb beside it. The bearer token and the URL are never printed. They come from the Studio's
+// connection, .studio-secrets.json at the repo root (its local3d block: url and token), when it has a token; otherwise
+// from .local3d-token (the older file, still git-ignored). LOCAL3D_URL, when set, overrides the URL.
 // The 3080 runs one heavy GPU job at a time, so this submits one job and waits for it before the next.
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const BASE = process.env.LOCAL3D_URL ?? 'http://192.168.0.9:8082';
 const OUT = path.join(ROOT, 'zips', 'runworld', 'assets');
+const secretsFile = path.join(ROOT, '.studio-secrets.json');
+const stored = (() => {
+  try { return fs.existsSync(secretsFile) ? (JSON.parse(fs.readFileSync(secretsFile, 'utf8')).local3d ?? {}) : {}; } catch { return {}; }
+})();
 const tokenFile = path.join(ROOT, '.local3d-token');
-if (!fs.existsSync(tokenFile)) { console.log('missing .local3d-token (the pipeline\'s bearer token, one line)'); process.exit(2); }
-const auth = { Authorization: `Bearer ${fs.readFileSync(tokenFile, 'utf8').trim()}` };
+const token = String(stored.token || (fs.existsSync(tokenFile) ? fs.readFileSync(tokenFile, 'utf8') : '')).trim();
+if (!token) { console.log('no 3D AI token: connect it in the Studio (its Redo panel), or put it in .local3d-token (one line)'); process.exit(2); }
+const BASE = (process.env.LOCAL3D_URL ?? '').trim() || stored.url || 'http://192.168.0.9:8082';
+const auth = { Authorization: `Bearer ${token}` };
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs', 'runworld', 'assets.json'), 'utf8'));
 const args = process.argv.slice(2), texture = !args.includes('--no-texture');
 const [cmd, ...ids] = args.filter((a) => !a.startsWith('--'));

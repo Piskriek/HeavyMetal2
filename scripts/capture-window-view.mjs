@@ -35,12 +35,19 @@ await page.addInitScript(() => {
 page.on('pageerror', (err) => console.error('[page error]', err.message));
 page.on('console', (msg) => { if (msg.type() === 'error') console.log('[console error]', msg.text()); });
 
-const HIDE = ['.play-prompt', '.play-goal', '.play-plot', '.play-build', '.gr-bar', '.gr-window', '.play-sync', '.hm-draw-calls-badge', '.play-crosshair', '.play-toast', '.hm-shelter-chip', '.play-hud-hotbar', '.gr-footer', '.play-sync-indicator', '.play-dot', '.play-mash-btn', '.hm-build-readout', '.hm-hotbar', '.play-build-reticle', '.play-create', '.play-start'];
+const HIDE = ['.mentor-subtitle', '.radio-hud-btn', '.play-prompt', '.play-goal', '.play-plot', '.play-build', '.gr-bar', '.gr-window', '.play-sync', '.hm-draw-calls-badge', '.play-crosshair', '.play-toast', '.hm-shelter-chip', '.play-hud-hotbar', '.gr-footer', '.play-sync-indicator', '.play-dot', '.play-mash-btn', '.hm-build-readout', '.hm-hotbar', '.play-build-reticle', '.play-create', '.play-start'];
 async function shot(name) {
   if (only && only !== name.replace(/\.png$/, '')) return;
   await page.evaluate((sels) => { for (const s of sels) document.querySelectorAll(s).forEach((el) => { el.style.display = 'none'; }); }, HIDE);
   await new Promise((r) => setTimeout(r, 250));
-  fs.writeFileSync(path.join(shotsDir, name), await page.screenshot());
+  const png = await page.screenshot();
+  // Windows can hold a PNG for a moment (a preview or a sync client): retry the write rather than lose the run
+  for (let tries = 0; ; tries++) {
+    try { fs.writeFileSync(path.join(shotsDir, name), png); break; } catch (err) {
+      if (tries >= 20) throw err;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
   console.log('saved', name);
 }
 /** Puts the debug camera where the shot needs it, then waits a couple of frames. */
@@ -50,6 +57,16 @@ async function cam(pos, look) {
     ps.debug.setAltCam(p, 0, 0, l);
   }, [pos, look]);
   await new Promise((r) => setTimeout(r, 700));
+}
+/** A zoom through the window (the lens, not the camera's place): the pockets are 50 to 90 m out, so a close-up needs a narrower field. */
+async function zoom(fov) {
+  await page.evaluate((f) => {
+    const cam = window.__playScene.camera;
+    window.__baseFov ??= cam.fov;
+    cam.fov = f ?? window.__baseFov;
+    cam.updateProjectionMatrix();
+  }, fov);
+  await new Promise((r) => setTimeout(r, 500));
 }
 async function setView(progress, view) {
   await page.evaluate(([p, v]) => {
@@ -63,7 +80,7 @@ try {
   await page.goto(URL_ROOT, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.sm-menu button', { timeout: 60000 });
   await page.locator('.sm-menu button', { hasText: 'Play' }).first().click();
-  await page.waitForFunction(() => window.hmPlay?.ready === true, null, { timeout: 120000, polling: 250 });
+  await page.waitForFunction(() => window.hmPlay?.ready === true, null, { timeout: 240000, polling: 250 });
   await page.evaluate(() => {
     const done = [...document.querySelectorAll('.play-create .btns button')].find((b) => b.textContent.startsWith('Done'));
     done?.click();
@@ -113,25 +130,38 @@ try {
     await shot('flash-mid.png');
   }
 
-  // a pocket close-up through the window: the camera inside the lab at the glass, looking up at pocket 1's centre (it floats)
+  // a pocket close-up from the spawn, zoomed: the pocket floats 50 to 90 m out, so the lens is narrowed (20 degrees)
   const pk = await page.evaluate(() => window.__playScene.room.vista.debugPockets()[0]);
   console.log('pocket 1:', JSON.stringify(pk));
-  await cam({ x: -1.5, y: 1.7, z: -7.8 }, { x: pk.centre[0], y: pk.centre[1], z: pk.centre[2] });
+  await cam(spawn, { x: pk.centre[0], y: pk.centre[1], z: pk.centre[2] });
+  await zoom(20);
   await shot('pocket-close.png');
+  await zoom(null);
   // the crate that flies through pocket 1 (lane 0), shot mid-pocket: wait until it is inside the pocket's core
+  // the crate that flies through pocket 1 (lane 0), zoomed from the spawn: the camera follows the crate while it waits, and the shot is
+  // taken the moment it is inside the pocket's core (it moves about 6 m a second)
   if (!only || only === 'pocket-crate') {
-    const inside = await page.waitForFunction(() => {
-      const v = window.__playScene.room.vista;
+    await cam(spawn, { x: pk.centre[0], y: pk.centre[1], z: pk.centre[2] });
+    await zoom(20);
+    const inside = await page.waitForFunction((eye) => {
+      const ps = window.__playScene;
+      const v = ps.room.vista;
       const pp = v.debugPockets()[0];
       const f = v.debugFlyers().find((q) => q.lane === 0);
-      return !!f && Math.hypot(f.x - pp.centre[0], f.y - pp.centre[1], f.z - pp.centre[2]) < 0.6 * pp.radius;
-    }, null, { timeout: 150000, polling: 100 }).then(() => true, () => false);
+      if (!f) return false;
+      ps.debug.setAltCam(eye, 0, 0, { x: f.x, y: f.y, z: f.z });
+      return Math.hypot(f.x - pp.centre[0], f.y - pp.centre[1], f.z - pp.centre[2]) < 0.6 * pp.radius;
+    }, spawn, { timeout: 150000, polling: 30 }).then(() => true, () => false);
     console.log('crate inside pocket 1:', inside);
-    const c = await page.evaluate(() => { const f = window.__playScene.room.vista.debugFlyers().find((q) => q.lane === 0); return [f.x, f.y, f.z]; });
-    await cam({ x: -1.5, y: 1.7, z: -7.8 }, { x: c[0], y: c[1], z: c[2] });
     await shot('pocket-crate.png');
+    await zoom(null);
   }
 
+  // the ground under the 1-bit pocket, from above: its fidelity is cast down as a soft disc (review 2, V2)
+  if (!only || only === 'ground-disc') {
+    await cam({ x: pk.centre[0], y: 34, z: pk.centre[2] + 30 }, { x: pk.centre[0], y: 0, z: pk.centre[2] });
+    await shot('ground-disc.png');
+  }
   // the storm's progress again, from the spawn: Lite and Static
   await setView(0.5, 'lite');
   await cam(spawn, windowLook);
@@ -167,6 +197,24 @@ try {
   });
   console.log('vista renderer.info (lite, spawn view):', JSON.stringify(measuredLite));
   await setView(0.5, 'full');
+  // the planet seen through the gate (R8): the planet camera stands 4 m east of the gate, and the lab's window shows the storm plane (no hole)
+  if (!only || only === 'planet-gate-storm') {
+    // the gate is on only when powered: restore a fresh plot (newPlot's shape) with the gate on, then stand on the planet
+    await page.evaluate(() => window.__playScene.restore({ gateOn: true, plot: { v: 1, time: 0, ore: 60, points: { pxd: 0, vtx: 0, lx: 0, aq: 0 }, stage: 0, machines: [], nextId: 1 }, running: new Map(), connected: new Set() }));
+    await new Promise((r) => setTimeout(r, 1500));
+    const g = await page.evaluate(() => window.__playScene.debug.gatePlanet());
+    const dir = (process.env.PLANET_DIR ?? '1,0').split(',').map(Number);
+    const dist = Number(process.env.PLANET_DIST ?? 4);
+    await page.evaluate(([x, z]) => { window.__playScene.debug.teleport('planet', x, z, 0, 0); }, [g.x + dir[0] * dist, g.z + dir[1] * dist]);
+    await new Promise((r) => setTimeout(r, 1500));
+    await page.evaluate(([x, z, dx, dz, dd]) => {
+      window.__playScene.debug.setAltCam({ x: x + dx * dd, y: 2.2, z: z + dz * dd }, 0, 0, { x, y: 2.0, z });
+    }, [g.x, g.z, dir[0], dir[1], dist]);
+    await new Promise((r) => setTimeout(r, 900));
+    await shot('planet-gate-storm.png');
+    await page.evaluate(() => window.__playScene.debug.clearAltCam());
+    console.log('planet gate at', JSON.stringify(g), 'dir', dir.join(','));
+  }
   const errors = await page.evaluate(() => (window.__playScene ? 'ok' : 'no scene'));
   console.log('scene:', errors);
 } finally {

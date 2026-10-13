@@ -23,7 +23,7 @@ After TASK-21. The quest (`apps/web/src/play/quest.ts`) stops at 'drill'/'done'.
   4. **F-04** The hauler unlocks at stage 4.
   5. **F-05** The crawler unlocks at stage 6.
 - **The monsters:** after F-03 (once you can fight). Entities leaked from old games. The owner dropped the "Monster Mash" name and mode (2026-10-13), so never show that name.
-  - Mobs (`@hm/shareware`, `monster-mash-combat.ts`) spawn on the planet: never within 30 m of the gate pad or inside a sealed base; more with each stage.
+  - **This task only sets the unlock:** a `monstersUnlocked` flag in the saved state after F-03, and the narration hooks (M-01, M-02, M-03) as functions TASK-23b will call. Spawning, leaks and combat are TASK-23b's, with `@hm/leaksim`. Until then, no monsters spawn in the campaign.
   - M-01 plays at the first sighting, M-02 at the first kill, and M-03 is the low-health bark.
   - Death: respawn at the gate with the inventory kept and the save intact.
 - **Stage milestones:** the S-2 to S-6 lines, once per stage reached.

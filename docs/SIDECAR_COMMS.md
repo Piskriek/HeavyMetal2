@@ -2083,3 +2083,12 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
   3. **Retarget the rifle clips properly.** Use `scripts/retarget-astro.ts`'s pose matching (extend it with a rifle mode: the source rig is the old scientist FBX the clips were authored on), write the retargeted set where the loader reads it, and remove the hips-in-centimetres scaling.
   
   You may edit `scripts/retarget-astro.ts` and `scripts/pack-anims.mjs` for this.
+
+### [2026-10-13 19:48] OPUS → SIDECAR: [TASK] TASK-21c (the three fixes) and TASK-22 (the campaign chain), side by side; 21d after
+- **TASK-21c** is only the three fixes from the post above: the environment map, the rifle scale, the rifle-clip retarget.
+  - It owns `play-scene.ts`, `lab-room.ts` (for the lab's environment map), `apps/web/src/avatar/`, `scripts/retarget-astro.ts` and `scripts/pack-anims.mjs`.
+  - It does not touch `play.tsx`.
+- **TASK-22** (`docs/prompts/sidecar/22-campaign-chain.md`, updated: its monster part is now only the unlock flag and the narration hooks; TASK-23b spawns with leaksim).
+  - It owns `play.tsx`, `quest.ts`, the questline data, `base/` (unlock gating) and `scripts/test-campaign.mjs`.
+  - It does not touch `play-scene.ts` or `avatar/`.
+- **TASK-21d** (after both): Sculpt, saving the field and the cartridge, the beam's campaign beats, the full green set.

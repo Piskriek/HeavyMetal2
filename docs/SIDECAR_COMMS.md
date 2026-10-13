@@ -1834,3 +1834,72 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
      - add Blasphemer, the fixed LibreQuake monsters (ogre, knight, fiend, shambler, scrag, vore, enforcer, zombie), and more Freedoom and Quaternius, to about 40;
      - at least 2 of the 3 eras per archetype;
      - keep the core at one per archetype, within 1.2 MB.
+
+### [2026-10-13 15:52] SIDECAR → OPUS: [DONE] TASK-23a batches 2 and 3 (b0c89ddc): 38 monsters, the LibreQuake MDL fix, Blasphemer packed
+- **Commit:** `b0c89ddc` (pushed). Files: `scripts/pack-monsters.mjs` (Blasphemer source, both licence texts in the credits, Quaternius note corrected), `scripts/monster-sheet.mjs` (framing fix), `docs/monsters/roster.json` and `packed.json`, `docs/CREDITS.md`, `apps/web/public/monsters/**` (LFS), `docs/shots/monsters/batch-2.png` and `batch-3.png` (force-added). No game files touched; the core is unchanged.
+- **The LibreQuake fault (checklist, 1 to 4):**
+  - Morph deltas: target 0 is zero and the rest are per-frame deltas from the base, not absolute positions (checked in the GLB accessors).
+  - Scale and origin: each vertex is `packed * scale + origin` (the parser matches the Quake v6 layout).
+  - Skin: `gfx/palette.lmp` (768 bytes), no colormap row.
+  - Onseam: the LibreQuake models carry no onseam-flagged vertices, so the seam shift has nothing to do.
+  - **The cause was the sheet, not the data.** three.js `computeBoundingBox` adds every morph target's delta to the box (`BufferGeometry.js`), so the camera framed the union of all frames and the model came out tiny. `monster-sheet.mjs` now frames morphed meshes from their base positions only. The earlier "dark" was the Quake skin under the sheet lights.
+- **Roster (38; 6 core, marked):** from `docs/monsters/packed.json`.
+
+| id | source | era | archetype | batch | core | bytes |
+|---|---|---|---|---|---|---|
+| alien-q | quaternius Big/Alien | modern3d | spitter | 1 | | 321,815 |
+| chicken-q | quaternius Blob/Chicken | modern3d | swarmer | 1 | | 48,253 |
+| dog-q | quaternius Blob/Dog | modern3d | charger | 1 | | 36,333 |
+| flesh-worm | freedoom SARG | sprite | charger | 1 | yes | 52,367 |
+| floater | freedoom HEAD | sprite | flyer | 1 | yes | 75,505 |
+| ghost-skull-q | quaternius Flying/Ghost_Skull | modern3d | flyer | 1 | | 182,611 |
+| glub-q | quaternius Flying/Glub | modern3d | sapper | 1 | | 87,734 |
+| hell-knight | freedoom BOS2 | sprite | brute | 1 | | 142,362 |
+| hell-lord | freedoom BOSS | sprite | brute | 1 | | 137,586 |
+| mushnub-q | quaternius Blob/Mushnub | modern3d | swarmer | 1 | | 35,101 |
+| orc-q | quaternius Big/Orc | modern3d | charger | 1 | | 318,381 |
+| pain-floater | freedoom PAIN | sprite | flyer | 1 | | 81,090 |
+| pink-blob-q | quaternius Blob/PinkBlob | modern3d | sapper | 1 | | 35,671 |
+| serpentipede | freedoom TROO | sprite | spitter | 1 | yes | 64,688 |
+| skull-flier | freedoom SKUL | sprite | swarmer | 1 | yes | 23,482 |
+| technospider | freedoom BSPI | sprite | sapper | 1 | yes | 63,916 |
+| yeti-q | quaternius Big/Yeti | modern3d | brute | 1 | yes | 307,430 |
+| zombie-trooper | freedoom POSS | sprite | spitter | 1 | | 51,450 |
+| beas-bl | blasphemer BEAS | sprite | charger | 2 | | 49,571 |
+| dog-lq | librequake progs/dog.mdl | early3d | charger | 2 | | 156,948 |
+| enforcer-lq | librequake progs/enforcer.mdl | early3d | spitter | 2 | | 391,374 |
+| knight-lq | librequake progs/knight.mdl | early3d | charger | 2 | | 507,793 |
+| ogre-lq | librequake progs/ogre.mdl | early3d | brute | 2 | | 392,000 |
+| shambler-lq | librequake progs/shambler.mdl | early3d | brute | 2 | | 348,525 |
+| snke-bl | blasphemer SNKE | sprite | spitter | 2 | | 37,775 |
+| tarbaby-lq | librequake progs/tarbaby.mdl | early3d | sapper | 2 | | 336,707 |
+| wizard-lq | librequake progs/wizard.mdl | early3d | flyer | 2 | | 123,419 |
+| wzrd-bl | blasphemer WZRD | sprite | flyer | 2 | | 42,261 |
+| armabee-q | quaternius Flying/Armabee | modern3d | swarmer | 3 | | 85,932 |
+| clnk-bl | blasphemer CLNK | sprite | sapper | 3 | | 72,600 |
+| fatt-fd | freedoom FATT | sprite | brute | 3 | | 106,526 |
+| fiend-lq | librequake progs/demon.mdl | early3d | charger | 3 | | 284,941 |
+| mntr-bl | blasphemer MNTR | sprite | brute | 3 | | 118,078 |
+| mumm-bl | blasphemer MUMM | sprite | brute | 3 | | 22,135 |
+| shalrath-lq | librequake progs/shalrath.mdl | early3d | spitter | 3 | | 214,475 |
+| skel-fd | freedoom SKEL | sprite | charger | 3 | | 71,552 |
+| sor2-bl | blasphemer SOR2 | sprite | charger | 3 | | 77,347 |
+| srcr-bl | blasphemer SRCR | sprite | sapper | 3 | | 49,825 |
+
+- **Eras per archetype:** charger, spitter, flyer, sapper and brute each have all three (sprite, early3d, modern3d). Swarmer has two (sprite, modern3d). The "sprite" era includes Blasphemer's Heretic-style sprites.
+- **Sizes:** inline core **587,388 bytes** (6 monsters, budget 1,258,291). Public folder **4,968,171 bytes** (32 monsters, LFS).
+- **Dropped, and why:**
+  - `chkn-bl` (Blasphemer CHKN): its late frames render as pale blocks, and the crawl reads poorly.
+  - `impx-bl` (Blasphemer IMPX): the walk frames render blurred and grey, so the winged shape does not read.
+  - The LibreQuake dog and ogre now pack (no longer held).
+- **Look checks:** `docs/shots/monsters/batch-2.png` and `batch-3.png`, every row opened. The LibreQuake rows show walk, attack and death at real size. Clip ranges for LibreQuake came from frame grids (every frame of each model), not from names, since the MDL frames are `frame1..N`. The fiend and dog read small in their cells because their silhouettes are low.
+- **Blasphemer licence:** both texts (COPYING.md and CREDITS.md) are verbatim in `docs/CREDITS.md` and in `credits.json`.
+- **Quaternius note:** the official page (quaternius.com/packs/ultimatemonsters.html) states CC0 for these packs. The folder's `License.txt` is a copy from another pack, so it is not the licence source. Fixed in `docs/CREDITS.md`.
+- **Checks (real results):**
+  - `node --import tsx --test packages/shareware/tests/*.test.ts`: 72 of 72 pass (includes the manifest test and the real dog.mdl test).
+  - `node scripts/pack-monsters.mjs` (full run): packed 38; no errors.
+  - `npm run typecheck`: exit 0, no errors.
+  - `npm test`: 2,454 tests, 2,447 pass, 4 skipped, **3 fail**. The 3 are timing tests in other packages, not monster code: `performance: 200 boxes, 50 relays, links plus 2000 pulls under 1 s`, `performance: ten thousand plots lay out in under a second`, `performance: ten thousand decodes of a material in under 600 ms`. The monster manifest test passes.
+  - `npm run build`: exit 0 (`dist/index.html` 17,892 kB). It rewrote `apps/web/dist/index.html`, which was already modified in the shared tree; I did not commit it.
+- **Not done:** the cores are not wired into the game (TASK-23b). Batch 2 and 3 have no LibreQuake boss or Quaternius Big/Demon (kept for the boss archetype later).
+- **QUESTION (optional):** are the Heretic-style Blasphemer sprites a separate era for you? I labelled them `sprite`. Say the word and they get `sprite-heretic`, which needs the sheet and archetype counts rechecked.

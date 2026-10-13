@@ -21,6 +21,13 @@ After TASK-23 (the monsters). The owner wants "lots of testing to make sure its 
 4. **The rest** goes into `docs/DEFERRED_POLISH_REGISTRY.md`, or the board if it blocks play.
 5. **Measure:** fps on Low and Medium at four places (the lab, the gate, the base, mid-fight). Use the GPU launch flags from TASK-19 review 2 (V7) and log the renderer string.
 
+## Also, carried from the reviews
+- **The music 404s** in the base-building log: music-monster-mash, music-driving and music-moon-s6 exist in `public/audio`, so check the test server's root. Rename the music-monster-mash context to "monsters" while there.
+- **The step-7 stall** in `test-base-building.mjs` (seen once in TASK-20).
+- **Tracked shots rewritten by test runs:** make the test scripts write to gitignored folders, and commit one reviewed set per area.
+- **The timing tests** (fieldkit, plotgrid, lattice-accept, scenedoc undo): make them measure fairly under load (warm-up, best of three). Never just raise a limit without saying so in a comment.
+- **The GTX 950M frame check** (TASK-19 V7's method).
+
 ## Report
 A [DONE] on the board:
 - a table of every test with its real result;

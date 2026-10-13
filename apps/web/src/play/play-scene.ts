@@ -28,7 +28,7 @@ import * as F from '@hm/substrate';
 import * as S from '@hm/structure';
 import type { Kind } from '@hm/structure';
 import { globalKitPieceCache } from '../base/kit-pieces';
-import { beamEffect, type BeamFx, type BeamMode } from '@hm/beamkit';
+import { beamEffect, createMaterials, extractionBeam, type BeamFx, type BeamMode, type BeamTool } from '@hm/beamkit';
 import { BEAM_RANGE } from '../base/world';
 import type { WalkWorld } from '../base/walk';
 import { spawn as spawnRover, step as stepRover, speed as roverSpeed, ROVERS, DT as ROVER_DT, type RoverState, type RoverKind } from '@hm/rover';
@@ -175,6 +175,10 @@ export interface PlayScene {
   setDetail(d: Detail): void;
   /** Activity of the lab machines (bench writing, combiner mixing, rack cataloguing) for the lab plume. */
   setLabActivity(act: { readonly bench: number; readonly combiner: number; readonly rack: number }): void;
+  /** Shows or hides the held extraction rifle (the first-person view model) and sets its mode's screen. */
+  setBeamHeld(held: boolean, mode: BeamMode): void;
+  /** The held rifle's lamps and muzzle while the beam fires (on) or idles. */
+  setBeamFiring(on: boolean): void;
   /** Sets first person (body hidden) or third person over the shoulder. */
   setCameraView(mode: 'first' | 'third'): void;
   getCameraView(): 'first' | 'third';
@@ -844,6 +848,16 @@ export function createPlayScene(o: {
   const beamFx: BeamFx = beamEffect({ pixels: detail.plumes === 'dither' || detail.plumeDensity <= 0.5 ? 80 : 160 });
   planetScene.add(beamFx.object);
   beamFx.object.visible = false;
+
+  // The held rifle (TASK-21): a first-person view model on the camera, right of centre. It sits on layer 1, which only the
+  // main camera enables, so the gate's far-side camera never draws a rifle floating in its view.
+  const heldBeam: BeamTool = extractionBeam(createMaterials(), { stage: 1 });
+  heldBeam.group.position.set(0.22, -0.2, -0.46);
+  heldBeam.group.traverse((o) => o.layers.set(1));
+  heldBeam.group.visible = false;
+  camera.layers.enable(1);
+  camera.add(heldBeam.group);
+  planetScene.add(camera);
 
   const beamCoreGeom = keep(new THREE.CylinderGeometry(0.04, 0.07, 1, 10));
   const beamCoreUniforms = { uColour: { value: new THREE.Color('#00e5ff') }, uLit: { value: 0 } };
@@ -2022,6 +2036,13 @@ export function createPlayScene(o: {
       }
     },
     setLabActivity,
+    setBeamHeld(held, mode) {
+      heldBeam.setMode(mode);
+      heldBeam.group.visible = held;
+    },
+    setBeamFiring(on) {
+      heldBeam.setFiring(on ? 1 : 0);
+    },
     setCameraView(mode) {
       cameraView = mode;
       scientistHolder.visible = (mode === 'third');

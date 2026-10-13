@@ -66,6 +66,11 @@ import { weaponStats } from '../base/weapons';
 import * as S from '@hm/structure';
 import type { Kind } from '@hm/structure';
 import * as L from '@hm/lattice';
+import type { BeamMode } from '@hm/beamkit';
+import { cycleBeamMode } from './beam-tool';
+
+/** The extraction rifle's modes, as the player reads them (the chip and the toasts). */
+const BEAM_LABEL: Readonly<Record<BeamMode, string>> = { extract: 'Extract', apply: 'Apply', sculpt: 'Sculpt' };
 import {
   GameNarratorController,
   preloadMentorVo,
@@ -312,6 +317,16 @@ export function PlayScreen(props: {
   /** The scene's mouse handler is set up once, so it reads the layout being placed through this ref (not the state). */
   const placingLayoutRef = useRef<string | null>(null);
   placingLayoutRef.current = placingLayoutId;
+  /** The extraction rifle (TASK-21): out in hand or racked, and its mode. The mouse and wheel handlers read the refs. */
+  const beamHeldRef = useRef(false);
+  const beamModeRef = useRef<BeamMode>('extract');
+  const [beamHud, setBeamHud] = useState<{ readonly held: boolean; readonly mode: BeamMode }>({ held: false, mode: 'extract' });
+  const setBeamHeld = (held: boolean, mode: BeamMode): void => {
+    beamHeldRef.current = held;
+    beamModeRef.current = mode;
+    sceneRef.current?.setBeamHeld(held, mode);
+    setBeamHud({ held, mode });
+  };
   const placingLayoutRotationRef = useRef<number>(0);
   const [planPrompt, setPlanPrompt] = useState<string | null>(null);
   const nearestPlanRef = useRef<Plan | null>(null);
@@ -943,6 +958,8 @@ export function PlayScreen(props: {
           scene.mash.setTrigger(true);
           fireWeapon();
         } else {
+          // A held rifle takes the mouse: the beam mines in the frame loop, and the other modes' strokes are the next step.
+          if (beamHeldRef.current) return;
           if (placingLayoutRef.current !== null) {
             const hit = scene.aimPoint();
             if (hit) {
@@ -988,11 +1005,13 @@ export function PlayScreen(props: {
       // 1. Tick accumulator for 100ms ticks (node regrowth, beam extraction, machine refinement)
       harvestAccRef.current += dt;
       const aimedNode = scene.aimNode(w.field, BEAM_RANGE);
-      const hasBeam = w.equipment.beam?.item === 'tool-beam';
+      // A held rifle mines in Extract mode; in Apply and Sculpt it does not mine (the equipped beam still does, as before).
+      const hasBeam = beamHeldRef.current ? beamModeRef.current === 'extract' : w.equipment.beam?.item === 'tool-beam';
       const targetNode = forceBeamRef.current !== null
         ? (w.field.nodes.find((n) => n.id === forceBeamRef.current) ?? aimedNode)
         : aimedNode;
       const isMining = (isLmbDownRef.current || forceBeamRef.current !== null) && hasBeam && targetNode !== null && !scene.mash.isEquipped();
+      scene.setBeamFiring(isMining && beamHeldRef.current);
 
       if (harvestAccRef.current >= 0.1) {
         const powerMap: Record<number, number> = {};
@@ -1947,6 +1966,7 @@ export function PlayScreen(props: {
         }
       }
       if (e.code === 'KeyR') {
+        if (beamHeldRef.current) return; // the rifle's reload is the next beam step (TASK-21)
         if (placingLayoutId !== null) {
           placingLayoutRotationRef.current = (placingLayoutRotationRef.current + 1) % 4;
           say(`Layout Rotation: ${placingLayoutRotationRef.current * 90}°`);
@@ -1955,6 +1975,12 @@ export function PlayScreen(props: {
         buildRotationRef.current = (buildRotationRef.current + 1) % 4;
         say(`Rotation: ${buildRotationRef.current * 90}°`);
         (baseViewSource as WorldViewSource).notify?.();
+        return;
+      }
+      if (e.code === 'KeyQ' && beamHeldRef.current) {
+        const mode = cycleBeamMode(beamModeRef.current, 1);
+        setBeamHeld(true, mode);
+        say(`Beam: ${BEAM_LABEL[mode]}`);
         return;
       }
       if (e.code === 'KeyQ') {
@@ -2088,6 +2114,17 @@ export function PlayScreen(props: {
           freeMouse();
         }
       }
+      if (e.code === 'KeyG') {
+        // The extraction rifle (TASK-21): out in hand on the planet; racked on the lab wall until its place in the story.
+        if (hud.where !== 'planet') {
+          say('The beam stays racked on the lab wall', 'It comes down to the planet later.');
+          return;
+        }
+        const held = !beamHeldRef.current;
+        setBeamHeld(held, beamModeRef.current);
+        say(held ? `Extraction beam: ${BEAM_LABEL[beamModeRef.current]}` : 'Extraction beam put away', held ? 'Q or the wheel cycles Extract, Apply and Sculpt.' : undefined);
+        return;
+      }
       if (e.code === 'KeyB' && hud.where === 'planet') {
         if (visitingRef.current) {
           say(`Visiting ${visitingRef.current.snapshot.owner}'s plot`, 'Visits are read-only.');
@@ -2108,6 +2145,12 @@ export function PlayScreen(props: {
   // Mouse wheel kind cycling for base-building (Item C1)
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
+      if (beamHeldRef.current) {
+        const mode = cycleBeamMode(beamModeRef.current, e.deltaY > 0 ? 1 : -1);
+        setBeamHeld(true, mode);
+        say(`Beam: ${BEAM_LABEL[mode]}`);
+        return;
+      }
       const w = baseWorldRef.current;
       const slot = w.player.slots[w.hotbar];
       if (!slot || slot.n <= 0) return;
@@ -2127,7 +2170,7 @@ export function PlayScreen(props: {
 
   // leaving the planet closes the build menu; entering planet closes lab panels
   useEffect(() => {
-    if (hud.where === 'lab') { setMenu(false); setPanel(null); stopBuilding(); }
+    if (hud.where === 'lab') { setMenu(false); setPanel(null); stopBuilding(); if (beamHeldRef.current) setBeamHeld(false, beamModeRef.current); }
     if (hud.where === 'planet') { setLabPanel(null); setDialOpen(false); }
   }, [hud.where, stopBuilding]);
 
@@ -3092,6 +3135,12 @@ export function PlayScreen(props: {
                   ({baseWorldRef.current?.base.pieces.length ?? 0} PIECES)
                 </span>
               </div>
+          ) : null}
+          {beamHud.held && hud.where === 'planet' && !hideOverlays ? (
+            <div className="hm-beam-chip" data-testid="beam-mode" data-mode={beamHud.mode}>
+              <b>{BEAM_LABEL[beamHud.mode]}</b>
+              <span>Q or wheel: next mode</span>
+            </div>
           ) : null}
           {hud.where === 'planet' && !hideOverlays ? (
             <>

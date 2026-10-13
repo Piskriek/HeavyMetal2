@@ -986,3 +986,36 @@ button.hm-quick-stack-btn:active,
 }
 
 
+
+/* The held extraction rifle's mode (TASK-21): one telemetry line, out of the way of the hotbar. */
+.hm-beam-chip {
+  position: fixed;
+  right: 16px;
+  bottom: 112px;
+  z-index: 40;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: rgba(8, 14, 24, 0.78);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.16);
+  font-family: Oxanium, Inter, sans-serif;
+  color: #cffafe;
+  pointer-events: none;
+}
+.hm-beam-chip b {
+  font-size: 14px;
+  font-weight: 800;
+  color: #00e5ff;
+  text-shadow: 0 0 10px rgba(0, 229, 255, 0.55);
+}
+.hm-beam-chip span {
+  font-size: 11px;
+  color: #94a3b8;
+}
+@media (max-width: 640px) {
+  .hm-beam-chip { right: 12px; bottom: 96px; }
+}

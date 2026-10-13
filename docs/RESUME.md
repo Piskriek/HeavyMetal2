@@ -128,3 +128,7 @@ The context a new Opus session needs on its first message. Keep it current: upda
     - The rest of the subjects wait for batch 2 to finish: drum-square, generator-small, cart-flatbed, cable-reel-square, shelving-closed, specimen-freezer, gas-cabinet, server-crate, portable-office, comms-mast-solid, wrecked-van, container-crushed, datacentre-annex, silo-square, transformer-box, checkpoint-booth, office-block-ruin, battery-pack, workbench-old, crater-rim-chunk, chimney-square.
     - Hold: chimney-square (the owner's no-chimney rule); crater-rim-chunk (no option is good).
   - **Sidecars running:** TASK-19 review 2, and TASK-20 (one game).
+- **2026-10-13 afternoon:**
+  - TASK-19 is accepted after review 3: the Breach is a glitch-sliced column and the storm reads dark. POL-25 and POL-26 are logged.
+  - 17 batch-2 props are packed (cb5d569e).
+  - **TASK-23a** (the monster art pipeline, `docs/prompts/sidecar/23a-monster-art.md`) is dispatched beside TASK-20. Both run in Haiku sidecars and never share files.

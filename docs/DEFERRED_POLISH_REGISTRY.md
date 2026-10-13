@@ -20,6 +20,7 @@
 | **POL-25** | **Window Flash on the Lab Floor** | TASK-19 review 3 (2026-10-13) | A static burst in the window view should briefly light the lab floor. The light gain is up (+12 per unit of flash, capped at 0.7), but the capture lands about 0.3 s after the peak, so it cannot be shown yet. Add a peak hook in the vista and check it by eye. | Polish pass. |
 | **POL-26** | **Stage-0 Storm Ground Speckle** | TASK-19 review 3 (2026-10-13) | At progress 0 the window's dust plain is EGA-quantised (Pxd 0.15) and speckles black and white. It follows the plan's fidelity, but it is busy. Kept for now; a candidate for the owner's Studio polish (raise the ground's Pxd or soften the dither). | Owner's Studio pass. |
 | **POL-27** | **Single-File Size Watch** | Opus (2026-10-13) | dist/index.html is 17.9 MB, up from 6.9 MB on main (9 Oct). Most of it is the 114 inline generated lows (6 MB raw). Measure the load and parse time on the GTX 950M laptop (TASK-24). If it passes ~25 MB or loads slowly, move vista-only props to a fetched side file behind the loading bar, keeping the playable core inline. | Watch; TASK-24 measures. |
+| **POL-28** | **Two-Hand IK on the Rifle** | TASK-21c (2026-10-13) | The third-person left hand aims at the beam's foregrip socket but isn't IK-placed on it; from the side the foregrip reads foreshortened. Add a two-bone IK for the left arm to the foregrip socket. | Polish pass. |
 
 ---
 

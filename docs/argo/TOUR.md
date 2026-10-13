@@ -17,7 +17,7 @@ These are taken by the automated tests, so some show test overlays: the "Click t
 | [11 the inventory](tour/11-inventory.jpg) | The suit rig, the weapon loadout and the cargo grid. | Clean, but generic. |
 | [12 driving the rover](tour/12-rover-driving.jpg) | The scout in motion. | The camera clips into geometry, and the vehicle camera needs work. |
 | [13 the beam, first person](tour/13-beam-first-person-apply-paint.jpg) | The rifle-shaped extraction beam in Apply mode, with a painted patch of ground. | The prop reads, but it is dark. |
-| [14 the beam, third person](tour/14-beam-third-person.jpg) | The player character holding the beam. | The character renders near-black, and the rifle is tiny. Both are being fixed in TASK-21c. |
+| [14 the beam, third person](tour/14-beam-third-person.jpg) | The player character holding the beam. | Fixed on 13 October: the suit reads (it takes the lab's reflection, metal capped), and the rifle clips are retargeted onto Astro's rig. Still open: the left hand aims at the foregrip but isn't IK-placed. |
 | [15 the Studio](tour/15-studio-editor.jpg) | The owner's editor: the content browser, gizmo viewport, details, and Changes with Accept. | The shell and asset bench were finished on 13 October. |
 | [16 the Studio's asset bench](tour/16-studio-asset-levels.jpg) | One model at Low, Mid and High side by side, with the redo panel. | Used to touch up and redo the generated models. |
 | [17 monsters, batch 1](tour/17-monsters-batch1.jpg) | Freedoom sprites and Quaternius 3D monsters, packed by archetype. | Not in the game yet (TASK-23b). The tonal clash between gory Doom-era sprites and cute low-poly is open for your direction. |

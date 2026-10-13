@@ -71,7 +71,7 @@ The briefs are in [`docs/prompts/sidecar/`](../prompts/sidecar/).
 - **The HUD fights itself.** On arrival on the Moon, three texts overlap (a big title, the build readout, the radio subtitle), and a build readout ("CANNOT PLACE") shows when you aren't building. Design language varies between screens built by different sidecars.
 - **Prototype looks:**
   - foundations are flat red slabs with blue rings;
-  - the player character renders near-black on the planet (being fixed);
+  - the player character rendered near-black on the planet (fixed on 13 October; the left hand still isn't IK-placed on the rifle);
   - the rover camera clips into geometry;
   - the menu is a list of text.
 - **No juice yet:** placing, mining, printing and killing lack the feedback (sound, VFX, camera, haptics) that makes them feel good.

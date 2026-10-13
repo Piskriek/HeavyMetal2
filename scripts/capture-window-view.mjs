@@ -36,10 +36,19 @@ page.on('pageerror', (err) => console.error('[page error]', err.message));
 page.on('console', (msg) => { if (msg.type() === 'error') console.log('[console error]', msg.text()); });
 
 const HIDE = ['.mentor-subtitle', '.radio-hud-btn', '.play-prompt', '.play-goal', '.play-plot', '.play-build', '.gr-bar', '.gr-window', '.play-sync', '.hm-draw-calls-badge', '.play-crosshair', '.play-toast', '.hm-shelter-chip', '.play-hud-hotbar', '.gr-footer', '.play-sync-indicator', '.play-dot', '.play-mash-btn', '.hm-build-readout', '.hm-hotbar', '.play-build-reticle', '.play-create', '.play-start'];
-async function shot(name) {
+/** Takes one shot. Every overlay (any fixed or absolute element with no canvas inside) is hidden too, so the build HUD and the hotbar
+ *  never reach a shot (review 2, V6: the planet-side shot had them). `settle` is the wait before the grab (0 for a flash at its peak). */
+async function shot(name, settle = 250) {
   if (only && only !== name.replace(/\.png$/, '')) return;
-  await page.evaluate((sels) => { for (const s of sels) document.querySelectorAll(s).forEach((el) => { el.style.display = 'none'; }); }, HIDE);
-  await new Promise((r) => setTimeout(r, 250));
+  await page.evaluate((sels) => {
+    for (const s of sels) document.querySelectorAll(s).forEach((el) => { el.style.display = 'none'; });
+    for (const el of document.querySelectorAll('body *')) {
+      if (el.tagName === 'CANVAS' || el.querySelector('canvas')) continue;
+      const pos = getComputedStyle(el).position;
+      if (pos === 'fixed' || pos === 'absolute') el.style.visibility = 'hidden';
+    }
+  }, HIDE);
+  if (settle) await new Promise((r) => setTimeout(r, settle));
   const png = await page.screenshot();
   // Windows can hold a PNG for a moment (a preview or a sync client): retry the write rather than lose the run
   for (let tries = 0; ; tries++) {
@@ -123,11 +132,17 @@ try {
   await shot('parallax-b.png');
 
   // a flash: wait for a burst to be lit, then shoot it at once
-  if (!only || only === 'flash') {
+  if (!only || only === 'flash' || only === 'flash-mid') {
     await cam(spawn, windowLook);
-    const flashed = await page.waitForFunction(() => (window.__playScene.room.vista.flashLight ?? 0) > 0.35, null, { timeout: 90000, polling: 50 }).then(() => true, () => false);
+    // the grab is at the flash's peak (the light falls to a third in a quarter second, so there is no settle wait)
+    // the vista reports each scheduled burst at its strike (flash.onFlash); the grab follows it within a frame or two
+    await page.evaluate(() => {
+      window.__flashAt = null;
+      window.__playScene.room.vista.flash.onFlash(() => { window.__flashAt = performance.now(); });
+    });
+    const flashed = await page.waitForFunction(() => window.__flashAt != null && performance.now() - window.__flashAt < 80, null, { timeout: 90000, polling: 'raf' }).then(() => true, () => false);
     console.log('flash lit:', flashed);
-    await shot('flash-mid.png');
+    await shot('flash-mid.png', 0);
   }
 
   // a pocket close-up from the spawn, zoomed: the pocket floats 50 to 90 m out, so the lens is narrowed (20 degrees)
@@ -150,10 +165,11 @@ try {
       const f = v.debugFlyers().find((q) => q.lane === 0);
       if (!f) return false;
       ps.debug.setAltCam(eye, 0, 0, { x: f.x, y: f.y, z: f.z });
-      return Math.hypot(f.x - pp.centre[0], f.y - pp.centre[1], f.z - pp.centre[2]) < 0.6 * pp.radius;
-    }, spawn, { timeout: 150000, polling: 30 }).then(() => true, () => false);
+      return Math.hypot(f.x - pp.centre[0], f.y - pp.centre[1], f.z - pp.centre[2]) < 0.75 * pp.radius;
+    }, spawn, { timeout: 120000, polling: 30 }).then(() => true, () => false);
     console.log('crate inside pocket 1:', inside);
-    await shot('pocket-crate.png');
+    // a shot is taken only when the crate was seen inside (a miss leaves the camera on the last pose, so it is not saved)
+    if (inside) await shot('pocket-crate.png');
     await zoom(null);
   }
 

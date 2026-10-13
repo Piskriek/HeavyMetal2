@@ -436,8 +436,11 @@ export function createLabRoom(o: {
     level: VISTA_LEVEL,
   });
   stormPlane.visible = vista.view === 'static';
-  // Observation window glass
-  add(new THREE.PlaneGeometry(ww, wh), m.glass, (p) => { p.position.set(wx, wy, ROOM.back + 0.02); });
+  // Observation window glass: a lighter veil than the lab's own glass (0.28, shared with the monitors), so the view behind it reads
+  // dark, as the storm world should (review 3, W2)
+  const windowGlass = keep(m.glass.clone());
+  windowGlass.opacity = 0.1;
+  add(new THREE.PlaneGeometry(ww, wh), windowGlass, (p) => { p.position.set(wx, wy, ROOM.back + 0.02); });
 
   // ---- Helper to place props and register colliders
   const place = (p: Prop, x: number, z: number, yaw = 0, y = 0): Prop => {
@@ -903,8 +906,8 @@ export function createLabRoom(o: {
       pulseUniforms.uTime.value = now;
       stormUniforms.uTime.value = now;
       vista.update(now, dt);
-      // the bursts flash the window light, capped: the floor lights up, the room never whites out
-      windowLight.intensity = 3.5 + 6 * vista.flashLight;
+      // the bursts flash the window light, capped at 0.7 of the peak: the floor lights up, the room never whites out (review 3)
+      windowLight.intensity = 3.5 + 12 * vista.flashLight;
     },
     dispose() {
       vista.dispose();

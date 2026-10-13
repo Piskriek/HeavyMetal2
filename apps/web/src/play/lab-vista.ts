@@ -60,18 +60,19 @@ const BREACH = BREACH_XZ;
 const beyond = (bearing: number, w: number): readonly [number, number] => polar(SPAWN_XZ, bearing, WINDOW_DIST + w);
 /** The lab's north wall (the window's plane). */
 const WALL_Z = -9;
-/** The breach column: 300 m square, 600 m tall. From the spawn it stands 26.6 degrees high, above the glass top (10.5 degrees). */
-const BREACH_W = 300, BREACH_H = 600;
+/** The breach column: a square core 120 m across and 600 m tall (review 3, W1). From the spawn it stands 26.6 degrees high, above the glass top. */
+const BREACH_CORE_W = 120, BREACH_H = 600;
 /** The storm's cloud layer, 450 m up: the Breach's top rises through it (review 2, V1). */
 const CLOUD_H = 450;
-/** The glow sheath is twice the column's width: its alpha falls from the core's edge to nothing at the sheath's edge. */
-const SHEATH_W = BREACH_W * 2;
+/** The soft glow sheath is 300 m across: it glows just outside the core's edge and fades to nothing at its own edge (review 3, W1). */
+const SHEATH_W = 300;
 /** The pocket shells' rim colours are the kinds' (math); the back faces take the kinds' sky. Padded to the shader's array length. */
 const SHELL_RIM = Array.from({ length: MAX_POCKETS }, (_, i) => POCKET_KINDS[i]?.rim ?? [0, 0, 0] as const);
 const SHELL_SKY = Array.from({ length: MAX_POCKETS }, (_, i) => POCKET_KINDS[i]?.sky ?? [0, 0, 0] as const);
 
-/** The horizon colour at the storm and at dusk (sRGB, as the sky shader writes it); the fog takes the same colour. */
-const HORIZON_STORM: Readonly<[number, number, number]> = [0.2, 0.19, 0.23];
+/** The horizon colour at the storm and at dusk (sRGB, as the sky shader writes it); the fog takes the same colour. The storm is dark
+ *  (review 3, W2): the Breach and the pockets' rims are the only bright things in the view. */
+const HORIZON_STORM: Readonly<[number, number, number]> = [0.13, 0.12, 0.16];
 const HORIZON_DUSK: Readonly<[number, number, number]> = [0.92, 0.52, 0.3];
 /** exp2 fog: half faded at 500 m, nearly gone at 1.5 km (the brief, R3). */
 const FOG_DENSITY = 0.00167;
@@ -322,7 +323,7 @@ void main() {
   vec3 d = normalize(vDir);
   float up = clamp(d.y, 0.0, 1.0);
   vec3 hz = mix(uHorizon, uDuskHorizon, uDusk);
-  vec3 zen = mix(vec3(0.05, 0.05, 0.08), vec3(0.17, 0.18, 0.32), uDusk);
+  vec3 zen = mix(vec3(0.025, 0.025, 0.045), vec3(0.17, 0.18, 0.32), uDusk);
   vec3 col = mix(hz, zen, smoothstep(0.0, 0.5, up));
   // the storm clouds are a layer at uCloudH: the view ray meets it, the clouds drift on it, and their undersides within 1.5 km
   // of the Breach take its cyan (cloudLitAt in the maths) and the flashes' light (review 2, V1)
@@ -335,7 +336,7 @@ void main() {
     cl *= smoothstep(0.02, 0.12, d.y);
     lit = 1.0 - smoothstep(200.0, 1500.0, length(q - uBreachXZ));
   }
-  vec3 cloudDark = mix(vec3(0.17, 0.16, 0.2), vec3(0.36, 0.22, 0.18), uDusk);
+  vec3 cloudDark = mix(vec3(0.11, 0.105, 0.13), vec3(0.36, 0.22, 0.18), uDusk);
   vec3 cloudLit = vec3(0.45, 0.92, 1.0) * uGlow;
   vec3 cloudCol = mix(cloudDark, cloudLit, lit) + vec3(0.8, 0.95, 1.0) * uFlash * 0.5 * (0.3 + 0.7 * lit);
   col = mix(col, cloudCol, cl * 0.9);
@@ -347,21 +348,30 @@ void main() {
 }
 `;
 
-/** The Breach: the column is cut into 10 m slices, and each slice jumps sideways in steps (the glitch), not a flag's stripes. */
+/**
+ * The Breach (review 3, W1): a square column of 60 rigid 10 m slices. Each slice is its own box, so a glitched slice jumps sideways as
+ * one band (its vertices share the slice index), and the bands are darker when they jump. The core is cyan, with a few white cells
+ * (the only white in the column) and a few dead cells. The top 28% dissolves into the lit cloud, and is see-through there.
+ */
 const BREACH_VERT = /* glsl */ `
 uniform float uTime, uH;
+attribute float aSlice;
 varying vec3 vP;
 varying float vY;
+varying float vT;
+varying float vBand;
 float bh(float n) { return fract(sin(n * 91.345) * 47453.5453); }
 void main() {
   vec3 p = position;
   p.y *= uH;
   float tick = floor(uTime * 2.2);
-  float slice = floor(p.y / 10.0);
-  float roll = bh(slice * 1.7 + tick * 13.1);
-  p.x += step(0.6, roll) * (bh(slice * 3.3 + tick * 7.7) - 0.5) * 46.0;
+  float roll = bh(aSlice * 1.7 + tick * 13.1);
+  float off = step(0.6, roll);
+  p.x += off * (bh(aSlice * 3.3 + tick * 7.7) - 0.5) * 56.0;
   vP = p;
   vY = p.y;
+  vT = position.y / ${BREACH_H.toFixed(1)};
+  vBand = off;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
 }
 `;
@@ -370,22 +380,26 @@ uniform float uTime, uGlow, uHaze;
 uniform vec3 uHazeCol;
 varying vec3 vP;
 varying float vY;
+varying float vT;
+varying float vBand;
 float bh2(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 void main() {
   float tick = floor(uTime * 18.0);
   vec2 cell = floor(vec2(vP.x + vP.z, vY) / vec2(5.0, 3.0));
   float n = bh2(cell + tick * 0.37);
-  // the core is white-cyan and the brightest thing in the view (review 2, V1); its cold cells are cyan, the hot ones white
-  vec3 hot = vec3(1.0, 1.0, 1.0);
-  vec3 cold = vec3(0.55, 0.95, 1.0);
-  vec3 c = mix(cold, hot, step(0.32, n));
-  c *= 1.6 * (0.7 + 0.3 * uGlow);
+  vec3 cold = vec3(0.55, 0.92, 1.0);
+  vec3 c = mix(cold, vec3(1.0), step(0.88, n));
+  c = mix(c, vec3(0.08, 0.16, 0.2), step(n, 0.06));
+  c *= (0.85 + 0.15 * uGlow) * mix(1.0, 0.6, vBand);
   c = mix(c, uHazeCol * 1.3, uHaze * 0.5);
-  gl_FragColor = vec4(c, 1.0);
+  float top = smoothstep(0.72, 1.0, vT);
+  c = mix(c, vec3(0.4, 0.7, 0.8) * uGlow, top * 0.6);
+  gl_FragColor = vec4(c, 1.0 - top);
 }
 `;
 
-/** The glow sheath: a soft additive cylinder twice the column's width. Its front faces brighten toward the middle and fall off at the edge. */
+/** The glow sheath: a soft additive cylinder, 300 m across. Its screen radius s (0 at the axis, 1 at the silhouette) puts the glow just
+ *  outside the core's edge (the core is 120 m of the 300 m, so s 0.4) and fades it to nothing at the sheath's edge (review 3, W1). */
 const SHEATH_VERT = /* glsl */ `
 uniform float uH;
 varying vec3 vN;
@@ -408,10 +422,41 @@ varying vec3 vV;
 varying float vY;
 void main() {
   float facing = abs(dot(normalize(vN), normalize(vV)));
-  float a = pow(facing, 1.6) * 0.5 * uGlow * (1.0 - smoothstep(0.75, 1.0, vY));
+  float s = sqrt(max(0.0, 1.0 - facing * facing));
+  float ring = smoothstep(0.36, 0.44, s) * (1.0 - smoothstep(0.6, 1.0, s));
+  float a = 0.55 * ring * uGlow * (1.0 - smoothstep(0.75, 1.0, vY));
   gl_FragColor = vec4(vec3(0.35, 0.85, 1.0), a);
 }
 `;
+
+/** The breach column's geometry: 60 boxes of 10 m, one per slice, each with its slice index (`aSlice`), in one buffer. */
+function breachColumnGeometry(): THREE.BufferGeometry {
+  const slices = Math.round(BREACH_H / 10);
+  const box = new THREE.BoxGeometry(BREACH_CORE_W, 10, BREACH_CORE_W);
+  const pos = box.attributes.position as THREE.BufferAttribute;
+  const nor = box.attributes.normal as THREE.BufferAttribute;
+  const uv = box.attributes.uv as THREE.BufferAttribute;
+  const idx = box.index!;
+  const n = pos.count;
+  const P: number[] = [], N: number[] = [], U: number[] = [], S: number[] = [], I: number[] = [];
+  for (let k = 0; k < slices; k++) {
+    for (let v = 0; v < n; v++) {
+      P.push(pos.getX(v), pos.getY(v) + 10 * k + 5, pos.getZ(v));
+      N.push(nor.getX(v), nor.getY(v), nor.getZ(v));
+      U.push(uv.getX(v), uv.getY(v));
+      S.push(k);
+    }
+    for (let i = 0; i < idx.count; i++) I.push(idx.getX(i) + k * n);
+  }
+  box.dispose();
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+  g.setAttribute('aSlice', new THREE.Float32BufferAttribute(S, 1));
+  g.setIndex(I);
+  return g;
+}
 
 const CURTAIN_VERT = /* glsl */ `
 varying vec2 vUv;
@@ -494,8 +539,8 @@ void main() {
   float a = clamp(rim * 1.6 * (0.5 + 0.5 * grain), 0.0, 0.9);
   vec3 c = rimCol;
   if (!gl_FrontFacing) {
-    // the back faces: the pocket's sky at 25% opacity, with the rim on top
-    c = mix(uShellSky[vSlot], rimCol, rim);
+    // the back faces: the pocket's sky at 25% opacity, dimmed by half so the rim is what is bright (review 3, W2), with the rim on top
+    c = mix(uShellSky[vSlot] * 0.5, rimCol, rim);
     a = max(a, 0.25);
   }
   gl_FragColor = vec4(c, a);
@@ -653,8 +698,9 @@ export function createLabVista(o: LabVistaOptions): LabVista {
   const apronTex = keep(crack.clone());
   apronTex.repeat.set(10, 5);
   groundTex.needsUpdate = apronTex.needsUpdate = true;
-  const groundMat = keep(new THREE.MeshStandardMaterial({ map: groundTex, roughness: 0.94, metalness: 0, color: '#d8c6a8' }));
-  const apronMat = keep(new THREE.MeshStandardMaterial({ map: apronTex, roughness: 0.8, metalness: 0, color: '#8f877b' }));
+  // the dust plain is dark under the storm (review 3, W2): the Breach and the pockets are what is bright
+  const groundMat = keep(new THREE.MeshStandardMaterial({ map: groundTex, roughness: 0.94, metalness: 0, color: '#6a6155' }));
+  const apronMat = keep(new THREE.MeshStandardMaterial({ map: apronTex, roughness: 0.8, metalness: 0, color: '#4f4a43' }));
   patchMaterial(groundMat, shared);
   patchMaterial(apronMat, shared);
   const groundGeo = keep(new THREE.PlaneGeometry(GROUND * 2, GROUND * 2, GRID, GRID));
@@ -706,12 +752,11 @@ export function createLabVista(o: LabVistaOptions): LabVista {
     scene.add(ridge);
   }
 
-  // ---- The Breach: a 150 m square column, 600 m tall, its 10 m slices jumping sideways; the brightest thing in the view (R4)
+  // ---- The Breach: a square core 120 m across, 600 m tall, its 10 m slices jumping sideways in dark and white bands (R4, W1)
   const breachU = { uTime: { value: 0 }, uH: { value: 1 }, uGlow: { value: 1 }, uHaze: { value: 0.3 }, uHazeCol: { value: hexOf(HORIZON_STORM) } };
-  const breachGeo = keep(new THREE.BoxGeometry(BREACH_W, BREACH_H, BREACH_W, 1, 60, 1));
-  breachGeo.translate(0, BREACH_H / 2, 0);
+  const breachGeo = keep(breachColumnGeometry());
   const breach = new THREE.Mesh(breachGeo, keep(new THREE.ShaderMaterial({
-    vertexShader: BREACH_VERT, fragmentShader: BREACH_FRAG, uniforms: breachU, toneMapped: false,
+    vertexShader: BREACH_VERT, fragmentShader: BREACH_FRAG, uniforms: breachU, toneMapped: false, transparent: true,
   })));
   breach.position.set(BREACH[0], 0, BREACH[1]);
   scene.add(breach);

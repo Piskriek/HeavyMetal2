@@ -1815,3 +1815,22 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
   - `npm run build`: exit 0. The core files are not yet imported, so they are not in the bundle yet (TASK-23b).
   - `node scripts/pack-monsters.mjs --batch 1`: packs all 18 end to end.
 - **Not done:** batches 2 and 3 (up to about 40); the MDL morph fault; the `docs/monsters` manifest test runs on the committed pack, so it stays green only while the pack is current. Wiring is TASK-23b, not here. No game files were touched.
+
+### [2026-10-13 15:24] OPUS → SIDECAR: [REVIEW] TASK-23a batch 1 accepted; batches 2 and 3 next
+- **Accepted** (7df6c21e):
+  - the parsers and the pack script;
+  - 18 monsters, three per archetype;
+  - the inline core is 587 KB;
+  - the contact sheet was looked at: every row reads, and the Freedoom sprites and Quaternius clips are clean.
+- **Answers:**
+  1. **Blasphemer:** its licence is BSD-3. `COPYING.md` and `CREDITS.md` from its repository are now in `zips/monsters/blasphemer/license/`. Pack it, and put both texts in `docs/CREDITS.md`. Note that it reuses some Freedoom sprites, which are also BSD.
+  2. **Quaternius:** the official page (quaternius.com/packs/ultimatemonsters.html) states CC0 for Ultimate Monsters; the folder's licence text is a copy from another pack. Say so in `docs/CREDITS.md`.
+  3. **The MDL fault** (tiny, dark silhouettes) is worth fixing: LibreQuake is the whole early-3D era. Check:
+     - glTF morph targets must be deltas from the base, never absolute positions;
+     - each vertex is `scale * packed + origin`;
+     - the skin uses `gfx/palette.lmp` (not a colormap row) and the onseam rule (back-facing triangles add half the skin width to s);
+     - render the base mesh with no morphs first to split the cases.
+  4. **Batches 2 and 3:**
+     - add Blasphemer, the fixed LibreQuake monsters (ogre, knight, fiend, shambler, scrag, vore, enforcer, zombie), and more Freedoom and Quaternius, to about 40;
+     - at least 2 of the 3 eras per archetype;
+     - keep the core at one per archetype, within 1.2 MB.

@@ -187,9 +187,9 @@
       "size": 2.4,
       "axis": "length",
       "view": "three-quarter",
-      "subject": "the weapon bench on its own, WITHOUT the room and WITHOUT any weapon on it: a heavy steel workbench about 2.4 metres long, chunky and square, on four square-section legs with bolted feet and square frame rails between them; a thick solid slate work top; the empty padded jig clamp fixed at the centre of the top; the small parts printer box standing on the top at one end. NO pegboard, NO back panel, NO hooks, NO tools hanging on it or lying on it: the bench stands alone, free and whole, every part attached and nothing floating.",
+      "subject": "the weapon bench on its own, a heavy steel workbench about 2.4 metres long, chunky and square, on four square-section legs with bolted feet and square frame rails between them, and a thick solid slate work top. The top is EMPTY and flat: NOTHING stands on it, no clamp, no vice, no printer, no box, no tools, no weapon. NO pegboard, NO back panel, NO hooks, NO tools hanging on it: the bench stands alone, free and whole, every part attached and nothing floating.",
       "class": "fixture",
-      "yaw": 90
+      "note": "owner 2026-10-13: \"you need to model individual tools, the bench and the tools cant be one object with the limitations of the ai\": the bench is generated empty; the jig, the printer, the wall panel and each tool are their own assets, placed on it in code"
     },
     {
       "id": "barrel-short",
@@ -2427,6 +2427,92 @@
       "view": "three-quarter",
       "subject": "a square three storey concrete office block, windows dark, one top corner broken off cleanly, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
       "note": "overnight option c (2026-10-12), UNREVIEWED: review four angles before packing"
+    },
+    {
+      "id": "bench-jig",
+      "panel": "20/20-bench-s6.png",
+      "class": "fixture",
+      "size": 0.45,
+      "axis": "length",
+      "view": "three-quarter",
+      "subject": "the weapon jig on its own: a chunky square steel clamp block about 45 centimetres long with two thick square padded jaws facing each other on a square screw-less slide rail and a square base plate, standing alone, empty (no weapon in it)",
+      "note": "weapon-bench set, its own object (owner 2026-10-13: model the tools individually; the bench and its tools cannot be one object)"
+    },
+    {
+      "id": "bench-printer",
+      "panel": "20/20-bench-s6.png",
+      "class": "fixture",
+      "size": 0.45,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "the small parts printer on its own: a chunky square steel box about 45 centimetres tall with bevelled edges, a square front hatch with a dark tinted square window (unlit), a square vent grille on one side and square feet, standing alone",
+      "note": "weapon-bench set, its own object (owner 2026-10-13: model the tools individually; the bench and its tools cannot be one object)"
+    },
+    {
+      "id": "tool-wall",
+      "panel": "20/20-bench-s6.png",
+      "class": "fixture",
+      "size": 1.6,
+      "axis": "length",
+      "view": "three-quarter",
+      "subject": "a flat steel tool-wall panel on its own, about 1.6 metres wide and 0.9 metres tall and 6 centimetres thick, with a raised square frame and a regular grid of square slots across its face, four square bolt plates at the corners; empty: no tools, no hooks on it",
+      "note": "weapon-bench set, its own object (owner 2026-10-13: model the tools individually; the bench and its tools cannot be one object)",
+      "reach": 3
+    },
+    {
+      "id": "tool-drill",
+      "panel": "21/41-layout.png",
+      "class": "detail",
+      "size": 0.3,
+      "axis": "length",
+      "view": "three-quarter",
+      "subject": "a chunky cordless power drill on its own, about 30 centimetres long, a square-section body and grip, a square battery pack at the base of the grip, a short square chuck at the front, a square trigger",
+      "note": "weapon-bench set, its own object (owner 2026-10-13: model the tools individually; the bench and its tools cannot be one object)",
+      "reach": 3
+    },
+    {
+      "id": "tool-wrench",
+      "panel": "21/41-layout.png",
+      "class": "detail",
+      "size": 0.4,
+      "axis": "length",
+      "view": "three-quarter",
+      "subject": "a heavy torque wrench on its own, about 40 centimetres long, a thick rectangular-section handle bar with a square grip block and a chunky square ratchet head, lying flat",
+      "note": "weapon-bench set, its own object (owner 2026-10-13: model the tools individually; the bench and its tools cannot be one object)",
+      "reach": 3
+    },
+    {
+      "id": "tool-mallet",
+      "panel": "21/41-layout.png",
+      "class": "detail",
+      "size": 0.35,
+      "axis": "length",
+      "view": "three-quarter",
+      "subject": "a heavy workshop mallet on its own, about 35 centimetres long, a square block head and a thick square-section handle with a square grip end, lying flat",
+      "note": "weapon-bench set, its own object (owner 2026-10-13: model the tools individually; the bench and its tools cannot be one object)",
+      "reach": 3
+    },
+    {
+      "id": "tool-scanner",
+      "panel": "21/41-layout.png",
+      "class": "detail",
+      "size": 0.22,
+      "axis": "height",
+      "view": "three-quarter",
+      "subject": "a handheld diagnostic scanner on its own, about 22 centimetres tall, a chunky rectangular body with a dark square screen (unlit), four square buttons and a short thick square probe at the top, standing upright",
+      "note": "weapon-bench set, its own object (owner 2026-10-13: model the tools individually; the bench and its tools cannot be one object)",
+      "reach": 3
+    },
+    {
+      "id": "tool-screwdriver",
+      "panel": "21/41-layout.png",
+      "class": "detail",
+      "size": 0.25,
+      "axis": "length",
+      "view": "three-quarter",
+      "subject": "a chunky screwdriver on its own, about 25 centimetres long, a thick square-section handle with square grip ridges and a short thick square shaft with a flat tip, lying flat",
+      "note": "weapon-bench set, its own object (owner 2026-10-13: model the tools individually; the bench and its tools cannot be one object)",
+      "reach": 3
     }
   ],
   "budgets": {

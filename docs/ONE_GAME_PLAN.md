@@ -70,3 +70,19 @@ The owner, 13 October:
 See `docs/DLSS5_NEURAL_BAKE_RESEARCH.md`. In short:
 - Runtime DLSS 5 cannot run in a browser and needs an RTX 50. It belongs in the Unreal bridge build, once NVIDIA ships its UE plugin.
 - The bakeable version is a "neural" texture tier, made offline (Hunyuan3D-Paint on the 3D PC) and reviewed per asset. It runs on every GPU.
+
+## 6. Argo's master plan (owner-approved 13 October)
+Argo (creative lead) delivered `docs/argo/plans/ARGO_MASTER_PLAN.md`: an audit, the creative direction and 12 area plans. The owner approved it.
+
+Opus's review is `docs/argo/plans/ARGO_MASTER_PLAN_REVIEW.md`. About 80% is agreed. Eight points (O1 to O8) go back to Argo; until he answers, the contested parts are held and everything else proceeds.
+- **Wave A (now, before main):** the active queue with Argo's additions folded into the briefs:
+  - TASK-21d: P0-VFX-01, the rim light, the mode rib;
+  - TASK-23b-2: P0-MON-01 steps 2 and 3, P0-MON-02, P0-MON-03, P1-MON-05;
+  - TASK-23c: P0-LORE-01;
+  - TASK-24: P0-PROD-01;
+  - Opus: Astro's mid and high levels out of the single file, the low-luminance check, a 16 MB CI gate.
+  
+  Then main.
+- **Wave B:** briefs 25 (the HUD's 9 zones and the build ribbon), 26 (industrial foundation frames, the safe dome, power brownout) and 27 (world-locked stage-0 dither, the rover camera, the modular scout).
+- **Wave C:** briefs 28 (lab choreography, the live main menu), 29 (the 5-bus mixer, the 12 action sounds, the juice) and 30 (the leak shader, rifts, era escalation polish).
+- **Wave D:** briefs 31 (the Studio's 4-angle grid, the stage scrubber, the socket editor, the material designer) and 32 (heavy terraformers, the vehicle fabricator, turrets).

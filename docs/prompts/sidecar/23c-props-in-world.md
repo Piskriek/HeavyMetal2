@@ -30,3 +30,11 @@ The earlier plan (RESUME §5, item 1): lab clutter you can clear to free floor f
 
 ## Report
 On the board: the placements, the draw calls, the results and the shots.
+
+## Additions from Argo's master plan (owner-approved 13 October)
+- **P0-LORE-01, micro-logs:**
+  - **Which props:** `old-monitor`, `server-rack`, `filing-cabinet`, `sample-case`, plus 4 lunar wreck transponders at the wreck sites.
+  - **On hover:** a 2-sentence forensic readout.
+  - **On salvage (E):** a "Bridge Incident Log" entry in a small databank panel (HUD style, frontend-design skill), with a short CRT data-chirp.
+  - Text lives in the UI, never on the models (rule 12). Use Argo's examples as the tone ("BRIDGE TELEMETRY [T-00:04:12]: ...").
+- **Owner decision:** `old-monitor` and one `server-rack` stay as permanent, re-readable fixtures. Every other clutter prop dissolves into salvage.

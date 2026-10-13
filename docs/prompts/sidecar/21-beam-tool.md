@@ -61,3 +61,11 @@ On the board:
 - fps with the beam firing in each mode;
 - the test results;
 - the shots.
+
+## TASK-21d additions from Argo's master plan (owner-approved 13 October; see docs/argo/plans/ARGO_MASTER_PLAN.md and Opus's review)
+- **P0-VFX-01:**
+  - a projected ring decal at the aim point showing the brush radius, coloured by mode (Extract #3dc8ff, Apply #ff3d8a, Sculpt #7cff4d, Seal #ffc13d);
+  - in Extract, an instanced stream of 16 dark chunks spiralling from the hit point into the muzzle;
+  - the first-person rifle sways on look, bobs on walk and vibrates while firing, through `@hm/tooljuice`'s damped spring.
+- **P0-LIGHT-01 (the rest):** a view-aligned rim term and a hemisphere floor for the player and the view model in stages 0 to 2, so they never merge into the dark ground. The metal cap from 21c stays.
+- **The mode rib (agreed part of P0-VEH-02):** a square emissive strip along the rifle's top rail, glowing in the mode's colour. **No 1.65× scale:** the rifle is real size (see review O2).

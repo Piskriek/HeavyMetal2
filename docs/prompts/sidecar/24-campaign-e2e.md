@@ -36,3 +36,8 @@ A [DONE] on the board:
 - a shot per act.
 
 Opus reviews it and pushes `main`.
+
+## Additions from Argo's master plan (P0-PROD-01, owner-approved 13 October)
+- Give the HUD's overlays `data-hud-zone` attributes (title, build-hint, subtitle, quest, hotbar). At every e2e shot, assert zero overlap between the title, build-hint and subtitle boxes.
+- **A clean-shot flag** (`?cleanShot=1`) hides the pointer-lock prompt and the debug UI for review shots.
+- **Avatar luminance:** in the third-person Moon shot, the mean luminance of the avatar's pixel patch must be above 35/255, so a black-avatar regression fails the run.

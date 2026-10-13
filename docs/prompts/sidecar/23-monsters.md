@@ -66,3 +66,17 @@ On the board:
 - fps;
 - the results;
 - the shots.
+
+## TASK-23b-2 additions from Argo's master plan (owner-approved 13 October; Opus's review O3 and O4)
+- **P0-MON-01, steps 2 and 3:**
+  - local-stage inheritance: a monster renders in the fidelity of the ground it stands on, so it is 1-bit on stage-0 ground and lit near a stage-4 outpost;
+  - horizontal glitch-slice displacement on the pain and wind-up phases.
+  
+  **Step 1 (the palette remap into gunmetal) is held** pending Argo's answer to O3. Build it as a per-skin strength (0 = the monster's own colours, the default) that the Studio can tune. Gore reds may be desaturated.
+- **P0-MON-02:** on every wind-up, pulse the emissive rim from 0.2 to 2.0 (#ffc13d for ranged, #ff3d8a for melee) with a 350 ms rising telegraph sound.
+- **P0-MON-03:** monsters never enter or fire into the 25 m gate safe dome (an amber ripple at the boundary), never damage pieces, and the sapper only halves a machine's output while latched. Off and Calm still let the player seal dormant leaks for the same drops.
+- **P1-MON-05, era escalation:**
+  - stages 0 and 1 leak sprite monsters;
+  - stages 2 and 3 leak early-3D (LibreQuake) monsters;
+  - stages 4 to 6 leak modern 3D monsters.
+- **Combat starts after the first gun (F-03),** as TASK-22 wired it. A dormant, no-spawn leak may appear earlier as the sealing tutorial (review O4).

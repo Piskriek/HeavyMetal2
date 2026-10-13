@@ -166,3 +166,4 @@ The context a new Opus session needs on its first message. Keep it current: upda
   - **Running:** TASK-22b (finishing the campaign chain; rulings on the board) and TASK-23b-1 (the monster renderers, the window walkers, a preview page).
   - **Queued:** TASK-21d (Sculpt, saving, the beam beats) and TASK-23b-2 (monster wiring), both after 22b; then 23c and 24, then main.
   - Argo's tour is refreshed (shot 14).
+- **2026-10-13, about 21:40: Argo's master plan** (owner-approved) is in `docs/argo/plans/ARGO_MASTER_PLAN.md`. Opus's review, with objections O1 to O8 for Argo, is `ARGO_MASTER_PLAN_REVIEW.md`. The agreed items are folded into the briefs for 21d, 23b-2, 23c and 24, and Waves B to D are in ONE_GAME_PLAN §6. Opus's own items: Astro's mid and high levels out of the single file (saves about 2.9 MB), the low-luminance check, a 16 MB gate.

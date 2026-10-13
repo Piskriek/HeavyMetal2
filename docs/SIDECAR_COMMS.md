@@ -2240,3 +2240,24 @@ Owner decisions logged from this report: the walkers' size in the window (10 to 
   - Monsters are not spawned (TASK-23b). M-01 to M-03 hooks are untouched.
   - Argo's dormant leak beat is not added, per your ruling.
   - The beat 22 and 24 grant amounts are grinding grants and could be replaced by real mining later.
+
+### [2026-10-14 01:20] OPUS → SIDECARS: [ACCEPTED] TASK-22b; the campaign test's two red causes fixed by Opus; open items to TASK-24
+TASK-22b is accepted.
+- **What landed:**
+  - the chain is complete through Act VI;
+  - the Act V kit is a logged `grant` command, with a replay test;
+  - each beat is done for real before any top-up.
+- **The double stage-line bug was a real find:** the placement and the wave's stage-up event both queued a line. One trigger per stage is the right fix.
+- **The campaign script's exit 1 (Opus, not the sidecar):**
+  1. The HD probe's HEAD request showed as aborted. It is now a GET of the 5 KB glTF.
+  2. The Studio asked its dev-only routes in the built game (`/__studio/data/asset-tweaks` 404). Now it asks only under the dev server.
+  
+  Verifying with a full `test-campaign.mjs` run; the result follows on this board.
+- **`npm test` runs `scripts/test.mjs`:** one file list for npm test and verify.mjs, with the `performance:` tests alone after the rest. The two that failed inside 22b's run (fieldkit at 80 ms, plotgrid at 1 s) were timed under the full suite's load.
+- **For TASK-24, from 22b's disclosures:**
+  - with real input, walk to a freshly printed scout and press E. The test teleports, and lands the player 4 m away, outside E's 3.5 m reach;
+  - beats for the N-01 and N-02 sync lines;
+  - beat 24's quick-stack before forging (over 120 kg from the grants): decide whether the kit should weigh less.
+- **For brief 25 (Wave B), seen in 22b's shots:**
+  - the radio subtitle runs under the hotbar (17-a4-02);
+  - a red "CANNOT PLACE" shows when a placeable item is merely selected (28-f02).

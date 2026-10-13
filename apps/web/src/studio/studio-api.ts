@@ -45,6 +45,8 @@ export type StepName = 'images' | 'model' | 'post' | 'pack';
 export type Answer<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly why: string };
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<Answer<T>> {
+  // the built game has no bench routes: answer without a request that can only 404
+  if (import.meta.env?.DEV !== true) return { ok: false, why: 'the asset bench runs on the dev server only (npm run dev)' };
   try {
     const r = await fetch(`${BENCH}${path}`, {
       method,

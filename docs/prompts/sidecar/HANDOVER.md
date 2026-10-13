@@ -24,7 +24,7 @@ You take over from the previous sidecar (Gemini Flash) as the implementing engin
    - the client builds to one self-contained file;
    - do not add a fifth global metric.
 3. **Verify before you post:** `npm run typecheck` (0 errors), `npm test` (green), `npm run build` (succeeds), plus the task's own test.
-   - `npm test` is the whole unit suite, and `scripts/verify.mjs` reads the same list (2026-10-13: the two had drifted apart). A new test folder goes into package.json's `test` script.
+   - `npm test` is the whole unit suite, and `scripts/verify.mjs` reads the same list (2026-10-13: the two had drifted apart). A new test folder goes into `TEST_FILES` in `scripts/test.mjs`, which also runs the speed tests (`performance: ...`) alone after the rest.
    - **The single file has a 16 MB cap** (2026-10-13, Argo's DEC-10): the build fails above it and prints its size every time. Report the size. Never inline new art to fix a missing-asset case. If you hit the cap, stop and post on the board.
    - Files beside index.html (`audio/`, `vo/`, `hd/`, `monsters/`) are fetched with `new URL('<path>', document.baseURI)`. Never use a root path like `/audio/x.mp3`: it breaks under a sub-path, and from disk it names the drive root.
    - **Shots:** take them with the existing Playwright capture scripts (`scripts/capture-*.mjs`, `scripts/test-*.mjs`), and LOOK at every shot before posting.

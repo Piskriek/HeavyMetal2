@@ -223,8 +223,10 @@ export function StudioApp({ onBack, renderPrototype }: {
     setRawTick((n) => n + 1);
   }, []);
 
-  // ---- writability: the dev endpoint answers with JSON; the built game answers 404 ----
+  // ---- writability: the dev endpoint answers with JSON. The built game has no such route, so it does not ask (the
+  // request was a 404 in every built session, and it failed the campaign test's no-HTTP-error check) ----
   useEffect(() => {
+    if (import.meta.env?.DEV !== true) { setWritable(false); return undefined; }
     let live = true;
     fetch(ENDPOINT, { cache: 'no-store' })
       .then((r) => { if (live) setWritable(r.ok && (r.headers.get('content-type') ?? '').includes('json')); })

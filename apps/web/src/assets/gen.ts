@@ -105,14 +105,17 @@ export function getGenSync(id: string, level: GenLevel = 'low'): THREE.Group | n
 
 let hdAvailable: Promise<boolean> | null = null;
 
-/** Whether the HD pack is reachable: one small probe, made once. */
+/**
+ * Whether the HD pack is reachable: one small probe, made once. A GET of a 5 KB glTF, which the browser then has cached:
+ * Chromium reports a fetched HEAD as aborted once its headers arrive, which failed the campaign test's no-failed-request check.
+ */
 export function probeHd(): Promise<boolean> {
   hdAvailable ??= (async () => {
     const first = Object.keys(GEN)[0];
     if (!first || (typeof location !== 'undefined' && location.protocol === 'file:')) return false;
     try {
       const base = typeof document !== 'undefined' ? document.baseURI : 'http://localhost/';
-      const r = await fetch(new URL(`hd/${first}/high.gltf`, base), { method: 'HEAD' });
+      const r = await fetch(new URL(`hd/${first}/high.gltf`, base));
       return r.ok;
     } catch { return false; }
   })();

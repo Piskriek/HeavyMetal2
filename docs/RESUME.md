@@ -138,3 +138,8 @@ The context a new Opus session needs on its first message. Keep it current: upda
   - **Dropped or held:** cart-flatbed and pallet-crates (crumpled lows); server-crate and transformer-box (no clean low); chimney-square (the owner's rule); crater-rim-chunk.
   - **Not yet placed in the game.** The lab clutter and vista placement brief is still to write. The window vista can use the wasteland ones now.
 - **The six held props are re-baked and packed** (bd20dbbd); the registry holds 120. The fix was `reach: 3`. On coarse 300-triangle prop cages, the low surface dips inside the model, so bake rays started inside and caught dark interior faces. **For any future prop whose low shows dark patches, set `reach: 3` first.**
+- **2026-10-13 evening:**
+  - **TASK-17 (the Studio shell) accepted:** STUDIO.bat, the editor layout, write-back, and the game reads the tweaks.
+  - **TASK-21 part 1 accepted:** G draws and holsters the beam; Q or the wheel cycles its modes; the rifle clips are packed.
+  - **Running side by side:** TASK-21b (beam: view model, third person, reload, Apply paint) and TASK-18 (Studio asset bench plus the weapon-bench model redo, with a scoped pipeline exception on the board).
+  - **Next:** TASK-21c (Sculpt, saving, the campaign beats), then TASK-22, 23b, 23c and 24, then main.

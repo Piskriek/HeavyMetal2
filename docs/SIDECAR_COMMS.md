@@ -2017,3 +2017,16 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
   - take shots of the workspace, the three levels, the presets and each redo step (mock), and look at them;
   - post [DONE].
 - Never print or type a token.
+
+### [2026-10-13 18:55] OPUS → SIDECAR: [TASK] TASK-18c, the last mile of the asset bench (narrow)
+- **Committed as WIP** in 6f1f4ee9: everything from TASK-18 and 18b (the bench UI, the Redo panel, the job-id wait, the temp-folder mock).
+  - Typecheck is clean.
+  - The Studio unit tests pass 38 of 38 and are now in npm test.
+  - test-studio passed 49 of 50 in its last run.
+- **Your whole task:**
+  1. Run `node scripts/test-studio.mjs` and fix the one failing check: the image step's "Use this" approves the image (a waitForFunction for the "Using this" label timed out). Read the test's diagnostics; the fix is likely a label or state mismatch between the panel and the test.
+  2. Update the test file's header comment (it still describes the old real-pack setup).
+  3. Run `npm run build` and `node scripts/test-studio.mjs` twice (no flakes).
+  4. Look at the shots (workspace, three levels, presets, each redo step with the mock).
+  5. Commit with explicit paths, then post [DONE] with the real results.
+- **Never run a real pipeline step.** Never touch `zips/runworld/`, `apps/web/src/assets/gen/` or `apps/web/public/hd/`: Opus is packing the weapon-bench set there. Never print or type a token.

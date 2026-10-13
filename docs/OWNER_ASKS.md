@@ -203,3 +203,4 @@
 - (same day) "also flesh out the mobs from other games, i think the flash model did 2 mobs and left it to you and youve done nothing with it so far"
 - (same day) "no, first plan everything, add that to the plans and then do the plan"
 - (same day, at the Arena sign-in prompt) "ill log in"
+- (same day) "logged in, download whatever you need, dont get stuck on on type of moster, there must be loads out there we can use. and put some walking outside the window if you want. continue"

@@ -1068,5 +1068,93 @@
       2.999,
       3.729
     ]
+  },
+  "workbench-old-a": {
+    "class": "prop",
+    "size": [
+      1.36,
+      0.998,
+      1.225
+    ]
+  },
+  "shelving-closed-b": {
+    "class": "prop",
+    "size": [
+      2.065,
+      2.2,
+      0.671
+    ]
+  },
+  "specimen-freezer-a": {
+    "class": "prop",
+    "size": [
+      0.748,
+      0.799,
+      0.774
+    ]
+  },
+  "portable-office-b": {
+    "class": "prop",
+    "size": [
+      2.29,
+      2.397,
+      2.377
+    ]
+  },
+  "comms-mast-solid-a": {
+    "class": "vista",
+    "size": [
+      4.651,
+      11.995,
+      4.493
+    ]
+  },
+  "wrecked-van-a": {
+    "class": "vista",
+    "size": [
+      3.064,
+      3.005,
+      4.921
+    ]
+  },
+  "datacentre-annex-b": {
+    "class": "vista",
+    "size": [
+      6.194,
+      5.995,
+      6.135
+    ]
+  },
+  "silo-square-a": {
+    "class": "vista",
+    "size": [
+      9.591,
+      11.995,
+      9.522
+    ]
+  },
+  "checkpoint-booth-a": {
+    "class": "vista",
+    "size": [
+      2.321,
+      2.497,
+      2.368
+    ]
+  },
+  "office-block-ruin-b": {
+    "class": "vista",
+    "size": [
+      13.844,
+      14.98,
+      12.983
+    ]
+  },
+  "gas-cabinet-c": {
+    "class": "prop",
+    "size": [
+      0.704,
+      0.699,
+      0.626
+    ]
   }
 }

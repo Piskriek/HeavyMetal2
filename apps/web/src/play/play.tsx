@@ -247,6 +247,8 @@ export function PlayScreen(props: {
   const isDevSeed = typeof location !== 'undefined' && new URLSearchParams(location.search).get('kit') === '1';
   /** The debug switch (TASK-20): `window.__dev` exists in dev builds and when the URL has `?e2e`. Players never get it. */
   const debugHooks = import.meta.env.DEV || (typeof location !== 'undefined' && new URLSearchParams(location.search).has('e2e'));
+  /** The draw-call readout (Settings: Show performance stats; on under `?e2e`). Players see it only when they turn it on. */
+  const showStatsOn = (typeof location !== 'undefined' && new URLSearchParams(location.search).has('e2e')) || resolveGraphics('low', props.profile.graphics).showStats;
   const creating = state.step === 'create' && !isMashTest;
 
   useEffect(() => {
@@ -3054,8 +3056,7 @@ export function PlayScreen(props: {
               {hitMarker ? <div className="ch-hit-x">✕</div> : null}
             </div>
           )}
-          {hud.where === 'planet' && !hideOverlays ? (
-            <>
+          {hud.where === 'planet' && !hideOverlays && showStatsOn ? (
               <div
                 className="hm-draw-calls-badge"
                 data-testid="draw-calls-badge"
@@ -3088,6 +3089,9 @@ export function PlayScreen(props: {
                   ({baseWorldRef.current?.base.pieces.length ?? 0} PIECES)
                 </span>
               </div>
+          ) : null}
+          {hud.where === 'planet' && !hideOverlays ? (
+            <>
               <BaseHud
               source={baseViewSource}
               paused={paused}

@@ -1156,5 +1156,53 @@
       0.699,
       0.626
     ]
+  },
+  "drum-square-b": {
+    "class": "prop",
+    "size": [
+      0.965,
+      0.899,
+      0.965
+    ]
+  },
+  "generator-small-a": {
+    "class": "prop",
+    "size": [
+      0.84,
+      0.998,
+      0.971
+    ]
+  },
+  "battery-pack-a": {
+    "class": "prop",
+    "size": [
+      0.567,
+      0.599,
+      0.553
+    ]
+  },
+  "cable-reel-square-a": {
+    "class": "prop",
+    "size": [
+      1.194,
+      1.198,
+      0.695
+    ]
+  },
+  "terminal-old-a": {
+    "class": "prop",
+    "size": [
+      1.029,
+      1.099,
+      1.094
+    ]
+  },
+  "container-crushed-a": {
+    "class": "vista",
+    "size": [
+      3.031,
+      2.504,
+      2.493
+    ]
   }
 }

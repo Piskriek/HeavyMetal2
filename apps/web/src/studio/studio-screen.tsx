@@ -144,7 +144,7 @@ export const GAME_TYPES = [
   },
   {
     id: 'combat',
-    title: 'Daemon Containment (Monster Mash)',
+    title: 'Daemon Containment',
     desc: 'Hostile daemon survival arena, weapon drops (shotgun/rifle), and wave containment.',
     icon: Swords,
   },

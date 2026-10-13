@@ -1,11 +1,11 @@
 /**
- * Automated Playwright validation for SetMix Monster Mash Combat on the Planet:
+ * Automated Playwright validation for the monsters in combat on the planet (TASK-20: renamed from test-planet-monstermash.mjs):
  * - Serves apps/web/dist on port 8199
- * - Boots http://localhost:8199/?mash
+ * - Boots http://localhost:8199/?mash&e2e (the debug switch e2e, and a test fixture: on the planet, the shotgun equipped, one Ogro spawned)
  * - Verifies scientist is on the planet surface
- * - Verifies Monster Mash menu is open
+ * - Verifies the Monster Mash button and panel are gone (owner, 13 Oct), and the debug hooks window.__dev exist
  * - Verifies Combat Shotgun equips and crosshair renders
- * - Spawns 3D Ogro and 2D Demon mobs onto planet terrain
+ * - Spawns 3D Ogro and 2D Demon mobs onto planet terrain (window.__dev.spawnMob, the hooks the old sandbox panel called)
  * - Fires shotgun, verifies raycast hits, damage registered, pain/death reaction
  * - Captures verification screenshots
  */
@@ -59,26 +59,18 @@ page.on('console', (msg) => {
 
 try {
   console.log(`Navigating to http://localhost:${port}/?mash...`);
-  await page.goto(`http://localhost:${port}/?mash`, { waitUntil: 'domcontentloaded', timeout: 35000 });
+  await page.goto(`http://localhost:${port}/?mash&e2e`, { waitUntil: 'domcontentloaded', timeout: 35000 });
 
   // Wait for the Play screen to initialize
-  console.log('Waiting for Play canvas and Monster Mash panel...');
+  console.log('Waiting for Play canvas and the debug hooks...');
   await page.waitForSelector('canvas', { timeout: 30000 });
 
-  // Check if Monster Mash button or panel is visible
-  const mashBtn = page.locator('.play-mash-btn');
-  await mashBtn.waitFor({ state: 'visible', timeout: 35000 });
-  console.log('OK: Monster Mash button is visible');
-
-  // Ensure panel is open
-  const panel = page.locator('.play-mash-panel');
-  const isPanelVisible = await panel.isVisible();
-  if (!isPanelVisible) {
-    console.log('Opening Monster Mash panel...');
-    await mashBtn.click();
-    await panel.waitFor({ state: 'visible', timeout: 5000 });
-  }
-  console.log('OK: Monster Mash tactical panel is open');
+  // The Monster Mash button and sandbox panel are removed from the game (owner, 13 Oct: "forget this tacky monster mash idea").
+  // Their actions are the debug hooks now (window.__dev, behind ?e2e or a dev build). The ?mash fixture still runs.
+  await page.waitForFunction(() => !!window.__dev, null, { timeout: 35000 });
+  const oldUi = (await page.locator('.play-mash-btn').count()) + (await page.locator('.play-mash-panel').count());
+  if (oldUi !== 0) throw new Error(`the Monster Mash button or panel is still in the game (${oldUi})`);
+  console.log('OK: Monster Mash button and panel are gone; the monsters are driven by window.__dev');
 
   // Screenshot initial state
   await page.screenshot({ path: 'docs/shots/planet-mash-initial.png' });
@@ -93,8 +85,7 @@ try {
   console.log('Initially equipped:', isEquipped);
   if (!isEquipped) {
     console.log('Equipping Combat Shotgun...');
-    const equipBtn = page.locator('button:has-text("Equip Shotgun")');
-    await equipBtn.click();
+    await page.evaluate(() => window.__dev.equip('shotgun', true));
     await page.waitForTimeout(600);
   }
 
@@ -103,40 +94,35 @@ try {
 
   // Spawn 3D Ogro
   console.log('Spawning 3D Ogro (Quake 2)...');
-  const spawnOgroBtn = page.locator('button:has-text("Spawn 3D Ogro")');
-  await spawnOgroBtn.click();
+  await page.evaluate(() => window.__dev.spawnMob('ogro', 1));
   await page.waitForTimeout(2000);
 
   // Spawn 2D Demon
   console.log('Spawning 2D Demon (DOOM)...');
-  const spawnDemonBtn = page.locator('button:has-text("Spawn 2D Demon")');
-  await spawnDemonBtn.click();
+  await page.evaluate(() => window.__dev.spawnMob('demon', 1));
   await page.waitForTimeout(2000);
 
   // Verify mobs are listed in active entities
-  const mobCount = await page.locator('.mash-mob-card').count();
+  const mobCount = await page.evaluate(() => window.__dev.mobs().length);
   console.log(`OK: Active mobs on planet: ${mobCount}`);
 
   // Test Stage 0: 1-bit Dither
   console.log('Testing Fidelity Stage 0: Dither...');
-  const ditherBtn = page.locator('button:has-text("0: Dither")');
-  await ditherBtn.click();
+  await page.evaluate(() => window.__dev.fidelity(0));
   await page.waitForTimeout(600);
   await page.screenshot({ path: 'docs/shots/planet-mash-dither.png' });
   console.log('Captured docs/shots/planet-mash-dither.png');
 
   // Test Stage 4: PBR
   console.log('Testing Fidelity Stage 4: PBR...');
-  const pbrBtn = page.locator('button:has-text("4: PBR")');
-  await pbrBtn.click();
+  await page.evaluate(() => window.__dev.fidelity(4));
   await page.waitForTimeout(600);
   await page.screenshot({ path: 'docs/shots/planet-mash-pbr.png' });
   console.log('Captured docs/shots/planet-mash-pbr.png');
 
   // Test Fidelity Stage Switcher Buttons - Switch to Stage 2 (VGA)
   console.log('Testing Fidelity Stage buttons...');
-  const vgaBtn = page.locator('button:has-text("2: VGA")');
-  await vgaBtn.click();
+  await page.evaluate(() => window.__dev.fidelity(2));
   await page.waitForTimeout(600);
   console.log('OK: Switched to Stage 2 (VGA)');
 
@@ -146,9 +132,8 @@ try {
 
   // Fire the shotgun multiple times to inflict damage and kill
   console.log('Firing Combat Shotgun at monsters...');
-  const fireBtn = page.locator('button:has-text("Fire Shotgun")');
   for (let i = 0; i < 9; i++) {
-    await fireBtn.click();
+    await page.evaluate(() => window.__dev.fire());
     await page.waitForTimeout(400);
   }
 
@@ -470,7 +455,7 @@ try {
     process.exit(1);
   }
 
-  console.log('ALL MONSTER MASH PLANET COMBAT CHECKS PASSED!');
+  console.log('ALL PLANET MONSTER COMBAT CHECKS PASSED!');
 } finally {
   server.kill();
   await browser.close();

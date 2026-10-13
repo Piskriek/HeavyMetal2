@@ -35,4 +35,4 @@ Every active document in `docs/` is current, relative to the active codebase, an
 - `npm run typecheck` — TypeScript check across all packages (must be 0 errors).
 - `npm run build` — Standalone single-file bundle build (`apps/web/dist/index.html`).
 - `node scripts/test-fidelity-sync-studio.mjs` — Automated Playwright E2E for Menu, Studio (Moon Editor + Planet Forge), and Synced/Desynced campaign.
-- `node scripts/test-planet-monstermash.mjs` — Automated Playwright E2E for Monster Mash combat, mobs, and stage fidelity.
+- `node scripts/test-planet-monsters.mjs` — Automated Playwright E2E for the monsters in combat (the debug hooks, window.__dev), mobs, and stage fidelity.

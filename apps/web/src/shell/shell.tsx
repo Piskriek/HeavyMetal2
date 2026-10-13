@@ -62,7 +62,7 @@ export const ROUTES: Readonly<Record<Screen, { readonly back: Screen | 'origin' 
   build: { back: 'activity', doc: "Goblin Racing's track editor, on the Goblin Racing island. Esc opens its menu; Back to Goblin Racing returns." },
   crafter: { back: 'home', doc: 'The Resolution Crafter preview: your plot through the six stages, a test view (open with ?crafter in the address). Esc or Back to SetMix returns.' },
   play: { back: 'home', doc: 'Play: the first Play of the Resolution Crafter, in first person: you make your human in the lab, turn on the gate, look round your stage-0 plot and place your first machine. Esc pauses; Back to SetMix returns.' },
-  monstermash: { back: 'home', doc: 'Monster Mash game jam exploration spike: live retro model, sprite, sound, and fidelity adaptation test.' },
+  monstermash: { back: 'home', doc: 'The Workshop: the monsters live. Retro models, sprites, sounds and fidelity adaptation, as a test bench.' },
   studio: { back: 'home', doc: 'The Studio: modify the moon base game and forge new activity planets in the SetMix Multiverse.' },
 };
 

@@ -172,7 +172,7 @@ export function MonsterMashScreen(props: { readonly onBack: () => void }): React
           scene.add(spriteMesh);
         }
 
-        setStatusMsg('Monster Mash models and sprites live! Ready.');
+        setStatusMsg('Monster models and sprites live! Ready.');
       } catch (e: unknown) {
         setStatusMsg(`Note: Loaded with local fallback (${(e as Error).message})`);
       }
@@ -300,7 +300,7 @@ export function MonsterMashScreen(props: { readonly onBack: () => void }): React
     <div className="mm-screen">
       <header className="mm-header">
         <div className="mm-title">
-          <span className="mm-badge">Monster Mash Jam Spike</span>
+          <span className="mm-badge">Monsters Workshop</span>
           <strong>Inter-Game Asset Ingestion & Fidelity Adaptation</strong>
         </div>
         <button type="button" className="mm-back-btn" onClick={props.onBack}>

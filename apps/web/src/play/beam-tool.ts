@@ -33,6 +33,21 @@ export function cycleBeamMode(mode: BeamMode, step: 1 | -1): BeamMode {
   return BEAM_MODES[(((i + step) % n) + n) % n]!;
 }
 
+/** The beam takes about 4 ore a second from a boulder on rock (the ruling), and more on scree: up to 3 more a second. */
+export const BEAM_BOULDER_RATE = 4;
+export const BEAM_SCREE_BONUS = 3;
+
+/**
+ * Ore a second the beam takes from a boulder, given the rock and scree weights of the ground under it (the terrain's material
+ * weights, index 0 rock and 1 scree). Pure ground rock is 4; pure scree is 7; with neither, the boulder is still 4.
+ */
+export function boulderBeamRate(rock: number, scree: number): number {
+  const r = Number.isFinite(rock) && rock > 0 ? rock : 0;
+  const s = Number.isFinite(scree) && scree > 0 ? scree : 0;
+  const share = r + s > 0 ? s / (r + s) : 0;
+  return BEAM_BOULDER_RATE + BEAM_SCREE_BONUS * share;
+}
+
 /** In Sculpt, keys 1, 2 and 3 pick the tool (carve, raise, smooth). Any other key picks nothing. */
 export function sculptToolForKey(code: string): SculptTool | null {
   if (code === 'Digit1') return 'carve';

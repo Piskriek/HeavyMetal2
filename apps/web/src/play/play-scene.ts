@@ -188,6 +188,12 @@ export interface PlayScene {
   setAvatar(avatar: PlayAvatar | null): void;
   /** Gathers ore from a boulder. */
   gatherBoulder(id: number, amount: number): number;
+  /** The boulder with ore the view ray meets within `maxDist` metres (the held rifle's reach), or null. */
+  aimBoulder(maxDist: number): number | null;
+  /** The held rifle takes ore from boulder `id` for `dt` seconds; returns the ore taken and the boulder's centre (null if none). */
+  beamGatherBoulder(id: number, dt: number): { readonly mined: number; readonly x: number; readonly y: number; readonly z: number } | null;
+  /** The ground point the view ray meets within `reach` metres (the held rifle's aim point), or null. */
+  beamAim(reach: number): { readonly x: number; readonly y: number; readonly z: number } | null;
   /**
    * Compiles every shader the frames will need, for each place it draws, behind the loading bar: a compile mid-play is a hitch the
    * display governor would read as a slow machine (and the owner's rule is never to start a screen choppy).
@@ -1036,10 +1042,11 @@ export function createPlayScene(o: {
     return result;
   };
 
-  const aimGround = (): THREE.Vector3 | null => {
+  /** The ground the view ray meets within `reach` metres (the planet's stroke reach for the beam is 25; the aim point is 36). */
+  const aimGround = (reach = 36): THREE.Vector3 | null => {
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
     const p = pos.clone();
-    for (let d = 1; d < 36; d += 0.25) {
+    for (let d = 1; d < reach; d += 0.25) {
       const q = p.clone().addScaledVector(dir, d);
       if (q.y <= groundAt(q.x, q.z)) return q;
     }
@@ -1523,6 +1530,11 @@ export function createPlayScene(o: {
       }
     },
     beamMuzzle() {
+      // in first person the held rifle's muzzle socket, in the view; otherwise a point just in front of the camera
+      if (heldBeam.group.visible && cameraView === 'first') {
+        const w = camera.localToWorld(heldBeam.sockets.muzzle.clone().add(heldBeam.group.position));
+        return { x: w.x, y: w.y, z: w.z };
+      }
       const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
       const rgt = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
       const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
@@ -2077,6 +2089,18 @@ export function createPlayScene(o: {
     },
     gatherBoulder(id, amount) {
       return ground?.gather(id, amount) ?? 0;
+    },
+    aimBoulder(maxDist) {
+      if (!ground) return null;
+      const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      return ground.findAimedBoulder(camera.position, dir, maxDist);
+    },
+    beamGatherBoulder(id, dt) {
+      return ground?.beamGather(id, dt) ?? null;
+    },
+    beamAim(reach) {
+      const hit = aimGround(reach);
+      return hit ? { x: hit.x, y: hit.y, z: hit.z } : null;
     },
     async preloadLabGenerated() {
       await preloadLabGenerated(genLevelFor(currentQuality));

@@ -67,7 +67,7 @@ import * as S from '@hm/structure';
 import type { Kind } from '@hm/structure';
 import * as L from '@hm/lattice';
 import type { BeamMode } from '@hm/beamkit';
-import { cycleBeamMode } from './beam-tool';
+import { BEAM_STROKE_RANGE, cycleBeamMode } from './beam-tool';
 
 /** The extraction rifle's modes, as the player reads them (the chip and the toasts). */
 const BEAM_LABEL: Readonly<Record<BeamMode, string>> = { extract: 'Extract', apply: 'Apply', sculpt: 'Sculpt' };
@@ -408,6 +408,21 @@ export function PlayScreen(props: {
   const [baseWindowOpen, setBaseWindowOpen] = useState(false);
   const [beamHarvest, setBeamHarvest] = useState<{ count: number; name: string; fading?: boolean } | null>(null);
   const beamHarvestTimerRef = useRef<number | null>(null);
+  /** The boulder the held rifle takes ore from this frame (its centre; null when none), the ore not yet on the counter, and when it was last shown. */
+  const beamBoulderTargetRef = useRef<{ readonly x: number; readonly y: number; readonly z: number } | null>(null);
+  const beamOreAccRef = useRef(0);
+  const beamOreFlushRef = useRef(0);
+  /** The extraction counter: adds to the running count and fades two seconds after the last add (field nodes and boulders). */
+  const flashBeamHarvest = (count: number, name: string): void => {
+    setBeamHarvest((prev) => ({ count: (prev ? prev.count : 0) + count, name, fading: false }));
+    if (beamHarvestTimerRef.current !== null) window.clearTimeout(beamHarvestTimerRef.current);
+    beamHarvestTimerRef.current = window.setTimeout(() => {
+      setBeamHarvest((prev) => (prev ? { ...prev, fading: true } : null));
+      beamHarvestTimerRef.current = window.setTimeout(() => {
+        setBeamHarvest(null);
+      }, 400);
+    }, 2000);
+  };
   const forceBeamRef = useRef<number | null>(null);
   const isAnyBaseWindowOpen = menu || baseWindowOpen || machinePickerHardpoint !== null || refineryMachineId !== null || fabricatorMachineId !== null || weaponBenchOpen;
   const hardpointToPlotMachineRef = useRef<Map<number, number>>(new Map());
@@ -561,20 +576,7 @@ export function PlayScreen(props: {
           totalHarvested += item.n;
           itemName = ITEMS[item.item]?.name ?? item.item;
         }
-        setBeamHarvest((prev) => ({
-          count: (prev ? prev.count : 0) + totalHarvested,
-          name: itemName,
-          fading: false,
-        }));
-        if (beamHarvestTimerRef.current !== null) {
-          window.clearTimeout(beamHarvestTimerRef.current);
-        }
-        beamHarvestTimerRef.current = window.setTimeout(() => {
-          setBeamHarvest((prev) => (prev ? { ...prev, fading: true } : null));
-          beamHarvestTimerRef.current = window.setTimeout(() => {
-            setBeamHarvest(null);
-          }, 400);
-        }, 2000);
+        flashBeamHarvest(totalHarvested, itemName);
 
         fx('relay-click', { minGapMs: 80 });
         if (ev.lost.length > 0) {
@@ -1011,7 +1013,7 @@ export function PlayScreen(props: {
         ? (w.field.nodes.find((n) => n.id === forceBeamRef.current) ?? aimedNode)
         : aimedNode;
       const isMining = (isLmbDownRef.current || forceBeamRef.current !== null) && hasBeam && targetNode !== null && !scene.mash.isEquipped();
-      scene.setBeamFiring(isMining && beamHeldRef.current);
+      scene.setBeamFiring((isMining || beamBoulderTargetRef.current !== null) && beamHeldRef.current);
 
       if (harvestAccRef.current >= 0.1) {
         const powerMap: Record<number, number> = {};
@@ -1042,6 +1044,9 @@ export function PlayScreen(props: {
         const target = { x: targetNode.x, y: scene.heightAt(targetNode.x, targetNode.z) + 0.35, z: targetNode.z };
         const col = targetNode.kind === 'dither' ? '#d9d9d9' : targetNode.kind === 'fold' ? '#7dd3fc' : targetNode.kind === 'chroma' ? '#ff4fd8' : '#22d3ee';
         scene.setBeam(muzzle, target, 'extract', col, true);
+      } else if (beamBoulderTargetRef.current !== null) {
+        // the rifle takes ore from a boulder: the beam runs from the muzzle to its centre (the amber of the ore)
+        scene.setBeam(scene.beamMuzzle(), beamBoulderTargetRef.current, 'extract', '#f3b848', true);
       } else {
         scene.setBeam(null, null, 'extract', '#ffffff', false);
       }
@@ -1512,6 +1517,27 @@ export function PlayScreen(props: {
           if (!firstGatherRef.current) {
             firstGatherRef.current = true;
             say('Ore gathered by hand.', 'A rock drill mines it for you.');
+          }
+        }
+      }
+
+      // ---- the held rifle takes ore from the boulder it is aimed at (TASK-21): Extract, left button, no field node in reach,
+      // the boulder out to the beam's 25 m; about 4 ore a second on rock, more on scree (the boulder's own rate)
+      {
+        const boulderId = live && !visitingRef.current && out.where === 'planet' && beamHeldRef.current && beamModeRef.current === 'extract' && isLmbDownRef.current && !scene.mash.isEquipped() && scene.aimNode(baseWorldRef.current.field, BEAM_RANGE) === null
+          ? scene.aimBoulder(BEAM_STROKE_RANGE)
+          : null;
+        const hit = boulderId !== null ? scene.beamGatherBoulder(boulderId, dt) : null;
+        beamBoulderTargetRef.current = hit && hit.mined > 0 ? { x: hit.x, y: hit.y, z: hit.z } : null;
+        if (hit && hit.mined > 0) {
+          plotRef.current = { ...plotRef.current, ore: Math.min(1e5, plotRef.current.ore + hit.mined) };
+          plotChanged = true;
+          beamOreAccRef.current += hit.mined;
+          if (ms - beamOreFlushRef.current > 250) {
+            const whole = Math.floor(beamOreAccRef.current);
+            beamOreAccRef.current -= whole;
+            beamOreFlushRef.current = ms;
+            if (whole > 0) flashBeamHarvest(whole, 'Ore');
           }
         }
       }

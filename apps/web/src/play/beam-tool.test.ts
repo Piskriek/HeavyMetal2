@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { emptyField } from '@hm/terrainbrush';
-import { BEAM_START, cycleBeamMode, runStroke, sculptToolForKey, strokeOf, STROKE_RADIUS, type BeamState } from './beam-tool';
+import { BEAM_START, boulderBeamRate, cycleBeamMode, runStroke, sculptToolForKey, strokeOf, STROKE_RADIUS, type BeamState } from './beam-tool';
 
 const RULES = { maxDepth: 2, maxHeight: 2, orePerCubicMetre: 1, ratePerSecond: 1 };
 const flat = (): number => 0;
@@ -70,4 +70,13 @@ test('painting costs no ore; the preset lands on the ground under the aim', () =
   assert.equal(r.ore, 0, 'applying changes no ore');
   assert.equal(r.balance, 12, 'applying costs no ore');
   assert.ok(r.field.paint.some((p) => p === 'preset:moss'), 'a cell is painted with the preset');
+});
+
+test('the beam takes about 4 ore a second from a boulder on rock, and more on scree', () => {
+  assert.equal(boulderBeamRate(1, 0), 4, 'pure rock is the ruled 4 ore a second');
+  assert.equal(boulderBeamRate(0, 1), 7, 'pure scree is 4 plus the 3 scree bonus');
+  assert.equal(boulderBeamRate(0.5, 0.5), 5.5, 'an even mix is halfway');
+  assert.equal(boulderBeamRate(0, 0), 4, 'a boulder on neither still gives the base rate');
+  assert.equal(boulderBeamRate(Number.NaN, 2), 7, 'a broken weight counts as none');
+  assert.equal(boulderBeamRate(-1, -1), 4, 'negative weights count as none');
 });

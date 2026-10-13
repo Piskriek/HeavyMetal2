@@ -7,6 +7,7 @@ import { chunkMesh, chunksAround, createTerrain, type Terrain } from '@hm/plotte
 import { createGroundMaterial, makeGroundTextures, setStage as setGroundStage } from '@hm/groundshader';
 import { drop } from '../crafter/planet';
 import { smoothModel, type SmoothId } from '../crafter/smooth-models';
+import { boulderBeamRate } from './beam-tool';
 
 export interface BoulderInfo {
   readonly id: number;
@@ -32,6 +33,8 @@ export interface PlotGround {
   setVisible(on: boolean): void;
   /** Gathers up to `amount` ore from boulder `id`. Shrinks as taken and crumbles when empty. */
   gather(id: number, amount: number): number;
+  /** The held rifle takes ore from boulder `id` for `dt` seconds at the boulder's own rate (about 4 ore a second, more on scree). */
+  beamGather(id: number, dt: number): { readonly mined: number; readonly x: number; readonly y: number; readonly z: number } | null;
   /** Finds the boulder with ore aimed at by the ray from `origin` in `dir` within `maxDist`. */
   findAimedBoulder(origin: THREE.Vector3, dir: THREE.Vector3, maxDist?: number): number | null;
   /** Finds the nearest boulder with ore to `origin`. */
@@ -59,6 +62,8 @@ interface TrackedBoulder {
   readonly shape: number;
   readonly instanceIndex: number;
   readonly baseMatrix: THREE.Matrix4;
+  /** The beam's ore a second on this boulder's ground (rock and scree). */
+  readonly beamRate: number;
   ore: number;
 }
 
@@ -114,6 +119,7 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
   boulders.forEach((b, i) => {
     const y = terrain.height(b.x, b.z) - drop(b.x, b.z) - b.size * 0.2;
     const shape = i % 3;
+    const mats = terrain.materials(b.x, b.z);
     const instanceIndex = byShape[shape]!.length;
     const baseMat = m4.compose(p.set(b.x, y, b.z), q.setFromEuler(e.set(0, b.yaw, 0)), s.set(b.size, b.size, b.size)).clone();
     byShape[shape]!.push(baseMat);
@@ -126,6 +132,7 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
       shape,
       instanceIndex,
       baseMatrix: baseMat,
+      beamRate: boulderBeamRate(mats[0], mats[1]),
       ore: BOULDER_INITIAL_ORE,
     });
   });
@@ -138,6 +145,27 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
     group.add(im);
     return im;
   });
+
+  /** Takes up to `amount` ore from boulder `id`; the boulder shrinks as it empties and crumbles to nothing. */
+  const takeOre = (id: number, amount: number): number => {
+    const b = trackedBoulders[id];
+    if (!b || b.ore <= 0 || amount <= 0) return 0;
+    const mined = Math.min(b.ore, amount);
+    b.ore -= mined;
+    const im = rocks[b.shape];
+    if (im) {
+      if (b.ore <= 0) {
+        b.ore = 0;
+        m4.copy(b.baseMatrix).scale(s.set(0, 0, 0));
+      } else {
+        const factor = Math.cbrt(b.ore / BOULDER_INITIAL_ORE);
+        m4.copy(b.baseMatrix).scale(s.set(factor, factor, factor));
+      }
+      im.setMatrixAt(b.instanceIndex, m4);
+      im.instanceMatrix.needsUpdate = true;
+    }
+    return mined;
+  };
 
   return {
     terrain,
@@ -166,24 +194,12 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
     },
     setVisible(on) { group.visible = on; },
     triangles() { let n = 0; for (const [, mesh] of chunks) n += (mesh.geometry.index?.count ?? 0) / 3; return n; },
-    gather(id, amount) {
+    gather: takeOre,
+    beamGather(id, dt) {
       const b = trackedBoulders[id];
-      if (!b || b.ore <= 0 || amount <= 0) return 0;
-      const mined = Math.min(b.ore, amount);
-      b.ore -= mined;
-      const im = rocks[b.shape];
-      if (im) {
-        if (b.ore <= 0) {
-          b.ore = 0;
-          m4.copy(b.baseMatrix).scale(s.set(0, 0, 0));
-        } else {
-          const factor = Math.cbrt(b.ore / BOULDER_INITIAL_ORE);
-          m4.copy(b.baseMatrix).scale(s.set(factor, factor, factor));
-        }
-        im.setMatrixAt(b.instanceIndex, m4);
-        im.instanceMatrix.needsUpdate = true;
-      }
-      return mined;
+      if (!b || b.ore <= 0 || !(dt > 0)) return null;
+      const mined = takeOre(id, b.beamRate * dt);
+      return { mined, x: b.x, y: b.y + b.size * 0.4, z: b.z };
     },
     findAimedBoulder(origin, dir, maxDist = 5.0) {
       let bestT = maxDist;

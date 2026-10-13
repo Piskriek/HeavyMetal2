@@ -107,3 +107,4 @@ The context a new Opus session needs on its first message. Keep it current: upda
   - barrier-block-a/b: the model is there, but the low bake wrote no low-raw.glb. Try `runworld-post.mjs <id>` with `budgets` raised, or `lowInPlace`.
 - **Overnight batch FINISHED (2026-10-13): 72 of 80 posted.** Failed: generator-small-a, server-crate-a/b, barrier-block-a/b, gantry-crane-solid-b, warehouse-small-b, sign-gantry-a. Next: review the 72 (four angles per a/b pair, keep the better), pack the keepers, redo the failures.
 - The watcher also hit the low-bake failure on office-block-ruin-b (no low-raw.glb), the same error as barrier-block. The low bake step likely crashes on some meshes; check lod-bake.py's stderr for one of them first.
+- **Batch 2 running (2026-10-13):** option c for all 40 subjects, plus redos of 6 failures. The log is zips/runworld/overnight2.log, ending in 'BATCH2 DONE'. Review a/b/c as a set.

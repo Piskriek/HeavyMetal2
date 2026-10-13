@@ -2000,3 +2000,20 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
     - for the end-to-end run, the scripts may use the existing `.local3d-token` file as they do now.
   - A new RUN.world image costs about 120 credits. One or two tries for the bench are fine.
 - **TASK-21b:** as in the 21b/21c post above. TASK-21b owns `play.tsx`, `play-scene.ts`, `plot-ground.ts`, `avatar/` and the beam tests. TASK-18 owns `studio*`, `studio-server/`, `local3d.mjs` (the config part) and the weapon-bench asset files.
+
+### [2026-10-13 17:50] OPUS → SIDECAR: [TASK] TASK-18b, finish the asset bench (the previous sidecar ran out mid-task)
+- **Committed:** d14c051d (the bench endpoint, secrets file, local3d reading it), 29 of 29 tests.
+- **Uncommitted in the tree** (the previous sidecar's, typechecked, untested):
+  - `apps/web/src/studio/`: studio-presets(.test).ts, studio-api.ts, studio-levels.ts, studio-thumbs.ts, studio-redo.tsx, studio-viewport.ts, studio-panels.tsx, studio-app.tsx, studio-app.css;
+  - `scripts/studio-bench-mock.mjs`;
+  - the bench section of `scripts/test-studio.mjs`.
+- **The weapon-bench redo is done by Opus by hand.** The new image and the new 3D model came from the Studio routes; Opus posted it with `yaw: 90` (the redo came back turned) and packs it. **Do not redo the bench and do not touch its asset files.** Use the mock fixture for tests.
+- **Bugs from the live run, to reproduce with the mock and fix:**
+  1. "Process and pack" reported done after about 20 s, but the post never rebuilt the levels. The run driver probably read the previous job's "ok". Make the client wait for the job it started (match the job id), and make the test catch this case.
+  2. Keep stayed disabled after the pack.
+- **Then:**
+  - run `node scripts/test-studio.mjs` (with the bench section), typecheck, npm test and build;
+  - commit the UI and test paths with explicit paths;
+  - take shots of the workspace, the three levels, the presets and each redo step (mock), and look at them;
+  - post [DONE].
+- Never print or type a token.

@@ -17,7 +17,24 @@ export const CLIP_NAMES = [
   'pointing',
 ] as const;
 
-export type ClipName = (typeof CLIP_NAMES)[number];
+/** The extraction rifle's eleven clips (TASK-21), packed from the Mixamo rifle set into `astro/rifle-anims.bin`. */
+export const RIFLE_CLIP_NAMES = [
+  'rifle-idle',
+  'rifle-aiming-idle',
+  'firing-rifle',
+  'rifle-walk',
+  'rifle-run',
+  'backwards-rifle-walk',
+  'strafe-left',
+  'strafe-right',
+  'rifle-pull-out',
+  'rifle-put-away',
+  'reloading',
+] as const;
+
+export type RifleClipName = (typeof RIFLE_CLIP_NAMES)[number];
+
+export type ClipName = (typeof CLIP_NAMES)[number] | RifleClipName;
 
 /**
  * Decodes all packed animation clips from an ArrayBuffer / ArrayBufferView.

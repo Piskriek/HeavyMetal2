@@ -23,6 +23,8 @@ import { disposeProp, lineSpan, machineProp, PIXELS_OF, type MachineProp } from 
 import { createScientistInstance } from '../avatar/scientist/scientist-model';
 import { loadScientistAnimations, type ClipName } from '../avatar/scientist/anims-loader';
 import { createScientistAnimator, type OneShotKind, type ScientistAnimator } from '../avatar/scientist/animator';
+import { loadRifleAnimations } from '../avatar/astro/rifle-clips';
+import { handPose, viewPose } from './rifle-hold';
 import { createMonsterMashCombat, type MonsterMashCombatManager } from './monster-mash-combat';
 import * as F from '@hm/substrate';
 import * as S from '@hm/structure';
@@ -179,6 +181,8 @@ export interface PlayScene {
   setBeamHeld(held: boolean, mode: BeamMode): void;
   /** The held rifle's lamps and muzzle while the beam fires (on) or idles. */
   setBeamFiring(on: boolean): void;
+  /** Whether the left button aims the held rifle (its aiming idle in the character's hands). */
+  setBeamAiming(on: boolean): void;
   /** Sets first person (body hidden) or third person over the shoulder. */
   setCameraView(mode: 'first' | 'third'): void;
   getCameraView(): 'first' | 'third';
@@ -224,6 +228,10 @@ export interface PlayScene {
     holo(): { readonly visible: boolean; readonly machines: number };
     view(): 'first' | 'third';
     clipWeight(name: ClipName): number;
+    /** Where the held rifle is: in the right hand of the character, in the first-person view, or put away. */
+    rifleIn(): 'hand' | 'view' | 'none';
+    /** The character: which scene it is in, whether it is shown, where it stands, and whether an alternate camera is on. */
+    avatar(): { readonly in: string; readonly visible: boolean; readonly at: readonly number[]; readonly kids: number; readonly altCam: boolean };
     currentOneShot(): OneShotKind | null;
     animator(): ScientistAnimator | null;
     gather(amount: number): number;
@@ -859,11 +867,38 @@ export function createPlayScene(o: {
   // own pass after the planet (see drawViewModel), with its own lights, so the stage's look (the 1-bit dither at stage 0,
   // which turns dark metal to black) never hides it. The rig copies the main camera's pose each frame.
   const heldBeam: BeamTool = extractionBeam(createMaterials(), { stage: 1 });
-  heldBeam.group.position.set(0.2, -0.24, -0.6);
   heldBeam.group.visible = false;
   const viewModelScene = new THREE.Scene();
   const viewRig = new THREE.Group();
   viewRig.add(heldBeam.group);
+  // the rifle is in the view in first person and in the right hand (the Astro's bone) in third; the avatar loads later
+  let rifleHand: THREE.Object3D | null = null, leftHand: THREE.Object3D | null = null;
+  const riflePoint = new THREE.Vector3();
+  let rifleAimingNow = false, rifleFiringNow = false;
+  const attachRifle = (): void => {
+    const inHand = cameraView === 'third' && rifleHand !== null;
+    const parent: THREE.Object3D = inHand ? rifleHand! : viewRig;
+    if (heldBeam.group.parent !== parent) { heldBeam.group.removeFromParent(); parent.add(heldBeam.group); }
+    const pose = inHand ? handPose(heldBeam.sockets.grip, heldBeam.sockets.muzzle) : viewPose();
+    heldBeam.group.position.copy(pose.position);
+    heldBeam.group.quaternion.copy(pose.quaternion);
+  };
+  /**
+   * In third person the grip socket sits on the right hand and the barrel points from it to the left hand (the foregrip): each
+   * frame the rifle turns so its foregrip socket lies toward the left hand's bone, after the clip has posed the arms.
+   */
+  const holdRifleInHand = (): void => {
+    if (cameraView !== 'third' || rifleHand === null || leftHand === null || heldBeam.group.parent !== rifleHand) return;
+    scientistHolder.updateMatrixWorld(true);
+    leftHand.getWorldPosition(riflePoint);
+    const toLeft = rifleHand.worldToLocal(riflePoint);
+    if (toLeft.lengthSq() < 1e-6) return;
+    const axis = heldBeam.sockets.foregrip.clone().sub(heldBeam.sockets.grip).normalize();
+    const q = new THREE.Quaternion().setFromUnitVectors(axis, toLeft.normalize());
+    heldBeam.group.quaternion.copy(q);
+    heldBeam.group.position.copy(heldBeam.sockets.grip).applyQuaternion(q).negate();
+    heldBeam.group.updateMatrixWorld(true);
+  };
   // a key light fixed to the camera, up and to the right of the rifle, and a sky fill: the rifle reads at every stage
   const viewKey = new THREE.PointLight('#ffffff', 2.4, 6, 1.6);
   viewKey.position.set(0.7, 0.55, 0.1);
@@ -948,11 +983,14 @@ export function createPlayScene(o: {
   };
 
   const initialVisor = o.avatar?.kind === 'scientist' ? o.avatar.visor : '#f59e0b';
-  void Promise.all([createScientistInstance(initialVisor), loadScientistAnimations()]).then(
-    ([{ group, visorMaterials: vm }, clips]) => {
+  void Promise.all([createScientistInstance(initialVisor), loadScientistAnimations(), loadRifleAnimations()]).then(
+    ([{ group, visorMaterials: vm }, clips, rifleClips]) => {
       scientistHolder.add(group);
       visorMaterials = vm;
-      scientistAnimator = createScientistAnimator(group, clips);
+      scientistAnimator = createScientistAnimator(group, new Map([...clips, ...rifleClips]));
+      rifleHand = group.getObjectByName('mixamorigRightHand') ?? null;
+      leftHand = group.getObjectByName('mixamorigLeftHand') ?? null;
+      attachRifle();
     }
   ).catch((err) => {
     console.warn('Failed to load scientist in Play:', err);
@@ -1530,9 +1568,14 @@ export function createPlayScene(o: {
       }
     },
     beamMuzzle() {
-      // in first person the held rifle's muzzle socket, in the view; otherwise a point just in front of the camera
+      // the held rifle's muzzle socket: in the view in first person, in the right hand in third; otherwise in front of the camera
       if (heldBeam.group.visible && cameraView === 'first') {
-        const w = camera.localToWorld(heldBeam.sockets.muzzle.clone().add(heldBeam.group.position));
+        const socket = heldBeam.sockets.muzzle.clone().applyQuaternion(heldBeam.group.quaternion).add(heldBeam.group.position);
+        const w = camera.localToWorld(socket);
+        return { x: w.x, y: w.y, z: w.z };
+      }
+      if (heldBeam.group.visible && rifleHand !== null) {
+        const w = heldBeam.group.localToWorld(heldBeam.sockets.muzzle.clone());
         return { x: w.x, y: w.y, z: w.z };
       }
       const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -1777,7 +1820,9 @@ export function createPlayScene(o: {
           strafe: c.move.x,
           run: c.run,
           jumping: false,
+          rifle: { held: heldBeam.group.visible, aiming: rifleAimingNow, firing: rifleFiringNow },
         });
+        holdRifleInHand();
       }
 
       if (altCamPos) {
@@ -2071,14 +2116,25 @@ export function createPlayScene(o: {
     setLabActivity,
     setBeamHeld(held, mode) {
       heldBeam.setMode(mode);
+      const was = heldBeam.group.visible;
       heldBeam.group.visible = held;
+      attachRifle();
+      if (held !== was) {
+        if (!held) rifleAimingNow = rifleFiringNow = false;
+        scientistAnimator?.playOneShot(held ? 'draw' : 'holster');
+      }
     },
     setBeamFiring(on) {
+      rifleFiringNow = on;
       heldBeam.setFiring(on ? 1 : 0);
+    },
+    setBeamAiming(on) {
+      rifleAimingNow = on;
     },
     setCameraView(mode) {
       cameraView = mode;
       scientistHolder.visible = (mode === 'third');
+      attachRifle();
     },
     getCameraView: () => cameraView,
     playAction(kind) {
@@ -2189,6 +2245,11 @@ export function createPlayScene(o: {
       holo: () => holo.debug(),
       view: () => cameraView,
       clipWeight: (name: ClipName) => scientistAnimator?.getClipWeight(name) ?? 0,
+      rifleIn: () => (!heldBeam.group.visible ? 'none' : heldBeam.group.parent === viewRig ? 'view' : rifleHand !== null && heldBeam.group.parent === rifleHand ? 'hand' : 'none'),
+      avatar: () => {
+        const box = new THREE.Box3().setFromObject(scientistHolder);
+        return { in: scientistHolder.parent === planetScene ? 'planet' : scientistHolder.parent === labScene ? 'lab' : 'none', visible: scientistHolder.visible, at: scientistHolder.position.toArray().map((v) => +v.toFixed(2)), kids: scientistHolder.children.length, altCam: !!altCamPos, box: [box.min.toArray(), box.max.toArray()].map((p) => p.map((v) => +v.toFixed(2))) };
+      },
       currentOneShot: () => scientistAnimator?.currentOneShot ?? null,
       animator: () => scientistAnimator,
       gather(amount) {

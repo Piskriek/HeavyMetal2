@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { type ClipName } from './anims-loader';
 import { adaptClipsForAstro } from './scientist-model';
 
-export type OneShotKind = 'lever' | 'button' | 'plant' | 'wave' | 'cheer' | 'point';
+export type OneShotKind = 'lever' | 'button' | 'plant' | 'wave' | 'cheer' | 'point' | 'draw' | 'holster' | 'reload';
 
 const ONE_SHOT_MAP: Record<OneShotKind, ClipName> = {
   lever: 'pulling-lever',
@@ -11,7 +11,13 @@ const ONE_SHOT_MAP: Record<OneShotKind, ClipName> = {
   wave: 'waving',
   cheer: 'cheering',
   point: 'pointing',
+  draw: 'rifle-pull-out',
+  holster: 'rifle-put-away',
+  reload: 'reloading',
 };
+
+/** The one-shots that hold the body while they play (the rifle's draw, holster and reload): nothing else blends under them. */
+const RIFLE_ONE_SHOTS: ReadonlySet<OneShotKind> = new Set<OneShotKind>(['draw', 'holster', 'reload']);
 
 export interface LocomotionInput {
   /** Forward/backward movement: +1 = forward, -1 = backward. */
@@ -22,6 +28,11 @@ export interface LocomotionInput {
   readonly run: boolean;
   /** Whether the character is jumping. */
   readonly jumping?: boolean;
+  /**
+   * The extraction rifle (TASK-21). Held: the rifle clips replace the unarmed locomotion and idle. Aiming (the left button):
+   * the aiming idle, not the relaxed one. Firing (the beam is on): the firing loop while standing still.
+   */
+  readonly rifle?: { readonly held: boolean; readonly aiming: boolean; readonly firing: boolean };
 }
 
 export interface ScientistAnimator {
@@ -79,6 +90,24 @@ export function createScientistAnimator(
   const jump = actions.get('jump');
 
   for (const act of [walk, run, strafeL, strafeR, walkBack]) {
+    if (act) {
+      act.play();
+      act.setEffectiveWeight(0);
+    }
+  }
+
+  // The rifle's set (TASK-21): the same locomotion with the rifle, a standing idle with it raised, and the firing loop
+  const rifle = {
+    idle: actions.get('rifle-idle'),
+    aim: actions.get('rifle-aiming-idle'),
+    fire: actions.get('firing-rifle'),
+    walk: actions.get('rifle-walk'),
+    run: actions.get('rifle-run'),
+    back: actions.get('backwards-rifle-walk'),
+    strafeL: actions.get('strafe-left'),
+    strafeR: actions.get('strafe-right'),
+  };
+  for (const act of [rifle.idle, rifle.aim, rifle.fire, rifle.walk, rifle.run, rifle.back, rifle.strafeL, rifle.strafeR]) {
     if (act) {
       act.play();
       act.setEffectiveWeight(0);
@@ -173,6 +202,12 @@ export function createScientistAnimator(
 
     const moveMag = Math.min(1, Math.hypot(forward, strafe));
     const isMoving = moveMag > 0.05;
+    // the rifle (TASK-21): held, its set takes the body; a rifle one-shot (draw, holster, reload) holds the body alone
+    const rifleHeld = !!loco?.rifle?.held;
+    const rifleBusy = activeOneShot !== null && RIFLE_ONE_SHOTS.has(activeOneShot.kind);
+    const armed = rifleHeld && !rifleBusy;
+    const rifleFiring = armed && !!loco?.rifle?.firing;
+    const rifleAiming = armed && !!loco?.rifle?.aiming;
 
     if (isMoving && isLookingAround && lookAround) {
       // Abort look-around if moving
@@ -180,7 +215,7 @@ export function createScientistAnimator(
       isLookingAround = false;
     }
 
-    if (!isMoving && !activeOneShot) {
+    if (!isMoving && !activeOneShot && !rifleHeld) {
       // Idle looking-around countdown
       lookAroundTimer += dt;
       if (lookAroundTimer >= nextLookAroundTime && !isLookingAround && lookAround && idle) {
@@ -226,13 +261,20 @@ export function createScientistAnimator(
       }
     }
 
-    // Blend actions
+    // Blend actions: the unarmed locomotion, or the rifle's when it is held (the other set fades out; a rifle one-shot holds both at zero)
     const locoSpeed = 12;
-    lerpWeight(walk, targetWalk, dt, locoSpeed);
-    lerpWeight(run, targetRun, dt, locoSpeed);
-    lerpWeight(walkBack, targetBack, dt, locoSpeed);
-    lerpWeight(strafeL, targetStrafeL, dt, locoSpeed);
-    lerpWeight(strafeR, targetStrafeR, dt, locoSpeed);
+    const unarmed = armed || rifleBusy ? 0 : 1;
+    const armedScale = armed ? 1 : 0;
+    lerpWeight(walk, targetWalk * unarmed, dt, locoSpeed);
+    lerpWeight(run, targetRun * unarmed, dt, locoSpeed);
+    lerpWeight(walkBack, targetBack * unarmed, dt, locoSpeed);
+    lerpWeight(strafeL, targetStrafeL * unarmed, dt, locoSpeed);
+    lerpWeight(strafeR, targetStrafeR * unarmed, dt, locoSpeed);
+    lerpWeight(rifle.walk, targetWalk * armedScale, dt, locoSpeed);
+    lerpWeight(rifle.run, targetRun * armedScale, dt, locoSpeed);
+    lerpWeight(rifle.back, targetBack * armedScale, dt, locoSpeed);
+    lerpWeight(rifle.strafeL, targetStrafeL * armedScale, dt, locoSpeed);
+    lerpWeight(rifle.strafeR, targetStrafeR * armedScale, dt, locoSpeed);
 
     if (jump) {
       if (isJumping) {
@@ -244,9 +286,13 @@ export function createScientistAnimator(
       }
     }
 
-    // Base idle weight
-    const targetIdle = isMoving ? 0 : isLookingAround ? 0 : 1;
+    // Base idle weight, and the rifle's standing poses: relaxed with it held, aiming with the left button, firing with the beam on
+    const targetIdle = isMoving || isLookingAround || armed || rifleBusy ? 0 : 1;
     lerpWeight(idle, targetIdle, dt, locoSpeed);
+    const standingArmed = armed && !isMoving;
+    lerpWeight(rifle.idle, standingArmed && !rifleAiming && !rifleFiring ? 1 : 0, dt, locoSpeed);
+    lerpWeight(rifle.aim, standingArmed && rifleAiming && !rifleFiring ? 1 : 0, dt, locoSpeed);
+    lerpWeight(rifle.fire, standingArmed && rifleFiring ? 1 : 0, dt, locoSpeed);
 
     mixer.update(dt);
   };

@@ -1014,6 +1014,7 @@ export function PlayScreen(props: {
         : aimedNode;
       const isMining = (isLmbDownRef.current || forceBeamRef.current !== null) && hasBeam && targetNode !== null && !scene.mash.isEquipped();
       scene.setBeamFiring((isMining || beamBoulderTargetRef.current !== null) && beamHeldRef.current);
+      scene.setBeamAiming(isLmbDownRef.current && beamHeldRef.current);
 
       if (harvestAccRef.current >= 0.1) {
         const powerMap: Record<number, number> = {};

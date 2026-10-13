@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as THREE from 'three';
 import { emptyField } from '@hm/terrainbrush';
+import { handPose, viewPose } from './rifle-hold';
 import { BEAM_START, boulderBeamRate, cycleBeamMode, runStroke, sculptToolForKey, strokeOf, STROKE_RADIUS, type BeamState } from './beam-tool';
 
 const RULES = { maxDepth: 2, maxHeight: 2, orePerCubicMetre: 1, ratePerSecond: 1 };
@@ -70,6 +72,19 @@ test('painting costs no ore; the preset lands on the ground under the aim', () =
   assert.equal(r.ore, 0, 'applying changes no ore');
   assert.equal(r.balance, 12, 'applying costs no ore');
   assert.ok(r.field.paint.some((p) => p === 'preset:moss'), 'a cell is painted with the preset');
+});
+
+test('the rifle in the hand: the grip socket sits at the hand bone, the barrel runs along the hand (+Y)', () => {
+  // the beamkit prop's own sockets: grip, then muzzle ahead of it
+  const grip = new THREE.Vector3(0, -0.111, -0.137), muzzle = new THREE.Vector3(0, 0.026, 0.45);
+  const pose = handPose(grip, muzzle);
+  const atHand = grip.clone().applyQuaternion(pose.quaternion).add(pose.position);
+  assert.ok(atHand.length() < 1e-6, `the grip lands on the hand origin (${atHand.length()})`);
+  const ahead = muzzle.clone().applyQuaternion(pose.quaternion).add(pose.position);
+  assert.ok(Math.abs(ahead.x) < 1e-6 && Math.abs(ahead.z) < 1e-6 && ahead.y > 0.5, `the muzzle is up the hand's +Y (${ahead.toArray()})`);
+  const view = viewPose();
+  const barrel = muzzle.clone().sub(grip).normalize().applyQuaternion(view.quaternion);
+  assert.ok(barrel.z < -0.9, `in the view the barrel points forward, down -Z (${barrel.z})`);
 });
 
 test('the beam takes about 4 ore a second from a boulder on rock, and more on scree', () => {

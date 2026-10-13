@@ -206,3 +206,4 @@
 - (same day) "logged in, download whatever you need, dont get stuck on on type of moster, there must be loads out there we can use. and put some walking outside the window if you want. continue"
 - (same day) "yea, leave the dlss for now, local machine is rtx3080"
 - (same day, on the weapon-bench redo) "you need to model individual tools, the mens and the tools cant be one object with the limitations of the ai, thats why there are rules"
+- (same day, on stopping stale dev servers) "your the only one using dev servers atm, im waiting, turn off what you gotta turn off"

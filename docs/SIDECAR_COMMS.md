@@ -1636,3 +1636,17 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
 - **V3 rubble-slab, the cause (see group A):** the box was a stale build. The current build loads it. Triangles: 5 instances × 12 (box) → 5 × 600 (generated).
 - **Capture reliability:** a Windows file lock failed some shot writes (`UNKNOWN` on open); the writes now retry. The other session's `play.tsx` edits also reload the dev page during a run, which cost two runs.
 - **Shots added:** `lite-spawn-p05.png` (the storm sky and the Breach, the shells off) and `static-spawn-p05.png` (the flat plane, the old look).
+
+### [2026-10-13 14:10] SIDECAR → OPUS: [DONE] TASK-19 REVIEW 2 (31d341ab, 91d6efd4, this commit): V1 to V7
+- **V7 frame time on the real GPU.** Renderer: `ANGLE (NVIDIA, NVIDIA GeForce GTX 950M, Direct3D11)`. Headed Chrome with `--use-angle=d3d11 --force_high_performance_gpu --disable-gpu-vsync`, on the production single file (`apps/web/dist/index.html`), spawn view, 10 s per view, frames from `requestAnimationFrame`:
+
+| View | Owner's name | Median frame | p95 frame | Frames in 10 s | Vista GPU cost (60 renders, each synced) |
+|---|---|---|---|---|---|
+| Lite | Low | 16.7 ms | 17.3 ms | 585 | 1.34 ms |
+| Full | Medium | 16.7 ms | 16.9 ms | 595 | 1.52 ms |
+| Static | (the flat plane) | 16.7 ms | 17.5 ms | 588 | 0.03 ms (no vista) |
+
+- **The frame median sits at 16.7 ms in all three**, which is the display's 60 Hz cap, so it cannot show headroom. The vista's own cost (the last column) is the number to read: about 1.3 to 1.5 ms of the frame on this card.
+- **Draw calls and triangles** (production, spawn view, progress 0.5, `renderer.info` around `vista.render`): **Full 32 calls, 64,012 triangles**; **Lite 27 calls, 52,064 triangles**. Dust: 900 (Full), 450 (Lite). Budget: 40 calls, 120k triangles, 1000 dust.
+- **Checks (real results):** `npm test`: 2386 tests, 2379 pass, 3 fail, the known timing tests (fieldkit, lattice-accept, plotgrid). Vista maths: 23 of 23. `npm run build`: OK (run after the last code change). `npm run typecheck`: 2 errors in `apps/web/src/play/play.tsx` (lines 655 and 656), from another session's uncommitted rewrite, not from my files. `scripts/capture-window-view.mjs`: runs end to end, every shot listed above.
+- **Open, for a ruling:** (1) the pocket radius ratio (0.07, not 0.1) and the sector-bounded drift (1 to 2 m/s at the fastest, not the plan's wander); (2) the crosswind props cross the Breach's corridor (their lanes run at 23 to 77 m out, so they pass in front of the column for a moment). That is the owner's "props flying around", but it contradicts "nothing stands in front of it"; say which you want; (3) the whole-frame GPU time is not measured, only the vista's share; (4) the rubble cause is my best reading (a stale build), not a reproduced failure.

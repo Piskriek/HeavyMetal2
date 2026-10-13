@@ -74,15 +74,27 @@ See `docs/DLSS5_NEURAL_BAKE_RESEARCH.md`. In short:
 ## 6. Argo's master plan (owner-approved 13 October)
 Argo (creative lead) delivered `docs/argo/plans/ARGO_MASTER_PLAN.md`: an audit, the creative direction and 12 area plans. The owner approved it.
 
-Opus's review is `docs/argo/plans/ARGO_MASTER_PLAN_REVIEW.md`. About 80% is agreed. Eight points (O1 to O8) go back to Argo; until he answers, the contested parts are held and everything else proceeds.
+Opus's review is `docs/argo/plans/ARGO_MASTER_PLAN_REVIEW.md`: about 80% agreed, with eight objections (O1 to O8). **Argo accepted all eight the same evening** (`docs/argo/plans/ARGO_MASTER_PLAN_REPLY.md`), so nothing is held. Where the reply differs from the plan, the reply wins:
+- stages 0 to 6 with five looks (4 to 6 are PBR with the water, coverage and forest blooms);
+- the rifle at real size, with at most 1.15x in third person by eye;
+- monsters keep their colours, with a per-skin `remapStrength` (default 0.20);
+- a dormant leak to seal in Act IV, with combat only after F-03;
+- D3's heavy machines (field machines: the drill, the pylon and the first mill);
+- the approved audio and the owner's mix;
+- TASK-22's first-hour order.
+
+Argo's chat is open in Opus's browser for questions (owner, 13 October).
 - **Wave A (now, before main):** the active queue with Argo's additions folded into the briefs:
   - TASK-21d: P0-VFX-01, the rim light, the mode rib;
   - TASK-23b-2: P0-MON-01 steps 2 and 3, P0-MON-02, P0-MON-03, P1-MON-05;
   - TASK-23c: P0-LORE-01;
   - TASK-24: P0-PROD-01;
-  - Opus: Astro's mid and high levels out of the single file, the low-luminance check, a 16 MB CI gate.
+  - Opus: done in 0e3a6f2e: the single file at 14.51 MB (Astro's mid and high in the HD pack, a duplicate QuickJS removed), the build gate at 16 MB, and the luminance gate in post and pack.
   
   Then main.
-- **Wave B:** briefs 25 (the HUD's 9 zones and the build ribbon), 26 (industrial foundation frames, the safe dome, power brownout) and 27 (world-locked stage-0 dither, the rover camera, the modular scout).
+- **Wave B:** briefs 25 to 27, with the reply's §3 adjustments:
+  - 25: the HUD's 9 zones and the build ribbon, in play.tsx and base/ui; F fills a plan, X removes, H locks the hologram;
+  - 26: industrial foundation frames, the safe dome (25 m at the gate, 15 m at a pylon), power brownout; the heavy machines mount on foundation hardpoints;
+  - 27: world-locked stage-0 dither with the amber gate pool, the rover camera, the modular scout.
 - **Wave C:** briefs 28 (lab choreography, the live main menu), 29 (the 5-bus mixer, the 12 action sounds, the juice) and 30 (the leak shader, rifts, era escalation polish).
 - **Wave D:** briefs 31 (the Studio's 4-angle grid, the stage scrubber, the socket editor, the material designer) and 32 (heavy terraformers, the vehicle fabricator, turrets).

@@ -123,3 +123,14 @@ The lows *already* ship 256 px WebP maps with meshopt compression, which quantis
 Then `main`.
 
 **Waves B to D:** briefs 25 to 32 as you sequenced them, with O1 to O8 applied once you answer.
+
+## 5. Resolution (13 October 2026, the same evening)
+Argo accepted all eight: [ARGO_MASTER_PLAN_REPLY.md](ARGO_MASTER_PLAN_REPLY.md). Two details of his ruling go into the briefs as written:
+- **`remapStrength`** defaults to 0.20 per skin, not 0.
+- **"Seal" on the mode rib** (#ffc13d): sealing stays the beam's Extract held on a leak, so Seal is the state the beam shows while it seals, not a fourth mode to cycle. Argo has been told, and can still object.
+
+O5 as built (0e3a6f2e): the single file went from 17.93 to **14.51 MB**, not the estimated 14.9:
+- the sidecars had added about 0.8 MB since the measurement;
+- a duplicate QuickJS (1.3 MB) turned up and was removed.
+
+The build now fails above 16 MB, and the luminance gate is in the post and pack steps.

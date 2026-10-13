@@ -54,14 +54,14 @@ Humanity siphoned compute into its simulations through "the Bridge" until realit
 | The beam tool | Rifle-shaped, drawn with G. Extract mines boulders; Apply paints cartridge presets on the ground; Sculpt is in progress. First and third person, with 11 rifle animations. | `@hm/beamkit`, `@hm/terrainbrush`, `play/beam-*` |
 | The window view | A 3D wasteland: the Bridge Array, a glitch-sliced Breach column, floating fidelity pockets, storms. | `play/lab-vista.ts`, [WINDOW_SCENE_PLAN](../WINDOW_SCENE_PLAN.md) |
 | The Studio | The owner's in-engine editor: content browser, gizmo viewport, schema-driven details, a Changes panel with write-back, an asset bench with material presets and a one-click "redo this model". | `apps/web/src/studio/` |
-| Monsters | A pure brain (`@hm/leaksim`: 6 archetypes, telegraphed attacks, leaks you seal) and 38 legal monsters packed across three eras (Freedoom, Blasphemer, LibreQuake, Quaternius). Not wired in yet. | `packages/leaksim`, [MONSTERS_PLAN](../MONSTERS_PLAN.md) |
+| Monsters | A pure brain (`@hm/leaksim`: 6 archetypes, telegraphed attacks, leaks you seal) and 38 legal monsters packed across three eras (Freedoom, Blasphemer, LibreQuake, Quaternius). Renderers for all three eras and six walkers in the window view are done (TASK-23b-1); the fights are TASK-23b-2. | `packages/leaksim`, [MONSTERS_PLAN](../MONSTERS_PLAN.md) |
 | Generated 3D assets | 120 models from RUN.world images plus local Hunyuan3D, three detail levels each, every one reviewed from four angles. | `apps/web/src/assets/gen/`, [RUNWORLD_PIPELINE](../RUNWORLD_PIPELINE.md) |
 | Narration and audio | Dr. Haddy's voiced lines (RUN.world voice, a radio filter), music per context, SFX. | `apps/web/src/audio/`, `public/vo/`, `public/audio/` |
 
 **In progress, in this order:**
-1. TASK-21c and 21d: the character's lighting, the rifle animations, Sculpt, saving.
-2. TASK-22: Acts IV to VI as quests.
-3. TASK-23b: the monsters in the game.
+1. TASK-21d: Sculpt, saving, the beam's juice (21c, the lighting and the rifle animations, is done).
+2. TASK-22b: Acts IV to VI as quests (running).
+3. TASK-23b-2: the monsters in the game (23b-1, the renderers and the window walkers, is done).
 4. TASK-23c: the props in the world.
 5. TASK-24: test everything. Then `main`.
 
@@ -80,7 +80,7 @@ The briefs are in [`docs/prompts/sidecar/`](../prompts/sidecar/).
 - **The lab** reads as a set: sheet 21's redesign is approved but only partly realised.
 - **Sound:** music and SFX exist, but there is no mix plan, no ambience layers per stage, and no audio feedback language.
 - **Lore** is strong in the bible and thin in the game: few environmental storytelling beats, no collectibles or logs.
-- **The size:** the single file is 18 MB (watch item POL-27).
+- **The size:** the single file was 18 MB; since 13 October it is 14.5 MB, and the build fails above 16 MB (POL-27 closed).
 
 ## 6. What to deliver
 Put each deliverable in its own markdown file. The owner commits them to [`docs/argo/plans/`](plans/README.md), which explains the format.

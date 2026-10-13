@@ -1,0 +1,88 @@
+# 13 — Level Layouts, Plot Topology & The Lab Plan: Grounded Industrial Spatial Design
+
+## 1. The Goal: A Believable Portal-2-Caliber Lab Opening Onto a 1 km Natural World
+
+Our spatial architecture has two halves that must contrast sharply yet connect seamlessly through a single 2.6 m × 1.7 m freestanding doorway:
+1. **The Shielded Earth Lab:** A grounded, tactile research facility inspired by [*Portal 2*](https://developer.valvesoftware.com/wiki/Clean_(Portal_2)) and [*Control*](https://www.gamedeveloper.com/art/the-real-buildings-that-inspired-i-control-i-s-oldest-house), laid out strictly per [`07-sheet-lab-power-and-machines.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/07-sheet-lab-power-and-machines.png) and [`21-sheet-the-lab.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/21-sheet-the-lab.png), with a 14.8 m × 3.1 m observation window looking out onto the collapsing Bridge Array wasteland ([`docs/WINDOW_SCENE_PLAN.md`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/WINDOW_SCENE_PLAN.md)).
+2. **The 1 km Lunar Plot:** A natural geological basin on a 40,000 km shared planet ([`11-desolate-horizon.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/11-desolate-horizon.png), [`10-plot-stage-6-hero.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/10-plot-stage-6-hero.png)) where elevation, crater rims, mineral veins, and hydrological drainage reward smart machine and outpost placement.
+
+## 2. Where It Stands Today
+
+- **What Exists:**
+  - [`apps/web/src/lab/lab-scene.ts`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/apps/web/src/lab/lab-scene.ts) and [`apps/web/src/play/lab-room.ts`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/apps/web/src/play/lab-room.ts) implement the Lab interior, freestanding Gate, power wall, and 3D window vista ([`apps/web/src/lab/lab-vista.ts`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/apps/web/src/lab/lab-vista.ts)).
+  - 10 lab clutter props (`crate-large`, `crate-small`, `cardboard-stack`, `filing-cabinet`, `server-rack`, `locker`, `toolbox`, `coolant-can`, `sample-case`, `old-monitor`) and 6 vista pieces (`datacentre-hall`, `chiller-block`, `shipping-container`, `pylon-tower`, `overpass-segment`, `rubble-slab`) are packed in [`apps/web/src/assets/gen/registry.json`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/apps/web/src/assets/gen/registry.json).
+  - [`apps/web/src/crafter/planet.ts`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/apps/web/src/crafter/planet.ts) and [`packages/plotterrain/`](https://github.com/Piskriek/HeavyMetal2/tree/feat/monster-mash-exploration/packages/plotterrain) generate the 1 km plot with a 4.2 km horizon and 11 sample neighbor domes.
+- **What Is Weak or Missing:**
+  - **The Lab Still Reads as a Sparse Stage Set ([`02-lab-act1-wake.jpg`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/argo/tour/02-lab-act1-wake.jpg), [`03-lab-power-wall.jpg`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/argo/tour/03-lab-power-wall.jpg)):** Sheet 21 ([`21-sheet-the-lab.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/21-sheet-the-lab.png)) and [`docs/LAB_LAYOUT_RESEARCH.md`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/LAB_LAYOUT_RESEARCH.md) are only partly realized. The power wall lacks copper bus bars and overhead cable trays ([`07-sheet-lab-power-and-machines.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/07-sheet-lab-power-and-machines.png)), and the floor feels empty before clutter placement.
+  - **Foundations Look Like Red Prototype Pucks ([`10-foundation-placed.jpg`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/argo/tour/10-foundation-placed.jpg)):** Instead of the industrial box-section steel frames and grated decks of [`13-sheet-base-construction.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/13-sheet-base-construction.png) and [`14-outpost-stage-3.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/14-outpost-stage-3.png), placed foundations render as flat red slabs with blue rings.
+  - **3D Window Vista Composition (`05-window-view-storm-and-breach.jpg`):** Needs Review 1 fixes from [`docs/RESUME.md`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/RESUME.md) §7 completed (push foreground boxes back, ground horizon plane with fog depth, make the cyan glitch-sliced Breach column tower past the top of the glass one-third from the left, and float full spherical S-space fidelity pockets).
+
+## 3. What the Best Games Do (Research & Sources)
+
+| Reference Game | Spatial & Architectural Technique | Player Praise & Design Lesson |
+| :--- | :--- | :--- |
+| [***Portal 2***](https://developer.valvesoftware.com/wiki/Clean_(Portal_2)) | **Modular Panel Grids & Overhead Service Trays:** Off-white 2 m × 2 m modular wall panels with dark recessed seams, steel kick-plates, and exposed ceiling cable trays that ground high-tech machines in industrial reality ([Valve Clean Theme Docs](https://developer.valvesoftware.com/wiki/Clean_(Portal_2))). | Directly matches our canon Lab spec in [`docs/concept/setmix/README.md`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/README.md): off-white panels, dark steel kick band, polished concrete floor, 8 m ceiling with cold-white strip lights, and floor cable ramps. |
+| [***Abiotic Factor***](https://store.steampowered.com/app/427410/Abiotic_Factor/) | **Functional Lab Zones & Clearable Clutter:** Every corner of a lab room has a clear purpose (Power & Engineering, Fabrication & Synthesis, Observation & Command, Armory & Storage), and clearing crates opens prime real estate for advanced benches ([Abiotic Factor Base Tips](https://www.reddit.com/r/AbioticFactor/comments/1itys3y/how_to_build_a_better_base/)). | Validates `TASK-23c` where dissolving `crate-large` and `cardboard-stack` clears the right-wall bay for new machines while yielding starter salvage. |
+| [***Subnautica***](https://store.steampowered.com/app/264710/Subnautica/) & [***Satisfactory 1.0***](https://www.youtube.com/watch?v=oPsb7OFp1gg) | **Terrain-Adaptive Foundation Legs & Hardpoint Pads:** When a foundation is placed on a slope, telescoping corner legs automatically extend down into the bedrock so nothing ever floats ([Base Building Research `D13–D16`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/BASE_BUILDING_RESEARCH.md)). | Essential for Rule 10 (*"Nothing floats"*): every foundation and field machine must extend support legs or a cast concrete plinth down into the lunar slope. |
+
+## 4. Concrete Changes Ranked P0, P1, and P2
+
+### Canonical Lab Floor Plan (18 m × 14 m × 8 m High)
+
+| Zone | Coordinates & Orientation | Fixtures & Props (All Grounded + Cabled per Rule 10) |
+| :--- | :--- | :--- |
+| **Back-Left: Observation Window** | Back wall, left/center-left (`14.8 m × 3.1 m` letterbox armored glass) | Looks out onto [`apps/web/src/lab/lab-vista.ts`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/apps/web/src/lab/lab-vista.ts) (Bridge Array ruins, towering cyan Breach column 1/3 from left, floating spherical S-pockets). Flanked by `old-monitor` telemetry desk and `filing-cabinet`. |
+| **Center-Right: Freestanding Gate** | `3.0 m` forward of back wall, middle-right (`2.6 m × 1.7 m` opening, `3.2 m` outer height) | Box-section gunmetal frame, ribbed amber field coils, side buttresses, hazard-striped plinth, rear junction box with 6 cable glands ([`06-sheet-gate.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/06-sheet-gate.png)). Main **Operator Console** (red lever) stands `2.2 m` front-left of Gate. |
+| **Back-Right: The Power Chain** | Back-right corner along wall | Left-to-right per [`07-sheet-lab-power-and-machines.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/07-sheet-lab-power-and-machines.png): **Capacitor Bank** (6 cylinders + copper bus bars on steel skid) $	o$ **Breaker Panel** (rotary handle + 2 analog gauges) $	o$ **4 Relay Cabinets** (amber top beacons) $	o$ **Control Boxes** $	o$ **Ribbed Steel Floor Cable Covers** running straight into the Gate plinth. |
+| **Right Wall: Synthesis & Fabrication Bay** | Right wall, front-to-back | **Hardware Fabricator** (`#7cff4d` green print bed), **Preset Bench** (`#ff3d8a` pink laser), and **Preset Combiner** (`#b46bff` violet plasma globe), fed by overhead ceiling cable drops. Clutter props (`crate-large`, `coolant-can`, `toolbox`) initially block the secondary expansion slots (`TASK-23c`). |
+| **Center-Left & Left Wall: Command & Armory** | Center-left floor & left wall | **Round 2.4 m Planet Table** (amber hologram of plot + neighbor enclaves) in center-left; **Preset Rack** (cartridge library wall) and **Armory Tool Rack** (holding the Extraction Beam Rifle and Shareware Sidearm, mounted as separate socketed objects per Rule 16) on the left wall. |
+
+### P0 — Must Fix Before First Public Test
+
+1. **P0-LAYOUT-01: Replace Red Slab Foundations with Sheet 13 Industrial Box-Section Frames (`10-foundation-placed.jpg` Fix)**
+   - **What to build:** In [`apps/web/src/base/view.ts`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/apps/web/src/base/view.ts), retire the prototype red cylinder/ring geometry seen in [`10-foundation-placed.jpg`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/argo/tour/10-foundation-placed.jpg) and bind the packed modular pieces from [`13-sheet-base-construction.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/13-sheet-base-construction.png) and [`15-sheet-base-roofs-openings.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/15-sheet-base-roofs-openings.png) (gunmetal box-section frame, grated deck plate, hazard-striped rim, and auto-extending corner support legs that raycast down into slopes up to 3 m).
+   - **Needs:** **Code** (`apps/web/src/base/view.ts`), **Art** (already in `registry.json` from Sheet 13/15 batches).
+
+2. **P0-LAYOUT-02: Complete the Lab Power Chain & Clutter Staging (`03-lab-power-wall.jpg` & `TASK-23c`)**
+   - **What to build:** In [`apps/web/src/lab/lab-scene.ts`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/apps/web/src/lab/lab-scene.ts) and [`apps/web/src/play/lab-room.ts`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/apps/web/src/play/lab-room.ts):
+     - Arrange the Power Wall strictly left-to-right per [`07-sheet-lab-power-and-machines.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/07-sheet-lab-power-and-machines.png) with visible copper bus bars on the Capacitor Bank, amber rotating/pulsing beacons atop the 4 Relay Cabinets, and ribbed steel floor cable ramps connecting the relays to the Gate plinth and Operator Console.
+     - Place the 10 packed clutter props (`crate-large`, `crate-small`, `cardboard-stack`, `filing-cabinet`, `server-rack`, `locker`, `toolbox`, `coolant-can`, `sample-case`, `old-monitor`) in logical functional clusters with ground contact shadows so the room feels lived-in.
+   - **Needs:** **Code** (`apps/web/src/lab/lab-scene.ts`, `apps/web/src/play/lab-room.ts`).
+
+3. **P0-LAYOUT-03: Lock 3D Window Vista Composition & Scale (`05-window-view-storm-and-breach.jpg` & `TASK-19` Review 1)**
+   - **What to build:** In [`apps/web/src/lab/lab-vista.ts`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/apps/web/src/lab/lab-vista.ts), verify all items from Opus's Review 1 ([`docs/RESUME.md`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/RESUME.md) §7):
+     - Push `datacentre-hall` and `chiller-block` to mid-ground (`45–120 m`) so they do not crowd the glass; place `overpass-segment` and `pylon-tower` leading the eye toward the **Breach Column** positioned at the left one-third rule (`x = -35%` of window span), rising above the upper window frame with horizontal glitch-slice shader displacement.
+     - Render 3 floating **S-Space Fidelity Pockets** as true 3D spheres (`r = 4–9 m`) that stencil/shader-render Stage 3/4 lush terrain inside their volume while a `shipping-container` or `rubble-slab` straddles a pocket boundary (half 1-bit dither, half full PBR).
+   - **Needs:** **Code** (`apps/web/src/lab/lab-vista.ts`).
+
+### P1 — Makes It Feel AAA
+
+4. **P1-LAYOUT-04: Curate the 1 km Starting Lunar Plot Topology (`packages/plotterrain/`)**
+   - **What to build:** Tune the default starting plot heightfield in [`packages/plotterrain/`](https://github.com/Piskriek/HeavyMetal2/tree/feat/monster-mash-exploration/packages/plotterrain) and [`apps/web/src/crafter/planet.ts`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/apps/web/src/crafter/planet.ts) around four distinct, readable landmarks within 250 m of the Twin Gate ([`08-plot-stage-ladder.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/08-plot-stage-ladder.png), [`11-desolate-horizon.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/11-desolate-horizon.png)):
+     1. **The Gate Pad Plateau (`0–30 m`):** Flat enough to place the first 4 machines and a 3x3 outpost without fighting steep slopes.
+     2. **The Low Hydro Basin (`35–90 m` East/Center):** A natural depression `-3.5 m` below pad level that stays dry in Stages 0–2 and floods into the hero turquoise lake at Stage 3–4 ([`08-plot-stage-ladder.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/08-plot-stage-ladder.png) Panel 4–6).
+     3. **The Bouldered Ore Ridge (`50–120 m` North-West):** High-density boulder scatter and exposed mineral veins ideal for `Rock Drill` placement and `Goblin Rover` hill climbs.
+     4. **The Wreck & Anomaly Rim (`120–220 m` Perimeter):** Crater rim hosting 3 salvageable lunar wreck sites (`TASK-23c`) and the initial perimeter anomaly leak points (`TASK-23b`), framing the 11 distant neighbor enclave domes on the 4.2 km horizon.
+   - **Needs:** **Code** (`packages/plotterrain/`, `apps/web/src/crafter/planet.ts`).
+
+5. **P1-LAYOUT-05: Dynamic Floor Cable Covers Between Field Machines & Relay Pylons**
+   - **What to build:** Whenever a field machine (`Texture Mill`, `Shape Press`, `Light Projector`, `Water Maker`) is placed within 20 m of the Twin Gate pad or a `Relay Pylon`, automatically extrude a low-poly ribbed steel floor cable cover (on flat ground/foundations) or catenary sag cable (between pylons) so no machine ever operates "wirelessly" (enforcing Rule 10 and [`12-sheet-field-machines.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/12-sheet-field-machines.png)).
+   - **Needs:** **Code** (`apps/web/src/base/view.ts`, `apps/web/src/crafter/world.ts`).
+
+### P2 — Stretch Goals
+
+6. **P2-LAYOUT-06: Weathering & Moss Progression on Placed Base Pieces at Stage 4 (`12-sheet-field-machines.png` Bottom Row)**
+   - **What to build:** As local `Aq` and `Lx` cross Stage 4 (`>= 0.75`), blend a world-space top-down moss and patina normal/albedo overlay onto the upward-facing surfaces of the Twin Gate, foundations, and field machines so they age into the meadow they created ([`10-plot-stage-6-hero.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/10-plot-stage-6-hero.png)).
+   - **Needs:** **Code** (`packages/groundshader/`, `apps/web/src/crafter/world.ts`).
+
+## 5. Rules Touched (`docs/argo/RULES.md`)
+
+- **Rule 9 (One natural world, 1 km plot):** The starting plot topology uses natural geological basins and ridges that stay identical across Stages 0–4, only gaining vertex smoothness, water, and flora.
+- **Rule 10 (Believable machines, nothing floats, cabled):** Telescoping foundation legs and automatic floor cable covers ensure every structure and machine is physically anchored and wired.
+- **Rule 11 (Square sections) & Rule 16 (Split hard parts):** Wall-mounted rifles and benchtop printers remain separate socketed meshes placed in code.
+
+## 6. Owner Decisions Needed
+
+1. **Water Maker Footprint (`7.74 m × 6.30 m` vs. 8 m Hardpoint Socket):**
+   - *Question:* [`docs/RESUME.md`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/RESUME.md) §5.4 flags checking the `Water Maker`'s `7.74 m × 6.30 m` footprint on its hardpoint. Should the standard field `Water Maker` fit on a **1x1 foundation cell (`4 m × 4 m`)** like the `Texture Mill` and `Shape Press` (scaling the field version to `3.6 m × 3.0 m`), while reserving the `8 m × 8 m` (2x2 cell) footprint for the **Heavy Water Maker** (`#30` on Sheet 17)?
+   - *Recommendation:* **Yes—scale the starter field Water Maker to fit a 1x1 (`4 m × 4 m`) pad** and reserve the 2x2 (`8 m × 8 m`) hardpoint for the Sheet 17 Heavy Terraformer tier.

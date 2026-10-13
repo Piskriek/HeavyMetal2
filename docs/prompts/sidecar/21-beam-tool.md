@@ -68,4 +68,10 @@ On the board:
   - in Extract, an instanced stream of 16 dark chunks spiralling from the hit point into the muzzle;
   - the first-person rifle sways on look, bobs on walk and vibrates while firing, through `@hm/tooljuice`'s damped spring.
 - **P0-LIGHT-01 (the rest):** a view-aligned rim term and a hemisphere floor for the player and the view model in stages 0 to 2, so they never merge into the dark ground. The metal cap from 21c stays.
-- **The mode rib (agreed part of P0-VEH-02):** a square emissive strip along the rifle's top rail, glowing in the mode's colour. **No 1.65× scale:** the rifle is real size (see review O2).
+- **The mode rib (P0-VEH-02 as Argo ruled on O2):** a square emissive strip along the rifle's top rail, glowing in the mode's colour:
+  - Extract #3dc8ff;
+  - Apply #ff3d8a;
+  - Sculpt #7cff4d;
+  - Seal #ffc13d, shown while Extract is held on a leak (sealing is not a fourth mode to cycle).
+  
+  The rifle stays real size in first person. In third person keep 1.0x; go up to 1.10x only if the shots show it reading small after the lighting fix, and never past 1.15x.

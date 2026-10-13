@@ -1,0 +1,85 @@
+# 14 — Lighting Per Stage & Transitions Plan: From 1-Bit Dither to Golden-Hour PBR
+
+## 1. The Goal: Make Every Stage of `S = (Pxd, Vtx, Lx, Aq)` Look Like an Art-Directed Masterpiece
+
+In **FIDELITY**, lighting is not a static post-process—it is a core gameplay metric (`Lx`, Light Flux) and the primary way the player perceives progress. Right now ([`docs/argo/START_HERE.md`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/argo/START_HERE.md) §5), stage lighting and transitions are functional rather than cinematic, the Lab power-up barely changes room exposure ([`04-lab-power-on.jpg`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/argo/tour/04-lab-power-on.jpg)), and the player character and rifle render near-black on the Moon ([`13-beam-first-person-apply-paint.jpg`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/argo/tour/13-beam-first-person-apply-paint.jpg), [`14-beam-third-person.jpg`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/argo/tour/14-beam-third-person.jpg)). Our goal is to make **every stage from Stage 0 to Stage 4 look intentionally art-directed** while keeping the GTX 950M locked at 60 fps (`POL-04`).
+
+## 2. Where It Stands Today
+
+- **What Exists:**
+  - [`packages/lighting/`](https://github.com/Piskriek/HeavyMetal2/tree/feat/monster-mash-exploration/packages/lighting), [`packages/lightplace/`](https://github.com/Piskriek/HeavyMetal2/tree/feat/monster-mash-exploration/packages/lightplace), [`packages/groundshader/`](https://github.com/Piskriek/HeavyMetal2/tree/feat/monster-mash-exploration/packages/groundshader), and [`apps/web/src/crafter/looks.ts`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/apps/web/src/crafter/looks.ts) drive the shader uniforms for `Pxd`, `Vtx`, `Lx`, and `Aq`.
+  - [`08-plot-stage-ladder.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/08-plot-stage-ladder.png) defines the exact canonical lighting arc: low sun `20–25°` up from frame right, pitch-black sky at S1 $	o$ thin horizon color band at S2 $	o$ atmospheric haze and soft shadows at S3 $	o$ water reflections at S4 $	o$ golden-hour god rays through lush forest canopy at S6 ([`10-plot-stage-6-hero.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/10-plot-stage-6-hero.png)).
+  - `TASK-21c` ([`docs/prompts/sidecar/21-beam-tool.md`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/prompts/sidecar/21-beam-tool.md)) is currently addressing avatar lighting in [`apps/web/src/avatar/`](https://github.com/Piskriek/HeavyMetal2/tree/feat/monster-mash-exploration/apps/web/src/avatar).
+- **What Is Weak or Missing:**
+  - **Near-Black Avatar & Viewmodel (`13-beam-first-person-apply-paint.jpg`, `14-beam-third-person.jpg`):** Standard Three.js `MeshStandardMaterial` with `metalness > 0.3` and no environment cubemap (`scene.environment = null` at low `Lx`) multiplies diffuse light toward zero and reflects black sky, turning the Scientist and rifle into black silhouettes.
+  - **Screen-Space Dither Swimming in Stage 0 (`07-moon-stage0.jpg`):** Sampling a 4x4 Bayer matrix solely in screen-space `(gl_FragCoord.xy)` causes terrain patterns to "swim" across polygons whenever the player rotates the camera, flattening perspective depth (`V1_1_ONBOARDING_PLAN.md` §1 note: *"needs slight adjustment on the dither of the terrain to add perspective"*).
+  - **Flat Lab Power-On Contrast (`02-lab-act1-wake.jpg` vs. `04-lab-power-on.jpg`):** Act I wakes in a room that is already too evenly lit by ambient light, so throwing the breaker in [`04-lab-power-on.jpg`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/argo/tour/04-lab-power-on.jpg) lacks the dramatic shift shown in [`01-lab-first-play.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/01-lab-first-play.png) and [`02-gate-power-on.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/02-gate-power-on.png).
+  - **Missing Radial Wave Drama:** Stage upgrades interpolate globally or linearly without a dramatic volumetric scan-ring sweeping across the terrain and leaving glowing edge-tessellation in its wake.
+
+## 3. What the Best Games Do (Research & Sources)
+
+| Reference Game | Lighting & Shader Technique | Player Praise & Design Lesson |
+| :--- | :--- | :--- |
+| [***Return of the Obra Dinn***](https://dukope.com/devlogs/obra-dinn/tig-32/) | **Surface/Sphere-Projected 1-Bit Dither & Sobel Edge Preservation:** Lucas Pope projected the dither pattern onto a world-anchored sphere/cube around the camera and injected a 1-bit normal/depth edge line so horizon silhouettes stay rock-solid during camera rotation ([Lucas Pope TIGSource Devlog](https://dukope.com/devlogs/obra-dinn/tig-32/)). | Solves our exact Stage 0 dither swimming and perspective-loss problem at virtually zero GPU cost (~0.2 ms). |
+| [***Portal 2***](https://steamcommunity.com/sharedfiles/filedetails/?id=158903426) | **Dark Contrast Pools & Sequential Power-Up Choreography:** Power-off rooms rely on a single emergency bounce light and dark silhouettes; power-on sequences fire banks of cold-white strip lights (`5600K`) with a subtle fluorescent ballast flicker while warm amber (`2700K`) accents highlight interactive consoles ([Portal 2 Lighting Guide](https://steamcommunity.com/sharedfiles/filedetails/?id=158903426)). | Directly upgrades `LabScene.ts` to match [`01-lab-first-play.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/01-lab-first-play.png) and [`02-gate-power-on.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/02-gate-power-on.png). |
+| [***The Planet Crafter***](https://store.steampowered.com/app/1284190/The_Planet_Crafter/) | **Atmospheric Scattering & Fog Color Progression:** Transitioning the sky dome from harsh airless vacuum to warm dust haze to Rayleigh blue sky transforms how every rock and machine reads without changing a single mesh ([Steam Store](https://store.steampowered.com/app/1284190/The_Planet_Crafter/)). | Validates tying Rayleigh/Mie sky uniforms and distance fog directly to `Lx` and `Aq`. |
+| [***Signalis***](https://store.steampowered.com/app/1262350/Signalis/) & [***Prodeus***](https://store.steampowered.com/app/964800/Prodeus/) | **Quantized Color Ramps with Rim-Light Separation:** Even in 16-color or 256-color palettes, dynamic actors (player, weapons, enemies) receive a view-space Fresnel rim light locked to the nearest bright palette index so they never merge into dark backgrounds. | Permanently fixes the dark avatar and dark rifle in Stages 0–2 (`TASK-21c`). |
+
+## 4. Concrete Changes Ranked P0, P1, and P2
+
+### Canonical Stage-by-Stage Lighting Specification
+
+| Stage | Sun & Sky Parameters (`sunElevation = 22°` Frame Right) | Shadow & Ambient Model | Character / Viewmodel Fill (`TASK-21c`) | Performance Guard (`GTX 950M = 60 FPS`) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Stage 0 (`Lx < 0.15`)** | Black vacuum sky (`#050608`), crisp 1-bit starfield, alien ochre/green Goblin planet; hard directional key (`intensity = 1.4`). | World-space/cylindrical 4x4 Bayer dither + 1 px normal/depth silhouette edge; zero sky ambient (`hemisphere = 0.12` cold slate floor). | View-space Fresnel rim light (`power = 2.5`, intensity `0.65`, quantized to 1-bit white/amber) + minimum albedo floor (`metalness <= 0.15` in Stage 0–2). | Single directional light, no shadow map cascades needed (`0.4 ms` total pass). |
+| **Stage 1 (`Lx 0.15–0.35`)** | Black zenith (`#080b12`) with thin indigo/amber horizon band (`#2a1f3d` $	o$ `#b86b35`); 16-color EGA ramp quantization. | Flat face normals (`dFdx/dFdy` screen-space face normal) + hard sun glint (`specular power = 16`, quantized to 2 steps). | Rim light tints to suit visor color + `#ffc13d` bounce from Twin Gate coils within 25 m. | No extra draw calls; face normals computed in fragment shader. |
+| **Stage 2 (`Lx 0.35–0.60`)** | Deep twilight blue zenith (`#14243b`) to warm ochre horizon haze (`#c98a5b`); 256-color VGA LUT with distance fog starting at `180 m`. | 1-cascade PCF shadow map (`1024²` on Low, `2048²` on High) + Gouraud vertex/fragment interpolation. | Hemisphere light (`sky = #4a6b9c`, `ground = #5c4332`, `intensity = 0.55`) + weapon emissive mode coils. | Low tier caps shadow map at `1024²` and disables distant grid lines (`POL-04`). |
+| **Stage 3 (`Lx 0.60–0.85`)** | Full Rayleigh blue sky (`#3b78b8`) with warm horizon scatter (`#e8c89b`); normal maps active on terrain and machines. | Soft PCF shadows + procedural hemisphere IBL cubemap baked once per stage transition (`64²` PMREM). | Full hemisphere + PMREM environment reflections on hazmat visor, rifle housing, and rover chassis. | PMREM cubemap updates only when `Lx` changes by `> 0.05` (zero per-frame cost). |
+| **Stage 4 (`Lx >= 0.85`)** | Golden-hour scattering (`sun = #ffe2a8`, `intensity = 2.4`), volumetric cloud shadow plane, water specular caustics (`@hm/hydro`). | 2-cascade shadow map (High/Ultra) + contact ambient occlusion around machine feet and coverage turf ([`09-sheet-coverage-growth.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/09-sheet-coverage-growth.png)). | Full PBR with subtle canopy dapple shadow and `#ff3d8a`/`#7cff4d` plume bounce (`POL-02` on High/Ultra). | Low tier uses analytical sun + baked vertex AO (`POL-04` guaranteed 60 fps). |
+
+### P0 — Must Fix Before First Public Test
+
+1. **P0-LIGHT-01: Fix Near-Black Avatar & Beam Rifle Rendering via Hemisphere Floor + Fresnel Rim + De-Metalling (`TASK-21c`)**
+   - **What to build:** In [`apps/web/src/avatar/`](https://github.com/Piskriek/HeavyMetal2/tree/feat/monster-mash-exploration/apps/web/src/avatar) and [`apps/web/src/play/beam-tool.ts`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/apps/web/src/play/beam-tool.ts):
+     1. Clamp `material.metalness = Math.min(material.metalness, 0.25)` on the Scientist suit and Beam Rifle whenever `scene.environment` is absent or `Lx < 0.5` (the exact same root cause fixed in `lod-bake.py` on 12 Oct in [`docs/RESUME.md`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/RESUME.md) §4 where metallic surfaces baked black without an environment map!).
+     2. Attach a dedicated three-point rig to the player/viewmodel layer (`HemisphereLight(#8fa8c8, #3d352e, 0.65)` + view-aligned rim term `(1.0 - max(dot(N, V), 0.0))^2.5 * 0.55`) so the character and rifle read clearly in [`13-beam-first-person-apply-paint.jpg`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/argo/tour/13-beam-first-person-apply-paint.jpg) and [`14-beam-third-person.jpg`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/argo/tour/14-beam-third-person.jpg) even in pitch-black Stage 0 craters.
+   - **Needs:** **Code** (`apps/web/src/avatar/`, `apps/web/src/play/beam-tool.ts`).
+
+2. **P0-LIGHT-02: Stabilize Stage 0 1-Bit Dither with Cylindrical World-Direction Projection & Depth Contours (`07-moon-stage0.jpg` Fix)**
+   - **What to build:** In [`packages/groundshader/`](https://github.com/Piskriek/HeavyMetal2/tree/feat/monster-mash-exploration/packages/groundshader) and [`apps/web/src/crafter/world.ts`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/apps/web/src/crafter/world.ts):
+     1. Replace raw screen-space `gl_FragCoord.xy` Bayer indexing in Stage 0 with a blended **world-anchored / camera-spherical UV projection** (`atan(viewDir.x, viewDir.z), asin(viewDir.y)` quantized to pixel grid, following Lucas Pope's [*Obra Dinn* method](https://dukope.com/devlogs/obra-dinn/tig-32/)) so the dither pattern stays glued to the lunar hills as the player looks around.
+     2. Add a distance-attenuated luminance gradient and 1 px depth-discontinuity contour line so crater rims at `50 m`, `150 m`, and `500 m` separate into distinct perspective planes (`V1_1_ONBOARDING_PLAN.md` §1).
+   - **Needs:** **Code** (`packages/groundshader/`).
+
+3. **P0-LIGHT-03: Dramatize Lab Power-Off vs. Power-On Lighting (`02-lab-act1-wake.jpg` to `04-lab-power-on.jpg`)**
+   - **What to build:** In [`apps/web/src/lab/lab-scene.ts`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/apps/web/src/lab/lab-scene.ts):
+     - **Act I Cold State (`power = false`):** Drop global Lab ambient light to `0.08` cold blue-grey (`#1a2433`); light the room primarily with a pulsing red emergency strobe (`#ff2a1a`, `1.2 Hz`) over the Power Wall, the cyan storm glow leaking through the `14.8 m × 3.1 m` window (including the `POL-25` floor flash on static bursts), and the glowing red breaker handle.
+     - **Act I Powered State (`power = true`):** Sequentially ignite 3 banks of overhead cold-white strip lights (`#eef4ff`, `intensity = 1.8` total) from back to front over `1.8 seconds`, turn on the warm amber (`#ffc13d`) Relay Cabinet beacons and Planet Table hologram, and kick in machine emissives (`#ff3d8a` Preset Bench, `#b46bff` Combiner, `#7cff4d` Fabricator) matching [`02-gate-power-on.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/02-gate-power-on.png) and [`04-menu-setmix.png`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/concept/setmix/04-menu-setmix.png).
+   - **Needs:** **Code** (`apps/web/src/lab/lab-scene.ts`).
+
+### P1 — Makes It Feel AAA
+
+4. **P1-LIGHT-04: Radial Volumetric Scan-Wave on Every Stage & Machine Upgrade**
+   - **What to build:** When a machine activates or `S` crosses a stage boundary, trigger an expanding spherical shell in [`packages/groundshader/`](https://github.com/Piskriek/HeavyMetal2/tree/feat/monster-mash-exploration/packages/groundshader) (`radius = 0 -> 450 m` over `4.5 seconds`, ring thickness `6 m`, colored by the triggering metric `#ff3d8a` / `#7cff4d` / `#ffc13d` / `#3dc8ff`). Inside `r < waveRadius`, render the new stage shader; outside `r > waveRadius`, keep the old stage shader; inside the `6 m` ring band, render a glowing wireframe tessellation grid so the player literally watches the higher-resolution reality sweep across rocks and craters.
+   - **Needs:** **Code** (`packages/groundshader/`, `apps/web/src/crafter/looks.ts`).
+
+5. **P1-LIGHT-05: Lock Stage 4 Low-Spec 60 FPS Governor (`POL-04` Resolution)**
+   - **What to build:** On the `Low` graphics tier (targeting the GTX 950M laptop where Stage 4 currently measures `49.5–50 FPS` in [`docs/DEFERRED_POLISH_REGISTRY.md`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/DEFERRED_POLISH_REGISTRY.md)), cap ground shader noise octaves at `2` beyond `80 m` distance, skip dynamic shadow map rendering on distant neighbor domes (`> 250 m`), and bake the Stage 4 sky cubemap once on transition—recovering the missing `~3.3 ms/frame` to lock `60 FPS` without sacrificing the golden-hour palette.
+   - **Needs:** **Code** (`packages/groundshader/`, `apps/web/src/crafter/world.ts`).
+
+### P2 — Stretch Goals
+
+6. **P2-LIGHT-06: High/Ultra Plume Ground Glow & Floating Pixel Point Lights (`POL-02`, `POL-03`)**
+   - **What to build:** Behind the `High` / `Ultra` graphics toggle (Rule 21), enable a single pooled `PointLight` (`distance = 14 m`, `decay = 2`) at the base of each active pixel plume (`#ff3d8a`, `#7cff4d`, `#ffc13d`, `#3dc8ff`, `#b46bff`) so surrounding grass, wet rocks, and machine housings catch colored bounce light at dusk.
+   - **Needs:** **Code** (`apps/web/src/crafter/world.ts`).
+
+## 5. Rules Touched (`docs/argo/RULES.md`)
+
+- **Rule 1 (Four floats, one formula) & Rule 4 (Terraforming is graphical fidelity):** Every lighting parameter is a pure deterministic function of `Lx`, `Pxd`, `Vtx`, and `Aq`.
+- **Rule 20 (GTX 950M at 60 fps on Low) & Rule 21 (The toggle rule):** `P1-LIGHT-05` brings Stage 4 Low from `49.5 fps` to `60 fps` (`POL-04`), while `POL-02` and `POL-03` ship exclusively on `High`/`Ultra` behind the `Auto` graphics setting.
+
+## 6. Owner Decisions Needed
+
+1. **Stage 0 Dither Tint (Pure Black & White vs. Subtle Amber/Phosphor Warmth Near the Gate):**
+   - *Question:* In [`07-moon-stage0.jpg`](https://github.com/Piskriek/HeavyMetal2/blob/feat/monster-mash-exploration/docs/argo/tour/07-moon-stage0.jpg), Stage 0 is stark black-and-white (`#000000` / `#ffffff`). Would you like Stage 0 to remain pure monochrome `#050608` / `#e8eef5` across the crater while casting a warm amber `#ffc13d` dither pool within `15 m` of the Twin Gate's glowing coils, so the Gate immediately reads as a warm safe haven?
+   - *Recommendation:* **Yes—keep the Moon pure stark monochrome, with a 15 m amber coil glow around the Twin Gate.** It makes the contrast between your powered beachhead and the cold 1-bit wasteland unforgettable.

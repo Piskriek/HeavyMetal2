@@ -116,3 +116,15 @@ The context a new Opus session needs on its first message. Keep it current: upda
   - The Arena brief `docs/prompts/battle/leaksim.txt` (the monster brain) is ready, its tests typechecked.
   - The research: `docs/MONSTERS_PLAN.md` and `docs/DLSS5_NEURAL_BAKE_RESEARCH.md`.
   - The owner's calls are open: plan §4.
+- **2026-10-13, about 14:30:**
+  - **Landed `@hm/leaksim`** (a1b242ea), the monster brain: Arena answer B, 10/10 as landed.
+  - **Monster art downloaded** to `zips/monsters/` (the owner: "download whatever you need"): Freedoom, Blasphemer, LibreQuake and 50 Quaternius CC0 monsters, about 93 in all. TASK-23's prerequisites are met.
+  - **The owner:** DLSS parked; the faster machine is an RTX 3080.
+  - **Batch-2 review (a/b/c per subject):**
+    - 19 picks made on the contact sheets, then a four-angle low review: 17 kept.
+    - pallet-crates is dropped: a crumpled low, and a heap.
+    - terminal-old-a is held: dark bake smudges; re-post it with `fix: ['plain-back']`.
+    - The packs keep the option ids (for example `barrier-block-a`).
+    - The rest of the subjects wait for batch 2 to finish: drum-square, generator-small, cart-flatbed, cable-reel-square, shelving-closed, specimen-freezer, gas-cabinet, server-crate, portable-office, comms-mast-solid, wrecked-van, container-crushed, datacentre-annex, silo-square, transformer-box, checkpoint-booth, office-block-ruin, battery-pack, workbench-old, crater-rim-chunk, chimney-square.
+    - Hold: chimney-square (the owner's no-chimney rule); crater-rim-chunk (no option is good).
+  - **Sidecars running:** TASK-19 review 2, and TASK-20 (one game).

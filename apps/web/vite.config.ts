@@ -1,13 +1,14 @@
 import { defineConfig } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 import { fileURLToPath } from 'node:url';
+import { studioWriteBack } from './studio-server/vite-plugin';
 
 const p = (rel: string) => fileURLToPath(new URL(rel, import.meta.url));
 
 /** The deployable app: ONE static html file (RUN loads a static build; no server). base './' so it works from a sub-path. */
 export default defineConfig(({ mode }) => ({
   base: './',
-  plugins: [viteSingleFile()],
+  plugins: [viteSingleFile(), studioWriteBack()],
   // which game this build is (src/edition.ts): `HM_EDITION=goblin-racing npm run build` for the Goblin Racing launch; SetMix by default
   define: { __HM_EDITION__: JSON.stringify(process.env.HM_EDITION ?? 'setmix') },
   resolve: {

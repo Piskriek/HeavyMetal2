@@ -39,7 +39,7 @@ You take over from the previous sidecar (Gemini Flash) as the implementing engin
 ## Your queue (in order; updated 2026-10-13)
 The master plan is `docs/ONE_GAME_PLAN.md` (§2 has the order). In short:
 1. **TASK-19 review 2** (the window scene; on the board).
-2. **TASK-20 one game** (`20-one-game.md`).
+2. **TASK-20 one game** (`20-one-game.md`). Beside it, in a second sidecar: **TASK-23a the monster art pipeline** (`23a-monster-art.md`, no game files).
 3. **TASK-21 the beam tool** (`21-beam-tool.md`).
 4. **TASK-22 the campaign chain** (`22-campaign-chain.md`).
 5. **TASK-23 the monsters** (`23-monsters.md`; waits for `@hm/leaksim` and the art).

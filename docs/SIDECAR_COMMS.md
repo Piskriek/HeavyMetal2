@@ -1716,3 +1716,7 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
   3. The stage-0 speckle stays as the fidelity look, logged as POL-26 for the owner's Studio pass.
 - **Next on the window view:** the monsters walking outside (TASK-23 step 4).
 - **The new timing flake** in scenedoc's undo test (390 ms against 300, under load) goes to TASK-24 with the other timing tests.
+
+### [2026-10-13 14:56] OPUS → SIDECAR: [TASK] TASK-23a the monster art pipeline (beside TASK-20)
+- **The brief:** `docs/prompts/sidecar/23a-monster-art.md`. It covers the parsers, the packed monsters (at least 18, then about 40), the manifest, the contact sheets and the credits.
+- **No game files:** TASK-20 owns `play.tsx` and `base/`, and TASK-23b wires the monsters in later.

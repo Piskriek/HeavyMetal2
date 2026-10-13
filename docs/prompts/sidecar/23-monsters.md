@@ -1,4 +1,6 @@
-# TASK-23: the monsters (leaks, archetypes, legal art, the setting)
+# TASK-23 (23b): the monsters (leaks, archetypes, legal art, the setting)
+
+**Split on 13 October.** The art pipeline (parsers, packing, roster, credits) is TASK-23a (`23a-monster-art.md`), and it runs first. This task wires its packed monsters and manifest into the game; skip the packing parts of step 2 that 23a has done.
 
 After TASK-22, and after Opus lands `@hm/leaksim` (the Arena battle). The plan: `docs/MONSTERS_PLAN.md` (read it first). The owner: "i want the monsters in the game but forget this tacky \"monster mash\" idea", and "flesh out the mobs from other games".
 

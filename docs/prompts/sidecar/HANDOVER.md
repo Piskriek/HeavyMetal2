@@ -24,6 +24,9 @@ You take over from the previous sidecar (Gemini Flash) as the implementing engin
    - the client builds to one self-contained file;
    - do not add a fifth global metric.
 3. **Verify before you post:** `npm run typecheck` (0 errors), `npm test` (green), `npm run build` (succeeds), plus the task's own test.
+   - `npm test` is the whole unit suite, and `scripts/verify.mjs` reads the same list (2026-10-13: the two had drifted apart). A new test folder goes into package.json's `test` script.
+   - **The single file has a 16 MB cap** (2026-10-13, Argo's DEC-10): the build fails above it and prints its size every time. Report the size. Never inline new art to fix a missing-asset case. If you hit the cap, stop and post on the board.
+   - Files beside index.html (`audio/`, `vo/`, `hd/`, `monsters/`) are fetched with `new URL('<path>', document.baseURI)`. Never use a root path like `/audio/x.mp3`: it breaks under a sub-path, and from disk it names the drive root.
    - **Shots:** take them with the existing Playwright capture scripts (`scripts/capture-*.mjs`, `scripts/test-*.mjs`), and LOOK at every shot before posting.
    - A shot that is dark, empty or shows the wrong thing does not count. Retake it.
 4. **UI:** load the frontend-design skill before any UI work. Match the game's telemetry HUD (glassmorphism, glowing telemetry, Oxanium/Inter). No unstyled DOM.
@@ -37,7 +40,7 @@ You take over from the previous sidecar (Gemini Flash) as the implementing engin
 7. **The 3D PC:** never touch `scripts/local3d.mjs` jobs, `zips/runworld/` or the asset pipeline. Those are Opus's. You only use the packed assets: `apps/web/src/assets/gen/`, `apps/web/public/hd/`, `apps/web/public/audio/`, `apps/web/public/vo/`.
 
 ## Your queue (in order; updated 2026-10-13)
-The master plan is `docs/ONE_GAME_PLAN.md` (§2 has the order). In short:
+The master plan is `docs/ONE_GAME_PLAN.md` (§2 has the order, §6 Argo's waves). Gemini Argo is the creative lead (`docs/argo/`). His ruling `docs/argo/plans/ARGO_MASTER_PLAN_REPLY.md` is binding where your brief cites it. Done so far: 19, 20, 21 to 21c, 23a, 23b-1. Next: 22b (running), then 21d, 23b-2, 23c and 24, one at a time, because they all extend `scripts/test-campaign.mjs`. The order in short:
 1. **TASK-19 review 2** (the window scene; on the board).
 2. **TASK-20 one game** (`20-one-game.md`). Beside it, in a second sidecar: **TASK-23a the monster art pipeline** (`23a-monster-art.md`, no game files).
 3. **TASK-21 the beam tool** (`21-beam-tool.md`).

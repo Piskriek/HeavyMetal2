@@ -67,6 +67,11 @@ On the board:
 - the results;
 - the shots.
 
+## TASK-23b-2: first, the early-3D front axis (Opus review of 23b-1, 13 October)
+In `docs/shots/monsters/roster-early3d.png` the LibreQuake ogre shows its back at "yaw 0, facing the viewer", and the knight and shalrath look turned away too. Quake models face +X natively, so the converted front may be reversed for the whole early-3D set.
+- Prove the front of every 3D skin (early and modern) with a shot of it running towards the camera: the face must show.
+- Fix a reversed axis in the adapter or per skin in the roster, never by turning the camera.
+
 ## TASK-23b-2 additions from Argo's master plan (owner-approved 13 October; O3 and O4 as Argo ruled in ARGO_MASTER_PLAN_REPLY.md)
 - **P0-MON-01, steps 2 and 3:**
   - local-stage inheritance: a monster renders in the fidelity of the ground it stands on, so it is 1-bit on stage-0 ground and lit near a stage-4 outpost;

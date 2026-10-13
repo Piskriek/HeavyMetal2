@@ -67,6 +67,8 @@ export function clearRadioLog(slot?: string): void {
   kv.remove(logKeyForSlot(slot));
 }
 
+/** A file shipped beside index.html, relative to the page (a root path breaks under a sub-path, and from disk names the drive root). */
+const besidePage = (p: string): string => new URL(p, document.baseURI).href;
 const SETTINGS_KEY = 'fidelity.dialogue-settings';
 
 export function loadDialogueSettings(): MentorVoiceSettings {
@@ -132,7 +134,7 @@ export async function preloadMentorVo(
   // Fetch index.json
   let index: { id: string; when: string; text: string }[] = [];
   try {
-    const res = await fetch('/vo/index.json');
+    const res = await fetch(besidePage('vo/index.json'));
     if (res.ok) {
       index = (await res.json()) as { id: string; when: string; text: string }[];
     }
@@ -152,7 +154,7 @@ export async function preloadMentorVo(
         try {
           let buf = clipBuffers.get(item.id);
           if (!buf) {
-            const r = await fetch(`/vo/${item.id}.mp3`);
+            const r = await fetch(besidePage(`vo/${item.id}.mp3`));
             if (r.ok) {
               const arrayBuf = await r.arrayBuffer();
               buf = await c.decodeAudioData(arrayBuf);
@@ -182,7 +184,7 @@ export async function preloadMentorVo(
   if (c && !staticBedBuffer) {
     try {
       // the radio static the owner tuned the mix with (shipped beside index.html; the dev-only copy 404'd in builds)
-      const r = await fetch('/audio/radio-static.mp3');
+      const r = await fetch(besidePage('audio/radio-static.mp3'));
       if (r.ok) {
         staticBedBuffer = await c.decodeAudioData(await r.arrayBuffer());
       }

@@ -41,6 +41,8 @@ export const DEFAULT_AUDIO_SETTINGS: AudioSettings = {
   dialogue: 0.8,
 };
 
+/** A file shipped beside index.html, relative to the page (a root path breaks under a sub-path, and from disk names the drive root). */
+const besidePage = (p: string): string => new URL(p, document.baseURI).href;
 const SETTINGS_KEY = 'fidelity.audio-settings';
 
 export function loadAudioSettings(): AudioSettings {
@@ -307,8 +309,8 @@ export class GameAudioController {
     if (Object.keys(this.levels).length > 0 && this.entries.length > 0) return;
     try {
       const [levelsRes, indexRes] = await Promise.all([
-        fetch('/audio/levels.json'),
-        fetch('/audio/index.json'),
+        fetch(besidePage('audio/levels.json')),
+        fetch(besidePage('audio/index.json')),
       ]);
       if (levelsRes.ok) {
         const data = (await levelsRes.json()) as { levels: Record<string, AudioLevel> };
@@ -346,7 +348,7 @@ export class GameAudioController {
     const promise = (async () => {
       try {
         const c = this.getContext();
-        const res = await fetch(`/audio/${id}.mp3`);
+        const res = await fetch(besidePage(`audio/${id}.mp3`));
         if (!res.ok) {
           console.warn(`[game-audio] Failed to fetch /audio/${id}.mp3: ${res.status}`);
           return null;

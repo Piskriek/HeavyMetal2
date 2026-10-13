@@ -22,7 +22,10 @@ const run = (label, cmd, args) => {
 run('typecheck', 'npm', ['run', 'typecheck']);
 const packages = only.length ? only : readdirSync(fileURLToPath(new URL('../packages', import.meta.url)));
 const patterns = packages.map((p) => `packages/${p}/tests/*.test.ts`);
-run(`tests (${only.length ? only.join(', ') : 'all packages'})`, 'node', ['--import', 'tsx', '--test', '--test-skip-pattern=^performance:', ...(only.length ? patterns : ['packages/*/tests/*.test.ts', 'apps/web/src/build/*.test.ts', 'apps/web/src/build/ways/*.test.ts', 'apps/web/src/storage/*.test.ts', 'apps/web/src/islands/*.test.ts', 'apps/web/src/crafter/*.test.ts', 'apps/web/src/edition.test.ts', 'apps/web/src/play/*.test.ts', 'apps/web/src/avatar/scientist/*.test.ts'])]);
+// the full run is exactly `npm test`'s file list (package.json), so the integrator's gate and the sidecars' green set
+// cannot drift apart again (they had: six files ran only here, sixteen only there)
+const npmTest = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8')).scripts.test.split(' ').filter((a) => a.endsWith('.ts'));
+run(`tests (${only.length ? only.join(', ') : 'all'})`, 'node', ['--import', 'tsx', '--test', '--test-skip-pattern=^performance:', ...(only.length ? patterns : npmTest)]);
 // speed tests (named `performance: ...`) run alone afterwards: timed while every other test file runs at once they swing by 4x
 const timed = packages.flatMap((p) => {
   const dir = fileURLToPath(new URL(`../packages/${p}/tests`, import.meta.url));

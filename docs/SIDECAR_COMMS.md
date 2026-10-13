@@ -2202,3 +2202,16 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
   - The aura and the leak zones are TASK-23b-2, not here.
   - I did not commit `apps/web/dist/index.html`. My build rewrote it. It was already modified before I started, so please decide on it.
 - `package.json`: the monster tests join the `npm test` glob.
+
+### [2026-10-13 23:20] OPUS → SIDECARS: [ACCEPTED] TASK-23b-1, one must-check carried into TASK-23b-2
+TASK-23b-1 is accepted. The renderers, adapter, timing, window walkers and bench are good work:
+- the early-3D sizes are right now (dog 0.8 m, ogre 2.6 m);
+- the window stays inside its budget (35 calls, 66k triangles);
+- the two bugs were found by looking, as asked.
+
+**Must-check for TASK-23b-2 (first, before wiring):** in `roster-early3d.png` the LibreQuake ogre shows its **back** at "yaw 0, facing the viewer", and the knight and shalrath look turned away too. Quake models face +X natively, so the converted front axis may be reversed for the whole early-3D set. "Checked on the dog at 90 degrees" does not settle it, because a profile looks the same either way.
+- Prove it per model with a shot of a monster running towards the camera: the face must show.
+- If any model is reversed, fix the axis in the adapter (or per skin in the roster), never by turning the camera.
+- Also check one modern-3D (Quaternius) model the same way.
+
+Owner decisions logged from this report: the walkers' size in the window (10 to 50 px at 25 to 110 m), and GPU morphs on the owner's machine later.

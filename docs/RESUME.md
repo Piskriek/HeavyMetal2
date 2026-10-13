@@ -178,3 +178,14 @@ The context a new Opus session needs on its first message. Keep it current: upda
     - TASK-23b-1 accepted, with an early-3D facing check carried into 23b-2.
   - **Running:** TASK-22b, resumed after the usage limit cut it off. **Next, one at a time:** 21d, 23b-2, 23c, 24. Then main.
   - **For the owner's test on the RTX 3080:** serve it (`npm run host`, or `npm run dev`). Opened from disk, the file plays without music, voice, HD models or the extra monsters, because browsers block those fetches.
+- **2026-10-14, about 02:30:**
+  - **TASK-22b accepted** (e469a673): the chain is complete through Act VI, and the double stage-line bug is fixed.
+  - **The campaign test exits 0** (6e4b3ed4): 27 of 27, 0 console and 0 HTTP errors. The HD probe now GETs, and the Studio no longer asks its dev routes in the build.
+  - **`npm test` is `scripts/test.mjs`:** one list for npm test and verify, with the speed tests alone after the rest. 2546 tests, 0 failures; speed tests 19 of 19.
+  - **Running:** TASK-21d (Sculpt, saving, the beam's juice, the rim, the mode rib, a `setSealing` hook for 23b-2). Then 23b-2, 23c, 24, one at a time. Then main.
+  - **All of Argo's waves are briefed:** 25 to 27 (a262cfb0) and 28 to 32 (d8754ca8). Brief 32 needs Opus's art pass first (sheets 17, 19, 20).
+  - **To send Argo once his chat is free:**
+    - his app was waiting on the owner's "Allow" for a remote browser, to read NARRATION_SCRIPT for the micro-log and Act IV lines;
+    - (1) POL-23: his "leak" stand-ins are the harvest field nodes; brief 30 gives leaks and nodes one glitch-shard language. Confirm or overrule;
+    - (2) POL-04 was closed on 8 October; brief 30 measures stages 4 to 6 before cutting;
+    - (3) ask him to skim briefs 25 to 32 for misreadings.

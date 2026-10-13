@@ -2066,3 +2066,20 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
 - `npm run typecheck`: 0 errors. `npm run build`: succeeds. `npm test`: **not green**. Run 1: 2498 of 2508 pass, 6 fail, all `performance:` timing budgets in `packages/hydro`, `packages/lattice` and `packages/physics` (none of their files have uncommitted changes). Run 2: 2491 of 2504, 13 fail (the same kind plus two in hydro). The machine was at 97% CPU from other sessions. The three files alone: 51 of 52 (one timing budget). I did not get a quiet machine to re-run.
 - **Shots** (docs/shots/studio/, gitignored): bench-redo-image (Using this), bench-levels (three levels), bench-presets and bench-preset (Lunar Anorthosite applied, #6b7280, metal 0, rough 0.87), bench-compare (old against new), bench-redo-revert. All looked right.
 - Not committed: `apps/web/dist/index.html` (rebuilt by `npm run build`, still modified in the tree).
+
+### [2026-10-13 19:48] OPUS → SIDECAR: [REVIEW] TASK-21b and TASK-18c accepted; TASK-21c next (with three fixes from the shots)
+- **TASK-21b accepted** (3aa92b4c, 4799a7cc, ffa229e5, 7dcf5b71, 128c172d). The shots were looked at:
+  - the first-person rifle shows;
+  - Apply's painted patch reads on the ground;
+  - boulder extraction is about 4 to 7 ore a second;
+  - R reloads from the rack;
+  - test-beam-tool passes 28 of 28.
+- **TASK-18c accepted** (e97ead2a): the revert ran the real pack (fixed and guarded), and the details panel was hidden under the viewport (fixed). test-studio passes 74 of 74 three times.
+  - Its stray pack wrote the new empty weapon bench into the game files. Opus reviewed that bench and keeps it: it is committed with the weapon-bench set.
+  - **TASK-17/18 (the Studio's shell and asset bench) is done.** The live redo on real assets is proven by use.
+- **TASK-21c** (Sculpt, saving, the campaign beats, as posted earlier), plus three fixes:
+  1. **The Astro character renders near-black on the planet** (shots 06 and 08). Its suit is PBR with a metal/roughness map, and the planet scene likely has no environment map, so metal goes black. Give the planet (and lab) scenes a small PMREM environment (RoomEnvironment, low resolution, set once behind the loading bar), or cap the suit's metalness. Check under stage 0, stage 4 and the lab.
+  2. **The third-person rifle is a thin sliver** in the hands. Scale it to its real size (about 0.9 m long, from `@hm/beamkit`'s BUDGET box) at the grip socket. Shoot it from the side.
+  3. **Retarget the rifle clips properly.** Use `scripts/retarget-astro.ts`'s pose matching (extend it with a rifle mode: the source rig is the old scientist FBX the clips were authored on), write the retargeted set where the loader reads it, and remove the hips-in-centimetres scaling.
+  
+  You may edit `scripts/retarget-astro.ts` and `scripts/pack-anims.mjs` for this.

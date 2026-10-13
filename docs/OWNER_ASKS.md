@@ -198,3 +198,4 @@
 
 ## 2026-10-13: DLSS 5, everything in for a test on main, then the Studio
 - "we can add DLSS5 on top of the last fidelity stage to push it over the edge, altho im wondering, is there a way to bake in the dlss5 into the models?  is there an innovation opportunity here? I would like you to get everything in so we can test, the building mechanics, the quests, guns, vehicles, everything and do lots of testing to make sure its in then push to main so i can test on the faster machine. Then we need the Studio implimented and once thats in i will try and fix and make the game pretty with the studio tools and report bugs on both that im unable to fix"
+- (follow-up, same day) "tools and machines, everythign hooked up pls"

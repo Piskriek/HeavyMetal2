@@ -106,6 +106,14 @@ export interface Detail {
 
 const EYE = 1.68, RADIUS = 0.3, WALK = 3.0, RUN = 5.6;
 /**
+ * Astro's suit on the planet (TASK-21c): its metal is capped (the baked metal map is up to 1, and metal with no reflection is
+ * black), and it reflects the lab's room light (`roomEnvMap`). Only the character takes it: the planet's own look does not change.
+ */
+const SUIT_METAL_CAP = 0.6;
+const SUIT_PLANET_ENV = 1.8;
+/** The room's reflection on the rifle in the hand (third person). */
+const RIFLE_HAND_ENV = 1.2;
+/**
  * Each stage's look (the stages raise the resolution of one natural world): how many lines tall the planet is drawn, its colour
  * levels (0 = all) and stage 0's black-and-white dither. Stage 1 is about 240 lines, like a 1990s 3D game, whatever the screen; a
  * look's pixels are whole screen pixels, so the grid never shimmers. The planet's picture is drawn at a whole fraction of the screen,
@@ -252,6 +260,8 @@ export interface PlayScene {
     setAltCam(eye: { readonly x: number; readonly y: number; readonly z: number }, pitch: number, yaw: number, target?: { readonly x: number; readonly y: number; readonly z: number }): void;
     clearAltCam(): void;
     groundHeight(x: number, z: number): number;
+    /** A third-person side view at `metres` from the character (null: back to the over-the-shoulder camera). For the shots. */
+    sideShot(metres: number | null): void;
   };
   dispose(): void;
 }
@@ -301,7 +311,10 @@ export function createPlayScene(o: {
   holo.group.position.set(PLANET_TABLE_AT.x, 0, PLANET_TABLE_AT.z);
   const pmrem = keep(new THREE.PMREMGenerator(renderer));
   const roomEnv = new RoomEnvironment();
-  labScene.environment = keep(pmrem.fromScene(roomEnv, 0.04).texture);
+  // one small room reflection, made once (behind the loading bar): the lab's light, and the planet's too (below), so Astro's
+  // metal suit reads as armour on the planet instead of black (TASK-21c)
+  const roomEnvMap = keep(pmrem.fromScene(roomEnv, 0.04).texture);
+  labScene.environment = roomEnvMap;
   labScene.environmentIntensity = 0.22;
   roomEnv.dispose();
   room.group.updateMatrixWorld(true);
@@ -812,6 +825,7 @@ export function createPlayScene(o: {
   let altCamPos: THREE.Vector3 | null = null;
   let isSheltered = false;
   let debugAltCam = false;
+  let sideShotM: number | null = null;
 
   const planGhostMat = keep(new THREE.MeshBasicMaterial({
     color: 0x00f0ff,
@@ -883,6 +897,16 @@ export function createPlayScene(o: {
   let rifleHand: THREE.Object3D | null = null, leftHand: THREE.Object3D | null = null;
   const riflePoint = new THREE.Vector3();
   let rifleAimingNow = false, rifleFiringNow = false;
+  // the rifle's own materials: in the hand on the planet they take the room's reflection, so its dark gunmetal reads (TASK-21c);
+  // in the view they go back to the plain look (the view model's own lights)
+  const rifleMats: THREE.MeshStandardMaterial[] = [];
+  heldBeam.group.traverse((o) => {
+    const mat = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+    for (const one of Array.isArray(mat) ? mat : mat ? [mat] : []) {
+      if ((one as THREE.MeshStandardMaterial).isMeshStandardMaterial && !rifleMats.includes(one as THREE.MeshStandardMaterial)) rifleMats.push(one as THREE.MeshStandardMaterial);
+    }
+  });
+  let rifleEnvOn = false;
   const attachRifle = (): void => {
     const inHand = cameraView === 'third' && rifleHand !== null;
     const parent: THREE.Object3D = inHand ? rifleHand! : viewRig;
@@ -890,6 +914,10 @@ export function createPlayScene(o: {
     const pose = inHand ? handPose(heldBeam.sockets.grip, heldBeam.sockets.muzzle) : viewPose();
     heldBeam.group.position.copy(pose.position);
     heldBeam.group.quaternion.copy(pose.quaternion);
+    if (inHand !== rifleEnvOn) {
+      rifleEnvOn = inHand;
+      for (const mat of rifleMats) { mat.envMap = inHand ? roomEnvMap : null; mat.envMapIntensity = RIFLE_HAND_ENV; mat.needsUpdate = true; }
+    }
   };
   /**
    * In third person the grip socket sits on the right hand and the barrel points from it to the left hand (the foregrip): each
@@ -990,9 +1018,32 @@ export function createPlayScene(o: {
     }
   };
 
+  /** The character's own suit materials (TASK-21c) and whether they take the room's reflection (on the planet only). */
+  const suitMats: THREE.MeshStandardMaterial[] = [];
+  let suitOnPlanet = false;
+  const syncSuitEnv = (onPlanet: boolean): void => {
+    if (onPlanet === suitOnPlanet) return;
+    suitOnPlanet = onPlanet;
+    for (const mat of suitMats) {
+      mat.envMap = onPlanet ? roomEnvMap : null;
+      mat.envMapIntensity = SUIT_PLANET_ENV;
+      mat.needsUpdate = true;
+    }
+  };
   const initialVisor = o.avatar?.kind === 'scientist' ? o.avatar.visor : '#f59e0b';
   void Promise.all([createScientistInstance(initialVisor), loadScientistAnimations(), loadRifleAnimations()]).then(
     ([{ group, visorMaterials: vm }, clips, rifleClips]) => {
+      // Astro's suit is metal on a dark base: under the planet's 1-bit dither (stage 0) it reads as black. This instance gets its own
+      // materials (the creator keeps the baked values), with the metal capped; syncSuitEnv gives them the room's reflection on the planet
+      group.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const mat = (mesh.material as THREE.MeshStandardMaterial).clone();
+        mat.metalness = Math.min(mat.metalness, SUIT_METAL_CAP);
+        mesh.material = mat;
+        suitMats.push(mat);
+      });
+      syncSuitEnv(where === 'planet');
       scientistHolder.add(group);
       visorMaterials = vm;
       scientistAnimator = createScientistAnimator(group, new Map([...clips, ...rifleClips]));
@@ -1858,13 +1909,19 @@ export function createPlayScene(o: {
         const rightVec = new THREE.Vector3(1, 0, 0).applyEuler(camRot);
         const upVec = new THREE.Vector3(0, 1, 0).applyEuler(camRot);
         const backVec = new THREE.Vector3(0, 0, 1).applyEuler(camRot);
-        const desiredPos = pos.clone()
-          .addScaledVector(rightVec, 0.38)
-          .addScaledVector(upVec, 0.12)
-          .addScaledVector(backVec, 2.2);
-        const clampedPos = resolveThirdPersonCamera(pos, desiredPos, where);
-        camera.position.copy(clampedPos);
-        camera.rotation.set(pitch, yaw, 0, 'YXZ');
+        if (sideShotM !== null) {
+          // a debug side view (the TASK-21c shots): the character's right side at chest height, its rifle in profile
+          camera.position.copy(pos).addScaledVector(rightVec, sideShotM).add(new THREE.Vector3(0, -0.45, 0));
+          camera.lookAt(pos.x, pos.y - 0.75, pos.z);
+        } else {
+          const desiredPos = pos.clone()
+            .addScaledVector(rightVec, 0.38)
+            .addScaledVector(upVec, 0.12)
+            .addScaledVector(backVec, 2.2);
+          const clampedPos = resolveThirdPersonCamera(pos, desiredPos, where);
+          camera.position.copy(clampedPos);
+          camera.rotation.set(pitch, yaw, 0, 'YXZ');
+        }
       } else {
         camera.position.copy(pos);
         camera.rotation.set(pitch, yaw, 0, 'YXZ');
@@ -1964,6 +2021,7 @@ export function createPlayScene(o: {
       ground?.regrow(dt);
       ground?.update(where === 'planet' ? pos.x : 0, where === 'planet' ? pos.z : 0);
       labScene.environmentIntensity = room.envLevel();
+      syncSuitEnv(where === 'planet');
       world?.update(now, dt, where === 'planet' ? camera.position : virtual.position);
 
       // ---- audio listener update (zero allocations per frame)
@@ -2326,6 +2384,8 @@ export function createPlayScene(o: {
         altCamPos = null;
       },
       groundHeight: (x, z) => groundAt(x, z),
+      /** A third-person side view at `metres` from the character (null: the over-the-shoulder camera). Shots only. */
+      sideShot(metres: number | null) { sideShotM = metres; },
     },
     dispose() {
       sceneAlive = false;

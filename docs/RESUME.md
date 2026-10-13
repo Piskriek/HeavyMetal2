@@ -159,3 +159,4 @@ The context a new Opus session needs on its first message. Keep it current: upda
   - **The Studio (TASK-17/18/18c) is done:** test-studio passes 74 of 74.
   - **Running side by side:** TASK-21c (black character, rifle scale, rifle-clip retarget) and TASK-22 (the campaign chain). Next is TASK-21d (Sculpt, saving, the beats).
   - **The game files hold the new empty weapon bench**, from TASK-18c's stray pack. It is reviewed, but **uncommitted** until the weapon-bench set is packed: commit `apps/web/src/assets/gen/weapon-bench.glb`, `registry.json` and `apps/web/public/hd/weapon-bench/` with the set.
+- **2026-10-13, Gemini Argo is creative lead** (owner). His intro is docs/argo/START_HERE.md, the rules docs/argo/RULES.md, an 18-shot tour docs/argo/TOUR.md; his plans come back into docs/argo/plans/. Keep the tour and START_HERE §4–5 current when big things change.

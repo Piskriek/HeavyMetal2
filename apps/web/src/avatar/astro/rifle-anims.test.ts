@@ -6,7 +6,6 @@ import * as THREE from 'three';
 import { decodeAnimationClips } from '../scientist/anims-loader';
 import { createScientistAnimator } from '../scientist/animator';
 import { ASTRO_HIPS_Y } from './astro-model';
-import { scaleRifleClipsToAstro } from './rifle-clips';
 
 const RIFLE_CLIPS = [
   'rifle-idle', 'rifle-aiming-idle', 'firing-rifle', 'rifle-walk', 'rifle-run', 'backwards-rifle-walk',
@@ -15,7 +14,7 @@ const RIFLE_CLIPS = [
 
 test('rifle-anims.bin: the 11 rifle clips decode, sit on the mixamorig rig, and their root stays in place', () => {
   const binPath = path.resolve('apps/web/src/avatar/astro/rifle-anims.bin');
-  assert.ok(fs.existsSync(binPath), 'rifle-anims.bin must exist (node scripts/pack-anims.mjs --rifle)');
+  assert.ok(fs.existsSync(binPath), 'rifle-anims.bin must exist (node --import tsx scripts/retarget-astro.ts <scientist.fbx> --rifle)');
   const bytes = fs.statSync(binPath).size;
   assert.ok(bytes <= 150 * 1024, `the rifle set is at most 150 KB (is ${bytes})`);
 
@@ -44,12 +43,12 @@ test('rifle-anims.bin: the 11 rifle clips decode, sit on the mixamorig rig, and 
 /** The animator with the rifle's set merged in, as the scene builds it, over a rig-less root. */
 function rifleAnimator(): ReturnType<typeof createScientistAnimator> {
   const clips = decodeAnimationClips(fs.readFileSync(path.resolve('apps/web/src/avatar/scientist/anims.bin')));
-  const rifle = scaleRifleClipsToAstro(decodeAnimationClips(fs.readFileSync(path.resolve('apps/web/src/avatar/astro/rifle-anims.bin'))));
+  const rifle = decodeAnimationClips(fs.readFileSync(path.resolve('apps/web/src/avatar/astro/rifle-anims.bin')));
   return createScientistAnimator(new THREE.Group(), new Map([...clips, ...rifle]));
 }
 
-test('the rifle set stands Astro on its own hips height (the packed hips are in centimetres)', () => {
-  const clips = scaleRifleClipsToAstro(decodeAnimationClips(fs.readFileSync(path.resolve('apps/web/src/avatar/astro/rifle-anims.bin'))));
+test('the rifle set stands Astro on its own hips height (retargeted: the hips are in metres)', () => {
+  const clips = decodeAnimationClips(fs.readFileSync(path.resolve('apps/web/src/avatar/astro/rifle-anims.bin')));
   for (const name of RIFLE_CLIPS) {
     const hips = clips.get(name)!.tracks.find((t) => t.name === 'mixamorigHips.position')!;
     for (let i = 1; i < hips.values.length; i += 3) {

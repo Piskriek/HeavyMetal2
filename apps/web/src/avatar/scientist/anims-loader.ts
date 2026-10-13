@@ -59,9 +59,11 @@ export function decodeAnimationClips(buffer: ArrayBuffer | ArrayBufferView): Map
 
   const version = view.getUint16(offset, true);
   offset += 2;
-  if (version !== 1) {
+  // v1 (the scientist set): hips in centimetres, stored in tenths. v2 (the rifle set, TASK-21c): hips in metres, stored in millimetres
+  if (version !== 1 && version !== 2) {
     throw new Error(`Unsupported animations binary version: ${version}`);
   }
+  const positionScale = version === 2 ? 1000 : 10;
 
   const tnCount = view.getUint16(offset, true);
   offset += 2;
@@ -107,7 +109,7 @@ export function decodeAnimationClips(buffer: ArrayBuffer | ArrayBufferView): Map
 
       if (isPos) {
         for (let k = 0; k < numKeys * 3; k++) {
-          values[k] = view.getInt16(offset, true) / 10.0;
+          values[k] = view.getInt16(offset, true) / positionScale;
           offset += 2;
         }
         tracks.push(new THREE.VectorKeyframeTrack(trackName, times, values));

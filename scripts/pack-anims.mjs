@@ -70,21 +70,6 @@ function thinTrack(times, values, stride, isQuat, tol) {
   return { times: outTimes, values: outValues };
 }
 
-/** The rifle set (TASK-21): the extraction rifle's clips, in place, packed to their own binary (not the scientist's). */
-export const RIFLE_CLIPS = [
-  'rifle-idle',
-  'rifle-aiming-idle',
-  'firing-rifle',
-  'rifle-walk',
-  'rifle-run',
-  'backwards-rifle-walk',
-  'strafe-left',
-  'strafe-right',
-  'rifle-pull-out',
-  'rifle-put-away',
-  'reloading',
-];
-
 /**
  * Packs the clips. `opts.inPlace` removes the root's drift (the hips' X and Z stay at their first key, so a walk does not travel);
  * `opts.sample` is the clip whose track list is the file's dictionary (every clip in a set shares the rig).
@@ -223,7 +208,9 @@ export function packAnimations(animsDir, outFilePath, opts = {}) {
 
 if (process.argv[1] && process.argv[1].endsWith('pack-anims.mjs')) {
   if (process.argv.includes('--rifle')) {
-    packAnimations(path.resolve('zips/Models/rigged/anims/rifle'), path.resolve('apps/web/src/avatar/astro/rifle-anims.bin'), { clipNames: RIFLE_CLIPS, sample: 'rifle-idle', inPlace: true });
+    // the rifle set is not packed from its own rig any more: it is retargeted onto Astro's rig (TASK-21c), and written as HMAN v2
+    console.error('The rifle set is retargeted, not packed: node --import tsx scripts/retarget-astro.ts zips/Models/rigged/Sketchfab.fbx --rifle');
+    process.exit(2);
   } else {
     const animsDir = path.resolve('zips/Models/rigged/anims');
     const outFile = path.resolve('apps/web/src/avatar/scientist/anims.bin');

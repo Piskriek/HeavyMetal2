@@ -115,7 +115,8 @@
 .play-card.highlighted em { color: var(--amber); font-weight: 700; }
 
 /* the build menu (B): four tabs, each in its telemetry colour (--tab); the cards keep the play-card vocabulary */
-.bm { width: min(780px, calc(100vw - 32px)); }
+/* above the hotbar (it stays clear of the top telemetry and the hotbar's slots) */
+.play-build.bm { width: min(780px, calc(100vw - 32px)); bottom: 112px; max-height: min(56vh, calc(100vh - 230px)); }
 .bm-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .bm-head h3 { margin: 0; }
 .bm-close { padding: 2px 8px; font-size: 11px; background: transparent; border: 1px solid rgba(241, 244, 245, .25); color: rgba(232, 238, 241, .7); cursor: pointer; }

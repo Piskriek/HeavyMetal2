@@ -389,7 +389,7 @@ export function PlayScreen(props: {
   const [beamHarvest, setBeamHarvest] = useState<{ count: number; name: string; fading?: boolean } | null>(null);
   const beamHarvestTimerRef = useRef<number | null>(null);
   const forceBeamRef = useRef<number | null>(null);
-  const isAnyBaseWindowOpen = baseWindowOpen || machinePickerHardpoint !== null || refineryMachineId !== null || fabricatorMachineId !== null || weaponBenchOpen;
+  const isAnyBaseWindowOpen = menu || baseWindowOpen || machinePickerHardpoint !== null || refineryMachineId !== null || fabricatorMachineId !== null || weaponBenchOpen;
   const hardpointToPlotMachineRef = useRef<Map<number, number>>(new Map());
   const isLmbDownRef = useRef(false);
   const harvestAccRef = useRef(0);

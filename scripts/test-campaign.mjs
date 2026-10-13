@@ -291,9 +291,10 @@ await beat('8 on the planet: B opens the one build menu, Structures holds the fo
   await page.evaluate(() => window.__hm.hideOverlays(true));
   await page.keyboard.press('KeyE');
   await page.waitForTimeout(900);
-  await page.evaluate(() => window.__hm.hideOverlays(false));
   const after = await foundations();
+  // the placed foundation without the HUD (the overlays come back after the shot)
   row.shot = await shot('foundation-placed');
+  await page.evaluate(() => window.__hm.hideOverlays(false));
   const ok = menuOpen && tabs.length === 4 && menuClosed && after === before + 1;
   return { ok, detail: `menu=${menuOpen} tabs=${tabs.join('/')} closed=${menuClosed} foundations ${before}->${after}` };
 });

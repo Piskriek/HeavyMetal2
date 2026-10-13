@@ -204,3 +204,4 @@
 - (same day) "no, first plan everything, add that to the plans and then do the plan"
 - (same day, at the Arena sign-in prompt) "ill log in"
 - (same day) "logged in, download whatever you need, dont get stuck on on type of moster, there must be loads out there we can use. and put some walking outside the window if you want. continue"
+- (same day) "yea, leave the dlss for now, local machine is rtx3080"

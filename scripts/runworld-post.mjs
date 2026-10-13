@@ -82,6 +82,25 @@ function run(cmd, args) {
   return r.stdout;
 }
 
+// One post per asset at a time. The overnight loop and runworld-watch.mjs both reach a fresh model, and the second
+// run deleted the first's low-raw.glb mid-bake (the 2026-10-13 "FAILED" lines, whose three levels were in fact
+// written). A second run waits for the first to finish and then leaves its levels alone; a lock older than 40
+// minutes is a crashed run's and is taken over.
+const held = new Set();
+process.on('exit', () => { for (const l of held) fs.rmSync(l, { force: true }); });
+async function takeLock(d) {
+  const lock = path.join(d, '.posting');
+  for (;;) {
+    try { fs.writeFileSync(lock, String(process.pid), { flag: 'wx' }); held.add(lock); return true; } catch (e) { if (e.code !== 'EEXIST') throw e; }
+    const age = fs.existsSync(lock) ? Date.now() - fs.statSync(lock).mtimeMs : 0;
+    if (age > 40 * 60 * 1000) { fs.rmSync(lock, { force: true }); continue; }
+    while (fs.existsSync(lock)) await new Promise((r) => setTimeout(r, 5000));
+    // the other run finished: skip if it made the levels, else (it failed) post them here
+    if (fs.existsSync(path.join(d, 'high.glb'))) return false;
+  }
+}
+function releaseLock(d) { const lock = path.join(d, '.posting'); fs.rmSync(lock, { force: true }); held.delete(lock); }
+
 async function normalize(src, dst, a) {
   const { size, axis } = a;
   const doc = await io.read(src);
@@ -134,6 +153,7 @@ for (const a of manifest.assets.filter((x) => only.length === 0 || only.includes
   }
   if (!model) continue;
   if (fs.existsSync(path.join(d, 'high.glb')) && only.length === 0) continue;
+  if (!(await takeLock(d))) { console.log(`${a.id}: posted by another run`); continue; }
   // `budgets` on an asset overrides its class (a louvred chiller needs more low triangles than a plain box)
   const [low, mid, high] = a.budgets ?? manifest.budgets[a.class];
   const norm = path.join(d, 'norm.glb'), slim = 'scripts/slim-glb.mjs';
@@ -163,4 +183,5 @@ for (const a of manifest.assets.filter((x) => only.length === 0 || only.includes
   }
   const kb = (f) => Math.round(fs.statSync(path.join(d, f)).size / 1024);
   console.log(`${a.id}: ${dims.w.toFixed(2)} x ${dims.h.toFixed(2)} x ${dims.d.toFixed(2)} m${dims.yaw ? ` (turned ${dims.yaw} deg)` : ''}; low ${kb('low.glb')} KB, mid ${kb('mid.glb')} KB, high ${kb('high.glb')} KB`);
+  releaseLock(d);
 }

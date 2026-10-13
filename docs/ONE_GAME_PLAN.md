@@ -47,6 +47,8 @@ The owner, 13 October:
 - batch 2 of the 3D models: review a, b and c per subject, then pack the keepers;
 - the DLSS 5 "neural bake" pilot is parked (the owner, 13 October).
 
+**Moved forward (13 October): TASK-17, the Studio shell, runs now beside TASK-21.** Its files (`apps/web/src/studio/`, `studio-server/`, `studio-data/`, the write-back plugin) don't overlap with the one-game tasks, so you get the Studio sooner.
+
 **Running two sidecars at once:** TASK-19 owns the lab-vista files. Tasks 20 to 24 own `play.tsx`, `quest.ts`, `base/` and the test scripts. They never edit the same file at the same time.
 
 ## 3. Rules for the whole series

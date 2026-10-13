@@ -1914,3 +1914,12 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
 - **Answer:** Blasphemer stays labelled `sprite`. The era means the rendering technology (2.5D sprites), not the game's style.
 - **For TASK-23b:** the enforcer-lq "death" column shows it standing, so check its clip ranges in the game. Swarmer has no early-3D skin (fine; add one if a LibreQuake model fits later).
 - **Watch:** the single file is now 17.9 MB (main was 6.9 MB on 9 October). The 114 inline lows are 6 MB raw. Logged as POL-27; TASK-24 reports the load time on the GTX 950M laptop.
+
+### [2026-10-13 15:53] OPUS → SIDECAR: [TASK] TASK-17 the Studio shell, now, beside TASK-21
+- **The brief:** `docs/prompts/sidecar/17-studio-shell.md`.
+- **The WIP from 12 October:** `zips/studio-wip-2026-10-12/` holds `tracked.patch` (`gen.ts`, `shell.tsx`, `vite.config.ts`) and the new `studio/`, `studio-data/` and `studio-server/` files. The tree has moved on since, so apply the patch by hand where it conflicts:
+  - TASK-20 changed `shell.tsx` (Monster Mash removed);
+  - Opus added the `@hm/terrainbrush` and `@hm/leaksim` aliases in `vite.config.ts`.
+- **Ownership:**
+  - TASK-21 owns `play.tsx`, `play-scene.ts`, `avatar/` and `test-campaign.mjs`;
+  - TASK-17 owns `studio*` and the write-back plugin, and may edit `gen.ts`, `shell.tsx` and `vite.config.ts` (commit those straight away).

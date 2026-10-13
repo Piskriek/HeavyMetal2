@@ -9,6 +9,11 @@ import {
   burstSchedule, clipRect, groundFade, inCorridor, lookAt, mulberry32, polar, pocketFrame, pocketLifetime, type BurstEvent, type BurstLook,
   type PocketFrame, type VistaLook,
 } from './lab-vista-math';
+import { createMonsterRenderer, type MonsterMob, type MonsterRenderBudget, type MonsterRenderStats } from '../monsters/renderer';
+import { preloadSkins } from '../monsters/loader';
+import { skinFor } from '../monsters/adapter';
+import { walkerPose, type WalkerSpec } from '../monsters/walkers';
+import type { Archetype, Era } from '../monsters/roster';
 
 /** Full: the whole view. Lite: no curtains or pocket shells, half the dust. Static: the lab's flat storm plane (lab-room draws it). */
 export type WindowView = 'static' | 'lite' | 'full';
@@ -45,6 +50,10 @@ export interface LabVista {
   debugFlyers(): readonly { readonly lane: number; readonly x: number; readonly y: number; readonly z: number }[];
   /** Each model set: its id, whether it is the generated model or the box, and its instances (for the checks). */
   debugSets(): readonly { readonly key: string; readonly id: string; readonly source: 'gen' | 'box'; readonly instances: number }[];
+  /** The walkers as they stand now: id, archetype, the skin it wears, and its ground point (lab metres). */
+  debugWalkers(): readonly { readonly id: number; readonly kind: Archetype; readonly skin: string; readonly x: number; readonly z: number }[];
+  /** The monster renderer's counts: sprites drawn, 3D monsters, animated, held, fallbacks in use. */
+  monsterStats(): MonsterRenderStats;
   dispose(): void;
 }
 
@@ -102,7 +111,31 @@ export async function preloadVista(level: GenLevel): Promise<void> {
     console.warn(`[window view] ${id} stays a box:`, err);
     return null;
   })));
+  // the walkers' monster skins (a failed one is drawn as its fallback; the preload never rejects)
+  await preloadSkins(WALKER_SKINS);
 }
+
+/** The monsters' budget in the window: the nearest six animate (every walker, on the low end), and a sprite skin holds four. */
+export const VISTA_MONSTER_BUDGET: MonsterRenderBudget = { animated: 6, perSkin: 4 };
+
+/**
+ * The walkers (plan: "some walking outside the window"): six patrols over the wasteland, mid to far, one from each of the three eras
+ * where the shape fits. Each walker wears the adapter's skin for its archetype and era. The bearings keep clear of the Breach column.
+ */
+const WALKER_PATROLS: readonly { readonly kind: Archetype; readonly era: Era; readonly from: readonly [number, number]; readonly to: readonly [number, number]; readonly speed: number; readonly offset: number }[] = [
+  { kind: 'charger', era: 'sprite', from: [-22, 60], to: [-16, 95], speed: 1.5, offset: 0 },
+  { kind: 'spitter', era: 'sprite', from: [18, 80], to: [26, 70], speed: 1.2, offset: 0.3 },
+  { kind: 'brute', era: 'sprite', from: [-22, 200], to: [-14, 230], speed: 1.0, offset: 0.6 },
+  { kind: 'charger', era: 'early3d', from: [12, 60], to: [16, 110], speed: 1.6, offset: 0.15 },
+  { kind: 'brute', era: 'early3d', from: [36, 180], to: [30, 220], speed: 1.1, offset: 0.45 },
+  { kind: 'charger', era: 'modern3d', from: [40, 90], to: [34, 120], speed: 1.7, offset: 0.8 },
+];
+const WALKERS: readonly (WalkerSpec & { readonly skin: string })[] = WALKER_PATROLS.map((p, i) => {
+  const id = 1000 + i;
+  const from = beyond(p.from[0], p.from[1]), to = beyond(p.to[0], p.to[1]);
+  return { id, kind: p.kind, era: p.era, from, to, speed: p.speed, offset: p.offset, skin: skinFor(p.kind, p.era, id) };
+});
+const WALKER_SKINS: readonly string[] = [...new Set(WALKERS.map((w) => w.skin))];
 
 // ---- Pose helpers
 const tmpM = new THREE.Matrix4();
@@ -1049,7 +1082,16 @@ export function createLabVista(o: LabVistaOptions): LabVista {
 
   const schedule = burstSchedule(0xb7a5, BREACH[0], BREACH[1]);
 
-  const update = (t: number, _dt: number): void => {
+  // ---- The walkers: the monsters of the renderer, posed from the clock (their views and frames are picked in render, for the lens)
+  const monsters = createMonsterRenderer(scene, { budget: VISTA_MONSTER_BUDGET });
+  const skinOfWalker = (m: MonsterMob): string => WALKERS.find((w) => w.id === m.id)?.skin ?? skinFor(m.kind, 'sprite', m.id);
+  const walkerMobs = (t: number): MonsterMob[] => WALKERS.map((w) => {
+    const p = walkerPose(w, t);
+    return { id: p.id, kind: p.kind, x: p.x, z: p.z, phase: 'roam', phaseT: p.phaseT, yaw: p.yaw };
+  });
+  let lastDt = 0;
+
+  const update = (t: number, dt: number): void => {
     const prev = clock;
     clock = t;
     shared.uTime.value = t;
@@ -1060,6 +1102,8 @@ export function createLabVista(o: LabVistaOptions): LabVista {
     shellMat.uniforms.uTime!.value = t;
     burstMat.uniforms.uTime!.value = t;
     if (view === 'static') { flashLight = 0; return; }
+    lastDt = dt;
+    monsters.sync(walkerMobs(t), skinOfWalker);
 
     // the scheduled bursts that fell due since the last frame, and a small flicker where a pocket's cycle turns over
     for (const e of schedule.eventsBetween(prev, t, progress)) {
@@ -1165,6 +1209,7 @@ export function createLabVista(o: LabVistaOptions): LabVista {
     renderer.setScissorTest(true);
     renderer.setScissor(rect.x, height - rect.y - rect.h, rect.w, rect.h);
     renderer.autoClear = true;
+    monsters.update(lastDt, camera);
     renderer.render(scene, camera);
     renderer.autoClear = prevAuto;
     renderer.setScissorTest(false);
@@ -1206,6 +1251,8 @@ export function createLabVista(o: LabVistaOptions): LabVista {
     debugPockets: () => framePockets.map((f, slot) => ({ slot, centre: [...f.centre], radius: f.radius, kind: f.kind })),
     debugFlyers: () => flyerPos.map((f) => ({ ...f })),
     debugSets: () => sets.map((s) => ({ key: s.key, id: s.id, source: s.source, instances: s.poses.length })),
+    debugWalkers: () => WALKERS.map((w) => { const p = walkerPose(w, clock); return { id: w.id, kind: w.kind, skin: w.skin, x: p.x, z: p.z }; }),
+    monsterStats: () => monsters.stats(),
     dispose() {
       for (const s of sets) {
         for (const m of s.meshes) { scene.remove(m); m.dispose(); }
@@ -1214,6 +1261,7 @@ export function createLabVista(o: LabVistaOptions): LabVista {
       for (const x of owned) x.dispose();
       boxGeo.dispose();
       listeners.clear();
+      monsters.dispose();
       scene.clear();
     },
   };

@@ -932,5 +932,141 @@
       1.5,
       2.817
     ]
+  },
+  "tool-cabinet-a": {
+    "class": "prop",
+    "size": [
+      1.334,
+      1.799,
+      0.832
+    ]
+  },
+  "barrier-block-a": {
+    "class": "prop",
+    "size": [
+      1.546,
+      1.399,
+      1.544
+    ]
+  },
+  "water-tank-square-a": {
+    "class": "vista",
+    "size": [
+      3.988,
+      3.994,
+      3.95
+    ]
+  },
+  "substation-block-a": {
+    "class": "vista",
+    "size": [
+      5.975,
+      5.996,
+      5.254
+    ]
+  },
+  "cooling-tower-square-b": {
+    "class": "vista",
+    "size": [
+      10.064,
+      7.99,
+      9.381
+    ]
+  },
+  "gantry-crane-solid-a": {
+    "class": "vista",
+    "size": [
+      9.955,
+      9.995,
+      7.006
+    ]
+  },
+  "billboard-blank-b": {
+    "class": "vista",
+    "size": [
+      3.496,
+      5,
+      0.84
+    ]
+  },
+  "warehouse-small-b": {
+    "class": "vista",
+    "size": [
+      7.752,
+      6.989,
+      7.799
+    ]
+  },
+  "road-section-a": {
+    "class": "vista",
+    "size": [
+      5.065,
+      2,
+      4.991
+    ]
+  },
+  "sign-gantry-b": {
+    "class": "vista",
+    "size": [
+      2.993,
+      2.998,
+      0.414
+    ]
+  },
+  "fuel-tank-square-b": {
+    "class": "vista",
+    "size": [
+      2.984,
+      3.995,
+      3.134
+    ]
+  },
+  "boulder-block-b": {
+    "class": "vista",
+    "size": [
+      1.993,
+      1.998,
+      1.991
+    ]
+  },
+  "lab-bunker-a": {
+    "class": "vista",
+    "size": [
+      8.881,
+      9.001,
+      8.958
+    ]
+  },
+  "radar-panel-b": {
+    "class": "vista",
+    "size": [
+      3.743,
+      4.997,
+      3.577
+    ]
+  },
+  "pump-house-a": {
+    "class": "vista",
+    "size": [
+      5.148,
+      3.997,
+      4.717
+    ]
+  },
+  "conveyor-housing-b": {
+    "class": "vista",
+    "size": [
+      4.342,
+      5.995,
+      11.947
+    ]
+  },
+  "wrecked-truck-cab-c": {
+    "class": "vista",
+    "size": [
+      2.612,
+      2.999,
+      3.729
+    ]
   }
 }

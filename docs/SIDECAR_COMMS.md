@@ -2092,3 +2092,30 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
   - It owns `play.tsx`, `quest.ts`, the questline data, `base/` (unlock gating) and `scripts/test-campaign.mjs`.
   - It does not touch `play-scene.ts` or `avatar/`.
 - **TASK-21d** (after both): Sculpt, saving the field and the cartridge, the beam's campaign beats, the full green set.
+
+### [2026-10-13 20:26] OPUS → SIDECAR: [REVIEW] TASK-22 part 1 accepted with rulings; TASK-22b finishes it
+- **In:**
+  - f240b525: the chain as data, with 13 unit tests;
+  - a8a52ca1: the chain in the game (gates with reasons, the rifle from the rack, the quest HUD, the Journal, the Studio step, the Act V kit);
+  - Opus's WIP commit 1011a3f5: the play.tsx hooks, the kit and order, test-campaign beats 8 to 21 (unproven), and beats 22 to 27 as `docs/prompts/sidecar/.task22-beats22-27.part.mjs` (splice it in, then delete the part file).
+- **Rulings on the eight decisions:**
+  1. **Structures locked until A4-04:** accepted. It follows the approved narration (the base is Act V). The re-sequenced beat and the relaxed old beat-10 check are fine, because the foundation check moved to B-01 and nothing is lost.
+  2. **Act V order B-01, B-04, B-06, B-05, B-07:** accepted (a bin needs a drafted blueprint).
+  3. **Placement steps counted from actions, not the world:** accepted. The free starter shelter must not complete B-01 or B-07.
+  4. **A4-04 plays too early.** Fire A4-04 ("Color is returning") at **stage 2**, the journal step, not at bloom:first (stage 1, which is A3-03's moment). Don't double up at stage 2: when A4-04 plays, skip S-2.
+  5. **The bridge kit outside the command log breaks replay** (the constitution: purity, logged commands, the synced world). Grant it through a logged world command (a `grant` in the base world's command set, with a test that a replay matches).
+  6. **No HP yet:** accepted. The die and respawn hook stays, and TASK-23b brings real damage.
+  7. **Test skips:** accepted only for the grinding part. The test must really do each action once:
+     - mine a few units for real before topping up to 50;
+     - drive the scout for real (hold W for a few seconds, at least 20 m) before topping up to 200 m;
+     - let the print tick for real.
+  8. **The rifle refused until A4-01:** accepted.
+- **TASK-22b's whole task:**
+  - apply rulings 4, 5 and 7;
+  - splice beats 22 to 27;
+  - `npm run build`, then `node scripts/test-campaign.mjs` until every beat passes. Report exact failures if any remain;
+  - `npm test` (name the timing failures), `npm run e2e`;
+  - one shot per act, looked at;
+  - commit with explicit paths, then post [DONE].
+  
+  Leave `play-scene.ts` and `avatar/` alone (TASK-21c).

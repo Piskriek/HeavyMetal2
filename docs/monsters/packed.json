@@ -10,16 +10,36 @@
   ],
   "public": [
     "alien-q",
+    "armabee-q",
+    "beas-bl",
     "chicken-q",
+    "clnk-bl",
+    "dog-lq",
     "dog-q",
+    "enforcer-lq",
+    "fatt-fd",
+    "fiend-lq",
     "ghost-skull-q",
     "glub-q",
     "hell-knight",
     "hell-lord",
+    "knight-lq",
+    "mntr-bl",
+    "mumm-bl",
     "mushnub-q",
+    "ogre-lq",
     "orc-q",
     "pain-floater",
     "pink-blob-q",
+    "shalrath-lq",
+    "shambler-lq",
+    "skel-fd",
+    "snke-bl",
+    "sor2-bl",
+    "srcr-bl",
+    "tarbaby-lq",
+    "wizard-lq",
+    "wzrd-bl",
     "zombie-trooper"
   ],
   "monsters": {
@@ -679,34 +699,913 @@
         ]
       },
       "warnings": []
+    },
+    "dog-lq": {
+      "id": "dog-lq",
+      "name": "dog-lq",
+      "batch": 2,
+      "source": "librequake",
+      "entry": "progs/dog.mdl",
+      "era": "early3d",
+      "archetype": "charger",
+      "heightM": 0.8,
+      "where": "public",
+      "dir": "apps/web/public/monsters/dog-lq",
+      "files": {
+        "model.glb": 156476,
+        "model.json": 472
+      },
+      "bytes": 156948,
+      "frames": 31,
+      "detail": {
+        "frames": 31,
+        "clips": {
+          "walk": {
+            "frames": 8,
+            "seconds": 0.8,
+            "range": [
+              0,
+              7
+            ]
+          },
+          "attack": {
+            "frames": 8,
+            "seconds": 0.8,
+            "range": [
+              8,
+              15
+            ]
+          },
+          "pain": {
+            "frames": 6,
+            "seconds": 0.6,
+            "range": [
+              16,
+              21
+            ]
+          },
+          "death": {
+            "frames": 9,
+            "seconds": 0.9,
+            "range": [
+              22,
+              30
+            ]
+          }
+        },
+        "targets": 31,
+        "flippedWinding": true
+      },
+      "warnings": []
+    },
+    "knight-lq": {
+      "id": "knight-lq",
+      "name": "knight-lq",
+      "batch": 2,
+      "source": "librequake",
+      "entry": "progs/knight.mdl",
+      "era": "early3d",
+      "archetype": "charger",
+      "heightM": 2,
+      "where": "public",
+      "dir": "apps/web/public/monsters/knight-lq",
+      "files": {
+        "model.glb": 507308,
+        "model.json": 485
+      },
+      "bytes": 507793,
+      "frames": 49,
+      "detail": {
+        "frames": 49,
+        "clips": {
+          "walk": {
+            "frames": 14,
+            "seconds": 1.4,
+            "range": [
+              53,
+              66
+            ]
+          },
+          "attack": {
+            "frames": 15,
+            "seconds": 1.5,
+            "range": [
+              20,
+              34
+            ]
+          },
+          "pain": {
+            "frames": 4,
+            "seconds": 0.4,
+            "range": [
+              36,
+              39
+            ]
+          },
+          "death": {
+            "frames": 16,
+            "seconds": 1.6,
+            "range": [
+              81,
+              96
+            ]
+          }
+        },
+        "targets": 49,
+        "flippedWinding": true
+      },
+      "warnings": []
+    },
+    "ogre-lq": {
+      "id": "ogre-lq",
+      "name": "ogre-lq",
+      "batch": 2,
+      "source": "librequake",
+      "entry": "progs/ogre.mdl",
+      "era": "early3d",
+      "archetype": "brute",
+      "heightM": 2.6,
+      "where": "public",
+      "dir": "apps/web/public/monsters/ogre-lq",
+      "files": {
+        "model.glb": 391520,
+        "model.json": 480
+      },
+      "bytes": 392000,
+      "frames": 55,
+      "detail": {
+        "frames": 55,
+        "clips": {
+          "walk": {
+            "frames": 17,
+            "seconds": 1.7,
+            "range": [
+              0,
+              16
+            ]
+          },
+          "attack": {
+            "frames": 17,
+            "seconds": 1.7,
+            "range": [
+              50,
+              66
+            ]
+          },
+          "pain": {
+            "frames": 5,
+            "seconds": 0.5,
+            "range": [
+              68,
+              72
+            ]
+          },
+          "death": {
+            "frames": 16,
+            "seconds": 1.6,
+            "range": [
+              120,
+              135
+            ]
+          }
+        },
+        "targets": 55,
+        "flippedWinding": true
+      },
+      "warnings": []
+    },
+    "shambler-lq": {
+      "id": "shambler-lq",
+      "name": "shambler-lq",
+      "batch": 2,
+      "source": "librequake",
+      "entry": "progs/shambler.mdl",
+      "era": "early3d",
+      "archetype": "brute",
+      "heightM": 2.4,
+      "where": "public",
+      "dir": "apps/web/public/monsters/shambler-lq",
+      "files": {
+        "model.glb": 348036,
+        "model.json": 489
+      },
+      "bytes": 348525,
+      "frames": 48,
+      "detail": {
+        "frames": 48,
+        "clips": {
+          "walk": {
+            "frames": 19,
+            "seconds": 1.9,
+            "range": [
+              17,
+              35
+            ]
+          },
+          "attack": {
+            "frames": 12,
+            "seconds": 1.2,
+            "range": [
+              36,
+              47
+            ]
+          },
+          "pain": {
+            "frames": 7,
+            "seconds": 0.7,
+            "range": [
+              60,
+              66
+            ]
+          },
+          "death": {
+            "frames": 10,
+            "seconds": 1,
+            "range": [
+              84,
+              93
+            ]
+          }
+        },
+        "targets": 48,
+        "flippedWinding": true
+      },
+      "warnings": []
+    },
+    "enforcer-lq": {
+      "id": "enforcer-lq",
+      "name": "enforcer-lq",
+      "batch": 2,
+      "source": "librequake",
+      "entry": "progs/enforcer.mdl",
+      "era": "early3d",
+      "archetype": "spitter",
+      "heightM": 1.9,
+      "where": "public",
+      "dir": "apps/web/public/monsters/enforcer-lq",
+      "files": {
+        "model.glb": 390880,
+        "model.json": 494
+      },
+      "bytes": 391374,
+      "frames": 61,
+      "detail": {
+        "frames": 61,
+        "clips": {
+          "walk": {
+            "frames": 18,
+            "seconds": 1.8,
+            "range": [
+              84,
+              101
+            ]
+          },
+          "attack": {
+            "frames": 13,
+            "seconds": 1.3,
+            "range": [
+              38,
+              50
+            ]
+          },
+          "pain": {
+            "frames": 7,
+            "seconds": 0.7,
+            "range": [
+              27,
+              33
+            ]
+          },
+          "death": {
+            "frames": 23,
+            "seconds": 2.3,
+            "range": [
+              55,
+              77
+            ]
+          }
+        },
+        "targets": 61,
+        "flippedWinding": true
+      },
+      "warnings": []
+    },
+    "wizard-lq": {
+      "id": "wizard-lq",
+      "name": "wizard-lq",
+      "batch": 2,
+      "source": "librequake",
+      "entry": "progs/wizard.mdl",
+      "era": "early3d",
+      "archetype": "flyer",
+      "heightM": 1.6,
+      "where": "public",
+      "dir": "apps/web/public/monsters/wizard-lq",
+      "files": {
+        "model.glb": 122936,
+        "model.json": 483
+      },
+      "bytes": 123419,
+      "frames": 29,
+      "detail": {
+        "frames": 29,
+        "clips": {
+          "walk": {
+            "frames": 14,
+            "seconds": 1.4,
+            "range": [
+              15,
+              28
+            ]
+          },
+          "attack": {
+            "frames": 6,
+            "seconds": 0.6,
+            "range": [
+              42,
+              47
+            ]
+          },
+          "pain": {
+            "frames": 3,
+            "seconds": 0.3,
+            "range": [
+              29,
+              31
+            ]
+          },
+          "death": {
+            "frames": 6,
+            "seconds": 0.6,
+            "range": [
+              48,
+              53
+            ]
+          }
+        },
+        "targets": 29,
+        "flippedWinding": true
+      },
+      "warnings": []
+    },
+    "tarbaby-lq": {
+      "id": "tarbaby-lq",
+      "name": "tarbaby-lq",
+      "batch": 2,
+      "source": "librequake",
+      "entry": "progs/tarbaby.mdl",
+      "era": "early3d",
+      "archetype": "sapper",
+      "heightM": 0.9,
+      "where": "public",
+      "dir": "apps/web/public/monsters/tarbaby-lq",
+      "files": {
+        "model.glb": 336220,
+        "model.json": 487
+      },
+      "bytes": 336707,
+      "frames": 41,
+      "detail": {
+        "frames": 41,
+        "clips": {
+          "walk": {
+            "frames": 15,
+            "seconds": 1.5,
+            "range": [
+              0,
+              14
+            ]
+          },
+          "attack": {
+            "frames": 12,
+            "seconds": 1.2,
+            "range": [
+              29,
+              40
+            ]
+          },
+          "pain": {
+            "frames": 6,
+            "seconds": 0.6,
+            "range": [
+              41,
+              46
+            ]
+          },
+          "death": {
+            "frames": 8,
+            "seconds": 0.8,
+            "range": [
+              53,
+              60
+            ]
+          }
+        },
+        "targets": 41,
+        "flippedWinding": true
+      },
+      "warnings": []
+    },
+    "beas-bl": {
+      "id": "beas-bl",
+      "name": "beas-bl",
+      "batch": 2,
+      "source": "blasphemer",
+      "entry": "BEAS",
+      "era": "sprite",
+      "archetype": "charger",
+      "heightM": 1.8,
+      "where": "public",
+      "dir": "apps/web/public/monsters/beas-bl",
+      "files": {
+        "sprite.webp": 46688,
+        "sprite.json": 2883
+      },
+      "bytes": 49571,
+      "frames": 11,
+      "detail": {
+        "frames": 11,
+        "groups": {
+          "walk": 4,
+          "attack": 2,
+          "pain": 1,
+          "death": 4
+        },
+        "atlas": [
+          1023,
+          212
+        ]
+      },
+      "warnings": []
+    },
+    "snke-bl": {
+      "id": "snke-bl",
+      "name": "snke-bl",
+      "batch": 2,
+      "source": "blasphemer",
+      "entry": "SNKE",
+      "era": "sprite",
+      "archetype": "spitter",
+      "heightM": 1.9,
+      "where": "public",
+      "dir": "apps/web/public/monsters/snke-bl",
+      "files": {
+        "sprite.webp": 34530,
+        "sprite.json": 3245
+      },
+      "bytes": 37775,
+      "frames": 13,
+      "detail": {
+        "frames": 13,
+        "groups": {
+          "walk": 4,
+          "attack": 2,
+          "pain": 1,
+          "death": 6
+        },
+        "atlas": [
+          976,
+          137
+        ]
+      },
+      "warnings": []
+    },
+    "wzrd-bl": {
+      "id": "wzrd-bl",
+      "name": "wzrd-bl",
+      "batch": 2,
+      "source": "blasphemer",
+      "entry": "WZRD",
+      "era": "sprite",
+      "archetype": "flyer",
+      "heightM": 1.2,
+      "where": "public",
+      "dir": "apps/web/public/monsters/wzrd-bl",
+      "files": {
+        "sprite.webp": 39008,
+        "sprite.json": 3253
+      },
+      "bytes": 42261,
+      "frames": 13,
+      "detail": {
+        "frames": 13,
+        "groups": {
+          "walk": 4,
+          "attack": 3,
+          "pain": 1,
+          "death": 5
+        },
+        "atlas": [
+          1015,
+          122
+        ]
+      },
+      "warnings": []
+    },
+    "fiend-lq": {
+      "id": "fiend-lq",
+      "name": "fiend-lq",
+      "batch": 3,
+      "source": "librequake",
+      "entry": "progs/demon.mdl",
+      "era": "early3d",
+      "archetype": "charger",
+      "heightM": 1.4,
+      "where": "public",
+      "dir": "apps/web/public/monsters/fiend-lq",
+      "files": {
+        "model.glb": 284460,
+        "model.json": 481
+      },
+      "bytes": 284941,
+      "frames": 35,
+      "detail": {
+        "frames": 35,
+        "clips": {
+          "walk": {
+            "frames": 10,
+            "seconds": 1,
+            "range": [
+              36,
+              45
+            ]
+          },
+          "attack": {
+            "frames": 15,
+            "seconds": 1.5,
+            "range": [
+              21,
+              35
+            ]
+          },
+          "pain": {
+            "frames": 4,
+            "seconds": 0.4,
+            "range": [
+              54,
+              57
+            ]
+          },
+          "death": {
+            "frames": 6,
+            "seconds": 0.6,
+            "range": [
+              48,
+              53
+            ]
+          }
+        },
+        "targets": 35,
+        "flippedWinding": true
+      },
+      "warnings": []
+    },
+    "shalrath-lq": {
+      "id": "shalrath-lq",
+      "name": "shalrath-lq",
+      "batch": 3,
+      "source": "librequake",
+      "entry": "progs/shalrath.mdl",
+      "era": "early3d",
+      "archetype": "spitter",
+      "heightM": 2,
+      "where": "public",
+      "dir": "apps/web/public/monsters/shalrath-lq",
+      "files": {
+        "model.glb": 213988,
+        "model.json": 487
+      },
+      "bytes": 214475,
+      "frames": 32,
+      "detail": {
+        "frames": 32,
+        "clips": {
+          "walk": {
+            "frames": 12,
+            "seconds": 1.2,
+            "range": [
+              23,
+              34
+            ]
+          },
+          "attack": {
+            "frames": 10,
+            "seconds": 1,
+            "range": [
+              1,
+              10
+            ]
+          },
+          "pain": {
+            "frames": 4,
+            "seconds": 0.4,
+            "range": [
+              11,
+              14
+            ]
+          },
+          "death": {
+            "frames": 6,
+            "seconds": 0.6,
+            "range": [
+              17,
+              22
+            ]
+          }
+        },
+        "targets": 32,
+        "flippedWinding": true
+      },
+      "warnings": []
+    },
+    "mntr-bl": {
+      "id": "mntr-bl",
+      "name": "mntr-bl",
+      "batch": 3,
+      "source": "blasphemer",
+      "entry": "MNTR",
+      "era": "sprite",
+      "archetype": "brute",
+      "heightM": 2.4,
+      "where": "public",
+      "dir": "apps/web/public/monsters/mntr-bl",
+      "files": {
+        "sprite.webp": 113950,
+        "sprite.json": 4128
+      },
+      "bytes": 118078,
+      "frames": 16,
+      "detail": {
+        "frames": 16,
+        "groups": {
+          "walk": 4,
+          "attack": 4,
+          "pain": 1,
+          "death": 7
+        },
+        "atlas": [
+          1006,
+          465
+        ]
+      },
+      "warnings": []
+    },
+    "mumm-bl": {
+      "id": "mumm-bl",
+      "name": "mumm-bl",
+      "batch": 3,
+      "source": "blasphemer",
+      "entry": "MUMM",
+      "era": "sprite",
+      "archetype": "brute",
+      "heightM": 2,
+      "where": "public",
+      "dir": "apps/web/public/monsters/mumm-bl",
+      "files": {
+        "sprite.webp": 19124,
+        "sprite.json": 3011
+      },
+      "bytes": 22135,
+      "frames": 12,
+      "detail": {
+        "frames": 12,
+        "groups": {
+          "walk": 4,
+          "attack": 3,
+          "pain": 1,
+          "death": 4
+        },
+        "atlas": [
+          1000,
+          120
+        ]
+      },
+      "warnings": []
+    },
+    "clnk-bl": {
+      "id": "clnk-bl",
+      "name": "clnk-bl",
+      "batch": 3,
+      "source": "blasphemer",
+      "entry": "CLNK",
+      "era": "sprite",
+      "archetype": "sapper",
+      "heightM": 1.9,
+      "where": "public",
+      "dir": "apps/web/public/monsters/clnk-bl",
+      "files": {
+        "sprite.webp": 69282,
+        "sprite.json": 3318
+      },
+      "bytes": 72600,
+      "frames": 13,
+      "detail": {
+        "frames": 13,
+        "groups": {
+          "walk": 4,
+          "attack": 2,
+          "pain": 2,
+          "death": 5
+        },
+        "atlas": [
+          977,
+          288
+        ]
+      },
+      "warnings": []
+    },
+    "sor2-bl": {
+      "id": "sor2-bl",
+      "name": "sor2-bl",
+      "batch": 3,
+      "source": "blasphemer",
+      "entry": "SOR2",
+      "era": "sprite",
+      "archetype": "charger",
+      "heightM": 1.9,
+      "where": "public",
+      "dir": "apps/web/public/monsters/sor2-bl",
+      "files": {
+        "sprite.webp": 73650,
+        "sprite.json": 3697
+      },
+      "bytes": 77347,
+      "frames": 15,
+      "detail": {
+        "frames": 15,
+        "groups": {
+          "walk": 3,
+          "attack": 5,
+          "pain": 2,
+          "death": 5
+        },
+        "atlas": [
+          1018,
+          267
+        ]
+      },
+      "warnings": []
+    },
+    "srcr-bl": {
+      "id": "srcr-bl",
+      "name": "srcr-bl",
+      "batch": 3,
+      "source": "blasphemer",
+      "entry": "SRCR",
+      "era": "sprite",
+      "archetype": "sapper",
+      "heightM": 1.9,
+      "where": "public",
+      "dir": "apps/web/public/monsters/srcr-bl",
+      "files": {
+        "sprite.webp": 45558,
+        "sprite.json": 4267
+      },
+      "bytes": 49825,
+      "frames": 18,
+      "detail": {
+        "frames": 18,
+        "groups": {
+          "walk": 4,
+          "attack": 4,
+          "pain": 2,
+          "death": 8
+        },
+        "atlas": [
+          1019,
+          148
+        ]
+      },
+      "warnings": []
+    },
+    "skel-fd": {
+      "id": "skel-fd",
+      "name": "skel-fd",
+      "batch": 3,
+      "source": "freedoom",
+      "entry": "SKEL",
+      "era": "sprite",
+      "archetype": "charger",
+      "heightM": 2,
+      "where": "public",
+      "dir": "apps/web/public/monsters/skel-fd",
+      "files": {
+        "sprite.webp": 68108,
+        "sprite.json": 3444
+      },
+      "bytes": 71552,
+      "frames": 14,
+      "detail": {
+        "frames": 14,
+        "groups": {
+          "walk": 4,
+          "attack": 2,
+          "pain": 1,
+          "death": 7
+        },
+        "atlas": [
+          995,
+          173
+        ]
+      },
+      "warnings": []
+    },
+    "fatt-fd": {
+      "id": "fatt-fd",
+      "name": "fatt-fd",
+      "batch": 3,
+      "source": "freedoom",
+      "entry": "FATT",
+      "era": "sprite",
+      "archetype": "brute",
+      "heightM": 2.2,
+      "where": "public",
+      "dir": "apps/web/public/monsters/fatt-fd",
+      "files": {
+        "sprite.webp": 102150,
+        "sprite.json": 4376
+      },
+      "bytes": 106526,
+      "frames": 18,
+      "detail": {
+        "frames": 18,
+        "groups": {
+          "walk": 4,
+          "attack": 5,
+          "pain": 1,
+          "death": 8
+        },
+        "atlas": [
+          1020,
+          345
+        ]
+      },
+      "warnings": []
+    },
+    "armabee-q": {
+      "id": "armabee-q",
+      "name": "armabee-q",
+      "batch": 3,
+      "source": "quaternius",
+      "entry": "Flying/Armabee.gltf",
+      "era": "modern3d",
+      "archetype": "swarmer",
+      "heightM": 0.9,
+      "where": "public",
+      "dir": "apps/web/public/monsters/armabee-q",
+      "files": {
+        "model.glb": 85584,
+        "model.json": 348
+      },
+      "bytes": 85932,
+      "frames": 98,
+      "detail": {
+        "frames": 98,
+        "clips": {
+          "death": {
+            "keys": 21,
+            "seconds": 0.667
+          },
+          "walk": {
+            "keys": 26,
+            "seconds": 0.833
+          },
+          "attack": {
+            "keys": 36,
+            "seconds": 1.167
+          },
+          "pain": {
+            "keys": 15,
+            "seconds": 0.467
+          }
+        },
+        "scaleFromRaw": 0.477159
+      },
+      "warnings": []
     }
   },
   "held": [
     {
-      "id": "hound-lq",
-      "source": "librequake",
-      "entry": "progs/dog.mdl",
-      "reason": "Dropped at the look check (sheet batch-1): the packed MDL renders as a tiny, dark silhouette in three.js. The geometry bounds are correct (0.9 m) and the winding is not the cause (double-sided renders the same). Open: the MDL morph-target path (scripts/pack-monsters.mjs packMdl). The Quake clip ranges above are kept for when it is fixed."
-    },
-    {
-      "id": "ogre-lq",
-      "source": "librequake",
-      "entry": "progs/ogre.mdl",
-      "reason": "Dropped with hound-lq (the same MDL render fault). Its clip ranges are estimated and unverified."
-    },
-    {
-      "id": "blasphemer-set",
+      "id": "chkn-bl",
       "source": "blasphemer",
-      "entries": "BEAS CHKN CLNK IMPX KNIG MNTR MUMM SNKE SOR2 SRCR WZRD",
-      "reason": "Not packed. The archive zips/monsters/blasphemer/blasphem-0.1.8.zip holds only blasphem.wad: no COPYING or licence text. The BSD-3 claim in the brief cannot be verified from the files, so nothing from it ships until the licence is confirmed."
+      "entry": "CHKN",
+      "reason": "Dropped at the planning look (survey grid): the late frames (M to Q) are pale blocks, and the walk is a small crawler. Not packed."
+    },
+    {
+      "id": "impx-bl",
+      "source": "blasphemer",
+      "entry": "IMPX",
+      "reason": "Dropped at the batch 2 look check: the walk frames render blurred and grey, so the winged shape does not read. Not packed."
     }
   ],
   "totals": {
     "coreBytes": 587388,
-    "publicBytes": 1478387,
+    "publicBytes": 4968171,
     "coreBudgetBytes": 1258291.2
   },
   "batches": {
-    "1": "18 monsters, three per archetype"
+    "1": "18 monsters, three per archetype",
+    "2": "10 monsters: the LibreQuake set (fixed) and Blasphemer sprites (IMPX dropped at the look check)",
+    "3": "10 monsters: more Blasphemer and Freedoom sprites, Quaternius Armabee"
   }
 }

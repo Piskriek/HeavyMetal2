@@ -3,26 +3,22 @@
   "about": "The packed monster roster (TASK-23a). Read by scripts/pack-monsters.mjs. Sprites use frame letters (walk, attack, pain, death); LibreQuake MDL frames are numbered (frame1..N), so their clips are inclusive 0-based frame ranges; Quaternius clips are named in the glTF.",
   "held": [
     {
-      "id": "hound-lq",
-      "source": "librequake",
-      "entry": "progs/dog.mdl",
-      "reason": "Dropped at the look check (sheet batch-1): the packed MDL renders as a tiny, dark silhouette in three.js. The geometry bounds are correct (0.9 m) and the winding is not the cause (double-sided renders the same). Open: the MDL morph-target path (scripts/pack-monsters.mjs packMdl). The Quake clip ranges above are kept for when it is fixed."
-    },
-    {
-      "id": "ogre-lq",
-      "source": "librequake",
-      "entry": "progs/ogre.mdl",
-      "reason": "Dropped with hound-lq (the same MDL render fault). Its clip ranges are estimated and unverified."
-    },
-    {
-      "id": "blasphemer-set",
+      "id": "chkn-bl",
       "source": "blasphemer",
-      "entries": "BEAS CHKN CLNK IMPX KNIG MNTR MUMM SNKE SOR2 SRCR WZRD",
-      "reason": "Not packed. The archive zips/monsters/blasphemer/blasphem-0.1.8.zip holds only blasphem.wad: no COPYING or licence text. The BSD-3 claim in the brief cannot be verified from the files, so nothing from it ships until the licence is confirmed."
+      "entry": "CHKN",
+      "reason": "Dropped at the planning look (survey grid): the late frames (M to Q) are pale blocks, and the walk is a small crawler. Not packed."
+    },
+    {
+      "id": "impx-bl",
+      "source": "blasphemer",
+      "entry": "IMPX",
+      "reason": "Dropped at the batch 2 look check: the walk frames render blurred and grey, so the winged shape does not read. Not packed."
     }
   ],
   "batches": {
-    "1": "18 monsters, three per archetype"
+    "1": "18 monsters, three per archetype",
+    "2": "10 monsters: the LibreQuake set (fixed) and Blasphemer sprites (IMPX dropped at the look check)",
+    "3": "10 monsters: more Blasphemer and Freedoom sprites, Quaternius Armabee"
   },
   "monsters": [
     {
@@ -36,10 +32,22 @@
       "core": true,
       "sprite": {
         "groups": {
-          "walk": { "letters": "ABCD", "ticks": 6 },
-          "attack": { "letters": "EFG", "ticks": 5 },
-          "pain": { "letters": "H", "ticks": 4 },
-          "death": { "letters": "IJKLMN", "ticks": 5 }
+          "walk": {
+            "letters": "ABCD",
+            "ticks": 6
+          },
+          "attack": {
+            "letters": "EFG",
+            "ticks": 5
+          },
+          "pain": {
+            "letters": "H",
+            "ticks": 4
+          },
+          "death": {
+            "letters": "IJKLMN",
+            "ticks": 5
+          }
         }
       }
     },
@@ -51,7 +59,12 @@
       "era": "modern3d",
       "archetype": "charger",
       "heightM": 0.8,
-      "clips": { "walk": "Walk", "attack": "Bite_Front", "pain": "HitRecieve", "death": "Death" }
+      "clips": {
+        "walk": "Walk",
+        "attack": "Bite_Front",
+        "pain": "HitRecieve",
+        "death": "Death"
+      }
     },
     {
       "id": "orc-q",
@@ -61,7 +74,12 @@
       "era": "modern3d",
       "archetype": "charger",
       "heightM": 1.9,
-      "clips": { "walk": "Walk", "attack": "Punch", "pain": "HitReact", "death": "Death" }
+      "clips": {
+        "walk": "Walk",
+        "attack": "Punch",
+        "pain": "HitReact",
+        "death": "Death"
+      }
     },
     {
       "id": "serpentipede",
@@ -74,10 +92,22 @@
       "core": true,
       "sprite": {
         "groups": {
-          "walk": { "letters": "ABCD", "ticks": 6 },
-          "attack": { "letters": "EFG", "ticks": 5 },
-          "pain": { "letters": "H", "ticks": 4 },
-          "death": { "letters": "IJKL", "ticks": 5 }
+          "walk": {
+            "letters": "ABCD",
+            "ticks": 6
+          },
+          "attack": {
+            "letters": "EFG",
+            "ticks": 5
+          },
+          "pain": {
+            "letters": "H",
+            "ticks": 4
+          },
+          "death": {
+            "letters": "IJKL",
+            "ticks": 5
+          }
         }
       }
     },
@@ -91,10 +121,22 @@
       "heightM": 1.8,
       "sprite": {
         "groups": {
-          "walk": { "letters": "ABCD", "ticks": 6 },
-          "attack": { "letters": "EF", "ticks": 6 },
-          "pain": { "letters": "G", "ticks": 4 },
-          "death": { "letters": "HIJKL", "ticks": 5 }
+          "walk": {
+            "letters": "ABCD",
+            "ticks": 6
+          },
+          "attack": {
+            "letters": "EF",
+            "ticks": 6
+          },
+          "pain": {
+            "letters": "G",
+            "ticks": 4
+          },
+          "death": {
+            "letters": "HIJKL",
+            "ticks": 5
+          }
         }
       }
     },
@@ -106,7 +148,12 @@
       "era": "modern3d",
       "archetype": "spitter",
       "heightM": 1.8,
-      "clips": { "walk": "Walk", "attack": "Punch", "pain": "HitReact", "death": "Death" }
+      "clips": {
+        "walk": "Walk",
+        "attack": "Punch",
+        "pain": "HitReact",
+        "death": "Death"
+      }
     },
     {
       "id": "skull-flier",
@@ -119,10 +166,22 @@
       "core": true,
       "sprite": {
         "groups": {
-          "walk": { "letters": "AB", "ticks": 4 },
-          "attack": { "letters": "C", "ticks": 6 },
-          "pain": { "letters": "E", "ticks": 4 },
-          "death": { "letters": "FGHIJK", "ticks": 4 }
+          "walk": {
+            "letters": "AB",
+            "ticks": 4
+          },
+          "attack": {
+            "letters": "C",
+            "ticks": 6
+          },
+          "pain": {
+            "letters": "E",
+            "ticks": 4
+          },
+          "death": {
+            "letters": "FGHIJK",
+            "ticks": 4
+          }
         }
       }
     },
@@ -134,7 +193,12 @@
       "era": "modern3d",
       "archetype": "swarmer",
       "heightM": 0.7,
-      "clips": { "walk": "Walk", "attack": "Bite_Front", "pain": "HitRecieve", "death": "Death" }
+      "clips": {
+        "walk": "Walk",
+        "attack": "Bite_Front",
+        "pain": "HitRecieve",
+        "death": "Death"
+      }
     },
     {
       "id": "chicken-q",
@@ -144,7 +208,12 @@
       "era": "modern3d",
       "archetype": "swarmer",
       "heightM": 0.6,
-      "clips": { "walk": "Walk", "attack": "Bite_Front", "pain": "HitRecieve", "death": "Death" }
+      "clips": {
+        "walk": "Walk",
+        "attack": "Bite_Front",
+        "pain": "HitRecieve",
+        "death": "Death"
+      }
     },
     {
       "id": "floater",
@@ -157,10 +226,22 @@
       "core": true,
       "sprite": {
         "groups": {
-          "walk": { "letters": "AB", "ticks": 6 },
-          "attack": { "letters": "C", "ticks": 6 },
-          "pain": { "letters": "D", "ticks": 4 },
-          "death": { "letters": "FGHIJKL", "ticks": 5 }
+          "walk": {
+            "letters": "AB",
+            "ticks": 6
+          },
+          "attack": {
+            "letters": "C",
+            "ticks": 6
+          },
+          "pain": {
+            "letters": "D",
+            "ticks": 4
+          },
+          "death": {
+            "letters": "FGHIJKL",
+            "ticks": 5
+          }
         }
       }
     },
@@ -174,10 +255,22 @@
       "heightM": 1.5,
       "sprite": {
         "groups": {
-          "walk": { "letters": "ABCD", "ticks": 6 },
-          "attack": { "letters": "EF", "ticks": 6 },
-          "pain": { "letters": "G", "ticks": 4 },
-          "death": { "letters": "HIJKL", "ticks": 5 }
+          "walk": {
+            "letters": "ABCD",
+            "ticks": 6
+          },
+          "attack": {
+            "letters": "EF",
+            "ticks": 6
+          },
+          "pain": {
+            "letters": "G",
+            "ticks": 4
+          },
+          "death": {
+            "letters": "HIJKL",
+            "ticks": 5
+          }
         }
       }
     },
@@ -188,8 +281,13 @@
       "entry": "Flying/Ghost_Skull.gltf",
       "era": "modern3d",
       "archetype": "flyer",
-      "heightM": 1.0,
-      "clips": { "walk": "Fast_Flying", "attack": "Headbutt", "pain": "HitReact", "death": "Death" }
+      "heightM": 1,
+      "clips": {
+        "walk": "Fast_Flying",
+        "attack": "Headbutt",
+        "pain": "HitReact",
+        "death": "Death"
+      }
     },
     {
       "id": "hell-lord",
@@ -201,10 +299,22 @@
       "heightM": 3.2,
       "sprite": {
         "groups": {
-          "walk": { "letters": "ABCD", "ticks": 8 },
-          "attack": { "letters": "EF", "ticks": 6 },
-          "pain": { "letters": "G", "ticks": 5 },
-          "death": { "letters": "HIJKLMN", "ticks": 6 }
+          "walk": {
+            "letters": "ABCD",
+            "ticks": 8
+          },
+          "attack": {
+            "letters": "EF",
+            "ticks": 6
+          },
+          "pain": {
+            "letters": "G",
+            "ticks": 5
+          },
+          "death": {
+            "letters": "HIJKLMN",
+            "ticks": 6
+          }
         }
       }
     },
@@ -215,13 +325,25 @@
       "entry": "BOS2",
       "era": "sprite",
       "archetype": "brute",
-      "heightM": 3.0,
+      "heightM": 3,
       "sprite": {
         "groups": {
-          "walk": { "letters": "ABCD", "ticks": 8 },
-          "attack": { "letters": "EF", "ticks": 6 },
-          "pain": { "letters": "G", "ticks": 5 },
-          "death": { "letters": "HIJKLMN", "ticks": 6 }
+          "walk": {
+            "letters": "ABCD",
+            "ticks": 8
+          },
+          "attack": {
+            "letters": "EF",
+            "ticks": 6
+          },
+          "pain": {
+            "letters": "G",
+            "ticks": 5
+          },
+          "death": {
+            "letters": "HIJKLMN",
+            "ticks": 6
+          }
         }
       }
     },
@@ -234,7 +356,12 @@
       "archetype": "brute",
       "heightM": 2.4,
       "core": true,
-      "clips": { "walk": "Walk", "attack": "Punch", "pain": "HitReact", "death": "Death" }
+      "clips": {
+        "walk": "Walk",
+        "attack": "Punch",
+        "pain": "HitReact",
+        "death": "Death"
+      }
     },
     {
       "id": "technospider",
@@ -247,10 +374,22 @@
       "core": true,
       "sprite": {
         "groups": {
-          "walk": { "letters": "ABCD", "ticks": 6 },
-          "attack": { "letters": "EF", "ticks": 6 },
-          "pain": { "letters": "G", "ticks": 4 },
-          "death": { "letters": "HIJ", "ticks": 5 }
+          "walk": {
+            "letters": "ABCD",
+            "ticks": 6
+          },
+          "attack": {
+            "letters": "EF",
+            "ticks": 6
+          },
+          "pain": {
+            "letters": "G",
+            "ticks": 4
+          },
+          "death": {
+            "letters": "HIJ",
+            "ticks": 5
+          }
         }
       }
     },
@@ -262,7 +401,12 @@
       "era": "modern3d",
       "archetype": "sapper",
       "heightM": 0.9,
-      "clips": { "walk": "Fast_Flying", "attack": "Headbutt", "pain": "HitReact", "death": "Death" }
+      "clips": {
+        "walk": "Fast_Flying",
+        "attack": "Headbutt",
+        "pain": "HitReact",
+        "death": "Death"
+      }
     },
     {
       "id": "pink-blob-q",
@@ -271,8 +415,561 @@
       "entry": "Blob/PinkBlob.gltf",
       "era": "modern3d",
       "archetype": "sapper",
-      "heightM": 1.0,
-      "clips": { "walk": "Walk", "attack": "Bite_Front", "pain": "HitRecieve", "death": "Death" }
+      "heightM": 1,
+      "clips": {
+        "walk": "Walk",
+        "attack": "Bite_Front",
+        "pain": "HitRecieve",
+        "death": "Death"
+      }
+    },
+    {
+      "id": "dog-lq",
+      "batch": 2,
+      "source": "librequake",
+      "entry": "progs/dog.mdl",
+      "era": "early3d",
+      "archetype": "charger",
+      "heightM": 0.8,
+      "clips": {
+        "walk": [
+          0,
+          7
+        ],
+        "attack": [
+          8,
+          15
+        ],
+        "pain": [
+          16,
+          21
+        ],
+        "death": [
+          22,
+          30
+        ]
+      }
+    },
+    {
+      "id": "knight-lq",
+      "batch": 2,
+      "source": "librequake",
+      "entry": "progs/knight.mdl",
+      "era": "early3d",
+      "archetype": "charger",
+      "heightM": 2,
+      "clips": {
+        "walk": [
+          53,
+          66
+        ],
+        "attack": [
+          20,
+          34
+        ],
+        "pain": [
+          36,
+          39
+        ],
+        "death": [
+          81,
+          96
+        ]
+      }
+    },
+    {
+      "id": "ogre-lq",
+      "batch": 2,
+      "source": "librequake",
+      "entry": "progs/ogre.mdl",
+      "era": "early3d",
+      "archetype": "brute",
+      "heightM": 2.6,
+      "clips": {
+        "walk": [
+          0,
+          16
+        ],
+        "attack": [
+          50,
+          66
+        ],
+        "pain": [
+          68,
+          72
+        ],
+        "death": [
+          120,
+          135
+        ]
+      }
+    },
+    {
+      "id": "shambler-lq",
+      "batch": 2,
+      "source": "librequake",
+      "entry": "progs/shambler.mdl",
+      "era": "early3d",
+      "archetype": "brute",
+      "heightM": 2.4,
+      "clips": {
+        "walk": [
+          17,
+          35
+        ],
+        "attack": [
+          36,
+          47
+        ],
+        "pain": [
+          60,
+          66
+        ],
+        "death": [
+          84,
+          93
+        ]
+      }
+    },
+    {
+      "id": "enforcer-lq",
+      "batch": 2,
+      "source": "librequake",
+      "entry": "progs/enforcer.mdl",
+      "era": "early3d",
+      "archetype": "spitter",
+      "heightM": 1.9,
+      "clips": {
+        "walk": [
+          84,
+          101
+        ],
+        "attack": [
+          38,
+          50
+        ],
+        "pain": [
+          27,
+          33
+        ],
+        "death": [
+          55,
+          77
+        ]
+      }
+    },
+    {
+      "id": "wizard-lq",
+      "batch": 2,
+      "source": "librequake",
+      "entry": "progs/wizard.mdl",
+      "era": "early3d",
+      "archetype": "flyer",
+      "heightM": 1.6,
+      "clips": {
+        "walk": [
+          15,
+          28
+        ],
+        "attack": [
+          42,
+          47
+        ],
+        "pain": [
+          29,
+          31
+        ],
+        "death": [
+          48,
+          53
+        ]
+      }
+    },
+    {
+      "id": "tarbaby-lq",
+      "batch": 2,
+      "source": "librequake",
+      "entry": "progs/tarbaby.mdl",
+      "era": "early3d",
+      "archetype": "sapper",
+      "heightM": 0.9,
+      "clips": {
+        "walk": [
+          0,
+          14
+        ],
+        "attack": [
+          29,
+          40
+        ],
+        "pain": [
+          41,
+          46
+        ],
+        "death": [
+          53,
+          60
+        ]
+      }
+    },
+    {
+      "id": "beas-bl",
+      "batch": 2,
+      "source": "blasphemer",
+      "entry": "BEAS",
+      "era": "sprite",
+      "archetype": "charger",
+      "heightM": 1.8,
+      "sprite": {
+        "groups": {
+          "walk": {
+            "letters": "ABCD",
+            "ticks": 6
+          },
+          "attack": {
+            "letters": "EF",
+            "ticks": 6
+          },
+          "pain": {
+            "letters": "G",
+            "ticks": 4
+          },
+          "death": {
+            "letters": "MNOP",
+            "ticks": 5
+          }
+        }
+      }
+    },
+    {
+      "id": "snke-bl",
+      "batch": 2,
+      "source": "blasphemer",
+      "entry": "SNKE",
+      "era": "sprite",
+      "archetype": "spitter",
+      "heightM": 1.9,
+      "sprite": {
+        "groups": {
+          "walk": {
+            "letters": "ABCD",
+            "ticks": 6
+          },
+          "attack": {
+            "letters": "FG",
+            "ticks": 6
+          },
+          "pain": {
+            "letters": "H",
+            "ticks": 4
+          },
+          "death": {
+            "letters": "KLMNOP",
+            "ticks": 6
+          }
+        }
+      }
+    },
+    {
+      "id": "wzrd-bl",
+      "batch": 2,
+      "source": "blasphemer",
+      "entry": "WZRD",
+      "era": "sprite",
+      "archetype": "flyer",
+      "heightM": 1.2,
+      "sprite": {
+        "groups": {
+          "walk": {
+            "letters": "ABCD",
+            "ticks": 6
+          },
+          "attack": {
+            "letters": "EFG",
+            "ticks": 6
+          },
+          "pain": {
+            "letters": "H",
+            "ticks": 4
+          },
+          "death": {
+            "letters": "IJKLM",
+            "ticks": 5
+          }
+        }
+      }
+    },
+    {
+      "id": "fiend-lq",
+      "batch": 3,
+      "source": "librequake",
+      "entry": "progs/demon.mdl",
+      "era": "early3d",
+      "archetype": "charger",
+      "heightM": 1.4,
+      "clips": {
+        "walk": [
+          36,
+          45
+        ],
+        "attack": [
+          21,
+          35
+        ],
+        "pain": [
+          54,
+          57
+        ],
+        "death": [
+          48,
+          53
+        ]
+      }
+    },
+    {
+      "id": "shalrath-lq",
+      "batch": 3,
+      "source": "librequake",
+      "entry": "progs/shalrath.mdl",
+      "era": "early3d",
+      "archetype": "spitter",
+      "heightM": 2,
+      "clips": {
+        "walk": [
+          23,
+          34
+        ],
+        "attack": [
+          1,
+          10
+        ],
+        "pain": [
+          11,
+          14
+        ],
+        "death": [
+          17,
+          22
+        ]
+      }
+    },
+    {
+      "id": "mntr-bl",
+      "batch": 3,
+      "source": "blasphemer",
+      "entry": "MNTR",
+      "era": "sprite",
+      "archetype": "brute",
+      "heightM": 2.4,
+      "sprite": {
+        "groups": {
+          "walk": {
+            "letters": "ABCD",
+            "ticks": 8
+          },
+          "attack": {
+            "letters": "EFGH",
+            "ticks": 6
+          },
+          "pain": {
+            "letters": "I",
+            "ticks": 5
+          },
+          "death": {
+            "letters": "MNOPQRS",
+            "ticks": 6
+          }
+        }
+      }
+    },
+    {
+      "id": "mumm-bl",
+      "batch": 3,
+      "source": "blasphemer",
+      "entry": "MUMM",
+      "era": "sprite",
+      "archetype": "brute",
+      "heightM": 2,
+      "sprite": {
+        "groups": {
+          "walk": {
+            "letters": "ABCD",
+            "ticks": 8
+          },
+          "attack": {
+            "letters": "JKL",
+            "ticks": 6
+          },
+          "pain": {
+            "letters": "H",
+            "ticks": 5
+          },
+          "death": {
+            "letters": "MNOP",
+            "ticks": 6
+          }
+        }
+      }
+    },
+    {
+      "id": "clnk-bl",
+      "batch": 3,
+      "source": "blasphemer",
+      "entry": "CLNK",
+      "era": "sprite",
+      "archetype": "sapper",
+      "heightM": 1.9,
+      "sprite": {
+        "groups": {
+          "walk": {
+            "letters": "ABCD",
+            "ticks": 6
+          },
+          "attack": {
+            "letters": "EF",
+            "ticks": 5
+          },
+          "pain": {
+            "letters": "GH",
+            "ticks": 4
+          },
+          "death": {
+            "letters": "KLMNO",
+            "ticks": 5
+          }
+        }
+      }
+    },
+    {
+      "id": "sor2-bl",
+      "batch": 3,
+      "source": "blasphemer",
+      "entry": "SOR2",
+      "era": "sprite",
+      "archetype": "charger",
+      "heightM": 1.9,
+      "sprite": {
+        "groups": {
+          "walk": {
+            "letters": "MNO",
+            "ticks": 6
+          },
+          "attack": {
+            "letters": "PQRST",
+            "ticks": 6
+          },
+          "pain": {
+            "letters": "JK",
+            "ticks": 4
+          },
+          "death": {
+            "letters": "ABCDE",
+            "ticks": 6
+          }
+        }
+      }
+    },
+    {
+      "id": "srcr-bl",
+      "batch": 3,
+      "source": "blasphemer",
+      "entry": "SRCR",
+      "era": "sprite",
+      "archetype": "sapper",
+      "heightM": 1.9,
+      "sprite": {
+        "groups": {
+          "walk": {
+            "letters": "ABCD",
+            "ticks": 6
+          },
+          "attack": {
+            "letters": "EFGH",
+            "ticks": 6
+          },
+          "pain": {
+            "letters": "EF",
+            "ticks": 4
+          },
+          "death": {
+            "letters": "IJKLMNOP",
+            "ticks": 6
+          }
+        }
+      }
+    },
+    {
+      "id": "skel-fd",
+      "batch": 3,
+      "source": "freedoom",
+      "entry": "SKEL",
+      "era": "sprite",
+      "archetype": "charger",
+      "heightM": 2,
+      "sprite": {
+        "groups": {
+          "walk": {
+            "letters": "ABCD",
+            "ticks": 6
+          },
+          "attack": {
+            "letters": "EF",
+            "ticks": 6
+          },
+          "pain": {
+            "letters": "J",
+            "ticks": 4
+          },
+          "death": {
+            "letters": "KLMNOPQ",
+            "ticks": 5
+          }
+        }
+      }
+    },
+    {
+      "id": "fatt-fd",
+      "batch": 3,
+      "source": "freedoom",
+      "entry": "FATT",
+      "era": "sprite",
+      "archetype": "brute",
+      "heightM": 2.2,
+      "sprite": {
+        "groups": {
+          "walk": {
+            "letters": "ABCD",
+            "ticks": 8
+          },
+          "attack": {
+            "letters": "GHIJK",
+            "ticks": 6
+          },
+          "pain": {
+            "letters": "E",
+            "ticks": 4
+          },
+          "death": {
+            "letters": "MNOPQRST",
+            "ticks": 6
+          }
+        }
+      }
+    },
+    {
+      "id": "armabee-q",
+      "batch": 3,
+      "source": "quaternius",
+      "entry": "Flying/Armabee.gltf",
+      "era": "modern3d",
+      "archetype": "swarmer",
+      "heightM": 0.9,
+      "clips": {
+        "walk": "Fast_Flying",
+        "attack": "Headbutt",
+        "pain": "HitReact",
+        "death": "Death"
+      }
     }
   ]
 }

@@ -43,7 +43,23 @@ window.renderPoses = async (url, facing, poses) => {
   const gltf = await loader.loadAsync(url);
   const scene = gltf.scene;
   scene.traverse((o) => { if (o.isMesh) { o.material.side = THREE.DoubleSide; } });
-  const box = new THREE.Box3().setFromObject(scene);
+  // three.js's setFromObject includes every morph target's delta, so a morphed model frames far too small.
+  // Morphed meshes are framed from their base positions only.
+  let morphed = false;
+  scene.traverse((o) => { if (o.isMesh && o.geometry.morphAttributes?.position) morphed = true; });
+  let box;
+  if (morphed) {
+    scene.updateMatrixWorld(true);
+    box = new THREE.Box3();
+    const v = new THREE.Vector3();
+    scene.traverse((o) => {
+      if (!o.isMesh) return;
+      const pos = o.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i++) box.expandByPoint(v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld));
+    });
+  } else {
+    box = new THREE.Box3().setFromObject(scene);
+  }
   const size = box.getSize(new THREE.Vector3());
   const centre = box.getCenter(new THREE.Vector3());
   const radius = Math.max(size.x, size.y, size.z) * 0.62;

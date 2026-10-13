@@ -1,0 +1,1 @@
+{"id":"armabee-q","name":"armabee-q","era":"modern3d","source":"quaternius","entry":"Flying/Armabee.gltf","archetype":"swarmer","heightM":0.9,"model":{"file":"model.glb","scaleFromRaw":0.477159},"clips":{"death":{"keys":21,"seconds":0.667},"walk":{"keys":26,"seconds":0.833},"attack":{"keys":36,"seconds":1.167},"pain":{"keys":15,"seconds":0.467}}}

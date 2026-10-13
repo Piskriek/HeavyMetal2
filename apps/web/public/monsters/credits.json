@@ -15,12 +15,19 @@
       "notice": "Copyright © 2019-2023\nContributors to the LibreQuake project.  All rights reserved.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions are\nmet:\n\n  * Redistributions of source code must retain the above copyright\n    notice, this list of conditions and the following disclaimer.\n  * Redistributions in binary form must reproduce the above copyright\n    notice, this list of conditions and the following disclaimer in the\n    documentation and/or other materials provided with the distribution.\n  * Neither the name of the LibreQuake project nor the names of its\n    contributors may be used to endorse or promote products derived from\n    this software without specific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS\nIS” AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED\nTO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A\nPARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER\nOR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,\nEXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,\nPROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR\nPROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF\nLIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING\nNEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS\nSOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n\nFor a list of contributors to the LibreQuake project, see the file\nCREDITS.\n\nFor a list of resources used in the LibreQuake project, see the directory\ndocs"
     },
     {
+      "id": "blasphemer",
+      "name": "Blasphemer 0.1.8 (blasphem.wad sprites, Heretic style)",
+      "licence": "BSD-3-Clause",
+      "url": "https://github.com/Blasphemer/blasphemer",
+      "notice": "Copyright (c) 2021\nContributors to the Blasphemer project.  All rights reserved.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions are\nmet:\n\n  * Redistributions of source code must retain the above copyright \n    notice, this list of conditions and the following disclaimer.\n  * Redistributions in binary form must reproduce the above copyright \n    notice, this list of conditions and the following disclaimer in the\n    documentation and/or other materials provided with the distribution.\n  * Neither the name of the Blasphemer team nor the names of its \n    contributors may be used to endorse or promote products derived from\n    this software without specific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS\nIS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED\nTO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A\nPARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER\nOR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,\nEXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,\nPROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR\nPROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF\nLIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING\nNEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS\nSOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n\nFor a list of contributors to the Blasphemer project, see the file\nCREDITS.\n\nContributors (CREDITS.md from the Blasphemer repository):\n\nG. \"Stilgar\" Wessner - Graphics, Former Project Lead\nJute Gyte - Music and Sound, Level Design, Former Project Lead\nSodaholic - Sounds and Graphics, Former Project Maintainer, Former Project Lead\nSpringy - Project Lead\nCacowad - Level Design, Project Mantainer\nDooMAD - Graphics\nBlox - Graphics\nEriance - Weapon Graphics\nWarfare - Graphics\nLeilei - Base Data, Graphics\nEsselfortium - Graphics\nSnarboo - Level Design\nRyathaen - Level Design\nOwen \"Sarge Baldy\" Lloyd - Level Design\nRellik - Level Design from FREEDM\nHellbent - Level Design from FREEDM\nMechadon - Font Graphics\n40oz - Graphics\nEspi - Graphics\nAirraid - Graphics\nMellow - Graphics\nFredrik - Graphics\nGreyGhost - Bugfixing, Data\nSkibbi - Tweaks\nPawel \"Nmn\" Zarczynski - Graphics\nNeoworm - Graphics\nPrintz - Graphics\nClebardman - Weapon Graphics\nArtisticdude - Sounds\nCatoptromancy - Graphics Cleanup, Tester, Bugfix\nBethOfDeath - Graphics\nLokito - Graphics\nLinguica - Graphics\nBigProjectAlone - Graphics\nHorrorMovieGuy - Graphics\nSuporma - Level Design\nCraneo - Level Design\nEttinGrinder - Level Design\n\nFor detailed credits regarding who made which resources, refer to the file\nwadinfo.txt."
+    },
+    {
       "id": "quaternius",
       "name": "Quaternius, Ultimate Monsters packs (Big, Blob, Flying)",
       "licence": "CC0 1.0 Universal (public domain dedication)",
       "url": "https://quaternius.com/",
       "notice": "CC0 1.0 Universal. Thanks to Quaternius (quaternius.com) for the free monster packs.",
-      "note": "The License.txt inside the downloaded folder is headed \"Ultimate Platformer Pack\"; the CC0 status is taken from the brief and the pack owner. Check it before shipping."
+      "note": "The official Ultimate Monsters page (quaternius.com/packs/ultimatemonsters.html) states CC0. The License.txt inside the downloaded folder is a copy from another pack (headed \"Ultimate Platformer Pack\"), so it is not the licence source."
     }
   ],
   "monsters": [
@@ -34,6 +41,24 @@
       "where": "public"
     },
     {
+      "id": "armabee-q",
+      "name": "armabee-q",
+      "source": "quaternius",
+      "entry": "Flying/Armabee.gltf",
+      "era": "modern3d",
+      "archetype": "swarmer",
+      "where": "public"
+    },
+    {
+      "id": "beas-bl",
+      "name": "beas-bl",
+      "source": "blasphemer",
+      "entry": "BEAS",
+      "era": "sprite",
+      "archetype": "charger",
+      "where": "public"
+    },
+    {
       "id": "chicken-q",
       "name": "chicken-q",
       "source": "quaternius",
@@ -43,11 +68,56 @@
       "where": "public"
     },
     {
+      "id": "clnk-bl",
+      "name": "clnk-bl",
+      "source": "blasphemer",
+      "entry": "CLNK",
+      "era": "sprite",
+      "archetype": "sapper",
+      "where": "public"
+    },
+    {
+      "id": "dog-lq",
+      "name": "dog-lq",
+      "source": "librequake",
+      "entry": "progs/dog.mdl",
+      "era": "early3d",
+      "archetype": "charger",
+      "where": "public"
+    },
+    {
       "id": "dog-q",
       "name": "dog-q",
       "source": "quaternius",
       "entry": "Blob/Dog.gltf",
       "era": "modern3d",
+      "archetype": "charger",
+      "where": "public"
+    },
+    {
+      "id": "enforcer-lq",
+      "name": "enforcer-lq",
+      "source": "librequake",
+      "entry": "progs/enforcer.mdl",
+      "era": "early3d",
+      "archetype": "spitter",
+      "where": "public"
+    },
+    {
+      "id": "fatt-fd",
+      "name": "fatt-fd",
+      "source": "freedoom",
+      "entry": "FATT",
+      "era": "sprite",
+      "archetype": "brute",
+      "where": "public"
+    },
+    {
+      "id": "fiend-lq",
+      "name": "fiend-lq",
+      "source": "librequake",
+      "entry": "progs/demon.mdl",
+      "era": "early3d",
       "archetype": "charger",
       "where": "public"
     },
@@ -106,12 +176,48 @@
       "where": "public"
     },
     {
+      "id": "knight-lq",
+      "name": "knight-lq",
+      "source": "librequake",
+      "entry": "progs/knight.mdl",
+      "era": "early3d",
+      "archetype": "charger",
+      "where": "public"
+    },
+    {
+      "id": "mntr-bl",
+      "name": "mntr-bl",
+      "source": "blasphemer",
+      "entry": "MNTR",
+      "era": "sprite",
+      "archetype": "brute",
+      "where": "public"
+    },
+    {
+      "id": "mumm-bl",
+      "name": "mumm-bl",
+      "source": "blasphemer",
+      "entry": "MUMM",
+      "era": "sprite",
+      "archetype": "brute",
+      "where": "public"
+    },
+    {
       "id": "mushnub-q",
       "name": "mushnub-q",
       "source": "quaternius",
       "entry": "Blob/Mushnub.gltf",
       "era": "modern3d",
       "archetype": "swarmer",
+      "where": "public"
+    },
+    {
+      "id": "ogre-lq",
+      "name": "ogre-lq",
+      "source": "librequake",
+      "entry": "progs/ogre.mdl",
+      "era": "early3d",
+      "archetype": "brute",
       "where": "public"
     },
     {
@@ -151,6 +257,33 @@
       "where": "core"
     },
     {
+      "id": "shalrath-lq",
+      "name": "shalrath-lq",
+      "source": "librequake",
+      "entry": "progs/shalrath.mdl",
+      "era": "early3d",
+      "archetype": "spitter",
+      "where": "public"
+    },
+    {
+      "id": "shambler-lq",
+      "name": "shambler-lq",
+      "source": "librequake",
+      "entry": "progs/shambler.mdl",
+      "era": "early3d",
+      "archetype": "brute",
+      "where": "public"
+    },
+    {
+      "id": "skel-fd",
+      "name": "skel-fd",
+      "source": "freedoom",
+      "entry": "SKEL",
+      "era": "sprite",
+      "archetype": "charger",
+      "where": "public"
+    },
+    {
       "id": "skull-flier",
       "name": "skull-flier",
       "source": "freedoom",
@@ -160,6 +293,42 @@
       "where": "core"
     },
     {
+      "id": "snke-bl",
+      "name": "snke-bl",
+      "source": "blasphemer",
+      "entry": "SNKE",
+      "era": "sprite",
+      "archetype": "spitter",
+      "where": "public"
+    },
+    {
+      "id": "sor2-bl",
+      "name": "sor2-bl",
+      "source": "blasphemer",
+      "entry": "SOR2",
+      "era": "sprite",
+      "archetype": "charger",
+      "where": "public"
+    },
+    {
+      "id": "srcr-bl",
+      "name": "srcr-bl",
+      "source": "blasphemer",
+      "entry": "SRCR",
+      "era": "sprite",
+      "archetype": "sapper",
+      "where": "public"
+    },
+    {
+      "id": "tarbaby-lq",
+      "name": "tarbaby-lq",
+      "source": "librequake",
+      "entry": "progs/tarbaby.mdl",
+      "era": "early3d",
+      "archetype": "sapper",
+      "where": "public"
+    },
+    {
       "id": "technospider",
       "name": "technospider",
       "source": "freedoom",
@@ -167,6 +336,24 @@
       "era": "sprite",
       "archetype": "sapper",
       "where": "core"
+    },
+    {
+      "id": "wizard-lq",
+      "name": "wizard-lq",
+      "source": "librequake",
+      "entry": "progs/wizard.mdl",
+      "era": "early3d",
+      "archetype": "flyer",
+      "where": "public"
+    },
+    {
+      "id": "wzrd-bl",
+      "name": "wzrd-bl",
+      "source": "blasphemer",
+      "entry": "WZRD",
+      "era": "sprite",
+      "archetype": "flyer",
+      "where": "public"
     },
     {
       "id": "yeti-q",
@@ -189,22 +376,16 @@
   ],
   "held": [
     {
-      "id": "hound-lq",
-      "source": "librequake",
-      "entry": "progs/dog.mdl",
-      "reason": "Dropped at the look check (sheet batch-1): the packed MDL renders as a tiny, dark silhouette in three.js. The geometry bounds are correct (0.9 m) and the winding is not the cause (double-sided renders the same). Open: the MDL morph-target path (scripts/pack-monsters.mjs packMdl). The Quake clip ranges above are kept for when it is fixed."
-    },
-    {
-      "id": "ogre-lq",
-      "source": "librequake",
-      "entry": "progs/ogre.mdl",
-      "reason": "Dropped with hound-lq (the same MDL render fault). Its clip ranges are estimated and unverified."
-    },
-    {
-      "id": "blasphemer-set",
+      "id": "chkn-bl",
       "source": "blasphemer",
-      "entries": "BEAS CHKN CLNK IMPX KNIG MNTR MUMM SNKE SOR2 SRCR WZRD",
-      "reason": "Not packed. The archive zips/monsters/blasphemer/blasphem-0.1.8.zip holds only blasphem.wad: no COPYING or licence text. The BSD-3 claim in the brief cannot be verified from the files, so nothing from it ships until the licence is confirmed."
+      "entry": "CHKN",
+      "reason": "Dropped at the planning look (survey grid): the late frames (M to Q) are pale blocks, and the walk is a small crawler. Not packed."
+    },
+    {
+      "id": "impx-bl",
+      "source": "blasphemer",
+      "entry": "IMPX",
+      "reason": "Dropped at the batch 2 look check: the walk frames render blurred and grey, so the winged shape does not read. Not packed."
     }
   ]
 }

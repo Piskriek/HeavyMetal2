@@ -1,8 +1,8 @@
 // Packs the monster roster (docs/monsters/roster.json) into the game's asset folders (TASK-23a).
 //   node scripts/pack-monsters.mjs [--batch N] [--only id,id]
 //
-// Sources (read only, never fetched): Freedoom WAD (sprites), LibreQuake PAKs (Quake MDL), Quaternius glTF (CC0).
-// Blasphemer is held out (no licence text in its archive; see the roster's "held" entry).
+// Sources (read only, never fetched): Freedoom WAD (sprites), Blasphemer WAD (Heretic-style sprites, BSD-3),
+// LibreQuake PAKs (Quake MDL, BSD-3), Quaternius glTF (CC0).
 //
 // Output, per monster, in one folder named by its id:
 //   core (one per archetype, inlined by the bundler):  apps/web/src/assets/monsters/<id>/
@@ -30,6 +30,9 @@ const CORE_BUDGET_BYTES = 1.2 * 1024 * 1024;
 const SRC = {
   freedoomWad: path.join(ROOT, 'zips/monsters/freedoom/freedoom-0.13.0/freedoom2.wad'),
   freedoomCopying: path.join(ROOT, 'zips/monsters/freedoom/freedoom-0.13.0/COPYING.txt'),
+  blasphemerWad: path.join(ROOT, 'zips/monsters/blasphemer/blasphem.wad'),
+  blasphemerCopying: path.join(ROOT, 'zips/monsters/blasphemer/license/COPYING.md'),
+  blasphemerCredits: path.join(ROOT, 'zips/monsters/blasphemer/license/CREDITS.md'),
   libreDir: path.join(ROOT, 'zips/monsters/librequake/lite/id1'),
   libreCopying: path.join(ROOT, 'zips/monsters/librequake/lite/id1/docs/COPYING'),
   quaterniusDir: path.join(ROOT, 'zips/monsters/quaternius-ultimate'),
@@ -85,7 +88,7 @@ function loadWad(file) {
 }
 
 async function packSprite(m) {
-  const { wad, palette } = loadWad(SRC.freedoomWad);
+  const { wad, palette } = loadWad(m.source === 'blasphemer' ? SRC.blasphemerWad : SRC.freedoomWad);
   const base = m.entry;
   // one rendered patch per lump, however many views use it
   const patches = new Map();
@@ -430,7 +433,7 @@ for (const m of monsters) {
   const where = m.core ? 'core' : 'public';
   const dir = path.join(m.core ? OUT_CORE : OUT_PUBLIC, m.id);
   let result;
-  if (m.source === 'freedoom') result = await packSprite(m);
+  if (m.source === 'freedoom' || m.source === 'blasphemer') result = await packSprite(m);
   else if (m.source === 'librequake') result = await packMdl(m);
   else if (m.source === 'quaternius') result = await packQuaternius(m);
   else throw new Error(`${m.id}: unknown source ${m.source}`);
@@ -498,12 +501,19 @@ const credits = {
       notice: readText(SRC.libreCopying),
     },
     {
+      id: 'blasphemer',
+      name: 'Blasphemer 0.1.8 (blasphem.wad sprites, Heretic style)',
+      licence: 'BSD-3-Clause',
+      url: 'https://github.com/Blasphemer/blasphemer',
+      notice: [readText(SRC.blasphemerCopying), 'Contributors (CREDITS.md from the Blasphemer repository):', readText(SRC.blasphemerCredits)].join('\n\n'),
+    },
+    {
       id: 'quaternius',
       name: 'Quaternius, Ultimate Monsters packs (Big, Blob, Flying)',
       licence: 'CC0 1.0 Universal (public domain dedication)',
       url: 'https://quaternius.com/',
       notice: 'CC0 1.0 Universal. Thanks to Quaternius (quaternius.com) for the free monster packs.',
-      note: 'The License.txt inside the downloaded folder is headed "Ultimate Platformer Pack"; the CC0 status is taken from the brief and the pack owner. Check it before shipping.',
+      note: 'The official Ultimate Monsters page (quaternius.com/packs/ultimatemonsters.html) states CC0. The License.txt inside the downloaded folder is a copy from another pack (headed "Ultimate Platformer Pack"), so it is not the licence source.',
     },
   ],
   monsters: all

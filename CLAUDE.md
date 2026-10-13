@@ -1,5 +1,6 @@
 # CLAUDE OPUS MASTER CONTEXT & OPERATING DIRECTIVE
 > **NEW SESSION? Read [`docs/RESUME.md`](docs/RESUME.md) first**: the current state, the owner's model rules and the game plan.
+> **Creative lead (since 2026-10-13): Gemini Argo**. His intro, the consolidated rules and his plans live in [`docs/argo/`](docs/argo/START_HERE.md). Approved plans from him become our briefs.
 > **Game**: *FIDELITY: The SetMix Multiverse* (incorporating *The Resolution Crafter* & *Monster Mash*)  
 > **Repository**: `https://github.com/Piskriek/HeavyMetal2`  
 > **Active Branch**: `feat/monster-mash-exploration`  

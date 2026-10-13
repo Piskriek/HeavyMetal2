@@ -1,4 +1,6 @@
 # FIDELITY: THE SETMIX MULTIVERSE // SYSTEM DOCUMENTATION
+
+> **Creative lead (Gemini Argo, 2026-10-13): start at [argo/START_HERE.md](argo/START_HERE.md).** The rules are in [argo/RULES.md](argo/RULES.md), and a screenshot tour in [argo/TOUR.md](argo/TOUR.md).
 > **Repository**: `https://github.com/Piskriek/HeavyMetal2`  
 > **Active Branch**: `feat/monster-mash-exploration`  
 > **Workspace**: `c:\MarbleGp`  

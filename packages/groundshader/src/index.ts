@@ -452,6 +452,11 @@ const FRAGMENT_SHADER = /* glsl */ `
   uniform vec3 uSunColour;
   uniform vec3 uSkyColour;
   uniform vec3 uGroundColour;
+  /** The paint layer (TASK-21): rgb colour and a = painted (0 none), and roughness in r; x, z origin and span in metres. */
+  uniform sampler2D uPaintColour;
+  uniform sampler2D uPaintRough;
+  uniform vec4 uPaintRect;
+  uniform float uPaintOn;
 
   in vec3 vWorldPosition;
   in vec3 vWorldNormal;
@@ -622,6 +627,16 @@ const FRAGMENT_SHADER = /* glsl */ `
       roughness += (roughnesses[i] - 0.9) * blendWeight;
     }
 
+    // a painted cell shows the preset's colour and roughness over the natural ground (the paint layer is off until a stroke)
+    if (uPaintOn > 0.5) {
+      vec2 paintUv = (vWorldPosition.xz - uPaintRect.xy) / uPaintRect.zw;
+      if (paintUv.x >= 0.0 && paintUv.x <= 1.0 && paintUv.y >= 0.0 && paintUv.y <= 1.0) {
+        vec4 paint = texture(uPaintColour, paintUv);
+        albedo = mix(albedo, paint.rgb, paint.a);
+        roughness = mix(roughness, texture(uPaintRough, paintUv).r, paint.a);
+      }
+    }
+
     if (uLevels > 0.0) {
       albedo = floor(albedo * uLevels + 0.5) / uLevels;
     }
@@ -695,6 +710,10 @@ export function createGroundMaterial(
         uSunColour: { value: (o.sunColour ?? new THREE.Color(0xffd7ae)).clone() },
         uSkyColour: { value: (o.skyColour ?? new THREE.Color(0x9ca7a6)).clone() },
         uGroundColour: { value: (o.groundColour ?? new THREE.Color(0x514137)).clone() },
+        uPaintColour: { value: null },
+        uPaintRough: { value: null },
+        uPaintRect: { value: new THREE.Vector4(0, 0, 1, 1) },
+        uPaintOn: { value: 0 },
       },
     ]),
   });
@@ -703,6 +722,17 @@ export function createGroundMaterial(
   defaults.aShade = [1];
   setStage(material, o.stage);
   return material;
+}
+
+/**
+ * Turns the paint layer on (TASK-21): `colour` holds rgb and a = painted (0 none), `rough` holds the roughness in r, and the
+ * layer covers the square from (x0, z0) for `span` metres. Painting later only rewrites the textures.
+ */
+export function setGroundPaint(material: THREE.ShaderMaterial, paint: { readonly colour: THREE.Texture; readonly rough: THREE.Texture; readonly x0: number; readonly z0: number; readonly span: number }): void {
+  material.uniforms.uPaintColour!.value = paint.colour;
+  material.uniforms.uPaintRough!.value = paint.rough;
+  (material.uniforms.uPaintRect!.value as THREE.Vector4).set(paint.x0, paint.z0, paint.span, paint.span);
+  material.uniforms.uPaintOn!.value = 1;
 }
 
 /** Changes stage uniforms only; the ShaderMaterial program and defines are untouched. */

@@ -198,6 +198,10 @@ export interface PlayScene {
   beamGatherBoulder(id: number, dt: number): { readonly mined: number; readonly x: number; readonly y: number; readonly z: number } | null;
   /** The ground point the view ray meets within `reach` metres (the held rifle's aim point), or null. */
   beamAim(reach: number): { readonly x: number; readonly y: number; readonly z: number } | null;
+  /** The held rifle paints the loaded preset on the ground under (x, z) for `dt` seconds (no ore); returns the cells changed. */
+  beamPaint(x: number, z: number, preset: string, dt: number): number;
+  /** The loaded cartridge's colour in the rifle's port (null: empty). */
+  setBeamCartridge(colour: string | null): void;
   /**
    * Compiles every shader the frames will need, for each place it draws, behind the loading bar: a compile mid-play is a hitch the
    * display governor would read as a slow machine (and the owner's rule is never to start a screen choppy).
@@ -230,6 +234,8 @@ export interface PlayScene {
     clipWeight(name: ClipName): number;
     /** Where the held rifle is: in the right hand of the character, in the first-person view, or put away. */
     rifleIn(): 'hand' | 'view' | 'none';
+    /** How many plot cells carry a preset's paint. */
+    paintedCells(): number;
     /** The character: which scene it is in, whether it is shown, where it stands, and whether an alternate camera is on. */
     avatar(): { readonly in: string; readonly visible: boolean; readonly at: readonly number[]; readonly kids: number; readonly altCam: boolean };
     currentOneShot(): OneShotKind | null;
@@ -2158,6 +2164,12 @@ export function createPlayScene(o: {
       const hit = aimGround(reach);
       return hit ? { x: hit.x, y: hit.y, z: hit.z } : null;
     },
+    beamPaint(x, z, preset, dt) {
+      return ground?.paint(x, z, preset, dt) ?? 0;
+    },
+    setBeamCartridge(colour) {
+      heldBeam.setCartridge(colour);
+    },
     async preloadLabGenerated() {
       await preloadLabGenerated(genLevelFor(currentQuality));
       await preloadVista(VISTA_LEVEL);
@@ -2246,6 +2258,7 @@ export function createPlayScene(o: {
       view: () => cameraView,
       clipWeight: (name: ClipName) => scientistAnimator?.getClipWeight(name) ?? 0,
       rifleIn: () => (!heldBeam.group.visible ? 'none' : heldBeam.group.parent === viewRig ? 'view' : rifleHand !== null && heldBeam.group.parent === rifleHand ? 'hand' : 'none'),
+      paintedCells: () => ground?.paintedCells() ?? 0,
       avatar: () => {
         const box = new THREE.Box3().setFromObject(scientistHolder);
         return { in: scientistHolder.parent === planetScene ? 'planet' : scientistHolder.parent === labScene ? 'lab' : 'none', visible: scientistHolder.visible, at: scientistHolder.position.toArray().map((v) => +v.toFixed(2)), kids: scientistHolder.children.length, altCam: !!altCamPos, box: [box.min.toArray(), box.max.toArray()].map((p) => p.map((v) => +v.toFixed(2))) };

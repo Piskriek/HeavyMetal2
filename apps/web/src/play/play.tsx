@@ -68,6 +68,7 @@ import type { Kind } from '@hm/structure';
 import * as L from '@hm/lattice';
 import type { BeamMode } from '@hm/beamkit';
 import { BEAM_STROKE_RANGE, cycleBeamMode } from './beam-tool';
+import { presetLook, reloadedLab, writtenOnRack } from './beam-port';
 
 /** The extraction rifle's modes, as the player reads them (the chip and the toasts). */
 const BEAM_LABEL: Readonly<Record<BeamMode, string>> = { extract: 'Extract', apply: 'Apply', sculpt: 'Sculpt' };
@@ -149,8 +150,9 @@ const KEYS: readonly [string, string][] = [['W A S D', 'walk'], ['Mouse', 'look'
 const CONTROLS: readonly [string, string][] = [
   ['W A S D', 'Walk'], ['Mouse', 'Look (click the world to capture the mouse)'], ['Shift', 'Run'],
   ['E', 'Use: leave or enter a vehicle, use a station, machine or bin; hold on a boulder to gather ore'],
-  ['B', 'Build menu: Machines, Structures, Heavy, Plans'], ['Q', 'Previous structure kind (the wheel too)'],
-  ['R', 'Rotate the piece you hold, or the layout while you place it'], ['X', 'Remove the piece you aim at'],
+  ['B', 'Build menu: Machines, Structures, Heavy, Plans'], ['Q', 'Previous structure kind (the wheel too); with the beam out, the beam mode'],
+  ['R', 'Rotate the piece you hold, or the layout while you place it; with the beam out, reload its port'], ['X', 'Remove the piece you aim at'],
+  ['G', 'Draw or holster the extraction beam (the rifle)'], ['Left mouse', 'Hold with the beam out: mine a boulder (Extract), paint the port (Apply)'],
   ['F', 'Build the plan you stand near'], ['T', 'Structural integrity overlay'], ['V', 'First or third person view'],
   ['Space', 'Brake a vehicle; fire the shotgun when it is equipped'], ['Tab or I', 'Inventory'], ['K', 'Drafting table'],
   ['L', 'Lattice storage'], ['1 to 9', 'Hotbar slot'], ['Esc', 'Close the open thing, then pause'],
@@ -408,10 +410,16 @@ export function PlayScreen(props: {
   const [baseWindowOpen, setBaseWindowOpen] = useState(false);
   const [beamHarvest, setBeamHarvest] = useState<{ count: number; name: string; fading?: boolean } | null>(null);
   const beamHarvestTimerRef = useRef<number | null>(null);
-  /** The boulder the held rifle takes ore from this frame (its centre; null when none), the ore not yet on the counter, and when it was last shown. */
-  const beamBoulderTargetRef = useRef<{ readonly x: number; readonly y: number; readonly z: number } | null>(null);
+  /**
+   * Where the held rifle's beam lands this frame: a boulder it takes ore from (amber), or the ground it paints (the loaded
+   * preset's colour). Null when it lands nowhere. The ore not yet on the counter, and when it was last shown.
+   */
+  const beamBoulderTargetRef = useRef<{ readonly x: number; readonly y: number; readonly z: number; readonly colour: string } | null>(null);
   const beamOreAccRef = useRef(0);
   const beamOreFlushRef = useRef(0);
+  /** The rifle's port (TASK-21): the written cartridge loaded from the lab rack, and its preset and colour. Not saved yet (TASK-21c). */
+  const beamPortRef = useRef<{ readonly cartridge: Cartridge; readonly preset: string; readonly name: string; readonly colour: string } | null>(null);
+  const [beamPort, setBeamPort] = useState<{ readonly name: string } | null>(null);
   /** The extraction counter: adds to the running count and fades two seconds after the last add (field nodes and boulders). */
   const flashBeamHarvest = (count: number, name: string): void => {
     setBeamHarvest((prev) => ({ count: (prev ? prev.count : 0) + count, name, fading: false }));
@@ -422,6 +430,27 @@ export function PlayScreen(props: {
         setBeamHarvest(null);
       }, 400);
     }, 2000);
+  };
+  /**
+   * R on the held rifle (TASK-21): a written cartridge from the lab rack goes into the port. A cartridge already in the port goes
+   * back on the rack first. A cartridge a lab job still needs stays where it is.
+   */
+  const reloadBeam = (): void => {
+    const written = writtenOnRack(labRef.current);
+    if (!written || written.preset === null) {
+      say('The port stays empty', 'No written cartridge is on the lab rack. Write one at the bench.');
+      return;
+    }
+    const port = beamPortRef.current;
+    const next = reloadedLab(labRef.current, written, port ? port.cartridge : null);
+    const look = presetLook(written.preset);
+    beamPortRef.current = { cartridge: written, preset: written.preset, name: written.name, colour: look?.colour ?? '#808080' };
+    labRef.current = next;
+    commit(withLab(withPlot(stateRef.current, plotRef.current), next));
+    setBeamPort({ name: written.name });
+    sceneRef.current?.setBeamCartridge(beamPortRef.current.colour);
+    sceneRef.current?.playAction('reload');
+    say(`Loaded: ${written.name}`, port ? `${port.name} went back on the rack.` : 'Hold the left button in Apply to paint.');
   };
   const forceBeamRef = useRef<number | null>(null);
   const isAnyBaseWindowOpen = menu || baseWindowOpen || machinePickerHardpoint !== null || refineryMachineId !== null || fabricatorMachineId !== null || weaponBenchOpen;
@@ -1046,8 +1075,8 @@ export function PlayScreen(props: {
         const col = targetNode.kind === 'dither' ? '#d9d9d9' : targetNode.kind === 'fold' ? '#7dd3fc' : targetNode.kind === 'chroma' ? '#ff4fd8' : '#22d3ee';
         scene.setBeam(muzzle, target, 'extract', col, true);
       } else if (beamBoulderTargetRef.current !== null) {
-        // the rifle takes ore from a boulder: the beam runs from the muzzle to its centre (the amber of the ore)
-        scene.setBeam(scene.beamMuzzle(), beamBoulderTargetRef.current, 'extract', '#f3b848', true);
+        // the rifle takes ore from a boulder (amber) or paints the ground (the preset's colour): the beam runs from the muzzle to it
+        scene.setBeam(scene.beamMuzzle(), beamBoulderTargetRef.current, 'extract', beamBoulderTargetRef.current.colour, true);
       } else {
         scene.setBeam(null, null, 'extract', '#ffffff', false);
       }
@@ -1529,7 +1558,7 @@ export function PlayScreen(props: {
           ? scene.aimBoulder(BEAM_STROKE_RANGE)
           : null;
         const hit = boulderId !== null ? scene.beamGatherBoulder(boulderId, dt) : null;
-        beamBoulderTargetRef.current = hit && hit.mined > 0 ? { x: hit.x, y: hit.y, z: hit.z } : null;
+        beamBoulderTargetRef.current = hit && hit.mined > 0 ? { x: hit.x, y: hit.y, z: hit.z, colour: '#f3b848' } : null;
         if (hit && hit.mined > 0) {
           plotRef.current = { ...plotRef.current, ore: Math.min(1e5, plotRef.current.ore + hit.mined) };
           plotChanged = true;
@@ -1540,6 +1569,18 @@ export function PlayScreen(props: {
             beamOreFlushRef.current = ms;
             if (whole > 0) flashBeamHarvest(whole, 'Ore');
           }
+        }
+      }
+
+      // ---- Apply (TASK-21): the held rifle paints the loaded cartridge's preset under the aim point (radius 3 m); it costs no ore
+      {
+        const port = beamPortRef.current;
+        const aim = live && !visitingRef.current && out.where === 'planet' && beamHeldRef.current && beamModeRef.current === 'apply' && isLmbDownRef.current && port !== null
+          ? scene.beamAim(BEAM_STROKE_RANGE)
+          : null;
+        if (aim && port) {
+          scene.beamPaint(aim.x, aim.z, port.preset, dt);
+          beamBoulderTargetRef.current = { x: aim.x, y: aim.y + 0.15, z: aim.z, colour: port.colour };
         }
       }
 
@@ -1993,7 +2034,7 @@ export function PlayScreen(props: {
         }
       }
       if (e.code === 'KeyR') {
-        if (beamHeldRef.current) return; // the rifle's reload is the next beam step (TASK-21)
+        if (beamHeldRef.current) { reloadBeam(); return; }
         if (placingLayoutId !== null) {
           placingLayoutRotationRef.current = (placingLayoutRotationRef.current + 1) % 4;
           say(`Layout Rotation: ${placingLayoutRotationRef.current * 90}°`);
@@ -3164,9 +3205,13 @@ export function PlayScreen(props: {
               </div>
           ) : null}
           {beamHud.held && hud.where === 'planet' && !hideOverlays ? (
-            <div className="hm-beam-chip" data-testid="beam-mode" data-mode={beamHud.mode}>
+            <div className="hm-beam-chip" data-testid="beam-mode" data-mode={beamHud.mode} data-port={beamPort?.name ?? ''}>
               <b>{BEAM_LABEL[beamHud.mode]}</b>
-              <span>Q or wheel: next mode</span>
+              <span>
+                {beamHud.mode === 'apply'
+                  ? beamPort ? `Port: ${beamPort.name}` : 'Port empty: R loads a cartridge'
+                  : 'Q or wheel: next mode'}
+              </span>
             </div>
           ) : null}
           {hud.where === 'planet' && !hideOverlays ? (

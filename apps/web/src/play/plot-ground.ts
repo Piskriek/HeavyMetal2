@@ -4,10 +4,12 @@
 // planet curves away: every height drops by drop(x, z).
 import * as THREE from 'three';
 import { chunkMesh, chunksAround, createTerrain, type Terrain } from '@hm/plotterrain';
-import { createGroundMaterial, makeGroundTextures, setStage as setGroundStage } from '@hm/groundshader';
+import { createGroundMaterial, makeGroundTextures, setGroundPaint, setStage as setGroundStage } from '@hm/groundshader';
+import { apply as brushApply, emptyField, type BrushOp, type Field, type Rules } from '@hm/terrainbrush';
 import { drop } from '../crafter/planet';
 import { smoothModel, type SmoothId } from '../crafter/smooth-models';
-import { boulderBeamRate } from './beam-tool';
+import { boulderBeamRate, STROKE_RADIUS } from './beam-tool';
+import { presetLook } from './beam-port';
 
 export interface BoulderInfo {
   readonly id: number;
@@ -41,6 +43,10 @@ export interface PlotGround {
   findNearestBoulder(origin: THREE.Vector3): number | null;
   /** Advances boulder regrowth slowly over a few minutes near rock and scree. */
   regrow(dt: number): void;
+  /** The held beam paints `preset` on the ground under (x, z), radius 3 m, for `dt` seconds (no ore). Returns the cells it changed. */
+  paint(x: number, z: number, preset: string, dt: number): number;
+  /** How many cells carry a preset's paint. */
+  paintedCells(): number;
   /** Returns boulder states for debug and inspection. */
   getBoulders(): readonly BoulderInfo[];
   dispose(): void;
@@ -110,6 +116,36 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
     for (const [key, mesh] of chunks) if (!keys.has(key)) { group.remove(mesh); mesh.geometry.dispose(); chunks.delete(key); }
   };
 
+  // the paint layer (TASK-21): a grid of 2.5 m cells over the boulder span, painted through @hm/terrainbrush by the beam and
+  // shown by the ground shader from two textures (colour with a painted flag, and roughness), so a stroke rewrites texels only
+  const PAINT_CELLS = 256, PAINT_CELL = BOULDER_SPAN / PAINT_CELLS, PAINT_ORIGIN = -BOULDER_SPAN / 2;
+  /** Frames since a stroke changed the paint (the textures go up about ten times a second while the beam paints). */
+  let paintDirtyFrames = -1;
+  const PAINT_RULES: Rules = { maxDepth: 0, maxHeight: 0, orePerCubicMetre: 0, ratePerSecond: 0 };
+  let paintField: Field = emptyField(PAINT_CELLS, PAINT_CELL);
+  const paintColourBytes = new Uint8Array(PAINT_CELLS * PAINT_CELLS * 4);
+  const paintRoughBytes = new Uint8Array(PAINT_CELLS * PAINT_CELLS * 4);
+  const paintColour = new THREE.DataTexture(paintColourBytes, PAINT_CELLS, PAINT_CELLS, THREE.RGBAFormat);
+  const paintRough = new THREE.DataTexture(paintRoughBytes, PAINT_CELLS, PAINT_CELLS, THREE.RGBAFormat);
+  for (const t of [paintColour, paintRough]) {
+    t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false;
+    t.wrapS = THREE.ClampToEdgeWrapping; t.wrapT = THREE.ClampToEdgeWrapping; t.needsUpdate = true;
+  }
+  setGroundPaint(material, { colour: paintColour, rough: paintRough, x0: PAINT_ORIGIN, z0: PAINT_ORIGIN, span: BOULDER_SPAN });
+  const writeTexel = (i: number): void => {
+    const o = i * 4;
+    const look = (paintField.paint[i] ?? '') !== '' ? presetLook(paintField.paint[i]!) : null;
+    if (!look) {
+      paintColourBytes.fill(0, o, o + 4);
+      paintRoughBytes.fill(0, o, o + 4);
+      return;
+    }
+    const v = parseInt(look.colour.slice(1), 16);
+    paintColourBytes[o] = (v >> 16) & 255; paintColourBytes[o + 1] = (v >> 8) & 255; paintColourBytes[o + 2] = v & 255; paintColourBytes[o + 3] = 255;
+    const rough = Math.round(Math.max(0, Math.min(1, look.roughness)) * 255);
+    paintRoughBytes[o] = rough; paintRoughBytes[o + 1] = rough; paintRoughBytes[o + 2] = rough; paintRoughBytes[o + 3] = 255;
+  };
+
   // boulders from the terrain, near the gate, in the smooth boulder shapes, wearing the ground's rock colour
   const rockMat = new THREE.MeshStandardMaterial({ color: '#7d756b', roughness: 0.92, metalness: 0, flatShading: flat });
   const boulders = terrain.boulders(-BOULDER_SPAN / 2, -BOULDER_SPAN / 2, BOULDER_SPAN);
@@ -173,6 +209,11 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
     update(eyeX, eyeZ, all = false) {
       if (Math.hypot(eyeX - lastX, eyeZ - lastZ) > MIN_SIZE / 2) plan(eyeX, eyeZ);
       step(all ? Infinity : 1);
+      // a paint stroke's texels go up once it has settled for six frames (about ten uploads a second while the beam paints)
+      if (paintDirtyFrames >= 0 && ++paintDirtyFrames >= 6) {
+        paintColour.needsUpdate = true; paintRough.needsUpdate = true;
+        paintDirtyFrames = -1;
+      }
     },
     setStage(stage) {
       setGroundStage(material, Math.max(1, stage));
@@ -264,6 +305,19 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
         });
       }
     },
+    paint(x, z, preset, dt) {
+      const op: BrushOp = { kind: 'paint', x: x - PAINT_ORIGIN, z: z - PAINT_ORIGIN, radius: STROKE_RADIUS, strength: 1, dt, preset };
+      const r = brushApply(paintField, () => 0, op, PAINT_RULES, 0);
+      paintField = r.field;
+      for (const i of r.changed) writeTexel(i);
+      if (r.changed.length > 0) paintDirtyFrames = Math.max(0, paintDirtyFrames);
+      return r.changed.length;
+    },
+    paintedCells() {
+      let n = 0;
+      for (const p of paintField.paint) if (p) n += 1;
+      return n;
+    },
     getBoulders() {
       return trackedBoulders.map((b) => ({ id: b.id, x: b.x, y: b.y, z: b.z, size: b.size, ore: b.ore }));
     },
@@ -273,6 +327,7 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
       for (const r of rocks) r.dispose();
       scene.remove(group);
       material.dispose(); rockMat.dispose();
+      paintColour.dispose(); paintRough.dispose();
       textures.albedoHeight.dispose();
       textures.normalRough.dispose();
     },

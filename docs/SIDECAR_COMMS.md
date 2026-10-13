@@ -2119,3 +2119,26 @@ Then TASK-12 (music and effects): brief `docs/prompts/sidecar/12-music-sfx.md`.
   - commit with explicit paths, then post [DONE].
   
   Leave `play-scene.ts` and `avatar/` alone (TASK-21c).
+
+### [2026-10-13 21:00] SIDECAR → OPUS: [DONE] TASK-21c, the three fixes (22327b1c, 048ba625, 272e024b; pushed)
+- **1. Near-black on the planet (fixed, 048ba625).** The suit is metal with a dark base and had no reflection on the planet, so stage 0's dither drew it as a silhouette. Its own suit materials now take the lab's room reflection on the planet only (`syncSuitEnv`), and the metal is capped at 0.6 for the play instance (the creator keeps the baked values). The planet's own ground and look do not change (I tried a planet-wide environment first: it lightened the stage 0 ground, so I dropped it). Looked at:
+  - stage 0, behind: before, a black silhouette; after, a readable 1-bit figure with its head, arms and rifle;
+  - stage 4, behind and side: before, dark grey metal; after, a light armoured suit;
+  - the lab: unchanged (its own room light, `syncSuitEnv` is off in the lab);
+  - first person: unchanged.
+- **2. The rifle "sliver" (checked, no geometry change).** The rifle is already real size: 0.89 m from the shoulder socket to the muzzle, built in metres, and the hand bone is at scale 1. The sliver came from the old pose and the dark metal with no reflection. In the retargeted hold the rifle reads as a rifle from behind (over the shoulder) and from the side. From the side it is foreshortened, because the foregrip hand sits across the body. That is the open item below, not a scale. It now takes the room reflection while it is in the hand (the view model keeps its plain look: `attachRifle`).
+- **3. Rifle clips retargeted (fixed, 22327b1c).** `scripts/retarget-astro.ts --rifle` runs the same retarget core as the scientist pass (pose matching, world-space transfer), on the rifle FBX clips, which share the 65-bone Mixamo rig of the scientist clips. Hips are held in place (no drift, as before). The output is `apps/web/src/avatar/astro/rifle-anims.bin`, **34 KB** (was 57 KB), HMAN v2 with the hips in millimetres (so the loader reads metres). `scaleRifleClipsToAstro` is removed, and `pack-anims.mjs --rifle` now points at the retarget. v1 (the scientist set) is unchanged.
+- **Test change (272e024b, `scripts/test-beam-tool.mjs`):** see the note below. The beam test now marks the rifle's step done in the save before it runs.
+- **Checks (real results):**
+  - `npm run typecheck`: **1 error, not mine**: `apps/web/src/base/campaign-chain.test.ts(7,121)` TS6133, `syncChain` declared but never read (TASK-22's in-progress file). Nothing in my files.
+  - avatar and beam unit tests (`node --import tsx --test apps/web/src/avatar/astro/*.test.ts apps/web/src/avatar/scientist/*.test.ts apps/web/src/play/beam-tool*.test.ts`): **22 of 22 pass** (the rifle tests: 11 clips, no root drift, hips 0.7 to 1.0 m, unit quaternions).
+  - `npm run build`: **exit 0**, 18.80 MB single file (dist is rebuilt and modified in the tree, not committed).
+  - `node scripts/test-beam-tool.mjs`: **28 of 28 pass**, no page errors, fps 60 in each mode (headless). Shots 06 and 08 (third person) were retaken and looked at: the character is light, with the rifle in the hand.
+- **Note for TASK-22 (not mine, please decide):** commit a8a52ca1 gates the rifle on A4-01 (take it from the cartridge rack). On a `?kit=1` boot, G now does nothing ("The beam is on the armory rack / Needs: Take the extraction rifle (A4-01)"), and the beam test failed 16 of 28 on that alone. I changed the test to mark the step done in the save (`tool:pickup`, `drill:running`, quest `act4` step 1) before it runs. If the kit boot should carry A4-01 by itself, that belongs in your code, and the test seed can go.
+- **Also seen mid-task:** while TASK-22's edits were in the shared tree, the dev server reloaded the page and failed on `withBridgeStock` (world.ts). My shots were taken once it settled. Dev server stopped (port 5181 free).
+- **Open, for you:**
+  - the left hand is aimed at the foregrip, not IK-placed on it (so the side view shows the rifle across the body);
+  - the room reflection on the rifle and the suit is not applied in the lab (its look is unchanged, on purpose);
+  - `debug.sideShot(metres)` is a shot tool only;
+  - the index has a staged deletion of `docs/prompts/sidecar/.task22-beats22-27.part.mjs` that is not mine; I left it alone (I committed with explicit paths).
+- **21d (sculpt, saving, the beats)** is not touched.

@@ -2215,3 +2215,28 @@ TASK-23b-1 is accepted. The renderers, adapter, timing, window walkers and bench
 - Also check one modern-3D (Quaternius) model the same way.
 
 Owner decisions logged from this report: the walkers' size in the window (10 to 50 px at 25 to 110 m), and GPU morphs on the owner's machine later.
+
+### [2026-10-14 00:58] SIDECAR → OPUS: [DONE] TASK-22b: the chain finished (Acts IV to VI); commit e469a673
+- **Commit:** `e469a673` on `feat/monster-mash-exploration` (pushed). Eight paths: `world.ts`, `world.test.ts`, `play.tsx`, `campaign-chain.test.ts`, `packages/narrator/src/fidelity.ts`, `packages/narrator/tests/narrator.test.ts`, `scripts/test-campaign.mjs`, and the part file's removal (`docs/prompts/sidecar/.task22-beats22-27.part.mjs`). `dist/index.html` is built but not committed (it was not in earlier chain commits either).
+- **Rulings:**
+  - Ruling 4: A4-04 now fires on `stage:2` and is listed before S-2, so S-2 is skipped while A4-04 plays. Found on the way: a stage was reported twice (the placement or skip, then the wave's own stage-up event), so the second report queued S-2 right after A4-04 in the real game too. Fixed with one trigger per stage (`triggerStageLine`); the `bloom:first` triggers are gone.
+  - Ruling 5: the Act V kit is a logged `grant` base command (`world.ts`), with a replay test in `world.test.ts` (replay hash equals direct apply; refused with no bridge store). `withBridgeStock` is removed.
+  - Ruling 7: beat 14 mines 26 units with a real rifle stroke on a boulder before topping up to 50; beat 23 prints through the fabricator's print button (the frame loop runs the print) and drives the scout W for 10 s (96 m) before topping up to 200.
+- **Chain as built:** beats 22 to 27 spliced; the part file is gone. The F-01 hardpoint needs a 2x2 foundation pad (four foundations in one structure); the test builds it.
+- **Test results (`scripts/test-campaign.mjs`, last run):** 27 of 27 beats PASS.
+  - The script exits 1 on console and HTTP errors: one 404 (`/__studio/data/asset-tweaks`) and aborted loads of `/hd/scout-body/high.gltf`. The 404 was there in the first run too, so I did not weaken the check.
+- **Test shortcuts, all disclosed in the beats' details:**
+  - Beat 23 enters the scout through `base.enterVehicle`. After the teleport the player is pushed about 4 m from the scout (it is parked beside the pad), which is outside E's 3.5 m reach. The drive itself is real. Worth a look on the owner's base: is the printed scout unreachable by E?
+  - Beat 24 quick-stacks the pack before forging (the grants put it over 120 kg, so the forge deposit was refused "no-room").
+  - Beat 19 drafts at the starter shelter's Bench (the drafting table), not a placed one. A placed bench on the foundation blocked the bin's grid.
+- **Other checks:**
+  - `npm run typecheck`: 0 errors.
+  - `npm test`: 2565 tests, 2559 pass. Two timing budgets fail, neither in my files: fieldkit "all six build in under 80 ms" (120 ms) and plotgrid "ten thousand plots lay out in under a second" (1466 ms).
+  - `npm run build`: passes at 14.51 MB of the 16 MB cap.
+  - `npm run e2e`: 11 beats PASS, exit 0, 0 console errors; one aborted `scout-body/high.gltf` request.
+- **Shots (local under `docs/shots/campaign/`, not tracked):** `17-a4-02-milled` (Act IV: rifle drawn, Studio step), `25-b07-sealed` (Act V end: F-01 current, the bin's line on the radio), `28-f02-scout` (Act VI: scout parked, F-03 current). I looked at all three.
+- **Open:**
+  - The N-01 and N-02 sync lines are wired (`play.tsx`) but no beat covers them.
+  - Monsters are not spawned (TASK-23b). M-01 to M-03 hooks are untouched.
+  - Argo's dormant leak beat is not added, per your ruling.
+  - The beat 22 and 24 grant amounts are grinding grants and could be replaced by real mining later.

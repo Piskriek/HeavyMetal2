@@ -37,6 +37,9 @@ import {
 } from '@hm/cartlab';
 import { fx } from '../maker/feedback';
 import { FRESH, METRIC_COLOUR, METRIC_NAME, SAVE_KEY, arrived, created, isFreeDrill, loadState, objective, poweredOn, returned, withLab, withPlot, type PlayState } from './quest';
+import { Journal } from './journal';
+import { ACT_V_KIT, COUNT, advanceChain, bump, chainView, finishedSteps, gateReason, monsterKilled, monsterSeen, placedKey, syncChain, type Chain, type Evidence } from '../base/campaign-chain';
+import { withBridgeStock, type BaseEvent } from '../base/world';
 import { encodePlot, decodePlot, plotOfSnapshot } from './plot-code';
 import type { Snapshot } from '@hm/plotcodec';
 import type { MobStatus, CombatStats } from './monster-mash-combat';
@@ -117,6 +120,35 @@ const STAGE_SAYS: readonly string[] = [
 ];
 
 
+/** What the world shows, for the chain's derived counters (TASK-22, campaign-chain.ts). */
+function worldEvidence(w: BaseWorld, plot: PlotState): Evidence {
+  const stacks = [...w.player.slots, ...w.boxes.flatMap((b) => b.slots), ...Object.values(w.equipment)];
+  return {
+    stage: plot.stage,
+    drillsRunning: plot.machines.filter((m) => m.kind === 'drill' && m.on).length,
+    pieceKinds: w.base.pieces.map((p) => p.kind),
+    machineKinds: w.machines.map((m) => m.kind),
+    vehicleKinds: w.vehicles.map((v) => v.kind),
+    sidearm: !!w.equipment.sidearm,
+    itemIds: stacks.flatMap((st) => (st ? [st.item] : [])),
+  };
+}
+
+/** The counters a batch of base events moves (TASK-22). */
+function chainPairs(events: readonly BaseEvent[]): [string, number][] {
+  const out: [string, number][] = [];
+  for (const ev of events) {
+    if (ev.type === 'placed') out.push([placedKey(ev.kind), 1]);
+    else if (ev.type === 'drafted') out.push([COUNT.drafted, 1]);
+    else if (ev.type === 'forged') out.push([COUNT.forged, 1]);
+    else if (ev.type === 'fitted') out.push([COUNT.fitted, 1]);
+    else if (ev.type === 'printed' && ev.kind === 'scout') out.push([COUNT.printedScout, 1]);
+    else if (ev.type === 'installed' && ev.kind === 'fabricator') out.push([COUNT.installedFabricator, 1]);
+    else if (ev.type === 'harvested' && ev.items.some((i) => ITEMS[i.item]?.kind === 'raw-pxd')) out.push([COUNT.harvestPxd, 1]);
+  }
+  return out;
+}
+
 function loadSaved(): PlayState { try { return loadState(JSON.parse(kv.get(SAVE_KEY) ?? 'null')); } catch { return FRESH; } }
 function save(s: PlayState): void { try { kv.set(SAVE_KEY, JSON.stringify(s)); } catch { /* storage unavailable: progress lives for this visit */ } }
 
@@ -160,6 +192,8 @@ const CONTROLS: readonly [string, string][] = [
 
 export function PlayScreen(props: {
   readonly profile: Profile;
+  /** Opens the Studio from the journal (the shell's Studio route). */
+  readonly onStudio?: () => void;
   readonly onBack: () => void;
   readonly initialSyncMode?: 'desynced' | 'synced';
 }): ReactElement {
@@ -193,6 +227,10 @@ export function PlayScreen(props: {
   const narratorRef = useRef<GameNarratorController | null>(null);
   const [subtitle, setSubtitle] = useState<{ id: string; text: string; cleanText: string } | null>(null);
   const [radioLogOpen, setRadioLogOpen] = useState(false);
+  const [journalOpen, setJournalOpen] = useState(false);
+  /** Running seconds of the texture mill and metres driven, whole units go to the chain (TASK-22). */
+  const millAccRef = useRef(0);
+  const driveAccRef = useRef(0);
   const [heardLogs, setHeardLogs] = useState<readonly string[]>(savedHeard);
   const [dialogueSettings, setDialogueSettings] = useState(() => loadDialogueSettings());
   const [audioSettings, setAudioSettings] = useState<AudioSettings>(() => loadAudioSettings());
@@ -281,6 +319,22 @@ export function PlayScreen(props: {
   }, [isDevSeed]);
 
   const commit = useCallback((next: PlayState) => { stateRef.current = next; setState(next); save(next); }, []);
+  /** The campaign chain (TASK-22): change the counters, read the world as evidence, run the questline, save if it moved. */
+  const updateChain = useCallback((f: (c: Chain) => Chain) => {
+    const before = stateRef.current.chain;
+    const next = advanceChain(syncChain(f(before), worldEvidence(baseWorldRef.current, plotRef.current)));
+    if (JSON.stringify(next) === JSON.stringify(before)) return;
+    commit(withLab(withPlot({ ...stateRef.current, chain: next }, plotRef.current), labRef.current));
+    const newly = finishedSteps(next.progress).filter((id) => !finishedSteps(before.progress).includes(id));
+    if (newly.includes('A4-02')) narratorRef.current?.trigger('dirt:process');
+    if (newly.includes('A4-04')) {
+      // Act V opens: the bridge store gets the primitives a hardpoint and a heavy press need (campaign-chain.ts ACT_V_KIT)
+      baseWorldRef.current = withBridgeStock(baseWorldRef.current, ACT_V_KIT);
+      persistBaseWorld(true);
+      baseViewSourceRef.current?.notify?.();
+      say('Bridge stock delivered', 'Primitives for a hardpoint and a heavy press are on the bridge.');
+    }
+  }, [commit]);
   const say = useCallback((text: string, sub = '') => setToast({ text, sub, id: Date.now() }), []);
   useEffect(() => {
     if (!toast) return undefined;
@@ -648,6 +702,7 @@ export function PlayScreen(props: {
       }
     }
 
+    updateChain((c) => chainPairs(res.events).reduce((x, [k, n]) => bump(x, k, n), c));
     if (res.world.field !== prevField || res.events.some((e) => e.type === 'harvested' || e.type === 'stage')) {
       scene?.setNodes(res.world.field);
     }
@@ -689,6 +744,8 @@ export function PlayScreen(props: {
       }
       return false;
     }
+    const lock = gateReason(snap.mode === 'place' && snap.piece.kind === 'weaponBench' ? 'weaponBench' : 'structures', stateRef.current.chain, plotRef.current.stage);
+    if (lock) { say('Locked', lock); return false; }
     if (snap.mode === 'place') {
       let finalR = snap.piece.r;
       if (
@@ -742,6 +799,7 @@ export function PlayScreen(props: {
         hitMarkerTimeout.current = window.setTimeout(() => setHitMarker(false), 110);
         if (res.killed > 0) {
           narratorRef.current?.trigger('mob:kill');
+          updateChain(monsterKilled);
           say('Monster neutralized!', `+${res.killed * 50} Biomass Ore recovered.`);
         }
       }
@@ -1461,6 +1519,12 @@ export function PlayScreen(props: {
         : { move: { x: 0, z: 0 }, look: { dx: 0, dy: 0 }, run: false });
       if (out.drivingVehicle) {
         setDrivingSpeed(out.drivingVehicle.speed);
+        driveAccRef.current += out.drivingVehicle.speed * dt;
+        if (driveAccRef.current >= 1) {
+          const whole = Math.floor(driveAccRef.current);
+          driveAccRef.current -= whole;
+          updateChain((c) => bump(c, COUNT.drivenM, whole));
+        }
       } else if (drivingSpeed !== null) {
         setDrivingSpeed(null);
       }
@@ -1568,6 +1632,7 @@ export function PlayScreen(props: {
             beamOreAccRef.current -= whole;
             beamOreFlushRef.current = ms;
             if (whole > 0) flashBeamHarvest(whole, 'Ore');
+            if (whole > 0) updateChain((c) => bump(c, COUNT.minedBeam, whole));
           }
         }
       }
@@ -1613,6 +1678,16 @@ export function PlayScreen(props: {
           if (e.type === 'underpowered' && !visitingRef.current) say('Not enough power', 'Build a power unit, or switch a machine off.');
         }
         if (r.events.length) plotChanged = true;
+        // the texture mill's running seconds (A4-02: process the dirt at the mill); whole seconds go to the chain
+        if (!visitingRef.current) {
+          const runMap = running(plotRef.current, env);
+          if (plotRef.current.machines.some((m) => m.kind === 'mill' && (runMap.get(m.id) ?? 0) > 0)) millAccRef.current += dt;
+          if (millAccRef.current >= 1) {
+            const whole = Math.floor(millAccRef.current);
+            millAccRef.current -= whole;
+            updateChain((c) => bump(c, COUNT.milled, whole));
+          }
+        }
         if (!visitingRef.current) {
           scene.setPlot(plotRef.current, running(plotRef.current, env), network(plotRef.current, env).connected);
         } else {
@@ -1637,6 +1712,7 @@ export function PlayScreen(props: {
         if (!hasSeenMobRef.current && mobList.some((m) => m.state !== 'death')) {
           hasSeenMobRef.current = true;
           narratorRef.current?.trigger('mob:seen');
+          updateChain(monsterSeen);
         }
       }
       if (ms - hudAt > 90 || out.event || labRes.events.length) {
@@ -1690,6 +1766,7 @@ export function PlayScreen(props: {
       } else {
         gameAudio.setMusicContext('lab');
       }
+      updateChain((c) => c);
       narratorRef.current?.trigger('wake');
       raf = requestAnimationFrame(loop);
     };
@@ -1740,6 +1817,15 @@ export function PlayScreen(props: {
       boulders: () => scene.debug.boulders(),
       machines: () => scene.debug.machines(),
       state: () => stateRef.current,
+      chain: () => chainView(stateRef.current.chain),
+      chainState: () => stateRef.current.chain,
+      die: () => {
+        // a death: the screen takes the player back to the gate; the inventory and the save stay (TASK-22)
+        updateChain((c) => bump(c, COUNT.deaths));
+        const g = scene.debug.gatePlanet();
+        scene.debug.teleport('planet', g.x, g.z - 6, 0, 0);
+        say('Pulled back to the gate', 'Your inventory and your progress are kept.');
+      },
       detail: () => scene.debug.detail(),
       raise: (to: number) => scene.raiseStage(to, scene.debug.gatePlanet()),
       twinStage: () => scene.debug.twinStage(),
@@ -2184,6 +2270,8 @@ export function PlayScreen(props: {
       }
       if (e.code === 'KeyG') {
         // The extraction rifle (TASK-21): out in hand on the planet; racked on the lab wall until its place in the story.
+        const rifleLock = gateReason('rifle', stateRef.current.chain, plotRef.current.stage);
+        if (rifleLock) { say('The beam is on the armory rack', rifleLock); return; }
         if (hud.where !== 'planet') {
           say('The beam stays racked on the lab wall', 'It comes down to the planet later.');
           return;
@@ -2340,7 +2428,11 @@ export function PlayScreen(props: {
     } : undefined);
     if (!locked) lock();
   };
-  const goal = objective({ ...state, plot: plotRef.current }, hud.where);
+  // the quest HUD: the chain's current step and the next one, once the chain has started; the plot's goal until then
+  const plotGoal = objective({ ...state, plot: plotRef.current }, hud.where);
+  const chainNow = chainView(state.chain);
+  const goal = chainNow.current && !visiting ? { title: chainNow.current.title, hint: chainNow.current.hint } : plotGoal;
+  const chainNext = !visiting && chainNow.current ? chainNow.next?.title ?? null : null;
   const syncLit = Math.ceil(hud.sync * SYNC_BLOCKS);
   const prompt = building
     ? (hud.ghost?.ok ? `Click or E: build the ${KINDS[building].name.toLowerCase()}` : hud.ghost?.why || 'Aim at the ground near the gate.')
@@ -2398,6 +2490,7 @@ export function PlayScreen(props: {
             <section className="play-goal" aria-live="polite">
               <h2>{visiting ? `Visiting ${visiting.snapshot.owner}’s plot` : goal.title}</h2>
               <p>{visiting ? 'Read-only visit. Walk back through the gate to return to your lab.' : goal.hint}</p>
+              {chainNext ? <small className="play-next">Next: {chainNext}</small> : null}
             </section>
           )}
           {hud.where === 'planet' ? (
@@ -2479,6 +2572,11 @@ export function PlayScreen(props: {
                 tab={buildTab}
                 onTab={setBuildTab}
                 stage={hud.plot.stage}
+                locks={{
+                  structures: gateReason('structures', state.chain, hud.plot.stage) ?? undefined,
+                  heavy: gateReason('heavy', state.chain, hud.plot.stage) ?? undefined,
+                }}
+                kindLock={(kind) => gateReason(kind === 'weaponBench' ? 'weaponBench' : 'structures', state.chain, hud.plot.stage)}
                 machines={machines}
                 blueprints={[...held.values()]}
                 selectedKind={buildKindRef.current}
@@ -2636,6 +2734,19 @@ export function PlayScreen(props: {
               return (
                 <section className="play-machine" aria-label="Cartridge Rack">
                   <h3>Cartridge Rack</h3>
+                  {chainView(state.chain).current?.id === 'A4-01' ? (
+                    <button
+                      type="button"
+                      className="play-pickup"
+                      onClick={() => {
+                        updateChain((c) => bump(c, COUNT.toolPickup));
+                        narratorRef.current?.trigger('tool:pickup');
+                        say('Extraction rifle taken', 'Draw it with G on the planet. Q cycles Extract, Apply and Sculpt.');
+                      }}
+                    >
+                      Take the extraction rifle from the armory
+                    </button>
+                  ) : null}
                   <p>
                     {rackCount(labRef.current)} of {CARTLAB_RULES.rackSize} slots used ({Math.floor(plotRef.current.ore)} ore available). Blanks can be written into presets at the bench.
                   </p>
@@ -2960,7 +3071,23 @@ export function PlayScreen(props: {
               <span className="play-keys">{KEYS.map(([k, what]) => <span key={k}><kbd>{k}</kbd>{what}</span>)}</span>
             </button>
           ) : null}
-          {paused && !isAnyBaseWindowOpen ? (
+          {paused && journalOpen && !isAnyBaseWindowOpen ? (
+            <div className="play-pause journal-pause" role="dialog" aria-label="Journal">
+              <Journal
+                chain={state.chain}
+                counts={state.chain.counts}
+                plotTitle={plotGoal.title}
+                plotHint={plotGoal.hint}
+                onStudio={props.onStudio ? () => {
+                  updateChain((c) => bump(c, COUNT.studioOpen));
+                  narratorRef.current?.trigger('studio:open');
+                  props.onStudio?.();
+                } : undefined}
+                onClose={() => setJournalOpen(false)}
+              />
+            </div>
+          ) : null}
+          {paused && !journalOpen && !isAnyBaseWindowOpen ? (
             <div className="play-pause" role="dialog" aria-label="Paused">
               <h2>Paused</h2>
               <div className="play-pause-sync">
@@ -2973,7 +3100,7 @@ export function PlayScreen(props: {
                 <h4>Controls</h4>
                 <dl>{CONTROLS.map(([k, what]) => <div key={k}><dt><kbd>{k}</kbd></dt><dd>{what}</dd></div>)}</dl>
               </section>
-              <button className="go" onClick={lock}>Resume</button>
+              <button className="go" onClick={() => { setJournalOpen(false); lock(); }}>Resume</button>
               <button
                 onClick={() => {
                   const next = syncMode === 'synced' ? 'desynced' : 'synced';
@@ -2987,6 +3114,7 @@ export function PlayScreen(props: {
               >
                 {syncMode === 'synced' ? 'Desync to Solo Branch' : 'Sync to Planetary Grid (Majority Merge)'}
               </button>
+              <button type="button" onClick={() => setJournalOpen(true)}>Journal</button>
               <button
                 onClick={() => {
                   setRadioLogOpen(true);
@@ -3226,6 +3354,8 @@ export function PlayScreen(props: {
               wheelCycleText={wheelCycleText}
               rotationText={rotationText}
               buildHidden={beamHud.held}
+              draftingLock={gateReason('drafting', state.chain, hud.plot.stage)}
+              onLocked={(why) => say('Drafting table locked', why)}
               world={baseWorldRef.current}
               at={sceneRef.current?.debug.position() ?? { x: 0, z: 0 }}
               currentStructureId={currentAimedStructureIdRef.current}
@@ -3263,6 +3393,8 @@ export function PlayScreen(props: {
               env={getBaseEnv()}
               at={sceneRef.current?.debug.position() ?? { x: 0, z: 0 }}
               onInstall={(hpId, kind) => {
+                const lock = gateReason(kind === 'fabricator' ? 'fabricator' : 'heavy', stateRef.current.chain, plotRef.current.stage);
+                if (lock) { say('Locked', lock); setMachinePickerHardpoint(null); return; }
                 dispatchBase({
                   t: 'install',
                   at: sceneRef.current?.debug.position() ?? { x: 0, z: 0 },
@@ -3281,6 +3413,8 @@ export function PlayScreen(props: {
               env={getBaseEnv()}
               at={sceneRef.current?.debug.position() ?? { x: 0, z: 0 }}
               onCraft={(machId, recipeId) => {
+                const lock = gateReason('heavy', stateRef.current.chain, plotRef.current.stage);
+                if (lock) { say('Locked', lock); return; }
                 dispatchBase({
                   t: 'craft',
                   at: sceneRef.current?.debug.position() ?? { x: 0, z: 0 },
@@ -3304,6 +3438,8 @@ export function PlayScreen(props: {
               env={getBaseEnv()}
               at={sceneRef.current?.debug.position() ?? { x: 0, z: 0 }}
               onCraft={(mId, rId) => {
+                const lock = gateReason('fabricator', stateRef.current.chain, plotRef.current.stage);
+                if (lock) { say('Locked', lock); return; }
                 dispatchBase({ t: 'craft', at: sceneRef.current?.debug.position() ?? { x: 0, z: 0 }, machine: mId, recipe: rId });
               }}
               onClose={() => setFabricatorMachineId(null)}

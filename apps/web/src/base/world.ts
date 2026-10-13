@@ -188,6 +188,18 @@ export function withBridgeStore(w: BaseWorld, env: WorldEnv, stock: readonly L.S
   return { ...w, boxes: [...s.boxes, ...w.boxes] };
 }
 
+/**
+ * Stock put into the bridge store that already stands (the campaign's Act V kit, TASK-22). What does not fit is dropped, as
+ * withBridgeStore does. Applied outside the command log: a campaign grant, like the dev kit, not a player action.
+ */
+export function withBridgeStock(w: BaseWorld, stock: readonly L.Stack[]): BaseWorld {
+  const box = w.boxes.find((b) => b.id === BRIDGE_STORE);
+  if (!box) return w;
+  const s = L.store([box], [BRIDGE_STORE], { x: box.x, z: box.z }, ITEMS, stock);
+  const next = s.boxes.find((b) => b.id === BRIDGE_STORE);
+  return next ? { ...w, boxes: w.boxes.map((b) => (b.id === BRIDGE_STORE ? next : b)) } : w;
+}
+
 /** The deterministic id of a world state (stable key order). */
 export const hashWorld = (w: BaseWorld): string => hashValue(w);
 

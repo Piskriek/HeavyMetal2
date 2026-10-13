@@ -1,8 +1,9 @@
 import test from 'node:test';
+import { HEAVY_BILL, PIECE_EXTRA } from './catalog';
 import assert from 'node:assert/strict';
 import type { Cond } from '@hm/questline';
 import {
-  CHAIN, CHAIN_START, CHAIN_STEPS, COUNT, GATES, advanceChain, bump, chainFromSave, chainProblems, chainView, evidence, firstTime,
+  ACT_V_KIT, CHAIN, CHAIN_START, CHAIN_STEPS, COUNT, GATES, advanceChain, bump, chainFromSave, chainProblems, chainView, evidence, firstTime,
   gateReason, isOpen, monsterKilled, monsterSeen, playerDied, playerLow, readChain, setAtLeast, stepDone, stepProgress, syncChain, unmet,
   type Chain, type Evidence,
 } from './campaign-chain';
@@ -147,4 +148,14 @@ test('the world evidence counts drafted blueprints and raw pixels, but not the s
   assert.equal(e[COUNT.harvestPxd], 1);
   assert.equal(evidence({ ...EMPTY, itemIds: ['bp:cube:basalt'] })[COUNT.drafted], 1);
   assert.equal(evidence({ ...EMPTY, sidearm: true })[COUNT.equipSidearm], 1);
+});
+
+test('the Act V kit covers one hardpoint and one heavy press, so a fresh player is never stuck without primitives', () => {
+  const need: Record<string, number> = {};
+  // the kit holds primitives only: the ore comes from the drills, the maps from the mill
+  for (const bill of [PIECE_EXTRA.hardpoint ?? [], HEAVY_BILL.press]) {
+    for (const { item, n } of bill) if (item.startsWith('prim-')) need[item] = (need[item] ?? 0) + n;
+  }
+  const kit = Object.fromEntries(ACT_V_KIT.map((st) => [st.item, st.n]));
+  for (const [item, n] of Object.entries(need)) assert.ok((kit[item] ?? 0) >= n, `${item}: kit ${kit[item] ?? 0} needs ${n}`);
 });

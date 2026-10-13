@@ -43,6 +43,10 @@ export interface BuildMenuProps {
   readonly onHeavy: () => void;
   readonly onLayout: (id: string) => void;
   readonly onClose: () => void;
+  /** A tab that is locked, and why (TASK-22): its panel says the reason instead of its items. */
+  readonly locks?: Readonly<Partial<Record<BuildTab, string>>>;
+  /** A piece kind that is locked, and why (TASK-22): its chip is disabled and says the reason. */
+  readonly kindLock?: (kind: string) => string | null;
 }
 
 const empty = (text: string): ReactElement => <p className="bm-empty">{text}</p>;
@@ -55,6 +59,7 @@ export function BuildMenu(props: BuildMenuProps): ReactElement {
     plans: props.layouts.length,
   };
   const colour = TABS.find((t) => t.id === props.tab)!.colour;
+  const lock = props.locks?.[props.tab] ?? null;
   return (
     <section className="play-build bm" aria-label="Build" style={{ '--tab': colour } as CSSProperties}>
       <header className="bm-head">
@@ -81,6 +86,7 @@ export function BuildMenu(props: BuildMenuProps): ReactElement {
       </div>
 
       <div id="bm-panel" role="tabpanel" aria-labelledby={`bm-tab-${props.tab}`} className="bm-panel">
+        {lock ? <p className="bm-locked" role="status">{lock}</p> : null}
         {props.tab === 'machines' ? (
           <>
             <div className="play-cards">
@@ -96,19 +102,22 @@ export function BuildMenu(props: BuildMenuProps): ReactElement {
           </>
         ) : null}
 
-        {props.tab === 'structures' ? (
+        {!lock && props.tab === 'structures' ? (
           props.blueprints.length === 0 ? empty('Nothing to build with yet. Draft a blueprint at the Drafting Table (K).') : (
             <div className="bm-groups">
               {props.blueprints.map((b) => (
                 <div key={b.id} className="bm-group">
                   <h4>{b.name}{b.slot === null ? <em> · not in the hotbar</em> : <em> · slot {b.slot + 1}</em>}</h4>
                   <div className="bm-chips">
-                    {b.kinds.map((k) => (
-                      <button key={k.kind} type="button" className={`bm-chip${props.selectedKind === k.kind && b.slot !== null ? ' on' : ''}`} onClick={() => props.onStructure(b.id, k.kind)}>
-                        <span>{k.label}</span>
-                        <em>{k.cost}</em>
-                      </button>
-                    ))}
+                    {b.kinds.map((k) => {
+                      const why = props.kindLock?.(k.kind) ?? null;
+                      return (
+                        <button key={k.kind} type="button" className={`bm-chip${props.selectedKind === k.kind && b.slot !== null ? ' on' : ''}${why ? ' locked' : ''}`} disabled={why !== null} title={why ?? undefined} onClick={() => props.onStructure(b.id, k.kind)}>
+                          <span>{k.label}</span>
+                          <em>{why ?? k.cost}</em>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
@@ -117,7 +126,7 @@ export function BuildMenu(props: BuildMenuProps): ReactElement {
           )
         ) : null}
 
-        {props.tab === 'heavy' ? (
+        {!lock && props.tab === 'heavy' ? (
           <>
             <div className="play-cards">
               {props.heavy.map((h) => (

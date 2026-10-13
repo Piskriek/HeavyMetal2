@@ -9,6 +9,7 @@
  * F-05. The monsters start after F-03 (the flag only; spawning and combat are TASK-23b).
  */
 import { advance, check, validate, START, type Cond, type Progress, type Questline, type Step as QStep } from '@hm/questline';
+import type { Stack } from '@hm/lattice';
 
 // ---------------------------------------------------------------------------------------------------------- counters
 /** The counter keys the chain reads. Event counters are bumped by the action; derived ones come from `evidence`. */
@@ -123,6 +124,13 @@ export function chainProblems(): string[] {
   for (const s of CHAIN_STEPS) if (!STEP_TEXT[s.id]) problems.push(`step ${s.id} has no text`);
   return problems;
 }
+
+/**
+ * The bridge stock Act V starts with (TASK-22). A fresh player has no primitives, and a hardpoint and a heavy press need
+ * them, so this kit covers one hardpoint (beam 4, chassis 2) and one heavy press (cube 4, beam 4, chassis 2). The press
+ * makes every other primitive from harvested vertices, so the base never stalls.
+ */
+export const ACT_V_KIT: readonly Stack[] = [{ item: 'prim-beam', n: 8 }, { item: 'prim-chassis', n: 4 }, { item: 'prim-cube', n: 4 }];
 
 // ---------------------------------------------------------------------------------------------------------- the state
 /** Chain progress: the questline's progress, the counters, and the monsters' unlock flag (after F-03). */

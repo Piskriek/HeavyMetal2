@@ -479,7 +479,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
       ) : null}
       {screen === 'play' ? (
         <div className="shell-layer" style={{ zIndex: 4 }}>
-          <PlayScreen profile={profile} onBack={toHome} initialSyncMode={playSyncMode} />
+          <PlayScreen profile={profile} onBack={toHome} onStudio={toStudio} initialSyncMode={playSyncMode} />
         </div>
       ) : null}
       {screen === 'crafter' ? (

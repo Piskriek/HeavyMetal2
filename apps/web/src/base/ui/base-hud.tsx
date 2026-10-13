@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { BaseView, BaseViewSource } from '../view';
 import type { Applied, BaseCommand, BaseWorld, Point } from '../world';
 import { Compass, Hammer } from 'lucide-react';
@@ -32,6 +32,9 @@ interface BaseHudProps {
   drivingSpeed?: number | null;
   /** The held extraction rifle takes the mouse: the build readout (CANNOT PLACE, the wheel hint) is hidden while it is out. */
   buildHidden?: boolean;
+  /** Why the drafting table is locked (TASK-22), or null when it is open. K then says the reason. */
+  draftingLock?: string | null;
+  onLocked?: (why: string) => void;
 }
 
 export type OpenWindow = 'none' | 'inventory' | 'drafting' | 'lattice';
@@ -58,9 +61,16 @@ export const BaseHud: React.FC<BaseHudProps> = ({
   ammo = null,
   drivingSpeed = null,
   buildHidden = false,
+  draftingLock = null,
+  onLocked,
 }) => {
   const [view, setView] = useState<BaseView>(() => source.get());
   const [openWindow, setOpenWindow] = useState<OpenWindow>('none');
+  // read by the key handler, which is set up once (TASK-22: the drafting table waits for Act V)
+  const draftingLockRef = useRef(draftingLock);
+  draftingLockRef.current = draftingLock;
+  const onLockedRef = useRef(onLocked);
+  onLockedRef.current = onLocked;
 
   useEffect(() => {
     const unsubscribe = source.subscribe(() => {
@@ -98,6 +108,7 @@ export const BaseHud: React.FC<BaseHudProps> = ({
       // 'K' toggles Drafting Table
       if (e.key.toLowerCase() === 'k') {
         e.preventDefault();
+        if (draftingLockRef.current) { onLockedRef.current?.(draftingLockRef.current); return; }
         setOpenWindow((prev) => (prev === 'drafting' ? 'none' : 'drafting'));
         return;
       }

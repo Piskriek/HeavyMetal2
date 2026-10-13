@@ -5,6 +5,7 @@
 import { loadPlot, newPlot, nextStage, type MachineKind, type Metric, type PlotState } from '@hm/plotsim';
 import { loadLab, newLab, type Cartridge, type LabState } from '@hm/cartlab';
 import { VAULT_BY_ID } from '@hm/vault';
+import { CHAIN_START, readChain, type Chain } from '../base/campaign-chain';
 
 /** Where you are in the first Play (the tutorial); after it, the plot's stages lead. */
 export type Step = 'create' | 'power' | 'explore' | 'build' | 'drill' | 'done';
@@ -29,9 +30,11 @@ export interface PlayState {
   readonly plot: PlotState;
   /** The lab's cartridges (bench, combiner, rack) (`@hm/cartlab`). */
   readonly lab: LabState;
+  /** The campaign chain (TASK-22): Acts IV to VI, the counters, the monsters' unlock. Absent in older saves (they start it from the world). */
+  readonly chain: Chain;
 }
 
-export const FRESH: PlayState = { v: 5, step: 'create', avatar: null, avatarId: null, gateOn: false, visited: false, plot: newPlot(), lab: newLab() };
+export const FRESH: PlayState = { v: 5, step: 'create', avatar: null, avatarId: null, gateOn: false, visited: false, plot: newPlot(), lab: newLab(), chain: CHAIN_START };
 export const SAVE_KEY = 'hm.setmix.play';
 
 /** What players call the four metrics. */
@@ -120,6 +123,7 @@ export function loadState(raw: unknown): PlayState {
     visited: r['visited'] === true,
     plot,
     lab,
+    chain: readChain(r['chain']),
   };
 }
 

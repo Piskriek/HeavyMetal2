@@ -141,6 +141,7 @@ export default defineConfig(({ mode }) => ({
       '@hm/shareware': p('../../packages/shareware/src/index.ts'),
       '@hm/beamkit': p('../../packages/beamkit/src/index.ts'),
       '@hm/terrainbrush': p('../../packages/terrainbrush/src/index.ts'),
+      '@hm/leaksim': p('../../packages/leaksim/src/index.ts'),
     },
   },
   assetsInclude: ['**/*.fbx', '**/*.bin'],

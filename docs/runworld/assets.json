@@ -1259,7 +1259,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a square steel chemical drum with a flush lid and flat square handles moulded in, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing",
+      "reach": 3
     },
     {
       "id": "pallet-crates-a",
@@ -1309,7 +1310,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a square portable generator block with flush louvre panels and a square control face, on a solid skid, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing",
+      "reach": 3
     },
     {
       "id": "generator-small-b",
@@ -1329,7 +1331,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a big square industrial battery block with two square terminal caps on top, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing",
+      "reach": 3
     },
     {
       "id": "battery-pack-b",
@@ -1369,7 +1372,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a square drum-housing cable winder box with its cable fully wound inside, no loose cable, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing",
+      "reach": 3
     },
     {
       "id": "cable-reel-square-b",
@@ -1429,7 +1433,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "an old square computer terminal desk unit, one block, square screen set in, square keyboard slab, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing",
+      "reach": 3
     },
     {
       "id": "terminal-old-b",
@@ -1649,7 +1654,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a 20 foot steel shipping container crushed and folded in the middle, solid, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing",
+      "reach": 3
     },
     {
       "id": "container-crushed-b",

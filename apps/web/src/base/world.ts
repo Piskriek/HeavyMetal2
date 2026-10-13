@@ -126,7 +126,9 @@ export type BaseCommand =
   /** Crafts a weapon frame or part at a Weapon Bench within reach. */
   | { readonly t: 'forge'; readonly at: Point; readonly item: string }
   /** Fits a part from the pack into its slot (the part there goes back to the pack), or empties a slot (item null). */
-  | { readonly t: 'fit'; readonly slot: PartSlot; readonly item: string | null };
+  | { readonly t: 'fit'; readonly slot: PartSlot; readonly item: string | null }
+  /** Puts stock into the bridge store (the campaign's Act V kit, TASK-22). Logged, so a replay holds the same stock; what does not fit is dropped. */
+  | { readonly t: 'grant'; readonly stock: readonly L.Stack[] };
 
 export type BaseEvent =
   | { readonly type: 'refused'; readonly cmd: BaseCommand['t']; readonly why: string; readonly short?: readonly L.Stack[] }
@@ -152,7 +154,8 @@ export type BaseEvent =
   | { readonly type: 'printed'; readonly machine: number; readonly vehicle: number; readonly kind: VehicleKind }
   | { readonly type: 'parked'; readonly vehicle: number }
   | { readonly type: 'forged'; readonly item: string }
-  | { readonly type: 'fitted'; readonly slot: PartSlot; readonly item: string | null };
+  | { readonly type: 'fitted'; readonly slot: PartSlot; readonly item: string | null }
+  | { readonly type: 'granted'; readonly stock: readonly L.Stack[]; readonly lost: readonly L.Stack[] };
 
 export interface Applied { readonly world: BaseWorld; readonly events: readonly BaseEvent[] }
 
@@ -188,16 +191,13 @@ export function withBridgeStore(w: BaseWorld, env: WorldEnv, stock: readonly L.S
   return { ...w, boxes: [...s.boxes, ...w.boxes] };
 }
 
-/**
- * Stock put into the bridge store that already stands (the campaign's Act V kit, TASK-22). What does not fit is dropped, as
- * withBridgeStore does. Applied outside the command log: a campaign grant, like the dev kit, not a player action.
- */
-export function withBridgeStock(w: BaseWorld, stock: readonly L.Stack[]): BaseWorld {
+/** The bridge store's stock grant (TASK-22, the `grant` command): what fits goes into the store that stands; the rest is dropped. */
+function grantStock(w: BaseWorld, cmd: Extract<BaseCommand, { t: 'grant' }>): Applied {
   const box = w.boxes.find((b) => b.id === BRIDGE_STORE);
-  if (!box) return w;
-  const s = L.store([box], [BRIDGE_STORE], { x: box.x, z: box.z }, ITEMS, stock);
-  const next = s.boxes.find((b) => b.id === BRIDGE_STORE);
-  return next ? { ...w, boxes: w.boxes.map((b) => (b.id === BRIDGE_STORE ? next : b)) } : w;
+  if (!box) return refuse(w, cmd.t, 'no-bridge-store');
+  const s = L.store([box], [BRIDGE_STORE], { x: box.x, z: box.z }, ITEMS, cmd.stock);
+  const stored = s.boxes.find((b) => b.id === BRIDGE_STORE) ?? box;
+  return next(w, { boxes: w.boxes.map((b) => (b.id === BRIDGE_STORE ? stored : b)) }, [{ type: 'granted', stock: cmd.stock, lost: s.left }]);
 }
 
 /** The deterministic id of a world state (stable key order). */
@@ -343,6 +343,8 @@ export function apply(w: BaseWorld, env: WorldEnv, cmd: BaseCommand): Applied {
       return forge(w, env, cmd);
     case 'fit':
       return fit(w, cmd);
+    case 'grant':
+      return grantStock(w, cmd);
     default: {
       const unknown: never = cmd;
       return refuse(w, (unknown as BaseCommand).t, 'unknown-cmd');

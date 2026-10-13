@@ -119,6 +119,25 @@ test('a command log replays to the same hash', () => {
   assert.equal(a.world.hotbar, 3);
 });
 
+test('the campaign grant is a logged command: a replay of the log holds the same bridge stock as the direct apply', () => {
+  const start = withBridgeStore(createWorld(), env, []);
+  const stock: L.Stack[] = [{ item: 'prim-cube', n: 4 }, { item: 'map-basalt', n: 10 }];
+  const log: BaseCommand[] = [{ t: 'grant', stock }];
+  const direct = run(start, ...log);
+  const replayed = replay(start, env, log);
+  assert.equal(hashWorld(replayed.world), hashWorld(direct));
+  assert.notEqual(hashWorld(direct), hashWorld(start));
+  assert.deepEqual(replayed.events.map((e) => e.type), ['granted']);
+  const bridge = direct.boxes.find((b) => b.id === BRIDGE_STORE)!;
+  assert.equal(L.count(bridge, 'prim-cube'), 4);
+  assert.equal(L.count(bridge, 'map-basalt'), 10);
+  // without the bridge store there is nothing to stock: the command is refused and the world is unchanged
+  const bare = createWorld();
+  const refused = apply(bare, env, { t: 'grant', stock });
+  assert.equal(refused.world, bare);
+  assert.equal(refused.events[0]?.type, 'refused');
+});
+
 test('airlock doors open and close; the ghost preview says where and whether you can pay', () => {
   let w = run(give(createWorld(), 'ore', 120), found);
   const s = w.base.structures[0]!.id;

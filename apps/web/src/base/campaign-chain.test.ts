@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import type { Cond } from '@hm/questline';
 import {
   ACT_V_KIT, CHAIN, CHAIN_START, CHAIN_STEPS, COUNT, GATES, advanceChain, bump, chainFromSave, chainProblems, chainView, evidence, firstTime,
-  gateReason, isOpen, monsterKilled, monsterSeen, playerDied, playerLow, readChain, setAtLeast, stepDone, stepProgress, syncChain, unmet,
+  gateReason, isOpen, monsterKilled, monsterSeen, playerDied, playerLow, readChain, setAtLeast, stepDone, stepProgress, unmet,
   type Chain, type Evidence,
 } from './campaign-chain';
 

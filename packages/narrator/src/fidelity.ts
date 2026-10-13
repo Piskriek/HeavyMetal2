@@ -24,7 +24,8 @@ const DEFS: Readonly<Record<string, Def>> = {
   'A4-01': { priority: 'story', on: 'tool:pickup' },
   'A4-02': { priority: 'story', on: 'dirt:process', after: 'A4-01' },
   'A4-03': { priority: 'story', on: 'studio:open' },
-  'A4-04': { priority: 'story', on: 'bloom:first' },
+  // the journal step (stage 2). It shares the event with S-2 and is listed first, so the trigger queues it and S-2 is skipped
+  'A4-04': { priority: 'story', on: 'stage:2' },
   // base building, harvesting and linked storage
   'B-01': { priority: 'story', on: 'build:foundation' },
   'B-02': { priority: 'bark', on: 'build:refused', cooldown: 60 },

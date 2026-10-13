@@ -39,7 +39,7 @@ import { fx } from '../maker/feedback';
 import { FRESH, METRIC_COLOUR, METRIC_NAME, SAVE_KEY, arrived, created, isFreeDrill, loadState, objective, poweredOn, returned, withLab, withPlot, type PlayState } from './quest';
 import { Journal } from './journal';
 import { ACT_V_KIT, COUNT, advanceChain, bump, chainView, finishedSteps, gateReason, monsterKilled, monsterSeen, placedKey, syncChain, type Chain, type Evidence } from '../base/campaign-chain';
-import { withBridgeStock, type BaseEvent } from '../base/world';
+import type { BaseEvent } from '../base/world';
 import { encodePlot, decodePlot, plotOfSnapshot } from './plot-code';
 import type { Snapshot } from '@hm/plotcodec';
 import type { MobStatus, CombatStats } from './monster-mash-combat';
@@ -224,6 +224,16 @@ export function PlayScreen(props: {
   const avatarLogKey = state.avatar ? (state.avatar.kind === 'custom' ? state.avatar.key : state.avatar.name) : null;
   const savedHeard = (): string[] => (state.step === 'create' ? [] : [...new Set([...loadRadioLog(slotKey), ...(avatarLogKey ? loadRadioLog(avatarLogKey) : [])])]);
   const narratorRef = useRef<GameNarratorController | null>(null);
+  /**
+   * The highest stage whose line has been triggered. A stage is reported twice (the placement or the skip, then the wave's
+   * own stage-up event when it finishes); the second report must not queue the next story line (S-2 after A4-04 at stage 2).
+   */
+  const stageLinedRef = useRef<number>(state.plot.stage);
+  const triggerStageLine = (stage: number): void => {
+    if (stage <= stageLinedRef.current) return;
+    stageLinedRef.current = stage;
+    narratorRef.current?.trigger(`stage:${stage}`);
+  };
   const [subtitle, setSubtitle] = useState<{ id: string; text: string; cleanText: string } | null>(null);
   const [radioLogOpen, setRadioLogOpen] = useState(false);
   const [journalOpen, setJournalOpen] = useState(false);
@@ -327,10 +337,9 @@ export function PlayScreen(props: {
     const newly = finishedSteps(next.progress).filter((id) => !finishedSteps(before.progress).includes(id));
     if (newly.includes('A4-02')) narratorRef.current?.trigger('dirt:process');
     if (newly.includes('A4-04')) {
-      // Act V opens: the bridge store gets the primitives a hardpoint and a heavy press need (campaign-chain.ts ACT_V_KIT)
-      baseWorldRef.current = withBridgeStock(baseWorldRef.current, ACT_V_KIT);
-      persistBaseWorld(true);
-      baseViewSourceRef.current?.notify?.();
+      // Act V opens: the bridge store gets the primitives a hardpoint and a heavy press need (campaign-chain.ts ACT_V_KIT),
+      // through the logged `grant` command, so a replay of the base's log holds the same stock
+      dispatchBaseRef.current({ t: 'grant', stock: ACT_V_KIT });
       say('Bridge stock delivered', 'Primitives for a hardpoint and a heavy press are on the bridge.');
     }
   }, [commit]);
@@ -1022,8 +1031,7 @@ export function PlayScreen(props: {
       if (after.machines.length === 1) narratorRef.current?.trigger('machine:first');
       if (after.stage > before.stage) {
         scene.raiseStage(after.stage, { x, z });
-        narratorRef.current?.trigger(`stage:${after.stage}`);
-        if (after.stage === 1) narratorRef.current?.trigger('bloom:first');
+        triggerStageLine(after.stage);
         if (after.stage === 4) narratorRef.current?.trigger('fab:hauler');
         if (after.stage === 6) narratorRef.current?.trigger('fab:crawler');
       }
@@ -1568,9 +1576,8 @@ export function PlayScreen(props: {
           gameAudio.setMusicContext('lab');
         }
         if (out.event === 'stage-up') {
-          narratorRef.current.trigger(`stage:${out.stage}`);
+          triggerStageLine(out.stage);
           gameAudio.setMoonStage(out.stage);
-          if (out.stage === 1) narratorRef.current.trigger('bloom:first');
           if (out.stage === 4) narratorRef.current.trigger('fab:hauler');
           if (out.stage === 6) narratorRef.current.trigger('fab:crawler');
         }
@@ -1799,8 +1806,7 @@ export function PlayScreen(props: {
         plotRef.current = { ...plotRef.current, stage };
         scene.raiseStage(stage, scene.debug.gatePlanet());
         // the stage-up lines a real stage change plays (the plot's own stage-up event is not raised by this skip)
-        narratorRef.current?.trigger(`stage:${stage}`);
-        if (stage === 1) narratorRef.current?.trigger('bloom:first');
+        triggerStageLine(stage);
         if (stage === 4) narratorRef.current?.trigger('fab:hauler');
         if (stage === 6) narratorRef.current?.trigger('fab:crawler');
         updateChain((c) => c);

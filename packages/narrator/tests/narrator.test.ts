@@ -1,7 +1,7 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createNarrator, finish, hashNarrator, say, step, trigger, FIDELITY_LINE_IDS, fidelityRules, type Rules, type State } from '../src/index';
+import { createNarrator, finish, hashNarrator, say, step, trigger, FIDELITY_LINE_IDS, FIDELITY_TRIGGERS, fidelityRules, type Rules, type State } from '../src/index';
 
 const rules: Rules = {
   lines: {
@@ -160,4 +160,19 @@ test('FIDELITY: Act I runs in order from waking to power on', () => {
     for (let i = 0; i < 40; i++) { const x = step(r, s, 0.1); s = x.state; if (x.start) played.push(x.start); }
   }
   assert.deepEqual(played, ['A1-01', 'A1-02', 'A1-03', 'A1-04', 'A2-01']);
+});
+
+test('FIDELITY: stage 2 plays the journal line A4-04 and skips S-2 (they share the event; A4-04 is listed first)', () => {
+  assert.deepEqual(FIDELITY_TRIGGERS['stage:2'], ['A4-04', 'S-2']);
+  assert.equal(FIDELITY_TRIGGERS['bloom:first'], undefined);
+  const r = fidelityRules({ 'A4-04': 4, 'S-2': 4 });
+  const played: string[] = [];
+  let s = trigger(r, createNarrator([]), 'stage:2');
+  for (let i = 0; i < 80; i++) { const x = step(r, s, 0.1); s = x.state; if (x.start) played.push(x.start); }
+  assert.deepEqual(played, ['A4-04']);
+  // once A4-04 is heard, the same stage event plays S-2 instead
+  const again: string[] = [];
+  let t = trigger(r, createNarrator(['A4-04']), 'stage:2');
+  for (let i = 0; i < 80; i++) { const x = step(r, t, 0.1); t = x.state; if (x.start) again.push(x.start); }
+  assert.deepEqual(again, ['S-2']);
 });

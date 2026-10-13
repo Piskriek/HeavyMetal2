@@ -161,3 +161,8 @@ The context a new Opus session needs on its first message. Keep it current: upda
   - **The game files hold the new empty weapon bench**, from TASK-18c's stray pack. It is reviewed, but **uncommitted** until the weapon-bench set is packed: commit `apps/web/src/assets/gen/weapon-bench.glb`, `registry.json` and `apps/web/public/hd/weapon-bench/` with the set.
 - **2026-10-13, Gemini Argo is creative lead** (owner). His intro is docs/argo/START_HERE.md, the rules docs/argo/RULES.md, an 18-shot tour docs/argo/TOUR.md; his plans come back into docs/argo/plans/. Keep the tour and START_HERE §4–5 current when big things change.
 - **The weapon-bench set is packed** (d63ffca5): an empty bench (yaw 90), the jig, the printer, the tool wall and five tools; the registry holds 128. The drill's low is 700 triangles (300 shattered). TASK-23c places the set. Until then the lab's bench stands bare.
+- **2026-10-13, late:**
+  - **TASK-21c accepted:** the suit reads on the planet, and the rifle clips are properly retargeted (34 KB). POL-28 logged for two-hand IK.
+  - **Running:** TASK-22b (finishing the campaign chain; rulings on the board) and TASK-23b-1 (the monster renderers, the window walkers, a preview page).
+  - **Queued:** TASK-21d (Sculpt, saving, the beam beats) and TASK-23b-2 (monster wiring), both after 22b; then 23c and 24, then main.
+  - Argo's tour is refreshed (shot 14).

@@ -1,5 +1,6 @@
-import type { ReactElement, ReactNode } from 'react';
+import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import { FPS_TARGETS, parseQuality, tidyGpuName, type Quality } from '@hm/game';
+import type { CheckpointEntry } from '../storage/checkpoints';
 import { resolveGraphics } from '@hm/render';
 import { ControlsList, ControlsSettings } from './controls-list';
 import { GraphicsTuning } from './graphics-tuning';
@@ -126,6 +127,47 @@ export function SettingsBody(props: {
         ) : null}
         {props.onReplayTour || props.onReset ? <div className="btns">{props.onReplayTour ? <button onClick={props.onReplayTour}>Replay the tour</button> : null}{props.onReset ? <button className="danger" onClick={props.onReset}>Reset progress</button> : null}</div> : null}
       </section>
+      <CheckpointList />
     </div>
+  );
+}
+
+/**
+ * The checkpoints for the owner's review (TASK-24): one button per act, shown only when the URL has `?checkpoint` or `?e2e`.
+ * A button reloads the page with `?checkpoint=<name>`, which loads that save into the Checkpoint profile (checkpoints.ts).
+ */
+function CheckpointList(): ReactElement | null {
+  const [shown] = useState(() => {
+    const p = new URLSearchParams(location.search);
+    return p.has('checkpoint') || p.has('e2e');
+  });
+  const [entries, setEntries] = useState<readonly CheckpointEntry[] | null>(null);
+  useEffect(() => {
+    if (!shown) return undefined;
+    let cancelled = false;
+    fetch(new URL('checkpoints/index.json', document.baseURI))
+      .then((r) => (r.ok ? (r.json() as Promise<readonly CheckpointEntry[]>) : []))
+      .then((list) => { if (!cancelled) setEntries(Array.isArray(list) ? list : []); })
+      .catch(() => { if (!cancelled) setEntries([]); });
+    return () => { cancelled = true; };
+  }, [shown]);
+  if (!shown) return null;
+  const go = (name: string): void => {
+    const p = new URLSearchParams(location.search);
+    p.set('checkpoint', name);
+    location.search = p.toString();
+  };
+  return (
+    <section aria-label="Checkpoints" className="checkpoint-list">
+      <h4>Checkpoints</h4>
+      <p className="hint">Each act's start, saved by the campaign test. Loading one writes it to the Checkpoint profile; your own profile is not touched.</p>
+      {entries === null ? <p className="hint">Reading the list...</p> : null}
+      {entries !== null && entries.length === 0 ? <p className="hint">No checkpoints are built into this copy.</p> : null}
+      <div className="checkpoint-buttons">
+        {(entries ?? []).map((c) => (
+          <button key={c.name} type="button" onClick={() => go(c.name)} title={c.act ? `Act ${c.act}` : undefined}>{c.title || c.name}</button>
+        ))}
+      </div>
+    </section>
   );
 }

@@ -10,12 +10,15 @@ import { initQuickJS } from '@hm/script';
 import { Shell } from './shell/shell';
 import { bootPlatform } from './platform/boot';
 import { initBigStore } from './storage/big-store';
+import { loadCheckpointFromUrl } from './storage/checkpoints';
 import { setSoundResolver } from './maker/feedback';
 import { packSound, resolveSound } from './sound/bank';
 import './shell.css';
 import './studio.css';
 
 async function start(): Promise<void> {
+  // `?checkpoint=<name>` goes first: it chooses the profile the stores below open (TASK-24), behind its own loading bar
+  await loadCheckpointFromUrl();
   await initQuickJS(); // the script engine is loaded explicitly: no top-level await in the single-file build
   const platform = await bootPlatform(); // in RUN.world this installs the cloud-backed save store before anything reads a save
   await initBigStore(platform); // islands and the racetrack: IndexedDB (moved out of localStorage once), all in memory before the first read

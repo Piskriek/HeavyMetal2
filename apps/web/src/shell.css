@@ -150,3 +150,7 @@ button.on { background: var(--accent); color: #1a1500; border-color: var(--accen
 .sculpt-bar { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 5; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; max-width: 92%; padding: 6px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 4px 18px rgba(0,0,0,.25); }
 .sculpt-bar .swatches { display: flex; gap: 3px; flex-wrap: wrap; }
 .sculpt-bar .swatches button.on { outline: 3px solid var(--accent2, #f0a); }
+
+/* TASK-24: the checkpoints under Settings (shown with ?checkpoint or ?e2e) */
+.checkpoint-list .checkpoint-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.checkpoint-list .checkpoint-buttons button { min-width: 9.5rem; }

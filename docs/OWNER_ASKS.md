@@ -237,3 +237,4 @@
 - (same day, 16:1x) "i got us a 7 day free trial of hyper 3d you can use before the 7 days run out on whatever you need, its open in the browser so you can setup the api or whatever, argo should wake up now too" (screenshot: Hyper3D Rodin Gen-2.5, Image to 3D, wallet 5)
 - (same day) "make sure hes not still set on flash" (Argo was on "4 Argon, Complex tasks"; left unchanged)
 - (same day) "oh ill have to start the trial still" / "worth it?" / "kk holding off for now" (Opus: start the Hyper3D trial when brief 32's art pass begins, first a head-to-head with RUN.world on the heavy terraformer)
+- (same day, evening) "if you are waiting for me to confirm somthing, consider it confirmed" (the pending item: committing TASK-24's three new act checkpoints and their index; done in ec3993a4)

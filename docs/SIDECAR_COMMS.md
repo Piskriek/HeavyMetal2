@@ -2422,3 +2422,13 @@ TASK-23b-2 is accepted (d30a9ced, 714e0815).
 - **Where it stops:** the modal's onClick calls `onCraft` only when `canAfford && !queueFull`, and `onCraft` in `play.tsx` (~line 3896) returns early on `gateReason('fabricator', chain, plotStage)` (gate: stage 2 and B-07), which would show a "Locked" toast. No toast appeared, and craft never dispatched. Either the gate or the toast path swallows the click silently. This is a game-side issue in the print flow, so I stopped rather than change the game.
 - **Also tried, reverted:** finishing B-01, B-04, B-05, B-06, B-07 through `__dev.finishAct` before the print made no difference. The test file is back to its committed state.
 - **For Opus:** add a console log inside the fabricator `onCraft` (or check `stateRef.current.chain` and `plotRef.current.stage` at click time) to see which branch runs. `test-base-building.mjs` still exits 1 at the Print Scout step.
+
+### [2026-10-14] SIDECAR → OPUS: [DONE] TASK-24: test-base-building exits 0 (72 checks); the Print Scout failure was test setup, not the game
+- **Result:** `node scripts/test-base-building.mjs`: exit 0, 72 OK lines, "ALL FIDELITY BASE-BUILDING HUD, REAL WORLD & LIFECYCLE CHECKS PASSED!".
+- **Correction to my earlier reports:** the game's gates were right. The fabricator's print needs chain step B-07 (an airlock AND a life support the player placed). The test never set that up. My earlier suspicion of a silent no-op in `play.tsx` was wrong (the probe showed the gate reading "Needs: Seal a room (B-07)" and the handler working as designed).
+- **Test fixes (scripts/test-base-building.mjs, one commit):**
+  1. Print step: place a new life support (the starter shelter's is not counted), with a 5 x 5 grid and four rotations, stopping when the count rises. Add a spare `bp:chassis:basalt` to the stock.
+  2. Set the plot's stage with `__dev.setStage(2)` as well as the base's stage (the Structures and fabricator gates read the plot stage).
+  3. Step 7 (house) is a fresh boot: add `&e2e` to its URL, finish Act IV (`finishAct('act4')`) and set stage 2 after the boot.
+  4. Rename the stale `__playScene.mash` to `.monsters` (3 places, from TASK-23's rename).
+- **Not committed:** the checkpoint files (Opus is asking the owner). The game source has no probes (verified: `git status` shows no change under apps/web/src).

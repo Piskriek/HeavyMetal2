@@ -217,3 +217,4 @@
 - (same morning) "argo is done" (his lore micro-logs, saved as docs/argo/plans/22-lore-micrologs.md)
 - (same morning) "you clicked his model choice dropdown instead of send" (Opus fixed it: the picker was closed unchanged, and the message sent)
 - (same morning) "hes done, when he genereate his replys the browser is laggy unfortunately but he gets there"
+- (same morning) "Im going with you guys's recommendations. once we have somthing to test i will act as the objective observer and review your precision and argo's creativity. Ill report and we will make changes. so lets get the game to the stage where i can test all of it properly. you may continue until then"

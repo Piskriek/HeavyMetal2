@@ -28,6 +28,16 @@ After TASK-23 (the monsters). The owner wants "lots of testing to make sure its 
 - **The timing tests:** `npm test` is now `scripts/test.mjs` (6e4b3ed4), which runs the `performance:` tests alone after the rest, and fieldkit and plotgrid pass there. For lattice-accept, scenedoc undo and any other timed test not named `performance: ...`, name it so, or make it measure fairly (warm-up, best of three). Never just raise a limit without saying so in a comment.
 - **The GTX 950M frame check** (TASK-19 V7's method).
 
+## Checkpoints for the owner's review (Opus, 14 October)
+The owner will test everything as an objective observer (OWNER_ASKS, 14 October), and must reach each act without replaying the hours before it.
+- ** saves a checkpoint at the start of each act** (I, IV, V and VI), plus one at stage 6 with the monsters unlocked. A checkpoint is every save key the game wrote for the profile (the play state, the base world, the beam, the chain, the inventory), as JSON in .
+- ** loads one into a separate "Checkpoint" profile** (created if missing, then made active), never into the player's own profile. It loads behind the loading bar. The main menu shows the checkpoints as a small list under Settings, only when the URL has  or .
+- **Tests:**
+  - each checkpoint loads and lands in its act;
+  - the player's own profile is byte-identical before and after;
+  - an old checkpoint (from a previous save version) still loads, or says plainly why not.
+- **Re-run the campaign test** to refresh the checkpoints whenever the save format changes; the checkpoint files are committed.
+
 ## Report
 A [DONE] on the board:
 - a table of every test with its real result;

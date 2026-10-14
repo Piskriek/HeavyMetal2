@@ -35,6 +35,7 @@
 | A4-01 | Picking up the extraction rifle | **[canon]** "You need a tool cartridge to use it for anything other than mining. Step outside, mine 50 units of dirt, and bring it back to build the Dirt-to-Ore processor." |
 | A4-02 | Processing the dirt | **[canon]** "It's not really dirt, you get that right? We're just calling it that for your sake—we can change it at any time we want." |
 | A4-03 | The studio and consensus sync | **[canon]** "Open up the studio terminal. See those variables? That's the simulation schema. If you change a name or tweak a setting, you can submit it to the weekly consensus queue. Out there, it's majority rules. If you walk into a sector where others have a different sync, you can merge with them or branch off into a solo desynced expedition." |
+| A4-LEAK-SEAL | Sealing the Act IV dormant leak (the first Anomaly Core; Argo, 22-lore-micrologs.md) | "Clean seal. That core's condensed archive data—bring it inside, the Combiner can splice it." |
 | A4-04 | First colour bloom | **[canon]** "The Light Amplifier is online. Look at that crater—the wave is spreading! Color is returning. If we push this all the way to Stage 4, reality stabilizes for good." |
 
 ## Act V (proposal): the base, harvesting and linked storage
@@ -59,9 +60,10 @@ These follow the base-building milestone already built.
 | F-04 | Hauler unlocked (stage 4) | "Hauler's printable. Its bin rides on the bridge too, so your storage goes where you drive." |
 | F-05 | Crawler unlocked (stage 6) | "Stage six. The crawler's yours. That drill on the front isn't for decoration." |
 
-## Monster Mash (proposal)
+## Monsters (the owner dropped the "Monster Mash" name, 2026-10-13)
 | ID | When | Line |
 |---|---|---|
+| A6-LEAK-SURGE | 20 s before a leak opens its waves (Argo, 24-lore-expansion.md) | "Archive pressure's spiking—twenty seconds before a perimeter rift tears open. Ready your weapon." |
 | M-01 | First shareware entity seen | "That's... a sprite. A real one. They broke loose when the simulation cracked. Keep your distance." |
 | M-02 | First kill | "It came apart in pixels. Whatever they are, they're not alive the way we are." |
 | M-03 | Player health low (repeatable bark) | "[quietly] You're hurt. Back off and patch up." |

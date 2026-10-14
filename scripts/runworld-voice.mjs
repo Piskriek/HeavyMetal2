@@ -18,7 +18,8 @@ const lines = [];
 for (const row of fs.readFileSync(path.join(ROOT, 'docs', 'NARRATION_SCRIPT.md'), 'utf8').split('\n')) {
   const cells = row.split('|').map((c) => c.trim());
   const id = cells[1];
-  if (!id || !/^[A-Z][A-Z0-9]*-[0-9]+$/.test(id)) continue;
+  // ids like A1-01, S-2, and the named lines Argo writes (A4-LEAK-SEAL, A6-LEAK-SURGE)
+  if (!id || !/^[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$/.test(id)) continue;
   const raw = cells[cells.length - 2] ?? '';
   if (/truncated/i.test(raw)) { console.log(`${id}: skipped (truncated in the bible; the owner owes its ending)`); continue; }
   const m = /"(.+)"/.exec(raw);

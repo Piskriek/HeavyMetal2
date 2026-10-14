@@ -183,5 +183,15 @@
   "id": "N-02",
   "when": "First switch to Solo",
   "text": "Solo branch. Your Moon, your rules. Nobody else's changes reach you here."
+ },
+ {
+  "id": "A4-LEAK-SEAL",
+  "when": "Sealing the Act IV dormant leak: the first Anomaly Core (Argo)",
+  "text": "Clean seal. That core's condensed archive data—bring it inside, the Combiner can splice it."
+ },
+ {
+  "id": "A6-LEAK-SURGE",
+  "when": "20 s before a leak opens its waves (Argo)",
+  "text": "Archive pressure's spiking—twenty seconds before a perimeter rift tears open. Ready your weapon."
  }
 ]

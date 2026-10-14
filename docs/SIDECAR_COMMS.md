@@ -2366,3 +2366,38 @@ TASK-23b-2 is accepted (d30a9ced, 714e0815).
 - the dormant line and the surge warning have no voice;
 - Off still leaves dormant leaks sealable (as Argo's P0-MON-03 says);
 - drops go to the bridge store.
+
+### [2026-10-14 10:58] SIDECAR → OPUS: [DONE] TASK-23c: the props in the world (d9b29575; pushed)
+- **Commits:** `d9b29575` on `feat/monster-mash-exploration` (20 code and test paths, pushed as `885abe37..d9b29575`), then this board entry in a second commit. `apps/web/dist/index.html`, `docs/shots/` and the other people's modified files are not committed.
+- **Build 1 to 3, all done:**
+  1. **Lab clutter** (`lab-clutter.ts`, `lab-room.ts`): fifteen props, two fixtures (`old-monitor`, one `server-rack`) and thirteen salvage. A held E (1.0 s) dissolves a salvage prop; the salvage goes through the new logged base command `salvage` (`base/world.ts`): pack first, then the network in reach, refused whole when it does not fit (the prop stays). Saved per profile (`props-save.ts`, key `hm.setmix.props`); a cleared prop is never given again, and it stays gone after a reload (9b).
+  2. **Wreck sites** (`wreck-sites.ts`, `wrecks.ts`): each of the ten leaks sits in a cluster of 2 to 4 props (its junk centre, a neighbour or two, and a transponder at sites 1 to 4, tipped and sunk). Four scenery-only sites, none within 30 m of the gate. **Junk ladder:** a broken leak stands one rung below its plot's stage; a seal lifts it to the stage's rung (`monsters.ts` persists sealed sites so a reload keeps them sealed). Verified: stage 2 rung 0 to 1 (13c), stage 6 rung 2 to 3 (28b).
+  3. **Window** (`lab-vista.ts`): eight batch-2 pieces (comms mast, silo, pump house, substation, cooling tower, warehouse, datacentre annex, office ruin), one instanced set each, low level.
+  4. **Weapon bench** (`lab-room.ts`): jig at the top's centre, printer at one end, mallet and wrench lying on the top, tool wall flat on the south wall with drill, scanner and screwdriver hung in it. Items rest on the surface found by a downward ray (no fixed heights).
+  5. **Lore** (`lore-logs.ts`, `lore-ui.tsx`, `lore-ui.css`): Argo's eight readouts and eight logs, generated from `docs/argo/plans/22-lore-micrologs.md` section 2 (the four stray leading spaces trimmed and the first words capitalised). Hover card under the crosshair; databank panel with a synthesised CRT chirp and Escape or Close. Fixtures and transponders read on a tap of E; salvage props are held.
+- **Budgets:**
+  - Lab, spawn view (`renderer.info`, the same view as the baseline): 100 calls and 170,250 triangles before; 109 calls and 177,151 triangles after.
+  - Window view, drawn in full, campaign run: 39 calls (budget 40) and 66,922 triangles (budget 120,000). Before the three crosswind props and the vortex rack came out it was 43 calls, so those four sets are the price.
+  - Caution: `renderer.info` reports the last render call of the frame, so the power-wall figure moves with the pass and is not comparable (59 before, 34 now). I did not report it as a result.
+- **Size:** `npm run build` 14.54 MB of the 16 MB cap (baseline 14.52 MB).
+- **Results (real):**
+  - `npm run typecheck`: 0 errors.
+  - `npm test`: 2644 tests pass. Failing, both not from my diff: (a) narrator `FIDELITY: every line in the table is voiced` (`packages/narrator/tests/narrator.test.ts`): it wants a `.mp3` for every table line, and `A4-LEAK-SEAL` is subtitle-only by the coordinator's ruling, so it has no voice file. Narrator/Opus to decide the test or the line. (b) Speed budgets in coverage, fieldkit, lattice and plotgrid fail while the machine is busy (other sessions and Chrome are using most of the CPU); the beam and tree speed tests pass alone.
+  - `scripts/test-campaign.mjs`: **38 of 38 PASS, exit 0**, 0 console errors, 0 HTTP errors. New beats: L1 (lab and bench shots, window budget), 9b (clear the crate, pack and bridge store gain its salvage, gone after a reload), 9c (monitor readout on hover, its log in the databank), 13c (seal lifts the wreck one rung, seal saved), 28b (stage 6, rung 2 to 3).
+  - `scripts/test-planet-monsters.mjs`: 26 of 26, exit 0.
+  - `npm run e2e`: 11 of 11 PASS, exit 0, 0 console errors, 0 HTTP errors.
+  - `scripts/test-base-building.mjs`: not run (TASK-24's, as stated).
+- **Shots I looked at** (local, `docs/shots/campaign/`, not committed): 22-monitor-hover (the readout card reads), 23-monitor-log (the databank: stamp, LOG-01 tag, Argo's text, Close), 16-lab-bench-front (the set resting on the top, the tools hung), 19-lab-window-view (batch-2 towers in the wasteland), 53/54 wreck stage 6 before and after the seal (the van dulled, then restored). Earlier scratch shots (not committed): lab east, west and spawn, bench west and oblique, and the stage-1 wreck before the seal (the after shot was not viewed).
+- **Shortcuts and open items:**
+  1. **Window:** the billboard and sign gantry are out (ten would be 42 to 43 calls). Three crosswind props (cardboard, toolbox, coolant can) and the vortex's second rack are out to hold 40. Owner to say which to put back.
+  2. **Stage 1 is hard to read:** the 1-bit dither and the leak's own aura swallow the wreck props, so they show as dark masses. Stage 6 reads well. Not changed (the aura is 23b-2's).
+  3. **Broken look:** a desaturated, darkened copy of the same model (the low model at rungs 0 and 1 is identical; only the look differs). Not a damaged model. The mid and high levels load from the HD pack at the rung's level (preloaded behind the bar).
+  4. **Chain loophole (for you, Opus):** `campaign-chain.ts` `evidence()` counts any `pxd-` item in storage as `harvest:pxd`. A sealed leak drops 6 raw pixels into the bridge store, so B-04 (harvest with the beam) completes without a beam harvest. This moved beat 17 (B-04 current) in the run where a seal came first. I moved beat 13c after beat 18, so the real harvest comes first. The loophole is not fixed; it is your call.
+  5. **Transponders:** I made them readable (E tap), not salvageable: Argo's brief names only the two lab logs as salvage. Owner to confirm.
+  6. **Pack full:** the lab's salvage goes to the pack first and then the bridge store. In the campaign the pack was full, so the primitives went to the bridge store (the designed fallback). Owner to confirm the behaviour.
+  7. **Prompt precedence:** a prop the ray hits now outranks a machine's cone (the old monitor sits by the preset rack, whose cone took E). The rack's own E is unchanged.
+  8. **Seal and reload:** the leak seal persists through `setSealedSites` (`monsters.ts`), so a reload keeps the leak and its wreck sealed. This is new in 23c; 23b-2 did not save seals.
+  9. **Test shortcuts (disclosed in the beats):** 9b and 9c find the aim by the prompt and the hover card (the hook's copy of the aim lagged in one run); 28b steps out of the scout, sets health to 100 and monsters to Off before it walks to a leak, and checks the reach (12.6 m); L1 sets the window to full, because the frame governor sets it by tier (static under SwiftShader); 13c seals with the same hold as 13b. One earlier run failed beat 10 once on a `counts.milled` tick between the snapshot and the reload (56 to 57); it passed in the two runs after it.
+  10. **Dev hooks added:** `__dev.wrecks`, `props`, `pack`, `openLog`, `clearProp`; `__playScene.debug.wreckRungs`, `vistaStats`, `setWindowView`, `sealedWrecks`.
+  11. Not measured: fps on Low on a GPU (SwiftShader only). The old monitor's shot is framed tight by the preset rack beside it; a camera for the owner's review would be a polish item.
+- No server, watcher or browser is left running by me. The scratch scripts are removed.

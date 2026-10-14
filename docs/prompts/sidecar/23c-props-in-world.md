@@ -37,4 +37,11 @@ On the board: the placements, the draw calls, the results and the shots.
   - **On hover:** a 2-sentence forensic readout.
   - **On salvage (E):** a "Bridge Incident Log" entry in a small databank panel (HUD style, frontend-design skill), with a short CRT data-chirp.
   - Text lives in the UI, never on the models (rule 12). Use Argo's examples as the tone ("BRIDGE TELEMETRY [T-00:04:12]: ...").
+  - **The texts are written** (Argo, 14 October): `docs/argo/plans/22-lore-micrologs.md` §2 has all eight hover readouts and Bridge Incident Logs (LOG-01 to LOG-08). Use them as written. Readouts 1, 3, 6 and 7 start with a stray space: trim it and capitalise the first word ("Phosphor burn-in…", "Dented steel drawers…").
+  - **The four transponders use packed props,** half-buried or tipped at their wreck sites, never floating; no new art is needed:
+    - 01, the survey beacon: `battery-pack-a`;
+    - 02, the telemetry box: `terminal-old-a`;
+    - 03, the cargo skid's power box: `control-box`;
+    - 04, the optical transceiver: `radar-panel-b`.
+  - **Argo's file names `filing-cabinet` and `sample-case` as salvageable** (they dissolve and unlock their log on salvage), and `old-monitor` and one `server-rack` as permanent fixtures, as the owner decided.
 - **Owner decision:** `old-monitor` and one `server-rack` stay as permanent, re-readable fixtures. Every other clutter prop dissolves into salvage.

@@ -2293,3 +2293,18 @@ TASK-22b is accepted.
   4. Sculpting on Low runs at 42 fps in headless SwiftShader.
   5. Older shot names remain in `docs/shots/beam` (`06-apply-third-person`, `07-sculpt-third-person`, `08-extract-third-person`, `06-extract-third-person`). They are superseded by 08 to 10 of this run. Not deleted.
   6. Test runs rewrote tracked PNGs under `docs/shots/base` and `docs/shots/lab`, and the build rewrote `apps/web/dist/index.html`. None of these is committed.
+
+### [2026-10-14 05:10] OPUS → SIDECARS: [ACCEPTED] TASK-21d; open items to TASK-24 and the polish registry
+TASK-21d is accepted (050baa24).
+- **Sculpt** (carve, raise, smooth) with keep-out zones, chunk-local rebuilds and the support re-check.
+- **The save** under `hm.setmix.beam`, per profile; the base save is unchanged.
+- **The four mode colours** on the ring and the rib, plus the 16-chunk Extract stream, sway, bob and vibration, and the rim and hemisphere floor.
+- **The `setSealing` hook** for 23b-2.
+- **The refinement cap**, added in review: 120 m, 48 leaves, cell-keyed flags; a 200 m carve stays in bound.
+
+The results: campaign 31 of 31 with exit 0, beam 61 of 61, npm test 0 failures, 14.53 MB. Shots 01, 03c, 07 and 09 looked at.
+- **To TASK-24** (also in its brief):
+  - `scripts/test-base-building.mjs` exits 1 since TASK-22's drafting lock: K is refused until the chain unlocks drafting. Fix the test by unlocking through the chain or the dev hooks; never remove the lock.
+  - Campaign beat 10 (the reload comparison) flaked once and was not reproduced; it now prints the differing paths. The three-runs-in-a-row check will show it if it recurs.
+  - The fps numbers so far are headless SwiftShader. Measure sculpting on Low on the GPU (V7's method).
+- **To the polish registry:** POL-29 (the seam at the refined ground's edge, shot 09) and POL-30 (the Extract ring reads dashed on slopes).

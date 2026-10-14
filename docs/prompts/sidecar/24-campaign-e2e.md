@@ -43,6 +43,10 @@ Opus reviews it and pushes `main`.
   1. **The radio subtitle** pins at bottom 108 px, above the hotbar, never higher than 160 px. Today it runs under the hotbar: docs/shots/campaign/17-a4-02-milled.png.
   2. **CANNOT PLACE** (base/ui/build-readout.tsx, base-hud.tsx) shows only while a placement ghost is shown, 36 px below the reticle.
   3. **Title cards** (`say()` in play.tsx) sit at top 72 px for 3 s and hold any other banner until they fade.
+- **From TASK-21d:**
+  - `scripts/test-base-building.mjs` exits 1 since TASK-22's drafting lock: K is refused until the chain unlocks drafting. Fix the test by unlocking through the chain or the dev hooks; never remove or weaken the lock.
+  - Campaign beat 10 (the reload comparison) flaked once; it now prints the differing paths. If the three runs show it, fix the race (snapshot after the base tick settles).
+  - Measure sculpting on Low on the GPU; the sidecar's numbers were software-rendered.
 - **From TASK-22b:**
   - with real input, walk to a freshly printed scout and press E; the test teleports, and lands the player 4 m away, outside E's 3.5 m reach;
   - add beats for the N-01 and N-02 sync lines;

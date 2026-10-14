@@ -1019,3 +1019,25 @@ button.hm-quick-stack-btn:active,
 @media (max-width: 640px) {
   .hm-beam-chip { right: 12px; bottom: 96px; }
 }
+
+/* TASK-24 (P0-UI-01): CANNOT PLACE is its own line 36 px below the reticle, shown only while a placement ghost is in view,
+   and a title card holds it (body[data-title-up]) until the card fades */
+.hm-cannot-place {
+  position: fixed;
+  top: calc(50% + 36px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  pointer-events: none;
+  white-space: nowrap;
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 14px;
+  border-radius: 4px;
+  backdrop-filter: blur(8px);
+  background: rgba(239, 68, 68, 0.25);
+  border: 1px solid #ef4444;
+  color: #fca5a5;
+}
+body[data-title-up] .hm-cannot-place { display: none; }

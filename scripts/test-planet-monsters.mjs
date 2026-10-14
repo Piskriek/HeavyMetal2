@@ -8,7 +8,7 @@
  * - a held seal ends a leak's waves for good; the dormant anomaly drops the first Anomaly Core
  * - health: a hit takes it down, low at 30 percent, death sends the player back to the gate at full health
  * - the fidelity looks, and the fps with eight fighting (headless: SwiftShader, not the owner's GPU)
- * Writes docs/shots/planet-*.png. Exits 1 on the first failed check, and kills its server and browser.
+ * Writes shots-run/planet-*.png. Exits 1 on the first failed check, and kills its server and browser.
  */
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright-core';
@@ -27,7 +27,7 @@ if (!chromePath) {
 }
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const shots = fileURLToPath(new URL('../docs/shots/', import.meta.url));
+const shots = fileURLToPath(new URL('../shots-run/', import.meta.url));
 fs.mkdirSync(shots, { recursive: true });
 const port = 8199;
 console.log(`Starting static server on port ${port}...`);
@@ -171,6 +171,23 @@ try {
   await dev('fire');
   await stepSec(1);
   check('a burst core fires three shots on the sim clock', (await dev('stats')).shotsFired - shots0 === 3, `shots ${(await dev('stats')).shotsFired - shots0}`);
+  // the beam core: held, it fires on every tick its 0.1 s cooldown allows (TASK-23b-2), not once per pull
+  await dev('setWeapon', { core: 'core-beam', barrel: 'barrel-scatter', sight: 'sight-iron', cell: 'cell-compact' });
+  await dev('placeMob', 'charger', 6);
+  // R reloads the gun in hand (the magazine the loadout gives): the beam's 40 rounds are a full magazine before the hold
+  await page.keyboard.press('KeyR');
+  await page.waitForTimeout(200);
+  const mag = await dev('ammo');
+  check('R reloads the gun to a full magazine', mag && mag.current === mag.max && mag.max > 0, `ammo ${mag?.current}/${mag?.max}`);
+  await page.evaluate(() => Object.defineProperty(document, 'pointerLockElement', { configurable: true, get: () => document.querySelector('canvas') }));
+  const beamShots0 = (await dev('stats')).shotsFired;
+  await page.mouse.move(640, 360);
+  await page.mouse.down();
+  await page.waitForTimeout(1000);
+  await page.mouse.up();
+  await page.evaluate(() => { delete document.pointerLockElement; });
+  const beamShots = (await dev('stats')).shotsFired - beamShots0;
+  check('a held beam core fires on every tick (5 or more in a second, not one per pull)', beamShots >= 5, `shots ${beamShots}`);
   await dev('setWeapon', { core: 'core-semi', barrel: 'barrel-scatter', sight: 'sight-iron', cell: 'cell-compact' });
   await dev('setMonstersSetting', 'normal');
 
@@ -228,7 +245,7 @@ try {
     await dev('fidelity', stage);
     await page.waitForTimeout(500);
     await page.screenshot({ path: `${shots}planet-mash-${name}.png` });
-    console.log(`Captured docs/shots/planet-mash-${name}.png (stage ${stage})`);
+    console.log(`Captured shots-run/planet-mash-${name}.png (stage ${stage})`);
   }
   await dev('fidelity', 2);
 

@@ -65,7 +65,7 @@
 .play-controls dd { margin: 0; color: rgba(232, 238, 241, .8); line-height: 1.4; }
 
 /* moments: big, centred above the crosshair, gone in three seconds */
-.play-toast { position: absolute; left: 50%; top: 28%; transform: translateX(-50%); display: grid; justify-items: center; gap: 6px; text-align: center; pointer-events: none; text-shadow: 0 2px 8px rgba(0, 0, 0, .75); animation: play-toast 3.2s var(--ease-out) both; z-index: 500; }
+.play-toast { position: absolute; left: 50%; top: 72px; transform: translateX(-50%); display: grid; justify-items: center; gap: 6px; text-align: center; pointer-events: none; text-shadow: 0 2px 8px rgba(0, 0, 0, .75); animation: play-toast 3s var(--ease-out) both; z-index: 500; }
 .play-toast b { font-family: var(--font-setmix); font-size: clamp(30px, 4.4vw, 54px); font-weight: 800; letter-spacing: -0.02em; }
 .play-toast span { font-size: 15px; color: rgba(232, 238, 241, .9); max-width: 44ch; }
 .play-toast.lost b { color: var(--amber); animation: play-tear .5s steps(3) 2; }
@@ -357,7 +357,7 @@
 
 .mentor-subtitle {
   position: absolute;
-  bottom: 84px;
+  bottom: 108px; /* P0-UI-01: pinned above the hotbar (was 84 px, under it) */
   left: 50%;
   transform: translateX(-50%);
   width: min(720px, calc(100vw - 32px));

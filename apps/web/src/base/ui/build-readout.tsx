@@ -46,8 +46,14 @@ export const BuildReadout: React.FC<BuildReadoutProps> = ({
           ? '#fbbf24' // yellow
           : '#ef4444'; // red (unsupported)
 
+  // P0-UI-01: CANNOT PLACE shows only while a placement ghost is in view (the aim gives it a verdict), 36 px below the reticle.
+  // With an item selected and nothing to place against, it says nothing.
+  const ghostShown = verdict !== null;
+  const refusal = build.blueprint && ghostShown && !isOk ? message : null;
+
   return (
-    <div className="hm-build-readout-hud" data-testid="build-readout-hud">
+    <>
+    <div className="hm-build-readout-hud" data-testid="build-readout-hud" data-hud-zone="build-hint">
       {hoverSupport && (!build.blueprint || !isOk) && (
         <div
           className="hm-build-hover-badge"
@@ -65,12 +71,11 @@ export const BuildReadout: React.FC<BuildReadoutProps> = ({
             <span>{build.blueprint.name}</span>
           </div>
 
-          <div
-            className={`hm-build-verdict-banner ${isOk ? 'ok' : 'refused'}`}
-            data-testid="build-verdict-banner"
-          >
-            {message}
-          </div>
+          {ghostShown && isOk ? (
+            <div className="hm-build-verdict-banner ok" data-testid="build-ready-banner">
+              {message}
+            </div>
+          ) : null}
 
           {wheelCycleText && (
             <div className="hm-build-wheel-hint" data-testid="build-wheel-hint">
@@ -114,5 +119,9 @@ export const BuildReadout: React.FC<BuildReadoutProps> = ({
         </>
       )}
     </div>
+    {refusal !== null ? (
+      <div className="hm-cannot-place" role="status" data-hud-zone="build-hint" data-testid="build-verdict-banner">{refusal}</div>
+    ) : null}
+    </>
   );
 };

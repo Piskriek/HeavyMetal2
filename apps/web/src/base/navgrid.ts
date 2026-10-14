@@ -14,9 +14,12 @@
  * thin wall at any angle stays a wall.
  */
 import type { Nav } from '@hm/mobsim';
+import type { Solid } from '@hm/leaksim';
 import * as S from '@hm/structure';
 
 const EDGE_HALF = 0.125;
+/** A heavy machine's footprint: its hardpoint pad, half its width from the centre (the pad's rectangle below). */
+export const HARDPOINT_HALF = 1.7;
 const DOOR_FROM = 1.3, DOOR_TO = 2.7;
 /** Fixture footprints (width along x, depth along z), as in @hm/structure. */
 const FIXTURE: Readonly<Partial<Record<S.Kind, readonly [number, number]>>> = { bin: [1.2, 0.9], bench: [2.4, 1.2], repeater: [1.6, 1.6], lifeSupport: [1.1, 0.7], weaponBench: [2.4, 1.2] };
@@ -35,13 +38,38 @@ function rects(p: S.Piece): Rect[] {
       : { cu: p.i * C, cv: p.j * C + (a + b) / 2, hu: EDGE_HALF, hv: (b - a) / 2, au: 1, av: 0 }));
   }
   if (p.kind === 'pillar') return [{ cu: p.i * C, cv: p.j * C, hu: 0.2, hv: 0.2, au: 1, av: 0 }];
-  if (p.kind === 'hardpoint') return [{ cu: (p.i + 1) * C, cv: (p.j + 1) * C, hu: 1.7, hv: 1.7, au: 1, av: 0 }];
+  if (p.kind === 'hardpoint') return [{ cu: (p.i + 1) * C, cv: (p.j + 1) * C, hu: HARDPOINT_HALF, hv: HARDPOINT_HALF, au: 1, av: 0 }];
   const size = FIXTURE[p.kind];
   if (size) {
     const t = ((p.deg ?? p.r * 90) * Math.PI) / 180;
     return [{ cu: (p.i + 0.5) * C + (p.dx ?? 0) / 100, cv: (p.j + 0.5) * C + (p.dz ?? 0) / 100, hu: size[0] / 2, hv: size[1] / 2, au: Math.cos(t), av: Math.sin(t) }];
   }
   return [];
+}
+
+/**
+ * The ground footprints of a base, as the monsters' brain keeps them out of (leaksim's boxes). The same rectangles the
+ * nav is cut from, in world space: each is the structure's frame turned by its yaw (the u axis is (ux, uz)).
+ */
+export function footprintSolids(base: S.Base): Solid[] {
+  const byId = new Map(base.structures.map((s) => [s.id, s] as const));
+  const out: Solid[] = [];
+  for (const p of base.pieces) {
+    const st = byId.get(p.s);
+    if (!st || p.k !== 0) continue;
+    const c = Math.cos(st.yaw), s = Math.sin(st.yaw);
+    for (const r of rects(p)) {
+      out.push({
+        x: st.x + r.cu * c - r.cv * s,
+        z: st.z + r.cu * s + r.cv * c,
+        ux: r.au * c - r.av * s,
+        uz: r.au * s + r.av * c,
+        hu: r.hu,
+        hv: r.hv,
+      });
+    }
+  }
+  return out;
 }
 
 /** The mobs' Nav for a square of side 2 * radius around `center`, `cell` metres a cell. */

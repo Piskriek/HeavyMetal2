@@ -6,7 +6,7 @@
  * No monster is shown with the words "Monster Mash" (the owner, 13 October): the sprites are monsters, the setting is Monsters.
  */
 import * as THREE from 'three';
-import { ARCHETYPES, addLeak, createWorld, hurt as leakHurt, placeMob, raycast, step as leakStep, type Archetype, type Event as LeakEvent, type Input as LeakInput, type Mob, type World } from '@hm/leaksim';
+import { ARCHETYPES, addLeak, createWorld, hurt as leakHurt, placeMob, raycast, step as leakStep, type Archetype, type Event as LeakEvent, type Input as LeakInput, type Mob, type Solid, type World } from '@hm/leaksim';
 import { createMonsterRenderer, type MonsterMob, type MonsterRenderer } from '../monsters/renderer';
 import { hash32, skinFor } from '../monsters/adapter';
 import { GATE_DOME_RADIUS, eraForStage, kindsForEra, leakSites, clearOfGate, dropStack, hitBearing, monsterCap, DORMANT_REWARD, SEAL_REWARD, DEFAULT_MONSTERS, type LeakSite, type MonstersSetting, type Point, type SafeZone } from '../monsters/policy';
@@ -105,7 +105,10 @@ export interface MonstersSystem {
   /** The screen's handlers (the HUD, the narration, the chain, the health and the items). */
   setEvents(events: MonsterEvents): void;
   setSafeZones(zones: readonly SafeZone[]): void;
-  setMachines(machines: readonly { readonly id: number; readonly x: number; readonly z: number }[]): void;
+  /** The built machines: a sapper drains the nearest one from its footprint's edge (`hu` is the half size). */
+  setMachines(machines: readonly { readonly id: number; readonly x: number; readonly z: number; readonly hu?: number }[]): void;
+  /** The built footprints the ground monsters keep out of (P0-MON-03): the base's boxes, from `footprintSolids`. */
+  setSolids(solids: readonly Solid[]): void;
   /** The graphics budget: the most living monsters (`monsterCap`). */
   setQuality(quality: string): void;
   /** The leak the beam is held on (its id from `leakUnder`), or null. The brain seals it while the player is within SEAL_REACH. */
@@ -567,7 +570,8 @@ export function createMonsters(options: {
   let sites: LeakSite[] = leakSites(seed, gate);
   let cap = monsterCap('low');
   let safe: SafeZone[] = [];
-  let machines: { id: number; x: number; z: number }[] = [];
+  let machines: { id: number; x: number; z: number; hu: number }[] = [];
+  let solids: readonly Solid[] = [];
   let sealingLeak: number | null = null;
   let world: World = createWorld(seed);
   const siteLeak = new Map<number, number>();
@@ -859,7 +863,8 @@ export function createMonsters(options: {
     },
     setEvents(e) { handlers = e; },
     setSafeZones(zones) { safe = zones.map((z) => ({ x: z.x, z: z.z, r: z.r })); },
-    setMachines(list) { machines = list.map((m) => ({ id: m.id, x: m.x, z: m.z })); },
+    setMachines(list) { machines = list.map((m) => ({ id: m.id, x: m.x, z: m.z, hu: m.hu ?? 0 })); },
+    setSolids(list) { solids = list; },
     setQuality(q) { cap = monsterCap(q); },
     setSealing(leak) { sealingLeak = leak; },
     leakUnder(origin, dir, range) {
@@ -888,8 +893,9 @@ export function createMonsters(options: {
         stage,
         aggression: unlocked ? setting : 'off',
         player: { x: player.x, z: player.z, alive: player.alive },
-        machines: machines.map((m) => ({ id: m.id, x: m.x, z: m.z })),
+        machines: machines.map((m) => ({ id: m.id, x: m.x, z: m.z, hu: m.hu })),
         safe,
+        solids,
         sealing: sealingLeak,
         cap,
       };

@@ -29,7 +29,7 @@ export const Hotbar: React.FC<HotbarProps> = ({ inventory, actions }) => {
   const hotbarSlots = inventory.slots.slice(0, 9);
 
   return (
-    <div className="hm-hotbar-container" data-testid="base-hotbar">
+    <div className="hm-hotbar-container" data-testid="base-hotbar" data-hud-zone="hotbar">
       {hotbarSlots.map((slot, idx) => {
         const isSelected = inventory.hotbar === idx;
         const item = slot.item;

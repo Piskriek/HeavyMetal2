@@ -54,10 +54,11 @@ import { kv } from '../storage/profile-storage';
 import { BASE_SAVE_KEY, saveWorld } from '../base/save';
 import { startCampaignWorld } from '../base/campaign-world';
 import { BaseHud } from '../base/ui/base-hud';
+import { footprintSolids, HARDPOINT_HALF } from '../base/navgrid';
 import { createWorldViewSource, WorldViewSource, formatRefusalToast } from '../base/world-view';
 import {
   apply, pieceAt, pieceAtIn, preview, withBridgeStore, BRIDGE_RANGE, BRIDGE_STORE,
-  BEAM_RANGE, structureEnv, planGhosts, layoutPieces, roomAt,
+  BEAM_RANGE, structureEnv, planGhosts, layoutPieces, roomAt, machineAt,
   type BaseWorld, type BaseCommand, type WorldEnv, type Applied, type Plan,
 } from '../base/world';
 import { PieceMeshManager } from '../base/piece-meshes';
@@ -167,6 +168,8 @@ function save(s: PlayState): void { try { kv.set(SAVE_KEY, JSON.stringify(s)); }
  * profile key: not the base world's save and not the play save. A broken or old save starts a fresh plot, with an empty port.
  */
 const BEAM_SAVE_KEY = 'hm.setmix.beam';
+/** `?cleanShot=1`: the review shots' switch. The pointer-lock prompt, the stats panel and the HUD overlays stay hidden (TASK-24). */
+const cleanShotMode = typeof location !== 'undefined' && new URLSearchParams(location.search).has('cleanShot');
 /** Hold E this long on a salvage prop in the lab to clear it (TASK-23c). */
 const CLEAR_HOLD_SECONDS = 1.0;
 /** Where a lab salvage goes: the pack first, then the network in reach of the gate (the bridge). */
@@ -337,7 +340,7 @@ export function PlayScreen(props: {
   /** The debug switch (TASK-20): `window.__dev` exists in dev builds and when the URL has `?e2e`. Players never get it. */
   const debugHooks = import.meta.env.DEV || (typeof location !== 'undefined' && new URLSearchParams(location.search).has('e2e'));
   /** The draw-call readout (Settings: Show performance stats; on under `?e2e`). Players see it only when they turn it on. */
-  const showStatsOn = (typeof location !== 'undefined' && new URLSearchParams(location.search).has('e2e')) || resolveGraphics('low', props.profile.graphics).showStats;
+  const showStatsOn = !cleanShotMode && ((typeof location !== 'undefined' && new URLSearchParams(location.search).has('e2e')) || resolveGraphics('low', props.profile.graphics).showStats);
   const creating = state.step === 'create' && !isMashTest;
 
   useEffect(() => {
@@ -381,8 +384,13 @@ export function PlayScreen(props: {
   const say = useCallback((text: string, sub = '') => setToast({ text, sub, id: Date.now() }), []);
   useEffect(() => {
     if (!toast) return undefined;
-    const t = window.setTimeout(() => setToast((x) => (x?.id === toast.id ? null : x)), 3200);
-    return () => window.clearTimeout(t);
+    // a title card holds the other banners (CANNOT PLACE) until it fades: 3 s, at 72 px from the top (P0-UI-01)
+    document.body.dataset.titleUp = '1';
+    const t = window.setTimeout(() => setToast((x) => (x?.id === toast.id ? null : x)), 3000);
+    return () => {
+      window.clearTimeout(t);
+      delete document.body.dataset.titleUp;
+    };
   }, [toast]);
 
 
@@ -458,7 +466,7 @@ export function PlayScreen(props: {
   const placedCounterTimerRef = useRef<number | null>(null);
 
   // Overlay visibility toggle for clean screenshot capture
-  const [hideOverlays, setHideOverlays] = useState(false);
+  const [hideOverlays, setHideOverlays] = useState(cleanShotMode);
   const [renderCalls, setRenderCalls] = useState(0);
 
   useEffect(() => {
@@ -824,7 +832,7 @@ export function PlayScreen(props: {
       };
     });
     scene?.setFabricators(fabs);
-    scene?.monsters.setWeaponStats(weaponStats(res.world.loadout));
+    scene?.monsters.setWeaponStats(devWeaponRef.current ?? weaponStats(res.world.loadout));
     (baseViewSource as WorldViewSource).notify?.();
     setBaseWorldVersion((v) => v + 1);
     persistBaseWorld(false);
@@ -924,6 +932,8 @@ export function PlayScreen(props: {
     if (scene) {
       scene.monsters.clearMobs();
       scene.setPlayerAlive(true);
+      // a death at the wheel (TASK-24): the rover is left where it stands, parked, and the player walks back from the gate
+      if (scene.getDrivingVehicle()) scene.exitVehicle();
       const g = scene.debug.gatePlanet();
       scene.debug.teleport('planet', g.x, g.z - 6, 0, 0);
     }
@@ -1221,7 +1231,7 @@ export function PlayScreen(props: {
           };
         });
         scene.setFabricators(initFabs);
-        scene.monsters.setWeaponStats(weaponStats(baseWorldRef.current.loadout));
+        scene.monsters.setWeaponStats(devWeaponRef.current ?? weaponStats(baseWorldRef.current.loadout));
         for (const m of baseWorldRef.current.machines) {
           const piece = baseWorldRef.current.base.pieces.find((p) => p.id === m.id);
           if (piece) {
@@ -1329,6 +1339,8 @@ export function PlayScreen(props: {
     const flushOnHide = (): void => { flushBeam(); };
     window.addEventListener('pagehide', flushOnHide);
     window.addEventListener('mousedown', onMouseDown); window.addEventListener('mouseup', onMouseUp);
+    // the base the monsters last kept their footprints from (rebuilt when the base changes, P0-MON-03)
+    let solidsBase: BaseWorld['base'] | null = null;
     const loop = (ms: number): void => {
       if (cancelled) return;
       const frameMs = ms - last;
@@ -1337,6 +1349,9 @@ export function PlayScreen(props: {
       pieceManagerRef.current.update(dt);
       const w = baseWorldRef.current;
       const playerPos = scene.debug.position();
+
+      // a held beam core fires on every tick it can (its 0.1 s cooldown paces it), not once per pull (TASK-23b-2)
+      if (isLmbDownRef.current && scene.monsters.isEquipped() && scene.monsters.getWeaponStats()?.mode === 'beam') fireWeapon();
 
       // 1. Tick accumulator for 100ms ticks (node regrowth, beam extraction, machine refinement)
       harvestAccRef.current += dt;
@@ -1361,6 +1376,19 @@ export function PlayScreen(props: {
             }
           }
         }
+        // the sappers (P0-MON-03): the built machines are what the brain's sappers go for, and a machine a sapper holds
+        // works at half its share this tick
+        const machineSpots: { id: number; x: number; z: number; hu: number }[] = [];
+        for (const m of w.machines) {
+          const at = machineAt(w, m.id);
+          if (at) machineSpots.push({ id: m.id, x: at.x, z: at.z, hu: HARDPOINT_HALF });
+        }
+        scene.monsters.setMachines(machineSpots);
+        if (solidsBase !== w.base) {
+          solidsBase = w.base;
+          scene.monsters.setSolids(footprintSolids(w.base));
+        }
+        const latched = w.machines.filter((m) => scene.monsters.isLatched(m.id)).map((m) => m.id);
         while (harvestAccRef.current >= 0.1) {
           harvestAccRef.current -= 0.1;
           dispatchBaseRef.current({
@@ -1369,6 +1397,7 @@ export function PlayScreen(props: {
             dt: 0.1,
             beam: isMining && targetNode ? { node: targetNode.id, power: 1 } : null,
             power: powerMap,
+            latched,
           });
         }
       }
@@ -2250,7 +2279,7 @@ export function PlayScreen(props: {
             };
           });
           scene.setFabricators(fabs);
-          scene.monsters.setWeaponStats(weaponStats(baseWorldRef.current.loadout));
+          scene.monsters.setWeaponStats(devWeaponRef.current ?? weaponStats(baseWorldRef.current.loadout));
         },
         enterVehicle: (id: number) => scene.enterVehicle(id),
         exitVehicle: () => {
@@ -2446,6 +2475,14 @@ export function PlayScreen(props: {
       }
       if (e.code === 'KeyR') {
         if (beamHeldRef.current) { reloadBeam(); return; }
+        // the gun in hand reloads its magazine (a full magazine is the loadout's; a reload is a player's action, not a tick)
+        const gunScene = sceneRef.current;
+        if (gunScene?.monsters.isEquipped()) {
+          gunScene.monsters.reload();
+          setGunAmmo(gunScene.monsters.getAmmo());
+          say(`Magazine ${gunScene.monsters.getAmmo().current} of ${gunScene.monsters.getAmmo().max}`);
+          return;
+        }
         if (placingLayoutId !== null) {
           placingLayoutRotationRef.current = (placingLayoutRotationRef.current + 1) % 4;
           say(`Layout Rotation: ${placingLayoutRotationRef.current * 90}°`);
@@ -2767,6 +2804,8 @@ export function PlayScreen(props: {
       stats: (): MonsterStats | null => sceneRef.current?.monsters.getStats() ?? null,
       /** The monsters' clock: advances them by whole seconds without a frame (the warnings, the waves, the seal). */
       stepMonsters: (seconds: number): void => { sceneRef.current?.stepMonsters(seconds); },
+      /** Whether a sapper holds a base machine this moment (its output halves; P0-MON-03). */
+      isLatched: (machineId: number): boolean => sceneRef.current?.monsters.isLatched(machineId) ?? false,
       /** The F-03 flag (the monsters fight once the first gun exists). A test sets it; the chain sets it on F-03. */
       unlockMonsters: (on = true): void => {
         updateChain((c) => ({ ...c, monstersUnlocked: on }));
@@ -2897,7 +2936,7 @@ export function PlayScreen(props: {
       {ready && !creating ? (
         <>
           {!hideOverlays && drivingSpeed === null && (
-            <section className="play-goal" aria-live="polite">
+            <section className="play-goal" aria-live="polite" data-hud-zone="quest">
               <h2>{visiting ? `Visiting ${visiting.snapshot.owner}’s plot` : goal.title}</h2>
               <p>{visiting ? 'Read-only visit. Walk back through the gate to return to your lab.' : goal.hint}</p>
               {chainNext ? <small className="play-next">Next: {chainNext}</small> : null}
@@ -3477,7 +3516,7 @@ export function PlayScreen(props: {
               </section>
             );
           })() : null}
-          {!locked && !paused && panel === null && labPanel === null && !dialOpen && !menu && !isAnyBaseWindowOpen ? (
+          {!cleanShotMode && !locked && !paused && panel === null && labPanel === null && !dialOpen && !menu && !isAnyBaseWindowOpen ? (
             <button className="play-start" onClick={lock}>
               <b>Click to look around</b>
               <span className="play-keys">{KEYS.map(([k, what]) => <span key={k}><kbd>{k}</kbd>{what}</span>)}</span>
@@ -3541,7 +3580,7 @@ export function PlayScreen(props: {
 
           {/* Mentor Subtitles (On by default) */}
           {subtitle && dialogueSettings.subtitlesEnabled && (
-            <div className="mentor-subtitle" role="region" aria-label="Mentor Radio Subtitles" data-testid="mentor-subtitle">
+            <div className="mentor-subtitle" role="region" aria-label="Mentor Radio Subtitles" data-testid="mentor-subtitle" data-hud-zone="subtitle">
               <div className="mentor-subtitle-header">
                 <span className="mentor-subtitle-pip" />
                 <span>DR. HADDY // FIELD RADIO</span>
@@ -3879,7 +3918,7 @@ export function PlayScreen(props: {
               onClose={() => setWeaponBenchOpen(false)}
             />
           )}
-          {toast && !isAnyBaseWindowOpen && !hideOverlays ? <div key={toast.id} className={`play-toast${toast.text === 'Sync lost' ? ' lost' : ''}`} role="status"><b>{toast.text}</b>{toast.sub ? <span>{toast.sub}</span> : null}</div> : null}
+          {toast && !isAnyBaseWindowOpen && !hideOverlays ? <div key={toast.id} className={`play-toast${toast.text === 'Sync lost' ? ' lost' : ''}`} role="status" data-hud-zone="title"><b>{toast.text}</b>{toast.sub ? <span>{toast.sub}</span> : null}</div> : null}
           {baseWorldVersion > 0 && <span style={{ display: 'none' }} data-base-version={baseWorldVersion} />}
         </>
       ) : null}

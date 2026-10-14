@@ -14,7 +14,7 @@
  *   6 V puts the rifle in the character's hand (third person), the rifle clips play, and the character stands on the ground;
  *   7 the frame rate over two seconds in each mode with the beam firing (the left button held: a boulder, the paint, the cut);
  *   8 G holsters the rifle.
- * Shots are gitignored (docs/shots/beam/), overlays hidden. Each shot is looked at before it is posted.
+ * Shots are gitignored (shots-run/beam/), overlays hidden. Each shot is looked at before it is posted.
  * Exit code 1 when a check fails.
  */
 import { spawn } from 'node:child_process';
@@ -35,7 +35,7 @@ if (!chromePath) {
 }
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const shotsDir = path.join(root, 'docs/shots/beam');
+const shotsDir = path.join(root, 'shots-run/beam');
 fs.mkdirSync(shotsDir, { recursive: true });
 
 const port = 8198;

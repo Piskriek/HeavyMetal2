@@ -5,7 +5,7 @@
  *   2 the Plans tab: save a layout at the drafting table (K), the Plans tab lists it, and placing it adds a plan;
  *   3 E on a bin opens the lattice (the bin is aimed at, E is pressed, the lattice window shows).
  * The profile-delete check is a unit test (apps/web/src/storage/profile-storage.test.ts).
- * Shots (gitignored, docs/shots/tabs/), each one looked at before it is posted. Exit code 1 when any beat fails.
+ * Shots (gitignored, shots-run/tabs/), each one looked at before it is posted. Exit code 1 when any beat fails.
  */
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright-core';
@@ -25,7 +25,7 @@ if (!chromePath) {
 }
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const shotsDir = path.join(root, 'docs/shots/tabs');
+const shotsDir = path.join(root, 'shots-run/tabs');
 fs.mkdirSync(shotsDir, { recursive: true });
 
 const port = 8197;

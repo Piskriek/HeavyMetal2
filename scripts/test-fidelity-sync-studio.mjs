@@ -76,9 +76,9 @@ try {
   console.log('OK: Planetary Grid button visible:', await gridBtn.isVisible());
   console.log('OK: The Studio button visible:', await studioBtn.isVisible());
 
-  fs.mkdirSync('docs/shots', { recursive: true });
-  await page.screenshot({ path: 'docs/shots/fidelity-menu-synced-desynced.png' });
-  console.log('Captured docs/shots/fidelity-menu-synced-desynced.png');
+  fs.mkdirSync('shots-run', { recursive: true });
+  await page.screenshot({ path: 'shots-run/fidelity-menu-synced-desynced.png' });
+  console.log('Captured shots-run/fidelity-menu-synced-desynced.png');
 
   // 2. Click The Studio
   console.log('Testing The Studio (Creative Suite)...');
@@ -86,6 +86,10 @@ try {
   await page.waitForTimeout(2000);
 
   // Verify Studio Root & Topbar
+  // TASK-17/18: The Studio opens the asset bench (.sx); the old Moon editor is its "Moon (prototype)" workspace
+  await page.locator('.sx').waitFor({ state: 'visible', timeout: 5000 });
+  await page.locator('button', { hasText: 'Moon (prototype)' }).click();
+  await page.waitForTimeout(500);
   const studioRoot = page.locator('.studio-root');
   await studioRoot.waitFor({ state: 'visible', timeout: 5000 });
   console.log('OK: Studio root mounted!');
@@ -103,8 +107,8 @@ try {
   await page.locator('.stage-pill', { hasText: 'S5' }).click();
   await page.waitForTimeout(500);
 
-  await page.screenshot({ path: 'docs/shots/fidelity-studio-moon.png' });
-  console.log('Captured docs/shots/fidelity-studio-moon.png');
+  await page.screenshot({ path: 'shots-run/fidelity-studio-moon.png' });
+  console.log('Captured shots-run/fidelity-studio-moon.png');
 
   // Test Weekly Patch Modal
   console.log('Testing Weekly Patch Diff Modal...');
@@ -116,8 +120,8 @@ try {
   const diffPre = page.locator('.code-diff-viewer pre');
   console.log('OK: Diff viewer has patch JSON:', (await diffPre.textContent())?.includes('PATCH-MOON'));
 
-  await page.screenshot({ path: 'docs/shots/fidelity-studio-patch-diff.png' });
-  console.log('Captured docs/shots/fidelity-studio-patch-diff.png');
+  await page.screenshot({ path: 'shots-run/fidelity-studio-patch-diff.png' });
+  console.log('Captured shots-run/fidelity-studio-patch-diff.png');
 
   // Close modal via Escape
   console.log('Dismissing patch modal with Escape...');
@@ -142,8 +146,8 @@ try {
   const planetOrb = page.locator('.planet-orb-sphere');
   console.log('OK: Planet orb visualizer visible:', await planetOrb.isVisible());
 
-  await page.screenshot({ path: 'docs/shots/fidelity-studio-planet-forge.png' });
-  console.log('Captured docs/shots/fidelity-studio-planet-forge.png');
+  await page.screenshot({ path: 'shots-run/fidelity-studio-planet-forge.png' });
+  console.log('Captured shots-run/fidelity-studio-planet-forge.png');
 
   // Test Publish to Multiverse
   console.log('Testing Publish to SetMix Multiverse...');
@@ -155,8 +159,8 @@ try {
   const regCodeEl = page.locator('.celebration-text .reg-code b');
   console.log('OK: Multiverse ID generated:', await regCodeEl.textContent());
 
-  await page.screenshot({ path: 'docs/shots/fidelity-studio-planet-published.png' });
-  console.log('Captured docs/shots/fidelity-studio-planet-published.png');
+  await page.screenshot({ path: 'shots-run/fidelity-studio-planet-published.png' });
+  console.log('Captured shots-run/fidelity-studio-planet-published.png');
 
   // Close publish modal
   await page.locator('button', { hasText: 'Continue Editing' }).click();
@@ -171,14 +175,17 @@ try {
   console.log('Launching Planetary Grid (Synced)...');
   await page.locator('.sm-menu button', { hasText: 'Planetary Grid' }).click();
   await page.waitForTimeout(3000);
+  // a fresh grid profile opens the character creator first (as the campaign test dismisses it)
+  await page.locator('button', { hasText: 'Done: into the lab' }).click({ timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(2500);
 
   const syncBadge = page.locator('.sync-badge');
   await syncBadge.waitFor({ state: 'visible', timeout: 30000 });
   const syncText = await syncBadge.textContent();
   console.log('OK: Sync Badge visible on campaign HUD:', syncText?.trim());
 
-  await page.screenshot({ path: 'docs/shots/fidelity-grid-synced.png' });
-  console.log('Captured docs/shots/fidelity-grid-synced.png');
+  await page.screenshot({ path: 'shots-run/fidelity-grid-synced.png' });
+  console.log('Captured shots-run/fidelity-grid-synced.png');
 
   // 4. Test Desync Toggle
   console.log('Toggling Desync into Solo Branch...');

@@ -5,7 +5,7 @@
  * - Clicks 'Expedition' to launch the play scene
  * - Verifies voice clips preload behind loading bar
  * - Verifies 'wake' fires line A1-01 and displays Dr. Haddy subtitle overlay
- * - Captures subtitle HUD screenshot to docs/shots/mentor-subtitle.png & docs/shots/lab/subtitle-act1.png
+ * - Captures subtitle HUD screenshot to shots-run/mentor-subtitle.png & shots-run/lab/subtitle-act1.png
  * - Opens radio comms log modal and tests Dr. Gwen Haddy header, list, and replay
  * - Verifies dialogue volume slider and subtitle toggle
  * - Steps through Act I story events (look:power-wall -> breaker:thrown -> power:on -> look:window)
@@ -134,12 +134,12 @@ try {
   }
 
   // 4. Capture Subtitle HUD Screenshots
-  if (!fs.existsSync('docs/shots')) fs.mkdirSync('docs/shots', { recursive: true });
-  if (!fs.existsSync('docs/shots/lab')) fs.mkdirSync('docs/shots/lab', { recursive: true });
+  if (!fs.existsSync('shots-run')) fs.mkdirSync('shots-run', { recursive: true });
+  if (!fs.existsSync('shots-run/lab')) fs.mkdirSync('shots-run/lab', { recursive: true });
 
-  await page.screenshot({ path: 'docs/shots/mentor-subtitle.png' });
-  await page.screenshot({ path: 'docs/shots/lab/subtitle-act1.png' });
-  console.log('OK: Captured docs/shots/mentor-subtitle.png and docs/shots/lab/subtitle-act1.png');
+  await page.screenshot({ path: 'shots-run/mentor-subtitle.png' });
+  await page.screenshot({ path: 'shots-run/lab/subtitle-act1.png' });
+  console.log('OK: Captured shots-run/mentor-subtitle.png and shots-run/lab/subtitle-act1.png');
 
   // 5. Test Comms HUD button and Radio Log Modal
   console.log('Testing Radio Comms Log modal...');

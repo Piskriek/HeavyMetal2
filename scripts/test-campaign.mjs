@@ -30,7 +30,7 @@
  *   rung (broken junk stands a rung below the plot's stage until it is sealed), and the seal is saved; 28b at stage 6 a broken wreck
  *   stands at rung 2 and its seal lifts it to rung 3.
  *
- * Every beat: a shot in docs/shots/campaign/, the FPS over two seconds, and a pass or fail. Console errors and HTTP errors
+ * Every beat: a shot in shots-run/campaign/, the FPS over two seconds, and a pass or fail. Console errors and HTTP errors
  * are collected across the whole run. Exit code 1 when any beat fails.
  */
 import { chromium } from 'playwright-core';
@@ -51,7 +51,7 @@ if (!chromePath) {
 }
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const shotsDir = path.join(root, 'docs/shots/campaign');
+const shotsDir = path.join(root, 'shots-run/campaign');
 fs.mkdirSync(shotsDir, { recursive: true });
 for (const f of fs.readdirSync(shotsDir)) {
   if (f.endsWith('.png') || f === 'summary.json') fs.unlinkSync(path.join(shotsDir, f));
@@ -93,12 +93,34 @@ page.on('requestfailed', (req) => httpErrors.push(`failed ${req.url()} ${req.fai
 
 const results = [];
 let shotNo = 0;
+// TASK-24 (P0-PROD-01): at every shot, the title card, the build hint and the radio subtitle must not overlap each other.
+// Each overlay carries a data-hud-zone attribute; the boxes of the zones are compared pairwise.
+const hudViolations = [];
+const hudOverlaps = () => page.evaluate(() => {
+  const boxes = [];
+  for (const zone of ['title', 'build-hint', 'subtitle']) {
+    for (const el of document.querySelectorAll(`[data-hud-zone="${zone}"]`)) {
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0 && getComputedStyle(el).display !== 'none') boxes.push({ zone, x0: r.left, y0: r.top, x1: r.right, y1: r.bottom });
+    }
+  }
+  const out = [];
+  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+    const a = boxes[i], b = boxes[j];
+    if (a.zone === b.zone) continue;
+    const ox = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0), oy = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
+    if (ox > 1 && oy > 1) out.push(`${a.zone} and ${b.zone} overlap by ${Math.round(ox)} x ${Math.round(oy)} px`);
+  }
+  return out;
+}).catch(() => []);
+
 const shot = async (name) => {
   shotNo += 1;
   const file = path.join(shotsDir, `${String(shotNo).padStart(2, '0')}-${name}.png`);
   for (let attempt = 1; attempt <= 5; attempt++) {
     try {
       await page.screenshot({ path: file });
+      for (const v of await hudOverlaps()) hudViolations.push(`${name}: ${v}`);
       return file;
     } catch (err) {
       if (attempt === 5) throw err;
@@ -140,6 +162,38 @@ const quiet = async (timeout = 25000) => {
   return false;
 };
 
+// TASK-24: the checkpoints the owner's review loads (apps/web/public/checkpoints, listed in index.json). One per act's start,
+// and stage 6 with the monsters unlocked. Each holds the save keys of src/storage/checkpoints.ts (CHECKPOINT_KEYS and the radio logs).
+const CHECKPOINT_AFTER = [
+  { beat: '2', name: 'act1-wake', title: 'Act I: the wake', act: 'I' },
+  { beat: '11', name: 'act4-start', title: 'Act IV: the drill', act: 'IV' },
+  { beat: '16', name: 'act5-start', title: 'Act V: the base', act: 'V' },
+  { beat: '21', name: 'act6-start', title: 'Act VI: the hardpoint', act: 'VI' },
+  { beat: '25', name: 'stage6-monsters', title: 'Stage 6: the monsters unlocked', act: 'VI' },
+];
+const checkpointsDir = path.join(root, 'apps/web/public/checkpoints');
+const checkpointIndex = [];
+fs.mkdirSync(checkpointsDir, { recursive: true });
+for (const f of fs.readdirSync(checkpointsDir)) if (f.endsWith('.json')) fs.unlinkSync(path.join(checkpointsDir, f));
+const saveCheckpoint = async (name, title, act) => {
+  const data = await page.evaluate(() => {
+    // the base is saved now (its save runs at most every 2 s), so the file holds the state the chain is in
+    window.hmPlay.base.save();
+    const keep = (k) => ['hm.setmix.play', 'hm-base-v1', 'hm.setmix.beam', 'hm.setmix.props', 'hm.player.v1'].includes(k) || k.startsWith('fidelity.radio-log.');
+    const keys = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && keep(k)) keys[k] = localStorage.getItem(k);
+    }
+    return { keys, where: window.hmPlay.where ?? null, step: window.hmPlay.chain().current?.id ?? null };
+  });
+  const file = { format: 'hm-checkpoint', v: 1, name, title, act, expect: { where: data.where, step: data.step }, keys: data.keys };
+  fs.writeFileSync(path.join(checkpointsDir, `${name}.json`), `${JSON.stringify(file, null, 2)}\n`);
+  checkpointIndex.push({ name, title, act });
+  fs.writeFileSync(path.join(checkpointsDir, 'index.json'), `${JSON.stringify(checkpointIndex, null, 2)}\n`);
+  console.log(`checkpoint ${name} (act ${act}): where=${data.where} step=${data.step} keys=${Object.keys(data.keys).length}`);
+};
+
 const beat = async (name, fn) => {
   const started = Date.now();
   const row = { name, ok: false, detail: '', fps: null, shot: null, seconds: 0 };
@@ -157,6 +211,9 @@ const beat = async (name, fn) => {
   row.fps = await fps(2000).catch(() => null);
   results.push(row);
   console.log(`${row.ok ? 'PASS' : 'FAIL'} ${name} | fps ${row.fps ?? '?'} | ${row.detail}`);
+  // TASK-24: an act's checkpoint is taken when the beat that starts it has passed
+  const cp = CHECKPOINT_AFTER.find((c) => name.startsWith(`${c.beat} `));
+  if (cp && row.ok) await saveCheckpoint(cp.name, cp.title, cp.act);
   return row;
 };
 
@@ -609,10 +666,17 @@ const chainDiff = (a, b, path = '', out = []) => {
 };
 
 await beat('10 reload: the inventory and the chain persist, and Act I does not replay', async (row) => {
+  // the snapshot is taken once the base tick has settled: the game pauses (no tick), the base is saved now (the save
+  // runs at most every 2 s, so an unforced save can trail the live counts), and both are read in the same frame
+  await pauseOn();
   await page.waitForTimeout(2500);
-  const beforeSlots = await slotsJson();
-  const beforeStep = await page.evaluate(() => window.hmPlay.state?.()?.step ?? null);
-  const beforeChain = JSON.stringify(await chainState());
+  const snap = await page.evaluate(() => {
+    window.hmPlay.base.save();
+    return { slots: JSON.stringify(window.hmPlay.base.world().player.slots), step: window.hmPlay.state?.()?.step ?? null, chain: JSON.stringify(window.hmPlay.chainState()) };
+  });
+  const beforeSlots = snap.slots;
+  const beforeStep = snap.step;
+  const beforeChain = snap.chain;
   await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
   // a reload opens the main menu: Continue loads the saved profile
   await page.waitForFunction(() => !!window.hmPlay?.ready || !!document.querySelector('.sm-menu button'), null, { timeout: 25000 });
@@ -629,7 +693,12 @@ await beat('10 reload: the inventory and the chain persist, and Act I does not r
   const afterChain = JSON.stringify(await chainState());
   const replayed = await waitSub('A1-01', 2500);
   row.shot = await shot('after-reload');
-  const persisted = afterSlots === beforeSlots && afterChain === beforeChain;
+  // the base tick keeps running (the mill counts while the game is paused), so the counters can rise between the snapshot and the
+  // reload (counts.milled 44 -> 45 in one run). What must survive a reload is the progress, the flags and the inventory, and no
+  // counter may fall: counters only rise.
+  const bc = JSON.parse(beforeChain), ac = JSON.parse(afterChain);
+  const countsKept = Object.keys(bc.counts ?? {}).every((k) => (ac.counts?.[k] ?? 0) >= (bc.counts[k] ?? 0));
+  const persisted = afterSlots === beforeSlots && JSON.stringify(ac.progress) === JSON.stringify(bc.progress) && ac.monstersUnlocked === bc.monstersUnlocked && countsKept;
   const noReplay = afterStep === beforeStep && afterStep !== 'create' && !replayed;
   // which paths of the chain differ, for the report (a changed value is named, not hidden)
   const chainDiffs = chainDiff(JSON.parse(beforeChain), JSON.parse(afterChain));
@@ -705,11 +774,13 @@ await beat('13b A4-01b: the dormant anomaly by the perimeter appears once the ri
   await page.evaluate(([x, z]) => window.hmPlay.teleport('planet', x + 6, z, 0, 0), [found.x, found.z]);
   await page.waitForTimeout(300);
   const core0 = await page.evaluate(() => window.__dev.bridgeStock()['anomaly-core'] ?? 0);
+  // the seal's line is a voiced story line: it is queued behind any line still playing (A4-01), so the radio is quiet first
+  await quiet();
   await page.evaluate((id) => window.__dev.sealLeak(id, 9), found.id);
   const core1 = await page.evaluate(() => window.__dev.bridgeStock()['anomaly-core'] ?? 0);
   const cur = await chainCur();
   const toast = await toastText();
-  const radio = await waitSub('A4-LEAK-SEAL', 4000);
+  const radio = await waitSub('A4-LEAK-SEAL', 12000);
   row.shot = await shot('dormant-sealed');
   return { ok: shown && core1 - core0 === 1 && cur === 'A4-02' && radio, detail: `radio line=${radio} ` +  `anomaly dormant=${shown} cores ${core0} -> ${core1} current=${cur} toast="${toast}"` };
 });
@@ -1172,18 +1243,34 @@ await beat('23 F-02: the scout printed at the fabricator (the print button, then
   let vDiag = null;
   let viaHook = false;
   if (v) {
-    // stand within 3 m of the scout (the walk can be pushed off the hull): try the sides until the position holds, facing it
-    for (const [ox, oz] of [[-1.2, 0], [1.2, 0], [0, 1.2], [0, -1.2], [-2, 0], [2, 0], [0, 2], [0, -2]]) {
-      await page.evaluate(({ v, ox, oz }) => window.hmPlay.go('planet', v.x + ox, v.z + oz, Math.atan2(ox, oz), 0), { v, ox, oz });
-      await page.waitForTimeout(400);
-      vDiag = await page.evaluate(() => ({ where: window.hmPlay.where, p: window.__playScene.debug.position() }));
-      if (Math.hypot(vDiag.p.x - v.x, vDiag.p.z - v.z) <= 3) break;
+    // TASK-24: the walk is real. The player is set 8 m off the scout (on the side where the walk has room), faces it, and
+    // walks in with W until it is within 3 m; then E is pressed (E reaches 3.5 m)
+    await page.evaluate(({ v }) => window.hmPlay.go('planet', v.x + 8, v.z, Math.atan2(8, 0), 0), { v });
+    await page.waitForTimeout(400);
+    await page.keyboard.down('KeyW');
+    let gap = 99;
+    for (let i = 0; i < 40 && gap > 3; i++) {
+      await page.waitForTimeout(200);
+      gap = await page.evaluate(({ v }) => { const p = window.__playScene.debug.position(); return Math.hypot(p.x - v.x, p.z - v.z); }, { v });
     }
+    await page.keyboard.up('KeyW');
+    vDiag = await page.evaluate(() => ({ where: window.hmPlay.where, p: window.__playScene.debug.position() }));
     await page.keyboard.press('KeyE');
     await page.waitForTimeout(400);
     entered = (await page.evaluate(() => window.hmPlay.base.driving())) !== null;
-    // E only reaches a vehicle within 3.5 m; where the walk is pushed out beyond that (the pad beside the scout), the scene's own
-    // enterVehicle (what E calls once in reach) gets the player in, and the rest of the beat drives for real
+    // the walk can be stopped by the pad or the hull; then the teleport fallback stands the player beside the scout (recorded)
+    if (!entered) {
+      for (const [ox, oz] of [[-1.2, 0], [1.2, 0], [0, 1.2], [0, -1.2], [-2, 0], [2, 0], [0, 2], [0, -2]]) {
+        await page.evaluate(({ v, ox, oz }) => window.hmPlay.go('planet', v.x + ox, v.z + oz, Math.atan2(ox, oz), 0), { v, ox, oz });
+        await page.waitForTimeout(400);
+        vDiag = await page.evaluate(() => ({ where: window.hmPlay.where, p: window.__playScene.debug.position() }));
+        if (Math.hypot(vDiag.p.x - v.x, vDiag.p.z - v.z) <= 3) break;
+      }
+      await page.keyboard.press('KeyE');
+      await page.waitForTimeout(400);
+      entered = (await page.evaluate(() => window.hmPlay.base.driving())) !== null;
+    }
+    // if E still does not reach, the scene's own enterVehicle (what E calls once in reach) gets the player in
     if (!entered) {
       await page.evaluate((id) => window.hmPlay.base.enterVehicle(id), v.id);
       await page.waitForTimeout(300);
@@ -1260,6 +1347,20 @@ await beat('26 a death respawns at the gate; the inventory and the chain are kep
   // the chain is kept when its progress and its monsters flag are the same and no counter went down (the counters keep
   // growing on their own: the mill runs, the print and the drive move on)
   const chainBefore = await chainState();
+  // TASK-24: a death at the wheel first. The scout printed in beat 23 is entered; the death leaves it parked where it stands, and the
+  // player comes back on foot at the gate (dieNow exits the vehicle)
+  const scout = await page.evaluate(() => window.hmPlay.base.world().vehicles.find((x) => x.kind === 'scout') ?? null);
+  let wheelDeath = { ok: true, why: 'no scout to drive' };
+  if (scout) {
+    await page.evaluate((id) => window.hmPlay.base.enterVehicle(id), scout.id);
+    await page.waitForTimeout(300);
+    const wasDriving = (await page.evaluate(() => window.hmPlay.base.driving())) !== null;
+    await page.evaluate(() => window.hmPlay.die());
+    await page.waitForTimeout(600);
+    const stillDriving = (await page.evaluate(() => window.hmPlay.base.driving())) !== null;
+    const parked = await page.evaluate((id) => { const v = window.hmPlay.base.world().vehicles.find((x) => x.id === id); return !!v; }, scout.id);
+    wheelDeath = { ok: wasDriving && !stillDriving && parked, why: `driving before ${wasDriving}, after ${stillDriving}, scout kept ${parked}` };
+  }
   await page.evaluate(() => window.hmPlay.die());
   await page.waitForTimeout(800);
   const deaths = (await chainState()).counts.deaths ?? 0;
@@ -1272,7 +1373,7 @@ await beat('26 a death respawns at the gate; the inventory and the chain are kep
     && chainNow.monstersUnlocked === chainBefore.monstersUnlocked
     && Object.entries(chainBefore.counts).every(([k, v]) => (chainNow.counts[k] ?? 0) >= v);
   row.shot = await shot('respawn-at-gate');
-  return { ok: deaths === 1 && nearGate && kept && chainKept, detail: `deaths=${deaths} near gate=${nearGate} inventory kept=${kept} chain kept=${chainKept}` };
+  return { ok: wheelDeath.ok && deaths === (chainBefore.counts.deaths ?? 0) + 2 && nearGate && kept && chainKept, detail: `wheel death: ${wheelDeath.why}; deaths=${deaths} near gate=${nearGate} inventory kept=${kept} chain kept=${chainKept}` };
 });
 
 await beat('27 each chain narration line played once; the radio log holds no repeats', async (row) => {
@@ -1337,16 +1438,59 @@ await beat('28b the ladder at stage 6: a broken leak stands at the RUN.world tie
   return { ok, detail: `stage 6, leak site ${lk.site} (${reach.toFixed(1)} m away): rung ${before?.rung} broken=${before?.broken} -> rung ${after?.rung} broken=${after?.broken}` };
 });
 
+// TASK-24: the sapper (P0-MON-03). It goes for the nearest built machine, but the gate's 25 m dome is a sanctuary the monsters never
+// enter (the ruling), and the base stands inside it. So a sapper stops at the dome's edge and latches nothing inside it. The owner must rule
+// on that (a base machine inside the dome cannot be latched); this beat checks the rule as it stands.
+await beat('28c a sapper goes for the base machine and stops at the gate dome (a sanctuary): nothing inside it is latched', async (row) => {
+  await toPlanet();
+  await page.evaluate(() => { window.__dev.setHp(100); window.__dev.setMonstersSetting('normal'); });
+  await page.waitForTimeout(300);
+  const fab = await page.evaluate(() => window.hmPlay.base.world().machines.find((m) => m.kind === 'fabricator')?.id ?? null);
+  if (fab === null) return { ok: false, detail: 'no fabricator installed (F-01 is not done)' };
+  // the sapper starts outside the dome: 31 m from the gate, then 4 m from the player (a monster placed inside the dome would not test the rule)
+  const gate = await page.evaluate(() => window.__playScene.debug.gatePlanet());
+  await page.evaluate((g) => window.hmPlay.go('planet', g.x + 31, g.z, 0, -0.3), gate);
+  await page.waitForTimeout(400);
+  await page.evaluate(() => window.__dev.placeMob('sapper', 4));
+  let latched = false;
+  let closest = Infinity;
+  for (let i = 0; i < 60; i++) {
+    await page.evaluate(() => window.__dev.stepMonsters(0.5));
+    const s = await page.evaluate((id) => ({ latched: window.__dev.isLatched(id), sap: window.__dev.mobs().filter((m) => m.kind === 'sapper').map((m) => ({ x: m.pos.x, z: m.pos.z })) }), fab);
+    latched = latched || s.latched;
+    for (const m of s.sap) closest = Math.min(closest, Math.hypot(m.x - gate.x, m.z - gate.z));
+  }
+  row.shot = await shot('sapper-at-dome');
+  await page.evaluate(() => window.__dev.setMonstersSetting('off'));
+  const dome = closest >= 24.5;
+  return { ok: !latched && dome, detail: `fabricator ${fab}: latched=${latched}; the sapper came no closer than ${closest.toFixed(1)} m to the gate (the dome is 25 m)` };
+});
+
+// TASK-24: the sync lines (N-01 on Sync to Planetary Grid, N-02 on Desync). The pause menu's button plays them (narrator table).
+await beat('28d the sync lines: the pause menu\'s sync toggle plays N-01 when synced and N-02 when desynced', async (row) => {
+  await quiet();
+  await pauseOn();
+  await page.locator('.play-pause button', { hasText: 'Sync to Planetary Grid' }).click();
+  const n1 = await waitSub('N-01', 6000);
+  await quiet();
+  await page.locator('.play-pause button', { hasText: 'Desync to Solo Branch' }).click();
+  const n2 = await waitSub('N-02', 6000);
+  row.shot = await shot('sync-lines');
+  await pauseOff();
+  return { ok: n1 && n2, detail: `N-01 (synced)=${n1} N-02 (desynced)=${n2}` };
+});
+
 // ----------------------------------------------------------------------------------------------------------------------
 // The report
 // ----------------------------------------------------------------------------------------------------------------------
 const zeroErrors = consoleErrors.length === 0;
+console.log(`HUD overlaps (title, build hint, subtitle): ${hudViolations.length}${hudViolations.length ? " " + JSON.stringify(hudViolations.slice(0, 5)) : ""}`);
 console.log(`console errors: ${consoleErrors.length}${zeroErrors ? '' : ' ' + JSON.stringify(consoleErrors.slice(0, 5))}`);
 console.log(`http errors: ${httpErrors.length}${httpErrors.length ? ' ' + JSON.stringify(httpErrors.slice(0, 5)) : ''}`);
 const passed = results.filter((r) => r.ok).length;
-fs.writeFileSync(path.join(shotsDir, 'summary.json'), JSON.stringify({ results, consoleErrors, httpErrors }, null, 2));
+fs.writeFileSync(path.join(shotsDir, 'summary.json'), JSON.stringify({ results, consoleErrors, httpErrors, hudViolations }, null, 2));
 console.log(`${passed} of ${results.length} beats PASS`);
 
 server.kill();
 await browser.close();
-process.exit(passed === results.length && zeroErrors ? 0 : 1);
+process.exit(passed === results.length && zeroErrors && hudViolations.length === 0 ? 0 : 1);

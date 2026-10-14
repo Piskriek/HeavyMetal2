@@ -1,7 +1,7 @@
 /**
  * The monster renderer on the bench (apps/web/monsters.html, dev only) and in the window view. Starts its own Vite dev server on
  * MONSTERS_PORT (default 5197), shoots every skin per era, the eight views of a sprite and of a 3D model, a live leaksim arena through
- * wind-up, attack, pain and death, and the window with its walkers. Writes docs/shots/monsters/*.png and prints the checks.
+ * wind-up, attack, pain and death, and the window with its walkers. Writes shots-run/monsters/*.png and prints the checks.
  *   node scripts/test-monsters-render.mjs
  * Exit code 1 when a check fails or the page logs an error.
  */
@@ -24,7 +24,7 @@ if (!chromePath) {
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const webRoot = path.join(root, 'apps/web');
-const shotsDir = path.join(root, 'docs/shots/monsters');
+const shotsDir = path.join(root, 'shots-run/monsters');
 fs.mkdirSync(shotsDir, { recursive: true });
 const port = Number(process.env.MONSTERS_PORT ?? 5197);
 

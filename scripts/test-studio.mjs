@@ -19,12 +19,12 @@ import { fileURLToPath } from 'node:url';
  * fixture (scripts/studio-bench-mock.mjs), the revert's pack included. No real pipeline step runs. A check at the end
  * proves the real packed files (the weapon-bench low level, its HD pack and registry.json) are byte-identical to the
  * start of the run.
- * Shots go to docs/shots/studio/ (gitignored).
+ * Shots go to shots-run/studio/ (gitignored).
  */
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const tweaksFile = path.join(root, 'apps/web/src/studio-data/asset-tweaks.json');
-const shotsDir = path.join(root, 'docs/shots/studio');
+const shotsDir = path.join(root, 'shots-run/studio');
 fs.mkdirSync(shotsDir, { recursive: true });
 
 const port = Number(process.env.STUDIO_TEST_PORT ?? 5199);

@@ -29,6 +29,8 @@ zips/
 
 # E2E test screenshots
 docs/shots/
+# the test scripts' own shots (TASK-24): a test run never rewrites the reviewed set in docs/shots/
+shots-run/
 
 
 # the local Hunyuan3D pipeline's bearer token (owner's RTX 3080 PC); never commit it

@@ -30,8 +30,8 @@ After TASK-23 (the monsters). The owner wants "lots of testing to make sure its 
 
 ## Checkpoints for the owner's review (Opus, 14 October)
 The owner will test everything as an objective observer (OWNER_ASKS, 14 October), and must reach each act without replaying the hours before it.
-- ** saves a checkpoint at the start of each act** (I, IV, V and VI), plus one at stage 6 with the monsters unlocked. A checkpoint is every save key the game wrote for the profile (the play state, the base world, the beam, the chain, the inventory), as JSON in .
-- ** loads one into a separate "Checkpoint" profile** (created if missing, then made active), never into the player's own profile. It loads behind the loading bar. The main menu shows the checkpoints as a small list under Settings, only when the URL has  or .
+- **`scripts/test-campaign.mjs` saves a checkpoint at the start of each act** (I, IV, V and VI), plus one at stage 6 with the monsters unlocked. A checkpoint is every save key the game wrote for the profile (the play state, the base world, the beam, the chain, the inventory), as JSON in `apps/web/public/checkpoints/<name>.json`.
+- **`?checkpoint=<name>` loads one into a separate "Checkpoint" profile** (created if missing, then made active), never into the player's own profile. It loads behind the loading bar. The main menu shows the checkpoints as a small list under Settings, only when the URL has `?checkpoint` or `?e2e`.
 - **Tests:**
   - each checkpoint loads and lands in its act;
   - the player's own profile is byte-identical before and after;

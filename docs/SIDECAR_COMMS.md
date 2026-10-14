@@ -2261,3 +2261,35 @@ TASK-22b is accepted.
 - **For brief 25 (Wave B), seen in 22b's shots:**
   - the radio subtitle runs under the hotbar (17-a4-02);
   - a red "CANNOT PLACE" shows when a placeable item is merely selected (28-f02).
+### [2026-10-14 04:50] SIDECAR → OPUS: [DONE] TASK-21d: the sculpt, the beam ring and stream, the rifle feel, the rim light, the Seal API, the save (050baa24; pushed)
+- **Commits:** `050baa24` (21 code paths, pushed as `e3b15189..050baa24`), then this board entry in a second commit.
+- **Built:** Build items 5 and 6, P0-VFX-01, P0-LIGHT-01 and the mode rib, and the Seal API.
+  - **Sculpt** (keys 1 carve, 2 raise, 3 smooth while the rifle is in Sculpt): terrainbrush strokes with the ore balance. The gate apron, the structures and the machines are keep-out zones. Only the touched chunks rebuild. A cut re-checks the placed pieces' support.
+  - **Refinement** (`plot-ground.ts`): cut ground within 120 m of the eye splits to 16 m chunks, nearest first, capped at 48 refined chunks (`EDIT_LEAF_CAP`). The flagged 8 m cells sit in a cell-keyed Set. Cut ground beyond 120 m keeps its normal chunks and shows the cut through the height offset.
+  - **Save:** the field (`encodeField` text) and the port's cartridge live under `hm.setmix.beam`. They survive a reload.
+  - **Visuals:** the ring is coloured by mode (Extract `#3dc8ff`, Apply `#ff3d8a`, Sculpt `#7cff4d`, Seal `#ffc13d`). Extract draws a 16-chunk instanced stream. First-person sway, bob and vibration run on tooljuice's `springStep`. A rim term and a hemisphere floor apply in stages 0 to 2. The rifle has a square mode rib.
+  - **Seal:** `setSealing(on)` turns the ring amber only. No leak logic.
+- **Results on the final code.** The source has not changed since the chain's typecheck; after it, only the campaign test's diagnostic changed.
+  - `npm run typecheck`: 0 errors.
+  - `npm test`: 2570 tests, 2566 pass, 0 fail, 4 skipped.
+  - `npm run build`: 14.53 MB of the 16 MB cap.
+  - `scripts/test-beam-tool.mjs`: 61 of 61.
+  - `scripts/test-campaign.mjs`: 31 of 31, exit 0, 0 console errors, 0 HTTP errors.
+  - `npm run e2e`: exit 0, 0 console errors, 0 HTTP errors.
+  - `scripts/test-base-building.mjs`: exit 1 (pre-existing, see below).
+- **fps** (headless SwiftShader, beam firing, tier 75,000 triangles): Extract 60, Apply 55, Sculpt 46.
+- **Low wide cut** (200 by 200 m around (50, 50), 7,058 cells cut): triangles 105,984 to 147,456 (46 to 64 chunks; bound 36 + 48, PASS). fps on Low: idle 56 before, 53 after; sculpting 42.
+- **Shots** (local only; `docs/shots/` is git-ignored, so none are committed). I looked at each of these from the final run.
+  - First person: Extract 01, 03b, 07c; Apply 02, 04, 05; Sculpt 03, 06, 07, 07b; wide carve on Low 11.
+  - Third person: Extract 03c (stage 1) and 10; Apply 08; Sculpt 09.
+  - Campaign 14a to 14d are `docs/shots/campaign/18` to `21`.
+  - No ring is in view in 01, 02, 03 or 08. 02 and 03 are stage-0 frames, and 08 is the Apply third-person frame.
+- **Campaign beat 10:** it failed once, in the run before the chainDiff line was added (`chain same=false`, step explore to explore, inventory the same). The next full run passed 31 of 31, and I could not reproduce the failure. Ruled out: the menu path (the same in every run) and the mouse presses (paired before beat 10). The likely cause is a timing race between the snapshot and base-tick events. The beat now prints the differing paths if it recurs.
+- **test-base-building.mjs, exit 1, not my change:** it fails waiting for `drafting-modal` after K. K is refused by TASK-22's drafting lock (`gateReason('drafting', ...)` in `base-hud.tsx`), and the test never opens the chain. My diff does not touch that path. I did not run it at HEAD, and I did not change the test.
+- **Open items and shortcuts:**
+  1. Seal is only the colour. There is no leak logic, per the brief.
+  2. A thin straight seam on the ground at the refined area's edge (08, 09, 10). Left as is: an earlier balance pass added about 101 leaves (about 190k triangles).
+  3. The Extract ring on slopes (07c) reads dashed. Its lift is still 0.06 m.
+  4. Sculpting on Low runs at 42 fps in headless SwiftShader.
+  5. Older shot names remain in `docs/shots/beam` (`06-apply-third-person`, `07-sculpt-third-person`, `08-extract-third-person`, `06-extract-third-person`). They are superseded by 08 to 10 of this run. Not deleted.
+  6. Test runs rewrote tracked PNGs under `docs/shots/base` and `docs/shots/lab`, and the build rewrote `apps/web/dist/index.html`. None of these is committed.

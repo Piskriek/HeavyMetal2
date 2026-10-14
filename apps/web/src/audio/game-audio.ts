@@ -61,7 +61,7 @@ export function saveAudioSettings(s: Partial<AudioSettings>): void {
   kv.set(SETTINGS_KEY, JSON.stringify({ ...cur, ...s }));
 }
 
-export type MusicContext = 'silent' | 'lab' | 'moon' | 'monster-mash' | 'driving';
+export type MusicContext = 'silent' | 'lab' | 'moon' | 'monsters' | 'driving';
 
 export interface PositionalVoice {
   id: string;
@@ -452,7 +452,7 @@ export class GameAudioController {
     // Target gains based on context
     const labTarget = this.currentContext === 'lab' ? 1.0 : 0.0;
     const moonTarget = this.currentContext === 'moon' ? 1.0 : 0.0;
-    const mashTarget = this.currentContext === 'monster-mash' ? 1.0 : 0.0;
+    const mashTarget = this.currentContext === 'monsters' ? 1.0 : 0.0;
     const drivingTarget = this.currentContext === 'driving' ? 1.0 : 0.0;
 
     this.labMusicGain.gain.setTargetAtTime(labTarget, now, tc);
@@ -465,7 +465,7 @@ export class GameAudioController {
       this.ensureLabMusicRunning();
     } else if (this.currentContext === 'moon') {
       this.ensureMoonScoreRunning();
-    } else if (this.currentContext === 'monster-mash') {
+    } else if (this.currentContext === 'monsters') {
       this.ensureMashMusicRunning();
     } else if (this.currentContext === 'driving') {
       this.ensureDrivingMusicRunning();
@@ -597,7 +597,7 @@ export class GameAudioController {
     if (engaged) {
       this.calmTimer = 0;
       if (!this.isDriving && this.currentContext !== 'lab') {
-        this.setMusicContext('monster-mash', 2.0);
+        this.setMusicContext('monsters', 2.0);
       }
     }
   }
@@ -609,7 +609,7 @@ export class GameAudioController {
       this.setMusicContext('driving', 1.5);
     } else {
       if (this.mobsEngaged) {
-        this.setMusicContext('monster-mash', 2.0);
+        this.setMusicContext('monsters', 2.0);
       } else {
         this.setMusicContext('moon', 1.5);
       }
@@ -1068,7 +1068,7 @@ export class GameAudioController {
     }
 
     // Monster mash calm countdown
-    if (!this.mobsEngaged && this.currentContext === 'monster-mash') {
+    if (!this.mobsEngaged && this.currentContext === 'monsters') {
       this.calmTimer += dt;
       if (this.calmTimer >= 10.0) {
         if (!this.isDriving) {

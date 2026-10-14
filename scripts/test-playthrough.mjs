@@ -9,7 +9,7 @@
  *   9 rover: enter the scout, drive (the driving music), 10 monsters: mobs, combat music, a kill (M-02),
  *   11 reload: the save loads and Act I does not replay.
  *
- * Every beat: a shot in docs/shots/playthrough/, the FPS over two seconds, and a pass or fail. Console errors and HTTP
+ * Every beat: a shot in shots-run/playthrough/, the FPS over two seconds, and a pass or fail. Console errors and HTTP
  * errors (404s) are collected across the whole run. Exit code 1 when any beat fails.
  */
 import { chromium } from 'playwright-core';
@@ -30,7 +30,7 @@ if (!chromePath) {
 }
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const shotsDir = path.join(root, 'docs/shots/playthrough');
+const shotsDir = path.join(root, 'shots-run/playthrough');
 fs.mkdirSync(shotsDir, { recursive: true });
 // this run's shots only: earlier runs' files would be mixed in
 for (const f of fs.readdirSync(shotsDir)) {
@@ -400,15 +400,15 @@ await beat('10 monsters: mobs engage, combat music, a kill (M-02)', async (row) 
     await page.evaluate(() => window.__dev.fire());
     await page.waitForTimeout(600);
     const now = await page.evaluate(() => window.hmPlay.audio?.getMusicContext?.() ?? null);
-    if (now === 'monster-mash') music = now;
+    if (now === 'monsters') music = now;
   }
   const stats = await page.evaluate(() => window.__dev.stats());
   // the radio log keeps every line that played (a subtitle is only up for a few seconds)
   const heard = await page.evaluate(() => window.hmPlay?.heard?.() ?? []);
   const m02 = heard.includes('M-02') || (await waitSub('M-02', 3000));
-  row.shot = await shot('monster-mash');
+  row.shot = await shot('monsters');
   const kills = stats?.mobsDefeated ?? 0;
-  const ok = kills >= 1 && m02 && music === 'monster-mash';
+  const ok = kills >= 1 && m02 && music === 'monsters';
   return { ok, detail: `kills=${kills} M-02=${m02} music=${music} stats=${JSON.stringify(stats).slice(0, 160)}` };
 });
 

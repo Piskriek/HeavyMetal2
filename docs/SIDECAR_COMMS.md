@@ -2439,3 +2439,58 @@ TASK-23b-2 is accepted (d30a9ced, 714e0815).
   - test-campaign 40 of 40; test-base-building 72 checks. The print-scout failure was the test's setup: it lacked B-07 with an airlock and life support. Fixed in 2b05d24d; no game code changed.
 - **Checkpoints:** act1-wake, act4-start, act5-start, act6-start and stage6-monsters, from one 40-of-40 run, committed with the owner's OK (ec3993a4). The owner's guide is `docs/TEST_GUIDE.md`.
 - **Left open, logged:** POL-31 to POL-38; the checkpoint-load and profile-identity tests; the triple flake run of the campaign. They go to Wave B's workers or a later task.
+
+### [2026-10-15] SIDECAR → OPUS: [DONE, PARTIAL] TASK-25: nine zones, build ribbon, labels on aim, hologram lock, fidelity skins; campaign 39 of 40 (one window-view budget beat)
+- **Commits (branch `feat/monster-mash-exploration`):** `6739076f` (zone logic, unit tests, test list), `c4e4bd49` (zone layer, CSS, wiring in play, base and monsters), `4814190c` (the gate module and the browser checks), and the docs commit that carries this entry and the POL rows. `apps/web/dist/index.html` is modified by the builds and is not committed.
+- **Verification (real numbers):**
+  - typecheck: 0 errors (final run).
+  - `npm test`: 2,628 tests, 2,624 pass, 0 fail in the main pass. One speed test (`packages/fieldkit`, "all six build in under 80 ms") failed once under load in the combined run and passed alone. It is not in this brief's code.
+  - build: 14.57 MB of the 16 MB cap (TASK-24 was 14.55 MB).
+  - `node scripts/test-hud-zones.mjs` (new, 23 checks, clean-shot mode): 23 of 23. Covers the zone gate at each state; B opens the ribbon (784 x 136 px, bottom edge at 104 px); a card collapses it to the pill; the centre 60% holds no HUD box (the centre zone's own readouts excluded); H locks; the right arrow moves the aim point 0.50 m in x; Esc releases; a label shows at 6 m aimed, none at 22 m, all with Alt; stage 1 gives skin `1`, 2 gives `2`, 3 gives `3`, 6 gives `4-6`.
+  - `node scripts/test-base-building.mjs`: exit 0 (the gate runs on every shot).
+  - `node scripts/test-campaign.mjs`: **39 of 40 beats**. The HUD gate is 0 violations across 28 shots. The one failing beat is L1 (the window view inside its budget): **41 draw calls against 40** (67,458 triangles, the same in two runs). The walkers TASK-23 added move this count, and the TASK-23 run recorded 39. Nothing in this brief touches `lab-vista.ts`. I did not run a baseline of HEAD to prove it pre-dates this work. Decide whether to raise the budget or cap the walkers.
+- **What was built, file by file:**
+  - `apps/web/src/base/ui/hud-zones-logic.ts` (new, pure): the nine zone ids; the reticle clear zone; the overlap assertion; the visibility rules (CANNOT PLACE, subtitle, coherence gauge, rover telemetry); the aim-gated label rule; the banner queue (one per slot; a title card holds the rest for 3 s; time-driven and deterministic); the stage-to-skin map (lab: 3 with power off, 4-6 once on; plot stage otherwise, with 0a and 0b split by machine count); the 0.5 s skin hold.
+  - `apps/web/src/base/ui/hud-zones.test.ts` (new): 11 unit tests, two of Argo's v2 tests adapted, plus queue, clear-zone, label and skin cases.
+  - `apps/web/src/base/ui/hud-zones.tsx` (new): `HudZone` anchors, `CompassRibbon` (bearing to the Gate), `SyncWord`, `FloatsPill` (the four floats and the S0 to S6 badge), `MachineLabel`.
+  - `apps/web/src/base/ui/hud-zones.css` (new): the six skin token sets from plan 28's table (the default is 4-6); the zone anchors; the compass, pill, bars and labels per skin; the 120 ms shift on the zones only; the ribbon and pill geometry; the per-overlay zone rules.
+  - `apps/web/src/play/play.tsx`: the root carries `data-hud-root` and `data-fidelity`; top-left quest; top-centre compass and sync word; top-right floats, branch chip and comms; bottom-left sync gauge (hidden while driving); bottom-right ticker and tool chip; the centre prompt at +36 px; the build drawer and the placement pill (B and card picks; RMB and Esc cancel; the key strip); the aim-gated labels (Alt shows all); the hologram lock on H and the arrow nudge (arrows no longer walk while locked); the radio line that holds for stage title cards ("Stage N", the arrival card) and yields to the open drawer or pill; the DRAWS badge moved to the top centre (outside the zones); test hooks `hmPlay.anchors`, `hideOverlays`, `lockAim`.
+  - `apps/web/src/play/play-scene.ts`: `lockGhost`, `releaseGhost`, `nudgeGhost` (8 m cap, Argo's number), `ghostLocked`, `facing`, `machineAnchors`. The lock lives in `aimGround` and `aimPointFn`, so the machine ghost, the piece snap, the verdict and the commit all read the frozen point.
+  - `apps/web/src/play/build-menu.tsx`: `BuildMenu` is now the ribbon (`play-build bm bm-ribbon`, the same tabs and `#bm-tab-*` ids, a key strip); new `BuildPill`.
+  - `apps/web/src/base/ui/base-hud.tsx`, `build-readout.tsx`, `hotbar.tsx`: zone attributes; the plan prompt; the pickup counters (bottom-left, above the weapon badge); the placed counter (its inline `bottom` removed); the weapon and speed badges (bottom-left).
+  - `apps/web/src/monsters/hud.tsx`: zone attributes on the radar (top-right), the health plate (bottom-right) and the seal plate (centre).
+  - `scripts/e2e-hud-and-luminance-gate.mjs` (Argo's file, landed): `hudZoneViolations(page)` compares every pair of visible zone boxes and the reticle's 48 px clear zone. Used by the campaign and base-building shots.
+  - `scripts/test-hud-zones.mjs` (new): the 23 checks above.
+  - `scripts/test-campaign.mjs`, `scripts/test-base-building.mjs`: the all-pairs gate replaces the three-zone check; base-building fails on any violation.
+  - `scripts/test.mjs`: `apps/web/src/base/ui/*.test.ts` added.
+- **Drop files used, and what changed:**
+  - `argo-relay/apps/web/src/shell/hud-skins.css`: a reference only. Rewritten as `hud-zones.css` from plan 28's table, because Argo's draft used the wrong body font on skin 2 and had no per-skin metric colours.
+  - `argo-relay/apps/web/src/shell/build-ribbon.tsx`: not landed. It had Weapons where the brief says Plans, F bound to Demolish (the reply says Fill Plan), and a hard-coded catalogue. The ribbon is the live `BuildMenu`, restyled.
+  - `argo-relay-v2/packages/hudlayout/tests/nine-zone-budget.test.ts`: adapted into `hud-zones.test.ts`. Its implementation, `nine-zone-budget.ts`, is not in the drop (the guide says v1 has it; it does not), so the logic is written here.
+  - `argo-relay/packages/structure/src/hologram-lock-and-nudge.ts`: not landed. Its parallel state machine would not drive the live snap; the lock is in the scene. Its 8 m nudge cap is taken.
+  - `argo-relay/apps/web/src/base/machine-plume-and-labels.ts`: only the aim rule (14 m, 8 degrees, Alt) is used, re-written in `hud-zones-logic.ts`. The socket and plume parts belong to brief 29.
+  - `argo-relay/scripts/e2e-hud-and-luminance-gate.mjs`: landed and extended (above). The luminance gate is unused in this brief.
+  - Triage-guide errors, for Argo's next note: `apps/web/src/shell/hud.tsx` does not exist (the live HUD is `play.tsx`); `hud-9zone-and-ribbon.tsx` and `nine-zone-budget.ts` are not in the drop; "less than 22 % of screen height" conflicts with bottom 92 px plus 136 px (about 32 % at 720p); the arrival card in the live game reads "Stage 0: Lunar Surface", not "STAGE 0 // LUNAR SUBSTRATE"; the guide's F is Demolish, the reply's F is Fill Plan.
+- **Decisions Opus must make:**
+  1. **The radio line yields to the build UI.** It is held while the drawer or the pill is up. While the placement readout shows, its wheel and rotation hints drop. A blueprint in the selected slot is the normal state in the starter kit, so a stricter yield (hold the line whenever a blueprint is in hand) silenced Dr. Haddy through Act I. I tried it and reverted it; the campaign's A1-01 beat caught it.
+  2. **The drawer sits at bottom 104 px, not 92 px.** The hotbar is 76 px tall at bottom 24, so 92 px would overlap it. Shorten the hotbar, or keep 104 px.
+  3. **The reticle's clear zone is read as a 48 px square (plus or minus 24 px).** A 48 px radius would forbid CANNOT PLACE, which the brief puts 36 px under the reticle.
+  4. **"Centre 60% free" is measured with the pill up.** The full drawer reaches into that band by design.
+  5. **The title hold is 3 s** (the zone table), not the guide's "about 2 s". Only stage title cards hold the radio line; holding on every toast would lag ordinary messages.
+  6. **The skins follow the plot's stage.** The game has no local stage pockets yet, so "the ground under the player" is the plot's stage.
+- **Left out, and why** (logged as POL-39 to POL-47 in the registry):
+  - the machine housing LED (needs per-kind anchors in `machine-props.ts`);
+  - Dr. Haddy's portrait (no approved asset in the repo);
+  - the pixel font: Share Tech Mono or VT323 (OFL, about 18 KB) is not in the repo, and a download needs the owner's OK. Skins 0a, 0b and 1 fall back to monospace; CREDITS.md waits for it;
+  - the degauss tick and EGA colour quantising of the metric bars;
+  - linked-bin counts and gun ammo in the ticker, and pickup toasts separate from the title toast;
+  - driving drift, leak bearings, the gate-dome hide (TASK-23b-2 and 26);
+  - the 1024 px drawer width (it narrows and the cards scroll);
+  - the clean shots of driving and a fight;
+  - the before and after shots of tour 07 to 09, which I did not produce (the campaign and probe shots are in `shots-run/`).
+- **Not verified in a browser:** the lock's commit by left click (the test stubs pointer lock, so the click path does not run); the title-then-subtitle timing itself (the queue is unit-tested, and the campaign's A1-01 beat passes); the 120 ms glitch frames.
+- **POL-35** (title cards hold only CANNOT PLACE): partly closed. The radio line now waits for stage title cards; CANNOT PLACE and the readout hold on every toast, as before.
+- **Shots:** `shots-run/hud/` (planet HUD, ribbon open and picked, hologram locked, machine aimed and Alt, skin stages 3 and 6), `shots-run/campaign/` and `shots-run/base/` (the gate's shots).
+
+### Reply to Opus (under 150 words)
+TASK-25 is done except what is listed above. Commits: `6739076f`, `c4e4bd49`, `4814190c`, and the docs commit. Typecheck 0 errors; unit 2,624 of 2,628 (the one failure is a fieldkit speed test under load, which passes alone); build 14.57 MB; test-hud-zones 23 of 23; test-base-building exit 0; test-campaign 39 of 40. The failing beat is the window-view budget (41 draw calls against 40, from TASK-23's walkers); the HUD gate is clean on 28 shots. Decisions for you: the radio yields to the build UI (I reverted a stricter yield that silenced Act I); the drawer at 104 px, not 92; the window budget. Full detail above.

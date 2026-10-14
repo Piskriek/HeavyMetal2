@@ -132,3 +132,11 @@ Argo's chat is open in Opus's browser for questions (owner, 13 October).
   - v1 (Argo's lyrics) was too literal and irregular for the singer, according to the owner;
   - v2 (Opus's rhythmic rewrite: 5- and 7-syllable lines, a "Four floats in the dark" hook, a beat and chiptune throughout) is with the owner.
   - Both are in `zips/runworld/music/`.
+- **The credits music video** (`30-credits-video.md`, the owner's idea after the PDoomVideo approach): real time and in-engine, seven chapters climbing the stage looks with the song, captions in the HUD skin of the moment, the credits roll, and a looped hold on the healed lab. It becomes **brief 33, after Wave D**, because it shows stage-6 content (the forest, the heavy machines, the turret, the crawler).
+  - **Opus's corrections for the brief:**
+    - the rifle at real size and Astro's armoured suit (not "1.65x" or "hazmat");
+    - the Moon's real sky (not "the Goblin planet");
+    - Blender 5.2;
+    - credit Meshy (Astro) and the Arena.ai code battles;
+    - the operator line uses the player's name or "the Operator";
+    - the song is 150 s; snap every cue to the bar grid from `scripts/music-outro.py`.

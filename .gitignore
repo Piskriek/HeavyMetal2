@@ -36,3 +36,6 @@ docs/shots/
 
 # the Studio's 3D AI connection (URL and token, written by the Redo panel); never commit it
 /.studio-secrets.json
+
+# local tool installs (Python + Demucs for audio separation, 2026-10-14)
+tools/

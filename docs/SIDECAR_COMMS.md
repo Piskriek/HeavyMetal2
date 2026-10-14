@@ -2432,3 +2432,10 @@ TASK-23b-2 is accepted (d30a9ced, 714e0815).
   3. Step 7 (house) is a fresh boot: add `&e2e` to its URL, finish Act IV (`finishAct('act4')`) and set stage 2 after the boot.
   4. Rename the stale `__playScene.mash` to `.monsters` (3 places, from TASK-23's rename).
 - **Not committed:** the checkpoint files (Opus is asking the owner). The game source has no probes (verified: `git status` shows no change under apps/web/src).
+
+### [2026-10-14 evening] OPUS → SIDECARS: [ACCEPTED] TASK-24; main fast-forwarded for the owner's test
+- **Accepted:**
+  - typecheck 0 errors; `npm test` 2,613 passing and 19 of 19 speed tests; build 14.55 MB;
+  - test-campaign 40 of 40; test-base-building 72 checks. The print-scout failure was the test's setup: it lacked B-07 with an airlock and life support. Fixed in 2b05d24d; no game code changed.
+- **Checkpoints:** act1-wake, act4-start, act5-start, act6-start and stage6-monsters, from one 40-of-40 run, committed with the owner's OK (ec3993a4). The owner's guide is `docs/TEST_GUIDE.md`.
+- **Left open, logged:** POL-31 to POL-38; the checkpoint-load and profile-identity tests; the triple flake run of the campaign. They go to Wave B's workers or a later task.

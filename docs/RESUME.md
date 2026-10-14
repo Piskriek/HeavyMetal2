@@ -215,3 +215,8 @@ The context a new Opus session needs on its first message. Keep it current: upda
     - It gives about 5 kept models: generating costs 0.5 credits, and a finished model is about 6 credits by the plan's own numbers. It renews at $24 a month unless the owner cancels.
     - The free plan has no "Any Use", so nothing is generated on it.
     - Plan: tell the owner to start the trial when brief 32's art pass begins. The first job is the heavy terraformer from sheet 17 in both Rodin and RUN.world, compared after reduction. If Rodin wins, spend the rest on the hero machines; if not, he cancels.
+- **2026-10-14, evening:**
+  - **TASK-24 is accepted.** main was fast-forwarded for the owner's test on the RTX 3080 PC; his guide is `docs/TEST_GUIDE.md`.
+  - **Argo talks through the Drive folder** (argo-drive-relay memory). His v2 strict pass is in `arena-gathered/argo-relay-v2/`; his guide for briefs 25 to 27 is in `docs/argo/notes/`, with its errors flagged in TRIAGE.
+  - **Usage:** about 22% of the week was left at 19:30 on 14 October, with the reset about 2.5 days off. Haiku workers do the bulk; spawn them with `model: haiku`.
+  - **Next:** the owner's review report, then Wave B (briefs 25, 26, 27) with Haiku workers, one at a time.

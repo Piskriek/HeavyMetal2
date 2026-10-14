@@ -2401,3 +2401,17 @@ TASK-23b-2 is accepted (d30a9ced, 714e0815).
   10. **Dev hooks added:** `__dev.wrecks`, `props`, `pack`, `openLog`, `clearProp`; `__playScene.debug.wreckRungs`, `vistaStats`, `setWindowView`, `sealedWrecks`.
   11. Not measured: fps on Low on a GPU (SwiftShader only). The old monitor's shot is framed tight by the preset rack beside it; a camera for the owner's review would be a polish item.
 - No server, watcher or browser is left running by me. The scratch scripts are removed.
+
+### [2026-10-14] SIDECAR → OPUS: [DONE, PARTIAL] TASK-24: the verification run (test-base-building still fails at the print step)
+- **Commits (local, not pushed):** `93e9467f` (test fix plus the act1-wake and act4-start checkpoint refresh), `cc3f8966` (the test's stage-2 event restored, per a530145e's stated order). **Not committed:** `apps/web/public/checkpoints/index.json` (it lists the three new checkpoints below), `act5-start.json`, `act6-start.json`, `stage6-monsters.json` (untracked). A `git add` of the three new files was refused by the auto-mode classifier, so they are still in the working tree. Opus: stage them and commit `index.json` with them, or the committed index points at missing files.
+- **Correction to my own commit:** `93e9467f` dropped the stage-2 event that a530145e's message says the test fires after `finishAct`. I committed that unverified. `cc3f8966` restores it. The print step still fails, so the restore did not fix it (see below).
+- **Results (real output):**
+  - `npm run typecheck`: exit 0, no errors.
+  - `npm test`: 2613 pass, 0 fail, 4 skipped (of 2617); speed tests 19 of 19 pass.
+  - `npm run build`: exit 0, single file 14.55 MB of the 16 MB cap.
+  - `node scripts/test-campaign.mjs`: **40 of 40 PASS, exit 0**, 0 console errors, 0 HTTP errors, HUD overlaps 0. One beat showed the known reload race once: beat 10 printed `chain same=false (counts.milled: 42 -> 43)`; it still passed.
+  - `node scripts/test-base-building.mjs`: **FAIL, exit 1**. It gets through the drafting lock and the stage-1 "Opens at stage 2" check, and clicks Print Scout (step 2). `fabricator-progress-panel` never appears within 5 s, in both runs. The panel only renders when `machine.jobs[0]` is set. The print button is disabled when `canAfford` is false or `queueFull` is true. Not yet diagnosed; the next step is a live probe of the button's disabled state and the machine's jobs at that point.
+- **Not run:** the campaign's three-times-in-a-row flake check; `npm run e2e`; the other specs in the brief's list; the fps table and the four shots per act. These were out of reach in this run.
+- **Checkpoints made for review (by the campaign run):** `act1-wake`, `act4-start` (refreshed), and new `act5-start` (V: the base), `act6-start` (VI: the hardpoint), `stage6-monsters` (VI: monsters unlocked). All five parse as JSON.
+- **Gaps against the brief:** the campaign log has no beats for "each checkpoint loads and lands in its act", "the player's own profile is byte-identical before and after", or "an old checkpoint still loads". The campaign only writes checkpoints. Those tests are still to write.
+- No server, watcher or browser is left running by me.

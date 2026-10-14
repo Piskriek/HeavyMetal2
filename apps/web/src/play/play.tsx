@@ -2807,6 +2807,10 @@ export function PlayScreen(props: {
       /** Whether a sapper holds a base machine this moment (its output halves; P0-MON-03). */
       isLatched: (machineId: number): boolean => sceneRef.current?.monsters.isLatched(machineId) ?? false,
       /** The F-03 flag (the monsters fight once the first gun exists). A test sets it; the chain sets it on F-03. */
+      /** A finished act (TASK-24): marks the act's quest done and advances the chain, for the tests that do not play its steps. */
+      finishAct: (quest: string): void => {
+        updateChain((c) => advanceChain({ ...c, progress: { ...c.progress, finished: [...c.progress.finished.filter((x) => x !== quest), quest] } }));
+      },
       unlockMonsters: (on = true): void => {
         updateChain((c) => ({ ...c, monstersUnlocked: on }));
         sceneRef.current?.monsters.setUnlocked(on);

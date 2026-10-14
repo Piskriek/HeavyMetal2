@@ -19,7 +19,7 @@
  *   7. Remove the floor tile -> verify cascading collapse of the bin
  *   8. Verify ore refund in player inventory
  *   9. Verify drafted blueprint appears in inventory
- * - Captures verification screenshots into docs/shots/base/
+ * - Captures verification screenshots into shots-run/base/
  */
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright-core';
@@ -40,7 +40,7 @@ if (!chromePath) {
 }
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const shotsDir = path.join(root, 'docs/shots/base');
+const shotsDir = path.join(root, 'shots-run/base');
 if (!fs.existsSync(shotsDir)) {
   fs.mkdirSync(shotsDir, { recursive: true });
 }
@@ -102,8 +102,9 @@ page.on('console', (msg) => {
 });
 
 try {
-  console.log(`Navigating to http://localhost:${port}/?base&kit=1...`);
-  await page.goto(`http://localhost:${port}/?base&kit=1${scoutQuery}`, { waitUntil: 'domcontentloaded' });
+  // ?e2e is the debug switch (window.__dev): the test reaches the drafting table through the campaign's own stage event
+  console.log(`Navigating to http://localhost:${port}/?base&kit=1&e2e...`);
+  await page.goto(`http://localhost:${port}/?base&kit=1&e2e${scoutQuery}`, { waitUntil: 'domcontentloaded' });
 
   // Wait for Play Canvas to initialize
   const canvas = page.locator('canvas.play-canvas');
@@ -157,8 +158,8 @@ try {
   const isReadoutVisible = await buildReadout.isVisible();
   console.log('OK: Build Readout under reticle visible:', isReadoutVisible);
 
-  await takeScreenshot(page, { path: 'docs/shots/base/hotbar-selection.png' });
-  console.log('Captured docs/shots/base/hotbar-selection.png');
+  await takeScreenshot(page, { path: 'shots-run/base/hotbar-selection.png' });
+  console.log('Captured shots-run/base/hotbar-selection.png');
 
   // 2. Open Inventory Window using 'Tab'
   console.log('Opening Inventory Window using Tab...');
@@ -192,8 +193,8 @@ try {
   await page.mouse.move(0, 0);
   await page.waitForTimeout(200);
 
-  await takeScreenshot(page, { path: 'docs/shots/base/inventory-window.png' });
-  console.log('Captured docs/shots/base/inventory-window.png');
+  await takeScreenshot(page, { path: 'shots-run/base/inventory-window.png' });
+  console.log('Captured shots-run/base/inventory-window.png');
 
   // Test Quick Stack button
   const quickStackBtn = page.locator('[data-testid="quick-stack-btn"]');
@@ -230,6 +231,11 @@ try {
   });
   await page.waitForTimeout(400);
 
+  // The drafting table opens after chain step A4-04 (TASK-22's drafting lock). The stage-2 bloom completes that step, the
+  // same event the campaign's beat 16 uses; the lock itself stays as it is.
+  await page.evaluate(() => { window.__dev.setStage(2); window.__dev.finishAct('act4'); });
+  await page.waitForTimeout(400);
+
   console.log('Opening Drafting Table using K...');
   await page.keyboard.press('k');
   const draftModal = page.locator('[data-testid="drafting-modal"]');
@@ -261,8 +267,8 @@ try {
     throw new Error('Cost table does not contain Structural Cube requirement');
   }
 
-  await takeScreenshot(page, { path: 'docs/shots/base/drafting-window.png' });
-  console.log('Captured docs/shots/base/drafting-window.png');
+  await takeScreenshot(page, { path: 'shots-run/base/drafting-window.png' });
+  console.log('Captured shots-run/base/drafting-window.png');
 
   // Test Layouts tab
   console.log('Switching to Layouts tab in Drafting Table...');
@@ -303,8 +309,8 @@ try {
   console.log('OK: Mini footprint SVG is visible:', await miniSvg.isVisible());
 
   // Capture layouts-tab.png
-  await takeScreenshot(page, { path: 'docs/shots/base/layouts-tab.png' });
-  console.log('Captured docs/shots/base/layouts-tab.png');
+  await takeScreenshot(page, { path: 'shots-run/base/layouts-tab.png' });
+  console.log('Captured shots-run/base/layouts-tab.png');
 
   // Share button test
   const shareBtn = layoutCard.locator('.hm-layout-card-btn.share');
@@ -360,8 +366,8 @@ try {
   const rangeBadge = page.locator('[data-testid="quantum-range-badge"]');
   console.log('OK: Quantum Range Status:', (await rangeBadge.textContent())?.trim());
 
-  await takeScreenshot(page, { path: 'docs/shots/base/lattice-window.png' });
-  console.log('Captured docs/shots/base/lattice-window.png');
+  await takeScreenshot(page, { path: 'shots-run/base/lattice-window.png' });
+  console.log('Captured shots-run/base/lattice-window.png');
 
   // Close lattice window
   await page.keyboard.press('Escape');
@@ -661,8 +667,8 @@ try {
   if (!harvestVerdict.ok) throw new Error(harvestVerdict.error);
 
   await page.waitForTimeout(300);
-  await takeScreenshot(page, { path: 'docs/shots/base/beam-harvesting.png' });
-  console.log('Captured docs/shots/base/beam-harvesting.png');
+  await takeScreenshot(page, { path: 'shots-run/base/beam-harvesting.png' });
+  console.log('Captured shots-run/base/beam-harvesting.png');
 
   // Turn live beam off after screenshot
   await page.evaluate(() => {
@@ -745,8 +751,8 @@ try {
   await machinePickerModal.waitFor({ state: 'visible', timeout: 5000 });
   console.log('OK: Machine Picker modal is visible');
 
-  await takeScreenshot(page, { path: 'docs/shots/base/machine-picker-modal.png' });
-  console.log('Captured docs/shots/base/machine-picker-modal.png');
+  await takeScreenshot(page, { path: 'shots-run/base/machine-picker-modal.png' });
+  console.log('Captured shots-run/base/machine-picker-modal.png');
 
   // Click install heavy mill
   const installMillBtn = page.locator('[data-testid="install-btn-mill"]');
@@ -776,8 +782,8 @@ try {
   await refineryModal.waitFor({ state: 'visible', timeout: 5000 });
   console.log('OK: Refinery Modal is visible');
 
-  await takeScreenshot(page, { path: 'docs/shots/base/refinery-modal.png' });
-  console.log('Captured docs/shots/base/refinery-modal.png');
+  await takeScreenshot(page, { path: 'shots-run/base/refinery-modal.png' });
+  console.log('Captured shots-run/base/refinery-modal.png');
 
   // Queue 'map-basalt' recipe via button
   const queueMapBtn = page.locator('[data-testid="queue-btn-map-basalt"]');
@@ -1040,8 +1046,8 @@ try {
   await page.waitForTimeout(500);
 
   // Capture plan ghost screenshot
-  await takeScreenshot(page, { path: 'docs/shots/base/plan-ghost.png' });
-  console.log('Captured docs/shots/base/plan-ghost.png');
+  await takeScreenshot(page, { path: 'shots-run/base/plan-ghost.png' });
+  console.log('Captured shots-run/base/plan-ghost.png');
 
   await page.evaluate(() => {
     window.__hm?.hideOverlays?.(false);
@@ -1156,8 +1162,8 @@ try {
     }
   });
   await page.waitForTimeout(600);
-  await takeScreenshot(page, { path: 'docs/shots/base/shelter-s1.png' });
-  console.log('Captured docs/shots/base/shelter-s1.png');
+  await takeScreenshot(page, { path: 'shots-run/base/shelter-s1.png' });
+  console.log('Captured shots-run/base/shelter-s1.png');
 
   // Screenshot: kit-outpost-s1.png
   await page.evaluate(() => {
@@ -1194,8 +1200,8 @@ try {
     }
   });
   await page.waitForTimeout(600);
-  await takeScreenshot(page, { path: 'docs/shots/base/kit-outpost-s1.png' });
-  console.log('Captured docs/shots/base/kit-outpost-s1.png');
+  await takeScreenshot(page, { path: 'shots-run/base/kit-outpost-s1.png' });
+  console.log('Captured shots-run/base/kit-outpost-s1.png');
 
   // Screenshot: kit-outpost-s6.png
   await page.evaluate(() => {
@@ -1232,8 +1238,8 @@ try {
     }
   });
   await page.waitForTimeout(600);
-  await takeScreenshot(page, { path: 'docs/shots/base/kit-outpost-s6.png' });
-  console.log('Captured docs/shots/base/kit-outpost-s6.png');
+  await takeScreenshot(page, { path: 'shots-run/base/kit-outpost-s6.png' });
+  console.log('Captured shots-run/base/kit-outpost-s6.png');
   await page.evaluate(() => {
     window.__playScene?.debug.clearAltCam?.();
   });
@@ -1282,8 +1288,8 @@ try {
     scene?.debug.teleport('planet', 4, 24, Math.PI / 2, -0.15);
   });
   await page.waitForTimeout(600);
-  await takeScreenshot(page, { path: 'docs/shots/base/integrity-five.png' });
-  console.log('Captured docs/shots/base/integrity-five.png');
+  await takeScreenshot(page, { path: 'shots-run/base/integrity-five.png' });
+  console.log('Captured shots-run/base/integrity-five.png');
 
   // Toggle integrity back OFF
   await page.evaluate(() => {
@@ -1314,8 +1320,8 @@ try {
     scene?.frame(0, 0.016, { move: { x: 0, z: 0 }, look: { dx: 0, dy: 0 }, run: false, altCam: true });
   });
   await page.waitForTimeout(600);
-  await takeScreenshot(page, { path: 'docs/shots/base/socket-glow.png' });
-  console.log('Captured docs/shots/base/socket-glow.png');
+  await takeScreenshot(page, { path: 'shots-run/base/socket-glow.png' });
+  console.log('Captured shots-run/base/socket-glow.png');
   await page.evaluate(() => {
     window.__playScene?.debug.clearAltCam?.();
   });
@@ -1336,8 +1342,8 @@ try {
     }
   });
   await page.waitForTimeout(600);
-  await takeScreenshot(page, { path: 'docs/shots/base/build-camera.png' });
-  console.log('Captured docs/shots/base/build-camera.png');
+  await takeScreenshot(page, { path: 'shots-run/base/build-camera.png' });
+  console.log('Captured shots-run/base/build-camera.png');
   await page.keyboard.up('Alt');
 
   // =========================================================================
@@ -1419,8 +1425,8 @@ try {
   }
   console.log('OK: Verified Stage 1 lock message: "Opens at stage 2"');
 
-  await takeScreenshot(page, { path: 'docs/shots/base/fabricator-window.png' });
-  console.log('Captured docs/shots/base/fabricator-window.png');
+  await takeScreenshot(page, { path: 'shots-run/base/fabricator-window.png' });
+  console.log('Captured shots-run/base/fabricator-window.png');
 
   // Step 2: Advance to stage 2, print scout, verify progress bar, wait for printed
   await page.evaluate(() => {
@@ -1439,8 +1445,8 @@ try {
   await progressPanel.waitFor({ state: 'visible', timeout: 5000 });
   console.log('OK: Print progress bar visible');
 
-  await takeScreenshot(page, { path: 'docs/shots/base/printing.png' });
-  console.log('Captured docs/shots/base/printing.png');
+  await takeScreenshot(page, { path: 'shots-run/base/printing.png' });
+  console.log('Captured shots-run/base/printing.png');
 
   // Advance simulation tick so print finishes
   await page.evaluate(() => {
@@ -1502,8 +1508,8 @@ try {
   });
   await page.waitForTimeout(600);
 
-  await takeScreenshot(page, { path: 'docs/shots/base/scout-driving.png' });
-  console.log('Captured docs/shots/base/scout-driving.png (chase camera)');
+  await takeScreenshot(page, { path: 'shots-run/base/scout-driving.png' });
+  console.log('Captured shots-run/base/scout-driving.png (chase camera)');
 
   // Continue driving for at least 50m over bumpy ground and verify the scout never sinks below terrain
   console.log('\n--- Driving Scout Rover 50m over Bumpy Ground & Terrain Clearance Verification ---');
@@ -1671,8 +1677,8 @@ try {
     throw new Error(`Expected pellets to be 1 with long barrel, got: ${fittedVerdict.pellets}`);
   }
 
-  await takeScreenshot(page, { path: 'docs/shots/base/weapon-bench.png' });
-  console.log('Captured docs/shots/base/weapon-bench.png');
+  await takeScreenshot(page, { path: 'shots-run/base/weapon-bench.png' });
+  console.log('Captured shots-run/base/weapon-bench.png');
 
   // Close weapon bench modal
   const benchCloseBtn = page.locator('[data-testid="weapon-bench-close-btn"]');
@@ -1717,8 +1723,8 @@ try {
   }
 
   await page.waitForTimeout(400);
-  await takeScreenshot(page, { path: 'docs/shots/base/loadout-swap.png' });
-  console.log('Captured docs/shots/base/loadout-swap.png');
+  await takeScreenshot(page, { path: 'shots-run/base/loadout-swap.png' });
+  console.log('Captured shots-run/base/loadout-swap.png');
 
   // Close inventory window
   const invCloseBtn = page.locator('[data-testid="inventory-close-btn"]');
@@ -1828,8 +1834,8 @@ try {
   const badge = page.locator('[data-testid="draw-calls-badge"]');
   await badge.waitFor({ state: 'visible', timeout: 5000 });
 
-  await takeScreenshot(page, { path: 'docs/shots/base/batched-200.png' });
-  console.log('Captured docs/shots/base/batched-200.png');
+  await takeScreenshot(page, { path: 'shots-run/base/batched-200.png' });
+  console.log('Captured shots-run/base/batched-200.png');
 
   // Step 7: TASK-13 house, built through the real path: the blueprint on the hotbar, the aim (where the camera looks),
   // the kind from the build menu (the mouse wheel names them), and E (the place key). No piece is written into the world directly.
@@ -2118,8 +2124,8 @@ try {
     await page.evaluate(() => window.__hm?.hideOverlays?.(true));
     await altLook(outsideEye, houseCentre);
     await page.waitForTimeout(700);
-    await takeScreenshot(page, { path: `docs/shots/base/house-stage${st}.png` });
-    console.log(`Captured docs/shots/base/house-stage${st}.png`);
+    await takeScreenshot(page, { path: `shots-run/base/house-stage${st}.png` });
+    console.log(`Captured shots-run/base/house-stage${st}.png`);
   }
   // the screenshot loop left the debug alt camera on: release it, or the aim ray starts from the alt eye
   await page.evaluate(() => window.__playScene.debug.clearAltCam());
@@ -2137,8 +2143,8 @@ try {
   await page.evaluate(() => window.__hm?.hideOverlays?.(true));
   await altLook({ x: doorOrigin.x + 10, y: doorOrigin.y + 2.2, z: doorOrigin.z - 1 }, { x: doorOrigin.x + 2, y: doorOrigin.y + 1.2, z: doorOrigin.z });
   await page.waitForTimeout(700);
-  await takeScreenshot(page, { path: 'docs/shots/base/house-door-open.png' });
-  console.log('Captured docs/shots/base/house-door-open.png');
+  await takeScreenshot(page, { path: 'shots-run/base/house-door-open.png' });
+  console.log('Captured shots-run/base/house-door-open.png');
 
   // The build menu: the cube blueprint on the hotbar; one mouse-wheel step cycles its kinds and the HUD names them.
   await page.evaluate(() => window.__hm?.hideOverlays?.(false));
@@ -2154,8 +2160,8 @@ try {
   const wheelText = await page.evaluate(() => document.querySelector('[data-testid="build-wheel-hint"]')?.textContent ?? '');
   console.log('OK: the build menu lists the house kinds:', wheelText);
   if (!/halfWall/.test(wheelText) || !/gable/.test(wheelText)) throw new Error('house: the build menu does not list the new kinds');
-  await takeScreenshot(page, { path: 'docs/shots/base/house-build-menu.png' });
-  console.log('Captured docs/shots/base/house-build-menu.png');
+  await takeScreenshot(page, { path: 'shots-run/base/house-build-menu.png' });
+  console.log('Captured shots-run/base/house-build-menu.png');
 
   console.log('\nALL FIDELITY BASE-BUILDING HUD, REAL WORLD & LIFECYCLE CHECKS PASSED!');
 } catch (err) {

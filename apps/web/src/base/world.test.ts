@@ -310,7 +310,7 @@ test('fabrication: the fabricator prints rovers as the stage allows; the weapon 
   const printed = apply(w, env, { t: 'tick', at, dt: 130, beam: null, power: {} });
   assert.ok(printed.events.some((e) => e.type === 'printed' && e.kind === 'scout'), 'it runs on relay power, not the plot grid');
   w = printed.world;
-  assert.equal(w.vehicles.length, 1); assert.ok(Math.hypot(w.vehicles[0]!.x - 4, w.vehicles[0]!.z - 4) < 1e-6, 'parked on the pad');
+  assert.equal(w.vehicles.length, 1); assert.ok(Math.hypot(w.vehicles[0]!.x - 4, w.vehicles[0]!.z - 4) > 4, 'parked clear of the pad (TASK-24: 4.5 m off, not under the fabricator)');
   // the hauler carries a bin on the linked network, and the bin goes where the hauler is parked
   w = run(topUp(w), { t: 'stage', stage: 4 }, { t: 'craft', at, machine: pad, recipe: 'vehicle-hauler' });
   w = apply(w, env, { t: 'tick', at, dt: 250, beam: null, power: {} }).world;

@@ -230,9 +230,15 @@
    "rms": -16
   },
   "music-ending": {
+   "gain": 0
+  },
+  "music-ending-loop": {
    "gain": 0,
-   "start": 0,
-   "end": 150
+   "start": 13.328957,
+   "end": 26.657914
+  },
+  "music-ending-overclocked": {
+   "gain": 0
   }
  }
 }

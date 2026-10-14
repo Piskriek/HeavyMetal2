@@ -324,8 +324,22 @@
   {
     "id": "music-ending",
     "kind": "music",
-    "duration": 150,
-    "text": "\"Four Floats (Not Really Dirt)\": the ending and credits song, sung (lyrics: Argo, rhythm rewrite: Opus; docs/argo/plans/26b-ending-song-v2.md). Chiptune synth-pop at 120 BPM that climbs the fidelity ladder.",
+    "duration": 160.732,
+    "text": "\"Four Floats (Not Really Dirt)\": the ending and credits song, sung (lyrics: Argo, rhythm rewrite and production: Opus; docs/argo/plans/26b-ending-song-v2.md). Synth-pop over chiptune at 144 BPM (v4b, tempo-stretched 1.2x, formants kept), ending on \"See you, Sector Four.\" Then music-ending-loop takes over on the next downbeat.",
+    "loop": false
+  },
+  {
+    "id": "music-ending-loop",
+    "kind": "music",
+    "duration": 40.08,
+    "text": "The instrumental final chorus of \"Four Floats\", which loops under the credits after the song (scripts/music-outro.py: 8 bars, sample-aligned, crossfaded wrap). Three copies in the file: play from 0, loop levels start..end (the middle copy).",
+    "loop": true
+  },
+  {
+    "id": "music-ending-overclocked",
+    "kind": "music",
+    "duration": 166.963,
+    "text": "\"Four Floats (Overclocked)\": the same song sped up 1.2x with the pitch (happy, silly), for the old-monitor replay.",
     "loop": false
   }
 ]

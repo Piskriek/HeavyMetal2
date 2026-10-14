@@ -233,3 +233,4 @@
 - (same day, on v3) "i like version a but b is not bat the only gripe i have is the word "naturally" does not sound natural in either one when she says "you do it naturally""
 - (same day) "v4b is perfect but needs to be at about 1.2x speed (just a slight speed up)"
 - (same day, on v4b at 1.2x) "both are are absolute bangers, its up to you, the tempo one sounds more happy mature and the speed one is happy silly" (Opus chose the tempo one for the ending; the speed one becomes "Four Floats (Overclocked)", the lab monitor's replay)
+- (same day, afternoon) "haiku ate all your usage, lol, argo was kind enough to demonstrate how far we can stretch his usage and wrote all the code he could think off, you can find it in his chat open in the browser, i listened to the song, last words i hear her say were "floats in the dark" "sector four" is missing from the song so you cut it off too early and the loop doesnt blend exactly seamlessly"

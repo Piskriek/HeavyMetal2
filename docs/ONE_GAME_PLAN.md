@@ -117,3 +117,18 @@ Argo's chat is open in Opus's browser for questions (owner, 13 October).
   - LOG-10 uses the player's chosen avatar name, or "the Operator" (Argo's ruling).
 - **Suit-cam optics** (`docs/argo/plans/25-camera-realism.md`, the owner's idea): stages 4 to 6 as a capture medium, in brief 27's post pass, behind a Graphics setting.
 - **Voiced so far:** A4-LEAK-SEAL and A6-LEAK-SURGE (481466d3). The game switches to them after TASK-23c.
+- **HUD fidelity skins** (`28-hud-fidelity-skins.md`, the owner's idea): brief 25.
+- **Depth and charm** (`29-depth-and-charm.md`, the owner asked Argo to research it), scheduled by system:
+  - brief 28 (the lab): the red-button escalation (2.1), the fixtures' second and third inspections (2.2), Vance's corner behind the cleared crates (2.3), and the ending song on the old monitor (2.10);
+  - brief 27: the wireframe arrival toast and CHARM-WIREFRAME-FILL (2.9);
+  - brief 25: the boundary shuffle (2.5);
+  - brief 30: the sprite and Z-axis monster jokes (2.4);
+  - brief 31: the dirt rename (2.6);
+  - brief 27b: the rover boot lines and the airtime bark (2.7). The rare line "NOT EVEN SQUIDDING" borrows another game's joke, so write our own;
+  - brief 29: painting the gate pink (2.8).
+  
+  The eight charm lines are voiced when their briefs land, about 180 credits.
+- **The ending song:**
+  - v1 (Argo's lyrics) was too literal and irregular for the singer, according to the owner;
+  - v2 (Opus's rhythmic rewrite: 5- and 7-syllable lines, a "Four floats in the dark" hook, a beat and chiptune throughout) is with the owner.
+  - Both are in `zips/runworld/music/`.

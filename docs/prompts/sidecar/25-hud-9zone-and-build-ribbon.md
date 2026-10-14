@@ -115,3 +115,4 @@ The owner: "if the hud elements changed style according to the the fidelity you 
   - crossing a stage boundary flips it;
   - the overlap and contrast assertions pass in every skin;
   - shots of the same HUD in all six skins.
+- **Argo's skins have landed:** `docs/argo/plans/28-hud-fidelity-skins.md` replaces the interim list above. Use its CSS token table, the metric bars per skin (patterns as well as colours, so colour-blind players can still tell them apart), the 120 ms shift with its degauss tick, the 0.5 s or 1.5 m hysteresis, and the lab rule (skin 3 before power, 4-6 after). The font is Share Tech Mono or VT323 (OFL, about 18 KB).

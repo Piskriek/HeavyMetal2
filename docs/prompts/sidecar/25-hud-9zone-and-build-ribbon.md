@@ -89,3 +89,29 @@ Opus refreshes Argo's tour from your shots.
 ## Argo's sign-off (14 October, docs/argo/plans/23-brief-review.md)
 Approved as written, plus:
 - **Clicks pass through the HUD:** the zone wrapper is `pointer-events: none`; only the interactive children (the hotbar, the ribbon, buttons) take `pointer-events: auto`, so a click in the open screen always reaches the scene to place the ghost. Test it: a click at the screen centre places a piece with the ribbon open.
+
+## Addition: the HUD takes the look of the fidelity you stand in (the owner, 14 October)
+The owner: "if the hud elements changed style according to the the fidelity you are standing in that would really sell it". Each stage is a capture medium (`docs/argo/plans/27-stage-look-bible.md`), and the HUD is part of the medium.
+- **One switch:**
+  - a `data-fidelity` attribute on the HUD root: `0a`, `0b`, `1`, `2`, `3`, or `4-6`;
+  - it is set from the stage of the ground under the player: the local stage where one exists, the plot's otherwise;
+  - each skin is a set of CSS variables (palette, font, panel fill, border, glow) on the same components;
+  - the layout and the zones never change.
+- **Crossing into another fidelity** flips the skin with a short glitch, about 120 ms; never mid-sentence for the subtitle.
+- **The skins** (Argo sets the exact palettes and fonts in `docs/argo/plans/28-hud-fidelity-skins.md`; until it lands, use these):
+  - **0a, vector:** 1 px phosphor line outlines, no fills, a monospace vector font, light on black;
+  - **0b, 1-bit:** black and white, dithered panel fills, a bitmap pixel font;
+  - **1, EGA:** the 16-colour palette, a chunky pixel font, hard bevels;
+  - **2, VGA:** 256 colours, flat bevelled window chrome of the 90s;
+  - **3, 16-bit:** smooth gradients and rounded panels;
+  - **4-6:** today's glass telemetry design system, framed as the suit camera's visor readout.
+- **Legibility is a hard floor in every skin:**
+  - numbers and the subtitle meet WCAG AA contrast;
+  - no font below 12 px at 720p;
+  - the metric colours stay recognisable (quantised to the nearest palette entry, never lost).
+- **Fonts must be embedded** in the single file: OFL-licensed pixel and vector fonts (for example VT323 or Silkscreen). Credit them in `CREDITS.md`, and report the size added.
+- **Tests:**
+  - each skin applies on its stage;
+  - crossing a stage boundary flips it;
+  - the overlap and contrast assertions pass in every skin;
+  - shots of the same HUD in all six skins.

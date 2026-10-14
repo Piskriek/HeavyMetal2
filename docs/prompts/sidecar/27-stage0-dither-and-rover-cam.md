@@ -86,3 +86,26 @@ The top of the fidelity ladder becomes a capture medium too: Astro's suit camera
   - the exposure filter (a step into daylight overshoots, then settles in about 0.4 s);
   - Off is byte-identical to today's look;
   - a stage-5 shot with Off and with Auto, side by side.
+
+## Addition: the stage-look bible (Argo's plan 27, 14 October; the owner's wireframe and facets idea)
+`docs/argo/plans/27-stage-look-bible.md` is now the canonical ladder:
+- **0a, wireframe on arrival:** until the first machine runs (`uWireframeMix`);
+- **0b, 1-bit dither over flat facets:** from the first machine, swept in by the scan wave;
+- **1:** EGA;
+- **2:** VGA;
+- **3:** Gouraud;
+- **4 to 6:** PBR through the suit camera (the addition above).
+
+The progression stays 0 to 6, so nothing renumbers. Build its §4 into this task's post pass:
+- **One pass for every object (Opus's recommendation).** Rebuild the normal per pixel from the depth buffer (`worldAt()` and screen-space derivatives). On a triangle mesh it is constant per triangle, so it gives the flat facets for the terrain and every prop at once, with no per-material shader work. The same normal and depth breaks give the hidden-line edges for 0a; the 2 m terrain grid comes from `worldAt()`.
+- **0a:** black fill, 1 px light edges, and the converging world grid fading by 180 m. The gate's amber pool, plumes, the build ghost and the HUD stay in colour (the 0.5 alpha mark).
+- **0a to 0b:** the first machine's tick sends the scan wave (350 m over 3.5 s). Inside the ring the world resolves into 0b; outside it stays wireframe until the wave passes. Test it, and take a shot mid-wave.
+- **0b and 1:** the flat-facet lighting feeds the world-locked dither (0b) and the EGA ramp (1); it blends to smooth normals as Vtx rises (the bible's mix).
+- **Tests:**
+  - 0a shows edges and the grid, with no filled shading;
+  - the first machine flips 0a to 0b through the wave;
+  - the facets read in a shot at 50, 150 and 500 m;
+  - the monsters' quantisation and the window walkers still follow their stage.
+
+## Split (14 October)
+This brief is now the **stage looks** (the dither, the pool, the suit cam, the wireframe and facets). Its rover-camera and modular-scout items (Build 3 and 4) run separately as **TASK-27b** (`27b-rover-cam-and-scout.md`), after this one.

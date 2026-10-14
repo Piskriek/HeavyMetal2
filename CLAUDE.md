@@ -35,8 +35,8 @@
    (Pixel Density, Vertex Density, Light Flux, Aquatic Level). Never propose a 5th global metric.
 2. **Purity is Load-Bearing**: All simulation packages must be 100% deterministic pure functions. No `Date.now()`, no `Math.random()`, no direct I/O.
 3. **Single-File Zero-Dependency Distribution**: The client builds to a standalone self-contained bundle (`apps/web/dist/index.html`).
-4. **Terraforming IS Graphical Fidelity**: As machines run, reality physically upgrades:
-   $$\text{Stage 0 (1-bit Bayer Dither)} \to \text{Stage 1 (16-color EGA)} \to \text{Stage 2 (256-color VGA)} \to \text{Stage 3 (Gouraud)} \to \text{Stage 4 (Full PBR)}$$
+4. **Terraforming IS Graphical Fidelity**: As machines run, reality physically upgrades. Every stage is a capture medium. The progression stays Stage 0 to 6 (quests, unlocks and lines key on it); the looks are set by [`docs/argo/plans/27-stage-look-bible.md`](docs/argo/plans/27-stage-look-bible.md) (the owner's wireframe idea, 2026-10-14):
+   $$\text{0a (Wireframe, on arrival)} \to \text{0b (1-bit flat-faceted dither, from the first machine)} \to \text{1 (16-color EGA)} \to \text{2 (256-color VGA)} \to \text{3 (Gouraud)} \to \text{4–6 (PBR through the suit camera: water, coverage, forest)}$$
 
 ---
 

@@ -32,6 +32,10 @@ In **FIDELITY**, **terraforming physically raises the graphic rendering engine o
 
 $$\text{Stage 0 (1-bit Dither)} \longrightarrow \text{Stage 1 (16-color EGA)} \longrightarrow \text{Stage 2 (256-color VGA)} \longrightarrow \text{Stage 3 (Gouraud)} \longrightarrow \text{Stage 4 (Full PBR)}$$
 
+> **Superseded on 14 October 2026** (the owner's wireframe idea, set by Argo and Opus under his delegation; the full table is in `docs/argo/plans/27-stage-look-bible.md`):
+> `Stage 0a (Hidden-Line Wireframe on Arrival) -> Stage 0b (1-Bit Flat-Faceted Dither on First Machine) -> Stage 1 (16-Color EGA Facets) -> Stage 2 (256-Color VGA & Grass Bloom) -> Stage 3 (16-Bit Gouraud & Sky) -> Stage 4 (Hydro Lakes & Suit-Cam Optics) -> Stage 5 (Coverage Creep) -> Stage 6 (Full Forest Biosphere & Suit-Cam PBR).`
+> The progression stays Stage 0 to 6; 0a and 0b are two looks inside stage 0.
+
 ---
 
 ## 3. THE FIVE FIDELITY STAGES

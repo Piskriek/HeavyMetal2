@@ -228,6 +228,11 @@
   "sfx-ui-close": {
    "gain": -4,
    "rms": -16
+  },
+  "music-ending": {
+   "gain": 0,
+   "start": 0,
+   "end": 150
   }
  }
 }

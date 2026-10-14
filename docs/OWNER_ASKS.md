@@ -226,3 +226,5 @@
 - (same day) "if the hud elements changed style according to the the fidelity you are standing in that would really sell it"
 - (same day) "you are more than welcome to ask argo to research things like "the song in portal" as an example of how to add depth and charm to the game."
 - (same day, on "Four Floats" v1) "listening now, you can try again or edit if you want. it feels like its missing a beat and 8bit background music and the words feel too accurate, the singer is having to force a rythm with words that dont fit that shape that makes sense? i think it can be more catchy"
+- (same day, on "Four Floats" v2) "i like it, its a banger. if you can make and animation that plays over the credits, here is a link to someone who did it in a way https://github.com/JohnHeibel/PDoomVideo"
+- (same day, on v2) "it ends on the words "sector 4" and just stops, i recomend popping in the courus with no vocals after that and loop it"

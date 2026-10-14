@@ -320,5 +320,12 @@
     "duration": 0.5,
     "text": "A sci-fi interface panel closing with a short soft reverse whoosh",
     "loop": false
+  },
+  {
+    "id": "music-ending",
+    "kind": "music",
+    "duration": 150,
+    "text": "\"Four Floats (Not Really Dirt)\": the ending and credits song, sung (lyrics: Argo, rhythm rewrite: Opus; docs/argo/plans/26b-ending-song-v2.md). Chiptune synth-pop at 120 BPM that climbs the fidelity ladder.",
+    "loop": false
   }
 ]

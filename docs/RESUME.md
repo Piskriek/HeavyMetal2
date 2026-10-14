@@ -210,3 +210,8 @@ The context a new Opus session needs on its first message. Keep it current: upda
     - Briefs 33 (credits video) and 34 (song radio and machine choir) carry landing notes: the song is 144 BPM, not his 112 BPM or 1:57.
   - **To send Argo once his usage resets (16:13 on 14 October):** the drop is committed and pushed; please resend fixed versions of the files TRIAGE.md lists (the vitest tests as node:test, the strict index reads, the purity flags). Use only `rich-textarea .ql-editor` (see the gemini-input-selector memory).
   - **Running:** TASK-24 (resumed after the usage limit). Then main for the owner's test.
+  - **Hyper3D Rodin (the owner's offer, 14 October): not started, on purpose.**
+    - The 7-day trial is the Creator plan: "Unlimited Export & Any Use", Smart Low-Poly, multi-image to 3D. There is no API (Business only).
+    - It gives about 5 kept models: generating costs 0.5 credits, and a finished model is about 6 credits by the plan's own numbers. It renews at $24 a month unless the owner cancels.
+    - The free plan has no "Any Use", so nothing is generated on it.
+    - Plan: tell the owner to start the trial when brief 32's art pass begins. The first job is the heavy terraformer from sheet 17 in both Rodin and RUN.world, compared after reduction. If Rodin wins, spend the rest on the hero machines; if not, he cancels.

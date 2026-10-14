@@ -234,3 +234,6 @@
 - (same day) "v4b is perfect but needs to be at about 1.2x speed (just a slight speed up)"
 - (same day, on v4b at 1.2x) "both are are absolute bangers, its up to you, the tempo one sounds more happy mature and the speed one is happy silly" (Opus chose the tempo one for the ending; the speed one becomes "Four Floats (Overclocked)", the lab monitor's replay)
 - (same day, afternoon) "haiku ate all your usage, lol, argo was kind enough to demonstrate how far we can stretch his usage and wrote all the code he could think off, you can find it in his chat open in the browser, i listened to the song, last words i hear her say were "floats in the dark" "sector four" is missing from the song so you cut it off too early and the loop doesnt blend exactly seamlessly"
+- (same day, 16:1x) "i got us a 7 day free trial of hyper 3d you can use before the 7 days run out on whatever you need, its open in the browser so you can setup the api or whatever, argo should wake up now too" (screenshot: Hyper3D Rodin Gen-2.5, Image to 3D, wallet 5)
+- (same day) "make sure hes not still set on flash" (Argo was on "4 Argon, Complex tasks"; left unchanged)
+- (same day) "oh ill have to start the trial still" / "worth it?" / "kk holding off for now" (Opus: start the Hyper3D trial when brief 32's art pass begins, first a head-to-head with RUN.world on the heavy terraformer)

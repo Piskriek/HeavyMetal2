@@ -34,6 +34,7 @@
  * are collected across the whole run. Exit code 1 when any beat fails.
  */
 import { chromium } from 'playwright-core';
+import { hudZoneViolations } from './e2e-hud-and-luminance-gate.mjs';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -94,25 +95,9 @@ page.on('requestfailed', (req) => httpErrors.push(`failed ${req.url()} ${req.fai
 const results = [];
 let shotNo = 0;
 // TASK-24 (P0-PROD-01): at every shot, the title card, the build hint and the radio subtitle must not overlap each other.
-// Each overlay carries a data-hud-zone attribute; the boxes of the zones are compared pairwise.
+// Each overlay carries a data-hud-zone attribute; every pair of boxes is compared, and none may reach the reticle's clear zone (TASK-25).
 const hudViolations = [];
-const hudOverlaps = () => page.evaluate(() => {
-  const boxes = [];
-  for (const zone of ['title', 'build-hint', 'subtitle']) {
-    for (const el of document.querySelectorAll(`[data-hud-zone="${zone}"]`)) {
-      const r = el.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0 && getComputedStyle(el).display !== 'none') boxes.push({ zone, x0: r.left, y0: r.top, x1: r.right, y1: r.bottom });
-    }
-  }
-  const out = [];
-  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
-    const a = boxes[i], b = boxes[j];
-    if (a.zone === b.zone) continue;
-    const ox = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0), oy = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
-    if (ox > 1 && oy > 1) out.push(`${a.zone} and ${b.zone} overlap by ${Math.round(ox)} x ${Math.round(oy)} px`);
-  }
-  return out;
-}).catch(() => []);
+const hudOverlaps = () => hudZoneViolations(page).catch(() => []);
 
 const shot = async (name) => {
   shotNo += 1;

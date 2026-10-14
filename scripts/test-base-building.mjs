@@ -23,6 +23,7 @@
  */
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright-core';
+import { hudZoneViolations } from './e2e-hud-and-luminance-gate.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -45,9 +46,12 @@ if (!fs.existsSync(shotsDir)) {
   fs.mkdirSync(shotsDir, { recursive: true });
 }
 
+/** TASK-25: every shot is checked for HUD zone overlap and reticle clear-zone intrusions. */
+const hudViolations = [];
 async function takeScreenshot(p, options) {
   const { path: shotPath, ...rest } = options;
   const buf = await p.screenshot(rest);
+  for (const v of await hudZoneViolations(p).catch(() => [])) hudViolations.push(`${shotPath}: ${v}`);
   if (shotPath) {
     for (let attempt = 1; attempt <= 5; attempt++) {
       try {
@@ -2198,6 +2202,7 @@ try {
   await takeScreenshot(page, { path: 'shots-run/base/house-build-menu.png' });
   console.log('Captured shots-run/base/house-build-menu.png');
 
+  if (hudViolations.length > 0) throw new Error('HUD zone violations: ' + hudViolations.join(' | '));
   console.log('\nALL FIDELITY BASE-BUILDING HUD, REAL WORLD & LIFECYCLE CHECKS PASSED!');
 } catch (err) {
   console.error('Test execution failed:', err);

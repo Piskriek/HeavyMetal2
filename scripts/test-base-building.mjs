@@ -1373,6 +1373,8 @@ try {
       { item: 'prim-cube', n: 50 },
       { item: 'map-basalt', n: 50 },
       { item: 'map-quartz', n: 50 },
+      // a spare chassis blueprint: the life support is drafted from it (the airlock used the test fixture's one)
+      { item: 'bp:chassis:basalt', n: 1 },
       { item: 'wpn-frame', n: 5 },
       { item: 'core-semi', n: 5 },
       { item: 'barrel-scatter', n: 5 },
@@ -1429,11 +1431,35 @@ try {
   console.log('Captured shots-run/base/fabricator-window.png');
 
   // Step 2: Advance to stage 2, print scout, verify progress bar, wait for printed
+  // the plot's stage (the gate for Structures and the fabricator reads it) is set by __dev.setStage; the base's stage by the command
   await page.evaluate(() => {
     const baseApi = window.__hm?.base ?? window.hmPlay?.base;
     baseApi?.apply({ t: 'stage', stage: 2 });
+    window.__dev.setStage(2);
     window.hmPlay?.raise?.(2);
   });
+  await page.waitForTimeout(300);
+
+  // Chain step B-07 (the fabricator's gate) needs an airlock AND a life support that the PLAYER placed (the place event counts;
+  // the starter shelter's life support is not counted). Place a new life support on the first free cell of the structure.
+  const lifeSupport = await page.evaluate(() => {
+    const baseApi = window.__hm?.base ?? window.hmPlay?.base;
+    const st = baseApi.world().base.structures[0];
+    const at = { x: st.x, z: st.z };
+    const count = () => baseApi.world().base.pieces.filter((p) => p.kind === 'lifeSupport').length;
+    const before = count();
+    // every cell of a 5 x 5 grid and each rotation: the refused ones (no floor, occupied) change nothing
+    for (let i = 0; i < 5 && count() === before; i++) {
+      for (let j = 0; j < 5 && count() === before; j++) {
+        for (let r = 0; r < 4 && count() === before; r++) {
+          baseApi.apply({ t: 'place', at, blueprint: 'bp:chassis:basalt', piece: { s: st.id, kind: 'lifeSupport', i, j, k: 0, r } });
+        }
+      }
+    }
+    return count() - before;
+  });
+  if (lifeSupport < 1) throw new Error('Could not place a life support for the B-07 gate (no free cell in the structure)');
+  console.log('OK: Life support placed for chain step B-07:', lifeSupport);
   await page.waitForTimeout(300);
 
   const printScoutBtn = page.locator('[data-testid="print-btn-scout"]');
@@ -1631,7 +1657,7 @@ try {
     window.__playScene?.debug.teleport('planet', 20, 20, 0);
 
     // Default loadout check (should have 7 pellets)
-    const initialStats = window.__playScene?.mash.getWeaponStats?.();
+    const initialStats = window.__playScene?.monsters.getWeaponStats?.();
     baseApi.openWeaponBench();
     return { ok: true, initialPellets: initialStats?.pellets ?? 7 };
   });
@@ -1666,7 +1692,7 @@ try {
   const fittedVerdict = await page.evaluate(() => {
     const baseApi = window.__hm?.base ?? window.hmPlay?.base;
     const w = baseApi.world();
-    const stats = window.__playScene?.mash.getWeaponStats?.();
+    const stats = window.__playScene?.monsters.getWeaponStats?.();
     return {
       fittedBarrel: w.loadout.barrel,
       pellets: stats?.pellets,
@@ -1711,7 +1737,7 @@ try {
   const swapVerdict = await page.evaluate(() => {
     const baseApi = window.__hm?.base ?? window.hmPlay?.base;
     baseApi.apply({ t: 'fit', slot: 'barrel', item: 'barrel-scatter' });
-    const stats = window.__playScene?.mash.getWeaponStats?.();
+    const stats = window.__playScene?.monsters.getWeaponStats?.();
     return {
       fittedBarrel: baseApi.world().loadout.barrel,
       pellets: stats?.pellets,
@@ -1841,7 +1867,7 @@ try {
   // the kind from the build menu (the mouse wheel names them), and E (the place key). No piece is written into the world directly.
   console.log('\n--- Step 7: TASK-13 house through the blueprint, hotbar, aim, place and snap path ---');
   // A fresh kit boot for the house: the earlier sections of this run spend the dev seed's ore (600) on the heavy machines and the fabricator.
-  await page.goto(`http://localhost:${port}/?base&kit=1${scoutQuery}`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`http://localhost:${port}/?base&kit=1&e2e${scoutQuery}`, { waitUntil: 'domcontentloaded' });
   await canvas.waitFor({ state: 'visible', timeout: 25000 });
   await page.waitForFunction(() => window.hmPlay?.ready === true, { timeout: 35000 });
   await page.evaluate(() => {
@@ -1851,6 +1877,15 @@ try {
   });
   await page.waitForFunction(() => window.hmPlay?.where === 'planet', { timeout: 15000 });
   await page.waitForTimeout(800);
+  // A fresh boot starts at stage 1 with Act IV unplayed: Structures (and the house's foundation) open at stage 2 after A4-04,
+  // so finish Act IV through the chain's debug hook, then the stage-2 event in the plot and in the base.
+  await page.evaluate(() => {
+    const api = window.__hm?.base ?? window.hmPlay?.base;
+    window.__dev.finishAct('act4');
+    api?.apply({ t: 'stage', stage: 2 });
+    window.__dev.setStage(2);
+  });
+  await page.waitForTimeout(300);
   // The found point: a level site north of the batch grid (which spans x -28..28, z -40..16 around the shelter), with every stand inside the gate's 60 m network range.
   const HOUSE_CX = -17, HOUSE_CZ = 35;
 

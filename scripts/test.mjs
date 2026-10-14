@@ -20,6 +20,7 @@ export const TEST_FILES = [
   'apps/web/src/islands/*.test.ts',
   'apps/web/src/crafter/*.test.ts',
   'apps/web/src/base/*.test.ts',
+  'apps/web/src/base/ui/*.test.ts',
   'apps/web/src/play/*.test.ts',
   'apps/web/src/avatar/astro/*.test.ts',
   'apps/web/src/avatar/scientist/*.test.ts',

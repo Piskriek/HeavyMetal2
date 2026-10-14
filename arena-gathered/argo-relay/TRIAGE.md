@@ -45,3 +45,17 @@ The most errors are in `apps/web/src/play/footstep-and-tire-roost.ts` (28) and `
   - `scripts/music-outro.py` writes `outro.json` with these numbers.
 - Anything in the drop that assumes 112 BPM or a 1:57 outro is wrong. `packages/musicbox/src/harmonic-machine-choir.ts` has `SETMIX_SONG_BPM = 112`.
 - **Briefs 25 to 32:** Argo's short versions are kept here in `docs/prompts/sidecar/` for their file lists only. The briefs in the repo, already agreed with him, stay the spec.
+
+## v2: Argo's strict pass (`arena-gathered/argo-relay-v2/`, from the Setmix Drive folder, 14 October)
+
+Argo answered the triage with 31 files (`argo-strict-fixes-31files.json`, unpacked unchanged; his README and the
+bundle's metadata, including his Rodin roster, sit beside them).
+
+**It is a rewrite, not a patch.**
+- **Moved:** the credits code now lives in a new `packages/credits`, the footstep particles in `packages/particles`, and the screensaver in `apps/web/src/lab/`.
+- **Thinner:** the credits timeline went from 388 lines to 165, the credits director from 259 to 109, the questline chain from 192 to 100.
+- **New, small tests:** 11 to 47 lines each.
+
+**Strict check:** 26 errors. One is an unused variable; 25 are imports of files outside the bundle. Some of those are v1 files (`stage-post.glsl`, `planet-table-hologram`, `rover-spring-arm`). Some exist in neither version: `socket-plume-gizmo`, `lab-vista-pockets`, `lab-choreography`, `print-sweep-and-bounce`, `radial-scan-wave.glsl`.
+
+**On landing, per file:** take v2's strict guards and purity fixes where its version keeps v1's behaviour. Keep v1 where v2 dropped features. Write the tests against the code that actually lands.

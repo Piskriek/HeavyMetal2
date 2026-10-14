@@ -1,0 +1,33 @@
+{
+  "relayVersion": "2026-10-14-strict-patch-v2",
+  "songFactsLocked": {
+    "title": "Four Floats v4b (1.2x)",
+    "bpm": 144,
+    "lastLyricSeeYouSectorFourEndSec": 160.2,
+    "songSwitchToLoopSec": 160.73,
+    "chorusLoopBars": 8,
+    "chorusLoopDurationSec": 13.329,
+    "loopMiddleCopyRangeSec": [
+      13.329,
+      26.658
+    ],
+    "audioFiles": [
+      "public/audio/music-ending.mp3",
+      "public/audio/music-ending-loop.mp3",
+      "public/audio/music-ending-overclocked.mp3"
+    ]
+  },
+  "oneLineUnpackCommand": "node -e \"const fs=require('fs'),path=require('path'),d=JSON.parse(fs.readFileSync('argo-strict-fixes-31files.json','utf8'));for(const[p,c]of Object.entries(d.files)){fs.mkdirSync(path.dirname(p),{recursive:true});fs.writeFileSync(p,c);console.log('Wrote',p);}\"",
+  "rodinGen25SevenDayPriority": [
+    "1. heavy-shape-press (Sheet 17 #28, 8m x 8m 2x2 hardpoint, square box-columns, rear #7cff4d exhaust)",
+    "2. heavy-light-projector (Sheet 17 #29, 8m x 8m, square-truss yoke + armored parabolic shutter array)",
+    "3. heavy-water-maker (Sheet 17 #30, 8m x 8m, twin horizontal box-section condenser drums, #3dc8ff steam stacks)",
+    "4. vehicle-fabricator-gantry (Sheet 19, overhead H-beam bridge crane + 4 corner box-columns + grated bay pad)",
+    "5. perimeter-defense-turret (Sheet 20, split into turret-plinth-base + turret-box-head with twin round barrels)",
+    "6. pulse-scatter-sidearm (Sheet 20, square-section industrial receiver + round barrel + rear OLED strip socket)",
+    "7. freestanding-twin-gate-hero (Sheet 06, 3.2m box-section portal frame with 8 ribbed coil blocks per upright)",
+    "8. extraction-beam-rifle-hero (1P/3P carbine cage with crisp square barrel ribs and top cartridge slot recess)",
+    "9. preset-combiner-bench & hardware-fabricator-bench (Sheet 07 Lab right-wall hero benches)",
+    "10. modular-scout-shell-v2 & heavy-hauler-shell-v2 (empty cab with flat floor socket for [-u-] square yoke)"
+  ]
+}

@@ -104,8 +104,9 @@ export type BaseCommand =
   | { readonly t: 'quickStack'; readonly at: Point }
   | { readonly t: 'draft'; readonly at: Point; readonly primitive: string; readonly map: string }
   | { readonly t: 'hotbar'; readonly index: number }
-  /** One frame (logged, so replays match): the field regrows, the beam harvests, machines work at their power share (0..1, from plotsim). */
-  | { readonly t: 'tick'; readonly at: Point; readonly dt: number; readonly beam: { readonly node: number; readonly power: number } | null; readonly power: Readonly<Record<number, number>> }
+  /** One frame (logged, so replays match): the field regrows, the beam harvests, machines work at their power share (0..1, from plotsim).
+   *  `latched`: the machines a sapper holds this frame; they work at half their share (P0-MON-03). */
+  | { readonly t: 'tick'; readonly at: Point; readonly dt: number; readonly beam: { readonly node: number; readonly power: number } | null; readonly power: Readonly<Record<number, number>>; readonly latched?: readonly number[] }
   | { readonly t: 'stage'; readonly stage: number }
   | { readonly t: 'install'; readonly at: Point; readonly hardpoint: number; readonly kind: StationKind }
   | { readonly t: 'craft'; readonly at: Point; readonly machine: number; readonly recipe: string }
@@ -531,9 +532,24 @@ export function preview(w: BaseWorld, env: WorldEnv, at: Point, bpId: string, ki
 
 // ---------------------------------------------------------------------------------------------- harvest and refining
 /** Where a heavy machine stands: the middle of its hardpoint pad. */
-function machineAt(w: BaseWorld, id: number): Point | null {
+export function machineAt(w: BaseWorld, id: number): Point | null {
   const p = w.base.pieces.find((q) => q.id === id);
   return p ? pieceAt(w.base, p) : null;
+}
+
+/**
+ * Where a printed vehicle parks: clear of its pad (TASK-24). The pad's footprint is about 2.8 m from its centre, and a parked
+ * scout on the pad stood under the fabricator, so the player could not walk within E's reach of it. The vehicle parks 4.5 m
+ * out on the first side (+x, -x, +z, -z) with no base piece within 2 m; the pad's centre when no side is free.
+ */
+export function parkSpot(w: BaseWorld, pad: Point): Point {
+  const centres = w.base.pieces.map((q) => pieceAt(w.base, q)).filter((c): c is { x: number; y: number; z: number } => c !== null);
+  const free = (p: Point): boolean => centres.every((c) => Math.hypot(c.x - p.x, c.z - p.z) >= 2);
+  for (const [dx, dz] of [[4.5, 0], [-4.5, 0], [0, 4.5], [0, -4.5]] as const) {
+    const p = { x: pad.x + dx, z: pad.z + dz };
+    if (free(p)) return p;
+  }
+  return pad;
 }
 
 /** Runs a machine's queue for `work` seconds of full-power work; leftover work flows into the next job. */
@@ -571,7 +587,9 @@ function tick(w: BaseWorld, env: WorldEnv, cmd: Extract<BaseCommand, { t: 'tick'
   const machines = w.machines.map((m) => {
     if (m.jobs.length === 0) return m;
     // terraformers get their share from the plot's power grid; the fabricator runs while a relay reaches it
-    const share = m.kind === 'fabricator' ? (reached(w, env, m.id) ? 1 : 0) : Math.max(0, Math.min(1, cmd.power[m.id] ?? 0));
+    // a sapper holding the machine halves its share (P0-MON-03)
+    const held = cmd.latched?.includes(m.id) ? 0.5 : 1;
+    const share = (m.kind === 'fabricator' ? (reached(w, env, m.id) ? 1 : 0) : Math.max(0, Math.min(1, cmd.power[m.id] ?? 0))) * held;
     const r = runQueue(m.jobs, cmd.dt * share);
     if (r.finished.length === 0) return { ...m, jobs: r.jobs };
     let out = m.out.slice();
@@ -580,7 +598,7 @@ function tick(w: BaseWorld, env: WorldEnv, cmd: Extract<BaseCommand, { t: 'tick'
       const o = RECIPE_BY_ID[rid]!.output;
       if (o.item.startsWith('vehicle:')) {
         // a printed vehicle rolls off the bed, parked on the pad, facing along the structure
-        const kind = o.item.slice('vehicle:'.length) as VehicleKind, id = nextVehicle++, p = at ?? cmd.at;
+        const kind = o.item.slice('vehicle:'.length) as VehicleKind, id = nextVehicle++, p = at ? parkSpot(w, at) : cmd.at;
         const pad = w.base.pieces.find((q) => q.id === m.id), st = pad ? w.base.structures.find((x) => x.id === pad.s) : undefined;
         const box = VEHICLE[kind].cargo ? vehicleBox(id) : null;
         vehicles = [...vehicles, { id, kind, x: p.x, z: p.z, yaw: st?.yaw ?? 0, box }];

@@ -5,7 +5,7 @@ import { ITEMS, STARTER } from './catalog';
 import * as S from '@hm/structure';
 import { loadWorld, saveWorld } from './save';
 import { weaponStats } from './weapons';
-import { BRIDGE_STORE, SHELTER, apply, createWorld, hashWorld, layoutPieces, networkAt, planGhosts, preview, replay, roomAt, withBridgeStore, type BaseCommand, type BaseWorld, type WorldEnv } from './world';
+import { BRIDGE_STORE, SHELTER, apply, createWorld, hashWorld, layoutPieces, networkAt, parkSpot, planGhosts, preview, replay, roomAt, withBridgeStore, type BaseCommand, type BaseWorld, type WorldEnv } from './world';
 
 const env: WorldEnv = { heightAt: () => 0, bridge: { x: 0, z: 0, range: 60 } };
 const at = { x: 2, z: 2 };
@@ -193,6 +193,30 @@ test('the beam harvests nodes in reach; a heavy mill on a hardpoint refines at i
   const got = run(done.world, { t: 'collect', machine: pad });
   assert.equal(L.count(got.player, 'map-basalt'), maps + 2);
   assert.deepEqual(apply(got, env, { t: 'remove', at, id: pad }).events, [{ type: 'refused', cmd: 'remove', why: 'has-machine' }]);
+});
+
+test('a printed vehicle parks clear of its pad (TASK-24): 4.5 m out on the first free side, never on the pad', () => {
+  // an empty base: the first side (+x) is free, so the scout parks 4.5 m east of the pad, not under the fabricator
+  const w = createWorld();
+  assert.deepEqual(parkSpot(w, { x: 10, z: 10 }), { x: 14.5, z: 10 });
+});
+
+test('a sapper latched to a machine halves its output (P0-MON-03): the same full-power tick does half the work', () => {
+  // the stock is in the bridge store: the pack's weight limit (120 kg, ore is 0.6 kg each) would refuse most of it
+  let w = withBridgeStore(createWorld(), env, [{ item: 'ore', n: 500 }, { item: 'prim-chassis', n: 5 }, { item: 'prim-beam', n: 4 }, { item: 'prim-cube', n: 6 }, { item: 'map-basalt', n: 5 }, { item: 'pxd-mono', n: 40 }]);
+  w = run(w, found);
+  const s = w.base.structures[0]!.id;
+  w = run(w, { t: 'place', at, blueprint: STARTER, piece: piece('bench', 0, 0, s) }, { t: 'draft', at, primitive: 'chassis', map: 'basalt' });
+  w = run(w, { t: 'remove', at, id: w.base.pieces.find((p) => p.kind === 'bench')!.id });
+  for (const [i, j] of [[1, 0], [0, 1], [1, 1]] as const) w = run(w, { t: 'place', at, blueprint: STARTER, piece: piece('foundation', i, j, s) });
+  w = run(w, { t: 'place', at, blueprint: 'bp:chassis:basalt', piece: { s, kind: 'hardpoint', i: 0, j: 0, k: 0, r: 0 } });
+  const pad = w.base.pieces.find((p) => p.kind === 'hardpoint')!.id;
+  w = run(w, { t: 'install', at, hardpoint: pad, kind: 'mill' }, { t: 'craft', at, machine: pad, recipe: 'map-basalt' });
+  const free = apply(w, env, { t: 'tick', at, dt: 20, beam: null, power: { [pad]: 1 } }).world.machines[0]!.jobs;
+  const held = apply(w, env, { t: 'tick', at, dt: 20, beam: null, power: { [pad]: 1 }, latched: [pad] }).world.machines[0]!.jobs;
+  // a 30 s job: 20 s at full power leaves it 20 s done; a latched machine does half the work in the same tick, 10 s done
+  assert.deepEqual(free, [{ recipe: 'map-basalt', done: 20 }]);
+  assert.deepEqual(held, [{ recipe: 'map-basalt', done: 10 }]);
 });
 
 test('the bridge store stands at the gate on the network, and building pulls from it with an empty pack', () => {

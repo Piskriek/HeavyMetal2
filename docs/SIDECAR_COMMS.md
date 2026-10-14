@@ -2345,3 +2345,24 @@ The results: campaign 31 of 31 with exit 0, beam 61 of 61, npm test 0 failures, 
   7. fps on Low with eight fighting is still to measure on the owner's machine.
   8. `apps/web/dist/index.html` and the `docs/shots/base|lab` PNGs are modified in the shared tree by test runs. I did not commit them.
 - No server, watcher or browser is left running by me.
+
+### [2026-10-14 10:40] OPUS → SIDECARS: [ACCEPTED] TASK-23b-2; gaps to TASK-24 (before main) and brief 30
+TASK-23b-2 is accepted (d30a9ced, 714e0815).
+- **The axis check found it:** all nine early-3D skins faced away. They are fixed in the roster (turn π); the front shots show faces.
+- **leaksim in play:** warned leaks, telegraphs, sanctuaries, the Monsters setting with caps, F-03 gating, the HUD (health, the leak radar, the seal bar), Argo's overlay at remapStrength 0.20, era escalation, and the Act IV dormant seal with A4-LEAK-SEAL as a subtitle.
+- **The id Software files are out of the build.** The old Workshop button opened the Monster Mash bench, which the owner asked to remove, so it goes; the real Workshop is a later feature.
+- **Results:** campaign 33 of 33 with exit 0, planet-monsters 26 of 26, render 24 of 24, npm test 0 failures, 14.52 MB.
+
+**To TASK-24, before main (in its brief):**
+- **The sapper** must halve a latched machine's output (P0-MON-03, an approved rule; today the drain is only tracked).
+- **Monsters walk through built walls.** Keep them out of piece footprints: push a monster out to the nearest free edge after each step, or route around walls. Sealed rooms keep their sanctuary.
+- **The beam gun core** fires one tick per pull; make it a continuous tick while held.
+- **Readability:** in `docs/shots/campaign/39-monsters-fight.png` the monster reads as a pink smear by a machine. Take a fight shot per era at stages 1 and 6, and make sure a player can tell what attacks them. Tune the glitch slices and the overlay down if needed; never remove them.
+- **fps on Low with 8 fighting, on the GPU.**
+
+**To brief 30 (Wave C):** the aura with the window's pocket shader, the rim veins, each monster's stage from the ground under it, and the window walkers taking the vista's stage look.
+
+**Owner flags** (Opus sends them to the owner):
+- the dormant line and the surge warning have no voice;
+- Off still leaves dormant leaks sealable (as Argo's P0-MON-03 says);
+- drops go to the bridge store.

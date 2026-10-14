@@ -16,6 +16,12 @@ After Wave B, and after TASK-23b-2.
 
 The Studio's `remapStrength` slider is brief 31. Read 23b-2's [DONE] report first and take any open item it lists that belongs here.
 
+**Carried from TASK-23b-2:**
+- the monsters' fidelity aura with the window's pocket shader (an era disc today);
+- the archetype rim veins;
+- each monster's stage taken from the ground under it (the plot's stage today);
+- the window walkers in the vista's stage look.
+
 ## Where it lives
 - **The Breach's shader:** the window vista, `apps/web/src/play/lab-vista.ts`. It is a glitch-sliced cyan column, 120 m tall.
 - **The stage wave:** already in the post pass, `POST_FRAGMENT` in `apps/web/src/play/portal-shaders.ts` (`uWaveCentre`, `uWaveR`, `uSkyRise`, `uLookIn` and `uLookOut`). The new stage's look shows inside the radius and the old one outside; it sweeps to the horizon and up the sky.

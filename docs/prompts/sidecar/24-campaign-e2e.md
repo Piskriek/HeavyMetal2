@@ -53,6 +53,12 @@ Opus reviews it and pushes `main`.
   1. **The radio subtitle** pins at bottom 108 px, above the hotbar, never higher than 160 px. Today it runs under the hotbar: docs/shots/campaign/17-a4-02-milled.png.
   2. **CANNOT PLACE** (base/ui/build-readout.tsx, base-hud.tsx) shows only while a placement ghost is shown, 36 px below the reticle.
   3. **Title cards** (`say()` in play.tsx) sit at top 72 px for 3 s and hold any other banner until they fade.
+- **From TASK-23b-2 (fix before main; details on the board, 14 October 10:40):**
+  - the sapper halves a latched machine's output (P0-MON-03);
+  - monsters stay out of built pieces' footprints (push them out, or route them round);
+  - the beam gun core ticks continuously while held;
+  - fights read: a shot per era at stages 1 and 6 where you can tell what attacks you (tune the overlay down, never remove it);
+  - fps on Low with 8 fighting, on the GPU.
 - **From TASK-21d:**
   - `scripts/test-base-building.mjs` exits 1 since TASK-22's drafting lock: K is refused until the chain unlocks drafting. Fix the test by unlocking through the chain or the dev hooks; never remove or weaken the lock.
   - Campaign beat 10 (the reload comparison) flaked once; it now prints the differing paths. If the three runs show it, fix the race (snapshot after the base tick settles).

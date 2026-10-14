@@ -148,3 +148,29 @@ test('performance: six busy leaks for a simulated minute in under 300 ms', () =>
   // landed with 450 ms: 300 to 350 ms on the min-spec laptop while the 3D batch and Blender renders run beside it
   assert.ok(performance.now() - t0 < 450, `${performance.now() - t0} ms`);
 });
+
+test('a dormant leak (no kinds) never warns or spawns, and seals like any other', () => {
+  const w = addLeak(createWorld(14), { x: 30, z: 0 }, []);
+  const quiet = run(w, 300, () => input({ aggression: 'hard', stage: 6 }));
+  assert.equal(quiet.events.filter((x) => x.e.t === 'warn' || x.e.t === 'spawn').length, 0, 'dormant: no warning, no spawn');
+  const id = w.leaks[0]!.id;
+  const sealed = run(w, SEAL_SECONDS + 0.5, () => input({ sealing: id, player: { x: 10, z: 0, alive: true } }));
+  assert.ok(sealed.events.some((x) => x.e.t === 'sealed' && x.e.leak === id), 'the beam seals it');
+});
+
+test('the safe dome is a sanctuary: no telegraph or hit on a player inside it, and no bolt enters it', () => {
+  const dome = [{ x: 0, z: 0, r: 25 }];
+  const w = addLeak(addLeak(createWorld(15), { x: 40, z: 0 }, ['charger', 'spitter']), { x: -40, z: 5 }, ['spitter', 'brute']);
+  const r = run(w, 300, () => input({ aggression: 'hard', stage: 4, player: { x: 0, z: 0, alive: true }, safe: dome }), (cur) => {
+    for (const b of cur.bolts) assert.ok(Math.hypot(b.x, b.z) >= 25 - 1e-6, `a bolt inside the dome at ${b.x.toFixed(2)}, ${b.z.toFixed(2)}`);
+  });
+  assert.ok(r.events.some((x) => x.e.t === 'spawn'), 'the leaks did open');
+  assert.equal(r.events.filter((x) => x.e.t === 'telegraph' || x.e.t === 'hitPlayer').length, 0, 'nothing targets the player inside the dome');
+});
+
+test('a spitter at the dome edge does not shoot a player who stands just inside it', () => {
+  const dome = [{ x: 0, z: 0, r: 25 }];
+  const w = addLeak(createWorld(16), { x: 27, z: 0 }, ['spitter']);
+  const r = run(w, 120, () => input({ aggression: 'hard', stage: 4, player: { x: 24.5, z: 0, alive: true }, safe: dome }));
+  assert.equal(r.events.filter((x) => x.e.t === 'hitPlayer' || x.e.t === 'telegraph').length, 0);
+});

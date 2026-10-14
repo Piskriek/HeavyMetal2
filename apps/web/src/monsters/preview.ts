@@ -179,6 +179,45 @@ function rosterSetup(era: Era): { ids: string[]; mode: Mode; cam: THREE.Perspect
   return { ids: ids(skins), mode: m, cam };
 }
 
+// ---- front: the 3D skins of one era running straight at the camera (yaw 0 is +z, where the camera stands; the walk clip plays).
+// The face must show. A model that shows its back is reversed: the fix goes in the roster (turn) or the adapter, never the camera.
+function frontSetup(era: Era, pick: readonly string[] | null): { ids: string[]; mode: Mode; cam: THREE.PerspectiveCamera } {
+  const skins = pick ? pick.map((id) => SKINS.find((s) => s.id === id)).filter((s): s is SkinInfo => !!s) : SKINS.filter((s) => s.era === era);
+  const sp = 3.0;
+  const scene = baseScene();
+  const mon = createMonsterRenderer(scene, { budget: { animated: 64, perSkin: 4 } });
+  const mobs: MonsterMob[] = skins.map((s, i) => ({
+    id: i + 1, kind: s.archetype, x: i * sp - ((skins.length - 1) * sp) / 2, z: 0, phase: 'chase', phaseT: 0, yaw: 0,
+  }));
+  // one row, framed close enough to read a face: the half width the row needs, at the camera's horizontal half-angle
+  const cam = new THREE.PerspectiveCamera(36, innerWidth / innerHeight, 0.1, 500);
+  const halfW = ((skins.length - 1) * sp) / 2 + 1.8;
+  const tanH = Math.tan((18 * Math.PI) / 180) * (innerWidth / innerHeight);
+  // a single skin is framed close (a face is a few pixels from 5 m on a 0.8 m dog)
+  const dist = skins.length === 1 ? Math.max(3.2, skins[0]!.heightM * 3.4) : Math.max(4, halfW / tanH) + 1;
+  const cy = skins.length === 1 ? skins[0]!.heightM * 0.5 : 1.0;
+  cam.position.set(0, cy + 0.4, dist);
+  cam.lookAt(0, cy, 0);
+  cam.updateProjectionMatrix();
+  for (const m of mobs) {
+    const s = skins[m.id - 1]!;
+    chipAt(new THREE.Vector3(m.x, s.heightM + 0.3, m.z), s.id, `${s.archetype} running at you`);
+  }
+  note(`${era} front`, `${skins.length} skins running at the camera (yaw 0, the walk clip). The face must show; a back means the axis is reversed.`);
+  const m: Mode = {
+    api: {},
+    advance(seconds) { this.tick(seconds); },
+    tick(dt) {
+      t += dt;
+      mon.sync(mobs.map((mm) => ({ ...mm, phaseT: t })), (mm) => skins[mm.id - 1]!.id);
+      mon.update(dt, cam);
+      renderer.render(scene, cam);
+      readout(mon.stats());
+    },
+  };
+  return { ids: ids(skins), mode: m, cam };
+}
+
 // ---- turn: one skin at eight facings (yaw 0 to 315 degrees), to check the view pick and the mirror
 function turnSetup(skinId: string): { ids: string[]; mode: Mode; cam: THREE.PerspectiveCamera } {
   const skin = SKINS.find((s) => s.id === skinId) ?? SKINS[0]!;
@@ -382,6 +421,17 @@ async function boot(): Promise<void> {
     mode = w.mode;
     activeCam = w.cam;
     publish(w.mode.api);
+    hideLoad();
+    return;
+  }
+  if (modeName === 'front') {
+    const frontEra: Era = eraParam === 'modern3d' ? 'modern3d' : 'early3d';
+    const pickParam = params.get('skins');
+    const set = frontSetup(frontEra, pickParam ? pickParam.split(',').filter(Boolean) : null);
+    await preloadSkins(set.ids, setLoad);
+    mode = set.mode;
+    activeCam = set.cam;
+    publish(set.mode.api);
     hideLoad();
     return;
   }

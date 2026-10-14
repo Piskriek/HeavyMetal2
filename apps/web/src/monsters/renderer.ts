@@ -54,6 +54,9 @@ interface MotionState { x: number; z: number; yaw: number }
 export function createMonsterRenderer(scene: THREE.Scene, opts: { readonly budget: MonsterRenderBudget; readonly roster?: readonly SkinInfo[] }): MonsterRenderer {
   const roster = opts.roster ?? SKINS;
   const budget = opts.budget;
+  // a 3D skin turns its native front onto +z (roster turn): the facing is the mobs' yaw plus that turn
+  const turns = new Map(roster.map((r) => [r.id, r.turn] as const));
+  const turnOf = (id: string): number => turns.get(id) ?? 0;
   const batches = new Map<string, SpriteBatch>();
   const models = new Map<number, ModelEntry>();
   const motion = new Map<number, MotionState>();
@@ -125,7 +128,7 @@ export function createMonsterRenderer(scene: THREE.Scene, opts: { readonly budge
         e.z = m.z;
         e.play = play;
         e.inst.root.position.set(m.x, 0, m.z);
-        e.inst.root.rotation.set(0, yaw, 0);
+        e.inst.root.rotation.set(0, yaw + turnOf(d.id), 0);
         e.inst.root.visible = true;
         e.inst.setPlay(play, m.phaseT);
         next.push(e);

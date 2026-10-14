@@ -336,7 +336,7 @@ export function step(
         nextWave += dt;
       } else {
         const warnTime = nextWave - WARN_SECONDS;
-        if (warnTime >= curT - 1e-7 && warnTime < nextT - 1e-7) {
+        if (l.kinds.length > 0 && warnTime >= curT - 1e-7 && warnTime < nextT - 1e-7) {
           events.push({ t: 'warn', leak: l.id, inSeconds: WARN_SECONDS });
         }
 
@@ -470,6 +470,16 @@ export function step(
     }
   }
 
+  // The sanctuary (P0-MON-03): a player inside a safe circle is never targeted, and no bolt enters one.
+  const inSafe = (x: number, z: number): boolean => {
+    for (let sIdx = 0; sIdx < input.safe.length; sIdx++) {
+      const s = input.safe[sIdx];
+      if (s && Math.hypot(x - s.x, z - s.z) < s.r) return true;
+    }
+    return false;
+  };
+  const playerSafe = inSafe(input.player.x, input.player.z);
+
   // 3. Update Existing Mobs
   const allMobs: Mob[] = [];
   const newBolts: Bolt[] = [];
@@ -548,7 +558,7 @@ export function step(
           });
         } else {
           const curDist = Math.hypot(input.player.x - m.x, input.player.z - m.z);
-          if (input.player.alive && curDist <= spec.reach + 0.5) {
+          if (input.player.alive && !playerSafe && curDist <= spec.reach + 0.5) {
             events.push({ t: 'hitPlayer', mob: m.id, damage: spec.damage });
           }
         }
@@ -636,7 +646,7 @@ export function step(
       continue;
     }
 
-    if (!isTargetingMachine && shouldChase && distToTarget <= spec.reach) {
+    if (!isTargetingMachine && shouldChase && distToTarget <= spec.reach && !playerSafe) {
       events.push({ t: 'telegraph', mob: m.id });
       allMobs.push({
         ...m,
@@ -762,6 +772,9 @@ export function step(
 
     const bx = b.x + b.vx * dt;
     const bz = b.z + b.vz * dt;
+
+    // a bolt breaks on the dome's edge: it never flies in, and never hits anyone inside
+    if (inSafe(bx, bz)) continue;
 
     if (input.player.alive && Math.hypot(bx - input.player.x, bz - input.player.z) <= 0.6) {
       events.push({ t: 'hitPlayer', mob: b.from, damage: b.damage });

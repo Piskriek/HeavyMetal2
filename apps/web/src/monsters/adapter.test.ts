@@ -77,7 +77,7 @@ test('the roster matches docs/monsters/packed.json, and every skin has its files
     monsters: Record<string, { id: string; era: Era; archetype: Archetype; heightM: number; where: string; source: string }>;
   };
   const fromManifest = Object.values(packed.monsters).map((m) => ({ id: m.id, era: m.era, archetype: m.archetype, heightM: m.heightM, core: m.where === 'core', source: m.source })).sort((a, b) => a.id.localeCompare(b.id));
-  assert.deepEqual(SKINS.map((s) => ({ ...s })), fromManifest, 'roster.ts is generated from the manifest: regenerate it if this fails');
+  assert.deepEqual(SKINS.map((s) => ({ id: s.id, era: s.era, archetype: s.archetype, heightM: s.heightM, core: s.core, source: s.source })), fromManifest, 'roster.ts is generated from the manifest: regenerate it if this fails');
   for (const s of SKINS) {
     const dir = s.core ? `${root}apps/web/src/assets/monsters/${s.id}` : `${root}apps/web/public/monsters/${s.id}`;
     const want = s.era === 'sprite' ? ['sprite.json', 'sprite.webp'] : ['model.glb'];

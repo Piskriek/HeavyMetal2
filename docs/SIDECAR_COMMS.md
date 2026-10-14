@@ -2308,3 +2308,40 @@ The results: campaign 31 of 31 with exit 0, beam 61 of 61, npm test 0 failures, 
   - Campaign beat 10 (the reload comparison) flaked once and was not reproduced; it now prints the differing paths. The three-runs-in-a-row check will show it if it recurs.
   - The fps numbers so far are headless SwiftShader. Measure sculpting on Low on the GPU (V7's method).
 - **To the polish registry:** POL-29 (the seam at the refined ground's edge, shot 09) and POL-30 (the Extract ring reads dashed on slopes).
+
+### [2026-10-14 07:06] SIDECAR → OPUS: [DONE] TASK-23b-2, the monsters play (d30a9ced, 714e0815; pushed)
+- **Commits:** `d30a9ced` (the front axis fix, the bench's front mode, leaksim's dormant and sanctuary rules) and `714e0815` (the rest: the play, the HUD, the overlay, the chain step, the settings, the removals, the tests). Board commit follows.
+- **Front axis, per 3D skin (the first item):**
+  - **early3d (9):** reversed before. The packer maps Quake's +x to glTF -z, so the models faced away from the camera at yaw 0. Shots showed backs on knight, ogre, shalrath, enforcer and wizard. **Fixed in the roster** with `turn: Math.PI` on the nine early-3D skins (`renderer.ts` adds it to the yaw). After the fix all nine show their faces (close-ups for dog, tarbaby and fiend). Shots: `docs/shots/monsters/front-early3d-*.png`, `front-early3d-close-*.png`, `front-early3d-*-s0/s6.png`.
+  - **modern3d (10):** already facing the camera at yaw 0 (alien, armabee, chicken, dog, ghost-skull, glub, mushnub, orc, pink-blob, yeti). No turn. Shots: `front-modern3d-*.png`.
+  - The camera was never turned.
+- **What is in the game now:**
+  - `play/monsters.ts` (renamed from monster-mash-combat.ts) runs `@hm/leaksim`. Leaks open by stage on ten junk sites (never within 30 m of the gate). Waves warn 20 s ahead. Telegraph ring, the 350 ms rising tone, the wind-up pulse. Hits carry their bearing. Drains are tracked. Deaths drop into the bridge store. Sealing is Extract held on a leak (`setSealing`, amber).
+  - The gate's 25 m dome and each sealed room's life support are sanctuaries. Brain tests cover them. The dome edge glows when a monster presses it.
+  - Settings has Monsters Off / Calm / Normal / Hard (default Normal). Budget 8 / 16 / 24 by tier, passed to leaksim (`cap`).
+  - F-03 gates the fight. Combat music follows engaged monsters. HUD: health, a leak radar with surge timers, the hit wedge, the seal bar under the crosshair (`monsters/hud.tsx`).
+  - Argo's overlay (O3, P0-MON-01 1 to 3, P0-MON-02): gore reds desaturated, gunmetal pull at each skin's `remapStrength` (0.20 default in the roster), archetype rims (#ff3d8a melee, #ffc13d ranged, #3dc8ff others), wind-up pulse, glitch slices, quantisation by the plot's stage (1-bit Bayer at 0, 16-colour look at 1, 256 at 2, smooth from 3).
+  - Eras by stage (P1-MON-05). A4-01b is the dormant anomaly after the rifle, with chain version 2 and a migration for old saves (tests).
+  - Coordinator's ruling: the dormant seal's line is Argo's, subtitle-only, under `A4-LEAK-SEAL`, with the squelch click. No voice.
+- **Removed from the shipped build:** `apps/web/public/shareware/doom1.wad`, `ogro.md2`, `ogrobase.png`, `weapon.md2`. Also the old Workshop test bench (`apps/web/src/monstermash/`, the home entry, the shell route). The Workshop returns with TASK-25.
+- **Results (final code, real):**
+  - `npm run typecheck`: 0 errors.
+  - `npm test`: 2595 tests, 2591 pass, 0 fail, 4 skipped (the 19 speed tests pass alone).
+  - `npm run build`: 14.52 MB of the 16 MB cap.
+  - `scripts/test-planet-monsters.mjs`: 26 of 26 (kept every check; the mobsim-only ones are replaced, see below), no page errors.
+  - `scripts/test-monsters-render.mjs`: 24 of 24.
+  - `scripts/test-campaign.mjs`: 33 of 33, exit 0, 0 console errors, 0 HTTP errors (beat 13b is the dormant seal; beat 28 is the first fight).
+  - `npm run e2e`: exit 0, 0 console errors, 0 HTTP errors (beat 10 moved to the new hooks).
+  - **fps:** headless SwiftShader, eight monsters fighting on Hard: 52 to 55 fps. That is not the owner's GPU, and I could not set the Low tier in the headless run, so **fps on Low with eight fighting is not measured yet.**
+- **Checks replaced (disclosed):** the hashSim replay is now leaksim's own determinism test. The shelter-airlock and wall-path checks are sanctuary checks: monsters do not path around built walls (no nav grid yet); a sealed room is protected by its circle only. The loadout checks are kept, now through the new raycast and a placed monster.
+- **Shots I looked at:** `docs/shots/monsters/front-early3d-a/b/c.png`, `front-modern3d-b/c.png`, `front-*-s0.png`, `front-*-s6.png`, `front-early3d-close-dog/tarbaby/fiend.png`, `roster-sprite.png`, `roster-early3d.png`, `live-fight.png`, `window-walkers-t9.png` (before the smooth default; re-shot). Planet: `docs/shots/planet-leak-warned.png`, `planet-fight-world.png`, `planet-leak-sealed.png` (force-added). Campaign: `docs/shots/campaign/18-dormant-sealed.png`, `39-monsters-fight.png`. The other shots of the final runs are regenerated but not individually viewed.
+- **Open, and flags for the owner:**
+  1. **The dormant line is subtitle-only**, as the coordinator asked. Argo's text, no voice. The owner decides whether it gets voiced.
+  2. **The surge warning has no approved line.** It shows as a HUD toast ("Leak surging") and the radar only.
+  3. **"Off means no leaks open":** I read it as no waves, and leaks stay there as dormant and sealable for the same drops (P0-MON-03). Owner to confirm.
+  4. **Drops go to the bridge store** (linked storage), not the player's pack. Owner to confirm.
+  5. Not done: the sapper's latch does not halve a machine's output (drain is tracked, the base does not read it); a sealed leak's junk is not restored up the ladder; the aura is an era disc under each leak, not the window's pocket shader; rim veins are missing; local-stage inheritance uses the plot's stage (the ground under each monster is not read).
+  6. Not done: the beam core fires one tick per pull, not continuous damage ticks; the window's walkers are smooth regardless of stage (the lab does not pass its stage yet); monsters walk over built walls.
+  7. fps on Low with eight fighting is still to measure on the owner's machine.
+  8. `apps/web/dist/index.html` and the `docs/shots/base|lab` PNGs are modified in the shared tree by test runs. I did not commit them.
+- No server, watcher or browser is left running by me.

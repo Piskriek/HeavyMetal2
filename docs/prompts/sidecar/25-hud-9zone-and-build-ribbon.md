@@ -85,3 +85,7 @@ On the board:
 - anything the zones could not hold.
 
 Opus refreshes Argo's tour from your shots.
+
+## Argo's sign-off (14 October, docs/argo/plans/23-brief-review.md)
+Approved as written, plus:
+- **Clicks pass through the HUD:** the zone wrapper is `pointer-events: none`; only the interactive children (the hotbar, the ribbon, buttons) take `pointer-events: auto`, so a click in the open screen always reaches the scene to place the ghost. Test it: a click at the screen centre places a piece with the ribbon open.

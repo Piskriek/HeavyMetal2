@@ -81,3 +81,7 @@ On the board:
 - the results.
 
 Opus refreshes Argo's tour.
+
+## Argo's sign-off (14 October, docs/argo/plans/23-brief-review.md)
+Approved as written, plus:
+- **No autoplay at the menu:** while the menu shows the live lab, the world-SFX and ambience buses stay at zero gain until the player clicks a menu control or enters the lab, so the browser raises no autoplay warning. Coordinate with TASK-29's buses (whichever lands second wires it).

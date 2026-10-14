@@ -214,3 +214,6 @@
 - (same day, pasting Argo's reply to the review) "maybe this will help:" (the reply: all eight objections accepted; saved as docs/argo/plans/ARGO_MASTER_PLAN_REPLY.md)
 - (same day) "i forgot i could, ive opend argo's chat in your browser so you can talk there anytime, he can create code for you and other stuff too"
 - (2026-10-14, morning) "you are alowed to alow his browser from now on, you guys sat like that for hours while i slept"
+- (same morning) "argo is done" (his lore micro-logs, saved as docs/argo/plans/22-lore-micrologs.md)
+- (same morning) "you clicked his model choice dropdown instead of send" (Opus fixed it: the picker was closed unchanged, and the message sent)
+- (same morning) "hes done, when he genereate his replys the browser is laggy unfortunately but he gets there"

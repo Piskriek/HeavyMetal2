@@ -59,3 +59,7 @@ On the board:
 - the soft-lock proof;
 - the brownout shots;
 - the results.
+
+## Argo's sign-off (14 October, docs/argo/plans/23-brief-review.md)
+Approved as written, plus:
+- **Stage 0 too:** `stepSync` in `apps/web/src/play/quest.ts` (about line 205) refills sync near a machine only from stage 1 (`o.stage >= 1 && o.nearMachine`, `MACHINE_FIELD` 28). The gate's 25 m dome and the powered pylon's and shelter's 15 m domes must hold and refill sync **at stage 0** as well. Keep the machine rule as it is.

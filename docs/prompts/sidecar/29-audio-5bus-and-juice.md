@@ -71,3 +71,7 @@ On the board:
 - the results.
 
 Flag any approved file you think should be redone; the owner decides.
+
+## Argo's sign-off (14 October, docs/argo/plans/23-brief-review.md)
+Approved as written, plus:
+- **No autoplay at the menu:** the world-SFX and ambience buses stay at zero gain on the main menu until the first click or entering the lab (TASK-28's live menu). Whichever of 28 and 29 lands second wires it.

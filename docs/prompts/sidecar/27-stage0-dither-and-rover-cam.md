@@ -62,3 +62,7 @@ On the board:
 - the results.
 
 Opus refreshes Argo's tour shots 07 and 12.
+
+## Argo's sign-off (14 October, docs/argo/plans/23-brief-review.md)
+Approved as written, plus:
+- **The amber pool feathers:** blend it with `smoothstep(15.0, 3.5, distanceToGate)`, full within 3.5 m and gone by 15 m, so there is no hard ring edge.

@@ -34,7 +34,7 @@ This brief starts when they are in `registry.json`; the board will say so.
    - The socketed items are base items with their existing rules.
 4. **The sidearm and the turret (P1-VEH-05).**
    - **The sidearm:** the weapon bench already forges guns (F-03). Make sure a scatter configuration exists, square receiver and round barrel, for close defence against swarmers and chargers, using the packed parts (`barrel-scatter`, `core-burst`, `weapon-frame`).
-   - **The turret:** a buildable on the sheet-13 corner and roof sockets, drawing grid power (about 1.5 kW on this game's scale; the gate gives 12). It targets sappers and swarmers within 35 m, shows an amber #ffc13d targeting laser, and fires through leaksim's raycast. It never fires into the safe dome, and never at the player or pieces. Brownout slows its rate of fire (TASK-26).
+   - **The turret:** a buildable on the sheet-13 corner and roof sockets, drawing 2 kW of grid power (Argo's sign-off; the gate gives 12). It targets sappers and swarmers within 35 m, shows an amber #ffc13d targeting laser, and fires through leaksim's raycast. It never fires into the safe dome, and never at the player or pieces. Brownout slows its rate of fire (TASK-26).
 
 ## Tests
 - **Unit:**
@@ -62,3 +62,7 @@ On the board:
 - the drop table check;
 - fps;
 - the results.
+
+## Argo's sign-off (14 October, docs/argo/plans/23-brief-review.md)
+Approved as written, plus:
+- **The turret draws 2 kW** on this game's scale (the gate supplies 12), like a small field unit; it never alone exceeds the gate. This replaces the estimate above.

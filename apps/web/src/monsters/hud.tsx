@@ -70,7 +70,7 @@ export function MonsterHud(props: MonsterHudProps) {
         <div key={hitAt} className="mhud-hit" style={{ transform: `rotate(${hitBearing}rad)` }} aria-hidden="true" />
       ) : null}
 
-      <aside className="mhud-plate mhud-radar" aria-label="Leaks">
+      <aside className="mhud-plate mhud-radar" data-hud-zone="top-right" aria-label="Leaks">
         <svg className="mhud-scope" viewBox="0 0 100 100" role="img" aria-label={summary}>
           <circle className="ring" cx="50" cy="50" r="48" />
           <circle className="ring" cx="50" cy="50" r="24" />
@@ -104,7 +104,7 @@ export function MonsterHud(props: MonsterHudProps) {
         </div>
       </aside>
 
-      <section className={`mhud-plate mhud-vitals${low ? ' low' : ''}`} aria-label="Health">
+      <section className={`mhud-plate mhud-vitals${low ? ' low' : ''}`} data-hud-zone="bottom-right" aria-label="Health">
         <p className="mhud-title">Health</p>
         <div className="mhud-figure">
           <b>{shown}</b>
@@ -119,7 +119,7 @@ export function MonsterHud(props: MonsterHudProps) {
       </section>
 
       {seal ? (
-        <div className="mhud-plate mhud-seal">
+        <div className="mhud-plate mhud-seal" data-hud-zone="centre">
           <p className="mhud-title">{seal.inReach ? `Sealing, ${pct}%` : 'Too far to seal'}</p>
           <p className="mhud-sub">{seal.inReach ? 'Keep the beam on it.' : 'Walk within 25 m of the leak.'}</p>
           <div className="mhud-seal-bar" aria-hidden="true">

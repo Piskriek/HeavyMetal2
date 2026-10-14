@@ -53,7 +53,7 @@ export const BuildReadout: React.FC<BuildReadoutProps> = ({
 
   return (
     <>
-    <div className="hm-build-readout-hud" data-testid="build-readout-hud" data-hud-zone="build-hint">
+    <div className="hm-build-readout-hud" data-testid="build-readout-hud" data-hud-zone="centre">
       {hoverSupport && (!build.blueprint || !isOk) && (
         <div
           className="hm-build-hover-badge"
@@ -120,7 +120,7 @@ export const BuildReadout: React.FC<BuildReadoutProps> = ({
       )}
     </div>
     {refusal !== null ? (
-      <div className="hm-cannot-place" role="status" data-hud-zone="build-hint" data-testid="build-verdict-banner">{refusal}</div>
+      <div className="hm-cannot-place" role="status" data-hud-zone="centre" data-testid="build-verdict-banner">{refusal}</div>
     ) : null}
     </>
   );

@@ -145,8 +145,8 @@ export const BaseHud: React.FC<BaseHudProps> = ({
 
       {/* Plan build prompt (within 8m) */}
       {planPrompt && !paused && openWindow === 'none' && !modalOpen && drivingSpeed === null && (
-        <div style={{ position: 'absolute', bottom: 130, left: '50%', transform: 'translateX(-50%)', zIndex: 100 }}>
-          <div className="hm-plan-build-prompt" data-testid="plan-build-prompt">
+        <div style={{ position: 'absolute', top: 'calc(50% + 36px)', left: '50%', transform: 'translateX(-50%)', zIndex: 100 }}>
+          <div className="hm-plan-build-prompt" data-hud-zone="centre" data-testid="plan-build-prompt">
             <Hammer size={14} />
             <span>{planPrompt}</span>
           </div>
@@ -155,7 +155,7 @@ export const BaseHud: React.FC<BaseHudProps> = ({
 
       {/* Running harvest counter pill beside hotbar */}
       {harvestCounter && !paused && openWindow === 'none' && !modalOpen && (
-        <div className={`hm-harvest-counter${harvestCounter.fading ? ' fading' : ''}`} data-testid="base-harvest-counter">
+        <div className={`hm-harvest-counter${harvestCounter.fading ? ' fading' : ''}`} data-hud-zone="bottom-left" data-testid="base-harvest-counter">
           <span className="hm-count-pill">+{harvestCounter.count}</span>
           <span className="hm-count-name">{harvestCounter.name}</span>
         </div>
@@ -165,8 +165,7 @@ export const BaseHud: React.FC<BaseHudProps> = ({
       {placedCounter && !paused && openWindow === 'none' && !modalOpen && (
         <div
           className={`hm-harvest-counter${placedCounter.fading ? ' fading' : ''}`}
-          style={{ bottom: harvestCounter ? 134 : 84 }}
-          data-testid="base-placed-counter"
+          data-hud-zone="bottom-left" data-testid="base-placed-counter"
         >
           <span className="hm-count-pill">{placedCounter.count > 0 ? `+${placedCounter.count}` : placedCounter.count}</span>
           <span className="hm-count-name">{placedCounter.name}</span>
@@ -175,7 +174,7 @@ export const BaseHud: React.FC<BaseHudProps> = ({
 
       {/* Active plans HUD card */}
       {world && world.plans.length > 0 && !paused && openWindow === 'none' && !modalOpen && (
-        <div className="hm-plans-hud-card" data-testid="active-plans-hud">
+        <div className="hm-plans-hud-card" data-hud-zone="top-right" data-testid="active-plans-hud">
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: 'var(--base-cyan)', textTransform: 'uppercase' }}>
             <Compass size={12} />
             <span>Active Plans ({world.plans.length})</span>
@@ -212,10 +211,10 @@ export const BaseHud: React.FC<BaseHudProps> = ({
 
       {/* Weapon readout beside hotbar */}
       {weaponStats && !paused && openWindow === 'none' && !modalOpen && (
-        <div className="hm-weapon-hud-badge" data-testid="weapon-hud-badge" style={{
-          position: 'fixed',
-          bottom: 24,
-          left: 'calc(50% + 280px)',
+        <div className="hm-weapon-hud-badge" data-hud-zone="bottom-left" data-testid="weapon-hud-badge" style={{
+          position: 'absolute',
+          bottom: 100,
+          left: 24,
           display: 'flex',
           alignItems: 'center',
           gap: 8,
@@ -239,10 +238,10 @@ export const BaseHud: React.FC<BaseHudProps> = ({
 
       {/* Driving speed readout */}
       {drivingSpeed !== null && drivingSpeed !== undefined && !paused && openWindow === 'none' && !modalOpen && (
-        <div className="hm-speed-hud-badge" data-testid="speed-hud-badge" style={{
-          position: 'fixed',
+        <div className="hm-speed-hud-badge" data-hud-zone="bottom-left" data-testid="speed-hud-badge" style={{
+          position: 'absolute',
           bottom: 24,
-          right: 'calc(50% + 280px)',
+          left: 24,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',

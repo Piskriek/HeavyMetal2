@@ -2,7 +2,7 @@
 // planet looked round, the first machine placed; then the plot's game loop (`@hm/plotsim`): mine ore, run power out, build the
 // machines whose pixels raise the plot's four fidelity metrics, and climb the six stages. The scene is play-scene.ts, the
 // tutorial quest.ts; this screen loads them behind a bar, reads your keys and mouse, runs the plot, saves, and says what to do.
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { deviceFor, type Stage } from '@hm/fidelity';
 import { VAULT, VAULT_BY_ID } from '@hm/vault';
 import { createAdaptiveQuality, parseQuality, type Quality } from '@hm/game';
@@ -71,7 +71,7 @@ import { LoreHover, DataBank, propLabel } from './lore-ui';
 
 const isFixture = (kind: Kind): boolean => kind === 'bin' || kind === 'bench' || kind === 'repeater' || kind === 'lifeSupport' || kind === 'weaponBench';
 import { blueprint, ITEMS, pieceCost } from '../base/catalog';
-import { BuildMenu, KIND_LABEL, type BuildTab, type MenuBlueprint, type MenuHeavy, type MenuMachine } from './build-menu';
+import { BuildMenu, BuildPill, KIND_LABEL, type BuildTab, type MenuBlueprint, type MenuHeavy, type MenuMachine } from './build-menu';
 import { MachinePickerModal } from '../base/ui/machine-picker-modal';
 import { RefineryModal } from '../base/ui/refinery-modal';
 import { FabricatorModal } from '../base/ui/fabricator-modal';
@@ -102,6 +102,15 @@ import {
   type AudioSettings,
 } from '../audio/game-audio';
 import { fidelityRules, FIDELITY_LINE_IDS } from '@hm/narrator';
+import { HudZone, CompassRibbon, FloatsPill, MachineLabel, SyncWord } from '../base/ui/hud-zones';
+import {
+  FIDELITY_SHIFT_MS,
+  fidelitySkinFor,
+  isTitleCardText,
+  shouldRenderMachineBillboard,
+  startFidelityTrack,
+  stepFidelityTrack,
+} from '../base/ui/hud-zones-logic';
 import '../base/base.css';
 import './play.css';
 
@@ -121,6 +130,20 @@ const GROUND_BUDGET: Readonly<Record<Quality, number>> = { potato: 60000, low: 7
 /** The most lines the planet is drawn at by tier: the later stages' resolution is capped on the light tiers, so they hold their frame rate. */
 const PLANET_LINES: Readonly<Record<Quality, number>> = { potato: 360, low: 480, medium: 1080, high: 1e5, ultra: 1e5 };
 const detailOf = (g: GraphicsSettings, q: Quality): Detail => ({ plumes: g.pixelPlumes, plumeDensity: g.plumeDensity, groundBudget: GROUND_BUDGET[q], planetLines: PLANET_LINES[q], plumeGlow: g.plumeGlow, pixelLights: g.pixelLights, windowView: g.windowView });
+/** The bearing from the player's facing to the planet's gate (degrees, positive to the right) and the distance in metres. */
+function gateBearingOf(scene: PlayScene | null): { readonly relativeDeg: number; readonly distanceM: number } | null {
+  if (!scene) return null;
+  const p = scene.debug.position();
+  const g = scene.debug.gatePlanet();
+  const dx = g.x - p.x;
+  const dz = g.z - p.z;
+  const yaw = scene.debug.facing();
+  // the forward direction on the ground for this yaw, and the Gate's direction from the player
+  const fwd = Math.atan2(-Math.sin(yaw), -Math.cos(yaw));
+  const off = fwd - Math.atan2(dx, dz);
+  return { relativeDeg: (Math.atan2(Math.sin(off), Math.cos(off)) * 180) / Math.PI, distanceM: Math.hypot(dx, dz) };
+}
+
 /** What each stage brings, for the toast when its wave has crossed the plot. */
 const STAGE_SAYS: readonly string[] = [
   'Stage 0: 1-Bit Dither. Reality degraded; digital entities roam unbound.',
@@ -274,6 +297,17 @@ export function PlayScreen(props: {
     narratorRef.current?.trigger(`stage:${stage}`);
   };
   const [subtitle, setSubtitle] = useState<{ id: string; text: string; cleanText: string } | null>(null);
+  // the HUD's skin (TASK-25, plan 28): the stage under the player picks it; a flip waits 0.5 s, then glitches for 120 ms
+  const [skinTrack, setSkinTrack] = useState(() => startFidelityTrack('3', 0));
+  const [skinGlitch, setSkinGlitch] = useState(false);
+  const whereRef = useRef<Hud['where']>('lab');
+  whereRef.current = hud.where;
+  // a stage title card holds the radio line that follows it (P0-HOUR-02): the line waits until the card's 3 s are up
+  const titleCardUntilRef = useRef(0);
+  const subtitleHoldRef = useRef<{ id: string; text: string; cleanText: string } | null>(null);
+  const altHeldRef = useRef(false);
+  // a placement session: a piece picked from the build ribbon. Its pill and the open drawer hold the radio line back.
+  const pieceSessionRef = useRef(false);
   const [radioLogOpen, setRadioLogOpen] = useState(false);
   const [journalOpen, setJournalOpen] = useState(false);
   /** Running seconds of the texture mill and metres driven, whole units go to the chain (TASK-22). */
@@ -305,7 +339,21 @@ export function PlayScreen(props: {
       const initialLogs = savedHeard();
       narratorRef.current = new GameNarratorController(defaultRules, initialLogs, loadDialogueSettings(), slotKey);
     }
-    const unsubSub = narratorRef.current.onSubtitle(setSubtitle);
+    const unsubSub = narratorRef.current.onSubtitle((s) => {
+      // a line that arrives under a stage title card waits for the card (P0-HOUR-02); a clear always goes through
+      const wait = titleCardUntilRef.current - performance.now();
+      if (s && wait > 0) {
+        subtitleHoldRef.current = s;
+        window.setTimeout(() => {
+          if (subtitleHoldRef.current !== s) return;
+          subtitleHoldRef.current = null;
+          setSubtitle(s);
+        }, wait);
+        return;
+      }
+      if (!s) subtitleHoldRef.current = null;
+      setSubtitle(s);
+    });
     const unsubLog = narratorRef.current.onRadioLog(setHeardLogs);
     return () => {
       unsubSub();
@@ -386,12 +434,48 @@ export function PlayScreen(props: {
     if (!toast) return undefined;
     // a title card holds the other banners (CANNOT PLACE) until it fades: 3 s, at 72 px from the top (P0-UI-01)
     document.body.dataset.titleUp = '1';
+    if (isTitleCardText(toast.text)) titleCardUntilRef.current = performance.now() + 3000;
     const t = window.setTimeout(() => setToast((x) => (x?.id === toast.id ? null : x)), 3000);
     return () => {
       window.clearTimeout(t);
       delete document.body.dataset.titleUp;
     };
   }, [toast]);
+  // the skin follows the ground under the player: a candidate must hold 0.5 s before the HUD flips (fidelity skins)
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const candidate = fidelitySkinFor({
+        stage: plotRef.current.stage,
+        machinesOnPlot: plotRef.current.machines.length,
+        inShieldedLab: whereRef.current === 'lab',
+        labPowerOn: stateRef.current.gateOn,
+      });
+      setSkinTrack((t) => stepFidelityTrack(t, candidate, performance.now()));
+    }, 250);
+    return () => window.clearInterval(id);
+  }, []);
+  // a flip plays its 120 ms glitch once; the timer is not tied to the track, so the next tick cannot cut it short
+  useEffect(() => {
+    if (!skinTrack.flipped) return;
+    setSkinGlitch(true);
+    window.setTimeout(() => setSkinGlitch(false), FIDELITY_SHIFT_MS);
+  }, [skinTrack]);
+  // the build readout drops its wheel and rotation hints while a radio line is on screen (TASK-25: the two bands never meet)
+useEffect(() => {
+    const shown = !!subtitle && dialogueSettings.subtitlesEnabled && !(menu || building !== null || placingLayoutId !== null || pieceSessionRef.current);
+    if (shown) document.body.dataset.subtitleUp = '1';
+    else delete document.body.dataset.subtitleUp;
+  });
+  // Alt is the tactical view: every machine label shows while it is held
+  useEffect(() => {
+    const on = (e: KeyboardEvent): void => { altHeldRef.current = e.altKey; };
+    window.addEventListener('keydown', on);
+    window.addEventListener('keyup', on);
+    return () => {
+      window.removeEventListener('keydown', on);
+      window.removeEventListener('keyup', on);
+    };
+  }, []);
 
 
 
@@ -1284,7 +1368,11 @@ export function PlayScreen(props: {
       return true;
     };
     placeRef.current = tryPlace;
-    const onKey = (e: KeyboardEvent, down: boolean): void => { if (down) keys.add(e.code); else keys.delete(e.code); };
+    // while a hologram is locked the arrows nudge it instead of walking (WASD still walks round it)
+    const onKey = (e: KeyboardEvent, down: boolean): void => {
+      const nudging = !!sceneRef.current?.ghostLocked() && e.code.startsWith('Arrow');
+      if (down && !nudging) keys.add(e.code); else keys.delete(e.code);
+    };
     const kd = (e: KeyboardEvent) => onKey(e, true), ku = (e: KeyboardEvent) => onKey(e, false);
     const realMove = lookFilter();
     const onMove = (e: MouseEvent): void => {
@@ -2131,6 +2219,9 @@ export function PlayScreen(props: {
       heard: () => narratorRef.current?.getState().heard ?? [],
       initAudio: () => initNarratorAudio(),
       go: (where: 'lab' | 'planet', x: number, z: number, yaw: number, pitch?: number) => scene.debug.teleport(where, x, z, yaw, pitch),
+      anchors: () => scene.debug.machineAnchors(),
+      hideOverlays: (hide: boolean) => setHideOverlays(hide),
+      lockAim: () => ({ locked: scene.ghostLocked(), aim: scene.aimPoint() }),
       gate: () => scene.debug.gatePlanet(),
       showGround: (on: boolean) => scene.debug.showGround(on),
       placeAt: (x: number, z: number, kind: MachineKind = 'mill') => { const g = scene.debug.gatePlanet(); return tryPlace(kind, x, z, Math.atan2(x - g.x, z - g.z)); },
@@ -2444,6 +2535,9 @@ export function PlayScreen(props: {
         }
         if (machinePickerHardpoint !== null) { setMachinePickerHardpoint(null); return; }
         if (refineryMachineId !== null) { setRefineryMachineId(null); return; }
+        // Esc releases a locked hologram first, then ends a placement session, then the build itself (TASK-25)
+        if (sceneRef.current?.ghostLocked()) { sceneRef.current.releaseGhost(); say('Hologram released'); return; }
+        if (pieceSessionRef.current) { pieceSessionRef.current = false; return; }
         if (building) { stopBuilding(); return; }
         if (menu) { setMenu(false); return; }
         if (dialOpen) { setDialOpen(false); return; }
@@ -2651,22 +2745,53 @@ export function PlayScreen(props: {
         say(held ? `Extraction beam: ${BEAM_LABEL[beamModeRef.current]}` : 'Extraction beam put away', held ? 'Q or the wheel cycles Extract, Apply and Sculpt.' : undefined);
         return;
       }
+      // H locks the hologram (P2-UI-06): the ghost stays where it is, the arrows nudge it 0.5 m, H or Esc releases it
+      if (e.code === 'KeyH' && (building !== null || placingLayoutRef.current !== null || pieceSessionRef.current)) {
+        const scene = sceneRef.current;
+        if (scene?.ghostLocked()) { scene.releaseGhost(); say('Hologram released'); }
+        else if (scene?.lockGhost()) say('Hologram locked', 'Arrows nudge it 0.5 m. R turns it. Left click places it. H or Esc releases.');
+        else say('Aim at the ground to lock the hologram');
+        return;
+      }
+      if (sceneRef.current?.ghostLocked() && (e.code === 'ArrowUp' || e.code === 'ArrowDown' || e.code === 'ArrowLeft' || e.code === 'ArrowRight')) {
+        // the nudge is screen-relative: up is away from the camera, right is to its right, on the ground
+        const yaw = sceneRef.current.debug.facing();
+        const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+        const rx = Math.cos(yaw), rz = -Math.sin(yaw);
+        const dir = e.code === 'ArrowUp' ? [fx, fz] : e.code === 'ArrowDown' ? [-fx, -fz] : e.code === 'ArrowRight' ? [rx, rz] : [-rx, -rz];
+        sceneRef.current.nudgeGhost((dir[0] ?? 0) * 0.5, (dir[1] ?? 0) * 0.5);
+        return;
+      }
       if (e.code === 'KeyB' && hud.where === 'planet') {
         if (visitingRef.current) {
           say(`Visiting ${visitingRef.current.snapshot.owner}'s plot`, 'Visits are read-only.');
           return;
         }
-        if (building) stopBuilding(); else { setPanel(null); setMenu((m) => { if (!m) freeMouse(); return !m; }); }
+        if (building) stopBuilding(); else { setPanel(null); pieceSessionRef.current = false; setMenu((m) => { if (!m) freeMouse(); return !m; }); }
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [ready, creating, building, gunEquipped, fireWeapon, menu, panel, labPanel, dialOpen, locked, paused, hud.atLever, hud.atDial, hud.aimed, hud.aimedBoulder, hud.aimedLab, hud.aimedProp, openLog, hud.where, placeNow, stopBuilding, freeMouse, say, props.profile]);
   useEffect(() => {
-    const onClick = (): void => { if (building && locked) placeNow(); };
+    const onClick = (e: MouseEvent): void => {
+      // the right button cancels a placement (the key strip says so); the left button places (TASK-25)
+      if (e.button === 2) {
+        if (sceneRef.current?.ghostLocked()) sceneRef.current.releaseGhost();
+        else if (pieceSessionRef.current) pieceSessionRef.current = false;
+        else if (building) stopBuilding();
+        return;
+      }
+      if (building && locked) placeNow();
+    };
+    const noMenu = (e: MouseEvent): void => { if (building || pieceSessionRef.current) e.preventDefault(); };
     window.addEventListener('mousedown', onClick);
-    return () => window.removeEventListener('mousedown', onClick);
-  }, [building, locked, placeNow]);
+    window.addEventListener('contextmenu', noMenu);
+    return () => {
+      window.removeEventListener('mousedown', onClick);
+      window.removeEventListener('contextmenu', noMenu);
+    };
+  }, [building, locked, placeNow, stopBuilding]);
 
   // Mouse wheel kind cycling for base-building (Item C1)
   useEffect(() => {
@@ -2897,12 +3022,26 @@ export function PlayScreen(props: {
     : '';
 
   return (
-    <div className={`play${ready ? ' ready' : ''}${hud.where === 'planet' ? ' on-planet' : ''}${hud.sync < 0.3 && hud.where === 'planet' ? ' sync-low' : ''}`}>
+    <div data-hud-root data-fidelity={skinTrack.skin} className={`play${ready ? ' ready' : ''}${hud.where === 'planet' ? ' on-planet' : ''}${hud.sync < 0.3 && hud.where === 'planet' ? ' sync-low' : ''}${skinGlitch ? ' hud-glitch' : ''}`}>
       {failed ? <p className="play-failed" role="alert">This browser could not start 3D graphics (WebGL 2). Try another browser, or turn on hardware acceleration in its settings.</p> : <canvas ref={canvasRef} className="play-canvas" onClick={() => { if (ready && !creating && !locked) lock(); }} aria-label="The lab, in first person. Click to look around." />}
       {!ready && !failed ? <div className="gr-loading play-loading" role="status"><span>{loading}</span><i /></div> : null}
 
       {ready ? (
-        <div className="play-sync-indicator" title={syncMode === 'synced' ? 'Connected to shared 40,000 km planetary substrate' : 'Playing on private local simulation branch'}>
+        <HudZone zone="top-centre">
+          {hud.where === 'planet' && drivingSpeed === null ? (() => {
+            const g = gateBearingOf(sceneRef.current);
+            return <CompassRibbon relativeDeg={g?.relativeDeg ?? null} distanceM={g?.distanceM ?? null} />;
+          })() : null}
+          <SyncWord draining={hud.sync < 0.3} hidden={hud.where !== 'planet'} />
+        </HudZone>
+      ) : null}
+      {ready ? (
+        <HudZone zone="top-right">
+          <FloatsPill
+            stage={hud.plot.stage}
+            floats={METRICS.map((m) => ({ key: m, name: METRIC_NAME[m], colour: METRIC_COLOUR[m], value: hud.plot.levels[m] }))}
+          />
+        <div className="play-sync-indicator" data-hud-zone="top-right" title={syncMode === 'synced' ? 'Connected to shared 40,000 km planetary substrate' : 'Playing on private local simulation branch'}>
           <span className={`sync-badge ${syncMode}`}>
             <span className="sync-pulse" />
             {syncMode === 'synced' ? 'GRID SYNCED' : 'SOLO DESYNCED'}
@@ -2921,6 +3060,7 @@ export function PlayScreen(props: {
             {syncMode === 'synced' ? 'Desync' : 'Sync'}
           </button>
         </div>
+        </HudZone>
       ) : null}
 
       {ready && creating ? (
@@ -2940,14 +3080,17 @@ export function PlayScreen(props: {
       {ready && !creating ? (
         <>
           {!hideOverlays && drivingSpeed === null && (
-            <section className="play-goal" aria-live="polite" data-hud-zone="quest">
+            <HudZone zone="top-left">
+            <section className="play-goal" aria-live="polite" data-hud-zone="top-left">
               <h2>{visiting ? `Visiting ${visiting.snapshot.owner}’s plot` : goal.title}</h2>
               <p>{visiting ? 'Read-only visit. Walk back through the gate to return to your lab.' : goal.hint}</p>
               {chainNext ? <small className="play-next">Next: {chainNext}</small> : null}
             </section>
+            </HudZone>
           )}
-          {hud.where === 'planet' ? (
-            <div className="play-sync" role="meter" aria-label="Sync" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(hud.sync * 100)}>
+          {hud.where === 'planet' && drivingSpeed === null ? (
+            <HudZone zone="bottom-left">
+            <div className="play-sync" data-hud-zone="bottom-left" role="meter" aria-label="Sync" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(hud.sync * 100)}>
               <span>Sync</span>
               <ol>{Array.from({ length: SYNC_BLOCKS }, (_, i) => <li key={i} className={i < syncLit ? 'on' : ''} />)}</ol>
               {shelterState === 'pressurized' ? (
@@ -2956,13 +3099,15 @@ export function PlayScreen(props: {
                 <span className="hm-shelter-chip unpowered">SEALED · NO LIFE SUPPORT</span>
               ) : null}
             </div>
+            </HudZone>
           ) : null}
           <i className="play-dot" aria-hidden="true" />
-          {prompt && drivingSpeed === null ? <p className={`play-prompt${building && !hud.ghost?.ok ? ' bad' : ''}`}>{prompt}</p> : null}
+          {prompt && drivingSpeed === null && building === null ? <p className={`play-prompt${building && !hud.ghost?.ok ? ' bad' : ''}`} data-hud-zone="centre">{prompt}</p> : null}
           {hud.aimedProp && !hud.aimedProp.salvage && databank === null ? <LoreHover prop={hud.aimedProp.id} /> : null}
           {databank !== null ? <DataBank log={databank} onClose={closeDatabank} /> : null}
           {(state.step === 'build' || state.step === 'drill' || state.step === 'done' || visiting) && drivingSpeed === null ? (
-            <section className="play-plot" aria-label={visiting ? `Visiting ${visiting.snapshot.owner}'s plot` : 'Your plot'}>
+            <HudZone zone="bottom-right">
+            <section className="play-plot" data-hud-zone="bottom-right" aria-label={visiting ? `Visiting ${visiting.snapshot.owner}'s plot` : 'Your plot'}>
               {visiting ? (
                 <div className="play-visiting-banner">
                   <span>Visiting <b>{visiting.snapshot.owner}</b></span>
@@ -2981,14 +3126,8 @@ export function PlayScreen(props: {
                   </>
                 );
               })()}
-              <ul className="play-levels">
-                {METRICS.map((m) => (
-                  <li key={m} style={{ '--c': METRIC_COLOUR[m] } as CSSProperties}>
-                    <span>{METRIC_NAME[m]}</span><i><s style={{ width: `${Math.min(100, hud.plot.levels[m])}%` }} /></i><b>{Math.floor(hud.plot.levels[m])}</b>
-                  </li>
-                ))}
-              </ul>
             </section>
+            </HudZone>
           ) : null}
           {menu ? (() => {
             const w = baseWorldRef.current;
@@ -3051,6 +3190,7 @@ export function PlayScreen(props: {
                   buildKindRef.current = kind as Kind;
                   ghostKindRef.current = null;
                   setMenu(false);
+                  pieceSessionRef.current = true;
                   if (!locked) lock();
                   say(`Holding the ${KIND_LABEL[kind] ?? kind}`, 'Click to place. Q or the wheel cycles the kinds.');
                 }}
@@ -3079,6 +3219,31 @@ export function PlayScreen(props: {
               />
             );
           })() : null}
+          {!menu && !paused && !hideOverlays && !isAnyBaseWindowOpen && (building !== null || placingLayoutId !== null || pieceSessionRef.current) ? (
+            <BuildPill
+              label={building ? `Placing ${KINDS[building]?.name ?? building}` : placingLayoutId !== null ? 'Placing a plan' : 'Placing a piece'}
+              onOpen={() => {
+                stopBuilding();
+                setPlacingLayoutId(null);
+                pieceSessionRef.current = false;
+                setMenu(true);
+                freeMouse();
+              }}
+            />
+          ) : null}
+          {hud.where === 'planet' && drivingSpeed === null && !hideOverlays && sceneRef.current
+            ? sceneRef.current.debug.machineAnchors().map((a) => {
+              // a label shows within 14 m and 8 degrees of the crosshair, or with Alt held (TASK-25, P0-UI-03)
+              if (a.behind || !shouldRenderMachineBillboard(a.aimAngleDeg, a.distanceM, altHeldRef.current)) return null;
+              const x = (a.ndcX + 1) * 0.5 * window.innerWidth;
+              const y = (1 - a.ndcY) * 0.5 * window.innerHeight - 36;
+              const run = a.running;
+              const tone = run > 0.95 ? 'ok' : run > 0.05 ? 'warn' : 'bad';
+              const state = run > 0.95 ? 'RUNNING' : run > 0.05 ? `BROWNOUT ${Math.round(run * 100)}%` : 'NOT RUNNING';
+              const name = (KINDS as Readonly<Record<string, { readonly name: string }>>)[a.kind]?.name ?? a.kind;
+              return <MachineLabel key={a.id} x={x} y={y} name={name} state={state} tone={tone} />;
+            })
+            : null}
           {panel !== null ? (() => {
             const curPlot = visiting ? visiting.plot : plotRef.current;
             const curLab = visiting ? visiting.lab : labRef.current;
@@ -3583,7 +3748,7 @@ export function PlayScreen(props: {
           ) : null}
 
           {/* Mentor Subtitles (On by default) */}
-          {subtitle && dialogueSettings.subtitlesEnabled && (
+          {subtitle && dialogueSettings.subtitlesEnabled && !(menu || building !== null || placingLayoutId !== null || pieceSessionRef.current) && (
             <div className="mentor-subtitle" role="region" aria-label="Mentor Radio Subtitles" data-testid="mentor-subtitle" data-hud-zone="subtitle">
               <div className="mentor-subtitle-header">
                 <span className="mentor-subtitle-pip" />
@@ -3596,10 +3761,11 @@ export function PlayScreen(props: {
           {/* Radio Log HUD Button */}
           <button
             className={`radio-hud-btn${subtitle ? ' speaking' : ''}`}
+            data-hud-zone="top-right"
             style={{
-              position: 'fixed',
-              top: 14,
-              right: 400,
+              position: 'absolute',
+              top: 186,
+              right: 24,
               zIndex: 40,
             }}
             onClick={() => {
@@ -3760,8 +3926,9 @@ export function PlayScreen(props: {
                 data-testid="draw-calls-badge"
                 style={{
                   position: 'fixed',
-                  top: 16,
-                  right: 16,
+                  top: 0,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
@@ -3769,7 +3936,7 @@ export function PlayScreen(props: {
                   backdropFilter: 'blur(10px)',
                   border: '1px solid rgba(56, 189, 248, 0.35)',
                   borderRadius: 8,
-                  padding: '6px 14px',
+                  padding: '2px 10px',
                   fontFamily: 'Oxanium, sans-serif',
                   zIndex: 100,
                   boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
@@ -3789,7 +3956,7 @@ export function PlayScreen(props: {
               </div>
           ) : null}
           {beamHud.held && hud.where === 'planet' && !hideOverlays ? (
-            <div className="hm-beam-chip" data-testid="beam-mode" data-mode={beamHud.mode} data-port={beamPort?.name ?? ''} data-tool={beamHud.mode === 'sculpt' ? sculptTool : ''}>
+            <div className="hm-beam-chip" data-hud-zone="bottom-right" data-testid="beam-mode" data-mode={beamHud.mode} data-port={beamPort?.name ?? ''} data-tool={beamHud.mode === 'sculpt' ? sculptTool : ''}>
               <b>{beamHud.mode === 'sculpt' ? `${BEAM_LABEL[beamHud.mode]}: ${SCULPT_LABEL[sculptTool]}` : BEAM_LABEL[beamHud.mode]}</b>
               <span>
                 {beamHud.mode === 'apply'

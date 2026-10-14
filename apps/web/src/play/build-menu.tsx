@@ -61,11 +61,8 @@ export function BuildMenu(props: BuildMenuProps): ReactElement {
   const colour = TABS.find((t) => t.id === props.tab)!.colour;
   const lock = props.locks?.[props.tab] ?? null;
   return (
-    <section className="play-build bm" aria-label="Build" style={{ '--tab': colour } as CSSProperties}>
-      <header className="bm-head">
-        <h3>Build</h3>
-        <button type="button" className="bm-close" onClick={props.onClose} aria-label="Close the build menu">Esc</button>
-      </header>
+    <section className="play-build bm bm-ribbon" data-hud-zone="bottom-centre" aria-label="Build" style={{ '--tab': colour } as CSSProperties}>
+      <div className="bm-tabs-row">
       <div className="bm-tabs" role="tablist" aria-label="Build categories">
         {TABS.map((t) => (
           <button
@@ -83,6 +80,8 @@ export function BuildMenu(props: BuildMenuProps): ReactElement {
             <b>{counts[t.id]}</b>
           </button>
         ))}
+      </div>
+        <button type="button" className="bm-close" onClick={props.onClose} aria-label="Close the build drawer">Esc</button>
       </div>
 
       <div id="bm-panel" role="tabpanel" aria-labelledby={`bm-tab-${props.tab}`} className="bm-panel">
@@ -155,6 +154,28 @@ export function BuildMenu(props: BuildMenuProps): ReactElement {
           )
         ) : null}
       </div>
+      <footer className="bm-keys" aria-label="Build keys">
+        <span><kbd>R</kbd> Rotate</span>
+        <span><kbd>H</kbd> Lock hologram</span>
+        <span><kbd>F</kbd> Fill plan</span>
+        <span><kbd>X</kbd> Remove</span>
+        <span><kbd>RMB</kbd> or <kbd>Esc</kbd> Cancel</span>
+      </footer>
+    </section>
+  );
+}
+
+/** The drawer once a card is picked: a small header pill that keeps the centre of the screen clear while placing. */
+export function BuildPill(props: { readonly label: string; readonly onOpen: () => void }): ReactElement {
+  return (
+    <section className="bm-pill play-build" data-hud-zone="bottom-centre" aria-label="Placing">
+      <button type="button" className="bm-pill-open" onClick={props.onOpen} aria-label="Open the build drawer">
+        <b>{props.label}</b>
+        <span>B: tabs</span>
+      </button>
+      <span className="bm-pill-keys">
+        <kbd>R</kbd> Rotate · <kbd>H</kbd> Lock · <kbd>F</kbd> Fill plan · <kbd>X</kbd> Remove · <kbd>RMB</kbd>/<kbd>Esc</kbd> Cancel
+      </span>
     </section>
   );
 }

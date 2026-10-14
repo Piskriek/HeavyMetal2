@@ -164,6 +164,12 @@ export interface PlayScene {
   pullLever(): void;
   /** Shows the build ghost of a machine (null hides it), on the planet; `check` says whether it may stand where it is aimed. */
   setBuilding(kind: MachineKind | null, check?: (x: number, z: number) => { readonly ok: boolean; readonly why: string }): void;
+  /** The hologram lock (TASK-25, P2-UI-06): H freezes the ghost on the ground where it is, so the player can walk round it. */
+  lockGhost(): boolean;
+  releaseGhost(): void;
+  /** Moves a locked ghost by (dx, dz) metres on the ground (the arrow keys nudge it 0.5 m). */
+  nudgeGhost(dx: number, dz: number): void;
+  ghostLocked(): boolean;
   /** Where the ghost stands, facing the gate, if it may stand there. */
   aim(): { readonly x: number; readonly z: number; readonly yaw: number } | null;
   /** Generic ghost for base building pieces. */
@@ -274,6 +280,10 @@ export interface PlayScene {
     sealedWrecks(): readonly number[];
     groundTriangles(): number; showGround(on: boolean): void; where(): Where; position(): THREE.Vector3; teleport(where: Where, x: number, z: number, yaw: number, pitch?: number): void; sync(): number;
     stats(): { readonly triangles: number; readonly calls: number }; wave(): number; gatePlanet(): { x: number; z: number };
+    /** The way the player faces (the scene's yaw, radians). */
+    facing(): number;
+    /** Each placed machine's anchor above its housing, projected for the aim-gated labels (TASK-25). */
+    machineAnchors(): readonly { readonly id: number; readonly kind: string; readonly ndcX: number; readonly ndcY: number; readonly behind: boolean; readonly distanceM: number; readonly aimAngleDeg: number; readonly running: number }[];
     /** The drawn world bounds of one base piece (batched instances or its dynamic group), or null when not drawn. */
     pieceBounds(id: number): { readonly min: readonly [number, number, number]; readonly max: readonly [number, number, number]; readonly leaf?: { readonly centre: readonly [number, number, number]; readonly normal: readonly [number, number, number] } } | null;
     /** The detail in use, the planet picture's size, and the pixels each machine pours now. */
@@ -877,6 +887,11 @@ export function createPlayScene(o: {
   const paintGhost = (ok: boolean): void => ghost?.group.traverse((obj) => { const mesh = obj as THREE.Mesh; if (mesh.isMesh) mesh.material = ok ? ghostOk : ghostBad; });
   let building = false, ghostVerdict: { ok: boolean; why: string } = { ok: false, why: '' };
   const ghostAt = new THREE.Vector3();
+  /** The hologram lock: while set, the ghost's ground point is this, whatever the crosshair says. */
+  let ghostLock: { x: number; z: number } | null = null;
+  /** Where the lock was set: a nudge may move the ghost at most MAX_NUDGE_M from here (Argo's 8 m cap). */
+  let ghostLockOrigin: { x: number; z: number } | null = null;
+  const MAX_NUDGE_M = 8;
 
   // piece build ghost for Valheim/Dune base-building (Hologram with Fresnel, scanlines, slow pulse)
   const holoUniforms = { uTime: { value: 0 } };
@@ -1221,6 +1236,7 @@ export function createPlayScene(o: {
 
   /** The ground the view ray meets within `reach` metres (the planet's stroke reach for the beam is 25; the aim point is 36). */
   const aimGround = (reach = 36): THREE.Vector3 | null => {
+    if (ghostLock) return new THREE.Vector3(ghostLock.x, groundAt(ghostLock.x, ghostLock.z), ghostLock.z);
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
     const p = pos.clone();
     for (let d = 1; d < reach; d += 0.25) {
@@ -1311,7 +1327,8 @@ export function createPlayScene(o: {
     let pieceHit: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null = null;
     let pieceDist = Infinity;
 
-    if (piecesGroup && piecesGroup.children.length > 0) {
+    // a locked ghost aims at its frozen ground point, not at whatever piece the crosshair crosses
+    if (piecesGroup && piecesGroup.children.length > 0 && !ghostLock) {
       aimRayDir.set(0, 0, -1).applyQuaternion(camera.quaternion);
       pieceRaycaster.set(camera.position, aimRayDir);
       pieceRaycaster.far = 36;
@@ -1598,6 +1615,27 @@ export function createPlayScene(o: {
     },
     heightAt: (x, z) => groundAt(x, z),
     aimPoint: () => aimPointFn(),
+    lockGhost() {
+      if (ghostLock) return true;
+      const a = aimGround();
+      if (!a) return false;
+      ghostLock = { x: a.x, z: a.z };
+      ghostLockOrigin = { x: a.x, z: a.z };
+      return true;
+    },
+    releaseGhost() {
+      ghostLock = null;
+      ghostLockOrigin = null;
+    },
+    nudgeGhost(dx, dz) {
+      if (!ghostLock || !ghostLockOrigin) return;
+      const nx = ghostLock.x + dx, nz = ghostLock.z + dz;
+      const ox = ghostLockOrigin.x, oz = ghostLockOrigin.z;
+      const d = Math.hypot(nx - ox, nz - oz);
+      const k = d > MAX_NUDGE_M ? MAX_NUDGE_M / d : 1;
+      ghostLock = { x: ox + (nx - ox) * k, z: oz + (nz - oz) * k };
+    },
+    ghostLocked: () => ghostLock !== null,
     setNodes(field) {
       if (!field) {
         for (const k of (['dither', 'fold', 'chroma', 'spire'] as const)) {
@@ -2401,6 +2439,29 @@ export function createPlayScene(o: {
       showGround: (on) => ground?.setVisible(on),
       where: () => where,
       position: () => pos.clone(),
+      facing: () => yaw,
+      machineAnchors() {
+        const out: { id: number; kind: string; ndcX: number; ndcY: number; behind: boolean; distanceM: number; aimAngleDeg: number; running: number }[] = [];
+        const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        for (const v of views.values()) {
+          const p = new THREE.Vector3(v.m.x, groundAt(v.m.x, v.m.z) + 1.4, v.m.z);
+          const toM = p.clone().sub(camera.position);
+          const dist = toM.length();
+          const cos = dist > 1e-6 ? THREE.MathUtils.clamp(fwd.dot(toM.clone().divideScalar(dist)), -1, 1) : 1;
+          const ndc = p.clone().project(camera);
+          out.push({
+            id: v.m.id,
+            kind: v.m.kind,
+            ndcX: ndc.x,
+            ndcY: ndc.y,
+            behind: cos < 0,
+            distanceM: dist,
+            aimAngleDeg: THREE.MathUtils.radToDeg(Math.acos(cos)),
+            running: v.running,
+          });
+        }
+        return out;
+      },
       teleport(w, x, z, y, p) {
         if (where !== w) {
           if (w === 'planet') {

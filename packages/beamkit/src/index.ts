@@ -14,18 +14,29 @@ export interface LabMaterials {
 
 export type BeamMode = 'extract' | 'apply' | 'sculpt';
 
+/**
+ * The beam's colours (TASK-21d): each mode's, and Seal, which is Extract held on a leak (not a fourth mode to cycle). The mode rib
+ * and the ground ring both take them.
+ */
+export const BEAM_COLOURS = { extract: '#3dc8ff', apply: '#ff3d8a', sculpt: '#7cff4d', seal: '#ffc13d' } as const;
+
 export interface BeamTool {
   readonly group: THREE.Group;
   readonly sockets: Readonly<Record<'grip' | 'foregrip' | 'shoulder' | 'muzzle' | 'cartridge' | 'screen', THREE.Vector3>>;
   readonly lamps: readonly THREE.Mesh[];
+  /** The square emissive strip along the top rail: its colour is the mode's, or Seal's while sealing. */
+  readonly rib: THREE.Mesh;
   setMode(mode: BeamMode): void;
+  /** Seal (TASK-21d): while on, the rib shows Seal's amber instead of the mode's colour. TASK-23b-2 turns it on at a leak. */
+  setSealing(on: boolean): void;
   setCartridge(colour: string | null): void;
   setCharge(level: number): void;
   setFiring(level: number): void;
   readonly triangles: number;
 }
 
-export const BUDGET = { stage1: 800, full: 6000 } as const;
+/** Triangle budgets: stage 1 is 800, plus the 12 of the mode rib (TASK-21d). */
+export const BUDGET = { stage1: 812, full: 6000 } as const;
 
 type V3 = readonly [number, number, number];
 type BoxSpec = { readonly size: V3; readonly position: V3; readonly rotation?: V3 };
@@ -307,6 +318,10 @@ export function extractionBeam(m: LabMaterials, o?: { readonly stage?: number })
     railSpecs.push({ size: [0.052, 0.009, full ? 0.008 : 0.012], position: [0, 0.115, z] });
   }
   addBoxBatch('carry-rail-lugs', m.gunmetal, railSpecs);
+  // The mode rib (TASK-21d, P0-VEH-02): a square emissive strip on the rail bed, glowing the mode's colour. It sits on the bed's top
+  // (0.112 m), its base just inside it, so it never floats; the stage 1 rifle has only two lugs, so the rib cannot rest on them.
+  const ribMaterial = new THREE.MeshStandardMaterial({ color: '#15181c', emissive: BEAM_COLOURS.extract, emissiveIntensity: 1.6, metalness: 0.2, roughness: 0.35 });
+  const rib = addBox('mode-rib', ribMaterial, [0.006, 0.006, 0.2], [0, 0.1145, -0.07]);
   if (full) {
     addBoxBatch('rail-side-notches', m.darkSteel, [
       { size: [0.003, 0.005, 0.17], position: [0.025, 0.103, -0.064] },
@@ -536,18 +551,25 @@ export function extractionBeam(m: LabMaterials, o?: { readonly stage?: number })
   } as const;
 
   let mode: BeamMode = 'extract';
+  let sealing = false;
   let cartridgeColour: string | null = '#f3b848';
   const redrawScreen = (): void => {
     const image = screenTexture.image;
     (image.data as Uint8Array).set(makeScreenData(mode, cartridgeColour));
     screenTexture.needsUpdate = true;
   };
+  const paintRib = (): void => { ribMaterial.emissive.set(sealing ? BEAM_COLOURS.seal : BEAM_COLOURS[mode]); };
   const setMode = (next: BeamMode): void => {
     mode = next;
     if (mode === 'extract') rootMaterial.emissive.set('#4adfff');
     else if (mode === 'apply') rootMaterial.emissive.copy(stripeMaterial.color);
     else rootMaterial.emissive.set('#e891ff');
+    paintRib();
     redrawScreen();
+  };
+  const setSealing = (on: boolean): void => {
+    sealing = on;
+    paintRib();
   };
   const setCartridge = (colour: string | null): void => {
     cartridgeColour = colour;
@@ -573,7 +595,9 @@ export function extractionBeam(m: LabMaterials, o?: { readonly stage?: number })
     group,
     sockets,
     lamps,
+    rib,
     setMode,
+    setSealing,
     setCartridge,
     setCharge,
     setFiring,

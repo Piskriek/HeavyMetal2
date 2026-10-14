@@ -5,10 +5,11 @@
 import * as THREE from 'three';
 import { chunkMesh, chunksAround, createTerrain, type Terrain } from '@hm/plotterrain';
 import { createGroundMaterial, makeGroundTextures, setGroundPaint, setStage as setGroundStage } from '@hm/groundshader';
-import { apply as brushApply, emptyField, type BrushOp, type Field, type Rules } from '@hm/terrainbrush';
+import { apply as brushApply, decodeField, emptyField, encodeField, heightAt as brushHeightAt, type BrushOp, type Field, type Rules } from '@hm/terrainbrush';
 import { drop } from '../crafter/planet';
 import { smoothModel, type SmoothId } from '../crafter/smooth-models';
-import { boulderBeamRate, STROKE_RADIUS } from './beam-tool';
+import { boulderBeamRate, runStroke, SCULPT_RULES, STROKE_RADIUS } from './beam-tool';
+import { keptOut, type KeepOutZone } from './beam-keepout';
 import { presetLook } from './beam-port';
 
 export interface BoulderInfo {
@@ -47,6 +48,25 @@ export interface PlotGround {
   paint(x: number, z: number, preset: string, dt: number): number;
   /** How many cells carry a preset's paint. */
   paintedCells(): number;
+  /**
+   * A sculpt stroke (TASK-21d): carve, raise or smooth at the op's point, on the cells the keep-out zones leave alone. The ore is
+   * the player's: a carve gains it, a raise spends it (never below zero). Returns the ore after the stroke and the cells cut.
+   */
+  stroke(op: BrushOp, ore: number): { readonly balance: number; readonly cells: number; readonly gained: number };
+  /** The zones the sculpt beam keeps out (the gate's apron, the structures, the machines); the scene sets them as the base changes. */
+  setKeepOut(zones: readonly KeepOutZone[]): void;
+  /** The sculpt edits and the paint as text (encodeField), for the save. */
+  exportField(): string;
+  /** Loads the edits and the paint from exportField's text. False, and nothing changes, when the text is not this plot's field. */
+  importField(text: string): boolean;
+  /** The height edit under (x, z) in metres: negative where ground was carved, positive where it was raised, zero where it was not. */
+  editAt(x: number, z: number): number;
+  /** How many cells carry a height edit. */
+  sculptedCells(): number;
+  /** The height of the rendered ground under (x, z), read from the chunk meshes (null off the plot): the check that a cut is drawn. */
+  surfaceAt(x: number, z: number): number | null;
+  /** Whether the ground is settled: the chunks drawn are the wanted ones, all built, none waiting for a cut's rebuild. */
+  settled(): boolean;
   /** Returns boulder states for debug and inspection. */
   getBoulders(): readonly BoulderInfo[];
   dispose(): void;
@@ -58,16 +78,39 @@ const CELLS = 32, MIN_SIZE = 16, SKIRT = 2, EXTENT = 4096;
 const BOULDER_SPAN = 320;
 /** Each boulder holds about 40 ore when full. */
 export const BOULDER_INITIAL_ORE = 40;
+/**
+ * The sculpt's refinement (TASK-21d): the ground a cut touches is flagged in cells of EDIT_FLAG metres, and the chunks under the flags
+ * split down to EDIT_REFINE. Without it a 3 m cut sits inside a chunk whose grid is 30 m or more on the low tiers (the budget spreads
+ * the leaves over the whole planet), and the cut would not be drawn. 16 m leaves (0.6 m between vertices) draw a cut of 3 m radius.
+ * The refinement is bounded (Opus's review): only cut ground within EDIT_REACH metres of the eye is refined, the nearest first, and
+ * at most EDIT_LEAF_CAP refined chunks are made. Cut ground farther off keeps its normal chunks and shows the cut through the height
+ * offset alone, which is softer but never a hole.
+ */
+const EDIT_FLAG = 8;
+const EDIT_REFINE = 16;
+/** Only cut ground within this many metres of the eye is refined. */
+const EDIT_REACH = 120;
+/** The most refined chunks a cut may make: 48 chunks of 2048 triangles, so at most about 98,000 triangles over the tier's budget. */
+const EDIT_LEAF_CAP = 48;
+
+/** Whether a square (centre cx, cz, side size) lies within `reach` metres of the eye, measured to its nearest edge. */
+const withinReach = (eyeX: number, eyeZ: number, cx: number, cz: number, size: number, reach: number): boolean => {
+  const dx = Math.max(Math.abs(eyeX - cx) - size / 2, 0);
+  const dz = Math.max(Math.abs(eyeZ - cz) - size / 2, 0);
+  return dx * dx + dz * dz <= reach * reach;
+};
 
 interface TrackedBoulder {
   readonly id: number;
   readonly x: number;
-  readonly y: number;
+  /** Where it sits: moved when the ground under it is cut or raised (TASK-21d). */
+  y: number;
   readonly z: number;
   readonly size: number;
+  readonly yaw: number;
   readonly shape: number;
   readonly instanceIndex: number;
-  readonly baseMatrix: THREE.Matrix4;
+  baseMatrix: THREE.Matrix4;
   /** The beam's ore a second on this boulder's ground (rock and scree). */
   readonly beamRate: number;
   ore: number;
@@ -81,9 +124,16 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
   scene.add(group);
   const chunks = new Map<string, THREE.Mesh>();
   let flat = o.stage <= 1, budget = o.budget, wanted: { key: string; cx: number; cz: number; size: number }[] = [], lastX = Infinity, lastZ = Infinity;
+  /** The chunks a cut or raise has changed (keys), rebuilt a few a frame; the keep-out zones the sculpt beam leaves alone. */
+  const dirtyKeys = new Set<string>();
+  let keepOut: readonly KeepOutZone[] = [];
+  /** The debug surface probe: a ray and its scratch vectors, so a read makes no garbage. */
+  const surfaceRay = new THREE.Raycaster();
+  const surfaceOrigin = new THREE.Vector3();
+  const surfaceDown = new THREE.Vector3(0, -1, 0);
 
   const build = (cx: number, cz: number, size: number): THREE.Mesh => {
-    const m = chunkMesh(terrain, cx, cz, size, CELLS, { flat, skirt: SKIRT });
+    const m = chunkMesh(terrain, cx, cz, size, CELLS, { flat, skirt: SKIRT, offset: editHeight });
     const pos = m.positions;
     for (let i = 0; i < pos.length; i += 3) pos[i + 1] = pos[i + 1]! - drop(pos[i]!, pos[i + 2]!);
     const g = new THREE.BufferGeometry();
@@ -100,7 +150,11 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
 
   /** Which chunks the eye wants now; the old ones stay until their replacements are built, so no hole ever opens. */
   const plan = (eyeX: number, eyeZ: number): void => {
-    wanted = chunksAround(eyeX, eyeZ, { extent: EXTENT, cells: CELLS, minSize: MIN_SIZE, budget }).map((l) => ({ key: `${l.cx},${l.cz},${l.size}`, cx: l.cx, cz: l.cz, size: l.size }));
+    // the ground a sculpt has cut is kept fine near the eye (EDIT_REACH), the nearest first, at most EDIT_LEAF_CAP chunks
+    const refine = editFlagged.size > 0
+      ? { minSize: EDIT_REFINE, maxLeaves: EDIT_LEAF_CAP, touches: (cx: number, cz: number, size: number): boolean => withinReach(eyeX, eyeZ, cx, cz, size, EDIT_REACH) && touchesEdit(cx, cz, size) }
+      : undefined;
+    wanted = chunksAround(eyeX, eyeZ, { extent: EXTENT, cells: CELLS, minSize: MIN_SIZE, budget, refine }).map((l) => ({ key: `${l.cx},${l.cz},${l.size}`, cx: l.cx, cz: l.cz, size: l.size }));
     lastX = eyeX; lastZ = eyeZ;
   };
   const step = (most: number): void => {
@@ -122,7 +176,71 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
   /** Frames since a stroke changed the paint (the textures go up about ten times a second while the beam paints). */
   let paintDirtyFrames = -1;
   const PAINT_RULES: Rules = { maxDepth: 0, maxHeight: 0, orePerCubicMetre: 0, ratePerSecond: 0 };
+  // The same field carries the sculpt edits (its height, `delta`) and the paint (TASK-21d): one save, one undo, one brush.
   let paintField: Field = emptyField(PAINT_CELLS, PAINT_CELL);
+  /** Whether any cell has been cut or raised: until then the ground is the terrain as made, and no chunk pays for the edits. */
+  let sculpted = false;
+  /**
+   * The flagged 8 m cells the sculpt has cut, keyed by cell (gx + gz * EDIT_CELLS_SIDE), and the box they fill (in cell indices): the
+   * planner refines the chunks under them, near the eye only (see plan). A set keyed by cell, not a list of rectangles, so that a lookup
+   * costs the cells it covers and a new cut costs its own cells.
+   */
+  const EDIT_CELLS_SIDE = Math.ceil(BOULDER_SPAN / EDIT_FLAG);
+  const editFlagged = new Set<number>();
+  const editBox = { gx0: Infinity, gx1: -Infinity, gz0: Infinity, gz1: -Infinity };
+  /** Flags the cells under a box (planet metres). True when a cell was newly flagged, so the chunks must be planned again. */
+  const flagEdit = (x0: number, z0: number, x1: number, z1: number): boolean => {
+    let added = false;
+    const gx0 = Math.max(0, Math.floor((x0 - PAINT_ORIGIN) / EDIT_FLAG));
+    const gx1 = Math.min(EDIT_CELLS_SIDE - 1, Math.floor((x1 - PAINT_ORIGIN) / EDIT_FLAG));
+    const gz0 = Math.max(0, Math.floor((z0 - PAINT_ORIGIN) / EDIT_FLAG));
+    const gz1 = Math.min(EDIT_CELLS_SIDE - 1, Math.floor((z1 - PAINT_ORIGIN) / EDIT_FLAG));
+    for (let gz = gz0; gz <= gz1; gz++) {
+      for (let gx = gx0; gx <= gx1; gx++) {
+        const key = gx + gz * EDIT_CELLS_SIDE;
+        if (editFlagged.has(key)) continue;
+        editFlagged.add(key);
+        added = true;
+        if (gx < editBox.gx0) editBox.gx0 = gx;
+        if (gx > editBox.gx1) editBox.gx1 = gx;
+        if (gz < editBox.gz0) editBox.gz0 = gz;
+        if (gz > editBox.gz1) editBox.gz1 = gz;
+      }
+    }
+    return added;
+  };
+  /**
+   * Whether a planner square (centre cx, cz, side size) touches a flagged cut cell. It looks up the cells the square covers in the set,
+   * or, when the square covers more cells than are flagged, scans the flags: its cost is the smaller of the two, never every cut for
+   * every leaf.
+   */
+  const touchesEdit = (cx: number, cz: number, size: number): boolean => {
+    if (editFlagged.size === 0) return false;
+    const h = size / 2;
+    const gx0 = Math.max(editBox.gx0, Math.floor((cx - h - PAINT_ORIGIN) / EDIT_FLAG));
+    const gx1 = Math.min(editBox.gx1, Math.floor((cx + h - PAINT_ORIGIN) / EDIT_FLAG));
+    const gz0 = Math.max(editBox.gz0, Math.floor((cz - h - PAINT_ORIGIN) / EDIT_FLAG));
+    const gz1 = Math.min(editBox.gz1, Math.floor((cz + h - PAINT_ORIGIN) / EDIT_FLAG));
+    if (gx0 > gx1 || gz0 > gz1) return false;
+    const covered = (gx1 - gx0 + 1) * (gz1 - gz0 + 1);
+    if (covered <= editFlagged.size) {
+      for (let gz = gz0; gz <= gz1; gz++) {
+        for (let gx = gx0; gx <= gx1; gx++) if (editFlagged.has(gx + gz * EDIT_CELLS_SIDE)) return true;
+      }
+      return false;
+    }
+    for (const key of editFlagged) {
+      const gx = key % EDIT_CELLS_SIDE;
+      const gz = Math.floor(key / EDIT_CELLS_SIDE);
+      if (gx >= gx0 && gx <= gx1 && gz >= gz0 && gz <= gz1) return true;
+    }
+    return false;
+  };
+  /** The planet's x and z of cell i's centre. */
+  const cellX = (i: number): number => ((i % PAINT_CELLS) + 0.5) * PAINT_CELL + PAINT_ORIGIN;
+  const cellZ = (i: number): number => (Math.floor(i / PAINT_CELLS) + 0.5) * PAINT_CELL + PAINT_ORIGIN;
+  /** The height edit under (x, z) (planet metres): bilinear from the field, zero until the ground is sculpted. */
+  const editHeight = (x: number, z: number): number => (sculpted ? brushHeightAt(paintField, () => 0, x - PAINT_ORIGIN, z - PAINT_ORIGIN) : 0);
   const paintColourBytes = new Uint8Array(PAINT_CELLS * PAINT_CELLS * 4);
   const paintRoughBytes = new Uint8Array(PAINT_CELLS * PAINT_CELLS * 4);
   const paintColour = new THREE.DataTexture(paintColourBytes, PAINT_CELLS, PAINT_CELLS, THREE.RGBAFormat);
@@ -165,6 +283,7 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
       y,
       z: b.z,
       size: b.size,
+      yaw: b.yaw,
       shape,
       instanceIndex,
       baseMatrix: baseMat,
@@ -203,12 +322,60 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
     return mined;
   };
 
+  /** Writes boulder `b`'s instance: its base matrix, shrunk by the ore it still holds (nothing when it is empty). */
+  const writeBoulder = (b: TrackedBoulder): void => {
+    const im = rocks[b.shape];
+    if (!im) return;
+    if (b.ore <= 0) {
+      m4.copy(b.baseMatrix).scale(s.set(0, 0, 0));
+    } else {
+      const factor = Math.cbrt(b.ore / BOULDER_INITIAL_ORE);
+      m4.copy(b.baseMatrix).scale(s.set(factor, factor, factor));
+    }
+    im.setMatrixAt(b.instanceIndex, m4);
+    im.instanceMatrix.needsUpdate = true;
+  };
+  /** Seats boulder `b` on the ground under it, cut or raised as it is (TASK-21d): it never hangs over a cut or sinks into a raise. */
+  const seatBoulder = (b: TrackedBoulder): void => {
+    const y = terrain.height(b.x, b.z) - drop(b.x, b.z) - b.size * 0.2 + editHeight(b.x, b.z);
+    if (Math.abs(y - b.y) < 1e-4) return;
+    b.y = y;
+    b.baseMatrix = m4.compose(p.set(b.x, y, b.z), q.setFromEuler(e.set(0, b.yaw, 0)), s.set(b.size, b.size, b.size)).clone();
+    writeBoulder(b);
+  };
+  /** Marks the chunks that touch a box (planet metres, two cells of margin) for a rebuild. */
+  const markDirty = (x0: number, z0: number, x1: number, z1: number): void => {
+    const margin = 2 * PAINT_CELL;
+    for (const key of chunks.keys()) {
+      const [cx = 0, cz = 0, size = 0] = key.split(',').map(Number);
+      const h = size / 2;
+      if (cx + h < x0 - margin || cx - h > x1 + margin || cz + h < z0 - margin || cz - h > z1 + margin) continue;
+      dirtyKeys.add(key);
+    }
+  };
+  /** Rebuilds up to `most` dirty chunks (each one from the current edits), so a long cut spreads over frames. */
+  const rebuildDirty = (most: number): void => {
+    let n = 0;
+    for (const key of [...dirtyKeys]) {
+      if (n >= most) return;
+      dirtyKeys.delete(key);
+      const old = chunks.get(key);
+      if (!old) continue;
+      const [cx = 0, cz = 0, size = 0] = key.split(',').map(Number);
+      group.remove(old);
+      old.geometry.dispose();
+      chunks.set(key, build(cx, cz, size));
+      n += 1;
+    }
+  };
+
   return {
     terrain,
-    heightAt: (x, z) => terrain.height(x, z) - drop(x, z),
+    heightAt: (x, z) => terrain.height(x, z) - drop(x, z) + editHeight(x, z),
     update(eyeX, eyeZ, all = false) {
       if (Math.hypot(eyeX - lastX, eyeZ - lastZ) > MIN_SIZE / 2) plan(eyeX, eyeZ);
       step(all ? Infinity : 1);
+      rebuildDirty(all ? Infinity : 2);
       // a paint stroke's texels go up once it has settled for six frames (about ten uploads a second while the beam paints)
       if (paintDirtyFrames >= 0 && ++paintDirtyFrames >= 6) {
         paintColour.needsUpdate = true; paintRough.needsUpdate = true;
@@ -316,6 +483,75 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
     paintedCells() {
       let n = 0;
       for (const p of paintField.paint) if (p) n += 1;
+      return n;
+    },
+    stroke(op, ore) {
+      // the op is in the planet's metres; the field is in its own, from PAINT_ORIGIN
+      const local: BrushOp = { ...op, x: op.x - PAINT_ORIGIN, z: op.z - PAINT_ORIGIN };
+      const r = runStroke(paintField, (x, z) => terrain.height(x + PAINT_ORIGIN, z + PAINT_ORIGIN), local, SCULPT_RULES, ore, (i) => keptOut(keepOut, cellX(i), cellZ(i)));
+      if (r.changed.length === 0) return { balance: r.balance, cells: 0, gained: 0 };
+      paintField = r.field;
+      sculpted = true;
+      let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+      for (const i of r.changed) {
+        const x = cellX(i), z = cellZ(i);
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (z < z0) z0 = z;
+        if (z > z1) z1 = z;
+      }
+      const half = PAINT_CELL / 2;
+      markDirty(x0 - half, z0 - half, x1 + half, z1 + half);
+      // the chunks under a new cut are planned again, so the refined leaves replace the coarse ones (the old stand until then)
+      if (flagEdit(x0 - half, z0 - half, x1 + half, z1 + half) && Number.isFinite(lastX)) plan(lastX, lastZ);
+      for (const b of trackedBoulders) {
+        if (b.x >= x0 - 3 && b.x <= x1 + 3 && b.z >= z0 - 3 && b.z <= z1 + 3) seatBoulder(b);
+      }
+      return { balance: r.balance, cells: r.changed.length, gained: r.ore };
+    },
+    setKeepOut(zones) {
+      keepOut = zones;
+    },
+    exportField() {
+      return encodeField(paintField);
+    },
+    importField(text) {
+      const next = decodeField(text);
+      if (next === null || next.size !== PAINT_CELLS || Math.abs(next.cell - PAINT_CELL) > 1e-6) return false;
+      paintField = next;
+      sculpted = next.delta.some((d) => d !== 0);
+      // the cut cells of a saved field are flagged, so the first plan keeps their chunks fine
+      let flaggedAny = false;
+      for (let i = 0; i < next.delta.length; i++) {
+        if (next.delta[i] === 0) continue;
+        const x = cellX(i), z = cellZ(i);
+        if (flagEdit(x - PAINT_CELL / 2, z - PAINT_CELL / 2, x + PAINT_CELL / 2, z + PAINT_CELL / 2)) flaggedAny = true;
+      }
+      if (flaggedAny && Number.isFinite(lastX)) plan(lastX, lastZ);
+      for (let i = 0; i < PAINT_CELLS * PAINT_CELLS; i++) writeTexel(i);
+      paintColour.needsUpdate = true;
+      paintRough.needsUpdate = true;
+      for (const b of trackedBoulders) seatBoulder(b);
+      for (const key of chunks.keys()) dirtyKeys.add(key);
+      return true;
+    },
+    editAt: (x, z) => editHeight(x, z),
+    settled() {
+      // the chunks drawn are exactly the ones wanted, all built, and none is waiting for a rebuild (no stale chunk stands over a cut)
+      const want = new Set(wanted.map((w) => w.key));
+      if (dirtyKeys.size > 0 || chunks.size !== want.size) return false;
+      for (const key of want) if (!chunks.has(key)) return false;
+      return true;
+    },
+    surfaceAt(x, z) {
+      // the rendered ground under (x, z): a ray down through the chunk meshes, the same triangles the eye sees (null off the plot)
+      surfaceRay.set(surfaceOrigin.set(x, 800, z), surfaceDown);
+      const hit = surfaceRay.intersectObjects([...chunks.values()], false)[0];
+      return hit ? hit.point.y : null;
+    },
+    sculptedCells() {
+      let n = 0;
+      for (const d of paintField.delta) if (d !== 0) n += 1;
       return n;
     },
     getBoulders() {

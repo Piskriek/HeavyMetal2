@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { emptyField } from '@hm/terrainbrush';
 import { handPose, viewPose } from './rifle-hold';
-import { BEAM_START, boulderBeamRate, cycleBeamMode, runStroke, sculptToolForKey, strokeOf, STROKE_RADIUS, type BeamState } from './beam-tool';
+import { BEAM_START, boulderBeamRate, cycleBeamMode, runStroke, SCULPT_RULES, sculptToolForKey, strokeOf, STROKE_RADIUS, type BeamState } from './beam-tool';
 
 const RULES = { maxDepth: 2, maxHeight: 2, orePerCubicMetre: 1, ratePerSecond: 1 };
 const flat = (): number => 0;
@@ -94,4 +94,24 @@ test('the beam takes about 4 ore a second from a boulder on rock, and more on sc
   assert.equal(boulderBeamRate(0, 0), 4, 'a boulder on neither still gives the base rate');
   assert.equal(boulderBeamRate(Number.NaN, 2), 7, 'a broken weight counts as none');
   assert.equal(boulderBeamRate(-1, -1), 4, 'negative weights count as none');
+});
+
+test('the sculpt rules: a carve gains ore, a raise is paid from the ore held, a smooth moves no ore', () => {
+  const field = emptyField(SIZE, CELL);
+  const carve = runStroke(field, flat, strokeOf({ ...BEAM_START, mode: 'sculpt', sculpt: 'carve' }, at(8, 8), 1)!, SCULPT_RULES, 0);
+  assert.ok(carve.ore > 0 && carve.balance === carve.ore, `a carve gains ore at the rules' price (${carve.ore})`);
+  const raise = runStroke(field, flat, strokeOf({ ...BEAM_START, mode: 'sculpt', sculpt: 'raise' }, at(8, 8), 1)!, SCULPT_RULES, 0.5);
+  assert.ok(raise.ore <= 0 && raise.balance >= 0 && raise.balance <= 0.5, `a raise is paid from the ore held (${raise.balance})`);
+  const smooth = runStroke(field, flat, strokeOf({ ...BEAM_START, mode: 'sculpt', sculpt: 'smooth' }, at(8, 8), 1)!, SCULPT_RULES, 7);
+  assert.equal(smooth.ore, 0, 'a smooth moves no ore');
+  assert.equal(smooth.balance, 7, 'and the balance stays');
+});
+
+test('a protected cell is never cut: a stroke on a fully protected area changes nothing and keeps the ore', () => {
+  const field = emptyField(SIZE, CELL);
+  const op = strokeOf({ ...BEAM_START, mode: 'sculpt', sculpt: 'carve' }, at(8, 8), 1)!;
+  const r = runStroke(field, flat, op, SCULPT_RULES, 12, () => true);
+  assert.equal(r.changed.length, 0, 'no cell changed');
+  assert.equal(r.balance, 12, 'the ore is kept');
+  assert.equal(centre(r.field), 0, 'the ground stays put');
 });

@@ -14,6 +14,8 @@ export const Hotbar: React.FC<HotbarProps> = ({ inventory, actions }) => {
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
 
       const num = parseInt(e.key, 10);
+      // while the extraction rifle sculpts (TASK-21d), keys 1 to 3 pick its tool and leave the hotbar alone
+      if (num >= 1 && num <= 3 && document.documentElement.dataset.beamSculpt === '1') return;
       if (num >= 1 && num <= 9) {
         actions.selectHotbar(num - 1);
       }

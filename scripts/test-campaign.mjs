@@ -14,6 +14,8 @@
  *   12 the journal lists the act, the step and its hint,
  *   13 the armory rack hands over the rifle; G draws it,
  *   14 A4-02: 50 units mined and 10 s of the mill; its line plays,
+ *   14a to 14d (TASK-21d) the rifle in hand (V); the boulder mined for ore; a cartridge loaded and painted; carve, raise, the gate pad
+ *     kept out, and the cut kept through a reload (the save is real: the game reloads and Continue loads it),
  *   15 A4-03: the Studio opens from the journal; the line plays on the way back,
  *   16 A4-04: stage 2 ends Act IV; the Structures tab opens; the bridge kit arrives,
  *   17 B-01 the foundation, 18 B-04 a real harvest of raw pixels, 19 B-06 a drafted blueprint, 20 B-05 the bin,
@@ -472,6 +474,17 @@ await beat('9 the inventory (Tab) opens and holds the starter kit', async (row) 
   return { ok: open && hasKit, detail: `inventory open=${open} starter-kit=${hasKit}` };
 });
 
+/** The paths where two chain snapshots differ (a dotted path and the two values), so a failed comparison says what moved. */
+const chainDiff = (a, b, path = '', out = []) => {
+  if (out.length >= 8) return out;
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) chainDiff(a[k], b[k], path ? `${path}.${k}` : k, out);
+    return out;
+  }
+  if (JSON.stringify(a) !== JSON.stringify(b)) out.push(`${path || '(root)'}: ${JSON.stringify(a)} -> ${JSON.stringify(b)}`);
+  return out;
+};
+
 await beat('10 reload: the inventory and the chain persist, and Act I does not replay', async (row) => {
   await page.waitForTimeout(2500);
   const beforeSlots = await slotsJson();
@@ -495,7 +508,9 @@ await beat('10 reload: the inventory and the chain persist, and Act I does not r
   row.shot = await shot('after-reload');
   const persisted = afterSlots === beforeSlots && afterChain === beforeChain;
   const noReplay = afterStep === beforeStep && afterStep !== 'create' && !replayed;
-  return { ok: persisted && noReplay, detail: `inventory same=${afterSlots === beforeSlots} chain same=${afterChain === beforeChain} step ${beforeStep}->${afterStep} A1-01 replayed=${replayed}` };
+  // which paths of the chain differ, for the report (a changed value is named, not hidden)
+  const chainDiffs = chainDiff(JSON.parse(beforeChain), JSON.parse(afterChain));
+  return { ok: persisted && noReplay, detail: `inventory same=${afterSlots === beforeSlots} chain same=${afterChain === beforeChain} (${chainDiffs.slice(0, 4).join('; ') || 'no path differs'}) step ${beforeStep}->${afterStep} A1-01 replayed=${replayed}` };
 });
 
 // ----------------------------------------------------------------------------------------------------------------------
@@ -609,6 +624,137 @@ await beat('14 A4-02: the rifle mines dirt for real (a stroke on a boulder), gri
   const sub = await waitSub('A4-02', 9000);
   row.shot = await shot('a4-02-milled');
   return { ok: realOk && milled >= 10 && cur === 'A4-03' && sub, detail: `real stroke: aimed=${aimed.ok ? aimed.id : aimed.why} mined=${minedReal}; milled=${milled} current=${cur} A4-02 line=${sub}` };
+});
+
+// TASK-21d: the beam's ground work, each step the game's own (the keys, the mouse, the rack, the save). The rifle stays drawn
+// from beat 13 to the end of 14d, and the player stays at the boulder beat 14 aimed at.
+const holdLeft = async (ms) => {
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'pointerLockElement', { configurable: true, get: () => document.querySelector('canvas') });
+  });
+  await page.mouse.move(640, 360);
+  await page.mouse.down();
+  await page.waitForTimeout(ms);
+  await page.mouse.up();
+  await page.evaluate(() => { delete document.pointerLockElement; });
+};
+const beamMode = () => page.evaluate(() => document.querySelector('[data-testid="beam-mode"]')?.getAttribute('data-mode') ?? null);
+const pressUntil = async (key, mode) => {
+  for (let i = 0; i < 4 && (await beamMode()) !== mode; i++) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(150);
+  }
+  return (await beamMode()) === mode;
+};
+const aimedGround = () => page.evaluate(() => {
+  const p = window.__playScene.beamAim(25);
+  return p ? { x: p.x, z: p.z } : null;
+});
+/** A reload goes to the main menu; Continue loads the saved profile (as beat 10 does). */
+const reloadGame = async () => {
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.waitForFunction(() => !!window.hmPlay?.ready || !!document.querySelector('.sm-menu button'), null, { timeout: 25000 });
+  if (!(await page.evaluate(() => !!window.hmPlay?.ready))) {
+    const labels = await page.locator('.sm-menu button').allTextContents();
+    const want = labels.some((l) => l.includes('Continue')) ? 'Continue' : 'Expedition';
+    await page.locator('.sm-menu button', { hasText: want }).first().click();
+  }
+  await page.waitForFunction(() => !!window.hmPlay?.ready, null, { timeout: 60000 });
+  await page.waitForTimeout(800);
+};
+
+await beat('14a the rifle in the character\'s hand (V): its rifle idle plays; V puts it back in the view', async (row) => {
+  await page.keyboard.press('KeyV');
+  await page.waitForTimeout(2500);
+  const where = await page.evaluate(() => window.__playScene.debug.rifleIn());
+  const idle = await page.evaluate(() => window.hmPlay.clipWeight('rifle-idle') + window.hmPlay.clipWeight('rifle-aiming-idle'));
+  row.shot = await shot('rifle-in-hand');
+  await page.keyboard.press('KeyV');
+  await page.waitForTimeout(400);
+  const back = await page.evaluate(() => window.__playScene.debug.rifleIn());
+  return { ok: where === 'hand' && idle > 0.5 && back === 'view', detail: `rifle in ${where}, rifle idle weight ${idle.toFixed(2)}, back in ${back}` };
+});
+
+await beat('14b Extract: the held rifle mines the boulder it is aimed at; the plot\'s ore rises as the boulder\'s falls', async (row) => {
+  await pressUntil('KeyQ', 'extract');
+  const id = await page.evaluate(() => window.__playScene.debug.aimedBoulder());
+  const boulderOre = () => page.evaluate((bid) => window.hmPlay.boulders().find((b) => b.id === bid)?.ore ?? null, id);
+  const plotOre = () => page.evaluate(() => window.hmPlay.plot().ore);
+  const b0 = await boulderOre();
+  const p0 = await plotOre();
+  if (id !== null) await holdLeft(1500);
+  const b1 = await boulderOre();
+  const p1 = await plotOre();
+  row.shot = await shot('extract-ore');
+  return { ok: id !== null && b1 < b0 && p1 > p0, detail: `boulder ${id}: ore ${b0} to ${b1}; plot ore ${p0.toFixed(1)} to ${p1.toFixed(1)}` };
+});
+
+await beat('14c Apply: a written cartridge loads from the rack (R), and Apply paints the ground under the aim', async (row) => {
+  await page.evaluate(() => {
+    const h = window.hmPlay;
+    const count = () => h.lab().cartridges.filter((c) => c.kind === 'preset' && c.slot === null).length;
+    if (count() === 0) {
+      h.give(300);
+      const made = h.makeBlank();
+      const blank = made.state.cartridges.find((c) => c.kind === 'blank' && c.slot === null);
+      if (blank) h.startWrite(blank.id, 'crater_calcite');
+      for (let i = 0; i < 60 && count() === 0; i++) h.labStep(2);
+    }
+  });
+  const rackCount = () => page.evaluate(() => window.hmPlay.lab().cartridges.filter((c) => c.kind === 'preset' && c.slot === null).length);
+  const rackBefore = await rackCount();
+  await page.keyboard.press('KeyR');
+  await page.waitForTimeout(400);
+  const port = (await page.locator('[data-testid="beam-mode"]').getAttribute('data-port')) ?? '';
+  const rackAfter = await rackCount();
+  await pressUntil('KeyQ', 'apply');
+  await page.evaluate(() => window.__playScene.debug.teleport('planet', 60, 60, 0.3, -0.5));
+  await page.waitForTimeout(500);
+  const painted0 = await page.evaluate(() => window.__playScene.debug.paintedCells());
+  await holdLeft(1500);
+  const painted1 = await page.evaluate(() => window.__playScene.debug.paintedCells());
+  row.shot = await shot('apply-paint');
+  return { ok: port !== '' && rackAfter === rackBefore - 1 && painted1 > painted0, detail: `port "${port}", rack ${rackBefore} to ${rackAfter}; cells painted ${painted0} to ${painted1}` };
+});
+
+await beat('14d Sculpt: carve digs and gains ore, raise builds and spends ore, the gate pad is kept out, and the cut survives a reload', async (row) => {
+  await pressUntil('KeyQ', 'sculpt');
+  await page.evaluate(() => window.__playScene.debug.teleport('planet', 60, 60, 0.3, -0.5));
+  await page.waitForTimeout(500);
+  const aim = await aimedGround();
+  if (!aim) return { ok: false, detail: 'no ground under the aim' };
+  const edit = () => page.evaluate(([x, z]) => window.__playScene.debug.groundEdit(x, z), [aim.x, aim.z]);
+  const ore = () => page.evaluate(() => window.hmPlay.plot().ore);
+  const e0 = await edit();
+  const o0 = await ore();
+  await holdLeft(2000);
+  const e1 = await edit();
+  const o1 = await ore();
+  await page.keyboard.press('Digit2');
+  await page.waitForTimeout(200);
+  const e2 = await edit();
+  const o2 = await ore();
+  await holdLeft(1500);
+  const e3 = await edit();
+  const o3 = await ore();
+  const padCells = await page.evaluate(() => window.__playScene.beamSculpt(0, 0, 'carve', 1, 100).cells);
+  row.shot = await shot('sculpt-cut');
+  const carved = e1 < e0 - 0.05;
+  const gained = o1 > o0;
+  const raised = e3 > e2 + 0.05;
+  const spent = o3 < o2;
+  // the cut survives a reload: the same height at the same point, after the save has been written
+  await page.waitForTimeout(2500);
+  await reloadGame();
+  await toPlanet();
+  await page.keyboard.press('KeyG');
+  await page.waitForTimeout(400);
+  const kept = await page.evaluate(([x, z]) => window.__playScene.debug.groundEdit(x, z), [aim.x, aim.z]);
+  const survived = Math.abs(kept - e3) < 0.02;
+  return {
+    ok: carved && gained && raised && spent && padCells === 0 && survived,
+    detail: `carve ${e0.toFixed(2)} to ${e1.toFixed(2)} m, ore ${o0.toFixed(1)} to ${o1.toFixed(1)}; raise ${e2.toFixed(2)} to ${e3.toFixed(2)} m, ore ${o2.toFixed(1)} to ${o3.toFixed(1)}; gate pad cells ${padCells}; after reload ${kept.toFixed(2)} m (${survived ? 'kept' : 'LOST'})`,
+  };
 });
 
 await beat('15 A4-03: the Studio opens from the journal; the Act IV line plays on the way back', async (row) => {

@@ -1,7 +1,7 @@
 // tests/tooljuice.test.ts
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TOOL_IDS, TOOL_JUICE, burstsBetween, check, squashAt } from '../src/index';
+import { TOOL_IDS, TOOL_JUICE, burstsBetween, check, springStep, squashAt } from '../src/index';
 test('eleven tools, all clean', () => {
   assert.equal(TOOL_IDS.length, 11);
   for (const id of TOOL_IDS) assert.deepEqual(check(TOOL_JUICE[id]), [], id);
@@ -185,4 +185,28 @@ test('describe gives one tooltip line', () => {
   assert.equal(describe(TOOL_JUICE.zapGun), 'Zap gun: cyan beam, hit-stop 60 ms, shake 0.4');
   assert.equal(describe(TOOL_JUICE.flashlight), 'Flashlight: warm white cone, no shake');
   for (const id of TOOL_IDS) assert.ok(!describe(TOOL_JUICE[id]).includes('\n'), id);
+});
+test('a damped spring settles on its target; a zero frame changes nothing', () => {
+  const crit = { x: 0, v: 0 };
+  let s = crit;
+  for (let i = 0; i < 120; i++) s = springStep(s, 1, 100, 2 * Math.sqrt(100), 1 / 60);
+  assert.ok(Math.abs(s.x - 1) < 0.01 && Math.abs(s.v) < 0.05, `critically damped settles (${s.x})`);
+  assert.deepEqual(springStep({ x: 0.3, v: 0.2 }, 1, 100, 10, 0), { x: 0.3, v: 0.2 }, 'a zero frame is no change');
+  assert.deepEqual(springStep({ x: 0.3, v: 0.2 }, 1, 100, 10, Number.NaN), { x: 0.3, v: 0.2 }, 'a broken frame is no change');
+});
+
+test('an underdamped spring overshoots (the sway) and the damping brings it back', () => {
+  let s = { x: 0, v: 0 };
+  let peak = 0;
+  for (let i = 0; i < 300; i++) {
+    s = springStep(s, 1, 120, 2, 1 / 60);
+    peak = Math.max(peak, s.x);
+  }
+  assert.ok(peak > 1.05, `it overshoots the target (peak ${peak})`);
+  assert.ok(Math.abs(s.x - 1) < 0.02, `and comes back (${s.x})`);
+});
+
+test('a long frame is substepped: a 5 s frame stays bounded', () => {
+  const s = springStep({ x: 0, v: 0 }, 1, 400, 8, 5);
+  assert.ok(Number.isFinite(s.x) && Math.abs(s.x) < 3 && Math.abs(s.v) < 40, `bounded (${s.x}, ${s.v})`);
 });

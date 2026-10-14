@@ -25,6 +25,11 @@ import { loadScientistAnimations, type ClipName } from '../avatar/scientist/anim
 import { createScientistAnimator, type OneShotKind, type ScientistAnimator } from '../avatar/scientist/animator';
 import { loadRifleAnimations } from '../avatar/astro/rifle-clips';
 import { handPose, viewPose } from './rifle-hold';
+import { BEAM_START, BEAM_STROKE_RANGE, STROKE_RADIUS, strokeOf, type SculptTool } from './beam-tool';
+import { keepOutZones, type KeepOutZone } from './beam-keepout';
+import { createBeamVisuals, ringColourOf, type BeamVisuals } from './beam-visuals';
+import { FEEL_START, feelStep, type RifleFeelState } from './rifle-feel';
+import { applyRimFloor, setRimFloorOn, rimFloorOn } from './rim-floor';
 import { createMonsterMashCombat, type MonsterMashCombatManager } from './monster-mash-combat';
 import * as F from '@hm/substrate';
 import * as S from '@hm/structure';
@@ -210,6 +215,14 @@ export interface PlayScene {
   beamPaint(x: number, z: number, preset: string, dt: number): number;
   /** The loaded cartridge's colour in the rifle's port (null: empty). */
   setBeamCartridge(colour: string | null): void;
+  /** The sculpt stroke (TASK-21d): carve, raise or smooth at (x, z) for dt seconds, with the ore the player holds. Returns the ore after it and the cells cut. */
+  beamSculpt(x: number, z: number, tool: SculptTool, dt: number, ore: number): { readonly ore: number; readonly cells: number; readonly gained: number };
+  /** The zones the sculpt beam keeps out (the gate's apron, the structures, the machines); the play screen sets them as the base changes. */
+  setBeamKeepOut(zones: readonly KeepOutZone[]): void;
+  /** The sculpt edits and the paint as text, for the save (empty before the plot is made). */
+  beamFieldText(): string;
+  /** Seal (TASK-21d): while on, the rifle's rib and the ground ring show Seal's amber. TASK-23b-2 calls it at a leak; nothing here seals. */
+  setBeamSealing(on: boolean): void;
   /**
    * Compiles every shader the frames will need, for each place it draws, behind the loading bar: a compile mid-play is a hitch the
    * display governor would read as a slow machine (and the owner's rule is never to start a screen choppy).
@@ -244,6 +257,20 @@ export interface PlayScene {
     rifleIn(): 'hand' | 'view' | 'none';
     /** How many plot cells carry a preset's paint. */
     paintedCells(): number;
+    /** How many plot cells carry a sculpt edit (a cut or a raise), and the edit under a point in metres (negative: cut). */
+    sculptedCells(): number;
+    groundEdit(x: number, z: number): number;
+    /** The height of the rendered ground (its chunk meshes) under (x, z), or null off the plot. */
+    surfaceAt(x: number, z: number): number | null;
+    /** Whether the ground is settled: every wanted chunk built, and no chunk waiting for a cut's rebuild. */
+    groundSettled(): boolean;
+    /** The ground ring's colour while the held beam is drawn (null: hidden), and whether the Extract stream is drawn. */
+    ringColour(): string | null;
+    streamShown(): boolean;
+    /** Whether the rim and the floor are on (stages 0 to 2). */
+    rimFloorOn(): boolean;
+    /** The first-person rifle's feel this frame: the offset in metres (x, y, z) of its sway, bob and vibration. */
+    rifleFeelOffset(): readonly number[];
     /** Whether the held blueprint's ghost is shown on the ground (it is not while the rifle is out). */
     pieceGhostShown(): boolean;
     /** The character: which scene it is in, whether it is shown, where it stands, and whether an alternate camera is on. */
@@ -272,6 +299,8 @@ export function createPlayScene(o: {
   readonly groundTexture: number; readonly detail: Detail;
   readonly cameraView?: 'first' | 'third';
   readonly avatar?: PlayAvatar | null;
+  /** The sculpt edits and the paint as saved (encodeField text), applied when the plot is made; null for a fresh plot. */
+  readonly beamField?: string | null;
 }): PlayScene {
   const renderer = new THREE.WebGLRenderer({ canvas: o.canvas, antialias: o.antialias, powerPreference: o.powerPreference });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -884,6 +913,18 @@ export function createPlayScene(o: {
   const beamFx: BeamFx = beamEffect({ pixels: detail.plumes === 'dither' || detail.plumeDensity <= 0.5 ? 80 : 160 });
   planetScene.add(beamFx.object);
   beamFx.object.visible = false;
+  // The beam's ground ring (the stroke's radius, coloured by mode) and the Extract stream (TASK-21d, P0-VFX-01). The sculpt field from
+  // the save waits here until the plot is made (setPlanet).
+  const beamVisuals: BeamVisuals = createBeamVisuals(planetScene, keep);
+  let pendingBeamField: string | null = o.beamField ?? null;
+  let heldMode: BeamMode = 'extract';
+  let beamSealingNow = false;
+  /** The rifle's sway, bob and vibration (first person), and its rest pose and scratch objects. */
+  let rifleFeel: RifleFeelState = FEEL_START;
+  const viewRest = viewPose();
+  const feelOffset = new THREE.Vector3();
+  const feelQuat = new THREE.Quaternion();
+  const feelEuler = new THREE.Euler();
 
   // The held rifle (TASK-21): a first-person view model, right of centre. It is not in the planet scene: it is drawn in its
   // own pass after the planet (see drawViewModel), with its own lights, so the stage's look (the 1-bit dither at stage 0,
@@ -906,6 +947,8 @@ export function createPlayScene(o: {
       if ((one as THREE.MeshStandardMaterial).isMeshStandardMaterial && !rifleMats.includes(one as THREE.MeshStandardMaterial)) rifleMats.push(one as THREE.MeshStandardMaterial);
     }
   });
+  // the rim and the floor (TASK-21d, P0-LIGHT-01) for the rifle, in stages 0 to 2; the metal cap of TASK-21c stays
+  for (const mat of rifleMats) applyRimFloor(mat);
   let rifleEnvOn = false;
   const attachRifle = (): void => {
     const inHand = cameraView === 'third' && rifleHand !== null;
@@ -1042,6 +1085,7 @@ export function createPlayScene(o: {
         mat.metalness = Math.min(mat.metalness, SUIT_METAL_CAP);
         mesh.material = mat;
         suitMats.push(mat);
+        applyRimFloor(mat);
       });
       syncSuitEnv(where === 'planet');
       scientistHolder.add(group);
@@ -1289,6 +1333,13 @@ export function createPlayScene(o: {
       // the plot's natural ground (its own terrain and materials); the old world brings the sky, the stars and the neighbours, seated on it
       const g = createPlotGround(planetScene, { seed: 7, sunDir: SUN, stage: Math.max(1, stage), textureSize: o.groundTexture, budget: detail.groundBudget });
       ground = g;
+      // the gate's apron is always kept out (TASK-21d); the play screen adds the structures and machines as the base changes
+      g.setKeepOut(keepOutZones({ gate: { x: 0, z: 0 }, structures: [], pieces: [], machines: [] }));
+      // the saved sculpt edits and paint go in before the first chunks are built, so the ground is built as edited
+      if (pendingBeamField !== null) {
+        g.importField(pendingBeamField);
+        pendingBeamField = null;
+      }
       world = createWorld(planetScene, { gridSpacing: o.gridSpacing, reducedMotion: o.reducedMotion, ground: false });
       world.setPlanet(base, neighbours, { treeDetailRange: 150, height: (x, z) => g.terrain.height(x, z) + 0.6 });
       world.show(plot);
@@ -1602,6 +1653,8 @@ export function createPlayScene(o: {
         const vTo = new THREE.Vector3(to.x, to.y, to.z);
         const beamCol = colour === '#d9d9d9' ? '#00e5ff' : colour;
         beamFx.set(vFrom, vTo, mode, beamCol, true);
+        // Extract's stream of chunks runs from the hit point into the muzzle (TASK-21d); Apply and Sculpt draw none
+        beamVisuals.setStream(mode === 'extract' ? vTo : null, mode === 'extract' ? vFrom : null, clock);
 
         const dir = vTo.clone().sub(vFrom);
         const dist = dir.length();
@@ -1623,6 +1676,7 @@ export function createPlayScene(o: {
       } else {
         gameAudio.stopBeamLoop();
         beamFx.object.visible = false;
+        beamVisuals.setStream(null, null, clock);
         beamCoreMesh.visible = false;
         beamSparkMesh.visible = false;
       }
@@ -2020,6 +2074,19 @@ export function createPlayScene(o: {
       // the ground's chunks follow you on the planet; from the lab, they stay round the gate
       ground?.regrow(dt);
       ground?.update(where === 'planet' ? pos.x : 0, where === 'planet' ? pos.z : 0);
+      // the held rifle's feel (TASK-21d, P0-VFX-01): it sways on the look, bobs on the walk and vibrates while it fires
+      const walked = Math.hypot(pos.x - before.x, pos.z - before.z);
+      const feel = feelStep(rifleFeel, { lookX: c.look.dx, lookY: c.look.dy, walked, dt, firing: rifleFiringNow, time: now });
+      rifleFeel = feel.state;
+      if (heldBeam.group.visible && heldBeam.group.parent === viewRig) {
+        heldBeam.group.position.copy(viewRest.position).add(feelOffset.set(feel.out.x, feel.out.y, feel.out.z));
+        heldBeam.group.quaternion.copy(viewRest.quaternion).multiply(feelQuat.setFromEuler(feelEuler.set(feel.out.pitch, 0, feel.out.roll)));
+      }
+      // the rim and the floor (P0-LIGHT-01) are on in stages 0 to 2 only
+      setRimFloorOn(shown <= 2);
+      // the ring under the beam: the stroke's radius where the held rifle lands, coloured by its mode (Seal's amber while sealing)
+      const beamAimed = heldBeam.group.visible && where === 'planet' ? aimGround(BEAM_STROKE_RANGE) : null;
+      beamVisuals.setRing(beamAimed ? { x: beamAimed.x, z: beamAimed.z } : null, STROKE_RADIUS, ringColourOf(heldMode, beamSealingNow), groundAt);
       labScene.environmentIntensity = room.envLevel();
       syncSuitEnv(where === 'planet');
       world?.update(now, dt, where === 'planet' ? camera.position : virtual.position);
@@ -2182,6 +2249,7 @@ export function createPlayScene(o: {
     },
     setLabActivity,
     setBeamHeld(held, mode) {
+      heldMode = mode;
       heldBeam.setMode(mode);
       const was = heldBeam.group.visible;
       heldBeam.group.visible = held;
@@ -2230,6 +2298,22 @@ export function createPlayScene(o: {
     },
     setBeamCartridge(colour) {
       heldBeam.setCartridge(colour);
+    },
+    beamSculpt(x, z, tool, dt, ore) {
+      const op = strokeOf({ ...BEAM_START, mode: 'sculpt', sculpt: tool }, { x, z }, dt);
+      if (!ground || op === null) return { ore, cells: 0, gained: 0 };
+      const r = ground.stroke(op, ore);
+      return { ore: r.balance, cells: r.cells, gained: r.gained };
+    },
+    setBeamKeepOut(zones) {
+      ground?.setKeepOut(zones);
+    },
+    beamFieldText() {
+      return ground ? ground.exportField() : '';
+    },
+    setBeamSealing(on) {
+      beamSealingNow = on;
+      heldBeam.setSealing(on);
     },
     async preloadLabGenerated() {
       await preloadLabGenerated(genLevelFor(currentQuality));
@@ -2320,6 +2404,14 @@ export function createPlayScene(o: {
       clipWeight: (name: ClipName) => scientistAnimator?.getClipWeight(name) ?? 0,
       rifleIn: () => (!heldBeam.group.visible ? 'none' : heldBeam.group.parent === viewRig ? 'view' : rifleHand !== null && heldBeam.group.parent === rifleHand ? 'hand' : 'none'),
       paintedCells: () => ground?.paintedCells() ?? 0,
+      sculptedCells: () => ground?.sculptedCells() ?? 0,
+      groundEdit: (x, z) => ground?.editAt(x, z) ?? 0,
+      surfaceAt: (x, z) => ground?.surfaceAt(x, z) ?? null,
+      groundSettled: () => ground?.settled() ?? false,
+      ringColour: () => beamVisuals.ringColour(),
+      streamShown: () => beamVisuals.streamShown(),
+      rimFloorOn: () => rimFloorOn(),
+      rifleFeelOffset: () => [feelOffset.x, feelOffset.y, feelOffset.z],
       pieceGhostShown: () => pieceGhost !== null && pieceGhost.visible,
       avatar: () => {
         const box = new THREE.Box3().setFromObject(scientistHolder);
@@ -2415,6 +2507,7 @@ export function createPlayScene(o: {
       renderer.dispose();
       mash.dispose();
       beamFx.dispose();
+      beamVisuals.dispose();
       planetScene.remove(planGhostsGroup);
       beamCoreGeom.dispose();
       beamCoreMat.dispose();

@@ -69,12 +69,15 @@ import { weaponStats } from '../base/weapons';
 import * as S from '@hm/structure';
 import type { Kind } from '@hm/structure';
 import * as L from '@hm/lattice';
-import type { BeamMode } from '@hm/beamkit';
-import { BEAM_STROKE_RANGE, cycleBeamMode } from './beam-tool';
+import { BEAM_COLOURS, type BeamMode } from '@hm/beamkit';
+import { BEAM_STROKE_RANGE, cycleBeamMode, sculptToolForKey, type SculptTool } from './beam-tool';
 import { presetLook, reloadedLab, writtenOnRack } from './beam-port';
+import { keepOutZones } from './beam-keepout';
 
 /** The extraction rifle's modes, as the player reads them (the chip and the toasts). */
 const BEAM_LABEL: Readonly<Record<BeamMode, string>> = { extract: 'Extract', apply: 'Apply', sculpt: 'Sculpt' };
+/** The sculpt tools as the player reads them (TASK-21d): keys 1, 2 and 3 in Sculpt. */
+const SCULPT_LABEL: Readonly<Record<SculptTool, string>> = { carve: 'Carve', raise: 'Raise', smooth: 'Smooth' };
 import {
   GameNarratorController,
   preloadMentorVo,
@@ -150,6 +153,26 @@ function chainPairs(events: readonly BaseEvent[]): [string, number][] {
 
 function loadSaved(): PlayState { try { return loadState(JSON.parse(kv.get(SAVE_KEY) ?? 'null')); } catch { return FRESH; } }
 function save(s: PlayState): void { try { kv.set(SAVE_KEY, JSON.stringify(s)); } catch { /* storage unavailable: progress lives for this visit */ } }
+/**
+ * The beam's save (TASK-21d): the sculpt edits and the paint (encodeField text), and the cartridge in the port. It has its own
+ * profile key: not the base world's save and not the play save. A broken or old save starts a fresh plot, with an empty port.
+ */
+const BEAM_SAVE_KEY = 'hm.setmix.beam';
+interface BeamSave { readonly field: string | null; readonly port: Cartridge | null }
+function loadBeamSave(): BeamSave {
+  try {
+    const raw = JSON.parse(kv.get(BEAM_SAVE_KEY) ?? 'null') as { readonly v?: unknown; readonly field?: unknown; readonly port?: unknown } | null;
+    if (!raw || raw.v !== 1) return { field: null, port: null };
+    const p = raw.port as Partial<Cartridge> | null | undefined;
+    const port = p && typeof p === 'object' && typeof p.id === 'string' && typeof p.preset === 'string' && typeof p.name === 'string' ? (p as Cartridge) : null;
+    return { field: typeof raw.field === 'string' && raw.field.length > 0 ? raw.field : null, port };
+  } catch {
+    return { field: null, port: null };
+  }
+}
+function saveBeam(field: string, port: Cartridge | null): void {
+  try { kv.set(BEAM_SAVE_KEY, JSON.stringify({ v: 1, field: field.length > 0 ? field : null, port })); } catch { /* storage unavailable: the edits live for this visit */ }
+}
 
 /** The plot's numbers for the HUD. */
 interface PlotHud { readonly ore: number; readonly oreRate: number; readonly supply: number; readonly demand: number; readonly levels: Readonly<Record<Metric, number>>; readonly stage: number }
@@ -183,7 +206,7 @@ const CONTROLS: readonly [string, string][] = [
   ['E', 'Use: leave or enter a vehicle, use a station, machine or bin; hold on a boulder to gather ore'],
   ['B', 'Build menu: Machines, Structures, Heavy, Plans'], ['Q', 'Previous structure kind (the wheel too); with the beam out, the beam mode'],
   ['R', 'Rotate the piece you hold, or the layout while you place it; with the beam out, reload its port'], ['X', 'Remove the piece you aim at'],
-  ['G', 'Draw or holster the extraction beam (the rifle)'], ['Left mouse', 'Hold with the beam out: mine a boulder (Extract), paint the port (Apply)'],
+  ['G', 'Draw or holster the extraction beam (the rifle)'], ['Left mouse', 'Hold with the beam out: mine a boulder (Extract), paint the port (Apply), cut or raise the ground (Sculpt; 1 2 3 pick the tool)'],
   ['F', 'Build the plan you stand near'], ['T', 'Structural integrity overlay'], ['V', 'First or third person view'],
   ['Space', 'Brake a vehicle; fire the shotgun when it is equipped'], ['Tab or I', 'Inventory'], ['K', 'Drafting table'],
   ['L', 'Lattice storage'], ['1 to 9', 'Hotbar slot'], ['Esc', 'Close the open thing, then pause'],
@@ -385,11 +408,29 @@ export function PlayScreen(props: {
   const beamHeldRef = useRef(false);
   const beamModeRef = useRef<BeamMode>('extract');
   const [beamHud, setBeamHud] = useState<{ readonly held: boolean; readonly mode: BeamMode }>({ held: false, mode: 'extract' });
+  /** The sculpt tool (TASK-21d): carve, raise or smooth. The frame loop reads the ref; the chip reads the state. */
+  const sculptToolRef = useRef<SculptTool>('carve');
+  const [sculptTool, setSculptTool] = useState<SculptTool>('carve');
+  const chooseSculptTool = (tool: SculptTool): void => {
+    sculptToolRef.current = tool;
+    setSculptTool(tool);
+  };
+  /** The beam's save: edits since the last write, when it was written, and the last support count and check time (TASK-21d). */
+  const beamDirtyRef = useRef(false);
+  const beamSaveAtRef = useRef(0);
+  const keepOutAtRef = useRef(-1e9);
+  const supportAtRef = useRef(-1e9);
+  const lostSupportRef = useRef(0);
   const setBeamHeld = (held: boolean, mode: BeamMode): void => {
     beamHeldRef.current = held;
     beamModeRef.current = mode;
     sceneRef.current?.setBeamHeld(held, mode);
     setBeamHud({ held, mode });
+    // the hotbar keys 1 to 3 pick the sculpt tool while the rifle sculpts (base/ui/hotbar.tsx reads this flag)
+    if (typeof document !== 'undefined') {
+      if (held && mode === 'sculpt') document.documentElement.dataset.beamSculpt = '1';
+      else delete document.documentElement.dataset.beamSculpt;
+    }
   };
   const placingLayoutRotationRef = useRef<number>(0);
   const [planPrompt, setPlanPrompt] = useState<string | null>(null);
@@ -497,6 +538,45 @@ export function PlayScreen(props: {
    * R on the held rifle (TASK-21): a written cartridge from the lab rack goes into the port. A cartridge already in the port goes
    * back on the rack first. A cartridge a lab job still needs stays where it is.
    */
+  /**
+   * The keep-out zones the sculpt beam leaves alone now (TASK-21d): the gate's apron, every structure (its origin), every placed
+   * piece (its cell's centre, so a long structure is kept out along its length) and every plot machine.
+   */
+  const sculptZones = () => {
+    const base = baseWorldRef.current.base;
+    const byId = new Map(base.structures.map((s) => [s.id, s] as const));
+    const pieces: { x: number; z: number }[] = [];
+    for (const p of base.pieces) {
+      const s = byId.get(p.s);
+      if (!s) continue;
+      const c = S.toWorld(s, (p.i + 0.5) * S.CELL, (p.j + 0.5) * S.CELL, 0);
+      pieces.push({ x: c.x, z: c.z });
+    }
+    return keepOutZones({
+      gate: envRef.current?.gate ?? { x: 0, z: 0 },
+      structures: base.structures.map((s) => ({ x: s.x, z: s.z })),
+      pieces,
+      machines: plotRef.current.machines,
+    });
+  };
+  /** The edits and the port as the save holds them now (the scene owns the field). */
+  const flushBeam = (): void => {
+    saveBeam(sceneRef.current?.beamFieldText() ?? '', beamPortRef.current ? beamPortRef.current.cartridge : null);
+  };
+  /**
+   * The support re-check after a cut (TASK-21d): every placed piece's support is read again on the ground as it now is (the base's own
+   * integrity). A rise in the count of pieces under the minimum is said once; the structure view is redrawn for the integrity overlay.
+   */
+  const recheckSupport = (): void => {
+    const support = S.supports(baseWorldRef.current.base, structureEnv(getBaseEnv()));
+    let lost = 0;
+    for (const v of support.values()) if (v < S.MIN_SUPPORT) lost += 1;
+    if (lost > lostSupportRef.current) {
+      say(`${lost} ${lost === 1 ? 'piece has' : 'pieces have'} lost support`, 'The ground under them was cut. Raise it back, or move them.');
+    }
+    lostSupportRef.current = lost;
+    (baseViewSource as WorldViewSource).notify?.();
+  };
   const reloadBeam = (): void => {
     const written = writtenOnRack(labRef.current);
     if (!written || written.preset === null) {
@@ -512,6 +592,7 @@ export function PlayScreen(props: {
     setBeamPort({ name: written.name });
     sceneRef.current?.setBeamCartridge(beamPortRef.current.colour);
     sceneRef.current?.playAction('reload');
+    beamDirtyRef.current = true;
     say(`Loaded: ${written.name}`, port ? `${port.name} went back on the rack.` : 'Hold the left button in Apply to paint.');
   };
   const forceBeamRef = useRef<number | null>(null);
@@ -891,6 +972,7 @@ export function PlayScreen(props: {
         detail: detailOf(graphics, tier),
         cameraView: props.profile.cameraView ?? 'first',
         avatar: stateRef.current.avatar,
+        beamField: loadBeamSave().field,
       });
     } catch {
       setFailed(true);
@@ -936,6 +1018,14 @@ export function PlayScreen(props: {
       }),
       ['Opening the lab', () => {
         scene.setPlanet(look(PLOT, 1), look(PLOT, 1), NEIGHBOURS.map((plot) => ({ plot, look: look(plot.cartridge, plot.stage) })));
+        // the cartridge that was in the rifle's port comes back into it (TASK-21d): it left the rack when it was loaded
+        const savedPort = loadBeamSave().port;
+        if (savedPort && savedPort.preset) {
+          const colour = presetLook(savedPort.preset)?.colour ?? '#808080';
+          beamPortRef.current = { cartridge: savedPort, preset: savedPort.preset, name: savedPort.name, colour };
+          scene.setBeamCartridge(colour);
+          setBeamPort({ name: savedPort.name });
+        }
         env = { gate: scene.debug.gatePlanet(), plotRadius: 500, richness: (x, z) => scene.richness(x, z), affinity: (id, metric) => cartlabAffinityOf(labRef.current, id, metric) };
         envRef.current = env;
         plotRef.current = stateRef.current.plot;
@@ -1089,6 +1179,9 @@ export function PlayScreen(props: {
       }
     };
     window.addEventListener('keydown', kd); window.addEventListener('keyup', ku); window.addEventListener('mousemove', onMove);
+    // the beam's edits are written when the page leaves (TASK-21d); the loop writes them every 1.5 s while they change
+    const flushOnHide = (): void => { flushBeam(); };
+    window.addEventListener('pagehide', flushOnHide);
     window.addEventListener('mousedown', onMouseDown); window.addEventListener('mouseup', onMouseUp);
     const loop = (ms: number): void => {
       if (cancelled) return;
@@ -1142,7 +1235,7 @@ export function PlayScreen(props: {
         scene.setBeam(muzzle, target, 'extract', col, true);
       } else if (beamBoulderTargetRef.current !== null) {
         // the rifle takes ore from a boulder (amber) or paints the ground (the preset's colour): the beam runs from the muzzle to it
-        scene.setBeam(scene.beamMuzzle(), beamBoulderTargetRef.current, 'extract', beamBoulderTargetRef.current.colour, true);
+        scene.setBeam(scene.beamMuzzle(), beamBoulderTargetRef.current, beamModeRef.current, beamBoulderTargetRef.current.colour, true);
       } else {
         scene.setBeam(null, null, 'extract', '#ffffff', false);
       }
@@ -1656,6 +1749,39 @@ export function PlayScreen(props: {
         }
       }
 
+      // ---- Sculpt (TASK-21d): the held rifle carves, raises or smooths the ground under the aim point while the left button is held,
+      // out to 25 m. Carve gains ore and raise spends it (the plot's ore, never below zero). The keep-out zones (the gate's apron, the
+      // structures, the machines, the plot's edge) are never cut. The cut lands in the chunks as they change, a few a frame.
+      {
+        const sculpting = live && !visitingRef.current && out.where === 'planet' && beamHeldRef.current && beamModeRef.current === 'sculpt' && isLmbDownRef.current && !scene.mash.isEquipped();
+        if (sculpting && ms - keepOutAtRef.current > 250) {
+          keepOutAtRef.current = ms;
+          scene.setBeamKeepOut(sculptZones());
+        }
+        const aim = sculpting ? scene.beamAim(BEAM_STROKE_RANGE) : null;
+        if (aim) {
+          const r = scene.beamSculpt(aim.x, aim.z, sculptToolRef.current, dt, plotRef.current.ore);
+          beamBoulderTargetRef.current = { x: aim.x, y: aim.y + 0.15, z: aim.z, colour: BEAM_COLOURS.sculpt };
+          if (r.ore !== plotRef.current.ore) {
+            plotRef.current = { ...plotRef.current, ore: Math.min(1e5, r.ore) };
+            plotChanged = true;
+          }
+          if (r.cells > 0) {
+            beamDirtyRef.current = true;
+            if (ms - supportAtRef.current > 500) {
+              supportAtRef.current = ms;
+              recheckSupport();
+            }
+          }
+        }
+      }
+      // the beam's save: the edits and the port are written every 1.5 s while they change, and again when the page leaves
+      if (beamDirtyRef.current && ms - beamSaveAtRef.current > 1500) {
+        beamDirtyRef.current = false;
+        beamSaveAtRef.current = ms;
+        flushBeam();
+      }
+
       // ---- the lab runs every frame
       const labEnv: LabEnv = { presets: VAULT, stage: plotRef.current.stage, powered: stateRef.current.gateOn };
       const labRes = stepCartlab(labRef.current, labEnv, dt);
@@ -2057,6 +2183,7 @@ export function PlayScreen(props: {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', size);
       window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('pagehide', flushOnHide);
       window.removeEventListener('mousedown', onMouseDown); window.removeEventListener('mouseup', onMouseUp);
       sceneRef.current = null;
       scene.dispose();
@@ -2134,6 +2261,15 @@ export function PlayScreen(props: {
             at: { x: playerPos.x, z: playerPos.z },
             plan: nearestPlanRef.current.id,
           });
+          return;
+        }
+      }
+      // in Sculpt, keys 1, 2 and 3 pick the tool (carve, raise, smooth); the hotbar ignores them while the rifle sculpts (TASK-21d)
+      if (beamHeldRef.current && beamModeRef.current === 'sculpt') {
+        const tool = sculptToolForKey(e.code);
+        if (tool) {
+          chooseSculptTool(tool);
+          say(`Sculpt: ${SCULPT_LABEL[tool]}`);
           return;
         }
       }
@@ -3351,12 +3487,12 @@ export function PlayScreen(props: {
               </div>
           ) : null}
           {beamHud.held && hud.where === 'planet' && !hideOverlays ? (
-            <div className="hm-beam-chip" data-testid="beam-mode" data-mode={beamHud.mode} data-port={beamPort?.name ?? ''}>
-              <b>{BEAM_LABEL[beamHud.mode]}</b>
+            <div className="hm-beam-chip" data-testid="beam-mode" data-mode={beamHud.mode} data-port={beamPort?.name ?? ''} data-tool={beamHud.mode === 'sculpt' ? sculptTool : ''}>
+              <b>{beamHud.mode === 'sculpt' ? `${BEAM_LABEL[beamHud.mode]}: ${SCULPT_LABEL[sculptTool]}` : BEAM_LABEL[beamHud.mode]}</b>
               <span>
                 {beamHud.mode === 'apply'
                   ? beamPort ? `Port: ${beamPort.name}` : 'Port empty: R loads a cartridge'
-                  : 'Q or wheel: next mode'}
+                  : beamHud.mode === 'sculpt' ? '1 carve, 2 raise, 3 smooth; Q: next mode' : 'Q or wheel: next mode'}
               </span>
             </div>
           ) : null}

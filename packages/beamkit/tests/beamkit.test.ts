@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { BUDGET, createMaterials, extractionBeam, beamEffect, beamPixelAt } from '../src/index';
+import { BEAM_COLOURS, BUDGET, createMaterials, extractionBeam, beamEffect, beamPixelAt } from '../src/index';
 
 const m = createMaterials();
 const box = (o: THREE.Object3D): THREE.Box3 => new THREE.Box3().setFromObject(o);
@@ -120,4 +120,30 @@ test('the shader-backed effect clamps its pixel count and sculpt keeps a spiral 
   const a = beamPixelAt(12, 256, 2, [0, 0, 0], [0, 0, 4], 'sculpt');
   assert.ok(Math.hypot(a[0], a[1]) > 0);
   fx.dispose();
+});
+test('the mode rib: a square strip on the top rail, the mode\'s colour, and Seal\'s amber while sealing', () => {
+  for (const stage of [1, 6]) {
+    const t = extractionBeam(m, { stage });
+    const rib = t.rib;
+    rib.geometry.computeBoundingBox();
+    const bb = rib.geometry.boundingBox!;
+    const w = bb.max.x - bb.min.x, h = bb.max.y - bb.min.y, d = bb.max.z - bb.min.z;
+    assert.ok(Math.abs(w - h) < 1e-6, 'the rib is square in section');
+    assert.ok(d > 0.15 && d < 0.25, `the rib runs along the rail (${d} m)`);
+    const base = rib.position.y + bb.min.y;
+    assert.ok(base >= 0.110 && base <= 0.114, `its base sits on the rail bed, not in the air (${base})`);
+    const colour = (): string => `#${(rib.material as THREE.MeshStandardMaterial).emissive.getHexString()}`;
+    t.setMode('extract');
+    assert.equal(colour(), BEAM_COLOURS.extract);
+    t.setMode('apply');
+    assert.equal(colour(), BEAM_COLOURS.apply);
+    t.setMode('sculpt');
+    assert.equal(colour(), BEAM_COLOURS.sculpt);
+    t.setSealing(true);
+    assert.equal(colour(), BEAM_COLOURS.seal, 'sealing shows the amber');
+    t.setMode('extract');
+    assert.equal(colour(), BEAM_COLOURS.seal, 'a mode change keeps the seal amber while it is on');
+    t.setSealing(false);
+    assert.equal(colour(), BEAM_COLOURS.extract, 'when the seal is off the rib takes the mode back');
+  }
 });

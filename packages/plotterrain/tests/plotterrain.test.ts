@@ -130,3 +130,72 @@ test('boulder candidates partition cleanly across neighbouring squares', () => {
   const right = t.boulders(-64, -64, 64);
   for (const a of left) for (const b of right) assert.ok(a.x !== b.x || a.z !== b.z);
 });
+
+test('a chunk with a height offset follows it: positions move by the offset, and a flat offset keeps the normals up', () => {
+  const plain = chunkMesh(t, 40, -24, 32, 8);
+  const lifted = chunkMesh(t, 40, -24, 32, 8, { offset: () => 1.5 });
+  for (let i = 1; i < plain.positions.length; i += 3) assert.ok(near(lifted.positions[i]!, plain.positions[i]! + 1.5, 1e-4));
+  for (let i = 0; i < plain.positions.length; i += 3) assert.equal(lifted.positions[i], plain.positions[i], 'x is unchanged');
+  for (let i = 0; i < plain.normals.length; i++) assert.ok(near(lifted.normals[i]!, plain.normals[i]!, 1e-5), 'a flat lift changes no normal');
+  // a sloped offset tilts the surface: its normals change and the heights follow the offset cell by cell
+  const tilted = chunkMesh(t, 40, -24, 32, 8, { offset: (x) => (x - 40) * 0.25 });
+  assert.notDeepEqual(Array.from(tilted.normals.slice(0, 3)), Array.from(plain.normals.slice(0, 3)));
+  for (let v = 0; v < plain.positions.length; v += 3) {
+    const x = tilted.positions[v]!;
+    assert.ok(near(tilted.positions[v + 1]!, plain.positions[v + 1]! + (x - 40) * 0.25, 1e-4), 'the tilt is in the heights');
+  }
+});
+
+test('a refined region keeps fine leaves; the leaves still tile the square; neighbours differ by at most 2x', () => {
+  const touches = (cx: number, cz: number, size: number): boolean => Math.abs(cx - 120) < size / 2 + 40 && Math.abs(cz) < size / 2 + 40;
+  const leaves = chunksAround(0, 0, { extent: 600, cells: 32, minSize: 16, budget: 60000, refine: { minSize: 16, touches } });
+  let area = 0;
+  for (const l of leaves) area += l.size * l.size;
+  assert.ok(near(area, 1200 * 1200, 1), `the leaves tile the square (${area})`);
+  // the quadtree halves a 1200 m root, so the finest leaf it makes for a refinement of 16 m is 18.75 m
+  assert.ok(leaves.some((l) => l.size <= 18.75 + 1e-6 && Math.abs(l.cx - 120) < 40 && Math.abs(l.cz) < 40), 'the refined region has fine leaves');
+  for (let i = 0; i < leaves.length; i++) {
+    for (let j = i + 1; j < leaves.length; j++) {
+      const a = leaves[i]!, b = leaves[j]!;
+      const reach = (a.size + b.size) / 2;
+      const dx = Math.abs(a.cx - b.cx), dz = Math.abs(a.cz - b.cz);
+      const shares = (near(dx, reach, 1e-6) && dz < reach - 1e-6) || (near(dz, reach, 1e-6) && dx < reach - 1e-6);
+      // a seam round the refined region may be wider than 2x (the chunk skirts close it); everywhere else the balance holds
+      const nearRegion = (l: { readonly cx: number; readonly cz: number }): boolean => Math.abs(l.cx - 120) < 200 && Math.abs(l.cz) < 200;
+      if (shares) assert.ok(Math.max(a.size, b.size) <= 2 * Math.min(a.size, b.size) + 1e-6 || nearRegion(a) || nearRegion(b), `neighbours ${a.size} and ${b.size} differ by more than 2x away from the refined region`);
+    }
+  }
+});
+
+test('a refinement leaves the detail round the eye as it was: the leaves far from the refined region are the same', () => {
+  const plain = chunksAround(0, 0, { extent: 600, cells: 32, minSize: 16, budget: 60000 });
+  const touches = (cx: number, cz: number, size: number): boolean => Math.abs(cx - 120) < size / 2 + 20 && Math.abs(cz) < size / 2 + 20;
+  const refined = chunksAround(0, 0, { extent: 600, cells: 32, minSize: 16, budget: 60000, refine: { minSize: 16, touches } });
+  const key = (l: { cx: number; cz: number; size: number }): string => `${l.cx},${l.cz},${l.size}`;
+  const refinedKeys = new Set(refined.map(key));
+  // a plain leaf far from the refined region (more than 150 m from it) must stand in the refined set too
+  const far = plain.filter((l) => Math.abs(l.cx - 120) - l.size / 2 > 150);
+  assert.ok(far.length > 0, 'there are far leaves to compare');
+  for (const l of far) assert.ok(refinedKeys.has(key(l)), `the far leaf ${key(l)} is unchanged`);
+});
+
+test('a wide cut (200 by 200 m, the eye in its middle) keeps the leaves inside the budget plus the refinement cap', () => {
+  const budget = 60000; // the potato tier's ground budget: 29 leaves of 2048 triangles
+  const cap = 48; // the plot ground's EDIT_LEAF_CAP: the most refined leaves a cut may make
+  const inCut = (cx: number, cz: number, size: number): boolean => Math.abs(cx) - size / 2 < 100 && Math.abs(cz) - size / 2 < 100;
+  const withinReach = (cx: number, cz: number, size: number): boolean =>
+    Math.hypot(Math.max(Math.abs(cx) - size / 2, 0), Math.max(Math.abs(cz) - size / 2, 0)) <= 120;
+  const plain = chunksAround(0, 0, { extent: 4096, cells: 32, minSize: 16, budget });
+  const cut = chunksAround(0, 0, {
+    extent: 4096,
+    cells: 32,
+    minSize: 16,
+    budget,
+    refine: { minSize: 16, maxLeaves: cap, touches: (cx, cz, size) => withinReach(cx, cz, size) && inCut(cx, cz, size) },
+  });
+  const budgetLeaves = Math.floor(budget / (2 * 32 * 32));
+  assert.ok(plain.length <= budgetLeaves, `the eye's own leaves fit the budget (${plain.length} of ${budgetLeaves})`);
+  assert.ok(cut.length <= budgetLeaves + cap, `with the cut the leaves stay within the budget plus the cap (${cut.length} of ${budgetLeaves} + ${cap})`);
+  assert.ok(cut.length > plain.length, 'the cut adds leaves');
+  assert.ok(cut.some((l) => l.size <= 16 + 1e-9 && Math.abs(l.cx) < 60 && Math.abs(l.cz) < 60), 'the cut has fine leaves next to the eye');
+});

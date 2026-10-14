@@ -430,3 +430,29 @@ export function describe(t: ToolJuice): string {
   parts.push(t.juice.shake > 0 ? `shake ${t.juice.shake}` : 'no shake');
   return parts.join(', ');
 }
+// ---------------------------------------------------------------------------
+// Damped spring (TASK-21d): the held rifle's sway, bob and kick follow a damped harmonic oscillator
+// ---------------------------------------------------------------------------
+
+/** A damped spring's state: where it is and how fast it moves. */
+export interface Spring {
+  readonly x: number;
+  readonly v: number;
+}
+
+/**
+ * One frame of a damped harmonic oscillator pulled to `target`, with stiffness `k` (1/s squared) and damping `c` (1/s). It is
+ * integrated in substeps of at most 1/240 s, so a long frame cannot blow the spring up. A zero or broken frame leaves it as it is.
+ */
+export function springStep(s: Spring, target: number, k: number, c: number, dt: number): Spring {
+  if (!(dt > 0) || !Number.isFinite(dt) || !(k > 0) || !(c >= 0) || !Number.isFinite(target)) return s;
+  const steps = Math.min(64, Math.max(1, Math.ceil(dt * 240)));
+  const h = dt / steps;
+  let x = s.x;
+  let v = s.v;
+  for (let i = 0; i < steps; i++) {
+    v += (k * (target - x) - c * v) * h;
+    x += v * h;
+  }
+  return { x, v };
+}

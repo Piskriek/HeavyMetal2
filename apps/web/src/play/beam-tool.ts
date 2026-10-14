@@ -12,6 +12,11 @@ import type { BeamMode } from '@hm/beamkit';
 export const BEAM_STROKE_RANGE = 25;
 /** A stroke's radius on the ground (metres). */
 export const STROKE_RADIUS = 3;
+/**
+ * The sculpt rules (TASK-21d): a carve digs at most 2 m down and a raise builds at most 2 m up, at 0.3 m a second under the brush's
+ * centre. Rock is worth 1.5 ore a cubic metre, both ways: a carve gains it, a raise spends it.
+ */
+export const SCULPT_RULES: Rules = { maxDepth: 2, maxHeight: 2, orePerCubicMetre: 1.5, ratePerSecond: 0.3 };
 
 export const BEAM_MODES: readonly BeamMode[] = ['extract', 'apply', 'sculpt'];
 export const SCULPT_TOOLS = ['carve', 'raise', 'smooth'] as const;

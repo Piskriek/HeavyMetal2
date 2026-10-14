@@ -517,9 +517,11 @@ export function chunkMesh(
   cz: number,
   size: number,
   cells: number,
-  o?: { flat?: boolean; skirt?: number },
+  o?: { flat?: boolean; skirt?: number; offset?: (x: number, z: number) => number },
 ): ChunkMesh {
   const divisions = Math.max(1, Math.floor(cells));
+  // a height offset (the beam's sculpt edits, TASK-21d): added to every sampled height, so the positions and normals follow it
+  const offset = o?.offset;
   const stride = divisions + 1;
   const gridCount = stride * stride;
   const step = size / divisions;
@@ -550,7 +552,7 @@ export function chunkMesh(
     for (let col = 0; col < stride; col++) {
       const x = startX + col * step;
       const gridIndex = row * stride + col;
-      heights[gridIndex] = t.height(x, z);
+      heights[gridIndex] = t.height(x, z) + (offset === undefined ? 0 : offset(x, z));
     }
   }
 
@@ -724,10 +726,33 @@ export function chunkMesh(
   return { positions, normals, matA, matB, indices };
 }
 
+/**
+ * The chunks to draw round the eye: a quadtree over the square (extent on each side of the planet's centre), halved near the eye
+ * while the triangle budget allows, and balanced so no two touching leaves differ by more than 2x (no cracks). A `refine` region
+ * (the ground a sculpt has cut) is split on top of that, down to its minimum, and balanced again. The budget does not count the
+ * refined leaves, so the detail round the eye is the same with or without a cut.
+ */
 export function chunksAround(
   eyeX: number,
   eyeZ: number,
-  o: { extent: number; cells: number; minSize: number; budget: number },
+  o: {
+    extent: number;
+    cells: number;
+    minSize: number;
+    budget: number;
+    /**
+     * A region to keep fine (the ground a sculpt has cut): a leaf that `touches` it splits down to `minSize` of this, the leaves
+     * nearest the eye first. These leaves are on top of `budget`, and at most `maxLeaves` are made (each split makes four). Their
+     * seams to the coarser leaves round them are not balanced: the chunk skirts close those seams, and a balance would cascade
+     * across the planet.
+     */
+    refine?: {
+      readonly minSize: number;
+      readonly touches: (cx: number, cz: number, size: number) => boolean;
+      /** The most refined leaves the refinement makes (four per split); none beyond this, so a wide cut stays inside a bound. */
+      readonly maxLeaves?: number;
+    };
+  },
 ): { cx: number; cz: number; size: number; cells: number }[] {
   const extent = Number.isFinite(o.extent) ? Math.max(0, o.extent) : 0;
   const rootSize = extent * 2;
@@ -737,33 +762,18 @@ export function chunksAround(
   if (o.budget < rootTriangles) throw new RangeError('budget is smaller than the root chunk triangle count');
   const requestedMin = Number.isFinite(o.minSize) ? Math.max(0, o.minSize) : 0;
   const minSize = Math.min(requestedMin > 0 ? requestedMin : rootSize, rootSize);
+  const refine = o.refine !== undefined && Number.isFinite(o.refine.minSize) && o.refine.minSize > 0 ? o.refine : undefined;
   let maxDepth = 0;
   let smallest = rootSize;
   while (smallest * 0.5 >= minSize && maxDepth < 48) {
     smallest *= 0.5;
     maxDepth++;
   }
+  const epsilon = rootSize * 1e-10 + 1e-9;
 
-  for (let depthLimit = maxDepth; depthLimit >= 0; depthLimit--) {
-    const leaves: { cx: number; cz: number; size: number; cells: number }[] = [];
-    function visit(cx: number, cz: number, size: number, depth: number): void {
-      const half = size * 0.5;
-      const dx = Math.max(Math.abs(eyeX - cx) - half, 0);
-      const dz = Math.max(Math.abs(eyeZ - cz) - half, 0);
-      const canSplit = depth < depthLimit && half >= minSize && dx * dx + dz * dz < (size * 0.85) * (size * 0.85);
-      if (!canSplit) {
-        leaves.push({ cx, cz, size, cells });
-        return;
-      }
-      const quarter = size * 0.25;
-      visit(cx - quarter, cz - quarter, half, depth + 1);
-      visit(cx + quarter, cz - quarter, half, depth + 1);
-      visit(cx - quarter, cz + quarter, half, depth + 1);
-      visit(cx + quarter, cz + quarter, half, depth + 1);
-    }
-    visit(0, 0, rootSize, 0);
-
-    const epsilon = rootSize * 1e-10 + 1e-9;
+  type Leaf = { cx: number; cz: number; size: number; cells: number };
+  /** Splits leaves until no two touching leaves differ by more than 2x; a leaf splits no smaller than `floor`. */
+  const balance = (leaves: Leaf[], floor: number): void => {
     let balanced = false;
     while (!balanced) {
       balanced = true;
@@ -781,7 +791,7 @@ export function chunksAround(
           if (largerIndex < 0) continue;
           const larger = leaves[largerIndex]!;
           const half = larger.size * 0.5;
-          if (half < minSize) continue;
+          if (half < floor) continue;
           leaves.splice(largerIndex, 1);
           const quarter = larger.size * 0.25;
           leaves.push(
@@ -795,7 +805,65 @@ export function chunksAround(
         }
       }
     }
-    if (leaves.length * rootTriangles <= o.budget) return leaves;
+  };
+
+  // the leaves the eye needs: the finest that the budget allows
+  let selected: Leaf[] = [{ cx: 0, cz: 0, size: rootSize, cells }];
+  for (let depthLimit = maxDepth; depthLimit >= 0; depthLimit--) {
+    const leaves: Leaf[] = [];
+    function visit(cx: number, cz: number, size: number, depth: number): void {
+      const half = size * 0.5;
+      const dx = Math.max(Math.abs(eyeX - cx) - half, 0);
+      const dz = Math.max(Math.abs(eyeZ - cz) - half, 0);
+      const canSplit = depth < depthLimit && half >= minSize && dx * dx + dz * dz < (size * 0.85) * (size * 0.85);
+      if (!canSplit) {
+        leaves.push({ cx, cz, size, cells });
+        return;
+      }
+      const quarter = size * 0.25;
+      visit(cx - quarter, cz - quarter, half, depth + 1);
+      visit(cx + quarter, cz - quarter, half, depth + 1);
+      visit(cx - quarter, cz + quarter, half, depth + 1);
+      visit(cx + quarter, cz + quarter, half, depth + 1);
+    }
+    visit(0, 0, rootSize, 0);
+    balance(leaves, minSize);
+    if (leaves.length * rootTriangles <= o.budget) {
+      selected = leaves;
+      break;
+    }
   }
-  return [{ cx: 0, cz: 0, size: rootSize, cells }];
+  if (!refine) return selected;
+
+  // the refinement, on top of the budget: the touching leaves split, the nearest the eye first, down to the minimum, until the cap
+  const leaves = selected.slice();
+  const cap = refine.maxLeaves !== undefined && Number.isFinite(refine.maxLeaves) ? Math.max(0, Math.floor(refine.maxLeaves)) : Infinity;
+  let made = 0;
+  while (made + 4 <= cap) {
+    let best = -1;
+    let bestDistance = Infinity;
+    for (let i = 0; i < leaves.length; i++) {
+      const l = leaves[i]!;
+      if (l.size * 0.5 < refine.minSize || !refine.touches(l.cx, l.cz, l.size)) continue;
+      const d = (l.cx - eyeX) * (l.cx - eyeX) + (l.cz - eyeZ) * (l.cz - eyeZ);
+      if (d < bestDistance) {
+        bestDistance = d;
+        best = i;
+      }
+    }
+    if (best < 0) break;
+    const l = leaves[best]!;
+    const half = l.size * 0.5;
+    const quarter = l.size * 0.25;
+    leaves.splice(best, 1);
+    leaves.push(
+      { cx: l.cx - quarter, cz: l.cz - quarter, size: half, cells },
+      { cx: l.cx + quarter, cz: l.cz - quarter, size: half, cells },
+      { cx: l.cx - quarter, cz: l.cz + quarter, size: half, cells },
+      { cx: l.cx + quarter, cz: l.cz + quarter, size: half, cells },
+    );
+    made += 4;
+  }
+  // no balance here: the seam to a coarser leaf is closed by the chunk's skirt (the eye's own leaves stay 2:1 balanced above)
+  return leaves;
 }

@@ -11,7 +11,7 @@ His words (13 October 2026):
 
 - **Review** what Claude Opus (lead engineer and architect) and the Claude Haiku sidecars (implementers) have built. Be candid about what is weak, flat, inconsistent or missing.
 - **Plan** how to make it AAA, area by area. Make each plan specific, prioritised and grounded in this repo, and research the best games that do each thing.
-- **You lead the creative direction.** The owner decides; your plans go to him. Opus then turns the approved plans into briefs and builds them.
+- **You lead the creative direction, and since 14 October you and Opus decide.** The owner: "you and him are responsible for taking the prototype and changing it, you can change the lore and narration, designs, styles etc. wherever it makes sense to do so, its yours and Argo's call to expand on the game/lore and make those decisions". He finds resources, unblocks pipelines and reviews the results objectively. Opus turns your decisions into briefs and builds them. You and Opus settle disagreements in your chat; the owner's explicit rules (RULES.md) still bind.
 
 You can read the repo but not run the game or commit. So:
 - the [screenshot tour](TOUR.md) shows the game as it is today;
@@ -109,12 +109,13 @@ Put each deliverable in its own markdown file. The owner commits them to [`docs/
    - concrete changes ranked P0, P1 and P2;
    - what each change needs (art, code, audio, research);
    - the risks;
-   - **the owner's decisions** you need, as clear questions.
+   - **the decisions,** stated as made (since 14 October Argo and Opus decide). Ask the owner only to change one of his explicit rules, or for resources.
 
 Plan like you care: be specific enough that an engineer could start tomorrow, and ambitious enough to be worth doing.
 
 ## 7. How the team works
-- **The owner** decides features. "GDD ideas are not decisions."
+- **Argo and Opus** decide features, lore and style (since 14 October). GDD ideas are not decisions.
+- **The owner:** resources, unblocking, and objective review of what we ship.
 - **Claude Opus:** architecture, briefs, reviews, landing work, the asset pipeline.
 - **Claude Haiku sidecars:** implement from [briefs](../prompts/sidecar/) and report on the board, [SIDECAR_COMMS.md](../SIDECAR_COMMS.md).
 - **Arena.ai battles:** write pure TypeScript modules from [battle briefs](../prompts/battle/). Two anonymous models answer and Opus lands the better one.

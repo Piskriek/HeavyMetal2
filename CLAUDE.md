@@ -61,9 +61,20 @@
 2. **LOAD FRONTEND DESIGN SKILLS (`/frontend`)**:
    - Do NOT ship bare, unstyled DOM, raw buttons, or browser defaults.
    - Always load and apply frontend design skills: rich CSS design systems, dark mode, glassmorphism, glowing telemetry, Outfit/Inter typography, responsive layouts, and polished micro-animations.
-3. **NO FEATURE CREEP / OBEY OWNER ASKS**:
-   - Check features against verbatim owner words in [`docs/OWNER_ASKS.md`](file:///c:/MarbleGp/docs/OWNER_ASKS.md).
-   - No unrequested chimneys or floating abstract objects. Machines must be grounded and spew colorful pixel plumes while operating.
+3. **WHO DECIDES, AND NO DRIFT (owner, 2026-10-14)**:
+   - **Opus (engineering) and Gemini Argo (creative lead) own the creative and design calls:** lore, narration, features, designs and styles. The owner provides tokens, credits and unblocking, and reviews the results objectively. His words: "its yours and Argo's call to expand on the game/lore and make those decisions".
+   - Decide deliberately: research, plan and record each decision in [`docs/argo/plans/`](docs/argo/plans/README.md) or the briefs, then build. Arena GDDs are ideas, never decisions.
+   - **The owner's explicit rules still bind:**
+     - the constitution;
+     - single file plus HD pack;
+     - the min-spec laptop;
+     - square sections, nothing floating, no lettering;
+     - believable grounded machines that spew colourful pixel plumes only while operating;
+     - legal art only;
+     - research first.
+     
+     Changing one of them needs his yes. Check [`docs/OWNER_ASKS.md`](file:///c:/MarbleGp/docs/OWNER_ASKS.md) for them, and act on his review reports.
+   - No chimneys or floating abstract objects (the 2026-10-06 lesson).
 4. **RESEARCH BEFORE YOU DESIGN (SOP, owner 2026-10-10)**:
    - Before designing any feature, system, piece list, rule set or UI, research it first: how the closest comparable games do it; what players praise and complain about (Steam threads, feature-request boards, and popular mods, which show unmet needs); and the newest releases and techniques. *"These days there is always a new innovation and we are pushing the frontier."*
    - Write the findings with sources as a research doc (pattern: [`docs/BASE_BUILDING_RESEARCH.md`](docs/BASE_BUILDING_RESEARCH.md)), then brief Arena, the art agent or the sidecar. Anything beyond the owner's words is a proposal for the owner.

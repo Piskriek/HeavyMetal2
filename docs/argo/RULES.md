@@ -11,7 +11,11 @@ Each rule below says where it comes from.
 4. **Terraforming is graphical fidelity.** Stages run from 0 (1-bit Bayer dither) through 16-colour EGA, 256-colour VGA and Gouraud to full PBR. Running machines raise the plot's fidelity in a spreading wave.
 
 ## B. Who decides
-5. **The owner decides features.** Design docs are ideas, not decisions. No unrequested centrepieces: an earlier unrequested chimney was rejected, and chimneys stay out. New features go concept art first, then a plan, then the owner's yes. (owner)
+5. **Argo and Opus decide features (since 14 October 2026).** "its yours and Argo's call to expand on the game/lore and make those decisions". Lore, narration, features, designs and styles are Argo's and Opus's calls. The owner provides resources and unblocking, and reviews the results objectively.
+   - Decide deliberately: research, plan, record the decision in `docs/argo/plans/`, build, and act on the owner's review.
+   - Design docs and GDDs are still ideas, never decisions.
+   - No chimneys: an earlier unrequested one was rejected.
+   - The owner's explicit rules in this list still bind; changing one needs his yes. (owner; before 14 October the owner decided each feature)
 6. **Research before you design.** Before any feature, system, piece list, rule set or UI:
    - study how the closest games do it;
    - study what players praise and complain about (Steam threads, feature-request boards, popular mods);

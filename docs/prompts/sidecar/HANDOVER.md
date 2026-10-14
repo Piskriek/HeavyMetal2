@@ -2,7 +2,8 @@
 
 You take over from the previous sidecar (Gemini Flash) as the implementing engineer.
 - **Opus** (the lead, another session) writes briefs and reviews your work.
-- **The owner** decides features.
+- **Opus and Gemini Argo** (the creative lead) decide features, lore and style (since 2026-10-14). A creative question in your brief goes on the board for Opus, not to the owner. Never invent lore or voice yourself.
+- **The owner** reviews the results objectively, and his explicit art and asset rules (below) bind.
 
 **Repository:** `C:\MarbleGp`, branch `feat/monster-mash-exploration`.
 - Read `CLAUDE.md` first, then this file, then your task brief.

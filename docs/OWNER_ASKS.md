@@ -218,3 +218,6 @@
 - (same morning) "you clicked his model choice dropdown instead of send" (Opus fixed it: the picker was closed unchanged, and the message sent)
 - (same morning) "hes done, when he genereate his replys the browser is laggy unfortunately but he gets there"
 - (same morning) "Im going with you guys's recommendations. once we have somthing to test i will act as the objective observer and review your precision and argo's creativity. Ill report and we will make changes. so lets get the game to the stage where i can test all of it properly. you may continue until then"
+
+## 2026-10-14: creative and design decisions delegated to Opus and Argo
+- "with argo stepping in as creative lead you and him are responsible for taking the prototype and changing it, you can change the lore and narration, designs, styles etc.  wherever it makes sense to do so, its yours and Argo's call to expand on the game/lore and make those decisions, its my job to find more tokens if you need them, unblock pipelines and review from an objective standpoint. go ahead"

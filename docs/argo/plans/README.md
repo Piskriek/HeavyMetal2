@@ -36,8 +36,8 @@ Add more as needed.
    
    Each change is specific enough to brief, and says what it needs (art, code, audio, research).
 5. **The rules it touches:** cite RULES.md. If a change needs a rule changed, say so as a proposal.
-6. **The owner's decisions:** clear questions with your recommendation.
+6. **The decisions:** since 14 October, Argo and Opus decide. State them as made, with the reasoning. Ask the owner only for resources or to change one of his explicit rules.
 
 ## What happens next
-- The owner reads each plan and decides.
+- Argo and Opus agree each plan, in Argo's chat if needed. The owner reviews the results objectively, after testing.
 - Opus turns approved items into briefs (`docs/prompts/sidecar/`), Arena battles (`docs/prompts/battle/`), concept-art requests or asset batches, then reviews what comes back.

@@ -231,9 +231,9 @@ try {
   });
   await page.waitForTimeout(400);
 
-  // The drafting table opens after chain step A4-04 (TASK-22's drafting lock). Act IV is finished through the chain (finishAct);
-  // the plot's stage stays where the test expects it (the stage is raised later in the test). The lock itself stays as it is.
-  await page.evaluate(() => window.__dev.finishAct('act4'));
+  // The drafting table opens after chain step A4-04 (TASK-22's drafting lock). Act IV is finished through the chain (finishAct),
+  // then the stage-2 event (the bloom grants the bridge kit the print needs). The lock itself stays as it is.
+  await page.evaluate(() => { window.__dev.finishAct('act4'); window.__dev.setStage(2); });
   await page.waitForTimeout(400);
 
   console.log('Opening Drafting Table using K...');

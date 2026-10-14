@@ -67,29 +67,30 @@ def strength(t0):
     return np.mean([low[min(len(low) - 1, int(t * fps))] for t in ts])
 bar0 = max((beat0 + k * beat for k in range(4)), key=strength)
 
-# 3. where the vocals are (50 ms RMS, gaps under 0.6 s filled)
-win = int(sr * 0.05)
-vrms = np.sqrt(np.convolve((vocals.mean(axis=1)) ** 2, np.ones(win) / win, mode='same'))
-active = vrms > 0.12 * np.percentile(vrms, 99)
-idx = np.flatnonzero(active)
-last_vocal = idx[-1] / sr
-bar_lines = np.arange(bar0, dur + bar, bar)
-switch = float(bar_lines[np.searchsorted(bar_lines, last_vocal + 0.05)])
+# 3. where she sings, per bar (robust to separation bleed and to long held "oooh" notes, which per-50-ms gaps were not)
+bar_lines = np.arange(bar0, dur, bar)
+vmono = vocals.mean(axis=1)
+bar_rms = np.array([np.sqrt(np.mean(vmono[int(t * sr) : int((t + bar) * sr)] ** 2) + 1e-12) for t in bar_lines])
+loud = np.sort(bar_rms)[int(len(bar_rms) * 0.7) :]
+sung = bar_rms > 0.25 * float(np.median(loud))
+last_bar = int(np.flatnonzero(sung)[-1])
+last_vocal = float(bar_lines[last_bar] + bar)
+switch = last_vocal  # the bar line after the last sung bar
+OUTRO_BARS = int(args[args.index('--outro-bars') + 1]) if '--outro-bars' in args else 4  # "Don't touch the red one. / See you, Sector Four."
+outro_start = float(bar_lines[max(0, last_bar - OUTRO_BARS + 1)])
 
-# 4. the loop window: `bars` bars of backing ending at a bar line before the outro lines; the smoothest seam wins
+# 4. the loop: `bars` bars of backing (the final chorus and post-chorus) ending at or before the outro lines; among
+#    the bar-aligned candidates up to two loop lengths earlier, the latest one with a clean seam wins
 L = int(round(bars * bar * sr))
-outro_start = None
-gaps = np.flatnonzero(np.diff(idx) > int(sr * 1.2))
-if len(gaps):
-    outro_start = idx[gaps[-1] + 1] / sr  # the last vocal phrase group starts after the last long gap
-end_limit = outro_start if outro_start else last_vocal
-candidates = [t for t in bar_lines if t + bars * bar <= end_limit + 0.01 and t >= end_limit - 3 * bars * bar]
 def seam(t):
     a = int(t * sr)
     seg = backing[a : a + L]
     k = int(sr * 0.08)
     return float(np.mean((seg[-k:] - seg[:k]) ** 2)) / (float(np.mean(seg**2)) + 1e-9)
-start = min(candidates, key=seam)
+candidates = [t for t in bar_lines if t + bars * bar <= outro_start + 0.01 and t >= outro_start - 3 * bars * bar]
+scored = [(seam(t), t) for t in candidates]
+best_seam = min(s for s, _ in scored)
+start = max(t for s, t in scored if s <= best_seam * 1.5 + 0.02)
 loop = backing[int(start * sr) : int(start * sr) + L]
 
 # 5. outputs

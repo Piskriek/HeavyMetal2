@@ -229,3 +229,7 @@
 - (same day, on "Four Floats" v2) "i like it, its a banger. if you can make and animation that plays over the credits, here is a link to someone who did it in a way https://github.com/JohnHeibel/PDoomVideo"
 - (same day, on v2) "it ends on the words "sector 4" and just stops, i recomend popping in the courus with no vocals after that and loop it"
 - (same day) "sure do what you need" (OK for the Python + PyTorch CPU + Demucs downloads into tools/, to separate the song's vocals)
+- (same day, on v2) "after another listen, i think it just needs a little more p"production" to push it over the edge like "katy perry" style stretched out vowels like "oooooh eh eh eh" or "aaaaaah ah ah aaaaah" in some places. you can ask for one with no vocals too however you want to do it"
+- (same day, on v3) "i like version a but b is not bat the only gripe i have is the word "naturally" does not sound natural in either one when she says "you do it naturally""
+- (same day) "v4b is perfect but needs to be at about 1.2x speed (just a slight speed up)"
+- (same day, on v4b at 1.2x) "both are are absolute bangers, its up to you, the tempo one sounds more happy mature and the speed one is happy silly" (Opus chose the tempo one for the ending; the speed one becomes "Four Floats (Overclocked)", the lab monitor's replay)

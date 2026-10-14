@@ -231,9 +231,9 @@ try {
   });
   await page.waitForTimeout(400);
 
-  // The drafting table opens after chain step A4-04 (TASK-22's drafting lock). The stage-2 bloom completes that step, the
-  // same event the campaign's beat 16 uses; the lock itself stays as it is.
-  await page.evaluate(() => { window.__dev.setStage(2); window.__dev.finishAct('act4'); });
+  // The drafting table opens after chain step A4-04 (TASK-22's drafting lock). Act IV is finished through the chain (finishAct);
+  // the plot's stage stays where the test expects it (the stage is raised later in the test). The lock itself stays as it is.
+  await page.evaluate(() => window.__dev.finishAct('act4'));
   await page.waitForTimeout(400);
 
   console.log('Opening Drafting Table using K...');

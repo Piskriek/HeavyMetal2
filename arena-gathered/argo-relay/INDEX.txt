@@ -1,0 +1,90 @@
+ 1  261 lines  apps/web/src/shell/hud-skins.css
+ 2  303 lines  packages/groundshader/src/stage-post.glsl.ts
+ 3  388 lines  apps/web/src/credits/timeline.ts
+ 4  238 lines  apps/web/src/credits/credits-hud.tsx
+ 5   80 lines  apps/web/src/credits/__tests__/timeline.test.ts
+ 6  201 lines  packages/content/src/charm-and-act789.ts
+ 7  259 lines  apps/web/src/credits/index.ts
+ 8   56 lines  scripts/test-credits-video.mjs
+ 9  179 lines  packages/shareware/src/fidelity-mob-leak.ts
+10  130 lines  packages/camerarig/src/rover-spring-arm.ts
+11  153 lines  packages/plotsim/src/coherence-and-power.ts
+12  116 lines  apps/web/src/lab/lab-choreography-and-heal.ts
+13  139 lines  packages/audio/src/five-bus-mixer.ts
+14   90 lines  scripts/e2e-hud-and-luminance-gate.mjs
+15  171 lines  apps/web/src/base/foundation-frame.ts
+16  198 lines  apps/web/src/shell/build-ribbon.tsx
+17  214 lines  apps/web/src/studio/asset-bench-4angle.tsx
+18  162 lines  apps/web/src/play/screensaver-pipes.ts
+19  140 lines  apps/web/src/play/beam-juice-and-modes.ts
+20   97 lines  apps/web/src/base/machine-plume-and-labels.ts
+21   87 lines  packages/plotsim/src/__tests__/coherence-and-power.test.ts
+22  137 lines  packages/groundshader/src/radial-scan-wave.ts
+23  323 lines  apps/web/src/shell/inventory-rig-panel.tsx
+24  108 lines  apps/web/src/lab/planet-table-hologram.ts
+25  163 lines  apps/web/src/base/heavy-and-vehicle-bay.ts
+26  147 lines  apps/web/src/shell/main-menu-diptych.tsx
+27   62 lines  packages/camerarig/src/__tests__/rover-spring-arm.test.ts
+28   46 lines  packages/content/src/__tests__/charm-and-act789.test.ts
+29  192 lines  packages/questline/src/act789-chain.ts
+30   87 lines  packages/questline/src/__tests__/act789-chain.test.ts
+31   77 lines  scripts/quantize-low-glb.mjs
+32   84 lines  scripts/triage-overnight-batch.mjs
+33   50 lines  scripts/batch-voice-act789.mjs
+34  205 lines  apps/web/src/studio/preset-combiner-ui.tsx
+35   70 lines  packages/groundshader/src/__tests__/stage-post-and-wave.test.ts
+36  192 lines  apps/web/src/play/charm-detector-engine.ts
+37   65 lines  apps/web/src/play/__tests__/charm-detector-engine.test.ts
+38  109 lines  packages/soundscape/src/stage-ambience-and-machine-loops.ts
+39  111 lines  apps/web/src/crafter/gate-beacon-and-moss-patina.ts
+40  122 lines  apps/web/src/play/footstep-and-tire-roost.ts
+41  121 lines  packages/presetcodec/src/smx-cartridge-card.ts
+42   50 lines  packages/presetcodec/src/__tests__/smx-cartridge-card.test.ts
+43   55 lines  docs/argo/plans/32-code-drop-index.md
+44  111 lines  packages/groundshader/src/blob47-and-polish.ts
+45   48 lines  packages/groundshader/src/__tests__/blob47-and-polish.test.ts
+46   90 lines  packages/plotterrain/src/curated-lunar-basin.ts
+47   36 lines  packages/plotterrain/src/__tests__/curated-lunar-basin.test.ts
+48  208 lines  apps/web/src/shell/bridge-archive-rumor-graph.tsx
+49   75 lines  packages/assembler/src/companion-drone-splicer.ts
+50   75 lines  scripts/apply-argo-drop.mjs
+51  102 lines  packages/hydro/src/stage34-water-and-shoreline.ts
+52  108 lines  packages/treegen/src/stage56-lsystem-canopy.ts
+53  122 lines  packages/structure/src/hologram-lock-and-nudge.ts
+54   42 lines  packages/structure/src/__tests__/hologram-lock-and-nudge.test.ts
+55   49 lines  packages/hydro/src/__tests__/stage34-water-and-trees.test.ts
+56  102 lines  packages/substrate/src/guaranteed-anti-softlock.ts
+57   51 lines  packages/substrate/src/__tests__/guaranteed-anti-softlock.test.ts
+58  213 lines  apps/web/src/studio/act5-lab-schema-terminal.tsx
+59   73 lines  packages/shareware/src/sub-bass-reinforcer.ts
+60   74 lines  apps/web/src/crafter/plume-point-lights.ts
+61  100 lines  apps/web/src/lab/vista-spheres-and-breach.ts
+62   43 lines  apps/web/src/lab/__tests__/vista-and-subbass.test.ts
+63   22 lines  docs/prompts/sidecar/25-hud-9zone-and-build-ribbon.md
+64   21 lines  docs/prompts/sidecar/26-foundation-frames-and-safe-dome.md
+65   21 lines  docs/prompts/sidecar/27-stage0-dither-and-rover-cam.md
+66   21 lines  docs/prompts/sidecar/28-lab-choreography-and-vista.md
+67   20 lines  docs/prompts/sidecar/29-audio-5bus-and-juice.md
+68   21 lines  docs/prompts/sidecar/30-monster-leak-shader-and-rifts.md
+69   19 lines  docs/prompts/sidecar/31-studio-bench-and-sockets.md
+70   19 lines  docs/prompts/sidecar/32-heavy-terraformers-and-turrets.md
+71   22 lines  docs/prompts/sidecar/33-charm-and-act9-convergence.md
+72   89 lines  scripts/verify-argo-milestones.mjs
+73   82 lines  packages/lattice/src/pylon-pulse-beads.ts
+74   63 lines  packages/presetcodec/src/smx-cartridge-card.ts
+75   85 lines  packages/particles/src/stage-roost-and-footsteps.ts
+76   86 lines  packages/lattice/src/__tests__/pylon-codec-and-roost.test.ts
+77  112 lines  apps/web/src/lab/planet-table-hologram.ts
+78  333 lines  apps/web/src/shell/inventory-suit-and-bandolier.tsx
+79   83 lines  packages/soundscape/src/stage-ambience-stems.ts
+80   43 lines  apps/web/src/crafter/twin-gate-sky-beacon.ts
+81   61 lines  apps/web/src/lab/__tests__/planet-table-and-ambience.test.ts
+82  106 lines  packages/juice/src/portal-threshold-shimmer.ts
+83  217 lines  apps/web/src/lab/power-wall-and-clutter-staging.ts
+84   61 lines  packages/juice/src/__tests__/portal-and-power-wall.test.ts
+85  130 lines  packages/musicbox/src/harmonic-machine-choir.ts
+86  123 lines  packages/content/src/diegetic-radio-and-tapes.ts
+87   77 lines  packages/tooljuice/src/beat-synced-plume-and-turbobass.ts
+88  169 lines  apps/web/src/shell/diegetic-radio-tuner-widget.tsx
+89   74 lines  packages/musicbox/src/__tests__/harmonic-radio-and-turbobass.test.ts
+90   20 lines  docs/prompts/sidecar/34-diegetic-song-radio-and-harmonic-machines.md

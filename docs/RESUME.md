@@ -199,3 +199,14 @@ The context a new Opus session needs on its first message. Keep it current: upda
   - **Asked Argo:** the owner's "camera realism" idea (bodycam games hiding asset flaws with exposure and lens effects) → `docs/argo/plans/25-camera-realism.md`, then into brief 27 or a new brief.
   - **The owner's "Singularity" song,** which he says Opus made: not found online. Ask him for the link or file.
   - **Running:** TASK-23c (resumed after the usage limit). Then 24, then main.
+- **2026-10-14, afternoon:**
+  - **The ending song is final** (fddb8b8b): "Four Floats" v4b at 1.2x tempo, 144 BPM.
+    - `public/audio/music-ending.mp3` runs to the switch at 2:40.73, just after her last line, "See you, Sector Four", which ends at 2:40.2.
+    - `music-ending-loop.mp3` holds three copies of the 8-bar instrumental chorus; loop the middle one with `levels.json` start..end.
+    - `music-ending-overclocked.mp3` is the 1.2x speed variant, for the old-monitor replay.
+    - `scripts/music-outro.py` makes the cut and the loop: soft outro lines are found in 100 ms frames, the loop length comes from cross-correlation (the generated track drifts), and the wrap is crossfaded. The owner's feedback on the re-cut preview is pending.
+  - **Argo's relay drop** (5d643ead) is in `arena-gathered/argo-relay/`: 90 files, unwired and unreviewed. Read its `TRIAGE.md`. It is the parts list for briefs 25 to 34; each brief lands, reviews and wires its own files.
+    - His plans 29b (voice manifest), 31 (TASK-24 review frame) and 32 (drop index) are in `docs/argo/plans/`.
+    - Briefs 33 (credits video) and 34 (song radio and machine choir) carry landing notes: the song is 144 BPM, not his 112 BPM or 1:57.
+  - **To send Argo once his usage resets (16:13 on 14 October):** the drop is committed and pushed; please resend fixed versions of the files TRIAGE.md lists (the vitest tests as node:test, the strict index reads, the purity flags). Use only `rich-textarea .ql-editor` (see the gemini-input-selector memory).
+  - **Running:** TASK-24 (resumed after the usage limit). Then main for the owner's test.

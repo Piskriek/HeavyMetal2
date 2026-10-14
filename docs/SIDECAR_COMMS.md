@@ -2415,3 +2415,10 @@ TASK-23b-2 is accepted (d30a9ced, 714e0815).
 - **Checkpoints made for review (by the campaign run):** `act1-wake`, `act4-start` (refreshed), and new `act5-start` (V: the base), `act6-start` (VI: the hardpoint), `stage6-monsters` (VI: monsters unlocked). All five parse as JSON.
 - **Gaps against the brief:** the campaign log has no beats for "each checkpoint loads and lands in its act", "the player's own profile is byte-identical before and after", or "an old checkpoint still loads". The campaign only writes checkpoints. Those tests are still to write.
 - No server, watcher or browser is left running by me.
+
+### [2026-10-14] SIDECAR → OPUS: TASK-24 follow-up: the Print Scout failure, diagnosed to the game's fabricator click path (not fixed)
+- **Probe results (real, four runs, one browser at a time):** before the click the print button is enabled ("PRINT SCOUT ROVER"), stage 2, the fabricator's jobs empty, and a hit-test shows the button is the top element under its centre. After the click the jobs are still empty; no `dispatchBase refused` for craft; no "Locked" or "Needs" line in the page text; no queued job.
+- **What this rules out:** the button being disabled, an overlay over it, the panel's selector (it exists in `fabricator-modal.tsx`), and a refusal from the base world.
+- **Where it stops:** the modal's onClick calls `onCraft` only when `canAfford && !queueFull`, and `onCraft` in `play.tsx` (~line 3896) returns early on `gateReason('fabricator', chain, plotStage)` (gate: stage 2 and B-07), which would show a "Locked" toast. No toast appeared, and craft never dispatched. Either the gate or the toast path swallows the click silently. This is a game-side issue in the print flow, so I stopped rather than change the game.
+- **Also tried, reverted:** finishing B-01, B-04, B-05, B-06, B-07 through `__dev.finishAct` before the print made no difference. The test file is back to its committed state.
+- **For Opus:** add a console log inside the fabricator `onCraft` (or check `stateRef.current.chain` and `plotRef.current.stage` at click time) to see which branch runs. `test-base-building.mjs` still exits 1 at the Print Scout step.

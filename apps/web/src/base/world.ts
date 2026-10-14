@@ -128,7 +128,9 @@ export type BaseCommand =
   /** Fits a part from the pack into its slot (the part there goes back to the pack), or empties a slot (item null). */
   | { readonly t: 'fit'; readonly slot: PartSlot; readonly item: string | null }
   /** Puts stock into the bridge store (the campaign's Act V kit, TASK-22). Logged, so a replay holds the same stock; what does not fit is dropped. */
-  | { readonly t: 'grant'; readonly stock: readonly L.Stack[] };
+  | { readonly t: 'grant'; readonly stock: readonly L.Stack[] }
+  /** Salvage from a cleared lab prop (TASK-23c, logged): the pack first, then the network in reach. All or nothing: a refused salvage keeps the prop standing. */
+  | { readonly t: 'salvage'; readonly at: Point; readonly stock: readonly L.Stack[] };
 
 export type BaseEvent =
   | { readonly type: 'refused'; readonly cmd: BaseCommand['t']; readonly why: string; readonly short?: readonly L.Stack[] }
@@ -155,7 +157,8 @@ export type BaseEvent =
   | { readonly type: 'parked'; readonly vehicle: number }
   | { readonly type: 'forged'; readonly item: string }
   | { readonly type: 'fitted'; readonly slot: PartSlot; readonly item: string | null }
-  | { readonly type: 'granted'; readonly stock: readonly L.Stack[]; readonly lost: readonly L.Stack[] };
+  | { readonly type: 'granted'; readonly stock: readonly L.Stack[]; readonly lost: readonly L.Stack[] }
+  | { readonly type: 'salvaged'; readonly stock: readonly L.Stack[] };
 
 export interface Applied { readonly world: BaseWorld; readonly events: readonly BaseEvent[] }
 
@@ -189,6 +192,14 @@ export function withBridgeStore(w: BaseWorld, env: WorldEnv, stock: readonly L.S
   const at = { x: env.bridge.x, z: env.bridge.z };
   const s = L.store([L.box(BRIDGE_STORE, at.x, at.z, BIN_SLOTS, BIN_KG)], [BRIDGE_STORE], at, ITEMS, stock);
   return { ...w, boxes: [...s.boxes, ...w.boxes] };
+}
+
+/** Salvage from a cleared lab prop (TASK-23c): the stock goes into the player's grid, then the network in reach. Refused whole when it does not all fit. */
+function salvage(w: BaseWorld, env: WorldEnv, cmd: Extract<BaseCommand, { t: 'salvage' }>): Applied {
+  const s = L.store(withPlayer(w, cmd.at), [PLAYER, ...networkAt(w, env, cmd.at)], cmd.at, ITEMS, cmd.stock);
+  if (s.left.length > 0) return refuse(w, cmd.t, 'no-room', s.left);
+  const { player, boxes } = split(w, s.boxes);
+  return next(w, { player, boxes }, [{ type: 'salvaged', stock: cmd.stock }]);
 }
 
 /** The bridge store's stock grant (TASK-22, the `grant` command): what fits goes into the store that stands; the rest is dropped. */
@@ -345,6 +356,8 @@ export function apply(w: BaseWorld, env: WorldEnv, cmd: BaseCommand): Applied {
       return fit(w, cmd);
     case 'grant':
       return grantStock(w, cmd);
+    case 'salvage':
+      return salvage(w, env, cmd);
     default: {
       const unknown: never = cmd;
       return refuse(w, (unknown as BaseCommand).t, 'unknown-cmd');

@@ -31,6 +31,8 @@ import { createBeamVisuals, ringColourOf, type BeamVisuals } from './beam-visual
 import { FEEL_START, feelStep, type RifleFeelState } from './rifle-feel';
 import { applyRimFloor, setRimFloorOn, rimFloorOn } from './rim-floor';
 import { createMonsters, type MonstersSystem } from './monsters';
+import { createWrecks, type WreckSystem } from './wrecks';
+import { clutterById } from './lab-clutter';
 import { safeZones as monsterSafeZones } from '../monsters/policy';
 import { pieceAt } from '../base/world';
 import * as F from '@hm/substrate';
@@ -91,6 +93,8 @@ export interface FrameOut {
   readonly aimedBoulder: number | null;
   /** The lab machine you are looking at, close enough to use. */
   readonly aimedLab: LabMachineKind | null;
+  /** The lab clutter or wreck transponder you are looking at, close enough (TASK-23c): its id, and whether it is a salvage prop (hold E). */
+  readonly aimedProp: { readonly id: string; readonly salvage: boolean } | null;
   /** The stage the picture shows (a wave brings the next one across the plot). */
   readonly stage: number;
   /** Something happened this frame ('stage-up': a wave has finished bringing `stage`). */
@@ -234,6 +238,14 @@ export interface PlayScene {
   preloadLabGenerated(): Promise<void>;
   /** The monsters on the planet: the leaks, the guns, the seal (play/monsters.ts). */
   readonly monsters: MonstersSystem;
+  /** The props in the world (TASK-23c): the cleared clutter goes at once, and the sealed leaks' wrecks stand restored (from the save). */
+  setProps(o: { readonly cleared: readonly string[]; readonly sealed: readonly number[] }): void;
+  /** Starts a salvage prop's dissolve in the lab; false when it is not standing (a fixture, or cleared already). */
+  dissolveClutter(id: string): boolean;
+  /** A leak was sealed: its wreck goes up a rung on the junk-model ladder. */
+  sealWreck(site: number): void;
+  /** Loads the wreck models at every level, behind the loading bar. */
+  preloadWrecks(): Promise<void>;
   /** Whether the player is alive (the monsters do not strike the dead). The screen sets it from the health. */
   setPlayerAlive(alive: boolean): void;
   /** The ray the view looks along, on the ground (x and z), and the eye's ground point. */
@@ -252,6 +264,14 @@ export interface PlayScene {
   getNearVehicle(reach?: number): { readonly id: number; readonly kind: RoverKind } | null;
   /** For the tests and the e2e: where you are, and a way to stand somewhere. */
   readonly debug: {
+    /** The wreck sites: each one's rung and whether it is broken or sealed (TASK-23c). */
+    wreckRungs(): readonly { readonly site: number; readonly leak: boolean; readonly sealed: boolean; readonly broken: boolean; readonly rung: number }[];
+    /** The window view's draw calls and triangles (lab-vista.ts). */
+    vistaStats(): { readonly drawCalls: number; readonly triangles: number; readonly dust: number };
+    /** Sets the window view directly (the budget check draws it in full; the governor sets it by tier otherwise). */
+    setWindowView(view: WindowView): void;
+    /** The wreck sites sealed so far. */
+    sealedWrecks(): readonly number[];
     groundTriangles(): number; showGround(on: boolean): void; where(): Where; position(): THREE.Vector3; teleport(where: Where, x: number, z: number, yaw: number, pitch?: number): void; sync(): number;
     stats(): { readonly triangles: number; readonly calls: number }; wave(): number; gatePlanet(): { x: number; z: number };
     /** The drawn world bounds of one base piece (batched instances or its dynamic group), or null when not drawn. */
@@ -437,6 +457,8 @@ export function createPlayScene(o: {
   let playerAlive = true;
   const monsterFwd = new THREE.Vector3();
   monsters.setPlot(7, { x: twin.group.position.x, z: twin.group.position.z });
+  // the wreck sites: the same seed and gate as the leaks (TASK-23c)
+  const wrecks: WreckSystem = createWrecks({ scene: planetScene, groundHeightAt: (x, z) => groundAt(x, z), seed: 7, gate: { x: twin.group.position.x, z: twin.group.position.z }, stage: 1 });
 
   // ---- Vehicles (@hm/rover & @hm/rovergear) and Station Fabricators
   const vehiclesGroup = new THREE.Group();
@@ -1728,6 +1750,7 @@ export function createPlayScene(o: {
       postUniforms.uWaveCentre.value.set(from.x, groundAt(from.x, from.z), from.z);
       ground?.setStage(Math.max(1, to));
       monsters.setFidelityStage(to);
+      wrecks.setStage(to);
       fitLooks();
     },
     setFidelityStage(to) {
@@ -1740,6 +1763,7 @@ export function createPlayScene(o: {
       waveTo = -1;
       ground?.setStage(Math.max(1, s));
       monsters.setFidelityStage(s);
+      wrecks.setStage(s);
       fitLooks();
       rebuildProps(s);
     },
@@ -2209,6 +2233,15 @@ export function createPlayScene(o: {
           }
         }
       }
+      // what you are looking at to read or salvage (TASK-23c): a lab prop, or a transponder on its wreck
+      let aimedProp: { id: string; salvage: boolean } | null = null;
+      if (where === 'lab') {
+        const id = room.aimClutter(pos, new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion), 3.4);
+        if (id) aimedProp = { id, salvage: clutterById(id)?.role === 'salvage' };
+      } else if (where === 'planet' && !building) {
+        const id = wrecks.aimProp(pos, new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion), 14);
+        if (id) aimedProp = { id, salvage: false };
+      }
       const ev = pendingEvent;
       pendingEvent = null;
       return {
@@ -2223,6 +2256,7 @@ export function createPlayScene(o: {
         aimed,
         aimedBoulder,
         aimedLab,
+        aimedProp,
         stage: shown,
         event: ev,
         drivingVehicle: drivingVehicleId !== null && drivingState ? { id: drivingVehicleId, kind: vehicleViews.get(drivingVehicleId)!.kind, speed: currentSpeed } : null,
@@ -2328,6 +2362,14 @@ export function createPlayScene(o: {
       beamSealingNow = on;
       heldBeam.setSealing(on);
     },
+    setProps(o) {
+      room.removeClutter(o.cleared);
+      wrecks.restore(o.sealed);
+      monsters.setSealedSites(o.sealed);
+    },
+    dissolveClutter: (id) => room.dissolveClutter(id),
+    sealWreck: (site) => wrecks.seal(site),
+    preloadWrecks: () => wrecks.preload(),
     async preloadLabGenerated() {
       await preloadLabGenerated(genLevelFor(currentQuality));
       await preloadVista(VISTA_LEVEL);
@@ -2351,6 +2393,10 @@ export function createPlayScene(o: {
       holo.warm(renderer, camera);
     },
     debug: {
+      wreckRungs: () => wrecks.rungs(),
+      vistaStats: () => room.vista.stats(),
+      setWindowView: (view) => room.setWindowView(view),
+      sealedWrecks: () => wrecks.sealedSites(),
       groundTriangles: () => ground?.triangles() ?? 0,
       showGround: (on) => ground?.setVisible(on),
       where: () => where,

@@ -100,10 +100,16 @@ const FALLBACK_COLOUR: Readonly<Record<string, string>> = {
   'overpass-segment': '#77736c', 'rubble-slab': '#6f6a63',
 };
 /** The hero models (the vista class of assets). */
-export const VISTA_ASSETS: readonly string[] = ['datacentre-hall', 'chiller-block', 'shipping-container', 'pylon-tower', 'overpass-segment', 'rubble-slab'];
+export const VISTA_ASSETS: readonly string[] = [
+  'datacentre-hall', 'chiller-block', 'shipping-container', 'pylon-tower', 'overpass-segment', 'rubble-slab',
+  // the batch-2 wasteland (TASK-23c): one instanced set each, at the low level, scattered beyond the existing pieces
+  'comms-mast-solid-a', 'silo-square-a', 'pump-house-a', 'substation-block-a', 'cooling-tower-square-b',
+  'warehouse-small-b', 'datacentre-annex-b', 'office-block-ruin-b',
+];
 /** The dressing that tumbles across the window (lane 0 is the crate that flies through pocket 0) and the props that orbit the Breach. */
-const CROSSWIND: readonly string[] = ['server-rack', 'cardboard-stack', 'toolbox', 'coolant-can', 'sample-case', 'old-monitor', 'filing-cabinet'];
-const VORTEX: readonly string[] = ['server-rack', 'crate-large', 'shipping-container'];
+// (TASK-23c) the window's draw-call budget is 40: the small props (cardboard, toolbox, coolant can) and the vortex's second rack are out
+const CROSSWIND: readonly string[] = ['server-rack', 'sample-case', 'old-monitor', 'filing-cabinet'];
+const VORTEX: readonly string[] = ['crate-large', 'shipping-container'];
 
 /** Loads the vista's generated models at a level, behind the caller's loading bar. A model that fails stays a box (and is logged). */
 export async function preloadVista(level: GenLevel): Promise<void> {
@@ -837,7 +843,11 @@ export function createLabVista(o: LabVistaOptions): LabVista {
 
   // hero placements (plan §4). Bearings are from the spawn (the bays: far-left -26..-7, middle -7..25, far-right 25..45). `w` is the
   // distance beyond the window. The near field (w under 25) stays low in the middle bays (R1).
-  const hero: Record<string, THREE.Matrix4[]> = { 'datacentre-hall': [], 'chiller-block': [], 'shipping-container': [], 'pylon-tower': [], 'overpass-segment': [], 'rubble-slab': [] };
+  const hero: Record<string, THREE.Matrix4[]> = {
+    'datacentre-hall': [], 'chiller-block': [], 'shipping-container': [], 'pylon-tower': [], 'overpass-segment': [], 'rubble-slab': [],
+    'comms-mast-solid-a': [], 'silo-square-a': [], 'pump-house-a': [], 'substation-block-a': [], 'cooling-tower-square-b': [],
+    'warehouse-small-b': [], 'datacentre-annex-b': [], 'office-block-ruin-b': [],
+  };
   // L0 the apron (3 to 25 m beyond the window): the container lies tilted in the far-left bay, two slabs, a chiller knocked on its side
   hero['shipping-container']!.push(pose(...at(beyond(-22, 30), 0), Math.PI / 2, 0, 0.09));
   hero['rubble-slab']!.push(pose(...at(beyond(-12, 8), 0), -0.4));
@@ -881,6 +891,15 @@ export function createLabVista(o: LabVistaOptions): LabVista {
     const [x, z] = beyond(b, w);
     hero['datacentre-hall']!.push(pose(x, 0, z, Math.PI / 2 + 0.02, 0, 0, s));
   }
+  // the batch-2 wasteland (TASK-23c): the bearings keep clear of the Breach corridor (about -8.5 to 3.5 degrees) and of the walkers' patrols
+  hero['comms-mast-solid-a']!.push(pose(...at(beyond(-11, 120), 0), 0.2));
+  hero['silo-square-a']!.push(pose(...at(beyond(18, 150), 0), 0.4));
+  hero['pump-house-a']!.push(pose(...at(beyond(-24, 16), 0), -0.3));
+  hero['substation-block-a']!.push(pose(...at(beyond(44, 140), 0), 0.9));
+  hero['cooling-tower-square-b']!.push(pose(...at(beyond(5.5, 140), 0), 0.1));
+  hero['warehouse-small-b']!.push(pose(...at(beyond(-17, 240), 0), Math.PI / 2 + 0.05));
+  hero['datacentre-annex-b']!.push(pose(...at(beyond(-16, 100), 0), Math.PI / 2));
+  hero['office-block-ruin-b']!.push(pose(...at(beyond(36, 180), 0), 0.3));
   for (const [id, poses] of Object.entries(hero)) if (poses.length) addSet(`hero:${id}`, id, poses, false);
 
   // the crosswind stream: three of each prop tumble across the window (plan §7). Lane 0 is the crate that flies through pocket 0:

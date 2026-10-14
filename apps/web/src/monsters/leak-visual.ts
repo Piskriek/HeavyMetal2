@@ -1,9 +1,7 @@
-// A leak on the plot: a junked model (a generated wreck prop, or a box stand-in while it loads) that glitches, a sliced column in the
-// leak's colour, and a ring on the ground when a wave is due. Sealing (the beam held on it) turns the column amber and locks its
-// slices back into line; a sealed leak shows only its cold junk. Pure geometry and one shader; the state comes from the monsters.
+// A leak on the plot: a sliced column in the leak's colour, and a ring on the ground when a wave is due. Sealing (the beam held on it) turns the column amber and locks its
+// slices back into line, and a sealed leak loses its column. The junked models around it are the wrecks (play/wrecks.ts). Pure geometry and
+// one shader; the state comes from the monsters.
 import * as THREE from 'three';
-import { getGenSync, loadGen } from '../assets/gen';
-import { JUNK_MODELS } from './policy';
 import type { MonsterMarker } from '../play/monsters';
 
 export interface LeakVisualFrame {
@@ -13,11 +11,6 @@ export interface LeakVisualFrame {
   readonly sealing: number | null;
   readonly camera: THREE.Camera;
   readonly stage: number;
-}
-
-/** Loads the junked models behind the loading bar (each one a generated prop; a failure leaves its stand-in in place). */
-export async function preloadMonsterJunk(): Promise<void> {
-  await Promise.all([...new Set(JUNK_MODELS)].map((id) => loadGen(id, 'low').catch(() => null)));
 }
 
 export interface LeakVisuals {
@@ -76,30 +69,18 @@ interface Entry {
   readonly ring: THREE.Mesh;
   /** The era aura: a soft disc on the ground that drops the ground to the leak's era. */
   readonly aura: THREE.Mesh;
-  readonly stand: THREE.Object3D;
-  junk: THREE.Object3D | null;
   readonly x: number;
   readonly z: number;
-  readonly junkId: string;
 }
 
 export function createLeakVisuals(scene: THREE.Scene, groundHeightAt: (x: number, z: number) => number): LeakVisuals {
   const entries = new Map<number, Entry>();
   let time = 0;
 
-  const standFor = (): THREE.Mesh => {
-    // a box stand-in: a dead machine's block, until the generated prop has loaded
-    const m = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.1, 2.6), new THREE.MeshStandardMaterial({ color: 0x3a3f46, roughness: 0.9, metalness: 0.4 }));
-    m.position.y = 0.55;
-    return m;
-  };
-
-  const create = (id: number, x: number, z: number, junkId: string): Entry => {
+  const create = (id: number, x: number, z: number): Entry => {
     const group = new THREE.Group();
     group.name = `leak:${id}`;
     group.position.set(x, groundHeightAt(x, z), z);
-    const stand = standFor();
-    group.add(stand);
     const column = new THREE.Mesh(new THREE.CylinderGeometry(COLUMN_RADIUS, COLUMN_RADIUS, COLUMN_HEIGHT, 20, 6, true), columnMaterial());
     column.position.y = COLUMN_HEIGHT / 2;
     group.add(column);
@@ -115,7 +96,7 @@ export function createLeakVisuals(scene: THREE.Scene, groundHeightAt: (x: number
     aura.position.y = 0.03;
     group.add(aura);
     scene.add(group);
-    return { group, column, ring, aura, stand, junk: null, x, z, junkId };
+    return { group, column, ring, aura, x, z };
   };
 
   return {
@@ -124,17 +105,8 @@ export function createLeakVisuals(scene: THREE.Scene, groundHeightAt: (x: number
       for (const mk of markers) {
         let e = entries.get(mk.id);
         if (!e) {
-          e = create(mk.id, mk.x, mk.z, mk.junk);
+          e = create(mk.id, mk.x, mk.z);
           entries.set(mk.id, e);
-        }
-        // the junked model: its generated prop once loaded (it replaces the stand-in)
-        if (!e.junk) {
-          const prop = getGenSync(e.junkId, 'low');
-          if (prop) {
-            e.junk = prop;
-            e.group.remove(e.stand);
-            e.group.add(prop);
-          }
         }
         // the era aura: sprite leaks are white, early 3D cyan-blue, modern 3D cyan; a sealed leak has none
         const eraColour = mk.era === 'early3d' ? 0x7dd3fc : mk.era === 'modern3d' ? 0x3dc8ff : 0xe8e8e8;

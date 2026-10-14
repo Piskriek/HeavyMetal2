@@ -98,6 +98,10 @@ export interface MonstersSystem {
   setDormantActive(on: boolean): void;
   /** The plot's seed and the gate pad: the leak sites are laid out from them. */
   setPlot(seed: number, gate: Point): void;
+  /** The leak sites already sealed (saved per profile): they come back sealed, with no waves and no reward. */
+  setSealedSites(sites: readonly number[]): void;
+  /** The leak sites sealed so far (for the save). */
+  sealedSites(): readonly number[];
   /** The screen's handlers (the HUD, the narration, the chain, the health and the items). */
   setEvents(events: MonsterEvents): void;
   setSafeZones(zones: readonly SafeZone[]): void;
@@ -567,6 +571,11 @@ export function createMonsters(options: {
   let sealingLeak: number | null = null;
   let world: World = createWorld(seed);
   const siteLeak = new Map<number, number>();
+  // the sealed sites, kept for the save: a sealed leak is shut for good, its wreck restored a rung (TASK-23c)
+  const sealedSet = new Set<number>();
+  const markSealed = (leakId: number): void => {
+    world = { ...world, leaks: world.leaks.map((l) => (l.id === leakId ? { ...l, sealed: true, seal: 1, kinds: [] } : l)) };
+  };
   const leakEra = new Map<number, Era>();
   const leakSite = new Map<number, LeakSite>();
   const latchedUntil = new Map<number, number>();
@@ -637,6 +646,7 @@ export function createMonsters(options: {
         world = addLeak(world, site, kindsForEra(eraForStage(stage)));
       }
       const created = world.leaks[world.leaks.length - 1]!;
+      if (sealedSet.has(site.index)) markSealed(created.id);
       siteLeak.set(site.index, created.id);
       leakSite.set(created.id, site);
       leakEra.set(created.id, eraForStage(stage));
@@ -705,6 +715,7 @@ export function createMonsters(options: {
           const mk = markerOf(e.leak);
           if (!mk) break;
           stats = { ...stats, leaksSealed: stats.leaksSealed + 1 };
+          sealedSet.add(mk.site);
           const reward = mk.dormant ? DORMANT_REWARD : SEAL_REWARD;
           handlers.onSealed?.(mk, reward);
           break;
@@ -818,6 +829,12 @@ export function createMonsters(options: {
     getSetting: () => setting,
     setUnlocked(on) { unlocked = on; },
     setDormantActive(on) { dormantActive = on; },
+    setSealedSites(sites) {
+      sealedSet.clear();
+      for (const i of sites) sealedSet.add(i);
+      for (const [site, leakId] of siteLeak) if (sealedSet.has(site)) markSealed(leakId);
+    },
+    sealedSites: () => [...sealedSet].sort((a, b) => a - b),
     setPlot(newSeed, newGate) {
       if (newSeed !== seed) {
         seed = newSeed;

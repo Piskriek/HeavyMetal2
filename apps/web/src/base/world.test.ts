@@ -310,3 +310,19 @@ test('fabrication: the fabricator prints rovers as the stage allows; the weapon 
   // it all saves and loads back
   assert.equal(hashWorld(loadWorld(saveWorld(w), 1)), hashWorld(w));
 });
+
+test('a salvage (TASK-23c) goes into the pack whole, or is refused whole and changes nothing', () => {
+  const w0 = createWorld();
+  const stock = [{ item: 'ore', n: 6 }, { item: 'prim-beam', n: 1 }];
+  const ok = apply(w0, env, { t: 'salvage', at, stock });
+  assert.deepEqual(ok.events.map((e) => e.type), ['salvaged']);
+  assert.equal(L.count(ok.world.player, 'ore'), 6);
+  assert.equal(L.count(ok.world.player, 'prim-beam'), 1);
+  // a stock too heavy for the grid is refused as a whole: the world is the same object, nothing is half given
+  const heavy = apply(w0, env, { t: 'salvage', at, stock: [{ item: 'ore', n: 100000 }] });
+  assert.equal(heavy.events[0]?.type, 'refused');
+  assert.equal(heavy.world, w0);
+  // the log replays to the same pack as the direct apply
+  const replayed = replay(w0, env, [{ t: 'salvage', at, stock }]);
+  assert.equal(L.count(replayed.world.player, 'ore'), 6);
+});

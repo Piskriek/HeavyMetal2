@@ -15,6 +15,7 @@ import type { Box, Prop } from '@hm/labkit';
 import { operatorConsole as consoleMillOperatorConsole } from '@hm/consolemill';
 import { type GenLevel, genLevelFor, getGenSync, loadGen } from '../assets/gen';
 import { createLabVista, VISTA_LEVEL, type LabVista, type WindowView } from './lab-vista';
+import { CLUTTER, CLUTTER_MODELS, type ClutterItem } from './lab-clutter';
 
 export const ROOM = { left: -8, right: 8, back: -9, front: 3, height: 5 } as const;
 const WINDOW = { x0: -7.4, x1: 7.4, y0: 0.4, y1: 3.5 } as const;
@@ -49,10 +50,19 @@ const BREAKER_HANDLES: readonly (readonly [number, number, number])[] = [
 const PANEL_TILE = 5.12, FLOOR_TILE = 4;
 
 /** The generated models the lab shows (TASK-16). Each replaces its labkit piece's visual; the labkit colliders stay. */
+/** The weapon bench's own set (TASK-23c): the jig and printer rest on its top, the tool wall hangs on the wall behind it. */
+export const WEAPON_BENCH_SET: readonly string[] = [
+  'bench-jig', 'bench-printer', 'tool-wall', 'tool-drill', 'tool-wrench', 'tool-mallet', 'tool-scanner', 'tool-screwdriver',
+];
+
 export const LAB_GEN_ASSETS: readonly string[] = [
   'gate', 'capacitor-bank', 'breaker-panel', 'breaker-handle', 'relay-cabinet', 'control-box', 'operator-console', 'console-lever',
   'preset-rack', 'preset-bench', 'preset-combiner', 'planet-table', 'her-desk', 'cot', 'wall-radio', 'armory-rail', 'weapon-bench', 'weapon-frame',
+  ...WEAPON_BENCH_SET, ...CLUTTER_MODELS,
 ];
+
+/** The dissolve of a cleared salvage prop, seconds. */
+const DISSOLVE_SECONDS = 0.9;
 
 /** Loads the lab's generated models at a level, behind the caller's loading bar. A model that fails stays on its labkit fallback. */
 export async function preloadLabGenerated(level: GenLevel): Promise<void> {
@@ -68,6 +78,73 @@ function lampOverlay(color: string, x: number, y: number, z: number, size: reado
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], size[2]), mat);
   mesh.position.set(x, y, z);
   return mesh;
+}
+
+/** A clutter prop in the lab: its entry, the disc of its dissolve, and the walls it adds (removed with it). */
+interface ClutterEntry {
+  readonly item: ClutterItem;
+  readonly prop: Prop;
+  readonly disc: THREE.Mesh;
+  readonly boxes: Box[];
+  state: 'standing' | 'dissolving' | 'gone';
+  t: number;
+}
+
+/**
+ * Rests a loaded model on a surface (TASK-23c): turns it to `yaw`, centres it on (x, z), and sets its lowest point on the surface.
+ * `surfaceAt` gives the surface's height under a point; the item rests on the highest of the surfaces under its four bottom corners,
+ * so no corner floats.
+ */
+function restOn(obj: THREE.Object3D, x: number, z: number, yaw: number, surfaceAt: (x: number, z: number) => number): void {
+  obj.rotation.set(0, yaw, 0);
+  obj.position.set(0, 0, 0);
+  obj.updateMatrixWorld(true);
+  const b = new THREE.Box3().setFromObject(obj);
+  const c = b.getCenter(new THREE.Vector3());
+  const ox = x - c.x, oz = z - c.z;
+  const surface = Math.max(...[b.min.x, b.max.x].flatMap((px) => [b.min.z, b.max.z].map((pz) => surfaceAt(px + ox, pz + oz))));
+  obj.position.set(ox, surface - b.min.y, oz);
+}
+
+/** Hangs a model on a flat panel (TASK-23c): its back on the panel's front face, with a small gap, centred on (x, y). */
+function hangOn(obj: THREE.Object3D, panelFrontZ: number, x: number, y: number, tiltX = 0): void {
+  obj.rotation.set(tiltX, 0, 0);
+  obj.position.set(0, 0, 0);
+  obj.updateMatrixWorld(true);
+  const b = new THREE.Box3().setFromObject(obj);
+  const c = b.getCenter(new THREE.Vector3());
+  obj.position.set(x - c.x, y - c.y, panelFrontZ + 0.011 - b.min.z);
+}
+
+/** The weapon bench's set (TASK-23c): the jig at the top's centre, the printer at one end, the mallet and the wrench lying on the top, and
+ *  the tool wall flat on the wall behind the bench with the drill, the scanner and the screwdriver hung in its slots. */
+function dressWeaponBench(bench: THREE.Group, parts: readonly THREE.Group[]): void {
+  const [jig, printer, wall, drill, wrench, mallet, scanner, screwdriver] = parts as unknown as [THREE.Group, THREE.Group, THREE.Group, THREE.Group, THREE.Group, THREE.Group, THREE.Group, THREE.Group];
+  const model = bench.children[0] ?? bench;
+  const topAt = (x: number, z: number): number => {
+    bench.updateMatrixWorld(true);
+    const from = bench.localToWorld(new THREE.Vector3(x, 5, z));
+    const hit = new THREE.Raycaster(from, new THREE.Vector3(0, -1, 0), 0, 10).intersectObject(model, true)[0];
+    return hit ? bench.worldToLocal(hit.point.clone()).y : 1.05;
+  };
+  restOn(jig, 0, 0, 0, topAt);
+  restOn(printer, -0.75, 0, 0, topAt);
+  restOn(mallet, 0.42, -0.12, 0.25, topAt);
+  restOn(wrench, 0.72, 0.15, -0.1, topAt);
+  bench.add(jig, printer, mallet, wrench);
+  // the tool wall: its back on the south wall (z 2.99 in the lab, its standoff 0.045 m), its bottom 1.35 m up, turned to face the room
+  const panelBox = new THREE.Box3().setFromObject(wall);
+  const wallGroup = new THREE.Group();
+  wallGroup.position.set(6.0, 1.35, 2.99 + panelBox.min.z);
+  wallGroup.rotation.y = Math.PI;
+  wallGroup.add(wall);
+  wall.position.set(0, 0, 0);
+  const front = panelBox.max.z;
+  hangOn(drill, front, -0.42, 0.62);
+  hangOn(scanner, front, 0.0, 0.66);
+  hangOn(screwdriver, front, 0.42, 0.6, Math.PI / 2);
+  wallGroup.add(drill, scanner, screwdriver);
+  bench.parent?.add(wallGroup);
 }
 
 /** How powered the lab is, each 0..1: the power-on sequence drives these. */
@@ -286,6 +363,12 @@ export interface LabRoom {
   setWindowView(view: WindowView): void;
   /** Shows the flat storm plane in the window's opening whatever the view (the planet seen through the gate: no hole, R8). */
   setPlaneFallback(on: boolean): void;
+  /** The lab clutter (TASK-23c): the prop the ray meets within `reach` metres (a fixture or a salvage prop), or null. Lab metres. */
+  aimClutter(origin: THREE.Vector3, dir: THREE.Vector3, reach: number): string | null;
+  /** Starts a salvage prop's dissolve (about a second; it then leaves the lab). False for a fixture or a prop that is not standing. */
+  dissolveClutter(id: string): boolean;
+  /** Takes away the props cleared in an earlier visit, at once (no dissolve). */
+  removeClutter(ids: readonly string[]): void;
   /** The view through the window: the 3D wasteland (drawn by the play scene before the lab, see lab-vista.ts). */
   readonly vista: LabVista;
   floorHeight(x: number, z: number): number;
@@ -691,11 +774,64 @@ export function createLabRoom(o: {
   // Weapon bench against south wall at x ≈ 6.0: the labkit preset bench until its generated model is swapped in
   const weaponBench = place(kit.presetBench(m), 6.0, 2.4, Math.PI);
   swaps.push(() => {
+    // the bench's own set (jig, printer, tools, tool wall) loads with it, so it all shows at once or not at all
+    const parts = genAll(WEAPON_BENCH_SET);
+    if (!parts) return false;
     if (!swapAll([{ p: weaponBench, id: 'weapon-bench' }])) return false;
     // the generated bench is wider than the labkit one: its footprint keeps the collider the lab always had
     colliders.push({ min: [4.8, 0, 2.0], max: [7.2, 1.6, 2.8] });
+    dressWeaponBench(weaponBench.group, parts);
     return true;
   });
+
+  // ---- The lab clutter (TASK-23c): fifteen props in the corners and along the walls (lab-clutter.ts). A salvage prop dissolves when it is
+  // cleared (dissolveClutter; the play screen gives the salvage); the two fixtures stay. Each prop is a box of its footprint until its
+  // model is loaded, then the model replaces the box. The walls each prop adds are its own colliders, removed with it.
+  const clutterEntries = new Map<string, ClutterEntry>();
+  const discGeo = keep(new THREE.CircleGeometry(1, 36));
+  discGeo.rotateX(-Math.PI / 2);
+  for (const item of CLUTTER) {
+    const stand = new THREE.Mesh(keep(new THREE.BoxGeometry(item.w, item.h, item.d)), m.gunmetal);
+    stand.position.y = item.h / 2;
+    const prop: Prop = { group: new THREE.Group(), colliders: [{ min: [-item.w / 2, 0, -item.d / 2], max: [item.w / 2, item.h, item.d / 2] }], sockets: [], lamps: [] };
+    prop.group.add(stand);
+    prop.group.userData.clutterId = item.id;
+    const before = colliders.length;
+    place(prop, item.x, item.z, item.yaw, 0);
+    const disc = new THREE.Mesh(discGeo, keep(new THREE.MeshBasicMaterial({ color: '#ffc13d', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })));
+    disc.position.set(item.x, 0.03, item.z);
+    disc.visible = false;
+    group.add(disc);
+    clutterEntries.set(item.id, { item, prop, disc, boxes: colliders.slice(before), state: 'standing', t: 0 });
+    swaps.push(() => {
+      const gen = genFor(item.model);
+      if (!gen) return false;
+      replaceVisual(prop.group, gen);
+      return true;
+    });
+  }
+  const takeAway = (e: ClutterEntry): void => {
+    e.state = 'gone';
+    group.remove(e.prop.group, e.disc);
+    for (const b of e.boxes) {
+      const i = colliders.indexOf(b);
+      if (i >= 0) colliders.splice(i, 1);
+    }
+  };
+  const tickClutter = (dt: number): void => {
+    for (const e of clutterEntries.values()) {
+      if (e.state !== 'dissolving') continue;
+      e.t += dt;
+      const p = Math.min(1, e.t / DISSOLVE_SECONDS);
+      e.prop.group.scale.setScalar(Math.max(0.001, 1 - p * p));
+      e.prop.group.position.y = -e.item.h * p * p;
+      const r = 0.5 * Math.max(e.item.w, e.item.d) + 0.1;
+      e.disc.scale.setScalar(r * (0.7 + 0.5 * p));
+      e.disc.visible = true;
+      (e.disc.material as THREE.MeshBasicMaterial).opacity = 0.85 * (1 - p);
+      if (p >= 1) takeAway(e);
+    }
+  };
 
   // ---- South Wall: Her Corner (panel 46 right & panel 41)
   // Folding camp cot along south wall at (-2.5, 2.2)
@@ -886,8 +1022,37 @@ export function createLabRoom(o: {
   };
   adoptGenerated(); // a model loaded by an earlier visit is used at once; the rest wait for the preload
 
+  /** The prop under the ray: a fixture or a salvage prop that is standing (the walls are the same). */
+  const aimClutter = (origin: THREE.Vector3, dir: THREE.Vector3, reach: number): string | null => {
+    const roots = [...clutterEntries.values()].filter((e) => e.state === 'standing').map((e) => e.prop.group);
+    for (const r of roots) r.updateMatrixWorld(true);
+    const ray = new THREE.Raycaster(origin, dir.clone().normalize(), 0, reach);
+    for (const h of ray.intersectObjects(roots, true)) {
+      let o: THREE.Object3D | null = h.object;
+      while (o && o.userData.clutterId === undefined) o = o.parent;
+      if (o) return o.userData.clutterId as string;
+    }
+    return null;
+  };
+  const dissolveClutter = (id: string): boolean => {
+    const e = clutterEntries.get(id);
+    if (!e || e.state !== 'standing' || e.item.role !== 'salvage') return false;
+    e.state = 'dissolving';
+    e.t = 0;
+    return true;
+  };
+  const removeClutter = (ids: readonly string[]): void => {
+    for (const id of ids) {
+      const e = clutterEntries.get(id);
+      if (e && e.state !== 'gone') takeAway(e);
+    }
+  };
+
   return {
     envLevel: () => 0.03 + (stripMat.emissiveIntensity / 2.2) * 0.2,
+    aimClutter,
+    dissolveClutter,
+    removeClutter,
     group,
     colliders,
     gate,
@@ -906,6 +1071,7 @@ export function createLabRoom(o: {
       pulseUniforms.uTime.value = now;
       stormUniforms.uTime.value = now;
       vista.update(now, dt);
+      tickClutter(dt);
       // the bursts flash the window light, capped at 0.7 of the peak: the floor lights up, the room never whites out (review 3)
       windowLight.intensity = 3.5 + 12 * vista.flashLight;
     },

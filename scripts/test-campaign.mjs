@@ -24,6 +24,11 @@
  *   23 F-02 the scout printed by the print button (the frame loop runs it), driven for real, the metres topped up,
  *   24 F-03 the weapon bench, the gun forged, fitted and equipped, 25 F-04 and F-05 the stages unlock the hauler and crawler,
  *   26 a death respawns at the gate (the death is a hook until TASK-23b), 27 each chain line once, S-2 skipped for A4-04.
+ * TASK-23c, the props in the world: L1 the lab with its clutter and the weapon bench (shots), and the window view inside its budget
+ *   (40 calls, 120k triangles); 9b a held E clears the large crate, its salvage goes into the pack, and it stays gone after a reload;
+ *   9c aimed at the old monitor, the readout shows on hover and E opens its Bridge Incident Log; 13c a seal lifts its leak's wreck one
+ *   rung (broken junk stands a rung below the plot's stage until it is sealed), and the seal is saved; 28b at stage 6 a broken wreck
+ *   stands at rung 2 and its seal lifts it to rung 3.
  *
  * Every beat: a shot in docs/shots/campaign/, the FPS over two seconds, and a pass or fail. Console errors and HTTP errors
  * are collected across the whole run. Exit code 1 when any beat fails.
@@ -474,6 +479,124 @@ await beat('9 the inventory (Tab) opens and holds the starter kit', async (row) 
   return { ok: open && hasKit, detail: `inventory open=${open} starter-kit=${hasKit}` };
 });
 
+// ----------------------------------------------------------------------------------------------------------------------
+// TASK-23c: the props in the world. The lab's clutter (cleared by a held E, saved), the micro-logs (a hover readout and the
+// Bridge Incident Log in the databank), and the wreck sites (a seal lifts a leak's wreck one rung on the junk-model ladder).
+// ----------------------------------------------------------------------------------------------------------------------
+/** The yaw and the pitch that look from (x, z, eye height) at (tx, tz, ty): yaw 0 faces north, a negative pitch looks down. */
+const aimAt = (x, z, eyeY, tx, tz, ty) => ({
+  yaw: Math.atan2(-(tx - x), -(tz - z)),
+  pitch: Math.atan2(ty - eyeY, Math.hypot(tx - x, tz - z)),
+});
+/** Reloads and Continues (the props beats; the same as reloadGame, which is declared further down). */
+const reloadProfile = async () => {
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.waitForFunction(() => !!window.hmPlay?.ready || !!document.querySelector('.sm-menu button'), null, { timeout: 25000 });
+  if (!(await page.evaluate(() => !!window.hmPlay?.ready))) {
+    const labels = await page.locator('.sm-menu button').allTextContents();
+    const want = labels.some((l) => l.includes('Continue')) ? 'Continue' : 'Expedition';
+    await page.locator('.sm-menu button', { hasText: want }).first().click();
+  }
+  await page.waitForFunction(() => !!window.hmPlay?.ready, null, { timeout: 60000 });
+  await page.waitForTimeout(800);
+};
+/** A screenshot with the HUD hidden (the brief's shots carry no overlays). */
+const cleanShot = async (name) => {
+  await page.evaluate(() => document.querySelectorAll('.play > :not(.play-canvas)').forEach((el) => { el.dataset.shotHidden = el.style.display; el.style.display = 'none'; }));
+  await page.waitForTimeout(400);
+  const file = await shot(name);
+  await page.evaluate(() => document.querySelectorAll('[data-shot-hidden]').forEach((el) => { el.style.display = el.dataset.shotHidden; delete el.dataset.shotHidden; }));
+  return file;
+};
+
+await beat('L1 the lab with its clutter and the weapon bench from three sides (no overlays); the window view inside its budget (40 calls, 120k triangles)', async (row) => {
+  await quiet();
+  const views = [
+    ['lab-clutter-east', 3.2, -1.2, -Math.PI / 2, -0.08],
+    ['lab-clutter-west', -3.5, -4.5, Math.PI / 2, -0.05],
+    ['lab-clutter-spawn', -2.5, 1.0, 1.97, -0.1],
+    ['lab-bench-front', 6.0, 0.8, Math.PI, -0.12],
+    ['lab-bench-west', 3.4, 2.4, -Math.PI / 2, -0.12],
+    ['lab-bench-oblique', 3.8, 0.6, -2.356, -0.12],
+  ];
+  for (const [name, x, z, yaw, pitch] of views) {
+    await page.evaluate((v) => window.__playScene.debug.teleport('lab', v[0], v[1], v[2], v[3]), [x, z, yaw, pitch]);
+    await page.waitForTimeout(900);
+    await cleanShot(name);
+  }
+  await page.evaluate(() => window.__playScene.debug.teleport('lab', -4.5, 0.2, -0.45, 0));
+  // the budget is for the full window (the frame governor sets it by tier, and under SwiftShader that is static)
+  await page.evaluate(() => window.__playScene.debug.setWindowView('full'));
+  await page.waitForTimeout(2500);
+  const vista = await page.evaluate(() => window.__playScene.debug.vistaStats());
+  await cleanShot('lab-window-view');
+  const ok = vista.dust > 0 && vista.drawCalls > 0 && vista.drawCalls <= 40 && vista.triangles <= 120000;
+  return { ok, detail: `window view: ${vista.drawCalls} draw calls (budget 40), ${vista.triangles} triangles (budget 120000), motes ${vista.dust} (0 means the view is static or not drawn)` };
+});
+
+await beat('9b clear a lab prop: aimed at the large crate, a held E dissolves it into salvage in the pack; it stays gone after a reload', async (row) => {
+  await quiet();
+  await page.evaluate(() => window.hmPlay.setLocked?.(true));
+  const a = aimAt(3.2, -1.2, 1.65, 4.5, -2.7, 0.6);
+  await page.evaluate((v) => window.__playScene.debug.teleport('lab', 3.2, -1.2, v.yaw, v.pitch), a);
+  let prompt = '';
+  for (let i = 0; i < 25 && !prompt.includes('salvage the large crate'); i++) {
+    await page.waitForTimeout(200);
+    prompt = (await page.locator('.play-prompt').first().textContent().catch(() => '')) ?? '';
+  }
+  const aimed = prompt.includes('salvage the large crate') ? { id: 'crate-large', salvage: true } : null;
+  const pack0 = await page.evaluate(() => window.__dev.pack());
+  const bridge0 = await page.evaluate(() => window.__dev.bridgeStock());
+  await page.keyboard.down('KeyE');
+  await page.waitForTimeout(1700);
+  await page.keyboard.up('KeyE');
+  await page.waitForTimeout(1400);
+  const cleared = await page.evaluate(() => window.__dev.props().cleared.includes('crate-large'));
+  const pack1 = await page.evaluate(() => window.__dev.pack());
+  const bridge1 = await page.evaluate(() => window.__dev.bridgeStock());
+  const gain = (k) => ((pack1[k] ?? 0) - (pack0[k] ?? 0)) + ((bridge1[k] ?? 0) - (bridge0[k] ?? 0));
+  const ore = gain('ore');
+  const prims = [...new Set([...Object.keys(pack1), ...Object.keys(bridge1)])].filter((k) => k.startsWith('prim-')).reduce((n, k) => n + gain(k), 0);
+  row.shot = await shot('crate-dissolved');
+  await reloadProfile();
+  await page.evaluate((v) => window.__playScene.debug.teleport('lab', 3.2, -1.2, v.yaw, v.pitch), a);
+  await page.waitForTimeout(1200);
+  const pack2 = await page.evaluate(() => window.__dev.pack());
+  const aimedAgain = await page.evaluate(() => window.hmPlay.aimedProp?.id ?? null);
+  const samePack = JSON.stringify(pack2) === JSON.stringify(pack1);
+  const stays = aimedAgain !== 'crate-large' && samePack;
+  row.shot = await shot('crate-gone-after-reload');
+  const ok = aimed?.id === 'crate-large' && aimed.salvage === true && cleared && ore === 10 && prims === 2 && stays;
+  return { ok, detail: `aimed ${aimed?.id ?? 'nothing'} (salvage ${aimed?.salvage ?? '-'}); cleared=${cleared}; gained ore ${ore}, primitives ${prims}; after reload the crate ${aimedAgain === 'crate-large' ? 'is BACK' : 'stays gone'}, the pack ${samePack ? 'is the same' : 'changed'}` };
+});
+
+await beat('9c read a micro-log: aimed at the old monitor, the readout shows on hover; E opens its Bridge Incident Log, and the monitor stays', async (row) => {
+  await quiet();
+  const a = aimAt(6.8, -7.2, 1.65, 7.68, -8.6, 0.25);
+  await page.evaluate((v) => window.__playScene.debug.teleport('lab', 6.8, -7.2, v.yaw, v.pitch), a);
+  let hoverName = '';
+  for (let i = 0; i < 25 && hoverName !== 'old monitor'; i++) {
+    await page.waitForTimeout(200);
+    hoverName = ((await page.locator('.lore-hover-name').first().textContent().catch(() => '')) ?? '').trim();
+  }
+  const aimed = hoverName === 'old monitor' ? { id: 'old-monitor', salvage: false } : null;
+  const hover = await page.locator('.lore-hover-text').first().textContent().catch(() => '');
+  row.shot = await shot('monitor-hover');
+  await page.keyboard.press('KeyE');
+  await page.waitForTimeout(700);
+  const bank = await page.locator('[data-testid="bridge-log"]').isVisible().catch(() => false);
+  const stamp = await page.locator('.lore-bank-stamp').first().textContent().catch(() => '');
+  row.shot = await shot('monitor-log');
+  await page.locator('.lore-bank-close').first().click().catch(() => {});
+  await page.waitForTimeout(300);
+  const logs = await page.evaluate(() => window.__dev.props().logs);
+  const cleared = await page.evaluate(() => window.__dev.props().cleared);
+  const readout = /Phosphor burn-in/.test(hover);
+  const monitorStays = !cleared.includes('old-monitor');
+  const ok = aimed?.id === 'old-monitor' && aimed.salvage === false && readout && bank && stamp.startsWith('BRIDGE TELEMETRY') && logs.includes('LOG-01') && monitorStays;
+  return { ok, detail: `aimed ${aimed?.id ?? 'nothing'}; readout ${readout ? 'shown' : 'missing'}; databank open=${bank} stamp "${stamp}"; LOG-01 read=${logs.includes('LOG-01')}; monitor kept=${monitorStays}` };
+});
+
 /** The paths where two chain snapshots differ (a dotted path and the two values), so a failed comparison says what moved. */
 const chainDiff = (a, b, path = '', out = []) => {
   if (out.length >= 8) return out;
@@ -899,6 +1022,35 @@ const draftAtBench = (item) => page.evaluate(async ({ item, spot }) => {
   return { ok: false, why: 'no-bench' };
 }, { item, spot: draftSpot });
 
+// TASK-23c: a seal lifts its wreck one rung. Before the seal a leak is broken: its props stand a rung below the plot's stage.
+/** The rung a plot stage asks for (wreck-sites.ts stageRung): 0 at stage 0, 1 at 1 and 2, 2 at 3 and 4, 3 at 5 and 6. */
+const stageRungOf = (s) => (s <= 0 ? 0 : s <= 2 ? 1 : s <= 4 ? 2 : 3);
+/** Walks the view to a leak's wreck (12.6 m off, facing it, looking down a little), and reads its wreck. */
+const lookAtWreck = async (lk) => {
+  const at = { x: lk.x + 12.6 * 0.949, z: lk.z + 12.6 * 0.316 };
+  await page.evaluate((v) => window.hmPlay.teleport('planet', v.x, v.z, 1.249, -0.18), at);
+  await page.waitForTimeout(1500);
+};
+const wreckRead = (site) => page.evaluate((s) => window.__dev.wrecks().find((r) => r.site === s) ?? null, site);
+
+await beat('13c a seal lifts its wreck one rung: a broken leak\'s props stand a rung below the plot\'s stage until the leak is sealed, and the seal is saved', async (row) => {
+  await toPlanet();
+  await page.waitForTimeout(400);
+  const stage = await page.evaluate(() => window.hmPlay.state?.()?.plot?.stage ?? 0);
+  const lk = await page.evaluate(() => window.__dev.leaks().find((l) => !l.dormant && l.state !== 'sealed') ?? null);
+  if (!lk) return { ok: false, detail: 'no open leak on the plot' };
+  await lookAtWreck(lk);
+  const before = await wreckRead(lk.site);
+  row.shot = await shot('wreck-before-seal');
+  await page.evaluate((id) => window.__dev.sealLeak(id, 9), lk.id);
+  await page.waitForTimeout(800);
+  const after = await wreckRead(lk.site);
+  const saved = (await page.evaluate(() => window.__dev.props().sealed)).includes(lk.site);
+  row.shot = await shot('wreck-after-seal');
+  const ok = !!before && !!after && before.broken && !after.broken && after.rung === before.rung + 1 && after.rung === stageRungOf(stage) && saved;
+  return { ok, detail: `stage ${stage}, leak site ${lk.site}: rung ${before?.rung} broken=${before?.broken} -> rung ${after?.rung} broken=${after?.broken}; seal saved=${saved}` };
+});
+
 await beat('19 B-06: the drafting table (the starter shelter\'s bench) is walked to; a cube blueprint drafted at it (a real draft command)', async (row) => {
   await quiet();
   await toPlanet();
@@ -1160,6 +1312,29 @@ await beat('28 F-03 unlocks the fight: a leak warns, its wave comes, M-01 plays 
   const sawM02 = await waitSub('M-02', 20000);
   row.shot = await shot('monsters-fight');
   return { ok: unlocked && warned && (spawned1 > spawned0 || living >= 8) && sawM01 && dropped && sawM02, detail: `unlocked=${unlocked} warned=${warned} living=${living} spawned ${spawned0} -> ${spawned1} M-01=${sawM01} drop=${dropped} M-02=${sawM02}` };
+});
+
+await beat('28b the ladder at stage 6: a broken leak stands at the RUN.world tier (rung 2), and its seal lifts it to the max tier (rung 3)', async (row) => {
+  await toPlanet();
+  // the scout the earlier beat drove is left behind: the character walks, so the teleport and the seal's reach are the player's
+  await page.evaluate(() => { if (window.__playScene.getDrivingVehicle()) window.__playScene.exitVehicle(); });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { window.__dev.setHp(100); window.__dev.setMonstersSetting('off'); });
+  await page.evaluate(() => window.__dev.setStage(6));
+  await page.waitForTimeout(800);
+  const lk = await page.evaluate(() => window.__dev.leaks().find((l) => !l.dormant && l.state !== 'sealed') ?? null);
+  if (!lk) return { ok: false, detail: 'no open leak on the plot' };
+  await lookAtWreck(lk);
+  const before = await wreckRead(lk.site);
+  row.shot = await shot('wreck-stage6-before-seal');
+  await page.evaluate((id) => window.__dev.sealLeak(id, 9), lk.id);
+  await page.waitForTimeout(800);
+  const after = await wreckRead(lk.site);
+  row.shot = await shot('wreck-stage6-after-seal');
+  const pos = await page.evaluate(() => window.__playScene.debug.position());
+  const reach = Math.hypot(pos.x - lk.x, pos.z - lk.z);
+  const ok = !!before && !!after && reach <= 25 && before.rung === 2 && before.broken && after.rung === 3 && !after.broken;
+  return { ok, detail: `stage 6, leak site ${lk.site} (${reach.toFixed(1)} m away): rung ${before?.rung} broken=${before?.broken} -> rung ${after?.rung} broken=${after?.broken}` };
 });
 
 // ----------------------------------------------------------------------------------------------------------------------

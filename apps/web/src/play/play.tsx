@@ -63,7 +63,10 @@ import {
 import { PieceMeshManager } from '../base/piece-meshes';
 import { globalKitPieceCache, integrityColorName } from '../base/kit-pieces';
 import { preloadAllGenAssets, genLevelForStage, createGenFixture } from '../assets/gen-props';
-import { preloadMonsterJunk } from '../monsters/leak-visual';
+import { PROPS_SAVE_KEY, parsePropsSave, serializePropsSave, clearedProp, readLog, sealedSite, type PropsSave } from './props-save';
+import { clutterById, salvageFor } from './lab-clutter';
+import { loreFor } from './lore-logs';
+import { LoreHover, DataBank, propLabel } from './lore-ui';
 
 const isFixture = (kind: Kind): boolean => kind === 'bin' || kind === 'bench' || kind === 'repeater' || kind === 'lifeSupport' || kind === 'weaponBench';
 import { blueprint, ITEMS, pieceCost } from '../base/catalog';
@@ -164,6 +167,10 @@ function save(s: PlayState): void { try { kv.set(SAVE_KEY, JSON.stringify(s)); }
  * profile key: not the base world's save and not the play save. A broken or old save starts a fresh plot, with an empty port.
  */
 const BEAM_SAVE_KEY = 'hm.setmix.beam';
+/** Hold E this long on a salvage prop in the lab to clear it (TASK-23c). */
+const CLEAR_HOLD_SECONDS = 1.0;
+/** Where a lab salvage goes: the pack first, then the network in reach of the gate (the bridge). */
+const SALVAGE_AT = { x: 0, z: 0 } as const;
 interface BeamSave { readonly field: string | null; readonly port: Cartridge | null }
 function loadBeamSave(): BeamSave {
   try {
@@ -182,7 +189,7 @@ function saveBeam(field: string, port: Cartridge | null): void {
 
 /** The plot's numbers for the HUD. */
 interface PlotHud { readonly ore: number; readonly oreRate: number; readonly supply: number; readonly demand: number; readonly levels: Readonly<Record<Metric, number>>; readonly stage: number }
-interface Hud { readonly where: FrameOut['where']; readonly sync: number; readonly atLever: boolean; readonly atDial: boolean; readonly ghost: FrameOut['ghost']; readonly aimed: number | null; readonly aimedBoulder: FrameOut['aimedBoulder']; readonly aimedLab: FrameOut['aimedLab']; readonly plot: PlotHud; readonly visitingOwner: string | null }
+interface Hud { readonly where: FrameOut['where']; readonly sync: number; readonly atLever: boolean; readonly atDial: boolean; readonly ghost: FrameOut['ghost']; readonly aimed: number | null; readonly aimedBoulder: FrameOut['aimedBoulder']; readonly aimedLab: FrameOut['aimedLab']; readonly aimedProp: FrameOut['aimedProp']; readonly plot: PlotHud; readonly visitingOwner: string | null }
 const NO_PLOT: PlotHud = { ore: 0, oreRate: 0, supply: 0, demand: 0, levels: { pxd: 0, vtx: 0, lx: 0, aq: 0 }, stage: 0 };
 /** The build menu, in the order the plot needs them. */
 const BUILD_ORDER: readonly MachineKind[] = ['mill', 'drill', 'pylon', 'press', 'power', 'projector', 'water'];
@@ -242,7 +249,7 @@ export function PlayScreen(props: {
   const [menu, setMenu] = useState(false);
   const [buildTab, setBuildTab] = useState<BuildTab>('machines');
   const [building, setBuilding] = useState<MachineKind | null>(null);
-  const [hud, setHud] = useState<Hud>({ where: 'lab', sync: 1, atLever: false, atDial: false, ghost: null, aimed: null, aimedBoulder: null, aimedLab: null, plot: NO_PLOT, visitingOwner: null });
+  const [hud, setHud] = useState<Hud>({ where: 'lab', sync: 1, atLever: false, atDial: false, ghost: null, aimed: null, aimedBoulder: null, aimedLab: null, aimedProp: null, plot: NO_PLOT, visitingOwner: null });
   const firstGatherRef = useRef(false);
 
   // TASK-11 Mentor Narration Controller & UI
@@ -941,6 +948,41 @@ export function PlayScreen(props: {
     }
   }, [dieNow, updateChain]);
 
+  // ---- the props in the world (TASK-23c): the saved clutter and logs (per profile), the databank, and the hold E that clears a prop
+  const propsRef = useRef<PropsSave>(parsePropsSave(kv.get(PROPS_SAVE_KEY)));
+  const clearHoldRef = useRef(0);
+  const clearPropRef = useRef<(id: string) => void>(() => {});
+  const [databank, setDatabank] = useState<string | null>(null);
+  const savePropsSave = useCallback((next: PropsSave): void => {
+    propsRef.current = next;
+    kv.set(PROPS_SAVE_KEY, serializePropsSave(next));
+  }, []);
+  const openLog = useCallback((log: string): void => {
+    if (!propsRef.current.logs.includes(log)) savePropsSave(readLog(propsRef.current, log));
+    setDatabank(log);
+  }, [savePropsSave]);
+  const closeDatabank = useCallback((): void => setDatabank(null), []);
+  // a salvage prop goes into the pack first (the base's salvage command, logged); refused whole when it does not fit, and the prop stays
+  const clearProp = useCallback((id: string): void => {
+    const item = clutterById(id);
+    const scene = sceneRef.current;
+    if (!item || item.role !== 'salvage' || !scene || propsRef.current.cleared.includes(id)) return;
+    const cmd: BaseCommand = { t: 'salvage', at: SALVAGE_AT, stock: [...salvageFor(item)] };
+    const res = apply(baseWorldRef.current, getBaseEnv(), cmd);
+    if (!res || res.events.some((e) => e.type === 'refused')) {
+      say('The pack is full', 'Make room for the salvage, then hold E again.');
+      gameAudio.playRefuse();
+      return;
+    }
+    if (!scene.dissolveClutter(id)) return;
+    dispatchBase(cmd);
+    savePropsSave(clearedProp(propsRef.current, id));
+    const summary = cmd.stock.map((st) => `${st.n} ${ITEMS[st.item]?.name ?? st.item}`).join(', ');
+    say(`${item.label.charAt(0).toUpperCase()}${item.label.slice(1)} salvaged`, `${summary} went into your pack.`);
+    if (item.log) openLog(item.log);
+  }, [dispatchBase, getBaseEnv, say, openLog, savePropsSave]);
+  clearPropRef.current = clearProp;
+
   // a drop goes to the bridge store: the linked storage that the refinery and the benches draw from (a logged grant, as the Act V kit)
   const payDrop = useCallback((item: string, n: number) => {
     dispatchBaseRef.current({ t: 'grant', stock: [{ item, n }] });
@@ -966,6 +1008,9 @@ export function PlayScreen(props: {
       },
       onSealed: (mk, reward) => {
         for (const r of reward) payDrop(r.item, r.n);
+        // the leak's wreck goes up a rung, and the seal is saved for this profile (TASK-23c)
+        sceneRef.current?.sealWreck(mk.site);
+        savePropsSave(sealedSite(propsRef.current, mk.site));
         if (mk.dormant) {
           updateChain((c) => bump(c, COUNT.dormantSealed));
           say('Anomaly Core recovered', '1 on the bridge store.');
@@ -1075,6 +1120,8 @@ export function PlayScreen(props: {
       return undefined;
     }
     sceneRef.current = scene;
+    // the props saved for this profile: the cleared clutter is gone, the sealed leaks' wrecks stand restored (TASK-23c)
+    scene.setProps(propsRef.current);
     if (typeof window !== 'undefined') {
       (window as any).__playScene = scene;
       (window as any).__createGenFixture = createGenFixture;
@@ -1105,7 +1152,7 @@ export function PlayScreen(props: {
         const s = stateRef.current.plot.stage || 1;
         await preloadAllGenAssets(genLevelForStage(s, props.profile.quality));
       }],
-      ['Loading the leaks', async () => { await preloadMonsterJunk(); }],
+      ['Loading the wreck sites', async () => { await scene.preloadWrecks(); }],
       ['Fitting the lab', async () => { await scene.preloadLabGenerated(); }],
       ...SMOOTH_IDS.map((id): [string, () => void] => ['Shaping the boulders', () => { smoothModel(id); }]),
       ['Building your plot', () => { look(PLOT, 1); }],
@@ -1188,7 +1235,7 @@ export function PlayScreen(props: {
       }],
       ['Compiling shaders', () => { scene.warm(); }],
     ];
-    const hook = { frames: 0, ready: false, step: stateRef.current.step, where: 'lab', sync: 1, wave: -1, triangles: 0, calls: 0, tier: tier as Quality };
+    const hook = { frames: 0, ready: false, step: stateRef.current.step, where: 'lab', sync: 1, wave: -1, triangles: 0, calls: 0, tier: tier as Quality, aimedProp: null as string | null };
     const keys = new Set<string>();
     let dx = 0, dy = 0, cancelled = false, raf = 0, at = 0, timer = 0, last = performance.now(), hudAt = 0, savedAt = 0;
     let env: Env | null = null;
@@ -1795,7 +1842,18 @@ export function PlayScreen(props: {
       if (out.event === 'stage-up') say(`Stage ${out.stage}`, STAGE_SAYS[out.stage] ?? '');
       if (s !== stateRef.current) commit(withLab(withPlot(s, plotRef.current), labRef.current));
 
-      // ---- hand gathering ore from boulders on the plot: hold E to gather 3 ore/s
+      // ---- a salvage prop in the lab: hold E for a second to clear it (TASK-23c); the salvage goes into the pack, or the prop stays
+  if (live && !visitingRef.current && out.where === 'lab' && out.aimedProp?.salvage && keys.has('KeyE') && !out.atLever) {
+    clearHoldRef.current += dt;
+    if (clearHoldRef.current >= CLEAR_HOLD_SECONDS) {
+      clearHoldRef.current = 0;
+      clearPropRef.current(out.aimedProp.id);
+    }
+  } else {
+    clearHoldRef.current = 0;
+  }
+
+  // ---- hand gathering ore from boulders on the plot: hold E to gather 3 ore/s
       let plotChanged = false;
       if (live && !visitingRef.current && out.where === 'planet' && out.aimedBoulder !== null && keys.has('KeyE') && out.aimed === null && !out.atLever && !out.atDial && !out.aimedLab && !scene.getDrivingVehicle() && !scene.getNearVehicle(3.5) && scene.aimPoint()?.piece == null) {
         const mined = scene.gatherBoulder(out.aimedBoulder, 3 * dt);
@@ -1941,7 +1999,7 @@ export function PlayScreen(props: {
         commit(withLab(withPlot(stateRef.current, plotRef.current), labRef.current));
         updateChain((c) => c);
       }
-      hook.frames += 1; hook.where = out.where; hook.sync = out.sync; hook.step = stateRef.current.step; hook.wave = scene.debug.wave();
+      hook.frames += 1; hook.where = out.where; hook.aimedProp = out.aimedProp?.id ?? null; hook.sync = out.sync; hook.step = stateRef.current.step; hook.wave = scene.debug.wave();
       if (hook.frames % 30 === 0) Object.assign(hook, scene.debug.stats());
       if (hook.frames % 15 === 0) {
         // the monsters follow the chain (the gate's lock after F-03, the dormant anomaly after the rifle); health comes back when quiet
@@ -1981,6 +2039,7 @@ export function PlayScreen(props: {
             aimed: out.aimed,
             aimedBoulder: out.aimedBoulder,
             aimedLab: out.aimedLab,
+            aimedProp: out.aimedProp,
             visitingOwner: vis.snapshot.owner,
             plot: { ore: 0, oreRate: 0, supply: 0, demand: 0, levels, stage: vp.stage },
           });
@@ -1996,6 +2055,7 @@ export function PlayScreen(props: {
             aimed: out.aimed,
             aimedBoulder: out.aimedBoulder,
             aimedLab: out.aimedLab,
+            aimedProp: out.aimedProp,
             visitingOwner: null,
             plot: { ore: p.ore, oreRate: rt?.ore ?? 0, supply: rt?.supply ?? 0, demand: rt?.demand ?? 0, levels, stage: p.stage },
           });
@@ -2449,6 +2509,14 @@ export function PlayScreen(props: {
         say(next === 'third' ? 'Third-person view' : 'First-person view');
         return;
       }
+      // a lore prop (TASK-23c): a tap on E reads a fixture's or a transponder's log; a salvage prop is held, never tapped
+      if (e.code === 'KeyE' && hud.aimedProp && hud.aimed === null && !hud.atLever && !hud.atDial) {
+        if (!hud.aimedProp.salvage) {
+          const entry = loreFor(hud.aimedProp.id);
+          if (entry) openLog(entry.log);
+        }
+        return;
+      }
       if (e.code === 'KeyE') {
         const driving = sceneRef.current?.getDrivingVehicle();
         if (driving) {
@@ -2554,7 +2622,7 @@ export function PlayScreen(props: {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [ready, creating, building, gunEquipped, fireWeapon, menu, panel, labPanel, dialOpen, locked, paused, hud.atLever, hud.atDial, hud.aimed, hud.aimedBoulder, hud.aimedLab, hud.where, placeNow, stopBuilding, freeMouse, say, props.profile]);
+  }, [ready, creating, building, gunEquipped, fireWeapon, menu, panel, labPanel, dialOpen, locked, paused, hud.atLever, hud.atDial, hud.aimed, hud.aimedBoulder, hud.aimedLab, hud.aimedProp, openLog, hud.where, placeNow, stopBuilding, freeMouse, say, props.profile]);
   useEffect(() => {
     const onClick = (): void => { if (building && locked) placeNow(); };
     window.addEventListener('mousedown', onClick);
@@ -2672,6 +2740,20 @@ export function PlayScreen(props: {
       /** The sidearm's ammo: the rounds left, and the magazine. */
       ammo: () => sceneRef.current?.monsters.getAmmo() ?? null,
       /** The bridge store's stock, by item (the drops and the Act V kit land here). */
+      /** The wreck sites: each one's rung, and whether it is broken or sealed (TASK-23c). */
+      wrecks: () => sceneRef.current?.debug.wreckRungs() ?? [],
+      /** The props saved for this profile: the cleared clutter, the logs read, the sealed sites. */
+      props: (): PropsSave => propsRef.current,
+      /** The player's pack: how many of each item it holds (the grid's slots). */
+      pack: (): Record<string, number> => {
+        const out: Record<string, number> = {};
+        for (const st of baseWorldRef.current.player.slots) if (st) out[st.item] = (out[st.item] ?? 0) + st.n;
+        return out;
+      },
+      /** Opens a Bridge Incident Log in the databank. */
+      openLog: (log: string): void => openLog(log),
+      /** Clears a salvage prop, as a held E does. */
+      clearProp: (id: string): void => clearPropRef.current(id),
       bridgeStock: (): Record<string, number> => {
         const out: Record<string, number> = {};
         const box = baseWorldRef.current.boxes.find((b) => b.id === BRIDGE_STORE);
@@ -2763,6 +2845,8 @@ export function PlayScreen(props: {
     : hud.atLever ? 'E: pull the main lever'
     : hud.atDial ? 'E: plot dial'
     : hud.where === 'planet' && hud.aimed !== null && panel === null ? `E: open the ${KINDS[(visiting ? visiting.plot.machines : plotRef.current.machines).find((x) => x.id === hud.aimed)?.kind ?? 'mill'].name.toLowerCase()}`
+    : hud.where === 'lab' && hud.aimedProp?.salvage && labPanel === null ? `Hold E: salvage the ${propLabel(hud.aimedProp.id)}`
+    : hud.aimedProp && !hud.aimedProp.salvage && labPanel === null && hud.aimed === null ? `E: read the ${propLabel(hud.aimedProp.id)}`
     : hud.where === 'lab' && hud.aimedLab !== null && labPanel === null ? `E: open the ${hud.aimedLab === 'rack' ? 'cartridge rack' : hud.aimedLab === 'bench' ? 'preset bench' : 'preset combiner'}`
     : hud.where === 'planet' && hud.aimedBoulder !== null && !visiting ? 'Hold E: gather ore'
     : '';
@@ -2830,6 +2914,8 @@ export function PlayScreen(props: {
           ) : null}
           <i className="play-dot" aria-hidden="true" />
           {prompt && drivingSpeed === null ? <p className={`play-prompt${building && !hud.ghost?.ok ? ' bad' : ''}`}>{prompt}</p> : null}
+          {hud.aimedProp && !hud.aimedProp.salvage && databank === null ? <LoreHover prop={hud.aimedProp.id} /> : null}
+          {databank !== null ? <DataBank log={databank} onClose={closeDatabank} /> : null}
           {(state.step === 'build' || state.step === 'drill' || state.step === 'done' || visiting) && drivingSpeed === null ? (
             <section className="play-plot" aria-label={visiting ? `Visiting ${visiting.snapshot.owner}'s plot` : 'Your plot'}>
               {visiting ? (

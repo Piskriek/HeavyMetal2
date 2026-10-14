@@ -238,3 +238,4 @@
 - (same day) "make sure hes not still set on flash" (Argo was on "4 Argon, Complex tasks"; left unchanged)
 - (same day) "oh ill have to start the trial still" / "worth it?" / "kk holding off for now" (Opus: start the Hyper3D trial when brief 32's art pass begins, first a head-to-head with RUN.world on the heavy terraformer)
 - (same day, evening) "if you are waiting for me to confirm somthing, consider it confirmed" (the pending item: committing TASK-24's three new act checkpoints and their index; done in ec3993a4)
+- (same day, evening) "ok, build the \"not built yet\" stuff. we have time"

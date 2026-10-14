@@ -999,6 +999,8 @@ export function PlayScreen(props: {
       },
       onWarn: (mk) => {
         say('Leak surging', mk.inSeconds !== null ? `A wave in ${Math.ceil(mk.inSeconds)} s. Keep your back to the gate.` : 'A wave is due.');
+        // Haddy's surge warning (A6-LEAK-SURGE, Argo's line); the narrator's cooldown keeps it from repeating
+        narratorRef.current?.trigger('leak:surge');
       },
       onHitPlayer: (damage, bearing) => takeHit(damage, bearing),
       onDeath: (_mob, drop) => {
@@ -1014,8 +1016,8 @@ export function PlayScreen(props: {
         if (mk.dormant) {
           updateChain((c) => bump(c, COUNT.dormantSealed));
           say('Anomaly Core recovered', '1 on the bridge store.');
-          // Argo's line for the dormant seal (docs/argo/plans/22-lore-micrologs.md §3): a subtitle-only radio line, no voice yet
-          narratorRef.current?.showSubtitleOnly('A4-LEAK-SEAL', "Clean seal. That core's condensed archive data—bring it inside, the Combiner can splice it.", 7);
+          // Argo's line for the dormant seal (docs/argo/plans/22-lore-micrologs.md §3), voiced in Haddy's voice (A4-LEAK-SEAL)
+          narratorRef.current?.trigger('leak:dormant-sealed');
         } else {
           updateChain((c) => bump(c, COUNT.leakSealed));
           say('Leak sealed', `${reward[0]?.n ?? 0} raw pixels and ${reward[1]?.n ?? 0} raw vertices went to the bridge store.`);

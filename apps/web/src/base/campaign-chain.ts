@@ -291,7 +291,9 @@ export function evidence(e: Evidence): Record<string, number> {
     [COUNT.installedFabricator]: e.machineKinds.includes('fabricator') ? 1 : 0,
     [COUNT.printedScout]: e.vehicleKinds.includes('scout') ? 1 : 0,
   };
-  if (e.itemIds.some((id) => id.startsWith('pxd-'))) out[COUNT.harvestPxd] = 1;
+  // B-04 (harvest raw pixels with the beam) is NOT derived from held items: since TASK-23b-2 a sealed leak drops raw
+  // pixels into the bridge store, so holding one no longer proves a harvest (TASK-23c found the chain skipping B-04 after
+  // a seal). Only the base's `harvested` event counts it; an old save harvests once more, as it re-places pieces.
   if (e.itemIds.some((id) => id.startsWith('bp:') && id !== 'bp:starter')) out[COUNT.drafted] = 1;
   return out;
 }

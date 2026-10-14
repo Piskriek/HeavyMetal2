@@ -143,11 +143,11 @@ test('a damaged saved chain falls back without breaking: junk counts and unknown
   assert.deepEqual(readChain('nonsense'), CHAIN_START);
 });
 
-test('the world evidence counts drafted blueprints and raw pixels, but not the starter kit', () => {
+test('the world evidence counts drafted blueprints, but not the starter kit, and not held raw pixels (a sealed leak drops them)', () => {
   const e = evidence({ ...EMPTY, itemIds: ['bp:starter', 'pxd-mono'] });
   assert.equal(e['placed:foundation'], undefined);
   assert.equal(e[COUNT.drafted], undefined);
-  assert.equal(e[COUNT.harvestPxd], 1);
+  assert.equal(e[COUNT.harvestPxd], undefined);
   assert.equal(evidence({ ...EMPTY, itemIds: ['bp:cube:basalt'] })[COUNT.drafted], 1);
   assert.equal(evidence({ ...EMPTY, sidearm: true })[COUNT.equipSidearm], 1);
 });

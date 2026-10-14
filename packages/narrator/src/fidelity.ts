@@ -24,6 +24,8 @@ const DEFS: Readonly<Record<string, Def>> = {
   'A4-01': { priority: 'story', on: 'tool:pickup' },
   'A4-02': { priority: 'story', on: 'dirt:process', after: 'A4-01' },
   'A4-03': { priority: 'story', on: 'studio:open' },
+  // the Act IV dormant leak sealed: the first Anomaly Core (Argo, docs/argo/plans/22-lore-micrologs.md §3; voiced 481466d3)
+  'A4-LEAK-SEAL': { priority: 'story', on: 'leak:dormant-sealed' },
   // the journal step (stage 2). It shares the event with S-2 and is listed first, so the trigger queues it and S-2 is skipped
   'A4-04': { priority: 'story', on: 'stage:2' },
   // base building, harvesting and linked storage
@@ -40,8 +42,10 @@ const DEFS: Readonly<Record<string, Def>> = {
   'F-03': { priority: 'story', on: 'weapon:swap' },
   'F-04': { priority: 'story', on: 'fab:hauler' },
   'F-05': { priority: 'story', on: 'fab:crawler' },
-  // Monster Mash
+  // the monsters (the owner dropped the "Monster Mash" name)
   'M-01': { priority: 'story', on: 'mob:seen' },
+  // a leak's waves 20 s away (Argo, docs/argo/plans/24-lore-expansion.md §1); a warning, so it lapses if the queue is busy
+  'A6-LEAK-SURGE': { priority: 'warn', on: 'leak:surge', cooldown: 45 },
   'M-02': { priority: 'story', on: 'mob:kill' },
   'M-03': { priority: 'warn', on: 'health:low', cooldown: 60 },
   // a plot reaching each stage

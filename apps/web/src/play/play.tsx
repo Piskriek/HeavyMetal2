@@ -38,11 +38,17 @@ import {
 import { fx } from '../maker/feedback';
 import { FRESH, METRIC_COLOUR, METRIC_NAME, SAVE_KEY, arrived, created, isFreeDrill, loadState, objective, poweredOn, returned, withLab, withPlot, type PlayState } from './quest';
 import { Journal } from './journal';
-import { ACT_V_KIT, COUNT, advanceChain, bump, chainView, finishedSteps, gateReason, monsterKilled, monsterSeen, placedKey, syncChain, type Chain, type Evidence } from '../base/campaign-chain';
+import { ACT_V_KIT, COUNT, advanceChain, bump, chainView, finishedSteps, gateReason, monsterKilled, monsterSeen, placedKey, playerDied, playerLow, stepDone, syncChain, type Chain, type Evidence } from '../base/campaign-chain';
 import type { BaseEvent } from '../base/world';
 import { encodePlot, decodePlot, plotOfSnapshot } from './plot-code';
 import type { Snapshot } from '@hm/plotcodec';
-import type { MobStatus, CombatStats } from './monster-mash-combat';
+import { SEAL_REACH, type MonsterMobStatus, type MonsterStats } from './monsters';
+import { MonsterHud, type RadarLeak } from '../monsters/hud';
+import type { Archetype } from '../monsters/roster';
+import type { MonstersSetting } from '../monsters/policy';
+import { weaponStats, type WeaponStats } from '../base/weapons';
+import { LOW_BARK_COOLDOWN, PLAYER_MAX_HP, hitBearing, hurt as hurtHp, isLow, parseMonsters, regen as regenHp } from '../monsters/policy';
+import { usePlaySettings } from '../shell/play-settings';
 import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { kv } from '../storage/profile-storage';
 import { BASE_SAVE_KEY, saveWorld } from '../base/save';
@@ -57,6 +63,7 @@ import {
 import { PieceMeshManager } from '../base/piece-meshes';
 import { globalKitPieceCache, integrityColorName } from '../base/kit-pieces';
 import { preloadAllGenAssets, genLevelForStage, createGenFixture } from '../assets/gen-props';
+import { preloadMonsterJunk } from '../monsters/leak-visual';
 
 const isFixture = (kind: Kind): boolean => kind === 'bin' || kind === 'bench' || kind === 'repeater' || kind === 'lifeSupport' || kind === 'weaponBench';
 import { blueprint, ITEMS, pieceCost } from '../base/catalog';
@@ -65,7 +72,6 @@ import { MachinePickerModal } from '../base/ui/machine-picker-modal';
 import { RefineryModal } from '../base/ui/refinery-modal';
 import { FabricatorModal } from '../base/ui/fabricator-modal';
 import { WeaponBenchModal } from '../base/ui/weapon-bench-modal';
-import { weaponStats } from '../base/weapons';
 import * as S from '@hm/structure';
 import type { Kind } from '@hm/structure';
 import * as L from '@hm/lattice';
@@ -269,7 +275,6 @@ export function PlayScreen(props: {
   const lookPowerWallTimerRef = useRef(0);
   const lookWindowTimerRef = useRef(0);
   const prevSyncRef = useRef(1);
-  const hasSeenMobRef = useRef(false);
   const audioInitializedRef = useRef(false);
 
   const initNarratorAudio = useCallback(() => {
@@ -812,7 +817,7 @@ export function PlayScreen(props: {
       };
     });
     scene?.setFabricators(fabs);
-    scene?.mash.setWeaponStats(weaponStats(res.world.loadout));
+    scene?.monsters.setWeaponStats(weaponStats(res.world.loadout));
     (baseViewSource as WorldViewSource).notify?.();
     setBaseWorldVersion((v) => v + 1);
     persistBaseWorld(false);
@@ -870,30 +875,121 @@ export function PlayScreen(props: {
 
   tryPlaceBaseRef.current = tryPlaceBase;
 
-  // ---- Monster Mash combat states & firing action
-  const [mashEquipped, setMashEquipped] = useState(false);
+  // ---- the gun (the sidearm's shotgun), the health, and the monsters' events: the HUD, the narration, the chain, the items
+  const [gunEquipped, setGunEquipped] = useState(false);
   const [hitMarker, setHitMarker] = useState(false);
-  const [mashAmmo, setMashAmmo] = useState({ current: 8, max: 8 });
+  const [gunAmmo, setGunAmmo] = useState({ current: 8, max: 8 });
   const hitMarkerTimeout = useRef<number | null>(null);
+  // the health: the monsters' hits take it down; it comes back after a quiet spell; the death sends the player back to the gate
+  const hpRef = useRef<number>(PLAYER_MAX_HP);
+  const lastHitRef = useRef(-1e9);
+  const lowBarkRef = useRef(-1e9);
+  const regenAtRef = useRef(0);
+  const sealAimRef = useRef<number | null>(null);
+  // a loadout the tests set: the real loadout re-applies whenever the base changes, so the fire re-applies this one
+  const devWeaponRef = useRef<WeaponStats | null>(null);
+  const [vitals, setVitals] = useState<{ readonly hp: number; readonly hitAt: number; readonly bearing: number }>({ hp: PLAYER_MAX_HP, hitAt: -1e9, bearing: 0 });
+  const [radar, setRadar] = useState<readonly RadarLeak[]>([]);
+  const [sealView, setSealView] = useState<{ readonly pct: number; readonly inReach: boolean } | null>(null);
 
   const fireWeapon = useCallback(() => {
     const scene = sceneRef.current;
-    if (!scene || !scene.mash.isEquipped()) return;
-    const res = scene.mash.fire();
+    if (!scene || !scene.monsters.isEquipped()) return;
+    const ray = scene.aimGround();
+    const res = scene.monsters.fire(ray.origin, ray.dir);
     if (res.fired) {
-      setMashAmmo(scene.mash.getAmmo());
+      setGunAmmo(scene.monsters.getAmmo());
       if (res.hits > 0) {
         setHitMarker(true);
         if (hitMarkerTimeout.current) window.clearTimeout(hitMarkerTimeout.current);
         hitMarkerTimeout.current = window.setTimeout(() => setHitMarker(false), 110);
-        if (res.killed > 0) {
-          narratorRef.current?.trigger('mob:kill');
-          updateChain(monsterKilled);
-          say('Monster neutralized!', `+${res.killed * 50} Biomass Ore recovered.`);
-        }
       }
     }
-  }, [say]);
+  }, []);
+
+  const dieNow = useCallback(() => {
+    // a death: the screen takes the player back to the gate; the inventory and the save stay (TASK-22)
+    updateChain((c) => playerDied(c));
+    hpRef.current = PLAYER_MAX_HP;
+    lastHitRef.current = -1e9;
+    setVitals((v) => ({ ...v, hp: PLAYER_MAX_HP }));
+    const scene = sceneRef.current;
+    if (scene) {
+      scene.monsters.clearMobs();
+      scene.setPlayerAlive(true);
+      const g = scene.debug.gatePlanet();
+      scene.debug.teleport('planet', g.x, g.z - 6, 0, 0);
+    }
+    say('Pulled back to the gate', 'Your inventory and your progress are kept.');
+  }, [say, updateChain]);
+
+  const takeHit = useCallback((damage: number, bearing: number) => {
+    const now = performance.now();
+    const next = hurtHp(hpRef.current, damage);
+    hpRef.current = next;
+    lastHitRef.current = now;
+    setVitals({ hp: next, hitAt: now, bearing });
+    if (next <= 0) {
+      sceneRef.current?.setPlayerAlive(false);
+      dieNow();
+      return;
+    }
+    if (isLow(next) && now - lowBarkRef.current > LOW_BARK_COOLDOWN * 1000) {
+      lowBarkRef.current = now;
+      narratorRef.current?.trigger('health:low');
+      updateChain(playerLow);
+    }
+  }, [dieNow, updateChain]);
+
+  // a drop goes to the bridge store: the linked storage that the refinery and the benches draw from (a logged grant, as the Act V kit)
+  const payDrop = useCallback((item: string, n: number) => {
+    dispatchBaseRef.current({ t: 'grant', stock: [{ item, n }] });
+  }, []);
+
+  // the monsters' events reach the game here, once the scene is ready
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!ready || !scene) return undefined;
+    scene.monsters.setEvents({
+      onSeen: () => {
+        narratorRef.current?.trigger('mob:seen');
+        updateChain(monsterSeen);
+      },
+      onWarn: (mk) => {
+        say('Leak surging', mk.inSeconds !== null ? `A wave in ${Math.ceil(mk.inSeconds)} s. Keep your back to the gate.` : 'A wave is due.');
+      },
+      onHitPlayer: (damage, bearing) => takeHit(damage, bearing),
+      onDeath: (_mob, drop) => {
+        narratorRef.current?.trigger('mob:kill');
+        updateChain(monsterKilled);
+        payDrop(drop.item, drop.n);
+      },
+      onSealed: (mk, reward) => {
+        for (const r of reward) payDrop(r.item, r.n);
+        if (mk.dormant) {
+          updateChain((c) => bump(c, COUNT.dormantSealed));
+          say('Anomaly Core recovered', '1 on the bridge store.');
+          // Argo's line for the dormant seal (docs/argo/plans/22-lore-micrologs.md §3): a subtitle-only radio line, no voice yet
+          narratorRef.current?.showSubtitleOnly('A4-LEAK-SEAL', "Clean seal. That core's condensed archive data—bring it inside, the Combiner can splice it.", 7);
+        } else {
+          updateChain((c) => bump(c, COUNT.leakSealed));
+          say('Leak sealed', `${reward[0]?.n ?? 0} raw pixels and ${reward[1]?.n ?? 0} raw vertices went to the bridge store.`);
+        }
+      },
+    });
+    return () => {
+      sceneRef.current?.monsters.setEvents({});
+    };
+  }, [ready, say, updateChain, takeHit, payDrop]);
+
+  // the Monsters setting (Settings: Off, Calm, Normal, Hard) and the living-monster budget by the graphics tier
+  const monstersSetting = usePlaySettings().monsters;
+  useEffect(() => {
+    sceneRef.current?.monsters.setSetting(parseMonsters(monstersSetting));
+  }, [ready, monstersSetting]);
+  useEffect(() => {
+    sceneRef.current?.monsters.setQuality(tier);
+  }, [ready, tier]);
 
   const dial = useCallback((raw: string): { readonly ok: boolean; readonly why?: string } => {
     const code = raw.trim();
@@ -1009,6 +1105,7 @@ export function PlayScreen(props: {
         const s = stateRef.current.plot.stage || 1;
         await preloadAllGenAssets(genLevelForStage(s, props.profile.quality));
       }],
+      ['Loading the leaks', async () => { await preloadMonsterJunk(); }],
       ['Fitting the lab', async () => { await scene.preloadLabGenerated(); }],
       ...SMOOTH_IDS.map((id): [string, () => void] => ['Shaping the boulders', () => { smoothModel(id); }]),
       ['Building your plot', () => { look(PLOT, 1); }],
@@ -1075,7 +1172,7 @@ export function PlayScreen(props: {
           };
         });
         scene.setFabricators(initFabs);
-        scene.mash.setWeaponStats(weaponStats(baseWorldRef.current.loadout));
+        scene.monsters.setWeaponStats(weaponStats(baseWorldRef.current.loadout));
         for (const m of baseWorldRef.current.machines) {
           const piece = baseWorldRef.current.base.pieces.find((p) => p.id === m.id);
           if (piece) {
@@ -1141,8 +1238,8 @@ export function PlayScreen(props: {
     const onMouseDown = (e: MouseEvent): void => {
       if (e.button === 0 && document.pointerLockElement === canvas) {
         isLmbDownRef.current = true;
-        if (scene.mash.isEquipped()) {
-          scene.mash.setTrigger(true);
+        if (scene.monsters.isEquipped()) {
+          scene.monsters.setTrigger(true);
           fireWeapon();
         } else {
           // A held rifle takes the mouse: the beam mines in the frame loop, and the other modes' strokes are the next step.
@@ -1175,7 +1272,7 @@ export function PlayScreen(props: {
     const onMouseUp = (e: MouseEvent): void => {
       if (e.button === 0) {
         isLmbDownRef.current = false;
-        scene.mash.setTrigger(false);
+        scene.monsters.setTrigger(false);
       }
     };
     window.addEventListener('keydown', kd); window.addEventListener('keyup', ku); window.addEventListener('mousemove', onMove);
@@ -1200,7 +1297,7 @@ export function PlayScreen(props: {
       const targetNode = forceBeamRef.current !== null
         ? (w.field.nodes.find((n) => n.id === forceBeamRef.current) ?? aimedNode)
         : aimedNode;
-      const isMining = (isLmbDownRef.current || forceBeamRef.current !== null) && hasBeam && targetNode !== null && !scene.mash.isEquipped();
+      const isMining = (isLmbDownRef.current || forceBeamRef.current !== null) && hasBeam && targetNode !== null && !scene.monsters.isEquipped();
       scene.setBeamFiring((isMining || beamBoulderTargetRef.current !== null) && beamHeldRef.current);
       scene.setBeamAiming(isLmbDownRef.current && beamHeldRef.current);
 
@@ -1718,7 +1815,12 @@ export function PlayScreen(props: {
       // ---- the held rifle takes ore from the boulder it is aimed at (TASK-21): Extract, left button, no field node in reach,
       // the boulder out to the beam's 25 m; about 4 ore a second on rock, more on scree (the boulder's own rate)
       {
-        const boulderId = live && !visitingRef.current && out.where === 'planet' && beamHeldRef.current && beamModeRef.current === 'extract' && isLmbDownRef.current && !scene.mash.isEquipped() && scene.aimNode(baseWorldRef.current.field, BEAM_RANGE) === null
+        // the beam held on a leak seals it (TASK-23b-2): Extract held on a leak's column, and no rock is mined meanwhile
+        const leakAim = live && !visitingRef.current && out.where === 'planet' && beamHeldRef.current && beamModeRef.current === 'extract' && isLmbDownRef.current && !scene.monsters.isEquipped() ? scene.aimLeak(BEAM_RANGE) : null;
+        sealAimRef.current = leakAim;
+        scene.monsters.setSealing(leakAim);
+        scene.setBeamSealing(leakAim !== null);
+        const boulderId = leakAim === null && live &&!visitingRef.current && out.where === 'planet' && beamHeldRef.current && beamModeRef.current === 'extract' && isLmbDownRef.current && !scene.monsters.isEquipped() && scene.aimNode(baseWorldRef.current.field, BEAM_RANGE) === null
           ? scene.aimBoulder(BEAM_STROKE_RANGE)
           : null;
         const hit = boulderId !== null ? scene.beamGatherBoulder(boulderId, dt) : null;
@@ -1753,7 +1855,7 @@ export function PlayScreen(props: {
       // out to 25 m. Carve gains ore and raise spends it (the plot's ore, never below zero). The keep-out zones (the gate's apron, the
       // structures, the machines, the plot's edge) are never cut. The cut lands in the chunks as they change, a few a frame.
       {
-        const sculpting = live && !visitingRef.current && out.where === 'planet' && beamHeldRef.current && beamModeRef.current === 'sculpt' && isLmbDownRef.current && !scene.mash.isEquipped();
+        const sculpting = live && !visitingRef.current && out.where === 'planet' && beamHeldRef.current && beamModeRef.current === 'sculpt' && isLmbDownRef.current && !scene.monsters.isEquipped();
         if (sculpting && ms - keepOutAtRef.current > 250) {
           keepOutAtRef.current = ms;
           scene.setBeamKeepOut(sculptZones());
@@ -1842,13 +1944,28 @@ export function PlayScreen(props: {
       hook.frames += 1; hook.where = out.where; hook.sync = out.sync; hook.step = stateRef.current.step; hook.wave = scene.debug.wave();
       if (hook.frames % 30 === 0) Object.assign(hook, scene.debug.stats());
       if (hook.frames % 15 === 0) {
-        const mobList = scene.mash.getMobList();
-        if (!hasSeenMobRef.current && mobList.some((m) => m.state !== 'death')) {
-          hasSeenMobRef.current = true;
-          narratorRef.current?.trigger('mob:seen');
-          updateChain(monsterSeen);
-        }
+        // the monsters follow the chain (the gate's lock after F-03, the dormant anomaly after the rifle); health comes back when quiet
+        const chainNow = stateRef.current.chain;
+        scene.monsters.setUnlocked(chainNow.monstersUnlocked);
+        scene.monsters.setDormantActive(stepDone(chainNow, 'A4-01'));
+        const nowMs = performance.now();
+        hpRef.current = regenHp(hpRef.current, (nowMs - lastHitRef.current) / 1000, Math.min(0.5, (nowMs - regenAtRef.current) / 1000));
+        regenAtRef.current = nowMs;
+        const eye = scene.debug.position();
+        const aim = scene.aimGround();
+        const yaw = Math.atan2(aim.dir.x, aim.dir.z);
+        const leaks = scene.monsters.markers();
+        setRadar(
+          leaks
+            .filter((m) => m.state !== 'sealed')
+            .map((m) => ({ id: m.id, bearing: hitBearing({ x: eye.x, z: eye.z, yaw }, m), distance: Math.hypot(m.x - eye.x, m.z - eye.z), state: m.state, inSeconds: m.inSeconds, seal: m.seal, dormant: m.dormant })),
+        );
+        const aimed = sealAimRef.current !== null ? leaks.find((m) => m.id === sealAimRef.current) : undefined;
+        setSealView(aimed ? { pct: aimed.seal, inReach: Math.hypot(aimed.x - eye.x, aimed.z - eye.z) <= SEAL_REACH } : null);
+        const hpNow = hpRef.current;
+        setVitals((v) => (v.hp === hpNow ? v : { ...v, hp: hpNow }));
       }
+
       if (ms - hudAt > 90 || out.event || labRes.events.length) {
         hudAt = ms;
         const vis = visitingRef.current;
@@ -1963,13 +2080,7 @@ export function PlayScreen(props: {
       // a test opens a lab panel (the click on its button is the real action); and skips grinding only (mining 50 units)
       openLabPanel: (kind: 'rack' | 'bench' | 'combiner' | null) => setLabPanel(kind),
       grindCount: (key: string, n: number) => updateChain((c) => bump(c, key, n)),
-      die: () => {
-        // a death: the screen takes the player back to the gate; the inventory and the save stay (TASK-22)
-        updateChain((c) => bump(c, COUNT.deaths));
-        const g = scene.debug.gatePlanet();
-        scene.debug.teleport('planet', g.x, g.z - 6, 0, 0);
-        say('Pulled back to the gate', 'Your inventory and your progress are kept.');
-      },
+      die: () => dieNow(),
       detail: () => scene.debug.detail(),
       raise: (to: number) => scene.raiseStage(to, scene.debug.gatePlanet()),
       twinStage: () => scene.debug.twinStage(),
@@ -2023,10 +2134,8 @@ export function PlayScreen(props: {
       teleport: (where: 'lab' | 'planet', x: number, z: number, y: number, p?: number) => scene.debug.teleport(where, x, z, y, p),
       setAltCam: (eye: { x: number; y: number; z: number }, p: number, y: number) => scene.debug.setAltCam(eye, p, y),
       clearAltCam: () => scene.debug.clearAltCam(),
-      mash: () => scene.mash,
-      spawnOgro: (count = 1) => scene.mash.spawnOgro(count),
-      spawnDemon: (count = 1) => scene.mash.spawnDemon(count),
-      equipShotgun: (on = true) => { scene.mash.equip(on); setMashEquipped(on); },
+      monsters: () => scene.monsters,
+      equipShotgun: (on = true) => { scene.monsters.equip(on); setGunEquipped(on); },
       fireShotgun: () => fireWeapon(),
       setPaused: (p: boolean) => setPaused(p),
       isPaused: () => pausedRef.current,
@@ -2079,7 +2188,7 @@ export function PlayScreen(props: {
             };
           });
           scene.setFabricators(fabs);
-          scene.mash.setWeaponStats(weaponStats(baseWorldRef.current.loadout));
+          scene.monsters.setWeaponStats(weaponStats(baseWorldRef.current.loadout));
         },
         enterVehicle: (id: number) => scene.enterVehicle(id),
         exitVehicle: () => {
@@ -2328,7 +2437,7 @@ export function PlayScreen(props: {
         say(next ? 'Structural Integrity: ON' : 'Structural Integrity: OFF');
         return;
       }
-      if (e.code === 'Space' && locked && mashEquipped && !sceneRef.current?.getDrivingVehicle()) {
+      if (e.code === 'Space' && locked && gunEquipped && !sceneRef.current?.getDrivingVehicle()) {
         fireWeapon();
         return;
       }
@@ -2445,7 +2554,7 @@ export function PlayScreen(props: {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [ready, creating, building, mashEquipped, fireWeapon, menu, panel, labPanel, dialOpen, locked, paused, hud.atLever, hud.atDial, hud.aimed, hud.aimedBoulder, hud.aimedLab, hud.where, placeNow, stopBuilding, freeMouse, say, props.profile]);
+  }, [ready, creating, building, gunEquipped, fireWeapon, menu, panel, labPanel, dialOpen, locked, paused, hud.atLever, hud.atDial, hud.aimed, hud.aimedBoulder, hud.aimedLab, hud.where, placeNow, stopBuilding, freeMouse, say, props.profile]);
   useEffect(() => {
     const onClick = (): void => { if (building && locked) placeNow(); };
     window.addEventListener('mousedown', onClick);
@@ -2497,9 +2606,9 @@ export function PlayScreen(props: {
           const g = scene.debug.gatePlanet();
           scene.debug.teleport('planet', g.x + 3, g.z + 5, Math.PI);
           if (p.has('mash') || p.has('monstermash') || p.has('spawn_test')) {
-            scene.mash.equip(true);
-            setMashEquipped(true);
-            void scene.mash.spawnOgro(1);
+            scene.monsters.equip(true);
+            setGunEquipped(true);
+            scene.monsters.setUnlocked(true);
           }
         }
       }
@@ -2538,24 +2647,85 @@ export function PlayScreen(props: {
       return true;
     };
     const dev = {
-      /** A mob by archetype, spawned on the planet in front of the player. */
-      spawnMob: (kind: 'ogro' | 'demon', count = 1): Promise<void> => {
-        const mash = sceneRef.current?.mash;
-        if (!mash) return Promise.resolve();
-        return kind === 'ogro' ? mash.spawnOgro(count) : mash.spawnDemon(count);
-      },
-      mobs: (): readonly MobStatus[] => sceneRef.current?.mash.getMobList() ?? [],
+      /** The living monsters on the planet (their state, era and position). */
+      mobs: (): readonly MonsterMobStatus[] => sceneRef.current?.monsters.getMobList() ?? [],
+      /** The leaks on the plot: their state, seal and wave timer. */
+      leaks: () => sceneRef.current?.monsters.markers() ?? [],
       /** Equips (or holsters) the combat shotgun. */
       equip: (item: 'shotgun' = 'shotgun', on = true): boolean => {
         if (item !== 'shotgun' || !sceneRef.current) return false;
-        sceneRef.current.mash.equip(on);
-        setMashEquipped(on);
+        sceneRef.current.monsters.equip(on);
+        setGunEquipped(on);
         return true;
       },
-      fire: (): void => fireWeapon(),
+      /** One shot from the view, straight through the monsters (the result: pellets, hits, damage, kills). */
+      fire: () => {
+        const s = sceneRef.current;
+        if (!s) return null;
+        if (devWeaponRef.current) s.monsters.setWeaponStats(devWeaponRef.current);
+        const r = s.aimGround();
+        return s.monsters.fire(r.origin, r.dir);
+      },
+      /** The view's ray on the ground (the origin and the unit direction, x and z), and the eye point. */
+      aim: () => sceneRef.current?.aimGround() ?? null,
+      eye: () => sceneRef.current?.debug.position() ?? null,
+      /** The sidearm's ammo: the rounds left, and the magazine. */
+      ammo: () => sceneRef.current?.monsters.getAmmo() ?? null,
+      /** The bridge store's stock, by item (the drops and the Act V kit land here). */
+      bridgeStock: (): Record<string, number> => {
+        const out: Record<string, number> = {};
+        const box = baseWorldRef.current.boxes.find((b) => b.id === BRIDGE_STORE);
+        for (const st of box?.slots ?? []) if (st) out[st.item] = (out[st.item] ?? 0) + st.n;
+        return out;
+      },
       /** The planet's and the mobs' fidelity stage (0 to 4: dither, EGA, VGA, Gouraud, PBR). */
       fidelity: (stage: number): void => { sceneRef.current?.setFidelityStage(stage); },
-      stats: (): CombatStats | null => sceneRef.current?.mash.getStats() ?? null,
+      stats: (): MonsterStats | null => sceneRef.current?.monsters.getStats() ?? null,
+      /** The monsters' clock: advances them by whole seconds without a frame (the warnings, the waves, the seal). */
+      stepMonsters: (seconds: number): void => { sceneRef.current?.stepMonsters(seconds); },
+      /** The F-03 flag (the monsters fight once the first gun exists). A test sets it; the chain sets it on F-03. */
+      unlockMonsters: (on = true): void => {
+        updateChain((c) => ({ ...c, monstersUnlocked: on }));
+        sceneRef.current?.monsters.setUnlocked(on);
+      },
+      /** Holds the seal on a leak for `seconds` (the beam's hold, without the aim); the brain seals it within reach. */
+      sealLeak: (id: number, seconds = 8): void => {
+        const scene = sceneRef.current;
+        if (!scene) return;
+        scene.monsters.setSealing(id);
+        scene.stepMonsters(seconds);
+        scene.monsters.setSealing(null);
+      },
+      /** The player's health: the hit points, and whether they are low. */
+      vitals: (): { readonly hp: number; readonly low: boolean } => ({ hp: hpRef.current, low: isLow(hpRef.current) }),
+      /** Sets the health (a test puts the player low, or near death). */
+      setHp: (hp: number): void => {
+        hpRef.current = Math.max(0, Math.min(PLAYER_MAX_HP, hp));
+        setVitals((v) => ({ ...v, hp: hpRef.current }));
+      },
+      /** The gate pad on the planet (the sanctuary's centre), in planet metres. */
+      gate: (): { readonly x: number; readonly z: number } | null => sceneRef.current?.debug.gatePlanet() ?? null,
+      /** A hit from a bearing (the damage, the health, the wedge, the low bark and the death). */
+      hit: (damage: number, bearing = 0): void => takeHit(damage, bearing),
+      /** Places a monster of `kind` on the ground `distance` m ahead of the view (the tests fire at it). Returns its id. */
+      placeMob: (kind: Archetype, distance = 6): number => {
+        const scene = sceneRef.current;
+        if (!scene) return -1;
+        const eye = scene.debug.position();
+        const aim = scene.aimGround();
+        const len = Math.hypot(aim.dir.x, aim.dir.z) || 1;
+        return scene.monsters.placeMob(kind, eye.x + (aim.dir.x / len) * distance, eye.z + (aim.dir.z / len) * distance);
+      },
+      /** A hit on a monster by id: its death and its drop, as a shot does. */
+      hurtMob: (id: number, damage: number) => sceneRef.current?.monsters.hurtMob(id, damage) ?? null,
+      /** The sidearm's parts (the weapon bench's core, barrel, sight and cell), as the bench fits them. */
+      setWeapon: (parts: { readonly core: string; readonly barrel: string; readonly sight: string; readonly cell: string }): void => {
+        const w = weaponStats({ ...parts });
+        devWeaponRef.current = w;
+        sceneRef.current?.monsters.setWeaponStats(w);
+      },
+      /** The Monsters setting (the Settings page sets it through the play settings; the tests set it here). */
+      setMonstersSetting: (level: MonstersSetting): void => { sceneRef.current?.monsters.setSetting(level); },
       /** Puts n of an item in the player's slots (stacks first). False when they do not fit or the item is unknown. */
       grant: (item: string, n: number): boolean => grant(item, n),
       /** The fidelity stage: the plot's and the base's (the base's pieces follow it). */
@@ -3442,7 +3612,8 @@ export function PlayScreen(props: {
             </div>
           )}
 
-          {mashEquipped && (
+          <MonsterHud hp={vitals.hp} maxHp={PLAYER_MAX_HP} hitAt={vitals.hitAt} hitBearing={vitals.bearing} radar={radar} seal={sealView} />
+          {gunEquipped && (
             <div className={`play-crosshair${hitMarker ? ' hit' : ''}`}>
               <div className="ch-top" />
               <div className="ch-bottom" />
@@ -3515,7 +3686,7 @@ export function PlayScreen(props: {
               currentStructureId={currentAimedStructureIdRef.current}
               planPrompt={planPrompt}
               weaponStats={weaponStats(baseWorldRef.current.loadout)}
-              ammo={mashAmmo}
+              ammo={gunAmmo}
               drivingSpeed={drivingSpeed}
               onDispatch={(cmd) => dispatchBase(cmd)}
               onPlaceLayout={(layoutId) => {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ARCHETYPES, MAX_MOBS, SEAL_SECONDS, WARN_SECONDS, addLeak, createWorld, decode, encode, hurt, raycast, step, type Archetype, type Event, type Input, type World } from '../src/index';
+import { ARCHETYPES, MAX_MOBS, SEAL_SECONDS, WARN_SECONDS, addLeak, createWorld, placeMob, decode, encode, hurt, raycast, step, type Archetype, type Event, type Input, type World } from '../src/index';
 
 type Timed = { readonly at: number; readonly e: Event };
 const input = (o: Partial<Input> = {}): Input => ({ dt: 1 / 30, stage: 2, aggression: 'normal', player: { x: 0, z: 0, alive: true }, machines: [], safe: [], sealing: null, ...o });
@@ -173,4 +173,15 @@ test('a spitter at the dome edge does not shoot a player who stands just inside 
   const w = addLeak(createWorld(16), { x: 27, z: 0 }, ['spitter']);
   const r = run(w, 120, () => input({ aggression: 'hard', stage: 4, player: { x: 24.5, z: 0, alive: true }, safe: dome }));
   assert.equal(r.events.filter((x) => x.e.t === 'hitPlayer' || x.e.t === 'telegraph').length, 0);
+});
+
+test('a placed monster is a real one: it fights, dies into its drop, and the id moves on', () => {
+  const w = placeMob(createWorld(17), 'brute', { x: 8, z: 0 });
+  assert.equal(w.mobs.length, 1);
+  assert.equal(w.nextId, 2);
+  const m = w.mobs[0]!;
+  assert.equal(m.hp, ARCHETYPES.brute.hp);
+  const dead = hurt(w, m.id, 1e9).events.find((e) => e.t === 'death');
+  assert.ok(dead && dead.t === 'death' && dead.drop.item === 'vertices');
+  assert.equal(placeMob(w, 'charger', { x: 0, z: 0 }).nextId, 3);
 });

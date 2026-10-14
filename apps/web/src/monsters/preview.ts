@@ -128,6 +128,7 @@ function rosterSetup(era: Era): { ids: string[]; mode: Mode; cam: THREE.Perspect
   const cols = 6, sp = 4.4, rows = Math.ceil(skins.length / cols);
   const scene = baseScene();
   const mon = createMonsterRenderer(scene, { budget: { animated: 16, perSkin: 4 } });
+  mon.setStage(Number(params.get('stage') ?? 6));
   const mobs: MonsterMob[] = skins.map((s, i) => ({
     id: i + 1, kind: s.archetype, x: (i % cols) * sp - ((cols - 1) * sp) / 2, z: -Math.floor(i / cols) * sp, phase: 'roam', phaseT: 0, yaw: 0,
   }));
@@ -186,6 +187,7 @@ function frontSetup(era: Era, pick: readonly string[] | null): { ids: string[]; 
   const sp = 3.0;
   const scene = baseScene();
   const mon = createMonsterRenderer(scene, { budget: { animated: 64, perSkin: 4 } });
+  mon.setStage(Number(params.get('stage') ?? 6));
   const mobs: MonsterMob[] = skins.map((s, i) => ({
     id: i + 1, kind: s.archetype, x: i * sp - ((skins.length - 1) * sp) / 2, z: 0, phase: 'chase', phaseT: 0, yaw: 0,
   }));

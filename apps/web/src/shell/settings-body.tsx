@@ -3,6 +3,7 @@ import { FPS_TARGETS, parseQuality, tidyGpuName, type Quality } from '@hm/game';
 import { resolveGraphics } from '@hm/render';
 import { ControlsList, ControlsSettings } from './controls-list';
 import { GraphicsTuning } from './graphics-tuning';
+import { MONSTER_CREDITS } from '../monsters/credits';
 import { gpuInUse, tierInUse, type GpuChoice, type Profile } from './profile';
 import { setPlaySettings, usePlaySettings } from './play-settings';
 
@@ -25,6 +26,14 @@ const PRESETS: readonly { readonly id: Choice; readonly name: string; readonly s
  * in sections: Graphics (one click from Potato to Ultra, or Auto with a frame-rate target, then fine-tuning and the graphics card), Sound,
  * Controls, Racing, and You (name, grown-up mode, the island's look, the tour).
  */
+/** The monsters' levels: what each one does, in the words the player needs (the owner: Off, Calm, Normal, Hard). */
+const MONSTER_LEVELS = [
+  { id: 'off', label: 'Off', hint: 'No leaks open. Sealing still works, for the same drops.' },
+  { id: 'calm', label: 'Calm', hint: 'Leaks open, but the monsters fight back only when hit.' },
+  { id: 'normal', label: 'Normal', hint: 'Monsters come for you within 40 m, a wave every 90 s.' },
+  { id: 'hard', label: 'Hard', hint: 'Bigger waves, a wave every minute.' },
+] as const;
+
 export function SettingsBody(props: {
   readonly profile: Profile; readonly update: (fn: (p: Profile) => Profile) => void;
   /** Replay the tour and reset progress (left out where they make no sense, e.g. in a paused race). */
@@ -86,6 +95,20 @@ export function SettingsBody(props: {
         </div>
         <label className="row"><input type="checkbox" checked={play.showMinimap} onChange={(e) => setPlaySettings({ showMinimap: e.target.checked })} /> Show the minimap</label>
         <label className="row"><input type="checkbox" checked={play.invertSteer} onChange={(e) => setPlaySettings({ invertSteer: e.target.checked })} /> Swap left and right steering</label>
+      </section>
+      <section aria-label="Monsters">
+        <h4>Monsters</h4>
+        <div className="row" role="group" aria-label="Monsters level">
+          <span className="seg">{MONSTER_LEVELS.map((m) => <button key={m.id} className={play.monsters === m.id ? 'on' : ''} aria-pressed={play.monsters === m.id} onClick={() => setPlaySettings({ monsters: m.id })}>{m.label}</button>)}</span>
+        </div>
+        <p className="hint">{MONSTER_LEVELS.find((m) => m.id === play.monsters)?.hint}</p>
+      </section>
+      <section aria-label="Credits">
+        <h4>Credits</h4>
+        <ul className="hint">
+          {MONSTER_CREDITS.map((c) => <li key={c.id}>{c.name}, {c.licence}. <a href={c.url} target="_blank" rel="noreferrer">{c.url.replace(/^https?:\/\//, '')}</a></li>)}
+        </ul>
+        <p className="hint">The full licence texts ship with the monster art (monsters/credits.json), and in docs/CREDITS.md.</p>
       </section>
       <section aria-label="You">
         <h4>You</h4>

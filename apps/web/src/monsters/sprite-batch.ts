@@ -2,6 +2,7 @@
 // point. Per instance the batch writes the anchor, the atlas rectangle of the view picked this frame (a mirrored view flips its U,
 // with the origin mirrored too) and the quad's box around the anchor, in metres. Unlit, with the scene's fog (pixel art is pre-lit).
 import * as THREE from 'three';
+import { SPRITE_OVERLAY_BODY, SPRITE_OVERLAY_FRAG, SPRITE_OVERLAY_VERT, pulseFor, sliceFor, type Look } from './overlay';
 import type { SpriteAsset, SpriteView } from './loader';
 import { bearing, frameIndex, pickView, type Play } from './timing';
 
@@ -9,6 +10,8 @@ import { bearing, frameIndex, pickView, type Play } from './timing';
 export interface SpriteSlot {
   readonly x: number;
   readonly z: number;
+  /** The ground height under the feet (0 when not given). */
+  readonly y?: number;
   readonly yaw: number;
   readonly play: Play;
   readonly phaseT: number;
@@ -19,11 +22,13 @@ attribute vec3 aAnchor;
 attribute vec4 aFrame;
 attribute vec4 aBox;
 varying vec2 vUv;
+${SPRITE_OVERLAY_VERT}
 #include <fog_pars_vertex>
 void main() {
   vUv = vec2(aFrame.x + uv.x * aFrame.z, aFrame.y + (1.0 - uv.y) * aFrame.w);
   vec4 mvPosition = modelViewMatrix * vec4(aAnchor, 1.0);
   mvPosition.xy += vec2(mix(aBox.x, aBox.z, uv.x), mix(aBox.y, aBox.w, uv.y));
+  mvPosition.x += uSlice * sin(floor(uv.y * 12.0) * 12.9898 + uTime * 9.0) * 0.05;
   gl_Position = projectionMatrix * mvPosition;
   #include <fog_vertex>
 }
@@ -32,12 +37,13 @@ void main() {
 const FRAG = /* glsl */ `
 uniform sampler2D uAtlas;
 uniform vec3 uTint;
+${SPRITE_OVERLAY_FRAG}
 varying vec2 vUv;
 #include <fog_pars_fragment>
 void main() {
   vec4 c = texture2D(uAtlas, vUv);
   if (c.a < 0.5) discard;
-  gl_FragColor = vec4(c.rgb * uTint, 1.0);
+${SPRITE_OVERLAY_BODY}
   #include <fog_fragment>
 }
 `;
@@ -49,10 +55,14 @@ export class SpriteBatch {
   private readonly frame: THREE.InstancedBufferAttribute;
   private readonly box: THREE.InstancedBufferAttribute;
   private slots: SpriteSlot[] = [];
+  private readonly uniforms: Record<string, THREE.IUniform>;
+  /** The frame's wind-up pulse and glitch slice (the strongest of the batch's monsters). */
+  private pulseNow = 0.2;
+  private sliceNow = 0;
   /** Slots that did not fit this frame (the batch's capacity). */
   dropped = 0;
 
-  constructor(readonly asset: SpriteAsset, readonly capacity: number, tint: readonly [number, number, number] = [1, 1, 1]) {
+  constructor(readonly asset: SpriteAsset, readonly capacity: number, tint: readonly [number, number, number] = [1, 1, 1], look: Look = { rim: 0x3dc8ff, remap: 0.2, levels: 0 }) {
     const quad = new THREE.PlaneGeometry(1, 1);
     this.geo = new THREE.InstancedBufferGeometry();
     this.geo.setIndex(quad.index);
@@ -69,17 +79,28 @@ export class SpriteBatch {
     this.geo.setAttribute('aFrame', this.frame);
     this.geo.setAttribute('aBox', this.box);
     this.geo.instanceCount = 0;
+    const img = asset.texture.image as { width?: number; height?: number } | undefined;
+    const tw = img?.width || 1;
+    const th = img?.height || 1;
     const mat = new THREE.ShaderMaterial({
       vertexShader: VERT,
       fragmentShader: FRAG,
       uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
         uAtlas: { value: asset.texture },
         uTint: { value: new THREE.Vector3(tint[0], tint[1], tint[2]) },
+        uRim: { value: new THREE.Color(look.rim) },
+        uPulse: { value: 0.2 },
+        uRemap: { value: look.remap },
+        uLevels: { value: look.levels },
+        uSlice: { value: 0 },
+        uTime: { value: 0 },
+        uTexel: { value: new THREE.Vector2(1 / tw, 1 / th) },
       }]),
       fog: true,
       side: THREE.DoubleSide,
     });
     this.mesh = new THREE.Mesh(this.geo, mat);
+    this.uniforms = mat.uniforms;
     this.mesh.frustumCulled = false;
     this.mesh.visible = false;
     this.mesh.name = `monster-sprite:${asset.id}`;
@@ -89,6 +110,13 @@ export class SpriteBatch {
   begin(): void {
     this.slots = [];
     this.dropped = 0;
+    this.pulseNow = 0.2;
+    this.sliceNow = 0;
+  }
+
+  /** The ground's quantisation steps (the stage the monster stands on; 0 is smooth). */
+  setLevels(levels: number): void {
+    this.uniforms['uLevels']!.value = levels;
   }
 
   /** Adds a monster to this frame; false when the batch is full. */
@@ -98,6 +126,9 @@ export class SpriteBatch {
       return false;
     }
     this.slots.push(slot);
+    const windup = slot.play.group === 'attack' && slot.play.mode === 'hold';
+    this.pulseNow = Math.max(this.pulseNow, pulseFor(windup ? slot.phaseT : null));
+    this.sliceNow = Math.max(this.sliceNow, sliceFor(windup ? 'windup' : slot.play.group === 'pain' ? 'pain' : 'other'));
     return true;
   }
 
@@ -107,6 +138,9 @@ export class SpriteBatch {
 
   /** Writes every slot's view for the camera at (cx, cz), and the frame of its phase. Returns the number drawn. */
   update(cx: number, cz: number): number {
+    this.uniforms['uPulse']!.value = this.pulseNow;
+    this.uniforms['uSlice']!.value = this.sliceNow;
+    this.uniforms['uTime']!.value = performance.now() / 1000;
     const a = this.asset;
     const W = a.width, H = a.height;
     let drawn = 0;
@@ -118,7 +152,7 @@ export class SpriteBatch {
       if (!v) {
         this.frame.setXYZW(i, 0, 0, 0, 0);
         this.box.setXYZW(i, 0, 0, 0, 0);
-        this.anchor.setXYZ(i, s.x, 0, s.z);
+        this.anchor.setXYZ(i, s.x, s.y ?? 0, s.z);
         return;
       }
       const mpp = a.mpp;
@@ -128,7 +162,7 @@ export class SpriteBatch {
       const du = (v.mirrored ? -v.w : v.w) / W;
       this.frame.setXYZW(i, u0, v.y / H, du, v.h / H);
       this.box.setXYZW(i, -ox * mpp, -(v.h - v.oy) * mpp, (v.w - ox) * mpp, v.oy * mpp);
-      this.anchor.setXYZ(i, s.x, 0, s.z);
+      this.anchor.setXYZ(i, s.x, s.y ?? 0, s.z);
       drawn++;
     });
     this.geo.instanceCount = this.slots.length;

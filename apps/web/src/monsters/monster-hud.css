@@ -1,0 +1,152 @@
+/* The monster HUD (TASK-23b-2). The game's own HUD vocabulary: a dark glass plate with a 2 px accent edge (the goal and plot panels),
+   Oxanium for figures and state words, Inter for sentences. Sentence case throughout. Pointer-free: nothing here takes a click.
+   The colours are the beam's and the leaks': cyan for dormant and Extract, magenta for open leaks and low health, amber for a surge
+   due and the Seal. Motion only answers the player: a hit fades out, a seal fills, low health pulses. */
+.mhud {
+  --mh-ink: #e7f1f7;
+  --mh-dim: #8aa0ad;
+  --mh-signal: #3dc8ff;
+  --mh-melee: #ff3d8a;
+  --mh-ranged: #ffc13d;
+  --mh-glass: rgba(8, 10, 12, 0.66);
+  --mh-edge: rgba(231, 241, 247, 0.12);
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  color: var(--mh-ink);
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.35;
+  text-shadow: 0 1px 3px rgba(4, 6, 8, 0.7);
+}
+.mhud * { box-sizing: border-box; }
+
+.mhud-plate {
+  position: absolute;
+  background: var(--mh-glass);
+  border: 1px solid var(--mh-edge);
+  border-left: 2px solid var(--mh-signal);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
+  padding: 10px 12px 11px;
+}
+
+.mhud-title {
+  margin: 0 0 6px;
+  font: 600 12px/1.2 Oxanium, Inter, sans-serif;
+  letter-spacing: 0.02em;
+  color: var(--mh-dim);
+}
+
+/* ---- the radar, top right: the scope and the nearest three leaks */
+.mhud-radar {
+  top: clamp(64px, 12vh, 104px);
+  right: clamp(16px, 4vw, 56px);
+  width: min(248px, 48vw);
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+.mhud-scope { width: 92px; height: 92px; overflow: visible; }
+.mhud-scope .ring { fill: none; stroke: rgba(138, 160, 173, 0.34); stroke-width: 0.6; }
+.mhud-scope .fwd { stroke: var(--mh-ink); stroke-width: 0.9; opacity: 0.7; }
+.mhud-scope .you { fill: var(--mh-ink); }
+.mhud-scope .blip { stroke: #07090c; stroke-width: 0.6; }
+.mhud-scope .blip.dormant { fill: var(--mh-signal); }
+.mhud-scope .blip.open { fill: var(--mh-melee); }
+.mhud-scope .blip.warned { fill: var(--mh-ranged); }
+.mhud-scope .surge {
+  fill: none;
+  stroke: var(--mh-ranged);
+  stroke-width: 0.9;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mhud-surge 1.2s ease-out infinite;
+}
+@keyframes mhud-surge {
+  from { transform: scale(0.6); opacity: 0.9; }
+  to { transform: scale(2.1); opacity: 0; }
+}
+
+.mhud-leaks { min-width: 0; }
+.mhud-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.mhud-list li { display: grid; gap: 1px; padding-left: 9px; border-left: 2px solid var(--mh-melee); }
+.mhud-list li.dormant { border-left-color: var(--mh-signal); }
+.mhud-list li.warned { border-left-color: var(--mh-ranged); }
+.mhud-list b { font: 700 15px/1.1 Oxanium, Inter, sans-serif; font-variant-numeric: tabular-nums; }
+.mhud-list span { font-size: 12px; color: var(--mh-dim); }
+.mhud-none { margin: 0; font-size: 12px; color: var(--mh-dim); }
+
+/* ---- health, bottom right: the figure and twenty segments */
+.mhud-vitals {
+  right: clamp(16px, 4vw, 56px);
+  bottom: clamp(88px, 14vh, 128px);
+  width: min(248px, 60vw);
+}
+.mhud-figure { display: flex; align-items: baseline; gap: 6px; }
+.mhud-figure b { font: 700 28px/1 Oxanium, Inter, sans-serif; font-variant-numeric: tabular-nums; }
+.mhud-figure span { font-size: 12px; color: var(--mh-dim); }
+.mhud-bar {
+  display: grid;
+  grid-template-columns: repeat(20, minmax(0, 1fr));
+  gap: 2px;
+  height: 10px;
+  margin-top: 9px;
+}
+.mhud-bar i { display: block; background: rgba(231, 241, 247, 0.14); }
+.mhud-bar i.on { background: var(--mh-ink); box-shadow: 0 0 6px rgba(61, 200, 255, 0.45); }
+.mhud-vitals.low .mhud-bar i.on { background: var(--mh-melee); box-shadow: 0 0 8px rgba(255, 61, 138, 0.6); animation: mhud-low 1s ease-in-out infinite; }
+.mhud-vitals.low .mhud-figure b { color: #ffd1e1; }
+@keyframes mhud-low { 50% { opacity: 0.45; } }
+.mhud-note { margin: 8px 0 0; font-size: 12px; color: #ffd1e1; }
+
+/* ---- the seal, under the crosshair: it sits below the centre and never on it */
+.mhud-seal {
+  left: 50%;
+  top: 57%;
+  transform: translateX(-50%);
+  width: min(232px, 60vw);
+  text-align: center;
+  border-left-color: var(--mh-ranged);
+}
+.mhud-seal .mhud-title { color: var(--mh-ranged); margin-bottom: 3px; }
+.mhud-sub { margin: 0; font-size: 12px; color: var(--mh-dim); }
+.mhud-seal-bar { height: 4px; margin-top: 8px; background: rgba(255, 193, 61, 0.16); }
+.mhud-seal-bar i { display: block; height: 100%; background: var(--mh-ranged); box-shadow: 0 0 10px rgba(255, 193, 61, 0.7); }
+
+/* ---- a hit: a wedge on the screen edge where it came from (the overlay turns to the bearing) */
+.mhud-hit {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+  background: linear-gradient(to bottom, rgba(255, 61, 138, 0.55), rgba(255, 61, 138, 0) 20%);
+  -webkit-mask-image: linear-gradient(to right, transparent 26%, #000 50%, transparent 74%);
+  mask-image: linear-gradient(to right, transparent 26%, #000 50%, transparent 74%);
+  opacity: 0;
+  animation: mhud-hit 0.9s ease-out forwards;
+}
+@keyframes mhud-hit {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ---- phones: the radar and the health shrink, and the health sits clear of the hotbar */
+@media (max-width: 720px) {
+  .mhud-radar { width: min(212px, 56vw); grid-template-columns: 72px minmax(0, 1fr); gap: 9px; }
+  .mhud-scope { width: 72px; height: 72px; }
+  .mhud-vitals { bottom: 118px; }
+  .mhud-seal { top: 52%; }
+}
+
+/* reduced motion: nothing moves or fades, but the hit's direction still shows, as a held wedge that drops out after a moment */
+@media (prefers-reduced-motion: reduce) {
+  .mhud *:not(.mhud-hit) { animation: none !important; transition: none !important; }
+  .mhud-hit { animation: mhud-hit-static 1.6s steps(1, end) forwards; }
+}
+@keyframes mhud-hit-static {
+  0%, 99% { opacity: 0.9; }
+  100% { opacity: 0; }
+}

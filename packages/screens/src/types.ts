@@ -10,9 +10,11 @@ export interface Settings {
   reducedMotion: boolean;
   invertSteer: boolean;
   showMinimap: boolean;
+  /** The monsters on the planet: Off (no leaks open), Calm (they fight back when hit), Normal, Hard. */
+  monsters: 'off' | 'calm' | 'normal' | 'hard';
 }
 
-export const DEFAULT_SETTINGS: Settings = { master: 0.8, sfx: 0.9, music: 0.5, quality: 'auto', touchControls: 'auto', reducedMotion: false, invertSteer: false, showMinimap: true };
+export const DEFAULT_SETTINGS: Settings = { master: 0.8, sfx: 0.9, music: 0.5, quality: 'auto', touchControls: 'auto', reducedMotion: false, invertSteer: false, showMinimap: true, monsters: 'normal' };
 
 /** Points a custom goblin may spend across weight, speed and bounce (each 1..10). */
 export const STAT_BUDGET = 15;

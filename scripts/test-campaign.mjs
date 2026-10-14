@@ -569,7 +569,26 @@ await beat('13 A4-01: the armory rack hands over the rifle (the button is the ac
   await page.waitForTimeout(400);
   const toast = await toastText();
   const drawn = toast.includes('Extraction beam');
-  return { ok: visible && cur === 'A4-02' && sub && drawn, detail: `button=${visible} current=${cur} A4-01 line=${sub} G draws=${drawn} toast="${toast}"` };
+  return { ok: visible && cur === 'A4-01b' && sub && drawn, detail: `button=${visible} current=${cur} A4-01 line=${sub} G draws=${drawn} toast="${toast}"` };
+});
+
+await beat('13b A4-01b: the dormant anomaly by the perimeter appears once the rifle is taken; the beam held on it seals it (the first Anomaly Core, on the bridge) and the step closes', async (row) => {
+  await toPlanet();
+  await page.waitForTimeout(400);
+  const found = await page.evaluate(() => window.__dev.leaks().find((l) => l.dormant) ?? null);
+  row.shot = await shot('dormant-anomaly');
+  if (!found) return { ok: false, detail: 'no dormant anomaly on the plot after the rifle' };
+  const shown = found.state === 'dormant';
+  await page.evaluate(([x, z]) => window.hmPlay.teleport('planet', x + 6, z, 0, 0), [found.x, found.z]);
+  await page.waitForTimeout(300);
+  const core0 = await page.evaluate(() => window.__dev.bridgeStock()['anomaly-core'] ?? 0);
+  await page.evaluate((id) => window.__dev.sealLeak(id, 9), found.id);
+  const core1 = await page.evaluate(() => window.__dev.bridgeStock()['anomaly-core'] ?? 0);
+  const cur = await chainCur();
+  const toast = await toastText();
+  const radio = await waitSub('A4-LEAK-SEAL', 4000);
+  row.shot = await shot('dormant-sealed');
+  return { ok: shown && core1 - core0 === 1 && cur === 'A4-02' && radio, detail: `radio line=${radio} ` +  `anomaly dormant=${shown} cores ${core0} -> ${core1} current=${cur} toast="${toast}"` };
 });
 
 await beat('14 A4-02: the rifle mines dirt for real (a stroke on a boulder), grinding tops up to 50, and the texture mill runs 10 s: its line plays', async (row) => {
@@ -1083,7 +1102,7 @@ await beat('25 F-04 and F-05: stages 2 to 6 (the plot stage is grinding, skipped
   return { ok: cur === null, detail: `stages ${seen.join(' ')} chain current=${cur}` };
 });
 
-await beat('26 a death respawns at the gate; the inventory and the chain are kept (the death source is TASK-23b)', async (row) => {
+await beat('26 a death respawns at the gate; the inventory and the chain are kept (the monsters can kill; here the death is the hook)', async (row) => {
   await toPlanet();
   const slotsBefore = await slotsJson();
   // the chain is kept when its progress and its monsters flag are the same and no counter went down (the counters keep
@@ -1119,6 +1138,28 @@ await beat('27 each chain narration line played once; the radio log holds no rep
   const s2Heard = heard.includes('S-2');
   row.shot = await shot('radio-log');
   return { ok: missing.length === 0 && repeats === 0 && !s2Heard, detail: `missing=${missing.join(',') || 'none'} repeats=${repeats} S-2 heard=${s2Heard}` };
+});
+
+await beat('28 F-03 unlocks the fight: a leak warns, its wave comes, M-01 plays at the first sighting, a kill drops its substrate on the bridge, and M-02 plays at the first kill', async (row) => {
+  await toPlanet();
+  const unlocked = await page.evaluate(() => window.hmPlay.chainState().monstersUnlocked === true);
+  await page.evaluate(() => window.__dev.setMonstersSetting('normal'));
+  await page.waitForTimeout(500);
+  const warned = await page.evaluate(() => window.__dev.leaks().some((l) => !l.dormant && l.state !== 'sealed'));
+  const spawned0 = (await page.evaluate(() => window.__dev.stats()))?.mobsSpawned ?? 0;
+  await page.evaluate(() => window.__dev.stepMonsters(100));
+  const spawned1 = (await page.evaluate(() => window.__dev.stats()))?.mobsSpawned ?? 0;
+  // a new wave, or the budget holding the living at its cap (8 on Low): either is the fight working
+  const living = await page.evaluate(() => window.__dev.mobs().length);
+  const sawM01 = await waitSub('M-01', 8000);
+  const stock0 = await page.evaluate(() => window.__dev.bridgeStock());
+  const id = await page.evaluate(() => window.__dev.placeMob('charger', 6));
+  await page.evaluate((i) => window.__dev.hurtMob(i, 9999), id);
+  const stock1 = await page.evaluate(() => window.__dev.bridgeStock());
+  const dropped = (stock1['pxd-mono'] ?? 0) - (stock0['pxd-mono'] ?? 0) === 4;
+  const sawM02 = await waitSub('M-02', 20000);
+  row.shot = await shot('monsters-fight');
+  return { ok: unlocked && warned && (spawned1 > spawned0 || living >= 8) && sawM01 && dropped && sawM02, detail: `unlocked=${unlocked} warned=${warned} living=${living} spawned ${spawned0} -> ${spawned1} M-01=${sawM01} drop=${dropped} M-02=${sawM02}` };
 });
 
 // ----------------------------------------------------------------------------------------------------------------------

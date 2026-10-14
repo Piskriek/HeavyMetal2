@@ -371,38 +371,41 @@ await beat('9 rover: enter the scout, drive (driving music), leave', async (row)
 });
 
 await beat('10 monsters: mobs engage, combat music, a kill (M-02)', async (row) => {
-  // the sandbox panel is gone (TASK-20): the monsters are spawned and fired by the debug hooks (window.__dev, ?e2e)
+  // the monsters are placed and fired by the debug hooks (window.__dev, ?e2e): the sandbox panel is gone (TASK-20)
   await page.goto(`${base}/?mash&e2e`, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.waitForFunction(() => window.hmPlay?.ready === true, null, { timeout: 60000 });
   await dismissCreator();
-  await page.evaluate(() => window.__dev.spawnMob('ogro', 1));
-  await page.waitForTimeout(1500);
-  await page.evaluate(() => window.__dev.spawnMob('demon', 1));
-  await page.waitForTimeout(1500);
+  await page.evaluate(() => { window.__dev.setMonstersSetting('normal'); window.__dev.unlockMonsters(true); });
+  // two monsters six metres ahead of the view (the gate's dome keeps them off the player; the shots are the test)
+  await page.evaluate(() => { window.__dev.placeMob('brute', 6); window.__dev.placeMob('charger', 6); });
+  await page.waitForTimeout(1200);
   // stand 4 m from the nearest live mob, facing it, then fire at it
   const aimed = await page.evaluate(() => {
-    const mash = window.hmPlay.mash();
-    const mobs = mash.getMobList().filter((m) => m.hp > 0);
+    const mobs = window.__dev.mobs();
     if (mobs.length === 0) return null;
-    const scene = window.__playScene;
-    const p = scene.debug.position();
-    const m = mobs.reduce((a, b) => (Math.hypot(a.pos.x - p.x, a.pos.z - p.z) <= Math.hypot(b.pos.x - p.x, b.pos.z - p.z) ? a : b));
-    const dx = m.pos.x - p.x, dz = m.pos.z - p.z, h = Math.hypot(dx, dz) || 1;
+    const eye = window.__dev.eye();
+    const m = mobs.reduce((a, b) => (Math.hypot(a.pos.x - eye.x, a.pos.z - eye.z) <= Math.hypot(b.pos.x - eye.x, b.pos.z - eye.z) ? a : b));
+    const dx = m.pos.x - eye.x, dz = m.pos.z - eye.z, h = Math.hypot(dx, dz) || 1;
     const dist = 4;
     const yaw = Math.atan2(-dx, -dz);
     const sx = m.pos.x - (dx / h) * dist, sz = m.pos.z - (dz / h) * dist;
-    scene.debug.teleport('planet', sx, sz, yaw, Math.atan2(m.pos.y + 0.8 - (scene.debug.position().y), dist));
+    window.hmPlay.teleport('planet', sx, sz, yaw, Math.atan2(m.pos.y + 0.8 - eye.y, dist));
     return { id: m.id, kind: m.kind, hp: m.hp, dist: Math.round(h * 10) / 10 };
   });
   console.log('aimed at mob:', JSON.stringify(aimed));
+  await page.waitForTimeout(400);
+  // the combat track is sampled while the fight runs (the monsters die within seconds, and the moon comes back after them)
+  let music = null;
   for (let i = 0; i < 9; i++) {
-    await page.evaluate(() => window.hmPlay.mash().reload?.());
     await page.evaluate(() => window.__dev.fire());
-    await page.waitForTimeout(350);
+    await page.waitForTimeout(600);
+    const now = await page.evaluate(() => window.hmPlay.audio?.getMusicContext?.() ?? null);
+    if (now === 'monster-mash') music = now;
   }
-  const stats = await page.evaluate(() => window.hmPlay.mash().getStats());
-  const m02 = await waitSub('M-02', 4000);
-  const music = await page.evaluate(() => window.hmPlay.audio?.getMusicContext?.() ?? null);
+  const stats = await page.evaluate(() => window.__dev.stats());
+  // the radio log keeps every line that played (a subtitle is only up for a few seconds)
+  const heard = await page.evaluate(() => window.hmPlay?.heard?.() ?? []);
+  const m02 = heard.includes('M-02') || (await waitSub('M-02', 3000));
   row.shot = await shot('monster-mash');
   const kills = stats?.mobsDefeated ?? 0;
   const ok = kills >= 1 && m02 && music === 'monster-mash';

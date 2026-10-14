@@ -496,6 +496,46 @@ export class GameNarratorController {
     return this.activeSub;
   }
 
+  /**
+   * A radio line with no voice yet (the owner decides whether it is voiced): a subtitle for `seconds`, with the PTT squelch click
+   * before it. Shows nothing when subtitles are off; the click needs the audio chain (after the first click on the page).
+   */
+  public showSubtitleOnly(id: string, text: string, seconds = 7): void {
+    this.squelchClick();
+    if (!this.settings.subtitlesEnabled) return;
+    this.activeSub = { id, text, cleanText: text };
+    this.notifySubscribers();
+    setTimeout(() => {
+      if (this.activeSub?.id === id) {
+        this.activeSub = null;
+        this.notifySubscribers();
+      }
+    }, seconds * 1000);
+  }
+
+  /** The push-to-talk squelch click: a 60 ms burst of band-limited noise (no voice). */
+  public squelchClick(): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    if (ctx.state === 'suspended') void ctx.resume();
+    const len = Math.floor(ctx.sampleRate * 0.06);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4);
+    const src = ctx.createBufferSource();
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.value = 2400;
+    band.Q.value = 1.2;
+    const gain = ctx.createGain();
+    gain.gain.value = 0.35;
+    src.buffer = buf;
+    src.connect(band);
+    band.connect(gain);
+    gain.connect(ctx.destination);
+    src.start();
+  }
+
   public trigger(event: string): void {
     this.state = trigger(this.rules, this.state, event);
   }

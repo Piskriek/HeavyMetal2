@@ -147,6 +147,8 @@ export interface Input {
   readonly safe: readonly (P & { readonly r: number })[];
   readonly sealing: number | null;
   readonly walkable?: (x: number, z: number) => boolean;
+  /** The most living monsters this frame (the graphics budget); defaults to MAX_MOBS. */
+  readonly cap?: number;
 }
 
 export type Event =
@@ -381,7 +383,7 @@ export function step(
       const count = Math.floor(rawCount);
 
       for (let c = 0; c < count; c++) {
-        if (livingMobsCount >= MAX_MOBS) break;
+        if (livingMobsCount >= (input.cap ?? MAX_MOBS)) break;
 
         let spawnX = leak.x;
         let spawnZ = leak.z;
@@ -946,4 +948,15 @@ export function decode(s: string): World {
       nextWave: l.nextWave,
     })),
   };
+}
+
+/**
+ * A monster placed by hand (the tests and the dev hooks): a mob of `kind` at `at`, on no leak (`leak` -1: it roams where it stands).
+ * Deterministic: the id is the world's next id, and the world's clock and random state are untouched.
+ */
+export function placeMob(w: World, kind: Archetype, at: P): World {
+  const id = w.nextId;
+  const spec = ARCHETYPES[kind];
+  const mob: Mob = { id, kind, leak: -1, hp: spec.hp, phase: 'roam', phaseT: 0, provoked: false, x: at.x, z: at.z };
+  return { t: w.t, rng: w.rng, nextId: id + 1, mobs: [...w.mobs, mob], bolts: w.bolts, leaks: w.leaks };
 }

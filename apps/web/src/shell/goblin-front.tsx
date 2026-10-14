@@ -60,7 +60,6 @@ export type MenuId =
   | 'grid'
   | 'fabricator'
   | 'studio'
-  | 'workshop'
   | 'community'
   | 'settings'
   | 'racing'
@@ -79,7 +78,6 @@ const FIDELITY_MENU: readonly MenuItem[] = [
   { id: 'expedition', label: 'Expedition', says: 'Singleplayer campaign (desynced): private local simulation branch. Play solo/offline.', badge: 'DESYNCED' },
   { id: 'grid', label: 'Planetary Grid', says: 'Multiplayer campaign (synced): shared 40,000 km world. Majority rules merging.', badge: 'SYNCED' },
   { id: 'studio', label: 'The Studio', says: 'In-engine world & schema editor. Terrain sculpting, machine placement & test drive.', badge: 'EDITOR' },
-  { id: 'workshop', label: 'The Workshop', says: 'Game bridging manager: ingest WAD/PAK/MD2, calibrate vehicle & weapon adapters.' },
   { id: 'community', label: 'Community Nexus', says: 'Share presets, bridge cartridges, and sector layouts.' },
   { id: 'settings', label: 'Diagnostics & Settings', says: 'Fidelity stages, Bayer dither, raw input, audio & hardware.' },
 ];
@@ -105,7 +103,6 @@ export function SetMixHome(props: {
   readonly onGrid?: () => void;
   readonly onFabricator?: () => void;
   readonly onStudio?: () => void;
-  readonly onWorkshop?: () => void;
   readonly onCommunity: () => void;
   readonly onSettings: () => void;
   readonly credits: number;
@@ -127,7 +124,6 @@ export function SetMixHome(props: {
     island: props.onMyIsland,
     fabricator: props.onFabricator,
     studio: props.onStudio,
-    workshop: props.onWorkshop,
     community: props.onCommunity,
     settings: props.onSettings,
     racing: props.onGoblin,

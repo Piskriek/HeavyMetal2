@@ -3,7 +3,7 @@ import { HEAVY_BILL, PIECE_EXTRA } from './catalog';
 import assert from 'node:assert/strict';
 import type { Cond } from '@hm/questline';
 import {
-  ACT_V_KIT, CHAIN, CHAIN_START, CHAIN_STEPS, COUNT, GATES, advanceChain, bump, chainFromSave, chainProblems, chainView, evidence, firstTime,
+  ACT_V_KIT, CHAIN, CHAIN_START, CHAIN_STEPS, CHAIN_VERSION, COUNT, GATES, advanceChain, bump, chainFromSave, chainProblems, chainView, evidence, firstTime,
   gateReason, isOpen, monsterKilled, monsterSeen, playerDied, playerLow, readChain, setAtLeast, stepDone, stepProgress, unmet,
   type Chain, type Evidence,
 } from './campaign-chain';
@@ -20,7 +20,7 @@ test('the chain data is sound: the questline validates and every step has its te
   assert.deepEqual(chainProblems(), []);
   assert.equal(CHAIN.quests.length, 3);
   assert.deepEqual(CHAIN_STEPS.map((s) => s.id), [
-    'A4-01', 'A4-02', 'A4-03', 'A4-04',
+    'A4-01', 'A4-01b', 'A4-02', 'A4-03', 'A4-04',
     'B-01', 'B-04', 'B-06', 'B-05', 'B-07',
     'F-01', 'F-02', 'F-03', 'F-04', 'F-05',
   ]);
@@ -50,7 +50,7 @@ test('the chain is not started until the drill runs (Act IV needs it)', () => {
   assert.equal(chainView(idle).index, 0);
   const started = advanceChain({ ...CHAIN_START, counts: { [COUNT.drillsRunning]: 1 } });
   assert.equal(chainView(started).current?.id, 'A4-01');
-  assert.equal(chainView(started).next?.id, 'A4-02');
+  assert.equal(chainView(started).next?.id, 'A4-01b');
 });
 
 test('each act waits for the one before it: Act V does not start while Act IV is open', () => {
@@ -67,7 +67,7 @@ test('gates: a locked feature says why, in the order the player meets the reason
   assert.equal(gateReason('rifle', none, 0), `Needs: Take the extraction rifle (A4-01)`);
   assert.equal(isOpen('rifle', none, 0), false);
   // the bloom and the Studio open the base
-  let c = advanceChain({ ...CHAIN_START, counts: { [COUNT.drillsRunning]: 1, [COUNT.toolPickup]: 1, [COUNT.minedBeam]: 50, [COUNT.milled]: 10, [COUNT.studioOpen]: 1, [COUNT.stage]: 2 } });
+  let c = advanceChain({ ...CHAIN_START, counts: { [COUNT.drillsRunning]: 1, [COUNT.toolPickup]: 1, [COUNT.dormantSealed]: 1, [COUNT.minedBeam]: 50, [COUNT.milled]: 10, [COUNT.studioOpen]: 1, [COUNT.stage]: 2 } });
   assert.equal(stepDone(c, 'A4-04'), true);
   assert.equal(gateReason('structures', c, 2), null);
   assert.equal(gateReason('drafting', c, 2), null);
@@ -163,4 +163,35 @@ test('the Act V kit covers one hardpoint and one heavy press, so a fresh player 
   for (const [item, n] of Object.entries(need)) assert.ok((kit[item] ?? 0) >= n, `${item}: kit ${kit[item] ?? 0} needs ${n}`);
   // the maps: one drafted blueprint each for the cube and the chassis, and a map per placed piece of those families
   assert.ok((kit['map-basalt'] ?? 0) >= 6, 'the kit holds maps for the drafts and the first pieces');
+});
+
+test('the dormant leak is the step after the rifle; only sealing the dormant anomaly finishes it', () => {
+  const c = advanceChain({ ...CHAIN_START, counts: { [COUNT.drillsRunning]: 1, [COUNT.toolPickup]: 1 } });
+  assert.equal(chainView(c).current?.id, 'A4-01b');
+  assert.equal(chainView(c).next?.id, 'A4-02');
+  assert.equal(stepDone(advanceChain({ ...c, counts: { ...c.counts, [COUNT.leakSealed]: 5 } }), 'A4-01b'), false);
+  assert.equal(stepDone(advanceChain({ ...c, counts: { ...c.counts, [COUNT.dormantSealed]: 1 } }), 'A4-01b'), true);
+});
+
+test('an old save past the rifle keeps its place: the seal is credited, so A4-02 is still the current step', () => {
+  const old = { progress: { quest: 'act4', step: 1, finished: [], rewarded: [] }, counts: { [COUNT.drillsRunning]: 1, [COUNT.toolPickup]: 1 }, monstersUnlocked: false };
+  const c = readChain(old);
+  assert.equal(c.version, CHAIN_VERSION);
+  assert.equal(chainView(c).current?.id, 'A4-02');
+  assert.equal(stepDone(c, 'A4-01'), true);
+  assert.equal(stepDone(c, 'A4-01b'), true);
+});
+
+test('an old save still at the rifle gets the dormant seal as its next step', () => {
+  const old = { progress: { quest: 'act4', step: 0, finished: [], rewarded: [] }, counts: { [COUNT.drillsRunning]: 1 }, monstersUnlocked: false };
+  const c = readChain(old);
+  assert.equal(chainView(c).current?.id, 'A4-01');
+  const next = advanceChain({ ...c, counts: { ...c.counts, [COUNT.toolPickup]: 1 } });
+  assert.equal(chainView(next).current?.id, 'A4-01b');
+});
+
+test('a version 2 save is read as it is (no second migration)', () => {
+  const saved = { progress: { quest: 'act4', step: 1, finished: [], rewarded: [] }, counts: {}, monstersUnlocked: false, version: 2 };
+  assert.equal(readChain(saved).progress.step, 1);
+  assert.equal(readChain(saved).version, CHAIN_VERSION);
 });

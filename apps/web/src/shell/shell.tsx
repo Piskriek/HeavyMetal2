@@ -33,7 +33,6 @@ import { bigStore } from '../storage/big-store';
 import { ResolutionCrafter } from '../crafter/crafter';
 import { PlayScreen } from '../play/play';
 import { exportIsland, importIsland } from '../islands/island-transfer';
-import { MonsterMashScreen } from '../monstermash/monstermash-screen';
 import { StudioScreen } from '../studio/studio-screen';
 import { StudioApp } from '../studio/studio-app';
 
@@ -44,7 +43,7 @@ import { StudioApp } from '../studio/studio-app';
  * brings a bar down from the top (back to galaxy, up one level, into the selected). Everything is a screen of this one shell: there are no
  * separate pages, so nothing can strand you (see ROUTES and the e2e smoke test). Goblin words belong to Goblin Racing; the harness is SetMix.
  */
-export type Screen = 'home' | 'goblin' | 'create' | 'avatars' | 'zoom' | 'island' | 'activities' | 'hub' | 'activity' | 'racing' | 'settings' | 'build' | 'islands' | 'crafter' | 'play' | 'monstermash' | 'studio';
+export type Screen = 'home' | 'goblin' | 'create' | 'avatars' | 'zoom' | 'island' | 'activities' | 'hub' | 'activity' | 'racing' | 'settings' | 'build' | 'islands' | 'crafter' | 'play' | 'studio';
 
 /** Where "back" goes from every screen. The e2e test and the unit test walk this table: each screen must have a way home. */
 export const ROUTES: Readonly<Record<Screen, { readonly back: Screen | 'origin' | null; readonly doc: string }>> = {
@@ -63,7 +62,6 @@ export const ROUTES: Readonly<Record<Screen, { readonly back: Screen | 'origin' 
   build: { back: 'activity', doc: "Goblin Racing's track editor, on the Goblin Racing island. Esc opens its menu; Back to Goblin Racing returns." },
   crafter: { back: 'home', doc: 'The Resolution Crafter preview: your plot through the six stages, a test view (open with ?crafter in the address). Esc or Back to SetMix returns.' },
   play: { back: 'home', doc: 'Play: the first Play of the Resolution Crafter, in first person: you make your human in the lab, turn on the gate, look round your stage-0 plot and place your first machine. Esc pauses; Back to SetMix returns.' },
-  monstermash: { back: 'home', doc: 'The Workshop: the monsters live. Retro models, sprites, sounds and fidelity adaptation, as a test bench.' },
   studio: { back: 'home', doc: 'The Studio: modify the moon base game and forge new activity planets in the SetMix Multiverse.' },
 };
 
@@ -94,11 +92,10 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   /** The activities window is making a new activity (quick, wizard or manual). */
   const [newActivity, setNewActivity] = useState(false);
   useEffect(() => onFork((m) => { setNote(`This island is now yours: "${m.name}". Rename it in My islands.`); window.setTimeout(() => setNote(''), 6000); }), []);
-  // ?crafter or ?monstermash opens testing screens straight away
+  // ?crafter or ?studio opens testing screens straight away
   const [screen, setScreen] = useState<Screen>(() => {
     if (typeof location !== 'undefined') {
       const p = new URLSearchParams(location.search);
-      if (p.has('monstermash')) return 'monstermash';
       if (p.has('studio')) return 'studio';
       if (p.has('crafter')) return 'crafter';
       if (p.has('play') || p.has('mash') || p.has('base') || p.has('building')) return 'play';
@@ -345,7 +342,6 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
             onExpedition={() => { origin.current = 'home'; setPlaySyncMode('desynced'); go('play'); }}
             onGrid={() => { origin.current = 'home'; setPlaySyncMode('synced'); go('play'); }}
             onStudio={() => { toStudio(); }}
-            onWorkshop={() => { origin.current = 'home'; go('monstermash'); }}
             onCommunity={() => toHub()}
             onSettings={toSettings}
             onPlay={() => { origin.current = 'home'; setPlaySyncMode('desynced'); go('play'); }}
@@ -485,11 +481,6 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
       {screen === 'crafter' ? (
         <div className="shell-layer" style={{ zIndex: 4 }}>
           <ResolutionCrafter profile={profile} onBack={toHome} />
-        </div>
-      ) : null}
-      {screen === 'monstermash' ? (
-        <div className="shell-layer" style={{ zIndex: 4 }}>
-          <MonsterMashScreen onBack={toHome} />
         </div>
       ) : null}
       {screen === 'studio' ? (

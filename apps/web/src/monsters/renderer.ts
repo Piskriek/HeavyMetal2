@@ -10,6 +10,7 @@ import { loadSkin, skinAsset, skinFailed, type ModelAsset, type SpriteAsset } fr
 import { SpriteBatch } from './sprite-batch';
 import { ModelInstance } from './model-instance';
 import { playFor, yawFromMotion, type Play } from './timing';
+import { levelsFor, rimOf, type Look } from './overlay';
 
 /** The part of a leaksim mob the renderer reads (a Mob has all of these). `yaw` overrides the facing taken from the motion. */
 export interface MonsterMob {
@@ -20,6 +21,8 @@ export interface MonsterMob {
   readonly phase: 'roam' | 'chase' | 'windup' | 'attack' | 'recover' | 'pain' | 'dead';
   readonly phaseT: number;
   readonly yaw?: number;
+  /** The ground height under the monster (the plot is not flat); 0 when the caller does not give it. */
+  readonly y?: number;
 }
 
 export interface MonsterRenderBudget {
@@ -44,6 +47,8 @@ export interface MonsterRenderer {
   sync(mobs: readonly MonsterMob[], skinOf: (m: MonsterMob) => string): void;
   /** Picks each monster's view and frame for the camera, and evaluates the animations within the budget. */
   update(dt: number, camera: THREE.Camera): void;
+  /** The plot's stage: the monsters are quantised to the ground's look (stage 0 is 1-bit, stage 3 and up smooth). */
+  setStage(stage: number): void;
   stats(): MonsterRenderStats;
   dispose(): void;
 }
@@ -57,6 +62,14 @@ export function createMonsterRenderer(scene: THREE.Scene, opts: { readonly budge
   // a 3D skin turns its native front onto +z (roster turn): the facing is the mobs' yaw plus that turn
   const turns = new Map(roster.map((r) => [r.id, r.turn] as const));
   const turnOf = (id: string): number => turns.get(id) ?? 0;
+  const skinInfoById = new Map(roster.map((r) => [r.id, r] as const));
+  // the look of a skin: its archetype's rim, its own remap pull, and the quantisation of the stage the plot is on
+  // smooth until the owner says the stage (the plot and the bench do; the window's walkers do not yet)
+  let levels = 0;
+  const lookOf = (id: string): Look => {
+    const info = skinInfoById.get(id);
+    return { rim: info ? rimOf(info.archetype) : 0x3dc8ff, remap: info?.remapStrength ?? 0.2, levels };
+  };
   const batches = new Map<string, SpriteBatch>();
   const models = new Map<number, ModelEntry>();
   const motion = new Map<number, MotionState>();
@@ -90,7 +103,7 @@ export function createMonsterRenderer(scene: THREE.Scene, opts: { readonly budge
   const batchFor = (id: string, asset: SpriteAsset): SpriteBatch => {
     let b = batches.get(id);
     if (!b) {
-      b = new SpriteBatch(asset, budget.perSkin);
+      b = new SpriteBatch(asset, budget.perSkin, [1, 1, 1], lookOf(id));
       batches.set(id, b);
       scene.add(b.mesh);
     }
@@ -98,6 +111,12 @@ export function createMonsterRenderer(scene: THREE.Scene, opts: { readonly budge
   };
 
   return {
+    setStage(stage) {
+      levels = levelsFor(stage);
+      for (const b of batches.values()) b.setLevels(levels);
+      for (const e of models.values()) e.inst.setLevels(levels);
+    },
+
     sync(mobs, skinOf) {
       for (const b of batches.values()) b.begin();
       fallbackCount = 0;
@@ -114,20 +133,20 @@ export function createMonsterRenderer(scene: THREE.Scene, opts: { readonly budge
         if (!d) continue;
         drawn.add(m.id);
         if (d.asset.kind === 'sprite') {
-          batchFor(d.id, d.asset).push({ x: m.x, z: m.z, yaw, play, phaseT: m.phaseT });
+          batchFor(d.id, d.asset).push({ x: m.x, z: m.z, y: m.y ?? 0, yaw, play, phaseT: m.phaseT });
           continue;
         }
         let e = models.get(m.id);
         if (!e || e.skin !== d.id) {
           if (e) e.inst.dispose();
-          e = { id: m.id, inst: new ModelInstance(d.asset), skin: d.id, x: m.x, z: m.z, play };
+          e = { id: m.id, inst: new ModelInstance(d.asset, lookOf(d.id)), skin: d.id, x: m.x, z: m.z, play };
           models.set(m.id, e);
           scene.add(e.inst.root);
         }
         e.x = m.x;
         e.z = m.z;
         e.play = play;
-        e.inst.root.position.set(m.x, 0, m.z);
+        e.inst.root.position.set(m.x, m.y ?? 0, m.z);
         e.inst.root.rotation.set(0, yaw + turnOf(d.id), 0);
         e.inst.root.visible = true;
         e.inst.setPlay(play, m.phaseT);

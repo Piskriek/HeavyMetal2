@@ -111,6 +111,8 @@ function buildItems(): Record<string, ItemSpec> {
     'pxd-chroma': { name: 'Raw Pixels (chroma)', kind: 'raw-pxd', tint: '#ff4fd8', stack: 100, kg: 0.2 },
     'vtx-rough': { name: 'Raw Vertices (rough)', kind: 'raw-vtx', tint: '#7dd3fc', stack: 100, kg: 0.5 },
     'vtx-fine': { name: 'Raw Vertices (fine)', kind: 'raw-vtx', tint: '#22d3ee', stack: 100, kg: 0.4 },
+    // the first one drops when the dormant leak seals (A4-01b); a bulk material, so no bench reads it as a part
+    'anomaly-core': { name: 'Anomaly Core', kind: 'bulk', tint: '#7cf3ff', stack: 10, kg: 0.5 },
     [STARTER]: { name: 'Regolith Slab Kit', kind: 'blueprint', tint: '#38bdf8', stack: 1, kg: 0 },
     'tool-beam': { name: 'Extraction Beam', kind: 'tool', tint: '#22d3ee', stack: 1, kg: 6 },
     'wpn-shotgun': { name: 'Combat Shotgun', kind: 'weapon', tint: '#f59e0b', stack: 1, kg: 4 },

@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { ModelAsset } from './loader';
 import { clipTime, type Play, type SpriteGroup } from './timing';
+import { overlayUniforms, patchStandard, pulseFor, sliceFor, type Look, type OverlayUniforms } from './overlay';
 
 interface Channel {
   readonly attr: THREE.BufferAttribute;
@@ -71,13 +72,26 @@ export class ModelInstance {
   private readonly actions = new Map<SpriteGroup, THREE.AnimationAction>();
   private readonly morphs: readonly MorphMesh[];
   private current: SpriteGroup | null = null;
+  /** The leak overlay's uniforms, shared by this instance's materials (the pulse, the slice, the time, the look). */
+  private readonly overlay: OverlayUniforms;
 
-  constructor(asset: ModelAsset) {
+  constructor(asset: ModelAsset, look: Look = { rim: 0x3dc8ff, remap: 0.2, levels: 0 }) {
     this.body = SkeletonUtils.clone(asset.prototype);
     this.root = new THREE.Group();
     this.root.name = `monster-model:${asset.id}`;
     this.root.add(this.body);
     this.morphs = detachMorphs(this.body);
+    this.overlay = overlayUniforms(look);
+    // each standard material is this instance's own (a clone), so the overlay's uniforms are per monster
+    this.body.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const mat = mesh.material as THREE.Material;
+      if (!(mat instanceof THREE.MeshStandardMaterial)) return;
+      const own = mat.clone();
+      patchStandard(own, this.overlay);
+      mesh.material = own;
+    });
     this.mixer = new THREE.AnimationMixer(this.body);
     for (const [group, clip] of asset.clips) {
       const action = this.mixer.clipAction(clip, this.body);
@@ -93,6 +107,9 @@ export class ModelInstance {
 
   /** Sets the clip for a phase at `t` seconds into it. The pose is applied by `apply()`. */
   setPlay(play: Play, t: number): void {
+    const windup = play.group === 'attack' && play.mode === 'hold';
+    this.overlay.uPulse.value = pulseFor(windup ? t : null);
+    this.overlay.uSlice.value = sliceFor(windup ? 'windup' : play.group === 'pain' ? 'pain' : 'other');
     const action = this.actions.get(play.group);
     if (!action) return;
     if (this.current !== play.group) {
@@ -105,6 +122,7 @@ export class ModelInstance {
 
   /** Evaluates the current pose now: the clip's weights and bones at the clip time set, then the morph blend. */
   apply(): void {
+    this.overlay.uTime.value = performance.now() / 1000;
     this.mixer.update(0);
     this.blend();
   }
@@ -125,6 +143,11 @@ export class ModelInstance {
         ch.attr.needsUpdate = true;
       }
     }
+  }
+
+  /** The ground's quantisation steps (the stage the monster stands on; 0 is smooth). */
+  setLevels(levels: number): void {
+    this.overlay.uLevels.value = levels;
   }
 
   /** Stops every clip. The cloned bones are shared with the prototype, so nothing is freed here beyond the instance's own geometry. */

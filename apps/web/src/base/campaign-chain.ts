@@ -32,6 +32,10 @@ export const COUNT = {
   mobKill: 'mob:kill',
   healthLow: 'health:low',
   deaths: 'deaths',
+  /** The dormant anomaly (Act IV) is sealed: the step A4-01b. */
+  dormantSealed: 'leak:dormant:sealed',
+  /** Any other leak is sealed (the substrate drop). */
+  leakSealed: 'leak:sealed',
 } as const;
 
 /** Placed-piece counters are `placed:<kind>` (e.g. `placed:foundation`). */
@@ -44,6 +48,7 @@ const every = (...cs: Cond[]): Cond => ({ all: cs });
 /** The step text (the journal's title) and hint (what to do), by step id. Titles are the player's words. */
 export const STEP_TEXT: Readonly<Record<string, { readonly title: string; readonly hint: string }>> = {
   'A4-01': { title: 'Take the extraction rifle', hint: 'It hangs on the armory rack in your lab. Open the cartridge rack (E) and take it down.' },
+  'A4-01b': { title: 'Seal the dormant leak', hint: 'Draw the rifle (G), set it to Extract (Q), and hold the left button on the glitching leak by the perimeter until it locks. It gives an Anomaly Core.' },
   'A4-02': { title: 'Mine 50 dirt and feed the mill', hint: 'Draw the rifle (G), hold the left button on rock until you have 50 units. Then let the texture mill run for 10 s.' },
   'A4-03': { title: 'Open the Studio terminal', hint: 'Open the journal (Esc) and press Open the Studio. The variables are the simulation schema.' },
   'A4-04': { title: 'First colour bloom', hint: 'Reach stage 2 on the Moon. Colour is returning.' },
@@ -73,6 +78,8 @@ export const CHAIN: Questline = {
       requires: at(COUNT.drillsRunning, 1),
       steps: [
         { id: 'A4-01', text: STEP_TEXT['A4-01']!.title, until: at(COUNT.toolPickup, 1) },
+        // the dormant anomaly by the perimeter: zero spawns; the beam seals it, and the first Anomaly Core drops (O4)
+        { id: 'A4-01b', text: STEP_TEXT['A4-01b']!.title, until: at(COUNT.dormantSealed, 1) },
         { id: 'A4-02', text: STEP_TEXT['A4-02']!.title, until: every(at(COUNT.minedBeam, 50), at(COUNT.milled, 10)) },
         { id: 'A4-03', text: STEP_TEXT['A4-03']!.title, until: at(COUNT.studioOpen, 1) },
         { id: 'A4-04', text: STEP_TEXT['A4-04']!.title, until: at(COUNT.stage, 2) },
@@ -140,9 +147,14 @@ export interface Chain {
   readonly progress: Progress;
   readonly counts: Readonly<Record<string, number>>;
   readonly monstersUnlocked: boolean;
+  /** The chain's shape: 1 before the dormant leak (A4-01b), 2 from it. Old saves are moved up (readChain). */
+  readonly version: number;
 }
 
-export const CHAIN_START: Chain = { progress: START, counts: {}, monstersUnlocked: false };
+/** The chain's current shape (see Chain.version). */
+export const CHAIN_VERSION = 2;
+
+export const CHAIN_START: Chain = { progress: START, counts: {}, monstersUnlocked: false, version: CHAIN_VERSION };
 
 /** Add `n` to an event counter (the action happened). */
 export function bump(c: Chain, key: string, n = 1): Chain {
@@ -313,7 +325,21 @@ export function readChain(raw: unknown): Chain {
   const rewarded = Array.isArray(p?.['rewarded']) ? (p!['rewarded'] as unknown[]).filter((x): x is string => typeof x === 'string') : [];
   const stepRaw = typeof p?.['step'] === 'number' ? Math.max(0, Math.floor(p!['step'] as number)) : 0;
   const progress: Progress = { quest, step: stepRaw, finished, rewarded };
-  return { progress, counts, monstersUnlocked: r['monstersUnlocked'] === true };
+  const savedVersion = typeof r['version'] === 'number' && Number.isFinite(r['version']) ? Math.floor(r['version']) : 1;
+  const chain: Chain = { progress, counts, monstersUnlocked: r['monstersUnlocked'] === true, version: CHAIN_VERSION };
+  return savedVersion < 2 ? migrateV1(chain) : chain;
+}
+
+/**
+ * A save from before A4-01b (version 1): the Act IV steps after the rifle move up by one. A save past the rifle has already earned
+ * the seal (its step is credited), so it is not sent back to the dormant anomaly; a save still at the rifle keeps it, which is
+ * now the next step after A4-01.
+ */
+function migrateV1(c: Chain): Chain {
+  const p = c.progress;
+  if (p.quest !== 'act4' || p.step < 1) return c;
+  const credited = Math.max(1, c.counts[COUNT.dormantSealed] ?? 0);
+  return { ...c, progress: { ...p, step: p.step + 1 }, counts: { ...c.counts, [COUNT.dormantSealed]: credited } };
 }
 
 // ---------------------------------------------------------------------------------------------------------- monsters (hooks)

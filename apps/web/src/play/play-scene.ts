@@ -30,7 +30,9 @@ import { keepOutZones, type KeepOutZone } from './beam-keepout';
 import { createBeamVisuals, ringColourOf, type BeamVisuals } from './beam-visuals';
 import { FEEL_START, feelStep, type RifleFeelState } from './rifle-feel';
 import { applyRimFloor, setRimFloorOn, rimFloorOn } from './rim-floor';
-import { createMonsterMashCombat, type MonsterMashCombatManager } from './monster-mash-combat';
+import { createMonsters, type MonstersSystem } from './monsters';
+import { safeZones as monsterSafeZones } from '../monsters/policy';
+import { pieceAt } from '../base/world';
 import * as F from '@hm/substrate';
 import * as S from '@hm/structure';
 import type { Kind } from '@hm/structure';
@@ -230,8 +232,16 @@ export interface PlayScene {
   warm(): void;
   /** Loads the lab's generated models (behind the loading bar) and puts them in the lab in place of the labkit fallbacks. */
   preloadLabGenerated(): Promise<void>;
-  /** Monster Mash retro mob spawning and weapon combat system. */
-  readonly mash: MonsterMashCombatManager;
+  /** The monsters on the planet: the leaks, the guns, the seal (play/monsters.ts). */
+  readonly monsters: MonstersSystem;
+  /** Whether the player is alive (the monsters do not strike the dead). The screen sets it from the health. */
+  setPlayerAlive(alive: boolean): void;
+  /** The ray the view looks along, on the ground (x and z), and the eye's ground point. */
+  aimGround(): { origin: { x: number; z: number }; dir: { x: number; z: number } };
+  /** Advances the monsters by whole seconds (the tests' clock). */
+  stepMonsters(seconds: number): void;
+  /** The leak the view is aimed at, within `range` m, or null (the beam's Seal hold). */
+  aimLeak(range: number): number | null;
   /** Immediately sets the world and mob visual fidelity stage (0 to 4). */
   setFidelityStage(stage: number): void;
   setVehicles(vehicles: readonly { readonly id: number; readonly kind: RoverKind; readonly x: number; readonly z: number; readonly yaw: number }[]): void;
@@ -416,13 +426,17 @@ export function createPlayScene(o: {
     return ground ? ground.heightAt(x, z) : 0;
   };
 
-  // ---- Monster Mash retro mob & combat manager
-  const mash = createMonsterMashCombat({
+  // ---- the monsters: leaks on the plot's junked models, the guns (raycast), the seal (play/monsters.ts; the screen sets the events)
+  const monsters = createMonsters({
     planetScene,
     camera,
     groundHeightAt: (x, z) => groundAt(x, z),
     initialStage: 1,
+    seed: 7,
   });
+  let playerAlive = true;
+  const monsterFwd = new THREE.Vector3();
+  monsters.setPlot(7, { x: twin.group.position.x, z: twin.group.position.z });
 
   // ---- Vehicles (@hm/rover & @hm/rovergear) and Station Fabricators
   const vehiclesGroup = new THREE.Group();
@@ -1501,7 +1515,9 @@ export function createPlayScene(o: {
       }
     },
     setBase(base) {
-      mash.setBase(base);
+      // the sanctuaries: the gate dome, and each sealed room's life support (B-07)
+      const lifeSupport = base ? base.pieces.filter((p) => p.kind === 'lifeSupport').map((p) => pieceAt(base, p)).filter((p): p is { x: number; y: number; z: number } => p !== null) : [];
+      monsters.setSafeZones(monsterSafeZones({ x: twin.group.position.x, z: twin.group.position.z }, lifeSupport));
     },
     setWalkWorld(walkWorld) {
       activeWalkWorld = walkWorld;
@@ -1711,7 +1727,7 @@ export function createPlayScene(o: {
       waveStart = clock + (shown === 0 ? 2.0 : 0.8);
       postUniforms.uWaveCentre.value.set(from.x, groundAt(from.x, from.z), from.z);
       ground?.setStage(Math.max(1, to));
-      mash.setFidelityStage(to);
+      monsters.setFidelityStage(to);
       fitLooks();
     },
     setFidelityStage(to) {
@@ -1723,7 +1739,7 @@ export function createPlayScene(o: {
       gameAudio.setMoonStage(s);
       waveTo = -1;
       ground?.setStage(Math.max(1, s));
-      mash.setFidelityStage(s);
+      monsters.setFidelityStage(s);
       fitLooks();
       rebuildProps(s);
     },
@@ -2057,11 +2073,8 @@ export function createPlayScene(o: {
       beamFx.update(now);
       holoUniforms.uTime.value = now;
       if (where === 'planet') {
-        mash.setIsOnPlanet(true);
-        const isMoving = Math.abs(c.move.x) > 0.01 || Math.abs(c.move.z) > 0.01;
-        mash.update(dt, pos, isMoving);
-      } else {
-        mash.setIsOnPlanet(false);
+        camera.getWorldDirection(monsterFwd);
+        monsters.update(dt, { x: pos.x, z: pos.z, yaw: Math.atan2(monsterFwd.x, monsterFwd.z), alive: playerAlive }, camera);
       }
       postUniforms.uTime.value = now;
       socketRingMat.opacity = 0.45 + 0.4 * Math.sin(now * 5.0);
@@ -2505,7 +2518,7 @@ export function createPlayScene(o: {
       planetScene.remove(fabricatorsGroup);
       for (const mat of Object.values(roverMaterials)) (mat as THREE.Material).dispose();
       renderer.dispose();
-      mash.dispose();
+      monsters.dispose();
       beamFx.dispose();
       beamVisuals.dispose();
       planetScene.remove(planGhostsGroup);
@@ -2523,7 +2536,24 @@ export function createPlayScene(o: {
         }
       }
     },
-    mash,
+    monsters,
+    setPlayerAlive(alive: boolean) { playerAlive = alive; },
+    aimGround(): { origin: { x: number; z: number }; dir: { x: number; z: number } } {
+      camera.getWorldDirection(monsterFwd);
+      return { origin: { x: camera.position.x, z: camera.position.z }, dir: { x: monsterFwd.x, z: monsterFwd.z } };
+    },
+    /** Advances the monsters by whole seconds without a frame (the tests' clock: warn, waves, the seal). */
+    stepMonsters(seconds: number): void {
+      const p = pos;
+      camera.getWorldDirection(monsterFwd);
+      const yaw = Math.atan2(monsterFwd.x, monsterFwd.z);
+      const n = Math.round(seconds * 30);
+      for (let i = 0; i < n; i++) monsters.update(1 / 30, { x: p.x, z: p.z, yaw, alive: playerAlive }, camera);
+    },
+    aimLeak(range: number): number | null {
+      camera.getWorldDirection(monsterFwd);
+      return monsters.leakUnder({ x: camera.position.x, z: camera.position.z }, { x: monsterFwd.x, z: monsterFwd.z }, range);
+    },
     setVehicles,
     setFabricators,
     enterVehicle,

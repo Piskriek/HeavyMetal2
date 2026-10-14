@@ -8,5 +8,20 @@
     "name": "act4-start",
     "title": "Act IV: the drill",
     "act": "IV"
+  },
+  {
+    "name": "act5-start",
+    "title": "Act V: the base",
+    "act": "V"
+  },
+  {
+    "name": "act6-start",
+    "title": "Act VI: the hardpoint",
+    "act": "VI"
+  },
+  {
+    "name": "stage6-monsters",
+    "title": "Stage 6: the monsters unlocked",
+    "act": "VI"
   }
 ]

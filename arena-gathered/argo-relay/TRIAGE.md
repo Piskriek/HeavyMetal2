@@ -59,3 +59,10 @@ bundle's metadata, including his Rodin roster, sit beside them).
 **Strict check:** 26 errors. One is an unused variable; 25 are imports of files outside the bundle. Some of those are v1 files (`stage-post.glsl`, `planet-table-hologram`, `rover-spring-arm`). Some exist in neither version: `socket-plume-gizmo`, `lab-vista-pockets`, `lab-choreography`, `print-sweep-and-bounce`, `radial-scan-wave.glsl`.
 
 **On landing, per file:** take v2's strict guards and purity fixes where its version keeps v1's behaviour. Keep v1 where v2 dropped features. Write the tests against the code that actually lands.
+
+## Argo's landing guide for briefs 25 to 27 (`docs/argo/notes/ARGO_NOTE_02_briefs_25_26_27_guide.md`)
+
+Use it as a wiring map and a list of on-screen checks. Three things in it are wrong, and the brief wins on any conflict:
+- **"v1 had no tsc errors":** wrong for several files. Run the tsconfig in this folder.
+- **File names:** it names `packages/plotsim/src/coherence-and-brownout.ts`, but v1's file is `coherence-and-power.ts`.
+- **Power:** it moves the gate from 12 kW to a 100 kW baseline. Brief 26 and v1's code use 12 kW, so keep 12 kW unless Opus and Argo change the brief.

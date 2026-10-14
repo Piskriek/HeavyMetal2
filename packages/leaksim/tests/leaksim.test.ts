@@ -1,6 +1,40 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ARCHETYPES, MAX_MOBS, SEAL_SECONDS, WARN_SECONDS, addLeak, createWorld, placeMob, decode, encode, hurt, raycast, step, type Archetype, type Event, type Input, type World } from '../src/index';
+import { ARCHETYPES, MAX_MOBS, SEAL_SECONDS, WARN_SECONDS, addLeak, createWorld, insideSolid, placeMob, pushOutOfSolids, decode, encode, hurt, raycast, step, type Archetype, type Event, type Input, type World } from '../src/index';
+
+test('built footprints: a monster is kept out of a box grown by its radius, and one standing in a box is pushed to its edge', () => {
+  const box = { x: 0, z: 0, ux: 1, uz: 0, hu: 3, hv: 2 };
+  // the box grown by 0.8 m: 3.8 m along u, 2.8 m across v
+  assert.equal(insideSolid(2.5, 0, 0.8, [box]), true);
+  assert.equal(insideSolid(0, 3, 0.8, [box]), false);
+  assert.equal(insideSolid(3.9, 0, 0.8, [box]), false);
+  // from the centre, the nearest edge is across v (2.8 m out), so the monster lands there
+  const out = pushOutOfSolids(0, 0, 0.8, [box]);
+  assert.ok(Math.abs(out.x) < 1e-9 && Math.abs(Math.abs(out.z) - 2.8) < 1e-9, `pushed to (${out.x}, ${out.z})`);
+  // a box turned by 90 degrees: its u axis runs along z
+  const turned = { x: 0, z: 0, ux: 0, uz: 1, hu: 3, hv: 2 };
+  assert.equal(insideSolid(0, 2.5, 0.8, [turned]), true);
+  // its across axis is x (2 m half size): 2.8 m grown, so 3.5 m out is clear and 2.5 m out is not
+  assert.equal(insideSolid(3.5, 0, 0.8, [turned]), false);
+  assert.equal(insideSolid(2.5, 0, 0.8, [turned]), true);
+  // the ground monsters do not stand in a box after a step, from inside it or from the side of its path
+  let w = placeMob(createWorld(9), 'charger', { x: 1, z: 0 });
+  w = step(w, input({ solids: [box], player: { x: -12, z: 0.5, alive: true } })).world;
+  for (const m of w.mobs) assert.equal(insideSolid(m.x, m.z, ARCHETYPES[m.kind].radius, [box]), false, `mob ${m.id} stands in the box`);
+  let c = placeMob(createWorld(10), 'charger', { x: 12, z: 0.5 });
+  let inside = 0;
+  c = run(c, 40, () => input({ solids: [box], player: { x: -12, z: 0.5, alive: true } }), (cur) => {
+    for (const m of cur.mobs) if (insideSolid(m.x, m.z, ARCHETYPES[m.kind].radius, [box])) inside += 1;
+  }).world;
+  assert.equal(inside, 0, 'a charger chasing the player never stands in the box');
+});
+
+test('a sapper drains a machine from its footprint edge: 1.5 m from a 1.7 m half-size pad is in reach', () => {
+  // the pad's centre is 3.2 m away: its edge is 1.5 m away, inside the sapper's 2 m reach
+  const w = placeMob(createWorld(8), 'sapper', { x: 3.2, z: 0 });
+  const r = step(w, input({ machines: [{ id: 7, x: 0, z: 0, hu: 1.7 }], player: { x: -30, z: 0, alive: true } }));
+  assert.ok(r.events.some((e) => e.t === 'drain' && e.machine === 7), 'drains from the edge');
+});
 
 type Timed = { readonly at: number; readonly e: Event };
 const input = (o: Partial<Input> = {}): Input => ({ dt: 1 / 30, stage: 2, aggression: 'normal', player: { x: 0, z: 0, alive: true }, machines: [], safe: [], sealing: null, ...o });

@@ -138,17 +138,67 @@ export interface World {
   readonly leaks: readonly Leak[];
 }
 
+/**
+ * A built footprint on the ground: an oriented box. Its centre is (x, z), its u axis is (ux, uz) (a unit vector), its v axis
+ * is (-uz, ux), and hu and hv are its half sizes along each. Ground monsters keep out of it (P0-MON-03): a monster of
+ * radius r stands no closer than r to any box.
+ */
+export interface Solid { readonly x: number; readonly z: number; readonly ux: number; readonly uz: number; readonly hu: number; readonly hv: number }
+
 export interface Input {
   readonly dt: number;
   readonly stage: number;
   readonly aggression: Aggression;
   readonly player: P & { readonly alive: boolean };
-  readonly machines: readonly (P & { readonly id: number })[];
+  /** A machine's `hu` is its footprint's half size: a sapper drains it from the footprint's edge, not its centre. */
+  readonly machines: readonly (P & { readonly id: number; readonly hu?: number })[];
   readonly safe: readonly (P & { readonly r: number })[];
   readonly sealing: number | null;
   readonly walkable?: (x: number, z: number) => boolean;
+  /** The built footprints the ground monsters stay out of. */
+  readonly solids?: readonly Solid[];
   /** The most living monsters this frame (the graphics budget); defaults to MAX_MOBS. */
   readonly cap?: number;
+}
+
+/** Whether a ground monster of radius r at (x, z) would stand inside a solid (its box grown by r). */
+export function insideSolid(x: number, z: number, r: number, solids: readonly Solid[]): boolean {
+  for (const s of solids) {
+    const dx = x - s.x, dz = z - s.z;
+    const du = dx * s.ux + dz * s.uz;
+    const dv = -dx * s.uz + dz * s.ux;
+    if (Math.abs(du) < s.hu + r && Math.abs(dv) < s.hv + r) return true;
+  }
+  return false;
+}
+
+/**
+ * Pushes a ground monster out of the solids it stands in: each box it is inside moves it to the nearest edge of that box
+ * (grown by r). Two passes, so a spot between two boxes settles too. A point clear of every box is returned unchanged.
+ */
+export function pushOutOfSolids(x: number, z: number, r: number, solids: readonly Solid[]): { readonly x: number; readonly z: number } {
+  let cx = x, cz = z;
+  for (let pass = 0; pass < 2; pass++) {
+    for (const s of solids) {
+      const dx = cx - s.x, dz = cz - s.z;
+      const du = dx * s.ux + dz * s.uz;
+      const dv = -dx * s.uz + dz * s.ux;
+      const eu = s.hu + r, ev = s.hv + r;
+      if (Math.abs(du) >= eu || Math.abs(dv) >= ev) continue;
+      // the four exits: out along +u, -u, +v or -v, each at the grown edge
+      const exits = [
+        { d: eu - du, nu: eu, nv: dv },
+        { d: eu + du, nu: -eu, nv: dv },
+        { d: ev - dv, nu: du, nv: ev },
+        { d: ev + dv, nu: du, nv: -ev },
+      ];
+      let best = exits[0]!;
+      for (const e of exits) if (e.d < best.d) best = e;
+      cx = s.x + best.nu * s.ux - best.nv * s.uz;
+      cz = s.z + best.nu * s.uz + best.nv * s.ux;
+    }
+  }
+  return { x: cx, z: cz };
 }
 
 export type Event =
@@ -265,7 +315,9 @@ function steerGround(
   baseAngle: number,
   dist: number,
   safe: readonly (P & { readonly r: number })[],
-  walkable?: (x: number, z: number) => boolean
+  walkable?: (x: number, z: number) => boolean,
+  solids: readonly Solid[] = [],
+  radius = 0
 ): { readonly x: number; readonly z: number } {
   for (let k = 0; k < TURN_OFFSETS.length; k++) {
     const offset = TURN_OFFSETS[k] ?? 0;
@@ -274,7 +326,7 @@ function steerGround(
     const candZ = curZ + Math.sin(angle) * dist;
 
     const clamped = clampOutsideSafe(candX, candZ, safe);
-    if (isValidPosition(clamped.x, clamped.z, false, safe, walkable)) {
+    if (isValidPosition(clamped.x, clamped.z, false, safe, walkable) && !insideSolid(clamped.x, clamped.z, radius, solids)) {
       return clamped;
     }
   }
@@ -598,19 +650,23 @@ export function step(
     let targetZ = leakZ;
     let isTargetingMachine = false;
     let nearestMachineId: number | null = null;
+    let nearestMachineHu = 0;
 
     if (spec.targets === 'machine') {
       isTargetingMachine = true;
+      // the nearest machine by the gap to its footprint's edge (its centre when it has no footprint)
       let closestDist = Infinity;
       for (let mi = 0; mi < input.machines.length; mi++) {
         const mc = input.machines[mi];
         if (!mc) continue;
-        const d = Math.hypot(mc.x - m.x, mc.z - m.z);
+        const hu = mc.hu ?? 0;
+        const d = Math.max(0, Math.hypot(mc.x - m.x, mc.z - m.z) - hu);
         if (d < closestDist) {
           closestDist = d;
           targetX = mc.x;
           targetZ = mc.z;
           nearestMachineId = mc.id;
+          nearestMachineHu = hu;
         }
       }
       if (nearestMachineId !== null) {
@@ -632,8 +688,10 @@ export function step(
     }
 
     const distToTarget = Math.hypot(targetX - m.x, targetZ - m.z);
+    // a sapper's reach is measured to the machine's footprint edge (the gap), so it drains from outside the pad
+    const machineGap = Math.max(0, distToTarget - nearestMachineHu);
 
-    if (isTargetingMachine && nearestMachineId !== null && distToTarget <= spec.reach) {
+    if (isTargetingMachine && nearestMachineId !== null && machineGap <= spec.reach) {
       events.push({
         t: 'drain',
         mob: m.id,
@@ -703,7 +761,7 @@ export function step(
       nextX = clamped.x;
       nextZ = clamped.z;
     } else {
-      const stepped = steerGround(m.x, m.z, baseAngle, stepLen, input.safe, input.walkable);
+      const stepped = steerGround(m.x, m.z, baseAngle, stepLen, input.safe, input.walkable, input.solids ?? [], spec.radius);
       nextX = stepped.x;
       nextZ = stepped.z;
     }
@@ -758,6 +816,18 @@ export function step(
           allMobs[j] = { ...mj, x: clJ.x, z: clJ.z };
         }
       }
+    }
+  }
+
+  // 4b. Ground monsters keep out of the built footprints: a wall built over one, or a separation push, moves it to the
+  // nearest edge (P0-MON-03). Flyers pass over.
+  const solids = input.solids ?? [];
+  if (solids.length > 0) {
+    for (let i = 0; i < allMobs.length; i++) {
+      const mi = allMobs[i];
+      if (!mi || mi.phase === 'dead' || ARCHETYPES[mi.kind].flies) continue;
+      const out = pushOutOfSolids(mi.x, mi.z, ARCHETYPES[mi.kind].radius, solids);
+      if (out.x !== mi.x || out.z !== mi.z) allMobs[i] = { ...mi, x: out.x, z: out.z };
     }
   }
 

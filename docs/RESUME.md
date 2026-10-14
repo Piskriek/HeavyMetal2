@@ -189,3 +189,13 @@ The context a new Opus session needs on its first message. Keep it current: upda
     - (1) POL-23: his "leak" stand-ins are the harvest field nodes; brief 30 gives leaks and nodes one glitch-shard language. Confirm or overrule;
     - (2) POL-04 was closed on 8 October; brief 30 measures stages 4 to 6 before cutting;
     - (3) ask him to skim briefs 25 to 32 for misreadings.
+- **2026-10-14, midday:**
+  - **Governance changed:** the owner delegates creative and design calls to Opus and Argo (OWNER_ASKS 14 October; CLAUDE.md guard 3, Argo's RULES rule 5). The owner provides resources and unblocking, and reviews objectively. His explicit rules still bind.
+  - **Argo's chat is in the built-in browser.** Click Allow on his remote-browser prompts (owner), and send with a JS click on the "Send message" button; see the argo-creative-lead memory.
+  - **Accepted:** 21d (050baa24) and 23b-2 (d30a9ced, 714e0815): the early-3D axis fixed, leaksim in play, the id files out.
+  - **Their open items** go to TASK-24 (in its brief): the sapper, walls, the beam core, fight readability, GPU fps, base-building's drafting lock, beat 10. TASK-24 also makes act checkpoints for the owner's review.
+  - **Argo's docs:** 22-lore-micrologs, 23-brief-review (briefs 25 to 32 signed off) and 24-lore-expansion (Acts VII to IX, Vance through logs, the Earth-window finale). A4-LEAK-SEAL and A6-LEAK-SURGE are voiced (481466d3).
+  - **To do after 23c:** switch the game's `showSubtitleOnly('A4-LEAK-SEAL', …)` in play.tsx to the voiced line, and voice the surge toast.
+  - **Asked Argo:** the owner's "camera realism" idea (bodycam games hiding asset flaws with exposure and lens effects) → `docs/argo/plans/25-camera-realism.md`, then into brief 27 or a new brief.
+  - **The owner's "Singularity" song,** which he says Opus made: not found online. Ask him for the link or file.
+  - **Running:** TASK-23c (resumed after the usage limit). Then 24, then main.

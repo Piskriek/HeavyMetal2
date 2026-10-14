@@ -107,3 +107,13 @@ Argo's chat is open in Opus's browser for questions (owner, 13 October).
   - 32 `32-heavy-terraformers-and-turrets.md`: the heavy machines on hardpoints, peaceful drops, the fabricator's gantry, the sidearm and the turret.
   
   32 needs Opus's art pass first (sheets 17, 19 and 20).
+
+## 7. Argo's expansions (14 October; decisions by Argo and Opus under the owner's delegation)
+- **Lore and narration** (`docs/argo/plans/24-lore-expansion.md`):
+  - Acts VII to IX: the heavy hardpoints and the blue-sky surge; the combiner's deep bus and coverage; the stage-6 finale back in the lab, where the Breach seals through the window and sandbox opens;
+  - Marcus Vance only through logs (LOG-05 to LOG-10); Haddy stays the only voice.
+  - **Scheduled:** A7-02 with brief 26 (the brownout); A7-01, A7-03, A8-01 and A8-02 with briefs 31 and 32; A9-01 to A9-03 and the window's heal with brief 28 (after 32's stage-6 content).
+  - Each act's lines are voiced when its brief lands.
+  - LOG-10 uses the player's chosen avatar name, or "the Operator" (Argo's ruling).
+- **Suit-cam optics** (`docs/argo/plans/25-camera-realism.md`, the owner's idea): stages 4 to 6 as a capture medium, in brief 27's post pass, behind a Graphics setting.
+- **Voiced so far:** A4-LEAK-SEAL and A6-LEAK-SURGE (481466d3). The game switches to them after TASK-23c.

@@ -66,3 +66,23 @@ Opus refreshes Argo's tour shots 07 and 12.
 ## Argo's sign-off (14 October, docs/argo/plans/23-brief-review.md)
 Approved as written, plus:
 - **The amber pool feathers:** blend it with `smoothstep(15.0, 3.5, distanceToGate)`, full within 3.5 m and gone by 15 m, so there is no hard ring edge.
+
+## Addition: the suit-cam optics (Argo's plan 25, 14 October; the owner's idea)
+The top of the fidelity ladder becomes a capture medium too: Astro's suit camera. Build `docs/argo/plans/25-camera-realism.md` §4 into the **same post pass** (`POST_FRAGMENT`), ramping in with `uSuitCamMix = smoothstep(0.45, 0.85, Lx)`, so it is fully on at stages 4 to 6:
+- analytical lagging auto-exposure (no GPU readback): a CPU RC filter over the sun direction, the view pitch, and lab or gate, passed as one `uExposure`;
+- a CMOS S-curve with an early warm white clip;
+- 4-tap halation (wide bleed on Mid and High only);
+- a 3×3 luma micro-sharpen;
+- grain capped at 2.5% and weighted to the midtones;
+- a cos⁴ vignette;
+- a gentle barrel (k1 = -0.035) with corner-only chromatic aberration;
+- all halved while the build ribbon is open, and off in the Studio unless its stage pill shows S4 or above.
+
+**Never** motion blur, camera roll or loose aim: those are the comfort complaints the research found.
+- The setting is **Suit-Cam Optics: Auto | Full | Subtle | Off** under Graphics (the toggle rule).
+- Within 0.45 ms on the GTX 950M; report the cost.
+- The research was checked by Opus: the Bodycam Steam page and its "Accessibility & Performance Tips" announcement are real; the motion-blur complaints are confirmed by third-party guides; the fisheye sickness by similar games' threads. The Reddit link could not be fetched.
+- **Tests:**
+  - the exposure filter (a step into daylight overshoots, then settles in about 0.4 s);
+  - Off is byte-identical to today's look;
+  - a stage-5 shot with Off and with Auto, side by side.

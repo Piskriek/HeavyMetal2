@@ -2505,3 +2505,55 @@ TASK-25 is done except what is listed above. Commits: `6739076f`, `c4e4bd49`, `4
   - (2) The drawer bottom of 104 px stands (POL-46).
   - (3) The lab window-view budget (41 draw calls against 40) does not come from TASK-25, whose changes are DOM and a ghost lock with no meshes. It is the wasteland walkers drifting into frame. It goes to TASK-28, which reworks the window view: count the walkers at a fixed state, or cap them in that view. Don't just raise the budget.
 - **Checkpoints:** the campaign run had rewritten them. Opus restored the committed, reviewed set. Workers: restore them after a campaign run (`git restore -- apps/web/public/checkpoints/`), and commit them only when the brief asks.
+
+### [2026-10-15] SIDECAR → OPUS: [DONE, PARTIAL] TASK-27: the stage looks (0a wireframe, 0b world-locked dither, the gate's amber pool, the suit-cam optics) and the rover's sphere-cast camera; the modular scout is not built (27b item 4)
+
+- **Commits (branch `feat/monster-mash-exploration`):**
+  - `3466c0b0`: the pure modules `rover-camera.ts` and `stage-look.ts`, with their tests.
+  - `4aacb404`: the Graphics setting `suitCamOptics` (Auto | Full | Subtle | Off).
+  - `7c1bc858`: the post pass in `portal-shaders.ts`.
+  - `1ddb49da`: the scene and play wiring.
+  - `6b6c5d45`: `scripts/test-stage-looks.mjs`.
+  - the docs commit that carries this entry and POL-48 to POL-55.
+  - `apps/web/dist/index.html` is modified by the builds and is not committed. The checkpoints the campaign rewrote were restored with `git restore`.
+- **Verification (real numbers):**
+  - typecheck: 0 errors (exit 0, after the last code change).
+  - `npm test`: 2,648 tests, 2,644 pass, 0 fail; the 19 speed tests pass 19 of 19 (exit 0). The new unit tests are 9 in `rover-camera.test.ts` and 11 in `stage-look.test.ts`.
+  - build: 14.59 MB of the 16 MB cap (TASK-25 was 14.57 MB).
+  - `node scripts/test-campaign.mjs`: **40 of 40 beats PASS**, exit 0, 0 console errors, 0 HTTP errors, 0 HUD overlaps. The L1 window-view budget passes this time (TASK-25 had 41 calls against 40). The per-beat FPS in this headless run is 32 to 60. These are headless numbers, not the GTX 950M, so they do not measure the look's cost.
+  - `node scripts/test-base-building.mjs`: exit 0.
+  - `node scripts/test-stage-looks.mjs` (new, shots in `shots-run/stage-looks/`): 11 of 12 checks pass. The one failure is the turn test (below).
+    - Stage 0 reached (the S0 badge). The shader compiles with no errors; the 2 compiler warnings are the ANGLE precision messages.
+    - Turn test: the flip fraction of a 64 by 64 ground patch on a 5 degree yaw is **16 to 17%**, against the 5% asked. The control with the yaw sign reversed is 64%, so the mapping is checked against the data. The pre-change shader, built and measured the same way, is **26.3%**. A perfectly world-locked pattern measures 7 to 8% with nearest-pixel sampling at 6 px cells, so the floor sits above 5%. See POL-49.
+    - Gate pool: 20% of the picture amber 3 m from the gate, 0.27% from 30 m away.
+    - Off against the pre-change look at stage 5: **0.08 of 255** on average (the same view, a fresh page each). Off reproduces today's picture.
+    - Auto against Off at stage 5 (fresh pages, same view): **5.0 of 255** on average. The optics are visible, not strong. Shots `08` and `09`.
+- **What was built, file by file:**
+  - `apps/web/src/play/rover-camera.ts` (new, pure): the arm from a pivot 1.4 m above the chassis to 5.5 m back and 2.1 m up, pulled to the hit minus 0.35 m; the snap-in and ease-out settle (25 ms and 250 ms, read as the 95% time); the floor clamp at the ground plus 0.65 m; the horizon level by construction; pitch lag 0.12 s. Casts: a ray march against the heightfield, a ray against spheres (the boulders at half their size). The placed pieces use the scene's `THREE.Raycaster`.
+  - `apps/web/src/play/stage-look.ts` (new, pure): the scan wave (ring 0 to 350 m in 3.5 s, held during a 2 s bit dissolve); the world-locked threshold index (azimuth cells a whole number of 4-cell periods, so no seam at plus or minus pi); the gate's amber weight (`ramp` feathered from 3.5 m to 15 m); the exposure filter (0.28 s step-down, 0.55 s recovery); the suit-cam profile per setting, the mix (`smoothstep(0.45, 0.85, Lx)`, fully on from stage 4), and the halving under the drawer.
+  - `apps/web/src/play/rover-camera.test.ts`, `apps/web/src/play/stage-look.test.ts` (new): the 20 unit tests above.
+  - `apps/web/src/play/portal-shaders.ts`: `POST_FRAGMENT` rewritten. Stage 0 (`stage0()`): the 0a wire (black fill, 1 px edges at crease and depth breaks within 150 m, the 2 m grid converging to 180 m) and the 0b dither (the threshold from the pixel's own ray, with no depth; lum = 80% facet + 20% the cell's colour; a 1 px depth-break contour; the distance gradient). The gate pool: ink from white to amber. The suit cam, stages 4 to 6, through `uSuitCam`: the lens barrel, the corner-only CA, the 3x3 micro-sharpen, the warm halation (narrow on Low, wide from Medium up or Full), the exposure, a CMOS S-curve with a warm clip, the cos^4 vignette, and the midtone grain.
+  - `apps/web/src/play/play-scene.ts`: the new uniforms set each frame; the scan starts at the first running machine on a stage-0 plot; the restore and the debug stage setter mark the scan done past stage 0; the exposure target from the view, the gate and the lab; the suit cam's strength smoothed over 0.35 s; the driving camera is `stepRoverArm` with a `roverCast` of ground, boulders and pieces. The old lerp and per-kind camera distances (4.6, 6.2, 7.8 m) are gone, as the brief's single arm replaces them.
+  - `apps/web/src/play/play.tsx`: `detailOf` carries `suitCam` and `wideTier`; an effect sends the drawer state (`menu` or `building`) to the scene.
+  - `packages/render/src/graphics.ts`: `suitCamOptics`, default `auto` on every tier, under Effects.
+  - `scripts/test-stage-looks.mjs` (new): the browser checks above.
+  - `docs/DEFERRED_POLISH_REGISTRY.md`: POL-48 to POL-55.
+- **Drop files used, and what changed:**
+  - `argo-relay/packages/camerarig/src/rover-spring-arm.ts`: rewritten. Its cast ran along the back direction only, not to the wanted spot, so the arm did not sit on its own line; its airtime detector (CHARM-AIRTIME, brief 33) is not landed.
+  - `argo-relay-v2/packages/camerarig/tests/rover-spring-arm.test.ts`: not landed. It imports a `src/rover-spring-arm` API and a `groundshader/src/stage0-dither.glsl` that the drop does not contain. Its tests are written against the module here.
+  - `argo-relay/packages/groundshader/src/stage-post.glsl.ts`: a reference. Its gate pool (`smoothstep(15, 2)`), its stage mapping (`hasActiveMachineOnPlot`, `Pxd < 0.08`) and its Bayer key (`sphericalUv * 512`) are not the brief's and were replaced. `smoothstep` with reversed edges is undefined in GLSL, so the pool uses a `ramp`.
+  - `argo-relay/packages/groundshader/src/radial-scan-wave.ts` (450 m, 4.5 s, brief 30) and its test: not landed. The brief's 350 m and 3.5 s are in `stage-look.ts`.
+  - `docs/argo/notes/ARGO_NOTE_02`: three errors. `MODULAR_SCOUT_SOCKETS` is not in `rover-spring-arm.ts`; `stage0-dither-and-contours.ts` is not in the drop; the 12 kW gate power is right, not 100 kW.
+- **Left out, and why:**
+  - the modular scout (27b item 4): vehicle modelling, not rover camera work. It needs Opus's shots at acceptance (POL-50);
+  - the rover drive test (wall and crater, depth at screen centre): the harness has no fabricated rover, so the driving path cannot be reached in a browser (POL-51). The arm is unit-tested, and the driving code compiles;
+  - the scan visible in play: the first mill's placement raises the plot to stage 1 at once (play.tsx line 1363), so the scan never runs in live play. POL-48;
+  - a 0.45 ms cost on the GTX 950M: not measured (POL-54);
+  - the Studio: the Studio has no planet post pass, so the suit cam cannot show there. Not checked in a browser.
+- **Decisions Opus must make:**
+  1. **POL-48: stage 1 on the first placement** kills the 0a to 0b step in play. Should the first placement wait for the first output?
+  2. **POL-49: the 5% turn target.** The measure floor is 7 to 8% at 6 px cells; we are at 16 to 17%. Accept the floor and the measure, or require a finer look?
+  3. **POL-55: stage 4 forced to a full suit cam**, where the brief's formula gives 0.61 at the threshold.
+  4. **POL-52: the scan ring holds at 350 m** and the far world dissolves over 2 s; no sweep to the horizon.
+  5. **HUD and scene disagree on 0b.** The HUD (TASK-25) shows 0b once a machine stands (`machines.length`). The scene switches at the first running machine. Pick one.
+- **Shots:** `shots-run/stage-looks/` (arrival 0a, scan frames `02` and `03`, the 0b state `04`, the turn pair `05` and `06`, the amber pool `07`, the far view `07b`, stage 5 Auto `08` and Off `09`). The scan frames show the stage 1 look, for the reason in POL-48. `shots-run/stage-looks-baseline/` holds the pre-change build's shots.

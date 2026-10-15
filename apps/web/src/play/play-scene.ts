@@ -286,6 +286,11 @@ export interface PlayScene {
   /** For the tests and the e2e: where you are, and a way to stand somewhere. */
   readonly debug: {
     /** The wreck sites: each one's rung and whether it is broken or sealed (TASK-23c). */
+    /** TASK-26 check hooks: set the sync (a dev hook, so a beat need not wait 90 s), and the plume's pixels now. */
+    setSync(v: number): void;
+    plumePixels(): number;
+    /** TASK-26: each machine's run now (0..1, at the grid's satisfaction), by kind. */
+    machineRuns(): readonly { readonly kind: string; readonly run: number }[];
     wreckRungs(): readonly { readonly site: number; readonly leak: boolean; readonly sealed: boolean; readonly broken: boolean; readonly rung: number }[];
     /** The window view's draw calls and triangles (lab-vista.ts). */
     vistaStats(): { readonly drawCalls: number; readonly triangles: number; readonly dust: number };
@@ -2590,6 +2595,9 @@ export function createPlayScene(o: {
       holo.warm(renderer, camera);
     },
     debug: {
+      setSync: (v: number) => { sync = Math.max(0, Math.min(1, v)); },
+      plumePixels: () => plume.stats().pixels,
+      machineRuns: () => [...views.values()].map((v) => ({ kind: v.m.kind, run: v.running })),
       wreckRungs: () => wrecks.rungs(),
       vistaStats: () => room.vista.stats(),
       setWindowView: (view) => room.setWindowView(view),

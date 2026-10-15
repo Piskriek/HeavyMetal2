@@ -63,6 +63,7 @@ import {
 } from '../base/world';
 import { PieceMeshManager } from '../base/piece-meshes';
 import { globalKitPieceCache, integrityColorName } from '../base/kit-pieces';
+import { planFrameLegs } from '../base/foundation-legs';
 import { preloadAllGenAssets, genLevelForStage, createGenFixture } from '../assets/gen-props';
 import { PROPS_SAVE_KEY, parsePropsSave, serializePropsSave, clearedProp, readLog, sealedSite, type PropsSave } from './props-save';
 import { clutterById, salvageSplit } from './lab-clutter';
@@ -1904,7 +1905,8 @@ useEffect(() => {
           driveAccRef.current -= whole;
           updateChain((c) => bump(c, COUNT.drivenM, whole));
         }
-      } else if (drivingSpeed !== null) {
+      } else {
+        // every frame, not only when the (closure) value says it is set: a stale null here left the plot readout hidden after a drive
         setDrivingSpeed(null);
       }
       dx = 0; dy = 0;
@@ -2253,6 +2255,8 @@ useEffect(() => {
       placeAt: (x: number, z: number, kind: MachineKind = 'mill') => { const g = scene.debug.gatePlanet(); return tryPlace(kind, x, z, Math.atan2(x - g.x, z - g.z)); },
       plot: () => (visitingRef.current ? visitingRef.current.plot : plotRef.current),
       give: (ore: number) => { plotRef.current = { ...plotRef.current, ore: plotRef.current.ore + ore }; },
+      /** TASK-26: the sync set (a check hook), and the planet's dome state now. */
+      setSync: (v: number) => scene.debug.setSync(v),
       /** The four floats as a fraction of their targets (the e2e check of the suit cam's Lx ramp). Stage is not changed here. */
       setFloats: (fraction: number) => {
         const f = Math.max(0, Math.min(1, fraction));
@@ -2385,6 +2389,16 @@ useEffect(() => {
           return next;
         },
         save: () => persistBaseWorld(true),
+        /** TASK-26: the legs a placed foundation needs, each foot on the terrain (planFrameLegs, the same numbers the frame is drawn with). */
+        frameLegs: (pieceId: number) => {
+          const w = baseWorldRef.current;
+          const piece = w.base.pieces.find((p) => p.id === pieceId);
+          const st = piece ? w.base.structures.find((s) => s.id === piece.s) : undefined;
+          const at = piece ? pieceAt(w.base, piece) : null;
+          if (!piece || !st || !at) return null;
+          const env = getBaseEnv();
+          return planFrameLegs(at, -st.yaw, (x, z) => env.heightAt(x, z));
+        },
         load: () => {
           baseWorldRef.current = initBaseWorld();
           scene.setBase(baseWorldRef.current.base);

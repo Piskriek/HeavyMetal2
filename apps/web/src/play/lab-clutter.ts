@@ -76,6 +76,20 @@ export function salvageFor(c: ClutterItem): readonly Stack[] {
   return out;
 }
 
+/**
+ * Where a salvage prop's salvage goes (TASK-26): its ore is the plot's ore, the stock the boulders, the beam and a drill's cost
+ * all share, so no player stalls for want of it; its other stacks (the primitives) go into the pack, as before.
+ */
+export function salvageSplit(c: ClutterItem): { readonly plotOre: number; readonly pack: readonly Stack[] } {
+  let plotOre = 0;
+  const pack: Stack[] = [];
+  for (const st of salvageFor(c)) {
+    if (st.item === 'ore') plotOre += st.n;
+    else pack.push(st);
+  }
+  return { plotOre, pack };
+}
+
 /** The clutter by id. */
 export function clutterById(id: string): ClutterItem | null {
   return CLUTTER.find((c) => c.id === id) ?? null;

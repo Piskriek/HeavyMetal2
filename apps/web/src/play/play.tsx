@@ -65,7 +65,7 @@ import { PieceMeshManager } from '../base/piece-meshes';
 import { globalKitPieceCache, integrityColorName } from '../base/kit-pieces';
 import { preloadAllGenAssets, genLevelForStage, createGenFixture } from '../assets/gen-props';
 import { PROPS_SAVE_KEY, parsePropsSave, serializePropsSave, clearedProp, readLog, sealedSite, type PropsSave } from './props-save';
-import { clutterById, salvageFor } from './lab-clutter';
+import { clutterById, salvageSplit } from './lab-clutter';
 import { loreFor } from './lore-logs';
 import { LoreHover, DataBank, propLabel } from './lore-ui';
 
@@ -1063,20 +1063,29 @@ useEffect(() => {
     const item = clutterById(id);
     const scene = sceneRef.current;
     if (!item || item.role !== 'salvage' || !scene || propsRef.current.cleared.includes(id)) return;
-    const cmd: BaseCommand = { t: 'salvage', at: SALVAGE_AT, stock: [...salvageFor(item)] };
-    const res = apply(baseWorldRef.current, getBaseEnv(), cmd);
-    if (!res || res.events.some((e) => e.type === 'refused')) {
-      say('The pack is full', 'Make room for the salvage, then hold E again.');
-      gameAudio.playRefuse();
-      return;
+    // TASK-26: the salvage's ore is the plot's ore (the stock the boulders, the beam and a drill's cost share), so a player with no ore
+    // can always reach a drill here; the primitives go into the pack, refused whole when they do not fit, as before
+    const split = salvageSplit(item);
+    const cmd: BaseCommand = { t: 'salvage', at: SALVAGE_AT, stock: [...split.pack] };
+    if (split.pack.length > 0) {
+      const res = apply(baseWorldRef.current, getBaseEnv(), cmd);
+      if (!res || res.events.some((e) => e.type === 'refused')) {
+        say('The pack is full', 'Make room for the salvage, then hold E again.');
+        gameAudio.playRefuse();
+        return;
+      }
     }
     if (!scene.dissolveClutter(id)) return;
-    dispatchBase(cmd);
+    if (split.pack.length > 0) dispatchBase(cmd);
+    if (split.plotOre > 0) plotRef.current = { ...plotRef.current, ore: Math.min(1e5, plotRef.current.ore + split.plotOre) };
     savePropsSave(clearedProp(propsRef.current, id));
-    const summary = cmd.stock.map((st) => `${st.n} ${ITEMS[st.item]?.name ?? st.item}`).join(', ');
-    say(`${item.label.charAt(0).toUpperCase()}${item.label.slice(1)} salvaged`, `${summary} went into your pack.`);
+    commit(withLab(withPlot(stateRef.current, plotRef.current), labRef.current));
+    const lines: string[] = [];
+    if (split.plotOre > 0) lines.push(`${split.plotOre} ore went to your plot`);
+    if (split.pack.length > 0) lines.push(`${split.pack.map((st) => `${st.n} ${ITEMS[st.item]?.name ?? st.item}`).join(', ')} went into your pack`);
+    say(`${item.label.charAt(0).toUpperCase()}${item.label.slice(1)} salvaged`, `${lines.join('; ')}.`);
     if (item.log) openLog(item.log);
-  }, [dispatchBase, getBaseEnv, say, openLog, savePropsSave]);
+  }, [dispatchBase, getBaseEnv, say, openLog, savePropsSave, commit]);
   clearPropRef.current = clearProp;
 
   // a drop goes to the bridge store: the linked storage that the refinery and the benches draw from (a logged grant, as the Act V kit)

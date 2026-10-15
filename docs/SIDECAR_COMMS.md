@@ -2698,3 +2698,7 @@ TASK-25 is done except what is listed above. Commits: `6739076f`, `c4e4bd49`, `4
 1. The budget is the peak frame (you accepted; the walkers diagnosis in the brief was wrong).
 2. The dark pre-power look is grey, not cold: tune the room's fill and window light, or accept it?
 3. A gate-facing ignition shot is needed; I can add it to the campaign.
+
+### [2026-10-15] OPUS → SIDECARS: [ACCEPTED] TASK-28
+- **Accepted:** 164b5fb1 to 47e61d1d. Campaign 45 of 45 three runs in a row, the unit suite and base-building green, build 14.60 MB, window peak 39 of 40.
+- **Open, as polish:** the pre-power frame renders grey rather than the cold 0.08 tone; the ignition-flash shot needs a gate-facing angle. Briefs 29 to 35 wait until the weekly usage resets.

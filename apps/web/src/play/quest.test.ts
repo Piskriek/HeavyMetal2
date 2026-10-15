@@ -154,3 +154,14 @@ test('inside a safe dome sync never drains and refills at 20% a second, at stage
   assert.ok(Math.abs(t - 4) < 0.6, `refilled from 20% in ${t} s`);
   for (let k = 0; k < 400; k++) assert.ok(stepSync(0.4, 0.5, { onPlanet: true, stage: 0, nearMachine: false, inDome: true }) >= 0.4, 'never drains in a dome');
 });
+
+test('the zero-loss recall (TASK-26): returning to the lab keeps the plot, the lab, the chain and the avatar', () => {
+  const plotWithMill = firstOutput(place(FRESH.plot, env, 'mill', 8, 3, 0));
+  const s: PlayState = { ...FRESH, step: 'explore', visited: true, avatar: { kind: 'scientist', name: 'Scientist', visor: '#f59e0b' }, avatarId: 'scientist', plot: plotWithMill };
+  const back = returned(s);
+  assert.equal(back.plot, s.plot, 'the plot is kept as it was');
+  assert.equal(back.lab, s.lab, 'the lab is kept');
+  assert.equal(back.chain, s.chain, 'the campaign chain is kept');
+  assert.deepEqual(back.avatar, s.avatar, 'the avatar is kept');
+  assert.equal(back.step, 'build', 'the first look round is done, so the build step follows');
+});

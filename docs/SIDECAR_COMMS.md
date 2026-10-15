@@ -2577,3 +2577,67 @@ TASK-25 is done except what is listed above. Commits: `6739076f`, `c4e4bd49`, `4
   - POL-49: the turn test's target is 10%. It measures 16.9% and stays failing, logged.
   - POL-52: the scan-ring fade is logged.
   - POL-50: the modular scout goes to the art pass (brief 32 / Hyper3D).
+
+### [2026-10-15] SIDECAR → OPUS: [DONE, PARTIAL] TASK-26: the industrial foundation frame, the safe domes, no soft-lock, the brownout you can see
+
+- **Commits** (branch `feat/monster-mash-exploration`):
+  - `5e135149` plotsim `safe-dome.ts` (the pure dome rules) and its tests.
+  - `bcb99a8a` the domes in play: `stepSync` (dome refill, 90 s drain at every stage), play-scene dome sources, the ripple, the 30% static cue and the compass arrow, the recall line, the power share; `quest.test.ts`.
+  - `b5b3098f` the frame: `kit-pieces.ts`, `piece-meshes.ts`, `foundation-frame.ts`, `foundation-legs.ts` and its tests.
+  - `1dd1d929` the brownout: `@hm/plume` `setCount`, the plume count per run, the pylon pulse beads, `brownout-visual.ts` and its tests.
+  - `4b4be69e` the salvage ore goes to the plot (the soft-lock fix) and the proof test `soft-lock.test.ts`.
+  - `784b661b` the recall-keeps-everything test.
+  - `da4ac4a1` the drive-state fix, and the TASK-26 check hooks (scene `setSync`, `plumePixels`, `machineRuns`; `hmPlay.base.frameLegs`).
+  - `b00f2586` the build readout sits 66 px below the centre (see the decisions below).
+  - `d6654d8e` the campaign beats 26a to 26d; beat 9b now checks the salvage ore on the plot.
+
+- **File by file:**
+  - `packages/plotsim/src/safe-dome.ts`: the gate's 25 m dome, a powered pylon's 15 m dome (on the grid and switched on), the shelter's 15 m dome, 20%/s refill, 90 s drain, the 30% warning.
+  - `apps/web/src/play/quest.ts`: `stepSync` takes `inDome`. Inside a dome it refills at 20%/s at every stage. Outside it drains over 90 s. The machine rule is unchanged.
+  - `apps/web/src/play/play-scene.ts`: the dome sources each frame, the amber ripple at the crossing point (one ring), one soft `static-burst` at 30%, the return arrow, the pulse beads (one instanced draw, speed from satisfaction), the plume count per run.
+  - `apps/web/src/play/play.tsx`: the shelter's dome centre (its first foundation), the 0% recall line and the power prompt as subtitles only, the readout's percentage, the driving-state fix.
+  - `apps/web/src/base/foundation-legs.ts` (pure planner, legs clamped and flagged), `foundation-frame.ts` (the frame: gunmetal box-section deck, grate from stage 2, hazard rim, collars; leg and pad parts), `kit-pieces.ts` and `piece-meshes.ts` (the deck keyed without the skirt; one leg and one pad per corner, batched; the generated foundation model is no longer swapped in).
+  - `apps/web/src/play/brownout-visual.ts` (pure: plume share, bead speed, span sag and point, matching `cableSpan`).
+  - `apps/web/src/play/lab-clutter.ts` (`salvageSplit`), `soft-lock.test.ts`.
+
+- **Numbers (real runs):**
+  - Dome: inside the dome the sync went 0.50 to 1.000 in 3 s. Outside it fell 0.034 in 3 s (0.033 is a 90 s buffer).
+  - Recall at 0%: back at the lab; the pack, the machines and the plot are unchanged.
+  - Foundation on a slope (26a): 2 legs; the worst foot is 0.0 cm from the terrain (limit 5 cm).
+  - Brownout (26d): 3 projectors placed; the mill's run goes from 1.00 to 0.39; the readout reads "31 of 12 kW 39%" in amber.
+  - Soft-lock: from ore 0, no drill. Hand: 18 ore in 6 s at 3 ore/s. A boulder regrows from empty within about 675 s even on the poorest ground. The beam at its base rate: 18 ore in 4.5 s. Lab salvage: 13 props hold 62 plot ore (the test needs 18).
+  - `npm run typecheck`: 0 errors. `npm test` (before the last three commits): 2669 pass, 0 fail, speed tests 19 of 19. After them, the plume, plotsim, play and base subset: 216 pass, 1 pass in the second pass, 0 fail.
+  - `npm run build`: 14.59 MB of the 16 MB cap.
+  - `node scripts/test-base-building.mjs`: exit 0.
+  - `node scripts/test-campaign.mjs`: **44 of 44** on the last run (6), with 0 HUD overlaps and 0 console or HTTP errors. The campaign now has 44 beats (was 40). The checkpoints were restored after every run.
+  - Runs 1 to 5 showed three known problems:
+    - The L1 window-view budget (41 calls against 40) failed in runs 2, 4 and 5, and passed in 1, 3 and 6. That is the walkers drifting into frame, which Opus gave to TASK-28.
+    - A first-machine label hit the reticle's clear zone in runs 1 and 5.
+    - The build readout overlapped "CANNOT PLACE" in runs 4 and 5. The drive fix exposed it, and `b00f2586` fixed it.
+
+- **Shots:** `shots-run/campaign/57-foundation-slope.png` (stage 6, a foundation on a slope: the frame, the rim, the legs), `58-dome-outside.png` (raw ground, 60 m out), `59-recall-lab.png` (the recall), `60-brownout.png` (the amber readout and the "Not enough power" toast). I looked at all four.
+  - **Owed:** foundations at stage 1, on flat ground, from three sides; the dome-edge ripple; and a like-for-like after of tour shot 10. The red is gone in shot 57, but the before and after are not the same camera.
+
+- **Drop files used, and what changed:**
+  - `argo-relay/packages/plotsim/src/coherence-and-power.ts` is the spec for `safe-dome.ts`, not landed verbatim. Changed: no 25% floor; the power unit is +16 kW (brief), not +36 kW; no turret code (27b and 32); a shelter dome added; the sync is the game's "sync", not "coherence"; the machine rule kept.
+  - `argo-relay/apps/web/src/base/foundation-frame.ts` is replaced by `foundation-frame.ts` and `foundation-legs.ts`. One batched leg and pad per corner, not one mesh per part; the legs are clamped at 3 m and flagged. Not landed: the print sweep and the cable covers (other briefs).
+  - `argo-relay-v2/packages/plotsim/tests/coherence-and-brownout.test.ts` is NOT used. It imports `../src/coherence-and-brownout` and `unified-economy`, neither in the drop, and calls APIs that do not exist in v1 (`evaluatePowerGridAndBrownout`, `TWIN_GATE_BASELINE_KW`, `coherence0to100`). I wrote the tests instead.
+  - `docs/argo/notes/ARGO_NOTE_02` errors: 100 kW (the brief's 12 kW kept); the file name (`coherence-and-power.ts`, not `coherence-and-brownout.ts`); `base/view.ts` is the HUD contract, not the foundation's render (that is `kit-pieces.ts` and `piece-meshes.ts`); the water maker's 3.6 x 3.0 footprint (D3 makes it heavy, not built here).
+
+- **Left out, and why:**
+  - The dome-edge ground band: the brief allows a ripple (POL-60).
+  - The 25% brownout floor: the sim runs in proportion (POL-58).
+  - The sapper rule: the POL-31 ruling is recorded (below), and no code changed.
+  - The Dr. Haddy lines (the recall and the power prompt) are Argo's text, subtitle only (POL-57).
+  - The stage 1 and flat-ground shots: the campaign took one slope shot at stage 6 (above).
+
+- **POL-31 ruling:** recorded as ruled in the registry (the dome protects the player; sappers can still brown out structures outside the dome). The brief does not contradict it: it says monsters respect the gate dome, and it does not say the base is safe. So I followed the brief and changed no sapper rule.
+
+- **Registry:** POL-57 (Haddy's unvoiced lines), POL-58 (the brownout floor), POL-59 (the beads' look), POL-60 (the dome ring, not a band), POL-61 (the 90 s stage 0 drain and the machine rule), POL-62 (salvage ore to the plot), POL-63 (the red root cause, partly settled by the shots).
+
+- **Decisions for Opus:**
+  1. The machine rule: the brief says "keep today's rule that a running machine slows the drain". The code has a stage 1+ recovery near a running machine, which I kept (POL-61). Is that the rule meant?
+  2. Salvage ore goes to the plot, not the pack (POL-62). This changes TASK-23c's rule.
+  3. Accept the build readout's new position (`b00f2586`, a TASK-25 zone) and the drive-state fix (`da4ac4a1`). The fix exposed a stale state that had hidden the readout and the build prompts after a drive.
+  4. Dr. Haddy's two lines: approve, cut or rewrite (POL-57).
+  5. The brownout floor: keep the proportional sim, or add Argo's 25% floor (POL-58).

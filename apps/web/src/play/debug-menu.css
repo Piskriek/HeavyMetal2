@@ -1,0 +1,112 @@
+/* The debug menu: a compact, sectioned, scrollable panel in the HUD's own vocabulary (dark glass, the lab's amber for
+   the actions, square corners as the owner asked for square sections). It sits over the paused game. */
+.debug-pause { background: rgba(5, 6, 8, .72); padding: 16px; box-sizing: border-box; }
+
+.dbg {
+  --dbg-line: rgba(241, 244, 245, .14);
+  --dbg-faint: rgba(232, 238, 241, .6);
+  --dbg-hover: rgba(255, 255, 255, .07);
+  box-sizing: border-box;
+  width: min(580px, 100%);
+  max-height: min(88vh, 820px);
+  display: flex;
+  flex-direction: column;
+  background: rgba(9, 11, 14, .96);
+  border: 1px solid var(--dbg-line);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .55);
+  color: #eef3f6;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.dbg-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--dbg-line);
+  border-top: 3px solid var(--power, #ffb02a);
+}
+.dbg-head h2 { margin: 0; font-family: var(--font-setmix); font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
+.dbg-head p { margin: 2px 0 0; color: var(--dbg-faint); font-size: 12px; }
+
+.dbg-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 0 6px; }
+
+/* the confirmation strip: always there, so the panel does not jump when an action lands */
+.dbg-foot { flex: none; border-top: 1px solid var(--dbg-line); padding: 8px 16px; min-height: 40px; box-sizing: border-box; }
+.dbg-toast { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 13px; animation: dbg-in .18s ease-out both; }
+.dbg-toast b { color: var(--power, #ffb02a); font-weight: 700; }
+.dbg-toast span { color: var(--dbg-faint); }
+.dbg-idle { color: var(--dbg-faint); font-size: 12px; }
+@keyframes dbg-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+
+.dbg-section { padding: 12px 16px 14px; border-bottom: 1px solid var(--dbg-line); display: grid; gap: 10px; }
+.dbg-section:last-child { border-bottom: 0; }
+.dbg-section h3 { margin: 0; font-family: var(--font-setmix); font-size: 15px; font-weight: 700; color: var(--power, #ffb02a); }
+
+.dbg-field { display: grid; gap: 6px; }
+.dbg-label { color: var(--dbg-faint); font-size: 12px; }
+.dbg-label b { color: #eef3f6; font-variant-numeric: tabular-nums; }
+
+.dbg-facts { display: grid; gap: 6px; margin: 0; }
+.dbg-facts div { display: grid; grid-template-columns: 96px 1fr; gap: 10px; align-items: baseline; }
+.dbg-facts dt { color: var(--dbg-faint); font-size: 12px; }
+.dbg-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.dbg-facts dd b { font-variant-numeric: tabular-nums; color: var(--power, #ffb02a); font-weight: 700; }
+
+.dbg-note { margin: 0; color: var(--dbg-faint); font-size: 12px; }
+.dbg-note b { color: #eef3f6; font-variant-numeric: tabular-nums; }
+.dbg-warn { color: #ffb4a8; }
+
+.dbg-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+.dbg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 6px; }
+.dbg-grid-wide { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+
+.dbg-stages { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.debug-pause .dbg-stages button { font-variant-numeric: tabular-nums; }
+
+/* buttons: the pause menu's, tightened for a panel that holds many of them */
+.debug-pause .dbg button,
+.debug-pause .dbg select,
+.debug-pause .dbg input {
+  font: inherit;
+  color: #f1f4f5;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(241, 244, 245, .22);
+  border-radius: 0;
+  padding: 7px 10px;
+  min-width: 0;
+}
+.debug-pause .dbg button { cursor: pointer; text-align: left; display: grid; gap: 1px; transition: background-color .12s ease, border-color .12s ease; }
+.debug-pause .dbg button:hover:not(:disabled) { background: var(--dbg-hover); border-color: rgba(241, 244, 245, .4); }
+.debug-pause .dbg button:disabled { opacity: .42; cursor: not-allowed; }
+.debug-pause .dbg button small { color: var(--dbg-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+.debug-pause .dbg button.on,
+.debug-pause .dbg button[aria-pressed="true"] { background: var(--power, #ffb02a); color: #17110a; border-color: var(--power, #ffb02a); font-weight: 700; }
+.debug-pause .dbg button.on small,
+.debug-pause .dbg button[aria-pressed="true"] small { color: rgba(23, 17, 10, .7); }
+.dbg-stages button { text-align: center; }
+.debug-pause .dbg .dbg-close { text-align: center; padding: 6px 12px; flex: none; }
+.debug-pause .dbg button.dbg-primary { background: var(--power, #ffb02a); color: #17110a; border-color: var(--power, #ffb02a); font-weight: 700; }
+.debug-pause .dbg button.dbg-primary:hover:not(:disabled) { background: #ffc24f; border-color: #ffc24f; }
+.debug-pause .dbg button:focus-visible,
+.debug-pause .dbg select:focus-visible,
+.debug-pause .dbg input:focus-visible { outline: 2px solid var(--power, #ffb02a); outline-offset: 2px; }
+
+.debug-pause .dbg select { min-width: 0; flex: 1 1 180px; }
+.debug-pause .dbg select option, .debug-pause .dbg select optgroup { background: #0b0d10; color: #eef3f6; }
+.debug-pause .dbg input[type="number"] { width: 84px; font-variant-numeric: tabular-nums; }
+.dbg-items select[aria-label="Destination"] { flex: 0 1 140px; }
+
+@media (max-width: 560px) {
+  .debug-pause { padding: 8px; }
+  .dbg { max-height: 94vh; }
+  .dbg-facts div { grid-template-columns: 1fr; gap: 0; }
+  .dbg-stages { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .debug-pause .dbg button { transition: none; }
+}

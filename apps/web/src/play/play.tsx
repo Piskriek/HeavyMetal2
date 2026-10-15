@@ -38,7 +38,8 @@ import {
 import { fx } from '../maker/feedback';
 import { FRESH, METRIC_COLOUR, METRIC_NAME, SAVE_KEY, arrived, created, isFreeDrill, loadState, objective, poweredOn, returned, withLab, withPlot, type PlayState } from './quest';
 import { Journal } from './journal';
-import { ACT_V_KIT, COUNT, advanceChain, bump, chainView, finishedSteps, gateReason, monsterKilled, monsterSeen, placedKey, playerDied, playerLow, stepDone, syncChain, type Chain, type Evidence } from '../base/campaign-chain';
+import { ACT_V_KIT, COUNT, advanceChain, bump, chainView, completeStepChain, finishedSteps, gateReason, monsterKilled, monsterSeen, placedKey, playerDied, playerLow, stepDone, syncChain, type Chain, type Evidence } from '../base/campaign-chain';
+import { DebugMenu, type DebugApi } from './debug-menu';
 import type { BaseEvent } from '../base/world';
 import { encodePlot, decodePlot, plotOfSnapshot } from './plot-code';
 import type { Snapshot } from '@hm/plotcodec';
@@ -71,7 +72,9 @@ import { loreFor } from './lore-logs';
 import { LoreHover, DataBank, propLabel } from './lore-ui';
 
 const isFixture = (kind: Kind): boolean => kind === 'bin' || kind === 'bench' || kind === 'repeater' || kind === 'lifeSupport' || kind === 'weaponBench';
-import { blueprint, ITEMS, pieceCost } from '../base/catalog';
+/** The lab's spawn beside the cot, facing north (lab-room.ts, the room's spawn): the debug menu's "The lab" teleport. */
+const LAB_SPAWN = { x: -2.5, z: 1.0, yaw: 0 } as const;
+import { VEHICLE, blueprint, ITEMS, pieceCost, type VehicleKind } from '../base/catalog';
 import { BuildMenu, BuildPill, KIND_LABEL, type BuildTab, type MenuBlueprint, type MenuHeavy, type MenuMachine } from './build-menu';
 import { MachinePickerModal } from '../base/ui/machine-picker-modal';
 import { RefineryModal } from '../base/ui/refinery-modal';
@@ -311,6 +314,9 @@ export function PlayScreen(props: {
   const pieceSessionRef = useRef(false);
   const [radioLogOpen, setRadioLogOpen] = useState(false);
   const [journalOpen, setJournalOpen] = useState(false);
+  /** The debug menu (Esc, then Debug menu): the testers' panel, in every build. Its hooks are set by the dev effect below. */
+  const [debugOpen, setDebugOpen] = useState(false);
+  const debugApiRef = useRef<DebugApi | null>(null);
   /** Running seconds of the texture mill and metres driven, whole units go to the chain (TASK-22). */
   const millAccRef = useRef(0);
   const driveAccRef = useRef(0);
@@ -431,6 +437,24 @@ export function PlayScreen(props: {
     }
   }, [commit]);
   const say = useCallback((text: string, sub = '') => setToast({ text, sub, id: Date.now() }), []);
+  /** The debug menu's "Complete this step": the chain moves exactly one step on (completeStepChain). Returns the step id, or null. */
+  const completeStepNow = useCallback((): string | null => {
+    const before = stateRef.current.chain;
+    const current = chainView(before).current;
+    if (!current) return null;
+    const moved = completeStepChain(before);
+    const next = stepDone(moved, 'F-03') ? { ...moved, monstersUnlocked: true } : moved;
+    commit(withLab(withPlot({ ...stateRef.current, chain: next }, plotRef.current), labRef.current));
+    if (stepDone(next, 'F-03')) sceneRef.current?.monsters.setUnlocked(true);
+    return current.id;
+  }, [commit]);
+  /** The debug menu's "Complete this act": the act's quest is marked finished, as the dev hook finishAct does. Returns the act id, or null. */
+  const completeActNow = useCallback((): string | null => {
+    const quest = stateRef.current.chain.progress.quest;
+    if (quest === null) return null;
+    updateChain((c) => advanceChain({ ...c, progress: { ...c.progress, finished: [...c.progress.finished.filter((x) => x !== quest), quest] } }));
+    return quest;
+  }, [updateChain]);
   useEffect(() => {
     if (!toast) return undefined;
     // a title card holds the other banners (CANNOT PLACE) until it fades: 3 s, at 72 px from the top (P0-UI-01)
@@ -2581,6 +2605,8 @@ useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (!ready || creating) return;
       if (e.code === 'Escape') {
+        // the debug menu closes first, back to the pause menu it opened from
+        if (debugOpen) { setDebugOpen(false); return; }
         if (placingLayoutId !== null) {
           setPlacingLayoutId(null);
           sceneRef.current?.setPlanGhosts([]);
@@ -2826,7 +2852,7 @@ useEffect(() => {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [ready, creating, building, gunEquipped, fireWeapon, menu, panel, labPanel, dialOpen, locked, paused, hud.atLever, hud.atDial, hud.aimed, hud.aimedBoulder, hud.aimedLab, hud.aimedProp, openLog, hud.where, placeNow, stopBuilding, freeMouse, say, props.profile]);
+  }, [ready, creating, building, gunEquipped, fireWeapon, menu, panel, labPanel, dialOpen, debugOpen, locked, paused, hud.atLever, hud.atDial, hud.aimed, hud.aimedBoulder, hud.aimedLab, hud.aimedProp, openLog, hud.where, placeNow, stopBuilding, freeMouse, say, props.profile]);
   useEffect(() => {
     const onClick = (e: MouseEvent): void => {
       // the right button cancels a placement (the key strip says so); the left button places (TASK-25)
@@ -2902,8 +2928,10 @@ useEffect(() => {
   }, [ready, commit]);
 
   // Debug hooks (TASK-20): the sandbox's actions for the tests and for dev work, in place of the removed Monster Mash panel.
+  // Built in every build: the debug menu (Esc, Debug menu) calls them through debugApiRef. window.__dev, the test switch,
+  // exists only in dev builds and under ?e2e (debugHooks).
   useEffect(() => {
-    if (!ready || !debugHooks) return undefined;
+    if (!ready) return undefined;
     const grant = (item: string, n: number): boolean => {
       const spec = ITEMS[item];
       if (!spec || n <= 0) return false;
@@ -2990,6 +3018,40 @@ useEffect(() => {
       finishAct: (quest: string): void => {
         updateChain((c) => advanceChain({ ...c, progress: { ...c.progress, finished: [...c.progress.finished.filter((x) => x !== quest), quest] } }));
       },
+      /** The debug menu's step skip: the current step is done and the chain moves exactly one step (null when none is current). */
+      completeStep: (): string | null => completeStepNow(),
+      /** The debug menu's act finish: the running act is marked done, as finishAct does (null when no act is running). */
+      completeAct: (): string | null => completeActNow(),
+      /** Refills the sync and the health. */
+      refill: (): void => {
+        sceneRef.current?.debug.setSync(1);
+        hpRef.current = PLAYER_MAX_HP;
+        setVitals((v) => ({ ...v, hp: PLAYER_MAX_HP }));
+      },
+      /** Teleports the player: the lab (the bed-side spawn), the gate pad, or the Moon plot (the spots the game's own moves use). */
+      teleport: (where: 'lab' | 'gate' | 'plot'): void => {
+        const scene = sceneRef.current;
+        if (!scene) return;
+        if (where === 'lab') { scene.debug.teleport('lab', LAB_SPAWN.x, LAB_SPAWN.z, LAB_SPAWN.yaw); return; }
+        if (where === 'plot') { scene.debug.teleport('planet', 0, 10, 0); return; }
+        const g = scene.debug.gatePlanet();
+        scene.debug.teleport('planet', g.x, g.z - 6, 0, 0);
+      },
+      /** Puts n of an item in the bridge store (the linked storage the benches draw from); what does not fit is dropped, as the grant command does. */
+      grantStock: (item: string, n: number): void => {
+        if (!ITEMS[item] || n <= 0) return;
+        dispatchBaseRef.current({ t: 'grant', stock: [{ item, n: Math.floor(n) }] });
+      },
+      /** Queues a vehicle's print at the first fabricator: the bill goes to the bridge store (the network pays it), then the craft. */
+      printVehicle: (kind: VehicleKind): string => {
+        const machine = baseWorldRef.current.machines.find((m) => m.kind === 'fabricator');
+        if (!machine) return 'No fabricator on the base yet. Install one first (Act VI, F-01).';
+        const p = sceneRef.current?.debug.position();
+        if (!p) return 'The scene is not ready.';
+        for (const s of VEHICLE[kind].bill) dispatchBaseRef.current({ t: 'grant', stock: [{ item: s.item, n: s.n }] });
+        dispatchBaseRef.current({ t: 'craft', at: { x: p.x, z: p.z }, machine: machine.id, recipe: `vehicle-${kind}` });
+        return 'Queued at the fabricator. A refusal shows as a toast.';
+      },
       unlockMonsters: (on = true): void => {
         updateChain((c) => ({ ...c, monstersUnlocked: on }));
         sceneRef.current?.monsters.setUnlocked(on);
@@ -3043,11 +3105,13 @@ useEffect(() => {
         dispatchBaseRef.current({ t: 'stage', stage });
       },
     };
-    (window as unknown as { __dev?: unknown }).__dev = dev;
+    debugApiRef.current = dev;
+    if (debugHooks) (window as unknown as { __dev?: unknown }).__dev = dev;
     return () => {
-      delete (window as unknown as { __dev?: unknown }).__dev;
+      debugApiRef.current = null;
+      if (debugHooks) delete (window as unknown as { __dev?: unknown }).__dev;
     };
-  }, [ready, debugHooks, fireWeapon, baseViewSource, persistBaseWorld]);
+  }, [ready, debugHooks, fireWeapon, baseViewSource, persistBaseWorld, completeStepNow, completeActNow]);
 
   const startBuilding = (kind: MachineKind): void => {
     setMenu(false);
@@ -3766,7 +3830,7 @@ useEffect(() => {
               />
             </div>
           ) : null}
-          {paused && !journalOpen && !isAnyBaseWindowOpen ? (
+          {paused && !journalOpen && !debugOpen && !isAnyBaseWindowOpen ? (
             <div className="play-pause" role="dialog" aria-label="Paused">
               <h2>Paused</h2>
               <div className="play-pause-sync">
@@ -3794,6 +3858,7 @@ useEffect(() => {
                 {syncMode === 'synced' ? 'Desync to Solo Branch' : 'Sync to Planetary Grid (Majority Merge)'}
               </button>
               <button type="button" onClick={() => setJournalOpen(true)}>Journal</button>
+              <button type="button" onClick={() => setDebugOpen(true)} data-testid="debug-open">Debug menu</button>
               <button
                 onClick={() => {
                   setRadioLogOpen(true);
@@ -3804,6 +3869,10 @@ useEffect(() => {
               </button>
               <button onClick={props.onBack}>Back to FIDELITY</button>
             </div>
+          ) : null}
+
+          {paused && debugOpen && !isAnyBaseWindowOpen && debugApiRef.current ? (
+            <DebugMenu api={debugApiRef.current} chain={state.chain} stage={state.plot.stage} where={hud.where} onClose={() => setDebugOpen(false)} />
           ) : null}
 
           {/* Mentor Subtitles (On by default) */}

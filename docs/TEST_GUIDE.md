@@ -23,6 +23,39 @@
 | `act6-start` | Act VI: the hardpoint, ready to install the fabricator and print the scout |
 | `stage6-monsters` | Stage 6 with the monsters unlocked |
 
+## Debug menu (for stuck quests and quick checks)
+Press **Esc** in the game to open the pause menu, then press **Debug menu**. Esc closes the debug menu and takes you back to the pause menu. Every action shows a short confirmation at the bottom of the panel. It works in the normal build, so PLAY.bat is enough.
+
+**Quest**
+- **Current step** (the line at the top): the step's id and title. It says "Not started" until the drill runs in Act IV, and "Every step is done" at the end.
+- **Act:** the running act and the step you are on.
+- **Complete this step:** marks the current step done. The chain moves exactly one step on. It is disabled when no step is current.
+- **Complete this act:** marks every step of the running act done, so the chain moves to the next act. It is disabled when no act is running.
+
+**Jump to act**
+- One button per checkpoint (the same list as the table above). Each reloads the game with `?checkpoint=<name>`.
+- A checkpoint already loaded in this tab keeps the progress made in it. Open a new tab to start it again from its beginning.
+
+**World**
+- **Plot stage 0 to 6:** sets the plot's fidelity stage, and the base and the Moon follow. The current stage is highlighted.
+- **Refill sync and health:** sets the sync to full and the health to 100.
+- **Teleport:**
+  - **The lab:** the spot beside the cot in the lab.
+  - **The gate:** a spot six metres from the gate pad on the Moon.
+  - **The Moon plot:** a spot on the Moon plot, near its centre.
+
+**Spawn**
+- **Items:** choose any item from the base catalog (ore, raw pixels and vertices, primitives, texture maps, blueprints, weapon parts, weapons, tools, equipment), type an amount from 1 to 999, choose the destination, then press **Grant**.
+  - **Pack:** your inventory. If it has no room, the panel says so and nothing is added.
+  - **Bridge store:** the linked storage that the benches and the fabricator draw from. What does not fit is dropped.
+  - Two counts show under the buttons: **In pack** and **On the bridge store**.
+- **Monsters:** Charger, Spitter, Swarmer, Flyer, Brute and Sapper. Each spawns six metres ahead of your view. The buttons work on the Moon only.
+- **Vehicles:** **Print Scout**, **Print Hauler** and **Print Crawler**.
+  - Printing needs a fabricator on the base (Act VI, F-01) and the vehicle's stage.
+  - It puts the vehicle's bill on the bridge store and queues the print at the fabricator. The vehicle rolls out when the fabricator finishes. The scout takes about two minutes at full power, so it does not appear at once.
+
+The automated check for this menu is `scripts/test-debug-menu.mjs` (run `npm run build` first).
+
 ## What this build has (what to judge)
 - **The campaign from Act I to Act VI, voiced.** The automated walkthrough passes 40 of 40 beats.
   - Act I: the lab and emergency power. Act II: the window and the gate. Act III: the Moon at stage 0. Act IV: the extraction tool and the Studio.

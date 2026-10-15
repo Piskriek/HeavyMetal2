@@ -876,7 +876,7 @@ useEffect(() => {
               commit(withPlot(stateRef.current, nextPlot));
               const placed = nextPlot.machines[nextPlot.machines.length - 1];
               if (placed) hardpointToPlotMachineRef.current.set(ev.machine, placed.id);
-              scene?.setPlot(nextPlot, running(nextPlot, envRef.current), network(nextPlot, envRef.current).connected);
+              scene?.setPlot(nextPlot, running(nextPlot, envRef.current), network(nextPlot, envRef.current).connected, network(nextPlot, envRef.current).satisfaction);
               say(`Heavy ${ev.kind.toUpperCase()} installed!`, 'Operational on hardpoint grid.');
             } catch (err: any) {
               console.warn('Plotsim placement refusal:', err?.message ?? err);
@@ -1357,7 +1357,7 @@ useEffect(() => {
       plotRef.current = after;
       commit(withPlot(stateRef.current, after));
       updateChain((c) => c);
-      scene.setPlot(after, running(after, env), network(after, env).connected);
+      scene.setPlot(after, running(after, env), network(after, env).connected, network(after, env).satisfaction);
       fx('mill-start');
       scene.playAction('plant');
       if (after.machines.length === 1) narratorRef.current?.trigger('machine:first');
@@ -2114,7 +2114,7 @@ useEffect(() => {
           }
         }
         if (!visitingRef.current) {
-          scene.setPlot(plotRef.current, running(plotRef.current, env), network(plotRef.current, env).connected);
+          scene.setPlot(plotRef.current, running(plotRef.current, env), network(plotRef.current, env).connected, network(plotRef.current, env).satisfaction);
         } else {
           const vp = visitingRef.current;
           const vEnv: Env = {

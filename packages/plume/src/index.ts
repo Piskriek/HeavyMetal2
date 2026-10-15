@@ -50,6 +50,8 @@ export interface Plume {
   setWave(centre: [number, number, number], radius: number): void;
   setViewport(heightPx: number): void;
   add(e: EmitterSpec): number;
+  /** Sets how many pixels an emitter pours, from 0 up to the plume's cap. It rebuilds only when the count changes (TASK-26: emission follows the machine's run rate). */
+  setCount(id: number, count: number): void;
   remove(id: number): void;
   update(t: number): void;
   stats(): { mode: PlumeMode; emitters: number; pixels: number; drawCalls: number; triangles: number };
@@ -637,6 +639,14 @@ export function createPlume(o: { mode?: PlumeMode; density?: number; maxPixels?:
       emitters.push({ id, spec, seed: emitterSeed(spec.at) });
       rebuild();
       return id;
+    },
+    setCount(id: number, count: number): void {
+      const em = emitters.find((x) => x.id === id);
+      if (em === undefined) return;
+      const next = Math.floor(finiteOr(count, em.spec.count, 0, maxPixels));
+      if (next === em.spec.count) return;
+      em.spec.count = next;
+      rebuild();
     },
     remove(id: number): void {
       const at = emitters.findIndex((em) => em.id === id);

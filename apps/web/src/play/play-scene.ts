@@ -20,6 +20,7 @@ import { createPlotHolo, type PlotHolo } from './plot-holo';
 import { COLOUR_MARK_FRAGMENT, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX } from './portal-shaders';
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
 import { disposeProp, lineSpan, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
+import { beadSpeed, plumeCount, spanPoint, spanSag } from './brownout-visual';
 import { castHeightfield, castSpheres, createRoverArmState, nearestHit, stepRoverArm, type CastSphere, type RoverArmState, type Vec3 as RoverVec3 } from './rover-camera';
 import { createExposureState, createScanWave, exposureTargetLuminance, gateOrLabFactor, markScanWaveDone, scanFrame, stepExposure, suitCamMix, suitCamProfile, suitCamStrength, triggerScanWave, type ExposureState, type ScanWave, type SuitCamSetting } from './stage-look';
 import { createScientistInstance } from '../avatar/scientist/scientist-model';
@@ -166,7 +167,8 @@ export interface PlayScene {
   /** The saved state, applied at once: the gate on or off, the plot's machines standing (already running), its stage. */
   restore(o: { readonly gateOn: boolean; readonly plot: PlotState; readonly running: ReadonlyMap<number, number>; readonly connected: ReadonlySet<number> }): void;
   /** The plot as it is now: machines built or removed appear or go (with their cables), running ones pour their pixels. */
-  setPlot(plot: PlotState, running: ReadonlyMap<number, number>, connected: ReadonlySet<number>): void;
+  /** The plot, each machine's run (0..1, already at the grid's satisfaction), the wired machines, and the grid's satisfaction (TASK-26: the pulse beads). */
+  setPlot(plot: PlotState, running: ReadonlyMap<number, number>, connected: ReadonlySet<number>, satisfaction?: number): void;
   /** Ore in the ground at x, z, 0..1 (rock and scree rich, dust poor): the drills' richness. */
   richness(x: number, z: number): number;
   /** Throws the main lever: the power-on sequence runs, then a 'powered' event. */
@@ -686,6 +688,9 @@ export function createPlayScene(o: {
   interface MachineView { readonly m: Machine; prop: MachineProp; vent: THREE.Vector3 | null; emitter: number | null; running: number; glow: THREE.Mesh | null; light: THREE.PointLight | null }
   const views = new Map<number, MachineView>();
   let cables: THREE.Mesh[] = [];
+  /** TASK-26: the grid's satisfaction (the pulse beads' speed), and the pylon spans the beads ride (the cables' own ends and sag). */
+  let gridSatisfaction = 1;
+  let beadSpans: { readonly a: THREE.Vector3; readonly b: THREE.Vector3; readonly sag: number }[] = [];
   /** The detail the props are built at: chunky low poly until the plot shows stage 2. */
   let propStage = 1;
   let detail: Detail = o.detail;
@@ -694,6 +699,33 @@ export function createPlayScene(o: {
   plume.setWind(WIND.x, WIND.z, WIND.speed);
   planetScene.add(plume.object);
   keep(plume);
+  // TASK-26: pulse beads that run along the relay spans, one instanced draw for all of them; they slow with the grid and stop at 0%
+  const BEADS_PER_SPAN = 3, MAX_SPANS = 64;
+  const beadMat = keep(new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  const beadMesh = keep(new THREE.InstancedMesh(keep(new THREE.SphereGeometry(0.11, 8, 6)), beadMat, BEADS_PER_SPAN * MAX_SPANS));
+  beadMesh.count = 0;
+  beadMesh.visible = false;
+  beadMesh.frustumCulled = false;
+  planetScene.add(beadMesh);
+  let beadPhase = 0;
+  const beadMatrix = new THREE.Matrix4();
+  const stepBeads = (dt: number): void => {
+    beadPhase += dt * beadSpeed(gridSatisfaction);
+    let k = 0;
+    for (const sp of beadSpans) {
+      if (k >= BEADS_PER_SPAN * MAX_SPANS) break;
+      const len = sp.a.distanceTo(sp.b);
+      if (len < 0.01) continue;
+      for (let j = 0; j < BEADS_PER_SPAN; j++) {
+        const along = (beadPhase + (j * len) / BEADS_PER_SPAN) % len;
+        const q = spanPoint(sp.a, sp.b, sp.sag, along / len);
+        beadMesh.setMatrixAt(k++, beadMatrix.makeTranslation(q.x, q.y, q.z));
+      }
+    }
+    beadMesh.count = k;
+    beadMesh.visible = k > 0;
+    if (k > 0) beadMesh.instanceMatrix.needsUpdate = true;
+  };
   const cableMat = m.rubber;
   const worldOf = (v: MachineView, local: THREE.Vector3): THREE.Vector3 => local.clone().applyMatrix4(v.prop.group.matrixWorld);
   const GLOW_RADIUS = 3.6, GLOW_SEGS = 8;
@@ -793,6 +825,7 @@ export function createPlayScene(o: {
   const relay = (connected: ReadonlySet<number>): void => {
     for (const c of cables) { planetScene.remove(c); c.geometry.dispose(); }
     cables = [];
+    beadSpans = [];
     const junction = new THREE.Vector3(...twin.sockets.find((x) => x.name === 'rear-junction')!.at).applyMatrix4(twin.group.matrixWorld);
     const nodes = [...views.values()].filter((v) => KINDS[v.m.kind].reach > 0 && connected.has(v.m.id));
     const g = twin.group.position;
@@ -807,9 +840,14 @@ export function createPlayScene(o: {
           if (d <= KINDS[n.m.kind].reach && d < best) { best = d; from = n; }
         }
       }
-      const line = from && from.prop.top && v.prop.top
-        ? lineSpan(m, worldOf(from, from.prop.top), worldOf(v, v.prop.top))
-        : groundCable(from ? worldOf(from, from.prop.power) : junction, worldOf(v, v.prop.power));
+      let line: THREE.Mesh;
+      if (from && from.prop.top && v.prop.top) {
+        const a = worldOf(from, from.prop.top), b = worldOf(v, v.prop.top);
+        line = lineSpan(m, a, b);
+        beadSpans.push({ a, b, sag: spanSag(a.distanceTo(b)) });
+      } else {
+        line = groundCable(from ? worldOf(from, from.prop.power) : junction, worldOf(v, v.prop.power));
+      }
       planetScene.add(line);
       cables.push(line);
     }
@@ -1514,7 +1552,8 @@ export function createPlayScene(o: {
         }
       }
     },
-    setPlot(plot, running, connected) {
+    setPlot(plot, running, connected, satisfaction = 1) {
+      gridSatisfaction = satisfaction;
       const ids = new Set(plot.machines.map((mm) => mm.id));
       let changed = false;
       for (const [id, v] of views) if (!ids.has(id)) { unbuild(v); views.delete(id); changed = true; }
@@ -1550,6 +1589,8 @@ export function createPlayScene(o: {
         if (!metric || !v.vent) continue;
         if (r > 0.05 && v.emitter === null) v.emitter = plume.add({ at: [v.vent.x, v.vent.y, v.vent.z], colour: METRIC_COLOUR[metric], ...MILL_POUR, startAt: clock + 0.6 });
         else if (r <= 0.05 && v.emitter !== null) { plume.remove(v.emitter); v.emitter = null; }
+        // TASK-26: the pour follows the machine's run rate, so a brownout thins the plume
+        if (v.emitter !== null) plume.setCount(v.emitter, plumeCount(MILL_POUR.count, r));
       }
     },
     richness(x, z) {
@@ -2083,6 +2124,7 @@ export function createPlayScene(o: {
         inDomeLast = inDomeNow;
       } else inDomeLast = null;
       stepDomeRipple(dt);
+      stepBeads(dt);
       sync = stepSync(sync, dt, { onPlanet: where === 'planet', stage, nearMachine, inDome: inDomeNow });
       // the 30% warning: one soft radio-static burst as the buffer goes down past it, and the return arrow until it is back above
       if (where === 'planet' && !inDomeNow && isWarnLevel(sync)) {

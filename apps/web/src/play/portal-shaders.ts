@@ -15,9 +15,20 @@ export const POST_FRAGMENT = /* glsl */ `
    *  has climbed to, from just below the horizon to the zenith): it never pops, it sweeps out to the horizon and up the sky. */
   uniform float uWaveR, uSkyRise, uGlitch, uTime, uLost;
   /** The stage's look outside the wave (and everywhere when no wave runs), and the look the wave brings: x and y = one look pixel
-   *  in uv (the stage's resolution), z = colour levels (0 = all), w = 1 for stage 0's black-and-white dither. */
+   *  in uv (the stage's resolution), z = colour levels (0 = all), w = 1 for stage 0's dither. */
   uniform vec4 uLookOut, uLookIn;
+  /** Stage 0 (the stage bible, plan 27): the sun, the gate, the first machine's scan ring (uScanR < 0: none, centred on
+   *  uScanCentre), the wireframe mix (1: wire outside the ring; 0: resolved) and the vertical field of view in radians. */
+  uniform vec3 uSunDir, uGatePos, uScanCentre;
+  uniform float uScanR, uWireMix, uFovY;
+  /** The suit cam (plan 25): its strength (0 = off), the lagging exposure, the barrel k1, the grain amplitude, and the wide
+   *  halation (1) or the narrow (0). */
+  uniform float uSuitCam, uExposure, uSuitK1, uSuitGrain, uSuitWide;
   varying vec2 vUv;
+  /** Per pixel, set at the top of main (fwidth needs every pixel of a quad to run the same code): the world point and the
+   *  grid's screen footprint. */
+  vec3 gPix;
+  vec2 gGridFw;
 
   float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
   float bayer4(vec2 p){
@@ -36,37 +47,149 @@ export const POST_FRAGMENT = /* glsl */ `
     v /= v.w;
     return (uCamWorld * v).xyz;
   }
-  /** The planet at a stage's look: its pixels (cells of the picture), its colour levels, or stage 0's black and white. */
-  vec3 lookAt(vec4 look, vec2 uv){
+  float luma(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
+  /** A smoothstep that also runs backwards (a > b): 0 at a, 1 at b. */
+  float ramp(float x, float a, float b){ float t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+  vec3 safeNormal(vec3 v){ float l = length(v); return l > 1e-12 ? v / l : vec3(0.0, 1.0, 0.0); }
+  float breakRatio(float a, float b){ return max(a, b) / max(min(a, b), 0.001); }
+  /** A depth break: the linear depths differ by more than 12% and by at least half a metre (far depth is noisy). */
+  float brk(float a, float b){ return (breakRatio(a, b) > 1.12 && abs(a - b) > 0.5) ? 1.0 : 0.0; }
+
+  /** Stage 0 (the stage bible, sections 1 to 4): one look cell is one pixel of the picture, and it is coloured by its world
+   *  facet. 0a: the black fill, the 1 px edges where depth or the facet's normal breaks, the 2 m world grid converging to 180 m.
+   *  0b: the cell's sun light and colour, thresholded by the world-locked Bayer matrix (the threshold follows the world
+   *  direction, Obra Dinn's way, so it holds still when you turn), with a 1 px contour at depth breaks and a distance gradient.
+   *  The gate's amber pool (DEC-06) turns the light ink amber within 15 m, full within 3.5 m. */
+  vec3 stage0(vec4 look, vec2 uv){
+    vec3 black = vec3(0.0196, 0.0235, 0.0314);
     vec2 cell = floor(uv / look.xy);
-    vec3 rgb = texture2D(uColour, (cell + 0.5) * look.xy).rgb;
-    if (look.w > 0.5) {
-      // stage 0: faint stars and haze drop to black; the ground's gentle middle tones are stretched apart, so lit and shaded
-      // slopes, stones and patches still read as land in one bit
-      float l = smoothstep(0.14, 0.6, dot(pow(rgb, vec3(1.0 / 2.2)), vec3(0.299, 0.587, 0.114)));
-      return mix(vec3(0.003, 0.0034, 0.004), vec3(0.74, 0.75, 0.72), step(bayer4(cell), l));
-    }
+    vec2 c = (cell + 0.5) * look.xy;
+    vec2 dx = vec2(look.x, 0.0), dy = vec2(0.0, look.y);
+    vec3 cam = uCamWorld[3].xyz;
+    float dC = texture2D(uDepth, c).x;
+    if (dC >= 0.99999) return black;
+    vec3 P = worldAt(c, dC);
+    vec3 PR = worldAt(c + dx, texture2D(uDepth, c + dx).x);
+    vec3 PL = worldAt(c - dx, texture2D(uDepth, c - dx).x);
+    vec3 PU = worldAt(c + dy, texture2D(uDepth, c + dy).x);
+    vec3 PD = worldAt(c - dy, texture2D(uDepth, c - dy).x);
+    // the flat facet: the normal from the four neighbours, facing the camera
+    vec3 N = safeNormal(cross(PR - PL, PU - PD));
+    if (dot(N, cam - P) < 0.0) N = -N;
+    // a crease: the normal of any one of the four quadrants turns away from the cell's own (a depth break is the other edge)
+    float crease = min(
+      min(abs(dot(safeNormal(cross(PR - P, PU - P)), N)), abs(dot(safeNormal(cross(P - PL, PU - P)), N))),
+      min(abs(dot(safeNormal(cross(PR - P, P - PD)), N)), abs(dot(safeNormal(cross(P - PL, P - PD)), N))));
+    float L = length(P - cam);
+    float depthBreak = max(
+      max(brk(L, length(PR - cam)), brk(L, length(PL - cam))),
+      max(brk(L, length(PU - cam)), brk(L, length(PD - cam))));
+    // the crease test is for near ground: far away the depth is too coarse to read a facet's normal (it drew a white band at the horizon)
+    float edge = ((crease < 0.85 && L < 150.0) || depthBreak > 0.5) ? 1.0 : 0.0;
+    // the gate's amber pool (DEC-06): #e8eef5 white outside, #ffc13d amber within 15 m, full within 3.5 m
+    float pool = ramp(length(P - uGatePos), 15.0, 3.5);
+    vec3 ink = mix(vec3(0.9098, 0.9333, 0.9608), vec3(1.0, 0.7569, 0.2392), pool);
+    // the world-locked threshold: the ray through this pixel, with no depth (the brief's way), so a world point keeps its threshold
+    // when the view turns; one look pixel to a Bayer cell, and the azimuth wraps in a whole number of 4-cell periods (no seam at +-pi)
+    vec3 dir = normalize(worldAt(uv, 1.0) - cam);
+    float pxA = uFovY * look.y;
+    float cells = max(4.0, 4.0 * floor(6.2831853 / (4.0 * pxA) + 0.5));
+    float size = 6.2831853 / cells;
+    float raw = bayer4(vec2(floor(atan(dir.x, dir.z) / size), floor(asin(clamp(dir.y, -1.0, 1.0)) / size)));
+    float thr = raw + 0.18 * ramp(L, 60.0, 600.0);
+    // the scan ring: inside it the world is resolved; outside it is wire, dissolving one bit at a time after the ring holds
+    float Ls = length((P - uScanCentre).xz);
+    float resolved = (uScanR >= 0.0 && Ls < uScanR) ? 1.0 : 0.0;
+    float wire = resolved > 0.5 ? 0.0 : step(raw, uWireMix);
+    // the lum: mostly the facet's sun light (the form, world-locked), a little of the planet's colour at the cell (its texture)
+    vec3 rgb = texture2D(uColour, c).rgb;
+    float tone = ramp(luma(pow(rgb, vec3(1.0 / 2.2))), 0.14, 0.6);
+    float facet = clamp(dot(N, normalize(uSunDir)) * 0.65 + 0.28, 0.05, 0.95);
+    float lum = mix(tone, facet, 0.8);
+    // the 0b contour is the depth break only: the crease test flickers as the cells move (it is kept for 0a, the wire)
+    float bit = max(step(thr, lum), max(depthBreak, 0.0));
+    vec3 dither = bit > 0.5 ? ink : black;
+    // the wire: the 2 m world grid per pixel (so it antialiases), converging and gone by 180 m
+    vec3 Pp = gPix;
+    vec2 g = Pp.xz / 2.0;
+    vec2 gd = abs(fract(g - 0.5) - 0.5) / max(gGridFw, vec2(1e-4));
+    float grid = (1.0 - min(min(gd.x, gd.y), 1.0)) * (1.0 - ramp(length(Pp - cam), 60.0, 180.0)) * 0.45;
+    vec3 wireCol = mix(black, ink, max(edge, grid));
+    return mix(dither, wireCol, wire);
+  }
+
+  /** The suit cam's colour on the planet's picture (plan 25): the lateral chromatic aberration in the corners only, a 3x3
+   *  luma micro-sharpen, and the warm halation of the bright neighbours (wide on Medium up and Full, narrow on Low). */
+  vec3 suitColour(vec2 c, vec2 uv, vec3 rgb){
+    vec2 q = uv - 0.5;
+    vec2 t = 1.0 / uRes;
+    vec2 ca = q * (0.0036 * dot(q, q)) * uSuitCam;
+    rgb.r = texture2D(uColour, c + ca).r;
+    rgb.b = texture2D(uColour, c - ca).b;
+    vec3 n = texture2D(uColour, c + vec2(t.x, t.y)).rgb + texture2D(uColour, c + vec2(-t.x, t.y)).rgb
+           + texture2D(uColour, c + vec2(t.x, -t.y)).rgb + texture2D(uColour, c + vec2(-t.x, -t.y)).rgb;
+    rgb += (rgb - n * 0.25) * (0.30 * uSuitCam);
+    float h = uSuitWide > 0.5 ? 5.0 : 2.5;
+    float bright = smoothstep(0.82, 1.0, luma(texture2D(uColour, c + t * h * vec2(1.0, 1.0)).rgb))
+                 + smoothstep(0.82, 1.0, luma(texture2D(uColour, c + t * h * vec2(-1.0, 1.0)).rgb))
+                 + smoothstep(0.82, 1.0, luma(texture2D(uColour, c + t * h * vec2(1.0, -1.0)).rgb))
+                 + smoothstep(0.82, 1.0, luma(texture2D(uColour, c + t * h * vec2(-1.0, -1.0)).rgb));
+    rgb += vec3(1.0, 0.957, 0.863) * (bright * 0.25 * 0.22 * uSuitCam);
+    return rgb;
+  }
+
+  /** The planet's colour for a look: its pixels (cells of the picture), its colour levels, stage 0's wire and dither, or colour. */
+  vec3 lookAt(vec4 look, vec2 uv){
+    if (look.w > 0.5) return stage0(look, uv);
+    vec2 cell = floor(uv / look.xy);
+    vec2 cellUv = (cell + 0.5) * look.xy;
+    vec3 rgb = texture2D(uColour, cellUv).rgb;
     if (look.z > 0.0) {
       // the early stages' few colour levels, posterised with the same ordered dither
       vec3 c = floor(pow(rgb, vec3(1.0 / 2.2)) * look.z + bayer4(cell)) / look.z;
       return pow(c, vec3(2.2));
     }
+    if (uSuitCam > 0.0) rgb = suitColour(cellUv, uv, rgb);
     return rgb;
+  }
+
+  /** The suit cam's optics on the finished colour (plan 25): the lagging exposure, the CMOS S-curve with an early warm clip, the
+   *  cos^4 vignette and the grain (2.5% at most, in the midtones). All of it scales with the strength. */
+  vec3 suitCam(vec3 c, vec2 uv){
+    vec2 q = uv - 0.5;
+    c = mix(c, c * uExposure, uSuitCam);
+    vec3 rolled = mix(c, 0.78 + 0.22 * (1.0 - exp(-(c - 0.78) / 0.22 * 2.2)), step(vec3(0.78), c));
+    rolled = mix(rolled, vec3(1.0, 0.988, 0.961), smoothstep(0.92, 1.0, luma(rolled)) * 0.6);
+    rolled = max(rolled - 0.02 * (1.0 - smoothstep(0.0, 0.08, rolled)), 0.0);
+    c = mix(c, rolled, uSuitCam);
+    c *= mix(1.0, pow(cos(length(q) * 1.33), 4.0), 0.28 * uSuitCam);
+    float l = luma(c);
+    float grain = (hash(floor(uv * uRes) + floor(uTime * 24.0)) - 0.5) * 2.0 * uSuitGrain;
+    c += grain * 4.0 * l * (1.0 - l) * uSuitCam;
+    return c;
   }
 
   void main(){
     vec2 uv = vUv;
+    // the suit cam's lens: a gentle barrel, the corners pulled in (k1 about -0.035 on Auto)
+    if (uSuitCam > 0.0) {
+      vec2 q = uv - 0.5;
+      uv = 0.5 + q * (1.0 + uSuitK1 * dot(q, q));
+    }
     // losing sync tears the picture: bands slide sideways, more as it runs out
     if (uGlitch > 0.0) {
       float band = floor(uv.y * 38.0 + floor(uTime * 9.0) * 7.0);
       float shift = (hash(vec2(band, floor(uTime * 12.0))) - 0.5) * uGlitch * uGlitch * 0.12;
       uv.x += step(1.0 - uGlitch * 0.6, hash(vec2(band, 3.0))) * shift;
     }
+    // the pixel's world point and its flat facet: the derivatives of the world point give the triangle's own normal (the bible's 0b)
+    gPix = worldAt(uv, texture2D(uDepth, uv).x);
+    gGridFw = fwidth(gPix.xz / 2.0);
     vec2 px = uv * uRes;
     vec4 fine = texture2D(uColour, uv);
     if (fine.a < 0.25) { gl_FragColor = vec4(texture2D(uLab, uv).rgb, 1.0); return; }
-    if (fine.a < 0.75) { gl_FragColor = vec4(fine.rgb, 1.0); }
-    else {
+    vec3 c = fine.rgb;
+    if (fine.a >= 0.75) {
       float d = texture2D(uDepth, uv).x;
       // the sky writes no depth: what is drawn is ground (the plot, the plains, the neighbours), what is not is sky
       bool sky = d >= 0.99999;
@@ -86,13 +209,13 @@ export const POST_FRAGMENT = /* glsl */ `
         }
       }
       // inside the wave the stage it brings, outside the stage the plot shows; the front is a band of light where the new look arrives
-      vec3 c = inside > 0.5 ? lookAt(uLookIn, uv) : lookAt(uLookOut, uv);
+      c = inside > 0.5 ? lookAt(uLookIn, uv) : lookAt(uLookOut, uv);
       c += vec3(1.0, 0.24, 0.54) * front * inside * 0.32;
-      gl_FragColor = vec4(c, 1.0);
     }
+    if (uSuitCam > 0.0) c = suitCam(c, uv);
     // static where sync is going, and a white-out when it is lost
     float n = hash(floor(px) + floor(uTime * 30.0));
-    gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(n), clamp(uGlitch * uGlitch * 0.35 + uLost, 0.0, 1.0));
+    gl_FragColor = vec4(mix(c, vec3(n), clamp(uGlitch * uGlitch * 0.35 + uLost, 0.0, 1.0)), 1.0);
     #include <colorspace_fragment>
   }`;
 

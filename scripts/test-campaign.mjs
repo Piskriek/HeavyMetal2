@@ -25,7 +25,7 @@
  *   24 F-03 the weapon bench, the gun forged, fitted and equipped, 25 F-04 and F-05 the stages unlock the hauler and crawler,
  *   26 a death respawns at the gate (the death is a hook until TASK-23b), 27 each chain line once, S-2 skipped for A4-04.
  * TASK-23c, the props in the world: L1 the lab with its clutter and the weapon bench (shots), and the window view inside its budget
- *   (40 calls, 120k triangles); 9b a held E clears the large crate, its salvage goes into the pack, and it stays gone after a reload;
+ *   (40 calls at the peak frame, 120k triangles); 9b a held E clears the large crate, its salvage goes into the pack, and it stays gone after a reload;
  *   9c aimed at the old monitor, the readout shows on hover and E opens its Bridge Incident Log; 13c a seal lifts its leak's wreck one
  *   rung (broken junk stands a rung below the plot's stage until it is sealed), and the seal is saved; 28b at stage 6 a broken wreck
  *   stands at rung 2 and its seal lifts it to rung 3.
@@ -127,6 +127,24 @@ const fps = (ms = 2000) => page.evaluate((ms) => new Promise((resolve) => {
 }), ms);
 
 const subId = () => page.evaluate(() => window.hmPlay?.subtitles?.()?.id ?? null);
+// TASK-28: the mean luminance (0 to 255, Rec. 709) of a saved shot, measured in the page on a 320 x 180 copy of it
+const meanLuma = async (file) => {
+  const b64 = fs.readFileSync(file).toString('base64');
+  return page.evaluate(async (data) => {
+    const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+    const bmp = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+    const cv = document.createElement('canvas');
+    cv.width = 320; cv.height = 180;
+    const cx = cv.getContext('2d');
+    cx.drawImage(bmp, 0, 0, 320, 180);
+    const px = cx.getImageData(0, 0, 320, 180).data;
+    let sum = 0;
+    for (let i = 0; i < px.length; i += 4) sum += 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
+    return sum / (px.length / 4);
+  }, b64);
+};
+let darkLuma = null;
+
 const waitSub = async (id, timeout = 5000) => {
   const end = Date.now() + timeout;
   let last = null;
@@ -173,9 +191,20 @@ const saveCheckpoint = async (name, title, act) => {
     return { keys, where: window.hmPlay.where ?? null, step: window.hmPlay.chain().current?.id ?? null };
   });
   const file = { format: 'hm-checkpoint', v: 1, name, title, act, expect: { where: data.where, step: data.step }, keys: data.keys };
-  fs.writeFileSync(path.join(checkpointsDir, `${name}.json`), `${JSON.stringify(file, null, 2)}\n`);
+  // a Windows file can be locked for a moment (a scan or an indexer holds it): the write is retried, three tries in all, and logged
+  const writeChecked = (p, text) => {
+    for (let attempt = 1; ; attempt++) {
+      try { fs.writeFileSync(p, text); return; } catch (err) {
+        if (attempt === 3) throw err;
+        console.log(`checkpoint write retry ${attempt} for ${path.basename(p)}: ${err.code ?? err.message}`);
+        const until = Date.now() + 500;
+        while (Date.now() < until) { /* a short pause before the retry */ }
+      }
+    }
+  };
+  writeChecked(path.join(checkpointsDir, `${name}.json`), `${JSON.stringify(file, null, 2)}\n`);
   checkpointIndex.push({ name, title, act });
-  fs.writeFileSync(path.join(checkpointsDir, 'index.json'), `${JSON.stringify(checkpointIndex, null, 2)}\n`);
+  writeChecked(path.join(checkpointsDir, 'index.json'), `${JSON.stringify(checkpointIndex, null, 2)}\n`);
   console.log(`checkpoint ${name} (act ${act}): where=${data.where} step=${data.step} keys=${Object.keys(data.keys).length}`);
 };
 
@@ -224,6 +253,23 @@ await beat('1 main menu, Expedition starts a new game in the lab (no fixture fla
   return { ok: where === 'lab' && hasDev, detail: `where=${where} __dev=${hasDev}` };
 });
 
+// TASK-28 (P1-HOUR-03): the wake. The camera starts pitched up about 65 degrees at the dark ceiling and sits up to level over 2.2 s.
+await beat('1a the wake: the camera starts pitched up at the dark ceiling and sits up to level over 2.2 s', async (row) => {
+  // the wake starts when the player gains control (after the loading bar and the creator); its log holds every frame of it
+  await page.waitForTimeout(2600);
+  const w = await page.evaluate(() => window.__playScene.debug.wake());
+  const log = w.log;
+  const first = log[0];
+  const last = log[log.length - 1];
+  const monotone = log.every((e, i) => i === 0 || e.lift <= log[i - 1].lift + 1e-9);
+  // the start, as a shot: the wake's clock set back to its first frame (the camera 65 degrees up, at the dark ceiling)
+  await page.evaluate(() => window.__playScene.debug.setWake(0));
+  row.shot = await shot('wake-start');
+  await page.evaluate(() => window.__playScene.debug.setWake(-1));
+  const deg = (r) => Math.round((r * 180) / Math.PI);
+  const ok = log.length > 20 && !!first && first.lift > 1.0 && monotone && !!last && last.t > 1.9 && last.t <= 2.2 && w.t < 0 && w.lift === 0;
+  return { ok, detail: `wake: ${log.length} frames; starts at ${first ? deg(first.lift) : 'n/a'} deg, eases to level by ${last ? last.t.toFixed(2) : 'n/a'} s; monotone=${monotone}; level now=${w.t < 0}` };
+});
 await beat('2 Act I: waking speaks A1-01 with the subtitle', async (row) => {
   const seen = await waitSub('A1-01', 15000);
   const visible = await page.locator('[data-testid="mentor-subtitle"]').isVisible().catch(() => false);
@@ -240,21 +286,63 @@ await beat('3 looking at the power wall gives A1-02', async (row) => {
   const ok = await waitSub('A1-02', 4000);
   await page.waitForTimeout(700);
   row.shot = await shot('power-wall');
+  // TASK-28: the dark lab from here, before the lever (the powered shot in beat 4 is taken from the same place)
+  darkLuma = await meanLuma(await shot('lab-dark-before-power'));
   return { ok, detail: `A1-02 seen=${ok}` };
 });
 
-await beat('4 breaker and lever: power on gives A1-04', async (row) => {
+await beat('4 breaker and lever: power on gives A1-04; the banks, the beacons and the gate coils come up in order over 3.5 s, then the arc flash (TASK-28)', async (row) => {
   await quiet();
   await page.evaluate(() => window.hmPlay.pull());
-  const breaker = await waitSub('A1-03', 4000);
-  await page.waitForTimeout(3500);
-  row.shot = await shot('breaker-lever');
-  await quiet();
-  await page.evaluate(() => window.hmPlay.trigger('power:on'));
-  const on = await waitSub('A1-04', 4000);
-  await page.waitForTimeout(3500);
-  await shot('power-on');
-  return { ok: breaker && on, detail: `A1-03=${breaker} A1-04=${on}` };
+  const t0 = Date.now();
+  // sample the sequence as it runs (the scene's power and its coils, read each step): the order is what the brief asks for.
+  // The lines (A1-03 at the lever, A1-04 when the power is on) are read in the same loop, because they play during it.
+  const samples = [];
+  const seenLines = new Set();
+  let midShot = null, flashShot = null;
+  while (Date.now() - t0 < 7600) {
+    const at = (Date.now() - t0) / 1000;
+    const s = await page.evaluate(() => ({
+      coils: window.__playScene.debug.coilsLit(),
+      p: window.__playScene.debug.power(),
+      line: window.hmPlay?.subtitles?.()?.id ?? null,
+    }));
+    if (s.line) seenLines.add(s.line);
+    samples.push({ at, coils: s.coils, banks: s.p.banks, beacons: s.p.beacons, arc: s.p.arc });
+    if (!midShot && at >= 2.6) midShot = await shot('power-mid');
+    if (!flashShot && s.p.arc > 0.6) flashShot = await shot('ignition-flash');
+    await page.waitForTimeout(120);
+  }
+  const breaker = seenLines.has('A1-03');
+  // the coils: each sample's lit set is a bottom-to-top prefix, the count only rises, and all of them are lit at the end
+  const n = samples[0]?.coils.length ?? 0;
+  const prefixOk = samples.every((x) => x.coils.every((c, i) => !c || i === 0 || x.coils[i - 1]));
+  const counts = samples.map((x) => x.coils.filter(Boolean).length);
+  const risesOk = counts.every((c, i) => i === 0 || c >= counts[i - 1]);
+  const lastAll = counts[counts.length - 1] === n && n > 0;
+  const firstLit = samples.find((x) => x.coils[0])?.at ?? Infinity;
+  const lastLit = samples.find((x) => x.coils[n - 1])?.at ?? Infinity;
+  const span = lastLit - firstLit;
+  // the banks light back to front: the first sample where each bank has any light
+  const firstBank = [0, 1, 2].map((i) => samples.find((x) => x.banks[i] > 0.02)?.at ?? Infinity);
+  const banksOk = firstBank[0] < firstBank[1] && firstBank[1] < firstBank[2];
+  const beaconsOk = samples.some((x) => x.beacons > 0.9);
+  const flashOk = flashShot !== null;
+  // the mean luminance: the lab is far brighter powered than in the dark (the shot before the lever)
+  // the power-on line: the scene plays it when the sequence ends; if it has not shown in the loop, the trigger asks for it
+  let on = seenLines.has('A1-04');
+  if (!on) {
+    await quiet();
+    await page.evaluate(() => window.hmPlay.trigger('power:on'));
+    on = await waitSub('A1-04', 4000);
+  }
+  await page.waitForTimeout(2500);
+  const lumaOn = await meanLuma(await shot('power-on'));
+  const lumaOk = darkLuma !== null && lumaOn > 2 * darkLuma + 5;
+  const ok = breaker && on && prefixOk && risesOk && lastAll && span > 2.4 && span < 4.0 && banksOk && beaconsOk && flashOk && lumaOk;
+  row.shot = midShot;
+  const f1 = (x) => x.toFixed(1);
+  return { ok, detail: `A1-03=${breaker} A1-04=${on} coils=${n}: bottom-to-top=${prefixOk} only-rises=${risesOk} all-lit=${lastAll} sweep=${span.toFixed(2)} s; banks back-to-front=${banksOk} beacons=${beaconsOk} arc flash=${flashOk}; mean luma dark ${darkLuma === null ? 'n/a' : f1(darkLuma)} powered ${f1(lumaOn)}` };
 });
 
 await beat('5 Act II: the window gives A2-01, the gate approach A2-02, the gate opens (A2-03, A2-04)', async (row) => {
@@ -551,7 +639,7 @@ const cleanShot = async (name) => {
   return file;
 };
 
-await beat('L1 the lab with its clutter and the weapon bench from three sides (no overlays); the window view inside its budget (40 calls, 120k triangles)', async (row) => {
+await beat('L1 the lab with its clutter and the weapon bench from three sides (no overlays); the window view inside its budget (40 calls at its peak frame, 120k triangles)', async (row) => {
   await quiet();
   const views = [
     ['lab-clutter-east', 3.2, -1.2, -Math.PI / 2, -0.08],
@@ -567,13 +655,14 @@ await beat('L1 the lab with its clutter and the weapon bench from three sides (n
     await cleanShot(name);
   }
   await page.evaluate(() => window.__playScene.debug.teleport('lab', -4.5, 0.2, -0.45, 0));
-  // the budget is for the full window (the frame governor sets it by tier, and under SwiftShader that is static)
+  // the budget is for the full window (the frame governor sets it by tier, and under SwiftShader that is static). The count is the peak
+  // frame (the burst meshes counted whether or not a burst strikes), so it reads the same on every run (TASK-28).
   await page.evaluate(() => window.__playScene.debug.setWindowView('full'));
   await page.waitForTimeout(2500);
   const vista = await page.evaluate(() => window.__playScene.debug.vistaStats());
   await cleanShot('lab-window-view');
   const ok = vista.dust > 0 && vista.drawCalls > 0 && vista.drawCalls <= 40 && vista.triangles <= 120000;
-  return { ok, detail: `window view: ${vista.drawCalls} draw calls (budget 40), ${vista.triangles} triangles (budget 120000), motes ${vista.dust} (0 means the view is static or not drawn)` };
+  return { ok, detail: `window view at its peak frame: ${vista.drawCalls} draw calls (budget 40), ${vista.triangles} triangles (budget 120000), motes ${vista.dust} (0 means the view is static or not drawn)` };
 });
 
 await beat('9b clear a lab prop: aimed at the large crate, a held E dissolves it into salvage in the pack; it stays gone after a reload', async (row) => {

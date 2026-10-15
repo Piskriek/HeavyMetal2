@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import type { Cond } from '@hm/questline';
 import {
   ACT_V_KIT, CHAIN, CHAIN_START, CHAIN_STEPS, CHAIN_VERSION, COUNT, GATES, advanceChain, bump, chainFromSave, chainProblems, chainView, evidence, firstTime,
-  gateReason, isOpen, monsterKilled, monsterSeen, playerDied, playerLow, readChain, setAtLeast, stepDone, stepProgress, unmet,
+  completeStepChain, gateReason, isOpen, monsterKilled, monsterSeen, playerDied, playerLow, readChain, setAtLeast, stepDone, stepProgress, unmet,
   type Chain, type Evidence,
 } from './campaign-chain';
 
@@ -194,4 +194,20 @@ test('a version 2 save is read as it is (no second migration)', () => {
   const saved = { progress: { quest: 'act4', step: 1, finished: [], rewarded: [] }, counts: {}, monstersUnlocked: false, version: 2 };
   assert.equal(readChain(saved).progress.step, 1);
   assert.equal(readChain(saved).version, CHAIN_VERSION);
+});
+
+test('the debug menu step skip moves the chain exactly one step, even when the next step already holds', () => {
+  const c = { ...CHAIN_START, progress: { quest: 'act4', step: 0, finished: [], rewarded: [] }, counts: { [COUNT.drillsRunning]: 1, [COUNT.toolPickup]: 1, [COUNT.dormantSealed]: 1 } };
+  assert.equal(chainView(c).current?.id, 'A4-01');
+  const once = completeStepChain(c);
+  assert.equal(chainView(once).current?.id, 'A4-01b');
+  assert.equal(stepDone(once, 'A4-01'), true);
+  // the next step's counters already hold, but the skip does not run them on
+  assert.equal(once.progress.step, 1);
+});
+
+test('the step skip does nothing before the chain starts or after it ends', () => {
+  assert.equal(completeStepChain(CHAIN_START), CHAIN_START);
+  const done = { ...CHAIN_START, progress: { quest: null, step: 0, finished: CHAIN.quests.map((q) => q.id), rewarded: [] } };
+  assert.equal(completeStepChain(done), done);
 });

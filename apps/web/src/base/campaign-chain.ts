@@ -8,7 +8,7 @@
  * The chain (docs/NARRATION_SCRIPT.md, docs/prompts/sidecar/22-campaign-chain.md): A4-01 to A4-04, B-01 to B-07, F-01 to
  * F-05. The monsters start after F-03 (the flag only; spawning and combat are TASK-23b).
  */
-import { advance, check, validate, START, type Cond, type Progress, type Questline, type Step as QStep } from '@hm/questline';
+import { advance, check, skip, validate, START, type Cond, type Progress, type Questline, type Step as QStep } from '@hm/questline';
 import type { Stack } from '@hm/lattice';
 
 // ---------------------------------------------------------------------------------------------------------- counters
@@ -233,6 +233,16 @@ export function unmet(cond: Cond, counts: Readonly<Record<string, number>>): { k
 export function stepProgress(s: ChainStepInfo, counts: Readonly<Record<string, number>>): string {
   const u = unmet(s.until, counts);
   return u && u.need > 1 ? `${Math.min(u.have, u.need)} / ${u.need}` : '';
+}
+
+/**
+ * The debug menu's "Complete this step": the current step is marked done and the chain moves exactly one step on (the
+ * questline's own skip, so a step whose successor already holds is NOT run through on the same click). Returns the same
+ * chain when nothing is current (the chain has not started, or it is finished).
+ */
+export function completeStepChain(c: Chain): Chain {
+  if (chainView(c).current === null) return c;
+  return { ...c, progress: skip(CHAIN, c.progress) };
 }
 
 // ---------------------------------------------------------------------------------------------------------- gates

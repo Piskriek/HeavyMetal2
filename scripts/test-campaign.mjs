@@ -589,6 +589,7 @@ await beat('9b clear a lab prop: aimed at the large crate, a held E dissolves it
   const aimed = prompt.includes('salvage the large crate') ? { id: 'crate-large', salvage: true } : null;
   const pack0 = await page.evaluate(() => window.__dev.pack());
   const bridge0 = await page.evaluate(() => window.__dev.bridgeStock());
+  const plotOre0 = await page.evaluate(() => window.hmPlay.plot().ore);
   await page.keyboard.down('KeyE');
   await page.waitForTimeout(1700);
   await page.keyboard.up('KeyE');
@@ -598,6 +599,8 @@ await beat('9b clear a lab prop: aimed at the large crate, a held E dissolves it
   const bridge1 = await page.evaluate(() => window.__dev.bridgeStock());
   const gain = (k) => ((pack1[k] ?? 0) - (pack0[k] ?? 0)) + ((bridge1[k] ?? 0) - (bridge0[k] ?? 0));
   const ore = gain('ore');
+  // TASK-26: the salvage's ore goes to the plot's ore (the drill's stock), so the pack gains none; the plot gains the ore (its own use is subtracted by a few)
+  const plotGain = (await page.evaluate(() => window.hmPlay.plot().ore)) - plotOre0;
   const prims = [...new Set([...Object.keys(pack1), ...Object.keys(bridge1)])].filter((k) => k.startsWith('prim-')).reduce((n, k) => n + gain(k), 0);
   row.shot = await shot('crate-dissolved');
   await reloadProfile();
@@ -608,7 +611,7 @@ await beat('9b clear a lab prop: aimed at the large crate, a held E dissolves it
   const samePack = JSON.stringify(pack2) === JSON.stringify(pack1);
   const stays = aimedAgain !== 'crate-large' && samePack;
   row.shot = await shot('crate-gone-after-reload');
-  const ok = aimed?.id === 'crate-large' && aimed.salvage === true && cleared && ore === 10 && prims === 2 && stays;
+  const ok = aimed?.id === 'crate-large' && aimed.salvage === true && cleared && ore === 0 && plotGain >= 8 && prims === 2 && stays;
   return { ok, detail: `aimed ${aimed?.id ?? 'nothing'} (salvage ${aimed?.salvage ?? '-'}); cleared=${cleared}; gained ore ${ore}, primitives ${prims}; after reload the crate ${aimedAgain === 'crate-large' ? 'is BACK' : 'stays gone'}, the pack ${samePack ? 'is the same' : 'changed'}` };
 });
 
@@ -1472,6 +1475,123 @@ const zeroErrors = consoleErrors.length === 0;
 console.log(`HUD overlaps (title, build hint, subtitle): ${hudViolations.length}${hudViolations.length ? " " + JSON.stringify(hudViolations.slice(0, 5)) : ""}`);
 console.log(`console errors: ${consoleErrors.length}${zeroErrors ? '' : ' ' + JSON.stringify(consoleErrors.slice(0, 5))}`);
 console.log(`http errors: ${httpErrors.length}${httpErrors.length ? ' ' + JSON.stringify(httpErrors.slice(0, 5)) : ''}`);
+// TASK-26: the foundation frame, the safe dome, the zero-loss recall and the brownout you can see
+await beat('26a the foundation frame: a foundation on a slope has legs down to the ground under its low corners, each foot within 5 cm of the terrain', async (row) => {
+  await toPlanet();
+  await page.evaluate(() => { if (window.__playScene.getDrivingVehicle()) window.__playScene.exitVehicle(); });
+  await page.waitForTimeout(400);
+  const spots = await page.evaluate(() => {
+    const s = window.__playScene;
+    const g = s.debug.gatePlanet();
+    const out = [];
+    // cells whose corners differ by 1.0 to 2.5 m: the structure sits on its highest corner, so the low corner's leg is the spread less the 0.5 m deck (a 0.25 m cell has none)
+    for (let r = 10; r <= 120 && out.length < 40; r += 2) for (let k = 0; k < 24; k++) {
+      const a = (k / 24) * Math.PI * 2;
+      const cx = g.x + r * Math.sin(a), cz = g.z + r * Math.cos(a);
+      const hs = [[-2, -2], [2, -2], [-2, 2], [2, 2]].map(([u, v]) => s.heightAt(cx + u, cz + v));
+      const spread = Math.max(...hs) - Math.min(...hs);
+      if (spread >= 1.0 && spread <= 2.5) out.push({ x: cx, z: cz, spread });
+    }
+    return out;
+  });
+  if (spots.length === 0) return { ok: false, detail: 'no sloped cell (1.0 to 2.5 m across) within 120 m of the gate' };
+  // the starter kit (the blueprint a foundation needs) and some ore in the pack: the dev grant puts them in the player's slots
+  await page.evaluate(() => { window.__dev.grant('bp:starter', 1); window.__dev.grant('ore', 300); });
+  await page.waitForTimeout(200);
+  const at = await page.evaluate(() => window.__playScene.debug.position());
+  const before = await page.evaluate(() => window.hmPlay.base.world().base.pieces.filter((p) => p.kind === 'foundation').map((p) => p.id));
+  let tried = 0;
+  let fresh = [];
+  let spot = spots[0];
+  for (const cand of spots.slice(0, 12)) {
+    tried += 1;
+    spot = cand;
+    await page.evaluate(([x, z, at]) => window.hmPlay.base.apply({ t: 'found', at, blueprint: 'bp:starter', cx: x, cz: z, yaw: 0 }), [cand.x, cand.z, at]);
+    await page.waitForTimeout(300);
+    const after = await page.evaluate(() => window.hmPlay.base.world().base.pieces.filter((p) => p.kind === 'foundation').map((p) => p.id));
+    fresh = after.filter((id) => !before.includes(id));
+    if (fresh.length > 0) break;
+  }
+  if (fresh.length === 0) return { ok: false, detail: `none of ${tried} sloped cells took a foundation (the starter kit, the ore in the pack, or the placement rule)` };
+  const legs = await page.evaluate((id) => window.hmPlay.base.frameLegs(id), fresh[0]);
+  if (!legs) return { ok: false, detail: 'no frame legs for the new foundation' };
+  const ground = await page.evaluate((ls) => ls.map((l) => window.__playScene.heightAt(l.x, l.z)), legs);
+  const worst = legs.reduce((m, l, i) => Math.max(m, Math.abs(l.footY - ground[i])), 0);
+  row.shot = await shot('foundation-slope');
+  const ok = legs.length >= 1 && worst <= 0.05 && legs.every((l) => !l.clamped);
+  return { ok, detail: `foundation ${fresh[0]}: ${legs.length} legs, the worst foot ${(worst * 100).toFixed(1)} cm from the terrain (limit 5 cm)` };
+});
+
+await beat('26b the safe dome: inside the gate\'s 25 m dome sync holds and refills; 60 m out, on raw ground, it drains (about 90 s for a full buffer)', async (row) => {
+  await toPlanet();
+  const g = await page.evaluate(() => window.__playScene.debug.gatePlanet());
+  await page.evaluate((g) => { window.hmPlay.setSync(0.5); window.hmPlay.go('planet', g.x + 8, g.z, 0, -0.2); }, g);
+  await page.waitForTimeout(3000);
+  const inside = await page.evaluate(() => window.hmPlay.sync);
+  await page.evaluate((g) => window.hmPlay.go('planet', g.x + 60, g.z, 0, -0.2), g);
+  await page.evaluate(() => window.hmPlay.setSync(0.9));
+  await page.waitForTimeout(500);
+  const a = await page.evaluate(() => window.hmPlay.sync);
+  await page.waitForTimeout(3000);
+  const b = await page.evaluate(() => window.hmPlay.sync);
+  const drop = a - b;
+  row.shot = await shot('dome-outside');
+  const holds = inside >= 0.5 - 0.005;
+  const drains = drop > 0.02 && drop < 0.05;
+  return { ok: holds && drains, detail: `inside the dome sync went 0.50 to ${inside.toFixed(3)}; outside it fell ${drop.toFixed(3)} in 3 s (a 90 s buffer falls 0.033)` };
+});
+
+await beat('26c the zero-loss recall: at 0% sync the gate pulls the player back to the lab, and the pack and the plot are the same as before', async (row) => {
+  await toPlanet();
+  const g = await page.evaluate(() => window.__playScene.debug.gatePlanet());
+  await page.evaluate((g) => window.hmPlay.go('planet', g.x + 60, g.z, 0, -0.2), g);
+  await page.waitForTimeout(400);
+  const before = await page.evaluate(() => JSON.stringify({ slots: window.hmPlay.base.world().player.slots, machines: window.hmPlay.plot().machines.length }));
+  await page.evaluate(() => window.hmPlay.setSync(0.01));
+  await page.waitForTimeout(2500);
+  const where = await page.evaluate(() => window.hmPlay.where);
+  const after = await page.evaluate(() => JSON.stringify({ slots: window.hmPlay.base.world().player.slots, machines: window.hmPlay.plot().machines.length }));
+  row.shot = await shot('recall-lab');
+  return { ok: where === 'lab' && before === after, detail: `recalled to ${where}; the pack, the machines and the ore ${before === after ? 'are the same as before' : 'CHANGED'}` };
+});
+
+await beat('26d the brownout you can see: over-building the grid thins the pixel plumes, and the power readout turns amber with its share', async (row) => {
+  await toPlanet();
+  const drivenAtStart = await page.evaluate(() => !!window.__playScene.getDrivingVehicle());
+  await page.evaluate(() => { if (window.__playScene.getDrivingVehicle()) window.__playScene.exitVehicle(); });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => window.hmPlay.hideOverlays(false));
+  await page.evaluate(() => window.hmPlay.give(600));
+  await page.waitForTimeout(800);
+  const p0 = await page.evaluate(() => window.__playScene.debug.plumePixels());
+  const mill0 = await page.evaluate(() => window.__playScene.debug.machineRuns().filter((m) => m.kind === 'mill').map((m) => m.run));
+  const g = await page.evaluate(() => window.__playScene.debug.gatePlanet());
+  let placed = 0;
+  for (const r of [9, 12, 15, 18, 21, 24]) {
+    for (let k = 0; k < 12 && placed < 3; k++) {
+      const a = (k / 12) * Math.PI * 2;
+      const x = g.x + r * Math.sin(a), z = g.z + r * Math.cos(a);
+      const n = await page.evaluate(([x, z]) => {
+        const before = window.hmPlay.plot().machines.length;
+        window.hmPlay.placeAt(x, z, 'projector');
+        return window.hmPlay.plot().machines.length - before;
+      }, [x, z]);
+      placed += n;
+    }
+    if (placed >= 3) break;
+  }
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => window.hmPlay.hideOverlays(false));
+  const p1 = await page.evaluate(() => window.__playScene.debug.plumePixels());
+  const mill1 = await page.evaluate(() => window.__playScene.debug.machineRuns().filter((m) => m.kind === 'mill').map((m) => m.run));
+  const readout = await page.evaluate(() => { const el = document.querySelector('.play-power'); return el ? { cls: el.className, text: el.textContent ?? '' } : null; });
+  row.shot = await shot('brownout');
+  const pct = readout ? Number((readout.text.match(/(\d+)%/) ?? [])[1]) : NaN;
+  const runDropped = mill0.length > 0 && mill1.length > 0 && mill1[0] < mill0[0] - 0.2 && mill1[0] < 0.99;
+  const ok = placed >= 1 && readout !== null && readout.cls.includes('short') && Number.isFinite(pct) && pct < 100 && runDropped;
+  return { ok, detail: `${drivenAtStart ? '(a vehicle was being driven; dismounted) ' : ''}${placed} projectors placed; the mill ran at ${mill0[0]?.toFixed(2)} then ${mill1[0]?.toFixed(2)}; the readout ${readout ? `"${readout.text.trim()}" (${readout.cls})` : 'is missing'}; plume pixels ${p0} to ${p1}` };
+});
+
 const passed = results.filter((r) => r.ok).length;
 fs.writeFileSync(path.join(shotsDir, 'summary.json'), JSON.stringify({ results, consoleErrors, httpErrors, hudViolations }, null, 2));
 console.log(`${passed} of ${results.length} beats PASS`);

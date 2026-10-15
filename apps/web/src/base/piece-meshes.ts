@@ -7,6 +7,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { BaseWorld, WorldEnv } from './world';
 import { pieceAt, structureEnv, BENCH_REACH, relays } from './world';
 import { WalkWorld, type PlacedPiece } from './walk';
+import { planFrameLegs } from './foundation-legs';
+import { FRAME_PAD_HEIGHT_M } from './foundation-frame';
 import {
   globalKitPieceCache,
   computeSkirt,
@@ -59,10 +61,17 @@ export function ensureFloatGeometry(geom: THREE.BufferGeometry): THREE.BufferGeo
   return res;
 }
 
+/** TASK-26: a foundation's legs and foot pads are batch ids of their own, one pair per corner, above every piece id. */
+const FRAME_PART_BASE = 1_000_000_000;
+const legBatchId = (pieceId: number, corner: number): number => FRAME_PART_BASE + pieceId * 8 + corner * 2;
+const padBatchId = (pieceId: number, corner: number): number => FRAME_PART_BASE + pieceId * 8 + corner * 2 + 1;
+
 export class PieceMeshManager {
   readonly root: THREE.Group;
   readonly walkWorld: WalkWorld = new WalkWorld();
   private pieceMap: Map<number, ActivePieceEntry> = new Map();
+  /** The batch ids of each foundation's legs and pads (leg and pad ids alternate per corner). */
+  private frameParts = new Map<number, number[]>();
   private collapsing: CollapsingPiece[] = [];
   private lastStage = 1;
   private batcher: Batcher;
@@ -97,6 +106,7 @@ export class PieceMeshManager {
       this.pieceMap.clear();
       this.batcher.dispose();
       this.batcher = new Batcher(this.root, (key) => this.getBatchParts(key));
+      this.frameParts.clear();
       globalKitPieceCache.dispose();
       this.lastStage = world.stage;
     }
@@ -156,11 +166,14 @@ export class PieceMeshManager {
       const totalYaw = -st.yaw + extraAngle;
 
       const skirt = computeSkirt(world, env, piece);
-      const key = `${piece.kind}|${world.stage}|${skirt}`;
+      // TASK-26: a foundation's deck does not depend on its skirt; its legs are placed per corner below
+      const isFrame = piece.kind === 'foundation';
+      const key = isFrame ? `foundation|${world.stage}|0` : `${piece.kind}|${world.stage}|${skirt}`;
       const matrix = new THREE.Matrix4().makeRotationY(totalYaw).setPosition(pos.x, pos.y, pos.z);
 
       // Render static parts through @hm/batcher
       this.batcher.set(piece.id, key, matrix);
+      if (isFrame) this.placeFrameLegs(piece.id, world.stage, pos, totalYaw, env);
 
       if (!entry) {
         let dynamicRoot: THREE.Group | undefined;
@@ -278,9 +291,11 @@ export class PieceMeshManager {
         const sup = supportMap.get(piece.id) ?? 0;
         const color = integrityColorForSupport(sup);
         this.batcher.tint(piece.id, color);
+        for (const part of this.frameParts.get(piece.id) ?? []) this.batcher.tint(part, color);
         entry.isTinted = true;
       } else if (entry.isTinted) {
         this.batcher.tint(piece.id, null);
+        for (const part of this.frameParts.get(piece.id) ?? []) this.batcher.tint(part, null);
         entry.isTinted = false;
       }
     }
@@ -291,6 +306,7 @@ export class PieceMeshManager {
     for (const [id, entry] of this.pieceMap.entries()) {
       if (!activeIds.has(id)) {
         this.batcher.remove(id);
+        this.dropFrameParts(id);
         if (entry.dynamicRoot) {
           this.root.remove(entry.dynamicRoot);
         }
@@ -302,6 +318,7 @@ export class PieceMeshManager {
   handleRemoval(removedId: number, collapsedIds: readonly number[]): void {
     // The removed piece vanishes immediately from batcher and scene
     this.batcher.remove(removedId);
+    this.dropFrameParts(removedId);
     const removedEntry = this.pieceMap.get(removedId);
     if (removedEntry) {
       if (removedEntry.dynamicRoot) {
@@ -313,6 +330,7 @@ export class PieceMeshManager {
     // Collapsed pieces leave the batch and animate with a temporary cloned group
     for (const cId of collapsedIds) {
       this.batcher.remove(cId);
+      this.dropFrameParts(cId);
       const entry = this.pieceMap.get(cId);
       if (entry) {
         if (entry.dynamicRoot) {
@@ -395,13 +413,42 @@ export class PieceMeshManager {
     return (object.userData?.pieceId as number | undefined) ?? null;
   }
 
+  /** TASK-26: the legs and pads of a foundation's frame, one for each corner that needs one. */
+  private placeFrameLegs(pieceId: number, stage: number, pos: { readonly x: number; readonly y: number; readonly z: number }, yaw: number, env: WorldEnv): void {
+    const legs = planFrameLegs(pos, yaw, (x, z) => env.heightAt(x, z));
+    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+    const next: number[] = [];
+    for (const leg of legs) {
+      const legId = legBatchId(pieceId, leg.corner);
+      const padId = padBatchId(pieceId, leg.corner);
+      const shaft = new THREE.Matrix4().compose(new THREE.Vector3(leg.x, leg.footY, leg.z), q, new THREE.Vector3(1, leg.length, 1));
+      this.batcher.set(legId, `foundation-leg|${stage}|0`, shaft);
+      const pad = new THREE.Matrix4().compose(new THREE.Vector3(leg.x, leg.groundY - FRAME_PAD_HEIGHT_M / 2, leg.z), q, new THREE.Vector3(1, 1, 1));
+      this.batcher.set(padId, `foundation-pad|${stage}|0`, pad);
+      next.push(legId, padId);
+    }
+    for (const old of this.frameParts.get(pieceId) ?? []) if (!next.includes(old)) this.batcher.remove(old);
+    this.frameParts.set(pieceId, next);
+  }
+
+  /** TASK-26: forgets a removed piece's legs and pads. */
+  private dropFrameParts(pieceId: number): void {
+    for (const part of this.frameParts.get(pieceId) ?? []) this.batcher.remove(part);
+    this.frameParts.delete(pieceId);
+  }
+
   private getBatchParts(key: string): readonly Part[] {
     const [kindStr, stageStr, skirtStr] = key.split('|');
     const kind = kindStr as S.Kind;
     const stage = Number(stageStr);
     const skirt = Number(skirtStr || 0);
 
-    const template = globalKitPieceCache.getTemplate(kind, stage, skirt);
+    // TASK-26: the frame's legs and pads are unit parts (the batcher places each one)
+    const template = kindStr === 'foundation-leg'
+      ? { group: globalKitPieceCache.getFoundationPartGroup('leg') }
+      : kindStr === 'foundation-pad'
+        ? { group: globalKitPieceCache.getFoundationPartGroup('pad') }
+        : globalKitPieceCache.getTemplate(kind, stage, skirt);
     template.group.updateMatrixWorld(true);
 
     const rootInv = template.group.matrixWorld.clone().invert();

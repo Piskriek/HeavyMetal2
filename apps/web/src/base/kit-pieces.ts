@@ -9,6 +9,7 @@ import { pieceAt } from './world';
 import { createGenFixture, genLevelForStage } from '../assets/gen-props';
 import { getGenSync } from '../assets/gen';
 import { latticeGenId } from './lattice-gen';
+import { foundationDeckGroup, foundationLegGroup, foundationPadGroup } from './foundation-frame';
 
 export type Box = basekit.Box;
 export type Socket = basegear.Socket;
@@ -147,6 +148,8 @@ function swapLatticeMesh(
   lamps: readonly THREE.Mesh[],
   m: basekit.LabMaterials,
 ): void {
+  // TASK-26: the foundation keeps its industrial frame; its generated model (with a skirt of ribs) is not used.
+  if (kind === 'foundation') return;
   const id = latticeGenId(kind, skirt);
   if (!id) return;
   const gen = getGenSync(id, genLevelForStage(stage));
@@ -219,6 +222,7 @@ export class KitPieceCache {
   private basekitMats: basekit.LabMaterials | null = null;
   private basegearMats: basegear.LabMaterials | null = null;
   private templates = new Map<string, KitPieceResult>();
+  private foundationParts = new Map<string, THREE.Group>();
 
   getBasekitMaterials(): basekit.LabMaterials {
     if (!this.basekitMats) this.basekitMats = basekit.createMaterials();
@@ -244,8 +248,12 @@ export class KitPieceCache {
 
     switch (kind) {
       case 'foundation': {
+        // TASK-26: the industrial frame (gunmetal box-section deck, grate, hazard rim, collars) replaces the basekit slab. The legs
+        // and foot pads are separate parts (getFoundationPartGroup), one per leg, placed by the piece manager. The basekit call stays
+        // for the colliders, which keep the skirt's boxes as before.
         const res = basekit.foundation(bkm, { stage, skirt });
-        rawGroup = res.group;
+        for (const child of res.group.children) if (child instanceof THREE.Mesh) child.geometry.dispose();
+        rawGroup = foundationDeckGroup(stage, bkm.hazard);
         rawColliders = res.colliders;
         rawLamps = res.lamps;
         break;
@@ -528,7 +536,25 @@ export class KitPieceCache {
   }
 
   /** Dispose all cached geometries and materials across templates. */
+  /**
+   * The foundation's leg (unit shaft) or foot pad (hazard square), one group each. The piece manager places one per leg.
+   * Cached until dispose (their hazard material is the basekit's, which dispose releases).
+   */
+  getFoundationPartGroup(part: 'leg' | 'pad'): THREE.Group {
+    const existing = this.foundationParts.get(part);
+    if (existing) return existing;
+    const group = part === 'leg' ? foundationLegGroup() : foundationPadGroup(this.getBasekitMaterials().hazard);
+    this.foundationParts.set(part, group);
+    return group;
+  }
+
   dispose(): void {
+    for (const group of this.foundationParts.values()) {
+      group.traverse((child) => {
+        if (child instanceof THREE.Mesh) child.geometry?.dispose();
+      });
+    }
+    this.foundationParts.clear();
     for (const tmpl of this.templates.values()) {
       tmpl.group.traverse((child) => {
         if (child instanceof THREE.Mesh) {

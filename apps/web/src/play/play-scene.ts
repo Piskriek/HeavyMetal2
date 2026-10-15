@@ -9,7 +9,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { StageLook } from '../crafter/looks';
 import { createWorld, PLANET_DIR, SUN, type Neighbour, type World } from '../crafter/world';
 import { createPlume, type PlumeMode } from '@hm/plume';
-import { GATE, KINDS, type Machine, type MachineKind, type PlotState } from '@hm/plotsim';
+import { GATE, KINDS, level as plotLevel, type Machine, type MachineKind, type PlotState } from '@hm/plotsim';
 import { createPlotGround, type BoulderInfo, type PlotGround } from './plot-ground';
 import { fx as sfx } from '../maker/feedback';
 import { gameAudio } from '../audio/game-audio';
@@ -20,6 +20,8 @@ import { createPlotHolo, type PlotHolo } from './plot-holo';
 import { COLOUR_MARK_FRAGMENT, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX } from './portal-shaders';
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
 import { disposeProp, lineSpan, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
+import { castHeightfield, castSpheres, createRoverArmState, nearestHit, stepRoverArm, type CastSphere, type RoverArmState, type Vec3 as RoverVec3 } from './rover-camera';
+import { createExposureState, createScanWave, exposureTargetLuminance, gateOrLabFactor, markScanWaveDone, scanFrame, stepExposure, suitCamMix, suitCamProfile, suitCamStrength, triggerScanWave, type ExposureState, type ScanWave, type SuitCamSetting } from './stage-look';
 import { createScientistInstance } from '../avatar/scientist/scientist-model';
 import { loadScientistAnimations, type ClipName } from '../avatar/scientist/anims-loader';
 import { createScientistAnimator, type OneShotKind, type ScientistAnimator } from '../avatar/scientist/animator';
@@ -113,6 +115,9 @@ export interface Detail {
   readonly pixelLights: boolean;
   /** What the lab window shows (full: the 3D wasteland; lite: fewer parts; static: the flat storm picture). */
   readonly windowView: WindowView;
+  /** The suit cam's optics on stages 4 to 6 (the Graphics setting), and whether this tier is wide enough for the wide halation on Auto. */
+  readonly suitCam: SuitCamSetting;
+  readonly wideTier: boolean;
 }
 
 const EYE = 1.68, RADIUS = 0.3, WALK = 3.0, RUN = 5.6;
@@ -200,6 +205,8 @@ export interface PlayScene {
   resize(width: number, height: number, pixelRatio: number): void;
   /** The live detail (the display governor's tier, with your own Settings on top). */
   setDetail(d: Detail): void;
+  /** Whether the build drawer or a placement is open: the suit cam's optics halve while it is (plan 25). */
+  setBuildOpen(open: boolean): void;
   /** Activity of the lab machines (bench writing, combiner mixing, rack cataloguing) for the lab plume. */
   setLabActivity(act: { readonly bench: number; readonly combiner: number; readonly rack: number }): void;
   /** Shows or hides the held extraction rifle (the first-person view model) and sets its mode's screen. */
@@ -1072,6 +1079,9 @@ export function createPlayScene(o: {
     uRes: { value: new THREE.Vector2(16, 16) }, uInvProj: { value: new THREE.Matrix4() }, uCamWorld: { value: new THREE.Matrix4() },
     uWaveCentre: { value: new THREE.Vector3() }, uWaveR: { value: -1 }, uSkyRise: { value: -1 }, uGlitch: { value: 0 }, uTime: { value: 0 }, uLost: { value: 0 },
     uLookOut: { value: new THREE.Vector4(0.01, 0.01, 0, 1) }, uLookIn: { value: new THREE.Vector4(0.01, 0.01, 0, 1) },
+    uSunDir: { value: SUN.clone() }, uGatePos: { value: new THREE.Vector3() }, uScanCentre: { value: new THREE.Vector3() },
+    uScanR: { value: -1 }, uWireMix: { value: 1 }, uFovY: { value: THREE.MathUtils.degToRad(camera.fov) },
+    uSuitCam: { value: 0 }, uExposure: { value: 1 }, uSuitK1: { value: 0 }, uSuitGrain: { value: 0 }, uSuitWide: { value: 0 },
   };
   const postScene = new THREE.Scene();
   const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -1087,6 +1097,13 @@ export function createPlayScene(o: {
   let powerT = -1, gateOn = false;
   /** The plot's stage, the stage the picture shows, and the stage a running wave brings (-1: none) and since when. */
   let stage = 0, shown = 0, waveTo = -1, waveStart = -1;
+  /** Stage 0's first-machine scan wave (0a to 0b), the lagging exposure and the suit cam's smoothed strength (plan 25), the build drawer, the plot's Lx. */
+  let scanWave: ScanWave = createScanWave();
+  let exposure: ExposureState = createExposureState(1);
+  let suitCamNow = 0, buildOpen = false, plotLx = 0;
+  const suitLook = new THREE.Vector3();
+  /** The rover's camera arm (P0-VEH-01): its state lives while a rover is driven. */
+  let roverArm: RoverArmState = createRoverArmState(), roverArmOn = false;
   /** The drawn picture's size in pixels: a look's pixels are whole pixels of it. */
   let bufW = 16, bufH = 16, planetK = 0;
   let pendingEvent: FrameOut['event'] = null;
@@ -1316,6 +1333,20 @@ export function createPlayScene(o: {
   let lastAimedBoulder: number | null = null;
 
   const pieceRaycaster = new THREE.Raycaster();
+  /** The rover's cast (P0-VEH-01): the nearest of the ground, the boulders (as spheres of half their size) and the placed pieces. */
+  const roverCast = (origin: RoverVec3, dir: RoverVec3, maxDist: number): number | null => {
+    let hit = castHeightfield(origin, dir, maxDist, groundAt);
+    const spheres: CastSphere[] = (ground?.getBoulders() ?? []).map((b) => ({ x: b.x, y: b.y, z: b.z, r: 0.5 * b.size }));
+    hit = nearestHit(hit, castSpheres(origin, dir, maxDist, spheres));
+    if (piecesGroup && piecesGroup.children.length > 0) {
+      pieceRaycaster.set(new THREE.Vector3(origin.x, origin.y, origin.z), new THREE.Vector3(dir.x, dir.y, dir.z));
+      pieceRaycaster.far = maxDist;
+      const first = pieceRaycaster.intersectObjects(piecesGroup.children, true)[0];
+      if (first) hit = nearestHit(hit, first.distance);
+      pieceRaycaster.far = Infinity;
+    }
+    return hit;
+  };
   const aimRayDir = new THREE.Vector3();
 
   const aimPointFn = (): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null => {
@@ -1413,6 +1444,9 @@ export function createPlayScene(o: {
       }
       openingUniforms.uStatic.value = gateOn ? 0 : 1;
       stage = shown = s.plot.stage;
+      scanWave = createScanWave();
+      if (s.plot.stage >= 1 || [...s.running.values()].some((r) => r > 0.05)) markScanWaveDone(scanWave);
+      plotLx = plotLevel(s.plot, 'lx');
       room.setStorm(Math.min(1, Math.max(0, stage / 6)));
       gameAudio.updateStormVolume(1.0 - Math.min(1, Math.max(0, stage / 6)));
       waveTo = -1;
@@ -1456,6 +1490,18 @@ export function createPlayScene(o: {
       const sameNet = connected.size === lastConnected.size && [...connected].every((id) => lastConnected.has(id));
       if (changed || !sameNet) { relay(connected); lastConnected = new Set(connected); }
       holo.setPlot(plot, running, connected);
+      plotLx = plotLevel(plot, 'lx');
+      // stage 0's first running machine starts the scan wave from its own spot (the stage bible, 0a to 0b); past stage 0 the world is resolved
+      if (plot.stage >= 1) markScanWaveDone(scanWave);
+      else if (!scanWave.done && scanWave.startSec === null) {
+        for (const v of views.values()) {
+          if ((running.get(v.m.id) ?? 0) > 0.05) {
+            const p = v.prop.group.getWorldPosition(new THREE.Vector3());
+            triggerScanWave(scanWave, clock, { x: p.x, y: p.y, z: p.z });
+            break;
+          }
+        }
+      }
       // pixels pour from every pixel machine while it runs; lamps show which run
       for (const v of views.values()) {
         const r = running.get(v.m.id) ?? 0;
@@ -1794,6 +1840,7 @@ export function createPlayScene(o: {
     setFidelityStage(to) {
       const s = Math.max(0, Math.min(4, Math.floor(to)));
       stage = s;
+      if (s >= 1) markScanWaveDone(scanWave);
       shown = s;
       room.setStorm(Math.min(1, Math.max(0, s / 6)));
       gameAudio.updateStormVolume(1.0 - Math.min(1, Math.max(0, s / 6)));
@@ -2017,24 +2064,23 @@ export function createPlayScene(o: {
         holdRifleInHand();
       }
 
+      if (drivingVehicleId === null) roverArmOn = false;
       if (altCamPos) {
         camera.position.copy(altCamPos);
         camera.rotation.set(pitch, yaw, 0, 'YXZ');
       } else if (drivingVehicleId !== null && drivingState) {
         const vView = vehicleViews.get(drivingVehicleId);
         if (vView) {
-          const roverQuat = vView.group.quaternion;
           const roverPos = vView.group.position;
-          const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(roverQuat);
-          const camDist = vView.kind === 'scout' ? 4.6 : vView.kind === 'hauler' ? 6.2 : 7.8;
-          const camHeight = vView.kind === 'scout' ? 1.8 : vView.kind === 'hauler' ? 2.4 : 3.0;
-          const lookHeight = vView.kind === 'scout' ? 0.7 : vView.kind === 'hauler' ? 1.0 : 1.3;
-          const idealCamPos = roverPos.clone().addScaledVector(fwd, -camDist).add(new THREE.Vector3(0, camHeight, 0));
-          const minCamY = groundAt(idealCamPos.x, idealCamPos.z) + 0.6;
-          if (idealCamPos.y < minCamY) idealCamPos.y = minCamY;
-
-          camera.position.lerp(idealCamPos, Math.min(1, dt * 12));
-          camera.lookAt(roverPos.clone().add(new THREE.Vector3(0, lookHeight, 0)));
+          const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(vView.group.quaternion);
+          // P0-VEH-01: the sphere-cast arm, the floor clamp and the level horizon (rover-camera.ts); the arm starts fresh on each drive
+          if (!roverArmOn) { roverArm = createRoverArmState(); roverArmOn = true; }
+          const arm = stepRoverArm(roverArm, {
+            chassis: roverPos, yaw: Math.atan2(fwd.x, fwd.z), pitch: Math.asin(Math.max(-1, Math.min(1, fwd.y))), dt,
+            groundAt, cast: roverCast,
+          });
+          camera.position.set(arm.camera.x, arm.camera.y, arm.camera.z);
+          camera.lookAt(arm.lookAt.x, arm.lookAt.y, arm.lookAt.z);
         }
       } else if (cameraView === 'third') {
         const camRot = new THREE.Euler(pitch, yaw, 0, 'YXZ');
@@ -2127,6 +2173,22 @@ export function createPlayScene(o: {
       if (waveTo >= 0 && r > 1e6) { shown = waveTo; waveTo = -1; fitLooks(); rebuildProps(shown); pendingEvent = pendingEvent ?? 'stage-up'; sfx('stage-up'); }
       postUniforms.uWaveR.value = waveTo >= 0 ? r : -1;
       postUniforms.uSkyRise.value = wave.sky;
+      // stage 0's scan wave (0a to 0b), the gate's amber pool, the sun, and the suit cam's optics (plan 25)
+      const scan = scanFrame(scanWave, now);
+      postUniforms.uScanR.value = scan.radius;
+      postUniforms.uWireMix.value = scan.wireMix;
+      postUniforms.uScanCentre.value.set(scanWave.centre.x, scanWave.centre.y, scanWave.centre.z);
+      postUniforms.uGatePos.value.copy(twin.group.position);
+      const profile = suitCamProfile(detail.suitCam, detail.wideTier);
+      camera.getWorldDirection(suitLook);
+      const gateDistM = camera.position.distanceTo(twin.group.position);
+      const lumTarget = exposureTargetLuminance(suitLook, SUN, gateOrLabFactor(where === 'lab', gateDistM));
+      postUniforms.uExposure.value = stepExposure(exposure, lumTarget, dt, profile.swing).exposure;
+      suitCamNow += (suitCamStrength(profile, suitCamMix(plotLx, stage), buildOpen) - suitCamNow) * (1 - Math.exp(-dt / 0.35));
+      postUniforms.uSuitCam.value = suitCamNow;
+      postUniforms.uSuitK1.value = profile.k1 * (buildOpen ? 0.5 : 1);
+      postUniforms.uSuitGrain.value = profile.grain;
+      postUniforms.uSuitWide.value = profile.wide ? 1 : 0;
       // a quarter of the pixels race out to the wave's front while it runs
       const wc = postUniforms.uWaveCentre.value;
       plume.setWave([wc.x, wc.y, wc.z], waveTo >= 0 ? Math.min(r, RACER_REACH) : -1);
@@ -2315,6 +2377,7 @@ export function createPlayScene(o: {
       planetK = 0;
       fitLooks();
     },
+    setBuildOpen(open) { buildOpen = open; },
     setDetail(d) {
       detail = d;
       room.setWindowView(d.windowView);

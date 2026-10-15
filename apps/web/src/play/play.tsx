@@ -129,7 +129,7 @@ const NEIGHBOURS: readonly Plot[] = ([
 const GROUND_BUDGET: Readonly<Record<Quality, number>> = { potato: 60000, low: 75000, medium: 200000, high: 200000, ultra: 280000 };
 /** The most lines the planet is drawn at by tier: the later stages' resolution is capped on the light tiers, so they hold their frame rate. */
 const PLANET_LINES: Readonly<Record<Quality, number>> = { potato: 360, low: 480, medium: 1080, high: 1e5, ultra: 1e5 };
-const detailOf = (g: GraphicsSettings, q: Quality): Detail => ({ plumes: g.pixelPlumes, plumeDensity: g.plumeDensity, groundBudget: GROUND_BUDGET[q], planetLines: PLANET_LINES[q], plumeGlow: g.plumeGlow, pixelLights: g.pixelLights, windowView: g.windowView });
+const detailOf = (g: GraphicsSettings, q: Quality): Detail => ({ plumes: g.pixelPlumes, plumeDensity: g.plumeDensity, groundBudget: GROUND_BUDGET[q], planetLines: PLANET_LINES[q], plumeGlow: g.plumeGlow, pixelLights: g.pixelLights, windowView: g.windowView, suitCam: g.suitCamOptics, wideTier: q === 'medium' || q === 'high' || q === 'ultra' });
 /** The bearing from the player's facing to the planet's gate (degrees, positive to the right) and the distance in metres. */
 function gateBearingOf(scene: PlayScene | null): { readonly relativeDeg: number; readonly distanceM: number } | null {
   if (!scene) return null;
@@ -441,6 +441,8 @@ export function PlayScreen(props: {
       delete document.body.dataset.titleUp;
     };
   }, [toast]);
+  // the suit cam's optics halve while the build drawer or a placement is open (plan 25)
+  useEffect(() => { sceneRef.current?.setBuildOpen(menu || building !== null); }, [menu, building]);
   // the skin follows the ground under the player: a candidate must hold 0.5 s before the HUD flips (fidelity skins)
   useEffect(() => {
     const id = window.setInterval(() => {

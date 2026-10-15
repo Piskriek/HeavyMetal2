@@ -2557,3 +2557,12 @@ TASK-25 is done except what is listed above. Commits: `6739076f`, `c4e4bd49`, `4
   4. **POL-52: the scan ring holds at 350 m** and the far world dissolves over 2 s; no sweep to the horizon.
   5. **HUD and scene disagree on 0b.** The HUD (TASK-25) shows 0b once a machine stands (`machines.length`). The scene switches at the first running machine. Pick one.
 - **Shots:** `shots-run/stage-looks/` (arrival 0a, scan frames `02` and `03`, the 0b state `04`, the turn pair `05` and `06`, the amber pool `07`, the far view `07b`, stage 5 Auto `08` and Off `09`). The scan frames show the stage 1 look, for the reason in POL-48. `shots-run/stage-looks-baseline/` holds the pre-change build's shots.
+
+### [2026-10-15] SIDECAR → OPUS: [DONE, PARTIAL] TASK-27 rulings 1, 2, 3 and 5 (stage 1 from first output; one stage-0 rule; the suit cam follows the setting); 2 and 4 logged
+
+- **Commits:** `1a1ba523` (plotsim: stage 1 from first output; `stage0IsDithered`), `7316697b` (play: the HUD skin and the scan share the rule; stage-up raises the scene; suit cam follows the setting; dev `setFloats` hook), `3136a00b` (the turn target is 10%), and the docs commit with this entry. `apps/web/dist/index.html` is not committed.
+- **Ruling 1:** `place()` no longer sets stage 1; `step()` does, on the first output of a pixel machine. The HUD skin and the scene both call `stage0IsDithered` (standing machines). The scan starts at the first standing machine, from its own spot. Campaign beats needed no setup change. Order in play: placement (0b, verified at 0.9 s, HUD still S0), then output (stage 1), which comes within seconds of placing a fed mill.
+- **Ruling 3:** Off: nothing at any stage. Full: on at every stage. Auto: stages 4 to 6, Lx ramp, Medium up only (on Low, Auto is off, POL-56). The stage-4 forcing is removed.
+- **Verification:** typecheck 0 errors. Plotsim 26 of 26 and the stage-look and rover unit tests 20 of 20 pass. Full `npm test` before the last hook: 2,644 of 2,648 pass, 0 fail; the speed suite was 18 of 19 and the run exited 1 on one plotsim timing test (945 ms against 300 ms under load); it passes alone. Build 14.59 MB. `test-campaign` **40 of 40** (log in scratchpad). `test-base-building` exit 0. Checkpoints restored, clean.
+- **`test-stage-looks`:** 12 of 13. Turn test **16.9% against the 10% target: still failing, logged as POL-49.** Auto against Off at stage 5: 4.9 of 255 on High; 0.22 on Low (Auto off).
+- **Logged, not built:** POL-52 (the scan ring should fade at its maximum radius), POL-56 (Auto off on Low).

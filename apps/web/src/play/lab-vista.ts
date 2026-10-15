@@ -3,6 +3,7 @@
 // window frame and the walls still cover it. The lab camera and the vista share one coordinate frame (lab metres), so the parallax is real.
 // The pure maths (pockets, bursts, progress, palettes) is in lab-vista-math.ts; this file is the scene, its layout and its shaders.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { getGenSync, GEN, loadGen, type GenLevel } from '../assets/gen';
 import {
   BASE_S, BREACH_XZ, BURST_SECONDS, CORRIDOR_DEG, EGA16, MAX_POCKETS, POCKET_KINDS, SPAWN_XZ, WINDOW_DIST, bearingFromSpawn, burstLook,
@@ -42,7 +43,7 @@ export interface LabVista {
   render(renderer: THREE.WebGLRenderer, lab: THREE.PerspectiveCamera, width: number, height: number): boolean;
   /** Swaps the fallback boxes for the generated models that are loaded now. */
   adoptGenerated(): void;
-  /** The draw calls and triangles of the view, counted from its visible objects. */
+  /** The draw calls and triangles of the view at its peak frame (the visible objects, and the burst meshes whether or not a burst strikes). */
   stats(): { readonly drawCalls: number; readonly triangles: number; readonly dust: number };
   /** The pockets as they are now (for the shots and the tests). */
   debugPockets(): readonly { readonly slot: number; readonly centre: readonly number[]; readonly radius: number; readonly kind: number }[];
@@ -965,22 +966,24 @@ export function createLabVista(o: LabVistaOptions): LabVista {
   motes.renderOrder = 5;
   scene.add(motes);
 
-  // ---- The curtains: three big planes at 45, 200 and 700 m (depth cues), and the ground drift near the horizon
+  // ---- The curtains: three big planes at 45, 200 and 700 m (depth cues), and the ground drift near the horizon. They share one material,
+  // so they are one merged mesh (TASK-28: four draw calls for one look). Merged back to front (700 m, the drift at 260 m, 200 m, 45 m),
+  // the blend order is the order the sorted meshes drew in.
   const curtainU = { uTime: { value: 0 }, uDust: { value: 1 }, uOpacity: { value: 0.6 } };
   const curtainMat = keep(new THREE.ShaderMaterial({
     vertexShader: CURTAIN_VERT, fragmentShader: CURTAIN_FRAG, uniforms: curtainU, transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
   }));
-  const curtains = new THREE.Group();
-  for (const dist of [45, 200, 700]) {
-    const p = new THREE.Mesh(keep(new THREE.PlaneGeometry(1800, 150 + dist * 0.12)), curtainMat);
-    p.position.set(0, 40 + dist * 0.06, WALL_Z - dist);
-    p.renderOrder = 4;
-    curtains.add(p);
-  }
-  const drift = new THREE.Mesh(keep(new THREE.PlaneGeometry(2600, 26)), curtainMat);
-  drift.position.set(0, 8, WALL_Z - 260);
-  drift.renderOrder = 4;
-  curtains.add(drift);
+  const curtainPlane = (w: number, h: number, x: number, y: number, z: number): THREE.BufferGeometry => new THREE.PlaneGeometry(w, h).translate(x, y, z);
+  const curtainMerged = mergeGeometries([
+    curtainPlane(1800, 150 + 700 * 0.12, 0, 40 + 700 * 0.06, WALL_Z - 700),
+    curtainPlane(2600, 26, 0, 8, WALL_Z - 260),
+    curtainPlane(1800, 150 + 200 * 0.12, 0, 40 + 200 * 0.06, WALL_Z - 200),
+    curtainPlane(1800, 150 + 45 * 0.12, 0, 40 + 45 * 0.06, WALL_Z - 45),
+  ]);
+  if (!curtainMerged) throw new Error('the curtain planes do not merge (attributes differ)');
+  const curtainGeo = keep(curtainMerged);
+  const curtains = new THREE.Mesh(curtainGeo, curtainMat);
+  curtains.renderOrder = 4;
   scene.add(curtains);
 
   // ---- The bursts: a jagged bolt (a ribbon), the burst shell, and the ring on the plain
@@ -1005,6 +1008,8 @@ export function createLabVista(o: LabVistaOptions): LabVista {
   ring.rotation.x = -Math.PI / 2;
   ring.visible = false;
   scene.add(ring);
+  /** The three meshes a burst shows (for part of it): the stats count them at the peak. */
+  const burstMeshes = new Set<THREE.Mesh>([bolt, burstMesh, ring]);
 
   /** Strikes the bolt: its zig-zag is seeded by the event's time, so every strike of one schedule repeats. */
   const strikeBolt = (e: BurstEvent): void => {
@@ -1237,18 +1242,28 @@ export function createLabVista(o: LabVistaOptions): LabVista {
     return true;
   };
 
+  /**
+   * The peak frame's draw calls and triangles: every visible mesh, and the three burst meshes counted even when no burst is striking.
+   * Each burst mesh shows for part of a burst (1.2 s, every 5 to 12 s), so a count on a random frame read 39, 41 or 42 (TASK-28).
+   * The peak is the worst frame and it is the same on every run.
+   */
   const stats = (): { drawCalls: number; triangles: number; dust: number } => {
     let drawCalls = 0, triangles = 0;
-    scene.traverseVisible((obj) => {
-      const m = obj as THREE.Mesh;
-      if (!m.isMesh) return;
+    const add = (m: THREE.Mesh): void => {
       const g = m.geometry as THREE.InstancedBufferGeometry;
       const im = m as THREE.InstancedMesh;
       const instances = im.isInstancedMesh ? im.count : (g.instanceCount ?? 1);
       drawCalls += 1;
       const indexed = g.index ? g.index.count : (g.attributes.position?.count ?? 0);
       triangles += Math.floor(indexed / 3) * Math.max(1, instances);
-    });
+    };
+    if (scene.visible) {
+      scene.traverseVisible((obj) => {
+        const m = obj as THREE.Mesh;
+        if (m.isMesh && !burstMeshes.has(m)) add(m);
+      });
+      for (const m of burstMeshes) add(m);
+    }
     return { drawCalls, triangles, dust: view === 'full' ? MOTES : view === 'lite' ? Math.floor(MOTES / 2) : 0 };
   };
 

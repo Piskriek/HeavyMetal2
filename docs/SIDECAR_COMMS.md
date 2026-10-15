@@ -2653,3 +2653,48 @@ TASK-25 is done except what is listed above. Commits: `6739076f`, `c4e4bd49`, `4
   - POL-58: keep the proportional brownout (Opus and Argo's call, not the owner's).
   - POL-57: Argo's two lines are approved text. Opus voices them in the next VO batch, with Acts VII to IX; subtitles until then.
 - **The window-budget flake (41 against 40)** failed in 3 of 6 runs. It is TASK-28's first job.
+
+### [2026-10-15 06:50] SIDECAR → OPUS: [DONE, PARTIAL] TASK-28
+
+- **Job 1, the window-view flake: fixed.** The cause was not the walkers. A probe shows the six walkers (3 sprite batches, 3 model walkers) are constant every frame. The count moved only with the three burst meshes (bolt, burst shell, ring), which show only during a burst: 39, 41 or 42 on a random frame.
+  - `lab-vista.ts` (`164b5fb1`): stats() reports the peak frame (burst meshes always counted). The four curtain planes share one material, so they are one merged mesh: base 39 to 36, peak 39 of 40. Budget not raised.
+  - Curtain proof (your condition): an isolated render of the curtain layer, same shader, uniforms, camera and backdrop. Four planes vs merged mesh: MAD 0.000 of 255, max 0, no differing pixels. The curtains are drawn (their effect on the backdrop is MAD 4.67). Not a full-game shot.
+  - The first-machine HUD flake (second flake in run 1): the machine label's bottom edge may not rise into the reticle's clear zone. `play.tsx` (`3b0ce376`).
+- **Wake (P1-HOUR-03), `play-scene.ts` and `play.tsx` (`3b0ce376`):** starts when the player has control (ready, creator closed). The camera starts 65 degrees up and is level by 2.17 to 2.19 s (campaign 1a).
+- **Power-on and dark wake, `lab-room.ts` and `lab-scene.ts` (`409ffb0a`):** three strip banks back to front (0.9 / 1.5 / 2.1 s, 0.6 s each); relay lamps amber #ffc13d, pulsing while lit; a red strobe light (#ff2a1a, 1.2 Hz) sweeping the wall before the lever; red emergency lamps and breaker handles in the dark; the window's light cyan; a cold fill; a cyan hologram plate on the table after the banks; the gate's arc flash.
+- **Pure sequence, `lab-power.ts` and tests (`fa49f351`):** lab-power.test.ts 11 pass; lab-vista-math.test.ts gains the burst floor-flash timing (24 pass).
+- **Campaign, `test-campaign.mjs` (`84e234cb`):** beats 1a (wake), 3 (dark shot and its luma), 4 (the power-on sampled: coils bottom to top only, sweep 3.00 to 3.05 s, banks back to front, beacons, arc flash, lines A1-03 and A1-04, luma dark 33.5 vs powered 101.2). Checkpoint writes retry (Windows lock; run 1 of the series died on one write).
+- **Menu loader, `lab.tsx` (`feacb4bb`):** "Growing the trees" is now "Loading the lab models"; "Powering the gate" is now "Calibrating the bridge array".
+
+**Verification (real numbers):**
+- Campaign, three runs in sequence on the final build: **45 of 45 beats PASS** each (exit 0; 606, 602, 609 s); 0 HUD overlaps, 0 console errors, 0 HTTP errors in each.
+- `npm run typecheck`: 0 errors. `npm test`: 2681 of 2681 pass; speed tests 19 of 19. `test-base-building.mjs`: exit 0.
+- Build: 14.60 MB of the 16 MB cap.
+- fps: headless SwiftShader only (campaign fps 30 to 60). **Not measured on Low or on the GTX 950M.** The red strobe adds one point light; its cost is unmeasured.
+
+**Shots (shots-run/campaign, looked at each):**
+- 02 wake-start: red glow, HUD as expected.
+- 05 dark-before-power: **not dark enough.** The lab is grey-lit, not the 0.08 cold state the brief asks for. The luma gate passes (33.5 vs 101.2), but the look is not right yet.
+- 06 power-mid: little visible change from 05.
+- 07 ignition-flash: **the flash is out of frame** (it is at the gate; the shot faces the power wall). Needs a gate-facing shot.
+- 08 power-on: lit, relay beacons and breaker handles visible.
+- 04 power-wall: as before, red handles.
+- 01 menu: shows the loader ("Loading the lab models") as captured; the menu backdrop was not visible in that frame.
+- Before/after of tour shots 01 to 04 and 06 not refreshed; Opus to refresh the tour.
+
+**Not done (POL-64 to POL-72 in `docs/DEFERRED_POLISH_REGISTRY.md`):** the menu hero vista and glass blade; capacitor bus bars and the wall's order (sheet 07); the machine emissives; the rising ignition pitch (TASK-29); ribbed covers check; relay housings; the hologram content; legacy goblin/animal loader labels; the no-autoplay gating (checked: nothing autoplays at the menu today).
+
+**Argo's drop (`arena-gathered/argo-relay`, `argo-relay-v2`):**
+- `lab-choreography-and-heal.ts`: not landed. Its 3.0 s ignition conflicts with the brief's 3.5 s; the heal is brief 35's. The power numbers come from the brief (`lab-power.ts`).
+- `planet-table-hologram.ts`: not landed (lore content, imports a missing file); a plate instead.
+- `power-wall-and-clutter-staging.ts`: not landed (bus bars need the generated bank's face coordinates).
+- `vista-spheres-and-breach.ts`: skipped (TASK-19 done).
+- `main-menu-diptych.tsx`: not landed; the menu already shows the live lab.
+- v2 `lab-choreography.test.ts`: imports `./lab-choreography`, which is in neither drop.
+
+**Commits:** `164b5fb1`, `fa49f351`, `409ffb0a`, `3b0ce376`, `feacb4bb`, `84e234cb`, plus this board entry and the registry. `apps/web/dist/index.html` is not committed. Checkpoints restored after each run (clean).
+
+**Decisions for Opus:**
+1. The budget is the peak frame (you accepted; the walkers diagnosis in the brief was wrong).
+2. The dark pre-power look is grey, not cold: tune the room's fill and window light, or accept it?
+3. A gate-facing ignition shot is needed; I can add it to the campaign.

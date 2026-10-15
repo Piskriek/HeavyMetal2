@@ -15,6 +15,7 @@ import { fx as sfx } from '../maker/feedback';
 import { gameAudio } from '../audio/game-audio';
 import * as kit from '@hm/labkit';
 import { createLabRoom, GATE_AT, PLANET_TABLE_AT, POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, preloadLabGenerated, ROOM, type LabRoom } from './lab-room';
+import { WAKE_SECONDS, wakeLift, type Power } from './lab-power';
 import { preloadVista, VISTA_LEVEL, type WindowView } from './lab-vista';
 import { createPlotHolo, type PlotHolo } from './plot-holo';
 import { COLOUR_MARK_FRAGMENT, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX } from './portal-shaders';
@@ -294,6 +295,11 @@ export interface PlayScene {
     wreckRungs(): readonly { readonly site: number; readonly leak: boolean; readonly sealed: boolean; readonly broken: boolean; readonly rung: number }[];
     /** The window view's draw calls and triangles (lab-vista.ts). */
     vistaStats(): { readonly drawCalls: number; readonly triangles: number; readonly dust: number };
+    power(): Power;
+    coilsLit(): boolean[];
+    wake(): { readonly t: number; readonly lift: number; readonly log: readonly { readonly t: number; readonly lift: number }[] };
+    startWake(): void;
+    setWake(t: number): void;
     /** Sets the window view directly (the budget check draws it in full; the governor sets it by tier otherwise). */
     setWindowView(view: WindowView): void;
     /** The wreck sites sealed so far. */
@@ -1170,6 +1176,16 @@ export function createPlayScene(o: {
   /** Metres walked since the last footstep, and how many relay lamps the sequence has lit (one click each). */
   let stride = 0, relaysHeard = 0;
   let powerT = -1, gateOn = false;
+  // the wake (TASK-28): the first time the player is in the lab before the lever, the camera starts 65 degrees up and sits up over 2.2 s
+  let wakeT = -1, woke = false;
+  /** The wake's frames so far (t and the lift), for the tests: the wake runs once per profile, from when the player has control. */
+  const wakeLog: { t: number; lift: number }[] = [];
+  const startWake = (): void => {
+    if (woke || gateOn || where !== 'lab' || powerT >= 0) return;
+    woke = true;
+    wakeT = 0;
+    wakeLog.length = 0;
+  };
   /** The plot's stage, the stage the picture shows, and the stage a running wave brings (-1: none) and since when. */
   let stage = 0, shown = 0, waveTo = -1, waveStart = -1;
   /** Stage 0's first-machine scan wave (0a to 0b), the lagging exposure and the suit cam's smoothed strength (plan 25), the build drawer, the plot's Lx. */
@@ -1937,6 +1953,12 @@ export function createPlayScene(o: {
       beamFx.update(clock);
       holoUniforms.uTime.value = now;
       socketRingMat.opacity = 0.55 + 0.35 * Math.sin(now * 5.0);
+      // ---- the wake: the camera's lift above level, from its start to the 2.2 s the player takes to sit up
+      if (wakeT >= 0) {
+        if (wakeLog.length < 400) wakeLog.push({ t: wakeT, lift: wakeLift(wakeT) });
+        wakeT += dt;
+        if (wakeT >= WAKE_SECONDS) wakeT = -1;
+      }
       // ---- the power-on sequence
       if (powerT >= 0) {
         const before = powerT;
@@ -2201,7 +2223,7 @@ export function createPlayScene(o: {
         }
       } else {
         camera.position.copy(pos);
-        camera.rotation.set(pitch, yaw, 0, 'YXZ');
+        camera.rotation.set(pitch + (wakeT >= 0 ? wakeLift(wakeT) : 0), yaw, 0, 'YXZ');
       }
       camera.updateMatrixWorld(true);
       // ---- the build ghost
@@ -2600,6 +2622,12 @@ export function createPlayScene(o: {
       machineRuns: () => [...views.values()].map((v) => ({ kind: v.m.kind, run: v.running })),
       wreckRungs: () => wrecks.rungs(),
       vistaStats: () => room.vista.stats(),
+      power: () => room.power(),
+      coilsLit: () => room.coilsLit(),
+      wake: () => ({ t: wakeT, lift: wakeT >= 0 ? wakeLift(wakeT) : 0, log: wakeLog.slice() }),
+      startWake,
+      /** Sets the wake's clock (the shot of the wake's start); -1 ends it. */
+      setWake: (t: number) => { wakeT = t; },
       setWindowView: (view) => room.setWindowView(view),
       sealedWrecks: () => wrecks.sealedSites(),
       groundTriangles: () => ground?.triangles() ?? 0,
@@ -2641,6 +2669,7 @@ export function createPlayScene(o: {
           pendingEvent = w === 'planet' ? 'to-planet' : 'to-lab';
         }
         where = w; pos.set(x, w === 'lab' ? EYE : groundAt(x, z) + EYE, z); yaw = y; if (p !== undefined) pitch = p;
+        wakeT = -1; // a moved player is not waking (the tests place the camera)
       },
       sync: () => sync,
       pieceBounds: (id) => {

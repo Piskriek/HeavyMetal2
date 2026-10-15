@@ -2539,6 +2539,13 @@ useEffect(() => {
     document.addEventListener('pointerlockchange', onLock);
     return () => document.removeEventListener('pointerlockchange', onLock);
   }, [ready, creating]);
+  // TASK-28 (P1-HOUR-03): the wake starts once the player has control of the lab (the loading bar is gone and the creator is closed)
+  const wokeRef = useRef(false);
+  useEffect(() => {
+    if (!ready || creating || wokeRef.current || !sceneRef.current) return;
+    wokeRef.current = true;
+    sceneRef.current.debug.startWake();
+  }, [ready, creating]);
   const lock = useCallback(() => {
     setPaused(false);
     if (canvasRef.current) captureMouse(canvasRef.current);
@@ -3286,7 +3293,9 @@ useEffect(() => {
               // a label shows within 14 m and 8 degrees of the crosshair, or with Alt held (TASK-25, P0-UI-03)
               if (a.behind || !shouldRenderMachineBillboard(a.aimAngleDeg, a.distanceM, altHeldRef.current)) return null;
               const x = (a.ndcX + 1) * 0.5 * window.innerWidth;
-              const y = (1 - a.ndcY) * 0.5 * window.innerHeight - 36;
+              // the label stands on its machine, 36 px above it; its bottom edge may not reach into the reticle's clear zone (a 48 px square,
+              // plus or minus 24 px, on the centre), so a machine just below the crosshair lifts its label above that zone (TASK-28)
+              const y = Math.min((1 - a.ndcY) * 0.5 * window.innerHeight - 36, window.innerHeight / 2 - 28);
               const run = a.running;
               const tone = run > 0.95 ? 'ok' : run > 0.05 ? 'warn' : 'bad';
               const state = run > 0.95 ? 'RUNNING' : run > 0.05 ? `BROWNOUT ${Math.round(run * 100)}%` : 'NOT RUNNING';

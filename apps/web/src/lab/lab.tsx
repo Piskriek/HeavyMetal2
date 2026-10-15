@@ -61,12 +61,12 @@ export function LabHome(props: { readonly profile: Profile }): ReactElement {
     const cartridges = [...new Set([FINISHED, ...NEIGHBOURS.map((n) => n.cartridge)])];
     // each step in its own task, so the bar keeps moving; the label names what comes next
     const steps: [string, () => void | Promise<void>][] = [
-      ...SMOOTH_IDS.map((id): [string, () => void] => ['Growing the trees', () => { smoothModel(id); }]),
+      ...SMOOTH_IDS.map((id): [string, () => void] => ['Loading the lab models', () => { smoothModel(id); }]),
       ['Waking the goblin', () => { smoothModel('goblin'); }],
       ...(['MOON_STRIDER', 'CRYSTAL_TORTOISE', 'SKY_MANTA'] as const).map((id): [string, () => void] => ['Waking the animals', () => { animalBody(id); }]),
       ...cartridges.map((id): [string, () => void] => ['Finishing the planet', () => { look(id); }]),
       ['Fitting the lab', () => scene.preloadLabGenerated()],
-      ['Powering the gate', () => { scene.setVista(look(FINISHED), look(FINISHED), NEIGHBOURS.map((plot) => ({ plot, look: look(plot.cartridge) }))); }],
+      ['Calibrating the bridge array', () => { scene.setVista(look(FINISHED), look(FINISHED), NEIGHBOURS.map((plot) => ({ plot, look: look(plot.cartridge) }))); }],
     ];
     let cancelled = false, raf = 0, at = 0, timer = 0, last = performance.now();
     const loop = (ms: number): void => {

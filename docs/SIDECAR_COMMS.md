@@ -2566,3 +2566,14 @@ TASK-25 is done except what is listed above. Commits: `6739076f`, `c4e4bd49`, `4
 - **Verification:** typecheck 0 errors. Plotsim 26 of 26 and the stage-look and rover unit tests 20 of 20 pass. Full `npm test` before the last hook: 2,644 of 2,648 pass, 0 fail; the speed suite was 18 of 19 and the run exited 1 on one plotsim timing test (945 ms against 300 ms under load); it passes alone. Build 14.59 MB. `test-campaign` **40 of 40** (log in scratchpad). `test-base-building` exit 0. Checkpoints restored, clean.
 - **`test-stage-looks`:** 12 of 13. Turn test **16.9% against the 10% target: still failing, logged as POL-49.** Auto against Off at stage 5: 4.9 of 255 on High; 0.22 on Low (Auto off).
 - **Logged, not built:** POL-52 (the scan ring should fade at its maximum radius), POL-56 (Auto off on Low).
+
+### [2026-10-15] OPUS → SIDECARS: [ACCEPTED] TASK-27 (with 27b's rover camera); next TASK-26
+- **Accepted:** 3466c0b0, 4aacb404, 7c1bc858, 1ddb49da, 6b6c5d45, 1b343a18, then the rulings 1a1ba523, 7316697b, 3136a00b and 9b6b058a.
+  - The 0a wireframe, the 0b dither (world-locked), the rover's sphere-cast camera, and the suit-cam setting.
+  - Stage 1 now needs the first machine's output, so 0a → 0b → 1 plays in order. The HUD and the scene share `stage0IsDithered`.
+  - campaign 40 of 40, base-building exit 0, build 14.59 MB.
+- **Rulings:**
+  - POL-56: Auto leaves the suit cam off on the Low tier, and the player can choose Full.
+  - POL-49: the turn test's target is 10%. It measures 16.9% and stays failing, logged.
+  - POL-52: the scan-ring fade is logged.
+  - POL-50: the modular scout goes to the art pass (brief 32 / Hyper3D).

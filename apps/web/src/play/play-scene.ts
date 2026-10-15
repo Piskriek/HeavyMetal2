@@ -9,7 +9,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { StageLook } from '../crafter/looks';
 import { createWorld, PLANET_DIR, SUN, type Neighbour, type World } from '../crafter/world';
 import { createPlume, type PlumeMode } from '@hm/plume';
-import { GATE, KINDS, level as plotLevel, stage0IsDithered, type Machine, type MachineKind, type PlotState } from '@hm/plotsim';
+import { GATE, GATE_DOME_RADIUS_M, KINDS, POWERED_DOME_RADIUS_M, WARN_LEVEL, inSafeDome, isWarnLevel, level as plotLevel, stage0IsDithered, type DomeSource, type Machine, type MachineKind, type PlotState } from '@hm/plotsim';
 import { createPlotGround, type BoulderInfo, type PlotGround } from './plot-ground';
 import { fx as sfx } from '../maker/feedback';
 import { gameAudio } from '../audio/game-audio';
@@ -101,6 +101,10 @@ export interface FrameOut {
   readonly stage: number;
   /** Something happened this frame ('stage-up': a wave has finished bringing `stage`). */
   readonly event: 'to-planet' | 'to-lab' | 'sync-lost' | 'powered' | 'stage-up' | null;
+  /** You stand inside a safe dome (the gate's, a powered pylon's or the shelter's): sync holds and refills (TASK-26). */
+  readonly inDome: boolean;
+  /** Sync is at or below 30% outside a dome: the return arrow shows in the compass (TASK-26). */
+  readonly warn: boolean;
   readonly drivingVehicle?: { readonly id: number; readonly kind: RoverKind; readonly speed: number } | null;
 }
 
@@ -188,6 +192,8 @@ export interface PlayScene {
   setSocketRings(poses: readonly { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }[]): void;
   setPlanGhosts(ghosts: readonly { readonly kind: Kind; readonly at: { readonly x: number; readonly y: number; readonly z: number }; readonly yaw: number }[]): void;
   setSheltered(sheltered: boolean): void;
+  /** The starter shelter's centre on the planet, for its 15 m safe dome (TASK-26); null until the shelter stands. */
+  setShelterDome(at: { readonly x: number; readonly z: number } | null): void;
   isSheltered(): boolean;
   heightAt(x: number, z: number): number;
   aimPoint(): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null;
@@ -911,6 +917,9 @@ export function createPlayScene(o: {
   let activeWalkWorld: WalkWorld | null = null;
   let altCamPos: THREE.Vector3 | null = null;
   let isSheltered = false;
+  /** TASK-26: the starter shelter's dome centre, and the scratch list of the domes round the player each frame. */
+  let shelterDome: { x: number; z: number } | null = null;
+  const domeBuf: DomeSource[] = [];
   let debugAltCam = false;
   let sideShotM: number | null = null;
 
@@ -943,6 +952,27 @@ export function createPlayScene(o: {
   const socketRingMesh = keep(new THREE.InstancedMesh(socketRingGeo, socketRingMat, 48));
   socketRingMesh.count = 0;
   socketRingMesh.visible = false;
+  // TASK-26: the safe dome's edge, a faint amber ripple where the player crosses it (one ring, one draw call)
+  const domeRippleMat = keep(new THREE.MeshBasicMaterial({ color: 0xffc13d, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+  const domeRipple = keep(new THREE.Mesh(keep(new THREE.RingGeometry(0.85, 1, 72)), domeRippleMat));
+  domeRipple.rotation.x = -Math.PI / 2;
+  domeRipple.renderOrder = 998;
+  domeRipple.visible = false;
+  planetScene.add(domeRipple);
+  let rippleAge = -1;
+  const startDomeRipple = (x: number, z: number): void => {
+    rippleAge = 0;
+    domeRipple.position.set(x, groundAt(x, z) + 0.08, z);
+    domeRipple.visible = true;
+  };
+  const stepDomeRipple = (dt: number): void => {
+    if (rippleAge < 0) return;
+    rippleAge += dt;
+    const t = rippleAge / 1.4;
+    if (t >= 1) { rippleAge = -1; domeRipple.visible = false; return; }
+    domeRipple.scale.setScalar(0.6 + 5.5 * t);
+    domeRippleMat.opacity = 0.55 * (1 - t) * (1 - t);
+  };
   socketRingMesh.renderOrder = 999;
   planetScene.add(socketRingMesh);
 
@@ -1092,6 +1122,8 @@ export function createPlayScene(o: {
   const pos = new THREE.Vector3(room.spawn.x, EYE, room.spawn.z);
   let yaw = room.spawn.yaw, pitch = -0.04;
   let sync = 1, lostAt = -100;
+  /** TASK-26: inside a safe dome now; last frame's state on the planet (null in the lab, so a crossing is only ever on the planet); the 30% warning. */
+  let inDomeNow = false, inDomeLast: boolean | null = null, warnOn = false;
   /** Metres walked since the last footstep, and how many relay lamps the sequence has lit (one click each). */
   let stride = 0, relaysHeard = 0;
   let powerT = -1, gateOn = false;
@@ -1652,6 +1684,9 @@ export function createPlayScene(o: {
         planGhostsGroup.add(instance.group);
       }
     },
+    setShelterDome(at) {
+      shelterDome = at ? { x: at.x, z: at.z } : null;
+    },
     setSheltered(sheltered) {
       isSheltered = sheltered;
     },
@@ -2031,11 +2066,29 @@ export function createPlayScene(o: {
         const op = where === 'lab' ? room.gate.opening : twin.opening;
         if (Math.sign(a.z - op.z) !== Math.sign(b.z - op.z) && Math.abs(b.x) < op.width / 2 - 0.15) crossTo(where === 'lab' ? 'planet' : 'lab');
       }
-      // ---- sync
+      // ---- sync (TASK-26: the safe domes). Inside the gate's 25 m dome, a powered pylon's or the shelter's 15 m dome, sync holds and
+      // refills at 20% a second; outside it drains over 90 s. The running-machine field (stage 1 and up) is unchanged.
       let nearMachine = false;
-      if (shown >= 1 && waveTo < 0) for (const v of views.values()) if (v.running > 0.05 && Math.hypot(v.m.x - pos.x, v.m.z - pos.z) < MACHINE_FIELD) { nearMachine = true; break; }
-      sync = stepSync(sync, dt, { onPlanet: where === 'planet', stage, nearMachine, sheltered: isSheltered });
-      if (where === 'planet' && sync > 0 && sync < 0.3) sfx('sync-warning', { minGapMs: 1400, volume: 0.6 });
+      domeBuf.length = 0;
+      domeBuf.push({ x: twin.group.position.x, z: twin.group.position.z, radius: GATE_DOME_RADIUS_M });
+      if (shelterDome !== null) domeBuf.push({ x: shelterDome.x, z: shelterDome.z, radius: POWERED_DOME_RADIUS_M });
+      for (const v of views.values()) {
+        if (v.running <= 0.05) continue;
+        if (v.m.kind === 'pylon') domeBuf.push({ x: v.m.x, z: v.m.z, radius: POWERED_DOME_RADIUS_M });
+        if (shown >= 1 && waveTo < 0 && Math.hypot(v.m.x - pos.x, v.m.z - pos.z) < MACHINE_FIELD) nearMachine = true;
+      }
+      inDomeNow = where === 'planet' && (isSheltered || inSafeDome(pos, domeBuf));
+      if (where === 'planet') {
+        if (inDomeLast !== null && inDomeNow !== inDomeLast) startDomeRipple(pos.x, pos.z);
+        inDomeLast = inDomeNow;
+      } else inDomeLast = null;
+      stepDomeRipple(dt);
+      sync = stepSync(sync, dt, { onPlanet: where === 'planet', stage, nearMachine, inDome: inDomeNow });
+      // the 30% warning: one soft radio-static burst as the buffer goes down past it, and the return arrow until it is back above
+      if (where === 'planet' && !inDomeNow && isWarnLevel(sync)) {
+        if (!warnOn) sfx('static-burst', { minGapMs: 1500, volume: 0.35 });
+        warnOn = true;
+      } else if (sync > WARN_LEVEL || inDomeNow) warnOn = false;
       if (where === 'planet' && sync <= 0) {
         sfx('sync-lost');
         // pulled back to the lab, in front of the gate, facing it
@@ -2346,6 +2399,8 @@ export function createPlayScene(o: {
       return {
         where,
         sync,
+        inDome: inDomeNow,
+        warn: where === 'planet' && warnOn,
         atLever,
         atDial,
         atGate,

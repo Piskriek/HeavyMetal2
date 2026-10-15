@@ -184,6 +184,9 @@
   border-top: 8px solid var(--hud-c-lx);
 }
 .hud-compass-gate.edge { border-top-color: var(--hud-c-pxd); }
+/* TASK-26: the sync warning, at 30% outside a dome: the return arrow in amber, with a soft pulse */
+.hud-compass-gate.warn { border-top-color: #ffc13d; filter: drop-shadow(0 0 4px #ffc13d); animation: hud-gate-warn 1.2s ease-in-out infinite; }
+@keyframes hud-gate-warn { 50% { opacity: 0.45; } }
 .hud-compass-label {
   display: block;
   margin-top: 2px;

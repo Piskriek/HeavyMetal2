@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { place, step, type Env, type PlotState } from '@hm/plotsim';
-import { FRESH, SYNC_SECONDS, arrived, created, isFreeDrill, loadState, objective, poweredOn, returned, stepSync, withPlot, type PlayState } from './quest';
+import { FRESH, SHELTER_REFILL, SYNC_SECONDS, arrived, created, isFreeDrill, loadState, objective, poweredOn, returned, stepSync, withPlot, type PlayState } from './quest';
 
 const env: Env = { gate: { x: 0, z: 0 }, plotRadius: 500, richness: () => 0.8 };
 /** The plot run until a pixel machine gives its first output (stage 1), with ore to burn. A standing machine is not output. */
@@ -131,14 +131,26 @@ test('every step tells you what to do, in the lab and on the planet', () => {
   assert.match(objective(done, 'planet').hint, /Stage 2 needs texture 15, shape 10/);
 });
 
-test('sync drains on the planet in about a minute and refills in the lab', () => {
-  let level = 1, t = 0;
-  while (level > 0 && t < 600) { level = stepSync(level, 0.5, { onPlanet: true, stage: 0, nearMachine: false }); t += 0.5; }
-  assert.ok(Math.abs(t - SYNC_SECONDS) <= 1, `ran out after ${t} s`);
+test('sync drains over 90 s on raw ground at every stage and refills in the lab', () => {
+  assert.equal(SYNC_SECONDS, 90);
+  for (const stage of [0, 1]) {
+    let level = 1, t = 0;
+    while (level > 0 && t < 600) { level = stepSync(level, 0.5, { onPlanet: true, stage, nearMachine: false }); t += 0.5; }
+    assert.ok(Math.abs(t - SYNC_SECONDS) <= 1, `stage ${stage} ran out after ${t} s`);
+  }
   assert.equal(stepSync(0.2, 10, { onPlanet: false, stage: 0, nearMachine: false }), 1);
-  // from stage 1 a running machine holds your sync up; away from one it drains, more slowly
+  // from stage 1 a running machine holds your sync up (the machine rule is unchanged); away from one it drains
   assert.ok(stepSync(0.5, 1, { onPlanet: true, stage: 1, nearMachine: true }) > 0.5);
-  assert.ok(Math.abs(stepSync(0.5, 1, { onPlanet: true, stage: 0, nearMachine: false, sheltered: true }) - 0.75) < 1e-9, 'a pressurised room refills');
   const away = 0.5 - stepSync(0.5, 1, { onPlanet: true, stage: 1, nearMachine: false });
-  assert.ok(away > 0 && away < 1 / SYNC_SECONDS);
+  assert.ok(Math.abs(away - 1 / SYNC_SECONDS) < 1e-9);
+});
+
+test('inside a safe dome sync never drains and refills at 20% a second, at stage 0 too', () => {
+  assert.equal(SHELTER_REFILL, 0.2);
+  assert.ok(Math.abs(stepSync(0.5, 1, { onPlanet: true, stage: 0, nearMachine: false, inDome: true }) - 0.7) < 1e-9, 'stage 0 in a dome refills');
+  assert.equal(stepSync(0.5, 0, { onPlanet: true, stage: 0, nearMachine: false, inDome: true }), 0.5);
+  let level = 0.2, t = 0;
+  while (level < 1 && t < 60) { level = stepSync(level, 0.5, { onPlanet: true, stage: 0, nearMachine: false, inDome: true }); t += 0.5; }
+  assert.ok(Math.abs(t - 4) < 0.6, `refilled from 20% in ${t} s`);
+  for (let k = 0; k < 400; k++) assert.ok(stepSync(0.4, 0.5, { onPlanet: true, stage: 0, nearMachine: false, inDome: true }) >= 0.4, 'never drains in a dome');
 });

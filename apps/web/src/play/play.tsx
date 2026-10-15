@@ -214,9 +214,9 @@ function saveBeam(field: string, port: Cartridge | null): void {
 }
 
 /** The plot's numbers for the HUD. */
-interface PlotHud { readonly ore: number; readonly oreRate: number; readonly supply: number; readonly demand: number; readonly levels: Readonly<Record<Metric, number>>; readonly stage: number }
-interface Hud { readonly where: FrameOut['where']; readonly sync: number; readonly atLever: boolean; readonly atDial: boolean; readonly ghost: FrameOut['ghost']; readonly aimed: number | null; readonly aimedBoulder: FrameOut['aimedBoulder']; readonly aimedLab: FrameOut['aimedLab']; readonly aimedProp: FrameOut['aimedProp']; readonly plot: PlotHud; readonly visitingOwner: string | null }
-const NO_PLOT: PlotHud = { ore: 0, oreRate: 0, supply: 0, demand: 0, levels: { pxd: 0, vtx: 0, lx: 0, aq: 0 }, stage: 0 };
+interface PlotHud { readonly ore: number; readonly oreRate: number; readonly supply: number; readonly demand: number; /** Kilowatts supplied over asked, capped at 1: the machines run at this share (TASK-26). */ readonly satisfaction: number; readonly levels: Readonly<Record<Metric, number>>; readonly stage: number }
+interface Hud { readonly where: FrameOut['where']; readonly sync: number; readonly inDome: boolean; readonly warn: boolean; readonly atLever: boolean; readonly atDial: boolean; readonly ghost: FrameOut['ghost']; readonly aimed: number | null; readonly aimedBoulder: FrameOut['aimedBoulder']; readonly aimedLab: FrameOut['aimedLab']; readonly aimedProp: FrameOut['aimedProp']; readonly plot: PlotHud; readonly visitingOwner: string | null }
+const NO_PLOT: PlotHud = { ore: 0, oreRate: 0, supply: 0, demand: 0, satisfaction: 1, levels: { pxd: 0, vtx: 0, lx: 0, aq: 0 }, stage: 0 };
 /** The build menu, in the order the plot needs them. */
 const BUILD_ORDER: readonly MachineKind[] = ['mill', 'drill', 'pylon', 'press', 'power', 'projector', 'water'];
 const BLURB: Readonly<Record<MachineKind, string>> = {
@@ -275,7 +275,7 @@ export function PlayScreen(props: {
   const [menu, setMenu] = useState(false);
   const [buildTab, setBuildTab] = useState<BuildTab>('machines');
   const [building, setBuilding] = useState<MachineKind | null>(null);
-  const [hud, setHud] = useState<Hud>({ where: 'lab', sync: 1, atLever: false, atDial: false, ghost: null, aimed: null, aimedBoulder: null, aimedLab: null, aimedProp: null, plot: NO_PLOT, visitingOwner: null });
+  const [hud, setHud] = useState<Hud>({ where: 'lab', sync: 1, inDome: false, warn: false, atLever: false, atDial: false, ghost: null, aimed: null, aimedBoulder: null, aimedLab: null, aimedProp: null, plot: NO_PLOT, visitingOwner: null });
   const firstGatherRef = useRef(false);
 
   // TASK-11 Mentor Narration Controller & UI
@@ -1733,6 +1733,10 @@ useEffect(() => {
           const feetY = playerPos.y - 1.7;
           const { room, pressurized } = roomAt(w, bEnv, { x: playerPos.x, y: feetY, z: playerPos.z });
           scene.setSheltered(pressurized);
+          // the starter shelter's 15 m dome: its first foundation, the one placed at first boot (TASK-26)
+          const shelterFoundation = w.base.pieces.filter((q) => q.kind === 'foundation').sort((a, b) => a.id - b.id)[0];
+          const shelterAt = w.shelter && shelterFoundation ? pieceAt(w.base, shelterFoundation) : null;
+          scene.setShelterDome(shelterAt ? { x: shelterAt.x, z: shelterAt.z } : null);
           setShelterState(pressurized ? 'pressurized' : (room && room.sealed ? 'sealed-no-power' : 'none'));
         } else {
           scene.setSheltered(false);
@@ -1956,6 +1960,8 @@ useEffect(() => {
       if (out.event === 'sync-lost') {
         s = returned(s);
         say('Sync lost', 'The gate pulled you back. Your sync refills in the lab.');
+        // the zero-loss recall (TASK-26): Argo's line as a subtitle only, not voiced; nothing in the pack is touched (flagged for the owner)
+        narratorRef.current?.showSubtitleOnly('recall-zero', 'Pulled your buffer back before the static ate you. Stay near the relay line or drop a pylon.', 8);
         setBuilding(null);
         setMenu(false);
         if (visitingRef.current) endVisit();
@@ -2090,7 +2096,11 @@ useEffect(() => {
             dispatchBaseRef.current({ t: 'stage', stage: e.stage });
           }
           if (e.type === 'ore-out' && !visitingRef.current) say('Out of ore', 'Hold E on a boulder, or build a rock drill.');
-          if (e.type === 'underpowered' && !visitingRef.current) say('Not enough power', 'Build a power unit, or switch a machine off.');
+          if (e.type === 'underpowered' && !visitingRef.current) {
+            say('Not enough power', 'Build a power unit, or switch a machine off.');
+            // Dr. Haddy's power prompt, once per shortage: subtitle only (Argo's line, not voiced; flagged for the owner, TASK-26)
+            narratorRef.current?.showSubtitleOnly('power-short', "There goes the Gate's twelve-kilowatt breaker. Drop a Power Unit on the line before the plumes stall out.", 8);
+          }
         }
         if (r.events.length) plotChanged = true;
         // the texture mill's running seconds (A4-02: process the dirt at the mill); whole seconds go to the chain
@@ -2155,6 +2165,8 @@ useEffect(() => {
           setHud({
             where: out.where,
             sync: out.sync,
+            inDome: out.inDome,
+            warn: out.warn,
             atLever: out.atLever,
             atDial: out.atDial,
             ghost: out.ghost,
@@ -2163,7 +2175,7 @@ useEffect(() => {
             aimedLab: out.aimedLab,
             aimedProp: out.aimedProp,
             visitingOwner: vis.snapshot.owner,
-            plot: { ore: 0, oreRate: 0, supply: 0, demand: 0, levels, stage: vp.stage },
+            plot: { ore: 0, oreRate: 0, supply: 0, demand: 0, satisfaction: 1, levels, stage: vp.stage },
           });
         } else {
           const p = plotRef.current, rt = env ? rates(p, env) : null;
@@ -2171,6 +2183,8 @@ useEffect(() => {
           setHud({
             where: out.where,
             sync: out.sync,
+            inDome: out.inDome,
+            warn: out.warn,
             atLever: out.atLever,
             atDial: out.atDial,
             ghost: out.ghost,
@@ -2179,7 +2193,7 @@ useEffect(() => {
             aimedLab: out.aimedLab,
             aimedProp: out.aimedProp,
             visitingOwner: null,
-            plot: { ore: p.ore, oreRate: rt?.ore ?? 0, supply: rt?.supply ?? 0, demand: rt?.demand ?? 0, levels, stage: p.stage },
+            plot: { ore: p.ore, oreRate: rt?.ore ?? 0, supply: rt?.supply ?? 0, demand: rt?.demand ?? 0, satisfaction: rt && rt.demand > 0 ? Math.min(1, rt.supply / rt.demand) : 1, levels, stage: p.stage },
           });
         }
       }
@@ -3043,7 +3057,7 @@ useEffect(() => {
         <HudZone zone="top-centre">
           {hud.where === 'planet' && drivingSpeed === null ? (() => {
             const g = gateBearingOf(sceneRef.current);
-            return <CompassRibbon relativeDeg={g?.relativeDeg ?? null} distanceM={g?.distanceM ?? null} />;
+            return <CompassRibbon relativeDeg={g?.relativeDeg ?? null} distanceM={g?.distanceM ?? null} warn={hud.warn} />;
           })() : null}
           <SyncWord draining={hud.sync < 0.3} hidden={hud.where !== 'planet'} />
         </HudZone>
@@ -3135,7 +3149,7 @@ useEffect(() => {
                       <b>{Math.floor(hud.plot.ore)}</b> ore <span>{signed(hud.plot.oreRate)}/s</span>
                       {outOfOreNoDrill ? <em className="play-ore-warn">Out of ore: hold E on a boulder, or build a rock drill</em> : null}
                     </p>
-                    <p className={`play-power${hud.plot.demand > hud.plot.supply + 1e-6 ? ' short' : ''}`}><b>{hud.plot.demand.toFixed(0)}</b> of {hud.plot.supply.toFixed(0)} kW</p>
+                    <p className={`play-power${hud.plot.satisfaction < 0.999 ? ' short' : ''}`}><b>{hud.plot.demand.toFixed(0)}</b> of {hud.plot.supply.toFixed(0)} kW <span className="play-power-pct">{Math.round(hud.plot.satisfaction * 100)}%</span></p>
                   </>
                 );
               })()}

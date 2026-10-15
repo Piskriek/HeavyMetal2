@@ -2,7 +2,7 @@
 // planet, the first machine; then the plot's stages (the plot itself is `@hm/plotsim`: ore, power, machines, metrics). Pure: the
 // steps, what each one asks of you, sync, and the save. The screen (play.tsx, play-scene.ts) draws it; this file decides it.
 
-import { loadPlot, newPlot, nextStage, type MachineKind, type Metric, type PlotState } from '@hm/plotsim';
+import { DOME_REFILL_PER_SEC, OUTSIDE_DRAIN_SECONDS, loadPlot, newPlot, nextStage, outsideDrainPerSec, type MachineKind, type Metric, type PlotState } from '@hm/plotsim';
 import { loadLab, newLab, type Cartridge, type LabState } from '@hm/cartlab';
 import { VAULT_BY_ID } from '@hm/vault';
 import { CHAIN_START, readChain, type Chain } from '../base/campaign-chain';
@@ -193,20 +193,23 @@ export function objective(s: PlayState, where: 'lab' | 'planet'): { readonly tit
 
 // ---- sync: how long your body holds together on the planet
 
-/** Seconds of sync on a stage-0 planet, from full. */
-export const SYNC_SECONDS = 60;
+/** Seconds of sync on raw ground outside every safe dome, from full (TASK-26: the same 90 s at every stage). */
+export const SYNC_SECONDS = OUTSIDE_DRAIN_SECONDS;
 /** Within this distance of a running machine, sync recovers (from stage 1). */
 export const MACHINE_FIELD = 28;
+/** Sync refill per second inside a safe dome (the gate's 25 m, a powered pylon's or the shelter's 15 m): 20% a second. */
+export const SHELTER_REFILL = DOME_REFILL_PER_SEC;
 
-/** Sync after `dt` seconds: it refills in the lab, drains on the planet, and from stage 1 recovers near a running machine. 0..1. */
-/** Sync refill per second inside a pressurised room on the planet (D14): slower than the lab, so the lab stays home. */
-export const SHELTER_REFILL = 0.25;
-
-export function stepSync(level: number, dt: number, o: { readonly onPlanet: boolean; readonly stage: number; readonly nearMachine: boolean; readonly sheltered?: boolean }): number {
+/**
+ * Sync after `dt` seconds (0..1). In the lab it refills; on the planet, inside a safe dome it never drains and refills at 20%/s
+ * (`inDome`, from plotsim's safe domes, at every stage); outside, from stage 1 it recovers near a running machine (the machine
+ * rule is unchanged); otherwise it drains over 90 s.
+ */
+export function stepSync(level: number, dt: number, o: { readonly onPlanet: boolean; readonly stage: number; readonly nearMachine: boolean; readonly inDome?: boolean }): number {
   let rate: number;
   if (!o.onPlanet) rate = 0.5;
-  else if (o.sheltered === true) rate = SHELTER_REFILL;
+  else if (o.inDome === true) rate = SHELTER_REFILL;
   else if (o.stage >= 1 && o.nearMachine) rate = 0.2;
-  else rate = -1 / (SYNC_SECONDS * (o.stage >= 1 ? 1.5 : 1));
+  else rate = -outsideDrainPerSec();
   return Math.min(1, Math.max(0, level + rate * dt));
 }

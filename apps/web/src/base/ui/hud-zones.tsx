@@ -15,6 +15,8 @@ export function CompassRibbon(props: {
   /** Degrees from the player's facing to the Gate: 0 is dead ahead, positive is to the right. */
   readonly relativeDeg: number | null;
   readonly distanceM: number | null;
+  /** Sync is low outside a dome (TASK-26): the gate marker turns amber, the return arrow. */
+  readonly warn?: boolean;
 }): ReactElement {
   const rel = props.relativeDeg;
   const shown = rel === null ? null : Math.max(-90, Math.min(90, rel));
@@ -26,7 +28,7 @@ export function CompassRibbon(props: {
           <span key={d} className={`hud-compass-tick${d === 0 ? ' mid' : ''}`} style={{ left: `${50 + (d / 90) * 50}%` }} />
         ))}
         {shown !== null ? (
-          <i className={`hud-compass-gate${off ? ' edge' : ''}`} style={{ left: `${50 + (shown / 90) * 50}%` }} />
+          <i className={`hud-compass-gate${off ? ' edge' : ''}${props.warn ? ' warn' : ''}`} style={{ left: `${50 + (shown / 90) * 50}%` }} />
         ) : null}
       </div>
       <span className="hud-compass-label">

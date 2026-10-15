@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { KINDS, GATE, STAGES, METRICS, newPlot, level, network, running, canPlace, place, remove, step, nextStage, loadPlot, type Env, type MachineKind, type PlotState, HEAVY_KINDS } from '../src/index';
+import { KINDS, GATE, STAGES, METRICS, newPlot, level, network, running, canPlace, place, remove, step, nextStage, loadPlot, stage0IsDithered, type Env, type MachineKind, type PlotState, HEAVY_KINDS } from '../src/index';
 
 const env: Env = { gate: { x: 0, z: 0 }, plotRadius: 500, richness: () => 0.8 };
 const poor: Env = { ...env, richness: () => 0.05 };
@@ -25,8 +25,14 @@ test('the first pixel machine lifts the plot to stage 1; building pays ore and s
   const pad = canPlace(s, env, 'mill', 0.5, 0); assert.ok(!pad.ok && /gate/i.test(pad.why));
   const far = canPlace(s, env, 'mill', 90, 0); assert.ok(!far.ok && /reach|power|pylon/i.test(far.why));
   s = place(s, env, 'mill', 10, 0, 0);
-  assert.equal(s.stage, 1);
+  assert.equal(s.stage, 0, 'a standing machine is not output: the plot stays stage 0');
+  assert.equal(stage0IsDithered(s.machines.length), true, 'the planet is dithered from the first machine');
   assert.equal(s.ore, 60 - KINDS.mill.cost);
+  // the mill's first output lifts the plot to stage 1
+  const first = run({ ...s, ore: 200 }, 300);
+  assert.equal(first.s.stage, 1, 'stage 1 comes with the first output');
+  assert.ok(METRICS.some((m) => first.s.points[m] > 0), 'the output is in the metrics');
+  s = first.s;
   const close = canPlace(s, env, 'drill', 10.5, 0.5); assert.ok(!close.ok && /close|room|space/i.test(close.why));
   const dry = canPlace(s, poor, 'drill', 0, 12); assert.ok(!dry.ok && /ore/i.test(dry.why));
   const id = s.machines[0]!.id;
@@ -174,7 +180,8 @@ test('every refusal says why, in the order the rules are checked', () => {
   assert.equal(why(canPlace(fresh, env, 'mill', padEdge - 0.01, 0)), 'Too close to the gate.');
   assert.equal(why(canPlace(fresh, env, 'mill', padEdge, 0)), 'ok');
   // room: radius + radius + 1 from every machine, naming the one in the way
-  let s = place({ ...fresh, ore: 1000 }, env, 'mill', 10, 0, 0);
+  // stage 1 (the mill's first output, as the stepping gives it): the press unlocks
+  let s: PlotState = { ...place({ ...fresh, ore: 1000 }, env, 'mill', 10, 0, 0), stage: 1 };
   const gap = KINDS.mill.radius + KINDS.drill.radius + 1;
   assert.equal(why(canPlace(s, env, 'drill', 10 + gap - 0.01, 0)), 'Too close to the texture mill.');
   assert.equal(why(canPlace(s, env, 'drill', 10 + gap, 0)), 'ok');
@@ -201,7 +208,7 @@ test('every refusal says why, in the order the rules are checked', () => {
   assert.equal(fresh.ore, 60);
 });
 
-test('stage 0 is the black-and-white world: only a pixel machine lifts it', () => {
+test('stage 0 is the black-and-white world: only the first output of a pixel machine lifts it', () => {
   let s: PlotState = { ...newPlot(), ore: 500 };
   s = place(s, env, 'drill', 0, 12, 0);
   s = place(s, env, 'pylon', 12, 0, 0);
@@ -209,9 +216,12 @@ test('stage 0 is the black-and-white world: only a pixel machine lifts it', () =
   assert.equal(run(s, 60).s.stage, 0);
   assert.deepEqual(nextStage(s), { stage: 1, needs: {}, progress: 0 });
   s = place(s, env, 'mill', -12, 0, 0);
-  assert.equal(s.stage, 1);
-  assert.equal(nextStage(s)!.stage, 2);
-  assert.equal(nextStage(s)!.progress, 0);
+  assert.equal(s.stage, 0, 'a standing mill is not output');
+  assert.equal(nextStage(s)!.progress, 0.5, 'half way: a pixel machine stands, with no output yet');
+  const out = run({ ...s, ore: 200 }, 300).s;
+  assert.equal(out.stage, 1, 'the first output lifts the plot to stage 1');
+  assert.equal(nextStage(out)!.stage, 2);
+  assert.ok(nextStage(out)!.progress < 1);
 });
 
 test('pylons chain outward, a power unit is a node too, and a broken link cuts the line', () => {
@@ -392,7 +402,7 @@ test('events: underpowered and ore-out fire once, and again only after a recover
 });
 
 test('stages arrive in order, several in one step, each announced once, and are never lost', () => {
-  const base = place(newPlot(), env, 'mill', 10, 0, 0);
+  const base: PlotState = { ...place(newPlot(), env, 'mill', 10, 0, 0), stage: 1 }; // the mill's first output has lifted it to stage 1
   assert.equal(base.stage, 1);
   const rich = { ...base, ore: 5000, points: { pxd: TARGET.pxd * 0.6, vtx: TARGET.vtx * 0.6, lx: TARGET.lx * 0.6, aq: TARGET.aq * 0.6 } };
   const r = step(rich, env, 1);
@@ -426,7 +436,7 @@ test('stages arrive in order, several in one step, each announced once, and are 
 });
 
 test('progress is the smallest level over need, between 0 and 1', () => {
-  const s = { ...place(newPlot(), env, 'mill', 10, 0, 0), points: { pxd: TARGET.pxd * 0.0025, vtx: TARGET.vtx * 0.0001, lx: 0, aq: 0 } };
+  const s = { ...place(newPlot(), env, 'mill', 10, 0, 0), stage: 1, points: { pxd: TARGET.pxd * 0.0025, vtx: TARGET.vtx * 0.0001, lx: 0, aq: 0 } };
   const ns = nextStage(s)!;
   assert.equal(ns.stage, 2);
   assert.deepEqual(ns.needs, { pxd: 15, vtx: 10 });

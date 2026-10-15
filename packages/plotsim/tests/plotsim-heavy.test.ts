@@ -1,7 +1,7 @@
 // Heavy terraformers (docs/BASE_BUILDING_ARCHITECTURE.md D3): added after the plotsim battle, kept beside its own tests.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GATE, HEAVY_KINDS, KINDS, MACHINE_KINDS, newPlot, place, rates, running, type Env } from '../src/index';
+import { GATE, HEAVY_KINDS, KINDS, MACHINE_KINDS, newPlot, place, rates, running, step, type Env } from '../src/index';
 
 const env: Env = { gate: { x: 0, z: 0 }, plotRadius: 500, richness: () => 0.5 };
 
@@ -18,10 +18,13 @@ test('heavy kinds: paid by the base, about 20x the output for 4x the power of th
   }
 });
 
-test('a heavy mill near the gate lifts stage 0 to 1 and runs at the share the gate can feed', () => {
+test('a heavy mill near the gate lifts stage 0 to 1 with its first output, and runs at the share the gate can feed', () => {
   const s = place(newPlot(), env, 'heavy-mill', 12, 0, 0);
   assert.equal(s.ore, newPlot().ore);
-  assert.equal(s.stage, 1);
+  assert.equal(s.stage, 0, 'a standing heavy mill is not output');
+  let t = { ...s, ore: 100 };
+  for (let i = 0; i < 300 && t.stage === 0; i++) t = step(t, env, 1).state;
+  assert.equal(t.stage, 1, 'its first output lifts the plot');
   const id = s.machines[0]!.id;
   // the gate gives 12 kW, the heavy mill asks 16: it runs at 75%; it needs ore, and a new plot has none
   const run = running({ ...s, ore: 100 }, env).get(id) ?? 0;

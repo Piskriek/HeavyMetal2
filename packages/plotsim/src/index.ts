@@ -73,7 +73,7 @@ export const MIN_RICHNESS = 0.2;
 /** Points a metric needs to stand at level 100. */
 export const TARGET: Readonly<Record<Metric, number>> = { pxd: 80000, vtx: 100000, lx: 90000, aq: 72000 };
 
-/** What each stage needs (level per metric). Index = stage. Stage 1 comes from placing the first pixel machine. */
+/** What each stage needs (level per metric). Index = stage. Stage 1 comes from the first output of a pixel machine. */
 export const STAGES: readonly Readonly<Partial<Record<Metric, number>>>[] = [
   {},
   {},
@@ -321,7 +321,15 @@ export function canPlace(
   return { ok: true };
 }
 
-/** Builds a machine, pays for it. Throws the reason when it may not be built. The first pixel machine lifts the plot to stage 1. */
+/**
+ * Stage 0's look (the stage bible): the planet is dithered from the moment a machine stands on it, whatever it is. One rule for
+ * the HUD and the scene (the fidelity skin and the scan wave both call it).
+ */
+export function stage0IsDithered(machinesStanding: number): boolean {
+  return machinesStanding > 0;
+}
+
+/** Builds a machine, pays for it. Throws the reason when it may not be built. The machine stands at once; stage 1 waits for its first output (see step). */
 export function place(s: PlotState, env: Env, kind: MachineKind, x: number, z: number, yaw: number): PlotState {
   const verdict = canPlace(s, env, kind, x, z);
   if (!verdict.ok) throw new Error(verdict.why);
@@ -330,7 +338,7 @@ export function place(s: PlotState, env: Env, kind: MachineKind, x: number, z: n
   return {
     ...s,
     ore: s.ore - spec.cost,
-    stage: s.stage === 0 && spec.emits !== null ? 1 : s.stage,
+    stage: s.stage,
     machines: [...s.machines, machine],
     nextId: s.nextId + 1,
   };
@@ -376,8 +384,9 @@ function advance(s: PlotState, env: Env, h: number, events: PlotEvent[]): PlotSt
   if (short && s.underpowered !== true) events.push({ type: 'underpowered' });
   if (starved && s.oreOut !== true) events.push({ type: 'ore-out' });
 
+  // stage 1 comes from the first pixel machine's first output, not from building it
   let stage = s.stage;
-  if (stage === 0 && hasPixelMachine(s)) {
+  if (stage === 0 && hasPixelMachine(s) && METRICS.some((m) => points[m] > 0)) {
     stage = 1;
     events.push({ type: 'stage-up', stage });
   }
@@ -445,7 +454,7 @@ export function nextStage(
     counted += 1;
     progress = Math.min(progress, Math.min(1, level(s, m) / need));
   }
-  if (counted === 0) progress = hasPixelMachine(s) ? 1 : 0; // stage 1: place a pixel machine
+  if (counted === 0) progress = hasPixelMachine(s) && METRICS.some((m) => s.points[m] > 0) ? 1 : hasPixelMachine(s) ? 0.5 : 0; // stage 1: a pixel machine gives its first output
   return { stage, needs, progress };
 }
 

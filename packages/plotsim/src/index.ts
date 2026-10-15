@@ -539,3 +539,6 @@ export function loadPlot(raw: unknown): PlotState {
     ...(raw['underpowered'] === true ? { underpowered: true as const } : {}),
   };
 }
+
+// The safe domes (TASK-26): the gate's 25 m dome, the powered pylons' and the shelter's 15 m domes, the sync rates.
+export * from './safe-dome';

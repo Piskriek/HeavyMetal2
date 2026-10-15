@@ -197,26 +197,31 @@ export interface SuitCamProfile {
 export const SUIT_CAM_K1 = -0.035;
 export const SUIT_CAM_GRAIN = 0.025;
 
-/** The profile for the Graphics setting. `wideTier` is true from Medium up, where the wide halation is cheap enough on Auto. */
-export function suitCamProfile(setting: SuitCamSetting, wideTier: boolean): SuitCamProfile {
+/**
+ * The profile for the Graphics setting (the player's choice wins, ruling of 15 October). `autoTier` is true on the GPU tiers that
+ * can afford the optics (Medium, High and Ultra): Auto is off below it. Full is on everywhere, with the wide halation; Subtle is
+ * half the strength on every tier; Off is nothing.
+ */
+export function suitCamProfile(setting: SuitCamSetting, autoTier: boolean): SuitCamProfile {
   switch (setting) {
     case 'off':
       return { strength: 0, wide: false, k1: 0, grain: 0, swing: 1 };
     case 'full':
       return { strength: 1, wide: true, k1: SUIT_CAM_K1, grain: SUIT_CAM_GRAIN, swing: 1 };
     case 'subtle':
-      return { strength: 0.5, wide: wideTier, k1: -0.015, grain: 0.01, swing: 0.41 };
+      return { strength: 0.5, wide: autoTier, k1: -0.015, grain: 0.01, swing: 0.41 };
     case 'auto':
-      return { strength: 1, wide: wideTier, k1: SUIT_CAM_K1, grain: SUIT_CAM_GRAIN, swing: 1 };
+      return { strength: autoTier ? 1 : 0, wide: autoTier, k1: SUIT_CAM_K1, grain: SUIT_CAM_GRAIN, swing: 1 };
   }
 }
 
 /**
- * The suit cam's mix from the floats and the stage: smoothstep(0.45, 0.85, Lx) ramps it in, and stages 4 to 6 are fully on
- * (the brief's "fully on at stages 4 to 6": at the stage 4 threshold Lx is 0.68, which alone would give 0.61).
+ * The suit cam's mix from the setting, the floats and the stage. Full is on at every stage. Auto and Subtle follow the look: on at
+ * stages 4 to 6, ramped by Lx through smoothstep(0.45, 0.85, Lx), with no forcing (at the stage 4 threshold, Lx 0.68, it is 0.61).
  */
-export function suitCamMix(lx: number, stage: number): number {
-  if (stage >= 4) return 1;
+export function suitCamMix(setting: SuitCamSetting, lx: number, stage: number): number {
+  if (setting === 'full') return 1;
+  if (stage < 4) return 0;
   return ramp(lx, 0.45, 0.85);
 }
 

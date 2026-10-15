@@ -16,7 +16,7 @@ import { CreateScientist } from '../avatar/create-scientist';
 import type { ClipName } from '../avatar/scientist/anims-loader';
 import type { OneShotKind } from '../avatar/scientist/animator';
 import { createPlayScene, type Detail, type FrameOut, type LabMachineKind, type PlayScene } from './play-scene';
-import { canPlace, KINDS, level, METRICS, network, place, rates, remove as removeMachine, running, setCartridge, setOn, step as stepPlot, type Env, type Machine, type MachineKind, type Metric, type PlotState } from '@hm/plotsim';
+import { canPlace, KINDS, level, METRICS, network, place, TARGET, rates, remove as removeMachine, running, setCartridge, setOn, step as stepPlot, type Env, type Machine, type MachineKind, type Metric, type PlotState } from '@hm/plotsim';
 import {
   activity as labActivity,
   affinityOf as cartlabAffinityOf,
@@ -129,7 +129,7 @@ const NEIGHBOURS: readonly Plot[] = ([
 const GROUND_BUDGET: Readonly<Record<Quality, number>> = { potato: 60000, low: 75000, medium: 200000, high: 200000, ultra: 280000 };
 /** The most lines the planet is drawn at by tier: the later stages' resolution is capped on the light tiers, so they hold their frame rate. */
 const PLANET_LINES: Readonly<Record<Quality, number>> = { potato: 360, low: 480, medium: 1080, high: 1e5, ultra: 1e5 };
-const detailOf = (g: GraphicsSettings, q: Quality): Detail => ({ plumes: g.pixelPlumes, plumeDensity: g.plumeDensity, groundBudget: GROUND_BUDGET[q], planetLines: PLANET_LINES[q], plumeGlow: g.plumeGlow, pixelLights: g.pixelLights, windowView: g.windowView, suitCam: g.suitCamOptics, wideTier: q === 'medium' || q === 'high' || q === 'ultra' });
+const detailOf = (g: GraphicsSettings, q: Quality): Detail => ({ plumes: g.pixelPlumes, plumeDensity: g.plumeDensity, groundBudget: GROUND_BUDGET[q], planetLines: PLANET_LINES[q], plumeGlow: g.plumeGlow, pixelLights: g.pixelLights, windowView: g.windowView, suitCam: g.suitCamOptics, suitCamTier: q === 'medium' || q === 'high' || q === 'ultra' });
 /** The bearing from the player's facing to the planet's gate (degrees, positive to the right) and the distance in metres. */
 function gateBearingOf(scene: PlayScene | null): { readonly relativeDeg: number; readonly distanceM: number } | null {
   if (!scene) return null;
@@ -2085,7 +2085,8 @@ useEffect(() => {
         plotRef.current = r.state;
         for (const e of r.events) {
           if (e.type === 'stage-up' && !visitingRef.current) {
-            if (e.stage >= 2) scene.raiseStage(e.stage, env.gate);
+            // stage 1 comes from the first output of a pixel machine; the scene plays its wave like any later stage
+            scene.raiseStage(e.stage, env.gate);
             dispatchBaseRef.current({ t: 'stage', stage: e.stage });
           }
           if (e.type === 'ore-out' && !visitingRef.current) say('Out of ore', 'Hold E on a boulder, or build a rock drill.');
@@ -2229,6 +2230,13 @@ useEffect(() => {
       placeAt: (x: number, z: number, kind: MachineKind = 'mill') => { const g = scene.debug.gatePlanet(); return tryPlace(kind, x, z, Math.atan2(x - g.x, z - g.z)); },
       plot: () => (visitingRef.current ? visitingRef.current.plot : plotRef.current),
       give: (ore: number) => { plotRef.current = { ...plotRef.current, ore: plotRef.current.ore + ore }; },
+      /** The four floats as a fraction of their targets (the e2e check of the suit cam's Lx ramp). Stage is not changed here. */
+      setFloats: (fraction: number) => {
+        const f = Math.max(0, Math.min(1, fraction));
+        plotRef.current = { ...plotRef.current, points: { pxd: TARGET.pxd * f, vtx: TARGET.vtx * f, lx: TARGET.lx * f, aq: TARGET.aq * f } };
+        const env = envRef.current, sc = sceneRef.current;
+        if (env && sc) sc.setPlot(plotRef.current, running(plotRef.current, env), network(plotRef.current, env).connected);
+      },
       setStage: (stage: number) => {
         plotRef.current = { ...plotRef.current, stage };
         scene.raiseStage(stage, scene.debug.gatePlanet());
@@ -2983,6 +2991,9 @@ useEffect(() => {
       /** Puts n of an item in the player's slots (stacks first). False when they do not fit or the item is unknown. */
       grant: (item: string, n: number): boolean => grant(item, n),
       /** The fidelity stage: the plot's and the base's (the base's pieces follow it). */
+      setFloats: (fraction: number): void => {
+        (window as unknown as { hmPlay?: { setFloats: (n: number) => void } }).hmPlay?.setFloats(fraction);
+      },
       setStage: (stage: number): void => {
         (window as unknown as { hmPlay?: { setStage: (n: number) => void } }).hmPlay?.setStage(stage);
         dispatchBaseRef.current({ t: 'stage', stage });

@@ -1,6 +1,8 @@
 // The HUD's nine zones, as pure logic (TASK-25, Argo's plan 16 and reply 25). No DOM, no clock: every function takes
 // the time it needs, so the same inputs always give the same screen. The React side is hud-zones.tsx.
 
+import { stage0IsDithered } from '@hm/plotsim';
+
 /** The nine fixed regions of the screen. Every overlay mounts into one of them and carries its name as data-hud-zone. */
 export const HUD_ZONES = [
   'top-left', // the quest step: title, one or two sentences, the key hint
@@ -242,7 +244,7 @@ export function fidelitySkinFor(input: {
 }): FidelitySkin {
   if (input.inShieldedLab) return input.labPowerOn ? '4-6' : '3';
   const s = Math.max(0, Math.min(6, Math.floor(input.stage)));
-  if (s === 0) return input.machinesOnPlot > 0 ? '0b' : '0a';
+  if (s === 0) return stage0IsDithered(input.machinesOnPlot) ? '0b' : '0a';
   if (s === 1) return '1';
   if (s === 2) return '2';
   if (s === 3) return '3';

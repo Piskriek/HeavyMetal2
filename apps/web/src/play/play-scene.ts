@@ -9,7 +9,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { StageLook } from '../crafter/looks';
 import { createWorld, PLANET_DIR, SUN, type Neighbour, type World } from '../crafter/world';
 import { createPlume, type PlumeMode } from '@hm/plume';
-import { GATE, KINDS, level as plotLevel, type Machine, type MachineKind, type PlotState } from '@hm/plotsim';
+import { GATE, KINDS, level as plotLevel, stage0IsDithered, type Machine, type MachineKind, type PlotState } from '@hm/plotsim';
 import { createPlotGround, type BoulderInfo, type PlotGround } from './plot-ground';
 import { fx as sfx } from '../maker/feedback';
 import { gameAudio } from '../audio/game-audio';
@@ -115,9 +115,9 @@ export interface Detail {
   readonly pixelLights: boolean;
   /** What the lab window shows (full: the 3D wasteland; lite: fewer parts; static: the flat storm picture). */
   readonly windowView: WindowView;
-  /** The suit cam's optics on stages 4 to 6 (the Graphics setting), and whether this tier is wide enough for the wide halation on Auto. */
+  /** The suit cam's optics (the Graphics setting), and whether this GPU tier can afford them on Auto (Medium up). */
   readonly suitCam: SuitCamSetting;
-  readonly wideTier: boolean;
+  readonly suitCamTier: boolean;
 }
 
 const EYE = 1.68, RADIUS = 0.3, WALK = 3.0, RUN = 5.6;
@@ -1445,7 +1445,7 @@ export function createPlayScene(o: {
       openingUniforms.uStatic.value = gateOn ? 0 : 1;
       stage = shown = s.plot.stage;
       scanWave = createScanWave();
-      if (s.plot.stage >= 1 || [...s.running.values()].some((r) => r > 0.05)) markScanWaveDone(scanWave);
+      if (s.plot.stage >= 1 || stage0IsDithered(s.plot.machines.length)) markScanWaveDone(scanWave);
       plotLx = plotLevel(s.plot, 'lx');
       room.setStorm(Math.min(1, Math.max(0, stage / 6)));
       gameAudio.updateStormVolume(1.0 - Math.min(1, Math.max(0, stage / 6)));
@@ -1491,15 +1491,14 @@ export function createPlayScene(o: {
       if (changed || !sameNet) { relay(connected); lastConnected = new Set(connected); }
       holo.setPlot(plot, running, connected);
       plotLx = plotLevel(plot, 'lx');
-      // stage 0's first running machine starts the scan wave from its own spot (the stage bible, 0a to 0b); past stage 0 the world is resolved
+      // the first machine standing on stage 0 starts the scan wave from its own spot (0a to 0b, the same rule as the HUD's skin); past stage 0 the world is resolved
       if (plot.stage >= 1) markScanWaveDone(scanWave);
-      else if (!scanWave.done && scanWave.startSec === null) {
-        for (const v of views.values()) {
-          if ((running.get(v.m.id) ?? 0) > 0.05) {
-            const p = v.prop.group.getWorldPosition(new THREE.Vector3());
-            triggerScanWave(scanWave, clock, { x: p.x, y: p.y, z: p.z });
-            break;
-          }
+      else if (!scanWave.done && scanWave.startSec === null && stage0IsDithered(plot.machines.length)) {
+        const newest = plot.machines[plot.machines.length - 1];
+        const view = newest ? views.get(newest.id) : undefined;
+        if (view) {
+          const p = view.prop.group.getWorldPosition(new THREE.Vector3());
+          triggerScanWave(scanWave, clock, { x: p.x, y: p.y, z: p.z });
         }
       }
       // pixels pour from every pixel machine while it runs; lamps show which run
@@ -2179,12 +2178,12 @@ export function createPlayScene(o: {
       postUniforms.uWireMix.value = scan.wireMix;
       postUniforms.uScanCentre.value.set(scanWave.centre.x, scanWave.centre.y, scanWave.centre.z);
       postUniforms.uGatePos.value.copy(twin.group.position);
-      const profile = suitCamProfile(detail.suitCam, detail.wideTier);
+      const profile = suitCamProfile(detail.suitCam, detail.suitCamTier);
       camera.getWorldDirection(suitLook);
       const gateDistM = camera.position.distanceTo(twin.group.position);
       const lumTarget = exposureTargetLuminance(suitLook, SUN, gateOrLabFactor(where === 'lab', gateDistM));
       postUniforms.uExposure.value = stepExposure(exposure, lumTarget, dt, profile.swing).exposure;
-      suitCamNow += (suitCamStrength(profile, suitCamMix(plotLx, stage), buildOpen) - suitCamNow) * (1 - Math.exp(-dt / 0.35));
+      suitCamNow += (suitCamStrength(profile, suitCamMix(detail.suitCam, plotLx, stage), buildOpen) - suitCamNow) * (1 - Math.exp(-dt / 0.35));
       postUniforms.uSuitCam.value = suitCamNow;
       postUniforms.uSuitK1.value = profile.k1 * (buildOpen ? 0.5 : 1);
       postUniforms.uSuitGrain.value = profile.grain;

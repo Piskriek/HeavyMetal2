@@ -1,9 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { place, type Env } from '@hm/plotsim';
+import { place, step, type Env, type PlotState } from '@hm/plotsim';
 import { FRESH, SYNC_SECONDS, arrived, created, isFreeDrill, loadState, objective, poweredOn, returned, stepSync, withPlot, type PlayState } from './quest';
 
 const env: Env = { gate: { x: 0, z: 0 }, plotRadius: 500, richness: () => 0.8 };
+/** The plot run until a pixel machine gives its first output (stage 1), with ore to burn. A standing machine is not output. */
+const firstOutput = (p: PlotState): PlotState => { let t: PlotState = { ...p, ore: Math.max(p.ore, 200) }; for (let i = 0; i < 300 && t.stage === 0; i++) t = step(t, env, 1).state; return t; };
 
 test('the first Play runs create, power, explore, build, done', () => {
   let s = FRESH;
@@ -22,6 +24,9 @@ test('the first Play runs create, power, explore, build, done', () => {
   s = withPlot(s, place(s.plot, env, 'drill', -9, 3, 0));
   assert.equal(s.step, 'build');
   s = withPlot(s, place(s.plot, env, 'mill', 8, 3, 0));
+  assert.equal(s.plot.stage, 0, 'a standing mill is not output');
+  assert.equal(s.step, 'build');
+  s = withPlot(s, firstOutput(s.plot));
   assert.equal(s.step, 'done');
   assert.equal(s.plot.stage, 1);
   assert.equal(s.plot.machines.length, 2);
@@ -30,6 +35,8 @@ test('the first Play runs create, power, explore, build, done', () => {
 test('placing the first mill without a drill enters drill step, where the first drill is free', () => {
   let s: PlayState = { ...FRESH, step: 'build' };
   s = withPlot(s, place(s.plot, env, 'mill', 8, 3, 0));
+  assert.equal(s.plot.stage, 0, 'a standing mill is not output');
+  s = withPlot(s, firstOutput(s.plot));
   assert.equal(s.step, 'drill');
   assert.equal(s.plot.stage, 1);
   assert.equal(objective(s, 'planet').title, 'Feed your mill');
@@ -118,7 +125,7 @@ test('every step tells you what to do, in the lab and on the planet', () => {
   }
   assert.notEqual(objective({ ...FRESH, step: 'explore' }, 'lab').title, objective({ ...FRESH, step: 'explore' }, 'planet').title);
   // after the tutorial, the next stage's needs
-  const plotWithBoth = place(place(FRESH.plot, env, 'mill', 8, 3, 0), env, 'drill', -9, 3, 0);
+  const plotWithBoth = firstOutput(place(place(FRESH.plot, env, 'mill', 8, 3, 0), env, 'drill', -9, 3, 0));
   const done = withPlot({ ...FRESH, step: 'drill' }, plotWithBoth);
   assert.equal(done.step, 'done');
   assert.match(objective(done, 'planet').hint, /Stage 2 needs texture 15, shape 10/);

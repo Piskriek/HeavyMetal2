@@ -173,24 +173,29 @@ test('the exposure target: a lab is darker, looking at the sun darkens the view,
   assert.ok(Math.abs(subtle / full - 0.41) < 0.02, `subtle swing ${subtle / full}`);
 });
 
-test('the suit cam: fully on from stage 4 (the brief), a ramp below that, halved under the ribbon, and Off is none at all', () => {
-  assert.equal(suitCamMix(0.2, 4), 1);
-  assert.equal(suitCamMix(0.1, 6), 1);
-  assert.equal(suitCamMix(0.3, 3), 0);
-  const mid = suitCamMix(0.65, 3);
-  assert.ok(mid > 0.4 && mid < 0.6, `ramp ${mid}`);
-  assert.equal(suitCamMix(0.9, 3), 1);
-
-  const off = suitCamProfile('off', true);
-  assert.equal(suitCamStrength(off, 1, false), 0, 'Off: no strength on any stage');
-  const auto = suitCamProfile('auto', false);
-  assert.equal(auto.wide, false, 'Auto on Low uses the narrow 4-tap halation');
-  assert.equal(suitCamProfile('auto', true).wide, true, 'Auto from Medium up adds the wide bloom');
+test('the suit cam follows the player\'s setting: Off is none at every stage, Full is on at every stage, Auto is stages 4 to 6 by Lx', () => {
+  // Off: nothing, whatever the stage and the floats
+  for (const stage of [0, 3, 4, 6]) assert.equal(suitCamStrength(suitCamProfile('off', true), suitCamMix('off', 0.9, stage), false), 0, `off at stage ${stage}`);
+  // Full: on at every stage, from stage 0
+  assert.equal(suitCamMix('full', 0.1, 0), 1);
+  assert.equal(suitCamMix('full', 0.1, 3), 1);
+  // Auto: off below stage 4 (the ramp does not start there), no forcing at stage 4 (Lx 0.68 gives 0.61), fully on at Lx 0.85
+  assert.equal(suitCamMix('auto', 0.9, 3), 0, 'stage 3 is not a suit-cam stage on Auto');
+  const at4 = suitCamMix('auto', 0.68, 4);
+  assert.ok(Math.abs(at4 - 0.6116) < 0.001, `stage 4 threshold ${at4}`);
+  assert.equal(suitCamMix('auto', 0.9, 6), 1);
+  // Auto is tier-gated: on Medium, High and Ultra only; on Low the profile is off, Full still works there
+  assert.equal(suitCamProfile('auto', false).strength, 0, 'Auto is off on the tiers that cannot afford it');
+  assert.equal(suitCamProfile('auto', true).strength, 1);
+  assert.equal(suitCamProfile('auto', true).wide, true, 'Auto on Medium up adds the wide bloom');
   assert.equal(suitCamProfile('full', false).wide, true, 'Full is wide on every tier');
+  assert.equal(suitCamProfile('full', false).strength, 1);
+  // Subtle: half strength, the ramp applies
   const sub = suitCamProfile('subtle', true);
   assert.equal(sub.strength, 0.5);
   assert.equal(sub.k1, -0.015);
   assert.equal(sub.grain, 0.01);
-  assert.equal(suitCamStrength(auto, 1, true), 0.5, 'halved while the build ribbon is open');
-  assert.equal(suitCamStrength(auto, 1, false), 1);
+  // halved while the build ribbon is open
+  assert.equal(suitCamStrength(suitCamProfile('auto', true), 1, true), 0.5);
+  assert.equal(suitCamStrength(suitCamProfile('auto', true), 1, false), 1);
 });

@@ -5,7 +5,7 @@
 // - SetMix: the lush sunlit terraformed planet (docs/concept/setmix/04-menu-setmix.png)
 // - Goblin Racing: the goblin planet in deep space (docs/concept/setmix/05-menu-goblin-racing.png)
 import * as THREE from 'three';
-import { createLabRoom, GATE_AT, PLANET_TABLE_AT, preloadLabGenerated, type LabRoom } from '../play/lab-room';
+import { createLabRoom, GATE_AT, PLANET_TABLE_AT, POWER_ON, preloadLabGenerated, type LabRoom } from '../play/lab-room';
 import { preloadVista, VISTA_LEVEL, type WindowView } from '../play/lab-vista';
 import { genLevelFor } from '../assets/gen';
 import { createPlotHolo, type PlotHolo } from '../play/plot-holo';
@@ -238,7 +238,7 @@ export function createLabScene(o: {
   const room: LabRoom = createLabRoom({ textureSize: o.textureSize, portalMaterial: portalMat, windowView: o.windowView });
   labScene.add(room.group);
   // Dim lab where the open gate is the brightest thing (matches 04-menu-setmix.png)
-  room.setPower({ relays: 1, pulse: 1, coils: 1, main: 0.35, emergency: 0, static: 0 });
+  room.setPower({ ...POWER_ON, main: 0.35, banks: [0.35, 0.35, 0.35], hologram: 0, emergency: 0, static: 0 });
   room.setStorm(0.5);
   room.lever.rotation.x = -1.1;
 

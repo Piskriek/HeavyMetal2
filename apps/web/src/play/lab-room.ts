@@ -16,6 +16,8 @@ import { operatorConsole as consoleMillOperatorConsole } from '@hm/consolemill';
 import { type GenLevel, genLevelFor, getGenSync, loadGen } from '../assets/gen';
 import { createLabVista, VISTA_LEVEL, type LabVista, type WindowView } from './lab-vista';
 import { CLUTTER, CLUTTER_MODELS, type ClutterItem } from './lab-clutter';
+import { type Power, POWER_OFF, darkStrobe, strobeSweepZ } from './lab-power';
+export { POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, type Power } from './lab-power';
 
 export const ROOM = { left: -8, right: 8, back: -9, front: 3, height: 5 } as const;
 const WINDOW = { x0: -7.4, x1: 7.4, y0: 0.4, y1: 3.5 } as const;
@@ -145,43 +147,6 @@ function dressWeaponBench(bench: THREE.Group, parts: readonly THREE.Group[]): vo
   hangOn(screwdriver, front, 0.42, 0.6, Math.PI / 2);
   wallGroup.add(drill, scanner, screwdriver);
   bench.parent?.add(wallGroup);
-}
-
-/** How powered the lab is, each 0..1: the power-on sequence drives these. */
-export interface Power {
-  /** Fraction of the relay lamps lit, in order. */
-  readonly relays: number;
-  /** Power running along the floor covers. */
-  readonly pulse: number;
-  /** Fraction of the gate's coils lit, bottom to top. */
-  readonly coils: number;
-  /** The ceiling lights. */
-  readonly main: number;
-  /** The orange emergency lamps. */
-  readonly emergency: number;
-  /** Static in the gate's opening (1 = all static, 0 = a clear picture); the opening shows nothing while coils are 0. */
-  readonly static: number;
-}
-export const POWER_OFF: Power = { relays: 0, pulse: 0, coils: 0, main: 0, emergency: 1, static: 1 };
-export const POWER_ON: Power = { relays: 1, pulse: 1, coils: 1, main: 1, emergency: 0, static: 0 };
-/** The power-on sequence's length, seconds. */
-export const POWER_SECONDS = 6.5;
-
-const ramp = (t: number, a: number, b: number): number => Math.max(0, Math.min(1, (t - a) / (b - a)));
-
-/** The lab at `t` seconds after the main lever is thrown: relays click on in a row, power runs along the floor to the gate,
- *  the coils light bottom to top while the lights dip (the gate draws from everything else), static resolves, the lights recover. */
-export function powerAt(t: number): Power {
-  if (t >= POWER_SECONDS) return POWER_ON;
-  const dip = ramp(t, 2.0, 2.6) * (1 - ramp(t, 5.0, 6.3));
-  return {
-    relays: ramp(t, 0.4, 1.9),
-    pulse: ramp(t, 1.2, 2.4),
-    coils: ramp(t, 2.0, 4.4),
-    main: ramp(t, 0.9, 1.6) * (1 - 0.65 * dip),
-    emergency: 1 - ramp(t, 1.2, 2.2),
-    static: 1 - ramp(t, 3.8, 5.4),
-  };
 }
 
 const STORM_VERTEX = /* glsl */ `
@@ -355,6 +320,10 @@ export interface LabRoom {
   readonly lever: THREE.Object3D;
   readonly spawn: { readonly x: number; readonly z: number; readonly yaw: number };
   setPower(p: Power): void;
+  /** The power as it was last set. */
+  power(): Power;
+  /** Which gate coils are lit, bottom to top. */
+  coilsLit(): boolean[];
   /** Puts the generated models in place of the labkit fallbacks for every piece that is loaded now (call again after a preload). */
   adoptGenerated(): void;
   /** The storm as progress 0 to 1 (the flat picture in Static; the vista's progress in Full and Lite). */
@@ -627,6 +596,7 @@ export function createLabRoom(o: {
       pivot.add(parts[i]!);
       panel.add(pivot);
       handles.push(pivot);
+      handleGlow(parts[i]!);
     });
     return true;
   });
@@ -638,7 +608,7 @@ export function createLabRoom(o: {
       const gen = gens[i]!;
       replaceVisual(r.group, gen);
       gen.rotation.y = WEST_WALL_TURN;
-      const pair = [lamp('#ff7a1c', -0.12, 1.13, 0.262), lamp('#ff7a1c', 0.12, 1.13, 0.262)];
+      const pair = [lamp('#ffc13d', -0.12, 1.13, 0.262), lamp('#ffc13d', 0.12, 1.13, 0.262)];
       gen.add(...pair);
       relayLamps.push(...pair);
     });
@@ -720,6 +690,12 @@ export function createLabRoom(o: {
     roughness: 0.4,
     metalness: 0.3,
   }));
+  // the hologram plate on the table's top (cyan, translucent; it comes up after the banks, see setPower)
+  const hologramMat = keep(new THREE.MeshStandardMaterial({
+    color: '#0a2430', emissive: new THREE.Color('#7ff0ff'), emissiveIntensity: 0, transparent: true, opacity: 0, depthWrite: false,
+  }));
+  const hologramPlate = new THREE.Mesh(keep(new THREE.CylinderGeometry(0.4, 0.4, 0.006, 32)), hologramMat);
+  hologramPlate.visible = false;
   const tableDisc = pTable.lamps[0];
   if (tableDisc) tableDisc.material = tableDiscMat;
 
@@ -736,6 +712,8 @@ export function createLabRoom(o: {
     const disc = new THREE.Mesh(keep(new THREE.CylinderGeometry(0.42, 0.42, 0.01, 32)), tableDiscMat);
     disc.position.set(0, 1.1 + 0.005, 0);
     plate.add(disc);
+    hologramPlate.position.set(0, 1.1 + 0.012, 0);
+    plate.add(hologramPlate);
     return true;
   });
 
@@ -930,19 +908,24 @@ export function createLabRoom(o: {
     group.add(chartQuad);
   }
 
-  // ---- Light: ceiling strips, one main lamp, emergency amber lamps, gate glow, window light
-  const stripMat = keep(new THREE.MeshStandardMaterial({ color: '#202428', emissive: '#eef6ff', emissiveIntensity: 0, roughness: 0.4 }));
+  // ---- Light: ceiling strips in three banks (back, middle, front: each ignites in turn), one main lamp, emergency lamps, gate glow, window light
+  // The strips are cut into three lengths along the room (the seams are the same material, so they do not show).
+  const stripLength = (depth - 2.5) / 3;
+  const stripMats = [0, 1, 2].map(() => keep(new THREE.MeshStandardMaterial({ color: '#202428', emissive: '#eef4ff', emissiveIntensity: 0, roughness: 0.4 })));
   for (const x of [-4.5, -1.5, 1.5, 4.5]) {
-    add(new THREE.BoxGeometry(0.24, 0.06, depth - 2.5), stripMat, (s) => {
-      s.position.set(x, ROOM.height - 0.04, (ROOM.back + ROOM.front) / 2);
-    });
+    for (let bank = 0; bank < 3; bank++) {
+      const zc = (ROOM.back + ROOM.front) / 2 - (depth - 2.5) / 2 + stripLength * (bank + 0.5);
+      add(new THREE.BoxGeometry(0.24, 0.06, stripLength), stripMats[bank]!, (s) => {
+        s.position.set(x, ROOM.height - 0.04, zc);
+      });
+    }
   }
   // One main lamp standing in for ceiling strips
   const mainLamp = new THREE.PointLight('#e6f2ff', 0, 24, 1.8);
   mainLamp.position.set(0, ROOM.height - 0.6, -2.0);
   group.add(mainLamp);
 
-  // Orange emergency lamps
+  // Orange emergency lamps (in the dark they strobe red, see the dark wake in update)
   const emergencyMat = keep(new THREE.MeshStandardMaterial({ color: '#331a08', emissive: '#ff7a1c', emissiveIntensity: 0, roughness: 0.4 }));
   for (const [x, z, face] of [[-7.9, -3.0, Math.PI / 2], [7.9, -1.0, -Math.PI / 2], [0, 2.92, Math.PI]] as const) {
     add(new THREE.BoxGeometry(0.18, 0.12, 0.1), emergencyMat, (e) => {
@@ -953,18 +936,40 @@ export function createLabRoom(o: {
   emergency.position.set(0, 4.4, 0);
   group.add(emergency);
 
-  // Gate glow
+  // The dark wake's red strobe: a point light that sweeps the power wall at 1.2 Hz (lab-power.ts), lit only before the lever
+  const strobe = new THREE.PointLight('#ff2a1a', 0, 7, 1.8);
+  strobe.position.set(-7.0, 2.6, -4.0);
+  group.add(strobe);
+
+  // Gate glow (the ignition's arc flash turns it up, amber)
   const gateGlow = new THREE.PointLight('#ff9a4a', 0, 10, 1.8);
   gateGlow.position.set(GATE_AT.x, 1.8, GATE_AT.z + 0.6);
   group.add(gateGlow);
 
-  // Window storm light (brightest feature in Act I dark)
-  const windowLight = new THREE.PointLight('#9fb6cc', 3.5, 16, 1.8);
+  // Window storm light (brightest feature in Act I dark): the window's cyan storm glow leaks across the floor, and each burst flashes it
+  const windowLight = new THREE.PointLight('#7fe9ff', 3.5, 16, 1.8);
   windowLight.position.set(wx, wy + 0.4, ROOM.back + 1.2);
   group.add(windowLight);
 
-  const fill = new THREE.HemisphereLight('#d8e2ea', '#2a2e33', 0.10);
+  // The fill: cold blue-grey in the dark (about 0.08), then the powered room's light
+  const fill = new THREE.HemisphereLight('#1a2433', '#2a2e33', 0.08);
   group.add(fill);
+
+  // The breaker handles glow red in the dark: each handle's own materials are cloned, so only they are lit
+  const handleMats: THREE.MeshStandardMaterial[] = [];
+  const handleGlow = (h: THREE.Object3D): void => {
+    h.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const src = mesh.material as THREE.Material;
+      if (!(src instanceof THREE.MeshStandardMaterial)) return;
+      const mat = src.clone();
+      mat.emissive = new THREE.Color('#ff2a1a');
+      mat.emissiveIntensity = 0;
+      mesh.material = mat;
+      handleMats.push(mat);
+    });
+  };
 
   // Power state handlers
   const lamps = {
@@ -972,26 +977,39 @@ export function createLabRoom(o: {
     boxes: boxes.flatMap((b) => b.lamps),
     desk: desk.lamps,
   };
+  /** The relay lamps that are lit (they pulse as amber beacons, in update). */
+  let relayOn: boolean[] = [];
 
   const setPower = (p: Power): void => {
     lastPower = p;
     // the breaker is thrown (its handles up) once the power comes on, before the relays click
     handles.forEach((h) => { h.rotation.x = p.relays > 0 ? 0 : -0.7; });
-    lamps.relays.forEach((l, i) => kit.setLamp(l, p.relays * lamps.relays.length > i ? 1 : 0));
+    relayOn = lamps.relays.map((_, i) => p.relays * lamps.relays.length > i);
+    lamps.relays.forEach((l, i) => { if (!relayOn[i]) kit.setLamp(l, 0); });
     lamps.boxes.forEach((l) => kit.setLamp(l, p.relays > 0.5 ? 1 : 0));
     lamps.desk.forEach((l) => kit.setLamp(l, 1));
     gate.coils.forEach((c, i) => kit.setLamp(c, p.coils * gate.coils.length > i ? 1 : 0));
 
     tableDiscMat.emissiveIntensity = p.main * 0.22;
+    // the planet table's hologram: a cyan plate on the table's top comes up after the banks
+    hologramMat.opacity = 0.75 * p.hologram;
+    hologramMat.emissiveIntensity = 1.6 * p.hologram;
+    hologramPlate.visible = p.hologram > 0.001;
     pTable.lamps.slice(1).forEach((l) => kit.setLamp(l, p.main > 0.5 ? 1 : 0));
 
     pulseUniforms.uPower.value = p.pulse;
-    stripMat.emissiveIntensity = p.main * 2.2;
+    stripMats.forEach((mat, i) => { mat.emissiveIntensity = p.banks[i]! * 2.2; });
     mainLamp.intensity = p.main * 18;
-    fill.intensity = 0.10 + p.main * 0.25;
+    fill.color.set(p.main > 0.02 ? '#d8e2ea' : '#1a2433');
+    fill.intensity = p.main > 0.02 ? 0.10 + p.main * 0.25 : 0.08;
+    emergencyMat.emissive.set('#ff7a1c');
     emergencyMat.emissiveIntensity = p.emergency * 2.4;
+    emergency.color.set('#ff8a3a');
     emergency.intensity = p.emergency * 22;
-    gateGlow.intensity = p.coils * 12;
+    gateGlow.intensity = p.coils * 12 + p.arc * 60;
+    gateGlow.color.set(p.arc > 0.01 ? '#ffb040' : '#ff9a4a');
+    strobe.intensity = 0;
+    handleMats.forEach((mat) => { mat.emissiveIntensity = 0; });
     portal.visible = p.coils > 0.6;
   };
   setPower(POWER_OFF);
@@ -1049,7 +1067,7 @@ export function createLabRoom(o: {
   };
 
   return {
-    envLevel: () => 0.03 + (stripMat.emissiveIntensity / 2.2) * 0.2,
+    envLevel: () => 0.03 + lastPower.main * 0.2,
     aimClutter,
     dissolveClutter,
     removeClutter,
@@ -1061,6 +1079,10 @@ export function createLabRoom(o: {
     lever: desk.lever,
     spawn: { x: -2.5, z: 1.0, yaw: 0 }, // beside the cot, facing north toward gate & storm
     setPower,
+    /** The power as it was last set (the tests read it). */
+    power: (): Power => lastPower,
+    /** Which gate coils are lit now, bottom to top (the ignition's order). */
+    coilsLit: (): boolean[] => gate.coils.map((c) => ((c.material as THREE.MeshStandardMaterial).emissiveIntensity ?? 0) > 0.5),
     adoptGenerated,
     setStorm,
     setWindowView,
@@ -1074,6 +1096,19 @@ export function createLabRoom(o: {
       tickClutter(dt);
       // the bursts flash the window light, capped at 0.7 of the peak: the floor lights up, the room never whites out (review 3)
       windowLight.intensity = 3.5 + 12 * vista.flashLight;
+      // the dark wake (before the lever): the red strobe sweeps the power wall, the emergency lamps and the breaker handles strobe red
+      if (lastPower.relays === 0) {
+        const s = darkStrobe(now);
+        strobe.position.z = strobeSweepZ(now);
+        strobe.intensity = 5 * s;
+        emergencyMat.emissive.set('#ff2a1a');
+        emergencyMat.emissiveIntensity = 0.35 + 1.65 * s;
+        emergency.color.set('#ff2a1a');
+        emergency.intensity = 22 * s;
+        handleMats.forEach((mat) => { mat.emissiveIntensity = 1.6 * s; });
+      }
+      // the relay lamps pulse as the amber beacons while they are lit (each out of step with the next)
+      relayOn.forEach((on, i) => { if (on) kit.setLamp(lamps.relays[i]!, 0.7 + 0.3 * Math.sin(now * 4 + i * 1.3)); });
     },
     dispose() {
       vista.dispose();

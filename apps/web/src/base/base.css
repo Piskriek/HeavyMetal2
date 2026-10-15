@@ -585,7 +585,8 @@ button.hm-quick-stack-btn:active,
    ------------------------------------------------------------- */
 .hm-build-readout-hud {
   position: absolute;
-  top: 56%;
+  /* TASK-26: below the CANNOT PLACE banner, which sits 36 px under the centre and is about 28 px tall (no overlap at any height) */
+  top: calc(50% + 66px);
   left: 50%;
   transform: translateX(-50%);
   display: flex;

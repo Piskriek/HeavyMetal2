@@ -91,7 +91,13 @@ export interface WorldEnv {
   heightAt(x: number, z: number): number;
   /** The lab's quantum bridge: every box within its range of the gate shares one network. */
   readonly bridge: Point & { readonly range: number };
+  /** How fast the machines' queues run (default 1, real time). The debug menu's Instant builds sets INSTANT_TIME_SCALE.
+   *  It scales only the machine work in a tick; the anomaly field and the beam keep real time. */
+  readonly timeScale?: number;
 }
+
+/** The time scale of Instant builds: a 0.1 s tick does 1000 s of machine work, so the longest recipe (the crawler, 420 s) ends in that tick. */
+export const INSTANT_TIME_SCALE = 10000;
 
 type PieceSpec = Omit<S.Piece, 'id' | 'mat'>;
 
@@ -584,13 +590,14 @@ function tick(w: BaseWorld, env: WorldEnv, cmd: Extract<BaseCommand, { t: 'tick'
     events.push({ type: 'harvested', items: f.items, lost: s.left });
   }
   let vehicles = w.vehicles, nextVehicle = w.nextVehicle;
+  const speed = env.timeScale !== undefined && Number.isFinite(env.timeScale) && env.timeScale > 0 ? env.timeScale : 1;
   const machines = w.machines.map((m) => {
     if (m.jobs.length === 0) return m;
     // terraformers get their share from the plot's power grid; the fabricator runs while a relay reaches it
     // a sapper holding the machine halves its share (P0-MON-03)
     const held = cmd.latched?.includes(m.id) ? 0.5 : 1;
     const share = (m.kind === 'fabricator' ? (reached(w, env, m.id) ? 1 : 0) : Math.max(0, Math.min(1, cmd.power[m.id] ?? 0))) * held;
-    const r = runQueue(m.jobs, cmd.dt * share);
+    const r = runQueue(m.jobs, cmd.dt * share * speed);
     if (r.finished.length === 0) return { ...m, jobs: r.jobs };
     let out = m.out.slice();
     const at = machineAt(w, m.id);

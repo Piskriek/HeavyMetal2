@@ -110,3 +110,17 @@
 @media (prefers-reduced-motion: reduce) {
   .debug-pause .dbg button { transition: none; }
 }
+
+/* Instant builds: a small tag in the top-right HUD corner while the switch is on (the goal is top-left, the sync top-centre) */
+.dbg-instant-tag {
+  position: absolute;
+  right: clamp(16px, 4vw, 56px);
+  top: clamp(16px, 5vh, 48px);
+  padding: 4px 9px;
+  background: var(--power, #ffb02a);
+  color: #17110a;
+  font: 700 11px/1.2 Inter, system-ui, sans-serif;
+  letter-spacing: .14em;
+  pointer-events: none;
+  z-index: 600;
+}

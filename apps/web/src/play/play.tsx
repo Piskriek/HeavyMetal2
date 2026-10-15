@@ -39,7 +39,7 @@ import { fx } from '../maker/feedback';
 import { FRESH, METRIC_COLOUR, METRIC_NAME, SAVE_KEY, arrived, created, isFreeDrill, loadState, objective, poweredOn, returned, withLab, withPlot, type PlayState } from './quest';
 import { Journal } from './journal';
 import { ACT_V_KIT, COUNT, advanceChain, bump, chainView, completeStepChain, finishedSteps, gateReason, monsterKilled, monsterSeen, placedKey, playerDied, playerLow, stepDone, syncChain, type Chain, type Evidence } from '../base/campaign-chain';
-import { DebugMenu, type DebugApi } from './debug-menu';
+import { DebugMenu, readInstantBuilds, writeInstantBuilds, type DebugApi } from './debug-menu';
 import type { BaseEvent } from '../base/world';
 import { encodePlot, decodePlot, plotOfSnapshot } from './plot-code';
 import type { Snapshot } from '@hm/plotcodec';
@@ -59,7 +59,7 @@ import { footprintSolids, HARDPOINT_HALF } from '../base/navgrid';
 import { createWorldViewSource, WorldViewSource, formatRefusalToast } from '../base/world-view';
 import {
   apply, pieceAt, pieceAtIn, preview, withBridgeStore, BRIDGE_RANGE, BRIDGE_STORE,
-  BEAM_RANGE, structureEnv, planGhosts, layoutPieces, roomAt, machineAt,
+  BEAM_RANGE, structureEnv, planGhosts, layoutPieces, roomAt, machineAt, INSTANT_TIME_SCALE,
   type BaseWorld, type BaseCommand, type WorldEnv, type Applied, type Plan,
 } from '../base/world';
 import { PieceMeshManager } from '../base/piece-meshes';
@@ -732,6 +732,10 @@ useEffect(() => {
   const isLmbDownRef = useRef(false);
   const harvestAccRef = useRef(0);
   const baseEnvRef = useRef<WorldEnv | null>(null);
+  // the debug menu's Instant builds: the base env reads the ref on every tick, so the switch takes effect at once
+  const [instantBuilds, setInstantBuilds] = useState<boolean>(readInstantBuilds);
+  const instantBuildsRef = useRef(instantBuilds);
+  useEffect(() => { instantBuildsRef.current = instantBuilds; writeInstantBuilds(instantBuilds); }, [instantBuilds]);
 
   const lastPreviewTickRef = useRef(-1);
   const lastPreviewBpRef = useRef<string | null>(null);
@@ -744,6 +748,8 @@ useEffect(() => {
     const env: WorldEnv = {
       heightAt: (x, z) => sceneRef.current?.heightAt(x, z) ?? 0,
       bridge: { x: gate.x, z: gate.z, range: BRIDGE_RANGE },
+      // the machines' time scale: real time, or the Instant builds scale (read per tick, not cached)
+      get timeScale(): number { return instantBuildsRef.current ? INSTANT_TIME_SCALE : 1; },
     };
     baseEnvRef.current = env;
     return env;
@@ -3872,8 +3878,10 @@ useEffect(() => {
           ) : null}
 
           {paused && debugOpen && !isAnyBaseWindowOpen && debugApiRef.current ? (
-            <DebugMenu api={debugApiRef.current} chain={state.chain} stage={state.plot.stage} where={hud.where} onClose={() => setDebugOpen(false)} />
+            <DebugMenu api={debugApiRef.current} chain={state.chain} stage={state.plot.stage} where={hud.where} instantBuilds={instantBuilds} onInstantBuilds={setInstantBuilds} onClose={() => setDebugOpen(false)} />
           ) : null}
+          {/* the tag: a screenshot with Instant builds on says so */}
+          {instantBuilds ? <div className="dbg-instant-tag" data-testid="instant-builds-tag">INSTANT BUILDS</div> : null}
 
           {/* Mentor Subtitles (On by default) */}
           {subtitle && dialogueSettings.subtitlesEnabled && !(menu || building !== null || placingLayoutId !== null || pieceSessionRef.current) && (

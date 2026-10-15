@@ -5,7 +5,7 @@ import { ITEMS, STARTER } from './catalog';
 import * as S from '@hm/structure';
 import { loadWorld, saveWorld } from './save';
 import { weaponStats } from './weapons';
-import { BRIDGE_STORE, SHELTER, apply, createWorld, hashWorld, layoutPieces, networkAt, parkSpot, planGhosts, preview, replay, roomAt, withBridgeStore, type BaseCommand, type BaseWorld, type WorldEnv } from './world';
+import { BRIDGE_STORE, INSTANT_TIME_SCALE, SHELTER, apply, createWorld, hashWorld, layoutPieces, networkAt, parkSpot, planGhosts, preview, replay, roomAt, withBridgeStore, type BaseCommand, type BaseWorld, type WorldEnv } from './world';
 
 const env: WorldEnv = { heightAt: () => 0, bridge: { x: 0, z: 0, range: 60 } };
 const at = { x: 2, z: 2 };
@@ -349,4 +349,25 @@ test('a salvage (TASK-23c) goes into the pack whole, or is refused whole and cha
   // the log replays to the same pack as the direct apply
   const replayed = replay(w0, env, [{ t: 'salvage', at, stock }]);
   assert.equal(L.count(replayed.world.player, 'ore'), 6);
+});
+
+test('Instant builds (debug): the time scale runs the machines\' queues at once; real time is the default; the field keeps its pace', () => {
+  const senv = { heightAt: () => 0, materials: { regolith: { vKeep: 0.85, hKeep: 0.5 }, basalt: { vKeep: 0.9, hKeep: 0.6 } } };
+  let base = S.found(S.empty(), senv, 2, 2, 0, 'regolith').base; const s = base.structures[0]!.id;
+  const put = (p: Omit<S.Piece, 'id' | 's' | 'mat'>) => { const r = S.place(base, senv, { ...p, s, mat: 'regolith' }); assert.ok(r.ok, `${p.kind}: ${r.why}`); base = r.base; return r.id; };
+  for (const [i, j] of [[1, 0], [0, 1], [1, 1], [2, 0]] as const) put({ kind: 'foundation', i, j, k: 0, r: 0 });
+  const pad = put({ kind: 'hardpoint', i: 0, j: 0, k: 0, r: 0 });
+  let w: BaseWorld = withBridgeStore({ ...createWorld(), base }, env, [{ item: 'ore', n: 450 }, { item: 'prim-chassis', n: 20 }, { item: 'prim-beam', n: 20 }, { item: 'prim-column', n: 20 }, { item: 'map-basalt', n: 20 }]);
+  const at = { x: 4, z: 4 };
+  w = run(w, { t: 'install', at, hardpoint: pad, kind: 'fabricator' }, { t: 'stage', stage: 2 }, { t: 'craft', at, machine: pad, recipe: 'vehicle-scout' });
+  const fast: WorldEnv = { ...env, timeScale: INSTANT_TIME_SCALE };
+  const tick = (e: WorldEnv) => apply(w, e, { t: 'tick', at, dt: 0.1, beam: null, power: {} });
+  // real time: a tenth of a second does not print a 120 s scout
+  assert.equal(tick(env).events.some((e) => e.type === 'printed'), false, 'real time is the default');
+  assert.equal(tick({ ...env, timeScale: 0 }).events.some((e) => e.type === 'printed'), false, 'a non-positive scale is real time');
+  // instant builds: the same tick prints it
+  const instant = tick(fast);
+  assert.ok(instant.events.some((e) => e.type === 'printed' && e.kind === 'scout'), 'instant builds: the scout is out in one tick');
+  assert.equal(instant.world.machines[0]!.jobs.length, 0);
+  assert.equal(instant.world.vehicles.length, 1);
 });

@@ -44,6 +44,12 @@ Press **Esc** in the game to open the pause menu, then press **Debug menu**. Esc
   - **The gate:** a spot six metres from the gate pad on the Moon.
   - **The Moon plot:** a spot on the Moon plot, near its centre.
 
+**Builds**
+- **Instant builds:** a switch, off by default. Turned on, the machines' work finishes at once: the fabricator's prints (the scout, hauler and crawler), and the refinery and bench crafts. The button shows On or Off.
+  - A tag, **INSTANT BUILDS**, shows in the top-right corner of the screen while it is on, so a screenshot says so.
+  - The choice is kept on this PC (in the browser's local storage), so it survives a reload. Turn it off to get the real build times back.
+  - Placing structures and machines and forging weapons were already instant; the switch does not change them.
+
 **Spawn**
 - **Items:** choose any item from the base catalog (ore, raw pixels and vertices, primitives, texture maps, blueprints, weapon parts, weapons, tools, equipment), type an amount from 1 to 999, choose the destination, then press **Grant**.
   - **Pack:** your inventory. If it has no room, the panel says so and nothing is added.

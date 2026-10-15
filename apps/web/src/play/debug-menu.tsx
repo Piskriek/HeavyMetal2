@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { CHAIN, CHAIN_STEPS, chainView, type Chain } from '../base/campaign-chain';
 import { ITEMS, VEHICLE, VEHICLES, type VehicleKind } from '../base/catalog';
 import type { Archetype } from '../monsters/roster';
+import { kv } from '../storage/profile-storage';
 import './debug-menu.css';
 
 /** The hooks the panel calls (play.tsx builds them from the same refs as window.__dev). */
@@ -42,7 +43,23 @@ export interface DebugMenuProps {
   readonly stage: number;
   /** Where the player stands ('lab' or 'planet'). */
   readonly where: string;
+  /** Instant builds: machine work (fabricator prints, refinery and bench crafts) finishes at once. */
+  readonly instantBuilds: boolean;
+  readonly onInstantBuilds: (on: boolean) => void;
   readonly onClose: () => void;
+}
+
+/** The debug key of the Instant builds switch, in the profile's storage (kv guards every read and write). Off unless the tester turned it on. */
+export const INSTANT_BUILDS_KEY = 'debug.instantBuilds';
+
+/** Reads the Instant builds switch. Storage can be blocked or missing: then it is off. */
+export function readInstantBuilds(): boolean {
+  return kv.get(INSTANT_BUILDS_KEY) === '1';
+}
+
+/** Keeps the Instant builds switch. A blocked store only loses the saved choice; the switch still works for the session. */
+export function writeInstantBuilds(on: boolean): void {
+  kv.set(INSTANT_BUILDS_KEY, on ? '1' : '0');
 }
 
 interface CheckpointEntry { readonly name: string; readonly title: string; readonly act: string }
@@ -86,7 +103,7 @@ function itemGroups(): readonly { readonly kind: string; readonly label: string;
 }
 const GROUPS = itemGroups();
 
-export function DebugMenu({ api, chain, stage, where, onClose }: DebugMenuProps) {
+export function DebugMenu({ api, chain, stage, where, instantBuilds, onInstantBuilds, onClose }: DebugMenuProps) {
   const view = chainView(chain);
   const actQuest = chain.progress.quest;
   const actTitle = CHAIN.quests.find((q) => q.id === actQuest)?.title ?? null;
@@ -174,6 +191,13 @@ export function DebugMenu({ api, chain, stage, where, onClose }: DebugMenuProps)
   const doStage = (n: number): void => {
     api.setStage(n);
     notify(`Plot at stage ${n}`, 'The base and the Moon follow.');
+    bump();
+  };
+
+  const toggleInstant = (): void => {
+    const next = !instantBuilds;
+    onInstantBuilds(next);
+    notify(next ? 'Instant builds on' : 'Instant builds off', next ? 'Prints and crafts finish at once. The tag shows in the corner.' : 'Build times are back to normal.');
     bump();
   };
 
@@ -271,6 +295,16 @@ export function DebugMenu({ api, chain, stage, where, onClose }: DebugMenuProps)
                 <button type="button" onClick={() => doTeleport('plot', 'the Moon plot')} data-teleport="plot">The Moon plot</button>
               </div>
             </div>
+          </section>
+
+          <section className="dbg-section" aria-labelledby="dbg-builds">
+            <h3 id="dbg-builds">Builds</h3>
+            <div className="dbg-row">
+              <button type="button" className={instantBuilds ? 'on' : undefined} aria-pressed={instantBuilds} onClick={toggleInstant} data-testid="dbg-instant">
+                Instant builds: <b data-testid="dbg-instant-state">{instantBuilds ? 'On' : 'Off'}</b>
+              </button>
+            </div>
+            <p className="dbg-note">While it is on, machine work finishes at once: fabricator prints (the scout, hauler and crawler), refinery and bench crafts. A tag shows in the top-right corner so screenshots say so. Off by default; the choice is kept on this PC.</p>
           </section>
 
           <section className="dbg-section" aria-labelledby="dbg-spawn">

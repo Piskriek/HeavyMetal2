@@ -254,3 +254,18 @@ test('the sectors sit in the glass, clear of the corridor, with the disc above t
   }
   assert.ok(polar(SPAWN_XZ, 0, 1)[1] < SPAWN_XZ[1], 'north is -z');
 });
+
+test('each window burst flashes the lab floor from its own strike (POL-25): the light peaks at the strike, fades, and is gone after 1.2 s', () => {
+  // the lab's floor light (the window light) follows the vista's flash, which comes from the same seeded schedule as the burst
+  const events = burstSchedule(0xb7a5, BREACH_XZ[0], BREACH_XZ[1]).eventsBetween(0, 120, 0);
+  assert.ok(events.length >= 6, `events in two minutes: ${events.length}`);
+  for (const e of events) {
+    const peak = burstLook(0, e.strength).light;
+    assert.ok(peak > 0.2, `a strike lights the floor at ${e.t}`);
+    assert.ok(burstLook(0.3, e.strength).light < peak, `the floor fades after the strike at ${e.t}`);
+    assert.equal(burstLook(BURST_SECONDS + 0.01, e.strength).light, 0, `and is gone by 1.2 s after ${e.t}`);
+    assert.equal(burstLook(-0.01, e.strength).light, 0, `and is dark before ${e.t}`);
+    // the flash is timed by the schedule: the same event comes back at its own time
+    assert.ok(burstSchedule(0xb7a5, BREACH_XZ[0], BREACH_XZ[1]).eventsBetween(e.t, e.t + 0.001, 0).some((x) => x.t === e.t));
+  }
+});

@@ -1,5 +1,24 @@
 # RESUME: start here (fresh session)
 
+## 16 Oct Session Handoff Checkpoint (read first)
+- **(a) Branch** `feat/monster-mash-exploration`, HEAD `df69c911`. `origin/main` is fast-forwarded to it.
+- **(b) Done this session, all on Haiku workers, each accepted in `docs/SIDECAR_COMMS.md`:**
+  - **TASK-24, the campaign e2e:** the act checkpoints in `apps/web/public/checkpoints/` and `docs/TEST_GUIDE.md`.
+  - **TASK-25, the nine-zone HUD and build ribbon:** `apps/web/src/base/ui/hud-zones*`, `base-hud.tsx`, `build-menu.tsx`, `play.tsx`, `play-scene.ts` (ghost lock).
+  - **TASK-27 (with 27b's rover camera), the stage looks:** the 0a wireframe and 0b dither (stage 1 now waits for the first output), the suit-cam setting, the sphere-cast rover camera. In `packages/plotsim`, `packages/groundshader`, `packages/camerarig`, the post pass, `play-scene.ts`, `play.tsx`.
+  - **TASK-26, the base:** foundation frames with legs, the safe domes, the visible 12 kW brownout, salvage ore to the plot. In `packages/plotsim` and `apps/web/src/base/`.
+  - **TASK-28, the lab:** the dark wake and power-on, the window budget at the peak frame. In `apps/web/src/play/lab-power.ts`, `lab-room.ts`, `lab-vista.ts`, `apps/web/src/lab/`.
+  - **The debug menu and Instant builds:** Esc, then Debug menu. Commits ccc1ad83 to df69c911, and `scripts/test-debug-menu.mjs`.
+  - **Briefs 29 to 35 are not started.** 35 (Acts VII–IX) is Argo's draft with Opus's notes.
+- **(c) Failing tests and gotchas:**
+  - test-stage-looks: the turn test fails, 16.9% against 10% (POL-49).
+  - The lab's pre-power frame is grey, not the cold 0.08 tone.
+  - The debug spawns and teleports are not browser-tested.
+  - A campaign run rewrites the checkpoints: `git restore -- apps/web/public/checkpoints/` afterwards.
+  - Never commit `apps/web/dist/index.html`.
+  - **The owner's QA:** terraforming shows no foliage, water or texture change. The treegen, hydro and stage56 drop files are not wired in, and this is the top gap. Sync drains on long drives, as designed.
+- **(d) The next session must read `ARGO_NOTE_05_PM_PROTOCOL_AND_SESSION_HANDOFF.md`** in the Setmix Drive folder: https://docs.google.com/document/d/1MpoGP7jfKlQ7KIOZSiE-KOYztBjUW0fHrQnWx9PmJ2s/edit (export it with `/export?format=md`). Then read Argo's `ARGO_GRAND_MASTER_REPORT.md` when it lands.
+
 The context a new Opus session needs on its first message. Keep it current: update it after every finished step. Last update: 2026-10-12, by Opus on the old account at about 5% of its weekly usage.
 
 ## 1. Who and where

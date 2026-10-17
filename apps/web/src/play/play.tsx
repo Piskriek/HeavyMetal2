@@ -53,6 +53,9 @@ import { usePlaySettings } from '../shell/play-settings';
 import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { kv } from '../storage/profile-storage';
 import { BASE_SAVE_KEY, saveWorld } from '../base/save';
+import { OUTPOST_PLOT_SEED } from '../base/plot-height';
+import { ROLE_LABELS } from '../net/protocol';
+import { currentOutpostSession, leaveOutpostSession, rosterOf, subscribeOutpostSession, takePendingHostSave, type OutpostSession } from '../net/outpost-session';
 import { startCampaignWorld } from '../base/campaign-world';
 import { BaseHud } from '../base/ui/base-hud';
 import { footprintSolids, HARDPOINT_HALF } from '../base/navgrid';
@@ -235,6 +238,58 @@ function loadBeamSave(): BeamSave {
     return { field: null, port: null };
   }
 }
+/** A session's host save: the room's world, written into this device's base save when the session ends (plan 36, Phase 1). */
+function writePendingHostSave(): void {
+  const world = takePendingHostSave();
+  if (!world) return;
+  try {
+    kv.set(BASE_SAVE_KEY, saveWorld(world));
+  } catch (e) {
+    console.warn('[host save sync error]', e);
+  }
+}
+
+const LINK_TEXT: Readonly<Record<string, string>> = {
+  connecting: 'Connecting',
+  connected: 'Connected',
+  reconnecting: 'Reconnecting',
+  disconnected: 'Disconnected',
+  error: 'Connection error',
+};
+
+/** The room in the sync indicator: its code, the link, who is in it with their role, and a way out. */
+function OutpostRoster({ session }: { readonly session: OutpostSession }) {
+  const [, bump] = useState(0);
+  useEffect(() => session.client.onStateChange(() => bump((n) => n + 1)), [session]);
+  const link = session.client.state().connectionState;
+  const roster = rosterOf(session.client);
+  return (
+    <div
+      role="group"
+      aria-label="Outpost room"
+      data-testid="play-roster"
+      style={{ position: 'absolute', top: 52, right: 175, zIndex: 40, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, fontFamily: 'Inter, system-ui, sans-serif', fontSize: 11, color: '#e2e8f0' }}
+    >
+      <span data-testid="play-roster-code">Room {session.code ?? '------'}, {LINK_TEXT[link] ?? link}</span>
+      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' }}>
+        {roster.map((p) => (
+          <li key={p.id} data-testid="play-roster-chip" style={{ padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(6,10,18,0.78)' }}>
+            <b style={{ fontWeight: 600 }}>{p.name}</b>{' '}
+            <span style={{ color: p.role === 'owner' ? '#ffc13d' : p.role === 'cobuilder' ? '#3dc8ff' : '#94a3b8' }}>{ROLE_LABELS[p.role]}</span>
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        onClick={() => leaveOutpostSession()}
+        style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(61,200,255,0.4)', background: 'rgba(61,200,255,0.14)', color: '#3dc8ff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+      >
+        Leave room
+      </button>
+    </div>
+  );
+}
+
 function saveBeam(field: string, port: Cartridge | null): void {
   try { kv.set(BEAM_SAVE_KEY, JSON.stringify({ v: 1, field: field.length > 0 ? field : null, port })); } catch { /* storage unavailable: the edits live for this visit */ }
 }
@@ -539,6 +594,7 @@ useEffect(() => {
 
   /** The base world this profile starts with: its save, or a fresh world (campaign-world.ts). Read once, on mount. */
   const initBaseWorld = (): BaseWorld => {
+    writePendingHostSave();
     let rawSave: string | null = null;
     try {
       rawSave = kv.get(BASE_SAVE_KEY);
@@ -551,6 +607,11 @@ useEffect(() => {
   };
   const [initialBase] = useState<BaseWorld>(initBaseWorld);
   const baseWorldRef = useRef<BaseWorld>(initialBase);
+  /** The live outpost session, if this screen is in one (plan 36): its base is the room's, and this device's base save is left alone. */
+  const outpostRef = useRef<OutpostSession | null>(currentOutpostSession());
+  const [, setOutpostTick] = useState(0);
+  /** The sculpt text last sent to the room (the host's ground), so a change goes up once. */
+  const lastTerrainRef = useRef<string | null>(null);
   const pieceManagerRef = useRef<PieceMeshManager>(new PieceMeshManager());
   const buildKindRef = useRef<Kind | null>(null);
   const buildRotationRef = useRef<number>(0);
@@ -653,6 +714,8 @@ useEffect(() => {
   }, []);
 
   const persistBaseWorld = useCallback((force = false) => {
+    // in a session the base is the room's: this device's save is left as it was (a guest keeps their own base)
+    if (outpostRef.current) return;
     const world = baseWorldRef.current;
     const now = performance.now();
     if (!force && (world.tick === lastSavedTickRef.current || now - lastSaveTimeRef.current < 2000)) {
@@ -734,8 +797,18 @@ useEffect(() => {
     });
   };
   /** The edits and the port as the save holds them now (the scene owns the field). */
+  /** The host's sculpt goes up to the room whenever it changes: the room keeps it with the plot and relays it to the guests. */
+  const pushTerrain = (): void => {
+    const session = outpostRef.current;
+    if (!session?.host) return;
+    const sculpt = sceneRef.current?.beamFieldText() ?? '';
+    if (sculpt === lastTerrainRef.current) return;
+    lastTerrainRef.current = sculpt;
+    session.client.setTerrain({ seed: OUTPOST_PLOT_SEED, sculpt });
+  };
   const flushBeam = (): void => {
     saveBeam(sceneRef.current?.beamFieldText() ?? '', beamPortRef.current ? beamPortRef.current.cartridge : null);
+    pushTerrain();
   };
   /**
    * The support re-check after a cut (TASK-21d): every placed piece's support is read again on the ground as it now is (the base's own
@@ -878,11 +951,40 @@ useEffect(() => {
     return src;
   }, [getBaseEnv]);
 
+  /** Redraws the base's view from baseWorldRef: the pieces, the walk world, the vehicles, the fabricators and the weapon stats. */
+  const refreshBaseView = useCallback((): void => {
+    const scene = sceneRef.current;
+    const world = baseWorldRef.current;
+    const bEnv = getBaseEnv();
+    scene?.setBase(world.base);
+    const integrity = (baseViewSource as WorldViewSource).get?.()?.build?.integrity ?? false;
+    pieceManagerRef.current.sync(world, bEnv, integrity);
+    scene?.setWalkWorld(pieceManagerRef.current.walkWorld);
+    scene?.setVehicles(world.vehicles);
+    const fabs = world.machines.filter((m) => m.kind === 'fabricator').map((m) => {
+      const hp = world.base.pieces.find((p) => p.id === m.id);
+      const pt = hp ? pieceAt(world.base, hp) : null;
+      return {
+        id: m.id,
+        x: pt?.x ?? 0,
+        z: pt?.z ?? 0,
+        yaw: 0,
+        printing: m.jobs.length > 0,
+      };
+    });
+    scene?.setFabricators(fabs);
+    scene?.monsters.setWeaponStats(devWeaponRef.current ?? weaponStats(world.loadout));
+    (baseViewSource as WorldViewSource).notify?.();
+    setBaseWorldVersion((v) => v + 1);
+  }, [getBaseEnv, baseViewSource]);
+
   const dispatchBase = useCallback((cmd: BaseCommand) => {
     const scene = sceneRef.current;
     const bEnv = getBaseEnv();
     const prevField = baseWorldRef.current.field;
-    const res = apply(baseWorldRef.current, bEnv, cmd);
+    // in a session the command goes through the client: it shows at once, and the room confirms it (or refuses it)
+    const session = outpostRef.current;
+    const res = session ? session.client.send(cmd) : apply(baseWorldRef.current, bEnv, cmd);
     if (!res || !res.world) return;
     baseWorldRef.current = res.world;
     scene?.setBase(baseWorldRef.current.base);
@@ -897,6 +999,8 @@ useEffect(() => {
 
     for (const ev of res.events) {
       if (ev.type === 'refused') {
+        // in a session the room answers every command, and that answer shows the refusal once (the session's listener below)
+        if (session) continue;
         console.warn('[dispatchBase refused]', ev);
         say(formatRefusalToast(ev));
         gameAudio.playRefuse();
@@ -981,30 +1085,79 @@ useEffect(() => {
       scene?.setNodes(res.world.field);
     }
 
-    const integrity = (baseViewSource as WorldViewSource).get?.()?.build?.integrity ?? false;
-    pieceManagerRef.current.sync(baseWorldRef.current, bEnv, integrity);
-    scene?.setWalkWorld(pieceManagerRef.current.walkWorld);
-    scene?.setVehicles(res.world.vehicles);
-    const fabs = res.world.machines.filter((m) => m.kind === 'fabricator').map((m) => {
-      const hp = res.world.base.pieces.find((p) => p.id === m.id);
-      const pt = hp ? pieceAt(res.world.base, hp) : null;
-      return {
-        id: m.id,
-        x: pt?.x ?? 0,
-        z: pt?.z ?? 0,
-        yaw: 0,
-        printing: m.jobs.length > 0,
-      };
-    });
-    scene?.setFabricators(fabs);
-    scene?.monsters.setWeaponStats(devWeaponRef.current ?? weaponStats(res.world.loadout));
-    (baseViewSource as WorldViewSource).notify?.();
-    setBaseWorldVersion((v) => v + 1);
+    refreshBaseView();
     persistBaseWorld(false);
     return res;
-  }, [say, baseViewSource, getBaseEnv, commit, incrementPlacedCounter, persistBaseWorld]);
+  }, [say, baseViewSource, getBaseEnv, commit, incrementPlacedCounter, persistBaseWorld, refreshBaseView]);
 
   dispatchBaseRef.current = dispatchBase;
+
+  // The shared outpost (plan 36, Phase 1): while a session is open this screen's base is the room's. A guest's own save is never
+  // written (persistBaseWorld stands down), so leaving gives them their own base back; the host's save takes the room's on leave.
+  useEffect(() => {
+    let bound: OutpostSession | null = null;
+    let offState: (() => void) | null = null;
+    let offEvents: (() => void) | null = null;
+    let terrainTimer: ReturnType<typeof setInterval> | null = null;
+    const unbind = (): void => {
+      offState?.();
+      offEvents?.();
+      if (terrainTimer !== null) clearInterval(terrainTimer);
+      offState = null;
+      offEvents = null;
+      terrainTimer = null;
+    };
+    const attach = (): void => {
+      const session = currentOutpostSession();
+      if (session === bound) return;
+      const wasInSession = bound !== null;
+      unbind();
+      bound = session;
+      outpostRef.current = session;
+      if (session) {
+        if (session.host) {
+          // a new room takes this base once; the sculpt goes up now and whenever it changes (the scene may still be loading)
+          session.client.seedWorld(baseWorldRef.current);
+          lastTerrainRef.current = null;
+          pushTerrain();
+          terrainTimer = setInterval(pushTerrain, 1000);
+        }
+        baseWorldRef.current = session.client.state().world;
+        refreshBaseView();
+        offState = session.client.onStateChange((state) => {
+          if (state.world === baseWorldRef.current) return;
+          baseWorldRef.current = state.world;
+          refreshBaseView();
+        });
+        offEvents = session.client.onEvents((events, meta) => {
+          if (!meta.confirmed) return;
+          const me = session.client.state().playerId;
+          for (const ev of events) {
+            if (ev.type === 'refused' && meta.actorId === me) {
+              say(formatRefusalToast(ev));
+              gameAudio.playRefuse();
+              narratorRef.current?.trigger('build:refused');
+            } else if (ev.type === 'removed' && meta.actorId !== me) {
+              pieceManagerRef.current.handleRemoval(ev.id, ev.collapsed);
+            }
+          }
+        });
+      } else if (wasInSession) {
+        // the session ended: the host's save takes the room's world, and this screen shows this device's own base again
+        writePendingHostSave();
+        lastTerrainRef.current = null;
+        baseWorldRef.current = initBaseWorld();
+        refreshBaseView();
+      }
+      setOutpostTick((t) => t + 1);
+    };
+    attach();
+    const unsubscribe = subscribeOutpostSession(attach);
+    return () => {
+      unsubscribe();
+      unbind();
+    };
+  }, [say, refreshBaseView]);
 
   const tryPlaceBase = useCallback((): boolean => {
     const lp = lastPreviewRef.current;
@@ -3466,6 +3619,7 @@ useEffect(() => {
             {syncMode === 'synced' ? 'Desync' : 'Sync'}
           </button>
         </div>
+        {outpostRef.current ? <OutpostRoster session={outpostRef.current} /> : null}
         </HudZone>
       ) : null}
 

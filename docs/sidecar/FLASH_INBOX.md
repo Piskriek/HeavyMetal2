@@ -81,3 +81,9 @@ Brief: `docs/prompts/sidecar/T02BE-coverage-water.md`. Start it only after F-07 
 
 ## F-09 [TAKEN] TICKET-02 P: performance pass, stage 6 on Low at 45 fps or more on the laptop
 Brief: `docs/prompts/sidecar/T02P-performance-pass.md`. Measure per layer first; expensive looks go behind Graphics settings with Auto, never deleted.
+
+## F-10 [OPEN] TICKET-05: square socket markers, gunmetal panels, sliding door, avatar at 3 m, beam core, outcrops
+Brief: `docs/prompts/sidecar/T05-base-meshes-avatar-beam-outcrops.md`. Start it only after F-09 is DONE (both touch play-scene).
+
+## F-11 [OPEN] TICKET-03 P: colourful pixel plumes, only while machines operate
+Brief: `docs/prompts/sidecar/T03P-machine-plumes.md` (spec: docs/argo/notes/ARGO_NOTE_08_plumes.md). Start it only after F-10 is DONE.

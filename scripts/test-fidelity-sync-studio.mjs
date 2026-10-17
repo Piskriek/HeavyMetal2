@@ -174,6 +174,9 @@ try {
   // 3. Click Planetary Grid (Shared Synced World)
   console.log('Launching Planetary Grid (Synced)...');
   await page.locator('.sm-menu button', { hasText: 'Planetary Grid' }).click();
+  // TICKET-08a: the Grid is a screen now (it used to start the campaign directly): choose SYNCED, then enter at the Earth lab
+  await page.locator('[data-testid="pg-sync-synced"]').click({ timeout: 15000 });
+  await page.locator('[data-testid="pg-spawn-lab"]').click({ timeout: 15000 });
   await page.waitForTimeout(3000);
   // a fresh grid profile opens the character creator first (as the campaign test dismisses it)
   await page.locator('button', { hasText: 'Done: into the lab' }).click({ timeout: 8000 }).catch(() => {});

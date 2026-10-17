@@ -61,5 +61,5 @@ Brief: `docs/prompts/sidecar/T01b-collision-leftovers.md`. Start it only after F
 ## F-04 [DONE] TICKET-02 D: install Argo's @hm/sky and wire it into the moon's sky
 Brief: `docs/prompts/sidecar/T02D-sky-install.md`. Bundle in `arena-gathered/argo-ticket02-sky/` (verified by Opus).
 
-## F-05 [TAKEN] TICKET-02 C: install Argo's @hm/plotbiome
+## F-05 [DONE] TICKET-02 C: install Argo's @hm/plotbiome
 Brief: `docs/prompts/sidecar/T02C-plotbiome-install.md`. Start it only after F-04 is DONE (both touch tsconfig and the lock).

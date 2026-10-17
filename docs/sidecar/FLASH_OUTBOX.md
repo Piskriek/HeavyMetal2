@@ -59,3 +59,15 @@ Append one entry per job, in the format in `FLASH_INBOX.md`. Newest at the botto
 - Changes from brief: Added `const sunArray = [SUN.x, SUN.y, SUN.z]` in `apps/web/src/crafter/world.ts` to supply missing identifier for `skyColour` and `skyPaletteFor`.
 - Decisions left: None. Proceeding to F-05.
 
+### [2026-10-17 12:45] F-05 [DONE] TICKET-02 C: install Argo's @hm/plotbiome
+- Commits: `e00210e9` ("feat(plotbiome): install @hm/plotbiome and wire into biome-input (TICKET-02 item C)")
+- Checks:
+  - `npm run typecheck`: 0 errors
+  - `packages/plotbiome/tests/plotbiome.test.ts`: 14 of 14 pass (including n=256 stage 6 under 40 ms)
+  - `apps/web/src/play/biome-input.test.ts`: 7 of 7 pass
+  - `npm test`: 2,772 unit pass (plotbiome 14/14 pass; brief's known load timing caveat on test 14 observed when concurrent)
+  - `npm run build`: 14.62 MB bundle (cap 16 MB)
+- Shots: None (pure math/biome simulation package; no browser UI).
+- Changes from brief: None. Installed Argo's bundle into `packages/plotbiome/`, wired `apps/web/src/play/biome-input.ts` to import `BiomeInput` and `Tier` from `@hm/plotbiome`, added Vite alias, linked package.
+- Decisions left: None.
+

@@ -96,3 +96,11 @@ Brief: none separate; the job is this list. HELD until Haiku's T06 (`docs/prompt
 - `play-scene.ts`: replace the hardcoded `targets` list in the lab aim (the `aimedLab` block) with `room.aimStation(pos, dir)` from T06's `lab-room.ts`, and widen `LabMachineKind` to `LabStationId` (`lab-machines.ts`). The rack, bench and combiner must keep working.
 - `play.tsx`: the E prompt comes from the station's `prompt`. E on `fabricator` opens the existing `FabricatorModal`; E on `planet-table` opens the Planetary Grid screen (08a's). Weapon Bench keeps its existing armory path.
 - Test: extend `scripts/test-lab-overhaul.mjs` (T06's) so aiming at each of the six stations shows its prompt and E opens its window. Run it, `npm test` and `test-campaign` (45 of 45) through `scripts/test-on-3dpc.sh --only`.
+
+## F-14 [HELD] Co-op play-scene hooks (plan 36 Phase 1 leftovers)
+Brief: none separate; the job is this list. Co-op Phase 1 landed at ad9eacec and 955395aa (Haiku, T36P1). The details are in POL-111 to POL-117 in `docs/DEFERRED_POLISH_REGISTRY.md`. HELD until F-13 is DONE; Opus opens it.
+- **POL-113:** a guest's live ground loads the host's sculpt. Add `importBeamField` (or reuse the beam-save load path) to `PlayScene`, and call it from the session's terrain event in `play.tsx`.
+- **POL-112:** the gate's footing pad (`groundAt` in `play-scene.ts`, |x| < 1.9, |z| < 1.25) moves into the pure `apps/web/src/base/plot-height.ts`, and `play-scene.ts` calls it, so the room and the scene agree on the pad. Add the 50-point check: `plotHeightAt` equals `scene.heightAt` in the browser.
+- **POL-111:** `plot-ground.ts` takes its terrain constants (`PAINT_ORIGIN` and the formula) from `plot-height.ts`.
+- **Remote avatars:** draw each peer from `client.samplePeers()` (100 ms behind) with the existing avatar mesh, inside the Low budget.
+- Test: extend `scripts/test-coop-outpost.mjs` so a guest sees the host's sculpt and the host's avatar. Run it, `npm test` and `test-campaign` (45 of 45) through `scripts/test-on-3dpc.sh --only`.

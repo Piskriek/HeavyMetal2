@@ -1,8 +1,9 @@
-// A leak on the plot: a sliced column in the leak's colour, and a ring on the ground when a wave is due. Sealing (the beam held on it) turns the column amber and locks its
-// slices back into line, and a sealed leak loses its column. The junked models around it are the wrecks (play/wrecks.ts). Pure geometry and
-// one shader; the state comes from the monsters.
+// A leak on the plot: an S-Space rift (play/rift.ts) standing on the ground, and a soft era aura under it. The rift follows the leak's state:
+// open is the violent tear, sealing (the beam held on it) turns amber and narrows, and a sealed leak collapses to its scar. A dormant leak
+// never opens, so it reads as a scar too. The junked models around it are the wrecks (play/wrecks.ts). Pure geometry; the state comes from the monsters.
 import * as THREE from 'three';
 import type { MonsterMarker } from '../play/monsters';
+import { createRift, type RiftInstance, type RiftState } from '../play/rift';
 
 export interface LeakVisualFrame {
   readonly dt: number;
@@ -18,59 +19,30 @@ export interface LeakVisuals {
   dispose(): void;
 }
 
-/** The leak colours: dormant (cyan), open and warned (magenta), sealing (amber, the beam's Seal colour, #ffc13d). */
-const COLOUR = { dormant: 0x3dc8ff, open: 0xff3d8a, warned: 0xff3d8a, sealing: 0xffc13d, sealed: 0x3dc8ff } as const;
-const COLUMN_RADIUS = 2.2;
-const COLUMN_HEIGHT = 3.5;
+/**
+ * The rift's state for one leak: a shut leak is a scar; a leak under the seal hold is sealing (amber), even a dormant one, since the
+ * dormant anomaly can be sealed; a dormant leak that is not being sealed is a scar too (it never opens); the rest are open.
+ */
+export function riftStateFor(mk: Pick<MonsterMarker, 'state' | 'dormant'>, sealing: boolean): RiftState {
+  if (mk.state === 'sealed') return 'sealed';
+  if (sealing) return 'sealing';
+  if (mk.dormant) return 'sealed';
+  return 'open';
+}
 
-const columnMaterial = (): THREE.ShaderMaterial =>
-  new THREE.ShaderMaterial({
-    transparent: true,
-    depthWrite: false,
-    uniforms: {
-      uTime: { value: 0 },
-      uColor: { value: new THREE.Color(COLOUR.dormant) },
-      uSeal: { value: 0 },
-      uOpacity: { value: 0.55 },
-    },
-    vertexShader: /* glsl */ `
-      uniform float uTime;
-      uniform float uSeal;
-      varying vec3 vLocal;
-      void main() {
-        vLocal = position;
-        // horizontal glitch slices: each band shifts sideways; sealing locks them back into line
-        float band = floor((position.y + 1.75) * 6.0);
-        float jitter = sin(band * 12.9898 + floor(uTime * 9.0) * 4.1);
-        float amp = (1.0 - uSeal) * 0.22;
-        vec3 p = position;
-        p.x += jitter * amp;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
-      }
-    `,
-    fragmentShader: /* glsl */ `
-      uniform vec3 uColor;
-      uniform float uTime;
-      uniform float uSeal;
-      uniform float uOpacity;
-      varying vec3 vLocal;
-      void main() {
-        float band = step(0.45, fract((vLocal.y + 1.75) * 6.0 + uTime * 0.6));
-        float rim = smoothstep(0.7, 1.0, length(vLocal.xz) / ${COLUMN_RADIUS.toFixed(2)});
-        float a = uOpacity * (0.6 + 0.4 * band) * (0.6 + 0.4 * rim);
-        gl_FragColor = vec4(uColor * (0.6 + 0.8 * rim), clamp(a, 0.0, 1.0));
-      }
-    `,
-  });
+/** The rift's height (m): the old column's, so the leak reads at the same size from the gate. */
+const RIFT_HEIGHT = 3.4;
+/**
+ * Beyond this distance (m) the tear's slices and scanlines are not drawn: a full rift is about 56 more draw calls than the old marker
+ * (the base-building check holds the frame to 80 draw calls). The collar and the scar stay, so a far leak still reads as a leak.
+ */
+export const RIFT_DETAIL_DISTANCE = 40;
 
 interface Entry {
   readonly group: THREE.Group;
-  readonly column: THREE.Mesh;
-  readonly ring: THREE.Mesh;
+  readonly rift: RiftInstance;
   /** The era aura: a soft disc on the ground that drops the ground to the leak's era. */
   readonly aura: THREE.Mesh;
-  readonly x: number;
-  readonly z: number;
 }
 
 export function createLeakVisuals(scene: THREE.Scene, groundHeightAt: (x: number, z: number) => number): LeakVisuals {
@@ -81,13 +53,8 @@ export function createLeakVisuals(scene: THREE.Scene, groundHeightAt: (x: number
     const group = new THREE.Group();
     group.name = `leak:${id}`;
     group.position.set(x, groundHeightAt(x, z), z);
-    const column = new THREE.Mesh(new THREE.CylinderGeometry(COLUMN_RADIUS, COLUMN_RADIUS, COLUMN_HEIGHT, 20, 6, true), columnMaterial());
-    column.position.y = COLUMN_HEIGHT / 2;
-    group.add(column);
-    const ring = new THREE.Mesh(new THREE.RingGeometry(COLUMN_RADIUS * 0.92, COLUMN_RADIUS * 1.05, 40), new THREE.MeshBasicMaterial({ color: COLOUR.warned, transparent: true, opacity: 0, depthWrite: false }));
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.04;
-    group.add(ring);
+    const rift = createRift({ seed: id, height: RIFT_HEIGHT });
+    group.add(rift.group);
     const aura = new THREE.Mesh(
       new THREE.CircleGeometry(4.5, 40),
       new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3, depthWrite: false }),
@@ -96,11 +63,18 @@ export function createLeakVisuals(scene: THREE.Scene, groundHeightAt: (x: number
     aura.position.y = 0.03;
     group.add(aura);
     scene.add(group);
-    return { group, column, ring, aura, x, z };
+    return { group, rift, aura };
+  };
+
+  const dispose = (e: Entry): void => {
+    scene.remove(e.group);
+    e.rift.dispose();
+    e.aura.geometry.dispose();
+    (e.aura.material as THREE.Material).dispose();
   };
 
   return {
-    update({ dt, markers, sealing }) {
+    update({ dt, markers, sealing, camera }) {
       time += dt;
       for (const mk of markers) {
         let e = entries.get(mk.id);
@@ -114,35 +88,20 @@ export function createLeakVisuals(scene: THREE.Scene, groundHeightAt: (x: number
         auraMat.color.setHex(eraColour);
         auraMat.opacity = mk.state === 'sealed' ? 0 : mk.state === 'warned' ? 0.6 + 0.2 * Math.abs(Math.sin(time * 6)) : mk.dormant ? 0.3 : 0.45;
 
-        const sealing1 = sealing === mk.id && mk.state !== 'sealed';
-        const colour = mk.state === 'sealed' ? COLOUR.sealed : sealing1 ? COLOUR.sealing : mk.dormant ? COLOUR.dormant : COLOUR.open;
-        const mat = e.column.material as THREE.ShaderMaterial;
-        mat.uniforms['uTime']!.value = time;
-        mat.uniforms['uSeal']!.value = mk.seal;
-        (mat.uniforms['uColor']!.value as THREE.Color).setHex(colour);
-        mat.uniforms['uOpacity']!.value = mk.state === 'sealed' ? 0.12 : 1;
-        e.column.visible = mk.state !== 'sealed' || mk.seal < 1;
-        const ringMat = e.ring.material as THREE.MeshBasicMaterial;
-        ringMat.color.setHex(colour);
-        ringMat.opacity = mk.state === 'warned' ? 0.8 + 0.2 * Math.abs(Math.sin(time * 6)) : sealing1 ? 0.9 : 0;
+        e.rift.setState(riftStateFor(mk, sealing === mk.id), time);
+        // the detail level: the tear's draw calls are only spent near the camera (the state above shows it on near leaks)
+        const tear = e.rift.group.getObjectByName('rift-tear');
+        if (tear) tear.visible = tear.visible && camera.position.distanceTo(e.group.position) <= RIFT_DETAIL_DISTANCE;
       }
       // leaks that are gone from the markers (none are removed in play, but a new plot clears them)
       for (const [id, e] of entries) {
         if (markers.some((m) => m.id === id)) continue;
-        scene.remove(e.group);
+        dispose(e);
         entries.delete(id);
       }
     },
     dispose() {
-      for (const e of entries.values()) {
-        scene.remove(e.group);
-        e.column.geometry.dispose();
-        (e.column.material as THREE.Material).dispose();
-        e.ring.geometry.dispose();
-        (e.ring.material as THREE.Material).dispose();
-        e.aura.geometry.dispose();
-        (e.aura.material as THREE.Material).dispose();
-      }
+      for (const e of entries.values()) dispose(e);
       entries.clear();
     },
   };

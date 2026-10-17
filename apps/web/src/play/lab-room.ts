@@ -1,3 +1,5 @@
+import { armoryRack, shouldShowAmmoBadge, ARMORY_RAIL_POS, ARMORY_PICKUP_REACH, SIDEARM_ITEM_ID, type ArmoryRackResult } from "./armory-rack";
+export { armoryRack, shouldShowAmmoBadge, ARMORY_RAIL_POS, ARMORY_PICKUP_REACH, SIDEARM_ITEM_ID, type ArmoryRackResult };
 // The lab you play in (SETMIX_PLAN Phase 2b / Sheet 21 AAA Rebuild):
 // A 16 × 12 × 5 m quantum-shielded white-room laboratory on Earth.
 // - North wall: wide observation window (14.8 × 3.1 m) framing the void storm as progress (setStorm).
@@ -771,6 +773,13 @@ export function createLabRoom(o: {
     railGroup.add(rail, tool);
     return true;
   });
+
+  // The sidearm holster (TICKET-07 Item D): Argo's armory rack on the same east-wall rail, lower down, with the Combat Shotgun in it.
+  // The rifle stays on the rail above (the generated weapon-frame), so the rack's own beam cradle is dropped. The pickup is E at
+  // ARMORY_RAIL_POS's pickup point (the play screen's); the sidearm is hidden there once it is taken.
+  const armory = armoryRack(m);
+  armory.group.getObjectByName('armory-beam-cradle')?.removeFromParent();
+  place({ group: armory.group, colliders: armory.colliders, sockets: [], lamps: [] }, ARMORY_RAIL_POS.x, ARMORY_RAIL_POS.z, 0, ARMORY_RAIL_POS.y);
 
   // Weapon bench against south wall at x ≈ 6.0: the labkit preset bench until its generated model is swapped in
   const weaponBench = place(kit.presetBench(m), 6.0, 2.4, Math.PI);

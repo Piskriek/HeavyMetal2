@@ -1,4 +1,4 @@
-// The wreck sites on the plot (TASK-23c): every leak (TASK-23b-2) sits in a cluster of two to four wasteland props, and four scenery-only
+// The wreck sites on the plot (TASK-23c, TICKET-07 Item F): every leak (TASK-23b-2) sits in a cluster of two to four wasteland props, and four scenery-only
 // sites hold clusters with no leak. Pure: the same plot gives the same layout, and the test pins it. The runtime (play/wrecks.ts)
 // builds the props and swaps their models.
 //
@@ -7,6 +7,7 @@
 // break: it stands at its stage's rung.
 import { LEAK_SITE_COUNT, MIN_GATE_DISTANCE, leakSites, type Point } from '../monsters/policy';
 import { hash32 } from '../monsters/adapter';
+import { loreFor } from './lore-logs';
 
 /** Scenery-only sites (no leak), numbered after the leak sites (their index is LEAK_SITE_COUNT and on). */
 export const SCENERY_SITE_COUNT = 4;
@@ -53,9 +54,123 @@ export interface WreckSite {
   readonly members: readonly WreckMember[];
 }
 
+export interface SettledWreckPose {
+  readonly yaw: number;
+  readonly pitch: number;
+  readonly roll: number;
+  readonly sink: number;
+}
+
+export interface WreckInteraction {
+  readonly salvage?: {
+    readonly item: string;
+    readonly n: number;
+    readonly secs: number;
+  };
+  readonly log?: string;
+}
+
 /** An integer hash, deterministic in its inputs (the same as the monsters' hash32 family). */
 const mix = (a: number, b: number): number => hash32(((a | 0) * 73856093) ^ ((b | 0) * 19349663) ^ 0x51ed27);
 const unit = (h: number): number => (h >>> 0) / 4294967296;
+
+function modelSeedHash(model: string, x: number, z: number, seed: number): number {
+  let h = seed | 0;
+  for (let i = 0; i < model.length; i++) {
+    h = mix(h, model.charCodeAt(i));
+  }
+  h = mix(h, Math.round(x * 100));
+  h = mix(h, Math.round(z * 100));
+  return h;
+}
+
+/**
+ * Pure deterministic wreck pose settler (TICKET-07 Item F — VEH-03):
+ * Tilts wreck trucks, vans, containers, and props onto the local terrain slope
+ * with extra pitch and roll and buries their base (`sink > 0`) so no corner ever floats.
+ */
+export function settleWreck(
+  member: Pick<WreckMember, 'model' | 'x' | 'z'> & { readonly yaw?: number; readonly tilt?: number; readonly sink?: number },
+  heightAt: (x: number, z: number) => number,
+  seed = 1
+): SettledWreckPose {
+  const h = modelSeedHash(member.model, member.x, member.z, seed);
+  const yaw = member.yaw !== undefined && Number.isFinite(member.yaw)
+    ? member.yaw
+    : unit(mix(h, 3)) * Math.PI * 2;
+
+  const isVehicleWreck =
+    member.model.includes('truck') ||
+    member.model.includes('van') ||
+    member.model.includes('container');
+
+  // Sample terrain around the footprint along the prop's rotated axes
+  const span = isVehicleWreck ? 1.8 : 0.9;
+  const cos = Math.cos(yaw);
+  const sin = Math.sin(yaw);
+  const hCentre = heightAt(member.x, member.z);
+  const hFront = heightAt(member.x + sin * span, member.z + cos * span);
+  const hBack = heightAt(member.x - sin * span, member.z - cos * span);
+  const hRight = heightAt(member.x + cos * span, member.z - sin * span);
+  const hLeft = heightAt(member.x - cos * span, member.z + sin * span);
+
+  const slopePitch = Math.atan2(hBack - hFront, span * 2);
+  const slopeRoll = Math.atan2(hLeft - hRight, span * 2);
+
+  const tiltMag = isVehicleWreck ? 0.18 + unit(mix(h, 7)) * 0.18 : 0.08 + unit(mix(h, 7)) * 0.14;
+  const rollMag = isVehicleWreck ? 0.14 + unit(mix(h, 11)) * 0.16 : 0.06 + unit(mix(h, 11)) * 0.10;
+  const pitchSign = Math.abs(slopePitch) > 0.01 ? Math.sign(slopePitch) : ((mix(h, 13) & 1) === 0 ? 1 : -1);
+  const rollSign = Math.abs(slopeRoll) > 0.01 ? Math.sign(slopeRoll) : ((mix(h, 17) & 1) === 0 ? 1 : -1);
+
+  const pitch = Math.max(-0.55, Math.min(0.55, slopePitch + (member.tilt || tiltMag * pitchSign)));
+  const roll = Math.max(-0.55, Math.min(0.55, slopeRoll + rollMag * rollSign));
+
+  const minGround = Math.min(hCentre, hFront, hBack, hRight, hLeft);
+  const groundDrop = Math.max(0, hCentre - minGround);
+  const tiltDrop = Math.abs(Math.sin(pitch)) * span + Math.abs(Math.sin(roll)) * (span * 0.75);
+  const baseBurial = isVehicleWreck ? 0.38 : Math.max(0.22, member.sink ?? 0.22);
+  const sink = Math.round((groundDrop + tiltDrop + baseBurial) * 1000) / 1000;
+
+  return { yaw, pitch, roll, sink };
+}
+
+const WRECK_SALVAGE_TABLE: Readonly<Record<string, { readonly item: string; readonly n: number; readonly secs: number; readonly defaultLog?: string }>> = {
+  'wrecked-truck-cab-c': { item: 'prim-chassis', n: 2, secs: 2.0, defaultLog: 'LOG-05' },
+  'wrecked-van-a': { item: 'prim-beam', n: 2, secs: 1.8, defaultLog: 'LOG-07' },
+  'container-crushed-a': { item: 'prim-cube', n: 2, secs: 1.8 },
+  'generator-small-a': { item: 'prim-column', n: 1, secs: 1.5, defaultLog: 'LOG-06' },
+  'cable-reel-square-a': { item: 'pxd-mono', n: 12, secs: 1.2 },
+  'drum-square-b': { item: 'ore', n: 15, secs: 1.2 },
+  'barrier-block-a': { item: 'vtx-rough', n: 8, secs: 1.2 },
+  'battery-pack-a': { item: 'pxd-chroma', n: 6, secs: 1.4, defaultLog: 'LOG-05' },
+  'terminal-old-a': { item: 'pxd-mono', n: 10, secs: 1.4, defaultLog: 'LOG-06' },
+  'control-box': { item: 'vtx-fine', n: 6, secs: 1.4, defaultLog: 'LOG-07' },
+  'radar-panel-b': { item: 'pxd-chroma', n: 8, secs: 1.6, defaultLog: 'LOG-08' },
+};
+
+/**
+ * Pure wreck interaction lookup (TICKET-07 Item F — VEH-03):
+ * Returns `{ salvage?: { item, n, secs }; log?: string }` for a `WreckMember`.
+ * Wreck trucks and vans provide both hold-E salvage and a readable Bridge Incident Log.
+ */
+export function wreckInteract(
+  member: Pick<WreckMember, 'model'> & { readonly transponder?: string; readonly x?: number; readonly z?: number }
+): WreckInteraction {
+  const trLore = member.transponder ? loreFor(member.transponder) : null;
+  const spec = WRECK_SALVAGE_TABLE[member.model];
+
+  const log = trLore?.log ?? spec?.defaultLog;
+  const salvage = spec
+    ? { item: spec.item, n: spec.n, secs: spec.secs }
+    : member.model !== 'rubble-slab'
+      ? { item: 'ore', n: 10, secs: 1.4 }
+      : undefined;
+
+  return {
+    ...(salvage ? { salvage } : {}),
+    ...(log ? { log } : {}),
+  };
+}
 
 /** Pure: the wreck sites of a plot, from its seed and gate and the leak sites the monsters use (`leakSites(seed, gate)`). */
 export function wreckSites(seed: number, gate: Point): WreckSite[] {
@@ -77,12 +192,19 @@ export function wreckSites(seed: number, gate: Point): WreckSite[] {
       const a = base + (k * Math.PI * 2) / Math.max(1, neighbours) + unit(mix(h, 11 + k)) * 0.6;
       const r = 3.0 + unit(mix(h, 13 + k)) * 1.8;
       const model = NEIGHBOUR_MODELS[mix(h, 17 + k) % NEIGHBOUR_MODELS.length]!;
-      members.push({ model, x: site.x + Math.cos(a) * r, z: site.z + Math.sin(a) * r, yaw: unit(mix(h, 19 + k)) * Math.PI * 2, tilt: unit(mix(h, 23 + k)) < 0.3 ? 0.12 : 0, sink: 0, junk: false });
+      const isTruckOrVan = model.includes('truck') || model.includes('van');
+      members.push({
+        model,
+        x: site.x + Math.cos(a) * r,
+        z: site.z + Math.sin(a) * r,
+        yaw: unit(mix(h, 19 + k)) * Math.PI * 2,
+        tilt: isTruckOrVan ? 0.24 : unit(mix(h, 23 + k)) < 0.3 ? 0.12 : 0,
+        sink: isTruckOrVan ? 0.38 : 0,
+        junk: false,
+      });
     }
     out.push({ index: site.index, leak: true, dormant: site.dormant, x: site.x, z: site.z, members });
   }
-  // scenery-only sites: outside the gate's keep-clear ring (every prop at least MIN_GATE_DISTANCE from the gate), clear of every leak site
-  // and of each other, from a deterministic search
   const far = (p: Point, q: Point, d: number): boolean => Math.hypot(p.x - q.x, p.z - q.z) >= d;
   const centres: Point[] = [];
   for (let j = 0; j < SCENERY_SITE_COUNT; j++) {
@@ -102,10 +224,16 @@ export function wreckSites(seed: number, gate: Point): WreckSite[] {
       for (let k = 0; k < total; k++) {
         const ang = base + (k * Math.PI * 2) / total;
         const rr = k === 0 ? 0 : 3.2 + unit(mix(h, 37 + k)) * 1.6;
+        const model = NEIGHBOUR_MODELS[mix(h, 41 + k) % NEIGHBOUR_MODELS.length]!;
+        const isTruckOrVan = model.includes('truck') || model.includes('van');
         members.push({
-          model: NEIGHBOUR_MODELS[mix(h, 41 + k) % NEIGHBOUR_MODELS.length]!,
-          x: c.x + Math.cos(ang) * rr, z: c.z + Math.sin(ang) * rr,
-          yaw: unit(mix(h, 43 + k)) * Math.PI * 2, tilt: 0, sink: 0, junk: false,
+          model,
+          x: c.x + Math.cos(ang) * rr,
+          z: c.z + Math.sin(ang) * rr,
+          yaw: unit(mix(h, 43 + k)) * Math.PI * 2,
+          tilt: isTruckOrVan ? 0.24 : 0,
+          sink: isTruckOrVan ? 0.38 : 0,
+          junk: false,
         });
       }
       out.push({ index, leak: false, dormant: false, x: c.x, z: c.z, members });
@@ -139,4 +267,3 @@ export function rungLevel(rung: number): 'low' | 'mid' | 'high' {
 export function wreckModels(sites: readonly WreckSite[]): string[] {
   return [...new Set(sites.flatMap((s) => s.members.map((m) => m.model)))];
 }
-

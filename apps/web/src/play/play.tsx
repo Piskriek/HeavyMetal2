@@ -69,6 +69,7 @@ import { preloadAllGenAssets, genLevelForStage, createGenFixture } from '../asse
 import { PROPS_SAVE_KEY, parsePropsSave, serializePropsSave, clearedProp, readLog, sealedSite, type PropsSave } from './props-save';
 import { clutterById, salvageSplit } from './lab-clutter';
 import { loreFor } from './lore-logs';
+import { ARMORY_PICKUP_REACH, ARMORY_RAIL_POS, SIDEARM_ITEM_ID, shouldShowAmmoBadge } from './armory-rack';
 import { LoreHover, DataBank, propLabel } from './lore-ui';
 
 const isFixture = (kind: Kind): boolean => kind === 'bin' || kind === 'bench' || kind === 'repeater' || kind === 'lifeSupport' || kind === 'weaponBench';
@@ -211,6 +212,15 @@ const BEAM_SAVE_KEY = 'hm.setmix.beam';
 const cleanShotMode = typeof location !== 'undefined' && new URLSearchParams(location.search).has('cleanShot');
 /** Hold E this long on a salvage prop in the lab to clear it (TASK-23c). */
 const CLEAR_HOLD_SECONDS = 1.0;
+/** The armory rail's pickup point, in the lab (armory-rack.ts): E within ARMORY_PICKUP_REACH of it takes the sidearm (TICKET-07 Item D). */
+const ARMORY_PICKUP_AT = { x: ARMORY_RAIL_POS.x - 0.08, z: ARMORY_RAIL_POS.z } as const;
+function nearArmoryPickup(p: { readonly x: number; readonly z: number }): boolean {
+  return Math.hypot(p.x - ARMORY_PICKUP_AT.x, p.z - ARMORY_PICKUP_AT.z) <= ARMORY_PICKUP_REACH;
+}
+/** Whether E does something with the aimed prop: a lab prop (read or salvage), or a planet prop with a log. A wreck with no log is not one. */
+function aimedPropActs(p: { readonly id: string; readonly salvage: boolean }, where: FrameOut['where']): boolean {
+  return p.salvage || where === 'lab' || loreFor(p.id) !== null;
+}
 /** Where a lab salvage goes: the pack first, then the network in reach of the gate (the bridge). */
 const SALVAGE_AT = { x: 0, z: 0 } as const;
 interface BeamSave { readonly field: string | null; readonly port: Cartridge | null }
@@ -231,7 +241,7 @@ function saveBeam(field: string, port: Cartridge | null): void {
 
 /** The plot's numbers for the HUD. */
 interface PlotHud { readonly ore: number; readonly oreRate: number; readonly supply: number; readonly demand: number; /** Kilowatts supplied over asked, capped at 1: the machines run at this share (TASK-26). */ readonly satisfaction: number; readonly levels: Readonly<Record<Metric, number>>; readonly stage: number }
-interface Hud { readonly where: FrameOut['where']; readonly sync: number; readonly inDome: boolean; readonly warn: boolean; readonly atLever: boolean; readonly atDial: boolean; readonly ghost: FrameOut['ghost']; readonly aimed: number | null; readonly aimedBoulder: FrameOut['aimedBoulder']; readonly aimedLab: FrameOut['aimedLab']; readonly aimedProp: FrameOut['aimedProp']; readonly plot: PlotHud; readonly visitingOwner: string | null }
+interface Hud { readonly where: FrameOut['where']; readonly sync: number; readonly inDome: boolean; readonly warn: boolean; readonly atLever: boolean; readonly atDial: boolean; readonly ghost: FrameOut['ghost']; readonly aimed: number | null; readonly aimedBoulder: FrameOut['aimedBoulder']; readonly aimedLab: FrameOut['aimedLab']; readonly aimedProp: FrameOut['aimedProp']; readonly plot: PlotHud; readonly visitingOwner: string | null; readonly atArmory: boolean }
 const NO_PLOT: PlotHud = { ore: 0, oreRate: 0, supply: 0, demand: 0, satisfaction: 1, levels: { pxd: 0, vtx: 0, lx: 0, aq: 0 }, stage: 0 };
 /** The build menu, in the order the plot needs them. */
 const BUILD_ORDER: readonly MachineKind[] = ['mill', 'drill', 'pylon', 'press', 'power', 'projector', 'water'];
@@ -298,7 +308,7 @@ export function PlayScreen(props: {
   const [menu, setMenu] = useState(false);
   const [buildTab, setBuildTab] = useState<BuildTab>('machines');
   const [building, setBuilding] = useState<MachineKind | null>(null);
-  const [hud, setHud] = useState<Hud>({ where: 'lab', sync: 1, inDome: false, warn: false, atLever: false, atDial: false, ghost: null, aimed: null, aimedBoulder: null, aimedLab: null, aimedProp: null, plot: NO_PLOT, visitingOwner: null });
+  const [hud, setHud] = useState<Hud>({ where: 'lab', sync: 1, inDome: false, warn: false, atLever: false, atDial: false, ghost: null, aimed: null, aimedBoulder: null, aimedLab: null, aimedProp: null, plot: NO_PLOT, visitingOwner: null, atArmory: false });
   const firstGatherRef = useRef(false);
 
   // TASK-11 Mentor Narration Controller & UI
@@ -1117,6 +1127,7 @@ useEffect(() => {
   const propsRef = useRef<PropsSave>(parsePropsSave(kv.get(PROPS_SAVE_KEY)));
   const clearHoldRef = useRef(0);
   const clearPropRef = useRef<(id: string) => void>(() => {});
+  const takeSidearmRef = useRef<() => void>(() => {});
   const [databank, setDatabank] = useState<string | null>(null);
   const savePropsSave = useCallback((next: PropsSave): void => {
     propsRef.current = next;
@@ -1156,6 +1167,32 @@ useEffect(() => {
     if (item.log) openLog(item.log);
   }, [dispatchBase, getBaseEnv, say, openLog, savePropsSave, commit]);
   clearPropRef.current = clearProp;
+
+  // the armory's sidearm (TICKET-07 Item D): E at the rail puts the Combat Shotgun into the sidearm slot. It goes through the pack first
+  // (the base's salvage, logged) and is then moved into the slot; refused whole when the pack has no free slot, so nothing is lost.
+  const takeSidearm = useCallback((): void => {
+    const w = baseWorldRef.current;
+    if (w.equipment.sidearm) { say('The sidearm is already in hand', 'Its rounds show bottom left.'); return; }
+    const refuse = (): void => { say('The pack is full', 'Make room for the sidearm, then take it again.'); gameAudio.playRefuse(); };
+    if (!w.player.slots.some((s) => s === null)) { refuse(); return; }
+    const salvage: BaseCommand = { t: 'salvage', at: SALVAGE_AT, stock: [{ item: SIDEARM_ITEM_ID, n: 1 }] };
+    const res = apply(w, getBaseEnv(), salvage);
+    if (!res || !res.world || res.events.some((e) => e.type === 'refused')) { refuse(); return; }
+    // the stack lands in the pack, or in linked storage in reach when the pack is too heavy: the move takes it from wherever it went
+    const packIndex = res.world.player.slots.findIndex((s) => s?.item === SIDEARM_ITEM_ID);
+    const box = packIndex >= 0 ? undefined : res.world.boxes.find((bx) => bx.slots.some((s) => s?.item === SIDEARM_ITEM_ID));
+    const boxIndex = box ? box.slots.findIndex((s) => s?.item === SIDEARM_ITEM_ID) : -1;
+    dispatchBase(salvage);
+    if (packIndex >= 0) dispatchBase({ t: 'move', at: SALVAGE_AT, from: { at: 'inventory', index: packIndex }, to: { at: 'equipment', slot: 'sidearm' }, n: 1 });
+    else if (box && boxIndex >= 0) dispatchBase({ t: 'move', at: SALVAGE_AT, from: { at: 'box', box: box.id, index: boxIndex }, to: { at: 'equipment', slot: 'sidearm' }, n: 1 });
+    if (!baseWorldRef.current.equipment.sidearm) {
+      say('The sidearm stays in storage', 'Move it from your inventory into the sidearm slot.');
+      return;
+    }
+    narratorRef.current?.trigger('tool:pickup');
+    say('Combat sidearm taken', 'It sits in the sidearm slot. Its rounds show bottom left on the planet.');
+  }, [dispatchBase, getBaseEnv, say]);
+  takeSidearmRef.current = takeSidearm;
 
   // a drop goes to the bridge store: the linked storage that the refinery and the benches draw from (a logged grant, as the Act V kit)
   const payDrop = useCallback((item: string, n: number) => {
@@ -2279,6 +2316,7 @@ useEffect(() => {
             aimedBoulder: out.aimedBoulder,
             aimedLab: out.aimedLab,
             aimedProp: out.aimedProp,
+            atArmory: out.where === 'lab' && nearArmoryPickup(sceneRef.current?.debug.position() ?? { x: 99, z: 99 }),
             visitingOwner: vis.snapshot.owner,
             plot: { ore: 0, oreRate: 0, supply: 0, demand: 0, satisfaction: 1, levels, stage: vp.stage },
           });
@@ -2297,6 +2335,7 @@ useEffect(() => {
             aimedBoulder: out.aimedBoulder,
             aimedLab: out.aimedLab,
             aimedProp: out.aimedProp,
+            atArmory: out.where === 'lab' && nearArmoryPickup(sceneRef.current?.debug.position() ?? { x: 99, z: 99 }),
             visitingOwner: null,
             plot: { ore: p.ore, oreRate: rt?.ore ?? 0, supply: rt?.supply ?? 0, demand: rt?.demand ?? 0, satisfaction: rt && rt.demand > 0 ? Math.min(1, rt.supply / rt.demand) : 1, levels, stage: p.stage },
           });
@@ -2924,8 +2963,13 @@ useEffect(() => {
         say(next === 'third' ? 'Third-person view' : 'First-person view');
         return;
       }
+      // the armory's sidearm (TICKET-07 Item D): a tap on E at the rail takes it
+      if (e.code === 'KeyE' && hud.atArmory && hud.aimedLab === null && !hud.atLever && !hud.atDial) {
+        takeSidearmRef.current();
+        return;
+      }
       // a lore prop (TASK-23c): a tap on E reads a fixture's or a transponder's log; a salvage prop is held, never tapped
-      if (e.code === 'KeyE' && hud.aimedProp && hud.aimed === null && !hud.atLever && !hud.atDial) {
+      if (e.code === 'KeyE' && hud.aimedProp && aimedPropActs(hud.aimedProp, hud.where) && hud.aimed === null && !hud.atLever && !hud.atDial) {
         if (!hud.aimedProp.salvage) {
           const entry = loreFor(hud.aimedProp.id);
           if (entry) openLog(entry.log);
@@ -3055,7 +3099,7 @@ useEffect(() => {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [ready, creating, building, gunEquipped, fireWeapon, menu, panel, labPanel, dialOpen, debugOpen, locked, paused, hud.atLever, hud.atDial, hud.aimed, hud.aimedBoulder, hud.aimedLab, hud.aimedProp, openLog, hud.where, placeNow, stopBuilding, freeMouse, say, props.profile, radial, isAnyBaseWindowOpen]);
+  }, [ready, creating, building, gunEquipped, fireWeapon, menu, panel, labPanel, dialOpen, debugOpen, locked, paused, hud.atLever, hud.atDial, hud.aimed, hud.aimedBoulder, hud.aimedLab, hud.aimedProp, hud.atArmory, openLog, hud.where, placeNow, stopBuilding, freeMouse, say, props.profile, radial, isAnyBaseWindowOpen]);
   // Z released: the remove hold ends (a tap, before the half second, removes nothing)
   useEffect(() => {
     const onKeyUp = (e: KeyboardEvent): void => {
@@ -3376,8 +3420,9 @@ useEffect(() => {
     : hud.atLever ? 'E: pull the main lever'
     : hud.atDial ? 'E: plot dial'
     : hud.where === 'planet' && hud.aimed !== null && panel === null ? `E: inspect the ${KINDS[(visiting ? visiting.plot.machines : plotRef.current.machines).find((x) => x.id === hud.aimed)?.kind ?? 'mill'].name.toLowerCase()}`
+    : hud.atArmory && hud.aimedLab === null && labPanel === null && !hud.atLever && !hud.atDial && !baseWorldRef.current.equipment.sidearm ? 'E: take the combat sidearm from the armory'
     : hud.where === 'lab' && hud.aimedProp?.salvage && labPanel === null ? `Hold E: salvage the ${propLabel(hud.aimedProp.id)}`
-    : hud.aimedProp && !hud.aimedProp.salvage && labPanel === null && hud.aimed === null ? `E: read the ${propLabel(hud.aimedProp.id)}`
+    : hud.aimedProp && aimedPropActs(hud.aimedProp, hud.where) && !hud.aimedProp.salvage && labPanel === null && hud.aimed === null ? `E: read the ${propLabel(hud.aimedProp.id)}`
     : hud.where === 'lab' && hud.aimedLab !== null && labPanel === null ? `E: open the ${hud.aimedLab === 'rack' ? 'cartridge rack' : hud.aimedLab === 'bench' ? 'preset bench' : 'preset combiner'}`
     : hud.where === 'planet' && hud.aimedBoulder !== null && !visiting ? 'Hold E: gather ore'
     : '';
@@ -4362,7 +4407,7 @@ useEffect(() => {
               at={sceneRef.current?.debug.position() ?? { x: 0, z: 0 }}
               currentStructureId={currentAimedStructureIdRef.current}
               planPrompt={planPrompt}
-              weaponStats={weaponStats(baseWorldRef.current.loadout)}
+              weaponStats={shouldShowAmmoBadge(baseWorldRef.current.equipment.sidearm) ? weaponStats(baseWorldRef.current.loadout) : null}
               ammo={gunAmmo}
               drivingSpeed={drivingSpeed}
               onDispatch={(cmd) => dispatchBase(cmd)}

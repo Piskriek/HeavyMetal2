@@ -17,9 +17,8 @@ import type { WeaponStats } from '../base/weapons';
 
 export type { MonstersSetting } from '../monsters/policy';
 
-/** How far the beam reaches a leak to seal it (leaksim seals within this distance of the player, m). */
-export const SEAL_REACH = 25;
-/** The sealing hold's colour is the beam's (#ffc13d, TASK-21d): the leak's ring and column go amber while it seals. */
+import { SEAL_REACH, PROXIMITY_SPAWN_RADIUS, PROXIMITY_SPAWN_INTERVAL, maxMobsPerLeak, spawnPolicy, beamDamage } from './monster-rules';
+export { SEAL_REACH, PROXIMITY_SPAWN_RADIUS, PROXIMITY_SPAWN_INTERVAL, maxMobsPerLeak, spawnPolicy, beamDamage };
 
 export interface MonsterMarker {
   readonly id: number;
@@ -77,6 +76,7 @@ export interface MonsterEvents {
 }
 
 export interface FireResult { readonly fired: boolean; readonly hits: number; readonly damage: number; readonly killed: number; readonly reason?: string }
+export interface BeamHitResult { readonly hit: number | null; readonly damage: number; readonly killed: boolean }
 
 export interface MonstersSystem {
   isEquipped(): boolean;
@@ -87,6 +87,8 @@ export interface MonstersSystem {
   setTrigger(held: boolean): void;
   /** Fires the weapon from `origin` along the ground direction `dir` (x and z). Pellets are raycast through leaksim. */
   fire(origin: Point, dir: Point): FireResult;
+  /** Raycasts the extraction beam through leaksim and applies chip damage `dmg` to the nearest hit mob (TICKET-07 Item C). */
+  beamHit(origin: Point, dir: Point, range: number, dmg: number): BeamHitResult;
   getAmmo(): { readonly current: number; readonly max: number };
   reload(): void;
   setFidelityStage(stage: number): void;
@@ -125,15 +127,12 @@ export interface MonstersSystem {
   hurtMob(id: number, damage: number): { readonly killed: boolean } | null;
   /** Places a monster of `kind` at (x, z), on no leak (the dev hooks and the tests). Returns its id. */
   placeMob(kind: Archetype, x: number, z: number): number;
-  getMobList(): readonly MonsterMobStatus[];
   getStats(): MonsterStats;
   /** The brain's world, for the tests and the replay check. */
   world(): World;
   clearMobs(): void;
   dispose(): void;
 }
-
-// ---------------------------------------------------------------------------------------------------------- the factory
 
 // -----------------------------------------------------------------------------
 // Procedural Web Audio FX Synthesizer
@@ -160,7 +159,6 @@ class CombatAudio {
     if (!ctx) return;
     const now = ctx.currentTime;
 
-    // Sub-bass punch (sine drop)
     const osc = ctx.createOscillator();
     const gainOsc = ctx.createGain();
     osc.type = 'triangle';
@@ -173,7 +171,6 @@ class CombatAudio {
     osc.start(now);
     osc.stop(now + 0.35);
 
-    // High crack / blast noise
     const bufferSize = ctx.sampleRate * 0.18;
     const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = noiseBuffer.getChannelData(0);
@@ -194,7 +191,6 @@ class CombatAudio {
     noiseGain.connect(ctx.destination);
     noise.start(now);
 
-    // Mechanical pump action (click-clack)
     setTimeout(() => {
       if (!ctx || ctx.state !== 'running') return;
       const t = ctx.currentTime;
@@ -212,57 +208,6 @@ class CombatAudio {
     }, 180);
   }
 
-  playPainGrunt(): void {
-    const ctx = this.init();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(140, now);
-    osc.frequency.exponentialRampToValueAtTime(70, now + 0.2);
-    gain.gain.setValueAtTime(0.4, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.25);
-  }
-
-  playDeathRoar(): void {
-    const ctx = this.init();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(110, now);
-    osc.frequency.exponentialRampToValueAtTime(35, now + 0.65);
-    gain.gain.setValueAtTime(0.55, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.75);
-  }
-
-  playAttackBite(): void {
-    const ctx = this.init();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(150, now);
-    osc.frequency.linearRampToValueAtTime(75, now + 0.14);
-    gain.gain.setValueAtTime(0.4, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.16);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.18);
-  }
-
   playEquip(): void {
     const ctx = this.init();
     if (!ctx) return;
@@ -278,57 +223,6 @@ class CombatAudio {
     gain.connect(ctx.destination);
     osc.start(now);
     osc.stop(now + 0.14);
-  }
-
-  playSpawn(): void {
-    const ctx = this.init();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(220, now);
-    osc.frequency.exponentialRampToValueAtTime(880, now + 0.25);
-    gain.gain.setValueAtTime(0.4, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.32);
-  }
-
-  playOreChime(): void {
-    const ctx = this.init();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, now);
-    osc.frequency.setValueAtTime(1320, now + 0.08);
-    gain.gain.setValueAtTime(0.35, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.28);
-  }
-
-  playBeamPulse(): void {
-    const ctx = this.init();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(880, now);
-    osc.frequency.exponentialRampToValueAtTime(440, now + 0.12);
-    gain.gain.setValueAtTime(0.3, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.15);
   }
 
   /** The wind-up's rising tone (350 ms): a monster is about to strike (P0-MON-02). */
@@ -361,13 +255,11 @@ function createShotgunViewmodel(): { group: THREE.Group; flashMesh: THREE.Mesh; 
   const darkWoodMat = new THREE.MeshStandardMaterial({ color: 0x4a2c18, roughness: 0.65, metalness: 0.05 });
   const steelMat = new THREE.MeshStandardMaterial({ color: 0x3d434a, roughness: 0.25, metalness: 0.9 });
 
-  // Main Receiver
   const receiverGeo = new THREE.BoxGeometry(0.07, 0.09, 0.34);
   const receiver = new THREE.Mesh(receiverGeo, gunMetalMat);
   receiver.position.set(0, 0, 0);
   group.add(receiver);
 
-  // Twin Barrels (Double-Barrel / Heavy Combat)
   const barrelGeo = new THREE.CylinderGeometry(0.016, 0.016, 0.48, 16);
   barrelGeo.rotateX(Math.PI / 2);
 
@@ -379,28 +271,24 @@ function createShotgunViewmodel(): { group: THREE.Group; flashMesh: THREE.Mesh; 
   rightBarrel.position.set(0.018, 0.022, -0.36);
   group.add(rightBarrel);
 
-  // Ribbed Pump Fore-End Grip
   const pumpGeo = new THREE.CylinderGeometry(0.026, 0.026, 0.22, 12);
   pumpGeo.rotateX(Math.PI / 2);
   const pump = new THREE.Mesh(pumpGeo, darkWoodMat);
   pump.position.set(0, -0.012, -0.26);
   group.add(pump);
 
-  // Stock / Grip
   const gripGeo = new THREE.BoxGeometry(0.055, 0.12, 0.12);
   gripGeo.rotateX(-0.4);
   const grip = new THREE.Mesh(gripGeo, darkWoodMat);
   grip.position.set(0, -0.07, 0.16);
   group.add(grip);
 
-  // Iron Sight Front Bead
   const beadGeo = new THREE.SphereGeometry(0.006, 8, 8);
   const beadMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
   const bead = new THREE.Mesh(beadGeo, beadMat);
   bead.position.set(0, 0.042, -0.58);
   group.add(bead);
 
-  // Muzzle Flash Quad
   const flashGeo = new THREE.PlaneGeometry(0.24, 0.24);
   const flashMat = new THREE.MeshBasicMaterial({
     color: 0xffaa22,
@@ -414,14 +302,12 @@ function createShotgunViewmodel(): { group: THREE.Group; flashMesh: THREE.Mesh; 
   flashMesh.visible = false;
   group.add(flashMesh);
 
-  // Muzzle Flash Point Light
   const flashLight = new THREE.PointLight(0xff7711, 0, 10);
   flashLight.position.set(0, 0.022, -0.64);
   group.add(flashLight);
 
   return { group, flashMesh, flashLight };
 }
-
 
 // -----------------------------------------------------------------------------
 // Particle Burst Pool
@@ -491,7 +377,7 @@ class ParticleSystem {
         this.particles.splice(i, 1);
         continue;
       }
-      p.vel.y -= 9.8 * dt; // gravity
+      p.vel.y -= 9.8 * dt;
       p.pos.addScaledVector(p.vel, dt);
 
       const alpha = 1 - p.life / p.maxLife;
@@ -505,7 +391,6 @@ class ParticleSystem {
       active++;
     }
 
-    // Hide remaining vertices
     for (let i = active; i < this.maxCount; i++) {
       this.pPos[i * 3] = 0;
       this.pPos[i * 3 + 1] = -9999;
@@ -521,7 +406,6 @@ class ParticleSystem {
     this.geom.dispose();
   }
 }
-
 
 /** The default gun: the sidearm's shotgun (the stock weapon, before any part is swapped). */
 const DEFAULT_WEAPON_STATS: WeaponStats = {
@@ -555,7 +439,6 @@ export function createMonsters(options: {
   const audio = new CombatAudio();
   const particles = new ParticleSystem(planetScene);
 
-  // the shotgun in view, as before (a viewmodel on the camera)
   const { group: viewmodelGroup, flashMesh, flashLight } = createShotgunViewmodel();
   camera.add(viewmodelGroup);
   viewmodelGroup.visible = false;
@@ -575,8 +458,10 @@ export function createMonsters(options: {
   let sealingLeak: number | null = null;
   let world: World = createWorld(seed);
   const siteLeak = new Map<number, number>();
-  // the sealed sites, kept for the save: a sealed leak is shut for good, its wreck restored a rung (TASK-23c)
   const sealedSet = new Set<number>();
+  const proxCooldown = new Map<number, number>();
+  let proxSeq = 1;
+
   const markSealed = (leakId: number): void => {
     world = { ...world, leaks: world.leaks.map((l) => (l.id === leakId ? { ...l, sealed: true, seal: 1, kinds: [] } : l)) };
   };
@@ -588,7 +473,6 @@ export function createMonsters(options: {
 
   const renderer: MonsterRenderer = createMonsterRenderer(planetScene, { budget: { animated: 24, perSkin: 24 } });
   renderer.setStage(stage);
-  // the gate's dome: a faint amber edge at 25 m, brighter where a monster presses it (P0-MON-03: the sanctuary is never entered)
   const domeMat = new THREE.MeshBasicMaterial({ color: 0xffc13d, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide });
   const dome = new THREE.Mesh(new THREE.RingGeometry(GATE_DOME_RADIUS - 0.6, GATE_DOME_RADIUS, 160), domeMat);
   dome.rotation.x = -Math.PI / 2;
@@ -680,7 +564,6 @@ export function createMonsters(options: {
         case 'spawn': {
           const mob = mobRef(e.mob);
           if (!mob) break;
-          // nothing spawns within 30 m of the gate pad: a spawn that lands there is taken back (the leak sites are all clear of it)
           if (!clearOfGate(mob, gate)) {
             world = { ...world, mobs: world.mobs.filter((m) => m.id !== mob.id) };
             break;
@@ -797,6 +680,69 @@ export function createMonsters(options: {
     return { fired: true, hits, damage, killed };
   };
 
+  /** Proximity spawn step (TICKET-07 Item B): spawns defenders around open leaks within 40 m of the player. */
+  const stepProximitySpawns = (dt: number, player: { readonly x: number; readonly z: number }): void => {
+    if (!unlocked || setting === 'off') return;
+    let totalLive = world.mobs.filter((m) => m.phase !== 'dead').length;
+    if (totalLive >= cap) return;
+
+    for (const lk of world.leaks) {
+      const cd = (proxCooldown.get(lk.id) ?? 0) - dt;
+      if (cd > 0) {
+        proxCooldown.set(lk.id, cd);
+        continue;
+      }
+      const site = leakSite.get(lk.id);
+      const activeForLeak = world.mobs.filter((m) => m.leak === lk.id && m.phase !== 'dead').length;
+      const playerDist = Math.hypot(player.x - lk.x, player.z - lk.z);
+      const toSpawn = spawnPolicy(
+        { sealed: lk.sealed, dormant: site?.dormant, kinds: lk.kinds },
+        playerDist,
+        stage,
+        activeForLeak
+      );
+      if (toSpawn <= 0) continue;
+
+      const kinds = lk.kinds.length > 0 ? lk.kinds : kindsForEra(eraForStage(stage));
+      let spawnedAny = false;
+      for (let i = 0; i < toSpawn && totalLive < cap; i++) {
+        const kind = kinds[(proxSeq + i) % kinds.length] ?? 'charger';
+        const angle = unit(seed + proxSeq * 73 + i * 19) * Math.PI * 2;
+        const rad = 3.6 + unit(seed + proxSeq * 31 + i * 11) * 2.0;
+        const sx = lk.x + Math.cos(angle) * rad;
+        const sz = lk.z + Math.sin(angle) * rad;
+        proxSeq++;
+
+        if (!clearOfGate({ x: sx, z: sz }, gate)) continue;
+        if (safe.some((s) => Math.hypot(sx - s.x, sz - s.z) < s.r)) continue;
+
+        const id = world.nextId;
+        const spec = ARCHETYPES[kind];
+        const mob: Mob = {
+          id,
+          kind,
+          leak: lk.id,
+          hp: spec.hp,
+          phase: 'roam',
+          phaseT: 0,
+          provoked: false,
+          x: sx,
+          z: sz,
+        };
+        world = { ...world, nextId: id + 1, mobs: [...world.mobs, mob] };
+        totalLive++;
+        spawnedAny = true;
+        stats = { ...stats, mobsSpawned: stats.mobsSpawned + 1 };
+        // no first-sighting signal here: the campaign's first sighting (M-01, the chain's monsterSeen) is the scripted wave's, so a
+        // defender that spawns on the way in does not use it up (the F-03 beat, campaign check 28)
+      }
+
+      if (spawnedAny) {
+        proxCooldown.set(lk.id, PROXIMITY_SPAWN_INTERVAL);
+      }
+    }
+  };
+
   const system: MonstersSystem = {
     isEquipped: () => equipped,
     equip(on) {
@@ -816,12 +762,26 @@ export function createMonsters(options: {
       if (cooldownLeft > 0) return { fired: false, hits: 0, damage: 0, killed: 0, reason: 'cooling' };
       if (ammo <= 0) return { fired: false, hits: 0, damage: 0, killed: 0, reason: 'empty' };
       cooldownLeft = weapon.cooldown;
-      // a burst: this shot now, the rest at the barrel's gap from the same aim (the update fires them)
       burstLeft = Math.max(0, weapon.burst - 1);
       burstTimer = weapon.burstGap;
       burstFrom = { x: origin.x, z: origin.z };
       burstDir = { x: dir.x, z: dir.z };
       return shoot(origin, dir);
+    },
+    beamHit(origin, dir, range, dmg) {
+      if (!(dmg > 0) || !(range > 0)) {
+        return { hit: null, damage: 0, killed: false };
+      }
+      const id = raycast(world, origin, dir, range);
+      if (id === null) {
+        return { hit: null, damage: 0, killed: false };
+      }
+      const r = hitMob(id, dmg);
+      if (!r) {
+        return { hit: null, damage: 0, killed: false };
+      }
+      stats = { ...stats, damageDealt: stats.damageDealt + dmg };
+      return { hit: id, damage: dmg, killed: r.killed > 0 };
     },
     getAmmo: () => ({ current: ammo, max: weapon?.magazine ?? 0 }),
     reload() { ammo = weapon?.magazine ?? 0; },
@@ -847,6 +807,7 @@ export function createMonsters(options: {
         leakEra.clear();
         leakSite.clear();
         latchedUntil.clear();
+        proxCooldown.clear();
         firstSightingDone = false;
         for (const id of [...rings.keys()]) {
           const r = rings.get(id)!;
@@ -887,7 +848,7 @@ export function createMonsters(options: {
       const h = Math.max(0, Math.min(0.1, dt));
       cooldownLeft = Math.max(0, cooldownLeft - h);
       ensureLeaks();
-      // the beam seals only inside its reach (the brain checks it too); the monsters fight only after F-03 (`unlocked`)
+      stepProximitySpawns(h, player);
       const input: LeakInput = {
         dt: h,
         stage,
@@ -902,9 +863,7 @@ export function createMonsters(options: {
       const res = leakStep(world, input);
       world = res.world;
       handle(res.events, player);
-      // the fight's music: while a monster chases or winds up, the combat track plays (the calm brings the moon back)
       gameAudio.setMobsEngaged(world.mobs.some((m) => m.phase === 'chase' || m.phase === 'windup' || m.phase === 'attack'));
-      // draw: the living, and the dead for their fall (the brain removes them after two seconds)
       const mobs: MonsterMob[] = world.mobs.map((m) => ({ id: m.id, kind: m.kind, x: m.x, z: m.z, y: groundHeightAt(m.x, m.z), phase: m.phase, phaseT: m.phaseT }));
       renderer.sync(mobs, (m) => skinFor(m.kind, leakEra.get(mobRef(m.id)?.leak ?? -1) ?? eraForStage(stage), m.id));
       renderer.update(h, cam);
@@ -919,7 +878,6 @@ export function createMonsters(options: {
         }
         if (ammo <= 0) burstLeft = 0;
       }
-      // the dome's edge brightens while a live monster presses it
       const pressed = world.mobs.some((m) => m.phase !== 'dead' && Math.abs(Math.hypot(m.x - gate.x, m.z - gate.z) - GATE_DOME_RADIUS) < 2.5);
       domeMat.opacity = pressed ? 0.4 + 0.3 * Math.abs(Math.sin(performance.now() / 150)) : 0.14;
       updateRings(h);

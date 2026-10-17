@@ -148,3 +148,38 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 - **Seen:** TICKET-08a. `planetary-grid.tsx` and `audio-tab.tsx` carry their stylesheet inside the module (their unit tests import the module, and Node cannot load CSS). Their `.css` files are the source, so every edit to one means regenerating the string in the other.
 - **Expected:** the stylesheet is imported as a file, and the tests import only the pure helpers from a module without CSS.
 - Sidecar Task: POL-87 - move the pure helpers to their own module and import the `.css` files directly, as the rest of the shell does.
+
+### POL-88: the Scene tab's Save has no project route
+- **Seen:** TICKET-08b. `apps/web/studio-server/write-back.ts` allows only `asset-tweaks`, so Scene layouts persist per browser (kv `studio.scene-layouts`) and reach the project only through Copy JSON.
+- **Expected:** in the dev server, Save writes `scene-layouts` to the project the way Assets does.
+- Sidecar Task: POL-88 - add `scene-layouts` to the write-back allowlist, with a schema check, and point the Scene tab's Save at it when the route is writable.
+
+### POL-89: machines have no sockets in the registry
+- **Seen:** TICKET-08b. The packed registry carries no sockets, so the gizmo shows socket markers only on the three rover bodies (taken from `VEHICLE_FIT`); machines show only their plume vents.
+- **Expected:** every asset with hardpoints shows its socket markers.
+- Sidecar Task: POL-89 - have the registry generator write sockets for machines and structures, and drop the rover special case.
+
+### POL-90: Scene edits aren't on the undo stack
+- **Seen:** TICKET-08b. Assets edits undo; Scene transform edits and gizmo drags don't.
+- Sidecar Task: POL-90 - put Scene transform edits on the Studio's undo stack.
+
+### POL-91: one throw unmounts the whole Studio
+- **Seen:** TICKET-08b. A throw inside a workspace (the Look tab's texture size, before the fix) took down the entire Studio.
+- Sidecar Task: POL-91 - wrap each Studio workspace in an error boundary that shows the error and keeps the other tabs alive.
+
+### POL-92: two offscreen renderers in the Studio
+- **Seen:** TICKET-08b. `four-angle.ts` and `studio-thumbs.ts` each make their own offscreen WebGL renderer; on the GTX 950M every extra context costs memory.
+- Sidecar Task: POL-92 - share one offscreen renderer between them.
+
+### POL-93: the Studio tabs' CSS lives twice
+- **Seen:** TICKET-08b. `look-tab.css` and `scene-tab.css` aren't imported; the same rules are embedded as strings in the `.tsx` files (as in POL-87).
+- Sidecar Task: POL-93 - fold into POL-87: one style source per screen.
+
+### POL-94: the gizmo drag isn't tested
+- **Seen:** TICKET-08b. `test-studio-tabs.mjs` covers the number inputs, not the pointer drag on the gizmo.
+- Sidecar Task: POL-94 - automate a gizmo drag on a placed copy and check its transform changes.
+
+### POL-95: the Look tab's stage-6 readout and green (Argo's review)
+- **Seen:** TICKET-08b. The readout says "Levels 0" at stage 6, and the stage-6 ground is a very saturated, ridged green. Both are Argo's values.
+- **Expected:** Argo confirms or retunes them against plan 27 (the stage look bible).
+- Sidecar Task: POL-95 - Argo's call; then a sidecar applies it.

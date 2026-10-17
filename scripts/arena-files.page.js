@@ -15,6 +15,7 @@ window.__arenaFiles = async (name, { go = true } = {}) => {
   const tree = [...document.querySelectorAll('button')].filter((b) => /^[\w.-]+\.(ts|tsx|js|jsx|mjs|html|css|json|md)$/.test(b.textContent.trim()));
   const files = {};
   for (const b of tree) {
+    if (/lock\.json$/.test(b.textContent.trim())) continue; // lock files only bloat the URL
     const base = b.textContent.trim();
     b.click();
     await sleep(900);

@@ -80,6 +80,8 @@ import { MachinePickerModal } from '../base/ui/machine-picker-modal';
 import { RefineryModal } from '../base/ui/refinery-modal';
 import { FabricatorModal } from '../base/ui/fabricator-modal';
 import { WeaponBenchModal } from '../base/ui/weapon-bench-modal';
+import { MachineInspector } from '../base/ui/machine-inspector';
+import { inspectMachine, type InspectAction } from '../base/machine-inspect';
 import * as S from '@hm/structure';
 import type { Kind } from '@hm/structure';
 import * as L from '@hm/lattice';
@@ -638,6 +640,9 @@ useEffect(() => {
   const [machinePickerHardpoint, setMachinePickerHardpoint] = useState<number | null>(null);
   const [refineryMachineId, setRefineryMachineId] = useState<number | null>(null);
   const [fabricatorMachineId, setFabricatorMachineId] = useState<number | null>(null);
+  /** The machine inspector (TICKET-03): a base hardpoint machine, or a plot machine (its own id space, so the source is kept). */
+  const [inspect, setInspect] = useState<{ readonly src: 'base' | 'plot'; readonly id: number } | null>(null);
+  const [, setInspectTick] = useState(0);
   const [weaponBenchOpen, setWeaponBenchOpen] = useState(false);
   const [drivingSpeed, setDrivingSpeed] = useState<number | null>(null);
   const [baseWorldVersion, setBaseWorldVersion] = useState(0);
@@ -727,7 +732,7 @@ useEffect(() => {
     say(`Loaded: ${written.name}`, port ? `${port.name} went back on the rack.` : 'Hold the left button in Apply to paint.');
   };
   const forceBeamRef = useRef<number | null>(null);
-  const isAnyBaseWindowOpen = menu || baseWindowOpen || machinePickerHardpoint !== null || refineryMachineId !== null || fabricatorMachineId !== null || weaponBenchOpen;
+  const isAnyBaseWindowOpen = menu || baseWindowOpen || machinePickerHardpoint !== null || refineryMachineId !== null || fabricatorMachineId !== null || weaponBenchOpen || inspect !== null;
   const hardpointToPlotMachineRef = useRef<Map<number, number>>(new Map());
   const isLmbDownRef = useRef(false);
   const harvestAccRef = useRef(0);
@@ -2620,6 +2625,31 @@ useEffect(() => {
     commit(withLab(withPlot(stateRef.current, next), labRef.current));
     if (env) sceneRef.current?.setPlot(next, running(next, env), network(next, env).connected);
   }, [commit]);
+  /** Closes the machine inspector and takes the mouse back, as the other panels do. */
+  const closeInspect = useCallback(() => { setInspect(null); lock(); }, [lock]);
+  /** The inspector's buttons. Refinery, fabricator and the plot panel take over (the inspector closes first); toggle switches a plot machine. */
+  const inspectAction = useCallback((target: { readonly src: 'base' | 'plot'; readonly id: number }, a: InspectAction): void => {
+    if (a === 'refine') { setInspect(null); setRefineryMachineId(target.id); freeMouse(); return; }
+    if (a === 'fabricate') { setInspect(null); setFabricatorMachineId(target.id); freeMouse(); return; }
+    if (a === 'controls') { setInspect(null); setPanel(target.id); setMenu(false); freeMouse(); return; }
+    if (a === 'toggle' && target.src === 'plot') {
+      if (visitingRef.current) { say('Not your machine', 'You cannot switch the machines of a plot you are visiting.'); return; }
+      const mm = plotRef.current.machines.find((x) => x.id === target.id);
+      if (mm) changePlot(setOn(plotRef.current, mm.id, !mm.on));
+    }
+  }, [changePlot, freeMouse, say]);
+  // the inspector's live numbers refresh while it is open; it closes itself if its machine is taken down
+  useEffect(() => {
+    if (inspect === null) return;
+    const t = window.setInterval(() => {
+      const machines = inspect.src === 'plot'
+        ? (visitingRef.current ? visitingRef.current.plot : plotRef.current).machines
+        : baseWorldRef.current.machines;
+      if (machines.some((m) => m.id === inspect.id)) setInspectTick((n) => n + 1);
+      else setInspect(null);
+    }, 400);
+    return () => window.clearInterval(t);
+  }, [inspect]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (!ready || creating) return;
@@ -2789,24 +2819,25 @@ useEffect(() => {
             freeMouse();
             return;
           }
+          // E on a bench opens the Drafting Table through the same lock as K (TICKET-03, BB-11)
+          if (p && p.kind === 'bench') {
+            const why = gateReason('drafting', stateRef.current.chain, plotRef.current.stage);
+            if (why) { say('Drafting table locked', why); return; }
+            (window as unknown as { __hmHud?: { openDrafting?: () => void } }).__hmHud?.openDrafting?.();
+            freeMouse();
+            return;
+          }
           if (p && p.kind === 'hardpoint') {
             const m = baseWorldRef.current.machines.find((x) => x.id === p.id);
             if (!m) {
               setMachinePickerHardpoint(p.id);
               freeMouse();
               return;
-            } else if (m.kind === 'mill' || m.kind === 'press') {
-              setRefineryMachineId(m.id);
-              freeMouse();
-              return;
-            } else if (m.kind === 'fabricator') {
-              setFabricatorMachineId(m.id);
-              freeMouse();
-              return;
-            } else {
-              say(`Heavy ${m.kind.toUpperCase()} operational`, 'Pouring pixels into atmospheric plume.');
-              return;
             }
+            // every placed machine opens the inspector; its refine and fabricate buttons open the windows (TICKET-03, BB-10)
+            setInspect({ src: 'base', id: m.id });
+            freeMouse();
+            return;
           }
         }
         if (tryPlaceBase()) return;
@@ -2822,7 +2853,7 @@ useEffect(() => {
           freeMouse();
         } else if (hud.where === 'planet' && hud.aimed !== null && panel === null) {
           sceneRef.current?.playAction('button');
-          setPanel(hud.aimed);
+          setInspect({ src: 'plot', id: hud.aimed });
           setMenu(false);
           freeMouse();
         } else if (hud.where === 'lab' && hud.aimedLab !== null && labPanel === null) {
@@ -3162,7 +3193,7 @@ useEffect(() => {
     ? (hud.ghost?.ok ? `Click or E: build the ${KINDS[building].name.toLowerCase()}` : hud.ghost?.why || 'Aim at the ground near the gate.')
     : hud.atLever ? 'E: pull the main lever'
     : hud.atDial ? 'E: plot dial'
-    : hud.where === 'planet' && hud.aimed !== null && panel === null ? `E: open the ${KINDS[(visiting ? visiting.plot.machines : plotRef.current.machines).find((x) => x.id === hud.aimed)?.kind ?? 'mill'].name.toLowerCase()}`
+    : hud.where === 'planet' && hud.aimed !== null && panel === null ? `E: inspect the ${KINDS[(visiting ? visiting.plot.machines : plotRef.current.machines).find((x) => x.id === hud.aimed)?.kind ?? 'mill'].name.toLowerCase()}`
     : hud.where === 'lab' && hud.aimedProp?.salvage && labPanel === null ? `Hold E: salvage the ${propLabel(hud.aimedProp.id)}`
     : hud.aimedProp && !hud.aimedProp.salvage && labPanel === null && hud.aimed === null ? `E: read the ${propLabel(hud.aimedProp.id)}`
     : hud.where === 'lab' && hud.aimedLab !== null && labPanel === null ? `E: open the ${hud.aimedLab === 'rack' ? 'cartridge rack' : hud.aimedLab === 'bench' ? 'preset bench' : 'preset combiner'}`
@@ -4186,6 +4217,24 @@ useEffect(() => {
               onClose={() => setMachinePickerHardpoint(null)}
             />
           )}
+          {inspect !== null && (() => {
+            const target = inspect;
+            const curPlot = visiting ? visiting.plot : plotRef.current;
+            const alive = (target.src === 'plot' ? curPlot.machines : baseWorldRef.current.machines).some((m) => m.id === target.id);
+            if (!alive) return null;
+            const view = inspectMachine(
+              target.src === 'plot' ? { ...baseWorldRef.current, machines: [] } : baseWorldRef.current,
+              { ...getBaseEnv(), ...(target.src === 'plot' ? { plot: curPlot, plotEnv: envRef.current ?? undefined } : {}) },
+              target.id
+            );
+            return (
+              <MachineInspector
+                view={view}
+                onAction={(a) => inspectAction(target, a)}
+                onClose={closeInspect}
+              />
+            );
+          })()}
           {refineryMachineId !== null && (
             <RefineryModal
               machineId={refineryMachineId}

@@ -1,0 +1,253 @@
+/* ============================================================================
+ * File: apps/web/src/base/ui/machine-inspector.css
+ * Dark-glassmorphic telemetry modal styles (Oxanium / Inter HUD vocabulary)
+ * ============================================================================ */
+
+.hm-insp-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 6, 8, 0.72);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+}
+
+.hm-insp-panel {
+  min-width: 560px;
+  max-width: 680px;
+  width: 92vw;
+  background: rgba(11, 15, 23, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 2px solid var(--hm-insp-accent, #3dc8ff);
+  border-radius: 8px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75);
+  color: #e8eef5;
+  font-family: 'Inter', system-ui, sans-serif;
+  overflow: hidden;
+}
+
+.hm-insp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: rgba(17, 24, 39, 0.75);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.hm-insp-title-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hm-insp-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.hm-insp-name {
+  font-family: 'Oxanium', monospace, sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #f8fafc;
+}
+
+.hm-insp-status-pill {
+  font-family: 'Oxanium', monospace, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.08em;
+}
+
+.hm-insp-status-running {
+  background: rgba(34, 197, 94, 0.18);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.hm-insp-status-idle {
+  background: rgba(56, 189, 248, 0.16);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+
+.hm-insp-status-nopower {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+}
+
+.hm-insp-status-nofeed {
+  background: rgba(250, 204, 21, 0.18);
+  color: #facc15;
+  border: 1px solid rgba(250, 204, 21, 0.4);
+}
+
+.hm-insp-status-off {
+  background: rgba(148, 163, 184, 0.16);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.hm-insp-plume-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'Oxanium', monospace, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.hm-insp-close-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #cbd5e1;
+  font-family: 'Oxanium', monospace, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hm-insp-close-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.hm-insp-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.hm-insp-card {
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hm-insp-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hm-insp-card-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Oxanium', monospace, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.06em;
+}
+
+.hm-insp-mono-val {
+  font-family: 'Oxanium', monospace, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.hm-insp-bar-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.hm-insp-bar-fill {
+  height: 100%;
+  transition: width 0.15s ease;
+}
+
+.hm-insp-row-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.hm-insp-slot-box {
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  font-family: 'Oxanium', monospace, sans-serif;
+  font-size: 12px;
+}
+
+.hm-insp-cart-active {
+  color: #ffc13d;
+  font-weight: 700;
+}
+
+.hm-insp-muted {
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.hm-insp-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.hm-insp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 5px;
+  font-family: 'Oxanium', monospace, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.hm-insp-btn-primary {
+  background: var(--hm-insp-accent, #3dc8ff);
+  color: #050608;
+}
+
+.hm-insp-btn-toggle {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.hm-insp-btn-on {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: rgba(34, 197, 94, 0.45);
+  color: #4ade80;
+}

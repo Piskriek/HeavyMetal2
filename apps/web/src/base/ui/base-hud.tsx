@@ -82,6 +82,8 @@ export const BaseHud: React.FC<BaseHudProps> = ({
   useEffect(() => {
     (window as any).__hmHud = {
       openInventory: () => setOpenWindow('inventory'),
+      /** E on a bench (TICKET-03): the caller checks the drafting lock first, as K does. */
+      openDrafting: () => setOpenWindow('drafting'),
       openLattice: () => setOpenWindow('lattice'),
       close: () => setOpenWindow('none'),
     };

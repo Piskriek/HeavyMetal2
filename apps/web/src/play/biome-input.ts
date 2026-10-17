@@ -3,21 +3,8 @@
 
 import { flood, type Source, type Terrain } from '@hm/hydro';
 
-// Local types mirroring @hm/plotbiome until that package lands.
-export type Tier = 'low' | 'mid' | 'high';
-
-export interface BiomeInput {
-  n: number;
-  cellM: number; // grid n x n cells (16..512), metres per cell
-  height: Float32Array; // n*n metres, index z*n+x; cell (x,z) centre is at world ((x+0.5)*cellM,(z+0.5)*cellM)
-  water: Uint8Array; // n*n, 0 = dry, >0 = water
-  stage: number; // 0..6, may be fractional
-  s: { pxd: number; vtx: number; lx: number; aq: number }; // each 0..1
-  machines: readonly { x: number; z: number; r: number }[]; // world metres relative to grid origin; r = keep-out radius
-  keepouts: readonly { x0: number; z0: number; x1: number; z1: number }[]; // world-metre rectangles relative to grid origin
-  seed: number;
-  tier: Tier;
-}
+import type { BiomeInput, Tier } from '@hm/plotbiome';
+export type { BiomeInput, Tier };
 
 export interface BuildBiomeInputOptions {
   heightAt(x: number, z: number): number;

@@ -110,6 +110,15 @@ try {
   await page.waitForFunction(() => window.hmPlay?.where === 'planet', { timeout: 15000 });
   console.log('OK: Teleported to moon');
 
+  // Place two operating machines and one water machine before baking/testing stages
+  await page.evaluate(() => {
+    window.hmPlay.placeAt(12, 0, 'mill');
+    window.hmPlay.placeAt(-12, 0, 'drill');
+    window.hmPlay.placeAt(0, 12, 'water');
+  });
+  await page.waitForTimeout(500);
+  console.log('OK: Placed 2 operating machines and 1 water machine');
+
   // Position camera on hill overlooking plot
   await page.evaluate(() => {
     const exit = window.__playScene.gateExit();
@@ -135,6 +144,37 @@ try {
     console.log(
       `Stage ${s}: Total=${counts.total}, Trees=${counts.trees}, Tufts=${counts.byKind.tuft}, Bushes=${counts.byKind.bush}, Pine=${counts.byKind.pine}, Oak=${counts.byKind.oak}, Birch=${counts.byKind.birch} -> saved ${shotPath}`
     );
+
+    // Close shots near machine at stages 2 and 4
+    if (s === 2) {
+      await page.evaluate(() => {
+        window.__playScene.debug.teleport('planet', 12, 4.0, 0, -0.2);
+      });
+      await page.waitForTimeout(300);
+      const close2Path = path.join(outDir, 'stage-2-close.png');
+      await page.screenshot({ path: close2Path });
+      console.log(`Saved stage 2 close shot near mill: ${close2Path}`);
+      // return camera to hill
+      await page.evaluate(() => {
+        const exit = window.__playScene.gateExit();
+        window.__playScene.debug.teleport('planet', exit.x - 5, exit.z + 14, 0.4, -0.22);
+      });
+      await page.waitForTimeout(300);
+    } else if (s === 4) {
+      await page.evaluate(() => {
+        window.__playScene.debug.teleport('planet', 0, 15.5, Math.PI, -0.2);
+      });
+      await page.waitForTimeout(300);
+      const close4Path = path.join(outDir, 'stage-4-close.png');
+      await page.screenshot({ path: close4Path });
+      console.log(`Saved stage 4 close shot near water machine: ${close4Path}`);
+      // return camera to hill
+      await page.evaluate(() => {
+        const exit = window.__playScene.gateExit();
+        window.__playScene.debug.teleport('planet', exit.x - 5, exit.z + 14, 0.4, -0.22);
+      });
+      await page.waitForTimeout(300);
+    }
   }
 
   // Close shot at stage 6
@@ -184,7 +224,23 @@ try {
     console.log('PASS: Stage 0 has 0 instances');
   }
 
-  // 2. Assert monotone instance count growth (never decreases)
+  // 2. Assert stage 2 has tufts > 0 on Low tier
+  if (stageResults[2].byKind.tuft <= 0) {
+    console.error(`FAIL: Stage 2 expected tufts > 0 on Low tier, got ${stageResults[2].byKind.tuft}`);
+    exitCode = 1;
+  } else {
+    console.log(`PASS: Stage 2 has ${stageResults[2].byKind.tuft} tufts on Low tier`);
+  }
+
+  // 3. Assert stage 4 has bushes > 0
+  if (stageResults[4].byKind.bush <= 0) {
+    console.error(`FAIL: Stage 4 expected bushes > 0, got ${stageResults[4].byKind.bush}`);
+    exitCode = 1;
+  } else {
+    console.log(`PASS: Stage 4 has ${stageResults[4].byKind.bush} bushes`);
+  }
+
+  // 4. Assert monotone instance count growth (never decreases)
   let prevTotal = stageResults[0].total;
   for (const s of [2, 4, 6]) {
     const curTotal = stageResults[s].total;
@@ -197,7 +253,7 @@ try {
     prevTotal = curTotal;
   }
 
-  // 3. Assert trees appear at stage 6
+  // 5. Assert trees appear at stage 6
   if (stageResults[6].trees <= 0) {
     console.error(`FAIL: Stage 6 expected trees > 0, got ${stageResults[6].trees}`);
     exitCode = 1;
@@ -205,7 +261,7 @@ try {
     console.log(`PASS: Stage 6 has ${stageResults[6].trees} trees`);
   }
 
-  // 4. Assert FPS >= 30 fps
+  // 6. Assert FPS >= 30 fps
   if (perf.fps < 30) {
     console.error(`FAIL: FPS below 30 (got ${perf.fps} fps)`);
     exitCode = 1;

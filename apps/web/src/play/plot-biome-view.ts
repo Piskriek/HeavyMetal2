@@ -20,7 +20,7 @@ export interface BiomeInstanceCount {
 }
 
 export interface PlotBiomeView {
-  build(input: BiomeInput): void;
+  build(input: BiomeInput, immediate?: boolean): void;
   setStage(stage: number): void;
   setTier(tier: 'low' | 'mid' | 'high' | 'off'): void;
   counts(): BiomeInstanceCount;
@@ -283,10 +283,11 @@ export function createPlotBiomeView(
       return;
     }
 
+    const threshold = Math.min(6, stage + 0.5);
     for (const slot of slots) {
-      // Find count where appear <= stage
+      // Find count where appear <= threshold
       let c = 0;
-      while (c < slot.appears.length && (slot.appears[c] ?? 999) <= stage) {
+      while (c < slot.appears.length && (slot.appears[c] ?? 999) <= threshold) {
         c++;
       }
       slot.mesh.count = c;
@@ -296,7 +297,7 @@ export function createPlotBiomeView(
 
   const dummy = new THREE.Object3D();
 
-  const build = (input: BiomeInput): void => {
+  const build = (input: BiomeInput, immediate = true): void => {
     lastInput = input;
     const bakeTier: Tier = currentTier === 'off' ? 'low' : currentTier;
 
@@ -321,8 +322,9 @@ export function createPlotBiomeView(
       const dist = Math.hypot(worldX, worldZ);
 
       if (s.kind === 'tuft') {
-        // Tufts only on mid/high, and strictly within 30 m
-        if (bakeTier === 'low' || dist > 30) continue;
+        // Tufts on Low within 20 m; Mid/High within 30 m
+        const maxDist = bakeTier === 'low' ? 20 : 30;
+        if (dist > maxDist) continue;
         groups.get('tuft')!.push({ ...s, worldX, worldZ });
       } else if (s.kind === 'bush') {
         groups.get('bush')!.push({ ...s, worldX, worldZ });
@@ -334,7 +336,9 @@ export function createPlotBiomeView(
     }
 
     // Populate each InstancedMesh sorted by appear ascending
-    for (const slot of slots) {
+    let slotIdx = 0;
+
+    const populateSlot = (slot: MeshSlot): void => {
       const list = groups.get(slot.id) ?? [];
       list.sort((a, b) => a.appear - b.appear);
 
@@ -354,9 +358,28 @@ export function createPlotBiomeView(
         slot.mesh.setMatrixAt(i, dummy.matrix);
       }
       slot.mesh.instanceMatrix.needsUpdate = true;
-    }
+    };
 
-    applyStage(currentStage);
+    if (immediate) {
+      for (const slot of slots) {
+        populateSlot(slot);
+      }
+      applyStage(currentStage);
+    } else {
+      const stepSlice = (): void => {
+        const start = performance.now();
+        while (slotIdx < slots.length) {
+          populateSlot(slots[slotIdx]!);
+          slotIdx++;
+          if (performance.now() - start > 8 && slotIdx < slots.length) {
+            setTimeout(stepSlice, 0);
+            return;
+          }
+        }
+        applyStage(currentStage);
+      };
+      stepSlice();
+    }
   };
 
   return {

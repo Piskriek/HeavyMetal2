@@ -637,6 +637,8 @@ export function createPlayScene(o: {
     }
   }
 
+  let scheduleBiomeRebuild: () => void = () => {};
+
   function setFabricators(list: readonly { readonly id: number; readonly x: number; readonly z: number; readonly yaw: number; readonly printing: boolean }[]): void {
     lastFabricatorsList = list;
     const keepIds = new Set<number>();
@@ -663,6 +665,7 @@ export function createPlayScene(o: {
         fabricatorViews.delete(id);
       }
     }
+    scheduleBiomeRebuild();
   }
 
   function enterVehicle(id: number): boolean {
@@ -1255,6 +1258,9 @@ export function createPlayScene(o: {
     const machinesList: { x: number; z: number; r: number }[] = [];
     const waterSourcesList: { x: number; z: number }[] = [];
 
+    // The Twin Gate as the first anchor (radius = pad + 1 m = 5.0 m)
+    machinesList.push({ x: twin.group.position.x, z: twin.group.position.z, r: 5.0 });
+
     for (const v of views.values()) {
       const fp = machineFootprint(v.m.kind);
       const rFp = Math.max(Math.abs(fp.min[0]), Math.abs(fp.max[0]), Math.abs(fp.min[2]), Math.abs(fp.max[2]));
@@ -1264,11 +1270,26 @@ export function createPlayScene(o: {
       }
     }
 
+    // Fabricators on hardpoints
+    for (const fab of lastFabricatorsList) {
+      if (!machinesList.some((m) => Math.hypot(m.x - fab.x, m.z - fab.z) < 1.0)) {
+        machinesList.push({ x: fab.x, z: fab.z, r: 4.5 });
+      }
+    }
+
     const keepoutsList: { x0: number; z0: number; x1: number; z1: number }[] = [
       { x0: -4.0, z0: -4.0, x1: 4.0, z1: 4.0 }, // Twin gate pad
     ];
 
     if (activeBase) {
+      for (const p of activeBase.pieces) {
+        if (p.kind === 'hardpoint') {
+          const pt = pieceAt(activeBase, p);
+          if (pt && !machinesList.some((m) => Math.hypot(m.x - pt.x, m.z - pt.z) < 1.0)) {
+            machinesList.push({ x: pt.x, z: pt.z, r: 4.5 });
+          }
+        }
+      }
       for (const s of activeBase.structures) {
         const pieces = activeBase.pieces.filter((p) => p.s === s.id);
         if (pieces.length === 0) {
@@ -1304,6 +1325,20 @@ export function createPlayScene(o: {
       seed: 7,
       tier: effectiveTier,
     });
+  };
+
+  let biomeRebuildTimer: ReturnType<typeof setTimeout> | null = null;
+  scheduleBiomeRebuild = (): void => {
+    if (!biomeView || !ground) return;
+    if (biomeRebuildTimer) clearTimeout(biomeRebuildTimer);
+    biomeRebuildTimer = setTimeout(() => {
+      biomeRebuildTimer = null;
+      if (!biomeView || !ground) return;
+      const input = buildDefaultBiomeInput(ground);
+      cachedBiomeInput = input;
+      biomeView.build(input, false);
+      biomeView.setStage(shown);
+    }, 50);
   };
 
   // ---- scientist character model & animation (TASK-07, POL-18)
@@ -1698,6 +1733,7 @@ export function createPlayScene(o: {
       let changed = false;
       for (const [id, v] of views) if (!ids.has(id)) { unbuild(v); views.delete(id); changed = true; }
       for (const mm of plot.machines) if (!views.has(mm.id)) { views.set(mm.id, build(mm)); changed = true; }
+      if (changed) scheduleBiomeRebuild();
       rebuildPlanetStatic();
       const sameNet = connected.size === lastConnected.size && [...connected].every((id) => lastConnected.has(id));
       if (changed || !sameNet) { relay(connected); lastConnected = new Set(connected); }
@@ -1817,6 +1853,7 @@ export function createPlayScene(o: {
       // the sanctuaries: the gate dome, and each sealed room's life support (B-07)
       const lifeSupport = base ? base.pieces.filter((p) => p.kind === 'lifeSupport').map((p) => pieceAt(base, p)).filter((p): p is { x: number; y: number; z: number } => p !== null) : [];
       monsters.setSafeZones(monsterSafeZones({ x: twin.group.position.x, z: twin.group.position.z }, lifeSupport));
+      scheduleBiomeRebuild();
     },
     gateExit(dist) {
       twin.group.updateMatrixWorld(true);
@@ -2983,6 +3020,7 @@ export function createPlayScene(o: {
       for (const v of views.values()) unbuild(v);
       for (const c of cables) c.geometry.dispose();
       dropGhost();
+      if (biomeRebuildTimer) clearTimeout(biomeRebuildTimer);
       biomeView?.dispose();
       world?.dispose();
       ground?.dispose();

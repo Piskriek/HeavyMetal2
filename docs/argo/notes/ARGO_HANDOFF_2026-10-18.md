@@ -46,3 +46,8 @@ You are **Gemini Argo**, creative lead and PM for **FIDELITY: The SetMix Multive
    - **For each ticket:** its items; its files; whether it needs an asset batch; and which pure modules can go to an Arena battle.
    - **Group** the `play-scene.ts` hooks: that file has one writer at a time.
    - **Size:** give each ticket's build-size cost.
+4. **POL-101** (from T06's install): your `lab-vista-math.ts` turned the EGA pocket cyan (its tint, sky and rim), where the old spec and test said magenta. Haiku kept your cyan and changed the test to match. Confirm cyan, or say to revert it.
+5. **POL-102 and POL-103:**
+   - At storm 0.5, the Lite and Full window views still show a few pale mauve or salmon blocks (about RGB 181, 148, 171).
+   - The East wall has a featureless grey box between the fabricator and the armory.
+   Say what each should be.

@@ -8,6 +8,10 @@
 3. **Tyre tracks and dust:** create Argo's `tireTracks` (on @hm/decals) and `wheelRoost` (on @hm/particles) in `play-scene.ts`. Feed them each wheel's ground contact while driving. Keep them inside the Low budget, and put them behind the Graphics settings with Auto if they cost frame rate.
 4. **Print gantry:** when a fabricator prints a vehicle (`setVehicles` gains one), play `printGantry(at).play(onDone)` at the fabricator pad. The vehicle appears when it ends.
 5. **Beam damage:** in `play-scene.ts`'s beam frame code (Extract mode), call `monsters.beamHit(origin, dir, range, beamDamage(mode, dt, dist))`. Seal mode does no damage.
+6. **T07a's two `play-scene.ts` leftovers** (Haiku landed T07a at 767f75a5 without them; the exact hooks are in `docs/DEFERRED_POLISH_REGISTRY.md`):
+   - **POL-96:** the taken sidearm leaves the armory rack. `play-scene.ts` passes the lab room's armory through (`room.armory.setTaken(...)`, the same route as `dissolveClutter`), and `play.tsx`'s `takeSidearm` calls it; a save with the sidearm taken shows an empty rack on every visit.
+   - **POL-97:** hold E on a wreck truck salvages it. `play-scene.ts` reports the aimed wreck (`wrecks.aimWreck`) and exposes `salvageWreck(id)`; `play.tsx` runs the existing hold-E path from `clearProp`. Its items go to the pack, then the network; its log opens through `readLog`; the truck disappears.
+   - Un-skip the two checks in `scripts/test-ticket07a.mjs` that are marked as moved to T07b, and make them pass.
 
 ## Verify
 - **A new `scripts/test-ticket07b.mjs`:**
@@ -21,4 +25,4 @@
 - Through `scripts/test-on-3dpc.sh --only "<your paths>" "npm run build && …"`: `npm test`, the new test, `test-ticket01-collision` and `test-campaign` (45 of 45).
 
 ## Stay inside
-`vehicle-juice.ts` and its test, `play-scene.ts`, `play.tsx` (`vehicleInput` only), and the new test. Start only after T07a has landed: it installs the `monsters.ts` this uses.
+`vehicle-juice.ts` and its test, `play-scene.ts`, `play.tsx` (`vehicleInput`, `takeSidearm` and the wreck hold-E path only), `scripts/test-ticket07a.mjs` (the two moved checks), and the new test. T07a has landed (767f75a5), with the `monsters.ts` this uses.

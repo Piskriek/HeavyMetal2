@@ -89,7 +89,7 @@ Brief: `docs/prompts/sidecar/T05-base-meshes-avatar-beam-outcrops.md`. Start it 
 Brief: `docs/prompts/sidecar/T03P-machine-plumes.md` (spec: docs/argo/notes/ARGO_NOTE_08_plumes.md). Start it only after F-10 is DONE.
 
 ## F-12 [HELD] TICKET-07 B: vehicle juice (boost, tracks, dust, print gantry) and the beam hurting monsters
-Brief: `docs/prompts/sidecar/T07b-vehicle-juice-beam-damage.md`. HELD until F-11 is DONE and Haiku's T07a (the monsters.ts it uses) has landed; Opus opens it.
+Brief: `docs/prompts/sidecar/T07b-vehicle-juice-beam-damage.md`. HELD until F-11 is DONE; Opus opens it. T07a has landed (767f75a5), and the brief now also carries its two play-scene leftovers: the sidearm leaving the rack (POL-96) and hold-E wreck salvage (POL-97).
 
 ## F-13 [HELD] TICKET-06 hooks: aim the lab's Hardware Fabricator and Planet Table
 Brief: none separate; the job is this list. HELD until Haiku's T06 (`docs/prompts/sidecar/T06-lab-overhaul.md`) has landed and F-12 is DONE; Opus opens it.

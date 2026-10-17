@@ -2763,7 +2763,7 @@ TASK-25 is done except what is listed above. Commits: `6739076f`, `c4e4bd49`, `4
   - Ammo badge: shows only with the sidearm slot filled (`shouldShowAmmoBadge`). Reads SEMI 8/8.
   - Wrecks: `settleWreck` tilts and buries the trucks in `wrecks.ts` (live: wired through `createWrecks`). Unit-checked, not seen in a shot.
   - POL-83: the bare `.play` rule is `.play[data-hud-root]`. A stray `.play` element is no longer positioned as the play screen.
-- **Moved to T07b (Opus's call, play-scene.ts is Flash's):** the wreck hold-E salvage and the log (POL-89), and hiding the sidearm model on the rack after the pickup (POL-88). `aimProp` now returns truck ids; their read prompt is hidden (`aimedPropActs`), so nothing shows that cannot be done.
+- **Moved to T07b (Opus's call, play-scene.ts is Flash's):** the wreck hold-E salvage and the log (POL-97), and hiding the sidearm model on the rack after the pickup (POL-96). `aimProp` now returns truck ids; their read prompt is hidden (`aimedPropActs`), so nothing shows that cannot be done.
 - **Checks (real results, final tree, worker `ea92124a` onward):**
   - `npm run typecheck` (laptop): 0 errors.
   - `npm run build`: 14.83 MB of the 16 MB cap.
@@ -2776,8 +2776,8 @@ TASK-25 is done except what is listed above. Commits: `6739076f`, `c4e4bd49`, `4
 - **Shots (`shots-run/`, gitignored):** `ticket07a-armory-rail.png` (the rail prompt "E: take the combat sidearm from the armory"; the holster is small and the HUD crowds it); `ticket07a-badge.png` (SEMI 8/8 bottom left, "Combat sidearm taken"); `ticket07a-rift-open.png` (open leak at 12 m, DRAWS 144; the 1-bit look makes the tear hard to read); `ticket07a-rift-sealed.png` ("Leak sealed", DRAWS 83, the scar).
 - **Not checked live:** the amber while sealing (no shot of a held seal; the unit test checks the seam colour 0xffc13d); the wreck tilt on screen.
 - **Decisions for Opus:**
-  1. The rift costs about 59 draw calls near (the old marker: 3); DRAWS went 83 → 144 with one leak at 12 m. The LOD at 40 m keeps the base-building check at 72. Merge its geometry (POL-90), or accept it?
+  1. The rift costs about 59 draw calls near (the old marker: 3); DRAWS went 83 → 144 with one leak at 12 m. The LOD at 40 m keeps the base-building check at 72. Merge its geometry (POL-98), or accept it?
   2. Dormant leaks read as a scar until the beam is on them. Keep it?
   3. Taking the sidearm does not draw the gun (`gunEquipped` is separate). Should it, in T07b?
   4. Proximity spawns no longer count as the first sighting (the wave still does). Keep it?
-- **Registry:** POL-88 (the sidearm left on the rack), POL-89 (truck salvage and log), POL-90 (rift draw cost), POL-91 (close-up shots with the HUD hidden).
+- **Registry:** POL-96 (the sidearm left on the rack), POL-97 (truck salvage and log), POL-98 (rift draw cost), POL-99 (close-up shots with the HUD hidden).

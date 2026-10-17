@@ -44,3 +44,18 @@ Append one entry per job, in the format in `FLASH_INBOX.md`. Newest at the botto
 - Rechecked F-01 change: Lab gate crossing to moon and twin gate return both verified and passing (checks 5 & 8).
 - Decisions left: None.
 
+### [2026-10-17 12:35] F-04 [DONE] TICKET-02 D: install Argo's @hm/sky and wire into moon sky
+- Commits: `af608935` ("feat(sky): install @hm/sky and wire into moon sky (TICKET-02 item D)")
+- Checks:
+  - `npm run typecheck`: 0 errors
+  - `packages/sky/tests/sky.test.ts`: 52 of 52 pass; `npm test`: 2,759 unit pass, 0 fail
+  - `npm run build`: 14.62 MB bundle (cap 16 MB)
+  - `node scripts/test-stage-world.mjs`: PASS (S1->S4 delta 128.01 vs 102.37, S4->S6 delta 32.92 vs 21.13, wave delta 131.69 vs 107.76)
+  - `node scripts/test-campaign.mjs`: 45 of 45 beats PASS, 0 console/http errors (`apps/web/public/checkpoints/` restored)
+- Shots (`shots-run/stage-world/s[1-6].png`):
+  - `s1.png`, `s2.png`: Deep vacuum black sky, stark stars, zero haze.
+  - `s3.png`: Slate-blue twilight atmospheric haze softens horizon; stars begin fading.
+  - `s4.png`, `s5.png`, `s6.png`: Brilliant daylight blue sky canopy, diffuse sun bloom, warm horizon.
+- Changes from brief: Added `const sunArray = [SUN.x, SUN.y, SUN.z]` in `apps/web/src/crafter/world.ts` to supply missing identifier for `skyColour` and `skyPaletteFor`.
+- Decisions left: None. Proceeding to F-05.
+

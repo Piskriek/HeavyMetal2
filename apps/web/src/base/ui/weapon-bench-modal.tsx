@@ -6,6 +6,7 @@ import { weaponStats, type WeaponStats } from '../weapons';
 import * as L from '@hm/lattice';
 import { Check, ChevronRight, Crosshair, Flame, Hammer, ShieldAlert, Sparkles, Wrench, X, Zap } from 'lucide-react';
 import { toItemView } from '../world-view';
+import { CloseHint } from './hud-bits';
 
 export interface WeaponBenchModalProps {
   world: BaseWorld;
@@ -138,7 +139,7 @@ export const WeaponBenchModal: React.FC<WeaponBenchModalProps> = ({
             </div>
           </div>
           <button className="hm-window-close-btn" onClick={onClose} data-testid="weapon-bench-close-btn">
-            <X size={14} /> ESC
+            <X size={14} /> <CloseHint />
           </button>
         </div>
 

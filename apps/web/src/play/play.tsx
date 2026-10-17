@@ -86,14 +86,24 @@ import * as S from '@hm/structure';
 import type { Kind } from '@hm/structure';
 import * as L from '@hm/lattice';
 import { BEAM_COLOURS, type BeamMode } from '@hm/beamkit';
-import { BEAM_STROKE_RANGE, cycleBeamMode, sculptToolForKey, type SculptTool } from './beam-tool';
+import { BEAM_STROKE_RANGE, cycleBeamMode, SCULPT_TOOLS, type SculptTool } from './beam-tool';
 import { presetLook, reloadedLab, writtenOnRack } from './beam-port';
 import { keepOutZones } from './beam-keepout';
+import { RadialMenu } from '../base/ui/radial-menu';
+import { HoldRing, thumbFor } from '../base/ui/hud-bits';
+import type { ThumbRef } from '../base/ui/thumb-map';
+import { ControlsGrid } from './controls-grid';
 
 /** The extraction rifle's modes, as the player reads them (the chip and the toasts). */
 const BEAM_LABEL: Readonly<Record<BeamMode, string>> = { extract: 'Extract', apply: 'Apply', sculpt: 'Sculpt' };
-/** The sculpt tools as the player reads them (TASK-21d): keys 1, 2 and 3 in Sculpt. */
+/** The sculpt tools as the player reads them (TASK-21d): picked from the X radial in Sculpt (TICKET-04). */
 const SCULPT_LABEL: Readonly<Record<SculptTool, string>> = { carve: 'Carve', raise: 'Raise', smooth: 'Smooth' };
+/** One slice of the X radial (TICKET-04): what it picks, its picture when it has one, and why it is locked. */
+interface RadialItem { readonly id: string; readonly label: string; readonly ref: ThumbRef | null; readonly locked: string | null }
+/** What the X radial shows right now, built from the held rifle's mode or the held blueprint; `pick` runs on the chosen slice. */
+interface RadialSpec { readonly hint: string; readonly items: readonly RadialItem[]; readonly pick: (id: string) => void }
+/** How long Z is held to remove the aimed piece (TICKET-04). A tap removes nothing. */
+const REMOVE_HOLD_MS = 500;
 import {
   GameNarratorController,
   preloadMentorVo,
@@ -249,12 +259,14 @@ const KEYS: readonly [string, string][] = [['W A S D', 'walk'], ['Mouse', 'look'
 const CONTROLS: readonly [string, string][] = [
   ['W A S D', 'Walk'], ['Mouse', 'Look (click the world to capture the mouse)'], ['Shift', 'Run'],
   ['E', 'Use: leave or enter a vehicle, use a station, machine or bin; hold on a boulder to gather ore'],
-  ['B', 'Build menu: Machines, Structures, Heavy, Plans'], ['Q', 'Previous structure kind (the wheel too); with the beam out, the beam mode'],
-  ['R', 'Rotate the piece you hold, or the layout while you place it; with the beam out, reload its port'], ['X', 'Remove the piece you aim at'],
-  ['G', 'Draw or holster the extraction beam (the rifle)'], ['Left mouse', 'Hold with the beam out: mine a boulder (Extract), paint the port (Apply), cut or raise the ground (Sculpt; 1 2 3 pick the tool)'],
+  ['B', 'Build menu: Machines, Structures, Heavy, Plans; B again ends the build'], ['Q', 'Previous structure kind (the wheel too); with the beam out, the beam mode'],
+  ['R', 'Rotate the piece you hold, or the layout while you place it; with the beam out, reload its port'],
+  ['X', 'Radial wheel: the structure kinds you hold, the beam cartridges (Apply) or the sculpt tools (Sculpt)'],
+  ['Hold Z', 'Remove the piece you aim at (keep Z down for half a second)'],
+  ['G', 'Draw or holster the extraction beam (the rifle)'], ['Left mouse', 'Hold with the beam out: mine a boulder (Extract), paint the port (Apply), cut or raise the ground (Sculpt)'],
   ['F', 'Build the plan you stand near'], ['T', 'Structural integrity overlay'], ['V', 'First or third person view'],
   ['Space', 'Brake a vehicle; fire the shotgun when it is equipped'], ['Tab or I', 'Inventory'], ['K', 'Drafting table'],
-  ['L', 'Lattice storage'], ['1 to 9', 'Hotbar slot'], ['Esc', 'Close the open thing, then pause'],
+  ['L', 'Lattice storage'], ['1 to 9', 'Hotbar slot, always (sculpt included)'], ['Esc', 'Close the open thing, then pause'],
 ];
 
 export function PlayScreen(props: {
@@ -559,12 +571,23 @@ useEffect(() => {
     beamModeRef.current = mode;
     sceneRef.current?.setBeamHeld(held, mode);
     setBeamHud({ held, mode });
-    // the hotbar keys 1 to 3 pick the sculpt tool while the rifle sculpts (base/ui/hotbar.tsx reads this flag)
-    if (typeof document !== 'undefined') {
-      if (held && mode === 'sculpt') document.documentElement.dataset.beamSculpt = '1';
-      else delete document.documentElement.dataset.beamSculpt;
-    }
   };
+  /** The X radial (TICKET-04): what it offers now, its thumbnails once they resolve, and whether Z is being held to remove. */
+  const [radial, setRadial] = useState<RadialSpec | null>(null);
+  const [radialThumbs, setRadialThumbs] = useState<readonly (string | null)[]>([]);
+  const [removeHolding, setRemoveHolding] = useState(false);
+  const removeHoldRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (radial === null) return;
+    let live = true;
+    void Promise.all(radial.items.map((it) => (it.ref ? thumbFor(it.ref) : Promise.resolve(null)))).then((urls) => {
+      if (live) setRadialThumbs(urls);
+    });
+    return () => { live = false; };
+  }, [radial]);
+  useEffect(() => () => {
+    if (removeHoldRef.current !== null) window.clearTimeout(removeHoldRef.current);
+  }, []);
   const placingLayoutRotationRef = useRef<number>(0);
   const [planPrompt, setPlanPrompt] = useState<string | null>(null);
   const nearestPlanRef = useRef<Plan | null>(null);
@@ -713,12 +736,9 @@ useEffect(() => {
     lostSupportRef.current = lost;
     (baseViewSource as WorldViewSource).notify?.();
   };
-  const reloadBeam = (): void => {
-    const written = writtenOnRack(labRef.current);
-    if (!written || written.preset === null) {
-      say('The port stays empty', 'No written cartridge is on the lab rack. Write one at the bench.');
-      return;
-    }
+  /** Puts a written cartridge from the lab rack into the rifle's port: R takes the first one, the X radial in Apply the one picked. */
+  const loadBeamCartridge = (written: Cartridge): void => {
+    if (written.preset === null) return;
     const port = beamPortRef.current;
     const next = reloadedLab(labRef.current, written, port ? port.cartridge : null);
     const look = presetLook(written.preset);
@@ -730,6 +750,14 @@ useEffect(() => {
     sceneRef.current?.playAction('reload');
     beamDirtyRef.current = true;
     say(`Loaded: ${written.name}`, port ? `${port.name} went back on the rack.` : 'Hold the left button in Apply to paint.');
+  };
+  const reloadBeam = (): void => {
+    const written = writtenOnRack(labRef.current);
+    if (!written || written.preset === null) {
+      say('The port stays empty', 'No written cartridge is on the lab rack. Write one at the bench.');
+      return;
+    }
+    loadBeamCartridge(written);
   };
   const forceBeamRef = useRef<number | null>(null);
   const isAnyBaseWindowOpen = menu || baseWindowOpen || machinePickerHardpoint !== null || refineryMachineId !== null || fabricatorMachineId !== null || weaponBenchOpen || inspect !== null;
@@ -1710,7 +1738,7 @@ useEffect(() => {
         }
 
         if (activeBp && activeBp.kinds.length > 1) {
-          setWheelCycleText(`wheel: ${activeBp.kinds.join(' · ')}`);
+          setWheelCycleText(`wheel: ${activeBp.kinds.map((k) => KIND_LABEL[k] ?? k).join(' · ')}`);
         } else {
           setWheelCycleText(null);
         }
@@ -2408,6 +2436,8 @@ useEffect(() => {
       clearToast: () => setToast(null),
       base: {
         world: () => baseWorldRef.current,
+        /** The kind the held blueprint builds next (the ghost's kind; the X radial and Q set it). */
+        buildKind: () => buildKindRef.current,
         apply: (cmd: BaseCommand) => dispatchBaseRef.current(cmd),
         openMachinePicker: (hardpointId: number) => {
           setMachinePickerHardpoint(hardpointId);
@@ -2602,14 +2632,119 @@ useEffect(() => {
     const at = sceneRef.current?.aim();
     if (!at || !building) return;
     if (!placeRef.current?.(building, at.x, at.z, at.yaw)) return;
+    // build mode stays on after a placement (TICKET-04): the next machine goes down without reopening B; Esc, right mouse or B ends it
     const name = KINDS[building].name;
-    setBuilding(null);
-    sceneRef.current?.setBuilding(null);
     say(`${name} built`, KINDS[building].emits ? 'Watch its pixels pour while it runs.' : BLURB[building]);
   }, [building, say]);
   const stopBuilding = useCallback(() => { setBuilding(null); sceneRef.current?.setBuilding(null); }, []);
   /** Frees the mouse for a menu without pausing the game. */
   const freeMouse = useCallback(() => { if (document.pointerLockElement) { quietRef.current = true; document.exitPointerLock(); } }, []);
+  /**
+   * What the X radial offers now (TICKET-04): the rifle's cartridges in Apply or its sculpt tools in Sculpt, else the kinds of the
+   * blueprint in the hotbar's hand. Null when X has nothing to offer.
+   */
+  const radialFromContext = (): RadialSpec | null => {
+    const mode = beamHeldRef.current ? beamModeRef.current : null;
+    if (mode === 'apply') {
+      const lab = labRef.current;
+      const inJob = new Set<string>([...(lab.bench?.inputs ?? []), ...(lab.combiner?.inputs ?? [])]);
+      const items: RadialItem[] = [];
+      for (const c of lab.cartridges) {
+        if (c.kind !== 'preset' || c.slot !== null || c.preset === null || inJob.has(c.id)) continue;
+        items.push({ id: c.id, label: c.name, ref: { item: `cartridge:${c.preset}`, tint: presetLook(c.preset)?.colour }, locked: null });
+      }
+      const empty = items.length === 0;
+      // a radial with one slice is half a wheel: a locked slice fills the other half
+      while (items.length < 2) {
+        items.push({
+          id: `pad-${items.length}`,
+          label: empty ? 'Rack empty' : 'Free slot',
+          ref: null,
+          locked: empty ? 'Write a cartridge at the preset bench in the lab' : 'Write another cartridge to fill this slot',
+        });
+      }
+      return {
+        hint: 'Beam port',
+        items,
+        pick: (id) => {
+          const cart = labRef.current.cartridges.find((c) => c.id === id);
+          if (cart) loadBeamCartridge(cart);
+        },
+      };
+    }
+    if (mode === 'sculpt') {
+      return {
+        hint: 'Sculpt tool',
+        items: SCULPT_TOOLS.map((t) => ({ id: t, label: SCULPT_LABEL[t], ref: null, locked: null })),
+        pick: (id) => {
+          const tool = id as SculptTool;
+          chooseSculptTool(tool);
+          say(`Sculpt: ${SCULPT_LABEL[tool]}`);
+        },
+      };
+    }
+    // the rifle in Extract has no radial of its own: X then offers the held blueprint, if there is one
+    const bw = baseWorldRef.current;
+    const slot = bw.player.slots[bw.hotbar];
+    if (!slot || slot.n <= 0) return null;
+    const bp = blueprint(slot.item);
+    if (!bp) return null;
+    const chain = stateRef.current.chain;
+    const stage = plotRef.current.stage;
+    return {
+      hint: bp.name,
+      items: bp.kinds.map((k) => ({
+        id: k,
+        label: KIND_LABEL[k] ?? k,
+        ref: { kind: k },
+        locked: gateReason(k === 'weaponBench' ? 'weaponBench' : 'structures', chain, stage),
+      })),
+      pick: (id) => {
+        buildKindRef.current = id as Kind;
+        (baseViewSource as WorldViewSource).notify?.();
+        say(`Selected: ${KIND_LABEL[id] ?? id}`);
+      },
+    };
+  };
+  const openRadial = (): void => {
+    if (radial !== null || isAnyBaseWindowOpen || paused || visitingRef.current || building !== null || placingLayoutRef.current !== null) return;
+    if (panel !== null || labPanel !== null || dialOpen || debugOpen) return;
+    const spec = radialFromContext();
+    if (spec === null) return;
+    setRadialThumbs([]);
+    setRadial(spec);
+    freeMouse();
+  };
+  const closeRadial = (): void => { setRadial(null); lock(); };
+  /** Z (TICKET-04): hold for half a second on the aimed piece to remove it. A tap removes nothing; the timer re-checks the aim. */
+  const startRemoveHold = (): void => {
+    if (removeHoldRef.current !== null || visitingRef.current || isAnyBaseWindowOpen || radial !== null) return;
+    const hit = sceneRef.current?.aimPoint();
+    if (!hit || hit.piece === null) {
+      say('Nothing aimed to remove', 'Aim at a piece you placed, then hold Z.');
+      return;
+    }
+    const target = hit.piece;
+    setRemoveHolding(true);
+    removeHoldRef.current = window.setTimeout(() => {
+      removeHoldRef.current = null;
+      setRemoveHolding(false);
+      const now = sceneRef.current?.aimPoint();
+      if (!now || now.piece !== target) {
+        say('Aim moved', 'Hold Z again on the piece.');
+        return;
+      }
+      dispatchBase({ t: 'remove', at: { x: now.x, z: now.z }, id: target });
+    }, REMOVE_HOLD_MS);
+  };
+  const cancelRemoveHold = (): void => {
+    if (removeHoldRef.current !== null) {
+      window.clearTimeout(removeHoldRef.current);
+      removeHoldRef.current = null;
+      say('Hold Z to remove', 'Keep Z down for half a second on the piece.');
+    }
+    setRemoveHolding(false);
+  };
   const openDial = useCallback(() => {
     sceneRef.current?.playAction('button');
     setDialOpen(true);
@@ -2674,6 +2809,8 @@ useEffect(() => {
         return;
       }
       if (paused) return;
+      // the X radial takes the keys while it is open: its own Esc and the X release close it (TICKET-04)
+      if (radial !== null) return;
       if (e.code === 'KeyF') {
         if (nearestPlanRef.current && sceneRef.current) {
           const playerPos = sceneRef.current.debug.position();
@@ -2682,15 +2819,6 @@ useEffect(() => {
             at: { x: playerPos.x, z: playerPos.z },
             plan: nearestPlanRef.current.id,
           });
-          return;
-        }
-      }
-      // in Sculpt, keys 1, 2 and 3 pick the tool (carve, raise, smooth); the hotbar ignores them while the rifle sculpts (TASK-21d)
-      if (beamHeldRef.current && beamModeRef.current === 'sculpt') {
-        const tool = sculptToolForKey(e.code);
-        if (tool) {
-          chooseSculptTool(tool);
-          say(`Sculpt: ${SCULPT_LABEL[tool]}`);
           return;
         }
       }
@@ -2736,16 +2864,14 @@ useEffect(() => {
           }
         }
       }
+      // X opens the radial wheel for what you hold; releasing X or clicking picks (RadialMenu). Z is the remove (below).
       if (e.code === 'KeyX') {
-        const hit = sceneRef.current?.aimPoint();
-        if (hit && hit.piece !== null) {
-          dispatchBase({
-            t: 'remove',
-            at: { x: hit.x, z: hit.z },
-            id: hit.piece,
-          });
-          return;
-        }
+        if (!e.repeat) openRadial();
+        return;
+      }
+      if (e.code === 'KeyZ') {
+        if (!e.repeat) startRemoveHold();
+        return;
       }
       if (e.code === 'KeyT') {
         const vs = baseViewSource as WorldViewSource;
@@ -2900,7 +3026,15 @@ useEffect(() => {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [ready, creating, building, gunEquipped, fireWeapon, menu, panel, labPanel, dialOpen, debugOpen, locked, paused, hud.atLever, hud.atDial, hud.aimed, hud.aimedBoulder, hud.aimedLab, hud.aimedProp, openLog, hud.where, placeNow, stopBuilding, freeMouse, say, props.profile]);
+  }, [ready, creating, building, gunEquipped, fireWeapon, menu, panel, labPanel, dialOpen, debugOpen, locked, paused, hud.atLever, hud.atDial, hud.aimed, hud.aimedBoulder, hud.aimedLab, hud.aimedProp, openLog, hud.where, placeNow, stopBuilding, freeMouse, say, props.profile, radial, isAnyBaseWindowOpen]);
+  // Z released: the remove hold ends (a tap, before the half second, removes nothing)
+  useEffect(() => {
+    const onKeyUp = (e: KeyboardEvent): void => {
+      if (e.code === 'KeyZ') cancelRemoveHold();
+    };
+    window.addEventListener('keyup', onKeyUp);
+    return () => window.removeEventListener('keyup', onKeyUp);
+  }, [say]);
   useEffect(() => {
     const onClick = (e: MouseEvent): void => {
       // the right button cancels a placement (the key strip says so); the left button places (TASK-25)
@@ -3009,6 +3143,27 @@ useEffect(() => {
       return true;
     };
     const dev = {
+      /**
+       * A test seam (debug switch only): a written preset cartridge goes on the lab rack, so the X radial in Apply has one to
+       * offer. Players never reach it (window.__dev exists only in dev builds and under ?e2e).
+       */
+      seedCartridge: (preset: string): boolean => {
+        const v = VAULT_BY_ID.get(preset);
+        if (!v) return false;
+        const lab = labRef.current;
+        const c: Cartridge = {
+          id: `seed-${preset}-${lab.cartridges.length}`,
+          name: `${v.name} (seeded)`,
+          kind: 'preset',
+          preset,
+          from: [],
+          affinity: { pxd: 1, vtx: 1, lx: 1, aq: 1 },
+          slot: null,
+        };
+        labRef.current = { ...lab, cartridges: [...lab.cartridges, c] };
+        commit(withLab(withPlot(stateRef.current, plotRef.current), labRef.current));
+        return true;
+      },
       /** The living monsters on the planet (their state, era and position). */
       mobs: (): readonly MonsterMobStatus[] => sceneRef.current?.monsters.getMobList() ?? [],
       /** The leaks on the plot: their state, seal and wave timer. */
@@ -3870,6 +4025,15 @@ useEffect(() => {
               <span className="play-keys">{KEYS.map(([k, what]) => <span key={k}><kbd>{k}</kbd>{what}</span>)}</span>
             </button>
           ) : null}
+          {radial !== null ? (
+            <RadialMenu
+              slices={radial.items.map((it, i) => ({ id: it.id, label: it.label, thumb: radialThumbs[i] ?? null, locked: it.locked }))}
+              hint={radial.hint}
+              onPick={(id) => { radial.pick(id); closeRadial(); }}
+              onClose={closeRadial}
+            />
+          ) : null}
+          {removeHolding && radial === null && !paused ? <HoldRing ms={REMOVE_HOLD_MS} /> : null}
           {paused && journalOpen && !isAnyBaseWindowOpen ? (
             <div className="play-pause journal-pause" role="dialog" aria-label="Journal">
               <Journal
@@ -3897,7 +4061,7 @@ useEffect(() => {
               </div>
               <section className="play-controls" aria-label="Controls">
                 <h4>Controls</h4>
-                <dl>{CONTROLS.map(([k, what]) => <div key={k}><dt><kbd>{k}</kbd></dt><dd>{what}</dd></div>)}</dl>
+                <ControlsGrid controls={CONTROLS} />
               </section>
               <button className="go" onClick={() => { setJournalOpen(false); lock(); }}>Resume</button>
               <button
@@ -4147,7 +4311,7 @@ useEffect(() => {
               <span>
                 {beamHud.mode === 'apply'
                   ? beamPort ? `Port: ${beamPort.name}` : 'Port empty: R loads a cartridge'
-                  : beamHud.mode === 'sculpt' ? '1 carve, 2 raise, 3 smooth; Q: next mode' : 'Q or wheel: next mode'}
+                  : beamHud.mode === 'sculpt' ? 'X: carve, raise, smooth; Q: next mode' : 'Q or wheel: next mode'}
               </span>
             </div>
           ) : null}

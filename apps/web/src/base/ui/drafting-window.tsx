@@ -4,6 +4,7 @@ import type { Applied, BaseCommand, BaseWorld, Point } from '../world';
 import { layoutPieces, pieceAt } from '../world';
 import { Compass, Hammer, X, LayoutGrid, Copy, Play, ArrowDownToLine, Plus } from 'lucide-react';
 import { ItemGlyph } from './item-glyph';
+import { CloseHint } from './hud-bits';
 
 interface DraftingWindowProps {
   draft: DraftView;
@@ -259,7 +260,7 @@ export const DraftingWindow: React.FC<DraftingWindowProps> = ({
             </div>
           </div>
           <button className="hm-window-close-btn" onClick={onClose} data-testid="drafting-close-btn">
-            <X size={14} /> ESC
+            <X size={14} /> <CloseHint />
           </button>
         </div>
 

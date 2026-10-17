@@ -3,6 +3,7 @@
 // the layouts you saved. Each tab has one telemetry colour, so the tab you are on reads at a glance. Pure presentation: the
 // screen (play.tsx) builds the rows and does the actions.
 import type { CSSProperties, ReactElement } from 'react';
+import { ThumbImg } from '../base/ui/hud-bits';
 
 export type BuildTab = 'machines' | 'structures' | 'heavy' | 'plans';
 const TABS: readonly { readonly id: BuildTab; readonly label: string; readonly colour: string }[] = [
@@ -91,6 +92,7 @@ export function BuildMenu(props: BuildMenuProps): ReactElement {
             <div className="play-cards">
               {props.machines.map((m) => (
                 <button key={m.key} type="button" className={`play-card${m.shut ? ' shut' : ''}${m.short ? ' short' : ''}${m.highlighted ? ' highlighted' : ''}`} disabled={m.shut} onClick={() => props.onMachine(m.key)}>
+                  <ThumbImg thumb={{ machine: m.key }} size={32} />
                   <b>{m.name}</b>
                   <span>{m.blurb}</span>
                   <em>{m.shut ? `Unlocks at stage ${m.unlock}` : m.cost}</em>
@@ -112,6 +114,7 @@ export function BuildMenu(props: BuildMenuProps): ReactElement {
                       const why = props.kindLock?.(k.kind) ?? null;
                       return (
                         <button key={k.kind} type="button" className={`bm-chip${props.selectedKind === k.kind && b.slot !== null ? ' on' : ''}${why ? ' locked' : ''}`} disabled={why !== null} title={why ?? undefined} onClick={() => props.onStructure(b.id, k.kind)}>
+                          <ThumbImg thumb={{ kind: k.kind }} size={22} />
                           <span>{k.label}</span>
                           <em>{why ?? k.cost}</em>
                         </button>
@@ -158,7 +161,7 @@ export function BuildMenu(props: BuildMenuProps): ReactElement {
         <span><kbd>R</kbd> Rotate</span>
         <span><kbd>H</kbd> Lock hologram</span>
         <span><kbd>F</kbd> Fill plan</span>
-        <span><kbd>X</kbd> Remove</span>
+        <span><kbd>X</kbd> Radial · <kbd>Hold Z</kbd> Remove</span>
         <span><kbd>RMB</kbd> or <kbd>Esc</kbd> Cancel</span>
       </footer>
     </section>
@@ -174,7 +177,7 @@ export function BuildPill(props: { readonly label: string; readonly onOpen: () =
         <span>B: tabs</span>
       </button>
       <span className="bm-pill-keys">
-        <kbd>R</kbd> Rotate · <kbd>H</kbd> Lock · <kbd>F</kbd> Fill plan · <kbd>X</kbd> Remove · <kbd>RMB</kbd>/<kbd>Esc</kbd> Cancel
+        <kbd>R</kbd> Rotate · <kbd>H</kbd> Lock · <kbd>F</kbd> Fill plan · <kbd>X</kbd> Radial · <kbd>Hold Z</kbd> Remove · <kbd>RMB</kbd>/<kbd>Esc</kbd> Cancel
       </span>
     </section>
   );

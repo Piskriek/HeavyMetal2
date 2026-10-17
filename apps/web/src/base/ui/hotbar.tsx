@@ -13,9 +13,8 @@ export const Hotbar: React.FC<HotbarProps> = ({ inventory, actions }) => {
       // Ignore if user is typing in an input
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
 
+      // keys 1 to 9 always pick the hotbar slot (TICKET-04: the sculpt tools moved to the X radial)
       const num = parseInt(e.key, 10);
-      // while the extraction rifle sculpts (TASK-21d), keys 1 to 3 pick its tool and leave the hotbar alone
-      if (num >= 1 && num <= 3 && document.documentElement.dataset.beamSculpt === '1') return;
       if (num >= 1 && num <= 9) {
         actions.selectHotbar(num - 1);
       }

@@ -1,0 +1,95 @@
+/* ============================================================================
+ * File: apps/web/src/base/ui/hud-bits.css
+ * TICKET-04: styling for the shared HUD pieces (hud-bits.tsx). Dark glass, telemetry cyan, Oxanium keycaps.
+ * ============================================================================ */
+
+.hm-thumb-img {
+  display: block;
+  object-fit: contain;
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.55));
+}
+
+.hm-close-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  font-family: var(--hud-font-display, 'Oxanium', sans-serif);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hud-text-dim, #94a3b8);
+  white-space: nowrap;
+}
+
+.hm-close-hint kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 18px;
+  padding: 0 5px;
+  font-family: inherit;
+  font-size: 10px;
+  color: var(--hud-text, #f4f8ff);
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(61, 200, 255, 0.35);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.hm-close-hint-sep {
+  color: var(--hud-text-dim, #94a3b8);
+}
+
+.hm-hold-ring {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 64px;
+  height: 64px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 95;
+  filter: drop-shadow(0 0 6px rgba(61, 200, 255, 0.55));
+}
+
+.hm-hold-ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+
+.hm-hold-ring-track {
+  fill: rgba(8, 13, 22, 0.5);
+  stroke: rgba(255, 255, 255, 0.18);
+  stroke-width: 4;
+}
+
+.hm-hold-ring-fill {
+  fill: none;
+  stroke: var(--hud-c-aq, #3dc8ff);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 163.36;
+  stroke-dashoffset: 163.36;
+  animation-name: hm-hold-ring-fill;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes hm-hold-ring-fill {
+  from { stroke-dashoffset: 163.36; }
+  to { stroke-dashoffset: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hm-hold-ring-fill {
+    animation-name: none;
+    stroke-dashoffset: 0;
+  }
+}

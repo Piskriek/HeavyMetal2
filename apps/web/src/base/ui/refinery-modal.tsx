@@ -5,6 +5,7 @@ import { ITEMS, QUEUE_MAX, RECIPE_BY_ID, RECIPES } from '../catalog';
 import * as L from '@hm/lattice';
 import { CheckCircle2, Clock, Factory, Flame, Layers, PackageCheck, Play, X } from 'lucide-react';
 import { ItemGlyph } from './item-glyph';
+import { CloseHint } from './hud-bits';
 import { toItemView } from '../world-view';
 
 export interface RefineryModalProps {
@@ -98,7 +99,7 @@ export const RefineryModal: React.FC<RefineryModalProps> = ({
             </div>
           </div>
           <button className="hm-window-close-btn" onClick={onClose} data-testid="refinery-close-btn">
-            <X size={14} /> ESC
+            <X size={14} /> <CloseHint />
           </button>
         </div>
 

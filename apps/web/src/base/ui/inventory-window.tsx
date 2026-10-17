@@ -5,6 +5,7 @@ import { FORGE_BY_ID, PART_SLOTS, type PartSlot } from '../catalog';
 import { weaponStats } from '../weapons';
 import { Backpack, Crosshair, Eye, Flame, Shield, Sparkles, Wind, X, Zap } from 'lucide-react';
 import { ItemGlyph } from './item-glyph';
+import { CloseHint } from './hud-bits';
 
 interface InventoryWindowProps {
   inventory: InventoryView;
@@ -120,7 +121,7 @@ export const InventoryWindow: React.FC<InventoryWindowProps> = ({
             <span style={{ fontSize: 12, opacity: 0.6, textTransform: 'none' }}>[Tab / I to toggle]</span>
           </div>
           <button className="hm-window-close-btn" onClick={onClose} data-testid="inventory-close-btn">
-            <X size={14} /> ESC
+            <X size={14} /> <CloseHint />
           </button>
         </div>
 

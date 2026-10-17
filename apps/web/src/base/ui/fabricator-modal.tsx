@@ -5,6 +5,7 @@ import { VEHICLES, VEHICLE, RECIPE_BY_ID, type VehicleKind } from '../catalog';
 import * as L from '@hm/lattice';
 import { Bot, Clock, Play, ShieldAlert, Truck, Users, X } from 'lucide-react';
 import { ItemGlyph } from './item-glyph';
+import { CloseHint } from './hud-bits';
 import { toItemView } from '../world-view';
 
 export interface FabricatorModalProps {
@@ -99,7 +100,7 @@ export const FabricatorModal: React.FC<FabricatorModalProps> = ({
             </div>
           </div>
           <button className="hm-window-close-btn" onClick={onClose} data-testid="fabricator-close-btn">
-            <X size={14} /> ESC
+            <X size={14} /> <CloseHint />
           </button>
         </div>
 

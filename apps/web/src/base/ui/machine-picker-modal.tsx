@@ -5,6 +5,7 @@ import { HEAVY, HEAVY_BILL, FABRICATOR_BILL, ITEMS, type StationKind } from '../
 import * as L from '@hm/lattice';
 import { Cpu, Droplets, Flame, Layers, SunMedium, Truck, Wrench, X } from 'lucide-react';
 import { ItemGlyph } from './item-glyph';
+import { CloseHint } from './hud-bits';
 import { toItemView } from '../world-view';
 
 export interface MachinePickerModalProps {
@@ -132,7 +133,7 @@ export const MachinePickerModal: React.FC<MachinePickerModalProps> = ({
             </div>
           </div>
           <button className="hm-window-close-btn" onClick={onClose} data-testid="machine-picker-close-btn">
-            <X size={14} /> ESC
+            <X size={14} /> <CloseHint />
           </button>
         </div>
 

@@ -27,6 +27,7 @@ import {
   type MachineInspect,
 } from '../machine-inspect';
 import type { MachineKind } from '@hm/plotsim';
+import { CloseHint } from './hud-bits';
 import './machine-inspector.css';
 
 export interface MachineInspectorProps {
@@ -159,7 +160,7 @@ export const MachineInspector: React.FC<MachineInspectorProps> = ({
             onClick={onClose}
             data-testid="machine-inspector-close"
           >
-            <X size={14} /> [Esc / Tab] Close
+            <X size={14} /> <CloseHint keys={['Esc', 'Tab']} />
           </button>
         </div>
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { BaseActions, LatticeView } from '../view';
 import { Network, Radio, X, Zap } from 'lucide-react';
 import { ItemGlyph } from './item-glyph';
+import { CloseHint } from './hud-bits';
 
 interface LatticeWindowProps {
   lattice: LatticeView;
@@ -36,7 +37,7 @@ export const LatticeWindow: React.FC<LatticeWindowProps> = ({
             </span>
           </div>
           <button className="hm-window-close-btn" onClick={onClose} data-testid="lattice-close-btn">
-            <X size={14} /> ESC
+            <X size={14} /> <CloseHint />
           </button>
         </div>
 

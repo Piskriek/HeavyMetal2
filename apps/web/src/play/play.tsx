@@ -1293,13 +1293,16 @@ useEffect(() => {
       ['Loading the wreck sites', async () => { await scene.preloadWrecks(); }],
       ['Fitting the lab', async () => { await scene.preloadLabGenerated(); }],
       ...SMOOTH_IDS.map((id): [string, () => void] => ['Shaping the boulders', () => { smoothModel(id); }]),
-      ['Building your plot', () => { look(PLOT, 1); }],
+      ...([1, 2, 3, 4, 5, 6] as const).map((s): [string, () => void] => [
+        `Growing stage ${s}`,
+        () => { look(PLOT, s); },
+      ]),
       ...[...new Set(NEIGHBOURS.map((n) => `${n.cartridge}@${n.stage}`))].map((k): [string, () => void] => {
         const [id, st] = k.split('@') as [string, string];
         return ['Finding the neighbours', () => { look(id, Number(st) as Stage); }];
       }),
       ['Opening the lab', () => {
-        scene.setPlanet(look(PLOT, 1), look(PLOT, 1), NEIGHBOURS.map((plot) => ({ plot, look: look(plot.cartridge, plot.stage) })));
+        scene.setPlanet(look(PLOT, 1), (st: Stage) => look(PLOT, st), NEIGHBOURS.map((plot) => ({ plot, look: look(plot.cartridge, plot.stage) })));
         // the cartridge that was in the rifle's port comes back into it (TASK-21d): it left the rack when it was loaded
         const savedPort = loadBeamSave().port;
         if (savedPort && savedPort.preset) {

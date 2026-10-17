@@ -6,6 +6,7 @@
 // Each frame the far side is drawn from a virtual camera into a texture, and the near side shows it in the opening.
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import type { Stage } from '@hm/fidelity';
 import type { StageLook } from '../crafter/looks';
 import { createWorld, PLANET_DIR, SUN, type Neighbour, type World } from '../crafter/world';
 import { createPlume, type PlumeMode } from '@hm/plume';
@@ -166,7 +167,7 @@ const MILL_POUR = { count: 220, height: 7.5, spread: 4.5 };
 
 export interface PlayScene {
   /** Puts the planet in place (once, after its looks are baked). */
-  setPlanet(base: StageLook, plot: StageLook, neighbours: readonly Neighbour[]): void;
+  setPlanet(base: StageLook, lookFor: (stage: Stage) => StageLook, neighbours: readonly Neighbour[]): void;
   /** The saved state, applied at once: the gate on or off, the plot's machines standing (already running), its stage. */
   restore(o: { readonly gateOn: boolean; readonly plot: PlotState; readonly running: ReadonlyMap<number, number>; readonly connected: ReadonlySet<number> }): void;
   /** The plot as it is now: machines built or removed appear or go (with their cables), running ones pour their pixels. */
@@ -280,7 +281,7 @@ export interface PlayScene {
   stepMonsters(seconds: number): void;
   /** The leak the view is aimed at, within `range` m, or null (the beam's Seal hold). */
   aimLeak(range: number): number | null;
-  /** Immediately sets the world and mob visual fidelity stage (0 to 4). */
+  /** Immediately sets the world and mob visual fidelity stage (0 to 6). */
   setFidelityStage(stage: number): void;
   setVehicles(vehicles: readonly { readonly id: number; readonly kind: RoverKind; readonly x: number; readonly z: number; readonly yaw: number }[]): void;
   setFabricators(fabricators: readonly { readonly id: number; readonly x: number; readonly z: number; readonly yaw: number; readonly printing: boolean }[]): void;
@@ -456,6 +457,7 @@ export function createPlayScene(o: {
   const planetScene = new THREE.Scene();
   const m = kit.createMaterials();
   let world: World | null = null, ground: PlotGround | null = null;
+  let lookForFn: ((stage: Stage) => StageLook) | null = null;
   let twin = kit.gate(m, { twin: true, stage: 1 });
   let twinStage = 1;
   const openingMark = keep(new THREE.ShaderMaterial({ vertexShader: MARK_VERTEX, fragmentShader: OPENING_MARK_FRAGMENT, side: THREE.DoubleSide, blending: THREE.NoBlending }));
@@ -1284,9 +1286,15 @@ export function createPlayScene(o: {
 
   /** Pushes the walker's circle of RADIUS out of the lab's boxes (TICKET-01 B: the swept resolver, from where the walker stood). */
   const collide = (p: THREE.Vector3, from: { readonly x: number; readonly z: number }): void => {
-    const solid = pushCircle(from, p, room.floorHeight(from.x, from.z), RADIUS, room.colliders);
-    p.x = solid.x;
-    p.z = solid.z;
+    const safeFrom = {
+      x: Math.max(ROOM.left + RADIUS, Math.min(ROOM.right - RADIUS, from.x)),
+      z: Math.max(ROOM.back + RADIUS, Math.min(ROOM.front - RADIUS, from.z)),
+    };
+    p.x = Math.max(ROOM.left + RADIUS, Math.min(ROOM.right - RADIUS, p.x));
+    p.z = Math.max(ROOM.back + RADIUS, Math.min(ROOM.front - RADIUS, p.z));
+    const solid = pushCircle(safeFrom, p, room.floorHeight(safeFrom.x, safeFrom.z), RADIUS, room.colliders);
+    p.x = Math.max(ROOM.left + RADIUS, Math.min(ROOM.right - RADIUS, solid.x));
+    p.z = Math.max(ROOM.back + RADIUS, Math.min(ROOM.front - RADIUS, solid.z));
   };
 
   /** Where a point is in a gate's own frame. */
@@ -1519,8 +1527,9 @@ export function createPlayScene(o: {
   };
 
   const api: PlayScene = {
-    setPlanet(base, plot, neighbours) {
+    setPlanet(base, lookFor, neighbours) {
       if (world) return;
+      lookForFn = lookFor;
       // the plot's natural ground (its own terrain and materials); the old world brings the sky, the stars and the neighbours, seated on it
       const g = createPlotGround(planetScene, { seed: 7, sunDir: SUN, stage: Math.max(1, stage), textureSize: o.groundTexture, budget: detail.groundBudget });
       ground = g;
@@ -1533,7 +1542,8 @@ export function createPlayScene(o: {
       }
       world = createWorld(planetScene, { gridSpacing: o.gridSpacing, reducedMotion: o.reducedMotion, ground: false });
       world.setPlanet(base, neighbours, { treeDetailRange: 150, height: (x, z) => g.terrain.height(x, z) + 0.6 });
-      world.show(plot);
+      const currentLookStage = Math.max(1, Math.min(6, Math.floor(stage))) as Stage;
+      world.show(lookFor(currentLookStage));
       const gy = g.heightAt(0, 0);
       padTop = gy + 0.25;
       twin.group.position.set(0, gy, 0);
@@ -1552,6 +1562,10 @@ export function createPlayScene(o: {
       }
       openingUniforms.uStatic.value = gateOn ? 0 : 1;
       stage = shown = s.plot.stage;
+      if (world && lookForFn) {
+        const currentLookStage = Math.max(1, Math.min(6, Math.floor(stage))) as Stage;
+        world.show(lookForFn(currentLookStage));
+      }
       scanWave = createScanWave();
       if (s.plot.stage >= 1 || stage0IsDithered(s.plot.machines.length)) markScanWaveDone(scanWave);
       plotLx = plotLevel(s.plot, 'lx');
@@ -1942,7 +1956,10 @@ export function createPlayScene(o: {
       if (to <= stage) return;
       scientistAnimator?.playOneShot('cheer');
       // a wave still running is overtaken: the stage it was bringing shows at once
-      if (waveTo >= 0) shown = waveTo;
+      if (waveTo >= 0) {
+        shown = waveTo;
+        world?.settle();
+      }
       stage = to;
       room.setStorm(Math.min(1, Math.max(0, to / 6)));
       gameAudio.updateStormVolume(1.0 - Math.min(1, Math.max(0, to / 6)));
@@ -1950,13 +1967,17 @@ export function createPlayScene(o: {
       waveTo = to;
       waveStart = clock + (shown === 0 ? 2.0 : 0.8);
       postUniforms.uWaveCentre.value.set(from.x, groundAt(from.x, from.z), from.z);
+      if (world && lookForFn) {
+        const targetStage = Math.max(1, Math.min(6, Math.floor(to))) as Stage;
+        world.setTarget(lookForFn(targetStage));
+      }
       ground?.setStage(Math.max(1, to));
       monsters.setFidelityStage(to);
       wrecks.setStage(to);
       fitLooks();
     },
     setFidelityStage(to) {
-      const s = Math.max(0, Math.min(4, Math.floor(to)));
+      const s = Math.max(0, Math.min(6, Math.floor(to)));
       stage = s;
       if (s >= 1) markScanWaveDone(scanWave);
       shown = s;
@@ -1964,6 +1985,9 @@ export function createPlayScene(o: {
       gameAudio.updateStormVolume(1.0 - Math.min(1, Math.max(0, s / 6)));
       gameAudio.setMoonStage(s);
       waveTo = -1;
+      if (world && lookForFn) {
+        world.show(lookForFn(Math.max(1, s) as Stage));
+      }
       ground?.setStage(Math.max(1, s));
       monsters.setFidelityStage(s);
       wrecks.setStage(s);
@@ -2321,7 +2345,18 @@ export function createPlayScene(o: {
       }
       // ---- the wave, and the event when it has crossed
       const wave = waveNow(), r = wave.r;
-      if (waveTo >= 0 && r > 1e6) { shown = waveTo; waveTo = -1; fitLooks(); rebuildProps(shown); pendingEvent = pendingEvent ?? 'stage-up'; sfx('stage-up'); }
+      if (waveTo >= 0 && r > 1e6) {
+        shown = waveTo;
+        waveTo = -1;
+        fitLooks();
+        rebuildProps(shown);
+        world?.settle();
+        pendingEvent = pendingEvent ?? 'stage-up';
+        sfx('stage-up');
+      }
+      if (waveTo >= 0) {
+        world?.setFront(r);
+      }
       postUniforms.uWaveR.value = waveTo >= 0 ? r : -1;
       postUniforms.uSkyRise.value = wave.sky;
       // stage 0's scan wave (0a to 0b), the gate's amber pool, the sun, and the suit cam's optics (plan 25)
@@ -2688,6 +2723,10 @@ export function createPlayScene(o: {
         return out;
       },
       teleport(w, x, z, y, p) {
+        if (w === 'lab') {
+          x = Math.max(ROOM.left + RADIUS, Math.min(ROOM.right - RADIUS, x));
+          z = Math.max(ROOM.back + RADIUS, Math.min(ROOM.front - RADIUS, z));
+        }
         if (where !== w) {
           if (w === 'planet') {
             labScene.remove(scientistHolder);

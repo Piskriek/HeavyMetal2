@@ -52,8 +52,8 @@ Only Opus adds jobs here. Flash changes only a job's status word. The old board 
 Opened 2026-10-17: TICKET-01 landed (7d0d9030, 52a02830), so play-scene.ts and play.tsx are free. Note that every moon teleport now lands at scene.gateExit().
 Brief: `docs/prompts/sidecar/T02A-stage-world-look.md`.
 
-## F-02 [OPEN] TICKET-02 C0: the plot's biome input (terrain, hydro water, keep-outs)
+## F-02 [DONE] TICKET-02 C0: the plot's biome input (terrain, hydro water, keep-outs)
 Brief: `docs/prompts/sidecar/T02C0-biome-input.md`. Pure module and unit tests; no browser test.
 
-## F-03 [OPEN] TICKET-01 leftovers: windows, doors, roofs, ramps on slopes, and your F-01 clamp
+## F-03 [DONE] TICKET-01 leftovers: windows, doors, roofs, ramps on slopes, and your F-01 clamp
 Brief: `docs/prompts/sidecar/T01b-collision-leftovers.md`. Start it only after F-02 is DONE.

@@ -788,23 +788,23 @@
     },
     {
       "id": "breaker-panel",
-      "panel": "21/44-power-wall.png",
+      "panel": "07/07-breaker-panel.png",
       "class": "lab",
-      "size": 2.2,
+      "size": 2.1,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the breaker panel on its own, WITHOUT its breaker handles: a standing steel cabinet on a low plinth, a top panel, and a row of six vertical breaker bays below it, each bay with an empty square socket where a handle mounts, rectangular louvred vents and two SQUARE gauges; NO round gauges, NO cables. In the base kit family style: warm light-grey painted steel, dark grey trim, amber hazard bands",
-      "note": "sheet 21 approved with the square rule (owner 2026-10-11)"
+      "subject": "the breaker cabinet on its own, WITHOUT its red isolator handle and WITHOUT its three small toggles: a tall standing steel cabinet with two doors split by a vertical centre seam, square barrel hinges on the outer edges, four banks of six horizontal louvre slots (two high, two low), two dial gauges in SQUARE bezels at the upper right, a square yellow-and-black hazard-striped mounting plate with an empty square spindle boss at the centre right, three empty small square sockets in a row at the middle left, a square key-latch plate on the left door, a row of four square cable glands on the roof, standing on two square steel channel legs with flat bolted footplates and a clear gap underneath; NO cables, NO conduit, NO pipes. In the sheet 07 lab style: mid-grey painted industrial steel, dark gunmetal trim, yellow-and-black hazard stripes only where named",
+      "note": "ARGO_NOTE_09 (TICKET-06): the sheet 07 design replaces the sheet 21 one the owner called doggy-door breakers and a laundry-chute console (2026-10-17)"
     },
     {
       "id": "breaker-handle",
-      "panel": "21/44-power-wall.png",
+      "panel": "07/07-breaker-panel.png",
       "class": "moving-part",
-      "size": 0.45,
-      "axis": "height",
+      "size": 0.24,
+      "axis": "length",
       "view": "three-quarter",
-      "subject": "ONLY one breaker handle on its own: a chunky square-section lever arm with a rectangular grip, on a square pivot block with a square mounting plate; NO round hub, nothing round. In the base kit family style: warm light-grey painted steel, dark grey trim, amber hazard bands",
-      "note": "sheet 21 approved with the square rule (owner 2026-10-11)"
+      "subject": "ONLY the cabinet's rotary isolator handle on its own: one chunky safety-red square-section blade handle, its root fixed into a square dark-gunmetal hub block; nothing round, NO plate, NO cabinet. In the sheet 07 lab style: mid-grey painted industrial steel, dark gunmetal trim, yellow-and-black hazard stripes only where named",
+      "note": "ARGO_NOTE_09 (TICKET-06): the sheet 07 design replaces the sheet 21 one the owner called doggy-door breakers and a laundry-chute console (2026-10-17)"
     },
     {
       "id": "relay-cabinet",
@@ -828,27 +828,27 @@
     },
     {
       "id": "operator-console",
-      "panel": "21/44-power-wall.png",
+      "panel": "07/07-operator-console.png",
       "class": "lab",
-      "size": 1.4,
+      "size": 1.32,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the operator console on its own, WITHOUT its throw lever: a heavy steel desk console with a sloped control top, a dark rectangular screen in a square housing, a rectangular speaker grille, rows of square buttons and an empty square slot where the lever mounts, on a solid boxy base; NO round gauges, NO cables. In the base kit family style: warm light-grey painted steel, dark grey trim, amber hazard bands",
-      "note": "sheet 21 approved with the square rule (owner 2026-10-11)",
+      "subject": "the operator console on its own, WITHOUT its red throw lever and WITHOUT its keypad: a central square steel pedestal with a recessed square service hatch and corner bolts, on a wider bolted floor flange; on top, a wide flat control deck overhanging the pedestal on both sides, with a yellow-and-black hazard stripe along its front edge, three square push-buttons and a small green status bar on its left half, and an empty slotted square lever guide box on its right; behind the deck, a sloped instrument hood with four dial gauges in SQUARE bezels on the left, a green oscilloscope screen deep inside a square dark shroud in the centre, and an empty square pocket on the right; NO cables, NO pipes. In the sheet 07 lab style: mid-grey painted industrial steel, dark gunmetal trim, yellow-and-black hazard stripes only where named",
+      "note": "ARGO_NOTE_09 (TICKET-06): the sheet 07 design replaces the sheet 21 one the owner called doggy-door breakers and a laundry-chute console (2026-10-17)",
       "fix": [
         "plain-back"
       ]
     },
     {
       "id": "console-lever",
-      "panel": "21/44-power-wall.png",
+      "panel": "07/07-operator-console.png",
       "class": "moving-part",
-      "size": 0.6,
+      "size": 0.34,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "ONLY the console's big throw lever on its own: a thick square-section lever arm with a rectangular red grip, on a square pivot block; NO round boss, NO base box, nothing round. In the base kit family style: warm light-grey painted steel, dark grey trim, amber hazard bands",
-      "integration": "The image keeps a base block and pivot clevis: split the mesh at the pivot axis in Blender at integration so only the arm rotates.",
-      "note": "sheet 21 approved with the square rule (owner 2026-10-11)"
+      "subject": "ONLY the console's throw lever on its own: two parallel square-section brushed-steel arms joined at the top by a horizontal safety-red square T-grip, their feet fixed into a square dark-gunmetal axle block; nothing round, NO guide box, NO console. In the sheet 07 lab style: mid-grey painted industrial steel, dark gunmetal trim, yellow-and-black hazard stripes only where named",
+      "integration": "The pivot is the axle block: the arms rotate about its X axis (ARGO_NOTE_09 socket 0.36, 0.96, 0.18 in the console frame).",
+      "note": "ARGO_NOTE_09 (TICKET-06): the sheet 07 design replaces the sheet 21 one the owner called doggy-door breakers and a laundry-chute console (2026-10-17)"
     },
     {
       "id": "preset-bench",

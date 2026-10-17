@@ -13,6 +13,8 @@
 4. **The armory sidearm:** `lab-room.ts` places Argo's `armoryRack` on the east-wall rail. E on its pickup point equips the sidearm in the existing equipment slot, with the same say/toast pattern as other pickups. The SEMI ammo badge in `play.tsx` shows only when `shouldShowAmmoBadge` (equipment.sidearm) is true.
 5. **Wrecks:** the trucks lie tilted and part-buried (Argo's `settleWreck`). Holding E on one salvages it, using the existing lab hold-E salvage pattern in `play.tsx` (`HOLD_E` with its progress ring). Its log goes through the existing `readLog` / lore-logs flow. Salvage items go to the pack, then the network, the way lab salvage does.
 
+6. **POL-83 (a small fix while you're in the play files):** a bare `.play` rule in `apps/web/src/play/play.css` styles any element with the class `play` and covered the viewport in the Studio's audio tab. Scope it to the play screen's root (for example `.play-screen .play`, or whatever the root class is) so it can't leak. Then check the play screen looks unchanged.
+
 ## Verify
 - **A new `scripts/test-ticket07a.mjs`:**
   - a leak shows the rift (no old marker mesh), and turns amber while sealing;
@@ -24,7 +26,7 @@
 - Run typecheck on the laptop. Run the rest through `scripts/test-on-3dpc.sh --only "<your paths>" "npm run build && …"`: `npm test`, the new test, `test-machine-inspector`, `test-build-ux` and `test-campaign` (45 of 45).
 
 ## Stay inside
-`apps/web/src/play/monsters.ts`, `rift.ts`, `armory-rack.ts`, `lab-room.ts`, `wrecks.ts`, `wreck-sites.ts` and their tests; `apps/web/src/monsters/` (only if a swap needs it); `play.tsx` (the badge and the hold-E salvage only); and the new test. **Flash owns `play-scene.ts` right now: don't touch it.** If the rift or spawning truly needs a `play-scene.ts` hook, stop and report it.
+`apps/web/src/play/monsters.ts`, `rift.ts`, `armory-rack.ts`, `lab-room.ts`, `wrecks.ts`, `wreck-sites.ts` and their tests; `apps/web/src/play/play.css` (POL-83 only); `apps/web/src/monsters/` (only if a swap needs it); `play.tsx` (the badge and the hold-E salvage only); and the new test. **Flash owns `play-scene.ts` right now: don't touch it.** If the rift or spawning truly needs a `play-scene.ts` hook, stop and report it.
 
 ## Git
 - Commit by explicit paths, after checking `git diff --cached --stat`.

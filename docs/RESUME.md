@@ -1,5 +1,18 @@
 # RESUME: start here (fresh session)
 
+## 18 Oct Checkpoint (read first)
+- **(a) Landed (pushed):**
+  - **T08b,** the Studio's Look and Scene tabs, the gizmo and the 4-angle panel (bba366cb, 7a2ab759).
+  - **T07a,** the rifts, proximity spawns, the armory sidearm and the ammo badge (767f75a5).
+  - **Co-op Phase 1** (plan 36): host and join an outpost by room code, with the same world hash in node and in two browser pages; the plain build stays solo (ad9eacec, 955395aa).
+  - **T06,** the lab overhaul, with a draw-call pass that brought it from 307 down to 180 (6e7575dc).
+  - **Build:** about 14.85 MB.
+- **(b) Running:**
+  - **Haiku T06b:** packs and adopts the generated sheet 07 breaker panel, isolator, console and lever (`docs/prompts/sidecar/T06b-sheet07-power-models.md`).
+  - **Flash F-09** (the performance pass) is still taken. F-10 to F-14 (all `play-scene.ts`) queue behind it: T05, the plumes, T07b with POL-96 and 97, the lab aim, and the co-op hooks.
+- **(c) Argo:** his Gemini chat began returning empty replies (likely full), so ARGO_NOTE_10 (the TICKET-09 onward plan) never arrived. The fresh-chat handoff is `docs/argo/notes/ARGO_HANDOFF_2026-10-18.md` (also in Setmix). The owner decides who starts the new chat.
+- **(d) Polish:** the registry runs to POL-117. The ranges in use are POL-101 to 110 (T06), POL-111 to 120 (co-op) and POL-121 to 130 (T06b).
+
 ## 17 Oct Checkpoint (read first)
 - **(a) The workflow** (`docs/argo/notes/`; Drive folder Setmix):
   - **Argo** (Gemini, PM and creative lead) gets one spec note per ticket (`OPUS_NOTE_NN`), writes or polishes the code, and saves `{files:{path:content}}` bundles. His Drive tool saves to My Drive's root, so Opus moves them into Setmix (the owner has given standing permission to upload or move anything Argo needs).

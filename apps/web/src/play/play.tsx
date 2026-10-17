@@ -1252,6 +1252,7 @@ useEffect(() => {
         cameraView: props.profile.cameraView ?? 'first',
         avatar: stateRef.current.avatar,
         beamField: loadBeamSave().field,
+        vegetation: (props.profile.graphics.vegetation as 'auto' | 'off' | 'low' | 'high' | undefined) ?? 'auto',
       });
     } catch {
       setFailed(true);
@@ -1301,6 +1302,9 @@ useEffect(() => {
         const [id, st] = k.split('@') as [string, string];
         return ['Finding the neighbours', () => { look(id, Number(st) as Stage); }];
       }),
+      ['Growing the vegetation', () => {
+        // Plotbiome scatter view runs behind the loading bar
+      }],
       ['Opening the lab', () => {
         scene.setPlanet(look(PLOT, 1), (st: Stage) => look(PLOT, st), NEIGHBOURS.map((plot) => ({ plot, look: look(plot.cartridge, plot.stage) })));
         // the cartridge that was in the rifle's port comes back into it (TASK-21d): it left the rack when it was loaded
@@ -2306,6 +2310,12 @@ useEffect(() => {
         if (stage === 6) narratorRef.current?.trigger('fab:crawler');
         updateChain((c) => c);
       },
+      setFidelityStage: (stage: number) => {
+        plotRef.current = { ...plotRef.current, stage };
+        scene.setFidelityStage(stage);
+      },
+      biomeCounts: () => scene.getBiomeCounts(),
+      setVegetationSetting: (v: 'auto' | 'off' | 'low' | 'high') => scene.setVegetationSetting(v),
       drain: () => {
         plotRef.current = { ...plotRef.current, ore: 0 };
         setHud((h) => ({ ...h, plot: { ...h.plot, ore: 0 } }));
@@ -3113,6 +3123,14 @@ useEffect(() => {
         (window as unknown as { hmPlay?: { setStage: (n: number) => void } }).hmPlay?.setStage(stage);
         dispatchBaseRef.current({ t: 'stage', stage });
       },
+      setFidelityStage: (stage: number): void => {
+        (window as unknown as { hmPlay?: { setFidelityStage: (n: number) => void } }).hmPlay?.setFidelityStage(stage);
+        dispatchBaseRef.current({ t: 'stage', stage });
+      },
+      setVegetationSetting: (v: 'auto' | 'off' | 'low' | 'high'): void => {
+        sceneRef.current?.setVegetationSetting(v);
+      },
+      getBiomeCounts: () => sceneRef.current?.getBiomeCounts() ?? null,
     };
     debugApiRef.current = dev;
     if (debugHooks) (window as unknown as { __dev?: unknown }).__dev = dev;

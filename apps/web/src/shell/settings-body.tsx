@@ -73,6 +73,24 @@ export function SettingsBody(props: {
         <label className="row slider" data-ui="settings.dither">Dither distance<input type="range" min={0} max={DITHER_STOPS.length - 1} step={1} value={ditherStop(dither)} aria-label="Dither distance" aria-valuetext={ditherSays}
           onChange={(e) => { const m = DITHER_STOPS[Number(e.target.value)] ?? 0; update((p) => ({ ...p, graphics: { ...p.graphics, ditherDistance: m } })); }} /><output>{ditherSays}</output></label>
         <p className="hint">How far from you the voxel ground blends two surfaces pixel by pixel. Past it, each block shows one surface. Unlimited blends everywhere; far away it can shimmer.</p>
+        <div className="row" role="group" aria-label="Vegetation" data-ui="settings.vegetation">
+          <span>Vegetation</span>
+          <span className="seg">
+            {(['auto', 'off', 'low', 'high'] as const).map((v) => (
+              <button
+                key={v}
+                className={(profile.graphics.vegetation ?? 'auto') === v ? 'on' : ''}
+                aria-pressed={(profile.graphics.vegetation ?? 'auto') === v}
+                onClick={() => {
+                  update((p) => ({ ...p, graphics: { ...p.graphics, vegetation: v } }));
+                }}
+              >
+                {v.charAt(0).toUpperCase() + v.slice(1)}
+              </button>
+            ))}
+          </span>
+        </div>
+        <p className="hint">Procedural plant life across terraformed ground: tufts, bushes and trees. Auto picks Low on this laptop.</p>
         <GraphicsTuning tier={parseQuality(profile.quality) ?? tierInUse() ?? 'medium'} own={profile.graphics} onChange={(g) => update((p) => ({ ...p, graphics: g }))} />
         <label className="row">Graphics card <select value={profile.gpu} onChange={(e) => update((p) => ({ ...p, gpu: e.target.value as GpuChoice }))}><option value="fast">Ask for the fast one</option><option value="saver">Ask for the battery saver</option><option value="browser">Let the browser choose</option></select></label>
         <p className="hint">In use: {gpu ? tidyGpuName(gpu) : 'not known yet'}. A page can only ask: on a laptop with two graphics cards, Windows decides. To always get the fast one, open Windows Settings, System, Display, Graphics, pick your browser and choose High performance.</p>

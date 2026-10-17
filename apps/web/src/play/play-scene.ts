@@ -49,6 +49,8 @@ import { BEAM_RANGE } from '../base/world';
 import type { WalkWorld } from '../base/walk';
 import { computeGateExitPose, pushCircle, pushCircleInFrame } from './static-colliders';
 import { machineFootprint } from '../base/machine-footprints';
+import { createPlotBiomeView, type PlotBiomeView, type BiomeInstanceCount } from './plot-biome-view';
+import { buildBiomeInput, type BiomeInput } from './biome-input';
 import { spawn as spawnRover, step as stepRover, speed as roverSpeed, ROVERS, DT as ROVER_DT, type RoverState, type RoverKind } from '@hm/rover';
 import {
   createMaterials as createRovergearMaterials,
@@ -289,8 +291,15 @@ export interface PlayScene {
   exitVehicle(): { readonly id: number; readonly x: number; readonly z: number; readonly yaw: number } | null;
   getDrivingVehicle(): { readonly id: number; readonly kind: RoverKind; readonly speed: number } | null;
   getNearVehicle(reach?: number): { readonly id: number; readonly kind: RoverKind } | null;
+  /** The plot's biome scatter view (TICKET-02 item F). */
+  buildBiome(input: BiomeInput): void;
+  setVegetationSetting(v: 'auto' | 'off' | 'low' | 'high'): void;
+  getBiomeCounts(): BiomeInstanceCount;
   /** For the tests and the e2e: where you are, and a way to stand somewhere. */
   readonly debug: {
+    biomeCounts(): BiomeInstanceCount | null;
+    biomeTriangles(): number;
+    biomeDrawCalls(): number;
     /** The wreck sites: each one's rung and whether it is broken or sealed (TASK-23c). */
     /** TASK-26 check hooks: set the sync (a dev hook, so a beat need not wait 90 s), and the plume's pixels now. */
     setSync(v: number): void;
@@ -372,6 +381,7 @@ export function createPlayScene(o: {
   readonly avatar?: PlayAvatar | null;
   /** The sculpt edits and the paint as saved (encodeField text), applied when the plot is made; null for a fresh plot. */
   readonly beamField?: string | null;
+  readonly vegetation?: 'auto' | 'off' | 'low' | 'high';
 }): PlayScene {
   const renderer = new THREE.WebGLRenderer({ canvas: o.canvas, antialias: o.antialias, powerPreference: o.powerPreference });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -1230,6 +1240,72 @@ export function createPlayScene(o: {
   let lastDrivingVehicleId: number | null = null;
   let lastRoverSpeed = 0;
 
+  // ---- plot biome scatter view (TICKET-02 item F)
+  let biomeView: PlotBiomeView | null = null;
+  let vegSetting: 'auto' | 'off' | 'low' | 'high' = o.vegetation ?? 'auto';
+  let cachedBiomeInput: BiomeInput | null = null;
+  let activeBase: S.Base | null = null;
+
+  const buildDefaultBiomeInput = (g: PlotGround): BiomeInput => {
+    const n = 256;
+    const cellM = 1;
+    const x0 = -128;
+    const z0 = -128;
+
+    const machinesList: { x: number; z: number; r: number }[] = [];
+    const waterSourcesList: { x: number; z: number }[] = [];
+
+    for (const v of views.values()) {
+      const fp = machineFootprint(v.m.kind);
+      const rFp = Math.max(Math.abs(fp.min[0]), Math.abs(fp.max[0]), Math.abs(fp.min[2]), Math.abs(fp.max[2]));
+      machinesList.push({ x: v.m.x, z: v.m.z, r: rFp + 1.0 });
+      if (v.m.kind === 'water' || v.m.kind === 'heavy-water') {
+        waterSourcesList.push({ x: v.m.x, z: v.m.z });
+      }
+    }
+
+    const keepoutsList: { x0: number; z0: number; x1: number; z1: number }[] = [
+      { x0: -4.0, z0: -4.0, x1: 4.0, z1: 4.0 }, // Twin gate pad
+    ];
+
+    if (activeBase) {
+      for (const s of activeBase.structures) {
+        const pieces = activeBase.pieces.filter((p) => p.s === s.id);
+        if (pieces.length === 0) {
+          keepoutsList.push({ x0: s.x - 4, z0: s.z - 4, x1: s.x + 4, z1: s.z + 4 });
+        } else {
+          let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+          for (const p of pieces) {
+            const w = S.toWorld(s, (p.i + 0.5) * S.CELL, (p.j + 0.5) * S.CELL, 0);
+            const half = S.CELL * 0.5;
+            if (w.x - half < minX) minX = w.x - half;
+            if (w.x + half > maxX) maxX = w.x + half;
+            if (w.z - half < minZ) minZ = w.z - half;
+            if (w.z + half > maxZ) maxZ = w.z + half;
+          }
+          keepoutsList.push({ x0: minX, z0: minZ, x1: maxX, z1: maxZ });
+        }
+      }
+    }
+
+    const effectiveTier = vegSetting === 'off' ? 'low' : vegSetting === 'high' ? 'high' : 'low';
+    return buildBiomeInput({
+      heightAt: (x, z) => g.heightAt(x, z),
+      x0,
+      z0,
+      n,
+      cellM,
+      machines: machinesList,
+      keepouts: keepoutsList,
+      waterSources: waterSourcesList,
+      waterVolume: waterSourcesList.length > 0 ? 60 : 0,
+      stage: 6,
+      s: { pxd: 0.5, vtx: 0.5, lx: 0.5, aq: 0.5 },
+      seed: 7,
+      tier: effectiveTier,
+    });
+  };
+
   // ---- scientist character model & animation (TASK-07, POL-18)
   let cameraView: 'first' | 'third' = o.cameraView ?? 'first';
   let scientistAnimator: ScientistAnimator | null = null;
@@ -1550,6 +1626,17 @@ export function createPlayScene(o: {
       syncPlanetMatrices();
       g.update(0, 0, true);
       holo.build(g, { x: 0, z: 0 });
+
+      // ---- plot biome scatter view (TICKET-02 item F)
+      const effectiveTier = vegSetting === 'off' ? 'off' : vegSetting === 'high' ? 'high' : 'low';
+      biomeView = createPlotBiomeView(planetScene, {
+        heightAt: (x, z) => g.heightAt(x, z),
+        tier: effectiveTier,
+      });
+      const bInput = cachedBiomeInput ?? buildDefaultBiomeInput(g);
+      cachedBiomeInput = bInput;
+      biomeView.build(bInput);
+      biomeView.setStage(shown);
     },
     restore(s) {
       gateOn = s.gateOn;
@@ -1573,6 +1660,7 @@ export function createPlayScene(o: {
       gameAudio.updateStormVolume(1.0 - Math.min(1, Math.max(0, stage / 6)));
       waveTo = -1;
       ground?.setStage(Math.max(1, stage));
+      biomeView?.setStage(stage);
       fitLooks();
       propStage = stage <= 1 ? 1 : 6;
       rebuildTwin(propStage);
@@ -1725,6 +1813,7 @@ export function createPlayScene(o: {
       }
     },
     setBase(base) {
+      activeBase = base;
       // the sanctuaries: the gate dome, and each sealed room's life support (B-07)
       const lifeSupport = base ? base.pieces.filter((p) => p.kind === 'lifeSupport').map((p) => pieceAt(base, p)).filter((p): p is { x: number; y: number; z: number } => p !== null) : [];
       monsters.setSafeZones(monsterSafeZones({ x: twin.group.position.x, z: twin.group.position.z }, lifeSupport));
@@ -1959,6 +2048,7 @@ export function createPlayScene(o: {
       if (waveTo >= 0) {
         shown = waveTo;
         world?.settle();
+        biomeView?.setStage(shown);
       }
       stage = to;
       room.setStorm(Math.min(1, Math.max(0, to / 6)));
@@ -1989,6 +2079,7 @@ export function createPlayScene(o: {
         world.show(lookForFn(Math.max(1, s) as Stage));
       }
       ground?.setStage(Math.max(1, s));
+      biomeView?.setStage(s);
       monsters.setFidelityStage(s);
       wrecks.setStage(s);
       fitLooks();
@@ -2351,6 +2442,7 @@ export function createPlayScene(o: {
         fitLooks();
         rebuildProps(shown);
         world?.settle();
+        biomeView?.setStage(shown);
         pendingEvent = pendingEvent ?? 'stage-up';
         sfx('stage-up');
       }
@@ -2863,6 +2955,25 @@ export function createPlayScene(o: {
       groundHeight: (x, z) => groundAt(x, z),
       /** A third-person side view at `metres` from the character (null: the over-the-shoulder camera). Shots only. */
       sideShot(metres: number | null) { sideShotM = metres; },
+      biomeCounts: () => (biomeView ? biomeView.counts() : null),
+      biomeTriangles: () => (biomeView ? biomeView.triangles() : 0),
+      biomeDrawCalls: () => (biomeView ? biomeView.drawCalls() : 0),
+    },
+    buildBiome(input) {
+      cachedBiomeInput = input;
+      if (biomeView) {
+        biomeView.build(input);
+        biomeView.setStage(shown);
+      }
+    },
+    setVegetationSetting(v) {
+      vegSetting = v;
+      const effectiveTier = v === 'off' ? 'off' : v === 'high' ? 'high' : 'low';
+      biomeView?.setTier(effectiveTier);
+      biomeView?.setStage(shown);
+    },
+    getBiomeCounts() {
+      return biomeView ? biomeView.counts() : { total: 0, trees: 0, byKind: { tuft: 0, bush: 0, pine: 0, oak: 0, birch: 0 } };
     },
     dispose() {
       sceneAlive = false;
@@ -2872,6 +2983,7 @@ export function createPlayScene(o: {
       for (const v of views.values()) unbuild(v);
       for (const c of cables) c.geometry.dispose();
       dropGhost();
+      biomeView?.dispose();
       world?.dispose();
       ground?.dispose();
       holo.dispose();

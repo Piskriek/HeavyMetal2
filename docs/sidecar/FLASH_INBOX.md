@@ -90,3 +90,9 @@ Brief: `docs/prompts/sidecar/T03P-machine-plumes.md` (spec: docs/argo/notes/ARGO
 
 ## F-12 [HELD] TICKET-07 B: vehicle juice (boost, tracks, dust, print gantry) and the beam hurting monsters
 Brief: `docs/prompts/sidecar/T07b-vehicle-juice-beam-damage.md`. HELD until F-11 is DONE and Haiku's T07a (the monsters.ts it uses) has landed; Opus opens it.
+
+## F-13 [HELD] TICKET-06 hooks: aim the lab's Hardware Fabricator and Planet Table
+Brief: none separate; the job is this list. HELD until Haiku's T06 (`docs/prompts/sidecar/T06-lab-overhaul.md`) has landed and F-12 is DONE; Opus opens it.
+- `play-scene.ts`: replace the hardcoded `targets` list in the lab aim (the `aimedLab` block) with `room.aimStation(pos, dir)` from T06's `lab-room.ts`, and widen `LabMachineKind` to `LabStationId` (`lab-machines.ts`). The rack, bench and combiner must keep working.
+- `play.tsx`: the E prompt comes from the station's `prompt`. E on `fabricator` opens the existing `FabricatorModal`; E on `planet-table` opens the Planetary Grid screen (08a's). Weapon Bench keeps its existing armory path.
+- Test: extend `scripts/test-lab-overhaul.mjs` (T06's) so aiming at each of the six stations shows its prompt and E opens its window. Run it, `npm test` and `test-campaign` (45 of 45) through `scripts/test-on-3dpc.sh --only`.

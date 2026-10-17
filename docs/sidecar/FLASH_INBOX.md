@@ -79,5 +79,5 @@ Brief: `docs/prompts/sidecar/T02F2-early-stages.md`. Tufts on Low, machines and 
 ## F-08 [DONE] TICKET-02 B+E: Argo's coverage shader and water surfaces, wired in
 Brief: `docs/prompts/sidecar/T02BE-coverage-water.md`. Start it only after F-07 is DONE. In play.tsx touch the loading step only (Haiku is on the E handler).
 
-## F-09 [OPEN] TICKET-02 P: performance pass, stage 6 on Low at 45 fps or more on the laptop
+## F-09 [TAKEN] TICKET-02 P: performance pass, stage 6 on Low at 45 fps or more on the laptop
 Brief: `docs/prompts/sidecar/T02P-performance-pass.md`. Measure per layer first; expensive looks go behind Graphics settings with Auto, never deleted.

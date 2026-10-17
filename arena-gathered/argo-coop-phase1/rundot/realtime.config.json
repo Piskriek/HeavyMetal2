@@ -1,0 +1,14 @@
+{
+  "rooms": [
+    {
+      "type": "outpost",
+      "file": "apps/web/src/rooms/OutpostRoom.ts",
+      "config": {
+        "maxPlayers": 4,
+        "allowReconnect": true,
+        "reconnectTimeout": 60,
+        "autoPersist": true
+      }
+    }
+  ]
+}

@@ -1,12 +1,40 @@
-import { armoryRack, shouldShowAmmoBadge, ARMORY_RAIL_POS, ARMORY_PICKUP_REACH, SIDEARM_ITEM_ID, type ArmoryRackResult } from "./armory-rack";
+import { armoryRack, shouldShowAmmoBadge, ARMORY_RAIL_POS, ARMORY_PICKUP_REACH, SIDEARM_ITEM_ID, type ArmoryRackResult } from './armory-rack';
 export { armoryRack, shouldShowAmmoBadge, ARMORY_RAIL_POS, ARMORY_PICKUP_REACH, SIDEARM_ITEM_ID, type ArmoryRackResult };
-// The lab you play in (SETMIX_PLAN Phase 2b / Sheet 21 AAA Rebuild):
+import {
+  aimLabStation,
+  buildCableDrop,
+  buildGateRibbedCoils,
+  buildHardwareFabricatorProp,
+  createRightWallMachineRig,
+  LAB_STATIONS,
+  mergeStaticMeshes,
+  nearestLabStation,
+  RIGHT_WALL_MACHINES,
+  stationById,
+  type LabMachineRig,
+  type LabStationId,
+  type LabStationSpec,
+  type RightWallMachineId,
+} from './lab-machines';
+export {
+  aimLabStation,
+  LAB_STATIONS,
+  nearestLabStation,
+  RIGHT_WALL_MACHINES,
+  stationById,
+  type LabStationId,
+  type LabStationSpec,
+  type RightWallMachineId,
+};
+
+// The lab you play in (SETMIX_PLAN Phase 2b / Sheet 21 AAA Rebuild / TICKET-06 Overhaul):
 // A 16 × 12 × 5 m quantum-shielded white-room laboratory on Earth.
 // - North wall: wide observation window (14.8 × 3.1 m) framing the void storm as progress (setStorm).
 // - Centre: the gate standing free on a walkable square two-step plinth, opening facing the window.
-// - West wall (The Power Wall): capacitor bank, breaker panel, 4 relay cabinets, 2 control boxes, console with throw lever.
-// - East wall (Studio Corner): preset rack, preset bench, preset combiner, and planet table carrying PlotHolo.
-// - South-east (The Armory): armory rail with extraction tool (weapon-frame) and weapon bench.
+// - West wall (The Power Wall): capacitor bank, breaker panel, 4 grounded relay cabinets, 2 control boxes, console with throw lever.
+// - East wall (Studio & Fabrication Bay): 4 distinct, grounded, cabled, E-interactable machines (Preset Rack, Preset Bench,
+//   Preset Combiner, Hardware Fabricator) plus the Planet Table carrying PlotHolo.
+// - South-east (The Armory): armory rail with extraction tool (weapon-frame), sidearm rack, and weapon bench.
 // - South wall (Her Corner): folding camp cot, her desk with notes and mug, inset wall radio, charts taped on wall.
 // - Spawn: beside the cot facing north toward the gate and storm.
 // Lab frame: x right (+x), y up (+y), z towards start (+z), north = -z.
@@ -18,9 +46,20 @@ import { operatorConsole as consoleMillOperatorConsole } from '@hm/consolemill';
 import { type GenLevel, genLevelFor, getGenSync, loadGen } from '../assets/gen';
 import { createLabVista, VISTA_LEVEL, type LabVista, type WindowView } from './lab-vista';
 import { CLUTTER, CLUTTER_MODELS, type ClutterItem } from './lab-clutter';
-import { type Power, POWER_OFF, darkStrobe, strobeSweepZ } from './lab-power';
+import { coilLevels, darkStrobe, POWER_OFF, strobeSweepZ, type Power } from './lab-power';
 import { overhangBoxes, type Bounds3D } from './static-colliders';
-export { POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, type Power } from './lab-power';
+export {
+  coilLevels,
+  coilsLitAt,
+  GATE_COIL_COUNT,
+  IGNITION,
+  IGNITION_SECONDS,
+  POWER_OFF,
+  POWER_ON,
+  POWER_SECONDS,
+  powerAt,
+  type Power,
+} from './lab-power';
 
 export const ROOM = { left: -8, right: 8, back: -9, front: 3, height: 5 } as const;
 /** The spot the lab's spawn stands on (-2.5, 1.0) and its walk toward the gate: the LAB-10 overhang fit never closes it. */
@@ -33,30 +72,17 @@ export const PLANET_TABLE_AT = { x: 5.0, z: -5.0 } as const;
 
 /** The generated gate's doorway (gate.glb, measured in its frame): the portal and the walk-through use it. */
 const GEN_GATE_OPENING = { width: 2.0, height: 2.2, sill: 0.33, z: 0 } as const;
-/** The generated gate's coil plates on its flat copper panels (gate.glb: panels at |x| 1.2..1.6, y 1.0..2.8, face at z 0.45),
- *  [x, y, width, height] in its frame, bottom to top (the lamps light in this order). */
-const COIL_PANELS: readonly (readonly [number, number, number, number])[] = [
-  [-1.4, 1.3, 0.2, 0.42], [1.4, 1.3, 0.2, 0.42],
-  [-1.4, 1.9, 0.2, 0.42], [1.4, 1.9, 0.2, 0.42],
-  [-1.4, 2.5, 0.2, 0.42], [1.4, 2.5, 0.2, 0.42],
-  [0, 3.03, 1.2, 0.2],
-];
-/** The copper face the plates sit on (their back at the face, their front 0.03 proud). */
-const COIL_PANEL_Z = 0.47;
 /** The labkit props on the west and east walls face the wall in the lab frame; their generated models turn half a turn to face the room. */
 const WEST_WALL_TURN = Math.PI;
 /** The operator console's throw lever, its pivot in the console frame (on the top, at the front). */
 const LEVER_AT: readonly [number, number, number] = [0.3, 1.4, 0.25];
-/** The breaker panel's six bay handles, [x, y, z] in the panel's frame (two columns, three rows, on its front). */
+/** The breaker panel's rotary isolator and sub-breaker handle pivots in the panel's frame (Sheet 07). */
 const BREAKER_HANDLES: readonly (readonly [number, number, number])[] = [
-  [-0.42, 0.75, 0.56], [0.42, 0.75, 0.56],
-  [-0.42, 1.2, 0.56], [0.42, 1.2, 0.56],
-  [-0.42, 1.65, 0.56], [0.42, 1.65, 0.56],
+  [0.22, 1.12, 0.38],
 ];
 
 const PANEL_TILE = 5.12, FLOOR_TILE = 4;
 
-/** The generated models the lab shows (TASK-16). Each replaces its labkit piece's visual; the labkit colliders stay. */
 /** The weapon bench's own set (TASK-23c): the jig and printer rest on its top, the tool wall hangs on the wall behind it. */
 export const WEAPON_BENCH_SET: readonly string[] = [
   'bench-jig', 'bench-printer', 'tool-wall', 'tool-drill', 'tool-wrench', 'tool-mallet', 'tool-scanner', 'tool-screwdriver',
@@ -87,6 +113,37 @@ function lampOverlay(color: string, x: number, y: number, z: number, size: reado
   return mesh;
 }
 
+/**
+ * Builds a subdivided wall or floor PlaneGeometry whose origin is at `(x0, y0)` and whose UVs are
+ * explicitly scaled in world metres (`u = x / tileM`, `v = y / tileM`). Prevents grazing-angle
+ * normal-map / mipmap UV smudges on long walls (TICKET-06 LAB-03 fix).
+ */
+function createTiledSurfaceGeometry(
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  segsX: number,
+  segsY: number,
+  tileM: number,
+): THREE.BufferGeometry {
+  const w = x1 - x0;
+  const h = y1 - y0;
+  const geo = new THREE.PlaneGeometry(w, h, Math.max(1, segsX), Math.max(1, segsY));
+  geo.translate(x0 + w / 2, y0 + h / 2, 0);
+  const pos = geo.getAttribute('position') as THREE.BufferAttribute | undefined;
+  const uv = geo.getAttribute('uv') as THREE.BufferAttribute | undefined;
+  if (pos && uv && ArrayBuffer.isView(uv.array)) {
+    const arr = uv.array as Float32Array;
+    for (let i = 0; i < pos.count; i++) {
+      arr[i * 2] = pos.getX(i) / tileM;
+      arr[i * 2 + 1] = pos.getY(i) / tileM;
+    }
+    uv.needsUpdate = true;
+  }
+  return geo;
+}
+
 /** A clutter prop in the lab: its entry, the disc of its dissolve, and the walls it adds (removed with it). */
 interface ClutterEntry {
   readonly item: ClutterItem;
@@ -99,8 +156,6 @@ interface ClutterEntry {
 
 /**
  * Rests a loaded model on a surface (TASK-23c): turns it to `yaw`, centres it on (x, z), and sets its lowest point on the surface.
- * `surfaceAt` gives the surface's height under a point; the item rests on the highest of the surfaces under its four bottom corners,
- * so no corner floats.
  */
 function restOn(obj: THREE.Object3D, x: number, z: number, yaw: number, surfaceAt: (x: number, z: number) => number): void {
   obj.rotation.set(0, yaw, 0);
@@ -113,6 +168,15 @@ function restOn(obj: THREE.Object3D, x: number, z: number, yaw: number, surfaceA
   obj.position.set(ox, surface - b.min.y, oz);
 }
 
+/** Grounds a swapped generated model so its lowest bounding-box point sits at `baseY` (default 0, never floating). */
+function groundModelAt(obj: THREE.Object3D, baseY = 0): void {
+  obj.updateMatrixWorld(true);
+  const b = new THREE.Box3().setFromObject(obj);
+  if (!b.isEmpty() && Number.isFinite(b.min.y)) {
+    obj.position.y += baseY - b.min.y;
+  }
+}
+
 /** Hangs a model on a flat panel (TASK-23c): its back on the panel's front face, with a small gap, centred on (x, y). */
 function hangOn(obj: THREE.Object3D, panelFrontZ: number, x: number, y: number, tiltX = 0): void {
   obj.rotation.set(tiltX, 0, 0);
@@ -123,8 +187,7 @@ function hangOn(obj: THREE.Object3D, panelFrontZ: number, x: number, y: number, 
   obj.position.set(x - c.x, y - c.y, panelFrontZ + 0.011 - b.min.z);
 }
 
-/** The weapon bench's set (TASK-23c): the jig at the top's centre, the printer at one end, the mallet and the wrench lying on the top, and
- *  the tool wall flat on the wall behind the bench with the drill, the scanner and the screwdriver hung in its slots. */
+/** The weapon bench's set (TASK-23c). */
 function dressWeaponBench(bench: THREE.Group, parts: readonly THREE.Group[]): void {
   const [jig, printer, wall, drill, wrench, mallet, scanner, screwdriver] = parts as unknown as [THREE.Group, THREE.Group, THREE.Group, THREE.Group, THREE.Group, THREE.Group, THREE.Group, THREE.Group];
   const model = bench.children[0] ?? bench;
@@ -139,7 +202,6 @@ function dressWeaponBench(bench: THREE.Group, parts: readonly THREE.Group[]): vo
   restOn(mallet, 0.42, -0.12, 0.25, topAt);
   restOn(wrench, 0.72, 0.15, -0.1, topAt);
   bench.add(jig, printer, mallet, wrench);
-  // the tool wall: its back on the south wall (z 2.99 in the lab, its standoff 0.045 m), its bottom 1.35 m up, turned to face the room
   const panelBox = new THREE.Box3().setFromObject(wall);
   const wallGroup = new THREE.Group();
   wallGroup.position.set(6.0, 1.35, 2.99 + panelBox.min.z);
@@ -184,7 +246,6 @@ const STORM_FRAGMENT = /* glsl */ `
     return v;
   }
 
-  // 4x4 Bayer dither matrix
   float bayer4(vec2 p) {
     vec2 q = mod(floor(p), 4.0);
     float i = q.x + q.y * 4.0;
@@ -201,7 +262,6 @@ const STORM_FRAGMENT = /* glsl */ `
     float p = clamp(uStorm, 0.0, 1.0);
     float stormT = uTime * 1.8;
 
-    // --- 1. Distant skyline and terrain (emerges as storm thins)
     float skylineSeed = floor(uv.x * 24.0);
     float skylineHeight = 0.18 + 0.14 * hash(vec2(skylineSeed, 7.31));
     float isTower = step(0.68, hash(vec2(skylineSeed, 13.89)));
@@ -217,7 +277,6 @@ const STORM_FRAGMENT = /* glsl */ `
     vec3 landGreen = vec3(0.18, 0.42, 0.16) * (0.7 + 0.3 * fbm(uv * 26.0));
     vec3 landCol = mix(landGrey, landGreen, smoothstep(0.48, 0.95, p));
 
-    // --- 2. Sky: Dark void at p=0, breaks to blue sky with soft clouds at p -> 1.0
     vec3 darkVoidSky = mix(vec3(0.04, 0.05, 0.07), vec3(0.14, 0.16, 0.20), uv.y);
     vec3 azureSky = mix(vec3(0.24, 0.54, 0.88), vec3(0.55, 0.78, 0.98), uv.y);
     float cloudNoise = fbm(vec2(uv.x * 4.0 - uTime * 0.08, uv.y * 5.0));
@@ -231,7 +290,6 @@ const STORM_FRAGMENT = /* glsl */ `
 
     vec3 worldCol = mix(skyCol, landCol, landVis);
 
-    // --- 3. Void storm static & pixel lightning
     float stormClouds = fbm(vec2(uv.x * 6.0 + stormT * 0.5, uv.y * 7.0 - stormT * 0.3));
     float staticNoise = hash(floor(uv * 160.0) + floor(uTime * 30.0));
 
@@ -267,39 +325,28 @@ function createChartTexture(): THREE.DataTexture {
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const idx = (y * w + x) * 4;
-      let r = 237, g = 233, b = 225; // paper base
-
-      // Grid lines
+      let r = 237, g = 233, b = 225;
       if (x % 16 === 0 || y % 16 === 0) {
         r = 215; g = 210; b = 200;
       }
-
-      // Sine wave chart
       const targetY1 = Math.floor(96 + 18 * Math.sin(x * 0.1));
       if (Math.abs(y - targetY1) <= 1) {
         r = 45; g = 110; b = 180;
       }
-
-      // Stepped pulse chart
       const pulseBlock = Math.floor(x / 20) % 2;
       const targetY2 = pulseBlock === 0 ? 50 : 66;
       if (y === targetY2 || (x % 20 === 0 && y >= 50 && y <= 66)) {
         r = 190; g = 75; b = 40;
       }
-
-      // Bar chart columns
       const barCol = Math.floor(x / 14);
       const inBar = (x % 14) >= 3 && (x % 14) <= 11;
       const barHeight = 12 + ((barCol * 7 + 5) % 22);
       if (inBar && y >= 12 && y <= barHeight) {
         r = 70; g = 80; b = 90;
       }
-
-      // Dark tape on 4 corners
       if ((x < 8 || x > w - 9) && (y < 8 || y > h - 9)) {
         r = 60; g = 62; b = 65;
       }
-
       data[idx] = r; data[idx + 1] = g; data[idx + 2] = b; data[idx + 3] = 255;
     }
   }
@@ -324,6 +371,12 @@ export interface LabRoom {
   readonly leverAt: THREE.Vector3;
   readonly lever: THREE.Object3D;
   readonly spawn: { readonly x: number; readonly z: number; readonly yaw: number };
+  /** All E-interactable Lab stations (the 4 right-wall machines + Planet Table + Weapon Bench). */
+  readonly stations: readonly LabStationSpec[];
+  /** Finds the Lab station aimed at by `(origin, dir)` within `reach` metres, or null. */
+  aimStation(origin: THREE.Vector3, dir: THREE.Vector3, reach?: number): LabStationSpec | null;
+  /** Finds the nearest Lab station within reach of `(x, z)`, or null. */
+  nearestStation(pos: { readonly x: number; readonly z: number }, maxReach?: number): LabStationSpec | null;
   setPower(p: Power): void;
   /** The power as it was last set. */
   power(): Power;
@@ -364,8 +417,6 @@ export function createLabRoom(o: {
   const m = kit.createMaterials();
   const colliders: Box[] = [];
 
-  // ---- Generated pieces (TASK-16). Every piece is built on its labkit fallback; a swap runs when its models are loaded
-  // (adoptGenerated, after the preload) and returns false until then, so a lab built before the preload is still whole.
   let swaps: (() => boolean)[] = [];
   let lastPower: Power = POWER_OFF;
   const genFor = (id: string): THREE.Group | null => getGenSync(id, genLevel);
@@ -379,12 +430,11 @@ export function createLabRoom(o: {
     return out;
   };
   /** Replaces a group's visual children with a generated model, keeping the children listed. */
-  const replaceVisual = (group: THREE.Object3D, gen: THREE.Object3D, kept: readonly THREE.Object3D[] = []): void => {
-    for (const child of [...group.children]) if (!kept.includes(child)) group.remove(child);
-    group.add(gen);
+  const replaceVisual = (targetGroup: THREE.Object3D, gen: THREE.Object3D, kept: readonly THREE.Object3D[] = []): void => {
+    for (const child of [...targetGroup.children]) if (!kept.includes(child)) targetGroup.remove(child);
+    targetGroup.add(gen);
   };
-  /** LAB-10: once a generated model is in place (once, at its swap), the part of its visible bounds that sticks out past the prop's
-   *  own colliders by more than 0.1 m gets a collider. The doorway and the spawn's walk stay clear (keepClear). */
+  /** LAB-10: overhang collider fit. */
   const fitOverhang = (p: { readonly group: THREE.Group; readonly colliders?: readonly Box[] }, keepClear: readonly Bounds3D[] = []): void => {
     if (!p.colliders) return;
     p.group.updateMatrixWorld(true);
@@ -397,19 +447,29 @@ export function createLabRoom(o: {
     const visible = { minX: vis.min.x, minY: vis.min.y, minZ: vis.min.z, maxX: vis.max.x, maxY: vis.max.y, maxZ: vis.max.z };
     colliders.push(...overhangBoxes(visible, own, [...keepClear, SPAWN_CLEAR], 0.1));
   };
-  /** Swaps labkit props for their generated models, all or none. `turn` is the extra yaw of the model inside its prop. */
-  const swapAll = (items: readonly { readonly p: { readonly group: THREE.Group; readonly colliders?: readonly Box[] }; readonly id: string; readonly turn?: number }[]): boolean => {
+  /** Swaps labkit props for their generated models, grounding each model at y = 0 and keeping any preserved children. */
+  const swapAll = (
+    items: readonly {
+      readonly p: { readonly group: THREE.Group; readonly colliders?: readonly Box[] };
+      readonly id: string;
+      readonly turn?: number;
+      readonly kept?: readonly THREE.Object3D[];
+      readonly ground?: boolean;
+    }[],
+  ): boolean => {
     const gens = genAll(items.map((it) => it.id));
     if (!gens) return false;
     items.forEach((it, i) => {
       const g = gens[i]!;
       g.rotation.y = it.turn ?? 0;
-      replaceVisual(it.p.group, g);
+      if (it.ground !== false) {
+        groundModelAt(g, 0);
+      }
+      replaceVisual(it.p.group, g, it.kept ?? []);
       fitOverhang(it.p);
     });
     return true;
   };
-  /** A lamp on a generated model's face, owned by the room (disposed with it). */
   const lamp = (color: string, x: number, y: number, z: number, size?: readonly [number, number, number]): THREE.Mesh => {
     const mesh = lampOverlay(color, x, y, z, size);
     keep(mesh.material as THREE.Material);
@@ -419,20 +479,32 @@ export function createLabRoom(o: {
 
   // ---- The Shell (16 × 12 × 5 m)
   const panels = panelTextures(o.textureSize), floorTex = floorTextures(o.textureSize);
-  for (const t of [panels.map, panels.roughnessMap, panels.normalMap]) { keep(t); t.repeat.set(1 / PANEL_TILE, 1 / PANEL_TILE); }
-  for (const t of [floorTex.map, floorTex.roughnessMap, floorTex.normalMap]) { keep(t); t.repeat.set(1 / FLOOR_TILE, 1 / FLOOR_TILE); }
-  const wallMat = keep(new THREE.MeshStandardMaterial({ ...panels, normalScale: new THREE.Vector2(0.6, 0.6), metalness: 0 }));
-  const floorMat = keep(new THREE.MeshStandardMaterial({ ...floorTex, normalScale: new THREE.Vector2(0.5, 0.5), metalness: 0 }));
-  const ceilingMat = keep(new THREE.MeshStandardMaterial({ color: '#1b1e22', roughness: 0.85, metalness: 0.2 }));
-  const rect = (x0: number, y0: number, x1: number, y1: number): THREE.Shape => new THREE.Shape([new THREE.Vector2(x0, y0), new THREE.Vector2(x1, y0), new THREE.Vector2(x1, y1), new THREE.Vector2(x0, y1)]);
+  // Keep texture repeat at (1, 1) for subdivided tiled surfaces; ShapeGeometry for north window wall uses explicit UV scaling
+  for (const t of [panels.map, panels.roughnessMap, panels.normalMap]) { keep(t); t.repeat.set(1, 1); }
+  for (const t of [floorTex.map, floorTex.roughnessMap, floorTex.normalMap]) { keep(t); t.repeat.set(1, 1); }
+  const wallMat = keep(new THREE.MeshStandardMaterial({ ...panels, normalScale: new THREE.Vector2(0.55, 0.55), metalness: 0 }));
+  const floorMat = keep(new THREE.MeshStandardMaterial({ ...floorTex, normalScale: new THREE.Vector2(0.45, 0.45), metalness: 0 }));
+  // TICKET-06 LAB-02 fix: architectural acoustic-steel ceiling panel material (never a pitch-black void)
+  const ceilingMat = keep(new THREE.MeshStandardMaterial({
+    color: '#5a6470',
+    roughness: 0.72,
+    metalness: 0.16,
+    side: THREE.DoubleSide,
+  }));
+  const rect = (x0: number, y0: number, x1: number, y1: number): THREE.Shape =>
+    new THREE.Shape([new THREE.Vector2(x0, y0), new THREE.Vector2(x1, y0), new THREE.Vector2(x1, y1), new THREE.Vector2(x0, y1)]);
+  // The shell (walls, floor, ceiling, beams, panels) is one group, merged per material before the room returns (TICKET-06 draw-call budget)
+  const shell = new THREE.Group();
+  shell.name = 'lab-shell';
+  group.add(shell);
   const add = (g: THREE.BufferGeometry, mat: THREE.Material, f: (mesh: THREE.Mesh) => void = () => undefined): THREE.Mesh => {
-    const mesh = new THREE.Mesh(keep(g), mat); f(mesh); group.add(mesh); return mesh;
+    const mesh = new THREE.Mesh(keep(g), mat); f(mesh); shell.add(mesh); return mesh;
   };
 
   const depth = ROOM.front - ROOM.back; // 12 m
   const width = ROOM.right - ROOM.left; // 16 m
 
-  // North wall with observation window cutout
+  // North wall with observation window cutout (scale ShapeGeometry UVs by 1 / PANEL_TILE directly)
   const back = rect(ROOM.left, 0, ROOM.right, ROOM.height);
   back.holes.push(new THREE.Path([
     new THREE.Vector2(WINDOW.x0, WINDOW.y0),
@@ -440,23 +512,43 @@ export function createLabRoom(o: {
     new THREE.Vector2(WINDOW.x1, WINDOW.y1),
     new THREE.Vector2(WINDOW.x0, WINDOW.y1),
   ]));
-  add(new THREE.ShapeGeometry(back), wallMat, (w) => { w.position.z = ROOM.back; });
+  const backGeo = new THREE.ShapeGeometry(back);
+  {
+    const uv = backGeo.getAttribute('uv') as THREE.BufferAttribute | undefined;
+    if (uv && ArrayBuffer.isView(uv.array)) {
+      const arr = uv.array as Float32Array;
+      for (let i = 0; i < arr.length; i++) arr[i] = (arr[i] ?? 0) / PANEL_TILE;
+      uv.needsUpdate = true;
+    }
+  }
+  add(backGeo, wallMat, (w) => { w.position.z = ROOM.back; });
 
-  // West wall (Power Wall, x = -8)
-  add(new THREE.ShapeGeometry(rect(0, 0, depth, ROOM.height)), wallMat, (w) => {
+  // Subdivided West wall (Power Wall, x = -8) — eliminates grazing-angle stretched UV smudge (LAB-03)
+  add(createTiledSurfaceGeometry(0, 0, depth, ROOM.height, 12, 5, PANEL_TILE), wallMat, (w) => {
     w.rotation.y = Math.PI / 2; w.position.set(ROOM.left, 0, ROOM.front);
   });
-  // East wall (Studio / Armory wall, x = 8)
-  add(new THREE.ShapeGeometry(rect(0, 0, depth, ROOM.height)), wallMat, (w) => {
+  // Subdivided East wall (Studio / Armory wall, x = 8)
+  add(createTiledSurfaceGeometry(0, 0, depth, ROOM.height, 12, 5, PANEL_TILE), wallMat, (w) => {
     w.rotation.y = -Math.PI / 2; w.position.set(ROOM.right, 0, ROOM.back);
   });
-  // South wall (Her corner, z = 3)
-  add(new THREE.ShapeGeometry(rect(0, 0, width, ROOM.height)), wallMat, (w) => {
+  // Subdivided South wall (Her corner, z = 3)
+  add(createTiledSurfaceGeometry(0, 0, width, ROOM.height, 16, 5, PANEL_TILE), wallMat, (w) => {
     w.rotation.y = Math.PI; w.position.set(ROOM.right, 0, ROOM.front);
   });
-  // Floor and ceiling
-  add(new THREE.ShapeGeometry(rect(ROOM.left, -ROOM.front, ROOM.right, -ROOM.back)), floorMat, (f) => { f.rotation.x = -Math.PI / 2; });
-  add(new THREE.ShapeGeometry(rect(ROOM.left, ROOM.back, ROOM.right, ROOM.front)), ceilingMat, (c) => { c.rotation.x = Math.PI / 2; c.position.y = ROOM.height; });
+  // Subdivided Floor and Ceiling
+  add(createTiledSurfaceGeometry(ROOM.left, -ROOM.front, ROOM.right, -ROOM.back, 16, 12, FLOOR_TILE), floorMat, (f) => {
+    f.rotation.x = -Math.PI / 2;
+  });
+  add(createTiledSurfaceGeometry(ROOM.left, ROOM.back, ROOM.right, ROOM.front, 8, 6, PANEL_TILE), ceilingMat, (c) => {
+    c.rotation.x = Math.PI / 2; c.position.y = ROOM.height;
+  });
+
+  // Structural steel ceiling cross-beams spanning x = -8..8 (frames the 3 strip banks cleanly, LAB-02)
+  for (const bz of [-7.8, -4.6, -1.4, 1.8]) {
+    add(new THREE.BoxGeometry(width, 0.12, 0.18), m.gunmetal, (b) => {
+      b.position.set(0, ROOM.height - 0.06, bz);
+    });
+  }
 
   // Steel kick band round walls
   const band = (x0: number, x1: number, z0: number, z1: number) => add(new THREE.BoxGeometry(Math.max(0.1, x1 - x0), 0.6, Math.max(0.1, z1 - z0)), m.darkSteel, (b) => {
@@ -481,18 +573,16 @@ export function createLabRoom(o: {
   const ww = WINDOW.x1 - WINDOW.x0; // 14.8
   const wh = WINDOW.y1 - WINDOW.y0; // 3.1
 
-  // Outer square frame borders
-  add(new THREE.BoxGeometry(ww + 0.28, 0.14, 0.32), m.gunmetal, (f) => { f.position.set(wx, WINDOW.y0 - 0.07, ROOM.back); }); // bottom sill
-  add(new THREE.BoxGeometry(ww + 0.28, 0.14, 0.32), m.gunmetal, (f) => { f.position.set(wx, WINDOW.y1 + 0.07, ROOM.back); }); // top sill
-  add(new THREE.BoxGeometry(0.14, wh + 0.28, 0.32), m.gunmetal, (f) => { f.position.set(WINDOW.x0 - 0.07, wy, ROOM.back); }); // left jamb
-  add(new THREE.BoxGeometry(0.14, wh + 0.28, 0.32), m.gunmetal, (f) => { f.position.set(WINDOW.x1 + 0.07, wy, ROOM.back); }); // right jamb
+  add(new THREE.BoxGeometry(ww + 0.28, 0.14, 0.32), m.gunmetal, (f) => { f.position.set(wx, WINDOW.y0 - 0.07, ROOM.back); });
+  add(new THREE.BoxGeometry(ww + 0.28, 0.14, 0.32), m.gunmetal, (f) => { f.position.set(wx, WINDOW.y1 + 0.07, ROOM.back); });
+  add(new THREE.BoxGeometry(0.14, wh + 0.28, 0.32), m.gunmetal, (f) => { f.position.set(WINDOW.x0 - 0.07, wy, ROOM.back); });
+  add(new THREE.BoxGeometry(0.14, wh + 0.28, 0.32), m.gunmetal, (f) => { f.position.set(WINDOW.x1 + 0.07, wy, ROOM.back); });
 
-  // Three square steel mullions dividing window into 4 bays (x = -3.7, 0, 3.7)
   for (const mx of [-ww / 4, 0, ww / 4]) {
     add(new THREE.BoxGeometry(0.14, wh, 0.3), m.gunmetal, (f) => { f.position.set(mx, wy, ROOM.back); });
   }
 
-  // Void storm shader background quad (rain dropped per brief)
+  // Void storm shader background quad (only visible in Static view or planeFallback)
   const stormUniforms = { uTime: { value: 0 }, uStorm: { value: 0 } };
   const stormMat = keep(new THREE.ShaderMaterial({
     vertexShader: STORM_VERTEX,
@@ -501,17 +591,14 @@ export function createLabRoom(o: {
     toneMapped: false,
   }));
   const stormPlane = add(new THREE.PlaneGeometry(50, 24), stormMat, (p) => { p.position.set(wx, wy + 2.0, ROOM.back - 8.0); });
-  // The 3D view outside the window (lab-vista.ts). The flat storm plane stays only in Static.
   const vista = createLabVista({
     view: o.windowView ?? 'full',
     window: { x0: WINDOW.x0, x1: WINDOW.x1, y0: WINDOW.y0, y1: WINDOW.y1, z: ROOM.back },
     level: VISTA_LEVEL,
   });
   stormPlane.visible = vista.view === 'static';
-  // Observation window glass: a lighter veil than the lab's own glass (0.28, shared with the monitors), so the view behind it reads
-  // dark, as the storm world should (review 3, W2)
   const windowGlass = keep(m.glass.clone());
-  windowGlass.opacity = 0.1;
+  windowGlass.opacity = 0.08;
   add(new THREE.PlaneGeometry(ww, wh), windowGlass, (p) => { p.position.set(wx, wy, ROOM.back + 0.02); });
 
   // ---- Helper to place props and register colliders
@@ -528,35 +615,23 @@ export function createLabRoom(o: {
   };
 
   // ---- The Gate & Square Two-Step Plinth (walkable, 0.2m per step)
-  // The decks are plain light-grey steel (sheet 21). The hazard is a band along each step's top edge only.
   const edgeBands = (size: number, topY: number): void => {
-    const band = 0.22;
+    const bnd = 0.22;
     const hz = 0.012;
     const half = size / 2;
     for (const s of [-1, 1]) {
-      add(new THREE.BoxGeometry(size, hz, band), m.hazard, (b) => { b.position.set(GATE_AT.x, topY + hz / 2, GATE_AT.z + s * (half - band / 2)); });
-      add(new THREE.BoxGeometry(band, hz, size - 2 * band), m.hazard, (b) => { b.position.set(GATE_AT.x + s * (half - band / 2), topY + hz / 2, GATE_AT.z); });
+      add(new THREE.BoxGeometry(size, hz, bnd), m.hazard, (b) => { b.position.set(GATE_AT.x, topY + hz / 2, GATE_AT.z + s * (half - bnd / 2)); });
+      add(new THREE.BoxGeometry(bnd, hz, size - 2 * bnd), m.hazard, (b) => { b.position.set(GATE_AT.x + s * (half - bnd / 2), topY + hz / 2, GATE_AT.z); });
     }
   };
-  // Step 1: 5 × 5 m, height = 0.2 m (y = 0 to 0.2)
   add(new THREE.BoxGeometry(5.0, 0.2, 5.0), m.paint, (p1) => { p1.position.set(GATE_AT.x, 0.1, GATE_AT.z); });
   edgeBands(5.0, 0.2);
-  // Step 2: 4 × 4 m, height = 0.2 m (y = 0.2 to 0.4)
   add(new THREE.BoxGeometry(4.0, 0.2, 4.0), m.paint, (p2) => { p2.position.set(GATE_AT.x, 0.3, GATE_AT.z); });
   edgeBands(4.0, 0.4);
 
+  // TICKET-06 LAB-09 fix: no top-lintel orange rectangle; only the 6 upright ribbed copper coils (bottom to top)
   const gate = kit.gate(m);
   place(gate, GATE_AT.x, GATE_AT.z, 0, 0.4);
-
-  // Top lintel coil on gate beam
-  const topCoilGeo = new THREE.BoxGeometry(1.6, 0.18, 0.22);
-  const topCoilMat = keep(new THREE.MeshStandardMaterial({
-    color: '#df8438', emissive: '#ff7700', emissiveIntensity: 0, roughness: 0.35, metalness: 0.8,
-  }));
-  const topCoilMesh = new THREE.Mesh(keep(topCoilGeo), topCoilMat);
-  topCoilMesh.position.set(0, 3.25, 0.25);
-  gate.group.add(topCoilMesh);
-  gate.coils.push(topCoilMesh);
 
   // Portal surface in opening
   const portal = new THREE.Mesh(keep(new THREE.PlaneGeometry(gate.opening.width, gate.opening.height)), o.portalMaterial);
@@ -564,24 +639,18 @@ export function createLabRoom(o: {
   portal.visible = false;
   gate.group.add(portal);
 
-  // The generated gate: its doorway is GEN_GATE_OPENING (the portal and the walk-through use it). Its coil lamps are thin
-  // emissive plates on the copper panels (three per pillar and one on the top beam), listed bottom to top: setPower lights them in that order.
+  // Swapping in gate.glb: uses 6 recessed 3D ribbed copper field-coil blocks (buildGateRibbedCoils), never flat floating orange rectangles
   swaps.push(() => {
     const gen = genFor('gate');
     if (!gen) return false;
+    groundModelAt(gen, 0);
     replaceVisual(gate.group, gen, [portal]);
     Object.assign(gate.opening, GEN_GATE_OPENING);
     portal.geometry = keep(new THREE.PlaneGeometry(GEN_GATE_OPENING.width, GEN_GATE_OPENING.height));
     portal.position.set(0, GEN_GATE_OPENING.sill + GEN_GATE_OPENING.height / 2, GEN_GATE_OPENING.z);
-    const plates = COIL_PANELS.map(([x, y, w, h]) => {
-      const mat = keep(new THREE.MeshStandardMaterial({ color: '#df8438', emissive: new THREE.Color('#ff8811'), emissiveIntensity: 0, roughness: 0.35, metalness: 0.8 }));
-      const mesh = new THREE.Mesh(keep(new THREE.BoxGeometry(w, h, 0.03)), mat);
-      mesh.position.set(x, y, COIL_PANEL_Z);
-      return mesh;
-    });
-    gen.add(...plates);
-    gate.coils.splice(0, gate.coils.length, ...plates);
-    // the doorway (the 2.0 m opening through the plinth) and the plinth's walkway stay clear: only the posts' overhang is fitted
+    const { housings, coils } = buildGateRibbedCoils(m, keep);
+    gen.add(housings);
+    gate.coils.splice(0, gate.coils.length, ...coils);
     fitOverhang(gate, [{
       minX: GATE_AT.x - GEN_GATE_OPENING.width / 2, maxX: GATE_AT.x + GEN_GATE_OPENING.width / 2,
       minY: 0, maxY: 4, minZ: GATE_AT.z - 2.5, maxZ: GATE_AT.z + 2.5,
@@ -589,7 +658,6 @@ export function createLabRoom(o: {
     return true;
   });
 
-  // Step colliders function for walking over the plinth
   const floorHeight = (x: number, z: number): number => {
     const dx = Math.abs(x - GATE_AT.x);
     const dz = Math.abs(z - GATE_AT.z);
@@ -598,15 +666,40 @@ export function createLabRoom(o: {
     return 0;
   };
 
-  // ---- West Wall: The Power Wall (panel 44, south to north)
+  // ---- West Wall: The Power Wall (Sheet 07, south to north — grounded & cabled)
   const bank = place(kit.capacitorBank(m), -7.2, 1.0, -Math.PI / 2);
   const breaker = place(kit.breakerPanel(m), -7.4, -1.0, -Math.PI / 2);
-  const relays = [-2.6, -3.5, -4.4, -5.3].map((z) => place(kit.relayCabinet(m), -7.6, z, -Math.PI / 2, 1.0));
+
+  // Grounded steel support plinth under the 4 Relay Cabinets (y = 0 to 0.72 m) so relay cabinets never float on the wall
+  add(new THREE.BoxGeometry(0.56, 0.72, 3.65), m.darkSteel, (pl) => {
+    pl.position.set(-7.58, 0.36, -3.95);
+  });
+  add(new THREE.BoxGeometry(0.02, 0.08, 3.62), m.hazard, (hz) => {
+    hz.position.set(-7.29, 0.06, -3.95);
+  });
+
+  const relays = [-2.6, -3.5, -4.4, -5.3].map((z) => place(kit.relayCabinet(m), -7.6, z, -Math.PI / 2, 0.72));
   const boxes = [-6.1, -6.7].map((z) => place(kit.controlBox(m), -7.6, z, -Math.PI / 2, 1.4));
   const desk = consoleMillOperatorConsole(m);
   place(desk, -6.5, -7.8, -Math.PI / 2);
 
-  // The generated power wall. Lamps are emissive plates on each model's front face (their overlays turn with the model).
+  // Vertical square-section conduit drops from West overhead cable tray (y = 4.2) to every West-wall unit
+  const westDrops = new THREE.Group();
+  for (const [cx, cz, topY] of [
+    [-7.35, 1.0, 1.85],
+    [-7.45, -1.0, 2.05],
+    [-7.6, -2.6, 2.02],
+    [-7.6, -3.5, 2.02],
+    [-7.6, -4.4, 2.02],
+    [-7.6, -5.3, 2.02],
+    [-7.65, -6.1, 1.65],
+    [-7.65, -6.7, 1.65],
+  ] as const) {
+    westDrops.add(buildCableDrop(m, cx, cz, topY, 4.2));
+  }
+  mergeStaticMeshes(westDrops); // draw-call budget (TICKET-06): the eight drops are three meshes, one per material
+  group.add(westDrops);
+
   swaps.push(() => swapAll([{ p: bank, id: 'capacitor-bank' }]));
   const handles: THREE.Object3D[] = [];
   swaps.push(() => {
@@ -614,7 +707,12 @@ export function createLabRoom(o: {
     const parts = BREAKER_HANDLES.map(() => genFor('breaker-handle'));
     if (!panel || parts.some((h) => h === null)) return false;
     panel.rotation.y = WEST_WALL_TURN;
+    groundModelAt(panel, 0);
     replaceVisual(breaker.group, panel);
+    // Sheet 07 Hazard disconnect plate + 2 analog gauge bezels on the breaker panel
+    const hzPlate = new THREE.Mesh(keep(new THREE.BoxGeometry(0.28, 0.28, 0.018)), m.hazard);
+    hzPlate.position.set(0.22, 1.12, 0.365);
+    panel.add(hzPlate);
     BREAKER_HANDLES.forEach(([x, y, z], i) => {
       const pivot = new THREE.Group();
       pivot.position.set(x, y, z);
@@ -631,8 +729,9 @@ export function createLabRoom(o: {
     const relayLamps: THREE.Mesh[] = [];
     relays.forEach((r, i) => {
       const gen = gens[i]!;
-      replaceVisual(r.group, gen);
       gen.rotation.y = WEST_WALL_TURN;
+      groundModelAt(gen, 0);
+      replaceVisual(r.group, gen);
       const pair = [lamp('#ffc13d', -0.12, 1.13, 0.262), lamp('#ffc13d', 0.12, 1.13, 0.262)];
       gen.add(...pair);
       relayLamps.push(...pair);
@@ -660,23 +759,52 @@ export function createLabRoom(o: {
     const lever = genFor('console-lever');
     if (!body || !lever) return false;
     body.rotation.y = WEST_WALL_TURN;
+    groundModelAt(body, 0);
     replaceVisual(desk.group, body);
-    // the lever is a pivot on the console's top, in the console's own frame (so it turns with the model)
     desk.lever.clear();
     desk.lever.add(lever);
     desk.lever.position.set(LEVER_AT[0], LEVER_AT[1], LEVER_AT[2]);
     body.add(desk.lever);
-    // the monitor glass: its front face is at z -0.04 in the console's frame (the console's keyboard shelf reaches z +0.5 lower down)
-    const screen = lamp('#2bff88', -0.03, 1.15, -0.035, [0.22, 0.17, 0.01]);
+    const screen = lamp('#2bff88', -0.03, 1.15, -0.035, [0.24, 0.18, 0.01]);
     body.add(screen);
     lamps.desk = [screen];
     return true;
   });
 
-  // Square cable tray along west wall at y ≈ 4.2 m
+  // Overhead square cable trays along BOTH West wall (-7.6) and East wall (+7.55) at y = 4.2 m
   group.add(kit.cableTray(m, [-7.6, 1.2], [-7.6, -8.2], 4.2, ROOM.height).group);
+  group.add(kit.cableTray(m, [7.55, -8.2], [7.55, 1.2], 4.2, ROOM.height).group);
 
-  // Floor covers carrying power to gate plinth's west side
+  // ---- East Wall: The Four Distinct, Grounded, Cabled, E-Interactable Studio & Fabrication Machines (Sheet 07)
+  const rack = place(kit.presetRack(m), 7.45, -7.0, Math.PI / 2);
+  const bench = place(kit.presetBench(m), 7.45, -5.0, Math.PI / 2);
+  const combiner = place(kit.presetCombiner(m), 7.45, -3.3, Math.PI / 2);
+  const fabricator = place(buildHardwareFabricatorProp(m), 7.45, -1.35, Math.PI / 2);
+  const pTable = place(kit.planetTable(m), PLANET_TABLE_AT.x, PLANET_TABLE_AT.z, 0);
+  pTable.group.userData.stationId = 'planet-table';
+
+  const machineRigs: readonly LabMachineRig[] = [
+    createRightWallMachineRig('preset-rack', rack, m),
+    createRightWallMachineRig('preset-bench', bench, m),
+    createRightWallMachineRig('preset-combiner', combiner, m),
+    createRightWallMachineRig('fabricator', fabricator, m),
+  ];
+
+  // Vertical square-section conduit drops from East overhead cable tray (y = 4.2) to all 4 East-wall machines & armory rail
+  const eastDrops = new THREE.Group();
+  for (const [cx, cz, topY] of [
+    [7.55, -7.0, 2.38],
+    [7.55, -5.0, 1.35],
+    [7.55, -3.3, 1.30],
+    [7.55, -1.35, 1.64],
+    [7.65, 0.6, 1.92],
+  ] as const) {
+    eastDrops.add(buildCableDrop(m, cx, cz, topY, 4.2));
+  }
+  mergeStaticMeshes(eastDrops); // draw-call budget (TICKET-06): the five drops are three meshes, one per material
+  group.add(eastDrops);
+
+  // Floor covers carrying power from West Power Wall -> Gate Plinth -> East Studio Bay & Planet Table (nothing wireless!)
   const covers = [
     // Main feed from breaker/relays to plinth west side (-2.5, -1.0)
     kit.floorCover(m, [[-7.2, -1.0], [-2.5, -1.0]], 0.32),
@@ -684,6 +812,10 @@ export function createLabRoom(o: {
     kit.floorCover(m, [[-7.2, 1.0], [-7.2, -1.0]], 0.28),
     // Operator console to relays along west wall
     kit.floorCover(m, [[-6.5, -7.8], [-7.2, -7.8], [-7.2, -5.3]], 0.25),
+    // Gate plinth east side (2.5, -1.0) to East wall Studio trunk and Planet Table
+    kit.floorCover(m, [[2.5, -1.0], [7.0, -1.0]], 0.28),
+    kit.floorCover(m, [[7.0, -7.0], [7.0, -1.0]], 0.26),
+    kit.floorCover(m, [[5.0, -1.0], [5.0, -4.0]], 0.24),
   ];
   for (const c of covers) group.add(c.group);
 
@@ -702,12 +834,6 @@ export function createLabRoom(o: {
   }));
   for (const c of covers) c.pulse.material = pulseMat;
 
-  // ---- East Wall: The Studio Corner (panel 45, north to south)
-  const rack = place(kit.presetRack(m), 7.5, -7.0, Math.PI / 2);
-  const bench = place(kit.presetBench(m), 7.5, -5.0, Math.PI / 2);
-  const combiner = place(kit.presetCombiner(m), 7.5, -3.4, Math.PI / 2);
-  const pTable = place(kit.planetTable(m), PLANET_TABLE_AT.x, PLANET_TABLE_AT.z, 0);
-  // The disc is the labkit lamp, or on the generated plate an emissive overlay (both driven through tableDiscMat)
   const tableDiscMat = keep(new THREE.MeshStandardMaterial({
     color: '#120c02',
     emissive: new THREE.Color('#ff7700'),
@@ -715,7 +841,6 @@ export function createLabRoom(o: {
     roughness: 0.4,
     metalness: 0.3,
   }));
-  // the hologram plate on the table's top (cyan, translucent; it comes up after the banks, see setPower)
   const hologramMat = keep(new THREE.MeshStandardMaterial({
     color: '#0a2430', emissive: new THREE.Color('#7ff0ff'), emissiveIntensity: 0, transparent: true, opacity: 0, depthWrite: false,
   }));
@@ -724,14 +849,16 @@ export function createLabRoom(o: {
   const tableDisc = pTable.lamps[0];
   if (tableDisc) tableDisc.material = tableDiscMat;
 
+  // Keep each machine's distinctive Sheet 07 dressGroup & pixel plume when swapping in generated GLBs!
   swaps.push(() => swapAll([
-    { p: rack, id: 'preset-rack', turn: WEST_WALL_TURN },
-    { p: bench, id: 'preset-bench', turn: WEST_WALL_TURN },
-    { p: combiner, id: 'preset-combiner', turn: WEST_WALL_TURN },
+    { p: rack, id: 'preset-rack', turn: WEST_WALL_TURN, kept: [machineRigs[0]!.dressGroup] },
+    { p: bench, id: 'preset-bench', turn: WEST_WALL_TURN, kept: [machineRigs[1]!.dressGroup] },
+    { p: combiner, id: 'preset-combiner', turn: WEST_WALL_TURN, kept: [machineRigs[2]!.dressGroup] },
   ]));
   swaps.push(() => {
     const plate = genFor('planet-table');
     if (!plate) return false;
+    groundModelAt(plate, 0);
     replaceVisual(pTable.group, plate);
     pTable.lamps.length = 0;
     const disc = new THREE.Mesh(keep(new THREE.CylinderGeometry(0.42, 0.42, 0.01, 32)), tableDiscMat);
@@ -742,8 +869,7 @@ export function createLabRoom(o: {
     return true;
   });
 
-  // ---- South-East: The Armory Nook (panel 46 left)
-  // Armory rail on east wall at z ≈ 0.6 m, rail at about y ≈ 1.3 m
+  // ---- South-East: The Armory Nook
   const railGroup = new THREE.Group();
   const railBar = new THREE.Mesh(keep(new THREE.BoxGeometry(0.06, 0.06, 1.4)), m.gunmetal);
   railGroup.add(railBar);
@@ -755,7 +881,6 @@ export function createLabRoom(o: {
     peg.position.set(-0.06, 0.04, rz);
     railGroup.add(peg);
   }
-  // The labkit rail and a mock tool (the fallback). The generated rail and the extraction tool (weapon-frame) replace them.
   const mockTool = new THREE.Mesh(keep(new THREE.BoxGeometry(0.12, 0.16, 0.55)), m.paint);
   mockTool.position.set(-0.08, 0.06, 0);
   railGroup.add(mockTool);
@@ -765,57 +890,51 @@ export function createLabRoom(o: {
     const tool = genFor('weapon-frame');
     if (!rail || !tool) return false;
     railGroup.clear();
-    // the rail's length runs along the wall (z) and its front faces into the room
     rail.rotation.y = -Math.PI / 2;
-    // the tool rests on the rail's top, lying along it
     tool.position.set(0, 0.62, 0);
     tool.rotation.y = Math.PI / 2;
     railGroup.add(rail, tool);
     return true;
   });
 
-  // The sidearm holster (TICKET-07 Item D): Argo's armory rack on the same east-wall rail, lower down, with the Combat Shotgun in it.
-  // The rifle stays on the rail above (the generated weapon-frame), so the rack's own beam cradle is dropped. The pickup is E at
-  // ARMORY_RAIL_POS's pickup point (the play screen's); the sidearm is hidden there once it is taken.
   const armory = armoryRack(m);
   armory.group.getObjectByName('armory-beam-cradle')?.removeFromParent();
   place({ group: armory.group, colliders: armory.colliders, sockets: [], lamps: [] }, ARMORY_RAIL_POS.x, ARMORY_RAIL_POS.z, 0, ARMORY_RAIL_POS.y);
 
-  // Weapon bench against south wall at x ≈ 6.0: the labkit preset bench until its generated model is swapped in
   const weaponBench = place(kit.presetBench(m), 6.0, 2.4, Math.PI);
+  weaponBench.group.userData.stationId = 'weapon-bench';
   swaps.push(() => {
-    // the bench's own set (jig, printer, tools, tool wall) loads with it, so it all shows at once or not at all
     const parts = genAll(WEAPON_BENCH_SET);
     if (!parts) return false;
     if (!swapAll([{ p: weaponBench, id: 'weapon-bench' }])) return false;
-    // the generated bench is wider than the labkit one: its footprint keeps the collider the lab always had
     colliders.push({ min: [4.8, 0, 2.0], max: [7.2, 1.6, 2.8] });
     dressWeaponBench(weaponBench.group, parts);
     return true;
   });
 
-  // ---- The lab clutter (TASK-23c): fifteen props in the corners and along the walls (lab-clutter.ts). A salvage prop dissolves when it is
-  // cleared (dissolveClutter; the play screen gives the salvage); the two fixtures stay. Each prop is a box of its footprint until its
-  // model is loaded, then the model replaces the box. The walls each prop adds are its own colliders, removed with it.
+  // ---- The lab clutter (TASK-23c)
   const clutterEntries = new Map<string, ClutterEntry>();
   const discGeo = keep(new THREE.CircleGeometry(1, 36));
   discGeo.rotateX(-Math.PI / 2);
   for (const item of CLUTTER) {
+    // Keep filing-cabinet clear of the 4th East-wall machine (Hardware Fabricator at z = -1.35)
+    const placedZ = item.id === 'filing-cabinet' ? -0.25 : item.z;
     const stand = new THREE.Mesh(keep(new THREE.BoxGeometry(item.w, item.h, item.d)), m.gunmetal);
     stand.position.y = item.h / 2;
     const prop: Prop = { group: new THREE.Group(), colliders: [{ min: [-item.w / 2, 0, -item.d / 2], max: [item.w / 2, item.h, item.d / 2] }], sockets: [], lamps: [] };
     prop.group.add(stand);
     prop.group.userData.clutterId = item.id;
     const before = colliders.length;
-    place(prop, item.x, item.z, item.yaw, 0);
+    place(prop, item.x, placedZ, item.yaw, 0);
     const disc = new THREE.Mesh(discGeo, keep(new THREE.MeshBasicMaterial({ color: '#ffc13d', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })));
-    disc.position.set(item.x, 0.03, item.z);
+    disc.position.set(item.x, 0.03, placedZ);
     disc.visible = false;
     group.add(disc);
     clutterEntries.set(item.id, { item, prop, disc, boxes: colliders.slice(before), state: 'standing', t: 0 });
     swaps.push(() => {
       const gen = genFor(item.model);
       if (!gen) return false;
+      groundModelAt(gen, 0);
       replaceVisual(prop.group, gen);
       return true;
     });
@@ -843,8 +962,7 @@ export function createLabRoom(o: {
     }
   };
 
-  // ---- South Wall: Her Corner (panel 46 right & panel 41)
-  // Folding camp cot along south wall at (-2.5, 2.2)
+  // ---- South Wall: Her Corner
   const cotGroup = new THREE.Group();
   const cotFrame = new THREE.Mesh(keep(new THREE.BoxGeometry(1.9, 0.35, 0.8)), m.darkSteel);
   cotFrame.position.y = 0.18;
@@ -859,10 +977,8 @@ export function createLabRoom(o: {
   cotBlanket.position.set(0.55, 0.46, 0);
   cotGroup.add(cotBlanket);
   const cotProp = place({ group: cotGroup, colliders: [{ min: [-1.0, 0, -0.45], max: [1.0, 0.6, 0.45] }], sockets: [], lamps: [] }, -2.5, 2.2, 0);
-  // the generated cot is long along z: turned to lie along the wall, like the labkit cot
   swaps.push(() => swapAll([{ p: cotProp, id: 'cot', turn: Math.PI / 2 }]));
 
-  // Her desk at (1.0, 2.4), facing into room (Math.PI)
   const deskGroup = new THREE.Group();
   const deskBody = new THREE.Mesh(keep(new THREE.BoxGeometry(1.4, 0.72, 0.68)), m.paint);
   deskBody.position.y = 0.36;
@@ -870,7 +986,6 @@ export function createLabRoom(o: {
   const deskTop = new THREE.Mesh(keep(new THREE.BoxGeometry(1.46, 0.05, 0.74)), m.gunmetal);
   deskTop.position.y = 0.74;
   deskGroup.add(deskTop);
-  // Stacked paper notes on desk
   const pStack1 = new THREE.Mesh(keep(new THREE.BoxGeometry(0.24, 0.03, 0.30)), m.paint);
   pStack1.position.set(-0.25, 0.78, 0.05);
   deskGroup.add(pStack1);
@@ -878,11 +993,9 @@ export function createLabRoom(o: {
   pStack2.position.set(-0.24, 0.81, 0.06);
   pStack2.rotation.y = 0.12;
   deskGroup.add(pStack2);
-  // Coffee mug (tiny low-sided cylinder)
   const mug = new THREE.Mesh(keep(new THREE.CylinderGeometry(0.04, 0.04, 0.08, 12)), m.darkSteel);
   mug.position.set(0.15, 0.80, -0.15);
   deskGroup.add(mug);
-  // Small desk terminal screen
   const dTerm = new THREE.Mesh(keep(new THREE.BoxGeometry(0.28, 0.22, 0.18)), m.darkSteel);
   dTerm.position.set(0.42, 0.87, 0.12);
   dTerm.rotation.y = -0.25;
@@ -894,17 +1007,17 @@ export function createLabRoom(o: {
   dScreen.rotation.y = -0.25;
   deskGroup.add(dScreen);
   const deskProp = place({ group: deskGroup, colliders: [{ min: [-0.75, 0, -0.4], max: [0.75, 1.0, 0.4] }], sockets: [], lamps: [] }, 1.0, 2.4, Math.PI);
-  // the generated desk replaces the body and top; the paper, the mug and the terminal stay on it
   swaps.push(() => {
     const body = genFor('her-desk');
     if (!body) return false;
+    groundModelAt(body, 0);
     deskGroup.remove(deskBody, deskTop);
     deskGroup.add(body);
     fitOverhang(deskProp);
     return true;
   });
 
-  // Inset wall radio in south wall beside desk at about 1.4 m
+  // Inset wall radio in south wall beside desk
   const radioGroup = new THREE.Group();
   const radioBox = new THREE.Mesh(keep(new THREE.BoxGeometry(0.48, 0.34, 0.12)), m.gunmetal);
   radioGroup.add(radioBox);
@@ -941,58 +1054,72 @@ export function createLabRoom(o: {
     group.add(chartQuad);
   }
 
-  // ---- Light: ceiling strips in three banks (back, middle, front: each ignites in turn), one main lamp, emergency lamps, gate glow, window light
-  // The strips are cut into three lengths along the room (the seams are the same material, so they do not show).
+  // ---- Light: recessed aluminum ceiling strip troffers in 3 banks (never black boxes when unlit, LAB-02)
   const stripLength = (depth - 2.5) / 3;
-  const stripMats = [0, 1, 2].map(() => keep(new THREE.MeshStandardMaterial({ color: '#202428', emissive: '#eef4ff', emissiveIntensity: 0, roughness: 0.4 })));
+  const stripMats = [0, 1, 2].map(() =>
+    keep(new THREE.MeshStandardMaterial({
+      color: '#c8d6e5',
+      emissive: '#eef4ff',
+      emissiveIntensity: 0,
+      roughness: 0.32,
+      metalness: 0.1,
+    })),
+  );
   for (const x of [-4.5, -1.5, 1.5, 4.5]) {
-    for (let bank = 0; bank < 3; bank++) {
-      const zc = (ROOM.back + ROOM.front) / 2 - (depth - 2.5) / 2 + stripLength * (bank + 0.5);
-      add(new THREE.BoxGeometry(0.24, 0.06, stripLength), stripMats[bank]!, (s) => {
-        s.position.set(x, ROOM.height - 0.04, zc);
+    for (let bnk = 0; bnk < 3; bnk++) {
+      const zc = (ROOM.back + ROOM.front) / 2 - (depth - 2.5) / 2 + stripLength * (bnk + 0.5);
+      // Brushed-steel troffer housing
+      add(new THREE.BoxGeometry(0.32, 0.04, stripLength + 0.04), m.paint, (housing) => {
+        housing.position.set(x, ROOM.height - 0.02, zc);
+      });
+      // Diffuser tube
+      add(new THREE.BoxGeometry(0.22, 0.04, stripLength - 0.04), stripMats[bnk]!, (s) => {
+        s.position.set(x, ROOM.height - 0.045, zc);
       });
     }
   }
-  // One main lamp standing in for ceiling strips
   const mainLamp = new THREE.PointLight('#e6f2ff', 0, 24, 1.8);
   mainLamp.position.set(0, ROOM.height - 0.6, -2.0);
   group.add(mainLamp);
 
-  // Orange emergency lamps (in the dark they strobe red, see the dark wake in update)
-  const emergencyMat = keep(new THREE.MeshStandardMaterial({ color: '#331a08', emissive: '#ff7a1c', emissiveIntensity: 0, roughness: 0.4 }));
-  for (const [x, z, face] of [[-7.9, -3.0, Math.PI / 2], [7.9, -1.0, -Math.PI / 2], [0, 2.92, Math.PI]] as const) {
-    add(new THREE.BoxGeometry(0.18, 0.12, 0.1), emergencyMat, (e) => {
-      e.position.set(x, 4.4, z); e.rotation.y = face;
+  // Flush-mounted wall emergency beacons with gunmetal wall bezels (never floating brown cubes, LAB-02)
+  const emergencyMat = keep(new THREE.MeshStandardMaterial({
+    color: '#b85c1e',
+    emissive: '#ff7a1c',
+    emissiveIntensity: 0,
+    roughness: 0.35,
+  }));
+  for (const [x, z, face] of [[-7.96, -3.0, Math.PI / 2], [7.96, -1.0, -Math.PI / 2], [0, 2.96, Math.PI]] as const) {
+    add(new THREE.BoxGeometry(0.24, 0.16, 0.03), m.gunmetal, (bezel) => {
+      bezel.position.set(x, 4.55, z); bezel.rotation.y = face;
+    });
+    add(new THREE.BoxGeometry(0.16, 0.09, 0.05), emergencyMat, (e) => {
+      e.position.set(x, 4.55, z); e.rotation.y = face;
     });
   }
   const emergency = new THREE.PointLight('#ff8a3a', 0, 22, 1.6);
   emergency.position.set(0, 4.4, 0);
   group.add(emergency);
 
-  // The dark wake's red strobe: a point light that sweeps the power wall at 1.2 Hz (lab-power.ts), lit only before the lever
   const strobe = new THREE.PointLight('#ff2a1a', 0, 7, 1.8);
   strobe.position.set(-7.0, 2.6, -4.0);
   group.add(strobe);
 
-  // Gate glow (the ignition's arc flash turns it up, amber)
   const gateGlow = new THREE.PointLight('#ff9a4a', 0, 10, 1.8);
   gateGlow.position.set(GATE_AT.x, 1.8, GATE_AT.z + 0.6);
   group.add(gateGlow);
 
-  // Window storm light (brightest feature in Act I dark): the window's cyan storm glow leaks across the floor, and each burst flashes it
   const windowLight = new THREE.PointLight('#7fe9ff', 3.5, 16, 1.8);
   windowLight.position.set(wx, wy + 0.4, ROOM.back + 1.2);
   group.add(windowLight);
 
-  // The fill: cold blue-grey in the dark (about 0.08), then the powered room's light
   const fill = new THREE.HemisphereLight('#1a2433', '#2a2e33', 0.08);
   group.add(fill);
 
-  // The breaker handles glow red in the dark: each handle's own materials are cloned, so only they are lit
   const handleMats: THREE.MeshStandardMaterial[] = [];
   const handleGlow = (h: THREE.Object3D): void => {
-    h.traverse((o) => {
-      const mesh = o as THREE.Mesh;
+    h.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
       if (!mesh.isMesh) return;
       const src = mesh.material as THREE.Material;
       if (!(src instanceof THREE.MeshStandardMaterial)) return;
@@ -1004,27 +1131,34 @@ export function createLabRoom(o: {
     });
   };
 
-  // Power state handlers
   const lamps = {
     relays: relays.flatMap((r) => r.lamps),
     boxes: boxes.flatMap((b) => b.lamps),
     desk: desk.lamps,
   };
-  /** The relay lamps that are lit (they pulse as amber beacons, in update). */
   let relayOn: boolean[] = [];
 
   const setPower = (p: Power): void => {
     lastPower = p;
-    // the breaker is thrown (its handles up) once the power comes on, before the relays click
-    handles.forEach((h) => { h.rotation.x = p.relays > 0 ? 0 : -0.7; });
+    handles.forEach((h) => { h.rotation.z = p.relays > 0 ? 0 : -Math.PI / 2; });
     relayOn = lamps.relays.map((_, i) => p.relays * lamps.relays.length > i);
     lamps.relays.forEach((l, i) => { if (!relayOn[i]) kit.setLamp(l, 0); });
     lamps.boxes.forEach((l) => kit.setLamp(l, p.relays > 0.5 ? 1 : 0));
     lamps.desk.forEach((l) => kit.setLamp(l, 1));
-    gate.coils.forEach((c, i) => kit.setLamp(c, p.coils * gate.coils.length > i ? 1 : 0));
+
+    // TICKET-06 Item 7: 3.5 s progressive bottom-to-top gate coil ignition
+    const cLevels = coilLevels(p.coils, gate.coils.length);
+    gate.coils.forEach((c, i) => {
+      const lvl = cLevels[i] ?? 0;
+      kit.setLamp(c, lvl * 2.2);
+    });
+
+    // Power the 4 right-wall Studio & Fabrication machines and their pixel exhaust plumes
+    for (const rig of machineRigs) {
+      rig.setPowered(p.main);
+    }
 
     tableDiscMat.emissiveIntensity = p.main * 0.22;
-    // the planet table's hologram: a cyan plate on the table's top comes up after the banks
     hologramMat.opacity = 0.75 * p.hologram;
     hologramMat.emissiveIntensity = 1.6 * p.hologram;
     hologramPlate.visible = p.hologram > 0.001;
@@ -1034,7 +1168,8 @@ export function createLabRoom(o: {
     stripMats.forEach((mat, i) => { mat.emissiveIntensity = p.banks[i]! * 2.2; });
     mainLamp.intensity = p.main * 18;
     fill.color.set(p.main > 0.02 ? '#d8e2ea' : '#1a2433');
-    fill.intensity = p.main > 0.02 ? 0.10 + p.main * 0.25 : 0.08;
+    fill.groundColor.set(p.main > 0.02 ? '#58626e' : '#2a2e33');
+    fill.intensity = p.main > 0.02 ? 0.14 + p.main * 0.28 : 0.08;
     emergencyMat.emissive.set('#ff7a1c');
     emergencyMat.emissiveIntensity = p.emergency * 2.4;
     emergency.color.set('#ff8a3a');
@@ -1064,24 +1199,22 @@ export function createLabRoom(o: {
   };
 
   const leverAt = desk.lever.getWorldPosition(new THREE.Vector3());
-  /** Swaps in the generated models that are loaded now, then re-applies the power state to their lamps. */
   const adoptGenerated = (): void => {
     swaps = swaps.filter((run) => !run());
     desk.lever.getWorldPosition(leverAt);
     setPower(lastPower);
     vista.adoptGenerated();
   };
-  adoptGenerated(); // a model loaded by an earlier visit is used at once; the rest wait for the preload
+  adoptGenerated();
 
-  /** The prop under the ray: a fixture or a salvage prop that is standing (the walls are the same). */
   const aimClutter = (origin: THREE.Vector3, dir: THREE.Vector3, reach: number): string | null => {
     const roots = [...clutterEntries.values()].filter((e) => e.state === 'standing').map((e) => e.prop.group);
     for (const r of roots) r.updateMatrixWorld(true);
     const ray = new THREE.Raycaster(origin, dir.clone().normalize(), 0, reach);
     for (const h of ray.intersectObjects(roots, true)) {
-      let o: THREE.Object3D | null = h.object;
-      while (o && o.userData.clutterId === undefined) o = o.parent;
-      if (o) return o.userData.clutterId as string;
+      let obj: THREE.Object3D | null = h.object;
+      while (obj && obj.userData.clutterId === undefined) obj = obj.parent;
+      if (obj) return obj.userData.clutterId as string;
     }
     return null;
   };
@@ -1099,22 +1232,27 @@ export function createLabRoom(o: {
     }
   };
 
+  // Draw-call budget (TICKET-06): the shell's panels that share a material become one mesh each. The storm plane stays on its own
+  // (syncPlane shows and hides it); the transparent materials are never merged (their draw order matters).
+  mergeStaticMeshes(shell, [stormPlane]);
+
   return {
     envLevel: () => 0.03 + lastPower.main * 0.2,
     aimClutter,
     dissolveClutter,
     removeClutter,
+    stations: LAB_STATIONS,
+    aimStation: (origin, dir, reach = 3.2) => aimLabStation(origin, dir, reach),
+    nearestStation: (pos, maxReach) => nearestLabStation(pos, maxReach),
     group,
     colliders,
     gate,
     portal,
     leverAt,
     lever: desk.lever,
-    spawn: { x: -2.5, z: 1.0, yaw: 0 }, // beside the cot, facing north toward gate & storm
+    spawn: { x: -2.5, z: 1.0, yaw: 0 },
     setPower,
-    /** The power as it was last set (the tests read it). */
     power: (): Power => lastPower,
-    /** Which gate coils are lit now, bottom to top (the ignition's order). */
     coilsLit: (): boolean[] => gate.coils.map((c) => ((c.material as THREE.MeshStandardMaterial).emissiveIntensity ?? 0) > 0.5),
     adoptGenerated,
     setStorm,
@@ -1127,9 +1265,10 @@ export function createLabRoom(o: {
       stormUniforms.uTime.value = now;
       vista.update(now, dt);
       tickClutter(dt);
-      // the bursts flash the window light, capped at 0.7 of the peak: the floor lights up, the room never whites out (review 3)
+      for (const rig of machineRigs) {
+        rig.animate(now, lastPower.main);
+      }
       windowLight.intensity = 3.5 + 12 * vista.flashLight;
-      // the dark wake (before the lever): the red strobe sweeps the power wall, the emergency lamps and the breaker handles strobe red
       if (lastPower.relays === 0) {
         const s = darkStrobe(now);
         strobe.position.z = strobeSweepZ(now);
@@ -1140,14 +1279,13 @@ export function createLabRoom(o: {
         emergency.intensity = 22 * s;
         handleMats.forEach((mat) => { mat.emissiveIntensity = 1.6 * s; });
       }
-      // the relay lamps pulse as the amber beacons while they are lit (each out of step with the next)
       relayOn.forEach((on, i) => { if (on) kit.setLamp(lamps.relays[i]!, 0.7 + 0.3 * Math.sin(now * 4 + i * 1.3)); });
     },
     dispose() {
       vista.dispose();
       for (const x of owned) x.dispose();
-      group.traverse((o) => {
-        const mesh = o as THREE.Mesh;
+      group.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
         if (mesh.isMesh) {
           mesh.geometry.dispose();
         }

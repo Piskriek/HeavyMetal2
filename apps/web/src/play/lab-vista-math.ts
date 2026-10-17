@@ -88,10 +88,10 @@ export interface PocketKind {
 }
 export const POCKET_KINDS: readonly PocketKind[] = [
   { name: 'Old Earth', s: [1, 1, 1, 0], tint: [0.62, 1.0, 0.5], sky: [0.36, 0.6, 0.9], rim: [0.45, 0.72, 1.0] },
-  { name: '1-bit', s: [0, 0.2, 0, 0], tint: [1, 1, 1], sky: [0.6, 0.6, 0.62], rim: [1.0, 1.0, 1.0] },
-  { name: 'EGA', s: [0.25, 0.4, 0.5, 0], tint: [1.0, 0.7, 1.0], sky: [0.25, 0.85, 0.95], rim: [1.0, 0.3, 0.9] },
+  { name: '1-bit', s: [0, 0.2, 0, 0], tint: [0.9, 0.96, 1.0], sky: [0.4, 0.55, 0.68], rim: [1.0, 1.0, 1.0] },
+  { name: 'EGA', s: [0.25, 0.4, 0.5, 0], tint: [0.68, 0.92, 1.0], sky: [0.18, 0.68, 0.88], rim: [0.35, 0.92, 1.0] },
   { name: 'Drowned', s: [0.7, 0.8, 0.8, 1], tint: [0.55, 0.9, 1.0], sky: [0.06, 0.3, 0.36], rim: [0.2, 0.95, 0.85] },
-  { name: 'Wire-crunch', s: [0.5, 0, 0.6, 0], tint: [1, 1, 1], sky: [0.28, 0.28, 0.32], rim: [0.4, 1.0, 0.35] },
+  { name: 'Wire-crunch', s: [0.5, 0, 0.6, 0], tint: [0.82, 0.95, 0.88], sky: [0.22, 0.32, 0.36], rim: [0.4, 1.0, 0.55] },
 ];
 
 /** The shader's view of one pocket at one moment. `radius` 0 means the slot is empty; `centre` is (x, height above the ground, z). */
@@ -101,11 +101,6 @@ export interface PocketFrame {
   readonly kind: number;
 }
 
-/**
- * The slots' sectors, seen from the spawn: a bearing (degrees), a distance (m) and an elevation (degrees). Each pocket drifts inside
- * its sector, so where it sits on the glass holds at every moment. The slots sit in the window's bays, at most two in any bay, and
- * none in the Breach's corridor. Slot 0 is the 1-bit pocket that the crate flies through.
- */
 export interface PocketSector { readonly bearing: number; readonly dist: number; readonly elev: number }
 export const POCKET_SECTORS: readonly PocketSector[] = [
   { bearing: 10, dist: 80, elev: 4.8 },
@@ -115,24 +110,13 @@ export const POCKET_SECTORS: readonly PocketSector[] = [
   { bearing: 35, dist: 50, elev: 4.0 },
   { bearing: 27, dist: 90, elev: 4.0 },
 ];
-/** How far a pocket drifts about its sector: bearing (deg), elevation (deg), distance (m). */
 const SECTOR_AMP = { bearing: 1.2, elev: 0.25, dist: 6 } as const;
 
-/**
- * Plan §5: each pocket lives for 20 to 40 s, then collapses in a burst and forms again. Slot 0 never collapses: it is the 1-bit
- * pocket that the crosswind's lane 0 flies through (the crate shot), so it stays where it is.
- */
 export function pocketLifetime(slot: number): number {
   if (slot === 0) return 1e9;
   return 20 + 20 * mulberry32(0x9e37 + slot * 131)();
 }
 
-/**
- * The pocket in slot `slot` at time `t` (seconds). `scale` grows the pockets with the storm's progress (plan §8). It drifts in its
- * sector on a seeded path (1 to 2 m a second), breathes +-10%, and shrinks to nothing over the last 1.2 s of its life and grows
- * back over the first 1.2 s of the next. Its centre is above the ground by more than its radius: every pocket floats (R5). Its
- * radius is at most POCKET_MAX_RATIO of its distance from the spawn, so from the spawn it subtends at most about 4 degrees.
- */
 export function pocketFrame(slot: number, t: number, scale = 1): PocketFrame {
   const sec = POCKET_SECTORS[slot % POCKET_SECTORS.length]!;
   const life = pocketLifetime(slot);
@@ -141,7 +125,6 @@ export function pocketFrame(slot: number, t: number, scale = 1): PocketFrame {
   const r = mulberry32(0x1d0c + slot * 613 + cycle * 1009);
   const kind = slot === 0 ? 1 : Math.floor(r() * POCKET_KINDS.length) % POCKET_KINDS.length;
   const size = slot === 0 ? 1 : 0.7 + 0.3 * r();
-  // a new cycle picks new drift phases, so the pocket forms in a new place
   const q = mulberry32(0x51f1 + slot * 977 + cycle * 7919);
   const pb = q() * 6.283, pe = q() * 6.283, pd = q() * 6.283;
   const grow = smoothstep(0, 1.2, phase);
@@ -157,39 +140,24 @@ export function pocketFrame(slot: number, t: number, scale = 1): PocketFrame {
   return { centre: [x, y, z], radius, kind };
 }
 
-/**
- * The ground under a pocket (review 2, V2): the pocket casts its fidelity straight down as a disc of its radius. The disc fades as the
- * pocket rises: full at 4 m, gone by 30 m. Mirrors `groundFade` in the shader.
- */
 export function groundFade(centreHeight: number): number {
   return 1 - smoothstep(4, 30, centreHeight);
 }
 
-/** A burst of static (plan §6): the bolt, the burst shell, the light and the ring, all from one event. */
 export interface BurstEvent {
-  /** Seconds from the start of the scene. */
   readonly t: number;
-  /** Where the bolt strikes the plain (lab frame, metres). */
   readonly x: number;
   readonly z: number;
-  /** 0..1: the bigger the strike, the wider the burst. */
   readonly strength: number;
 }
 
-/** How long one burst lasts (plan §6: about 1.2 s). */
 export const BURST_SECONDS = 1.2;
 
-/**
- * The bursts as a seeded schedule: one every 5 to 12 s, the Breach's side (x in the layout's band near the column) struck more often.
- * `eventsBetween(from, to)` returns the events whose time falls in [from, to), in order, and never repeats one.
- * `progress` lowers the chance of a burst as the storm thins (plan §8: the flashes drop off).
- */
 export function burstSchedule(seed: number, breachX: number, breachZ: number): {
   eventsBetween(from: number, to: number, progress: number): BurstEvent[];
 } {
   const r = mulberry32(seed);
   let next = 4 + 4 * r();
-  // each event carries a fixed roll, so the progress only decides, at read time, which of them strike (the schedule never changes)
   const made: { readonly event: BurstEvent; readonly roll: number }[] = [];
   const extend = (until: number): void => {
     while (next <= until) {
@@ -211,7 +179,6 @@ export function burstSchedule(seed: number, breachX: number, breachZ: number): {
   };
 }
 
-/** The look of one burst at its age (seconds since it struck): the bolt, the burst shell, the light (capped, never a whiteout) and the ring. */
 export interface BurstLook {
   readonly bolt: number;
   readonly burst: number;
@@ -224,24 +191,18 @@ export function burstLook(age: number, strength: number): BurstLook {
   const bolt = age < 0.15 ? 1 : 0;
   const burst = clamp01(age / 0.8) * (0.6 + 0.4 * strength);
   const burstAlpha = clamp01(1 - age / 0.8);
-  // capped at 0.7 of full: the lab floor lights up but never whites out (STALKER 2's complaint, plan §6)
   const light = 0.7 * strength * Math.exp(-age / 0.22);
   const ring = clamp01(age / BURST_SECONDS);
   return { bolt, burst, burstAlpha, light, ring };
 }
 
-/** The storm's progress (plan §8): what the view looks like at progress 0 (the storm) to 1 (the calm plain). */
 export interface VistaLook {
   readonly baseS: FidelityS;
   readonly pocketScale: number;
-  /** The Breach's height as a fraction of its column (1 at the storm, a faint scar at 1). */
   readonly breachHeight: number;
   readonly breachGlow: number;
-  /** Dust density (1 full storm, less when calm). */
   readonly dust: number;
-  /** Flashes per burst-schedule roll: the storm keeps them, the calm plain loses them. */
   readonly flashChance: number;
-  /** 0 storm sky, 1 dusk. */
   readonly dusk: number;
 }
 export function lookAt(progress: number): VistaLook {
@@ -257,26 +218,19 @@ export function lookAt(progress: number): VistaLook {
   };
 }
 
-/**
- * How lit the cloud layer is at a distance from the Breach (review 2, V1: the undersides within 1.5 km of it). 1 at the column,
- * 0 beyond 1.5 km. Mirrors the sky shader.
- */
 export function cloudLitAt(distFromBreach: number): number {
   return 1 - smoothstep(200, 1500, distFromBreach);
 }
 
-/** The Pxd bucket of a pixel-density float (plan §5): 0 the 1-bit dither, 0.25 the EGA palette, 0.5 the 3-3-2 quantise, 1 full colour. */
 export function pxdMode(pxd: number): 'bayer' | 'ega' | 'vga' | 'full' {
   const p = clamp01(pxd);
   return p < 0.125 ? 'bayer' : p < 0.375 ? 'ega' : p < 0.75 ? 'vga' : 'full';
 }
 
-/** Plan §5: the vertex grid of a Vtx float, mix(1.5 m, 0, Vtx). Zero means no snapping. */
 export function vtxGrid(vtx: number): number {
   return 1.5 * (1 - clamp01(vtx));
 }
 
-/** Plan §5: Lx 0 is unlit flat colour, 0.5 flat Lambert, 1 full PBR. Returns the weights of the three looks (they sum to 1). */
 export function lxWeights(lx: number): { readonly unlit: number; readonly flat: number; readonly pbr: number } {
   const l = clamp01(lx);
   if (l <= 0.5) { const f = l * 2; return { unlit: 1 - f, flat: f, pbr: 0 }; }
@@ -284,10 +238,6 @@ export function lxWeights(lx: number): { readonly unlit: number; readonly flat: 
   return { unlit: 0, flat: 1 - f, pbr: f };
 }
 
-/**
- * The strongest pocket around a point and its weight (0 outside every pocket, 1 inside the core). A point on the ground (height
- * under 0.5 m) takes the pocket's disc straight down, faded by the pocket's height. Mirrors the shader's loop.
- */
 export function strongestPocket(frames: readonly PocketFrame[], p: Vec3): { readonly index: number; readonly weight: number } {
   let best = -1, weight = 0;
   const ground = p[1] < 0.5;
@@ -302,7 +252,6 @@ export function strongestPocket(frames: readonly PocketFrame[], p: Vec3): { read
   return { index: best, weight };
 }
 
-/** The fidelity at a point: the base outside, the strongest pocket's S inside (blended over its soft edge). */
 export function fidelityAt(base: FidelityS, frames: readonly PocketFrame[], p: Vec3): FidelityS {
   const { index, weight } = strongestPocket(frames, p);
   if (index < 0 || weight <= 0) return base;
@@ -326,12 +275,42 @@ export function nearestEga(rgb: Vec3): Vec3 {
   return best;
 }
 
+/**
+ * Pure storm-safe colour quantiser (TICKET-06 LAB-04 fix):
+ * Quantises a wasteland colour according to `pxd` (`0..1`) and `inPocketWeight` (`0..1`)
+ * while preventing low-saturation grey/slate ruins from snapping to CGA magenta `[170,0,170]`
+ * or bright pink `[255,85,255]`.
+ */
+export function quantiseVistaStormColour(rgb: Vec3, pxd: number, inPocketWeight = 0): Vec3 {
+  const r = clamp01(rgb[0]);
+  const g = clamp01(rgb[1]);
+  const b = clamp01(rgb[2]);
+  if (pxd >= 0.75) return [r, g, b];
+
+  const maxC = Math.max(r, g, b);
+  const minC = Math.min(r, g, b);
+  const sat = maxC - minC;
+
+  // Outside pockets (or low-saturation wasteland rock/steel): quantise along the cold storm slate ramp, never magenta/pink
+  if (inPocketWeight < 0.25 || sat < 0.22) {
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    const steps = pxd < 0.375 ? 6 : 12;
+    const q = Math.round(lum * steps) / steps;
+    return [
+      clamp01(q * 0.88),
+      clamp01(q * 0.94),
+      clamp01(q * 1.06),
+    ];
+  }
+
+  return quantise332([r, g, b]);
+}
+
 /** The 256-colour 3-3-2 quantise of an RGB colour (0..1). */
 export function quantise332(rgb: Vec3): Vec3 {
   return [Math.round(clamp01(rgb[0]) * 7) / 7, Math.round(clamp01(rgb[1]) * 7) / 7, Math.round(clamp01(rgb[2]) * 3) / 3];
 }
 
-/** The screen rectangle (pixels) that holds the given points, clipped to the screen, or null if nothing of it is on screen. */
 export function clipRect(points: readonly { readonly x: number; readonly y: number }[], width: number, height: number): { readonly x: number; readonly y: number; readonly w: number; readonly h: number } | null {
   if (points.length === 0) return null;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -345,14 +324,12 @@ export function clipRect(points: readonly { readonly x: number; readonly y: numb
   return { x: cx0, y: cy0, w: cx1 - cx0, h: cy1 - cy0 };
 }
 
-/** The bay (0 to 3, left to right) of a bearing from the spawn, by the mullions; -1 outside the glass. */
 export function bayOfBearing(b: number): number {
   const edges = [GLASS.x0, ...MULLIONS_X, GLASS.x1].map((x) => bearingFromSpawn(x, SPAWN_XZ[1] - WINDOW_DIST));
   for (let i = 0; i < 4; i++) if (b >= edges[i]! && b < edges[i + 1]!) return i;
   return -1;
 }
 
-/** Whether a bearing lies in the Breach's corridor (its bearing plus or minus `halfWidth` degrees). */
 export function inCorridor(bearingDeg: number, halfWidth = CORRIDOR_DEG): boolean {
   return Math.abs(bearingDeg - BREACH_BEARING) < halfWidth;
 }

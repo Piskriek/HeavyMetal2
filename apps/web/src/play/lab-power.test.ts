@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BANK_START, BANK_SECONDS, IGNITION, POWER_OFF, POWER_ON, POWER_SECONDS, SWEEP_Z, WAKE_PITCH, WAKE_SECONDS, darkStrobe, powerAt,
+  BANK_START, BANK_SECONDS, coilLevels, coilsLitAt, IGNITION, IGNITION_SECONDS, POWER_OFF, POWER_ON, POWER_SECONDS, SWEEP_Z, WAKE_PITCH, WAKE_SECONDS, darkStrobe, powerAt,
   strobeSweepZ, wakeLift,
 } from './lab-power';
 
@@ -129,4 +129,32 @@ test('the wake camera starts 65 degrees up, eases to level over 2.2 s, and stays
   }
   // an ease-out: most of the turn is done early (half way through the time, the lift is an eighth of the start)
   assert.ok(Math.abs(wakeLift(WAKE_SECONDS / 2) - WAKE_PITCH / 8) < 1e-9);
+});
+
+test('the coil helpers: the gate ignition spans exactly 3.5 s (t = 2.0 to 5.5 s), and the coils light strictly bottom to top', () => {
+  assert.equal(IGNITION.start, 2.0);
+  assert.equal(IGNITION.end, 5.5);
+  assert.equal(IGNITION_SECONDS, 3.5);
+  assert.equal(powerAt(2.0).coils, 0);
+  assert.deepEqual(coilsLitAt(2.0, 6), [false, false, false, false, false, false]);
+  let prevLit = 0;
+  for (let t = 2.0; t <= 5.5; t += 0.25) {
+    const lit = coilsLitAt(t, 6);
+    assert.ok(lit.filter(Boolean).length >= prevLit, `monotonic ignition at t=${t}`);
+    prevLit = lit.filter(Boolean).length;
+    for (let i = 1; i < lit.length; i++) if (lit[i]) assert.equal(lit[i - 1], true, `coil ${i} lit before coil ${i - 1} at t=${t}`);
+  }
+  assert.equal(powerAt(5.5).coils, 1);
+  assert.deepEqual(coilLevels(1, 6), [1, 1, 1, 1, 1, 1]);
+  assert.deepEqual(coilsLitAt(5.5, 6), [true, true, true, true, true, true]);
+});
+
+test('the gate draws power during the ignition: the ceiling strip banks dip, and recover by POWER_SECONDS', () => {
+  const beforeDip = powerAt(2.65);
+  const duringDraw = powerAt(4.0);
+  assert.ok(duringDraw.main < beforeDip.main, 'the ceiling lights dip while the gate coils draw power');
+  assert.equal(powerAt(POWER_SECONDS).main, 1);
+  assert.equal(powerAt(POWER_SECONDS).emergency, 0);
+  assert.equal(powerAt(POWER_SECONDS).static, 0);
+  assert.equal(wakeLift(WAKE_SECONDS), 0);
 });

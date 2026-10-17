@@ -156,11 +156,11 @@ test('fidelity: the base outside, the pocket S inside, the strongest pocket wins
   assert.deepEqual(fidelityAt(BASE_S, frames, [9.3, 9, 0]), POCKET_KINDS[3]!.s, 'the drowned pocket is stronger here');
 });
 
-test('the rim of each pocket is its own colour: Old Earth blue, 1-bit white, EGA magenta, drowned teal, wire-crunch green', () => {
+test('the rim of each pocket is its own colour: Old Earth blue, 1-bit white, EGA cyan (Argo, TICKET-06), drowned teal, wire-crunch green', () => {
   const rims = POCKET_KINDS.map((k) => k.rim);
   assert.ok(rims[0]![2] > rims[0]![0], 'Old Earth: blue');
   assert.deepEqual(rims[1], [1, 1, 1], '1-bit: white');
-  assert.ok(rims[2]![0] > 0.8 && rims[2]![2] > 0.8 && rims[2]![1] < 0.5, 'EGA: magenta');
+  assert.ok(rims[2]![1] > 0.8 && rims[2]![2] > 0.8 && rims[2]![0] < 0.5, 'EGA: cyan');
   assert.ok(rims[3]![1] > 0.8 && rims[3]![2] > 0.8 && rims[3]![0] < 0.4, 'drowned: teal');
   assert.ok(rims[4]![1] > rims[4]![0] && rims[4]![1] > rims[4]![2], 'wire-crunch: green');
 });

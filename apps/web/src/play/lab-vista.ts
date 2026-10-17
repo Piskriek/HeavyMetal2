@@ -97,8 +97,8 @@ const FALLBACK: Readonly<Record<string, readonly [number, number, number]>> = {
   'rubble-slab': [6, 1.5, 5],
 };
 const FALLBACK_COLOUR: Readonly<Record<string, string>> = {
-  'datacentre-hall': '#5b6670', 'chiller-block': '#9aa3a8', 'shipping-container': '#7a4a2e', 'pylon-tower': '#4d5358',
-  'overpass-segment': '#77736c', 'rubble-slab': '#6f6a63',
+  'datacentre-hall': '#353f49', 'chiller-block': '#4c5864', 'shipping-container': '#3d4c59', 'pylon-tower': '#36404a',
+  'overpass-segment': '#454b52', 'rubble-slab': '#42464b',
 };
 /** The hero models (the vista class of assets). */
 export const VISTA_ASSETS: readonly string[] = [
@@ -251,14 +251,13 @@ const POCKET_FRAG_BODY = /* glsl */ `
       float bit = step(vistaBayer(gl_FragCoord.xy * 0.5), lum);
       sCol = mix(vec3(0.03), vec3(0.94), bit);
     } else if (vP < 0.375) {
-      float best = 1e9;
-      vec3 bc = sCol;
-      for (int i = 0; i < 16; i++) {
-        vec3 dd = sCol - VISTA_EGA[i];
-        float dsq = dot(dd, dd);
-        if (dsq < best) { best = dsq; bc = VISTA_EGA[i]; }
-      }
-      sCol = bc;
+      // TICKET-06 LAB-04 fix: quantise along cold storm slate/cyan ramp instead of snapping grey rock to CGA magenta/pink
+      float lum = dot(sCol, vec3(0.299, 0.587, 0.114));
+      float q = floor(lum * 6.0 + 0.5) / 6.0;
+      vec3 slate = vec3(q * 0.86, q * 0.94, min(1.0, q * 1.08));
+      vec3 quant = floor(clamp(sCol, 0.0, 1.0) * vec3(5.0, 6.0, 5.0) + 0.5) / vec3(5.0, 6.0, 5.0);
+      float sat = max(sCol.r, max(sCol.g, sCol.b)) - min(sCol.r, min(sCol.g, sCol.b));
+      sCol = mix(slate, quant, smoothstep(0.18, 0.42, sat));
     } else {
       sCol = floor(clamp(sCol, 0.0, 1.0) * vec3(7.0, 7.0, 3.0) + 0.5) / vec3(7.0, 7.0, 3.0);
     }
@@ -577,13 +576,13 @@ void main() {
   float rim = pow(1.0 - ndv, 3.0);
   float scan = 0.5 + 0.5 * sin(vY * 3.0 + uTime * 6.0);
   float grain = step(0.4, sh(floor(vec2(vY * 6.0, uTime * 20.0))));
-  vec3 rimCol = uShellRim[vSlot] * (0.55 + 0.45 * scan) * (0.6 + 0.8 * grain);
-  float a = clamp(rim * 1.6 * (0.5 + 0.5 * grain), 0.0, 0.9);
-  vec3 c = rimCol;
+  float band = step(0.72, fract(vY * 0.65 - uTime * 0.4));
+  vec3 rimCol = uShellRim[vSlot] * (0.75 + 0.45 * scan + 0.35 * band) * (0.75 + 0.65 * grain);
+  float a = clamp(rim * 2.35 * (0.65 + 0.35 * grain) + band * 0.18, 0.08, 0.95);
+  vec3 c = mix(uShellSky[vSlot] * 0.55, rimCol, clamp(rim * 1.5 + band * 0.35, 0.0, 1.0));
   if (!gl_FrontFacing) {
-    // the back faces: the pocket's sky at 25% opacity, dimmed by half so the rim is what is bright (review 3, W2), with the rim on top
-    c = mix(uShellSky[vSlot] * 0.5, rimCol, rim);
-    a = max(a, 0.25);
+    c = mix(uShellSky[vSlot] * 0.65, rimCol, rim);
+    a = max(a, 0.32);
   }
   gl_FragColor = vec4(c, a);
 }
@@ -636,9 +635,24 @@ function partsOf(id: string, level: GenLevel, shared: Shared): { parts: Part[]; 
     if (parts.length) return { parts, source: 'gen' };
   }
   const size = FALLBACK[id] ?? (GEN[id]?.size as readonly [number, number, number] | undefined) ?? [1, 1, 1];
-  const geometry = new THREE.BoxGeometry(size[0], size[1], size[2]);
-  geometry.translate(0, size[1] / 2, 0);
-  const material = new THREE.MeshStandardMaterial({ color: FALLBACK_COLOUR[id] ?? '#7a7570', roughness: 0.85, metalness: 0.05 });
+  const w = size[0], h = size[1], d = size[2];
+  let geometry: THREE.BufferGeometry;
+  if (id.includes('pylon') || id.includes('mast')) {
+    const base = new THREE.BoxGeometry(w * 0.55, h * 0.55, d * 0.45).translate(0, h * 0.275, 0);
+    const mast = new THREE.BoxGeometry(w * 0.24, h * 0.45, d * 0.22).translate(0, h * 0.775, 0);
+    const arm = new THREE.BoxGeometry(w, h * 0.06, d * 0.16).translate(0, h * 0.82, 0);
+    geometry = mergeGeometries([base, mast, arm]) ?? base;
+  } else if (id.includes('overpass')) {
+    const pierL = new THREE.BoxGeometry(w * 0.28, h * 0.78, d * 0.28).translate(-w * 0.3, h * 0.39, 0);
+    const pierR = new THREE.BoxGeometry(w * 0.28, h * 0.78, d * 0.28).translate(w * 0.3, h * 0.39, 0);
+    const deck = new THREE.BoxGeometry(w, h * 0.22, d).translate(0, h * 0.89, 0);
+    geometry = mergeGeometries([pierL, pierR, deck]) ?? deck;
+  } else {
+    const main = new THREE.BoxGeometry(w, h * 0.84, d).translate(0, h * 0.42, 0);
+    const roof = new THREE.BoxGeometry(w * 0.72, h * 0.16, d * 0.76).translate(0, h * 0.92, 0);
+    geometry = mergeGeometries([main, roof]) ?? main;
+  }
+  const material = new THREE.MeshStandardMaterial({ color: FALLBACK_COLOUR[id] ?? '#434a52', roughness: 0.82, metalness: 0.12 });
   patchMaterial(material, shared);
   return { parts: [{ geometry, material, local: new THREE.Matrix4(), owned: true }], source: 'box' };
 }
@@ -801,6 +815,7 @@ export function createLabVista(o: LabVistaOptions): LabVista {
     vertexShader: BREACH_VERT, fragmentShader: BREACH_FRAG, uniforms: breachU, toneMapped: false, transparent: true,
   })));
   breach.position.set(BREACH[0], 0, BREACH[1]);
+  breach.renderOrder = 2;
   scene.add(breach);
   // the glow sheath: a soft additive cylinder of twice the column's width, the same height and the same slow scale
   const sheathGeo = keep(new THREE.CylinderGeometry(SHEATH_W / 2, SHEATH_W / 2, BREACH_H, 40, 1, true));
@@ -928,7 +943,7 @@ export function createLabVista(o: LabVistaOptions): LabVista {
   }));
   const shells = new THREE.InstancedMesh(keep(new THREE.SphereGeometry(1, 40, 24)), shellMat, MAX_POCKETS);
   shells.frustumCulled = false;
-  shells.renderOrder = 2;
+  shells.renderOrder = 4;
   // the instance colour carries the pocket's kind in its red channel (the kind changes each cycle, the slot does not)
   const KIND_IDS = POCKET_KINDS.map((_, k) => new THREE.Color(k, 0, 0));
   for (let i = 0; i < MAX_POCKETS; i++) shells.setColorAt(i, KIND_IDS[0]!);
@@ -969,7 +984,7 @@ export function createLabVista(o: LabVistaOptions): LabVista {
   // ---- The curtains: three big planes at 45, 200 and 700 m (depth cues), and the ground drift near the horizon. They share one material,
   // so they are one merged mesh (TASK-28: four draw calls for one look). Merged back to front (700 m, the drift at 260 m, 200 m, 45 m),
   // the blend order is the order the sorted meshes drew in.
-  const curtainU = { uTime: { value: 0 }, uDust: { value: 1 }, uOpacity: { value: 0.6 } };
+  const curtainU = { uTime: { value: 0 }, uDust: { value: 1 }, uOpacity: { value: 0.16 } };
   const curtainMat = keep(new THREE.ShaderMaterial({
     vertexShader: CURTAIN_VERT, fragmentShader: CURTAIN_FRAG, uniforms: curtainU, transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
   }));
@@ -983,7 +998,7 @@ export function createLabVista(o: LabVistaOptions): LabVista {
   if (!curtainMerged) throw new Error('the curtain planes do not merge (attributes differ)');
   const curtainGeo = keep(curtainMerged);
   const curtains = new THREE.Mesh(curtainGeo, curtainMat);
-  curtains.renderOrder = 4;
+  curtains.renderOrder = 1;
   scene.add(curtains);
 
   // ---- The bursts: a jagged bolt (a ribbon), the burst shell, and the ring on the plain

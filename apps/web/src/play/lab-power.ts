@@ -1,5 +1,6 @@
-// The lab's power-on sequence, the dark wake and the wake camera (TASK-28, P0-LIGHT-03 and P1-HOUR-03). Pure: every value is a function of
-// t, the seconds since the main lever was thrown (or since the player woke). No DOM, no clock, no three.js, so it is testable.
+// The lab's power-on sequence, the dark wake and the wake camera (TASK-28, TICKET-06, P0-LIGHT-03 and P1-HOUR-03).
+// Pure: every value is a function of t, the seconds since the main lever was thrown (or since the player woke).
+// No DOM, no clock, no three.js, so it is testable.
 // lab-room.ts drives its lamps from these numbers, and play-scene.ts drives the camera from wakeLift.
 //
 // The power-on, in seconds after the lever (6.5 s in all):
@@ -43,6 +44,8 @@ export const POWER_SECONDS = 6.5;
 
 /** The gate's ignition: the coils light bottom to top over this span (3.5 s). */
 export const IGNITION = { start: 2.0, end: 5.5 } as const;
+export const IGNITION_SECONDS = IGNITION.end - IGNITION.start; // 3.5 s
+export const GATE_COIL_COUNT = 6;
 /** The three strip banks: the back bank's start, and each bank after it (0.6 s apart), each taking 0.6 s to ignite. */
 export const BANK_START: readonly [number, number, number] = [0.9, 1.5, 2.1];
 export const BANK_SECONDS = 0.6;
@@ -58,6 +61,33 @@ export const WAKE_PITCH = (65 * Math.PI) / 180;
 export const WAKE_SECONDS = 2.2;
 
 const ramp = (t: number, a: number, b: number): number => Math.max(0, Math.min(1, (t - a) / (b - a)));
+
+/**
+ * Pure helper (TICKET-06 — 3.5 s gate coil ignition):
+ * Given `coilsProgress` in `[0, 1]` (which spans `t = 2.0 s` to `t = 5.5 s`, i.e. `3.5 s`),
+ * returns the individual `0..1` glow level for each of the `count` gate coils ordered bottom to top.
+ * Each coil `i` ramps smoothly over its `[i / count, (i + 1) / count]` window, so lower coils
+ * always ignite before upper coils and all coils reach `1` at `t = 5.5 s`.
+ */
+export function coilLevels(coilsProgress: number, count = GATE_COIL_COUNT): number[] {
+  const n = Math.max(1, Math.floor(count));
+  const c = Math.max(0, Math.min(1, Number.isFinite(coilsProgress) ? coilsProgress : 0));
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const start = i / n;
+    const end = (i + 1) / n;
+    out.push(ramp(c, start, end));
+  }
+  return out;
+}
+
+/**
+ * Returns which gate coils are lit (`level > 0.25`) at `t` seconds after throwing the lever.
+ */
+export function coilsLitAt(t: number, count = GATE_COIL_COUNT): boolean[] {
+  const p = powerAt(t);
+  return coilLevels(p.coils, count).map((lvl) => lvl > 0.25);
+}
 
 /** The lab at `t` seconds after the main lever is thrown. */
 export function powerAt(t: number): Power {

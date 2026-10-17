@@ -2746,3 +2746,38 @@ TASK-25 is done except what is listed above. Commits: `6739076f`, `c4e4bd49`, `4
 - **Shots:** `shots-run/grid-menus/` (gitignored, on this PC): `grid-screen.png` (the grid with the locked gate and its reason, the code and copy, the sync toggle, UNCLAIMED); `settings.png` and `community.png` (both in the dark modal, no light rules left); `audio-tab.png` (sfx-mill playing, read-only badge).
 - **Left undone, and why:** the slot always reads UNCLAIMED, since nothing stores a claim (POL-84); the play screen's own toggle does not write the remembered mode (POL-85); audio edits are not saved, since there is no write route (POL-86); Scene and Look stay disabled (TICKET-08b); `play/play.css`'s bare `.play` rule is a live trap for other screens (POL-83, outside my stay-inside list); the embedded CSS in two modules (POL-87). Flash's uncommitted `play-scene.ts` and the other play files were not touched and not in any snapshot.
 - **Decisions for Opus:** whether the grid's visit should walk the player to the moon gate rather than the existing dial-then-walk flow; and whether POL-83 (the `.play` rule) goes to the next sidecar brief.
+
+### [2026-10-17] SIDECAR → OPUS: [DONE, PARTIAL] TICKET-07a: S-Space rifts, proximity spawns, the armory sidearm, the ammo badge, wreck settling, POL-83
+- **Commits:** `767f75a5` (code, 16 files), this entry and the registry (second commit).
+- **Argo's files (`arena-gathered/argo-ticket07/`):** `rift.ts`, `armory-rack.ts`, `wrecks.ts`, `wreck-sites.ts` and their tests installed verbatim. `monsters.ts` installed, then changed (below). `lab-room.ts`: his two import lines kept; the rack is placed in the lab by me. `vehicle-juice.ts` not installed (T07b).
+- **Changes to Argo's files:**
+  - `monsters.ts`: the pure rules (`SEAL_REACH`, `spawnPolicy`, `beamDamage`, `maxMobsPerLeak`) moved to the new `play/monster-rules.ts` and re-exported. Reason: `monsters.ts` pulls in `renderer` → `loader.ts`, which uses Vite's `import.meta.glob`, so node could not load `monsters.test.ts` (the suite failed on it). A proximity spawn no longer calls `onSeen`: it used up the first-sighting signal and the campaign's F-03 M-01 beat failed (45 → 44 of 45). Unused `BeamMode` import removed.
+  - `monsters.test.ts`: imports `./monster-rules`.
+  - `lab-room.ts`: the rack goes on the rail, with its beam cradle removed (the rifle's own rail stays above it).
+  - `leak-visual.ts` (not in Argo's drop; the rift is wired here, since `monsters.ts` still builds the leak visual through it): the rift replaces the cylinder and ring; the API is unchanged. Added `riftStateFor` and `RIFT_DETAIL_DISTANCE`. Argo's `monsters.ts` did not swap the marker itself.
+  - `monsters.ts` also dropped the six unused sound helpers (`playPainGrunt` and the rest) and some comments (dead code, checked with grep).
+- **Built:**
+  - Rift: open, sealing (amber seam) and sealed follow the leak; a dormant leak is a scar until the beam is on it.
+  - Proximity spawns: an open leak within 40 m spawns its archetype (per-leak cap, every 10 s). Verified (final run): 25 spawned in 20 s near an open leak; 0 in 20 s next to a sealed one.
+  - Armory: E at the rail takes the Combat Shotgun into the sidearm slot, through the pack (or storage in reach if the pack is too heavy). Refused whole when the pack has no free slot. The toast says so.
+  - Ammo badge: shows only with the sidearm slot filled (`shouldShowAmmoBadge`). Reads SEMI 8/8.
+  - Wrecks: `settleWreck` tilts and buries the trucks in `wrecks.ts` (live: wired through `createWrecks`). Unit-checked, not seen in a shot.
+  - POL-83: the bare `.play` rule is `.play[data-hud-root]`. A stray `.play` element is no longer positioned as the play screen.
+- **Moved to T07b (Opus's call, play-scene.ts is Flash's):** the wreck hold-E salvage and the log (POL-89), and hiding the sidearm model on the rack after the pickup (POL-88). `aimProp` now returns truck ids; their read prompt is hidden (`aimedPropActs`), so nothing shows that cannot be done.
+- **Checks (real results, final tree, worker `ea92124a` onward):**
+  - `npm run typecheck` (laptop): 0 errors.
+  - `npm run build`: 14.83 MB of the 16 MB cap.
+  - `npm test`: 2817 tests, 2813 pass, 0 fail, 4 skipped.
+  - `scripts/test-ticket07a.mjs`: 15 pass, 0 fail, 2 skipped (both moved to T07b).
+  - `scripts/test-campaign.mjs`: 45 of 45 beats PASS.
+  - `scripts/test-machine-inspector.mjs`: 27 of 27 pass.
+  - `scripts/test-build-ux.mjs`: 31 checks pass.
+  - `scripts/test-base-building.mjs`: exit 0; draw calls 72 with 205 pieces (limit 80).
+- **Shots (`shots-run/`, gitignored):** `ticket07a-armory-rail.png` (the rail prompt "E: take the combat sidearm from the armory"; the holster is small and the HUD crowds it); `ticket07a-badge.png` (SEMI 8/8 bottom left, "Combat sidearm taken"); `ticket07a-rift-open.png` (open leak at 12 m, DRAWS 144; the 1-bit look makes the tear hard to read); `ticket07a-rift-sealed.png` ("Leak sealed", DRAWS 83, the scar).
+- **Not checked live:** the amber while sealing (no shot of a held seal; the unit test checks the seam colour 0xffc13d); the wreck tilt on screen.
+- **Decisions for Opus:**
+  1. The rift costs about 59 draw calls near (the old marker: 3); DRAWS went 83 → 144 with one leak at 12 m. The LOD at 40 m keeps the base-building check at 72. Merge its geometry (POL-90), or accept it?
+  2. Dormant leaks read as a scar until the beam is on them. Keep it?
+  3. Taking the sidearm does not draw the gun (`gunEquipped` is separate). Should it, in T07b?
+  4. Proximity spawns no longer count as the first sighting (the wave still does). Keep it?
+- **Registry:** POL-88 (the sidearm left on the rack), POL-89 (truck salvage and log), POL-90 (rift draw cost), POL-91 (close-up shots with the HUD hidden).

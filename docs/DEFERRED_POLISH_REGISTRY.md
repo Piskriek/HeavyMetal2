@@ -183,3 +183,23 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 - **Seen:** TICKET-08b. The readout says "Levels 0" at stage 6, and the stage-6 ground is a very saturated, ridged green. Both are Argo's values.
 - **Expected:** Argo confirms or retunes them against plan 27 (the stage look bible).
 - Sidecar Task: POL-95 - Argo's call; then a sidecar applies it.
+
+### POL-88: the armory's sidearm stays on the rack after it is taken
+- **Seen:** TICKET-07a. E at the armory rail takes the Combat Shotgun into the sidearm slot, but the rack's model is still drawn on the rail. Nothing reaches the lab room from the play screen, so it cannot be hidden.
+- **Expected:** once taken, the sidearm is gone from the rack (on every visit, from the save).
+- Sidecar Task: POL-88 - in T07b, `play-scene.ts` passes the lab room's armory through (`room.armory.setTaken(...)`, the same route as `dissolveClutter`), and `play.tsx` calls it from `takeSidearm`.
+
+### POL-89: wreck trucks cannot be salvaged or read yet
+- **Seen:** TICKET-07a. `wrecks.ts` now tilts and buries the trucks (`settleWreck`), and `aimProp` returns a truck's id. The planet's read prompt is hidden for a wreck with no log (`aimedPropActs` in `play.tsx`), so the trucks have no interaction.
+- **Expected:** hold E on a truck salvages it (its items to the pack, then the network) and opens its Bridge Incident Log; the truck disappears.
+- Sidecar Task: POL-89 - in T07b, `play-scene.ts` reports the aimed wreck's salvage and log (`wrecks.aimWreck`, not `aimProp`) and exposes `salvageWreck(id)` (`wrecks.salvageWreck`); `play.tsx` runs the hold-E path from `clearProp` and sets the `aimedProp` salvage flag from it.
+
+### POL-90: a full-detail rift costs about 60 draw calls
+- **Seen:** TICKET-07a. The old leak marker was 3 draw calls. The S-Space rift (`rift.ts`: 14 slabs of 3 meshes, 10 scanlines, collar, scar) is about 59 when near. The DRAWS telemetry went from 83 to 144 with one leak at 12 m. `leak-visual.ts` draws the tear only within 40 m (RIFT_DETAIL_DISTANCE), which keeps the base-building check under 80.
+- **Expected:** the rift looks the same at a lower cost: merged slabs (one mesh per row with vertex colours), or fewer slabs at range.
+- Sidecar Task: POL-90 - measure the rift on the GTX 950M, then merge its geometry or cut its slab count, and tune RIFT_DETAIL_DISTANCE against the look.
+
+### POL-91: armory and rift shots need close-up frames with the HUD hidden
+- **Seen:** TICKET-07a. `shots-run/ticket07a-armory-rail.png` and `ticket07a-rift-open.png` are framed by the HUD and the toast; at stage 0's 1-bit look the rift and the sidearm holster are hard to read.
+- **Expected:** a clean close-up of the holster and of the rift (open and sealing) for review.
+- Sidecar Task: POL-91 - add `?cleanShot=1` close-ups of the armory rail and of a near leak (open and sealing) to the ticket test, and save them beside the others.

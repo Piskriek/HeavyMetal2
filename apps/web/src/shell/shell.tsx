@@ -31,7 +31,13 @@ import { CreateGoblin } from '../avatar/create-goblin';
 import { player } from '../build/player';
 import { bigStore } from '../storage/big-store';
 import { ResolutionCrafter } from '../crafter/crafter';
-import { PlayScreen } from '../play/play';
+import { PlayScreen, type PlayEntry } from '../play/play';
+import { encodePlot } from '../play/plot-code';
+import { FRESH, SAVE_KEY, loadState, type PlayState } from '../play/quest';
+import { kv } from '../storage/profile-storage';
+import { loadRecentCodes, rememberRecentCode } from '../storage/recent-codes';
+import { PlanetaryGridScreen } from './planetary-grid';
+import { DarkModal } from './dark-modal';
 import { exportIsland, importIsland } from '../islands/island-transfer';
 import { StudioScreen } from '../studio/studio-screen';
 import { StudioApp } from '../studio/studio-app';
@@ -43,7 +49,7 @@ import { StudioApp } from '../studio/studio-app';
  * brings a bar down from the top (back to galaxy, up one level, into the selected). Everything is a screen of this one shell: there are no
  * separate pages, so nothing can strand you (see ROUTES and the e2e smoke test). Goblin words belong to Goblin Racing; the harness is SetMix.
  */
-export type Screen = 'home' | 'goblin' | 'create' | 'avatars' | 'zoom' | 'island' | 'activities' | 'hub' | 'activity' | 'racing' | 'settings' | 'build' | 'islands' | 'crafter' | 'play' | 'studio';
+export type Screen = 'home' | 'goblin' | 'create' | 'avatars' | 'zoom' | 'island' | 'activities' | 'hub' | 'activity' | 'racing' | 'settings' | 'build' | 'islands' | 'crafter' | 'play' | 'studio' | 'grid';
 
 /** Where "back" goes from every screen. The e2e test and the unit test walk this table: each screen must have a way home. */
 export const ROUTES: Readonly<Record<Screen, { readonly back: Screen | 'origin' | null; readonly doc: string }>> = {
@@ -63,7 +69,30 @@ export const ROUTES: Readonly<Record<Screen, { readonly back: Screen | 'origin' 
   crafter: { back: 'home', doc: 'The Resolution Crafter preview: your plot through the six stages, a test view (open with ?crafter in the address). Esc or Back to SetMix returns.' },
   play: { back: 'home', doc: 'Play: the first Play of the Resolution Crafter, in first person: you make your human in the lab, turn on the gate, look round your stage-0 plot and place your first machine. Esc pauses; Back to SetMix returns.' },
   studio: { back: 'home', doc: 'The Studio: modify the moon base game and forge new activity planets in the SetMix Multiverse.' },
+  grid: { back: 'home', doc: 'The Planetary Grid: your enclave (plot code, sync mode, sector slot), visit a friend by code, and the spawn point (the Earth lab, or the Moon Gate once it is powered). Esc returns.' },
 };
+
+/** The sync mode last chosen for play, kept per profile (the Planetary Grid shows it and toggles it). */
+const SYNC_KEY = 'hm.setmix.play.sync';
+/** The Moon Twin Gate stands at the planet's origin (play-scene: twin.group.position.set(0, gy, 0)), so a plot's codes are relative to it. */
+const GRID_GATE = { x: 0, z: 0 } as const;
+
+/** What the Planetary Grid shows, read from the saved campaign and the recent codes. */
+interface GridView { readonly myCode: string | null; readonly codeNote?: string; readonly gateOn: boolean; readonly recent: readonly string[] }
+
+/** Your plot code: null until the first machine stands (the grid says so). Refused codes give their reason as the note. */
+function readGridView(): GridView {
+  let save: PlayState = FRESH;
+  try { save = loadState(JSON.parse(kv.get(SAVE_KEY) ?? 'null')); } catch { save = FRESH; }
+  let myCode: string | null = null;
+  let codeNote: string | undefined;
+  if (save.avatar && save.plot.machines.length > 0) {
+    const r = encodePlot(save, GRID_GATE);
+    if (r.ok) myCode = r.code;
+    else codeNote = r.why;
+  }
+  return { myCode, ...(codeNote ? { codeNote } : {}), gateOn: save.gateOn, recent: loadRecentCodes() };
+}
 
 const HOME: PlanetDef = { id: 'home', name: 'My Island', hue: 0.52, size: 1, ring: false, doc: 'Your own planet: walk it as your avatar, build, host.' };
 /** Goblin Racing's island lives under its own key, never mixed with your islands (H7: an evolution replaces it). */
@@ -104,8 +133,14 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   });
   // where the hub / activities / settings / the avatar maker were opened from: their Back and Esc return there, never to each other
   const origin = useRef<'home' | 'goblin' | 'island'>('home');
-  /** Campaign mode for PlayScreen: 'desynced' (solo branch) vs 'synced' (shared planetary grid). */
-  const [playSyncMode, setPlaySyncMode] = useState<'desynced' | 'synced'>('desynced');
+  /** Campaign mode for PlayScreen: 'desynced' (solo branch) vs 'synced' (shared planetary grid). Remembered per profile. */
+  const [playSyncMode, setPlaySyncModeState] = useState<'desynced' | 'synced'>(() => (kv.get(SYNC_KEY) === 'synced' ? 'synced' : 'desynced'));
+  const setPlaySyncMode = useCallback((mode: 'desynced' | 'synced') => { kv.set(SYNC_KEY, mode); setPlaySyncModeState(mode); }, []);
+  /** A Planetary Grid entry (a visit or a spawn) for the play screen to apply once the lab is ready. Cleared when the player leaves play. */
+  const [playEntry, setPlayEntry] = useState<PlayEntry | null>(null);
+  useEffect(() => { if (screen !== 'play') setPlayEntry(null); }, [screen]);
+  /** The grid's facts, read once each time the grid opens (the save and the recent codes are not re-read on every render). */
+  const gridView = useMemo(() => (screen === 'grid' ? readGridView() : null), [screen]);
   /** The Goblin Racing island: the world its menu orbits (its own map, never mixed with your islands). */
   const [raceWorld, setRaceWorld] = useState<World | null>(null);
   /** What the avatar maker leads to when done: a race (Goblin Racing's Play) or your island (My island). */
@@ -211,6 +246,15 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   const toActivities = useCallback(() => { remember(); go('activities'); }, [go]); // eslint-disable-line react-hooks/exhaustive-deps
   const toIslands = useCallback(() => { remember(); go('islands'); }, [go]); // eslint-disable-line react-hooks/exhaustive-deps
   const toSettings = useCallback(() => { remember(); go('settings'); }, [go]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** The Planetary Grid (TICKET-08a): the menu's button opens its screen, which shows the sync mode remembered for play. */
+  const toGrid = useCallback(() => { origin.current = 'home'; go('grid'); }, [go]);
+  /** A visit from the grid: the code is remembered, and the play screen dials it once the lab is ready (the existing visiting flow). */
+  const visitCode = useCallback((code: string) => { rememberRecentCode(code); setPlayEntry({ kind: 'visit', code }); origin.current = 'home'; go('play'); }, [go]);
+  /** A spawn from the grid: the Earth lab, or the Moon Gate once the gate is powered in the saved campaign (otherwise the grid says why). */
+  const spawnAt = useCallback((where: 'lab' | 'gate') => {
+    if (where === 'gate' && !readGridView().gateOn) { setNote('The Moon Twin Gate is still dark. Pull the console lever in the Earth lab first.'); return; }
+    setPlayEntry({ kind: 'spawn', where }); origin.current = 'home'; go('play');
+  }, [go]);
   const toAvatars = useCallback(() => { remember(); go('avatars'); }, [go]); // eslint-disable-line react-hooks/exhaustive-deps
   /** "Back" for the hub, the activities window and settings: return to where they were opened from. */
   const back = useCallback(() => { if (origin.current === 'island' && session) toIsland(); else if (origin.current === 'goblin') toGoblin(); else toHome(); }, [session, toIsland, toGoblin, toHome]);
@@ -340,7 +384,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
             leader={{ line: leaderLine, ring: leaderRing }}
             credits={profile.credits}
             onExpedition={() => { origin.current = 'home'; setPlaySyncMode('desynced'); go('play'); }}
-            onGrid={() => { origin.current = 'home'; setPlaySyncMode('synced'); go('play'); }}
+            onGrid={toGrid}
             onStudio={() => { toStudio(); }}
             onCommunity={() => toHub()}
             onSettings={toSettings}
@@ -371,14 +415,14 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
 
       {screen === 'hub' ? (
         <div className="shell-layer shell-ui" style={{ zIndex: 3 }}>
-          <header className="shell-top">
-            <div className="sm-brand small"><b>SetMix</b><i>Community</i></div>
-            <span className="grow" />
-            <span className="shell-credits" title="In-game credits. Never real money.">{profile.credits} cr</span>
-            {session ? <button onClick={toIsland}>Back to Island</button> : null}
-            <button onClick={toHome}>Home</button>
-          </header>
-          <Community profile={profile} onCredits={(d) => update((p) => ({ ...p, credits: Math.max(0, p.credits + d) }))} />
+          <DarkModal title="Community" subtitle="Presets, sounds and islands other players share." width={980} onClose={back}
+            headerRight={<>
+              <span className="shell-credits" title="In-game credits. Never real money.">{profile.credits} cr</span>
+              {session ? <button type="button" onClick={toIsland}>Back to Island</button> : null}
+              <button type="button" onClick={toHome}>Home</button>
+            </>}>
+            <Community profile={profile} onCredits={(d) => update((p) => ({ ...p, credits: Math.max(0, p.credits + d) }))} />
+          </DarkModal>
         </div>
       ) : null}
 
@@ -445,10 +489,18 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
 
       {screen === 'settings' ? (
         <div className="shell-layer shell-ui" style={{ zIndex: 3 }}>
-          <div className="shell-window narrow" role="dialog" aria-label="Settings">
-            <header><h3>Settings</h3><button onClick={back}>Close</button></header>
+          <DarkModal title="Settings" width={760} onClose={back}>
             <SettingsBody profile={profile} update={update} onReplayTour={replayTour} onReset={resetProgress} onManageProfiles={() => setManageProfilesOpen(true)} />
-          </div>
+          </DarkModal>
+        </div>
+      ) : null}
+
+      {screen === 'grid' && gridView ? (
+        <div className="shell-layer shell-ui" style={{ zIndex: 3 }}>
+          {/* the slot: no published plot claims exist yet (resolveSlots has no caller), so the grid shows UNCLAIMED */}
+          <PlanetaryGridScreen myCode={gridView.myCode} codeNote={gridView.codeNote} gateOn={gridView.gateOn} slot={null}
+            syncMode={playSyncMode} recent={gridView.recent} onToggleSync={() => setPlaySyncMode(playSyncMode === 'synced' ? 'desynced' : 'synced')}
+            onVisit={visitCode} onSpawn={spawnAt} onBack={toHome} />
         </div>
       ) : null}
 
@@ -475,7 +527,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
       ) : null}
       {screen === 'play' ? (
         <div className="shell-layer" style={{ zIndex: 4 }}>
-          <PlayScreen profile={profile} onBack={toHome} onStudio={toStudio} initialSyncMode={playSyncMode} />
+          <PlayScreen profile={profile} onBack={toHome} onStudio={toStudio} initialSyncMode={playSyncMode} entry={playEntry ?? undefined} />
         </div>
       ) : null}
       {screen === 'crafter' ? (

@@ -269,12 +269,17 @@ const CONTROLS: readonly [string, string][] = [
   ['L', 'Lattice storage'], ['1 to 9', 'Hotbar slot, always (sculpt included)'], ['Esc', 'Close the open thing, then pause'],
 ];
 
+/** Where the shell sends the player in: a visit dials a plot code; a spawn puts the player in the lab or at the moon gate (TICKET-08a). */
+export type PlayEntry = { readonly kind: 'visit'; readonly code: string } | { readonly kind: 'spawn'; readonly where: 'lab' | 'gate' };
+
 export function PlayScreen(props: {
   readonly profile: Profile;
   /** Opens the Studio from the journal (the shell's Studio route). */
   readonly onStudio?: () => void;
   readonly onBack: () => void;
   readonly initialSyncMode?: 'desynced' | 'synced';
+  /** Applied once, when the lab is ready (the Planetary Grid's visit or spawn). */
+  readonly entry?: PlayEntry;
 }): ReactElement {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<PlayScene | null>(null);
@@ -1259,6 +1264,27 @@ useEffect(() => {
     }
     say('Back at your plot', `Visit to ${owner}'s plot ended.`);
   }, [say]);
+
+  // the shell's entry (the Planetary Grid): applied once the lab is ready. A visit dials the code (the existing flow: step through the gate to walk it);
+  // a spawn moves the player to the lab's spawn point, or out from the moon gate's back, facing away from it
+  const entryDone = useRef(false);
+  useEffect(() => {
+    if (!ready || !props.entry || entryDone.current) return;
+    entryDone.current = true;
+    const entry = props.entry;
+    if (entry.kind === 'visit') {
+      const r = dialRef.current?.(entry.code) ?? { ok: false, why: 'The lab is not ready.' };
+      if (!r.ok) say('Visit refused', r.why ?? 'That code could not be dialed.');
+      return;
+    }
+    const scene = sceneRef.current;
+    if (!scene) return;
+    if (entry.where === 'lab') scene.debug.teleport('lab', LAB_SPAWN.x, LAB_SPAWN.z, LAB_SPAWN.yaw);
+    else {
+      const exit = scene.gateExit();
+      scene.debug.teleport('planet', exit.x, exit.z, exit.yaw, 0);
+    }
+  }, [ready, props.entry, say]);
 
   // ---- the scene, built behind the loading bar
   useEffect(() => {
@@ -2315,6 +2341,9 @@ useEffect(() => {
       heard: () => narratorRef.current?.getState().heard ?? [],
       initAudio: () => initNarratorAudio(),
       go: (where: 'lab' | 'planet', x: number, z: number, yaw: number, pitch?: number) => scene.debug.teleport(where, x, z, yaw, pitch),
+      // read-only pose for the Planetary Grid's spawn check (test-grid-menus): the player's ground x and z, and the facing
+      pose: () => { const p = scene.debug.position(); return { x: p.x, z: p.z, yaw: scene.debug.facing() }; },
+      gateExit: () => scene.gateExit(),
       anchors: () => scene.debug.machineAnchors(),
       hideOverlays: (hide: boolean) => setHideOverlays(hide),
       lockAim: () => ({ locked: scene.ghostLocked(), aim: scene.aimPoint() }),

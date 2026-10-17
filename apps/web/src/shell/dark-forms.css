@@ -1,0 +1,425 @@
+/* ============================================================================
+ * File: apps/web/src/shell/dark-forms.css
+ * TICKET-08a (OPUS_NOTE_13 Item B — MENU-02 & MENU-03):
+ * Scoped dark-glass form & card styles for Settings (settings-body.tsx) and
+ * Community (community.tsx) inside a DarkModal or .dark-forms wrapper.
+ * Replaces legacy #f1f0ea light surfaces and white inputs with HUD telemetry glass.
+ * ============================================================================ */
+
+.dark-forms,
+.dark-modal {
+  color: #f4f8ff;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Sections & Headings */
+.dark-forms section,
+.dark-modal .settings-body > section,
+.dark-modal .your-shares {
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  background: rgba(16, 23, 36, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.dark-forms h3,
+.dark-forms h4,
+.dark-modal h3,
+.dark-modal h4 {
+  margin: 0 0 10px;
+  font-family: 'Oxanium', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #3dc8ff;
+}
+
+/* Rows & Labels */
+.dark-forms .row,
+.dark-modal .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 13px;
+  color: #e2e8f0;
+}
+
+.dark-forms .row.slider,
+.dark-modal .row.slider {
+  display: grid;
+  grid-template-columns: 140px 1fr 56px;
+  align-items: center;
+  gap: 12px;
+}
+
+.dark-forms .row.slider output,
+.dark-modal .row.slider output {
+  font-family: 'Oxanium', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+  color: #3dc8ff;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Text, Number, Search Inputs & Selects */
+.dark-forms input[type='text'],
+.dark-forms input[type='number'],
+.dark-forms input[type='search'],
+.dark-forms input:not([type]),
+.dark-forms select,
+.dark-forms textarea,
+.dark-modal input[type='text'],
+.dark-modal input[type='number'],
+.dark-modal input[type='search'],
+.dark-modal input:not([type]),
+.dark-modal select,
+.dark-modal textarea {
+  padding: 7px 10px;
+  background: rgba(5, 9, 16, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: #f4f8ff;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+}
+
+.dark-forms input:focus,
+.dark-forms select:focus,
+.dark-forms textarea:focus,
+.dark-modal input:focus,
+.dark-modal select:focus,
+.dark-modal textarea:focus {
+  outline: none;
+  border-color: #3dc8ff;
+  box-shadow: 0 0 0 2px rgba(61, 200, 255, 0.2);
+}
+
+/* Range Sliders */
+.dark-forms input[type='range'],
+.dark-modal input[type='range'] {
+  width: 100%;
+  accent-color: #3dc8ff;
+  cursor: pointer;
+}
+
+/* Checkboxes */
+.dark-forms input[type='checkbox'],
+.dark-modal input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: #3dc8ff;
+  cursor: pointer;
+}
+
+/* Buttons & Segmented Controls */
+.dark-forms button,
+.dark-modal button {
+  padding: 6px 12px;
+  background: rgba(20, 29, 43, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  color: #e2e8f0;
+  font-family: 'Oxanium', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.dark-forms button:hover:not(:disabled),
+.dark-modal button:hover:not(:disabled) {
+  background: rgba(34, 49, 71, 0.95);
+  border-color: rgba(61, 200, 255, 0.45);
+  color: #ffffff;
+}
+
+.dark-forms button.on,
+.dark-forms button[aria-pressed='true'],
+.dark-modal button.on,
+.dark-modal button[aria-pressed='true'] {
+  background: rgba(61, 200, 255, 0.2);
+  border-color: #3dc8ff;
+  color: #3dc8ff;
+  box-shadow: 0 0 12px rgba(61, 200, 255, 0.18);
+}
+
+.dark-forms button.go,
+.dark-modal button.go {
+  background: linear-gradient(180deg, #3dc8ff, #0284c7);
+  border-color: #38bdf8;
+  color: #040810;
+  font-weight: 700;
+}
+
+.dark-forms button.danger,
+.dark-modal button.danger {
+  background: rgba(255, 61, 138, 0.16);
+  border-color: rgba(255, 61, 138, 0.45);
+  color: #fda4af;
+}
+
+.dark-forms .seg,
+.dark-modal .seg,
+.dark-forms .tabs,
+.dark-modal .tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 3px;
+  background: rgba(5, 9, 16, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+}
+
+.dark-forms .seg button,
+.dark-modal .seg button,
+.dark-forms .tabs button,
+.dark-modal .tabs button {
+  border-radius: 5px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.dark-forms .seg button.on,
+.dark-modal .seg button.on,
+.dark-forms .tabs button.on,
+.dark-modal .tabs button.on {
+  background: rgba(61, 200, 255, 0.2);
+  border-color: rgba(61, 200, 255, 0.55);
+  color: #3dc8ff;
+}
+
+/* Hints & Links */
+.dark-forms .hint,
+.dark-modal .hint {
+  margin: 4px 0 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #94a3b8;
+}
+
+.dark-forms a,
+.dark-modal a {
+  color: #3dc8ff;
+  text-decoration: none;
+}
+
+.dark-forms a:hover,
+.dark-modal a:hover {
+  text-decoration: underline;
+}
+
+/* Community Cards & Window Reset inside DarkModal */
+.dark-modal .shell-window,
+.dark-forms .shell-window {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  color: #f4f8ff;
+}
+
+.dark-modal .shell-window > header,
+.dark-forms .shell-window > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.dark-modal .shell-cards,
+.dark-forms .shell-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  margin: 12px 0;
+}
+
+.dark-modal .shell-activity,
+.dark-forms .shell-activity {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: rgba(16, 23, 36, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #f4f8ff;
+}
+
+.dark-modal .shell-activity .thumb,
+.dark-forms .shell-activity .thumb {
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 9, 16, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* ----------------------------------------------------------------------------
+ * Overrides for the legacy light rules in studio.css that Settings and Community
+ * still pick up (their selectors out-rank the rules above, so these repeat the
+ * .dark-modal.dark-forms pair to win). Nothing outside a DarkModal is touched.
+ * -------------------------------------------------------------------------- */
+
+/* the legacy window is absolutely centred on the page; inside the modal it sits in the flow */
+.dark-modal.dark-forms .shell-window,
+.dark-modal.dark-forms .shell-window.wide,
+.dark-modal.dark-forms .shell-window.narrow {
+  position: static;
+  left: auto;
+  top: auto;
+  transform: none;
+  width: auto;
+  max-height: none;
+  overflow: visible;
+  margin: 0;
+}
+
+.dark-modal.dark-forms .shell-window > header h3 {
+  color: #3dc8ff;
+  font-family: 'Oxanium', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dark-modal.dark-forms .shell-window > header {
+  padding: 0 0 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark-modal.dark-forms .shell-activity p {
+  color: #cbd5e1;
+}
+
+/* Settings sections and their headings: the studio sheet sets a light rule line and dark heading text */
+.dark-modal.dark-forms .settings-body section {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark-modal.dark-forms .settings-body section:last-child {
+  border-bottom: 0;
+}
+
+.dark-modal.dark-forms .settings-body section > h4 {
+  margin: 0 0 10px;
+  font-family: 'Oxanium', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #3dc8ff;
+}
+
+/* the studio sheet indents every row again: the section's own padding is the indent here */
+.dark-modal.dark-forms .settings-body section > .row,
+.dark-modal.dark-forms .settings-body section > p,
+.dark-modal.dark-forms .settings-body section > .btns,
+.dark-modal.dark-forms .settings-body section > .graphics-presets,
+.dark-modal.dark-forms .settings-body section > .graphics-tuning,
+.dark-modal.dark-forms .settings-body section > .controls-settings,
+.dark-modal.dark-forms .settings-body section > .controls-list,
+.dark-modal.dark-forms .settings-body section > .hotbar-settings {
+  margin: 6px 0 0;
+}
+
+.dark-modal.dark-forms .settings-body section > label.row.slider {
+  grid-template-columns: 140px 1fr 56px;
+}
+
+/* segmented choices (Graphics presets, the frame-rate target): a dark track, the chosen one lit cyan */
+.dark-modal.dark-forms .graphics-presets .seg,
+.dark-modal.dark-forms .fps-target .seg {
+  background: rgba(5, 9, 16, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  padding: 3px;
+  gap: 4px;
+}
+
+.dark-modal.dark-forms .graphics-presets .seg button,
+.dark-modal.dark-forms .fps-target .seg button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: #cbd5e1;
+}
+
+.dark-modal.dark-forms .graphics-presets .seg button.on,
+.dark-modal.dark-forms .graphics-presets .seg button.on:hover:not(:disabled),
+.dark-modal.dark-forms .fps-target .seg button.on,
+.dark-modal.dark-forms .fps-target .seg button.on:hover:not(:disabled) {
+  background: rgba(61, 200, 255, 0.2);
+  border-color: rgba(61, 200, 255, 0.55);
+  color: #3dc8ff;
+}
+
+/* the studio sheet's light inputs and selects: the same dark glass as the rest of the modal */
+.dark-modal.dark-forms select,
+.dark-modal.dark-forms input:not([type='range']):not([type='checkbox']),
+.dark-modal.dark-forms .shell-window > label.row > select,
+.dark-modal.dark-forms .settings-body section > label.row > select,
+.dark-modal.dark-forms .settings-body section > label.row > input:not([type='checkbox']) {
+  background: rgba(5, 9, 16, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f4f8ff;
+}
+
+/* the studio sheet's light hover fill on modal buttons */
+.dark-modal.dark-forms button:hover:not(:disabled) {
+  background: rgba(34, 49, 71, 0.95);
+  border-color: rgba(61, 200, 255, 0.45);
+  color: #ffffff;
+}
+
+/* the studio sheet paints every input white, checkboxes included: the modal keeps them dark */
+.dark-modal.dark-forms input[type='checkbox'] {
+  background: rgba(5, 9, 16, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Settings' graphics tuning (the machine-inspector rows) carries the studio sheet's light rows, labels and white fields */
+.dark-modal.dark-forms .graphics-tuning { color: #e2e8f0; }
+.dark-modal.dark-forms .hmi-h {
+  color: #3dc8ff;
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+  font-family: 'Oxanium', sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.dark-modal.dark-forms .hmi-row,
+.dark-modal.dark-forms .hmi-slot {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+}
+.dark-modal.dark-forms .hmi-label { color: #e2e8f0; }
+.dark-modal.dark-forms .hmi-in,
+.dark-modal.dark-forms .hmi-num,
+.dark-modal.dark-forms .hmi-swatch {
+  background: rgba(5, 9, 16, 0.9);
+  color: #f4f8ff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.dark-modal.dark-forms .hmi-ov { box-shadow: inset 2px 0 0 #3dc8ff; }
+.dark-modal.dark-forms .hmi-range { accent-color: #3dc8ff; }
+
+/* the studio sheet's light rules that still show inside the modal: the card grid's outer rule, the graphics divider,
+   and Community's own heading (the modal's title already says it, so the tabs sit on the right) */
+.dark-modal.dark-forms .shell-cards { border-top: 0; border-left: 0; }
+.dark-modal.dark-forms .graphics-tuning { border-top-color: rgba(255, 255, 255, 0.1); }
+.dark-modal.dark-forms .shell-window > header > h3 { display: none; }
+.dark-modal.dark-forms .shell-window > header { justify-content: flex-end; }

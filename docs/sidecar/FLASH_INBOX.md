@@ -31,6 +31,11 @@ Only Opus adds jobs here. Flash changes only a job's status word. The old board 
   - one browser test at a time;
   - no dev server left running;
   - pipe long output through `tail -40`.
+- **Run the heavy checks on the 3D PC worker (since 2026-10-17), not on this laptop.** The worker is 24 threads; a browser test takes about 20 s there.
+  - `scripts/test-on-3dpc.sh "<command>"` tests your **working tree** as it is. No commit or push is needed: it snapshots your files through a temporary index (the shared index is untouched), sends the snapshot to the worker over SSH, and runs the command there.
+  - Examples: `scripts/test-on-3dpc.sh "npm test"`, `scripts/test-on-3dpc.sh "npm run build && node scripts/test-campaign.mjs"`.
+  - Use it for `npm test`, `npm run build` and every browser test. Run only quick checks on the laptop (typecheck, a single unit file).
+  - Screenshots stay on the worker. To look at one, copy it back: `scp -i ~/.ssh/id_ed25519_fidelity RAMPAGE@192.168.0.9:/c/MarbleGp/<path> <local path>`.
 - **Verify before you report:**
   - `npm run typecheck` (0 errors);
   - `npm test` (the fieldkit and plotgrid timing tests fail on this laptop; that is known);
@@ -64,5 +69,5 @@ Brief: `docs/prompts/sidecar/T02D-sky-install.md`. Bundle in `arena-gathered/arg
 ## F-05 [DONE] TICKET-02 C: install Argo's @hm/plotbiome
 Brief: `docs/prompts/sidecar/T02C-plotbiome-install.md`. Start it only after F-04 is DONE (both touch tsconfig and the lock).
 
-## F-06 [OPEN] TICKET-02 F: plotbiome's tufts, bushes and trees in the moon world
+## F-06 [TAKEN] TICKET-02 F: plotbiome's tufts, bushes and trees in the moon world
 Brief: `docs/prompts/sidecar/T02F-biome-scatter.md`. Bake once at stage 6, show by `appear`; Vegetation setting with Auto; at least 30 fps on Low at stage 6.

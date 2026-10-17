@@ -118,3 +118,8 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 2. In the user update, provide a single-line handoff snippet:
    `"Sidecar Task: [Item ID] - [Brief Instruction]"`
 3. The Antigravity Sidecar agent will immediately implement the fix, run typechecks/tests, and push to main.
+
+### POL-82: refused actions show as a giant title card
+- **Seen:** `shots-run/build-ux/radial-build.png` (2026-10-17, T04 review by Opus). The text "Action refused: same-stage" covers the middle of the screen in title-card type.
+- **Expected:** a refused world action (`refused` event) is a small toast in the HUD style, never a headline. Raw reason ids such as `same-stage` get a player-facing sentence.
+- Sidecar Task: POL-82 - route `refused` events to the toast channel with friendly reasons.

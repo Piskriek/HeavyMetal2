@@ -41,5 +41,6 @@ ssh -i "$key" -o BatchMode=yes -o ConnectTimeout=10 -o LogLevel=ERROR "$host" "
   want=\$(git hash-object package-lock.json); have=\$(cat node_modules/.lockhash 2>/dev/null || true)
   if [ \"\$want\" != \"\$have\" ]; then npm ci --no-audit --no-fund > /tmp/worker-ci.txt 2>&1 || { tail -5 /tmp/worker-ci.txt; exit 91; }; echo \"\$want\" > node_modules/.lockhash; fi
   echo \"[worker] testing snapshot $snap\"
+  case \"$cmd\" in *'scripts/test-'*) case \"$cmd\" in *'npm run build'*) ;; *) echo '[worker] warning: browser tests serve apps/web/dist, which the snapshot resets to HEAD; run npm run build first in the same command' ;; esac ;; esac
   $cmd
 "

@@ -71,3 +71,18 @@ Append one entry per job, in the format in `FLASH_INBOX.md`. Newest at the botto
 - Changes from brief: None. Installed Argo's bundle into `packages/plotbiome/`, wired `apps/web/src/play/biome-input.ts` to import `BiomeInput` and `Tier` from `@hm/plotbiome`, added Vite alias, linked package.
 - Decisions left: None.
 
+### [2026-10-17 13:45] F-06 [DONE] TICKET-02 F: plotbiome's tufts, bushes and trees in the moon world
+- Commits: `bd0af0f9` ("feat(biome): add plotbiome tufts, bushes and trees to moon world (TICKET-02 item F)")
+- Checks:
+  - `npm run typecheck`: 0 errors; `npm run build`: 14.68 MB bundle (cap 16 MB)
+  - `node scripts/test-plot-biome.mjs`: ALL CHECKS PASSED (Monotone S0->S6: 0->334, 137 trees, 53 FPS >= 30, Biome Tris 123,904, Biome Draws 6, 0 errors)
+  - `node scripts/test-stage-world.mjs`: ALL CHECKS PASSED (S1->S4 delta 131.04, S4->S6 delta 32.93, wave delta 131.65)
+  - `node scripts/test-campaign.mjs`: 45 of 45 beats PASS, 0 console/http errors (`apps/web/public/checkpoints/` restored)
+  - `npx tsx --test apps/web/src/storage/profile-storage.test.ts`: 10/10 PASS (scanner passes, 0 direct localStorage calls)
+- Shots (`shots-run/plot-biome/`):
+  - `stage-0.png`: Empty moon surface, 0 vegetation instances.
+  - `stage-2.png`, `stage-4.png`: 0 vegetation instances (reaches threshold at higher stages).
+  - `stage-6.png`: 334 instances (47 pine, 49 oak, 41 birch, 197 bushes) outside keepout and pad.
+  - `stage-6-close.png`: Birch close-up, trunk firmly anchored (-0.05m sunk), zero floating, rich leaf canopy.
+- Changes from brief: Combined bark and leaves into single BufferGeometry per LOD with vertex colors, keeping tree draw calls to 6.
+- Decisions left: None. Ready for next ticket.

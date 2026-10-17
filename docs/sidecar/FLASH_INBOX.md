@@ -87,3 +87,6 @@ Brief: `docs/prompts/sidecar/T05-base-meshes-avatar-beam-outcrops.md`. Start it 
 
 ## F-11 [OPEN] TICKET-03 P: colourful pixel plumes, only while machines operate
 Brief: `docs/prompts/sidecar/T03P-machine-plumes.md` (spec: docs/argo/notes/ARGO_NOTE_08_plumes.md). Start it only after F-10 is DONE.
+
+## F-12 [HELD] TICKET-07 B: vehicle juice (boost, tracks, dust, print gantry) and the beam hurting monsters
+Brief: `docs/prompts/sidecar/T07b-vehicle-juice-beam-damage.md`. HELD until F-11 is DONE and Haiku's T07a (the monsters.ts it uses) has landed; Opus opens it.

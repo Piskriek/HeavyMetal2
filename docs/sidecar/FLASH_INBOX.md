@@ -63,3 +63,6 @@ Brief: `docs/prompts/sidecar/T02D-sky-install.md`. Bundle in `arena-gathered/arg
 
 ## F-05 [DONE] TICKET-02 C: install Argo's @hm/plotbiome
 Brief: `docs/prompts/sidecar/T02C-plotbiome-install.md`. Start it only after F-04 is DONE (both touch tsconfig and the lock).
+
+## F-06 [OPEN] TICKET-02 F: plotbiome's tufts, bushes and trees in the moon world
+Brief: `docs/prompts/sidecar/T02F-biome-scatter.md`. Bake once at stage 6, show by `appear`; Vegetation setting with Auto; at least 30 fps on Low at stage 6.

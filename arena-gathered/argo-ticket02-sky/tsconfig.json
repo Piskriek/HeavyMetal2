@@ -1,0 +1,411 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": [
+      "node"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@hm/contracts": [
+        "packages/contracts/src/index.ts"
+      ],
+      "@hm/kernel": [
+        "packages/kernel/src/index.ts"
+      ],
+      "@hm/script": [
+        "packages/script/src/index.ts"
+      ],
+      "@hm/sim": [
+        "packages/sim/src/index.ts"
+      ],
+      "@hm/platform": [
+        "packages/platform/src/index.ts"
+      ],
+      "@hm/ui": [
+        "packages/ui/src/index.ts"
+      ],
+      "@hm/render": [
+        "packages/render/src/index.ts"
+      ],
+      "@hm/tools": [
+        "packages/tools/src/index.ts"
+      ],
+      "@hm/physics": [
+        "packages/physics/src/index.ts"
+      ],
+      "@hm/engine": [
+        "packages/engine/src/index.ts"
+      ],
+      "@hm/terrain": [
+        "packages/terrain/src/index.ts"
+      ],
+      "@hm/racing": [
+        "packages/racing/src/index.ts"
+      ],
+      "@hm/racers": [
+        "packages/racers/src/index.ts"
+      ],
+      "@hm/trackgen": [
+        "packages/trackgen/src/index.ts"
+      ],
+      "@hm/content": [
+        "packages/content/src/index.ts"
+      ],
+      "@hm/looks": [
+        "packages/looks/src/index.ts"
+      ],
+      "@hm/raceflow": [
+        "packages/raceflow/src/index.ts"
+      ],
+      "@hm/input": [
+        "packages/input/src/index.ts"
+      ],
+      "@hm/goblins": [
+        "packages/goblins/src/index.ts"
+      ],
+      "@hm/game": [
+        "packages/game/src/index.ts"
+      ],
+      "@hm/audio": [
+        "packages/audio/src/index.ts"
+      ],
+      "@hm/trackedit": [
+        "packages/trackedit/src/index.ts"
+      ],
+      "@hm/terrainops": [
+        "packages/terrainops/src/index.ts"
+      ],
+      "@hm/scatter": [
+        "packages/scatter/src/index.ts"
+      ],
+      "@hm/modulation": [
+        "packages/modulation/src/index.ts"
+      ],
+      "@hm/modui": [
+        "packages/modui/src/index.ts"
+      ],
+      "@hm/soundlab": [
+        "packages/soundlab/src/index.ts"
+      ],
+      "@hm/screens": [
+        "packages/screens/src/index.ts"
+      ],
+      "@hm/itemdefs": [
+        "packages/itemdefs/src/index.ts"
+      ],
+      "@hm/hudlayout": [
+        "packages/hudlayout/src/index.ts"
+      ],
+      "@hm/soundpack": [
+        "packages/soundpack/src/index.ts"
+      ],
+      "@hm/texgraph": [
+        "packages/texgraph/src/index.ts"
+      ],
+      "@hm/tracklayouts": [
+        "packages/tracklayouts/src/index.ts"
+      ],
+      "@hm/evolve": [
+        "packages/evolve/src/index.ts"
+      ],
+      "@hm/lineage": [
+        "packages/lineage/src/index.ts"
+      ],
+      "@hm/motion": [
+        "packages/motion/src/index.ts"
+      ],
+      "@hm/voxel": [
+        "packages/voxel/src/index.ts"
+      ],
+      "@hm/pbrgrass": [
+        "packages/pbrgrass/src/index.ts"
+      ],
+      "@hm/assembler": [
+        "packages/assembler/src/index.ts"
+      ],
+      "@hm/islands": [
+        "packages/islands/src/index.ts"
+      ],
+      "@hm/lighting": [
+        "packages/lighting/src/index.ts"
+      ],
+      "@hm/buildkit": [
+        "packages/buildkit/src/index.ts"
+      ],
+      "@hm/gizmo": [
+        "packages/gizmo/src/index.ts"
+      ],
+      "@hm/triggers": [
+        "packages/triggers/src/index.ts"
+      ],
+      "@hm/primitives": [
+        "packages/primitives/src/index.ts"
+      ],
+      "@hm/physmat": [
+        "packages/physmat/src/index.ts"
+      ],
+      "@hm/keyframes": [
+        "packages/keyframes/src/index.ts"
+      ],
+      "@hm/erosion": [
+        "packages/erosion/src/index.ts"
+      ],
+      "@hm/wiregraph": [
+        "packages/wiregraph/src/index.ts"
+      ],
+      "@hm/splineroad": [
+        "packages/splineroad/src/index.ts"
+      ],
+      "@hm/camtrack": [
+        "packages/camtrack/src/index.ts"
+      ],
+      "@hm/walkpath": [
+        "packages/walkpath/src/index.ts"
+      ],
+      "@hm/smoothvox2": [
+        "packages/smoothvox2/src/index.ts"
+      ],
+      "@hm/toolanims": [
+        "packages/toolanims/src/index.ts"
+      ],
+      "@hm/tooljuice": [
+        "packages/tooljuice/src/index.ts"
+      ],
+      "@hm/vox": [
+        "packages/vox/src/index.ts"
+      ],
+      "@hm/schematic": [
+        "packages/schematic/src/index.ts"
+      ],
+      "@hm/puppet": [
+        "packages/puppet/src/index.ts"
+      ],
+      "@hm/decals": [
+        "packages/decals/src/index.ts"
+      ],
+      "@hm/kart": [
+        "packages/kart/src/index.ts"
+      ],
+      "@hm/kinematic": [
+        "packages/kinematic/src/index.ts"
+      ],
+      "@hm/musicbox": [
+        "packages/musicbox/src/index.ts"
+      ],
+      "@hm/chunkworld": [
+        "packages/chunkworld/src/index.ts"
+      ],
+      "@hm/pixels": [
+        "packages/pixels/src/index.ts"
+      ],
+      "@hm/questline": [
+        "packages/questline/src/index.ts"
+      ],
+      "@hm/machines": [
+        "packages/machines/src/index.ts"
+      ],
+      "@hm/market": [
+        "packages/market/src/index.ts"
+      ],
+      "@hm/rocket": [
+        "packages/rocket/src/index.ts"
+      ],
+      "@hm/ragdoll": [
+        "packages/ragdoll/src/index.ts"
+      ],
+      "@hm/navgrid": [
+        "packages/navgrid/src/index.ts"
+      ],
+      "@hm/hull": [
+        "packages/hull/src/index.ts"
+      ],
+      "@hm/remesh": [
+        "packages/remesh/src/index.ts"
+      ],
+      "@hm/lightplace": [
+        "packages/lightplace/src/index.ts"
+      ],
+      "@hm/voxelcsg": [
+        "packages/voxelcsg/src/index.ts"
+      ],
+      "@hm/soundscape": [
+        "packages/soundscape/src/index.ts"
+      ],
+      "@hm/npcbrain": [
+        "packages/npcbrain/src/index.ts"
+      ],
+      "@hm/particles": [
+        "packages/particles/src/index.ts"
+      ],
+      "@hm/selectset": [
+        "packages/selectset/src/index.ts"
+      ],
+      "@hm/voxelnature": [
+        "packages/voxelnature/src/index.ts"
+      ],
+      "@hm/worldrules": [
+        "packages/worldrules/src/index.ts"
+      ],
+      "@hm/anim": [
+        "packages/anim/src/index.ts"
+      ],
+      "@hm/avatarlook": [
+        "packages/avatarlook/src/index.ts"
+      ],
+      "@hm/toolcatalog": [
+        "packages/toolcatalog/src/index.ts"
+      ],
+      "@hm/voxpartshead": [
+        "packages/voxpartshead/src/index.ts"
+      ],
+      "@hm/voxpartsbody": [
+        "packages/voxpartsbody/src/index.ts"
+      ],
+      "@hm/smoothvox": [
+        "packages/smoothvox/src/index.ts"
+      ],
+      "@hm/juice": [
+        "packages/juice/src/index.ts"
+      ],
+      "@hm/tutorial": [
+        "packages/tutorial/src/index.ts"
+      ],
+      "@hm/uistack": [
+        "packages/uistack/src/index.ts"
+      ],
+      "@hm/activities": [
+        "packages/activities/src/index.ts"
+      ],
+      "@hm/plugs": [
+        "packages/plugs/src/index.ts"
+      ],
+      "@hm/camerarig": [
+        "packages/camerarig/src/index.ts"
+      ],
+      "@hm/voxelsculpt": [
+        "packages/voxelsculpt/src/index.ts"
+      ],
+      "@hm/voxelart": [
+        "packages/voxelart/src/index.ts"
+      ],
+      "@hm/fauna": [
+        "packages/fauna/src/index.ts"
+      ],
+      "@hm/flora": [
+        "packages/flora/src/index.ts"
+      ],
+      "@hm/vault": [
+        "packages/vault/src/index.ts"
+      ],
+      "@hm/groundshader": [
+        "packages/groundshader/src/index.ts"
+      ],
+      "@hm/plotterrain": [
+        "packages/plotterrain/src/index.ts"
+      ],
+      "@hm/plume": [
+        "packages/plume/src/index.ts"
+      ],
+      "@hm/labkit": [
+        "packages/labkit/src/index.ts"
+      ],
+      "@hm/plotsim": [
+        "packages/plotsim/src/index.ts"
+      ],
+      "@hm/structure": [
+        "packages/structure/src/index.ts"
+      ],
+      "@hm/lattice": [
+        "packages/lattice/src/index.ts"
+      ],
+      "@hm/substrate": [
+        "packages/substrate/src/index.ts"
+      ],
+      "@hm/basegear": [
+        "packages/basegear/src/index.ts"
+      ],
+      "@hm/heavygear": [
+        "packages/heavygear/src/index.ts"
+      ],
+      "@hm/basekit2": [
+        "packages/basekit2/src/index.ts"
+      ],
+      "@hm/navpath": [
+        "packages/navpath/src/index.ts"
+      ],
+      "@hm/narrator": [
+        "packages/narrator/src/index.ts"
+      ],
+      "@hm/mobsim": [
+        "packages/mobsim/src/index.ts"
+      ],
+      "@hm/rover": [
+        "packages/rover/src/index.ts"
+      ],
+      "@hm/rovergear": [
+        "packages/rovergear/src/index.ts"
+      ],
+      "@hm/batcher": [
+        "packages/batcher/src/index.ts"
+      ],
+      "@hm/basekit": [
+        "packages/basekit/src/index.ts"
+      ],
+      "@hm/fieldkit": [
+        "packages/fieldkit/src/index.ts"
+      ],
+      "@hm/beamkit": [
+        "packages/beamkit/src/index.ts"
+      ],
+      "@hm/terrainbrush": [
+        "packages/terrainbrush/src/index.ts"
+      ],
+      "@hm/leaksim": [
+        "packages/leaksim/src/index.ts"
+      ],
+      "@hm/fidelity": [
+        "packages/fidelity/src/index.ts"
+      ],
+      "@hm/cartlab": [
+        "packages/cartlab/src/index.ts"
+      ],
+      "@hm/plotcodec": [
+        "packages/plotcodec/src/index.ts"
+      ],
+      "@hm/consolemill": [
+        "packages/consolemill/src/index.ts"
+      ],
+      "@hm/shareware": [
+        "packages/shareware/src/index.ts"
+      ],
+      "@hm/sky": [
+        "packages/sky/src/index.ts"
+      ],
+      "@hm/plotbiome": [
+        "packages/plotbiome/src/index.ts"
+      ]
+    },
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "packages/*/src",
+    "packages/*/tests",
+    "apps/*/src",
+    "apps/*/vite.config.ts"
+  ]
+}

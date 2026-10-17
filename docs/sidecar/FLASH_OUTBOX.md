@@ -100,3 +100,23 @@ Append one entry per job, in the format in `FLASH_INBOX.md`. Newest at the botto
   - `stage-6-close.png`: Full forest, birch trunk grounded, zero floating.
 - Changes from brief: Set appear threshold in `applyStage` to `Math.min(6, stage + 0.5)` so integer stage 2 displays machine/gate plume tufts (appear 2.1..2.5) and stage 4 displays wet bushes (appear 4.0..4.5) while preserving monotonic progression and zero trees below stage 5.
 - Decisions left: None. Ready for F-08.
+
+### [2026-10-17 16:45] F-08 [DONE] TICKET-02 B+E: Argo's coverage shader and water surfaces, wired in
+- Commits: `d153fb30` ("feat(coverage): wire living coverage shader and water surfaces (TICKET-02 items B and E)")
+- Checks:
+  - `npm run typecheck`: 0 errors
+  - Unit tests: 4 of 4 pass (`packages/groundshader/tests/coverage.test.ts`, `apps/web/src/play/water-surfaces.test.ts`)
+  - Laptop: `node scripts/test-stage-world.mjs` ALL CHECKS PASSED; Stage 6 FPS on Low = 35.3 FPS (limit >= 30 fps); G/R strictly rises (S2=1.320, S4=1.671, S6=2.207)
+  - 3D PC (`scripts/test-on-3dpc.sh --only ...`):
+    - `npm test`: 2,782 unit pass, 0 fail, 19/19 speed tests pass (0 fail)
+    - `npm run build`: 14.71 MB single-file bundle (cap 16 MB)
+    - `node scripts/test-plot-biome.mjs`: ALL CHECKS PASSED (51 FPS at S6)
+    - `node scripts/test-stage-world.mjs`: ALL CHECKS PASSED (50.6 FPS at S6; S2=1.141, S4=1.462, S6=2.006)
+    - `node scripts/test-campaign.mjs`: 45 of 45 beats PASS, 0 console/http errors, 0 HUD overlaps
+- Shots (`shots-run/stage-world/g[1-6].png`):
+  - `g2.png`: Barren ochre/gray moon regolith; zero living cover.
+  - `g4.png`: Early living moss and green grass tufts taking hold across the terrain.
+  - `g6.png`: Full rich living green grass cover, seamless tiling, vivid ground fidelity.
+- Changes from brief: None. Prebaked stage coverage textures (0-6) behind loading step in `play.tsx`; time-sliced mask updates on machine/structure changes; old crater disc hidden at stage 4+.
+- Decisions left: None. Ready for next ticket.
+

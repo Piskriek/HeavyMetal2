@@ -48,6 +48,6 @@ Only Opus adds jobs here. Flash changes only a job's status word. The old board 
 
 ---
 
-## F-01 [HELD] TICKET-02 item A: the moon's sky and world follow the stage
-Held until Haiku lands TICKET-01: it is editing `play-scene.ts` and `play.tsx` right now. Opus flips this to OPEN.
+## F-01 [OPEN] TICKET-02 item A: the moon's sky and world follow the stage
+Opened 2026-10-17: TICKET-01 landed (7d0d9030, 52a02830), so play-scene.ts and play.tsx are free. Note that every moon teleport now lands at scene.gateExit().
 Brief: `docs/prompts/sidecar/T02A-stage-world-look.md`.

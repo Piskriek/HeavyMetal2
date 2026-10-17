@@ -1,0 +1,199 @@
+/* ============================================================================
+ * File: apps/web/src/studio/look-tab.css
+ * TICKET-08b (OPUS_NOTE_15 Item A):
+ * Studio Look tab styling (stage 0–6 scrubber, sun elevation, A/B split).
+ * Scoped under .sx-look to match .sx dark telemetry styling in studio-app.css.
+ * ============================================================================ */
+
+.sx-look {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  background: var(--sx-bg, #05080c);
+  color: var(--sx-text, #d7e3ee);
+  font: 400 13px/1.45 var(--sx-ui, Inter, system-ui, sans-serif);
+  overflow: hidden;
+}
+
+.sx-look-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+  background: var(--sx-panel, rgba(12, 17, 24, 0.86));
+  border-right: 1px solid var(--sx-line, #1c2734);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.sx-look-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(10, 15, 22, 0.72);
+  border: 1px solid var(--sx-line, #1c2734);
+  border-radius: 8px;
+}
+
+.sx-look-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sx-look-head h3 {
+  margin: 0;
+  font: 600 12px/1 var(--sx-display, Oxanium, sans-serif);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sx-text, #d7e3ee);
+}
+
+.sx-look-badge {
+  font: 600 11px/1 var(--sx-display, Oxanium, monospace);
+  color: var(--sx-amber, #ffc53d);
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: var(--sx-amber-soft, rgba(255, 197, 61, 0.14));
+  border: 1px solid rgba(255, 197, 61, 0.4);
+  font-variant-numeric: tabular-nums;
+}
+
+.sx-look-badge.cyan {
+  color: var(--sx-cyan, #5fd4ff);
+  background: rgba(95, 212, 255, 0.12);
+  border-color: rgba(95, 212, 255, 0.4);
+}
+
+.sx-look-stage-pills {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.sx-look-stage-pills button {
+  padding: 5px 0;
+  font: 600 11px/1 var(--sx-display, Oxanium, sans-serif);
+  text-align: center;
+}
+
+.sx-look-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.sx-look-readout-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 10px;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.sx-look-kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 6px;
+  background: rgba(5, 8, 12, 0.55);
+  border-radius: 4px;
+  border: 1px solid rgba(44, 61, 81, 0.45);
+}
+
+.sx-look-kv span {
+  color: var(--sx-dim, #6c8193);
+}
+
+.sx-look-kv b {
+  font: 600 11px/1.2 var(--sx-display, Oxanium, monospace);
+  color: var(--sx-text, #d7e3ee);
+  font-variant-numeric: tabular-nums;
+}
+
+.sx-look-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.sx-look-swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--sx-dim, #6c8193);
+}
+
+.sx-look-swatch-chip {
+  width: 100%;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid var(--sx-line-hi, #2c3d51);
+}
+
+.sx-look-stage-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: #060a10;
+  overflow: hidden;
+}
+
+.sx-look-canvas-host {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sx-look-canvas-host canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sx-look-ab-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--sx-amber, #ffc53d);
+  box-shadow: 0 0 12px rgba(255, 197, 61, 0.75);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.sx-look-ab-pill {
+  position: absolute;
+  top: 12px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: rgba(8, 12, 18, 0.85);
+  border: 1px solid var(--sx-line-hi, #2c3d51);
+  font: 600 11px/1.2 var(--sx-display, Oxanium, sans-serif);
+  color: var(--sx-text, #d7e3ee);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.sx-look-ab-pill.left {
+  left: 12px;
+  border-color: rgba(255, 197, 61, 0.5);
+  color: var(--sx-amber, #ffc53d);
+}
+
+.sx-look-ab-pill.right {
+  right: 12px;
+  border-color: rgba(95, 212, 255, 0.5);
+  color: var(--sx-cyan, #5fd4ff);
+}

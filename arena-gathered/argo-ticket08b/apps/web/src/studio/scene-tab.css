@@ -1,0 +1,155 @@
+/* ============================================================================
+ * File: apps/web/src/studio/scene-tab.css
+ * TICKET-08b (OPUS_NOTE_15 Item B):
+ * Studio Scene tab styling (saved layouts, item outliner, transform controls,
+ * and sockets & plumes gizmo toggle + panel readout).
+ * ============================================================================ */
+
+.sx-scene-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  color: var(--sx-text, #d7e3ee);
+  font: 400 13px/1.45 var(--sx-ui, Inter, system-ui, sans-serif);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.sx-scene-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 11px 12px;
+  background: rgba(10, 15, 22, 0.76);
+  border: 1px solid var(--sx-line, #1c2734);
+  border-radius: 8px;
+}
+
+.sx-scene-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sx-scene-head h3 {
+  margin: 0;
+  font: 600 12px/1 var(--sx-display, Oxanium, sans-serif);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sx-text, #d7e3ee);
+}
+
+.sx-scene-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sx-scene-row input[type='text'] {
+  flex: 1;
+}
+
+.sx-scene-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.sx-scene-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(16, 23, 33, 0.72);
+  border: 1px solid transparent;
+}
+
+.sx-scene-item.on {
+  background: var(--sx-amber-soft, rgba(255, 197, 61, 0.14));
+  border-color: rgba(255, 197, 61, 0.5);
+}
+
+.sx-scene-item-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: transparent !important;
+  border: 0 !important;
+  padding: 2px 4px !important;
+  text-align: left;
+  color: var(--sx-text, #d7e3ee);
+}
+
+.sx-scene-vec-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.sx-scene-vec-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--sx-dim, #6c8193);
+}
+
+.sx-scene-socket-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.sx-scene-socket-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 7px;
+  border-radius: 4px;
+  background: rgba(5, 8, 12, 0.6);
+  border: 1px solid rgba(44, 61, 81, 0.5);
+}
+
+.sx-scene-plume-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 11px/1 var(--sx-display, Oxanium, monospace);
+}
+
+.sx-scene-plume-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.sx-scene-status {
+  font-size: 11px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  background: rgba(95, 212, 255, 0.12);
+  border: 1px solid rgba(95, 212, 255, 0.35);
+  color: var(--sx-cyan, #5fd4ff);
+}
+
+.sx-scene-status.err {
+  background: rgba(255, 122, 107, 0.14);
+  border-color: rgba(255, 122, 107, 0.45);
+  color: var(--sx-err, #ff7a6b);
+}

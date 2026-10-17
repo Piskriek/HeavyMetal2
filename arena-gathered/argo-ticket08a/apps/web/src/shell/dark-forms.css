@@ -1,0 +1,268 @@
+/* ============================================================================
+ * File: apps/web/src/shell/dark-forms.css
+ * TICKET-08a (OPUS_NOTE_13 Item B — MENU-02 & MENU-03):
+ * Scoped dark-glass form & card styles for Settings (settings-body.tsx) and
+ * Community (community.tsx) inside a DarkModal or .dark-forms wrapper.
+ * Replaces legacy #f1f0ea light surfaces and white inputs with HUD telemetry glass.
+ * ============================================================================ */
+
+.dark-forms,
+.dark-modal {
+  color: #f4f8ff;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Sections & Headings */
+.dark-forms section,
+.dark-modal .settings-body > section,
+.dark-modal .your-shares {
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  background: rgba(16, 23, 36, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.dark-forms h3,
+.dark-forms h4,
+.dark-modal h3,
+.dark-modal h4 {
+  margin: 0 0 10px;
+  font-family: 'Oxanium', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #3dc8ff;
+}
+
+/* Rows & Labels */
+.dark-forms .row,
+.dark-modal .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 13px;
+  color: #e2e8f0;
+}
+
+.dark-forms .row.slider,
+.dark-modal .row.slider {
+  display: grid;
+  grid-template-columns: 140px 1fr 56px;
+  align-items: center;
+  gap: 12px;
+}
+
+.dark-forms .row.slider output,
+.dark-modal .row.slider output {
+  font-family: 'Oxanium', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+  color: #3dc8ff;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Text, Number, Search Inputs & Selects */
+.dark-forms input[type='text'],
+.dark-forms input[type='number'],
+.dark-forms input[type='search'],
+.dark-forms input:not([type]),
+.dark-forms select,
+.dark-forms textarea,
+.dark-modal input[type='text'],
+.dark-modal input[type='number'],
+.dark-modal input[type='search'],
+.dark-modal input:not([type]),
+.dark-modal select,
+.dark-modal textarea {
+  padding: 7px 10px;
+  background: rgba(5, 9, 16, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: #f4f8ff;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+}
+
+.dark-forms input:focus,
+.dark-forms select:focus,
+.dark-forms textarea:focus,
+.dark-modal input:focus,
+.dark-modal select:focus,
+.dark-modal textarea:focus {
+  outline: none;
+  border-color: #3dc8ff;
+  box-shadow: 0 0 0 2px rgba(61, 200, 255, 0.2);
+}
+
+/* Range Sliders */
+.dark-forms input[type='range'],
+.dark-modal input[type='range'] {
+  width: 100%;
+  accent-color: #3dc8ff;
+  cursor: pointer;
+}
+
+/* Checkboxes */
+.dark-forms input[type='checkbox'],
+.dark-modal input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: #3dc8ff;
+  cursor: pointer;
+}
+
+/* Buttons & Segmented Controls */
+.dark-forms button,
+.dark-modal button {
+  padding: 6px 12px;
+  background: rgba(20, 29, 43, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  color: #e2e8f0;
+  font-family: 'Oxanium', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.dark-forms button:hover:not(:disabled),
+.dark-modal button:hover:not(:disabled) {
+  background: rgba(34, 49, 71, 0.95);
+  border-color: rgba(61, 200, 255, 0.45);
+  color: #ffffff;
+}
+
+.dark-forms button.on,
+.dark-forms button[aria-pressed='true'],
+.dark-modal button.on,
+.dark-modal button[aria-pressed='true'] {
+  background: rgba(61, 200, 255, 0.2);
+  border-color: #3dc8ff;
+  color: #3dc8ff;
+  box-shadow: 0 0 12px rgba(61, 200, 255, 0.18);
+}
+
+.dark-forms button.go,
+.dark-modal button.go {
+  background: linear-gradient(180deg, #3dc8ff, #0284c7);
+  border-color: #38bdf8;
+  color: #040810;
+  font-weight: 700;
+}
+
+.dark-forms button.danger,
+.dark-modal button.danger {
+  background: rgba(255, 61, 138, 0.16);
+  border-color: rgba(255, 61, 138, 0.45);
+  color: #fda4af;
+}
+
+.dark-forms .seg,
+.dark-modal .seg,
+.dark-forms .tabs,
+.dark-modal .tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 3px;
+  background: rgba(5, 9, 16, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+}
+
+.dark-forms .seg button,
+.dark-modal .seg button,
+.dark-forms .tabs button,
+.dark-modal .tabs button {
+  border-radius: 5px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.dark-forms .seg button.on,
+.dark-modal .seg button.on,
+.dark-forms .tabs button.on,
+.dark-modal .tabs button.on {
+  background: rgba(61, 200, 255, 0.2);
+  border-color: rgba(61, 200, 255, 0.55);
+  color: #3dc8ff;
+}
+
+/* Hints & Links */
+.dark-forms .hint,
+.dark-modal .hint {
+  margin: 4px 0 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #94a3b8;
+}
+
+.dark-forms a,
+.dark-modal a {
+  color: #3dc8ff;
+  text-decoration: none;
+}
+
+.dark-forms a:hover,
+.dark-modal a:hover {
+  text-decoration: underline;
+}
+
+/* Community Cards & Window Reset inside DarkModal */
+.dark-modal .shell-window,
+.dark-forms .shell-window {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  color: #f4f8ff;
+}
+
+.dark-modal .shell-window > header,
+.dark-forms .shell-window > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.dark-modal .shell-cards,
+.dark-forms .shell-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  margin: 12px 0;
+}
+
+.dark-modal .shell-activity,
+.dark-forms .shell-activity {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: rgba(16, 23, 36, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #f4f8ff;
+}
+
+.dark-modal .shell-activity .thumb,
+.dark-forms .shell-activity .thumb {
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 9, 16, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  overflow: hidden;
+}

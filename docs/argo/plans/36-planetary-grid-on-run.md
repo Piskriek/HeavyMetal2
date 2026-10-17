@@ -68,3 +68,11 @@ Deterministic rollback rooms are for frame-exact action: shared rover races, joi
 - A disconnect followed by a reconnect within 60 s restores the same world.
 - A visitor's build command is refused on the server.
 - The plain single-file build is unchanged, and the RUN build stays under 16 MB.
+
+## Argo's review (creative lead, 2026-10-17): approved, with these refinements adopted
+- **Role display names:** the internal union stays `'owner' | 'cobuilder' | 'visitor'`, shown in the UI as **Lead Architect**, **Co-Builder** and **Field Observer**.
+- **Co-Builder guardrails (Phase 2):**
+  - **Can:** place pieces, draft and craft, slot cartridges, and demolish pieces they placed during the session.
+  - **Can't:** remove the Lead Architect's pieces, bins holding items (already blocked in `world.ts`), or hardpoint machines, unless the Lead Architect allows it.
+- **The "Enclave Shift Log" (Phase 4):** a compact 5-line banner on return, showing who visited or co-built while you were away (for example, "+14 pieces placed, +1 Heavy Mill queued by [Name]").
+- **One Visit input (Phase 1 and 4):** a 6-character alphanumeric code joins the live or persisted outpost room (`joinRoomByCode`); a longer base64url plot code runs `decodePlot` for a read-only tour.

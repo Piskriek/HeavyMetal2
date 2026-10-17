@@ -22,6 +22,9 @@ import { AudioTab, normalizeAudioLevels, type AudioLevelEntry, type AudioLevels,
 import { fileUrl, getAsset, type AssetInfo } from './studio-api';
 import { forgetLevels, loadGlbUrl } from './studio-levels';
 import { forgetThumb } from './studio-thumbs';
+import { forgetFourAngle } from './four-angle';
+import { LookTab } from './look-tab';
+import { SceneTab } from './scene-tab';
 import './studio-app.css';
 
 const ENDPOINT = '/__studio/data/asset-tweaks';
@@ -32,7 +35,7 @@ const KEYMAP_KEY = 'studio.keymap';
 const DEFAULT_LAYOUT = { left: 290, right: 320, changes: 210 };
 const LIMITS = { left: [200, 480], right: [240, 520], changes: [120, 420] } as const;
 
-type Workspace = 'assets' | 'moon' | 'audio';
+type Workspace = 'assets' | 'scene' | 'look' | 'moon' | 'audio';
 /** The sound library as public/audio/levels.json holds it (the wrapper keeps its note). */
 type AudioDoc = { readonly about?: string; readonly levels: Readonly<Record<string, AudioLevelEntry>> };
 type Status = { readonly tone: 'ok' | 'warn' | 'err'; readonly text: string };
@@ -130,6 +133,9 @@ export function StudioApp({ onBack, renderPrototype }: {
 
   const hostRef = useRef<HTMLDivElement>(null);
   const vpRef = useRef<StudioViewport | null>(null);
+  /** The Scene workspace's own viewport: created when the tab opens, handed to the Scene tab. */
+  const sceneHostRef = useRef<HTMLDivElement>(null);
+  const [sceneVp, setSceneVp] = useState<StudioViewport | null>(null);
   const raws = useRef(new Map<string, Group>());
   const loading = useRef(new Set<string>());
   const failed = useRef(new Set<string>());
@@ -224,6 +230,7 @@ export function StudioApp({ onBack, renderPrototype }: {
   const onAssetChanged = useCallback((id: string) => {
     forgetLevels(id);
     forgetThumb(id);
+    forgetFourAngle(id);
     for (const k of [...raws.current.keys()]) if (k.startsWith(`${id}|`) || k.includes(`/file/${id}/`)) raws.current.delete(k);
     failed.current.clear();
     setVersions((v) => ({ ...v, [id]: (v[id] ?? 0) + 1 }));
@@ -315,6 +322,19 @@ export function StudioApp({ onBack, renderPrototype }: {
 
   useEffect(() => { vpRef.current?.setKeymap(keymap); }, [keymap, vpTick]);
   useEffect(() => { vpRef.current?.setTool(tool); }, [tool, vpTick]);
+
+  // ---- the Scene workspace's viewport: the same renderer as Assets, its own copies (the Scene tab draws them) ----
+  useEffect(() => {
+    if (workspace !== 'scene' || !sceneHostRef.current) return undefined;
+    const vp = new StudioViewport(sceneHostRef.current, {
+      onDragStart: () => undefined,
+      onDrag: () => undefined,
+      onDragEnd: () => undefined,
+    });
+    setSceneVp(vp);
+    return () => { vp.dispose(); setSceneVp(null); };
+  }, [workspace]);
+  useEffect(() => { sceneVp?.setKeymap(keymap); }, [keymap, sceneVp]);
 
   // ---- what the viewport shows: the selected asset at one level or all three, or the old against the new ----
   useEffect(() => {
@@ -478,9 +498,8 @@ export function StudioApp({ onBack, renderPrototype }: {
         </div>
         <nav className="sx-tabs" aria-label="Workspaces">
           <button type="button" aria-pressed={workspace === 'assets'} onClick={() => setWorkspace('assets')}>Assets</button>
-          {['Scene', 'Look'].map((name) => (
-            <button key={name} type="button" disabled title="Coming next" aria-label={`${name}, coming next`}><span>{name}</span><i>next</i></button>
-          ))}
+          <button type="button" aria-pressed={workspace === 'scene'} onClick={() => setWorkspace('scene')}>Scene</button>
+          <button type="button" aria-pressed={workspace === 'look'} onClick={() => setWorkspace('look')}>Look</button>
           <button type="button" aria-pressed={workspace === 'audio'} onClick={() => setWorkspace('audio')}>Audio</button>
           <button type="button" aria-pressed={workspace === 'moon'} onClick={() => setWorkspace('moon')}>Moon (prototype)</button>
         </nav>
@@ -520,6 +539,17 @@ export function StudioApp({ onBack, renderPrototype }: {
 
       {workspace === 'moon' ? (
         <div className="sx-proto">{renderPrototype()}</div>
+      ) : workspace === 'scene' ? (
+        <div className="sx-tab-pane sx-scene-pane">
+          <div className="sx-view sx-scene-view" ref={sceneHostRef} />
+          <aside className="sx-panel sx-scene-side" aria-label="Scene tab">
+            <SceneTab viewport={sceneVp} writable={writable === true} />
+          </aside>
+        </div>
+      ) : workspace === 'look' ? (
+        <div className="sx-tab-pane">
+          <LookTab assetId={selected} />
+        </div>
       ) : workspace === 'audio' ? (
         <div className="sx-audio-pane">
           <div className="sx-audio-bar">

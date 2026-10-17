@@ -102,7 +102,7 @@ export class StudioViewport {
   private readonly target = new THREE.Vector3(0, 0.8, 0);
   private solidMats: THREE.Material[] = [];
 
-  constructor(private readonly host: HTMLElement, private readonly hooks: ViewportHooks) {
+  constructor(private readonly host: HTMLElement, private hooks: ViewportHooks) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'low-power' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = false;
@@ -139,6 +139,9 @@ export class StudioViewport {
     this.resize();
     this.loop();
   }
+
+  /** Replaces the edit hooks. The Scene tab binds its own transform edits; the Assets workspace keeps its own. */
+  setHooks(h: ViewportHooks): void { this.hooks = h; }
 
   setKeymap(k: Keymap): void { this.keymap = k; }
   setTool(t: Tool): void { this.tool = t; this.drawGizmo(); }

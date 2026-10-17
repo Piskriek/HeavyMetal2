@@ -437,3 +437,12 @@
 .sx-audio-bar button:hover:not(:disabled) { border-color: #3dc8ff; background: rgba(61, 200, 255, 0.14); }
 .sx-audio-bar button:disabled { opacity: 0.4; cursor: default; }
 .sx-audio-pane > .sx-banner { margin: 0; }
+
+/* The Scene and Look workspaces (TICKET-08b): a pane that fills the body; the Scene viewport sits beside its panel */
+.sx-tab-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.sx-scene-pane { display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: minmax(0, 1fr); }
+.sx-scene-side { border-left: 1px solid var(--sx-line); }
+.sx-scene-side > .sx-scene-tab { flex: 1; min-height: 0; }
+@media (max-width: 900px) {
+  .sx-scene-pane { grid-template-columns: minmax(0, 1fr); grid-template-rows: 60vh minmax(0, 1fr); }
+}

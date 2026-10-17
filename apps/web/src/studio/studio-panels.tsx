@@ -4,6 +4,7 @@ import { GEN } from '../assets/gen';
 import { clampField, type Change } from './studio-data';
 import { type MaterialPreset } from './studio-presets';
 import { thumbOf } from './studio-thumbs';
+import { FourAnglePanel } from './four-angle';
 
 export const GROUPS: readonly TweakGroup[] = ['Fit', 'Material', 'Glow'];
 
@@ -174,6 +175,7 @@ export function Details({ id, props, simple, onField, onPick, presets, subject, 
           <p className="sx-dim sx-help">Edit the description in the Redo panel.</p>
         </section>
       )}
+      <FourAnglePanel assetId={id} />
     </div>
   );
 }

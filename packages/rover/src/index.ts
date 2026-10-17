@@ -73,6 +73,7 @@ export interface Ground {
 
 export interface Input {
   throttle: number;
+  /** +1 = turn right (clockwise seen from above), -1 = turn left. A/Left is -1, D/Right is +1 (VEH-02). */
   steer: number;
   brake: boolean;
 }

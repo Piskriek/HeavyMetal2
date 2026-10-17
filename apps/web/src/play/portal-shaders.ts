@@ -250,6 +250,39 @@ export const MARK_VERTEX = /* glsl */ `
     gl_Position = projectionMatrix * modelViewMatrix * p;
   }`;
 export const OPENING_MARK_FRAGMENT = /* glsl */ `void main(){ gl_FragColor = vec4(0.0); }`;
+
+/** The unpowered doorway's vertex stage (GATE-03): passes the plane's uv on to OPENING_OFF_FRAGMENT. */
+export const OPENING_OFF_VERTEX = /* glsl */ `
+varying vec2 vUv;
+void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+`;
+
+/**
+ * Unpowered portal doorway fragment shader (GATE-03) for `twinOpening` while `!gateOn`:
+ * Renders a dim dark-substrate scanline static shimmer instead of a dead zero-alpha black mask.
+ */
+export const OPENING_OFF_FRAGMENT = /* glsl */ `
+uniform float uTime;
+varying vec2 vUv;
+
+float hash12(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+void main() {
+  vec2 uv = vUv;
+  float scan = 0.5 + 0.5 * sin(uv.y * 96.0 - uTime * 3.0);
+  float grain = hash12(floor(uv * vec2(64.0, 96.0)) + floor(uTime * 12.0));
+  vec2 edge = abs(uv - 0.5) * 2.0;
+  float rim = smoothstep(0.72, 0.98, max(edge.x, edge.y));
+  vec3 baseCol = vec3(0.055, 0.071, 0.098);
+  vec3 amberRim = vec3(1.0, 0.757, 0.239) * (0.12 * rim);
+  vec3 staticCol = baseCol + vec3(0.04, 0.05, 0.07) * (scan * 0.6 + grain * 0.4) + amberRim;
+  gl_FragColor = vec4(staticCol, 1.0);
+}
+`;
 export const COLOUR_MARK_FRAGMENT = /* glsl */ `
   uniform vec3 uColour; uniform float uLit;
   varying vec3 vN;

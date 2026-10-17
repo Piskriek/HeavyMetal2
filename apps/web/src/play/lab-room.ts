@@ -17,9 +17,12 @@ import { type GenLevel, genLevelFor, getGenSync, loadGen } from '../assets/gen';
 import { createLabVista, VISTA_LEVEL, type LabVista, type WindowView } from './lab-vista';
 import { CLUTTER, CLUTTER_MODELS, type ClutterItem } from './lab-clutter';
 import { type Power, POWER_OFF, darkStrobe, strobeSweepZ } from './lab-power';
+import { overhangBoxes, type Bounds3D } from './static-colliders';
 export { POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, type Power } from './lab-power';
 
 export const ROOM = { left: -8, right: 8, back: -9, front: 3, height: 5 } as const;
+/** The spot the lab's spawn stands on (-2.5, 1.0) and its walk toward the gate: the LAB-10 overhang fit never closes it. */
+const SPAWN_CLEAR: Bounds3D = { minX: -3.1, maxX: -1.9, minY: 0, maxY: 3, minZ: 0.4, maxZ: 1.6 };
 const WINDOW = { x0: -7.4, x1: 7.4, y0: 0.4, y1: 3.5 } as const;
 
 /** Where the gate stands and which way its opening faces (north, towards the window). */
@@ -378,14 +381,29 @@ export function createLabRoom(o: {
     for (const child of [...group.children]) if (!kept.includes(child)) group.remove(child);
     group.add(gen);
   };
+  /** LAB-10: once a generated model is in place (once, at its swap), the part of its visible bounds that sticks out past the prop's
+   *  own colliders by more than 0.1 m gets a collider. The doorway and the spawn's walk stay clear (keepClear). */
+  const fitOverhang = (p: { readonly group: THREE.Group; readonly colliders?: readonly Box[] }, keepClear: readonly Bounds3D[] = []): void => {
+    if (!p.colliders) return;
+    p.group.updateMatrixWorld(true);
+    const vis = new THREE.Box3().setFromObject(p.group);
+    if (vis.isEmpty()) return;
+    const own = p.colliders.map((b) => {
+      const bx = new THREE.Box3(new THREE.Vector3(...b.min), new THREE.Vector3(...b.max)).applyMatrix4(p.group.matrixWorld);
+      return { minX: bx.min.x, minY: bx.min.y, minZ: bx.min.z, maxX: bx.max.x, maxY: bx.max.y, maxZ: bx.max.z };
+    });
+    const visible = { minX: vis.min.x, minY: vis.min.y, minZ: vis.min.z, maxX: vis.max.x, maxY: vis.max.y, maxZ: vis.max.z };
+    colliders.push(...overhangBoxes(visible, own, [...keepClear, SPAWN_CLEAR], 0.1));
+  };
   /** Swaps labkit props for their generated models, all or none. `turn` is the extra yaw of the model inside its prop. */
-  const swapAll = (items: readonly { readonly p: { readonly group: THREE.Group }; readonly id: string; readonly turn?: number }[]): boolean => {
+  const swapAll = (items: readonly { readonly p: { readonly group: THREE.Group; readonly colliders?: readonly Box[] }; readonly id: string; readonly turn?: number }[]): boolean => {
     const gens = genAll(items.map((it) => it.id));
     if (!gens) return false;
     items.forEach((it, i) => {
       const g = gens[i]!;
       g.rotation.y = it.turn ?? 0;
       replaceVisual(it.p.group, g);
+      fitOverhang(it.p);
     });
     return true;
   };
@@ -561,6 +579,11 @@ export function createLabRoom(o: {
     });
     gen.add(...plates);
     gate.coils.splice(0, gate.coils.length, ...plates);
+    // the doorway (the 2.0 m opening through the plinth) and the plinth's walkway stay clear: only the posts' overhang is fitted
+    fitOverhang(gate, [{
+      minX: GATE_AT.x - GEN_GATE_OPENING.width / 2, maxX: GATE_AT.x + GEN_GATE_OPENING.width / 2,
+      minY: 0, maxY: 4, minZ: GATE_AT.z - 2.5, maxZ: GATE_AT.z + 2.5,
+    }]);
     return true;
   });
 
@@ -826,9 +849,9 @@ export function createLabRoom(o: {
   const cotBlanket = new THREE.Mesh(keep(new THREE.BoxGeometry(0.65, 0.08, 0.74)), m.gunmetal);
   cotBlanket.position.set(0.55, 0.46, 0);
   cotGroup.add(cotBlanket);
-  place({ group: cotGroup, colliders: [{ min: [-1.0, 0, -0.45], max: [1.0, 0.6, 0.45] }], sockets: [], lamps: [] }, -2.5, 2.2, 0);
+  const cotProp = place({ group: cotGroup, colliders: [{ min: [-1.0, 0, -0.45], max: [1.0, 0.6, 0.45] }], sockets: [], lamps: [] }, -2.5, 2.2, 0);
   // the generated cot is long along z: turned to lie along the wall, like the labkit cot
-  swaps.push(() => swapAll([{ p: { group: cotGroup }, id: 'cot', turn: Math.PI / 2 }]));
+  swaps.push(() => swapAll([{ p: cotProp, id: 'cot', turn: Math.PI / 2 }]));
 
   // Her desk at (1.0, 2.4), facing into room (Math.PI)
   const deskGroup = new THREE.Group();
@@ -861,13 +884,14 @@ export function createLabRoom(o: {
   dScreen.position.set(0.42, 0.87, 0.215);
   dScreen.rotation.y = -0.25;
   deskGroup.add(dScreen);
-  place({ group: deskGroup, colliders: [{ min: [-0.75, 0, -0.4], max: [0.75, 1.0, 0.4] }], sockets: [], lamps: [] }, 1.0, 2.4, Math.PI);
+  const deskProp = place({ group: deskGroup, colliders: [{ min: [-0.75, 0, -0.4], max: [0.75, 1.0, 0.4] }], sockets: [], lamps: [] }, 1.0, 2.4, Math.PI);
   // the generated desk replaces the body and top; the paper, the mug and the terminal stay on it
   swaps.push(() => {
     const body = genFor('her-desk');
     if (!body) return false;
     deskGroup.remove(deskBody, deskTop);
     deskGroup.add(body);
+    fitOverhang(deskProp);
     return true;
   });
 

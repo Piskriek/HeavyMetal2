@@ -1,3 +1,7 @@
+import { isRoofKind, roofLevel } from './roof-level';
+
+export { isRoofKind, roofLevel };
+
 export type Kind =
   | 'foundation'
   | 'floor'
@@ -206,10 +210,6 @@ function isEdgeKind(kind: Kind): boolean {
 
 function isFixtureKind(kind: Kind): boolean {
   return FIXTURE_KINDS.includes(kind);
-}
-
-function isRoofKind(kind: Kind): boolean {
-  return ROOF_KINDS.includes(kind);
 }
 
 /** A side of a cell. A quarter turn (r + 1) takes +z to -x, -x to -z, -z to +x and +x to +z, as the renderer turns pieces. */
@@ -1267,8 +1267,10 @@ export function snap(
     ): void => {
       const distance = Math.hypot(u - anchorU, v - anchorV);
       if (distance > reach) return;
+      // BB-07: a roof rests on the walls around its cell, so it sits at least one level above them.
+      const level = isRoofKind(kind) ? Math.max(k, roofLevel(base, structure.id, i, j)) : k;
       candidates.push({
-        piece: { s: structure.id, kind, i, j, k, r, mat },
+        piece: { s: structure.id, kind, i, j, k: level, r, mat },
         distance,
       });
     };

@@ -18,7 +18,7 @@ import { createLabRoom, GATE_AT, PLANET_TABLE_AT, POWER_OFF, POWER_ON, POWER_SEC
 import { WAKE_SECONDS, wakeLift, type Power } from './lab-power';
 import { preloadVista, VISTA_LEVEL, type WindowView } from './lab-vista';
 import { createPlotHolo, type PlotHolo } from './plot-holo';
-import { COLOUR_MARK_FRAGMENT, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX } from './portal-shaders';
+import { COLOUR_MARK_FRAGMENT, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_OFF_FRAGMENT, OPENING_OFF_VERTEX, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX } from './portal-shaders';
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
 import { disposeProp, lineSpan, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
 import { beadSpeed, plumeCount, spanPoint, spanSag } from './brownout-visual';
@@ -42,10 +42,12 @@ import { pieceAt } from '../base/world';
 import * as F from '@hm/substrate';
 import * as S from '@hm/structure';
 import type { Kind } from '@hm/structure';
-import { globalKitPieceCache } from '../base/kit-pieces';
+import { globalKitPieceCache, type Box } from '../base/kit-pieces';
 import { beamEffect, createMaterials, extractionBeam, type BeamFx, type BeamMode, type BeamTool } from '@hm/beamkit';
 import { BEAM_RANGE } from '../base/world';
 import type { WalkWorld } from '../base/walk';
+import { computeGateExitPose, pushCircle, pushCircleInFrame } from './static-colliders';
+import { machineFootprint } from '../base/machine-footprints';
 import { spawn as spawnRover, step as stepRover, speed as roverSpeed, ROVERS, DT as ROVER_DT, type RoverState, type RoverKind } from '@hm/rover';
 import {
   createMaterials as createRovergearMaterials,
@@ -192,6 +194,8 @@ export interface PlayScene {
   /** Sets the base structure for ground navigation and mob pathfinding. */
   setBase(base: S.Base | null): void;
   setWalkWorld(walkWorld: WalkWorld | null): void;
+  /** The moon arrival pose (GATE-05): `dist` metres out from the Twin Gate's back (default 3), facing away from the gate. */
+  gateExit(dist?: number): { readonly x: number; readonly z: number; readonly yaw: number };
   setSocketRings(poses: readonly { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }[]): void;
   setPlanGhosts(ghosts: readonly { readonly kind: Kind; readonly at: { readonly x: number; readonly y: number; readonly z: number }; readonly yaw: number }[]): void;
   setSheltered(sheltered: boolean): void;
@@ -455,7 +459,10 @@ export function createPlayScene(o: {
   let twin = kit.gate(m, { twin: true, stage: 1 });
   let twinStage = 1;
   const openingMark = keep(new THREE.ShaderMaterial({ vertexShader: MARK_VERTEX, fragmentShader: OPENING_MARK_FRAGMENT, side: THREE.DoubleSide, blending: THREE.NoBlending }));
-  const twinOpening = new THREE.Mesh(keep(new THREE.PlaneGeometry(twin.opening.width, twin.opening.height)), openingMark);
+  // GATE-03: the unpowered doorway shows the dim static (OPENING_OFF_FRAGMENT) until the gate is on, then the mark (openingMark)
+  const openingOffUniforms = { uTime: { value: 0 } };
+  const openingOffMat = keep(new THREE.ShaderMaterial({ vertexShader: OPENING_OFF_VERTEX, fragmentShader: OPENING_OFF_FRAGMENT, uniforms: openingOffUniforms, side: THREE.DoubleSide }));
+  const twinOpening = new THREE.Mesh(keep(new THREE.PlaneGeometry(twin.opening.width, twin.opening.height)), openingOffMat);
   twinOpening.position.set(0, twin.opening.sill + twin.opening.height / 2, twin.opening.z);
   twin.group.add(twinOpening);
   // the footing goes down into the ground, so the pad never floats on the slope of the peak
@@ -468,11 +475,20 @@ export function createPlayScene(o: {
   const gateYawDelta = twin.group.rotation.y;
   planetScene.add(twin.group);
   let planetGateM = new THREE.Matrix4(), toPlanet = new THREE.Matrix4(), toLab = new THREE.Matrix4();
+  /** TICKET-01 B: the moon's solids, each with its own frame: the twin's uprights and each field machine's footprint (rebuildPlanetStatic). */
+  let planetSolids: { readonly m: readonly number[]; readonly boxes: readonly Box[] }[] = [];
+  const rebuildPlanetStatic = (): void => {
+    twin.group.updateMatrixWorld(true);
+    const solids: { m: number[]; boxes: readonly Box[] }[] = [{ m: [...twin.group.matrixWorld.elements], boxes: twin.colliders }];
+    for (const v of views.values()) solids.push({ m: [...v.prop.group.matrixWorld.elements], boxes: [machineFootprint(v.m.kind)] });
+    planetSolids = solids;
+  };
   const syncPlanetMatrices = (): void => {
     twin.group.updateMatrixWorld(true);
     planetGateM = twin.group.matrixWorld.clone();
     toPlanet = planetGateM.clone().multiply(labGateM.clone().invert());
     toLab = toPlanet.clone().invert();
+    rebuildPlanetStatic();
   };
   let padTop = 0;
   const groundAt = (x: number, z: number): number => {
@@ -698,6 +714,8 @@ export function createPlayScene(o: {
   // the lines between pylons, and the pixels pouring from every pixel machine that runs (one plume for all, `@hm/plume`)
   interface MachineView { readonly m: Machine; prop: MachineProp; vent: THREE.Vector3 | null; emitter: number | null; running: number; glow: THREE.Mesh | null; light: THREE.PointLight | null }
   const views = new Map<number, MachineView>();
+  // TICKET-01 B: the moon's solids exist from the start (the twin's frame stands before any machine is placed)
+  rebuildPlanetStatic();
   let cables: THREE.Mesh[] = [];
   /** TASK-26: the grid's satisfaction (the pulse beads' speed), and the pylon spans the beads ride (the cables' own ends and sag). */
   let gridSatisfaction = 1;
@@ -913,6 +931,7 @@ export function createPlayScene(o: {
       views.set(id, nv);
     }
     relay(lastConnected);
+    rebuildPlanetStatic();
 
     // Refresh vehicles and fabricators to match the new stage fidelity
     if (lastVehiclesList.length > 0) {
@@ -1176,6 +1195,11 @@ export function createPlayScene(o: {
   /** Metres walked since the last footstep, and how many relay lamps the sequence has lit (one click each). */
   let stride = 0, relaysHeard = 0;
   let powerT = -1, gateOn = false;
+  /** GATE-03: the doorway is the dim static while the gate is off and the mark once it is on (called when gateOn changes). */
+  const syncOpeningMaterial = (): void => {
+    const want = gateOn ? openingMark : openingOffMat;
+    if (twinOpening.material !== want) twinOpening.material = want;
+  };
   // the wake (TASK-28): the first time the player is in the lab before the lever, the camera starts 65 degrees up and sits up over 2.2 s
   let wakeT = -1, woke = false;
   /** The wake's frames so far (t and the lift), for the tests: the wake runs once per profile, from when the player has control. */
@@ -1258,19 +1282,11 @@ export function createPlayScene(o: {
     console.warn('Failed to load scientist in Play:', err);
   });
 
-  /** Push a circle of RADIUS out of the lab's boxes. */
-  const collide = (p: THREE.Vector3): void => {
-    for (let pass = 0; pass < 2; pass++) for (const b of room.colliders) {
-      if (b.max[1] < 0.15 || b.min[1] > 1.8) continue;
-      const cx = Math.max(b.min[0], Math.min(p.x, b.max[0])), cz = Math.max(b.min[2], Math.min(p.z, b.max[2]));
-      const dx = p.x - cx, dz = p.z - cz, d = Math.hypot(dx, dz);
-      if (d >= RADIUS) continue;
-      if (d > 1e-6) { p.x = cx + (dx / d) * RADIUS; p.z = cz + (dz / d) * RADIUS; continue; }
-      // inside the box: out by the nearest face
-      const out = [p.x - b.min[0], b.max[0] - p.x, p.z - b.min[2], b.max[2] - p.z];
-      const k = out.indexOf(Math.min(...out));
-      if (k === 0) p.x = b.min[0] - RADIUS; else if (k === 1) p.x = b.max[0] + RADIUS; else if (k === 2) p.z = b.min[2] - RADIUS; else p.z = b.max[2] + RADIUS;
-    }
+  /** Pushes the walker's circle of RADIUS out of the lab's boxes (TICKET-01 B: the swept resolver, from where the walker stood). */
+  const collide = (p: THREE.Vector3, from: { readonly x: number; readonly z: number }): void => {
+    const solid = pushCircle(from, p, room.floorHeight(from.x, from.z), RADIUS, room.colliders);
+    p.x = solid.x;
+    p.z = solid.z;
   };
 
   /** Where a point is in a gate's own frame. */
@@ -1527,6 +1543,7 @@ export function createPlayScene(o: {
     },
     restore(s) {
       gateOn = s.gateOn;
+      syncOpeningMaterial();
       room.setPower(gateOn ? POWER_ON : POWER_OFF);
       if (gateOn) {
         room.lever.rotation.x = -1.1;
@@ -1579,6 +1596,7 @@ export function createPlayScene(o: {
       let changed = false;
       for (const [id, v] of views) if (!ids.has(id)) { unbuild(v); views.delete(id); changed = true; }
       for (const mm of plot.machines) if (!views.has(mm.id)) { views.set(mm.id, build(mm)); changed = true; }
+      rebuildPlanetStatic();
       const sameNet = connected.size === lastConnected.size && [...connected].every((id) => lastConnected.has(id));
       if (changed || !sameNet) { relay(connected); lastConnected = new Set(connected); }
       holo.setPlot(plot, running, connected);
@@ -1696,6 +1714,10 @@ export function createPlayScene(o: {
       // the sanctuaries: the gate dome, and each sealed room's life support (B-07)
       const lifeSupport = base ? base.pieces.filter((p) => p.kind === 'lifeSupport').map((p) => pieceAt(base, p)).filter((p): p is { x: number; y: number; z: number } => p !== null) : [];
       monsters.setSafeZones(monsterSafeZones({ x: twin.group.position.x, z: twin.group.position.z }, lifeSupport));
+    },
+    gateExit(dist) {
+      twin.group.updateMatrixWorld(true);
+      return computeGateExitPose(twin.group.matrixWorld.elements, gateYawDelta, dist);
     },
     setWalkWorld(walkWorld) {
       activeWalkWorld = walkWorld;
@@ -1952,6 +1974,7 @@ export function createPlayScene(o: {
       clock = now;
       beamFx.update(clock);
       holoUniforms.uTime.value = now;
+      openingOffUniforms.uTime.value = now;
       socketRingMat.opacity = 0.55 + 0.35 * Math.sin(now * 5.0);
       // ---- the wake: the camera's lift above level, from its start to the 2.2 s the player takes to sit up
       if (wakeT >= 0) {
@@ -1989,6 +2012,7 @@ export function createPlayScene(o: {
         if (powerT >= POWER_SECONDS) {
           powerT = -1;
           gateOn = true;
+          syncOpeningMaterial();
           pendingEvent = 'powered';
           gameAudio.startGateHum({ x: 0, y: 1.0, z: -1.0 });
         }
@@ -2016,7 +2040,8 @@ export function createPlayScene(o: {
         const vView = vehicleViews.get(drivingVehicleId);
         if (vView) {
           const throttle = c.vehicleInput?.throttle ?? (c.move.z > 0.05 ? 1 : c.move.z < -0.05 ? -1 : 0);
-          const steer = c.vehicleInput?.steer ?? (c.move.x < -0.05 ? 1 : c.move.x > 0.05 ? -1 : 0);
+          // VEH-02: A/Left (move.x < 0) is -1 (turn left), D/Right is +1 (turn right); see Input.steer in @hm/rover
+          const steer = c.vehicleInput?.steer ?? (c.move.x < -0.05 ? -1 : c.move.x > 0.05 ? 1 : 0);
           const brake = c.vehicleInput?.brake ?? false;
           const input = { throttle, steer, brake };
 
@@ -2104,7 +2129,7 @@ export function createPlayScene(o: {
       }
 
       if (where === 'lab') {
-        collide(pos);
+        collide(pos, before);
         const fh = room.floorHeight(pos.x, pos.z);
         pos.y = fh + EYE;
       } else if (drivingVehicleId === null) {
@@ -2112,8 +2137,13 @@ export function createPlayScene(o: {
         const r = Math.hypot(pos.x, pos.z);
         if (r > 420) { pos.x *= 420 / r; pos.z *= 420 / r; }
         if (!c.altCam) {
+          // TICKET-01 B: the moon's solids (the twin's frame and the field machines), each in its own frame, block first; then the base's walk world
+          const feetY = pos.y - EYE;
+          let solid = { x: pos.x, z: pos.z };
+          for (const sol of planetSolids) solid = pushCircleInFrame(before, solid, feetY, RADIUS, sol.boxes, sol.m);
+          pos.x = solid.x;
+          pos.z = solid.z;
           if (activeWalkWorld) {
-            const feetY = pos.y - EYE;
             const pushed = activeWalkWorld.push(pos.x, pos.z, feetY, 0.35);
             pos.x = pushed.x;
             pos.z = pushed.z;

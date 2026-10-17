@@ -1051,8 +1051,8 @@ useEffect(() => {
       scene.setPlayerAlive(true);
       // a death at the wheel (TASK-24): the rover is left where it stands, parked, and the player walks back from the gate
       if (scene.getDrivingVehicle()) scene.exitVehicle();
-      const g = scene.debug.gatePlanet();
-      scene.debug.teleport('planet', g.x, g.z - 6, 0, 0);
+      const exit = scene.gateExit(); // GATE-05: out from the gate's back, facing away from it
+      scene.debug.teleport('planet', exit.x, exit.z, exit.yaw, 0);
     }
     say('Pulled back to the gate', 'Your inventory and your progress are kept.');
   }, [say, updateChain]);
@@ -1914,7 +1914,7 @@ useEffect(() => {
       const drivingVehicle = scene.getDrivingVehicle();
       const vehicleInput = drivingVehicle ? {
         throttle: axis(['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']),
-        steer: axis(['KeyA', 'ArrowLeft'], ['KeyD', 'ArrowRight']),
+        steer: axis(['KeyD', 'ArrowRight'], ['KeyA', 'ArrowLeft']),
         brake: keys.has('Space'),
       } : undefined;
       const out = scene.frame(ms / 1000, dt, live
@@ -2512,7 +2512,7 @@ useEffect(() => {
         setBuildKind: (kind: Kind) => { buildKindRef.current = kind; },
         hideOverlays: (hide: boolean) => setHideOverlays(hide),
       },
-      teleportPlanet: () => scene.debug.teleport('planet', 0, 10, 0),
+      teleportPlanet: () => { const exit = scene.gateExit(); scene.debug.teleport('planet', exit.x, exit.z, exit.yaw); },
       renderCalls: () => scene.debug.stats().calls,
       drawCalls: () => scene.debug.stats().calls,
       batcherDrawCalls: () => pieceManagerRef.current.batcherDrawCalls,
@@ -3039,9 +3039,9 @@ useEffect(() => {
         const scene = sceneRef.current;
         if (!scene) return;
         if (where === 'lab') { scene.debug.teleport('lab', LAB_SPAWN.x, LAB_SPAWN.z, LAB_SPAWN.yaw); return; }
-        if (where === 'plot') { scene.debug.teleport('planet', 0, 10, 0); return; }
-        const g = scene.debug.gatePlanet();
-        scene.debug.teleport('planet', g.x, g.z - 6, 0, 0);
+        // GATE-05: the moon's arrivals start at the gate's exit pose, facing away from the gate
+        const exit = scene.gateExit();
+        scene.debug.teleport('planet', exit.x, exit.z, exit.yaw, 0);
       },
       /** Puts n of an item in the bridge store (the linked storage the benches draw from); what does not fit is dropped, as the grant command does. */
       grantStock: (item: string, n: number): void => {

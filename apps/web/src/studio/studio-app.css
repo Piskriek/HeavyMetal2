@@ -412,3 +412,28 @@
 }
 @keyframes sx-sweep { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
 @media (prefers-reduced-motion: reduce) { .sx-loading i::after { animation: none; width: 100%; opacity: 0.5; } }
+
+/* The Audio workspace (TICKET-08a): a thin bar above the sound library, in the Studio's dark telemetry look */
+.sx-audio-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.sx-audio-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  background: var(--sx-panel);
+  border-bottom: 1px solid var(--sx-line);
+}
+.sx-audio-bar p { margin: 0; flex: 1; font: 500 12px/1.4 Inter, system-ui, sans-serif; color: var(--sx-dim); }
+.sx-audio-bar button {
+  font: 600 11px/1 Oxanium, sans-serif;
+  letter-spacing: 0.06em;
+  padding: 7px 12px;
+  background: var(--sx-raise);
+  color: #3dc8ff;
+  border: 1px solid rgba(61, 200, 255, 0.45);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.sx-audio-bar button:hover:not(:disabled) { border-color: #3dc8ff; background: rgba(61, 200, 255, 0.14); }
+.sx-audio-bar button:disabled { opacity: 0.4; cursor: default; }
+.sx-audio-pane > .sx-banner { margin: 0; }

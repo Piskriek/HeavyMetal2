@@ -18,6 +18,7 @@ import { acceptInto, ASSET, clampField, discardOps, EMPTY_HISTORY, fileText, pen
 import { KEYMAPS, StudioViewport, type Context, type Copy, type Keymap, type Overlay, type Tool, type Transform } from './studio-viewport';
 import { presetsFrom, type MaterialPreset } from './studio-presets';
 import { RedoPanel } from './studio-redo';
+import { AudioTab, normalizeAudioLevels, type AudioLevelEntry, type AudioLevels, type AudioPatch } from './audio-tab';
 import { fileUrl, getAsset, type AssetInfo } from './studio-api';
 import { forgetLevels, loadGlbUrl } from './studio-levels';
 import { forgetThumb } from './studio-thumbs';
@@ -31,7 +32,9 @@ const KEYMAP_KEY = 'studio.keymap';
 const DEFAULT_LAYOUT = { left: 290, right: 320, changes: 210 };
 const LIMITS = { left: [200, 480], right: [240, 520], changes: [120, 420] } as const;
 
-type Workspace = 'assets' | 'moon';
+type Workspace = 'assets' | 'moon' | 'audio';
+/** The sound library as public/audio/levels.json holds it (the wrapper keeps its note). */
+type AudioDoc = { readonly about?: string; readonly levels: Readonly<Record<string, AudioLevelEntry>> };
 type Status = { readonly tone: 'ok' | 'warn' | 'err'; readonly text: string };
 /** The levels the viewport shows: one, or all three side by side. */
 type LevelChoice = GenLevel | 'all';
@@ -120,6 +123,10 @@ export function StudioApp({ onBack, renderPrototype }: {
   const [versions, setVersions] = useState<Record<string, number>>({});
   /** The bench's record of the selected asset (its description, budgets): undefined while it loads, null off the dev server. */
   const [benchInfo, setBenchInfo] = useState<AssetInfo | null | undefined>(undefined);
+  /** The Audio workspace: the levels as loaded, edited only in memory (no audio write route exists), and a note for Copy JSON. */
+  const [audioDoc, setAudioDoc] = useState<AudioDoc | null>(null);
+  const [audioError, setAudioError] = useState<string | null>(null);
+  const [audioNote, setAudioNote] = useState<string | null>(null);
 
   const hostRef = useRef<HTMLDivElement>(null);
   const vpRef = useRef<StudioViewport | null>(null);
@@ -233,6 +240,42 @@ export function StudioApp({ onBack, renderPrototype }: {
       .catch(() => { if (live) setWritable(false); });
     return () => { live = false; };
   }, []);
+
+  // ---- the Audio workspace: public/audio/levels.json, fetched beside the page the way the game's own audio loads it ----
+  useEffect(() => {
+    if (workspace !== 'audio' || audioDoc || audioError) return undefined;
+    let live = true;
+    fetch(new URL('audio/levels.json', document.baseURI).toString(), { cache: 'no-store' })
+      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() as Promise<AudioLevels>; })
+      .then((raw) => {
+        if (!live) return;
+        const about = (raw as { readonly about?: unknown }).about;
+        setAudioDoc({ ...(typeof about === 'string' ? { about } : {}), levels: normalizeAudioLevels(raw) });
+      })
+      .catch((e: unknown) => { if (live) setAudioError(`Could not load audio/levels.json (${e instanceof Error ? e.message : 'fetch failed'}).`); });
+    return () => { live = false; };
+  }, [workspace, audioDoc, audioError]);
+
+  /** A gain or loop change: kept in memory until the JSON is copied into the project (the dev Assets route writes asset-tweaks.json only). */
+  const changeAudio = useCallback((id: string, patch: AudioPatch) => {
+    setAudioDoc((d) => {
+      const cur = d?.levels[id];
+      if (!d || !cur) return d;
+      return { ...d, levels: { ...d.levels, [id]: { ...cur, ...patch } } };
+    });
+    setAudioNote(null);
+  }, []);
+
+  const copyAudioJson = useCallback(async () => {
+    if (!audioDoc) return;
+    const text = `${JSON.stringify(audioDoc, null, 2)}\n`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setAudioNote('Copied the levels JSON. Paste it over public/audio/levels.json to keep the edits.');
+    } catch {
+      setAudioNote('Could not copy here. The edits stay in this session only.');
+    }
+  }, [audioDoc]);
 
   // ---- the bench's record of the selected asset (dev only): its description and budgets ----
   const selVersion = selected ? versions[selected] ?? 0 : 0;
@@ -435,9 +478,10 @@ export function StudioApp({ onBack, renderPrototype }: {
         </div>
         <nav className="sx-tabs" aria-label="Workspaces">
           <button type="button" aria-pressed={workspace === 'assets'} onClick={() => setWorkspace('assets')}>Assets</button>
-          {['Scene', 'Look', 'Audio'].map((name) => (
+          {['Scene', 'Look'].map((name) => (
             <button key={name} type="button" disabled title="Coming next" aria-label={`${name}, coming next`}><span>{name}</span><i>next</i></button>
           ))}
+          <button type="button" aria-pressed={workspace === 'audio'} onClick={() => setWorkspace('audio')}>Audio</button>
           <button type="button" aria-pressed={workspace === 'moon'} onClick={() => setWorkspace('moon')}>Moon (prototype)</button>
         </nav>
         <span className="sx-grow" />
@@ -476,6 +520,17 @@ export function StudioApp({ onBack, renderPrototype }: {
 
       {workspace === 'moon' ? (
         <div className="sx-proto">{renderPrototype()}</div>
+      ) : workspace === 'audio' ? (
+        <div className="sx-audio-pane">
+          <div className="sx-audio-bar">
+            <p role="status">{audioNote ?? (writable === true
+              ? 'Dev build: edits stay in this session. Copy the JSON into public/audio/levels.json to keep them.'
+              : 'Built game: the levels are listed and previewed here, not edited.')}</p>
+            <button type="button" onClick={() => void copyAudioJson()} disabled={!audioDoc} title="Copy the whole levels.json, edits included">Copy JSON</button>
+          </div>
+          {audioError ? <p className="sx-banner" role="alert">{audioError}</p> : null}
+          {audioDoc ? <AudioTab levels={audioDoc.levels} writable={writable === true} onChange={changeAudio} /> : null}
+        </div>
       ) : (
         <div className="sx-body">
           <aside className="sx-left sx-panel" aria-label="Content and outliner">

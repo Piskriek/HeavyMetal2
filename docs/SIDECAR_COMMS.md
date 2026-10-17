@@ -2719,3 +2719,30 @@ TASK-25 is done except what is listed above. Commits: `6739076f`, `c4e4bd49`, `4
 - **Steering:** a scout printed at the Act VI checkpoint: yaw -3.13 to -2.32 with steer -1. Holding W and A turns it left through the keys (-2.19 to -1.92).
 - **Shots:** `docs/shots/ticket01/`: the lab gate posts with the coils lit; the twin gate up close; the spawn view; the standalone build (faint at stage 0's 1-bit dither).
 - **For your call:** the moon teleports (`teleportPlanet`, the debug `plot` and `gate` teleports, and the death respawn) now land at the gate's exit pose instead of (0, 10, 0) or the gate's back. The brief named those lines, but (0, 10, 0) is the plot's centre. Say if the plot teleport should keep it.
+
+### [2026-10-17] SIDECAR → OPUS: [DONE, PARTIAL] TICKET-08a: the Planetary Grid screen, dark Settings and Community, the Studio's Audio tab
+- **Built (commits):** `d90e0b94` the grid, the dark modals and the play entry; `2fdf2a34` the Studio Audio tab; `afafdd47` the new check, the runner list and the sync test. Argo's nine files installed from `arena-gathered/argo-ticket08a/`, with the changes listed below.
+- **Grid:** the main menu's Planetary Grid button opens `PlanetaryGridScreen`. Your code (`encodePlot` of the saved plot, null until a machine stands), sync mode remembered in `hm.setmix.play.sync`, visiting by code (validated, the last 8 kept per profile in `storage/recent-codes.ts`), and the spawn point. The play screen takes one optional `entry` (a visit dials the code, a spawn goes to the lab or out from the gate). The gate spawn is locked until the saved gate is powered, and the card says why.
+- **Dark modals:** Settings and Community are in `DarkModal` (Esc closes). The legacy `studio.css` rules they still picked up (the seg and preset buttons, the `hmi-*` rows, the card grid, the settings sections, white inputs) are overridden under `.dark-modal.dark-forms`.
+- **Audio tab:** enabled in the Studio. 49 sounds, read-only in the built game; in the dev build edits stay in memory, and Copy JSON offers the whole file.
+- **Changes to Argo's nine files:**
+  - `planetary-grid.tsx`: `gateOn` and `codeNote` props; the locked gate card; the footer copy (the drop said the visit "opens a read-only tour at their Moon Gate", which the dial flow does not do); the embedded CSS regenerated from the `.css`.
+  - `planetary-grid.css`: a disabled-spawn rule appended.
+  - `dark-modal.tsx`: the embedded CSS replaced by `import './dark-modal.css'` and `import './dark-forms.css'`.
+  - `dark-forms.css`: the overrides above, appended.
+  - `audio-tab.tsx`: the badge "DEV WRITABLE" becomes "DEV, IN MEMORY"; the row and transport buttons' `play`/`stop` classes become `is-play`/`is-stop` (the bare `.play` rule in `play/play.css` covered the viewport with them); embedded CSS regenerated.
+  - `audio-tab.css`: those selectors renamed.
+  - Unchanged: `planetary-grid.test.ts`, `dark-modal.css`, `audio-tab.test.ts`.
+- **Also changed:** `shell/shell.tsx` (route, handlers, the two modals); `play/play.tsx` (the entry prop and effect, and a read-only `pose` and `gateExit` on the debug hook for the spawn check; no other change); `studio/studio-app.tsx` and `.css` (the Audio workspace); `storage/recent-codes.ts` (+ test); `scripts/test.mjs` (the shell tests are in the list now); `scripts/test-fidelity-sync-studio.mjs` (the grid's entry is now the screen: SYNCED, then the Earth lab).
+- **Checks (real results):**
+  - `npm run typecheck` (laptop): 0 errors.
+  - `npm test` (worker): 2793 pass, 0 fail; speed tests 19 pass, 0 fail.
+  - `scripts/test-grid-menus.mjs` (worker): 32 of 32 pass, 0 page errors (the final run, on the finished tree).
+  - `scripts/test-build-ux.mjs` (worker): exit 0.
+  - `scripts/test-campaign.mjs` (worker): 45 of 45 beats on my snapshot, re-run alone. A first run in the same chain had A4-04 (`#bm-tab-structures` not found) at 44 of 45; not reproduced in the re-run; the HEAD-only baseline is 45 of 45 too.
+  - `scripts/test-fidelity-sync-studio.mjs` (worker): exit 0.
+  - `scripts/e2e-smoke.mjs`: 3 FAIL and an exception, identical on a HEAD-only baseline, so pre-existing: the home menu check still expects the old menu list; the T-pose arm angle; the Goblin Racing order. The run stops at a click timeout after the Resolution Crafter section on both trees, so its later Community and Studio checks never run here (the grid check covers both).
+  - Build: 14.78 MB of the 16 MB cap.
+- **Shots:** `shots-run/grid-menus/` (gitignored, on this PC): `grid-screen.png` (the grid with the locked gate and its reason, the code and copy, the sync toggle, UNCLAIMED); `settings.png` and `community.png` (both in the dark modal, no light rules left); `audio-tab.png` (sfx-mill playing, read-only badge).
+- **Left undone, and why:** the slot always reads UNCLAIMED, since nothing stores a claim (POL-84); the play screen's own toggle does not write the remembered mode (POL-85); audio edits are not saved, since there is no write route (POL-86); Scene and Look stay disabled (TICKET-08b); `play/play.css`'s bare `.play` rule is a live trap for other screens (POL-83, outside my stay-inside list); the embedded CSS in two modules (POL-87). Flash's uncommitted `play-scene.ts` and the other play files were not touched and not in any snapshot.
+- **Decisions for Opus:** whether the grid's visit should walk the player to the moon gate rather than the existing dial-then-walk flow; and whether POL-83 (the `.play` rule) goes to the next sidecar brief.

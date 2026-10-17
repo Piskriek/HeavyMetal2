@@ -123,3 +123,28 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 - **Seen:** `shots-run/build-ux/radial-build.png` (2026-10-17, T04 review by Opus). The text "Action refused: same-stage" covers the middle of the screen in title-card type.
 - **Expected:** a refused world action (`refused` event) is a small toast in the HUD style, never a headline. Raw reason ids such as `same-stage` get a player-facing sentence.
 - Sidecar Task: POL-82 - route `refused` events to the toast channel with friendly reasons.
+
+### POL-83: a bare `.play` rule in play.css catches other screens' buttons
+- **Seen:** TICKET-08a (2026-10-17), the Studio's Audio tab. `apps/web/src/play/play.css` sets `.play { position: absolute; inset: 0; overflow: hidden }`, so any element with class `play` outside the play screen covers the whole viewport: the audio tab's Play buttons did. They are now `is-play` and `is-stop` in the audio tab, which fixes that screen only.
+- **Expected:** the play screen's rule is scoped to its own root, so no other screen picks it up.
+- Sidecar Task: POL-83 - scope `.play` in `play.css` to the play screen's root; then re-run the campaign and the e2e checks.
+
+### POL-84: every player's Planetary Grid slot reads UNCLAIMED
+- **Seen:** TICKET-08a. `resolveSlots` (`crafter/shared-planet.ts`) has no caller, so no slot is ever stored and the grid's slot readout always says UNCLAIMED.
+- **Expected:** a slot is claimed when a plot publishes, and the grid shows `SECTOR #n` with its metres from the origin crater.
+- Owner: Networking phase (POL-16). Sidecar Task: POL-84 - store the claimed slot when a plot publishes; pass it to `PlanetaryGridScreen` as `slot`.
+
+### POL-85: the play screen's sync toggle does not change the remembered mode
+- **Seen:** TICKET-08a. The Grid screen remembers the sync mode in `hm.setmix.play.sync`, which only the main menu writes. The play screen's own Sync/Desync button (`play.tsx`) changes its internal state only.
+- **Expected:** one remembered mode: the play screen's toggle writes the same key.
+- Sidecar Task: POL-85 - write `hm.setmix.play.sync` from the play screen's toggle.
+
+### POL-86: Studio audio-level edits are not saved
+- **Seen:** TICKET-08a. The Audio tab edits `public/audio/levels.json` in memory only: there is no dev write route for it (the dev route writes asset tweaks). The tab offers Copy JSON instead.
+- **Expected:** in the dev build, edits save the way asset changes do.
+- Sidecar Task: POL-86 - add a dev write route for `public/audio/levels.json` beside `/__studio/data/asset-tweaks`, and wire the tab's `onChange` to it.
+
+### POL-87: two screens embed their CSS as a string
+- **Seen:** TICKET-08a. `planetary-grid.tsx` and `audio-tab.tsx` carry their stylesheet inside the module (their unit tests import the module, and Node cannot load CSS). Their `.css` files are the source, so every edit to one means regenerating the string in the other.
+- **Expected:** the stylesheet is imported as a file, and the tests import only the pure helpers from a module without CSS.
+- Sidecar Task: POL-87 - move the pure helpers to their own module and import the `.css` files directly, as the rest of the shell does.

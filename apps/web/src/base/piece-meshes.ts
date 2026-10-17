@@ -254,12 +254,16 @@ export class PieceMeshManager {
         }
       }
 
+      const colliders = piece.kind === 'door' && !piece.open
+        ? [...entry.colliders, { min: [-0.7, 0, -0.125], max: [0.7, 2.3, 0.125] } as Box]
+        : entry.colliders;
+
       placedForWalk.push({
         id: piece.id,
         kind: piece.kind,
         pos,
         yaw: totalYaw,
-        colliders: entry.colliders,
+        colliders,
       });
 
       // Update lamp emissive lighting

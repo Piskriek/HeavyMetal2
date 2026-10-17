@@ -401,7 +401,10 @@ export class KitPieceCache {
       case 'windowWall': {
         const res = basekit2.windowWall(bkm, { stage });
         rawGroup = res.group;
-        rawColliders = res.colliders;
+        rawColliders = [
+          ...res.colliders,
+          { min: [0.8, 1, -0.1], max: [3.2, 2.2, 0.1] },
+        ];
         rawLamps = res.lamps;
         break;
       }

@@ -90,5 +90,81 @@ test('walk: stand on foundation, wall yaw collision, ramp climbing, airlock door
   const flankPushed = walk.push(-1.5, 0, 0.2, radius);
   assert.notEqual(flankPushed.z, 0, 'Walking into wall flank must push player out');
 
+  // 5. WindowWall blocks player at its center face (glass height)
+  const windowTmpl = cache.getTemplate('windowWall', 1, 0);
+  walk.setPieces([
+    {
+      id: 5,
+      kind: 'windowWall',
+      pos: { x: 0, y: 0, z: 0 },
+      yaw: 0,
+      colliders: windowTmpl.colliders,
+    },
+  ]);
+  const windowCenterPushed = walk.push(0, 0, 0.2, radius);
+  assert.ok(Math.abs(windowCenterPushed.z) >= 0.4, `Window center face must block player: ${windowCenterPushed.z}`);
+
+  // 6. Door blocks when closed, lets player walk through when open
+  const doorTmpl = cache.getTemplate('door', 1, 0);
+  const closedDoorColliders = [
+    ...doorTmpl.colliders,
+    { min: [-0.7, 0, -0.125] as [number, number, number], max: [0.7, 2.3, 0.125] as [number, number, number] },
+  ];
+  walk.setPieces([
+    {
+      id: 6,
+      kind: 'door',
+      pos: { x: 0, y: 0, z: 0 },
+      yaw: 0,
+      colliders: closedDoorColliders,
+    },
+  ]);
+  const closedPushed = walk.push(0, 0, 0.2, radius);
+  assert.ok(Math.abs(closedPushed.z) >= 0.4, `Closed door must block player at doorway center: ${closedPushed.z}`);
+
+  // When door is open (leaf swung out):
+  walk.setPieces([
+    {
+      id: 6,
+      kind: 'door',
+      pos: { x: 0, y: 0, z: 0 },
+      yaw: 0,
+      colliders: doorTmpl.colliders,
+    },
+  ]);
+  const openPass = walk.push(0, 0, 0.2, radius);
+  assert.equal(openPass.x, 0, 'Open doorway must allow passage without X push');
+  assert.equal(openPass.z, 0, 'Open doorway must allow passage without Z push');
+
+  // 7. Roof at k=1 (ceiling) never pushes player walking underneath on floor
+  const roofTmpl = cache.getTemplate('roof', 1, 0);
+  walk.setPieces([
+    {
+      id: 7,
+      kind: 'roof',
+      pos: { x: 0, y: 3.0, z: 0 }, // k = 1 atop 3m walls
+      yaw: 0,
+      colliders: roofTmpl.colliders,
+    },
+  ]);
+  const roofUnderPushed = walk.push(0, 0, 0.0, radius);
+  assert.equal(roofUnderPushed.x, 0, 'Walking underneath roof must not deflect X');
+  assert.equal(roofUnderPushed.z, 0, 'Walking underneath roof must not deflect Z');
+
+  // 8. Ramp on a slope where terrain drops 0.8m under the low edge can still be stepped onto
+  walk.setPieces([
+    {
+      id: 8,
+      kind: 'ramp',
+      pos: { x: 0, y: 5.0, z: 0 },
+      yaw: 0,
+      colliders: rampTmpl.colliders,
+    },
+  ]);
+  // Player standing on ground at 4.2m (0.8m below ramp base at 5.0m)
+  const rampSlopeY = walk.standAt(0, -2.0, 4.2, 4.2);
+  assert.equal(rampSlopeY, 5.0, 'Must step onto low edge of ramp even on terrain slope drop');
+
   cache.dispose();
 });
+

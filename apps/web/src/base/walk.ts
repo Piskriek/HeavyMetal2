@@ -80,7 +80,8 @@ export class WalkWorld {
           // Analytic ramp top: in ramp frame across 4m run (-2..2 in z), y = 3 * (z + 2) / 4
           const ly = (3 * (lz + 2)) / 4;
           const candY = p.pos.y + ly;
-          if (candY <= maxStepUp && candY > bestY) {
+          const rampStepUp = Math.max(maxStepUp, groundY + 1.2);
+          if (candY <= rampStepUp && candY > bestY) {
             bestY = candY;
           }
         }
@@ -151,7 +152,15 @@ export class WalkWorld {
           // For ramps, the deck boxes follow the slope for standing/raycasting,
           // but do not act as horizontal barrier walls. Only the side handrails push.
           // The stairs' step boxes are solid under each tread: they are climbed, not walls, so they are skipped too.
-          if ((p.kind === 'ramp' || p.kind === 'stairs') && (c.max[0] - c.min[0]) > 1.0) continue;
+          // Roof kinds are overhead ceilings and do not act as horizontal pushing walls.
+          if (
+            ((p.kind === 'ramp' || p.kind === 'stairs') && (c.max[0] - c.min[0]) > 1.0) ||
+            p.kind === 'roof' ||
+            p.kind === 'lowRoof' ||
+            p.kind === 'roofOuter' ||
+            p.kind === 'roofInner' ||
+            p.kind === 'ridgeCap'
+          ) continue;
 
           // Transform curX, curZ into piece local frame
           const dx = curX - p.pos.x;

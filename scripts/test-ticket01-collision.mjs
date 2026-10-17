@@ -268,6 +268,175 @@ try {
     await page.evaluate(({ x, z }) => window.__playScene.debug.teleport('planet', x + 2, z - 9, Math.PI, 0), { x: st.x, z: st.z });
     await page.evaluate(() => window.__t1.run(12, { x: 0, z: 0 }));
     await shot('standalone-build.png');
+
+    // ---------------------------------------------------------------- 4b. T01b leftovers: windowWall, door, roof, ramp on slope
+    const leftovers = await page.evaluate(({ s, at }) => {
+      const api = window.hmPlay.base;
+      const w0 = api.world();
+      // Grant bp:cube:basalt, bp:beam:basalt, ore, and map-basalt to player directly in test fixture
+      const grantToPlayer = (item, n) => {
+        const slot = w0.player.slots.find((stk) => stk && stk.item === item);
+        if (slot) {
+          slot.n += n;
+        } else {
+          const emptyIdx = w0.player.slots.findIndex((stk) => stk === null);
+          if (emptyIdx >= 0) {
+            w0.player.slots[emptyIdx] = { item, n };
+          }
+        }
+      };
+      grantToPlayer('bp:cube:basalt', 1);
+      grantToPlayer('bp:beam:basalt', 1);
+      grantToPlayer('ore', 5000);
+      grantToPlayer('map-basalt', 50);
+
+      // 1. A wall with a window: place at i: 0, j: 0, r: 1 (west edge of cell 0,0)
+      const win = api.apply({ t: 'place', at, blueprint: 'bp:cube:basalt', piece: { s, kind: 'windowWall', i: 0, j: 0, k: 0, r: 1 } });
+
+      // 2. A door: place at i: 0, j: 1, r: 0 (north edge of cell 0,0)
+      const door = api.apply({ t: 'place', at, blueprint: 'bp:cube:basalt', piece: { s, kind: 'door', i: 0, j: 1, k: 0, r: 0 } });
+
+      // 3. A roof placed while aiming at the floor (k: 0) on cell 0,0: snaps to k=1 (on the walls)
+      // roofLevel is 1 + max carrying edge k
+      const carrying = new Set(['wall', 'airlock', 'windowWall', 'doorframe', 'door']);
+      let roofK = 1;
+      const wCur = api.world();
+      for (const p of wCur.base.pieces) {
+        if (p.s !== s || !carrying.has(p.kind)) continue;
+        const touches = (p.i === 0 && p.j === 0) ||
+          (p.r === 0 && p.i === 0 && p.j === 1) ||
+          (p.r === 1 && p.i === 1 && p.j === 0);
+        if (touches) roofK = Math.max(roofK, 1 + p.k);
+      }
+      const roof = api.apply({ t: 'place', at, blueprint: 'bp:beam:basalt', piece: { s, kind: 'roof', i: 0, j: 0, k: roofK, r: 0 } });
+
+      const w = api.world();
+      const placedWin = w.base.pieces.find((p) => p.s === s && p.kind === 'windowWall');
+      const placedDoor = w.base.pieces.find((p) => p.s === s && p.kind === 'door');
+      const placedRoof = w.base.pieces.find((p) => p.s === s && p.kind === 'roof');
+
+      return {
+        winOk: win.events.some((e) => e.type === 'placed'),
+        winWhy: win.events.map((e) => e.type + (e.why ? `:${e.why}` : '')).join(','),
+        doorOk: door.events.some((e) => e.type === 'placed'),
+        doorWhy: door.events.map((e) => e.type + (e.why ? `:${e.why}` : '')).join(','),
+        roofOk: roof.events.some((e) => e.type === 'placed'),
+        roofWhy: roof.events.map((e) => e.type + (e.why ? `:${e.why}` : '')).join(','),
+        doorId: placedDoor?.id ?? null,
+        roofK: placedRoof?.k ?? null,
+      };
+    }, { s: built.s, at: { x: st.x, z: st.z } });
+
+    check('base: windowWall is placed through base API', leftovers.winOk, leftovers.winWhy);
+    check('base: door is placed through base API', leftovers.doorOk, leftovers.doorWhy);
+    check('base: roof is placed through base API', leftovers.roofOk, leftovers.roofWhy);
+    check('T01b: roof placed while aiming at floor lands at k=1', leftovers.roofK === 1, `k=${leftovers.roofK}`);
+
+    // Walk test 1: A wall with a window blocks you at its face
+    // Face of windowWall is at local x = 0 (world x = st.x). Start at (st.x + 2, st.z + 2) facing -x (yaw Math.PI / 2).
+    await page.evaluate(({ x, z }) => window.__playScene.debug.teleport('planet', x + 2, z + 2, Math.PI / 2, 0), { x: st.x, z: st.z });
+    const winStop = await page.evaluate(({ x }) => {
+      const end = window.__t1.run(120, { x: 0, z: 1 });
+      return { x: end.x, passed: end.x < x - 0.05 };
+    }, { x: st.x });
+    check('T01b: a wall with a window blocks you at its face', !winStop.passed && winStop.x > st.x - 0.05, `x=${winStop.x.toFixed(2)} vs window ${st.x.toFixed(2)}`);
+
+    // Walk test 2: A door blocks you when closed
+    // Door is at local z = 4 (world z = st.z + 4). Start at (st.x + 2, st.z + 2) facing +z (yaw Math.PI).
+    await page.evaluate(({ x, z }) => window.__playScene.debug.teleport('planet', x + 2, z + 2, Math.PI, 0), { x: st.x, z: st.z });
+    const doorClosedStop = await page.evaluate(({ z }) => {
+      const end = window.__t1.run(120, { x: 0, z: 1 });
+      return { z: end.z, stopped: end.z < z + 4 - 0.05 };
+    }, { z: st.z });
+    check('T01b: a door blocks you when closed', doorClosedStop.stopped, `z=${doorClosedStop.z.toFixed(2)} vs door ${(st.z + 4).toFixed(2)}`);
+
+    // Walk test 3: Open the door with the base door action and you walk through
+    if (leftovers.doorId !== null) {
+      const doorOpened = await page.evaluate((id) => {
+        const res = window.hmPlay.base.apply({ t: 'door', id, open: true });
+        return res.events.some((e) => e.type === 'door' && e.open === true);
+      }, leftovers.doorId);
+      await page.evaluate(({ x, z }) => window.__playScene.debug.teleport('planet', x + 2, z + 2, Math.PI, 0), { x: st.x, z: st.z });
+      const doorOpenPass = await page.evaluate(({ z }) => {
+        const end = window.__t1.run(120, { x: 0, z: 1 });
+        return { z: end.z, passed: end.z > z + 4 + 0.5 };
+      }, { z: st.z });
+      check('T01b: open door with base action lets you walk through', doorOpened && doorOpenPass.passed, `opened=${doorOpened} z=${doorOpenPass.z.toFixed(2)} vs door ${(st.z + 4).toFixed(2)}`);
+    }
+
+    // Walk test 4: A roof placed while aiming at the floor lands at k=1. You can walk underneath it freely.
+    await page.evaluate(({ x, z }) => window.__playScene.debug.teleport('planet', x + 2, z + 2, 0, 0), { x: st.x, z: st.z });
+    const underRoof = await page.evaluate(() => {
+      const s0 = window.__t1.run(20, { x: 0, z: 0 });
+      const s1 = window.__t1.run(40, { x: 0.5, z: 0.5 });
+      return { feet0: s0.feet, feet1: s1.feet };
+    });
+    check('T01b: you can walk underneath roof freely (never pushes at head height)', Math.abs(underRoof.feet0 - st.y) < 0.06 && Math.abs(underRoof.feet1 - st.y) < 0.06, `feet=${underRoof.feet0.toFixed(3)} deck=${st.y.toFixed(3)}`);
+
+    // Walk test 5: A ramp on a slope: find ground at least 10 degrees steep near the plot (scan __playScene.heightAt).
+    // Place a ramp there, and walk up it from its low edge.
+    const slopeSpot = await page.evaluate(() => {
+      const scene = window.__playScene;
+      for (let r = 20; r <= 85; r += 2) {
+        for (let th = 0; th < Math.PI * 2; th += 0.15) {
+          const x = Math.round(r * Math.cos(th));
+          const z = Math.round(r * Math.sin(th));
+          const hx = scene.heightAt(x + 1, z) - scene.heightAt(x - 1, z);
+          const hz = scene.heightAt(x, z + 1) - scene.heightAt(x, z - 1);
+          const deg = Math.atan(Math.hypot(hx, hz) / 2) * 180 / Math.PI;
+          if (deg >= 10 && deg <= 25) {
+            return { x, z, deg: Math.round(deg), h: scene.heightAt(x, z) };
+          }
+        }
+      }
+      return null;
+    });
+    check('T01b: ground at least 10 degrees steep found near plot', !!slopeSpot, slopeSpot ? `${slopeSpot.deg} deg at (${slopeSpot.x}, ${slopeSpot.z})` : 'none found');
+
+    if (slopeSpot) {
+      const slopeBuild = await page.evaluate((spot) => {
+        const api = window.hmPlay.base;
+        const w0 = api.world();
+        const grantToPlayer = (item, n) => {
+          const slot = w0.player.slots.find((stk) => stk && stk.item === item);
+          if (slot) {
+            slot.n += n;
+          } else {
+            const emptyIdx = w0.player.slots.findIndex((stk) => stk === null);
+            if (emptyIdx >= 0) {
+              w0.player.slots[emptyIdx] = { item, n };
+            }
+          }
+        };
+        grantToPlayer('bp:starter', 1);
+        grantToPlayer('bp:beam:basalt', 1);
+        grantToPlayer('ore', 5000);
+        grantToPlayer('map-basalt', 50);
+
+        const at = { x: spot.x, z: spot.z };
+        const found = api.apply({ t: 'found', at, blueprint: 'bp:starter', cx: at.x, cz: at.z, yaw: 0 });
+        const w = api.world();
+        const st = w.base.structures[w.base.structures.length - 1];
+        if (!st) return { ok: false, why: 'no structure' };
+        const s = st.id;
+        const ramp = api.apply({ t: 'place', at, blueprint: 'bp:beam:basalt', piece: { s, kind: 'ramp', i: 1, j: 0, k: 0, r: 0 } });
+        return {
+          ok: found.events.some((e) => e.type === 'placed') && ramp.events.some((e) => e.type === 'placed'),
+          foundWhy: found.events.map((e) => e.type + (e.why ? `:${e.why}` : '')).join(','),
+          rampWhy: ramp.events.map((e) => e.type + (e.why ? `:${e.why}` : '')).join(','),
+          st: { x: st.x, y: st.y, z: st.z, yaw: st.yaw },
+        };
+      }, slopeSpot);
+      check('base: ramp on slope placed through base API', slopeBuild.ok, `${slopeBuild.foundWhy ?? ''};${slopeBuild.rampWhy ?? ''}`);
+
+      if (slopeBuild.ok && slopeBuild.st) {
+        const sst = slopeBuild.st;
+        await page.evaluate(({ x, z }) => window.__playScene.debug.teleport('planet', x + 6, z - 1.5, Math.PI, 0), { x: sst.x, z: sst.z });
+        const sRampStart = await page.evaluate(() => window.__t1.run(10, { x: 0, z: 0 }).feet);
+        const sRampPeak = await page.evaluate(() => window.__t1.run(180, { x: 0, z: 1 }).maxFeet);
+        check('T01b: ramp on a slope climbs at least 2 m from its low edge', sRampPeak - sRampStart >= 2.0, `rise=${(sRampPeak - sRampStart).toFixed(2)} m`);
+      }
+    }
   }
 
   // ---------------------------------------------------------------- 5. a field machine blocks the walk

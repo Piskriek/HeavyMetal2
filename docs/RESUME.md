@@ -1,6 +1,21 @@
 # RESUME: start here (fresh session)
 
-## 16 Oct Session Handoff Checkpoint (read first)
+## 17 Oct Checkpoint (read first)
+- **(a) The workflow** (`docs/argo/notes/`; Drive folder Setmix):
+  - **Argo** (Gemini, PM and creative lead) gets one spec note per ticket (`OPUS_NOTE_NN`), writes or polishes the code, and saves `{files:{path:content}}` bundles. His Drive tool saves to My Drive's root, so Opus moves them into Setmix (the owner has given standing permission to upload or move anything Argo needs).
+  - **Opus** runs the Arena battles and never reads their code; it judges them with hidden oracles.
+  - **Sidecars install:** Gemini Flash takes jobs from `docs/sidecar/FLASH_INBOX.md` and reports in `FLASH_OUTBOX.md`; Haiku is briefed through the Agent tool (`docs/prompts/sidecar/T*.md`).
+  - **Heavy checks run on the 3D PC worker** (`scripts/on-3dpc.sh` for the pushed branch, `scripts/test-on-3dpc.sh [--only paths]` for the working tree).
+- **(b) Landed and verified together on the 3D PC at d153fb30:** typecheck 0; 2,782 unit tests; build 14.71 MB; ticket01 32 of 32; inspector 27 of 27; plot-biome, stage-world and base-building pass; campaign 45 of 45.
+  - **TICKET-01:** colliders, the gate exit, the unpowered doorway, roof levels, the steering sign, and windows, doors, roofs and ramps on slopes.
+  - **TICKET-02:** `@hm/sky` (the sky follows the stage); `@hm/plotbiome` (tufts from stage 2, bushes at 4, forest at 6); the coverage shader (the ground greens); hydro water.
+  - **TICKET-03:** the machine inspector on E, the bench opening the Drafting Table, machines at real height.
+- **(c) Running:**
+  - Flash F-09: a performance pass, because stage 6 on Low fell to 35 fps on the laptop; the target is 45.
+  - Haiku T04: thumbnails, the X radial, hold-Z to remove, build and Esc UX.
+- **(d) Next:** the plume glue from `docs/argo/notes/ARGO_NOTE_08_plumes.md` (after F-09: it touches play-scene), then TICKET-05 to 08 (`ARGO_NOTE_05`). Deferred items are POL-73 to POL-77.
+
+## 16 Oct Session Handoff Checkpoint
 - **(a) Branch** `feat/monster-mash-exploration`, HEAD `df69c911`. `origin/main` is fast-forwarded to it.
 - **(b) Done this session, all on Haiku workers, each accepted in `docs/SIDECAR_COMMS.md`:**
   - **TASK-24, the campaign e2e:** the act checkpoints in `apps/web/public/checkpoints/` and `docs/TEST_GUIDE.md`.

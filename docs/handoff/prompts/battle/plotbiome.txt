@@ -1,0 +1,56 @@
+Build one pure TypeScript module, src/plotbiome.ts, plus src/plotbiome.test.ts (node:test + node:assert/strict) and a preview page.
+
+CONTEXT: a moon plot is terraformed through stages 0..6. Stage 2: grass tufts bloom near machines. Stage 4: bushes near water. Stage 5: moss and grass creep out from water and machines. Stage 6: forest. You bake the plot's ground cover and plant placements for any stage.
+
+MODULE RULES:
+- strict TS with noUncheckedIndexedAccess;
+- ZERO imports, no DOM, no Date, no Math.random, no I/O;
+- randomness only from this PRNG, seeded from input.seed:
+  function mulberry32(a:number){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+EXPORTS (exactly):
+export type Tier='low'|'mid'|'high';
+export type ScatterKind='tuft'|'bush'|'pine'|'oak'|'birch';
+export const CAPS:Readonly<Record<Tier,number>>={low:600,mid:2000,high:6000};
+export const SPACING:Readonly<Record<ScatterKind,number>>={tuft:0.8,bush:2,pine:4,oak:4.5,birch:3.5}; // metres
+export const FIRST_STAGE:Readonly<Record<ScatterKind,number>>={tuft:2,bush:4,pine:5,oak:5,birch:5};
+export const WET_REACH=6; // metres
+export interface BiomeInput{
+ n:number; cellM:number; // grid n x n cells (16..512), metres per cell
+ height:Float32Array; // n*n metres, index z*n+x; cell (x,z) centre is at world ((x+0.5)*cellM,(z+0.5)*cellM)
+ water:Uint8Array; // n*n, 0 = dry, >0 = water
+ stage:number; // 0..6, may be fractional
+ s:{pxd:number;vtx:number;lx:number;aq:number}; // each 0..1
+ machines:readonly{x:number;z:number;r:number}[]; // world metres; r = keep-out radius
+ keepouts:readonly{x0:number;z0:number;x1:number;z1:number}[]; // world-metre rectangles
+ seed:number; tier:Tier;
+}
+export interface Scatter{kind:ScatterKind;x:number;z:number;scale:number;yaw:number;appear:number}
+export interface BiomeBake{cover:Uint8Array;scatter:Scatter[]} // cover n*n*4: R dust, G moss, B grass, A wet
+export function slopeDeg(height:Float32Array,n:number,cellM:number,x:number,z:number):number;
+export function bakePlotBiome(i:BiomeInput):BiomeBake;
+
+DEFINITIONS (hidden tests check them exactly):
+- slopeDeg: central differences ((h[x+1]-h[x-1])/(2*cellM), the same in z), one-sided at the grid edges, as atan(|gradient|) in degrees.
+- A (wet) = 255 on water cells. Elsewhere it is round(255*max(0,1-d/WET_REACH)), where d is the Euclidean metres from the cell centre to the nearest water cell centre. It is independent of stage.
+- stage<2: G=B=0 everywhere and scatter=[].
+- G and B never decrease, and R never increases, as stage grows (inputs otherwise equal). G and B also never decrease as aq or lx grow. G=B=0 on water cells. B=0 where slope>35; G=0 where slope>45.
+- Each Scatter has appear in [FIRST_STAGE[kind],6], and is present iff appear<=stage. Its fields are identical at every stage where it is present (monotone growth: raising the stage only adds instances).
+- Never place scatter on a water cell, a cell with slope>35, within r of a machine, inside a keep-out, or outside [0,n*cellM).
+- Any two instances are at least max(SPACING[a],SPACING[b]) apart.
+- Trees go only on cells where G or B would be >=128 at stage 6.
+- Caps: at most CAPS[tier] instances. Choose the instances in an order that keeps monotone growth under the cap: sort by appear, ties by a seeded hash, then take a prefix.
+- scale in [0.7,1.3], yaw in [0,2*PI).
+- Tufts appear first nearest the machines (appear rises with distance). Bushes favour wet cells. Pines go on drier, higher ground, birches near water, oaks in between.
+- No NaN. The same input gives a byte-identical cover and a deep-equal scatter. A different seed gives a different scatter.
+- Speed: n=256 in under 40 ms in Node.
+
+TESTS: at least 12, covering each rule above.
+
+PREVIEW (index.html + a small script, plain TS/JS):
+- a canvas showing the shaded heightfield with the cover blended (dust grey, moss dark green, grass light green, wet blue tint) and the scatter as dots coloured by kind;
+- controls: a stage slider (0..6, step 0.1), a tier select, a seed field, and an aq slider;
+- a seeded test terrain: a crater with a lake, a ridge and 3 machines;
+- the instance count by kind, and the bake time in ms.
+
+Reply with the full files. Final line: state which model you are (vendor, model name and version), including any internal codename like Argon if applicable.

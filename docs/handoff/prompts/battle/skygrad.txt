@@ -1,0 +1,50 @@
+Build one pure TypeScript module, src/sky.ts, plus src/sky.test.ts (node:test + node:assert/strict) and a preview page.
+
+CONTEXT: a moon is terraformed through stages 0..6. Up to stage 2 it has no air: the sky is black (the game draws the stars itself). At stage 3 a thin atmosphere appears; from about stage 4.5 the sky is a full Earth-like blue, with golden hours when the sun is low. You compute the sky radiance physically.
+
+MODULE RULES: strict TS with noUncheckedIndexedAccess; ZERO imports, no DOM, no Date, no Math.random, no I/O. Pure deterministic functions only.
+
+EXPORTS (exactly):
+export type Vec3=readonly[number,number,number]; // y is up; directions need not be normalised (normalise them yourself)
+export const SKY_ROWS=64;
+export function density(stage:number):number; // smoothstep(2,4.5,stage): 0 at stage<=2, 1 at stage>=4.5
+export function skyAt(dir:Vec3,sunDir:Vec3,stage:number):[number,number,number];
+export function skyGradient(sunDir:Vec3,stage:number,out:Float32Array):void;
+export function sunColour(sunDir:Vec3,stage:number):[number,number,number];
+export function bakeSkyLut(sunDir:Vec3,stage:number,w:number,h:number,out:Float32Array):void;
+
+THE CONTRACT FOR EACH:
+- skyAt: linear-RGB radiance seen along dir. It is 0 for dir below the horizon.
+- skyGradient: writes SKY_ROWS*3 floats. Row 0 is the zenith and row 63 is elevation 0. Each row is skyAt averaged over the azimuth at that row's elevation (at least 16 azimuth samples), with the elevation linear in the row index.
+- sunColour: the transmittance-tinted sun disc colour, normalised so its largest channel is 1. It is [1,1,1] at density 0.
+- bakeSkyLut: w*h*3 floats. Columns are azimuth relative to the sun (0 to 2*PI) and rows are elevation from 90 degrees (row 0) down to 0 (row h-1).
+
+PHYSICS:
+- single scattering in a flat-planet exponential atmosphere, multiplied by density(stage);
+- Rayleigh: beta = 5.8e-6, 13.5e-6, 33.1e-6 per metre (R, G, B), scale height 8000 m, phase 3/(16*PI)*(1+cos^2);
+- Mie: beta = 2.1e-5 (grey), scale height 1200 m, Henyey-Greenstein phase with g=0.76;
+- view-ray optical depth with the airmass growing towards the horizon (a Chapman or Kasten-Young style approximation is fine; it must stay finite at elevation 0);
+- the sun's light is attenuated along its own path, so a low sun reddens;
+- integrate with 8 to 16 steps; the sun's irradiance is 20 per channel.
+
+INVARIANTS (hidden tests check them):
+1. density(stage)=0 means skyAt=0 everywhere and every skyGradient value is below 1e-6.
+2. stage 6, sun at elevation 60 degrees: the zenith has B>G>R. The horizon's B/R ratio is lower than the zenith's (paler near the horizon).
+3. stage 6, sun at 3 degrees: skyAt towards the sun at 2 degrees of elevation has R>B (warm). sunColour has R>=G>=B and B<0.6.
+4. stage 6, sun at 60 degrees: sunColour has B>0.8.
+5. For a fixed direction and sun, the zenith luminance (0.2126R+0.7152G+0.0722B) never decreases from stage 2 to stage 4.5.
+6. Brighter towards the sun: at elevation 20 degrees, azimuth 0 from the sun is brighter than azimuth 180.
+7. A sun below the horizon (-10 degrees) gives a dim but finite sky, luminance below 0.05.
+8. There is never a NaN or Infinity, for any input, including a zero vector or the sun straight up or straight down. Every value is in [0,10].
+9. Deterministic: identical calls give identical floats.
+10. Speed: skyGradient under 3 ms, and bakeSkyLut(32,16) under 15 ms, in Node.
+
+TESTS: at least 10, one per invariant.
+
+PREVIEW (index.html + a small script):
+- a canvas sky dome (a fisheye view looking up, plus a horizon strip), tone-mapped with ACES and gamma 2.2;
+- sliders for the sun elevation (-15 to 90 degrees), the sun azimuth and the stage (0 to 6, step 0.1);
+- the sun disc drawn in its sunColour;
+- a strip of the 64-row gradient beside the dome.
+
+Reply with the full files. Final line: state which model you are (vendor, model name and version), including any internal codename like Argon if applicable.

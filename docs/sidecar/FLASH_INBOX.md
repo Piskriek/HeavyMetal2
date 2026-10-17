@@ -72,7 +72,7 @@ Brief: `docs/prompts/sidecar/T02C-plotbiome-install.md`. Start it only after F-0
 ## F-06 [DONE] TICKET-02 F: plotbiome's tufts, bushes and trees in the moon world
 Brief: `docs/prompts/sidecar/T02F-biome-scatter.md`. Bake once at stage 6, show by `appear`; Vegetation setting with Auto; at least 30 fps on Low at stage 6.
 
-## F-07 [TAKEN] TICKET-02 F2: grass at stage 2 and bushes at stage 4 (F-06 follow-up)
+## F-07 [DONE] TICKET-02 F2: grass at stage 2 and bushes at stage 4 (F-06 follow-up)
 Brief: `docs/prompts/sidecar/T02F2-early-stages.md`. Tufts on Low, machines and the gate feed the input, water sources; fps on the laptop, everything else via scripts/test-on-3dpc.sh.
 
 ## F-08 [OPEN] TICKET-02 B+E: Argo's coverage shader and water surfaces, wired in

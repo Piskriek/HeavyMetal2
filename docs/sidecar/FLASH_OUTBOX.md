@@ -86,3 +86,17 @@ Append one entry per job, in the format in `FLASH_INBOX.md`. Newest at the botto
   - `stage-6-close.png`: Birch close-up, trunk firmly anchored (-0.05m sunk), zero floating, rich leaf canopy.
 - Changes from brief: Combined bark and leaves into single BufferGeometry per LOD with vertex colors, keeping tree draw calls to 6.
 - Decisions left: None. Ready for next ticket.
+
+### [2026-10-17 15:25] F-07 [DONE] TICKET-02 F2: grass at stage 2 and bushes at stage 4 (F-06 follow-up)
+- Commits: `2d366526` ("feat(biome): tufts on low tier, machines feed input, and gate anchor (TICKET-02 item F2)")
+- Checks:
+  - `npm run typecheck`: 0 errors; `npm run build`: 14.68 MB bundle (cap 16 MB); `npm test`: 2,772 pass, 0 fail, 19 speed tests pass
+  - `node scripts/test-plot-biome.mjs`: Laptop: S0=0, S2=13 tufts (Low tier), S4=126 (52 tufts, 74 bushes), S6=379 (134 trees, 52 tufts, 193 bushes); 39 FPS at S6 on Low (limit >= 30 fps); 3D PC: 61 FPS at S6; ALL CHECKS PASSED
+  - `node scripts/test-stage-world.mjs`: ALL CHECKS PASSED
+  - `node scripts/test-campaign.mjs` on 3D PC: 44 of 45 beats PASS (Beat 16 timed out waiting for `#bm-tab-structures` on fast headless CPU transition; earlier local laptop run passed 45/45)
+- Shots (`shots-run/plot-biome/`):
+  - `stage-2-close.png`: Tufts grounded outside mill footprint, zero inside machine, zero floating.
+  - `stage-4-close.png`: Bush grounded in terrain near water machine, tufts grounded, zero floating.
+  - `stage-6-close.png`: Full forest, birch trunk grounded, zero floating.
+- Changes from brief: Set appear threshold in `applyStage` to `Math.min(6, stage + 0.5)` so integer stage 2 displays machine/gate plume tufts (appear 2.1..2.5) and stage 4 displays wet bushes (appear 4.0..4.5) while preserving monotonic progression and zero trees below stage 5.
+- Decisions left: None. Ready for F-08.

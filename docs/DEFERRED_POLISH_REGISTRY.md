@@ -243,3 +243,28 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 - **Seen:** plan 36 Phase 1. A roster name comes from presence (a player's pose), so a friend who has not moved shows as "Friend". The room now broadcasts each join with its role, so the roster lists everyone, but without a name.
 - **Expected:** the join carries the player's name (the RUN `onPlayerJoined` callback has it), shown until the pose arrives.
 - Sidecar Task: POL-117 - pass the username from the room's join notice into `rosterOf` (outpost-session.ts), with the Phase 2 role UI.
+
+### POL-101: the EGA pocket is cyan (Argo's call), not the spec's magenta
+- **Seen:** TICKET-06 install. Argo's `lab-vista-math.ts` changes the EGA pocket's tint, sky and rim to cyan. The review-2 spec (SIDECAR_COMMS, V2) and `docs/WINDOW_SCENE_PLAN.md` say magenta. The test `the rim of each pocket is its own colour` now asserts cyan.
+- **Expected:** Argo confirms cyan, or restores magenta (the EGA entry and that test line go back).
+- Sidecar Task: POL-101 - Argo decides the EGA pocket colour; Opus makes the test match the decision.
+
+### POL-102: a few mauve blocks read as pink at storm 0.5 (Lite and Full)
+- **Seen:** `docs/shots/ticket06/window-lite-storm-0.5.png` and `window-full-storm-0.5.png`. Some structures render pale mauve or salmon (sampled RGB about (181,148,171) and (115,84,97)), not magenta. Storm 0 and storm 1 are clean. The LAB-04 slate path in `lab-vista.ts` does not catch them.
+- **Expected:** no pink or purple cubes at any storm progress (the TICKET-06 check).
+- Sidecar Task: POL-102 - find the material or the dusk tint that makes the mauve, clamp it in the shader, and check the three window views at storm 0, 0.5 and 1.
+
+### POL-103: the east wall's grey box is a featureless placeholder
+- **Seen:** `docs/shots/ticket06/right-wall-machines.png`. A plain grey block stands between the Hardware Fabricator and the armory rail (x 7.2 to 7.9, z -0.6 to 0.1, 1.3 m tall). It is grounded (its lowest point is y = 0), but it is a generated `low` model with no detail.
+- **Expected:** a believable piece of kit, per the sheet 07 design.
+- Sidecar Task: POL-103 - Argo names the piece; the generator batch (or a labkit piece) replaces the box.
+
+### POL-104: the lab's remaining draw calls after the TICKET-06 budget pass
+- **Seen:** the lab draws 172 calls at HEAD and 180 now (the 3D PC, Low, the gate view). Still unmerged: the generated model parts (about 56 meshes in `Scene` groups), the T07a armory rack and sidearm (11 meshes; the sidearm must stay separate for the pickup), and the operator console's parts.
+- **Expected:** the lab stays within +10% of HEAD as the generated models come in.
+- Sidecar Task: POL-104 - merge the static parts of the generated lab models at load with `mergeStaticMeshes` (keep the lever, the lamps and the sidearm separate).
+
+### POL-105: the lab's merged static geometry is not freed on dispose
+- **Seen:** TICKET-06. `mergeStaticMeshes` (lab-machines.ts) builds new merged geometry for the shell, the station dressing, the cable drops and the gate housings. The room's `keep` list does not hold it, so the room's `dispose()` leaves it for the garbage collector to miss.
+- **Expected:** `dispose()` frees every geometry the room made.
+- Sidecar Task: POL-105 - have `mergeStaticMeshes` return the geometry, and register it with the room's `keep` in `lab-room.ts`.

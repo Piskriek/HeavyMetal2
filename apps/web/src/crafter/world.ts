@@ -3,6 +3,7 @@
 // in it. The crafter screen orbits it; the lab menu looks at it through the archway. Your plot's centre is kept clear for the
 // gate's planet end (owner, 2026-10-06; docs/SETMIX_PLAN.md): it is built to the concept art, so nothing stands there yet.
 import * as THREE from 'three';
+import { skyUniforms as sampleSkyUniforms } from '@hm/sky';
 import type { StageLook } from './looks';
 import { MAIN_CRATER, facetedHeight, gridHeights, gridNormals, hash, makeGrid, type MoonGrid } from './moon';
 import { BOULDERS, FAR, PLANET_RADIUS, PLOT_EDGE, PLOT_RADIUS, drop, heightGrid, makeDisc, makeRing, planetHeight, sunlight, type Boulder, type HeightGrid, type Plot } from './planet';
@@ -34,6 +35,7 @@ export interface World {
 
 /** The sun: low (20 degrees), to the right of the first view, so crater rims and boulders throw long shadows across the plains. */
 export const SUN = new THREE.Vector3(0.42, 0.34, -0.84).normalize();
+const sunArray: readonly [number, number, number] = [SUN.x, SUN.y, SUN.z];
 /** The goblin planet hangs low over the plains, ahead and to the left of the first view. */
 export const PLANET_DIR = new THREE.Vector3(-0.935, 0.135, -0.327).normalize();
 const PLANET_SIZE = 0.095;
@@ -55,8 +57,41 @@ function texture(bytes: Uint8Array, size: number, colour: boolean, pixelated: bo
   return t;
 }
 
-function skyColour(atmosphere: number): THREE.Color {
-  return new THREE.Color(0, 0, 0).lerp(SKY_HORIZON, atmosphere);
+function skyPaletteFor(
+  sunDir: readonly [number, number, number],
+  atmosphere: number,
+): { zenith: THREE.Color; horizon: THREE.Color; sun: THREE.Color } {
+  const a = Math.max(0, Math.min(1, atmosphere));
+  if (a <= 0) {
+    return {
+      zenith: SKY_ZENITH.clone(),
+      horizon: SKY_HORIZON.clone(),
+      sun: new THREE.Color('#fff4e6'),
+    };
+  }
+  const u = sampleSkyUniforms(sunDir, 2 + Math.max(0.25, a) * 2.5);
+  const tone = (v: number, gain: number): number => {
+    const x = Math.max(0, v) * gain;
+    return x / (1 + x * 0.45);
+  };
+  const zenith = new THREE.Color(
+    tone(u.zenith[0], 4.6),
+    tone(u.zenith[1], 4.8),
+    tone(u.zenith[2], 5.2),
+  ).lerp(SKY_ZENITH, 0.25);
+  const horizon = new THREE.Color(
+    tone(u.zenith[0] * 3.0 + u.horizon[0] * 0.22 + u.sunGlow[0] * 0.1, 1.0),
+    tone(u.zenith[1] * 3.6 + u.horizon[1] * 0.22 + u.sunGlow[1] * 0.08, 1.0),
+    tone(u.zenith[2] * 4.4 + u.horizon[2] * 0.22 + u.sunGlow[2] * 0.06, 1.0),
+  ).lerp(SKY_HORIZON, 0.25);
+  const sun = new THREE.Color(u.sunColour[0], u.sunColour[1], u.sunColour[2]);
+  return { zenith, horizon, sun };
+}
+
+function skyColour(atmosphere: number, sunDir: readonly [number, number, number] = [SUN.x, SUN.y, SUN.z]): THREE.Color {
+  const a = Math.max(0, Math.min(1, atmosphere));
+  if (a <= 0) return new THREE.Color(0, 0, 0);
+  return new THREE.Color(0, 0, 0).lerp(skyPaletteFor(sunDir, a).horizon, a);
 }
 
 /** A look's uniforms, named for the shader (Base, From or To), showing `blank` until a look is set. */
@@ -69,7 +104,7 @@ function lookUniforms(name: string, blank: THREE.Texture): Uniforms {
 function setLook(u: Uniforms, name: string, g: { look: StageLook; colour: THREE.Texture; maps: THREE.Texture }): void {
   u[`u${name}Colour`]!.value = g.colour; u[`u${name}Maps`]!.value = g.maps;
   (u[`u${name}Look`]!.value as THREE.Vector4).set(g.look.levels, g.look.smooth, g.look.normalStrength, g.look.light);
-  (u[`u${name}Sky`]!.value as THREE.Color).copy(skyColour(g.look.atmosphere));
+  (u[`u${name}Sky`]!.value as THREE.Color).copy(skyColour(g.look.atmosphere, sunArray));
   u[`u${name}Tile`]!.value = g.look.tile;
 }
 
@@ -286,12 +321,16 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
     const k = next ? Math.max(0, Math.min(1, radius / WAVE_REACH)) : 0;
     const target = next ?? current;
     const atmosphere = current.look.atmosphere + (target.look.atmosphere - current.look.atmosphere) * k;
+    const pal = skyPaletteFor(sunArray, atmosphere);
+    skyUniforms.uZenith.value.copy(pal.zenith);
+    skyUniforms.uHorizon.value.copy(pal.horizon);
     skyUniforms.uAtmosphere.value = atmosphere;
+    sunLight.color.copy(pal.sun);
     for (const mat of starMaterials) mat.opacity = Math.max(0, 1 - atmosphere * 1.4);
     // with no air, only a trace of dust softens the far plains; air brings a blue haze
-    shared.uFogColour.value.copy(new THREE.Color(0.05, 0.048, 0.046).lerp(SKY_HORIZON, atmosphere));
+    shared.uFogColour.value.copy(new THREE.Color(0.05, 0.048, 0.046).lerp(pal.horizon, atmosphere));
     shared.uFogDensity.value = 0.00006 + atmosphere * 0.0004;
-    waterUniforms.uSkyColour.value.copy(new THREE.Color(0.05, 0.08, 0.1).lerp(SKY_HORIZON, atmosphere));
+    waterUniforms.uSkyColour.value.copy(new THREE.Color(0.05, 0.08, 0.1).lerp(pal.horizon, atmosphere));
     waterUniforms.uLight.value = current.look.light + (target.look.light - current.look.light) * k;
     fill.intensity = 0.35 + atmosphere * 0.9;
   };

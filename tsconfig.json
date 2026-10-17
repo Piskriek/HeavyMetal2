@@ -392,6 +392,12 @@
       ],
       "@hm/shareware": [
         "packages/shareware/src/index.ts"
+      ],
+      "@hm/sky": [
+        "packages/sky/src/index.ts"
+      ],
+      "@hm/plotbiome": [
+        "packages/plotbiome/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

@@ -2198,7 +2198,8 @@ try {
   await page.waitForTimeout(4500);
   const wheelText = await page.evaluate(() => document.querySelector('[data-testid="build-wheel-hint"]')?.textContent ?? '');
   console.log('OK: the build menu lists the house kinds:', wheelText);
-  if (!/halfWall/.test(wheelText) || !/gable/.test(wheelText)) throw new Error('house: the build menu does not list the new kinds');
+  // TICKET-04: the wheel hint names the kinds as the player reads them (build-menu KIND_LABEL), not their raw ids
+  if (!/Half wall/.test(wheelText) || !/Gable/.test(wheelText)) throw new Error('house: the build menu does not list the new kinds');
   await takeScreenshot(page, { path: 'shots-run/base/house-build-menu.png' });
   console.log('Captured shots-run/base/house-build-menu.png');
 

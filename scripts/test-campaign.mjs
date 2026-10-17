@@ -1020,7 +1020,13 @@ await beat('14d Sculpt: carve digs and gains ore, raise builds and spends ore, t
   await holdLeft(2000);
   const e1 = await edit();
   const o1 = await ore();
-  await page.keyboard.press('Digit2');
+  // TICKET-04: the sculpt tools moved to the X radial (keys 1 to 3 pick hotbar slots now): open X, hover raise, release X
+  await page.mouse.move(4, 4);
+  await page.keyboard.down('KeyX');
+  await page.locator('[data-testid="radial-menu"]').waitFor({ state: 'visible', timeout: 4000 });
+  await page.locator('[data-testid="radial-slice-raise"]').hover();
+  await page.waitForTimeout(120);
+  await page.keyboard.up('KeyX');
   await page.waitForTimeout(200);
   const e2 = await edit();
   const o2 = await ore();

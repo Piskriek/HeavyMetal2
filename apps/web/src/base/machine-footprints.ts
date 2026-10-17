@@ -10,19 +10,31 @@
 import type { MachineKind } from '@hm/plotsim';
 import type { Box } from './kit-pieces';
 import { packBoxBounds, type Bounds3D } from '../play/static-colliders';
+import { machineSize } from './machine-inspect';
+
+/** The heavy ring's top (play/machine-props.ts RING_TOP_Y), repeated here so this file stays free of THREE. */
+const RING_TOP = 0.78;
+const HEAVY: ReadonlySet<MachineKind> = new Set<MachineKind>(['heavy-mill', 'heavy-press', 'heavy-projector', 'heavy-water']);
+
+/** The box a machine of this kind blocks: its machineSize footprint (the same numbers the prop is scaled to), grounded. */
+function footprintOf(kind: MachineKind): Bounds3D {
+  const s = machineSize(kind);
+  const top = HEAVY.has(kind) ? RING_TOP + s.h : s.h;
+  return { minX: -s.w / 2, minY: 0, minZ: -s.d / 2, maxX: s.w / 2, maxY: top, maxZ: s.d / 2 };
+}
 
 const FOOTPRINT_TABLE: Readonly<Record<MachineKind, Bounds3D>> = {
-  drill: { minX: -1.1, minY: 0.0, minZ: -1.1, maxX: 1.1, maxY: 3.0, maxZ: 1.1 },
-  mill: { minX: -1.3, minY: 0.0, minZ: -1.1, maxX: 1.3, maxY: 2.8, maxZ: 1.1 },
-  press: { minX: -1.3, minY: 0.0, minZ: -1.2, maxX: 1.3, maxY: 3.0, maxZ: 1.2 },
-  pylon: { minX: -0.45, minY: 0.0, minZ: -0.45, maxX: 0.45, maxY: 3.4, maxZ: 0.45 },
-  power: { minX: -1.1, minY: 0.0, minZ: -1.0, maxX: 1.1, maxY: 2.6, maxZ: 1.0 },
-  projector: { minX: -0.9, minY: 0.0, minZ: -0.9, maxX: 0.9, maxY: 3.5, maxZ: 0.9 },
-  water: { minX: -1.5, minY: 0.0, minZ: -1.3, maxX: 1.5, maxY: 2.8, maxZ: 1.3 },
-  'heavy-mill': { minX: -1.5, minY: 0.0, minZ: -1.3, maxX: 1.5, maxY: 3.6, maxZ: 1.3 },
-  'heavy-press': { minX: -1.5, minY: 0.0, minZ: -1.4, maxX: 1.5, maxY: 3.8, maxZ: 1.4 },
-  'heavy-projector': { minX: -1.1, minY: 0.0, minZ: -1.1, maxX: 1.1, maxY: 4.3, maxZ: 1.1 },
-  'heavy-water': { minX: -1.7, minY: 0.0, minZ: -1.5, maxX: 1.7, maxY: 3.6, maxZ: 1.5 },
+  drill: footprintOf('drill'),
+  mill: footprintOf('mill'),
+  press: footprintOf('press'),
+  pylon: footprintOf('pylon'),
+  power: footprintOf('power'),
+  projector: footprintOf('projector'),
+  water: footprintOf('water'),
+  'heavy-mill': footprintOf('heavy-mill'),
+  'heavy-press': footprintOf('heavy-press'),
+  'heavy-projector': footprintOf('heavy-projector'),
+  'heavy-water': footprintOf('heavy-water'),
 };
 
 /**

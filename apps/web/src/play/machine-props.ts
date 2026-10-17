@@ -9,6 +9,7 @@ import * as heavygear from '@hm/heavygear';
 import { textureMill as consoleMillTextureMill, setLamp as setConsoleMillLamp } from '@hm/consolemill';
 import type { MachineKind, Metric } from '@hm/plotsim';
 import { type GenLevel, getGenSync } from '../assets/gen';
+import { machineSize } from '../base/machine-inspect';
 
 export interface MachineProp {
   readonly group: THREE.Group;
@@ -77,8 +78,37 @@ export function findMachineVent(obj: THREE.Object3D, baseY: number, prefX = 0, p
   return new THREE.Vector3(topX, maxY + 0.05, topZ);
 }
 
-/** The prop for a machine at a stage (0 or 1: chunky low poly; from 2: full detail). */
+/**
+ * Stands a built prop at its real height (machineSize, OPUS_NOTE_09 / BB-09): one uniform scale, its base kept where
+ * it was (the ground, or the 0.78 m ring for the heavies). The parts scale with it, and so do the sockets (power,
+ * vent, top), which are in the prop's own frame. The scale sits on an inner group, so the caller's group keeps its
+ * position and yaw.
+ */
+function fitToTable(p: MachineProp, kind: MachineKind): MachineProp {
+  const target = machineSize(kind).h;
+  const inner = new THREE.Group();
+  inner.name = 'fit-to-table';
+  for (const child of [...p.group.children]) inner.add(child);
+  p.group.add(inner);
+  p.group.updateMatrixWorld(true);
+  const toGroup = new THREE.Matrix4().copy(p.group.matrixWorld).invert();
+  const box = new THREE.Box3().setFromObject(inner).applyMatrix4(toGroup);
+  const native = box.max.y - box.min.y;
+  if (!(native > 1e-6)) return p;
+  const s = target / native;
+  const lift = box.min.y * (1 - s);
+  inner.scale.setScalar(s);
+  inner.position.set(0, lift, 0);
+  const at = (v: THREE.Vector3): THREE.Vector3 => v.clone().multiplyScalar(s).add(new THREE.Vector3(0, lift, 0));
+  return { ...p, power: at(p.power), vent: p.vent ? at(p.vent) : null, top: p.top ? at(p.top) : null };
+}
+
+/** The prop for a machine at a stage (0 or 1: chunky low poly; from 2: full detail), standing its real height (fitToTable). */
 export function machineProp(m: lab.LabMaterials, kind: MachineKind, stage: number, genLevel: GenLevel = 'low'): MachineProp {
+  return fitToTable(buildMachineProp(m, kind, stage, genLevel), kind);
+}
+
+function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number, genLevel: GenLevel): MachineProp {
   const st = stage <= 1 ? 1 : 6;
   const still = (): void => undefined;
   const lift = new THREE.Vector3(0, RING_TOP_Y, 0);

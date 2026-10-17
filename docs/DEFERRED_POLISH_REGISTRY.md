@@ -208,3 +208,38 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 - **Seen:** TICKET-07a (`shots-run/ticket07a-rift-open.png`). Under the stage 0a wireframe look, the open rift at 12 m draws as two or three white pixel circle outlines, not a vertical glitch-sliced tear.
 - **Expected:** the tear reads at every stage. One option: S-Space ignores the stage look (it's foreign data bleeding through), drawn in its own vivid palette.
 - Sidecar Task: POL-100 - Argo decides the rift's look per stage; then fold it into POL-98's rift rework (merged geometry, a few draw calls).
+
+### POL-111: plot-ground.ts should take its terrain constants from base/plot-height.ts
+- **Seen:** plan 36 Phase 1 (co-op). `apps/web/src/base/plot-height.ts` copies `BOULDER_SPAN`, `PAINT_CELLS` and the paint origin from `play/plot-ground.ts`, so the room and the clients can build on the same ground. The two copies can drift.
+- **Expected:** one source. `plot-ground.ts` imports the constants from `plot-height.ts` (or both import one module).
+- Sidecar Task: POL-111 - after F-09 lands (plot-ground.ts is Flash's work in progress), import the three constants in plot-ground.ts from base/plot-height.ts, and keep plot-height.test.ts green.
+
+### POL-112: the gate's footing pad is not in the room's ground
+- **Seen:** plan 36 Phase 1. `play-scene.ts` `groundAt` returns `padTop` (the gate's height plus 0.25 m) inside |x| < 1.9, |z| < 1.25 of the Moon Twin Gate. `plotHeightAt` has no pad, so a piece standing on the pad could be accepted by one side and refused by the other (the world hashes would part).
+- **Expected:** `plotHeightAt` returns the same height as `scene.heightAt` on the pad too (check the gate's yaw first).
+- Sidecar Task: POL-112 - add the pad to plotHeightAt and sample the pad points in test-coop-outpost.mjs once the browser check reaches the play screen.
+
+### POL-113: a guest's live ground does not load the host's sculpt yet (play-scene.ts)
+- **Seen:** plan 36 Phase 1. The room sends the terrain to every guest, and the guest's predicted world uses it (plotHeightAt), so the hashes agree. But the guest's ground mesh is built from the guest's own beam save: `PlayScene` takes `beamField` only when it is created (`createPlayScene`), and exposes no way to import a field into a live ground. This needs a `play-scene.ts` change (Flash's file), so it is not in this ticket.
+- **Expected:** a guest walks on the host's sculpted ground, and leaving the room puts their own ground back.
+- Sidecar Task: POL-113 - add `importBeamField(text)` to `PlayScene` (it calls the ground's `importField`, the same path as `beamField` at creation, plot-ground.ts line 541), then have play.tsx call it from the room's terrain (`client.onTerrain`) and on leave.
+
+### POL-114: the room's shared stock, and the ticks sent through the room
+- **Seen:** plan 36 Phase 1. The room owns one BaseWorld, so its `player` grid (the stock) is shared: a co-builder spends the Lead Architect's ore. Every machine tick (`t: 'tick'`, about 10 a second while mining or running machines) also goes through the room and is broadcast to everyone.
+- **Expected:** a decision from the owner and Argo on whose stock co-builders spend (a shared stock or a stock per player), and the ticks run on the room only for what must agree (or on the host alone).
+- Sidecar Task: POL-114 - Phase 2 design call (Argo, then Opus): per-player stock or a shared bridge store; move the machine tick server-side or make it the Lead Architect's job.
+
+### POL-115: a new room can take builds before the host's play has seeded it
+- **Seen:** plan 36 Phase 1. A host can open a room from the Planetary Grid, and the room then answers a friend's builds on the default base. The host's own base is sent only when the host's play screen mounts (`seedWorld`, which the room takes only while it has no commands).
+- **Expected:** a new room waits for its host's base (the room refuses builds until the host has seeded it, or the grid only hosts from play).
+- Sidecar Task: POL-115 - in OutpostRoom, hold commands from non-owners until `version > 0` (or the grid's Host opens play first).
+
+### POL-116: the browser check needs the RUN realtime in a plain browser
+- **Seen:** plan 36 Phase 1. `scripts/test-coop-outpost.mjs` starts `vite --mode run` (the plugin's room server on port 9001) and drives two pages through `window.__outpost`. On the 3D PC it passes 12 of 12: a room code, a join by code, 8 builds each, the roster on both grids, and the same world hash at version 19. What it does not cover: the play screen's ground (the 50-point heightAt sample) and a RUN host.
+- **Expected:** the play screen joins the room in the same check (the sampled heights match scene.heightAt), and the owner's RUN host (a private deploy, which the owner decides) confirms the same on RUN.
+- Sidecar Task: POL-116 - run the check on the 3D PC and record what the SDK says; the node convergence test stays the acceptance until then.
+
+### POL-117: the roster shows names only for players who send poses
+- **Seen:** plan 36 Phase 1. A roster name comes from presence (a player's pose), so a friend who has not moved shows as "Friend". The room now broadcasts each join with its role, so the roster lists everyone, but without a name.
+- **Expected:** the join carries the player's name (the RUN `onPlayerJoined` callback has it), shown until the pose arrives.
+- Sidecar Task: POL-117 - pass the username from the room's join notice into `rosterOf` (outpost-session.ts), with the Phase 2 role UI.

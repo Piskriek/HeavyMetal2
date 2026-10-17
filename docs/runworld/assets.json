@@ -803,7 +803,7 @@
       "size": 0.24,
       "axis": "length",
       "view": "three-quarter",
-      "subject": "ONLY the cabinet's rotary isolator handle on its own: one chunky safety-red square-section blade handle, its root fixed into a square dark-gunmetal hub block; nothing round, NO plate, NO cabinet. In the sheet 07 lab style: mid-grey painted industrial steel, dark gunmetal trim, yellow-and-black hazard stripes only where named",
+      "subject": "ONLY the cabinet's rotary isolator handle on its own: one chunky safety-red L-shaped handle in square section, a short square stem rising from a small flat square red hub plate, then the long square blade at right angles; NO base block, NO ring, NO collar, NO round parts, NO cabinet. In the sheet 07 lab style: mid-grey painted industrial steel, dark gunmetal trim, yellow-and-black hazard stripes only where named",
       "note": "ARGO_NOTE_09 (TICKET-06): the sheet 07 design replaces the sheet 21 one the owner called doggy-door breakers and a laundry-chute console (2026-10-17)"
     },
     {
@@ -833,7 +833,7 @@
       "size": 1.32,
       "axis": "height",
       "view": "three-quarter",
-      "subject": "the operator console on its own, WITHOUT its red throw lever and WITHOUT its keypad: a central square steel pedestal with a recessed square service hatch and corner bolts, on a wider bolted floor flange; on top, a wide flat control deck overhanging the pedestal on both sides, with a yellow-and-black hazard stripe along its front edge, three square push-buttons and a small green status bar on its left half, and an empty slotted square lever guide box on its right; behind the deck, a sloped instrument hood with four dial gauges in SQUARE bezels on the left, a green oscilloscope screen deep inside a square dark shroud in the centre, and an empty square pocket on the right; NO cables, NO pipes. In the sheet 07 lab style: mid-grey painted industrial steel, dark gunmetal trim, yellow-and-black hazard stripes only where named",
+      "subject": "the operator console on its own, WITHOUT its red throw lever and WITHOUT its keypad: a central square steel pedestal with a recessed square service hatch and corner bolts, on a wider bolted floor flange; on top, a wide flat control deck overhanging the pedestal on both sides, with a yellow-and-black hazard stripe along its front edge, three square push-buttons and a small green status bar on its left half, and an empty slotted square lever guide box on its right; behind the deck, a sloped instrument hood with four dial gauges in SQUARE bezels on the left, their faces carrying only plain tick marks and a needle, with NO numbers and NO text, a green oscilloscope screen deep inside a square dark shroud in the centre, and an empty square pocket on the right; NO cables, NO pipes. In the sheet 07 lab style: mid-grey painted industrial steel, dark gunmetal trim, yellow-and-black hazard stripes only where named",
       "note": "ARGO_NOTE_09 (TICKET-06): the sheet 07 design replaces the sheet 21 one the owner called doggy-door breakers and a laundry-chute console (2026-10-17)",
       "fix": [
         "plain-back"

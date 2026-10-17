@@ -1307,9 +1307,6 @@ useEffect(() => {
         const [id, st] = k.split('@') as [string, string];
         return ['Finding the neighbours', () => { look(id, Number(st) as Stage); }];
       }),
-      ['Growing the vegetation', () => {
-        // Plotbiome scatter view runs behind the loading bar
-      }],
       ['Opening the lab', () => {
         scene.setPlanet(look(PLOT, 1), (st: Stage) => look(PLOT, st), NEIGHBOURS.map((plot) => ({ plot, look: look(plot.cartridge, plot.stage) })));
         // the cartridge that was in the rifle's port comes back into it (TASK-21d): it left the rack when it was loaded
@@ -1383,6 +1380,7 @@ useEffect(() => {
           }
         }
       }],
+      ['Growing the vegetation', () => { scene.bakeCoverage(); }],
       ['Compiling shaders', () => { scene.warm(); }],
     ];
     const hook = { frames: 0, ready: false, step: stateRef.current.step, where: 'lab', sync: 1, wave: -1, triangles: 0, calls: 0, tier: tier as Quality, aimedProp: null as string | null };

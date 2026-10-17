@@ -4,7 +4,7 @@
 // planet curves away: every height drops by drop(x, z).
 import * as THREE from 'three';
 import { chunkMesh, chunksAround, createTerrain, type Terrain } from '@hm/plotterrain';
-import { createGroundMaterial, makeGroundTextures, setGroundPaint, setStage as setGroundStage } from '@hm/groundshader';
+import { createGroundMaterial, makeGroundTextures, setCoverage, setGroundPaint, setStage as setGroundStage, type CoverTextures } from '@hm/groundshader';
 import { apply as brushApply, decodeField, emptyField, encodeField, heightAt as brushHeightAt, type BrushOp, type Field, type Rules } from '@hm/terrainbrush';
 import { drop } from '../crafter/planet';
 import { smoothModel, type SmoothId } from '../crafter/smooth-models';
@@ -23,6 +23,15 @@ export interface BoulderInfo {
 
 export interface PlotGround {
   readonly terrain: Terrain;
+  readonly material: THREE.ShaderMaterial;
+  /** Sets or clears the living coverage mask (R dust, G moss, B grass, A wet) on the ground (TICKET-02 Item B). */
+  setCoverage(cover: {
+    readonly tex: THREE.DataTexture;
+    readonly x0: number;
+    readonly z0: number;
+    readonly size: number;
+    readonly tiles?: CoverTextures;
+  } | null): void;
   /** The ground's height at x, z, the planet's curve included. */
   heightAt(x: number, z: number): number;
   /** Keeps the chunks round the eye: builds every one now (behind the loading bar) or one per call (while you walk). */
@@ -116,10 +125,10 @@ interface TrackedBoulder {
   ore: number;
 }
 
-export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number; readonly sunDir: THREE.Vector3; readonly stage: number; readonly textureSize: number; readonly budget: number }): PlotGround {
+export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number; readonly sunDir: THREE.Vector3; readonly stage: number; readonly textureSize: number; readonly budget: number; readonly cover?: CoverTextures }): PlotGround {
   const terrain = createTerrain({ seed: o.seed });
   const textures = makeGroundTextures({ size: o.textureSize, seed: o.seed });
-  const material = createGroundMaterial(textures, { stage: Math.max(1, o.stage), sunDir: o.sunDir });
+  const material = createGroundMaterial(textures, { stage: Math.max(1, o.stage), sunDir: o.sunDir, cover: o.cover });
   const group = new THREE.Group();
   scene.add(group);
   const chunks = new Map<string, THREE.Mesh>();
@@ -553,6 +562,10 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
       let n = 0;
       for (const d of paintField.delta) if (d !== 0) n += 1;
       return n;
+    },
+    material,
+    setCoverage(cov) {
+      setCoverage(material, cov);
     },
     getBoulders() {
       return trackedBoulders.map((b) => ({ id: b.id, x: b.x, y: b.y, z: b.z, size: b.size, ore: b.ore }));

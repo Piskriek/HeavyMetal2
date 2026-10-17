@@ -51,6 +51,10 @@ import { computeGateExitPose, pushCircle, pushCircleInFrame } from './static-col
 import { machineFootprint } from '../base/machine-footprints';
 import { createPlotBiomeView, type PlotBiomeView, type BiomeInstanceCount } from './plot-biome-view';
 import { buildBiomeInput, type BiomeInput } from './biome-input';
+import { makeCoverTextures } from '@hm/groundshader';
+import { bakePlotBiome } from '@hm/plotbiome';
+import { flood, type Terrain as HydroTerrain, type Source as HydroSource } from '@hm/hydro';
+import { buildWaterSurfaces } from './water-surfaces';
 import { spawn as spawnRover, step as stepRover, speed as roverSpeed, ROVERS, DT as ROVER_DT, type RoverState, type RoverKind } from '@hm/rover';
 import {
   createMaterials as createRovergearMaterials,
@@ -295,6 +299,8 @@ export interface PlayScene {
   buildBiome(input: BiomeInput): void;
   setVegetationSetting(v: 'auto' | 'off' | 'low' | 'high'): void;
   getBiomeCounts(): BiomeInstanceCount;
+  /** Bakes the living coverage masks (stages 0 to 6) and hydro water surfaces behind the loading bar (TICKET-02 Items B and E). */
+  bakeCoverage(): void;
   /** For the tests and the e2e: where you are, and a way to stand somewhere. */
   readonly debug: {
     biomeCounts(): BiomeInstanceCount | null;
@@ -362,6 +368,9 @@ export interface PlayScene {
     boulders(): readonly BoulderInfo[];
     twinStage(): number;
     plumeGlowCount(): number;
+    waterVisible(): boolean;
+    hasWaterMesh(): boolean;
+    coverageActive(): boolean;
     pixelLightCount(): number;
     testPieceAim(pieceId: number): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null;
     setAltCam(eye: { readonly x: number; readonly y: number; readonly z: number }, pitch: number, yaw: number, target?: { readonly x: number; readonly y: number; readonly z: number }): void;
@@ -666,6 +675,7 @@ export function createPlayScene(o: {
       }
     }
     scheduleBiomeRebuild();
+    scheduleCoverRebuild();
   }
 
   function enterVehicle(id: number): boolean {
@@ -1327,6 +1337,145 @@ export function createPlayScene(o: {
     });
   };
 
+  // ---- living coverage & water surfaces (TICKET-02 items B and E)
+  const coverTiles = makeCoverTextures({ size: 64, seed: 701 });
+  const stageCoverTextures: (THREE.DataTexture | null)[] = [null, null, null, null, null, null, null];
+  let waterGroup: THREE.Group | null = null;
+  let waterMesh: THREE.Mesh | null = null;
+  let coverSliceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const bakeStageCoverage = (s: number, input: BiomeInput): THREE.DataTexture => {
+    const bake = bakePlotBiome({ ...input, stage: s });
+    const tex = new THREE.DataTexture(
+      bake.cover,
+      input.n,
+      input.n,
+      THREE.RGBAFormat,
+      THREE.UnsignedByteType,
+    );
+    tex.colorSpace = THREE.NoColorSpace;
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.magFilter = THREE.LinearFilter;
+    tex.minFilter = THREE.LinearFilter;
+    tex.needsUpdate = true;
+    return tex;
+  };
+
+  const applyCoverage = (stageNum: number): void => {
+    if (!ground) return;
+    const s = Math.max(0, Math.min(6, Math.floor(stageNum)));
+    const input = cachedBiomeInput ?? buildDefaultBiomeInput(ground);
+    cachedBiomeInput = input;
+    let tex = stageCoverTextures[s];
+    if (!tex) {
+      tex = bakeStageCoverage(s, input);
+      stageCoverTextures[s] = tex;
+    }
+    const size = input.n * input.cellM;
+    const x0 = -size * 0.5;
+    const z0 = -size * 0.5;
+    ground.setCoverage({
+      tex,
+      x0,
+      z0,
+      size,
+      tiles: coverTiles,
+    });
+  };
+
+  const buildAndAttachWaterSurfaces = (stageNum: number): void => {
+    if (!ground) return;
+    if (waterGroup) {
+      planetScene.remove(waterGroup);
+      waterGroup.traverse((obj) => {
+        const m = obj as THREE.Mesh;
+        if (m.isMesh) {
+          m.geometry.dispose();
+          if (Array.isArray(m.material)) m.material.forEach((mat) => mat.dispose());
+          else m.material.dispose();
+        }
+      });
+      waterGroup = null;
+      waterMesh = null;
+    }
+
+    const n = 256, cellM = 1, x0 = -128, z0 = -128;
+    const waterSources: HydroSource[] = [];
+    for (const v of views.values()) {
+      if (v.m.kind === 'water' || v.m.kind === 'heavy-water') {
+        const gx = Math.floor((v.m.x - x0) / cellM);
+        const gz = Math.floor((v.m.z - z0) / cellM);
+        if (gx >= 0 && gx < n && gz >= 0 && gz < n) {
+          waterSources.push({ x: gx, z: gz, share: 1 });
+        }
+      }
+    }
+
+    const vol = waterSources.length > 0 ? (stageNum >= 4 ? 600 : 60) : 0;
+    if (vol > 0 && waterSources.length > 0) {
+      const count = n * n;
+      const terrainHeights: number[] = new Array<number>(count);
+      for (let z = 0; z < n; z++) {
+        const wz = z0 + (z + 0.5) * cellM;
+        const rOff = z * n;
+        for (let x = 0; x < n; x++) {
+          const wx = x0 + (x + 0.5) * cellM;
+          terrainHeights[rOff + x] = ground.heightAt(wx, wz);
+        }
+      }
+      const hydroTerrain: HydroTerrain = { size: n, cell: cellM, heights: terrainHeights };
+      const w = flood(hydroTerrain, waterSources, vol);
+      waterGroup = buildWaterSurfaces(w, (wx, wz) => ground!.heightAt(wx, wz), stageNum, {
+        x0,
+        z0,
+        cellM,
+        sunDir: SUN,
+      });
+      waterGroup.visible = stageNum >= 4;
+      waterMesh = waterGroup.getObjectByName('hydro-water-mesh') as THREE.Mesh | null;
+      planetScene.add(waterGroup);
+    }
+  };
+
+  const bakeCoverage = (): void => {
+    if (!ground) return;
+    const input = cachedBiomeInput ?? buildDefaultBiomeInput(ground);
+    cachedBiomeInput = input;
+    for (let s = 0; s <= 6; s++) {
+      stageCoverTextures[s] = bakeStageCoverage(s, input);
+    }
+    applyCoverage(shown);
+    buildAndAttachWaterSurfaces(shown);
+  };
+
+  const scheduleCoverRebuild = (): void => {
+    if (!ground) return;
+    if (coverSliceTimer) clearTimeout(coverSliceTimer);
+    let sIdx = 0;
+    const stepCover = (): void => {
+      coverSliceTimer = null;
+      if (!ground) return;
+      const input = cachedBiomeInput ?? buildDefaultBiomeInput(ground);
+      cachedBiomeInput = input;
+      const start = performance.now();
+      while (sIdx <= 6) {
+        const s = sIdx;
+        sIdx++;
+        stageCoverTextures[s] = bakeStageCoverage(s, input);
+        if (s === Math.max(0, Math.min(6, Math.floor(shown)))) {
+          applyCoverage(shown);
+        }
+        if (performance.now() - start > 8 && sIdx <= 6) {
+          coverSliceTimer = setTimeout(stepCover, 0);
+          return;
+        }
+      }
+      buildAndAttachWaterSurfaces(shown);
+    };
+    coverSliceTimer = setTimeout(stepCover, 10);
+  };
+
   let biomeRebuildTimer: ReturnType<typeof setTimeout> | null = null;
   scheduleBiomeRebuild = (): void => {
     if (!biomeView || !ground) return;
@@ -1338,6 +1487,7 @@ export function createPlayScene(o: {
       cachedBiomeInput = input;
       biomeView.build(input, false);
       biomeView.setStage(shown);
+      scheduleCoverRebuild();
     }, 50);
   };
 
@@ -1642,7 +1792,7 @@ export function createPlayScene(o: {
       if (world) return;
       lookForFn = lookFor;
       // the plot's natural ground (its own terrain and materials); the old world brings the sky, the stars and the neighbours, seated on it
-      const g = createPlotGround(planetScene, { seed: 7, sunDir: SUN, stage: Math.max(1, stage), textureSize: o.groundTexture, budget: detail.groundBudget });
+      const g = createPlotGround(planetScene, { seed: 7, sunDir: SUN, stage: Math.max(1, stage), textureSize: o.groundTexture, budget: detail.groundBudget, cover: coverTiles });
       ground = g;
       // the gate's apron is always kept out (TASK-21d); the play screen adds the structures and machines as the base changes
       g.setKeepOut(keepOutZones({ gate: { x: 0, z: 0 }, structures: [], pieces: [], machines: [] }));
@@ -1672,6 +1822,10 @@ export function createPlayScene(o: {
       cachedBiomeInput = bInput;
       biomeView.build(bInput);
       biomeView.setStage(shown);
+      if (!stageCoverTextures[0]) {
+        applyCoverage(shown);
+        buildAndAttachWaterSurfaces(shown);
+      }
     },
     restore(s) {
       gateOn = s.gateOn;
@@ -1696,6 +1850,8 @@ export function createPlayScene(o: {
       waveTo = -1;
       ground?.setStage(Math.max(1, stage));
       biomeView?.setStage(stage);
+      applyCoverage(stage);
+      if (waterGroup) waterGroup.visible = stage >= 4;
       fitLooks();
       propStage = stage <= 1 ? 1 : 6;
       rebuildTwin(propStage);
@@ -1733,7 +1889,10 @@ export function createPlayScene(o: {
       let changed = false;
       for (const [id, v] of views) if (!ids.has(id)) { unbuild(v); views.delete(id); changed = true; }
       for (const mm of plot.machines) if (!views.has(mm.id)) { views.set(mm.id, build(mm)); changed = true; }
-      if (changed) scheduleBiomeRebuild();
+      if (changed) {
+        scheduleBiomeRebuild();
+        scheduleCoverRebuild();
+      }
       rebuildPlanetStatic();
       const sameNet = connected.size === lastConnected.size && [...connected].every((id) => lastConnected.has(id));
       if (changed || !sameNet) { relay(connected); lastConnected = new Set(connected); }
@@ -1854,6 +2013,7 @@ export function createPlayScene(o: {
       const lifeSupport = base ? base.pieces.filter((p) => p.kind === 'lifeSupport').map((p) => pieceAt(base, p)).filter((p): p is { x: number; y: number; z: number } => p !== null) : [];
       monsters.setSafeZones(monsterSafeZones({ x: twin.group.position.x, z: twin.group.position.z }, lifeSupport));
       scheduleBiomeRebuild();
+      scheduleCoverRebuild();
     },
     gateExit(dist) {
       twin.group.updateMatrixWorld(true);
@@ -2086,6 +2246,8 @@ export function createPlayScene(o: {
         shown = waveTo;
         world?.settle();
         biomeView?.setStage(shown);
+        applyCoverage(shown);
+        if (waterGroup) waterGroup.visible = shown >= 4;
       }
       stage = to;
       room.setStorm(Math.min(1, Math.max(0, to / 6)));
@@ -2117,6 +2279,8 @@ export function createPlayScene(o: {
       }
       ground?.setStage(Math.max(1, s));
       biomeView?.setStage(s);
+      applyCoverage(s);
+      if (waterGroup) waterGroup.visible = s >= 4;
       monsters.setFidelityStage(s);
       wrecks.setStage(s);
       fitLooks();
@@ -2480,6 +2644,8 @@ export function createPlayScene(o: {
         rebuildProps(shown);
         world?.settle();
         biomeView?.setStage(shown);
+        applyCoverage(shown);
+        if (waterGroup) waterGroup.visible = shown >= 4;
         pendingEvent = pendingEvent ?? 'stage-up';
         sfx('stage-up');
       }
@@ -2511,6 +2677,10 @@ export function createPlayScene(o: {
       labPlume.update(now);
       beamFx.update(now);
       holoUniforms.uTime.value = now;
+      if (waterMesh && waterMesh.material) {
+        const mat = waterMesh.material as THREE.ShaderMaterial;
+        if (mat.uniforms?.uTime) mat.uniforms.uTime.value = now;
+      }
       if (where === 'planet') {
         camera.getWorldDirection(monsterFwd);
         monsters.update(dt, { x: pos.x, z: pos.z, yaw: Math.atan2(monsterFwd.x, monsterFwd.z), alive: playerAlive }, camera);
@@ -2826,6 +2996,9 @@ export function createPlayScene(o: {
       sealedWrecks: () => wrecks.sealedSites(),
       groundTriangles: () => ground?.triangles() ?? 0,
       showGround: (on) => ground?.setVisible(on),
+      waterVisible: () => (waterGroup ? waterGroup.visible : false),
+      hasWaterMesh: () => waterMesh !== null,
+      coverageActive: () => Boolean(ground?.material.uniforms.uCoverOn?.value === 1),
       where: () => where,
       position: () => pos.clone(),
       facing: () => yaw,
@@ -3012,6 +3185,9 @@ export function createPlayScene(o: {
     getBiomeCounts() {
       return biomeView ? biomeView.counts() : { total: 0, trees: 0, byKind: { tuft: 0, bush: 0, pine: 0, oak: 0, birch: 0 } };
     },
+    bakeCoverage() {
+      bakeCoverage();
+    },
     dispose() {
       sceneAlive = false;
       scientistAnimator?.dispose();
@@ -3021,6 +3197,25 @@ export function createPlayScene(o: {
       for (const c of cables) c.geometry.dispose();
       dropGhost();
       if (biomeRebuildTimer) clearTimeout(biomeRebuildTimer);
+      if (coverSliceTimer) clearTimeout(coverSliceTimer);
+      if (waterGroup) {
+        planetScene.remove(waterGroup);
+        waterGroup.traverse((obj) => {
+          const m = obj as THREE.Mesh;
+          if (m.isMesh) {
+            m.geometry.dispose();
+            if (Array.isArray(m.material)) m.material.forEach((mat) => mat.dispose());
+            else m.material.dispose();
+          }
+        });
+        waterGroup = null;
+        waterMesh = null;
+      }
+      for (const tex of stageCoverTextures) {
+        tex?.dispose();
+      }
+      coverTiles.albedoHeight.dispose();
+      coverTiles.normalRough.dispose();
       biomeView?.dispose();
       world?.dispose();
       ground?.dispose();

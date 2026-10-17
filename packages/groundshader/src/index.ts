@@ -9,6 +9,8 @@ export const MATERIALS: readonly ['rock', 'scree', 'gravel', 'dust', 'cracked', 
   'redsoil',
 ];
 
+export const COVER_LAYERS: readonly ['moss', 'grass'] = ['moss', 'grass'];
+
 export interface GroundTextures {
   /** Six layers in MATERIALS order: rgb = albedo (sRGB), a = height 0..1. */
   albedoHeight: THREE.DataArrayTexture;
@@ -16,6 +18,16 @@ export interface GroundTextures {
   normalRough: THREE.DataArrayTexture;
   /** How many metres of ground one tile covers, per material. */
   metres: readonly number[];
+  size: number;
+}
+
+export interface CoverTextures {
+  /** Two layers in COVER_LAYERS order (0 = moss, 1 = grass): rgb = albedo (sRGB), a = height 0..1. */
+  albedoHeight: THREE.DataArrayTexture;
+  /** Two layers (0 = moss, 1 = grass): rgb = tangent-space normal (0.5, 0.5, 1 is flat), a = roughness 0..1. */
+  normalRough: THREE.DataArrayTexture;
+  /** How many metres of ground one tile covers, per layer (moss, grass). */
+  metres: readonly [number, number];
   size: number;
 }
 
@@ -29,6 +41,7 @@ export interface GroundStage {
 }
 
 const MATERIAL_METRES: readonly number[] = [16, 12, 9, 18, 15, 12];
+const COVER_METRES: readonly [number, number] = [6, 4.5];
 const TAU = Math.PI * 2;
 
 type RGB = readonly [number, number, number];
@@ -55,6 +68,11 @@ const BASE_COLOURS: readonly RGB[] = [
   [0.565, 0.525, 0.438],
   [0.405, 0.348, 0.266],
   [0.355, 0.132, 0.052],
+];
+
+const COVER_BASE_COLOURS: readonly [RGB, RGB] = [
+  [0.052, 0.148, 0.036], // 0: moss (deep velvety bryophyte green)
+  [0.082, 0.275, 0.052], // 1: grass (lush sunlit meadow chlorophyll green)
 ];
 
 function clamp(value: number, low: number, high: number): number {
@@ -269,6 +287,58 @@ function materialPixel(
   };
 }
 
+function coverPixel(
+  layer: number,
+  macro: number,
+  mid: number,
+  fine: number,
+  warpedU: number,
+  warpedV: number,
+  sites: WorleySites,
+): MaterialPixel {
+  const base = COVER_BASE_COLOURS[layer] ?? COVER_BASE_COLOURS[0];
+  const [nearest, second, style] = worley(warpedU, warpedV, sites);
+
+  if (layer === 0) {
+    // Layer 0: Moss — velvety cushion hummocks with warm olive spore tips
+    const cushion = 1 - smoothstep(0.04, 0.42, nearest);
+    const crevice = smoothstep(0.02, 0.14, second - nearest);
+    const sporeTip = smoothstep(0.55, 0.95, cushion * (0.65 + 0.35 * style) + fine * 0.15);
+    const tone = (0.72 + 0.38 * cushion + 0.14 * macro + 0.08 * mid) * (0.68 + 0.32 * crevice);
+    const red = base[0] * tone + sporeTip * 0.045;
+    const green = base[1] * tone + sporeTip * 0.065;
+    const blue = base[2] * tone + sporeTip * 0.012;
+    const height = 0.38 + cushion * 0.38 * crevice + mid * 0.06 + fine * 0.04;
+    const roughness = 0.88 - cushion * 0.08 + fine * 0.03;
+    return {
+      red: clamp(red, 0.01, 0.95),
+      green: clamp(green, 0.02, 0.95),
+      blue: clamp(blue, 0.01, 0.95),
+      height: clamp(height, 0.08, 0.96),
+      roughness: clamp(roughness, 0.65, 0.96),
+    };
+  }
+
+  // Layer 1: Grass — directional blade clusters, clover patches, and sunlit tips
+  const clump = 1 - smoothstep(0.05, 0.45, nearest);
+  const bladeWave = Math.sin(TAU * (warpedU * 14 + warpedV * 6 + mid * 0.22)) * 0.5 + 0.5;
+  const bladeTip = smoothstep(0.35, 0.92, bladeWave * (0.6 + 0.4 * clump) + fine * 0.2);
+  const sunTint = 0.5 + 0.5 * macro;
+  const tone = 0.78 + 0.32 * clump + 0.15 * mid + 0.08 * fine;
+  const red = base[0] * tone + bladeTip * (0.05 + 0.035 * sunTint);
+  const green = base[1] * tone + bladeTip * (0.11 + 0.05 * sunTint);
+  const blue = base[2] * tone + bladeTip * 0.025;
+  const height = 0.42 + clump * 0.32 + bladeTip * 0.18 + mid * 0.05;
+  const roughness = 0.74 - bladeTip * 0.12 + fine * 0.04;
+  return {
+    red: clamp(red, 0.01, 0.95),
+    green: clamp(green, 0.03, 0.95),
+    blue: clamp(blue, 0.01, 0.95),
+    height: clamp(height, 0.1, 0.98),
+    roughness: clamp(roughness, 0.54, 0.92),
+  };
+}
+
 function configureArrayTexture(texture: THREE.DataArrayTexture, colorSpace: THREE.ColorSpace): void {
   texture.colorSpace = colorSpace;
   texture.wrapS = THREE.RepeatWrapping;
@@ -372,6 +442,104 @@ export function makeGroundTextures(o: { size: number; seed: number }): GroundTex
   return { albedoHeight, normalRough, metres: MATERIAL_METRES, size };
 }
 
+/**
+ * Builds two deterministic, periodic procedural cover tiles (layer 0 = moss, layer 1 = grass)
+ * matching makeGroundTextures's albedo+height and normal+roughness format (TICKET-02 Item B).
+ */
+export function makeCoverTextures(o: { size: number; seed: number }): CoverTextures {
+  const size = o.size;
+  if (size !== 64 && size !== 128 && size !== 256 && size !== 512) {
+    throw new RangeError('Cover texture size must be 64, 128, 256 or 512.');
+  }
+
+  const seed = Number.isFinite(o.seed) ? o.seed | 0 : 0;
+  const pixelsPerLayer = size * size;
+  const bytesPerLayer = pixelsPerLayer * 4;
+  const albedoPixels = new Uint8Array(bytesPerLayer * COVER_LAYERS.length);
+  const normalPixels = new Uint8Array(bytesPerLayer * COVER_LAYERS.length);
+  const heightLayers = new Array<Float32Array>(COVER_LAYERS.length);
+  const worleyByLayer: readonly [WorleySites, WorleySites] = [
+    makeWorleySites(16, seed + 601),
+    makeWorleySites(24, seed + 709),
+  ];
+
+  for (let layer = 0; layer < COVER_LAYERS.length; layer++) {
+    const heights = new Float32Array(pixelsPerLayer);
+    heightLayers[layer] = heights;
+    const sites = worleyByLayer[layer]!;
+    const baseOffset = layer * bytesPerLayer;
+    const layerSeed = seed + 3001 + layer * 1237;
+
+    for (let y = 0; y < size; y++) {
+      const v = y / size;
+      for (let x = 0; x < size; x++) {
+        const u = x / size;
+        const warpU = latticeNoise(u, v, 5, layerSeed + 19) * 0.06;
+        const warpV = latticeNoise(u, v, 5, layerSeed + 41) * 0.06;
+        const warpedU = u + warpU;
+        const warpedV = v + warpV;
+        const macro = latticeNoise(warpedU, warpedV, 3, layerSeed + 61);
+        const mid = latticeNoise(warpedU, warpedV, 12, layerSeed + 89);
+        const fine = latticeNoise(warpedU, warpedV, 31, layerSeed + 113);
+        const pixel = coverPixel(layer, macro, mid, fine, warpedU, warpedV, sites);
+        const pixelIndex = y * size + x;
+        const offset = baseOffset + pixelIndex * 4;
+
+        albedoPixels[offset] = toByte(linearToSrgb(pixel.red));
+        albedoPixels[offset + 1] = toByte(linearToSrgb(pixel.green));
+        albedoPixels[offset + 2] = toByte(linearToSrgb(pixel.blue));
+        albedoPixels[offset + 3] = toByte(pixel.height);
+        normalPixels[offset + 3] = toByte(pixel.roughness);
+        heights[pixelIndex] = pixel.height;
+      }
+    }
+  }
+
+  for (let layer = 0; layer < COVER_LAYERS.length; layer++) {
+    const heights = heightLayers[layer]!;
+    const metres = COVER_METRES[layer]!;
+    const baseOffset = layer * bytesPerLayer;
+    const slopeScale = (size / metres) * 1.25;
+
+    for (let y = 0; y < size; y++) {
+      const previousY = y === 0 ? size - 1 : y - 1;
+      const nextY = y === size - 1 ? 0 : y + 1;
+      for (let x = 0; x < size; x++) {
+        const previousX = x === 0 ? size - 1 : x - 1;
+        const nextX = x === size - 1 ? 0 : x + 1;
+        const index = y * size + x;
+        const dx = (heights[y * size + nextX]! - heights[y * size + previousX]!) * 0.5;
+        const dy = (heights[nextY * size + x]! - heights[previousY * size + x]!) * 0.5;
+        const normalX = -dx * slopeScale;
+        const normalY = -dy * slopeScale;
+        const inverseLength = 1 / Math.sqrt(normalX * normalX + normalY * normalY + 1);
+        const offset = baseOffset + index * 4;
+
+        normalPixels[offset] = toByte(normalX * inverseLength * 0.5 + 0.5);
+        normalPixels[offset + 1] = toByte(normalY * inverseLength * 0.5 + 0.5);
+        normalPixels[offset + 2] = toByte(inverseLength * 0.5 + 0.5);
+      }
+    }
+  }
+
+  const albedoHeight = new THREE.DataArrayTexture(albedoPixels, size, size, COVER_LAYERS.length);
+  const normalRough = new THREE.DataArrayTexture(normalPixels, size, size, COVER_LAYERS.length);
+  albedoHeight.name = 'Cover moss/grass albedo and height';
+  normalRough.name = 'Cover moss/grass tangent normal and roughness';
+  configureArrayTexture(albedoHeight, THREE.SRGBColorSpace);
+  configureArrayTexture(normalRough, THREE.NoColorSpace);
+
+  return { albedoHeight, normalRough, metres: COVER_METRES, size };
+}
+
+let defaultCoverTextures: CoverTextures | null = null;
+function getDefaultCoverTextures(): CoverTextures {
+  if (!defaultCoverTextures) {
+    defaultCoverTextures = makeCoverTextures({ size: 64, seed: 701 });
+  }
+  return defaultCoverTextures;
+}
+
 const STAGE_LOOKS: readonly GroundStage[] = [
   { texelsPerMetre: 6, nearest: true, normalStrength: 0.25, levels: 12, specular: 0, triplanar: false },
   { texelsPerMetre: 11, nearest: true, normalStrength: 0.4, levels: 24, specular: 0.08, triplanar: false },
@@ -457,6 +625,13 @@ const FRAGMENT_SHADER = /* glsl */ `
   uniform sampler2D uPaintRough;
   uniform vec4 uPaintRect;
   uniform float uPaintOn;
+  /** The living coverage layer (TICKET-02): RGBA mask (R dust, G moss, B grass, A wet) + procedural moss/grass array tiles. */
+  uniform sampler2D uCoverMask;
+  uniform highp sampler2DArray uCoverAlbedoHeight;
+  uniform highp sampler2DArray uCoverNormalRough;
+  uniform vec2 uCoverMetres;
+  uniform vec4 uCoverRect;
+  uniform float uCoverOn;
 
   in vec3 vWorldPosition;
   in vec3 vWorldNormal;
@@ -620,11 +795,65 @@ const FRAGMENT_SHADER = /* glsl */ `
     vec3 albedo = vec3(0.0);
     vec3 mappedNormal = vec3(0.0);
     float roughness = 0.9;
+    float baseHeight = 0.5;
     for (int i = 0; i < 6; i++) {
       float blendWeight = blendWeights[i] / max(totalBlend, 0.0001);
       albedo += colours[i] * blendWeight;
       mappedNormal += tangentNormals[i] * blendWeight;
       roughness += (roughnesses[i] - 0.9) * blendWeight;
+      baseHeight += (heights[i] - 0.5) * blendWeight;
+    }
+
+    // Living coverage layer (TICKET-02 Item B): RGBA mask (R dust, G moss, B grass, A wet)
+    if (uCoverOn > 0.5) {
+      vec2 coverUv = (vWorldPosition.xz - uCoverRect.xy) / max(uCoverRect.zw, vec2(0.001));
+      if (coverUv.x >= 0.0 && coverUv.x <= 1.0 && coverUv.y >= 0.0 && coverUv.y <= 1.0) {
+        // Organic domain-warped macro breakup so cell edges and patches never read as a flat tint
+        float mCoarse = macroNoise(vWorldPosition.xz * 0.085, 11.3);
+        float mFine = macroNoise(vWorldPosition.xz * 0.31, 27.9);
+        float mBreak = mCoarse * 0.65 + mFine * 0.35;
+        vec2 jitterUv = coverUv + (vec2(mCoarse, mFine) - 0.5) * (1.25 / max(uCoverRect.zw, vec2(1.0)));
+        vec4 cov = texture(uCoverMask, clamp(jitterUv, 0.0, 1.0));
+
+        float mossMask = cov.g;
+        float grassMask = cov.b;
+        float wetMask = cov.a;
+
+        if (mossMask > 0.01 || grassMask > 0.01) {
+          vec2 mossUv = materialUv(vWorldPosition, geometricNormal, uCoverMetres.x, 6.0);
+          vec2 grassUv = materialUv(vWorldPosition, geometricNormal, uCoverMetres.y, 7.0);
+
+          vec4 mossAH = texture(uCoverAlbedoHeight, vec3(mossUv, 0.0));
+          vec4 mossNR = uStage > 1.0 ? texture(uCoverNormalRough, vec3(mossUv, 0.0)) : vec4(0.5, 0.5, 1.0, 0.86);
+          vec4 grassAH = texture(uCoverAlbedoHeight, vec3(grassUv, 1.0));
+          vec4 grassNR = uStage > 1.0 ? texture(uCoverNormalRough, vec3(grassUv, 1.0)) : vec4(0.5, 0.5, 1.0, 0.72);
+
+          // Macro hue & brightness variation across the plot
+          vec3 mossTint = mix(vec3(0.82, 0.90, 0.76), vec3(1.18, 1.15, 0.92), mBreak);
+          vec3 grassTint = mix(vec3(0.80, 0.94, 0.72), vec3(1.22, 1.16, 0.86), mBreak);
+          vec3 mossCol = mossAH.rgb * mossTint;
+          vec3 grassCol = grassAH.rgb * grassTint;
+
+          // Height-biased transition so moss creeps into regolith crevices first, then grass crowns on top
+          float mossW = smoothstep(0.08, 0.72, mossMask + (mossAH.a - baseHeight) * 0.32 + (mBreak - 0.5) * 0.22) * smoothstep(0.0, 0.08, mossMask);
+          float grassW = smoothstep(0.08, 0.68, grassMask + (grassAH.a - 0.45) * 0.35 + (mBreak - 0.5) * 0.24) * smoothstep(0.0, 0.08, grassMask);
+
+          albedo = mix(albedo, mossCol, mossW);
+          mappedNormal = mix(mappedNormal, mossNR.rgb * 2.0 - 1.0, mossW);
+          roughness = mix(roughness, mossNR.a, mossW);
+
+          albedo = mix(albedo, grassCol, grassW);
+          mappedNormal = mix(mappedNormal, grassNR.rgb * 2.0 - 1.0, grassW);
+          roughness = mix(roughness, grassNR.a, grassW);
+        }
+
+        // Wetness channel A: dampens regolith/moss albedo and lowers roughness near water
+        if (wetMask > 0.01) {
+          float damp = wetMask * (1.0 - 0.45 * grassMask);
+          albedo *= mix(1.0, 0.64, damp);
+          roughness = mix(roughness, 0.22, wetMask * 0.75);
+        }
+      }
     }
 
     // a painted cell shows the preset's colour and roughness over the natural ground (the paint layer is off until a stroke)
@@ -686,8 +915,10 @@ export function createGroundMaterial(
     sunColour?: THREE.Color;
     skyColour?: THREE.Color;
     groundColour?: THREE.Color;
+    cover?: CoverTextures;
   },
 ): THREE.ShaderMaterial {
+  const covTex = o.cover ?? getDefaultCoverTextures();
   const material = new THREE.ShaderMaterial({
     glslVersion: THREE.GLSL3,
     vertexShader: VERTEX_SHADER,
@@ -714,6 +945,12 @@ export function createGroundMaterial(
         uPaintRough: { value: null },
         uPaintRect: { value: new THREE.Vector4(0, 0, 1, 1) },
         uPaintOn: { value: 0 },
+        uCoverMask: { value: null },
+        uCoverAlbedoHeight: { value: covTex.albedoHeight },
+        uCoverNormalRough: { value: covTex.normalRough },
+        uCoverMetres: { value: new THREE.Vector2(covTex.metres[0], covTex.metres[1]) },
+        uCoverRect: { value: new THREE.Vector4(0, 0, 1, 1) },
+        uCoverOn: { value: 0 },
       },
     ]),
   });
@@ -722,6 +959,58 @@ export function createGroundMaterial(
   defaults.aShade = [1];
   setStage(material, o.stage);
   return material;
+}
+
+/**
+ * Binds the plotbiome RGBA coverage mask (R dust, G moss, B grass, A wet) onto the ground material
+ * over the world rectangle [x0, x0 + size] x [z0, z0 + size] (TICKET-02 Item B).
+ */
+export function setCoverage(
+  material: THREE.ShaderMaterial,
+  cover: {
+    readonly tex: THREE.DataTexture;
+    readonly x0: number;
+    readonly z0: number;
+    readonly size: number;
+    readonly tiles?: CoverTextures;
+  } | null,
+): void {
+  if (!cover) {
+    material.uniforms.uCoverMask!.value = null;
+    material.uniforms.uCoverOn!.value = 0;
+    material.uniformsNeedUpdate = true;
+    return;
+  }
+
+  cover.tex.colorSpace = THREE.NoColorSpace;
+  cover.tex.wrapS = THREE.ClampToEdgeWrapping;
+  cover.tex.wrapT = THREE.ClampToEdgeWrapping;
+  cover.tex.magFilter = THREE.LinearFilter;
+  cover.tex.minFilter = THREE.LinearFilter;
+  cover.tex.needsUpdate = true;
+
+  if (cover.tiles) {
+    material.uniforms.uCoverAlbedoHeight!.value = cover.tiles.albedoHeight;
+    material.uniforms.uCoverNormalRough!.value = cover.tiles.normalRough;
+    (material.uniforms.uCoverMetres!.value as THREE.Vector2).set(
+      cover.tiles.metres[0],
+      cover.tiles.metres[1],
+    );
+  } else if (!material.uniforms.uCoverAlbedoHeight?.value) {
+    const def = getDefaultCoverTextures();
+    material.uniforms.uCoverAlbedoHeight!.value = def.albedoHeight;
+    material.uniforms.uCoverNormalRough!.value = def.normalRough;
+  }
+
+  material.uniforms.uCoverMask!.value = cover.tex;
+  (material.uniforms.uCoverRect!.value as THREE.Vector4).set(
+    cover.x0,
+    cover.z0,
+    cover.size,
+    cover.size,
+  );
+  material.uniforms.uCoverOn!.value = 1;
+  material.uniformsNeedUpdate = true;
 }
 
 /**
@@ -772,6 +1061,7 @@ export function meanAlbedo(tex: GroundTextures, material: number): [number, numb
     const offset = firstPixel + index * 4;
     red += decode(data[offset]!);
     green += decode(data[offset + 1]!);
+    green += 0;
     blue += decode(data[offset + 2]!);
   }
 

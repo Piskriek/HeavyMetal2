@@ -92,6 +92,27 @@ function meanSkyColour(png) {
   return { r, g, b, lum };
 }
 
+function meanGroundRatio(png) {
+  let rSum = 0, gSum = 0, bSum = 0, count = 0;
+  // bottom half of the frame (v from 50% to 100%)
+  const minV = Math.floor(png.height * 0.5);
+  const maxV = png.height;
+  for (let v = minV; v < maxV; v++) {
+    for (let u = 0; u < png.width; u++) {
+      const idx = (v * png.width + u) * 4;
+      rSum += png.data[idx];
+      gSum += png.data[idx + 1];
+      bSum += png.data[idx + 2];
+      count++;
+    }
+  }
+  const r = rSum / count;
+  const g = gSum / count;
+  const b = bSum / count;
+  const ratio = r > 0 ? g / r : 0;
+  return { r, g, b, ratio };
+}
+
 let exitCode = 0;
 
 try {
@@ -216,6 +237,78 @@ try {
     exitCode = 1;
   } else {
     console.log(`OK: Sky colour changed after raiseStage wave (delta=${waveDelta.toFixed(2)})`);
+  }
+
+  // --- Ground Coverage & Living Greens (TICKET-02 Item B) ---
+  console.log('\n--- Testing Ground Coverage & Greens across stages 1 to 6 ---');
+  // Teleport camera near plot centre looking down at ground
+  await page.evaluate(() => {
+    const exit = window.__playScene.gateExit();
+    window.__playScene.debug.teleport('planet', exit.x, exit.z, 0, -0.55);
+  });
+  await page.waitForTimeout(300);
+
+  const groundRatios = {};
+  for (let s = 1; s <= 6; s++) {
+    await page.evaluate((stageNum) => {
+      window.__playScene.setFidelityStage(stageNum);
+    }, s);
+
+    await page.evaluate(async () => {
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    });
+    await page.waitForTimeout(200);
+
+    const shotPath = path.join(outDir, `g${s}.png`);
+    const buf = await page.screenshot({ path: shotPath });
+    const png = PNG.sync.read(buf);
+    const gr = meanGroundRatio(png);
+    groundRatios[s] = gr;
+    console.log(`Stage ${s} Ground Band: R=${gr.r.toFixed(1)}, G=${gr.g.toFixed(1)}, B=${gr.b.toFixed(1)}, G/R=${gr.ratio.toFixed(3)} -> ${shotPath}`);
+
+    // Check coverage active on ground
+    const covActive = await page.evaluate(() => window.__playScene.debug.coverageActive());
+    if (!covActive) {
+      console.error(`FAIL: Coverage uniform uCoverOn is not active at stage ${s}`);
+      exitCode = 1;
+    }
+  }
+
+  // Assert G/R strictly rises from stage 2 to 4 to 6: G/R_6 > G/R_4 > G/R_2
+  const gr2 = groundRatios[2].ratio;
+  const gr4 = groundRatios[4].ratio;
+  const gr6 = groundRatios[6].ratio;
+  console.log(`Ground G/R ratios: S2=${gr2.toFixed(3)}, S4=${gr4.toFixed(3)}, S6=${gr6.toFixed(3)}`);
+
+  if (!(gr6 > gr4 && gr4 > gr2)) {
+    console.error(`FAIL: Ground G/R ratio did not strictly rise from S2 to S4 to S6 (S2=${gr2.toFixed(3)}, S4=${gr4.toFixed(3)}, S6=${gr6.toFixed(3)})`);
+    exitCode = 1;
+  } else {
+    console.log(`OK: Ground green-to-red ratio strictly rises: G/R_6 (${gr6.toFixed(3)}) > G/R_4 (${gr4.toFixed(3)}) > G/R_2 (${gr2.toFixed(3)})`);
+  }
+
+  // Check FPS on Low tier at stage 6: must hold at least 30 FPS
+  console.log('\n--- Testing FPS at stage 6 on Low tier ---');
+  await page.evaluate(() => {
+    window.__playScene.setFidelityStage(6);
+  });
+  await page.waitForTimeout(300);
+
+  const measuredFps = await page.evaluate(async () => {
+    const frames = 60;
+    const start = performance.now();
+    for (let i = 0; i < frames; i++) {
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    const elapsed = performance.now() - start;
+    return (frames / elapsed) * 1000;
+  });
+  console.log(`Stage 6 measured FPS: ${measuredFps.toFixed(1)} FPS`);
+  if (measuredFps < 30) {
+    console.error(`FAIL: Stage 6 FPS too low: ${measuredFps.toFixed(1)} < 30`);
+    exitCode = 1;
+  } else {
+    console.log(`OK: Stage 6 FPS meets >= 30 fps threshold (${measuredFps.toFixed(1)} FPS)`);
   }
 
   if (pageErrors.length > 0) {

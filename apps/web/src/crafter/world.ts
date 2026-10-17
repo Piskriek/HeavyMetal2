@@ -313,6 +313,7 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
     for (const name of ['position', 'aTo', 'normal', 'aNormalTo']) geometry.attributes[name]!.needsUpdate = true;
     for (const u of lookTargets) { setLook(u, 'From', current); setLook(u, 'To', target); }
     waterUniforms.uFromLevel.value = current.look.water; waterUniforms.uToLevel.value = target.look.water;
+    water.visible = (next ?? current).look.stage < 4;
   };
 
   /** Sky, haze and light follow the wave: halfway across your plot, halfway to the new sky. */

@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, type Plugin, type PluginOption } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -29,10 +29,41 @@ function sizeGate(): Plugin {
   };
 }
 
+/**
+ * The RUN multiplayer plugin (the room server on port 9001 under `vite --mode run`, and the room bundle at build time), loaded ONLY in
+ * RUN mode (`npm run build:run`). The plain single-file build never imports the SDK's vite entry. A failed import fails the build:
+ * a RUN build without its rooms is a co-op that cannot connect.
+ */
+async function runMultiplayerPlugins(mode: string): Promise<PluginOption[]> {
+  if (mode !== 'run') return [];
+  const { rundotMultiplayerPlugin } = await import('@series-inc/rundot-game-sdk/vite');
+  return [rundotMultiplayerPlugin(), requireRoomBundle()];
+}
+
+/** RUN builds only: the room bundle must exist once the build is written. The SDK logs its own bundle errors and carries on. */
+function requireRoomBundle(): Plugin {
+  let root = '';
+  return {
+    name: 'hm-run-room-bundle',
+    apply: 'build',
+    configResolved(c) { root = c.root; },
+    async closeBundle() {
+      // the SDK writes the room bundle in its own closeBundle, which runs beside this one: wait for the file it writes last
+      const bundle = path.resolve(root, 'dist', 'server-bundle.js');
+      const written = path.resolve(root, 'dist', 'rooms.config.json');
+      for (let waited = 0; waited < 120_000 && !existsSync(written); waited += 250) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      if (!existsSync(bundle) || !existsSync(written)) throw new Error(`RUN build: ${bundle} was not written, so the outpost room did not bundle (see the [RUN:multiplayer] lines above).`);
+      console.log(`\n  RUN room bundle ${(statSync(bundle).size / 1024).toFixed(1)} KB`);
+    },
+  };
+}
+
 /** The deployable app: ONE static html file (RUN loads a static build; no server). base './' so it works from a sub-path. */
-export default defineConfig(({ mode }) => ({
+export default defineConfig(async ({ mode }) => ({
   base: './',
-  plugins: [viteSingleFile(), studioWriteBack(), sizeGate()],
+  plugins: [...(await runMultiplayerPlugins(mode)), viteSingleFile(), studioWriteBack(), sizeGate()],
   // which game this build is (src/edition.ts): `HM_EDITION=goblin-racing npm run build` for the Goblin Racing launch; SetMix by default
   define: { __HM_EDITION__: JSON.stringify(process.env.HM_EDITION ?? 'setmix') },
   resolve: {

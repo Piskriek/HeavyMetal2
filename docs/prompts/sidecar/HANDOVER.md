@@ -40,17 +40,11 @@ You take over from the previous sidecar (Gemini Flash) as the implementing engin
 6. **Loading:** preload behind a visible loading bar. Never start a screen choppy.
 7. **The 3D PC:** never touch `scripts/local3d.mjs` jobs, `zips/runworld/` or the asset pipeline. Those are Opus's. You only use the packed assets: `apps/web/src/assets/gen/`, `apps/web/public/hd/`, `apps/web/public/audio/`, `apps/web/public/vo/`.
 
-## Your queue (in order; updated 2026-10-13)
-The master plan is `docs/ONE_GAME_PLAN.md` (§2 has the order, §6 Argo's waves). Gemini Argo is the creative lead (`docs/argo/`). His ruling `docs/argo/plans/ARGO_MASTER_PLAN_REPLY.md` is binding where your brief cites it. Done so far: 19, 20, 21 to 21c, 23a, 23b-1. Next: 22b (running), then 21d, 23b-2, 23c and 24, one at a time, because they all extend `scripts/test-campaign.mjs`. The order in short:
-1. **TASK-19 review 2** (the window scene; on the board).
-2. **TASK-20 one game** (`20-one-game.md`). Beside it, in a second sidecar: **TASK-23a the monster art pipeline** (`23a-monster-art.md`, no game files).
-3. **TASK-21 the beam tool** (`21-beam-tool.md`).
-4. **TASK-22 the campaign chain** (`22-campaign-chain.md`).
-5. **TASK-23 the monsters** (`23-monsters.md`; waits for `@hm/leaksim` and the art).
-5b. **TASK-23c the props in the world** (`23c-props-in-world.md`).
-6. **TASK-24 test everything, fix, report** (`24-campaign-e2e.md`). Opus then pushes main.
-7. **TASK-17 Studio shell** (resume the WIP in `zips/studio-wip-2026-10-12/`), then **TASK-18 the asset bench**, then **TASK-25 the Workshop** (bring your own monsters).
-8. Then post `[QUESTION] ready for the next task` and stop.
+## Your queue (updated 2026-10-17)
+The old TASK queue is finished. The work now arrives as tickets from Argo (the 8-ticket QA queue in ARGO_NOTE_05), which Opus specs and splits into jobs.
+- **Gemini Flash** watches `docs/sidecar/FLASH_INBOX.md` and reports in `docs/sidecar/FLASH_OUTBOX.md`. The inbox has the loop and the short rules.
+- **Haiku** workers get one brief each from Opus through the Agent tool (`docs/prompts/sidecar/T*.md`).
+- The old board, `docs/SIDECAR_COMMS.md`, is history. Read it only if your brief cites an entry.
 
 ## Context you can rely on
 - **Generated assets:** `loadGen` / `getGenSync` / `genLevelFor` in `apps/web/src/assets/gen.ts`, and the patterns in `apps/web/src/assets/gen-props.ts`. `registry.json` lists every packed asset with its size, and its box for lattice pieces.

@@ -21,11 +21,13 @@ export interface EmitterSpec {
   at: [number, number, number];
   colour: string;
   count?: number;
+  maxCount?: number;
   height?: number;
   spread?: number;
   life?: number;
   size?: number;
   startAt?: number;
+  gravity?: number;
 }
 export interface PlumeEnv {
   wind: [number, number];
@@ -155,6 +157,14 @@ const mix = (a: number, b: number, t: number): number => a * (1 - t) + b * t;
  * CPU twin of the vertex shader. Keep it side by side with `pixelCore` below.
  * ---------------------------------------------------------------------------------------------- */
 export function pixelAt(e: Required<EmitterSpec>, i: number, t: number, env: PlumeEnv): PixelState {
+  if (i >= e.count) {
+    return {
+      p: [e.at[0], e.at[1], e.at[2]],
+      size: 0,
+      life: 0,
+      toWave: false,
+    };
+  }
   const seed = pixelSeed(emitterSeed(e.at), i);
   const ph = fract(i * PHI);
   const x = t / e.life + ph;
@@ -164,10 +174,11 @@ export function pixelAt(e: Required<EmitterSpec>, i: number, t: number, env: Plu
 
   // the pour
   const rise = 1 - Math.pow(1 - u, RISE_POW);
-  const py = e.at[1] + e.height * rise * (HEIGHT_MIN + HEIGHT_VAR * r5);
+  const age = u * e.life;
+  const grav = e.gravity ?? 0;
+  const py = e.at[1] + e.height * rise * (HEIGHT_MIN + HEIGHT_VAR * r5) - 0.5 * grav * age * age;
   const rad = 0.5 * e.spread * (RAD_MIN + RAD_VAR * r1) * u;
   const th = TAU * r2 + TAU * (SWIRL_MIN + SWIRL_VAR * r3) * u;
-  const age = u * e.life;
   const drift = env.windSpeed * env.windResponse * WIND_DRIFT * age * age;
   const plumeX = e.at[0] + rad * Math.cos(th) + env.wind[0] * drift;
   const plumeZ = e.at[2] + rad * Math.sin(th) + env.wind[1] * drift;
@@ -229,6 +240,7 @@ uniform vec3 uWaveC;
 uniform float uWaveR;
 uniform float uViewportH;
 uniform vec4 uEm[${MAX_EMITTERS * 3}];
+uniform float uCounts[${MAX_EMITTERS}];
 ${glslConstants()}
 const uint GOLD32 = 0x9e3779b1u;
 
@@ -244,7 +256,8 @@ struct Px { vec3 pos; vec3 col; float size; float u; float cover; float age; vec
 
 // GLSL twin of pixelAt() -- same formulas, same constant names.
 Px pixelCore(vec3 pix) {
-  int s = int(pix.x + 0.5) * 3;
+  int slot = int(pix.x + 0.5);
+  int s = slot * 3;
   vec4 A = uEm[s];
   vec4 B = uEm[s + 1];
   vec4 C = uEm[s + 2];
@@ -254,8 +267,23 @@ Px pixelCore(vec3 pix) {
   float life = C.x;
   float size0 = C.y;
   float startAt = C.z;
+  float gravity = C.w;
 
   float i = pix.y;
+  float maxCount = uCounts[slot];
+  if (i >= maxCount) {
+    Px dead;
+    dead.pos = at;
+    dead.col = vec3(0.0);
+    dead.size = 0.0;
+    dead.u = 0.0;
+    dead.cover = 0.0;
+    dead.age = 0.0;
+    dead.ra = vec3(0.0);
+    dead.rb = vec3(0.0);
+    return dead;
+  }
+
   uint seed = uint(pix.z);
   float ph = fract(i * PHI);
   float x = uTime / life + ph;
@@ -272,10 +300,10 @@ Px pixelCore(vec3 pix) {
 
   // the pour
   float rise = 1.0 - pow(1.0 - u, RISE_POW);
-  float py = at.y + height * rise * (HEIGHT_MIN + HEIGHT_VAR * r5);
+  float age = u * life;
+  float py = at.y + height * rise * (HEIGHT_MIN + HEIGHT_VAR * r5) - 0.5 * gravity * age * age;
   float rad = 0.5 * spread * (RAD_MIN + RAD_VAR * r1) * u;
   float th = TAU * r2 + TAU * (SWIRL_MIN + SWIRL_VAR * r3) * u;
-  float age = u * life;
   float drift = uWindSpeed * uWindResponse * WIND_DRIFT * age * age;
   vec3 plume = vec3(at.x + rad * cos(th) + uWind.x * drift, py, at.z + rad * sin(th) + uWind.y * drift);
 
@@ -340,6 +368,10 @@ vec3 rotAxis(vec3 v, vec3 a, float ang) {
 
 void main() {
   Px p = pixelCore(aPix);
+  if (p.size <= 0.0) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    return;
+  }
   vec3 axis = normalize(vec3(p.ra.y, p.rb.x, p.rb.z) - 0.5 + vec3(0.001, 0.002, 0.003));
   float ang = TAU * p.ra.x + p.age * TUMBLE * (0.6 + 0.8 * p.ra.z);
   vec3 local = rotAxis(position, axis, ang) * p.size;
@@ -429,6 +461,7 @@ const DITHER_FRAG = CUBES_FRAG;
 interface Emitter {
   id: number;
   spec: Required<EmitterSpec>;
+  maxCount: number;
   seed: number;
 }
 
@@ -443,6 +476,8 @@ export function createPlume(o: { mode?: PlumeMode; density?: number; maxPixels?:
 
   const emData: THREE.Vector4[] = [];
   for (let n = 0; n < MAX_EMITTERS * 3; n++) emData.push(new THREE.Vector4());
+  const uCountsData = new Float32Array(MAX_EMITTERS);
+  const uCounts = { value: uCountsData };
   const uTime = { value: 0 };
   const uWind = { value: new THREE.Vector2(1, 0) };
   const uWindSpeed = { value: 0 };
@@ -460,6 +495,7 @@ export function createPlume(o: { mode?: PlumeMode; density?: number; maxPixels?:
     uViewportH,
     uMark: { value: mark },
     uEm: { value: emData },
+    uCounts,
   };
 
   // one material per mode, built once. The alpha channel is never blended.
@@ -538,35 +574,63 @@ export function createPlume(o: { mode?: PlumeMode; density?: number; maxPixels?:
 
   const emitters: Emitter[] = [];
   let nextId = 1;
-  let total = 0;
+  let totalActive = 0;
+  let totalAllocated = 0;
+  let currentScale = 1;
   const tmpColour = new THREE.Color();
 
   function applyVisibility(): void {
-    const on = mode !== 'off' && total > 0;
+    const on = mode !== 'off' && totalActive > 0;
     cubes.visible = on && mode === 'cubes';
     splats.visible = on && mode === 'splats';
     sprites.visible = on && mode === 'dither';
   }
 
-  /** Rewrites the instance attribute and the emitter table. Rare events only (add/remove/density). */
+  function updateCountsUniform(): void {
+    let act = 0;
+    for (let s = 0; s < emitters.length; s++) {
+      const em = emitters[s]!;
+      const cnt = Math.floor(em.spec.count * density * currentScale + 1e-6);
+      uCountsData[s] = cnt;
+      act += cnt;
+    }
+    for (let s = emitters.length; s < MAX_EMITTERS; s++) {
+      uCountsData[s] = 0;
+    }
+    totalActive = act;
+    if (emitters.length <= 1) {
+      cubeGeo.instanceCount = totalActive;
+      splatGeo.instanceCount = totalActive;
+      pointGeo.setDrawRange(0, totalActive);
+    }
+    applyVisibility();
+  }
+
+  /** Rewrites the instance attribute and the emitter table. Structural events only (add/remove/density). */
   function rebuild(): void {
     let raw = 0;
-    for (const em of emitters) raw += em.spec.count * density;
+    for (const em of emitters) raw += em.maxCount * density;
     const scale = raw > maxPixels ? maxPixels / raw : 1;
+    currentScale = scale;
     let w = 0;
     let n = 0;
+    let act = 0;
     for (let s = 0; s < emitters.length; s++) {
       const em = emitters[s];
       if (!em) continue;
-      let cnt = Math.floor(em.spec.count * density * scale + 1e-6);
-      if (n + cnt > maxPixels) cnt = maxPixels - n;
-      for (let j = 0; j < cnt; j++) {
+      let allocCnt = Math.floor(em.maxCount * density * scale + 1e-6);
+      if (n + allocCnt > maxPixels) allocCnt = maxPixels - n;
+      for (let j = 0; j < allocCnt; j++) {
         pix[w] = s;
         pix[w + 1] = j;
         pix[w + 2] = pixelSeed(em.seed, j);
         w += 3;
       }
-      n += cnt;
+      n += allocCnt;
+      let activeCnt = Math.floor(em.spec.count * density * scale + 1e-6);
+      if (activeCnt > allocCnt) activeCnt = allocCnt;
+      uCountsData[s] = activeCnt;
+      act += activeCnt;
       const a = emData[3 * s];
       const b = emData[3 * s + 1];
       const c = emData[3 * s + 2];
@@ -575,13 +639,18 @@ export function createPlume(o: { mode?: PlumeMode; density?: number; maxPixels?:
         tmpColour.set(sp.colour); // sRGB hex -> linear working space
         a.set(sp.at[0], sp.at[1], sp.at[2], sp.height);
         b.set(tmpColour.r, tmpColour.g, tmpColour.b, sp.spread);
-        c.set(sp.life, sp.size, sp.startAt, 0);
+        c.set(sp.life, sp.size, sp.startAt, sp.gravity);
       }
     }
-    total = n;
-    cubeGeo.instanceCount = n;
-    splatGeo.instanceCount = n;
-    pointGeo.setDrawRange(0, n);
+    for (let s = emitters.length; s < MAX_EMITTERS; s++) {
+      uCountsData[s] = 0;
+    }
+    totalAllocated = n;
+    totalActive = act;
+    const drawTotal = emitters.length <= 1 ? totalActive : totalAllocated;
+    cubeGeo.instanceCount = drawTotal;
+    splatGeo.instanceCount = drawTotal;
+    pointGeo.setDrawRange(0, drawTotal);
     if (n > 0) {
       for (const at of [aCubes, aSplats, aPoints]) {
         at.clearUpdateRanges();
@@ -625,18 +694,22 @@ export function createPlume(o: { mode?: PlumeMode; density?: number; maxPixels?:
     },
     add(e: EmitterSpec): number {
       if (emitters.length >= MAX_EMITTERS) throw new RangeError(`a plume holds at most ${MAX_EMITTERS} emitters`);
+      const count = Math.floor(finiteOr(e.count, 160, 0, maxPixels));
+      const maxCount = Math.floor(finiteOr(e.maxCount ?? e.count, 160, 0, maxPixels));
       const spec: Required<EmitterSpec> = {
         at: [e.at[0], e.at[1], e.at[2]],
         colour: e.colour,
-        count: Math.floor(finiteOr(e.count, 160, 0, maxPixels)),
+        count,
+        maxCount: Math.max(count, maxCount),
         height: finiteOr(e.height, 6.5, 0.01, 1000),
         spread: finiteOr(e.spread, 2.6, 0, 1000),
         life: finiteOr(e.life, 3.1, 0.1, 600),
         size: finiteOr(e.size, 0.14, 0.001, 100),
         startAt: finiteOr(e.startAt, 0, -1e9, 1e9),
+        gravity: finiteOr(e.gravity, 0, -1000, 1000),
       };
       const id = nextId++;
-      emitters.push({ id, spec, seed: emitterSeed(spec.at) });
+      emitters.push({ id, spec, maxCount: spec.maxCount, seed: emitterSeed(spec.at) });
       rebuild();
       return id;
     },
@@ -646,7 +719,12 @@ export function createPlume(o: { mode?: PlumeMode; density?: number; maxPixels?:
       const next = Math.floor(finiteOr(count, em.spec.count, 0, maxPixels));
       if (next === em.spec.count) return;
       em.spec.count = next;
-      rebuild();
+      if (next > em.maxCount) {
+        em.maxCount = next;
+        rebuild();
+      } else {
+        updateCountsUniform();
+      }
     },
     remove(id: number): void {
       const at = emitters.findIndex((em) => em.id === id);
@@ -658,13 +736,13 @@ export function createPlume(o: { mode?: PlumeMode; density?: number; maxPixels?:
       uTime.value = t;
     },
     stats() {
-      const on = mode !== 'off' && total > 0;
+      const on = mode !== 'off' && totalActive > 0;
       return {
         mode,
         emitters: emitters.length,
-        pixels: on ? total : 0,
+        pixels: on ? totalActive : 0,
         drawCalls: on ? 1 : 0,
-        triangles: !on ? 0 : mode === 'cubes' ? total * 12 : mode === 'splats' ? total * 2 : 0,
+        triangles: !on ? 0 : mode === 'cubes' ? totalActive * 12 : mode === 'splats' ? totalActive * 2 : 0,
       };
     },
     dispose(): void {
@@ -677,7 +755,8 @@ export function createPlume(o: { mode?: PlumeMode; density?: number; maxPixels?:
       splatMat.dispose();
       ditherMat.dispose();
       emitters.length = 0;
-      total = 0;
+      totalActive = 0;
+      totalAllocated = 0;
       applyVisibility();
     },
   };

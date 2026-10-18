@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { createPlume, pixelAt, METRIC_COLOURS, PLUME_MODES, type EmitterSpec, type PlumeEnv } from '../src/index';
 
 const calm: PlumeEnv = { wind: [1, 0], windSpeed: 0, windResponse: 1, waveCentre: [0, 0, 0], waveR: -1 };
-const spec = (o: Partial<EmitterSpec> = {}): Required<EmitterSpec> => ({ at: [0, 1, 0], colour: METRIC_COLOURS.pxd, count: 160, height: 6.5, spread: 2.6, life: 3.1, size: 0.14, startAt: 0, ...o });
+const spec = (o: Partial<EmitterSpec> = {}): Required<EmitterSpec> => ({ at: [0, 1, 0], colour: METRIC_COLOURS.pxd, count: 160, maxCount: 160, height: 6.5, spread: 2.6, life: 3.1, size: 0.14, startAt: 0, gravity: 0, ...o });
 const sample = (e: Required<EmitterSpec>, t: number, env: PlumeEnv) => Array.from({ length: e.count }, (_, i) => pixelAt(e, i, t, env));
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
 const flat = (p: { p: [number, number, number] }) => Math.hypot(p.p[0], p.p[2]);
@@ -279,3 +279,81 @@ test('the pixel budget caps a huge request evenly', () => {
   assert.equal(plume.stats().pixels, 16384);
   plume.dispose();
 });
+
+test('gravity 0 equals default/omitted gravity output for a sample of pixels across time', () => {
+  const omittedSpec = spec();
+  const withZeroSpec = spec({ gravity: 0 });
+
+  for (const t of [0.5, 1, 2.5, 5, 10, 15.3]) {
+    const s1 = Array.from({ length: 160 }, (_, i) => pixelAt(omittedSpec, i, t, calm));
+    const s2 = Array.from({ length: 160 }, (_, i) => pixelAt(withZeroSpec, i, t, calm));
+    assert.deepEqual(s1, s2, `gravity 0 matches default at t=${t}`);
+  }
+});
+
+test('a gravity pixel rises, then falls below its peak', () => {
+  const emZero = spec({
+    at: [0, 0, 0],
+    colour: METRIC_COLOURS.pxd,
+    count: 1,
+    height: 10,
+    life: 4,
+    startAt: 0,
+    gravity: 0,
+  });
+  const emGrav = spec({
+    ...emZero,
+    gravity: 8,
+  });
+
+  const gravSamples: { age: number; py: number }[] = [];
+  const zeroSamples: { age: number; py: number }[] = [];
+  for (let dt = 0; dt < 4; dt += 0.05) {
+    const pg = pixelAt(emGrav, 0, dt, calm);
+    const pz = pixelAt(emZero, 0, dt, calm);
+    gravSamples.push({ age: pg.life * 4, py: pg.p[1] });
+    zeroSamples.push({ age: pz.life * 4, py: pz.p[1] });
+  }
+
+  gravSamples.sort((a, b) => a.age - b.age);
+  zeroSamples.sort((a, b) => a.age - b.age);
+
+  const maxGravY = Math.max(...gravSamples.map((s) => s.py));
+  const peakIndex = gravSamples.findIndex((s) => s.py === maxGravY);
+
+  assert.ok(maxGravY > 1.0, 'gravity pixel rises significantly above launch level');
+  assert.ok(peakIndex > 5 && peakIndex < gravSamples.length - 5, 'peak occurs mid-flight');
+
+  const endGravY = gravSamples[gravSamples.length - 1]!.py;
+  assert.ok(endGravY < maxGravY - 2.0, 'gravity pixel falls substantially below its peak');
+
+  const endZeroY = zeroSamples[zeroSamples.length - 1]!.py;
+  assert.ok(endGravY < endZeroY - 3.0, 'gravity pixel ends lower than zero-gravity pixel');
+});
+
+test('changing the count within maxCount makes no new buffer or attribute reallocation', () => {
+  const plume = createPlume({ mode: 'cubes' });
+  const id = plume.add({ at: [0, 1, 0], colour: METRIC_COLOURS.pxd, count: 50, maxCount: 100 });
+  const mesh = drawn(plume.object)[0] as THREE.Mesh;
+  const attr = mesh.geometry.getAttribute('aPix') as THREE.BufferAttribute;
+  const initialArray = attr.array;
+  const initialVersion = attr.version;
+
+  plume.setCount(id, 80);
+  assert.equal(mesh.geometry.getAttribute('aPix'), attr, 'same attribute reference');
+  assert.equal(attr.array, initialArray, 'same typed array reference (zero reallocation)');
+  assert.equal(attr.version, initialVersion, 'attribute version untouched (no buffer upload)');
+  assert.equal(plume.stats().pixels, 80, 'active pixels updated');
+
+  plume.setCount(id, 20);
+  assert.equal(attr.array, initialArray, 'same typed array reference');
+  assert.equal(attr.version, initialVersion, 'no buffer upload');
+  assert.equal(plume.stats().pixels, 20, 'active pixels updated to 20');
+
+  const mat = mesh.material as THREE.ShaderMaterial;
+  const uCounts = mat.uniforms.uCounts as { value: Float32Array };
+  assert.equal(uCounts.value[0], 20, 'uCounts uniform updated directly');
+
+  plume.dispose();
+});
+

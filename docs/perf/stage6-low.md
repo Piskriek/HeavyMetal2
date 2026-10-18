@@ -68,8 +68,8 @@ so it includes an early version of the fix).
 ## Campaign status (not green with the fix)
 
 - HEAD: test-campaign 45 of 45 on the worker, 3 of 3 runs. HEAD plus the debug accessors: 45 of 45.
-- With the fix: beat 16 (A4-04: B opens the Build menu) failed in 3 of 6 runs; a boot failure in 1; one more run had 45 of 45
-  beats and exited 1 from the HUD-overlap check (the journal toast reached the reticle's clear zone).
+- With the fix, six worker runs: beat 16 (A4-04: B opens the Build menu) failed in 3; a boot failure in 1; two ran 45 of 45
+  beats, and the last of those exited 1 from the HUD-overlap check (the journal toast reached the reticle's clear zone).
 - Diagnosis so far: the B key is ignored when React's `hud.where` has not caught up with the scene's `where` after
   `toPlanet()`. The key reaches the window (counted), so the handler's gate is the cause. The faster frames change that
   timing. Not fixed.

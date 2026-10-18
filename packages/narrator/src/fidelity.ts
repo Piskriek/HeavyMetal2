@@ -57,6 +57,21 @@ const DEFS: Readonly<Record<string, Def>> = {
   // synced and desynced
   'N-01': { priority: 'story', on: 'sync:on' },
   'N-02': { priority: 'story', on: 'sync:off' },
+  // Act VII: The Grid & The Flood (Brief 35 / TICKET-16)
+  'A7-01': { priority: 'story', on: 'act7:power-unit', after: 'F-02' },
+  'A7-02': { priority: 'story', on: 'act7:hydro-basin', after: 'A7-01' },
+  'A7-03': { priority: 'story', on: 'act7:wreck-transponders', after: 'A7-02' },
+  // Act VIII: The Splice & The Canopy (Brief 35 / TICKET-16)
+  'A8-01': { priority: 'story', on: 'act8:combiner-splice', after: 'A7-03' },
+  'A8-02': { priority: 'story', on: 'act8:rift-or-wave', after: 'A8-01' },
+  'A8-03': { priority: 'story', on: 'act8:biosphere', after: 'A8-02' },
+  // Act IX: Majority Consensus & The Four Floats Finale (Brief 35 / TICKET-16)
+  'A9-01': { priority: 'story', on: 'act9:horizon-domes', after: 'A8-03' },
+  'A9-02': { priority: 'story', on: 'act9:consensus-commit', after: 'A9-01' },
+  'A9-03': { priority: 'story', on: 'act9:finale-handoff', after: 'A9-02' },
+  // POL-57: Repeatable warning barks (0% sync recall & 12 kW Gate brownout)
+  'BARK-RECALL': { priority: 'warn', on: 'sync:recall', cooldown: 45 },
+  'BARK-BROWNOUT': { priority: 'warn', on: 'power:brownout', cooldown: 60 },
 };
 
 /** Event name to the lines it can trigger, in script order. */

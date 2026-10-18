@@ -32,6 +32,11 @@ export const TEST_FILES = [
   'apps/web/src/net/*.test.ts',
   'apps/web/src/rooms/*.test.ts',
   'apps/web/src/monsters/*.test.ts',
+  // tests that sit beside their sources (T10's wall-pathfinder and seam-stitch, T15's musicbox, T14's credits)
+  'packages/*/src/*.test.ts',
+  'packages/*/src/__tests__/*.test.ts',
+  'apps/web/src/avatar/*.test.ts',
+  'apps/web/src/credits/__tests__/*.test.ts',
 ];
 
 const root = fileURLToPath(new URL('../', import.meta.url));

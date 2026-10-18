@@ -7,7 +7,7 @@
 ## Copy or merge
 - **Copy (new):** `packages/questline/src/act789-chain.ts` and its test (`packages/questline/tests/charm-and-act789.test.ts`), `apps/web/src/play/planet-table-hologram.ts`, and `apps/web/src/shell/haddy-crt-portrait.tsx`.
 - **Merge by hand:**
-  - `packages/questline/src/index.ts` (+2) and `packages/narrator/src/fidelity.ts` (+15: the A7-01 to A9-03 triggers and the barks);
+  - `packages/questline/src/index.ts` (+2). (`packages/narrator/src/fidelity.ts` is already done: Opus applied Argo's +15 registrations early so `npm test` stays green.)
   - `apps/web/src/base/campaign-chain.ts` (+84: the A7 to A9 rows);
   - `apps/web/src/shell/goblin-front.tsx` (+104 −7): the menu hero (POL-01, POL-64), merged onto T14's version, which adds the Ending Credits entry first.
 - **`play-scene.ts` Window E** (ARGO_NOTE_15 and the bundle): the 11 enclave domes on the 4.2 km horizon (A9-01). One labelled section.

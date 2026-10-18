@@ -18,11 +18,12 @@ const EMPTY: Evidence = { stage: 0, drillsRunning: 0, machineKinds: [], vehicleK
 
 test('the chain data is sound: the questline validates and every step has its text', () => {
   assert.deepEqual(chainProblems(), []);
-  assert.equal(CHAIN.quests.length, 3);
+  assert.equal(CHAIN.quests.length, 6); // Acts IV to IX (TICKET-16 added VII to IX)
   assert.deepEqual(CHAIN_STEPS.map((s) => s.id), [
     'A4-01', 'A4-01b', 'A4-02', 'A4-03', 'A4-04',
     'B-01', 'B-04', 'B-06', 'B-05', 'B-07',
     'F-01', 'F-02', 'F-03', 'F-04', 'F-05',
+    'A7-01', 'A7-02', 'A7-03', 'A8-01', 'A8-02', 'A8-03', 'A9-01', 'A9-02', 'A9-03',
   ]);
 });
 
@@ -41,7 +42,7 @@ test('every step is reachable in order: each one holds once its action happens, 
   assert.deepEqual(seen, CHAIN_STEPS.map((s) => s.id));
   assert.equal(chainView(c).current, null);
   assert.equal(c.monstersUnlocked, true);
-  assert.deepEqual(c.progress.finished, ['act4', 'act5', 'act6']);
+  assert.deepEqual(c.progress.finished, ['act4', 'act5', 'act6', 'act7', 'act8', 'act9']);
 });
 
 test('the chain is not started until the drill runs (Act IV needs it)', () => {

@@ -141,9 +141,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   useEffect(() => { if (screen !== 'play') setPlayEntry(null); }, [screen]);
   /** Whether the campaign finale has played: gates the Ending Credits item on the title menu (POL-306). */
   const endingSeen = useMemo(() => {
-    if (typeof localStorage === 'undefined') return false;
     try {
-      if (localStorage.getItem('hm.endingSeen') === '1') return true;
+      if (kv.get('hm.endingSeen') === '1') return true;
       const raw = kv.get(SAVE_KEY);
       if (!raw) return false;
       const save = JSON.parse(raw);

@@ -393,8 +393,7 @@ export function PlayScreen(props: {
   const jukeboxRef = useRef(false);
   jukeboxRef.current = jukeboxOpen;
   const [endingSeen, setEndingSeen] = useState<boolean>(() => {
-    if (typeof localStorage === 'undefined') return false;
-    return localStorage.getItem('hm.endingSeen') === '1' || kv.get('hm.endingSeen') === '1';
+    try { return kv.get('hm.endingSeen') === '1'; } catch { return false; }
   });
   const finaleRef = useRef<{
     active: boolean;
@@ -2373,8 +2372,7 @@ useEffect(() => {
           fin.done = true;
           fin.active = false;
           updateChain((c) => bump(c, COUNT.finaleWindowHealed, 1));
-          if (typeof localStorage !== 'undefined') localStorage.setItem('hm.endingSeen', '1');
-          kv.set('hm.endingSeen', '1');
+          try { kv.set('hm.endingSeen', '1'); } catch { /* storage unavailable: the save's chain still records A9-03 */ }
           setEndingSeen(true);
           startCredits('lab');
         }

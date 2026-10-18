@@ -93,6 +93,10 @@ await page.addInitScript(() => {
   };
   try {
     localStorage.clear();
+    // the quality tier is locked at low: the display governor (packages/game/src/quality.ts) steps the tier up while the frames are
+    // fast, and each tier draws a different number of ground chunks (the ground budget). Left free, the terrain's draw calls grow with
+    // the frame rate, and the 200-piece check below measures the terrain, not the batching it is meant to verify.
+    localStorage.setItem('hm.profile.v2', JSON.stringify({ name: 'Goblin', credits: 500, grownUp: true, tutorialDone: true, style: 'voxel', skin: 'flat', favIslands: [], quality: 'low', fpsTarget: 60, graphics: { vegetation: 'low' }, gpu: 'fast', controls: { sensitivity: 1, invertY: false, fov: 75 }, cameraView: 'first' }));
   } catch {}
 });
 

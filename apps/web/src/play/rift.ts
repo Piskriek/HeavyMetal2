@@ -415,7 +415,9 @@ export function createRift(o: RiftOptions): RiftInstance {
   mergedGeo.setAttribute('aBaseOffset', new THREE.Float32BufferAttribute(baseOffsets, 3));
   mergedGeo.setAttribute('aFreqPhase', new THREE.Float32BufferAttribute(freqPhases, 2));
   mergedGeo.setIndex(indices);
-  mergedGeo.computeBoundingSphere();
+  // the bounds cover the tear's height: the positions are local, and the tear's slices and scanlines are lifted by their offsets in the
+  // vertex shader, so the sphere is set by hand (centre 1.6 m up, reaching the base and the top of the tear with room for the sway)
+  mergedGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 1.6, 0), 2.6);
 
   const uniforms = {
     uTime: { value: 0 },
@@ -435,7 +437,8 @@ export function createRift(o: RiftOptions): RiftInstance {
   const mesh = new THREE.Mesh(mergedGeo, riftMat);
   mesh.name = 'rift-unified-mesh';
   mesh.userData.ignoreStageLook = true;
-  mesh.frustumCulled = false;
+  // culled like any mesh: a rift out of the view costs no draw call (before, every rift cost one, in view or not)
+  mesh.frustumCulled = true;
   mesh.renderOrder = 12;
   group.add(mesh);
   // a flagged object draws on RIFT_LAYER: only the play scene's rift pass (after the stage look) sees it

@@ -268,3 +268,8 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 - **Seen:** TICKET-06. `mergeStaticMeshes` (lab-machines.ts) builds new merged geometry for the shell, the station dressing, the cable drops and the gate housings. The room's `keep` list does not hold it, so the room's `dispose()` leaves it for the garbage collector to miss.
 - **Expected:** `dispose()` frees every geometry the room made.
 - Sidecar Task: POL-105 - have `mergeStaticMeshes` return the geometry, and register it with the room's `keep` in `lab-room.ts`.
+
+### POL-121: the console's throw lever moves only 0.25 rad
+- **Seen:** T06b (b60aee2f). The generated console's guide is a short H-slot (0.18 m), so the lever's full throw (play-scene sends −1.1 rad) would put the grip through the hood. `lab-room.ts` maps the throw to 0.25 rad from a 0.15 rad rest tilt.
+- **Expected:** a big, readable throw. The player pulls the lever that wakes the lab.
+- Sidecar Task: POL-121 - re-image `operator-console` with a long arc slot (or a raised quadrant guide) on the deck's right, re-run the model batch, and widen the throw to about 1 rad.

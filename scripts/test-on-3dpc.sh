@@ -15,7 +15,7 @@ if [ "${1:-}" = "--only" ]; then only="${2:?--only needs a quoted list of paths}
 cmd="${1:?usage: scripts/test-on-3dpc.sh [--only \"<paths>\"] \"<command>\"}"
 root="$(git rev-parse --show-toplevel)"
 cd "$root"
-. "$root/scripts/worker.env"; WORKER_IP="${WORKER_IP%$''}"
+. "$root/scripts/worker.env"; WORKER_IP="${WORKER_IP%$'\r'}"
 host="RAMPAGE@${WORKER_IP}"
 key="$HOME/.ssh/id_ed25519_fidelity"
 export GIT_SSH_COMMAND="ssh -i $key -o BatchMode=yes -o ConnectTimeout=10 -o LogLevel=ERROR"

@@ -5,13 +5,42 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as THREE from 'three';
 import {
   aimLabStation,
+  buildHardwareFabricatorProp,
+  createRightWallMachineRig,
   LAB_STATIONS,
   nearestLabStation,
   RIGHT_WALL_MACHINES,
   stationById,
 } from './lab-machines';
+
+type RigMaterials = Parameters<typeof buildHardwareFabricatorProp>[0];
+type RigBase = Parameters<typeof createRightWallMachineRig>[1];
+
+/** One shared material stands in for every lab material: the rig's geometry does not need the real look to be checked. */
+function fakeRigMaterials(): RigMaterials {
+  const mat = new THREE.MeshBasicMaterial();
+  return { paint: mat, gunmetal: mat, darkSteel: mat, copper: mat, glass: mat, rubber: mat, hazard: mat } as unknown as RigMaterials;
+}
+
+test('the station dress faces the room: the fabricator turns with its prop, the rack, bench and combiner turn their dress by PI (POL-103)', () => {
+  const m = fakeRigMaterials();
+  for (const id of ['preset-rack', 'preset-bench', 'preset-combiner', 'fabricator'] as const) {
+    const base = { group: new THREE.Group(), colliders: [], sockets: [], lamps: [] } as unknown as RigBase;
+    const rig = createRightWallMachineRig(id, base, m);
+    assert.equal(rig.dressGroup.rotation.y, id === 'fabricator' ? 0 : Math.PI, `${id}: dress turn`);
+  }
+
+  // the fabricator's plume is one InstancedMesh (T06 draw-call budget), not 14 separate cubes
+  const fab = createRightWallMachineRig('fabricator', buildHardwareFabricatorProp(m), m);
+  let instanced = 0;
+  fab.plumeGroup.traverse((obj) => {
+    if ((obj as THREE.InstancedMesh).isInstancedMesh) instanced++;
+  });
+  assert.equal(instanced, 1, 'the station plume is a single InstancedMesh');
+});
 
 test('RIGHT_WALL_MACHINES defines all 4 distinct East-wall machines with Sheet 07 pixel colours and E actions', () => {
   assert.equal(RIGHT_WALL_MACHINES.length, 4);

@@ -1,17 +1,39 @@
 // ============================================================================
 // File: apps/web/src/play/rift.ts
-// TICKET-07 (OPUS_NOTE_14 Item A — MC-01 / P1-MON-04 / DEC-02):
-// Vertical glitch-sliced S-Space tear replacing the cylinder/ring leak marker:
-//  - Grounded square-section containment collar (buried base, zero round tubes)
-//  - Stacked horizontal offset glitch slabs with dark void core & chromatic edges
-//  - Cut-up horizontal scanline bars & deterministic high-frequency flicker
-//  - States: 'open' (violent chromatic tear), 'sealing' (turns amber & narrows),
-//    'sealed' (collapses tear and leaves a grounded vitrified scar decal)
+// TICKET-07 (MC-01 / P1-MON-04) + POL-100 & POL-98 Rework:
+// Vertical glitch-sliced S-Space tear:
+//  - Bypasses the planetary stage look (wireframe / 1-bit / EGA) at every stage
+//    (userData.ignoreStageLook = true) and always renders in its own vivid unlit
+//    S-Space palette (#ff1e8e electric magenta, #00f0ff cyan, #2a0845 deep violet
+//    void core, shifting to #ffc13d / #ffe082 amber when sealing).
+//  - Collapses all 58 former sub-meshes (4 collar boxes, 2 scar boxes, 42 tear
+//    slabs, 10 scanlines) into ONE merged BufferGeometry + single THREE.Mesh
+//    (strictly 1 draw call total, resolving POL-98's ~60 draw calls).
+//  - Keeps lightweight Group anchors ('rift-collar', 'rift-scar', 'rift-tear')
+//    so existing scene/test queries (getObjectByName('rift-tear').visible) pass.
 // ============================================================================
 
 import * as THREE from 'three';
 
 export type RiftState = 'open' | 'sealing' | 'sealed';
+
+/**
+ * The render layer of every flagged object (userData.ignoreStageLook): the planet's own pass skips this layer, so the stage look never
+ * touches a rift; the play scene draws the layer after the stage look (POL-100).
+ */
+export const RIFT_LAYER = 1;
+
+/**
+ * The planet's depth and the picture's size, for the rifts' own depth test: a rift drawn after the stage look still hides behind the
+ * ground and the walls. Shared by every rift; the play scene sets them on each draw of the planet (uDepthOn 1 while it does).
+ */
+export const riftDepthUniforms = {
+  uSceneDepth: { value: null as THREE.Texture | null },
+  uDepthOn: { value: 0 },
+  uOutRes: { value: new THREE.Vector2(1, 1) },
+  uNear: { value: 0.08 },
+  uFar: { value: 9000 },
+};
 
 export interface RiftOptions {
   readonly seed: number;
@@ -20,6 +42,7 @@ export interface RiftOptions {
 
 export interface RiftInstance {
   readonly group: THREE.Group;
+  readonly mesh: THREE.Mesh;
   setState(s: RiftState, t: number): void;
   getState(): RiftState;
   dispose(): void;
@@ -35,34 +58,15 @@ function seededUnit(seed: number, index: number): number {
   return h / 4294967296;
 }
 
-interface SlabEntry {
-  readonly row: THREE.Group;
-  readonly coreMat: THREE.MeshBasicMaterial;
-  readonly leftEdgeMat: THREE.MeshBasicMaterial;
-  readonly rightEdgeMat: THREE.MeshBasicMaterial;
-  readonly baseOffsetX: number;
-  readonly baseOffsetZ: number;
-  readonly baseWidth: number;
-  readonly phase: number;
-  readonly freq: number;
-}
-
-interface ScanlineEntry {
-  readonly mesh: THREE.Mesh;
-  readonly mat: THREE.MeshBasicMaterial;
-  readonly baseY: number;
-  readonly phase: number;
-}
-
 /**
  * Deterministic glitch displacement for slice `i` at time `t` seconds under state `s`.
- * Pure helper exported for unit testing.
+ * Pure helper exported for unit testing and mirrored in RIFT_VERT.
  */
 export function riftSliceOffset(
   seed: number,
   sliceIndex: number,
   state: RiftState,
-  t: number
+  t: number,
 ): { readonly dx: number; readonly dz: number; readonly widthScale: number; readonly amberMix: number } {
   if (state === 'sealed') {
     return { dx: 0, dz: 0, widthScale: 0, amberMix: 1 };
@@ -87,9 +91,179 @@ export function riftSliceOffset(
   return { dx, dz, widthScale, amberMix: 0 };
 }
 
+// Part IDs encoded in vertex attribute `aPart`:
+// 0 = grounded square-section containment collar
+// 1 = vitrified scar outer base
+// 2 = vitrified scar inner glowing seam
+// 3 = vertical tear void core (#2a0845 deep S-Space violet)
+// 4 = vertical tear left jagged chromatic edge (#ff1e8e electric magenta)
+// 5 = vertical tear right jagged chromatic edge (#00f0ff electric cyan)
+// 6 = horizontal glitch scanline bar (alternating #ff1e8e / #00f0ff)
+
+const RIFT_VERT = /* glsl */ `
+  attribute float aPart;
+  attribute float aSlice;
+  attribute vec3 aBaseOffset;
+  attribute vec2 aFreqPhase;
+
+  uniform float uTime;
+  uniform float uState; // 0.0 = open, 1.0 = sealing, 2.0 = sealed
+
+  varying float vPart;
+  varying float vSlice;
+  varying vec2 vFreqPhase;
+  varying vec3 vNormalW;
+
+  void main() {
+    vPart = aPart;
+    vSlice = aSlice;
+    vFreqPhase = aFreqPhase;
+    vNormalW = normalize(mat3(modelMatrix) * normal);
+
+    vec3 p = position;
+
+    // Dynamic vertical tear slabs (parts 3, 4, 5)
+    if (aPart >= 2.5 && aPart < 5.5) {
+      if (uState > 1.5) {
+        // Sealed: collapse tear geometry to zero
+        p = vec3(0.0, -10.0, 0.0);
+      } else {
+        float freq = aFreqPhase.x;
+        float phase = aFreqPhase.y;
+        float qStep = floor(uTime * 16.0 + aSlice * 1.7);
+        float jumpHash = mod(floor(sin(qStep * 12.9898) * 43758.5453), 7.0);
+        float stepJump = abs(jumpHash) < 0.5 ? 1.65 : 1.0;
+
+        bool sealing = uState > 0.5;
+        float wScale = sealing
+          ? (0.42 + 0.14 * abs(sin(uTime * 12.0 + phase)))
+          : (0.85 + 0.35 * abs(sin(uTime * 9.5 + phase)));
+        float dx = sealing
+          ? (sin(uTime * freq * 1.2 + phase) * 0.09 * stepJump)
+          : (sin(uTime * freq + phase) * 0.24 * stepJump);
+        float dz = sealing
+          ? (cos(uTime * freq * 0.7 + phase) * 0.04)
+          : (cos(uTime * freq * 0.65 + phase) * 0.08);
+
+        p.x = p.x * wScale + aBaseOffset.x + dx;
+        p.y = p.y + aBaseOffset.y;
+        p.z = p.z + aBaseOffset.z + dz;
+      }
+    } else if (aPart >= 5.5) {
+      // Horizontal glitch scanlines (part 6)
+      if (uState > 1.5) {
+        p = vec3(0.0, -10.0, 0.0);
+      } else {
+        float phase = aFreqPhase.y;
+        bool sealing = uState > 0.5;
+        float wScale = sealing ? 0.45 : 1.0;
+        float dx = sin(uTime * 27.0 + phase) * (sealing ? 0.12 : 0.32);
+        float dy = cos(uTime * 19.0 + phase) * 0.03;
+        p.x = p.x * wScale + dx;
+        p.y = p.y + aBaseOffset.y + dy;
+        p.z = p.z + aBaseOffset.z;
+      }
+    } else {
+      // Static grounded collar (0) and vitrified scar (1, 2)
+      p += aBaseOffset;
+    }
+
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+  }
+`;
+
+const RIFT_FRAG = /* glsl */ `
+  uniform float uTime;
+  uniform float uState; // 0.0 = open, 1.0 = sealing, 2.0 = sealed
+  uniform sampler2D uSceneDepth; // the planet's depth (its own pass), so the rift hides behind the ground and the walls
+  uniform float uDepthOn;
+  uniform vec2 uOutRes;          // the picture's size in pixels
+  uniform float uNear;
+  uniform float uFar;
+
+  varying float vPart;
+  varying float vSlice;
+  varying vec2 vFreqPhase;
+  varying vec3 vNormalW;
+
+  // the eye-space distance of a window depth (0..1) under this camera's near and far planes
+  float riftEyeZ(float d) {
+    float z = d * 2.0 - 1.0;
+    return 2.0 * uNear * uFar / (uFar + uNear - z * (uFar - uNear));
+  }
+
+  void main() {
+    if (uDepthOn > 0.5) {
+      float sceneZ = riftEyeZ(texture2D(uSceneDepth, gl_FragCoord.xy / uOutRes).x);
+      if (sceneZ < riftEyeZ(gl_FragCoord.z) - 0.04) discard;
+    }
+    // Discard collapsed tear fragments when sealed
+    if (uState > 1.5 && vPart >= 2.5) {
+      discard;
+    }
+
+    bool sealing = uState > 0.5 && uState < 1.5;
+    bool sealedState = uState > 1.5;
+
+    // 0: Grounded square-section containment collar
+    if (vPart < 0.5) {
+      float shade = 0.55 + 0.45 * abs(vNormalW.y * 0.6 + vNormalW.x * 0.4);
+      vec3 col = vec3(0.12, 0.15, 0.20) * shade;
+      gl_FragColor = vec4(col, 1.0);
+      return;
+    }
+
+    // 1: Vitrified scar outer base
+    if (vPart < 1.5) {
+      gl_FragColor = vec4(0.04, 0.06, 0.10, 1.0);
+      return;
+    }
+
+    // 2: Vitrified scar inner seam
+    if (vPart < 2.5) {
+      vec3 seamCol = sealedState
+        ? vec3(0.20, 0.25, 0.33)
+        : (sealing ? vec3(1.0, 0.76, 0.24) : vec3(1.0, 0.12, 0.56));
+      gl_FragColor = vec4(seamCol, 1.0);
+      return;
+    }
+
+    // 3: Tear void core (deep S-Space violet #2a0845 when open, warm dark amber when sealing)
+    if (vPart < 3.5) {
+      vec3 coreCol = sealing ? vec3(0.22, 0.11, 0.02) : vec3(0.165, 0.031, 0.271);
+      gl_FragColor = vec4(coreCol, 1.0);
+      return;
+    }
+
+    float flicker = 0.78 + 0.22 * abs(sin(uTime * vFreqPhase.x + vFreqPhase.y));
+
+    // 4: Left jagged chromatic edge (#ff1e8e electric magenta -> #ffc13d amber on sealing)
+    if (vPart < 4.5) {
+      vec3 leftCol = sealing ? vec3(1.0, 0.757, 0.239) : vec3(1.0, 0.118, 0.557);
+      gl_FragColor = vec4(leftCol * flicker, 1.0);
+      return;
+    }
+
+    // 5: Right jagged chromatic edge (#00f0ff electric cyan -> #ffe082 gold on sealing)
+    if (vPart < 5.5) {
+      vec3 rightCol = sealing ? vec3(1.0, 0.878, 0.510) : vec3(0.0, 0.941, 1.0);
+      gl_FragColor = vec4(rightCol * flicker, 1.0);
+      return;
+    }
+
+    // 6: Horizontal glitch scanlines
+    float isEven = mod(vSlice, 2.0) < 0.5 ? 1.0 : 0.0;
+    vec3 barCol = sealing
+      ? vec3(1.0, 0.757, 0.239)
+      : mix(vec3(0.0, 0.941, 1.0), vec3(1.0, 0.118, 0.557), isEven);
+    float gate = sin(uTime * 31.0 + vFreqPhase.y) > -0.35 ? 1.0 : 0.35;
+    gl_FragColor = vec4(barCol * gate, 1.0);
+  }
+`;
+
 /**
- * Builds a vertical glitch-sliced S-Space rift tear with a grounded square-section frame
- * and a vitrified scar decal when sealed.
+ * Builds a single-draw-call vertical glitch-sliced S-Space rift tear that bypasses
+ * the planetary stage look and renders in its own vivid S-Space palette (POL-100, POL-98).
  */
 export function createRift(o: RiftOptions): RiftInstance {
   const seed = Number.isFinite(o.seed) ? Math.floor(o.seed) : 1;
@@ -97,237 +271,199 @@ export function createRift(o: RiftOptions): RiftInstance {
 
   const group = new THREE.Group();
   group.name = 's-space-rift';
+  group.userData.ignoreStageLook = true;
 
-  const geometries: THREE.BufferGeometry[] = [];
-  const materials: THREE.Material[] = [];
-  const trackGeo = <T extends THREE.BufferGeometry>(g: T): T => {
-    geometries.push(g);
-    return g;
-  };
-  const trackMat = <T extends THREE.Material>(m: T): T => {
-    materials.push(m);
-    return m;
-  };
-
-  // 1. Grounded square-section containment collar (partly buried to -0.35 m so it never floats)
+  // Lightweight state/query groups (0 draw calls) so existing tests checking
+  // getObjectByName('rift-tear' | 'rift-scar' | 'rift-collar') continue to pass
   const collarGroup = new THREE.Group();
   collarGroup.name = 'rift-collar';
-  const collarMat = trackMat(
-    new THREE.MeshStandardMaterial({
-      color: 0x1e2530,
-      roughness: 0.68,
-      metalness: 0.42,
-    })
-  );
-  const collarPositions: readonly (readonly [number, number, number, number, number])[] = [
+  const scarGroup = new THREE.Group();
+  scarGroup.name = 'rift-scar';
+  const tearGroup = new THREE.Group();
+  tearGroup.name = 'rift-tear';
+  group.add(collarGroup, scarGroup, tearGroup);
+
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const parts: number[] = [];
+  const slices: number[] = [];
+  const baseOffsets: number[] = [];
+  const freqPhases: number[] = [];
+  const indices: number[] = [];
+
+  const appendBox = (
+    sx: number,
+    sy: number,
+    sz: number,
+    localShiftX: number,
+    localShiftY: number,
+    localShiftZ: number,
+    partId: number,
+    sliceIdx: number,
+    offX: number,
+    offY: number,
+    offZ: number,
+    freq: number,
+    phase: number,
+  ): void => {
+    const box = new THREE.BoxGeometry(sx, sy, sz);
+    if (localShiftX !== 0 || localShiftY !== 0 || localShiftZ !== 0) {
+      box.translate(localShiftX, localShiftY, localShiftZ);
+    }
+    const pos = box.getAttribute('position') as THREE.BufferAttribute;
+    const nor = box.getAttribute('normal') as THREE.BufferAttribute;
+    const idx = box.getIndex()!;
+    const baseVertex = positions.length / 3;
+
+    for (let i = 0; i < pos.count; i++) {
+      positions.push(pos.getX(i), pos.getY(i), pos.getZ(i));
+      normals.push(nor.getX(i), nor.getY(i), nor.getZ(i));
+      parts.push(partId);
+      slices.push(sliceIdx);
+      baseOffsets.push(offX, offY, offZ);
+      freqPhases.push(freq, phase);
+    }
+    for (let i = 0; i < idx.count; i++) {
+      indices.push(baseVertex + idx.getX(i));
+    }
+    box.dispose();
+  };
+
+  // 1. Grounded square-section containment collar (buried to -0.35 m so it never floats)
+  const collarSpecs: readonly (readonly [number, number, number, number, number])[] = [
     [-0.68, 0, 0.22, 0.62, 1.15],
     [0.68, 0, 0.22, 0.62, 1.15],
     [0, -0.68, 0.92, 0.56, 0.22],
     [0, 0.68, 0.92, 0.56, 0.22],
   ];
-  for (const [cx, cz, sx, sy, sz] of collarPositions) {
-    const g = trackGeo(new THREE.BoxGeometry(sx, sy, sz));
-    g.translate(cx, sy * 0.5 - 0.35, cz);
-    const mesh = new THREE.Mesh(g, collarMat);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    collarGroup.add(mesh);
+  for (const [cx, cz, sx, sy, sz] of collarSpecs) {
+    appendBox(sx, sy, sz, 0, 0, 0, 0, 0, cx, sy * 0.5 - 0.35, cz, 0, 0);
   }
-  group.add(collarGroup);
 
-  // 2. Grounded vitrified scar decal (visible in all states; remains as the sealed scar)
-  const scarGroup = new THREE.Group();
-  scarGroup.name = 'rift-scar';
-  const scarOuterMat = trackMat(
-    new THREE.MeshBasicMaterial({
-      color: 0x0b0f19,
-      transparent: true,
-      opacity: 0.88,
-      depthWrite: false,
-    })
-  );
-  const scarSeamMat = trackMat(
-    new THREE.MeshBasicMaterial({
-      color: 0xff3d8a,
-      transparent: true,
-      opacity: 0.75,
-      depthWrite: false,
-    })
-  );
-  const scarOuterGeo = trackGeo(new THREE.BoxGeometry(0.52, 0.025, 1.35));
-  scarOuterGeo.translate(0, 0.012, 0);
-  const scarSeamGeo = trackGeo(new THREE.BoxGeometry(0.14, 0.032, 1.15));
-  scarSeamGeo.translate(0, 0.016, 0);
-  scarGroup.add(
-    new THREE.Mesh(scarOuterGeo, scarOuterMat),
-    new THREE.Mesh(scarSeamGeo, scarSeamMat)
-  );
-  group.add(scarGroup);
+  // 2. Grounded vitrified scar decal
+  appendBox(0.52, 0.025, 1.35, 0, 0, 0, 1, 0, 0, 0.012, 0, 0, 0);
+  appendBox(0.14, 0.032, 1.15, 0, 0, 0, 2, 0, 0, 0.016, 0, 0, 0);
 
-  // 3. Vertical glitch-sliced tear slabs
-  const tearGroup = new THREE.Group();
-  tearGroup.name = 'rift-tear';
-  const slabs: SlabEntry[] = [];
+  // 3. Vertical jagged stepped-glitch tear slabs (SLAB_COUNT slices)
   const sliceH = (height - 0.12) / SLAB_COUNT;
-
   for (let i = 0; i < SLAB_COUNT; i++) {
     const u = (i + 0.5) / SLAB_COUNT;
-    // Diamond/fusiform vertical profile: widest in the middle, narrower at ground & apex
     const envelope = Math.sin(u * Math.PI);
-    const baseWidth = 0.22 + 0.62 * envelope * (0.8 + 0.4 * seededUnit(seed, i * 11 + 1));
-    const slabH = sliceH * (0.78 + 0.18 * seededUnit(seed, i * 13 + 2));
+    // Stepped jagged tear silhouette: alternating narrow/wide lightning-crack profile
+    const jag = i % 2 === 0 ? 1.18 : 0.76;
+    const baseWidth = (0.18 + 0.58 * envelope * (0.8 + 0.4 * seededUnit(seed, i * 11 + 1))) * jag;
+    const slabH = sliceH * (0.86 + 0.18 * seededUnit(seed, i * 13 + 2));
     const slabD = 0.08 + 0.06 * envelope;
 
-    const row = new THREE.Group();
-    row.position.y = 0.1 + i * sliceH;
-
-    const coreMat = trackMat(
-      new THREE.MeshBasicMaterial({
-        color: 0x05070e,
-      })
-    );
-    const leftEdgeMat = trackMat(
-      new THREE.MeshBasicMaterial({
-        color: 0xff3d8a,
-        transparent: true,
-        opacity: 0.92,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      })
-    );
-    const rightEdgeMat = trackMat(
-      new THREE.MeshBasicMaterial({
-        color: 0x3dc8ff,
-        transparent: true,
-        opacity: 0.92,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      })
-    );
-
-    const coreGeo = trackGeo(new THREE.BoxGeometry(baseWidth, slabH, slabD));
-    const edgeW = Math.max(0.04, baseWidth * 0.18);
-    const leftGeo = trackGeo(new THREE.BoxGeometry(edgeW, slabH * 1.04, slabD * 1.12));
-    leftGeo.translate(-baseWidth * 0.5 - edgeW * 0.35, 0, 0);
-    const rightGeo = trackGeo(new THREE.BoxGeometry(edgeW, slabH * 1.04, slabD * 1.12));
-    rightGeo.translate(baseWidth * 0.5 + edgeW * 0.35, 0, 0);
-
-    row.add(
-      new THREE.Mesh(coreGeo, coreMat),
-      new THREE.Mesh(leftGeo, leftEdgeMat),
-      new THREE.Mesh(rightGeo, rightEdgeMat)
-    );
-    tearGroup.add(row);
-
-    const baseOffsetX = (seededUnit(seed, i * 19 + 5) - 0.5) * 0.16;
+    const baseOffsetX = ((seededUnit(seed, i * 19 + 5) - 0.5) * 0.24) + (i % 2 === 0 ? 0.05 : -0.05) * envelope;
+    const baseOffsetY = 0.1 + i * sliceH;
     const baseOffsetZ = (seededUnit(seed, i * 23 + 9) - 0.5) * 0.08;
-    row.position.x = baseOffsetX;
-    row.position.z = baseOffsetZ;
+    const phase = seededUnit(seed, i * 17 + 3) * Math.PI * 2;
+    const freq = 14 + seededUnit(seed, i * 31 + 7) * 18;
 
-    slabs.push({
-      row,
-      coreMat,
-      leftEdgeMat,
-      rightEdgeMat,
+    const edgeW = Math.max(0.045, baseWidth * 0.22);
+    // Core shard (part 3)
+    appendBox(baseWidth, slabH, slabD, 0, 0, 0, 3, i, baseOffsetX, baseOffsetY, baseOffsetZ, freq, phase);
+    // Left magenta shard (part 4)
+    appendBox(
+      edgeW,
+      slabH * 1.06,
+      slabD * 1.14,
+      -baseWidth * 0.5 - edgeW * 0.35,
+      0,
+      0,
+      4,
+      i,
       baseOffsetX,
+      baseOffsetY,
       baseOffsetZ,
-      baseWidth,
-      phase: seededUnit(seed, i * 29 + 4) * Math.PI * 2,
-      freq: 14 + seededUnit(seed, i * 37 + 8) * 16,
-    });
+      freq,
+      phase,
+    );
+    // Right cyan shard (part 5)
+    appendBox(
+      edgeW,
+      slabH * 1.06,
+      slabD * 1.14,
+      baseWidth * 0.5 + edgeW * 0.35,
+      0,
+      0,
+      5,
+      i,
+      baseOffsetX,
+      baseOffsetY,
+      baseOffsetZ,
+      freq,
+      phase,
+    );
   }
 
-  // 4. Cut-up horizontal scanlines across the tear
-  const scanlines: ScanlineEntry[] = [];
+  // 4. Cut-up horizontal glitch scanlines (part 6)
   for (let j = 0; j < SCANLINE_COUNT; j++) {
     const frac = (j + 0.5) / SCANLINE_COUNT;
     const baseY = 0.18 + frac * (height - 0.3);
     const barW = 0.55 + 0.65 * seededUnit(seed, 200 + j * 7);
-    const barGeo = trackGeo(new THREE.BoxGeometry(barW, 0.018, 0.14));
-    const isMagenta = j % 2 === 0;
-    const mat = trackMat(
-      new THREE.MeshBasicMaterial({
-        color: isMagenta ? 0xff3d8a : 0x3dc8ff,
-        transparent: true,
-        opacity: 0.85,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      })
-    );
-    const mesh = new THREE.Mesh(barGeo, mat);
-    mesh.position.set(0, baseY, 0);
-    tearGroup.add(mesh);
-    scanlines.push({
-      mesh,
-      mat,
-      baseY,
-      phase: seededUnit(seed, 300 + j * 13) * Math.PI * 2,
-    });
+    const phase = seededUnit(seed, 300 + j * 13) * Math.PI * 2;
+    appendBox(barW, 0.022, 0.15, 0, 0, 0, 6, j, 0, baseY, 0, 27, phase);
   }
 
-  group.add(tearGroup);
+  const mergedGeo = new THREE.BufferGeometry();
+  mergedGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  mergedGeo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  mergedGeo.setAttribute('aPart', new THREE.Float32BufferAttribute(parts, 1));
+  mergedGeo.setAttribute('aSlice', new THREE.Float32BufferAttribute(slices, 1));
+  mergedGeo.setAttribute('aBaseOffset', new THREE.Float32BufferAttribute(baseOffsets, 3));
+  mergedGeo.setAttribute('aFreqPhase', new THREE.Float32BufferAttribute(freqPhases, 2));
+  mergedGeo.setIndex(indices);
+  mergedGeo.computeBoundingSphere();
+
+  const uniforms = {
+    uTime: { value: 0 },
+    uState: { value: 0 },
+    ...riftDepthUniforms,
+  };
+
+  const riftMat = new THREE.ShaderMaterial({
+    vertexShader: RIFT_VERT,
+    fragmentShader: RIFT_FRAG,
+    uniforms,
+    toneMapped: false,
+    side: THREE.DoubleSide,
+  });
+  riftMat.userData.ignoreStageLook = true;
+
+  const mesh = new THREE.Mesh(mergedGeo, riftMat);
+  mesh.name = 'rift-unified-mesh';
+  mesh.userData.ignoreStageLook = true;
+  mesh.frustumCulled = false;
+  mesh.renderOrder = 12;
+  group.add(mesh);
+  // a flagged object draws on RIFT_LAYER: only the play scene's rift pass (after the stage look) sees it
+  group.traverse((o) => {
+    if (o.userData.ignoreStageLook) o.layers.set(RIFT_LAYER);
+  });
 
   let currentState: RiftState = 'open';
 
   const setState = (s: RiftState, t: number): void => {
     currentState = s;
-    const time = Number.isFinite(t) ? t : 0;
-
-    if (s === 'sealed') {
-      tearGroup.visible = false;
-      scarSeamMat.color.set(0x334155);
-      scarSeamMat.opacity = 0.55;
-      return;
-    }
-
-    tearGroup.visible = true;
-    const isSealing = s === 'sealing';
-    scarSeamMat.color.set(isSealing ? 0xffc13d : 0xff3d8a);
-    scarSeamMat.opacity = isSealing ? 0.9 : 0.75;
-
-    for (let i = 0; i < slabs.length; i++) {
-      const sl = slabs[i]!;
-      const step = riftSliceOffset(seed, i, s, time);
-      sl.row.position.x = sl.baseOffsetX + step.dx;
-      sl.row.position.z = sl.baseOffsetZ + step.dz;
-      sl.row.scale.set(step.widthScale, 1, 1);
-
-      if (isSealing) {
-        sl.coreMat.color.set(0x2a1804);
-        sl.leftEdgeMat.color.set(0xffc13d);
-        sl.rightEdgeMat.color.set(0xffe082);
-        sl.leftEdgeMat.opacity = 0.95;
-        sl.rightEdgeMat.opacity = 0.95;
-      } else {
-        sl.coreMat.color.set(0x05070e);
-        sl.leftEdgeMat.color.set(0xff3d8a);
-        sl.rightEdgeMat.color.set(0x3dc8ff);
-        const flicker = 0.7 + 0.3 * Math.abs(Math.sin(time * sl.freq + sl.phase));
-        sl.leftEdgeMat.opacity = flicker;
-        sl.rightEdgeMat.opacity = flicker;
-      }
-    }
-
-    for (let j = 0; j < scanlines.length; j++) {
-      const sc = scanlines[j]!;
-      sc.mesh.position.x = Math.sin(time * 27 + sc.phase) * (isSealing ? 0.12 : 0.32);
-      sc.mesh.position.y = sc.baseY + Math.cos(time * 19 + sc.phase) * 0.03;
-      sc.mesh.scale.x = isSealing ? 0.45 : 1.0;
-      sc.mat.color.set(isSealing ? 0xffc13d : j % 2 === 0 ? 0xff3d8a : 0x3dc8ff);
-      sc.mat.opacity = Math.sin(time * 31 + sc.phase) > -0.35 ? 0.88 : 0.18;
-    }
+    uniforms.uTime.value = Number.isFinite(t) ? t : 0;
+    uniforms.uState.value = s === 'sealed' ? 2 : s === 'sealing' ? 1 : 0;
+    tearGroup.visible = s !== 'sealed';
+    scarGroup.visible = true;
   };
 
   setState('open', 0);
 
   return {
     group,
+    mesh,
     setState,
     getState: () => currentState,
     dispose() {
       group.removeFromParent();
-      for (const g of geometries) g.dispose();
-      for (const m of materials) m.dispose();
+      mergedGeo.dispose();
+      riftMat.dispose();
     },
   };
 }

@@ -214,7 +214,7 @@ export function lookAt(progress: number): VistaLook {
     breachGlow: 1 - 0.85 * p,
     dust: 1 - 0.7 * p,
     flashChance: 1 - 0.8 * p,
-    dusk: smoothstep(0.3, 1, p),
+    dusk: smoothstep(0.55, 1, p),
   };
 }
 
@@ -276,34 +276,32 @@ export function nearestEga(rgb: Vec3): Vec3 {
 }
 
 /**
- * Pure storm-safe colour quantiser (TICKET-06 LAB-04 fix):
- * Quantises a wasteland colour according to `pxd` (`0..1`) and `inPocketWeight` (`0..1`)
- * while preventing low-saturation grey/slate ruins from snapping to CGA magenta `[170,0,170]`
- * or bright pink `[255,85,255]`.
+ * Pure storm-safe colour quantiser (TICKET-06 LAB-04 fix, POL-102). It mirrors the vista's pocket shader (lab-vista.ts, POCKET_FRAG_BODY)
+ * for 0.125 <= vP < 0.75: one cold storm-slate ramp and symmetric steps (6 below pxd 0.375, 12 from there), so no grey block snaps to
+ * mauve or salmon. Low-saturation blocks take the slate (R <= G <= B); saturated ones the stepped colour, with R held near G.
+ * `_inPocketWeight` is not used: the shader quantises pocket and ruin colours the same way.
  */
-export function quantiseVistaStormColour(rgb: Vec3, pxd: number, inPocketWeight = 0): Vec3 {
+export function quantiseVistaStormColour(rgb: Vec3, pxd: number, _inPocketWeight = 0): Vec3 {
   const r = clamp01(rgb[0]);
   const g = clamp01(rgb[1]);
   const b = clamp01(rgb[2]);
   if (pxd >= 0.75) return [r, g, b];
 
-  const maxC = Math.max(r, g, b);
-  const minC = Math.min(r, g, b);
-  const sat = maxC - minC;
-
-  // Outside pockets (or low-saturation wasteland rock/steel): quantise along the cold storm slate ramp, never magenta/pink
-  if (inPocketWeight < 0.25 || sat < 0.22) {
-    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-    const steps = pxd < 0.375 ? 6 : 12;
-    const q = Math.round(lum * steps) / steps;
-    return [
-      clamp01(q * 0.88),
-      clamp01(q * 0.94),
-      clamp01(q * 1.06),
-    ];
-  }
-
-  return quantise332([r, g, b]);
+  const steps = pxd < 0.375 ? 6 : 12;
+  const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+  const q = Math.round(lum * steps) / steps;
+  const slate: Vec3 = [clamp01(q * 0.86), clamp01(q * 0.94), clamp01(Math.min(1, q * 1.05))];
+  const stepped: Vec3 = [Math.round(r * steps) / steps, Math.round(g * steps) / steps, Math.round(b * steps) / steps];
+  // suppress any residual red-over-green dominance outside saturated pockets
+  const quantR = Math.min(stepped[0], Math.max(stepped[1] * 0.96, stepped[0] - 0.08));
+  const sat = Math.max(r, g, b) - Math.min(r, g, b);
+  const w = smoothstep(0.24, 0.48, sat);
+  const mixR = slate[0] + (quantR - slate[0]) * w;
+  const mixG = slate[1] + (stepped[1] - slate[1]) * w;
+  const mixB = slate[2] + (stepped[2] - slate[2]) * w;
+  // cold at every progress (POL-102: no block samples warm): G is held to B, then R to G, so R <= G <= B always
+  const outG = Math.min(mixG, mixB);
+  return [Math.min(mixR, outG), outG, mixB];
 }
 
 /** The 256-colour 3-3-2 quantise of an RGB colour (0..1). */

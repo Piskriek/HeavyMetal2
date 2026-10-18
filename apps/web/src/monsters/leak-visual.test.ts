@@ -62,18 +62,16 @@ test('the rift turns amber while sealing and collapses to its scar once sealed',
   const visuals = createLeakVisuals(scene, () => 0);
   const rift = (): THREE.Object3D => leakGroup(scene).getObjectByName('s-space-rift')!;
   const tear = (): THREE.Object3D => rift().getObjectByName('rift-tear')!;
-  const seam = (): THREE.MeshBasicMaterial => {
-    const scar = rift().getObjectByName('rift-scar') as THREE.Group;
-    return (scar.children[1] as THREE.Mesh).material as THREE.MeshBasicMaterial;
-  };
+  // the rift is one merged mesh (POL-98): its state is the shader's uState (0 open, 1 sealing, 2 sealed), and its palette follows it
+  const uState = (): number => ((rift().getObjectByName('rift-unified-mesh') as THREE.Mesh).material as THREE.ShaderMaterial).uniforms.uState!.value as number;
 
   visuals.update(frame([marker()]));
   assert.equal(tear().visible, true, 'an open leak shows its tear');
-  assert.equal(seam().color.getHex(), 0xff3d8a, 'the open seam is magenta');
+  assert.equal(uState(), 0, 'the open seam is magenta (uState 0)');
 
   visuals.update(frame([marker({ seal: 0.4 })], 4));
   assert.equal(tear().visible, true, 'a sealing leak still shows its tear');
-  assert.equal(seam().color.getHex(), 0xffc13d, 'the sealing seam is amber');
+  assert.equal(uState(), 1, 'the sealing seam is amber (uState 1)');
 
   visuals.update(frame([marker({ state: 'sealed', seal: 1 })], null));
   assert.equal(tear().visible, false, 'a sealed leak hides its tear');

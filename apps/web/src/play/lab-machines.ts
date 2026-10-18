@@ -315,6 +315,9 @@ export function createRightWallMachineRig(
 
   const dressGroup = new THREE.Group();
   dressGroup.name = `station-dress:${id}`;
+  // The rack, bench and combiner are placed at yaw +PI/2 (the labkit convention) and their base models face the room, so their dress
+  // (front at +z) turns by PI to face the room too. The fabricator is placed at -PI/2, its dress already faces the room (POL-103).
+  dressGroup.rotation.y = id === 'fabricator' ? 0 : Math.PI;
   baseProp.group.add(dressGroup);
 
   // Grounded bolted dark-steel anchor pad at y = 0 so nothing ever floats even after GLB swap

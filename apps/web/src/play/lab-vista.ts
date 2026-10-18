@@ -82,7 +82,7 @@ const SHELL_SKY = Array.from({ length: MAX_POCKETS }, (_, i) => POCKET_KINDS[i]?
 
 /** The horizon colour at the storm and at dusk (sRGB, as the sky shader writes it); the fog takes the same colour. The storm is dark
  *  (review 3, W2): the Breach and the pockets' rims are the only bright things in the view. */
-const HORIZON_STORM: Readonly<[number, number, number]> = [0.13, 0.12, 0.16];
+const HORIZON_STORM: Readonly<[number, number, number]> = [0.10, 0.13, 0.16];
 const HORIZON_DUSK: Readonly<[number, number, number]> = [0.92, 0.52, 0.3];
 /** exp2 fog: half faded at 500 m, nearly gone at 1.5 km (the brief, R3). */
 const FOG_DENSITY = 0.00167;
@@ -250,16 +250,22 @@ const POCKET_FRAG_BODY = /* glsl */ `
       float lum = dot(sCol, vec3(0.299, 0.587, 0.114));
       float bit = step(vistaBayer(gl_FragCoord.xy * 0.5), lum);
       sCol = mix(vec3(0.03), vec3(0.94), bit);
-    } else if (vP < 0.375) {
-      // TICKET-06 LAB-04 fix: quantise along cold storm slate/cyan ramp instead of snapping grey rock to CGA magenta/pink
-      float lum = dot(sCol, vec3(0.299, 0.587, 0.114));
-      float q = floor(lum * 6.0 + 0.5) / 6.0;
-      vec3 slate = vec3(q * 0.86, q * 0.94, min(1.0, q * 1.08));
-      vec3 quant = floor(clamp(sCol, 0.0, 1.0) * vec3(5.0, 6.0, 5.0) + 0.5) / vec3(5.0, 6.0, 5.0);
-      float sat = max(sCol.r, max(sCol.g, sCol.b)) - min(sCol.r, min(sCol.g, sCol.b));
-      sCol = mix(slate, quant, smoothstep(0.18, 0.42, sat));
     } else {
-      sCol = floor(clamp(sCol, 0.0, 1.0) * vec3(7.0, 7.0, 3.0) + 0.5) / vec3(7.0, 7.0, 3.0);
+      // TICKET-06 LAB-04 & POL-102 fix (covers both EGA vP < 0.375 and VGA storm=0.5 where vP = 0.575):
+      // Quantise along the cold storm slate ramp and symmetric 12-level steps so mid-grey blocks
+      // never snap to asymmetric 3-3-2 mauve/salmon RGB(181, 148, 171).
+      float steps = vP < 0.375 ? 6.0 : 12.0;
+      float lum = dot(sCol, vec3(0.299, 0.587, 0.114));
+      float q = floor(lum * steps + 0.5) / steps;
+      vec3 slate = vec3(q * 0.86, q * 0.94, min(1.0, q * 1.05));
+      vec3 quant = floor(clamp(sCol, 0.0, 1.0) * steps + 0.5) / steps;
+      // Suppress any residual red+blue > green (mauve/salmon) channel dominance outside saturated pockets
+      quant.r = min(quant.r, max(quant.g * 0.96, quant.r - 0.08));
+      float sat = max(sCol.r, max(sCol.g, sCol.b)) - min(sCol.r, min(sCol.g, sCol.b));
+      sCol = mix(slate, quant, smoothstep(0.24, 0.48, sat));
+      // cold at every progress (POL-102: no block samples warm): G is held to B, then R to G, so R <= G <= B always
+      sCol.g = min(sCol.g, sCol.b);
+      sCol.r = min(sCol.r, sCol.g);
     }
     vCol = pow(sCol, vec3(2.2));
   }

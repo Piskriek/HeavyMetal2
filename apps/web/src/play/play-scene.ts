@@ -68,6 +68,7 @@ import {
   genLevelForStage,
 } from '../assets/gen-props';
 import { genLevelFor } from '../assets/gen';
+import { RIFT_LAYER, riftDepthUniforms } from './rift';
 
 export type Where = 'lab' | 'planet';
 /** What the screen gives the scene each frame. */
@@ -1667,16 +1668,38 @@ export function createPlayScene(o: {
     return f.intersectsBox(new THREE.Box3().setFromObject(mesh));
   };
 
+  /** The S-Space rifts (play/rift.ts) after the stage look (POL-100): their own pass on RIFT_LAYER, one draw call a rift, depth-tested
+   *  against the planet's depth so a rift still hides behind the ground and the walls. The planet's pass never drew them. */
+  const drawRifts = (cam: THREE.PerspectiveCamera, to: THREE.WebGLRenderTarget | null): void => {
+    riftDepthUniforms.uSceneDepth.value = planetRT.depthTexture;
+    riftDepthUniforms.uDepthOn.value = 1;
+    riftDepthUniforms.uNear.value = cam.near;
+    riftDepthUniforms.uFar.value = cam.far;
+    if (to) riftDepthUniforms.uOutRes.value.set(to.width, to.height);
+    else renderer.getDrawingBufferSize(riftDepthUniforms.uOutRes.value);
+    const mask = cam.layers.mask;
+    const autoUpdate = planetScene.matrixWorldAutoUpdate;
+    cam.layers.set(RIFT_LAYER);
+    planetScene.matrixWorldAutoUpdate = false; // the planet's pass updated every matrix this frame
+    renderer.setRenderTarget(to);
+    renderer.autoClear = false;
+    renderer.render(planetScene, cam);
+    renderer.autoClear = true;
+    planetScene.matrixWorldAutoUpdate = autoUpdate;
+    cam.layers.mask = mask;
+  };
+
   const drawPlanet = (cam: THREE.PerspectiveCamera, to: THREE.WebGLRenderTarget | null, hideTwin: boolean): void => {
     twin.group.visible = !hideTwin;
     renderer.setRenderTarget(planetRT);
     renderer.clear();
-    renderer.render(planetScene, cam);
+    renderer.render(planetScene, cam); // layer 0 only: the rifts (RIFT_LAYER) are not in the planet's picture
     twin.group.visible = true;
     postUniforms.uInvProj.value.copy(cam.projectionMatrixInverse);
     postUniforms.uCamWorld.value.copy(cam.matrixWorld);
     renderer.setRenderTarget(to);
-    renderer.render(postScene, postCam);
+    renderer.render(postScene, postCam); // the stage look
+    drawRifts(cam, to);
   };
 
   /** The held rifle over the picture: its own pass, depth cleared so no wall or ground cuts it, its own lights (TASK-21). */
@@ -2999,6 +3022,12 @@ export function createPlayScene(o: {
       for (const p of stand) p.group.traverse((obj) => { const mesh = obj as THREE.Mesh; if (mesh.isMesh) mesh.material = ghostOk; });
       renderer.setRenderTarget(planetRT);
       renderer.compile(planetScene, camera);
+      // the rifts' program: they draw on RIFT_LAYER after the stage look (drawRifts), so compile that layer too
+      const riftMask = camera.layers.mask;
+      camera.layers.set(RIFT_LAYER);
+      renderer.setRenderTarget(null);
+      renderer.compile(planetScene, camera);
+      camera.layers.mask = riftMask;
       renderer.setRenderTarget(null);
       for (const p of stand) { planetScene.remove(p.group); p.group.traverse((obj) => { const mesh = obj as THREE.Mesh; if (mesh.isMesh) mesh.geometry.dispose(); }); }
       holo.warm(renderer, camera);

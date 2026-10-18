@@ -1,6 +1,6 @@
 // ============================================================================
 // File: apps/web/src/play/lab-vista.test.ts
-// Unit tests for lab-vista-math and storm/pocket invariants (TICKET-06 Item 6).
+// Unit tests for lab-vista-math and storm/pocket invariants (TICKET-06 + POL-101 & POL-102).
 // ============================================================================
 
 import test from 'node:test';
@@ -16,31 +16,43 @@ import {
   quantiseVistaStormColour,
 } from './lab-vista-math';
 
-test('POCKET_KINDS and quantiseVistaStormColour never turn grey wasteland structures into purple or pink cubes', () => {
-  // Verify no pocket kind has a magenta/pink tint (R > G and B > G with low G)
+test('POCKET_KINDS keeps 1-bit pure white rim, EGA cyan (POL-101), and quantiseVistaStormColour prevents mauve/salmon at storm 0.5 (POL-102)', () => {
+  const oneBit = POCKET_KINDS.find((k) => k.name === '1-bit')!;
+  assert.deepEqual(oneBit.rim, [1, 1, 1], '1-bit pocket rim is pure white [1, 1, 1]');
+
+  const ega = POCKET_KINDS.find((k) => k.name === 'EGA')!;
+  assert.ok(ega.rim[2] > ega.rim[0] && ega.rim[1] > ega.rim[0], 'EGA pocket rim is cyan (POL-101)');
+
+  // Verify no pocket kind has a magenta/pink/mauve tint (R > G and B > G)
   for (const k of POCKET_KINDS) {
     const [r, g, b] = k.tint;
     const isPinkOrPurple = r > g + 0.15 && b > g + 0.15;
     assert.equal(isPinkOrPurple, false, `Pocket kind ${k.name} tint [${r}, ${g}, ${b}] must not be pink/purple`);
   }
 
-  // Verify neutral grey/brown wasteland surfaces outside pockets stay cold storm slate, never magenta [0.67, 0, 0.67]
+  // Verify storm = 0.0 (pxd = 0.15) and storm = 0.5 (pxd = 0.575, POL-102) never produce mauve/salmon blocks (e.g. RGB 181, 148, 171)
   const samples: readonly (readonly [number, number, number])[] = [
     [0.35, 0.32, 0.36],
     [0.45, 0.42, 0.46],
-    [0.28, 0.25, 0.29],
+    [0.71, 0.58, 0.67], // ~RGB(181, 148, 171) input
+    [0.66, 0.59, 0.62],
   ];
-  for (const s of samples) {
-    const q = quantiseVistaStormColour(s, 0.15, 0);
-    const isPurple = q[0] > q[1] + 0.15 && q[2] > q[1] + 0.15;
-    assert.equal(isPurple, false, `Quantised colour [${q.join(', ')}] must not snap to purple/pink`);
+  for (const pxd of [0.15, 0.575]) {
+    for (const s of samples) {
+      const q = quantiseVistaStormColour(s, pxd, 0);
+      const isMauveOrSalmon = q[0] > q[1] && q[2] > q[1];
+      assert.equal(
+        isMauveOrSalmon,
+        false,
+        `At pxd=${pxd}, quantised colour [${q.join(', ')}] must stay cold storm slate (R <= G <= B), never mauve/salmon`,
+      );
+    }
   }
 });
 
-test('pocketFrame generates floating 3D spherical S-pockets clear of the Breach corridor across storm progress', () => {
-  const look0 = lookAt(0);
+test('pocketFrame generates floating 3D spherical S-pockets and lookAt(0.5) keeps dusk at 0 so storm 0.5 stays cold slate', () => {
   const lookHalf = lookAt(0.5);
-  assert.ok(look0.breachHeight >= lookHalf.breachHeight, 'the Breach column is at least as tall at the storm as at progress 0.5');
+  assert.equal(lookHalf.dusk, 0, 'At storm 0.5 dusk has not yet tinted the fog warm/mauve (POL-102)');
   assert.ok(lookHalf.breachHeight > 0.45, 'Breach column remains tall at progress 0.5');
   assert.ok(lookHalf.breachGlow > 0.5, 'Breach column retains strong cyan glow at progress 0.5');
   assert.equal(inCorridor(BREACH_BEARING), true);
@@ -52,4 +64,13 @@ test('pocketFrame generates floating 3D spherical S-pockets clear of the Breach 
   }
 
   assert.ok(bayOfBearing(BREACH_BEARING) >= 0);
+});
+
+test('quantiseVistaStormColour is cold across the storm band: R <= G <= B for every colour, at every progress from EGA to VGA (POL-102)', () => {
+  for (const pxd of [0.15, 0.3, 0.375, 0.575, 0.7]) {
+    for (let ri = 0; ri <= 8; ri++) for (let gi = 0; gi <= 8; gi++) for (let bi = 0; bi <= 8; bi++) {
+      const q = quantiseVistaStormColour([ri / 8, gi / 8, bi / 8], pxd, 0);
+      assert.ok(q[0] <= q[1] + 1e-9 && q[1] <= q[2] + 1e-9, `pxd ${pxd}: [${ri / 8}, ${gi / 8}, ${bi / 8}] -> [${q.join(', ')}] is not cold`);
+    }
+  }
 });

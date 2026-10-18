@@ -40,6 +40,7 @@ export {
 // - Spawn: beside the cot facing north toward the gate and storm.
 // Lab frame: x right (+x), y up (+y), z towards start (+z), north = -z.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { floorTextures, panelTextures } from '../lab/lab-scene';
 import * as kit from '@hm/labkit';
 import type { Box, Prop } from '@hm/labkit';
@@ -867,7 +868,8 @@ export function createLabRoom(o: {
   const rack = place(kit.presetRack(m), 7.45, -7.0, Math.PI / 2);
   const bench = place(kit.presetBench(m), 7.45, -5.0, Math.PI / 2);
   const combiner = place(kit.presetCombiner(m), 7.45, -3.3, Math.PI / 2);
-  const fabricator = place(buildHardwareFabricatorProp(m), 7.45, -1.35, Math.PI / 2);
+  // the fabricator's glass bay faces the room (-PI/2: its front, +z, turns to -x); at +PI/2 its blank back faced the room (POL-103)
+  const fabricator = place(buildHardwareFabricatorProp(m), 7.45, -1.35, -Math.PI / 2);
   const pTable = place(kit.planetTable(m), PLANET_TABLE_AT.x, PLANET_TABLE_AT.z, 0);
   pTable.group.userData.stationId = 'planet-table';
 
@@ -1003,19 +1005,49 @@ export function createLabRoom(o: {
   // ---- The lab clutter (TASK-23c)
   const clutterEntries = new Map<string, ClutterEntry>();
   const discGeo = keep(new THREE.CircleGeometry(1, 36));
+  // the clutter fallbacks' one material: their parts' colours are vertex colours (see the loop)
+  const clutterFallbackMat = keep(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.25 }));
   discGeo.rotateX(-Math.PI / 2);
   for (const item of CLUTTER) {
-    // Keep filing-cabinet clear of the 4th East-wall machine (Hardware Fabricator at z = -1.35)
-    const placedZ = item.id === 'filing-cabinet' ? -0.25 : item.z;
-    const stand = new THREE.Mesh(keep(new THREE.BoxGeometry(item.w, item.h, item.d)), m.gunmetal);
-    stand.position.y = item.h / 2;
+    // POL-103: the filing cabinet (LOG-03) leaves the East-wall gap between the Hardware Fabricator (z = -1.35) and the Armory,
+    // where its plain box read as a grey block on the wall, and stands on the South wall beside Dr. Haddy's desk, facing north.
+    // x = -0.85, not Argo's -0.35: at -0.35 its east edge (x -0.02) blocks the walk north from the south wall at x = 0 (the
+    // campaign's beat 6), and the player is 0.3 m wide, so the cabinet's edge must sit below -0.3 with room to spare.
+    const placedX = item.id === 'filing-cabinet' ? -0.85 : item.x;
+    const placedZ = item.id === 'filing-cabinet' ? 2.48 : item.z;
+    const placedYaw = item.id === 'filing-cabinet' ? Math.PI : item.yaw;
+
+    // Articulated fallback (dark-steel plinth, painted body, dark-steel front trim, gunmetal top cap), so no clutter fallback is ever a
+    // plain grey box before its generated model swaps in (POL-103). The four parts merge into ONE mesh by vertex colour: one draw call,
+    // as the plain box it replaces (the lab's draw-call budget).
+    const plinthH = Math.min(0.08, item.h * 0.12);
+    const bodyH = Math.max(0.1, item.h - plinthH - 0.04);
+    const fallbackParts: readonly { readonly geo: THREE.BufferGeometry; readonly colour: THREE.Color }[] = [
+      { geo: new THREE.BoxGeometry(item.w * 0.96, plinthH, item.d * 0.96).translate(0, plinthH / 2, 0), colour: m.darkSteel.color },
+      { geo: new THREE.BoxGeometry(item.w * 0.92, bodyH, item.d * 0.92).translate(0, plinthH + bodyH / 2, 0), colour: m.paint.color },
+      { geo: new THREE.BoxGeometry(item.w, 0.04, item.d).translate(0, item.h - 0.02, 0), colour: m.gunmetal.color },
+      { geo: new THREE.BoxGeometry(item.w * 0.78, bodyH * 0.76, 0.02).translate(0, plinthH + bodyH / 2, item.d * 0.46), colour: m.darkSteel.color },
+    ];
+    const coloured = fallbackParts.map(({ geo, colour }) => {
+      const n = geo.getAttribute('position').count;
+      const col = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) { col[i * 3] = colour.r; col[i * 3 + 1] = colour.g; col[i * 3 + 2] = colour.b; }
+      geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      return geo;
+    });
+    const fallbackGeo = mergeGeometries(coloured, false);
+    coloured.forEach((geo) => geo.dispose());
+    if (!fallbackGeo) throw new Error(`clutter fallback ${item.id}: the parts did not merge`);
+    const stand = new THREE.Mesh(keep(fallbackGeo), clutterFallbackMat);
+    stand.name = `clutter-fallback:${item.id}`;
+
     const prop: Prop = { group: new THREE.Group(), colliders: [{ min: [-item.w / 2, 0, -item.d / 2], max: [item.w / 2, item.h, item.d / 2] }], sockets: [], lamps: [] };
     prop.group.add(stand);
     prop.group.userData.clutterId = item.id;
     const before = colliders.length;
-    place(prop, item.x, placedZ, item.yaw, 0);
+    place(prop, placedX, placedZ, placedYaw, 0);
     const disc = new THREE.Mesh(discGeo, keep(new THREE.MeshBasicMaterial({ color: '#ffc13d', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })));
-    disc.position.set(item.x, 0.03, placedZ);
+    disc.position.set(placedX, 0.03, placedZ);
     disc.visible = false;
     group.add(disc);
     clutterEntries.set(item.id, { item, prop, disc, boxes: colliders.slice(before), state: 'standing', t: 0 });

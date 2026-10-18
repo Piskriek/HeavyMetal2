@@ -1,10 +1,11 @@
 // ============================================================================
 // File: apps/web/src/play/rift.test.ts
-// Unit tests for createRift and riftSliceOffset (TICKET-07 Item A — MC-01).
+// Unit tests for createRift and riftSliceOffset (TICKET-07 Item A + POL-100 & POL-98).
 // ============================================================================
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as THREE from 'three';
 import { createRift, riftSliceOffset } from './rift';
 
 test('riftSliceOffset is deterministic and narrows on sealing and collapses on sealed', () => {
@@ -22,9 +23,17 @@ test('riftSliceOffset is deterministic and narrows on sealing and collapses on s
   assert.equal(sealed.widthScale, 0);
 });
 
-test('createRift builds grounded collar, vertical tear slabs, and transitions across open/sealing/sealed', () => {
+test('createRift builds a single-draw-call unified mesh that bypasses stage look and transitions across states (POL-98, POL-100)', () => {
   const rift = createRift({ seed: 101, height: 3.4 });
   assert.equal(rift.getState(), 'open');
+  assert.equal(rift.group.userData.ignoreStageLook, true);
+  assert.equal(rift.mesh.userData.ignoreStageLook, true);
+
+  let meshCount = 0;
+  rift.group.traverse((obj) => {
+    if ((obj as THREE.Mesh).isMesh) meshCount++;
+  });
+  assert.equal(meshCount, 1, 'Entire S-Space rift renders in a single draw call (POL-98)');
 
   const tear = rift.group.getObjectByName('rift-tear');
   const scar = rift.group.getObjectByName('rift-scar');

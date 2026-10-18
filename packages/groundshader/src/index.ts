@@ -71,8 +71,8 @@ const BASE_COLOURS: readonly RGB[] = [
 ];
 
 const COVER_BASE_COLOURS: readonly [RGB, RGB] = [
-  [0.052, 0.148, 0.036], // 0: moss (deep velvety bryophyte green)
-  [0.082, 0.275, 0.052], // 1: grass (lush sunlit meadow chlorophyll green)
+  [0.115, 0.165, 0.078], // 0: moss (natural olive-sage bryophyte green, Plan 27)
+  [0.145, 0.215, 0.092], // 1: grass (temperate fescue meadow green with warm thatch undertone, Plan 27)
 ];
 
 function clamp(value: number, low: number, high: number): number {
@@ -319,17 +319,17 @@ function coverPixel(
     };
   }
 
-  // Layer 1: Grass — directional blade clusters, clover patches, and sunlit tips
-  const clump = 1 - smoothstep(0.05, 0.45, nearest);
-  const bladeWave = Math.sin(TAU * (warpedU * 14 + warpedV * 6 + mid * 0.22)) * 0.5 + 0.5;
-  const bladeTip = smoothstep(0.35, 0.92, bladeWave * (0.6 + 0.4 * clump) + fine * 0.2);
+  // Layer 1: Grass — isotropic cellular fescue tufts and clover patches (no parallel sine ridges, POL-95)
+  const clump = 1 - smoothstep(0.06, 0.46, nearest);
+  const crest = smoothstep(0.02, 0.18, second - nearest);
+  const tuftTip = smoothstep(0.38, 0.88, clump * (0.62 + 0.38 * style) + fine * 0.16);
   const sunTint = 0.5 + 0.5 * macro;
-  const tone = 0.78 + 0.32 * clump + 0.15 * mid + 0.08 * fine;
-  const red = base[0] * tone + bladeTip * (0.05 + 0.035 * sunTint);
-  const green = base[1] * tone + bladeTip * (0.11 + 0.05 * sunTint);
-  const blue = base[2] * tone + bladeTip * 0.025;
-  const height = 0.42 + clump * 0.32 + bladeTip * 0.18 + mid * 0.05;
-  const roughness = 0.74 - bladeTip * 0.12 + fine * 0.04;
+  const tone = (0.82 + 0.24 * clump + 0.12 * macro + 0.08 * mid) * (0.78 + 0.22 * crest);
+  const red = base[0] * tone + tuftTip * (0.045 + 0.025 * sunTint);
+  const green = base[1] * tone + tuftTip * (0.055 + 0.030 * sunTint);
+  const blue = base[2] * tone + tuftTip * 0.020;
+  const height = 0.46 + clump * 0.16 * crest + tuftTip * 0.06 + mid * 0.035 + fine * 0.02;
+  const roughness = 0.82 - tuftTip * 0.08 + fine * 0.03;
   return {
     red: clamp(red, 0.01, 0.95),
     green: clamp(green, 0.03, 0.95),
@@ -499,7 +499,7 @@ export function makeCoverTextures(o: { size: number; seed: number }): CoverTextu
     const heights = heightLayers[layer]!;
     const metres = COVER_METRES[layer]!;
     const baseOffset = layer * bytesPerLayer;
-    const slopeScale = (size / metres) * 1.25;
+    const slopeScale = (size / metres) * 0.55;
 
     for (let y = 0; y < size; y++) {
       const previousY = y === 0 ? size - 1 : y - 1;
@@ -828,22 +828,22 @@ const FRAGMENT_SHADER = /* glsl */ `
           vec4 grassAH = texture(uCoverAlbedoHeight, vec3(grassUv, 1.0));
           vec4 grassNR = uStage > 1.0 ? texture(uCoverNormalRough, vec3(grassUv, 1.0)) : vec4(0.5, 0.5, 1.0, 0.72);
 
-          // Macro hue & brightness variation across the plot
-          vec3 mossTint = mix(vec3(0.82, 0.90, 0.76), vec3(1.18, 1.15, 0.92), mBreak);
-          vec3 grassTint = mix(vec3(0.80, 0.94, 0.72), vec3(1.22, 1.16, 0.86), mBreak);
+          // Macro hue & brightness variation across the plot (natural olive-fescue palette, POL-95)
+          vec3 mossTint = mix(vec3(0.90, 0.92, 0.84), vec3(1.12, 1.08, 0.94), mBreak);
+          vec3 grassTint = mix(vec3(0.92, 0.94, 0.86), vec3(1.14, 1.08, 0.92), mBreak);
           vec3 mossCol = mossAH.rgb * mossTint;
           vec3 grassCol = grassAH.rgb * grassTint;
 
           // Height-biased transition so moss creeps into regolith crevices first, then grass crowns on top
-          float mossW = smoothstep(0.08, 0.72, mossMask + (mossAH.a - baseHeight) * 0.32 + (mBreak - 0.5) * 0.22) * smoothstep(0.0, 0.08, mossMask);
-          float grassW = smoothstep(0.08, 0.68, grassMask + (grassAH.a - 0.45) * 0.35 + (mBreak - 0.5) * 0.24) * smoothstep(0.0, 0.08, grassMask);
+          float mossW = smoothstep(0.08, 0.72, mossMask + (mossAH.a - baseHeight) * 0.26 + (mBreak - 0.5) * 0.20) * smoothstep(0.0, 0.08, mossMask);
+          float grassW = smoothstep(0.08, 0.68, grassMask + (grassAH.a - 0.45) * 0.28 + (mBreak - 0.5) * 0.20) * smoothstep(0.0, 0.08, grassMask);
 
-          albedo = mix(albedo, mossCol, mossW);
-          mappedNormal = mix(mappedNormal, mossNR.rgb * 2.0 - 1.0, mossW);
+          albedo = mix(albedo, mossCol, mossW * 0.88);
+          mappedNormal = mix(mappedNormal, (mossNR.rgb * 2.0 - 1.0) * 0.55, mossW);
           roughness = mix(roughness, mossNR.a, mossW);
 
-          albedo = mix(albedo, grassCol, grassW);
-          mappedNormal = mix(mappedNormal, grassNR.rgb * 2.0 - 1.0, grassW);
+          albedo = mix(albedo, grassCol, grassW * 0.88);
+          mappedNormal = mix(mappedNormal, (grassNR.rgb * 2.0 - 1.0) * 0.55, grassW);
           roughness = mix(roughness, grassNR.a, grassW);
         }
 

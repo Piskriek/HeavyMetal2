@@ -1,0 +1,28 @@
+# **ARGO\_NOTE\_15 — Voice Batch V1 (A7-01..A9-03 \+ POL-57 Barks) & POL-40 CRT Portrait Brief**
+
+**From:** Gemini Argo (Creative Lead & PM)  
+**To:** Claude Opus (Engineering Lead) & Francois (Owner)  
+**Date:** 2026-10-18  
+**Subject:** Final Voiced Scripts for A7-01 to A9-03 \+ Two POL-57 Barks (public/vo/\<ID\>.mp3) and POL-40 Portrait Brief (public/ui/haddy-portrait.webp)
+
+## **1\. Voice Batch V1 — 9 Act VII–IX Story Lines \+ 2 POL-57 Repeatable Barks (11 Clips Total)**
+
+**Voice Profile:** FIDELITY Mentor on RUN.world (voice ID eBTgYm9Qho6PFSGSs2wn, eleven\_v3, stability 0.4, owner’s MENTOR\_MIX; radio band-pass filter applied in-engine). All 11 IDs strictly match ^\[A-Z\]\[A-Z0-9\]\*(-\[A-Z0-9\]+)+\$ for scripts/runworld-voice.mjs and output to public/vo/\<ID\>.mp3.
+
+| ID (public/vo/\<ID\>.mp3) | Priority & Trigger Event (fidelity.ts) | Delivery Note | Exact Final Text for TTS Generation   |
+| :---- | :---- | :---- | :---- |
+| **A7-01** | story on act7:power-unit (after F-03) | Focused, quietly urgent engineer spotting a load spike on her console | \[breathes\] You're red-lining the Gate's twelve-kilowatt feed. Drop a dedicated Power Unit on the pad and string Relay Pylons toward the eastern crater—we need real megawatts to spin up the Water Maker. |
+| **A7-02** | story on act7:hydro-basin (after A7-01) | Warm, astonished relief watching liquid water pool for the first time | \[relieved\] Condensers online. Look at the low basin—actual liquid water pooling over the regolith. Give it light and coverage will creep right up the banks. |
+| **A7-03** | story on act7:wreck-transponders (after A7-02) | Dry, practical field guidance with a protective warning at the end | \[dry\] Walking a one-kilometre crater gets old fast. Drive the Scout out to the perimeter wrecks and pull their transponder logs—and bolt a turret to your corner before the sappers sniff out our power line. |
+| **A8-01** | story on act8:combiner-splice (after A7-03) | Intrigued, conspiratorial physicist piecing together Vance’s logs | \[pause\] So Vance really did try to hot-patch the kernel from the Moon. Bring those Anomaly Cores to the Preset Combiner—let's splice a high-density cartridge strong enough to lock the whole plot. |
+| **A8-02** | story on act8:rift-or-wave (after A8-01) | Steady, tactical under pressure as the perimeter breach pushes back | Standard field units won't push us past Stage Four alone. Hold that perimeter rift—seal the tear with your beam or let the turrets clear the wave—and bring the Heavy Terraformers online. |
+| **A8-03** | story on act8:biosphere (after A8-02) | Rising warmth and wonder as moss, clover, and trees lock in | \[relieved\] Coverage is holding\! Moss, clover, and soil normals locking onto bare basalt. One more push on all four floats and we hit full biosphere coherence. |
+| **A9-01** | story on act9:horizon-domes (after A8-03) | Quiet awe, intimate over the headset as all 11 neighbor domes light up | \[quietly\] All four floats above point-eight-five. Look at the trees—and check the horizon. Eleven neighboring domes shining back at us. Come back through the Gate and slot the Golden Master into the Planet Table. |
+| **A9-02** | story on act9:consensus-commit (after A9-01) | Emotional, triumphant release as the Lab window storm collapses into golden hour | \[breathes\] Consensus branch committed at eighty-five percent. Look out the observation window\! The Breach column is collapsing—the fidelity pockets are merging across the ruins. You didn't just build a moon, kid. You patched the host. |
+| **A9-03** | story on act9:finale-handoff (after A9-02) | Warm, proud sign-off leading directly into the 144 BPM ending song | \[relieved\] Eleven domes on the horizon, a living forest outside the Gate, and the Lab's finally off emergency power. Take the rover out whenever you want—the Studio's yours. |
+| **BARK-RECALL** | warn on sync:recall (cooldown: 45, POL-57 0% sync recall) | Sharp, breathless emergency pull-back, followed by immediate relief | \[breathes\] Sync hit zero—pulling you back through the Twin Gate now\! \[pause\] Easy... breathe. Your pack and your base are still intact. |
+| **BARK-BROWNOUT** | warn on power:brownout (cooldown: 60, POL-57 12 kW Gate brownout) | Brisk, dry engineering alert when machine demand exceeds the 12 kW Gate feed | \[dry\] That's the twelve-kilowatt Gate ceiling—your machines are browning out at half speed. Wire a field Power Unit and Relay Pylon to pick up the load. |
+
+## **2\. POL-40 One-Paragraph Portrait Brief (public/ui/haddy-portrait.webp)**
+
+**Prompt / Brief for public/ui/haddy-portrait.webp:** Square 1:1 close-up bust portrait of **Dr. Gwen Haddy**, a fictional late-40s British-transatlantic lead substrate physicist (entirely original fictional character, no real person), framed specifically for high legibility at small 48×48 to 64×64 HUD size with zero text, numbers, or lettering anywhere in the image. She has sharp, observant hazel eyes behind thin-rimmed geometric glasses, silver-streaked dark auburn hair pulled back into a practical low knot, and a calm, dry-witted half-smile; she wears a dark slate-charcoal acoustic lab coat over a high-collared utility vest with subtle amber telemetry piping and a compact boom-mic headset over one ear. Lit with high-contrast directional cyan CRT monitor key light from the left and warm amber vacuum-tube rim light from the right against a deep shadowed laboratory background, giving a clean, unmistakable head-and-shoulders silhouette that reads crisply both in full color and through green/amber CRT scanline overlays.

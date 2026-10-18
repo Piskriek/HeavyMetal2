@@ -1,0 +1,37 @@
+# T16: Acts VII to IX, the 11-enclave hologram, the finale hand-off, the menu hero and the CRT portrait (TICKET-16)
+
+**Spec:** OPUS_NOTE_22, brief 35 (`docs/prompts/sidecar/35-acts-7-to-9-and-finale.md`), Argo's ARGO_NOTE_04, and `docs/argo/notes/ARGO_NOTE_15_ticket16_voice_and_portrait.md` (the voice lines and the portrait). **Source:** `arena-gathered/argo-ticket16/` (8 files). **Opus's staging run:** the questline suite passes 4 of 4.
+
+**Start only when Opus opens it,** after T14 (Flash's F-19: `goblin-front.tsx`, `play.tsx`, the credits) and once `play-scene.ts` is free. **The voice files** (`public/vo/A7-01.mp3` to `A9-03.mp3`, plus the two POL-57 barks) **and the portrait** (`public/ui/haddy-portrait.webp`) come from Opus's RUN.world batch. If they're not committed yet when you start, build against their ids, and the narrator test reads them when they land.
+
+## Copy or merge
+- **Copy (new):** `packages/questline/src/act789-chain.ts` and its test (`packages/questline/tests/charm-and-act789.test.ts`), `apps/web/src/play/planet-table-hologram.ts`, and `apps/web/src/shell/haddy-crt-portrait.tsx`.
+- **Merge by hand:**
+  - `packages/questline/src/index.ts` (+2) and `packages/narrator/src/fidelity.ts` (+15: the A7-01 to A9-03 triggers and the barks);
+  - `apps/web/src/base/campaign-chain.ts` (+84: the A7 to A9 rows);
+  - `apps/web/src/shell/goblin-front.tsx` (+104 −7): the menu hero (POL-01, POL-64), merged onto T14's version, which adds the Ending Credits entry first.
+- **`play-scene.ts` Window E** (ARGO_NOTE_15 and the bundle): the 11 enclave domes on the 4.2 km horizon (A9-01). One labelled section.
+- **`play.tsx`:** the Planet Table's E commit (A9-02), then the 12 s golden-hour heal through `evaluateFinaleWindowHeal`, then the epilogue voice (A9-03), then `creditsDirector.start()`; also the CRT portrait in the top-left HUD (POL-40). Use a free HUD zone, and never overlap the stage panel.
+
+## Do
+1. **Install** and run the questline tests in the repo.
+2. **Acts VII to IX play in order** after B-05 (A7-01 to A9-03), with the combat and peaceful (Aggression off or calm) parity Argo built into the predicates.
+3. **POL-70:** the Planet Table hologram shows the 11 enclaves and the 85 % consensus.
+4. **The finale hands off into the credits video (T14),** then post-credits freeplay.
+5. **POL-57:** the 0 % voice recall and the 12 kW brownout barks are wired.
+6. **POL-38:** commit the voice files' `.mp3.json` metadata where the narrator expects it (or move it out of `public/` as the asset notes say). Follow the repo's existing pattern.
+
+## Verify
+- **Extend `scripts/test-campaign.mjs`** with A7-01 to A9-03 through the debug checkpoints. The whole campaign must pass, the old 45 beats plus the new ones, with zero console errors and zero HUD overlaps.
+- **A finale check:** the Planet Table commit runs the heal and starts the credits.
+- **Shots:** the hologram, the horizon domes, the menu hero and the portrait. Look at every one.
+- Report the build size (Argo estimates +16 KB).
+- Run typecheck on the laptop. Run the rest through `scripts/test-on-3dpc.sh --only "<your paths>"`: `npm test` and the extended campaign.
+
+## Stay inside
+The files above, `play-scene.ts` (Window E only), `play.tsx` (the finale and portrait only), `scripts/test-campaign.mjs`, and the checkpoint files the campaign needs. Use POL-241 to POL-250 for any new registry entries.
+
+## Git
+- Commit by explicit paths, after checking `git diff --cached --stat`.
+- End messages with `Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>`.
+- Never commit `apps/web/dist/index.html`, and never push.

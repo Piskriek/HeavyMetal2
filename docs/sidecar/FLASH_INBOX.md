@@ -115,7 +115,7 @@ Brief: none separate; the job is this list. Each item's detail is in `docs/DEFER
 - **POL-87 and POL-93:** one style source per screen. Move the pure helpers out of `planetary-grid.tsx`, `audio-tab.tsx`, `look-tab.tsx` and `scene-tab.tsx` into modules without CSS, so their tests import only those, then import each `.css` file and drop the embedded strings.
 - Test: extend `scripts/test-studio-tabs.mjs` (Save writes the project file in dev; a thrown workspace leaves the others usable; undo restores a moved copy). Run it, `test-grid-menus`, `npm test` and `test-campaign` (45 of 45) through `scripts/test-on-3dpc.sh --only "<your paths>"`. Typecheck on the laptop.
 
-## F-16 [TAKEN] TICKET-12 (Studio part): brief 31's remaining Studio work, plus POL-86, POL-94 and POL-21
+## F-16 [DONE] TICKET-12 (Studio part): brief 31's remaining Studio work, plus POL-86, POL-94 and POL-21
 Brief: `docs/prompts/sidecar/31-studio-bench-and-sockets.md`. What's left of it is listed in `docs/argo/notes/ARGO_NOTE_10_next_batch_ticket09_onward.md` §2B and its TICKET-12 row; T08b and your F-15 already covered the 4-angle grid, the Look scrubber, the Scene tab, the gizmo, the error boundary, undo and the shared renderer.
 This job touches only `apps/web/src/studio/`, `apps/web/studio-server/`, `packages/scenedoc/` and the registry generator. Never touch `apps/web/src/play/`, `apps/web/src/net/`, `apps/web/src/rooms/`, `apps/web/src/shell/planetary-grid*` (Haiku T11a) or the audio files (Haiku T09a).
 - **P0-STUDIO-01 part 2:** one-click fix flags (fix: mirror-z, fix: plain-back, reach: 3, hold, lumOk) written through the Changes panel to `docs/runworld/assets.json` via studio-server, and the surface-luminance gate badge (low >= 0.18, and low/high >= 0.85).

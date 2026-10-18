@@ -137,3 +137,21 @@ Append one entry per job, in the format in `FLASH_INBOX.md`. Newest at the botto
   - POL-87 & POL-93: Extracted pure data/helpers into `-data.ts` modules for test isolation without CSS; replaced inline styles with CSS modules.
 - Decisions left: None. F-15 complete.
 
+### [2026-10-18 09:18] F-16 [DONE] TICKET-12 (Studio part): brief 31's remaining Studio work, plus POL-86, POL-94 and POL-21
+- Commits: `d529852f` ("feat(studio): bench, sockets, materials, monsters, and scenedoc structural sharing (TICKET-12)")
+- Checks:
+  - `npm run typecheck`: 0 errors
+  - `npm test` on 3D PC: 2,895 pass, 0 fail, 19/19 speed tests pass
+  - `npm run build` on 3D PC: 14.89 MB single-file bundle (cap 16 MB)
+  - `node scripts/test-studio-tabs.mjs` on 3D PC: 41 of 41 checks pass (POL-94 gizmo drag & undo, POL-89 starter/hauler sockets, Look A/B split, error boundary, 4-angle review, fix flags, luminance gate badge, snap sockets, material macro sliders, D21 tier badge, monster remap strength slider)
+- Features delivered:
+  - POL-21: Structural sharing in `@hm/scenedoc` via copy-on-write `DraftNodes` overlay.
+  - P0-STUDIO-01 (Part 2): One-click fix flags & surface-luminance gate badge in Details panel with `/asset-flags` write-back.
+  - P1-STUDIO-03 (Part 2) & POL-89: Click-to-snap socket authoring on model faces with `/sockets` write-back; baked machine/structure sockets into `registry.json`.
+  - P1-STUDIO-04: Two-tier Material Designer (5 macro sliders, 2-cartridge combiner, node graph preview, D21 constant-mean-luminance Potato-to-Ultra preview).
+  - O3: Per-skin monster `remapStrength` slider with live preview and `/monster-tweaks` write-back.
+  - POL-86: Dev write route for `levels.json`.
+  - POL-94: Automated 3D gizmo pointer drag and undo in `test-studio-tabs.mjs`.
+  - POL-95: Look tab `levelsLabel` ("12", "24", "Full (24-bit)") in `look-tab.tsx` and `look-tab-data.ts`.
+- Decisions left: None. Ready for next ticket.
+

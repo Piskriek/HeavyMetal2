@@ -189,3 +189,21 @@ Append one entry per job, in the format in `FLASH_INBOX.md`. Newest at the botto
   - `grid-menus/grid-screen.png`: Dark enclave directory, no light button hovers.
 - Changes from brief: Kept `input[type=range]` transparent background in `studio.css` and `dark-forms.css` so range sliders never inherit light UA surfaces in dark modals.
 - Decisions left: None. F-20 complete.
+
+### [2026-10-18 18:48] F-21 [DONE] @hm/plume: a gravity option and a count uniform (POL-261's package half)
+- Commits: `77a276b7` ("feat(plume): per-emitter gravity option and count uniform (POL-261)")
+- Checks:
+  - `npm run typecheck`: 0 errors
+  - `npm test` on 3D PC: 2,948 pass (2,929 unit, 19 speed tests, 0 fail, 4 skipped)
+  - `node --import tsx --test packages/plume/tests/plume.test.ts`: 22/22 pass
+  - `npm run build && node scripts/test-machine-plumes.mjs` on 3D PC: 69/69 pass, 0 page errors
+  - Build size: 15.10 MB (15,838.00 kB, cap 16 MB)
+- Features delivered:
+  - Added optional per-emitter `gravity` (m/s², default 0) with ballistic parabolic flight `-0.5 * gravity * age^2` in `pixelAt` and GLSL `pixelCore`.
+  - Packed `gravity` into `C.w` of `uEm` (previously unused fourth float).
+  - Allocated uniform array `uCounts[MAX_EMITTERS]` and instance capacity up to `maxCount` to drive active counts dynamically.
+  - Calling `setCount()` within `maxCount` updates uniform values without allocating new arrays, touching buffer attributes, or setting `needsUpdate`.
+  - Discarded/culled inactive instances with `gl_Position` clip across cubes, splats, and dither modes.
+  - Tests verify gravity 0 equality, ballistic flight peak/fall, and zero buffer allocations on count changes.
+- Decisions left: None. Ready for F-22.
+

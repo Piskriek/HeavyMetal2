@@ -329,3 +329,5 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 - **Gravity:** `@hm/plume` is rise-only, so the drill's ballistic sparks and the falling press and pylon pixels aren't reproduced. A gravity option in @hm/plume would be a small package change.
 - **Cost:** cadence-driven pours rebuild the instance buffer every frame (+0.11 ms GPU on the 3D PC). A count uniform in @hm/plume would remove it.
 - Sidecar Task: POL-261 - Argo rules on the first three; a sidecar does the @hm/plume changes.
+- **Package half done in F-21 (Gemini-Flash, 77a276b7):** added per-emitter `gravity` (m/s², default 0) with ballistic parabola displacement in `pixelAt` and GLSL `pixelCore` (packed into `C.w` of `uEm`). Added `uCounts` uniform array to drive visible count dynamically without instance buffer rebuilds or attribute updates. 22/22 plume unit tests pass; verified clean build (15.10 MB) and 69/69 checks on `scripts/test-machine-plumes.mjs` on 3D PC worker.
+

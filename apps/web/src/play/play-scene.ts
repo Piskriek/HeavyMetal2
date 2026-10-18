@@ -358,7 +358,7 @@ export interface PlayScene {
     /** Machines standing on the plot, and how many pour pixels now. */
     machines(): { readonly standing: number; readonly pouring: number };
     /** Each machine's pour (ARGO_NOTE_08): its kind, whether its emitter is up, its pixel count now, its colour, its vent and its feed cubes. */
-    plumes(): readonly { readonly kind: string; readonly emitting: boolean; readonly pour: number; readonly colour: string; readonly base: readonly [number, number]; readonly vent: readonly [number, number, number] | null; readonly feedCubes: number }[];
+    plumes(): readonly { readonly kind: string; readonly emitting: boolean; readonly pour: number; readonly colour: string; readonly base: readonly [number, number]; readonly vent: readonly [number, number, number] | null; readonly feed: readonly [number, number, number] | null; readonly feedCubes: number }[];
     holo(): { readonly visible: boolean; readonly machines: number };
     view(): 'first' | 'third';
     clipWeight(name: ClipName): number;
@@ -3500,6 +3500,7 @@ export function createPlayScene(o: {
         colour: machinePlumeSpec(v.m.kind).colour,
         base: [v.m.x, v.m.z] as const,
         vent: v.vent ? [v.vent.x, v.vent.y, v.vent.z] as const : null,
+        feed: v.feed ? [v.feed.x, v.feed.y, v.feed.z] as const : null,
         feedCubes: v.feed ? feedCubeCount(v.share) : 0,
       })),
       holo: () => holo.debug(),

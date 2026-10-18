@@ -50,9 +50,13 @@ const SPEC = {
   water: { colour: '#3dc8ff', full: 34 * 2.0 },
   power: { colour: '#b46bff', full: 36 * 1.7 },
   pylon: { colour: '#5ce1e6', full: 12 * 0.55 },
+  // the heavy water maker (a base hardpoint's kind): placed on the plot directly, as the one heavy kind shot here
+  'heavy-water': { colour: '#3dc8ff', full: 78 * 2.6 },
 };
-// Each kind's footprint on the ground, in metres (machine-inspect.ts MACHINE_SIZES: the largest side): a vent sits within it.
-const REACH = { drill: 2.5, mill: 2.6, press: 2.6, projector: 2.2, water: 3.2, power: 2.7, pylon: 1.5 };
+// Each kind's footprint on the ground, in metres (machine-inspect.ts MACHINE_SIZES: the largest side): a vent or a feed sits within it.
+const REACH = { drill: 2.5, mill: 2.6, press: 2.6, projector: 2.2, water: 3.2, power: 2.7, pylon: 1.5, 'heavy-water': 4.5 };
+// The kinds that take material in (their feed hopper is where the ore cubes drop): every other kind has no feed socket.
+const FEEDS = ['mill', 'press', 'water', 'power', 'heavy-water'];
 
 // Candidate spots near the gate for each kind (the first one that places wins). The gate and its reach are the same as the stage 6 measure's.
 const CANDIDATES = {
@@ -63,6 +67,7 @@ const CANDIDATES = {
   water: [[0, 12], [8, 12], [14, 10]],
   power: [[-6, -8], [-4, -10], [6, -10]],
   pylon: [[4, -8], [6, -2], [-4, 8]],
+  'heavy-water': [[-20, 6], [-22, -10], [18, 14]],
 };
 
 console.log(`Starting static server on port ${port}...`);
@@ -171,7 +176,7 @@ try {
 
   // forced: every machine running at full, through the scene's own setPlot
   await installOverride();
-  await force({ drill: 1, mill: 1, press: 1, projector: 1, water: 1, power: 1, pylon: 1 });
+  await force({ drill: 1, mill: 1, press: 1, projector: 1, water: 1, power: 1, pylon: 1, 'heavy-water': 1 });
   await settle(900);
   const full = byKind(await peakPlumes());
   for (const kind of Object.keys(SPEC)) {
@@ -191,11 +196,20 @@ try {
       check(`${kind} vent is above the ground`, vy > -0.5 && vy < 12, `y ${vy.toFixed(2)}`);
     }
   }
-  check('the feed cubes drop at full run for every kind that takes material in', ['mill', 'press', 'water', 'power'].every((k) => !placed[k] || (full[k]?.feedCubes ?? 0) > 0));
-  check('a drill and a projector take no ore in (no feed cubes)', (full.drill?.feedCubes ?? 0) === 0 && (full.projector?.feedCubes ?? 0) === 0);
+  check('the feed cubes drop at full run for every kind that takes material in', FEEDS.every((k) => !placed[k] || (full[k]?.feedCubes ?? 0) > 0));
+  check('a drill and a projector take no ore in (no feed cubes, no feed socket)', (full.drill?.feedCubes ?? 0) === 0 && (full.projector?.feedCubes ?? 0) === 0 && !full.drill?.feed && !full.projector?.feed);
+  for (const kind of FEEDS) {
+    const row = full[kind];
+    if (!placed[kind] || !row) continue;
+    if (!row.feed) { check(`${kind} has a feed hopper`, false, 'no feed socket'); continue; }
+    const [fx, fy, fz] = row.feed;
+    const [bx, bz] = row.base;
+    const dist = Math.hypot(fx - bx, fz - bz);
+    check(`${kind} feed hopper is on its own prop (within ${REACH[kind]} m of its foot)`, dist <= REACH[kind] + 0.5, `${dist.toFixed(2)} m from [${bx}, ${bz}], feed y ${fy.toFixed(2)}`);
+  }
 
   // the pour follows the run share: half the run, about half the pixels (the same count, scaled)
-  await force({ drill: 1, mill: 0.5, press: 1, projector: 1, water: 1, power: 1, pylon: 1 });
+  await force({ drill: 1, mill: 0.5, press: 1, projector: 1, water: 1, power: 1, pylon: 1, 'heavy-water': 1 });
   await settle(500);
   const half = byKind(await peakPlumes());
   if (half.mill) {
@@ -204,14 +218,14 @@ try {
   }
 
   // a machine that is off: its emitter and feed cubes stop, the others keep pouring
-  await force({ drill: 1, mill: 1, press: 1, projector: 1, water: 1, power: 1, pylon: 1 }, ['mill']);
+  await force({ drill: 1, mill: 1, press: 1, projector: 1, water: 1, power: 1, pylon: 1, 'heavy-water': 1 }, ['mill']);
   await settle(500);
   const off = byKind(await peakPlumes());
   check('a machine switched off pours nothing', off.mill && !off.mill.emitting && off.mill.pour === 0 && off.mill.feedCubes === 0, `emitting ${off.mill?.emitting}`);
   check('the others keep pouring while one is off', ['press', 'projector', 'water'].every((k) => !placed[k] || off[k]?.emitting));
 
   // a machine starved (out of ore: no run): its emitter stops, the others keep pouring
-  await force({ drill: 1, mill: 1, press: 0, projector: 1, water: 1, power: 1, pylon: 1 });
+  await force({ drill: 1, mill: 1, press: 0, projector: 1, water: 1, power: 1, pylon: 1, 'heavy-water': 1 });
   await settle(500);
   const starved = byKind(await peakPlumes());
   check('a starved press (out of ore) pours nothing', starved.press && !starved.press.emitting && starved.press.feedCubes === 0);
@@ -225,7 +239,7 @@ try {
   check('no machine pours with the grid idle', Object.values(idle).every((r) => !r.emitting));
 
   // the run back: every emitter restarts
-  await force({ drill: 1, mill: 1, press: 1, projector: 1, water: 1, power: 1, pylon: 1 });
+  await force({ drill: 1, mill: 1, press: 1, projector: 1, water: 1, power: 1, pylon: 1, 'heavy-water': 1 });
   await settle(700);
   const back = byKind(await readPlumes());
   check('putting the run back restarts the mill', !placed.mill || (back.mill?.emitting && back.mill.pour > 0));
@@ -233,7 +247,7 @@ try {
 
   // the shots: the stage 6 look at full run (the same fidelity walk the stage 6 measure makes), the overlook, then close looks at
   // the mill and the press with the overlays hidden. Yaw follows the scene's own convention: facing (-sin yaw, -cos yaw).
-  await force({ drill: 1, mill: 1, press: 1, projector: 1, water: 1, power: 1, pylon: 1 });
+  await force({ drill: 1, mill: 1, press: 1, projector: 1, water: 1, power: 1, pylon: 1, 'heavy-water': 1 });
   for (const st of [2, 4, 6]) {
     await page.evaluate((s) => window.__playScene.setFidelityStage(s), st);
     await page.evaluate(() => {
@@ -256,6 +270,10 @@ try {
   // a slight upward pitch keeps the held slab's ghost (the aim point on the ground) out of the frame
   if (placed.mill) await lookAt('plumes-mill-close.png', placed.mill, placed.mill[0] - 4.5, placed.mill[1] + 1.5, 0.03);
   if (placed.press) await lookAt('plumes-press-close.png', placed.press, placed.press[0] + 5, placed.press[1] + 3.5, 0.03);
+  // item 5 of T03P: the water maker, the projector and a heavy machine, close, each with its vent and feed in view
+  if (placed.water) await lookAt('plumes-water-close.png', placed.water, placed.water[0] + 4.5, placed.water[1] - 4, 0.03);
+  if (placed.projector) await lookAt('plumes-projector-close.png', placed.projector, placed.projector[0] - 4.5, placed.projector[1] - 3.5, 0.03);
+  if (placed['heavy-water']) await lookAt('plumes-heavy-water-close.png', placed['heavy-water'], placed['heavy-water'][0] - 10, placed['heavy-water'][1] + 5, -0.06);
   const stats = await page.evaluate(() => window.__playScene.debug.detail().pixels);
   console.log(`plume pixels now: ${stats}`);
 } catch (err) {

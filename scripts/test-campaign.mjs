@@ -81,16 +81,24 @@ await page.addInitScript(() => {
   };
 });
 
+// Every error, as it happens, goes to shots-run/campaign/page-errors.log (tagged with the beat that was running), so a failed
+// run leaves its errors behind even when a later beat or the report never runs. The log starts empty on every run.
+const errorLog = path.join(root, 'shots-run/campaign/page-errors.log');
+fs.writeFileSync(errorLog, '');
+let currentBeat = 'before the first beat';
+const logError = (kind, text) => fs.appendFileSync(errorLog, `[${kind}] during beat "${currentBeat}": ${text}
+`);
 const consoleErrors = [];
 const httpErrors = [];
 page.on('console', (msg) => {
-  if (msg.type() === 'error') consoleErrors.push(msg.text());
+  if (msg.type() === 'error') { consoleErrors.push(msg.text()); logError('console', msg.text()); }
 });
-page.on('pageerror', (err) => consoleErrors.push(`pageerror: ${err.message}`));
+page.on('pageerror', (err) => { consoleErrors.push(`pageerror: ${err.message}`); logError('pageerror', `${err.message}
+${err.stack ?? ''}`); });
 page.on('response', (res) => {
-  if (res.status() >= 400) httpErrors.push(`${res.status()} ${res.url()}`);
+  if (res.status() >= 400) { httpErrors.push(`${res.status()} ${res.url()}`); logError('http', `${res.status()} ${res.url()}`); }
 });
-page.on('requestfailed', (req) => httpErrors.push(`failed ${req.url()} ${req.failure()?.errorText ?? ''}`));
+page.on('requestfailed', (req) => { const t = `failed ${req.url()} ${req.failure()?.errorText ?? ''}`; httpErrors.push(t); logError('http', t); });
 
 const results = [];
 let shotNo = 0;
@@ -209,6 +217,7 @@ const saveCheckpoint = async (name, title, act) => {
 };
 
 const beat = async (name, fn) => {
+  currentBeat = name;
   const started = Date.now();
   const row = { name, ok: false, detail: '', fps: null, shot: null, seconds: 0 };
   try {
@@ -1690,6 +1699,7 @@ await beat('26d the brownout you can see: over-building the grid thins the pixel
 const passed = results.filter((r) => r.ok).length;
 fs.writeFileSync(path.join(shotsDir, 'summary.json'), JSON.stringify({ results, consoleErrors, httpErrors, hudViolations }, null, 2));
 console.log(`${passed} of ${results.length} beats PASS`);
+console.log(`page errors: ${consoleErrors.length} console/page, ${httpErrors.length} http, all saved in ${errorLog}`);
 
 server.kill();
 await browser.close();

@@ -15,6 +15,9 @@
 # working tree as it is (other agents' uncommitted edits included), not the snapshot: if it fails outside your files, re-run
 # with --worker-only. Use --worker-only too for timings, which need the worker's clean snapshot and steady machine.
 set -euo pipefail
+# The body is one function, so bash parses all of it before running: editing this file while a run is in progress
+# cannot break that run (2026-10-18: a mid-run edit made bash read on from its old offset into the new text).
+main() {
 only=""; worker_only=""
 while [ "${1:-}" = "--only" ] || [ "${1:-}" = "--worker-only" ]; do
   if [ "$1" = "--only" ]; then only="${2:?--only needs a quoted list of paths}"; shift 2; else worker_only=1; shift; fi
@@ -71,3 +74,5 @@ while :; do
   if [ -z "$said_wait" ]; then if [ -n "$worker_only" ]; then echo "[queue] --worker-only: waiting for the worker"; else echo "[queue] the worker and the laptop are both busy; waiting for whichever frees first"; fi; said_wait=1; fi
   sleep 5
 done
+}
+main "$@"; exit

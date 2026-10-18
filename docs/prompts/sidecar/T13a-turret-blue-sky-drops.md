@@ -51,10 +51,11 @@ The yoke yaws about the base's vertical axis, and the gun pitches about X at the
   - the parity test against the real tables;
   - structure: a turret on a wall top and on a roof places, and a floating one is refused;
   - the turret's draw counts against the 12 kW gate.
-- **Extend `scripts/test-campaign.mjs`:**
+- **A new browser test, `scripts/test-ticket13.mjs`** (Flash is extending `test-campaign.mjs` for TICKET-16 at the same time, so don't edit it; model the new script on it and reuse its debug hooks):
   - build a heavy light projector on a hardpoint and see the stage push;
   - put a turret on a roof, and check it hits a swarmer at 30 m and ignores one inside the gate's dome;
-  - the whole campaign still passes (45 of 45 plus the new beats), with zero console errors and zero HUD overlaps.
+  - zero console errors and zero HUD overlaps;
+- **The whole campaign still passes:** run `node scripts/test-campaign.mjs` unchanged.
 - **Shots** (prove the subject is in view; HUD hidden if the test can):
   - the turret tracking, its laser on a monster, from the side;
   - the turret on a wall top, from three sides (nothing floating);
@@ -70,7 +71,7 @@ The yoke yaws about the base's vertical axis, and the gun pitches about X at the
 - `packages/plotsim/`, `packages/structure/src/index.ts` and its tests, `packages/cartlab/src/index.ts` and its tests;
 - `apps/web/src/play/turret-view.ts`, `window-c-hooks.ts` and `play-scene.ts` (Window C only);
 - `apps/web/src/base/catalog.ts`, `apps/web/src/base/world.ts` (the turret and power only), `apps/web/src/base/weapons.ts` and `apps/web/src/assets/gen-props.ts` (POL-76 only);
-- `scripts/test-campaign.mjs` and the checkpoint files it needs.
+- the new `scripts/test-ticket13.mjs`.
 
 Another Haiku owns `play.tsx`, `apps/web/src/credits/`, `lab-room.ts`, `goblin-front.tsx` and the HUD zone files (T14). Flash owns `packages/plume/`. Never touch those. Use POL-291 to POL-300 for new registry entries.
 

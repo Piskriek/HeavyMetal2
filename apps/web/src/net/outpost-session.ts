@@ -149,15 +149,17 @@ if (typeof window !== 'undefined') {
         version: session.client.state().version,
       };
     },
-    /** The confirmed world's hash, the version, and the roster as the room sees it. */
-    state: (): { readonly hash: string; readonly version: number; readonly roles: readonly string[]; readonly connection: string; readonly structure: number | null; readonly player: string | null; readonly roleKeys: readonly string[]; readonly peers: number } | null => {
+    /** The confirmed world's hash, the version, and the roster as the room sees it (roles and names, POL-117). */
+    state: (): { readonly hash: string; readonly version: number; readonly roles: readonly string[]; readonly names: readonly string[]; readonly connection: string; readonly structure: number | null; readonly player: string | null; readonly roleKeys: readonly string[]; readonly peers: number } | null => {
       const session = currentOutpostSession();
       if (!session) return null;
       const st = session.client.state();
+      const roster = rosterOf(session.client);
       return {
         hash: st.confirmedHash,
         version: st.version,
-        roles: rosterOf(session.client).map((p) => p.role),
+        roles: roster.map((p) => p.role),
+        names: roster.map((p) => p.name),
         connection: st.connectionState,
         structure: st.confirmedWorld.base.structures[0]?.id ?? null,
         player: st.playerId,

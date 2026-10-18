@@ -62,8 +62,8 @@ export function LabHome(props: { readonly profile: Profile }): ReactElement {
     // each step in its own task, so the bar keeps moving; the label names what comes next
     const steps: [string, () => void | Promise<void>][] = [
       ...SMOOTH_IDS.map((id): [string, () => void] => ['Loading the lab models', () => { smoothModel(id); }]),
-      ['Waking the goblin', () => { smoothModel('goblin'); }],
-      ...(['MOON_STRIDER', 'CRYSTAL_TORTOISE', 'SKY_MANTA'] as const).map((id): [string, () => void] => ['Waking the animals', () => { animalBody(id); }]),
+      ['Loading the lab models', () => { smoothModel('goblin'); }],
+      ...(['MOON_STRIDER', 'CRYSTAL_TORTOISE', 'SKY_MANTA'] as const).map((id): [string, () => void] => ['Loading the lab models', () => { animalBody(id); }]),
       ...cartridges.map((id): [string, () => void] => ['Finishing the planet', () => { look(id); }]),
       ['Fitting the lab', () => scene.preloadLabGenerated()],
       ['Calibrating the bridge array', () => { scene.setVista(look(FINISHED), look(FINISHED), NEIGHBOURS.map((plot) => ({ plot, look: look(plot.cartridge) }))); }],

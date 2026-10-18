@@ -50,7 +50,7 @@
 .play-start b { font-family: var(--font-setmix); font-size: 20px; font-weight: 700; }
 .play-keys { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 14px; font-size: 12px; color: rgba(232, 238, 241, .75); }
 .play-keys span { display: inline-flex; align-items: center; gap: 6px; }
-.play kbd { font-family: inherit; font-size: 11px; padding: 1px 6px; border: 1px solid rgba(241, 244, 245, .3); border-bottom-width: 2px; color: #f1f4f5; }
+.play[data-hud-root] kbd { font-family: inherit; font-size: 11px; padding: 1px 6px; border: 1px solid rgba(241, 244, 245, .3); border-bottom-width: 2px; color: #f1f4f5; }
 
 .play-pause { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px; background: rgba(5, 6, 8, .62); overflow-y: auto; max-height: 100vh; padding: 16px 0; box-sizing: border-box; }
 .play-pause h2 { margin: 0 0 6px; font-family: var(--font-setmix); font-size: 28px; font-weight: 800; }

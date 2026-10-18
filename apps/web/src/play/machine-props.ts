@@ -198,12 +198,13 @@ export function machinePlumeSteady(s: MachinePlumeSpec): number {
 }
 
 /**
- * The ballistic pours (ARGO_NOTE_08): the drill's slag sparks and the pylon's corona sparks fall on their own arcs, under the
- * spec's gravity. The other pours rise with no arc (gravity 0, as before) until Argo rules on them.
+ * The falling pours: the drill's slag sparks and the pylon's corona sparks on their own ballistic arcs (ARGO_NOTE_08), and the
+ * presses' stamped-solid pours a small settle (ARGO_NOTE_17, ruling b, POL-282), all under the spec's gravity. The buoyant pours
+ * (mill, projectors, water, power, fabricator and the heavies) rise straight, with no arc: gravity 0.
  */
-const BALLISTIC_KINDS: ReadonlySet<MachineKind> = new Set<MachineKind>(['drill', 'pylon']);
+const FALLING_KINDS: ReadonlySet<MachineKind> = new Set<MachineKind>(['drill', 'pylon', 'press', 'heavy-press']);
 export function machinePlumeGravity(kind: MachineKind): number {
-  return BALLISTIC_KINDS.has(kind) ? MACHINE_PLUME_SPECS[kind].gravity : 0;
+  return FALLING_KINDS.has(kind) ? MACHINE_PLUME_SPECS[kind].gravity : 0;
 }
 
 /**

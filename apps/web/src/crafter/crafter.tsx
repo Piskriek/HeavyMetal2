@@ -154,7 +154,7 @@ export function ResolutionCrafter(props: { readonly profile: Profile; readonly o
     const steps: [string, () => void][] = [
       ['Building the moon', () => { lookFor(FIRST_CARTRIDGE, 1); }],
       ...SMOOTH_IDS.map((id): [string, () => void] => ['Shaping the boulders and trees', () => { smoothModel(id); }]),
-      ...(['MOON_STRIDER', 'CRYSTAL_TORTOISE', 'SKY_MANTA'] as const).map((id): [string, () => void] => ['Waking the animals', () => { animalBody(id); }]),
+      ...(['MOON_STRIDER', 'CRYSTAL_TORTOISE', 'SKY_MANTA'] as const).map((id): [string, () => void] => ['Loading the wildlife', () => { animalBody(id); }]),
       ...[...new Set(NEIGHBOURS.map((n) => `${n.cartridge}@${n.stage}`))].map((k): [string, () => void] => {
         const [id, st] = k.split('@') as [string, string];
         return ['Visiting the neighbours', () => { lookFor(id, Number(st) as Stage); }];

@@ -162,6 +162,17 @@ try {
     const joined = await guest.evaluate((c) => window.__outpost.join(c), code);
     check('a friend joins by the room code', joined === code, joined);
 
+    // POL-115 (T17a): a friend's build before the host's base is seeded is refused, and the refusal says why. The host's first
+    // command (the grant below) takes the room past version 0.
+    const earlyCmd = { t: 'place', at: { x: 8, z: 8 }, blueprint: STARTER, piece: { s: 0, kind: 'foundation', i: 0, j: 0, k: 0, r: 0 } };
+    const early = await guest.evaluate((c) => window.__outpost.send(c), earlyCmd);
+    check("a friend's build waits for the host's base (POL-115: refused as waiting-for-host-seed until the room is seeded)", early?.refused === true && early.why === 'waiting-for-host-seed', early);
+
+    // POL-117 (T17a): the host's roster names the friend from the join notice, before the friend has moved (not the 'Friend' placeholder)
+    await host.waitForFunction(() => (window.__outpost.state()?.roles.length ?? 0) === 2, null, { timeout: T(15000) }).catch(() => null);
+    const joinNames = (await host.evaluate(() => window.__outpost.state()?.names ?? [])) ?? [];
+    check("the host's roster names the friend from the join, not 'Friend' (POL-117)", joinNames.length === 2 && joinNames.includes('You') && joinNames.some((n) => n !== 'You' && n.trim() !== '' && n !== 'Friend'), joinNames);
+
     // the host grants stock and places the shelter (free), then both build
     await host.evaluate(() => window.__outpost.send({ t: 'grant', stock: [{ item: 'ore', n: 2000 }, { item: 'prim-cube', n: 120 }, { item: 'map-basalt', n: 120 }] }));
     await host.evaluate(() => window.__outpost.send({ t: 'shelter', cx: 8, cz: 8, yaw: 0 }));

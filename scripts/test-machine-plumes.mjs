@@ -276,7 +276,10 @@ try {
   // ARGO_NOTE_08 ballistic pours: the drill's sparks and the pylon's corona sparks are passed to the plume with their gravity arc (F-21's
   // per-emitter gravity); every other pour rises with none. Read from the scene's own rows while each emits.
   check('the drill and the pylon pour on their gravity arcs (ballistic, ARGO_NOTE_08)', Boolean(full.drill?.arc > 0) && Boolean(full.pylon?.arc > 0), `drill ${full.drill?.arc}, pylon ${full.pylon?.arc}`);
-  check('the other pours rise with no arc (gravity 0)', Object.entries(full).every(([k, r]) => k === 'drill' || k === 'pylon' || r.arc === 0), Object.entries(full).filter(([k, r]) => k !== 'drill' && k !== 'pylon' && r.arc !== 0).map(([k]) => k).join(', ') || 'none');
+  // T17a (ARGO_NOTE_17 ruling b, POL-282): the presses' stamped-solid pours settle a small fall; the buoyant pours rise straight
+  const FALLING = new Set(['drill', 'pylon', 'press', 'heavy-press']);
+  check('the presses settle a small fall (gravity above 0, under 0.5 m/s2, ARGO_NOTE_17)', ['press', 'heavy-press'].every((k) => !placed[k] || (full[k]?.arc > 0 && full[k].arc < 0.5)), ['press', 'heavy-press'].map((k) => `${k} ${full[k]?.arc}`).join(', '));
+  check('the other pours rise with no arc (gravity 0)', Object.entries(full).every(([k, r]) => FALLING.has(k) || r.arc === 0), Object.entries(full).filter(([k, r]) => !FALLING.has(k) && r.arc !== 0).map(([k]) => k).join(', ') || 'none');
 
   // ruling 3: the feeds. The ore cubes drop at full run, into the measured hopper; the four kinds that take none drop none.
   check('the feed cubes drop at full run for every kind that takes material in', FEEDS.every((k) => !placed[k] || (full[k]?.feedCubes ?? 0) > 0));

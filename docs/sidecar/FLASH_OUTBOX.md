@@ -155,3 +155,20 @@ Append one entry per job, in the format in `FLASH_INBOX.md`. Newest at the botto
   - POL-95: Look tab `levelsLabel` ("12", "24", "Full (24-bit)") in `look-tab.tsx` and `look-tab-data.ts`.
 - Decisions left: None. Ready for next ticket.
 
+### [2026-10-18 10:30] F-17 [DONE] TICKET-12 (HUD part): POL-78, 79, 80, 82 and 43, no play-scene
+- Commits: `60c47826` ("feat(hud): polish HUD controls grid, radial wrapping, empty rack, refusal toast, and bin ticker (TICKET-12)")
+- Checks:
+  - `npm run typecheck`: 0 errors (clean)
+  - `npm test` on 3D PC: 2,898 unit pass, 0 fail, 19/19 speed tests pass
+  - `npm run build` on 3D PC: 14.90 MB single-file bundle (cap 16 MB)
+  - `node scripts/test-build-ux.mjs` on 3D PC: 35 of 35 checks pass (zero HUD violations, zero page errors)
+  - `node scripts/test-campaign.mjs` on 3D PC: 45 of 45 beats PASS, 0 console/http errors, 0 HUD overlaps
+- Shots (`shots-run/build-ux/`):
+  - `esc-controls.png`: 3-column keycap grid at 1280x720, zero vertical clipping, internal scrolling preserved (POL-78).
+  - `radial-build.png`: "Weapon bench" slice label wraps cleanly to 2 lines without ellipsis/overflow (POL-79).
+  - `radial-apply-empty.png`: Dedicated dark glass empty state card with guidance message ("No written cartridges: write one at the preset bench") (POL-80).
+  - `refused-status-toast.png`: Refused action triggers compact status toast ("⚠ Already at this stage") in status zone, zero giant title cards (POL-82).
+  - `ticker-linked-count.png`: Bottom-right resource ticker displays linked-bin inventory count `(+600)` beside plot ore (POL-43).
+- Changes from brief: None. Moved gameplay refusals out of `say()` into `showStatusToast()` with `formatRefusalToast()` player-friendly sentences.
+- Decisions left: None. F-17 complete.
+

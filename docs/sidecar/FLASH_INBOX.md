@@ -128,7 +128,7 @@ This job touches only `apps/web/src/studio/`, `apps/web/studio-server/`, `packag
 - Test: extend `scripts/test-studio-tabs.mjs` (a flag writes `assets.json` in dev; a snapped socket persists and shows; the material sliders change the preview at constant mean luminance; the gizmo drag moves a copy). Run it, `npm test` and `test-campaign` (45 of 45) through `scripts/test-on-3dpc.sh --only "<your paths>"`. Typecheck on the laptop. Use POL-181 to POL-190 for new registry entries.
 - **Added by Opus:** the Look tab half of POL-95, since you're in the Studio. In `look-tab.tsx`, add `levelsLabel` ("12" at stage 1, "24" at stage 2, "Full (24-bit)" at stages 3 to 6) in place of the literal "0". Argo's version is in `arena-gathered/argo-pol95-103/apps/web/src/studio/look-tab.tsx` and its test. Merge it onto your current file. Haiku's TPOL does the groundshader half.
 
-## F-17 [TAKEN] TICKET-12 (HUD part): POL-78, 79, 80, 82 and 43, no play-scene
+## F-17 [DONE] TICKET-12 (HUD part): POL-78, 79, 80, 82 and 43, no play-scene
 Brief: none separate; the job is this list. Each item's detail is in `docs/DEFERRED_POLISH_REGISTRY.md`, and TICKET-12's row is in `docs/argo/notes/ARGO_NOTE_10_next_batch_ticket09_onward.md`.
 This job touches only `apps/web/src/base/ui/` (`radial-menu.*`, `hud-zones*`), `apps/web/src/play/controls-grid.*`, `apps/web/src/play/play.css`, and `play.tsx` (the toast, ticker and radial props only). Never touch `play-scene.ts`, the lab or vista files, `rift.ts` or `packages/groundshader` (Haiku TPOL has them), or `apps/web/src/net/`, `rooms/` or the audio files.
 - **POL-78:** the Esc pause panel shows the whole controls grid at 1280 x 720: three columns or a scroll inside the panel, never cut off.

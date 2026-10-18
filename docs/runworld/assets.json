@@ -2519,6 +2519,38 @@
       "subject": "a chunky screwdriver on its own, about 25 centimetres long, a thick square-section handle with square grip ridges and a short thick square shaft with a flat tip, lying flat",
       "note": "weapon-bench set, its own object (owner 2026-10-13: model the tools individually; the bench and its tools cannot be one object)",
       "reach": 3
+    },
+    {
+      "id": "turret-base",
+      "panel": "20/20-turret-s6.png",
+      "class": "fixture",
+      "size": 0.9,
+      "axis": "length",
+      "view": "three-quarter",
+      "note": "TICKET-13 B1 (Opus 2026-10-18): sheet 20 had no turret, so P-41 was drawn as panels/20/20-turret-s6.png; split per the split-parts rule, assembled at sockets in code; the round barrel is built in code",
+      "subject": "the perimeter turret's base on its own, WITHOUT the yoke and WITHOUT the gun: a SQUARE bolted steel base plate about 0.9 metres across with a bolt at each corner, a short thick SQUARE gunmetal pedestal column about 0.5 metres square and 0.6 metres tall on it, with one yellow-and-black hazard band and a flush square access panel, and on top of the column a flat square slewing turntable plate; NO cables",
+      "symmetric": true
+    },
+    {
+      "id": "turret-yoke",
+      "panel": "20/20-turret-s6.png",
+      "class": "moving-part",
+      "size": 0.75,
+      "axis": "height",
+      "view": "front",
+      "note": "TICKET-13 B1 (Opus 2026-10-18): sheet 20 had no turret, so P-41 was drawn as panels/20/20-turret-s6.png; split per the split-parts rule, assembled at sockets in code; the round barrel is built in code",
+      "subject": "the perimeter turret's yoke on its own, WITHOUT the gun and WITHOUT the base: a U-shaped yoke made of a thick square box-section cross bar with a square hub block at its centre underneath, and two thick upright SQUARE box-section arms rising from its ends, each arm topped by a chunky square trunnion block with a square pivot cap facing inwards; gunmetal",
+      "symmetric": true
+    },
+    {
+      "id": "turret-gun",
+      "panel": "20/20-turret-gun-s6.png",
+      "class": "moving-part",
+      "size": 0.9,
+      "axis": "length",
+      "view": "three-quarter",
+      "note": "TICKET-13 B1 (Opus 2026-10-18): sheet 20 had no turret, so P-41 was drawn as panels/20/20-turret-s6.png; split per the split-parts rule, assembled at sockets in code; the round barrel is built in code; rev2 drawn from a crop of the gun housing alone (rev1 pulled the yoke in)",
+      "subject": "the perimeter turret's gun housing on its own, floating free of any stand: NO U-shaped arms, NO yoke, NO pedestal, NO base and NO barrel: a boxy armoured SQUARE receiver about 0.9 metres long with bevelled edges, gunmetal with dark slate side panels, one small square amber status lamp on top, a square pivot boss on each side where it is held, a solid square barrel collar block on its front face (closed, NO hole), under the collar a small square laser emitter box with a flat amber lens (unlit), and a square ammunition and power cell box fixed to its left side"
     }
   ],
   "budgets": {

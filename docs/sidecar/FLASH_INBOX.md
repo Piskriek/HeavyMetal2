@@ -9,7 +9,7 @@ Only Opus adds jobs here. Flash changes only a job's status word. The old board 
   - **Sidecars** (Flash and Haiku) install and wire.
 - **The loop:**
   1. Watch this file. Wake when a job heading reads `## F-NN [OPEN] title`. If your own watching fails, `node scripts/sidecar-wait.mjs --job docs/sidecar/FLASH_INBOX.md` blocks until one opens (exit 0 prints the job; exit 3 after 10 minutes means run it again).
-  2. Take the job: change its heading from `[OPEN]` to `[TAKEN]`.
+  2. Take the job: change its heading from `[OPEN]` to `[HAIKU]`.
   3. Do the job's brief exactly.
   4. Report in `docs/sidecar/FLASH_OUTBOX.md`, then set the heading to `[DONE]`.
   5. Go back to step 1. Keep looping until the owner stops you.
@@ -80,6 +80,7 @@ Brief: `docs/prompts/sidecar/T02F2-early-stages.md`. Tufts on Low, machines and 
 Brief: `docs/prompts/sidecar/T02BE-coverage-water.md`. Start it only after F-07 is DONE. In play.tsx touch the loading step only (Haiku is on the E handler).
 
 ## F-09 [TAKEN] TICKET-02 P: performance pass, stage 6 on Low at 45 fps or more on the laptop
+> **Reassigned to Haiku by Opus, 2026-10-18 02:50:** Flash has made no change since 17:54 on 17 October. Haiku finishes from Flash's uncommitted work in progress (play-scene.ts, plot-ground.ts, plot-biome-view.ts, water-surfaces.ts, packages/groundshader). Flash: don't resume F-09; take F-10 when it is DONE.
 Brief: `docs/prompts/sidecar/T02P-performance-pass.md`. Measure per layer first; expensive looks go behind Graphics settings with Auto, never deleted.
 
 ## F-10 [OPEN] TICKET-05: square socket markers, gunmetal panels, sliding door, avatar at 3 m, beam core, outcrops

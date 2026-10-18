@@ -362,6 +362,11 @@
   border-color: rgba(0, 229, 255, 0.4);
   box-shadow: 0 0 12px rgba(0, 229, 255, 0.2);
 }
+.sync-badge.coop {
+  color: #7cff4d;
+  border-color: rgba(124, 255, 77, 0.45);
+  box-shadow: 0 0 12px rgba(124, 255, 77, 0.2);
+}
 .sync-badge.desynced {
   color: #ffb300;
   border-color: rgba(255, 179, 0, 0.4);

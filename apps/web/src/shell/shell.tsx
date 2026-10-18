@@ -384,6 +384,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
             leader={{ line: leaderLine, ring: leaderRing }}
             credits={profile.credits}
             onExpedition={() => { origin.current = 'home'; setPlaySyncMode('desynced'); go('play'); }}
+            onCredits={() => { origin.current = 'home'; setPlaySyncMode('desynced'); setPlayEntry({ kind: 'credits' }); go('play'); }}
             onGrid={toGrid}
             onStudio={() => { toStudio(); }}
             onCommunity={() => toHub()}

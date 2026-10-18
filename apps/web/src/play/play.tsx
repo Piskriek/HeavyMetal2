@@ -121,6 +121,8 @@ import {
   loadAudioSettings,
   type AudioSettings,
 } from '../audio/game-audio';
+import { CreditsDirector, OldMonitorJukeboxModal, isMonitorOverclockedPlaying, playMonitorOverclocked, stopMonitorOverclocked } from '../credits';
+import { CreditsPlayer } from '../credits/credits-player';
 import { fidelityRules, FIDELITY_LINE_IDS } from '@hm/narrator';
 import { HudZone, CompassRibbon, FloatsPill, MachineLabel, SyncWord } from '../base/ui/hud-zones';
 import {
@@ -268,10 +270,10 @@ function OutpostRoster({ session }: { readonly session: OutpostSession }) {
       role="group"
       aria-label="Outpost room"
       data-testid="play-roster"
-      style={{ position: 'absolute', top: 52, right: 175, zIndex: 40, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, fontFamily: 'Inter, system-ui, sans-serif', fontSize: 11, color: '#e2e8f0' }}
+      style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 5, fontFamily: 'Inter, system-ui, sans-serif', fontSize: 11, color: '#e2e8f0', pointerEvents: 'auto' }}
     >
       <span data-testid="play-roster-code">Room {session.code ?? '------'}, {LINK_TEXT[link] ?? link}</span>
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' }}>
+      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-start', maxWidth: 300 }}>
         {roster.map((p) => (
           <li key={p.id} data-testid="play-roster-chip" style={{ padding: '3px 8px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(6,10,18,0.78)' }}>
             <b style={{ fontWeight: 600 }}>{p.name}</b>{' '}
@@ -335,7 +337,14 @@ const CONTROLS: readonly [string, string][] = [
 ];
 
 /** Where the shell sends the player in: a visit dials a plot code; a spawn puts the player in the lab or at the moon gate (TICKET-08a). */
-export type PlayEntry = { readonly kind: 'visit'; readonly code: string } | { readonly kind: 'spawn'; readonly where: 'lab' | 'gate' };
+/** TICKET-14: a credits run on this screen, and where it started (the title's Ending Credits item, or the old monitor). */
+interface CreditsRun { readonly from: 'title' | 'lab'; readonly director: CreditsDirector }
+/** Where the player stood when the credits began, so Esc puts them back there. */
+interface CreditsSave { readonly where: 'lab' | 'planet'; readonly x: number; readonly z: number; readonly yaw: number; readonly stage: number }
+/** The old monitor's place in the lab (lab metres), for the overclocked track's speaker. */
+const OLD_MONITOR_AT = { x: 7.68, y: 1.0, z: -8.6 } as const;
+
+export type PlayEntry = { readonly kind: 'visit'; readonly code: string } | { readonly kind: 'spawn'; readonly where: 'lab' | 'gate' } | { readonly kind: 'credits' };
 
 export function PlayScreen(props: {
   readonly profile: Profile;
@@ -365,6 +374,81 @@ export function PlayScreen(props: {
   const [building, setBuilding] = useState<MachineKind | null>(null);
   const [hud, setHud] = useState<Hud>({ where: 'lab', sync: 1, inDome: false, warn: false, atLever: false, atDial: false, ghost: null, aimed: null, aimedBoulder: null, aimedLab: null, aimedProp: null, plot: NO_PLOT, visitingOwner: null, atArmory: false });
   const firstGatherRef = useRef(false);
+
+  // TICKET-14: the credits video. The title's Ending Credits item starts it here, and so does the old monitor's replay.
+  // One director per screen. The frame loop steps it before the scene draws; Esc ends it.
+  const [creditsRun, setCreditsRun] = useState<CreditsRun | null>(null);
+  const creditsRef = useRef<CreditsRun | null>(null);
+  const creditsDirectorRef = useRef<CreditsDirector | null>(null);
+  const creditsSaveRef = useRef<CreditsSave | null>(null);
+  const startCreditsRef = useRef<((from: CreditsRun['from']) => void) | null>(null);
+  const [jukeboxOpen, setJukeboxOpen] = useState(false);
+  const jukeboxRef = useRef(false);
+  jukeboxRef.current = jukeboxOpen;
+  /** The credits' director, made once per screen. Its three tracks are read in the background, so a replay starts at once. */
+  const prepareCredits = (): CreditsDirector | null => {
+    const scene = sceneRef.current;
+    if (!scene) return null;
+    const director = creditsDirectorRef.current ?? new CreditsDirector(scene.debug.camera(), {}, scene);
+    creditsDirectorRef.current = director;
+    void director.loadAssets();
+    return director;
+  };
+  const startCredits = (from: CreditsRun['from']): void => {
+    if (creditsRef.current) return;
+    const scene = sceneRef.current;
+    if (!scene) return;
+    const director = prepareCredits();
+    if (!director) return;
+    director.setSceneTarget(scene);
+    // where the player stands now: Esc puts them back here
+    const at = scene.debug.position();
+    creditsSaveRef.current = { where: scene.debug.where() === 'planet' ? 'planet' : 'lab', x: at.x, z: at.z, yaw: scene.debug.facing(), stage: stateRef.current.plot.stage };
+    const run: CreditsRun = { from, director };
+    creditsRef.current = run;
+    setCreditsRun(run);
+    setJukeboxOpen(false);
+    document.exitPointerLock?.();
+    gameAudio.setMusicContext('silent');
+    (window as unknown as { __creditsDirector?: CreditsDirector }).__creditsDirector = director;
+    void director.loadAssets().then(() => {
+      if (creditsRef.current === run) director.start(false);
+    });
+  };
+  startCreditsRef.current = startCredits;
+  const stopCredits = (): void => {
+    const run = creditsRef.current;
+    if (!run) return;
+    run.director.stop();
+    creditsRef.current = null;
+    setCreditsRun(null);
+    const scene = sceneRef.current;
+    const save = creditsSaveRef.current;
+    if (scene && save) {
+      scene.setBeamHeld(false, 'extract');
+      scene.setBeamSealing(false);
+      scene.setBeamFiring(false);
+      scene.setFidelityStage(stateRef.current.plot.stage);
+      scene.setCameraView(props.profile.cameraView ?? 'first');
+      scene.debug.teleport(save.where, save.x, save.z, save.yaw);
+    }
+    gameAudio.setMusicContext(save?.where === 'planet' ? 'moon' : 'lab');
+    if (run.from === 'title') props.onBack();
+  };
+  const replayCredits = (): void => {
+    creditsRef.current?.director.start(false);
+  };
+  const toggleMonitorOverclocked = (): void => {
+    if (isMonitorOverclockedPlaying()) {
+      stopMonitorOverclocked();
+      say('Monitor', 'The overclocked track is off.');
+      return;
+    }
+    void playMonitorOverclocked(OLD_MONITOR_AT).then((ok) => {
+      if (!ok) say('Monitor', 'No sound on this device.');
+    });
+    say('Monitor', 'Four Floats (Overclocked), through the lab monitor.');
+  };
 
   // TASK-11 Mentor Narration Controller & UI
   // The radio log belongs to the profile's one save. It was keyed by the avatar's name, which is only known after the
@@ -1504,6 +1588,10 @@ useEffect(() => {
     if (!ready || !props.entry || entryDone.current) return;
     entryDone.current = true;
     const entry = props.entry;
+    if (entry.kind === 'credits') {
+      startCreditsRef.current?.('title');
+      return;
+    }
     if (entry.kind === 'visit') {
       const r = dialRef.current?.(entry.code) ?? { ok: false, why: 'The lab is not ready.' };
       if (!r.ok) say('Visit refused', r.why ?? 'That code could not be dialed.');
@@ -2228,7 +2316,7 @@ useEffect(() => {
 
       // 9. Throttled auto-save
       persistBaseWorld(false);
-      const live = !pausedRef.current && stateRef.current.step !== 'create';
+      const live = !pausedRef.current && stateRef.current.step !== 'create' && creditsRef.current === null;
       // the governor judges only the frames you play (the creator draws its own turntable over the lab)
       const next = live ? adaptive.frame(frameMs) : null;
       if (next) {
@@ -2238,6 +2326,9 @@ useEffect(() => {
         noteTier(next);
         hook.tier = next;
       }
+      // TICKET-14: while the credits play, the video drives the camera and the scene's looks before the frame is drawn
+      const creditsNow = creditsRef.current;
+      if (creditsNow?.director.isActive()) creditsNow.director.stepAtTime(undefined, dt);
       const isAltCam = keys.has('AltLeft') || keys.has('AltRight');
       const flyUp = (keys.has('Space') ? 1 : 0) - (keys.has('ControlLeft') || keys.has('ControlRight') ? 1 : 0);
       const axis = (a: string[], b: string[]) => (a.some((k) => keys.has(k)) ? 1 : 0) - (b.some((k) => keys.has(k)) ? 1 : 0);
@@ -3092,6 +3183,18 @@ useEffect(() => {
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (!ready || creating) return;
+      // TICKET-14: while the credits play, their own listener takes Esc (it ends them); the old monitor's jukebox closes on Esc
+      if (creditsRef.current) return;
+      if (jukeboxRef.current) {
+        if (e.code === 'Escape') setJukeboxOpen(false);
+        return;
+      }
+      if (e.code === 'KeyJ' && hud.aimedProp?.id === 'old-monitor' && liveWhereRef.current === 'lab') {
+        prepareCredits();
+        setJukeboxOpen(true);
+        document.exitPointerLock?.();
+        return;
+      }
       if (e.code === 'Escape') {
         // the debug menu closes first, back to the pause menu it opened from
         if (debugOpen) { setDebugOpen(false); return; }
@@ -3127,6 +3230,11 @@ useEffect(() => {
           });
           return;
         }
+      }
+      // TICKET-14: R at the old monitor plays the overclocked track through its speaker (the equaliser lights up)
+      if (e.code === 'KeyR' && hud.aimedProp?.id === 'old-monitor' && liveWhereRef.current === 'lab' && !beamHeldRef.current && !sceneRef.current?.monsters.isEquipped()) {
+        toggleMonitorOverclocked();
+        return;
       }
       if (e.code === 'KeyR') {
         if (beamHeldRef.current) { reloadBeam(); return; }
@@ -3666,7 +3774,18 @@ useEffect(() => {
     : '';
 
   return (
-    <div data-hud-root data-fidelity={skinTrack.skin} className={`play${ready ? ' ready' : ''}${hud.where === 'planet' ? ' on-planet' : ''}${hud.sync < 0.3 && hud.where === 'planet' ? ' sync-low' : ''}${skinGlitch ? ' hud-glitch' : ''}`}>
+    <div data-hud-root={creditsRun ? undefined : true} data-fidelity={skinTrack.skin} className={`play${ready ? ' ready' : ''}${hud.where === 'planet' ? ' on-planet' : ''}${hud.sync < 0.3 && hud.where === 'planet' ? ' sync-low' : ''}${skinGlitch ? ' hud-glitch' : ''}${creditsRun ? ' credits-on' : ''}`}>
+      {creditsRun ? <CreditsPlayer director={creditsRun.director} onExit={stopCredits} onReplay={replayCredits} /> : null}
+      {jukeboxOpen && !creditsRun ? (
+        <OldMonitorJukeboxModal
+          open
+          overclockedPlaying={isMonitorOverclockedPlaying()}
+          elapsedSec={performance.now() / 1000}
+          onPlayCredits={() => { setJukeboxOpen(false); startCredits('lab'); }}
+          onPlayOverclocked={toggleMonitorOverclocked}
+          onClose={() => setJukeboxOpen(false)}
+        />
+      ) : null}
       {failed ? <p className="play-failed" role="alert">This browser could not start 3D graphics (WebGL 2). Try another browser, or turn on hardware acceleration in its settings.</p> : <canvas ref={canvasRef} className="play-canvas" onClick={() => { if (ready && !creating && !locked) lock(); }} aria-label="The lab, in first person. Click to look around." />}
       {!ready && !failed ? <div className="gr-loading play-loading" role="status"><span>{loading}</span><i /></div> : null}
 
@@ -3685,26 +3804,35 @@ useEffect(() => {
             stage={hud.plot.stage}
             floats={METRICS.map((m) => ({ key: m, name: METRIC_NAME[m], colour: METRIC_COLOUR[m], value: hud.plot.levels[m] }))}
           />
-        <div className="play-sync-indicator" data-hud-zone="top-right" title={syncMode === 'synced' ? 'Connected to shared 40,000 km planetary substrate' : 'Playing on private local simulation branch'}>
-          <span className={`sync-badge ${syncMode}`}>
-            <span className="sync-pulse" />
-            {syncMode === 'synced' ? 'GRID SYNCED' : 'SOLO DESYNCED'}
-          </span>
-          <button
-            className="sync-branch-toggle"
-            onClick={() => {
-              const next = syncMode === 'synced' ? 'desynced' : 'synced';
-              setSyncMode(next);
-              say(
-                next === 'synced' ? 'Synced with Planetary Grid' : 'Desynced to Solo Branch',
-                next === 'synced' ? 'Majority consensus active on Sector 4.' : 'Playing solo offline.',
-              );
-            }}
-          >
-            {syncMode === 'synced' ? 'Desync' : 'Sync'}
-          </button>
+        {/* In a co-op room the badge names the session, and the branch toggle is gone: the room is the grid (TICKET-11). */}
+        <div className="play-sync-indicator" data-hud-zone="top-right" title={outpostRef.current ? `Co-op room ${outpostRef.current.code ?? ''}: the room's world is shared with everyone in it` : syncMode === 'synced' ? 'Connected to shared 40,000 km planetary substrate' : 'Playing on private local simulation branch'}>
+          {outpostRef.current ? (
+            <span className="sync-badge coop" data-testid="play-coop-badge">
+              <span className="sync-pulse" />
+              CO-OP · room {outpostRef.current.code ?? '------'}
+            </span>
+          ) : (
+            <>
+              <span className={`sync-badge ${syncMode}`}>
+                <span className="sync-pulse" />
+                {syncMode === 'synced' ? 'GRID SYNCED' : 'SOLO DESYNCED'}
+              </span>
+              <button
+                className="sync-branch-toggle"
+                onClick={() => {
+                  const next = syncMode === 'synced' ? 'desynced' : 'synced';
+                  setSyncMode(next);
+                  say(
+                    next === 'synced' ? 'Synced with Planetary Grid' : 'Desynced to Solo Branch',
+                    next === 'synced' ? 'Majority consensus active on Sector 4.' : 'Playing solo offline.',
+                  );
+                }}
+              >
+                {syncMode === 'synced' ? 'Desync' : 'Sync'}
+              </button>
+            </>
+          )}
         </div>
-        {outpostRef.current ? <OutpostRoster session={outpostRef.current} /> : null}
         </HudZone>
       ) : null}
 
@@ -3731,6 +3859,8 @@ useEffect(() => {
               <p>{visiting ? 'Read-only visit. Walk back through the gate to return to your lab.' : goal.hint}</p>
               {chainNext ? <small className="play-next">Next: {chainNext}</small> : null}
             </section>
+            {/* The co-op room's chip sits under the quest card, in the top-left zone: the stage metrics keep the top-right */}
+            {outpostRef.current ? <OutpostRoster session={outpostRef.current} /> : null}
             </HudZone>
           )}
           {hud.where === 'planet' && drivingSpeed === null ? (

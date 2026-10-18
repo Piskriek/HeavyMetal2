@@ -1,0 +1,75 @@
+/* The credits video's HUD (TICKET-14). The root is `.play.credits-hud` with data-fidelity set to the chapter's skin, so the
+ * skin tokens in base/ui/hud-zones.css apply here too. The cards take their look from those tokens (the same vocabulary as
+ * the play HUD), and the roll sits in the right third, clear of the lyric pill on the left. */
+
+.credits-hud {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: auto;
+  overflow: hidden;
+  color: var(--hud-text);
+  font-family: var(--hud-font-body);
+}
+
+/* play.css paints every `.play[data-hud-root]` as a solid black, absolute panel; the credits root is that element too, and it
+ * must stay see-through so the 3D picture shows behind the cards. */
+.play.credits-hud[data-hud-root] {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+}
+
+.credits-card {
+  background: var(--hud-bg);
+  -webkit-backdrop-filter: var(--hud-backdrop);
+  backdrop-filter: var(--hud-backdrop);
+  border: var(--hud-border);
+  border-radius: var(--hud-radius);
+  box-shadow: var(--hud-shadow);
+  color: var(--hud-text);
+  font-family: var(--hud-font-body);
+}
+
+.credits-card button {
+  font-family: var(--hud-font-display);
+  color: var(--hud-text);
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: var(--hud-radius);
+}
+
+.credits-card button:hover,
+.credits-card button:focus-visible {
+  background: var(--hud-c-aq);
+  color: #05070a;
+  outline: none;
+}
+
+.credits-skin-shift {
+  animation: credits-skin-shift 120ms steps(3, end) 1;
+}
+
+@keyframes credits-skin-shift {
+  0% { transform: translateX(-3px); filter: contrast(1.6); }
+  50% { transform: translateX(2px); filter: invert(1); }
+  100% { transform: none; filter: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .credits-skin-shift { animation: none; }
+}
+
+.credits-jukebox {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, calc(100vw - 32px));
+  padding: 20px 24px;
+  z-index: 45;
+}
+
+.play.credits-on > *:not(canvas):not(.credits-hud) {
+  display: none !important;
+}

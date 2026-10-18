@@ -48,6 +48,7 @@ import { operatorConsole as consoleMillOperatorConsole } from '@hm/consolemill';
 import { type GenLevel, genLevelFor, getGenSync, loadGen } from '../assets/gen';
 import { createLabVista, VISTA_LEVEL, type LabVista, type WindowView } from './lab-vista';
 import { CLUTTER, CLUTTER_MODELS, type ClutterItem } from './lab-clutter';
+import { createMonitorEqualizer3D, isMonitorOverclockedPlaying, type MonitorEqualizer3D } from '../credits/monitor-jukebox';
 import { coilLevels, darkStrobe, POWER_OFF, strobeSweepZ, type Power } from './lab-power';
 import { overhangBoxes, type Bounds3D } from './static-colliders';
 export {
@@ -1008,6 +1009,8 @@ export function createLabRoom(o: {
   // the clutter fallbacks' one material: their parts' colours are vertex colours (see the loop)
   const clutterFallbackMat = keep(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.25 }));
   discGeo.rotateX(-Math.PI / 2);
+  // TICKET-14: the old monitor's 4-bar equaliser (lit while the overclocked track plays), mounted on its screen
+  let monitorEq: MonitorEqualizer3D | null = null;
   for (const item of CLUTTER) {
     // POL-103: the filing cabinet (LOG-03) leaves the East-wall gap between the Hardware Fabricator (z = -1.35) and the Armory,
     // where its plain box read as a grey block on the wall, and stands on the South wall beside Dr. Haddy's desk, facing north.
@@ -1044,6 +1047,11 @@ export function createLabRoom(o: {
     const prop: Prop = { group: new THREE.Group(), colliders: [{ min: [-item.w / 2, 0, -item.d / 2], max: [item.w / 2, item.h, item.d / 2] }], sockets: [], lamps: [] };
     prop.group.add(stand);
     prop.group.userData.clutterId = item.id;
+    if (item.id === 'old-monitor') {
+      monitorEq = createMonitorEqualizer3D(prop.group);
+      // on the screen plane, a couple of centimetres proud of the glass
+      monitorEq.group.position.set(0, 0.33, 0.25);
+    }
     const before = colliders.length;
     place(prop, placedX, placedZ, placedYaw, 0);
     const disc = new THREE.Mesh(discGeo, keep(new THREE.MeshBasicMaterial({ color: '#ffc13d', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })));
@@ -1055,7 +1063,8 @@ export function createLabRoom(o: {
       const gen = genFor(item.model);
       if (!gen) return false;
       groundModelAt(gen, 0);
-      replaceVisual(prop.group, gen);
+      // the monitor's equaliser stays on the swapped model's screen
+      replaceVisual(prop.group, gen, item.id === 'old-monitor' && monitorEq ? [monitorEq.group] : []);
       return true;
     });
   }
@@ -1386,6 +1395,10 @@ export function createLabRoom(o: {
       stormUniforms.uTime.value = now;
       vista.update(now, dt);
       tickClutter(dt);
+      if (monitorEq) {
+        monitorEq.setActive(isMonitorOverclockedPlaying());
+        monitorEq.update(now);
+      }
       // desk.lever carries the play scene's full throw; the swing takes back all but the travel (the swing sits inside desk.lever)
       leverSwing.rotation.x = desk.lever.rotation.x * (LEVER_TRAVEL / LEVER_THROW - 1);
       for (const rig of machineRigs) {

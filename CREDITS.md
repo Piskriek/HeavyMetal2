@@ -1,6 +1,38 @@
-# Credits & Third-Party Attributions
+# FIDELITY: THE SETMIX MULTIVERSE — Credits & Third-Party Attributions
 
 This project uses and supports open-source assets and community creations under permissive and Creative Commons licenses.
+The in-game credits video (TICKET-14) reads from the same lists: what this file says is what the game shows.
+
+---
+
+## Core Team & Direction
+
+- **Created & Directed By:** Francois (`Piskriek`): original concept, world constitution, four-float architecture & direction
+- **Creative Lead & PM:** Gemini Argo: art direction, the stage look bible, lore expansion, audio & UX plans
+- **Engineering Lead & Architect:** Claude Opus: core engine, pure simulation packages, shader pipeline, asset bake & tooling
+- **Implementation Sidecars:** Claude Haiku sidecar fleet: sequential brief execution & verification
+- **Pure-Package Code Battles:** Arena.ai contestants: pure TypeScript simulation & math modules
+- **Early Prototype Scaffolding:** Gemini Flash
+
+---
+
+## Voice & Original Music
+
+- **"Dr. Gwen Haddy" Voiceover:** generated via the RUN.world voice pipeline, radio DSP chain & Web Audio synth
+- **Ending Theme: "Four Floats" (v4b @ 144 BPM) & "Four Floats (Overclocked)":**
+  - **Lyrics & Story:** Gemini Argo & Claude Opus
+  - **Music generation:** RUN.world (ElevenLabs)
+  - **Instrumental chorus loop:** Demucs & `scripts/music-outro.py` (`levels.json` loop bounds `13.328957 s .. 26.657914 s`)
+  - **Procedural chiptune synth:** `@hm/musicbox`
+
+---
+
+## 3D Generation & Bake Pipeline
+
+- **Concept sheets & multi-view plates:** RUN.world image generation
+- **Armoured astronaut character ("Astro"):** Meshy.ai 3D generation & rigging
+- **3D mesh synthesis:** local Hunyuan3D 2.1 pipeline
+- **Automated LOD & de-metalled baking:** Blender 5.2 headless bake pipeline (`low.glb` / `mid.glb` / `high.glb`)
 
 ---
 
@@ -20,3 +52,25 @@ This project uses and supports open-source assets and community creations under 
 - **Author / Source**: Adobe Mixamo (mixamo.com)
 - **Usage**: Character animation clips (`anims.bin`), fitted at load time to Astro's rig. Astro's own walk and run come with its model.
 
+---
+
+## Open-Source & Legal Asset Attributions
+
+### 2D archive sprites & retro audio lumps
+- **Freedoom Project** — BSD-3-Clause License (`https://freedoom.github.io/`)
+- **Blasphemer Project** — BSD-3-Clause License (`https://github.com/Blasphemer/blasphemer`)
+
+### Early-3D vertex-morphed monster meshes
+- **LibreQuake Project** — BSD-3-Clause License (`https://github.com/MissLav/LibreQuake`)
+
+### Rigged 3D low-poly monster & prop meshes
+- **Quaternius** — CC0 1.0 Public Domain (`https://quaternius.com/`)
+
+### Rendering & runtime engine
+- **three.js** — MIT License (`https://threejs.org/`)
+- **React** — MIT License (`https://react.dev/`)
+
+### Typography (`POL-41`)
+- **Oxanium** — Copyright (c) Severin Meyer, SIL Open Font License 1.1 (loaded from Google Fonts: the HUD's display face)
+- **Inter** — Copyright (c) Rasmus Andersson, SIL Open Font License 1.1 (loaded from Google Fonts: the HUD's body face)
+- **FidelityPixel5x7** — the HUD's pixel face for skins `0a`, `0b` and `1`. It is FIDELITY's own 5x7 ASCII bitmap font: every glyph is drawn for this game, and `scripts/build-pixel-font.mjs` generates it (no third-party outlines). Its name table carries the project's own copyright record. The earlier embedded subset, which claimed the names 'Share Tech Mono' and 'VT323', had no copyright or licence record, so it was not shipped.

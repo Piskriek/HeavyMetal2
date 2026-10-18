@@ -3,6 +3,7 @@
 // play root as data-fidelity, and every zone takes its look from the CSS variables that skin defines.
 import type { CSSProperties, ReactElement, ReactNode } from 'react';
 import './hud-zones.css';
+import './pixel-font.css';
 import type { HudZone as Zone } from './hud-zones-logic';
 
 /** A zone's anchor. It has no data attribute of its own: its overlays do. */

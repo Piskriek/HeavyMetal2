@@ -65,7 +65,8 @@ export type MenuId =
   | 'racing'
   | 'play'
   | 'island'
-  | 'avatars';
+  | 'avatars'
+  | 'credits';
 
 export interface MenuItem {
   readonly id: MenuId;
@@ -80,6 +81,7 @@ const FIDELITY_MENU: readonly MenuItem[] = [
   { id: 'studio', label: 'The Studio', says: 'In-engine world & schema editor. Terrain sculpting, machine placement & test drive.', badge: 'EDITOR' },
   { id: 'community', label: 'Community Nexus', says: 'Share presets, bridge cartridges, and sector layouts.' },
   { id: 'settings', label: 'Diagnostics & Settings', says: 'Fidelity stages, Bayer dither, raw input, audio & hardware.' },
+  { id: 'credits', label: 'Ending Credits', says: 'Real-time in-engine music video: "Four Floats" (v4b @ 144 BPM).', badge: '144 BPM' },
 ];
 
 const RACING_ITEM: MenuItem = { id: 'racing', label: 'Goblin Racing', says: 'Race goblins in glass balls round an island.' };
@@ -105,6 +107,8 @@ export function SetMixHome(props: {
   readonly onStudio?: () => void;
   readonly onCommunity: () => void;
   readonly onSettings: () => void;
+  /** The title's Ending Credits item: the video plays in the play screen (TICKET-14). */
+  readonly onCredits?: () => void;
   readonly credits: number;
   // Compatibility props:
   readonly onPlay?: () => void;
@@ -126,6 +130,7 @@ export function SetMixHome(props: {
     studio: props.onStudio,
     community: props.onCommunity,
     settings: props.onSettings,
+    credits: props.onCredits,
     racing: props.onGoblin,
     avatars: props.onAvatars,
   };

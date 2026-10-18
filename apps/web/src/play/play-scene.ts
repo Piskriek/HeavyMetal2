@@ -21,7 +21,7 @@ import { preloadVista, VISTA_LEVEL, type WindowView } from './lab-vista';
 import { createPlotHolo, type PlotHolo } from './plot-holo';
 import { COLOUR_MARK_FRAGMENT, localMachineWaveAt, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_OFF_FRAGMENT, OPENING_OFF_VERTEX, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX, scanRingFadeAt, waveBandColourFor } from './portal-shaders';
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
-import { disposeProp, FEED_CUBES_FULL, feedCubeCount, feedCubeProgress, lineSpan, machinePlumeCount, machinePlumeLook, machinePlumeSpec, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
+import { disposeProp, FABRICATOR_PLUME, FABRICATOR_VENT, FEED_CUBES_FULL, feedCubeCount, feedCubeProgress, lineSpan, machinePlumeCount, machinePlumeCountOf, machinePlumeLook, machinePlumeLookOf, machinePlumeSpec, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
 import { beadSpeed, spanPoint, spanSag } from './brownout-visual';
 import { castHeightfield, castSpheres, createRoverArmState, nearestHit, stepRoverArm, type CastSphere, type RoverArmState, type Vec3 as RoverVec3 } from './rover-camera';
 import { createExposureState, createScanWave, exposureTargetLuminance, gateOrLabFactor, markScanWaveDone, scanFrame, stepExposure, suitCamMix, suitCamProfile, suitCamStrength, triggerScanWave, type ExposureState, type ScanWave, type SuitCamSetting } from './stage-look';
@@ -359,6 +359,8 @@ export interface PlayScene {
     machines(): { readonly standing: number; readonly pouring: number };
     /** Each machine's pour (ARGO_NOTE_08): its kind, whether its emitter is up, its pixel count now, its colour, its vent and its feed cubes. */
     plumes(): readonly { readonly kind: string; readonly emitting: boolean; readonly pour: number; readonly colour: string; readonly base: readonly [number, number]; readonly vent: readonly [number, number, number] | null; readonly feed: readonly [number, number, number] | null; readonly feedCubes: number }[];
+    /** Each base fabricator: its print state, whether its plume is up, its pixels now, and its vent in the world. */
+    fabricators(): readonly { readonly id: number; readonly printing: boolean; readonly emitting: boolean; readonly pour: number; readonly vent: readonly [number, number, number] }[];
     holo(): { readonly visible: boolean; readonly machines: number };
     view(): 'first' | 'third';
     clipWeight(name: ClipName): number;
@@ -595,11 +597,15 @@ export function createPlayScene(o: {
     wheelAngle: number;
   }
 
+  /** emitter: the fabricator's plume while it prints; pour: its pixels now; vent: its exhaust, in the world. */
   interface FabricatorView {
     id: number;
     group: THREE.Group;
     station: FabricatorStationMesh;
     printing: boolean;
+    emitter: number | null;
+    pour: number;
+    vent: THREE.Vector3;
   }
 
   const vehicleViews = new Map<number, VehicleView>();
@@ -685,6 +691,23 @@ export function createPlayScene(o: {
 
   let scheduleBiomeRebuild: () => void = () => {};
 
+  /** A base fabricator pours while it prints: printing is operating, so the print state alone turns the pour on and off. It has no
+   *  row in ARGO_NOTE_08, so it pours FABRICATOR_PLUME (neutral, for Argo to name), from its station's vent (machine-props.ts). */
+  const syncFabricatorPlume = (view: FabricatorView): void => {
+    view.group.updateMatrixWorld(true);
+    const vent = new THREE.Vector3(...FABRICATOR_VENT).applyMatrix4(view.group.matrixWorld);
+    view.vent = vent;
+    if (view.printing && view.emitter === null) {
+      view.emitter = plume.add({
+        at: [vent.x, vent.y, vent.z], colour: FABRICATOR_PLUME.colour, ...machinePlumeLookOf(FABRICATOR_PLUME),
+        count: machinePlumeCountOf(FABRICATOR_PLUME, 1, clock), startAt: clock + 0.6,
+      });
+    } else if (!view.printing && view.emitter !== null) {
+      plume.remove(view.emitter);
+      view.emitter = null;
+      view.pour = 0;
+    }
+  };
   function setFabricators(list: readonly { readonly id: number; readonly x: number; readonly z: number; readonly yaw: number; readonly printing: boolean }[]): void {
     lastFabricatorsList = list;
     const keepIds = new Set<number>();
@@ -697,16 +720,18 @@ export function createPlayScene(o: {
         station.group.position.set(f.x, groundAt(f.x, f.z), f.z);
         station.group.rotation.set(0, f.yaw, 0);
         fabricatorsGroup.add(station.group);
-        view = { id: f.id, group: station.group, station, printing: f.printing };
+        view = { id: f.id, group: station.group, station, printing: f.printing, emitter: null, pour: 0, vent: new THREE.Vector3() };
         fabricatorViews.set(f.id, view);
       } else {
         view.printing = f.printing;
         view.group.position.set(f.x, groundAt(f.x, f.z), f.z);
         view.group.rotation.set(0, f.yaw, 0);
       }
+      syncFabricatorPlume(view);
     }
     for (const [id, view] of fabricatorViews.entries()) {
       if (!keepIds.has(id)) {
+        if (view.emitter !== null) plume.remove(view.emitter);
         fabricatorsGroup.remove(view.group);
         fabricatorViews.delete(id);
       }
@@ -831,6 +856,9 @@ export function createPlayScene(o: {
   /** Each frame: every pour's pixel count (one number from machine-props: rate x life x run share x cadence, T15 multiplies it by the beat)
    *  and every feed hopper's cubes. */
   const tickMachinePlumes = (t: number): void => {
+    for (const f of fabricatorViews.values()) {
+      if (f.emitter !== null) { f.pour = machinePlumeCountOf(FABRICATOR_PLUME, 1, t); plume.setCount(f.emitter, f.pour); }
+    }
     let i = 0;
     let live = 0;
     for (const v of views.values()) {
@@ -1064,6 +1092,7 @@ export function createPlayScene(o: {
 
     if (lastFabricatorsList.length > 0) {
       for (const [id, view] of fabricatorViews.entries()) {
+        if (view.emitter !== null) plume.remove(view.emitter);
         fabricatorsGroup.remove(view.group);
         fabricatorViews.delete(id);
       }
@@ -3493,6 +3522,9 @@ export function createPlayScene(o: {
       gatePlanet: () => ({ x: twin.group.position.x, z: twin.group.position.z }),
       detail: () => ({ ...detail, planet: [postUniforms.uRes.value.x, postUniforms.uRes.value.y] as const, pixels: plume.stats().pixels }),
       machines: () => { let pouring = 0; for (const v of views.values()) if (v.emitter !== null) pouring++; return { standing: views.size, pouring }; },
+      fabricators: () => [...fabricatorViews.values()].map((f) => ({
+        id: f.id, printing: f.printing, emitting: f.emitter !== null, pour: f.pour, vent: [f.vent.x, f.vent.y, f.vent.z] as const,
+      })),
       plumes: () => [...views.values()].map((v) => ({
         kind: v.m.kind,
         emitting: v.emitter !== null,
@@ -3649,6 +3681,7 @@ export function createPlayScene(o: {
       }
       vehicleViews.clear();
       for (const f of fabricatorViews.values()) {
+        if (f.emitter !== null) plume.remove(f.emitter);
         fabricatorsGroup.remove(f.group);
       }
       fabricatorViews.clear();

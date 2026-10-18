@@ -152,20 +152,55 @@ export interface PlumeEmitterLook {
 }
 
 /** The look of a kind's pour: the rise is speed x lifetime x 0.6 (the plume eases out), its spread is the cone's width at that height. */
-export function machinePlumeLook(kind: MachineKind): PlumeEmitterLook {
-  const s = MACHINE_PLUME_SPECS[kind];
+export function machinePlumeLookOf(s: MachinePlumeSpec): PlumeEmitterLook {
   const height = s.speed * s.lifetime * 0.6;
   return { height, spread: 2 * height * Math.tan(s.spread), life: s.lifetime, size: s.pixelSize };
 }
+
+export function machinePlumeLook(kind: MachineKind): PlumeEmitterLook {
+  return machinePlumeLookOf(MACHINE_PLUME_SPECS[kind]);
+}
+
+/**
+ * The base fabricator is not in ARGO_NOTE_08. Until Argo names its plume, it pours this neutral look (the mill's rhythm, in a
+ * warm white) while it prints: printing is operating, so the pour follows the print state alone.
+ */
+export const FABRICATOR_PLUME: MachinePlumeSpec = {
+  colour: '#e6e9ee', rate: 28, speed: 2.2, spread: 0.22, pixelSize: 0.11, gravity: -0.4, lifetime: 1.8, cadence: 'continuous',
+};
+
+/**
+ * The fabricator's exhaust vent, in its station's frame (the frame stands on the 0.78 m ring). Found from renders of the model
+ * (front and side, the shots of the T03P follow-up): the top of the frame, at the back, clear of the gantry beam.
+ */
+export const FABRICATOR_VENT: readonly [number, number, number] = [0, RING_TOP_Y + 5.0, -2.4];
 
 /**
  * THE one number a kind's emitter pours: its steady count of live pixels (rate x lifetime at full run), times its run share
  * (0 when it does not operate, the plume's own tenths), times its cadence at time t. T15 multiplies this by the beat pulse.
  */
-export function machinePlumeCount(kind: MachineKind, run: number, t: number): number {
-  const s = MACHINE_PLUME_SPECS[kind];
+export function machinePlumeCountOf(s: MachinePlumeSpec, run: number, t: number): number {
   return Math.round(s.rate * s.lifetime * plumeShare(run) * plumeCadenceMultiplier(s.cadence, t));
 }
+
+export function machinePlumeCount(kind: MachineKind, run: number, t: number): number {
+  return machinePlumeCountOf(MACHINE_PLUME_SPECS[kind], run, t);
+}
+
+/**
+ * The feed hoppers of the generated meshes, in each asset's own frame: the sockets the asset registry (apps/web/src/assets/gen/
+ * registry.json) measures on each model, checked against close shots (T03P follow-up). Each mesh's origin is its base, so a
+ * hardpoint machine adds the ring height. The old raycast from the side missed the funnels: it landed on the tank top.
+ */
+const GEN_FEED: Readonly<Record<'mill' | 'press' | 'water', readonly [number, number, number]>> = {
+  mill: [0, 4.16, 0],
+  press: [0, 4.26, 0],
+  water: [3.05, 1.6, 0],
+};
+const genFeed = (which: keyof typeof GEN_FEED, base: number): THREE.Vector3 => {
+  const [x, y, z] = GEN_FEED[which];
+  return new THREE.Vector3(x, y + base, z);
+};
 
 /** Ore cubes falling into a feed hopper: at most this many at full run, one drop cycle takes FEED_DROP_SEC. */
 export const FEED_CUBES_FULL = 4;
@@ -330,10 +365,10 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
         const isHeavy = kind === 'heavy-mill';
         if (isHeavy) gen.position.copy(lift);
         group.add(gen);
-        // sheet 12: the ore goes in at the front hopper, the pixels come out of the rear stack (the power cable is at the rear)
+        // the ore goes in at the top hopper (genFeed: the asset's measured socket); the pixels come out of the rear stack (the power cable is at the rear)
         const base = isHeavy ? RING_TOP_Y : 0;
         const vent = findMachineVent(gen, base, 0, -0.6);
-        const feed = findMachineVent(gen, base, 0, 0.6);
+        const feed = genFeed('mill', base);
         const power = new THREE.Vector3(0, base + 0.2, -1.8);
         return {
           group,
@@ -384,7 +419,7 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
         group.add(ram1, ram2);
         // sheet 12: rock in at the side tray, pixels out of the rear vent
         const vent = findMachineVent(group, baseY, 0, -0.5);
-        const feed = findMachineVent(group, baseY, 0.9, 0);
+        const feed = genFeed('press', baseY);
         const power = new THREE.Vector3(0, baseY + 0.2, 0.8);
         return {
           group,
@@ -494,7 +529,7 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
         group.add(gen);
         // sheet 12: the ore comes in at the side screw, the cyan pixels out of the top-rear vent
         const vent = findMachineVent(gen, baseY, 0, -0.6);
-        const feed = findMachineVent(gen, baseY, 0.9, 0);
+        const feed = genFeed('water', baseY);
         const power = new THREE.Vector3(0, baseY + 0.2, 0.8);
         return {
           group,

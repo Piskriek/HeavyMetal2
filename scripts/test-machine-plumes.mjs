@@ -245,6 +245,38 @@ try {
   check('putting the run back restarts the mill', !placed.mill || (back.mill?.emitting && back.mill.pour > 0));
   check('putting the run back restarts every machine', Object.keys(placed).every((k) => back[k]?.emitting));
 
+  // the base fabricator (T03P follow-up): it pours its neutral plume while it prints, from its station's top-rear vent, and nothing
+  // while it idles. Printing is operating by definition, so the test drives the print state through the scene's own setFabricators.
+  const FAB = { id: 9001, x: -40, z: -20, yaw: 0 };
+  const fabs = async () => page.evaluate(() => window.__playScene.debug.fabricators());
+  // play.tsx hands the scene its own fabricator list on base changes, and the scene drops any station missing from it: so the test's
+  // station rides along on every call, through a wrapper of setFabricators (the scene's own call does the rest)
+  await page.evaluate(() => {
+    const s = window.__playScene;
+    const orig = s.setFabricators.bind(s);
+    window.__fakeFabs = [];
+    s.setFabricators = (list) => orig([...list, ...window.__fakeFabs]);
+  });
+  const setFab = (printing) => page.evaluate(({ f, printing }) => {
+    window.__fakeFabs = [{ ...f, printing }];
+    window.__playScene.setFabricators([]);
+  }, { f: FAB, printing });
+  await setFab(true);
+  await settle(900);
+  const printingFab = (await fabs()).find((f) => f.id === FAB.id);
+  check('a printing fabricator pours its plume', Boolean(printingFab && printingFab.emitting && printingFab.pour > 0), printingFab ? `pour ${printingFab.pour}` : 'no row');
+  if (printingFab) {
+    const [vx, vy, vz] = printingFab.vent;
+    const dist = Math.hypot(vx - FAB.x, vz - FAB.z);
+    check('the fabricator pours from its top-rear vent (on the station, above the bed)', dist <= 3.5 && vy > 4 && vy < 9, `${dist.toFixed(2)} m from its foot, y ${vy.toFixed(2)}`);
+  }
+  await setFab(false);
+  await settle(600);
+  const idleFab = (await fabs()).find((f) => f.id === FAB.id);
+  check('an idle fabricator pours nothing', Boolean(idleFab && !idleFab.emitting && idleFab.pour === 0));
+  await setFab(true);
+  await settle(600);
+  check('a fabricator that starts printing again pours again', (await fabs()).some((f) => f.id === FAB.id && f.emitting));
   // the shots: the stage 6 look at full run (the same fidelity walk the stage 6 measure makes), the overlook, then close looks at
   // the mill and the press with the overlays hidden. Yaw follows the scene's own convention: facing (-sin yaw, -cos yaw).
   await force({ drill: 1, mill: 1, press: 1, projector: 1, water: 1, power: 1, pylon: 1, 'heavy-water': 1 });
@@ -274,6 +306,11 @@ try {
   if (placed.water) await lookAt('plumes-water-close.png', placed.water, placed.water[0] + 4.5, placed.water[1] - 4, 0.03);
   if (placed.projector) await lookAt('plumes-projector-close.png', placed.projector, placed.projector[0] - 4.5, placed.projector[1] - 3.5, 0.03);
   if (placed['heavy-water']) await lookAt('plumes-heavy-water-close.png', placed['heavy-water'], placed['heavy-water'][0] - 10, placed['heavy-water'][1] + 5, -0.06);
+  // the heavy water maker's feed: its hopper sits on the +x end of the tank, so the camera stands on that side
+  if (placed['heavy-water']) await lookAt('plumes-heavy-water-feed.png', placed['heavy-water'], placed['heavy-water'][0] + 9, placed['heavy-water'][1] + 3, 0.03);
+  // the base fabricator, printing: from the front and from the side, the station and its vent in view
+  await lookAt('plumes-fabricator-front.png', [FAB.x, FAB.z], FAB.x, FAB.z + 13, 0.1);
+  await lookAt('plumes-fabricator-side.png', [FAB.x, FAB.z], FAB.x - 13, FAB.z, 0.1);
   const stats = await page.evaluate(() => window.__playScene.debug.detail().pixels);
   console.log(`plume pixels now: ${stats}`);
 } catch (err) {

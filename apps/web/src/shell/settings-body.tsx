@@ -7,8 +7,12 @@ import { GraphicsTuning } from './graphics-tuning';
 import { MONSTER_CREDITS } from '../monsters/credits';
 import { gpuInUse, tierInUse, type GpuChoice, type Profile } from './profile';
 import { setPlaySettings, usePlaySettings } from './play-settings';
+import { gameAudio, loadAudioSettings, type AudioSettings } from '../audio/game-audio';
+import { BUS_IDS, BUS_LABELS, type BusId } from '@hm/audiomix';
 
 type Choice = 'auto' | Quality;
+/** Where each bus's level is saved (the same keys the game's audio settings use). */
+const GAME_MIX_KEY: Readonly<Record<BusId, keyof AudioSettings>> = { voice: 'dialogue', combatUi: 'combatUi', world: 'effects', ambience: 'ambience', music: 'music' };
 /** The dither distance's stops in metres, finer close by; the last one blends everywhere (stored as 0, as the graphics preset says). */
 const DITHER_STOPS: readonly number[] = [2, 3, 4, 6, 8, 10, 15, 20, 30, 45, 60, 80, 100, 150, 200, 0];
 const ditherStop = (m: number): number => (m <= 0 ? DITHER_STOPS.length - 1 : DITHER_STOPS.reduce((best, s, i) => (s > 0 && Math.abs(s - m) < Math.abs((DITHER_STOPS[best] ?? 0) - m) ? i : best), 0));
@@ -46,6 +50,7 @@ export function SettingsBody(props: {
 }): ReactElement {
   const { profile, update } = props;
   const play = usePlaySettings();
+  const [gameMix, setGameMix] = useState<AudioSettings>(() => loadAudioSettings());
   const picked = PRESETS.find((p) => p.id === profile.quality) ?? PRESETS[PRESETS.length - 1]!;
   const gpu = gpuInUse();
   // the dither distance as the tier in use draws it, with your change on top
@@ -100,6 +105,15 @@ export function SettingsBody(props: {
         {volume('master', 'Everything')}
         {volume('sfx', 'Effects')}
         {volume('music', 'Music')}
+        <p className="hint">The Moon game's own mix, one level per bus. Her voice is never ducked; the rest step down while she speaks.</p>
+        {BUS_IDS.map((bus) => {
+          const key = GAME_MIX_KEY[bus];
+          const pct = Math.round(gameMix[key] * 100);
+          return (
+            <label key={bus} className="row slider">{BUS_LABELS[bus]}<input type="range" min={0} max={100} step={1} value={pct} aria-label={BUS_LABELS[bus]}
+              onChange={(e) => { const v = Number(e.target.value) / 100; gameAudio.setBusVolume(bus, v); setGameMix((s) => ({ ...s, [key]: v })); }} /><output>{pct}%</output></label>
+          );
+        })}
       </section>
       <section aria-label="Controls">
         <h4>Controls</h4>

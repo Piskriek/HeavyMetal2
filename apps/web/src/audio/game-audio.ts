@@ -1,16 +1,23 @@
-// Comprehensive game audio engine for FIDELITY / SetMix (TASK-12).
-// Architecture:
-// MasterBus -> MusicBus (with MentorDuckGain), SfxBus, DialogueBus.
+// Comprehensive game audio engine for FIDELITY / SetMix (TASK-12; five buses in TASK-29 part A).
+// Architecture: five buses, each with its own level (Settings), feeding the master.
+//   voice (Dr. Haddy's chain, never ducked) | combat and UI | world SFX (bit-depth mirror, low-pass while she speaks)
+//   | ambience (stage beds, reverb from stage 4) | music (context sub-buses, Moon score, ducks under her lines).
+//   Every source plays on exactly one bus: @hm/audiomix busOfSound. While she speaks the non-voice buses duck by
+//   @hm/audiomix DUCK (80 ms attack, 450 ms release).
 // - Loading strategy: Decode 36 SFX and lab music at startup; decode 7 Moon tracks,
 //   Monster Mash, and driving music behind gate transition / before first Moon visit.
 // - Equal-power Moon score stage crossfading (tracks music-moon-s0..s6).
 // - Context music: lab, moon, monster mash (mobs engage), driving (in rover).
 // - Positional SFX engine: max 8 positional voices using PannerNode (equalpower), voice stealing for farthest.
+// - Stage ambience (setAmbience): procedural beds from @hm/soundscape, on the ambience bus.
+// - No autoplay (POL-72): the world and ambience buses stay at zero gain until the first pointer or key press, or the lab.
 // - Zero allocations in audio update loop.
-// - window.__audio debug inspection hook.
+// - window.__audio debug inspection hook (created with the controller, so it exists before the first sound).
 
-import { MENTOR_MIX } from './mentor-mix';
 import { kv } from '../storage/profile-storage';
+import { BUS_IDS, BUS_START, DUCK, busOfSound, crushForStage, dbToGain, type BusId, type Crush } from '@hm/audiomix';
+import { ambiencePlan, reverbImpulse, whiteNoise, type AmbienceLayer, type AmbiencePlan, type AmbienceQuery } from '@hm/soundscape';
+import { BITCRUSH_PROCESSOR, bitcrushModuleUrl } from './bitcrush-worklet';
 
 export interface AudioLevel {
   readonly gain: number; // dB
@@ -27,19 +34,62 @@ export interface AudioEntry {
   readonly loop: boolean;
 }
 
+/** One level per bus, 0..1 (linear). `effects` is the world SFX bus; `dialogue` is the voice bus. */
 export interface AudioSettings {
   master: number; // 0..1, default 1.0
-  music: number; // 0..1, default 0.8
-  effects: number; // 0..1, default 0.8
-  dialogue: number; // 0..1, default 0.8
+  music: number; // 0..1, default 0.45 (the owner's music fader)
+  effects: number; // the world SFX bus, default -6 dB
+  dialogue: number; // the voice bus, default 0.8 (the owner's voice fader)
+  combatUi: number; // default -4 dB
+  ambience: number; // default -12 dB
 }
 
 export const DEFAULT_AUDIO_SETTINGS: AudioSettings = {
   master: 1.0,
-  music: 0.8,
-  effects: 0.8,
-  dialogue: 0.8,
+  music: BUS_START.music,
+  effects: BUS_START.world,
+  dialogue: BUS_START.voice,
+  combatUi: BUS_START.combatUi,
+  ambience: BUS_START.ambience,
 };
+
+/** The saved setting behind each bus. */
+const SETTING_OF: Readonly<Record<BusId, keyof AudioSettings>> = {
+  voice: 'dialogue',
+  combatUi: 'combatUi',
+  world: 'effects',
+  ambience: 'ambience',
+  music: 'music',
+};
+
+const clamp01 = (v: number): number => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
+
+/** A linear ramp from the parameter's current value to `target` over `seconds` (a clean duck, never a jump). */
+function rampTo(p: AudioParam, target: number, now: number, seconds: number): void {
+  p.cancelScheduledValues(now);
+  p.setValueAtTime(p.value, now);
+  p.linearRampToValueAtTime(target, now + seconds);
+}
+
+/** The RMS level of an analyser's last block, in dB (-200 for silence or no tap). */
+function rmsDb(a: AnalyserNode | undefined): number {
+  if (!a) return -200;
+  const buf = new Float32Array(a.fftSize);
+  a.getFloatTimeDomainData(buf);
+  let s = 0;
+  for (let i = 0; i < buf.length; i++) s += (buf[i] ?? 0) * (buf[i] ?? 0);
+  const r = Math.sqrt(s / buf.length);
+  return r > 0 ? 20 * Math.log10(r) : -200;
+}
+
+/** One stage ambience layer on the ambience bus: a source, its filter, the level and the LFO that breathes it. */
+interface AmbienceVoice {
+  readonly source: AudioScheduledSourceNode;
+  readonly filter: BiquadFilterNode;
+  readonly gain: GainNode;
+  readonly lfo: OscillatorNode;
+  readonly lfoDepth: GainNode;
+}
 
 /** A file shipped beside index.html, relative to the page (a root path breaks under a sub-path, and from disk names the drive root). */
 const besidePage = (p: string): string => new URL(p, document.baseURI).href;
@@ -83,6 +133,8 @@ export interface Play2dOptions {
   volume?: number;
   pitch?: number;
   loop?: boolean;
+  /** The bus, when it is not the one the sound id maps to (busOfSound). */
+  bus?: BusId;
 }
 
 export interface Play3dOptions {
@@ -94,18 +146,51 @@ export interface Play3dOptions {
   maxDistance?: number;
   rolloffFactor?: number;
   priority?: number;
+  /** The bus, when it is not the one the sound id maps to (busOfSound). */
+  bus?: BusId;
 }
 
 export class GameAudioController {
   private ctx: AudioContext | null = null;
   private settings: AudioSettings;
 
-  // Master & Bus Nodes
+  // Master & Bus Nodes (the five buses; each bus's level is the gain node named after it)
   private masterGain: GainNode | null = null;
   private musicDuckGain: GainNode | null = null;
   private musicBus: GainNode | null = null;
+  /** The world SFX bus (the Settings' Effects slider). */
   private sfxBus: GainNode | null = null;
+  /** The voice bus (Dr. Haddy's chain). */
   private dialogueBus: GainNode | null = null;
+  private combatBus: GainNode | null = null;
+  private combatDuck: GainNode | null = null;
+  private worldDuck: GainNode | null = null;
+  private worldLp: BiquadFilterNode | null = null;
+  private worldGate: GainNode | null = null;
+  private ambienceBus: GainNode | null = null;
+  private ambienceDuck: GainNode | null = null;
+  private ambienceGate: GainNode | null = null;
+  private reverbSend: GainNode | null = null;
+  private reverbLp: BiquadFilterNode | null = null;
+  private reverb: ConvolverNode | null = null;
+  /** The bit-depth mirror (DEC-07): crushIn -> [worklet] -> crushOut, on the world SFX bus only. */
+  private crushIn: GainNode | null = null;
+  private crushOut: GainNode | null = null;
+  private crushNode: AudioWorkletNode | null = null;
+  private crushMode: 'pending' | 'worklet' | 'bypass' = 'pending';
+  private crushNow: Crush | null = null;
+  private stage = 0;
+  /** Analysers after each bus (debug and the browser check only). */
+  private taps: Partial<Record<BusId | 'crushed', AnalyserNode>> = {};
+
+  /** No autoplay (POL-72): world and ambience stay silent until the first press, or the lab. */
+  private worldOpen = false;
+
+  // Stage ambience (setAmbience)
+  private ambienceVoices = new Map<string, AmbienceVoice>();
+  private ambiencePlanNow: AmbiencePlan | null = null;
+  private stormBed: { src: AudioBufferSourceNode; filter: BiquadFilterNode; gain: GainNode } | null = null;
+  private noiseBuffers: AudioBuffer[] | null = null;
 
   // Music Context Sub-buses
   private labMusicGain: GainNode | null = null;
@@ -154,6 +239,7 @@ export class GameAudioController {
 
   constructor(initialSettings = loadAudioSettings()) {
     this.settings = initialSettings;
+    this.setupDebugHook();
   }
 
   // ---------------------------------------------------------------------------
@@ -188,21 +274,65 @@ export class GameAudioController {
     this.masterGain = c.createGain();
     this.masterGain.gain.value = this.settings.master;
     this.masterGain.connect(c.destination);
+    const open = this.worldOpen ? 1 : 0;
 
-    // Dialogue Bus (plugs directly into Master)
+    // Voice bus: Dr. Haddy's chain plugs in here. It never ducks.
     this.dialogueBus = c.createGain();
     this.dialogueBus.gain.value = this.settings.dialogue;
-    this.dialogueBus.connect(this.masterGain);
+    this.tap('voice', this.dialogueBus);
 
-    // SFX Bus (plugs directly into Master)
+    // Combat and UI bus: weapons and the interface. It ducks 2 dB under her.
+    this.combatBus = c.createGain();
+    this.combatBus.gain.value = this.settings.combatUi;
+    this.combatDuck = c.createGain();
+    this.combatBus.connect(this.combatDuck);
+    this.tap('combatUi', this.combatDuck);
+
+    // World SFX bus: the bit-depth mirror sits here and nowhere else. It ducks 6.5 dB with a 1.8 kHz low-pass.
     this.sfxBus = c.createGain();
     this.sfxBus.gain.value = this.settings.effects;
-    this.sfxBus.connect(this.masterGain);
+    this.crushIn = c.createGain();
+    this.crushOut = c.createGain();
+    this.sfxBus.connect(this.crushIn);
+    this.crushIn.connect(this.crushOut); // straight through until the worklet is in (installBitcrush)
+    this.worldDuck = c.createGain();
+    this.worldLp = c.createBiquadFilter();
+    this.worldLp.type = 'lowpass';
+    this.worldLp.frequency.value = DUCK.worldLowpassOpenHz;
+    this.worldLp.Q.value = 0.707;
+    this.worldGate = c.createGain();
+    this.worldGate.gain.value = open;
+    // 'crushed' is the probe right after the bit-depth mirror: its samples sit on the crush grid, untouched by the filter and the duck
+    const probe = c.createAnalyser();
+    probe.fftSize = 2048;
+    this.taps.crushed = probe;
+    this.crushOut.connect(probe).connect(this.worldDuck);
+    this.worldDuck.connect(this.worldLp).connect(this.worldGate);
+    this.tap('world', this.worldGate);
+    void this.installBitcrush(c);
+
+    // Ambience bus: the stage's procedural beds. It ducks 5 dB; a warm reverb joins it from stage 4.
+    this.ambienceBus = c.createGain();
+    this.ambienceBus.gain.value = this.settings.ambience;
+    this.ambienceDuck = c.createGain();
+    this.ambienceGate = c.createGain();
+    this.ambienceGate.gain.value = open;
+    this.reverbSend = c.createGain();
+    this.reverbSend.gain.value = 0;
+    this.reverb = c.createConvolver();
+    this.reverb.buffer = this.reverbBuffer(c);
+    this.reverbLp = c.createBiquadFilter();
+    this.reverbLp.type = 'lowpass';
+    this.reverbLp.frequency.value = 2400;
+    this.ambienceBus.connect(this.ambienceDuck);
+    this.ambienceBus.connect(this.reverbSend).connect(this.reverb).connect(this.reverbLp).connect(this.ambienceDuck);
+    this.ambienceDuck.connect(this.ambienceGate);
+    this.tap('ambience', this.ambienceGate);
 
     // Music Ducking Node (ducks under Dr. Haddy's lines)
     this.musicDuckGain = c.createGain();
     this.musicDuckGain.gain.value = 1.0;
-    this.musicDuckGain.connect(this.masterGain);
+    this.tap('music', this.musicDuckGain);
 
     // Music Bus (connects to MusicDuckGain)
     this.musicBus = c.createGain();
@@ -235,7 +365,91 @@ export class GameAudioController {
       this.moonTrackGains.push(tg);
     }
 
-    this.setupDebugHook();
+    this.applyCrush();
+  }
+
+  /** A bus's output goes through an analyser (a pass-through) to the master. The browser check reads these. */
+  private tap(bus: BusId, from: AudioNode): void {
+    if (!this.ctx || !this.masterGain) return;
+    const a = this.ctx.createAnalyser();
+    a.fftSize = 2048;
+    this.taps[bus] = a;
+    from.connect(a).connect(this.masterGain);
+  }
+
+  /** Two seconds of reverb tail from a seeded noise: the same every time. */
+  private reverbBuffer(c: AudioContext): AudioBuffer {
+    const data = reverbImpulse(2.2, c.sampleRate, 0x51ed270b);
+    const buf = c.createBuffer(1, data.length, c.sampleRate);
+    buf.copyToChannel(data as Float32Array<ArrayBuffer>, 0);
+    return buf;
+  }
+
+  /**
+   * The bit-depth mirror (DEC-07). Its module is a Blob URL from an inline string (bitcrush-worklet.ts), so it loads from the
+   * built single file over http and from disk. If the browser refuses it, the world bus plays at full depth.
+   */
+  private async installBitcrush(c: AudioContext): Promise<void> {
+    try {
+      // a worklet that never settles counts as refused: the world bus then plays at full depth instead of waiting
+      await Promise.race([
+        c.audioWorklet.addModule(bitcrushModuleUrl()),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('worklet load timed out')), 5000)),
+      ]);
+      const node = new AudioWorkletNode(c, BITCRUSH_PROCESSOR, { numberOfInputs: 1, numberOfOutputs: 1 });
+      if (this.crushIn && this.crushOut) {
+        this.crushIn.disconnect(this.crushOut);
+        this.crushIn.connect(node).connect(this.crushOut);
+      }
+      this.crushNode = node;
+      this.crushMode = 'worklet';
+      this.applyCrush();
+    } catch (e) {
+      this.crushMode = 'bypass';
+      console.warn('[game-audio] Bit-depth mirror unavailable; world SFX play at full depth:', e);
+    }
+  }
+
+  /**
+   * The crush now: the stage's (0 to 2 crush, 3 and up full), and full in the lab, which is the shielded room on Earth and not
+   * part of the terraforming.
+   */
+  private applyCrush(): void {
+    this.crushNow = this.currentContext === 'lab' ? null : crushForStage(this.stage);
+    if (!this.crushNode || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    this.crushNode.parameters.get('rate')?.setValueAtTime(this.crushNow?.rateHz ?? this.ctx.sampleRate, now);
+    this.crushNode.parameters.get('bits')?.setValueAtTime(this.crushNow?.bits ?? 16, now);
+  }
+
+  /** The Fidelity stage for the world SFX's bit-depth mirror (0 to 6). Driven by setMoonStage too, which the play screen calls. */
+  public setStage(stage: number): void {
+    this.stage = Number.isFinite(stage) ? Math.min(6, Math.max(0, Math.floor(stage))) : 0;
+    this.applyCrush();
+  }
+
+  /** Open the world and ambience buses (the first pointer or key press, or the lab). Idempotent. */
+  public unlockWorldAudio(): void {
+    if (this.worldOpen) return;
+    this.worldOpen = true;
+    if (this.ctx) {
+      void this.ctx.resume();
+      const now = this.ctx.currentTime;
+      this.worldGate?.gain.setTargetAtTime(1, now, 0.25);
+      this.ambienceGate?.gain.setTargetAtTime(1, now, 0.25);
+    }
+  }
+
+  /** The node a sound on `bus` plays into. */
+  private busNode(bus: BusId): AudioNode {
+    this.getContext();
+    switch (bus) {
+      case 'voice': return this.dialogueBus!;
+      case 'combatUi': return this.combatBus!;
+      case 'world': return this.sfxBus!;
+      case 'ambience': return this.ambienceBus!;
+      case 'music': return this.musicBus!;
+    }
   }
 
   public getDialogueBus(): AudioNode {
@@ -251,6 +465,16 @@ export class GameAudioController {
   public getMusicBus(): AudioNode {
     this.getContext();
     return this.musicBus!;
+  }
+
+  public getCombatBus(): AudioNode {
+    this.getContext();
+    return this.combatBus!;
+  }
+
+  public getAmbienceBus(): AudioNode {
+    this.getContext();
+    return this.ambienceBus!;
   }
 
   // ---------------------------------------------------------------------------
@@ -269,36 +493,63 @@ export class GameAudioController {
     }
   }
 
+  /** Set one bus's level (0..1), save it, and move the bus now. */
+  public setBusVolume(bus: BusId, vol: number): void {
+    const v = clamp01(vol);
+    const key = SETTING_OF[bus];
+    (this.settings as unknown as Record<string, number>)[key] = v;
+    saveAudioSettings({ [key]: v } as Partial<AudioSettings>);
+    const node = this.busLevelNode(bus);
+    if (node && this.ctx) node.gain.setTargetAtTime(v, this.ctx.currentTime, 0.05);
+  }
+
+  private busLevelNode(bus: BusId): GainNode | null {
+    switch (bus) {
+      case 'voice': return this.dialogueBus;
+      case 'combatUi': return this.combatBus;
+      case 'world': return this.sfxBus;
+      case 'ambience': return this.ambienceBus;
+      case 'music': return this.musicBus;
+    }
+  }
+
   public setMusicVolume(vol: number): void {
-    this.settings.music = Math.max(0, Math.min(1, vol));
-    saveAudioSettings({ music: this.settings.music });
-    if (this.musicBus && this.ctx) {
-      this.musicBus.gain.setTargetAtTime(this.settings.music, this.ctx.currentTime, 0.05);
-    }
+    this.setBusVolume('music', vol);
   }
 
+  /** The world SFX bus (the Settings' Effects slider). */
   public setEffectsVolume(vol: number): void {
-    this.settings.effects = Math.max(0, Math.min(1, vol));
-    saveAudioSettings({ effects: this.settings.effects });
-    if (this.sfxBus && this.ctx) {
-      this.sfxBus.gain.setTargetAtTime(this.settings.effects, this.ctx.currentTime, 0.05);
-    }
+    this.setBusVolume('world', vol);
   }
 
+  /** The voice bus. */
   public setDialogueVolume(vol: number): void {
-    this.settings.dialogue = Math.max(0, Math.min(1, vol));
-    saveAudioSettings({ dialogue: this.settings.dialogue });
-    if (this.dialogueBus && this.ctx) {
-      this.dialogueBus.gain.setTargetAtTime(this.settings.dialogue, this.ctx.currentTime, 0.05);
-    }
+    this.setBusVolume('voice', vol);
   }
 
+  public setCombatUiVolume(vol: number): void {
+    this.setBusVolume('combatUi', vol);
+  }
+
+  public setAmbienceVolume(vol: number): void {
+    this.setBusVolume('ambience', vol);
+  }
+
+  /**
+   * While she speaks (true) or when she stops (false): every bus but the voice ducks by its DUCK depth. The attack is 80 ms and
+   * the release 450 ms (linear ramps, @hm/audiomix). The world bus also drops its low-pass to 1.8 kHz while she talks.
+   */
   public duckMusic(ducked: boolean): void {
-    if (!this.musicDuckGain || !this.ctx) return;
+    if (!this.ctx) return;
     const now = this.ctx.currentTime;
-    const target = ducked ? (MENTOR_MIX.duck.to ?? 0.3) : 1.0;
-    const timeConstant = ducked ? 0.08 : 0.2;
-    this.musicDuckGain.gain.setTargetAtTime(target, now, timeConstant);
+    const seconds = ducked ? DUCK.attackS : DUCK.releaseS;
+    const nodes: Partial<Record<BusId, GainNode | null>> = { combatUi: this.combatDuck, world: this.worldDuck, ambience: this.ambienceDuck, music: this.musicDuckGain };
+    for (const bus of BUS_IDS) {
+      const node = nodes[bus];
+      if (!node) continue;
+      rampTo(node.gain, ducked ? dbToGain(DUCK.depthDb[bus]) : 1, now, seconds);
+    }
+    if (this.worldLp) rampTo(this.worldLp.frequency, ducked ? DUCK.worldLowpassHz : DUCK.worldLowpassOpenHz, now, seconds);
   }
 
   // ---------------------------------------------------------------------------
@@ -435,12 +686,25 @@ export class GameAudioController {
     this.mobsEngaged = false;
     this.isDriving = false;
     this.calmTimer = 0;
-    if (this.ctx && this.musicDuckGain) this.musicDuckGain.gain.setValueAtTime(1, this.ctx.currentTime);
+    this.stopAmbience();
+    this.applyCrush();
+    if (this.ctx) {
+      const now = this.ctx.currentTime;
+      for (const node of [this.musicDuckGain, this.combatDuck, this.worldDuck, this.ambienceDuck]) {
+        node?.gain.cancelScheduledValues(now);
+        node?.gain.setValueAtTime(1, now);
+      }
+      this.worldLp?.frequency.cancelScheduledValues(now);
+      this.worldLp?.frequency.setValueAtTime(DUCK.worldLowpassOpenHz, now);
+    }
   }
 
   public setMusicContext(context: MusicContext, crossfadeSeconds = 1.5): void {
     if (this.currentContext === context) return;
     this.currentContext = context;
+    // entering the lab opens the world and ambience buses (POL-72); the lab itself is never crushed
+    if (context === 'lab') this.unlockWorldAudio();
+    this.applyCrush();
     this.applyMusicContextCrossfade(crossfadeSeconds);
   }
 
@@ -572,6 +836,8 @@ export class GameAudioController {
   public setMoonStage(stage: number): void {
     this.currentStage = Math.max(0, Math.min(6, stage));
     this.applyMoonScoreStageWeights(this.currentStage);
+    // the same stage drives the bit-depth mirror on the world SFX bus
+    this.setStage(this.currentStage);
   }
 
   private applyMoonScoreStageWeights(stage: number): void {
@@ -617,6 +883,169 @@ export class GameAudioController {
   }
 
   // ---------------------------------------------------------------------------
+  // Stage Ambience (P1-SOUND-03): procedural beds on the ambience bus, planned by @hm/soundscape
+  // ---------------------------------------------------------------------------
+
+  /**
+   * The ambience for this place and moment: the lab's hum, vent and storm, or the planet's beds by stage and floats. Layers that
+   * stay are retuned in place; layers that go fade out. Calling it again with the same answer changes nothing.
+   */
+  public setAmbience(q: AmbienceQuery): void {
+    if (q.where === 'lab') this.unlockWorldAudio();
+    const plan = ambiencePlan(q);
+    this.ambiencePlanNow = plan;
+    const c = this.getContext();
+    const now = c.currentTime;
+
+    const want = new Set(plan.layers.map((l) => l.id));
+    for (const [id, v] of this.ambienceVoices) {
+      if (want.has(id)) continue;
+      this.retireAmbience(v, now);
+      this.ambienceVoices.delete(id);
+    }
+    for (const layer of plan.layers) {
+      let v = this.ambienceVoices.get(layer.id);
+      if (!v) {
+        v = this.createAmbienceVoice(c, layer, now);
+        this.ambienceVoices.set(layer.id, v);
+      }
+      this.retuneAmbience(v, layer, now);
+    }
+    this.setStormBed(plan.storm, now);
+    this.reverbSend?.gain.setTargetAtTime(plan.reverbWet, now, 0.5);
+  }
+
+  /** The ambience layers now playing (ids), and the storm bed and reverb, for the browser check. */
+  public getAmbience(): { layers: string[]; storm: boolean; reverbWet: number } {
+    return {
+      layers: this.ambiencePlanNow?.layers.map((l) => l.id) ?? [],
+      storm: this.ambiencePlanNow?.storm !== null && this.ambiencePlanNow?.storm !== undefined,
+      reverbWet: this.ambiencePlanNow?.reverbWet ?? 0,
+    };
+  }
+
+  private stopAmbience(): void {
+    for (const v of this.ambienceVoices.values()) this.retireAmbience(v, this.ctx?.currentTime ?? 0, 0);
+    this.ambienceVoices.clear();
+    this.ambiencePlanNow = null;
+    if (this.stormBed) {
+      try { this.stormBed.src.stop(); } catch { /* already stopped */ }
+      this.stormBed.src.disconnect();
+      this.stormBed = null;
+    }
+    this.reverbSend?.gain.setValueAtTime(0, this.ctx?.currentTime ?? 0);
+  }
+
+  /** A noise source's buffer: three seeded two-second buffers, shared by the layers (each starts at its own offset). */
+  private noiseBuffer(c: AudioContext, id: string): { buffer: AudioBuffer; offsetS: number } {
+    if (!this.noiseBuffers) {
+      this.noiseBuffers = [0x1234567, 0x7654321, 0x0badf00d].map((seed) => {
+        const n = c.sampleRate * 2;
+        const b = c.createBuffer(1, n, c.sampleRate);
+        b.copyToChannel(whiteNoise(n, seed) as Float32Array<ArrayBuffer>, 0);
+        return b;
+      });
+    }
+    let h = 0;
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+    const buffer = this.noiseBuffers[h % 3]!;
+    return { buffer, offsetS: ((h >>> 3) % 97) / 97 * 1.9 };
+  }
+
+  private createAmbienceVoice(c: AudioContext, layer: AmbienceLayer, now: number): AmbienceVoice {
+    const gain = c.createGain();
+    gain.gain.value = 0;
+    const filter = c.createBiquadFilter();
+    filter.type = layer.filter;
+    filter.frequency.value = layer.cutoff;
+    filter.Q.value = 0.8;
+    const lfo = c.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = layer.lfoHz;
+    const lfoDepth = c.createGain();
+    lfo.connect(lfoDepth).connect(gain.gain);
+
+    let source: AudioScheduledSourceNode;
+    if (layer.wave === 'noise') {
+      const { buffer, offsetS } = this.noiseBuffer(c, layer.id);
+      const s = c.createBufferSource();
+      s.buffer = buffer;
+      s.loop = true;
+      s.start(now, offsetS);
+      source = s;
+    } else {
+      const o = c.createOscillator();
+      o.type = layer.wave;
+      o.frequency.value = layer.freq;
+      o.start(now);
+      source = o;
+    }
+    source.connect(filter).connect(gain).connect(this.ambienceBus!);
+    lfo.start(now);
+    return { source, filter, gain, lfo, lfoDepth };
+  }
+
+  /** The base level is the layer's gain less half its LFO depth; the LFO swings it by that half either way. */
+  private retuneAmbience(v: AmbienceVoice, layer: AmbienceLayer, now: number): void {
+    const d = layer.lfoDepth;
+    v.gain.gain.setTargetAtTime(layer.gain * (1 - d / 2), now, 0.6);
+    v.lfoDepth.gain.setTargetAtTime((layer.gain * d) / 2, now, 0.6);
+    v.filter.frequency.setTargetAtTime(layer.cutoff, now, 0.6);
+    v.filter.type = layer.filter;
+    v.lfo.frequency.setTargetAtTime(layer.lfoHz, now, 0.6);
+  }
+
+  /** Fade a layer out, stop it, and take its nodes out of the graph a moment later. */
+  private retireAmbience(v: AmbienceVoice, now: number, fadeS = 0.4): void {
+    v.gain.gain.cancelScheduledValues(now);
+    v.gain.gain.setTargetAtTime(0, now, Math.max(0.001, fadeS / 3));
+    try { v.source.stop(now + fadeS + 0.5); v.lfo.stop(now + fadeS + 0.5); } catch { /* already stopped */ }
+    setTimeout(() => {
+      for (const n of [v.source, v.filter, v.gain, v.lfo, v.lfoDepth] as AudioNode[]) {
+        try { n.disconnect(); } catch { /* already gone */ }
+      }
+    }, (fadeS + 0.6) * 1000);
+  }
+
+  /** The lab's muffled storm: the approved storm sound, low-passed and looped, on the ambience bus. */
+  private setStormBed(storm: AmbiencePlan['storm'], now: number): void {
+    if (!storm) {
+      if (this.stormBed) {
+        this.stormBed.gain.gain.setTargetAtTime(0, now, 0.2);
+        const old = this.stormBed;
+        this.stormBed = null;
+        try { old.src.stop(now + 1.2); } catch { /* already stopped */ }
+      }
+      return;
+    }
+    if (!this.stormBed) {
+      const buf = this.getBuffer('sfx-storm');
+      if (!buf) {
+        void this.loadBuffer('sfx-storm').then(() => {
+          const pending = this.ambiencePlanNow?.storm;
+          if (pending && this.ctx && !this.stormBed) this.setStormBed(pending, this.ctx.currentTime);
+        });
+        return;
+      }
+      const c = this.getContext();
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      this.applyLoopRegion(src, 'sfx-storm');
+      const filter = c.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.Q.value = 0.7;
+      const gain = c.createGain();
+      gain.gain.value = 0;
+      src.connect(filter).connect(gain).connect(this.ambienceBus!);
+      src.start(now);
+      this.stormBed = { src, filter, gain };
+    }
+    this.stormBed.filter.frequency.setTargetAtTime(storm.cutoffHz, now, 0.5);
+    this.stormBed.gain.gain.setTargetAtTime(storm.gain * this.gainOf('sfx-storm'), now, 0.5);
+  }
+
+  // ---------------------------------------------------------------------------
   // Sound Effects Engine (Max 8 Positional Voices)
   // ---------------------------------------------------------------------------
 
@@ -644,7 +1073,7 @@ export class GameAudioController {
     const vol = options?.volume ?? 1.0;
     gain.gain.value = baseGain * vol;
 
-    src.connect(gain).connect(this.sfxBus!);
+    src.connect(gain).connect(this.busNode(options?.bus ?? busOfSound(id)));
     src.start();
 
     this.recordRecentSound(id);
@@ -695,7 +1124,7 @@ export class GameAudioController {
 
     this.setPannerPosition(panner, pos.x, pos.y, pos.z);
 
-    src.connect(gain).connect(panner).connect(this.sfxBus!);
+    src.connect(gain).connect(panner).connect(this.busNode(options?.bus ?? busOfSound(id)));
     src.start();
 
     const voice: PositionalVoice = {
@@ -1098,14 +1527,44 @@ export class GameAudioController {
   private setupDebugHook(): void {
     if (typeof window === 'undefined') return;
     (window as any).__audio = {
-      getContext: () => this.ctx,
+      getContext: () => this.getContext(),
       getBuses: () => ({
         master: this.masterGain?.gain.value ?? 0,
         music: this.musicBus?.gain.value ?? 0,
         effects: this.sfxBus?.gain.value ?? 0,
         dialogue: this.dialogueBus?.gain.value ?? 0,
         duck: this.musicDuckGain?.gain.value ?? 1,
+        combatUi: this.combatBus?.gain.value ?? 0,
+        ambience: this.ambienceBus?.gain.value ?? 0,
+        duckWorld: this.worldDuck?.gain.value ?? 1,
+        duckCombatUi: this.combatDuck?.gain.value ?? 1,
+        duckAmbience: this.ambienceDuck?.gain.value ?? 1,
+        worldLowpassHz: this.worldLp?.frequency.value ?? DUCK.worldLowpassOpenHz,
       }),
+      /** RMS per bus after its duck, in dB (-200 for silence): the measured duck and gates. */
+      getBusLevels: () => {
+        const out: Record<string, number> = {};
+        for (const bus of BUS_IDS) out[bus] = rmsDb(this.taps[bus]);
+        return out;
+      },
+      /** The gates: 0 until the first press or the lab (POL-72). */
+      getGates: () => ({ world: this.worldGate?.gain.value ?? 0, ambience: this.ambienceGate?.gain.value ?? 0, open: this.worldOpen }),
+      /** The bit-depth mirror: the worklet's state, and the crush it is set to now (null is full depth). */
+      getCrush: () => ({ mode: this.crushMode, stage: this.stage, crush: this.crushNow, sampleRate: this.ctx?.sampleRate ?? 0 }),
+      setStage: (s: number) => this.setStage(s),
+      /** The last block of a tap ('voice' ... 'music', or 'crushed'), as samples. */
+      sampleTap: (name: string): number[] => {
+        const a = this.taps[name as BusId | 'crushed'];
+        if (!a) return [];
+        const b = new Float32Array(a.fftSize);
+        a.getFloatTimeDomainData(b);
+        return Array.from(b);
+      },
+      loadBuffer: async (id: string): Promise<boolean> => !!(await this.loadBuffer(id)),
+      unlock: () => this.unlockWorldAudio(),
+      setAmbience: (q: AmbienceQuery) => this.setAmbience(q),
+      getAmbience: () => this.getAmbience(),
+      setBusVolume: (bus: BusId, v: number) => this.setBusVolume(bus, v),
       getMusicContext: () => this.currentContext,
       getMoonWeights: () => [...this.moonWeights],
       getVoices: () =>
@@ -1132,3 +1591,10 @@ export class GameAudioController {
 
 // Global shared singleton
 export const gameAudio = new GameAudioController();
+
+// No autoplay (POL-72): the first pointer or key press opens the world and ambience buses. Entering the lab does too (setMusicContext).
+if (typeof window !== 'undefined') {
+  const wake = (): void => gameAudio.unlockWorldAudio();
+  window.addEventListener('pointerdown', wake, { capture: true, once: true });
+  window.addEventListener('keydown', wake, { capture: true, once: true });
+}

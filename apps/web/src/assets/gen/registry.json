@@ -664,17 +664,17 @@
   "breaker-panel": {
     "class": "lab",
     "size": [
-      1.877,
-      2.199,
-      0.713
+      1.216,
+      2.1,
+      0.697
     ]
   },
   "breaker-handle": {
     "class": "moving-part",
     "size": [
-      0.372,
-      0.45,
-      0.503
+      0.24,
+      0.152,
+      0.095
     ]
   },
   "relay-cabinet": {
@@ -696,17 +696,17 @@
   "operator-console": {
     "class": "lab",
     "size": [
-      1.139,
-      1.4,
-      1.008
+      1.184,
+      1.32,
+      0.793
     ]
   },
   "console-lever": {
     "class": "moving-part",
     "size": [
-      0.32,
-      0.6,
-      0.398
+      0.222,
+      0.34,
+      0.184
     ]
   },
   "preset-bench": {

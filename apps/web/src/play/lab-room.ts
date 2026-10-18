@@ -31,7 +31,8 @@ export {
 // A 16 × 12 × 5 m quantum-shielded white-room laboratory on Earth.
 // - North wall: wide observation window (14.8 × 3.1 m) framing the void storm as progress (setStorm).
 // - Centre: the gate standing free on a walkable square two-step plinth, opening facing the window.
-// - West wall (The Power Wall): capacitor bank, breaker panel, 4 grounded relay cabinets, 2 control boxes, console with throw lever.
+// - West wall (The Power Wall): capacitor bank, breaker panel (the isolator and three sub-breakers), 4 grounded relay cabinets,
+//   2 control boxes, the operator console (its throw lever and keypad).
 // - East wall (Studio & Fabrication Bay): 4 distinct, grounded, cabled, E-interactable machines (Preset Rack, Preset Bench,
 //   Preset Combiner, Hardware Fabricator) plus the Planet Table carrying PlotHolo.
 // - South-east (The Armory): armory rail with extraction tool (weapon-frame), sidearm rack, and weapon bench.
@@ -74,12 +75,48 @@ export const PLANET_TABLE_AT = { x: 5.0, z: -5.0 } as const;
 const GEN_GATE_OPENING = { width: 2.0, height: 2.2, sill: 0.33, z: 0 } as const;
 /** The labkit props on the west and east walls face the wall in the lab frame; their generated models turn half a turn to face the room. */
 const WEST_WALL_TURN = Math.PI;
-/** The operator console's throw lever, its pivot in the console frame (on the top, at the front). */
-const LEVER_AT: readonly [number, number, number] = [0.3, 1.4, 0.25];
-/** The breaker panel's rotary isolator and sub-breaker handle pivots in the panel's frame (Sheet 07). */
-const BREAKER_HANDLES: readonly (readonly [number, number, number])[] = [
-  [0.22, 1.12, 0.38],
+/** The operator console's throw lever: the bottom of its axle block, in the slot of the guide box on the deck (sheet 07, measured). */
+const LEVER_AT: readonly [number, number, number] = [0.336, 0.826, 0.203];
+/**
+ * The lever's own tilt at rest, about X (radians): it leans slightly toward the operator, so a throw sweeps it back along the slot.
+ * The play scene throws the pivot by LEVER_THROW (1.1 rad); the H-slot in the guide box is only 0.18 m long, so the lever travels
+ * LEVER_TRAVEL (0.25 rad, about 0.08 m along the slot) for that throw. Without the scale the grip would leave the slot.
+ */
+const LEVER_REST_TILT = 0.15;
+const LEVER_THROW = 1.1;
+const LEVER_TRAVEL = 0.25;
+/** The breaker panel's isolator spindle, on the hazard plate's knob, in the panel's frame (sheet 07, measured on the packed model). */
+const ISOLATOR_AT: readonly [number, number, number] = [0.262, 1.12, 0.32];
+/** The handle's hub centre sits 0.072 m to the left of its origin: the handle is turned to stand on the spindle, with the hub centred on it. */
+const ISOLATOR_HUB_X = 0.072;
+/** The three sub-breaker sockets' floors, in the panel's frame (the middle left, sheet 07). Each toggle's collar stands on its floor. */
+const TOGGLE_SOCKETS: readonly (readonly [number, number, number])[] = [
+  [-0.355, 1.443, 0.234],
+  [-0.258, 1.443, 0.234],
+  [-0.161, 1.443, 0.234],
 ];
+/** The keypad's pocket floor centre in the console's frame, and the hood's tilt about X (the hood leans back 20 degrees). */
+const KEYPAD_AT: readonly [number, number, number] = [0.405, 1.093, -0.109];
+const HOOD_TILT = -0.356;
+/** A sub-breaker's bat, tipped down (off) and up (on), in radians about X. */
+const TOGGLE_TIP = 0.5;
+
+/** Eased 0..1 from `a` to `b` (smoothstep), for the breaker's switching as the relays click on. */
+function easeBetween(x: number, a: number, b: number): number {
+  const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
+/**
+ * The breaker panel's switching, as the relay sweep runs (`relays` 0..1, lab-power.ts): the three sub-breakers flip one after
+ * another (0.05 to 0.48), then the isolator turns from off (-90 degrees) to on (0) between 0.5 and 0.9.
+ */
+function breakerToggleAngle(relays: number, i: number): number {
+  const start = 0.05 + 0.14 * i;
+  return TOGGLE_TIP * (1 - 2 * easeBetween(relays, start, start + 0.15));
+}
+function isolatorAngle(relays: number): number {
+  return -Math.PI / 2 * (1 - easeBetween(relays, 0.5, 0.9));
+}
 
 const PANEL_TILE = 5.12, FLOOR_TILE = 4;
 
@@ -701,26 +738,49 @@ export function createLabRoom(o: {
   group.add(westDrops);
 
   swaps.push(() => swapAll([{ p: bank, id: 'capacitor-bank' }]));
-  const handles: THREE.Object3D[] = [];
+  // The breaker panel (sheet 07): the isolator turns about its spindle (the panel's normal) and the three sub-breakers flip in their sockets.
+  // The panel's own model carries the hazard plate, the knob and the sockets; the code adds only the moving parts and the socket collars.
+  const isolator = new THREE.Group();
+  isolator.name = 'breaker-isolator';
+  const toggles = TOGGLE_SOCKETS.map((_, i) => {
+    const t = new THREE.Group();
+    t.name = `breaker-toggle-${i}`;
+    return t;
+  });
   swaps.push(() => {
     const panel = genFor('breaker-panel');
-    const parts = BREAKER_HANDLES.map(() => genFor('breaker-handle'));
-    if (!panel || parts.some((h) => h === null)) return false;
+    const handle = genFor('breaker-handle');
+    if (!panel || !handle) return false;
     panel.rotation.y = WEST_WALL_TURN;
     groundModelAt(panel, 0);
     replaceVisual(breaker.group, panel);
-    // Sheet 07 Hazard disconnect plate + 2 analog gauge bezels on the breaker panel
-    const hzPlate = new THREE.Mesh(keep(new THREE.BoxGeometry(0.28, 0.28, 0.018)), m.hazard);
-    hzPlate.position.set(0.22, 1.12, 0.365);
-    panel.add(hzPlate);
-    BREAKER_HANDLES.forEach(([x, y, z], i) => {
-      const pivot = new THREE.Group();
-      pivot.position.set(x, y, z);
-      pivot.add(parts[i]!);
+    fitOverhang(breaker);
+    // The isolator: the handle's column is turned to the panel's normal and its hub centred on the spindle
+    handle.rotation.x = Math.PI / 2;
+    handle.position.x = ISOLATOR_HUB_X;
+    isolator.clear();
+    isolator.add(handle);
+    isolator.position.set(ISOLATOR_AT[0], ISOLATOR_AT[1], ISOLATOR_AT[2]);
+    panel.add(isolator);
+    handleGlow(handle);
+    // The sub-breakers: a static collar seated in each socket (merged into one mesh), and a bat pivoting about the collar's top
+    const collars = new THREE.Group();
+    const batGeo = keep(new THREE.BoxGeometry(0.03, 0.02, 0.06));
+    const collarGeo = keep(new THREE.BoxGeometry(0.042, 0.042, 0.012));
+    TOGGLE_SOCKETS.forEach(([x, y, z], i) => {
+      const collar = new THREE.Mesh(collarGeo, m.darkSteel);
+      collar.position.set(x, y, z + 0.006);
+      collars.add(collar);
+      const pivot = toggles[i]!;
+      pivot.clear();
+      pivot.position.set(x, y, z + 0.012);
+      const bat = new THREE.Mesh(batGeo, m.gunmetal);
+      bat.position.set(0, 0, 0.03);
+      pivot.add(bat);
       panel.add(pivot);
-      handles.push(pivot);
-      handleGlow(parts[i]!);
     });
+    mergeStaticMeshes(collars);
+    panel.add(collars);
     return true;
   });
   swaps.push(() => {
@@ -754,6 +814,29 @@ export function createLabRoom(o: {
     lamps.boxes = boxLamps;
     return true;
   });
+  // The lever's swing: the play scene turns the pivot (desk.lever); the swing inside it carries the lever's rest tilt and the throw's travel
+  const leverSwing = new THREE.Group();
+  leverSwing.name = 'console-lever-swing';
+  // The keypad (sheet 07): a 4 x 4 grid of raised square keycaps with no numbers, one merged mesh, set into the hood's pocket.
+  const buildKeypad = (): THREE.Group => {
+    const pad = new THREE.Group();
+    pad.name = 'console-keypad';
+    const plate = new THREE.Mesh(keep(new THREE.BoxGeometry(0.18, 0.18, 0.02)), m.paint);
+    plate.position.set(0, 0, 0.01);
+    pad.add(plate);
+    const cap = keep(new THREE.BoxGeometry(0.034, 0.034, 0.012));
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        const key = new THREE.Mesh(cap, m.paint);
+        key.position.set((c - 1.5) * 0.045, (r - 1.5) * 0.045, 0.026);
+        pad.add(key);
+      }
+    }
+    mergeStaticMeshes(pad);
+    pad.position.set(KEYPAD_AT[0], KEYPAD_AT[1], KEYPAD_AT[2]);
+    pad.rotation.x = HOOD_TILT;
+    return pad;
+  };
   swaps.push(() => {
     const body = genFor('operator-console');
     const lever = genFor('console-lever');
@@ -761,13 +844,18 @@ export function createLabRoom(o: {
     body.rotation.y = WEST_WALL_TURN;
     groundModelAt(body, 0);
     replaceVisual(desk.group, body);
+    fitOverhang(desk);
+    // The throw lever: the play scene turns this pivot about X; the axle block is sunk in the guide box, so only the arms and grip show
     desk.lever.clear();
-    desk.lever.add(lever);
+    leverSwing.clear();
+    lever.rotation.x = LEVER_REST_TILT;
+    leverSwing.add(lever);
+    desk.lever.add(leverSwing);
     desk.lever.position.set(LEVER_AT[0], LEVER_AT[1], LEVER_AT[2]);
     body.add(desk.lever);
-    const screen = lamp('#2bff88', -0.03, 1.15, -0.035, [0.24, 0.18, 0.01]);
-    body.add(screen);
-    lamps.desk = [screen];
+    body.add(buildKeypad());
+    // The hood's CRT is painted on the model, so the console carries no lamp of its own
+    lamps.desk = [];
     return true;
   });
 
@@ -1140,7 +1228,8 @@ export function createLabRoom(o: {
 
   const setPower = (p: Power): void => {
     lastPower = p;
-    handles.forEach((h) => { h.rotation.z = p.relays > 0 ? 0 : -Math.PI / 2; });
+    toggles.forEach((t, i) => { t.rotation.x = breakerToggleAngle(p.relays, i); });
+    isolator.rotation.z = isolatorAngle(p.relays);
     relayOn = lamps.relays.map((_, i) => p.relays * lamps.relays.length > i);
     lamps.relays.forEach((l, i) => { if (!relayOn[i]) kit.setLamp(l, 0); });
     lamps.boxes.forEach((l) => kit.setLamp(l, p.relays > 0.5 ? 1 : 0));
@@ -1265,6 +1354,8 @@ export function createLabRoom(o: {
       stormUniforms.uTime.value = now;
       vista.update(now, dt);
       tickClutter(dt);
+      // desk.lever carries the play scene's full throw; the swing takes back all but the travel (the swing sits inside desk.lever)
+      leverSwing.rotation.x = desk.lever.rotation.x * (LEVER_TRAVEL / LEVER_THROW - 1);
       for (const rig of machineRigs) {
         rig.animate(now, lastPower.main);
       }

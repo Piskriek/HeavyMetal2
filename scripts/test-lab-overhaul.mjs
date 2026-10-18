@@ -28,7 +28,7 @@ if (!chromePath) {
 }
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const shotsDir = path.join(root, process.env.SHOTS_DIR ?? 'docs/shots/ticket06');
+const shotsDir = path.resolve(root, process.env.SHOTS_DIR ?? 'docs/shots/ticket06');
 fs.mkdirSync(shotsDir, { recursive: true });
 const port = 8206;
 const server = spawn(process.execPath, ['scripts/serve.mjs'], { cwd: root, env: { ...process.env, PORT: String(port) }, stdio: 'ignore' });
@@ -175,6 +175,82 @@ try {
   await page.evaluate(() => window.__playScene.room.setWindowView('full'));
   await page.evaluate(() => window.__playScene.room.setStorm(0));
 
+  // ---- the breaker panel and the operator console (TICKET-06b, sheet 07): the isolator turns, the three sub-breakers flip before it,
+  // the keypad is set in, and the throw lever sits in its guide box. The shots show each machine off and on, and the switching mid-way.
+  const partState = () => page.evaluate(() => {
+    const g = window.__playScene.room.group;
+    const pick = (n) => { const o = g.getObjectByName(n); return o ? { rx: o.rotation.x, rz: o.rotation.z, children: o.children.length } : null; };
+    return { isolator: pick('breaker-isolator'), toggles: [0, 1, 2].map((i) => pick(`breaker-toggle-${i}`)), keypad: pick('console-keypad') };
+  });
+  const powerAtRelays = (r) => ({ relays: r, beacons: 1, pulse: 1, coils: 1, banks: [1, 1, 1], main: 1, hologram: 1, emergency: 0, static: 0, arc: 0 });
+  const throwLever = (on) => page.evaluate((x) => { window.__playScene.room.lever.rotation.x = x; }, on ? -1.1 : 0);
+  const POWER_OFF = { relays: 0, beacons: 0, pulse: 0, coils: 0, banks: [0, 0, 0], main: 0, hologram: 0, emergency: 1, static: 1, arc: 0 };
+  const approx = (a, b, eps = 0.02) => Math.abs(a - b) < eps;
+  // MEASURE (the power wall, powered): the gate view does not see the wall's machines, so the draw calls are read here too
+  const measureDraws = () => page.evaluate(async () => {
+    const n = 60;
+    const t0 = performance.now();
+    for (let i = 0; i < n; i++) await new Promise((r) => requestAnimationFrame(r));
+    const ms = (performance.now() - t0) / n;
+    const s = window.__playScene.debug.stats();
+    return { fps: Math.round((1000 / ms) * 10) / 10, frameMs: Math.round(ms * 100) / 100, calls: s.calls, triangles: s.triangles };
+  });
+  await throwLever(true);
+  await setPower(powerWith(1, 1));
+  await cam({ x: -2.5, y: 1.8, z: -4.6 }, { x: -7.8, y: 1.3, z: -4.6 });
+  await frames(30);
+  console.log(`MEASURE-POWERWALL ${JSON.stringify(await measureDraws())}`);
+
+  await setPower(POWER_OFF);
+  await throwLever(false);
+  const off = await partState();
+  check('the isolator exists and is off (-90 degrees)', off.isolator !== null && approx(off.isolator.rz, -Math.PI / 2, 0.01), JSON.stringify(off.isolator));
+  check('the three sub-breakers exist and are tipped down (off)', off.toggles.every((t) => t !== null && approx(t.rx, 0.5, 0.01)), JSON.stringify(off.toggles));
+  check('the keypad exists, its 17 parts merged into one mesh', off.keypad !== null && off.keypad.children === 1, JSON.stringify(off.keypad));
+
+  await setPower(powerAtRelays(0.25));
+  await frames(6);
+  const mid1 = await partState();
+  check('the sub-breakers flip one after another (the first is up, the second mid-flip, the third still down) and the isolator is still off', approx(mid1.toggles[0].rx, -0.5, 0.02) && mid1.toggles[1].rx < 0.4 && mid1.toggles[1].rx > -0.4 && approx(mid1.toggles[2].rx, 0.5, 0.01) && approx(mid1.isolator.rz, -Math.PI / 2, 0.01), JSON.stringify(mid1));
+  await shot('breaker-sequence-toggles');
+  await setPower(powerAtRelays(0.7));
+  await frames(6);
+  const mid2 = await partState();
+  check('the isolator is part way round while the relays click on (between -90 and 0 degrees)', mid2.isolator.rz > -Math.PI / 2 + 0.2 && mid2.isolator.rz < -0.2, JSON.stringify(mid2.isolator));
+  await shot('breaker-sequence-isolator');
+
+  await setPower(powerWith(1, 1));
+  await throwLever(true);
+  await frames(20);
+  const on = await partState();
+  check('the isolator is on (0 degrees) and the sub-breakers are up', approx(on.isolator.rz, 0, 0.01) && on.toggles.every((t) => approx(t.rx, -0.5, 0.01)), JSON.stringify(on));
+  check('the isolator and the sub-breakers moved between off and on', Math.abs(on.isolator.rz - off.isolator.rz) > 1.5 && Math.abs(on.toggles[0].rx - off.toggles[0].rx) > 0.8);
+
+  const panelShots = [
+    ['breaker-off-front', POWER_OFF, false, { x: -5.6, y: 1.25, z: -1.0 }, { x: -7.4, y: 1.25, z: -1.0 }],
+    ['breaker-off-threequarter', POWER_OFF, false, { x: -5.9, y: 1.9, z: -2.4 }, { x: -7.35, y: 1.25, z: -1.0 }],
+    ['breaker-off-isolator', POWER_OFF, false, { x: -6.0, y: 1.15, z: -1.26 }, { x: -7.08, y: 1.12, z: -1.26 }],
+    ['breaker-on-front', powerWith(1, 1), true, { x: -5.6, y: 1.25, z: -1.0 }, { x: -7.4, y: 1.25, z: -1.0 }],
+    ['breaker-on-threequarter', powerWith(1, 1), true, { x: -5.9, y: 1.9, z: -2.4 }, { x: -7.35, y: 1.25, z: -1.0 }],
+    ['breaker-on-isolator', powerWith(1, 1), true, { x: -6.0, y: 1.15, z: -1.26 }, { x: -7.08, y: 1.12, z: -1.26 }],
+  ];
+  const consoleShots = [
+    ['console-off-front', POWER_OFF, false, { x: -5.0, y: 1.2, z: -7.8 }, { x: -6.5, y: 1.0, z: -7.8 }],
+    ['console-off-threequarter', POWER_OFF, false, { x: -5.3, y: 1.7, z: -9.2 }, { x: -6.45, y: 1.0, z: -7.9 }],
+    ['console-on-front', powerWith(1, 1), true, { x: -5.0, y: 1.2, z: -7.8 }, { x: -6.5, y: 1.0, z: -7.8 }],
+    ['console-on-threequarter', powerWith(1, 1), true, { x: -5.3, y: 1.7, z: -9.2 }, { x: -6.45, y: 1.0, z: -7.9 }],
+    ['console-on-keypad', powerWith(1, 1), true, { x: -5.1, y: 1.55, z: -7.8 }, { x: -6.55, y: 1.12, z: -7.8 }],
+    ['console-on-lever', powerWith(1, 1), true, { x: -5.2, y: 1.1, z: -8.14 }, { x: -6.3, y: 0.95, z: -8.14 }],
+  ];
+  for (const [name, power, leverOn, eye, target] of [...panelShots, ...consoleShots]) {
+    await setPower(power);
+    await throwLever(leverOn);
+    await cam(eye, target);
+    await shot(name);
+  }
+  await throwLever(false);
+  await setPower(powerWith(1, 1));
+
   // ---- MEASURE: draw calls and fps at the gate view (Low), in the state the lab is seen in when powered
   await cam({ x: 0, y: 1.7, z: 2.6 }, { x: 0, y: 1.5, z: -1.0 });
   await setPower(powerWith(1, 1));
@@ -188,6 +264,8 @@ try {
     return { fps: Math.round((1000 / ms) * 10) / 10, frameMs: Math.round(ms * 100) / 100, calls: s.calls, triangles: s.triangles };
   });
   console.log(`MEASURE ${JSON.stringify({ quality: quality?.quality ?? quality?.tier ?? null, ...measured })}`);
+  // the budget: TICKET-06's draw calls (180 on the 3D PC, 182 measured again at HEAD before TICKET-06b) plus 5
+  check('the lab draws within the draw-call budget (at most 185)', measured.calls <= 185, `${measured.calls} calls`);
 
   check('no page errors while the lab runs', pageErrors.length === 0, pageErrors.slice(0, 3).join(' | '));
   console.log(`\nAll ${passed} lab overhaul checks passed. Shots in ${path.relative(root, shotsDir)}.`);

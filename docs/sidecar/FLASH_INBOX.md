@@ -141,3 +141,6 @@ This job touches only `apps/web/src/base/ui/` (`radial-menu.*`, `hud-zones*`), `
 
 ## F-18 [HELD] TICKET-10: the wave band, monster wall pathing, the foregrip IK, play-scene Window A
 Brief: `docs/prompts/sidecar/T10-wave-band-monster-nav-window-a.md` (Argo's bundle and ARGO_NOTE_12). HELD: play-scene.ts has one writer at a time, and Haiku's T11b holds it now. Opus opens F-18 when T11b and then TRIFT (the rift fix, docs/prompts/sidecar/TRIFT-make-the-rift-visible.md) have landed. Read the brief's "copy or merge" section first: never copy Argo's play-scene.ts.
+
+## F-19 [HELD] TICKET-14: the real-time credits video, the lab monitor jukebox, the title entry
+Brief: `docs/prompts/sidecar/T14-credits-video.md` (Argo's bundle and ARGO_NOTE_13). HELD until Haiku's T11b lands (it is in play.tsx); Opus opens it. Then do F-19 before F-18: T14 doesn't touch play-scene.ts, so it can run alongside TRIFT. Read the brief's font section first: check the embedded font's origin and rename it before shipping anything.

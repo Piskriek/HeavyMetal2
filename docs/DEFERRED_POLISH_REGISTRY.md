@@ -16,7 +16,7 @@
 | **POL-17** | **Twin Gate Detail on the Planet** | Claude Opus (2026-10-07) | The planet's twin gate is built once at stage-1 detail; rebuild it at full detail when the plot reaches stage 2. | **Done in TASK-08** (Sidecar, 2026-10-08): `rebuildTwin` rebuilds twin gate at stage 6 on reaching stage 2. |
 | **POL-06** | **Console & Mill Visual Upgrades** | Arena Battle `console-mill` | Richer 3D operator console and texture mill props from concept sheet 12. | **Done in TASK-08** (Sidecar, 2026-10-08): swapped `@hm/consolemill` operator console into lab room and texture mill into machine props. |
 | **POL-23** | **Anomaly Field Node Concept Models** | Sidecar TASK-04 | Stand-in node geometries (dodecahedron, torus, icosahedron, cone) await dedicated concept art pass from Arena Codex/Art agents. | Concept Art pass. |
-| **POL-24** | **Heavy Terraformer Industrial Models** | Sidecar TASK-04 | Heavy terraformer machines currently use 1.9x scaled stand-in props on 8m hardpoints. Await multi-tier industrial modular models. | 3D Asset pass. |
+| **POL-24** | **Heavy Terraformer Industrial Models** | Sidecar TASK-04 | Heavy terraformer machines currently use 1.9x scaled stand-in props on 8m hardpoints. Await multi-tier industrial modular models. | **Closed (T13a, 2026-10-18):** Argo confirmed it in ARGO_NOTE_16. The packed heavy models and the gantry are in registry.json and bound in machine-props.ts, and no 1.9x stand-in is left. |
 | **POL-25** | **Window Flash on the Lab Floor** | TASK-19 review 3 (2026-10-13) | A static burst in the window view should briefly light the lab floor. The light gain is up (+12 per unit of flash, capped at 0.7), but the capture lands about 0.3 s after the peak, so it cannot be shown yet. Add a peak hook in the vista and check it by eye. | Polish pass. |
 | **POL-26** | **Stage-0 Storm Ground Speckle** | TASK-19 review 3 (2026-10-13) | At progress 0 the window's dust plain is EGA-quantised (Pxd 0.15) and speckles black and white. It follows the plan's fidelity, but it is busy. Kept for now; a candidate for the owner's Studio polish (raise the ground's Pxd or soften the dither). | Owner's Studio pass. |
 | **POL-27** | **Single-File Size Watch** | Opus (2026-10-13) | Was 17.9 MB. **Closed 2026-10-13 (0e3a6f2e): 14.51 MB.** Astro's mid and high levels moved to the HD pack, and a duplicate QuickJS was removed. The build now fails above 16 MB (vite.config.ts, hm-size-gate). Next room if needed: vista-only props to a fetched side file behind the loading bar. TASK-24 still measures the load and parse time on the GTX 950M. | Closed; gate in the build. |
@@ -79,7 +79,7 @@
 | **POL-73** | **Heavy pads have no on/off switch** | TICKET-03 (2026-10-17), BB-10 | The machine inspector shows no Turn Off on a base pad (mill, press, fabricator, projector, water): there is no world command that switches a pad machine, and the brief said not to invent one. Plot machines keep their switch. Needs a `switch` command in `base/world.ts` and an `on` flag on `Machine`, then the toggle comes back in `machine-inspect.ts`. | Opus decision. |
 | **POL-74** | **Plot-machine inspector not browser-tested** | TICKET-03 (2026-10-17) | `scripts/test-machine-inspector.mjs` covers the base pads, the refinery, the fabricator, Esc, Tab and the bench. The planet plot-machine path (E on a plot machine, Switch on/off, Cartridge and removal) is covered by the unit test of `inspectMachine` only. | Add a browser step once a plot machine can be placed from the test. |
 | **POL-75** | **Plume emitters on the scaled machines** | TICKET-03 (2026-10-17), BB-09 | `machineProp` now scales each machine to its table height and scales its vent socket with it. `play-scene.ts` still places the plume emitters from `prop.vent`, so they follow the scale, but no shot has looked at a running machine's plume against its new height. | Look at a running mill and projector in a shot. |
-| **POL-76** | **Unused generator prop builder** | TICKET-03 (2026-10-17) | `createGenMachineProp` in `assets/gen-props.ts` builds its generated branch without the table-height scale (its fallback does get it). Nothing calls it today. | Scale it the same way, or delete it. |
+| **POL-76** | **Unused generator prop builder** | TICKET-03 (2026-10-17) | `createGenMachineProp` in `assets/gen-props.ts` builds its generated branch without the table-height scale (its fallback does get it). Nothing calls it today. | **Closed (T13a, 2026-10-18): deleted.** There is no 1.9x branch left in `gen-props.ts` to scale. The unused `resolveGenMachineScale` helper (in `play/window-c-hooks.ts`) went too. |
 | **POL-77** | **Inspector hopper reads the whole network against a cap of 100** | TICKET-03 (2026-10-17), seen in `shots-run/inspector/inspector-mill.png` | `findStationFeedHopper` in `machine-inspect.ts` counts the ore of the whole network and divides by a fixed cap of 100, so the bar reads "Regolith Ore: 4835 / 100" with a full bar. Use the real cap for the hopper, or show the network stock as a number with no bar. | Opus decision on the cap. |
 | **POL-78** | **Pause panel cuts off the controls grid at 720 px** | TICKET-04 (2026-10-17), shots-run/build-ux/esc-controls.png | The Esc screen now shows the 20-row keycap grid (ControlsGrid). At 1280 x 720 the shot shows only the first nine rows; the rest sit under the Resume and Sync buttons. Not checked for scrolling. | Make the controls section scroll inside the panel, or lay the grid out in three columns at this width. |
 | **POL-79** | **Radial slice labels truncate** | TICKET-04 (2026-10-17), shots-run/build-ux/radial-build.png | The build radial shows "Weapon ben..." for Weapon bench: the slice label is capped at 80 px in radial-menu.css. | Wrap the label to two lines, or widen the slice. |
@@ -373,3 +373,38 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 - **Seen:** T14. E still opens the Bridge Incident Log (campaign beat 9c pins it). The jukebox is on J, with both replays, and R plays "Four Floats (Overclocked)" with the equaliser lit. The far shot shows the four bars on the monitor face; the near shot (`monitor-equaliser-R.png`) shows none.
 - **Expected:** Keep E as it is. In T16, J's credits replay waits for `endingSeen`. Check the bars' placement up close.
 - **Done in F-23 (Gemini-Flash):** In `apps/web/src/credits/credits-hud.tsx`, J's credits replay button is locked/disabled with reason "Available once campaign finale is reached" when `endingSeen` is false. On title screen (`homeMenu` in `goblin-front.tsx`), Ending Credits item is hidden until `endingSeen` is true. Esc debug menu has "Play ending credits" for preview anytime. Verified in `test-credits-video.mjs` (47/47) and `test-campaign.mjs`.
+
+### POL-291: the perimeter turret's bill and unlock (confirmed, not open)
+- **Ruling:** ARGO_NOTE_17, section c: 40 ore, 2 prim-cube and 1 prim-column; unlocked at stage 2. Argo confirmed the bill as set.
+- **Built in T13a (2026-10-18):** `catalog.ts` (PIECE_ORE 40, PIECE_EXTRA, PIECE_STAGE turret 2, the column family). `world.ts` `build()` refuses a turret below stage 2 ("locked").
+- Sidecar Task: none.
+
+### POL-292: the turret's 2 kW does not yet count in the HUD's "N of 12 kW" budget
+- **Seen:** T13a. The plot's budget reads `Env.extraDrawKw` (plotsim, read at each solve). `turretGridDrawKw` (base/world.ts) gives 2 kW per built turret. The play scene's own turret brownout uses the same budget, so the turrets do brown out. The HUD readout (play.tsx) builds its Env without `extraDrawKw`, so the readout does not show the turrets' draw.
+- **Expected:** one line in play.tsx's Env literal (near line 1696): `extraDrawKw: () => turretGridDrawKw(baseWorldRef.current.base)`. play.tsx is T14/Flash's file, so T13a did not touch it.
+- Sidecar Task: POL-292 - T14 or the owner adds the line.
+
+### POL-293: the scatter sidearm's numbers come from the weapon bench, not Argo's placeholders
+- **Seen:** T13a. `SCATTER_SIDEARM_PRESET` (base/weapons.ts) is a loadout (burst core, scatter barrel, iron sight, compact cell); its numbers are `weaponStats(loadout)`: 7 pellets, 60 m, burst of three, 16 to 22 damage per pellet. Argo's draft had 18 m range and 6 damage, which the weapon bench does not use.
+- **Expected:** Argo confirms the scatter numbers (or asks for different parts or a different core).
+- Sidecar Task: POL-293 - Argo confirms the sidearm's numbers.
+
+### POL-294: frame cost on Low is not a GPU timer
+- **Seen:** T13a. Four turrets on Low: 60 fps over 3 s, 260 k triangles, 117 draw calls. The play scene does not expose its renderer, so there is no GPU timer. The synced readback (one pixel per frame) caps at the display rate (16.6 ms), so it shows no more than "under 16.6 ms".
+- **Expected:** a GPU timer hook in the play scene (or a perf run that can read one) to give the real GPU ms against T03P-R.
+- Sidecar Task: POL-294 - the timer hook, for the owner's machine.
+
+### POL-295: the turret's support on pitched roofs is untested
+- **Seen:** T13a. A turret takes a corner socket and is held by the floor or foundation cells round its corner (at its level), or by the walls and pillar standing on that corner one level down. The tests cover wall tops and a flat floor deck. Pitched roof kinds count as cells, but no test puts a turret on a pitched roof, so its base may sit on the eave or inside the slope.
+- **Expected:** T13b tests a turret on a pitched roof's eave, and either accepts it there or refuses it.
+- Sidecar Task: T13b.
+
+### POL-296: the peaceful recipes are data, not yet in the lab's combiner
+- **Seen:** T13a. `PEACEFUL_COMBINER_RECIPES` (cartlab) makes pxd-mono, vtx-rough and anomaly-core from ore, pxd-mono and a blank. The parity test (plotsim tests) checks every real drop, from leaksim's table mapped by monsters/policy.ts, against a seal reward and a recipe. The in-game Preset Combiner mixes cartridges, not items, so the recipes are not yet offered to the player.
+- **Expected:** Argo and the owner decide how a player reaches these recipes in the lab (a new lab step, or the existing combiner's item mode).
+- Sidecar Task: POL-296 - Argo rules on the lab's peaceful route.
+
+### POL-297: the blue-sky wave's sky is mid-transition in the push shot
+- **Seen:** T13a. The stage push is in plotsim (ruling 06, `stage-up` to 4 on the first running heavy projector). The push shot, taken about a second after the install, shows the projector running, with its amber plume, and the sky going dark with stars. The stage-4 water shows in the east shot. The wave band itself is not clearly visible in any shot.
+- **Expected:** Argo reviews the wave band and the stage-4 sky on a settled shot, and the owner says whether the mid-wave dark sky is intended.
+- Sidecar Task: POL-297 - Argo reviews the push shots (shots-run/ticket13-stage-push.png).

@@ -1602,5 +1602,29 @@
       0.067,
       0.25
     ]
+  },
+  "turret-base": {
+    "class": "fixture",
+    "size": [
+      0.9,
+      0.672,
+      0.899
+    ]
+  },
+  "turret-yoke": {
+    "class": "moving-part",
+    "size": [
+      1.013,
+      0.75,
+      0.275
+    ]
+  },
+  "turret-gun": {
+    "class": "moving-part",
+    "size": [
+      0.87,
+      0.508,
+      0.9
+    ]
   }
 }

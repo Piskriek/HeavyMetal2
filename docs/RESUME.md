@@ -1,5 +1,12 @@
 # RESUME: start here (fresh session)
 
+## 18 Oct, evening (read first)
+- **Landed:** the T03P follow-up (the fabricator pours while printing, feeds from the registry's measured sockets, 44b6107f); Flash's F-20 (POL-175 and 174; POL-99 half done, the HUD still shows); and `test-on-3dpc.sh` falls back to the laptop when the worker is busy (owner), running as one function so a mid-run edit can't break it.
+- **TICKET-13:** the heavy machines and the gantry were already packed. Sheet 20 had no turret, so Opus drew P-41 (`panels/20/20-turret-s6.png`) and split it into turret-base, turret-yoke and turret-gun (images approved; the barrel is built in code). OPUS_NOTE_23 and `ticket13-context.json` are in Setmix; Argo is on it (ARGO_NOTE_16 first: the turret ruling and five plume answers).
+- **The 3D PC pipeline is stalled:** its memory gate wants 7 GB of free VRAM, but the separate Hunyuan mini server started at logon holds about 5 GB, so the turret jobs wait. The owner's PC agent has to change the logon setup.
+- **Running:** Haiku T14 (the credits). Flash: F-21 (@hm/plume gravity and count), then F-22 (POL-99).
+- **The play-scene queue:** free now. T07b (F-12) and T09b wait for T14 to release `play.tsx`; then F-13, T15, T16, and TICKET-13's Window C.
+
 ## 18 Oct, afternoon (read first)
 - **Landed today:**
   - TICKET-12 (F-16 and F-17, Flash);

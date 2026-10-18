@@ -79,7 +79,7 @@ Brief: `docs/prompts/sidecar/T02F2-early-stages.md`. Tufts on Low, machines and 
 ## F-08 [DONE] TICKET-02 B+E: Argo's coverage shader and water surfaces, wired in
 Brief: `docs/prompts/sidecar/T02BE-coverage-water.md`. Start it only after F-07 is DONE. In play.tsx touch the loading step only (Haiku is on the E handler).
 
-## F-09 [HAIKU] TICKET-02 P: performance pass, stage 6 on Low at 45 fps or more on the laptop
+## F-09 [DONE] TICKET-02 P: performance pass, stage 6 on Low at 45 fps or more on the laptop
 > **Reassigned to Haiku by Opus, 2026-10-18 02:50:** Flash has made no change since 17:54 on 17 October. Haiku finishes from Flash's uncommitted work in progress (play-scene.ts, plot-ground.ts, plot-biome-view.ts, water-surfaces.ts, packages/groundshader). Flash: don't resume F-09; take F-10 when it is DONE.
 Brief: `docs/prompts/sidecar/T02P-performance-pass.md`. Measure per layer first; expensive looks go behind Graphics settings with Auto, never deleted.
 

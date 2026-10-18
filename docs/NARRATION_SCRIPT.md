@@ -99,3 +99,18 @@ These follow the base-building milestone already built.
 | SFX | UI | Hover, select, open and close, in the glowing telemetry style. |
 
 About 40 effects at about 3 s each come to under 1,000 credits. With the music stems, all audio is about 3,000 to 4,000 credits.
+
+## Acts VII to IX and the finale (Argo, ARGO_NOTE_15, 2026-10-18)
+| ID | When | Line |
+|---|---|---|
+| A7-01 | Act VII: the gate feed red-lines (after F-03) | "[breathes] You're red-lining the Gate's twelve-kilowatt feed. Drop a dedicated Power Unit on the pad and string Relay Pylons toward the eastern crater—we need real megawatts to spin up the Water Maker." |
+| A7-02 | Act VII: first water pools in the basin | "[relieved] Condensers online. Look at the low basin—actual liquid water pooling over the regolith. Give it light and coverage will creep right up the banks." |
+| A7-03 | Act VII: drive to the perimeter wrecks | "[dry] Walking a one-kilometre crater gets old fast. Drive the Scout out to the perimeter wrecks and pull their transponder logs—and bolt a turret to your corner before the sappers sniff out our power line." |
+| A8-01 | Act VIII: splice Vance's anomaly cores | "[pause] So Vance really did try to hot-patch the kernel from the Moon. Bring those Anomaly Cores to the Preset Combiner—let's splice a high-density cartridge strong enough to lock the whole plot." |
+| A8-02 | Act VIII: hold the perimeter rift | "Standard field units won't push us past Stage Four alone. Hold that perimeter rift—seal the tear with your beam or let the turrets clear the wave—and bring the Heavy Terraformers online." |
+| A8-03 | Act VIII: the biosphere locks in | "[relieved] Coverage is holding! Moss, clover, and soil normals locking onto bare basalt. One more push on all four floats and we hit full biosphere coherence." |
+| A9-01 | Act IX: the eleven horizon domes light up | "[quietly] All four floats above point-eight-five. Look at the trees—and check the horizon. Eleven neighboring domes shining back at us. Come back through the Gate and slot the Golden Master into the Planet Table." |
+| A9-02 | Act IX: the consensus branch commits | "[breathes] Consensus branch committed at eighty-five percent. Look out the observation window! The Breach column is collapsing—the fidelity pockets are merging across the ruins. You didn't just build a moon, kid. You patched the host." |
+| A9-03 | Act IX: the finale hand-off into the ending song | "[relieved] Eleven domes on the horizon, a living forest outside the Gate, and the Lab's finally off emergency power. Take the rover out whenever you want—the Studio's yours." |
+| BARK-RECALL | Sync hits zero and pulls the player back (repeatable, 45 s cooldown, POL-57) | "[breathes] Sync hit zero—pulling you back through the Twin Gate now! [pause] Easy... breathe. Your pack and your base are still intact." |
+| BARK-BROWNOUT | Machines brown out on the 12 kW gate feed (repeatable, 60 s cooldown, POL-57) | "[dry] That's the twelve-kilowatt Gate ceiling—your machines are browning out at half speed. Wire a field Power Unit and Relay Pylon to pick up the load." |

@@ -21,8 +21,8 @@ import { preloadVista, VISTA_LEVEL, type WindowView } from './lab-vista';
 import { createPlotHolo, type PlotHolo } from './plot-holo';
 import { COLOUR_MARK_FRAGMENT, localMachineWaveAt, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_OFF_FRAGMENT, OPENING_OFF_VERTEX, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX, scanRingFadeAt, waveBandColourFor } from './portal-shaders';
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
-import { disposeProp, lineSpan, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
-import { beadSpeed, plumeCount, spanPoint, spanSag } from './brownout-visual';
+import { disposeProp, FEED_CUBES_FULL, feedCubeCount, feedCubeProgress, lineSpan, machinePlumeCount, machinePlumeLook, machinePlumeSpec, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
+import { beadSpeed, spanPoint, spanSag } from './brownout-visual';
 import { castHeightfield, castSpheres, createRoverArmState, nearestHit, stepRoverArm, type CastSphere, type RoverArmState, type Vec3 as RoverVec3 } from './rover-camera';
 import { createExposureState, createScanWave, exposureTargetLuminance, gateOrLabFactor, markScanWaveDone, scanFrame, stepExposure, suitCamMix, suitCamProfile, suitCamStrength, triggerScanWave, type ExposureState, type ScanWave, type SuitCamSetting } from './stage-look';
 import { AVATAR_LIGHT_LAYER, createScientistInstance, scientistLevelFor, thirdPersonLightRig } from '../avatar/scientist/scientist-model';
@@ -179,8 +179,9 @@ const GROUND_SECONDS = ((): number => { let lo = 0, hi = 60; for (let i = 0; i <
 const RACER_REACH = 300;
 /** The planet's wind for the plumes: from the west-south-west, enough to lean a pour about 3 m downwind by the top. */
 const WIND = { x: 0.94, z: 0.35, speed: 3.3 };
-/** The texture mill's pour: a full, wide plume (the owner: pixels visibly spewing out), 220 pixels at density 1. */
-const MILL_POUR = { count: 220, height: 7.5, spread: 4.5 };
+/** Each machine's pour now comes from its own kind's look and count (machine-props.ts, ARGO_NOTE_08). */
+/** Most machines the feed hoppers draw at once (one instanced draw for every hopper's cubes). */
+const MAX_FEED_MACHINES = 48;
 
 export interface PlayScene {
   /** Puts the planet in place (once, after its looks are baked). */
@@ -356,6 +357,8 @@ export interface PlayScene {
     detail(): Detail & { readonly planet: readonly [number, number]; readonly pixels: number };
     /** Machines standing on the plot, and how many pour pixels now. */
     machines(): { readonly standing: number; readonly pouring: number };
+    /** Each machine's pour (ARGO_NOTE_08): its kind, whether its emitter is up, its pixel count now, its colour, its vent and its feed cubes. */
+    plumes(): readonly { readonly kind: string; readonly emitting: boolean; readonly pour: number; readonly colour: string; readonly base: readonly [number, number]; readonly vent: readonly [number, number, number] | null; readonly feedCubes: number }[];
     holo(): { readonly visible: boolean; readonly machines: number };
     view(): 'first' | 'third';
     clipWeight(name: ClipName): number;
@@ -771,7 +774,8 @@ export function createPlayScene(o: {
 
   // ---- the plot's machines (`@hm/plotsim`): each a prop (machine-props.ts) on the ground, its cable from the node that powers it,
   // the lines between pylons, and the pixels pouring from every pixel machine that runs (one plume for all, `@hm/plume`)
-  interface MachineView { readonly m: Machine; prop: MachineProp; vent: THREE.Vector3 | null; emitter: number | null; running: number; glow: THREE.Mesh | null; light: THREE.PointLight | null }
+  /** share: the machine's run share as its pour uses it (a pylon's is 1 while its line is under load); pour: the pixels it pours now. */
+  interface MachineView { readonly m: Machine; prop: MachineProp; vent: THREE.Vector3 | null; feed: THREE.Vector3 | null; emitter: number | null; running: number; share: number; pour: number; glow: THREE.Mesh | null; light: THREE.PointLight | null }
   const views = new Map<number, MachineView>();
   // TICKET-01 B: the moon's solids exist from the start (the twin's frame stands before any machine is placed)
   rebuildPlanetStatic();
@@ -813,6 +817,50 @@ export function createPlayScene(o: {
     beadMesh.count = k;
     beadMesh.visible = k > 0;
     if (k > 0) beadMesh.instanceMatrix.needsUpdate = true;
+  };
+  // the feed hoppers (brief 29, item 6): dark grey ore cubes drop into each hopper while its machine consumes; the count follows the
+  // run share (0 when the machine is off or out of ore). One instanced draw for every hopper.
+  const feedMat = keep(new THREE.MeshLambertMaterial({ color: '#3b3f46' }));
+  const feedMesh = keep(new THREE.InstancedMesh(keep(new THREE.BoxGeometry(1, 1, 1)), feedMat, MAX_FEED_MACHINES * FEED_CUBES_FULL));
+  feedMesh.count = 0;
+  feedMesh.visible = false;
+  feedMesh.frustumCulled = false;
+  feedMesh.name = 'machine-feed-cubes';
+  planetScene.add(feedMesh);
+  const feedM = new THREE.Matrix4(), feedQ = new THREE.Quaternion(), feedS = new THREE.Vector3(), feedP = new THREE.Vector3();
+  /** Each frame: every pour's pixel count (one number from machine-props: rate x life x run share x cadence, T15 multiplies it by the beat)
+   *  and every feed hopper's cubes. */
+  const tickMachinePlumes = (t: number): void => {
+    let i = 0;
+    let live = 0;
+    for (const v of views.values()) {
+      if (v.emitter !== null) {
+        v.pour = machinePlumeCount(v.m.kind, v.share, t);
+        plume.setCount(v.emitter, v.pour);
+      }
+      if (i >= MAX_FEED_MACHINES) break;
+      const feed = v.feed;
+      const drop = feedCubeCount(v.share);
+      for (let c = 0; c < FEED_CUBES_FULL; c++) {
+        const slot = i * FEED_CUBES_FULL + c;
+        if (feed === null || c >= drop) {
+          feedM.makeScale(0, 0, 0);
+        } else {
+          const p = feedCubeProgress(t, c, FEED_CUBES_FULL);
+          const q = Math.min(1, Math.max(0, (p - 0.8) / 0.2));
+          const size = 0.08 * (1 - q * q * (3 - 2 * q));
+          feedP.set(feed.x + Math.sin(c * 2.1) * 0.03, feed.y + 0.9 * (1 - p * p), feed.z);
+          feedS.setScalar(size);
+          feedM.compose(feedP, feedQ, feedS);
+          live++;
+        }
+        feedMesh.setMatrixAt(slot, feedM);
+      }
+      i++;
+    }
+    feedMesh.count = i * FEED_CUBES_FULL;
+    feedMesh.visible = live > 0;
+    if (feedMesh.count > 0) feedMesh.instanceMatrix.needsUpdate = true;
   };
   const cableMat = m.rubber;
   const worldOf = (v: MachineView, local: THREE.Vector3): THREE.Vector3 => local.clone().applyMatrix4(v.prop.group.matrixWorld);
@@ -880,7 +928,18 @@ export function createPlayScene(o: {
         planetScene.add(light);
       }
     }
-    return { m: mm, prop, vent: prop.vent ? prop.vent.clone().applyMatrix4(prop.group.matrixWorld) : null, emitter: null, running: 0, glow, light };
+    return {
+      m: mm, prop,
+      vent: prop.vent ? prop.vent.clone().applyMatrix4(prop.group.matrixWorld) : null,
+      feed: prop.feed ? prop.feed.clone().applyMatrix4(prop.group.matrixWorld) : null,
+      emitter: null, running: 0, share: 0, pour: 0, glow, light,
+    };
+  };
+  /** One machine's pour (`@hm/plume`): its colour, look and pixel count, all from machine-props.ts (ARGO_NOTE_08). */
+  const addPlume = (v: MachineView, vent: THREE.Vector3, startAt: number): number => {
+    const look = machinePlumeLook(v.m.kind);
+    v.pour = machinePlumeCount(v.m.kind, v.share, clock);
+    return plume.add({ at: [vent.x, vent.y, vent.z], colour: machinePlumeSpec(v.m.kind).colour, ...look, count: v.pour, startAt });
   };
   const unbuild = (v: MachineView): void => {
     planetScene.remove(v.prop.group);
@@ -973,11 +1032,11 @@ export function createPlayScene(o: {
     if (stageShown === propStage) return;
     propStage = stageShown;
     for (const [id, v] of views) {
-      const running = v.running, emitter = v.emitter;
+      const running = v.running, emitter = v.emitter, share = v.share;
       v.emitter = null;
       unbuild(v);
       const nv = build(v.m);
-      nv.running = running; nv.emitter = emitter;
+      nv.running = running; nv.emitter = emitter; nv.share = share;
       if (running > 0.05) nv.prop.light(1);
       if (nv.glow) {
         nv.glow.visible = detail.plumeGlow && running > 0.05;
@@ -2152,8 +2211,7 @@ export function createPlayScene(o: {
       // a restored plot's machines are already running: their pixels show at once
       for (const v of views.values()) if (v.emitter !== null) { plume.remove(v.emitter); v.emitter = null; }
       for (const v of views.values()) {
-        const metric = PIXELS_OF[v.m.kind];
-        if (metric && v.vent && v.running > 0.05) v.emitter = plume.add({ at: [v.vent.x, v.vent.y, v.vent.z], colour: METRIC_COLOUR[metric], ...MILL_POUR, startAt: -100 });
+        if (v.vent && Math.round(v.share * 100) > 5) v.emitter = addPlume(v, v.vent, -100);
         if (v.glow) {
           v.glow.visible = detail.plumeGlow && v.running > 0.05;
           setGlowStrength(v.glow, Math.min(1.0, v.running) * 0.75);
@@ -2190,9 +2248,14 @@ export function createPlayScene(o: {
         }
       }
       if (changed) syncMonstersNavAndSolids(activeBase);
-      // pixels pour from every pixel machine while it runs; lamps and housing status LEDs (POL-39) show which run
+      // pixels pour from every machine while it operates (ARGO_NOTE_08): a machine that is off, unpowered or out of ore pours nothing.
+      // A pylon sparks while its line is under load: connected, powered, and some machine on the grid runs.
+      let gridLoaded = false;
+      for (const x of running.values()) if (x > 0.05) { gridLoaded = true; break; }
+      // lamps and housing status LEDs (POL-39) show which run
       for (const v of views.values()) {
         const r = running.get(v.m.id) ?? 0;
+        v.share = v.m.kind === 'pylon' ? (connected.has(v.m.id) && satisfaction > 0 && gridLoaded ? 1 : 0) : r;
         noteMachineActivationPulse(v.m.id, v.m.kind, v.m.x, v.m.z, r);
         if ((r > 0.05) !== (v.running > 0.05)) v.prop.light(r > 0.05 ? 1 : 0.1);
         v.prop.setStatusLed?.(r, connected.has(v.m.id), satisfaction, clock);
@@ -2205,12 +2268,12 @@ export function createPlayScene(o: {
           v.light.visible = detail.pixelLights && r > 0.05;
           v.light.intensity = v.light.visible ? r * 12.0 : 0;
         }
-        const metric = PIXELS_OF[v.m.kind];
-        if (!metric || !v.vent) continue;
-        if (r > 0.05 && v.emitter === null) v.emitter = plume.add({ at: [v.vent.x, v.vent.y, v.vent.z], colour: METRIC_COLOUR[metric], ...MILL_POUR, startAt: clock + 0.6 });
-        else if (r <= 0.05 && v.emitter !== null) { plume.remove(v.emitter); v.emitter = null; }
-        // TASK-26: the pour follows the machine's run rate, so a brownout thins the plume
-        if (v.emitter !== null) plume.setCount(v.emitter, plumeCount(MILL_POUR.count, r));
+        // the plume is up while the machine's run reads above 5% (the inspector's plumeOn: runPct > 5), and no longer
+        const plumeOn = Math.round(v.share * 100) > 5;
+        if (plumeOn && v.vent && v.emitter === null) v.emitter = addPlume(v, v.vent, clock + 0.6);
+        else if (!plumeOn && v.emitter !== null) { plume.remove(v.emitter); v.emitter = null; v.pour = 0; }
+        // TASK-26: the pour follows the run share (and its cadence each frame, in tickMachinePlumes)
+        if (v.emitter !== null) { v.pour = machinePlumeCount(v.m.kind, v.share, clock); plume.setCount(v.emitter, v.pour); }
       }
     },
     richness(x, z) {
@@ -2965,6 +3028,7 @@ export function createPlayScene(o: {
       // a quarter of the pixels race out to the wave's front while it runs
       const wc = postUniforms.uWaveCentre.value;
       plume.setWave([wc.x, wc.y, wc.z], waveTo >= 0 ? Math.min(r, RACER_REACH) : -1);
+      tickMachinePlumes(now);
       plume.update(now);
       labPlume.update(now);
       beamFx.update(now);
@@ -3429,6 +3493,15 @@ export function createPlayScene(o: {
       gatePlanet: () => ({ x: twin.group.position.x, z: twin.group.position.z }),
       detail: () => ({ ...detail, planet: [postUniforms.uRes.value.x, postUniforms.uRes.value.y] as const, pixels: plume.stats().pixels }),
       machines: () => { let pouring = 0; for (const v of views.values()) if (v.emitter !== null) pouring++; return { standing: views.size, pouring }; },
+      plumes: () => [...views.values()].map((v) => ({
+        kind: v.m.kind,
+        emitting: v.emitter !== null,
+        pour: v.pour,
+        colour: machinePlumeSpec(v.m.kind).colour,
+        base: [v.m.x, v.m.z] as const,
+        vent: v.vent ? [v.vent.x, v.vent.y, v.vent.z] as const : null,
+        feedCubes: v.feed ? feedCubeCount(v.share) : 0,
+      })),
       holo: () => holo.debug(),
       view: () => cameraView,
       clipWeight: (name: ClipName) => scientistAnimator?.getClipWeight(name) ?? 0,

@@ -25,7 +25,9 @@ import { disposeProp, lineSpan, machineProp, PIXELS_OF, type MachineProp } from 
 import { beadSpeed, plumeCount, spanPoint, spanSag } from './brownout-visual';
 import { castHeightfield, castSpheres, createRoverArmState, nearestHit, stepRoverArm, type CastSphere, type RoverArmState, type Vec3 as RoverVec3 } from './rover-camera';
 import { createExposureState, createScanWave, exposureTargetLuminance, gateOrLabFactor, markScanWaveDone, scanFrame, stepExposure, suitCamMix, suitCamProfile, suitCamStrength, triggerScanWave, type ExposureState, type ScanWave, type SuitCamSetting } from './stage-look';
-import { createScientistInstance } from '../avatar/scientist/scientist-model';
+import { AVATAR_LIGHT_LAYER, createScientistInstance, scientistLevelFor, thirdPersonLightRig } from '../avatar/scientist/scientist-model';
+import { socketMarkerGeometry, socketMarkerMaterial, socketMarkerOpacity } from './socket-markers';
+import { outcropGeometry, outcropMaterial } from './outcrops';
 import { loadScientistAnimations, type ClipName } from '../avatar/scientist/anims-loader';
 import { createScientistAnimator, type OneShotKind, type ScientistAnimator } from '../avatar/scientist/animator';
 import { loadRifleAnimations } from '../avatar/astro/rifle-clips';
@@ -393,6 +395,12 @@ export interface PlayScene {
     coverageActive(): boolean;
     planetScene(): THREE.Scene;
     labScene(): THREE.Scene;
+    /** TICKET-05 check hooks: the main camera, the beam core's state, the active socket marker's position, and the avatar layer. */
+    camera(): THREE.PerspectiveCamera;
+    beamCore(): { readonly shown: boolean; readonly colour: string | null };
+    activeSocket(): readonly number[] | null;
+    avatarLayer(): number;
+    pinBeam(on: boolean): void;
     setWaterVisible(v: boolean): void;
     setCoverageActive(v: boolean): void;
     pixelLightCount(): number;
@@ -1057,20 +1065,45 @@ export function createPlayScene(o: {
   const planGhostsGroup = keep(new THREE.Group());
   planetScene.add(planGhostsGroup);
 
-  // Single InstancedMesh capped at 48 for pulsing cyan socket glow
-  const socketRingGeo = keep(new THREE.RingGeometry(0.45, 0.65, 32));
-  socketRingGeo.rotateX(-Math.PI / 2);
-  const socketRingMat = keep(new THREE.MeshBasicMaterial({
-    color: 0x00f0ff,
-    transparent: true,
-    opacity: 0.95,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-    depthTest: false,
-  }));
+  // TICKET-05 (BB-05): square corner-bracket socket markers. One InstancedMesh (capped at 48) shows every open slot at the low
+  // rest opacity; the slot the build ghost is about to take gets an overlay that pulses, so only that one reads bright.
+  const socketRingGeo = keep(socketMarkerGeometry());
+  const socketRingMat = keep(socketMarkerMaterial());
   const socketRingMesh = keep(new THREE.InstancedMesh(socketRingGeo, socketRingMat, 48));
+  socketRingMesh.name = 'socket-markers';
   socketRingMesh.count = 0;
   socketRingMesh.visible = false;
+  const socketActiveMat = keep(socketMarkerMaterial());
+  const socketActiveMesh = keep(new THREE.Mesh(socketRingGeo, socketActiveMat));
+  socketActiveMesh.name = 'socket-marker-active';
+  socketActiveMesh.visible = false;
+  socketActiveMesh.renderOrder = 1000;
+  planetScene.add(socketActiveMesh);
+  let socketPoses: readonly { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }[] = [];
+  let ghostXZ: { readonly x: number; readonly z: number } | null = null;
+  /** The slot the build ghost is about to take: the open socket nearest the ghost (within 0.6 m), or none. */
+  const updateActiveSocket = (): void => {
+    let best = -1;
+    let bestD = 0.6 * 0.6;
+    if (ghostXZ !== null && socketRingMesh.visible) {
+      for (let i = 0; i < socketPoses.length; i++) {
+        const sp = socketPoses[i]!;
+        const d = (sp.x - ghostXZ.x) ** 2 + (sp.z - ghostXZ.z) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          best = i;
+        }
+      }
+    }
+    if (best < 0) {
+      socketActiveMesh.visible = false;
+      return;
+    }
+    const sp = socketPoses[best]!;
+    socketActiveMesh.position.set(sp.x, sp.y + 0.05, sp.z);
+    socketActiveMesh.rotation.set(0, sp.yaw, 0);
+    socketActiveMesh.visible = true;
+  };
   // TASK-26: the safe dome's edge, a faint amber ripple where the player crosses it (one ring, one draw call)
   const domeRippleMat = keep(new THREE.MeshBasicMaterial({ color: 0xffc13d, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
   const domeRipple = keep(new THREE.Mesh(keep(new THREE.RingGeometry(0.85, 1, 72)), domeRippleMat));
@@ -1095,18 +1128,19 @@ export function createPlayScene(o: {
   socketRingMesh.renderOrder = 999;
   planetScene.add(socketRingMesh);
 
-  // Stand-in anomaly node markers awaiting concept art
+  // The anomaly nodes are grounded mineral outcrops (TICKET-05 Item F, outcrops.ts): one geometry and one material per kind,
+  // each with a buried root skirt, so the InstancedMesh per kind stands on the ground instead of floating above it.
   const nodeGeometries: Record<F.Kind, THREE.BufferGeometry> = {
-    dither: keep(new THREE.DodecahedronGeometry(0.5, 0)),
-    fold: keep(new THREE.TorusGeometry(0.42, 0.16, 8, 16)),
-    chroma: keep(new THREE.IcosahedronGeometry(0.55, 0)),
-    spire: keep(new THREE.ConeGeometry(0.35, 1.4, 5)),
+    dither: keep(outcropGeometry('dither', 1)),
+    fold: keep(outcropGeometry('fold', 2)),
+    chroma: keep(outcropGeometry('chroma', 3)),
+    spire: keep(outcropGeometry('spire', 4)),
   };
   const nodeMaterials: Record<F.Kind, THREE.Material> = {
-    dither: keep(new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.8, metalness: 0.1, emissive: '#222222' })),
-    fold: keep(new THREE.MeshStandardMaterial({ color: '#ffffff', wireframe: true, roughness: 0.4 })),
-    chroma: keep(new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.2, metalness: 0.3, emissive: '#331122' })),
-    spire: keep(new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.1, metalness: 0.8, emissive: '#0a2233' })),
+    dither: keep(outcropMaterial('dither')),
+    fold: keep(outcropMaterial('fold')),
+    chroma: keep(outcropMaterial('chroma')),
+    spire: keep(outcropMaterial('spire')),
   };
   const nodeBaseColours: Record<F.Kind, THREE.Color> = {
     dither: new THREE.Color('#d9d9d9'),
@@ -1128,6 +1162,8 @@ export function createPlayScene(o: {
   let importedBeamText: string | null = null;
   let heldMode: BeamMode = 'extract';
   let beamSealingNow = false;
+  /** A check's pin: the last beam stays drawn while the game asks for none (debug.pinBeam). */
+  let beamPinned = false;
   /** The rifle's sway, bob and vibration (first person), and its rest pose and scratch objects. */
   let rifleFeel: RifleFeelState = FEEL_START;
   const viewRest = viewPose();
@@ -1329,6 +1365,10 @@ export function createPlayScene(o: {
   viewModelScene.add(viewFill);
   viewModelScene.add(viewRig);
   planetScene.add(camera);
+  // TICKET-05 (Item D): the third-person light rig rides the camera; its lights only reach the avatar layer (drawAvatarLayer)
+  const avatarRig = thirdPersonLightRig(camera);
+  /** The layer state the avatar and rifle meshes were last moved to (see syncAvatarLayers); -1 forces a move. */
+  let avatarLayerState = -1;
 
   const beamCoreGeom = keep(new THREE.CylinderGeometry(0.04, 0.07, 1, 10));
   const beamCoreUniforms = { uColour: { value: new THREE.Color('#00e5ff') }, uLit: { value: 0 } };
@@ -1704,7 +1744,8 @@ export function createPlayScene(o: {
     }
   };
   const initialVisor = o.avatar?.kind === 'scientist' ? o.avatar.visor : '#f59e0b';
-  void Promise.all([createScientistInstance(initialVisor), loadScientistAnimations(), loadRifleAnimations()]).then(
+  // TICKET-05 (Item D): the player's avatar loads at 'high' (scientistLevelFor drops it only on Low with fps under 30)
+  void Promise.all([createScientistInstance(initialVisor, scientistLevelFor('high')), loadScientistAnimations(), loadRifleAnimations()]).then(
     ([{ group, visorMaterials: vm }, clips, rifleClips]) => {
       // Astro's suit is metal on a dark base: under the planet's 1-bit dither (stage 0) it reads as black. This instance gets its own
       // materials (the creator keeps the baked values), with the metal capped; syncSuitEnv gives them the room's reflection on the planet
@@ -1725,6 +1766,7 @@ export function createPlayScene(o: {
       leftHand = group.getObjectByName('mixamorigLeftHand') ?? null;
       leftUpperArm = group.getObjectByName('mixamorigLeftArm') ?? null;
       leftForeArm = group.getObjectByName('mixamorigLeftForeArm') ?? null;
+      avatarLayerState = -1; // the new meshes take the avatar layer on the next frame
       attachRifle();
     }
   ).catch((err) => {
@@ -1851,11 +1893,42 @@ export function createPlayScene(o: {
     cam.layers.mask = mask;
   };
 
+  /**
+   * TICKET-05: the avatar layer. On the planet the third-person avatar, and the rifle while it is in the hand, sit on
+   * AVATAR_LIGHT_LAYER, so the world pass does not draw them and drawAvatarLayer does, under the rig's lights. In the lab, and
+   * with the rifle in the view, they stay on layer 0. Called once per frame before any draw; it only moves meshes on a change.
+   */
+  const syncAvatarLayers = (): void => {
+    const onPlanet = scientistHolder.parent === planetScene;
+    const inHand = heldBeam.group.parent !== viewRig;
+    const state = (onPlanet ? 2 : 0) + (inHand ? 1 : 0);
+    if (state === avatarLayerState) return;
+    avatarLayerState = state;
+    const avatarLayer = onPlanet ? AVATAR_LIGHT_LAYER : 0;
+    scientistHolder.traverse((o) => o.layers.set(avatarLayer));
+    const rifleLayer = onPlanet && inHand ? AVATAR_LIGHT_LAYER : 0;
+    heldBeam.group.traverse((o) => o.layers.set(rifleLayer));
+  };
+  /** The avatar pass: over the planet's picture (depth kept), drawn with the rig's lights only, so the world's lights never touch it. */
+  const drawAvatarLayer = (cam: THREE.PerspectiveCamera): void => {
+    if (scientistHolder.parent !== planetScene || !scientistHolder.visible) return;
+    const mask = cam.layers.mask;
+    const autoUpdate = planetScene.matrixWorldAutoUpdate;
+    cam.layers.set(AVATAR_LIGHT_LAYER);
+    planetScene.matrixWorldAutoUpdate = false; // the planet's pass updated every matrix this frame
+    renderer.autoClear = false;
+    renderer.render(planetScene, cam);
+    renderer.autoClear = true;
+    planetScene.matrixWorldAutoUpdate = autoUpdate;
+    cam.layers.mask = mask;
+  };
+
   const drawPlanet = (cam: THREE.PerspectiveCamera, to: THREE.WebGLRenderTarget | null, hideTwin: boolean): void => {
     twin.group.visible = !hideTwin;
     renderer.setRenderTarget(planetRT);
     renderer.clear();
     renderer.render(planetScene, cam); // layer 0 only: the rifts (RIFT_LAYER) are not in the planet's picture
+    drawAvatarLayer(cam);
     twin.group.visible = true;
     postUniforms.uInvProj.value.copy(cam.projectionMatrixInverse);
     postUniforms.uCamWorld.value.copy(cam.matrixWorld);
@@ -2187,6 +2260,8 @@ export function createPlayScene(o: {
       }
     },
     placePieceGhost(pose, tint) {
+      ghostXZ = pose && !heldBeam.group.visible ? { x: pose.x, z: pose.z } : null;
+      updateActiveSocket();
       if (!pieceGhost) return;
       // the held rifle takes the hand: the held blueprint's ghost (and its verdict colour) waits until the rifle is put away
       if (!pose || heldBeam.group.visible) {
@@ -2250,6 +2325,8 @@ export function createPlayScene(o: {
         socketRingMesh.setMatrixAt(i, m4);
       }
       socketRingMesh.instanceMatrix.needsUpdate = true;
+      socketPoses = poses.slice(0, count);
+      updateActiveSocket();
     },
     setPlanGhosts(ghosts) {
       while (planGhostsGroup.children.length > 0) {
@@ -2352,13 +2429,10 @@ export function createPlayScene(o: {
             const s = 0.4 + 0.6 * ratio;
             scaleV.set(s, s, s);
           }
+          // the outcrop's buried root skirt (outcrops.ts) reaches below the ground at these heights, so no node floats
           const ny = groundAt(n.x, n.z) + (kind === 'spire' ? 0.7 : 0.35);
           posV.set(n.x, ny, n.z);
-          if (kind === 'fold') {
-            rotQ.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
-          } else {
-            rotQ.identity();
-          }
+          rotQ.identity();
           mat4.compose(posV, rotQ, scaleV);
           mesh.setMatrixAt(i, mat4);
 
@@ -2399,6 +2473,7 @@ export function createPlayScene(o: {
       return bestNode;
     },
     setBeam(from, to, mode, colour, on) {
+      if (!on && beamPinned) return; // a check pins the last beam on screen (debug.pinBeam)
       if (on && from && to) {
         gameAudio.startBeamLoop(from);
         const vFrom = new THREE.Vector3(from.x, from.y, from.z);
@@ -2407,6 +2482,8 @@ export function createPlayScene(o: {
         beamFx.set(vFrom, vTo, mode, beamCol, true);
         // Extract's stream of chunks runs from the hit point into the muzzle (TASK-21d); Apply and Sculpt draw none
         beamVisuals.setStream(mode === 'extract' ? vTo : null, mode === 'extract' ? vFrom : null, clock);
+        // TICKET-05 (Item E): the tapered glowing core from the muzzle (the rifle's socket, first and third person) to the hit, in every mode
+        beamVisuals.setCore(vFrom, vTo, mode, clock, beamSealingNow);
 
         const dir = vTo.clone().sub(vFrom);
         const dist = dir.length();
@@ -2429,6 +2506,7 @@ export function createPlayScene(o: {
         gameAudio.stopBeamLoop();
         beamFx.object.visible = false;
         beamVisuals.setStream(null, null, clock);
+        beamVisuals.setCore(null, null, mode, clock);
         beamCoreMesh.visible = false;
         beamSparkMesh.visible = false;
       }
@@ -2503,7 +2581,7 @@ export function createPlayScene(o: {
       beamFx.update(clock);
       holoUniforms.uTime.value = now;
       openingOffUniforms.uTime.value = now;
-      socketRingMat.opacity = 0.55 + 0.35 * Math.sin(now * 5.0);
+      socketActiveMat.opacity = socketMarkerOpacity(true, now);
       // ---- the wake: the camera's lift above level, from its start to the 2.2 s the player takes to sit up
       if (wakeT >= 0) {
         if (wakeLog.length < 400) wakeLog.push({ t: wakeT, lift: wakeLift(wakeT) });
@@ -2900,7 +2978,6 @@ export function createPlayScene(o: {
         monsters.update(dt, { x: pos.x, z: pos.z, yaw: Math.atan2(monsterFwd.x, monsterFwd.z), alive: playerAlive }, camera);
       }
       postUniforms.uTime.value = now;
-      socketRingMat.opacity = 0.45 + 0.4 * Math.sin(now * 5.0);
       postUniforms.uGlitch.value = where === 'planet' ? Math.max(0, Math.min(1, (0.4 - sync) / 0.4)) : 0;
       postUniforms.uLost.value = Math.max(0, 1 - (now - lostAt) / 0.6);
       openingUniforms.uTime.value = now;
@@ -2934,6 +3011,7 @@ export function createPlayScene(o: {
       gameAudio.update(dt, camera.position.x, camera.position.y, camera.position.z, audioCamFwd.x, audioCamFwd.y, audioCamFwd.z, audioCamUp.x, audioCamUp.y, audioCamUp.z);
 
       // ---- draw
+      syncAvatarLayers();
       renderer.info.autoReset = false;
       renderer.info.reset();
       if (where === 'lab') {
@@ -3252,6 +3330,11 @@ export function createPlayScene(o: {
       coverageActive: () => Boolean(ground?.material.uniforms.uCoverOn?.value === 1),
       planetScene: () => planetScene,
       labScene: () => labScene,
+      camera: () => camera,
+      beamCore: () => ({ shown: beamVisuals.coreShown(), colour: beamVisuals.coreColour() }),
+      activeSocket: () => (socketActiveMesh.visible ? socketActiveMesh.position.toArray() : null),
+      avatarLayer: () => (scientistHolder.parent === planetScene ? AVATAR_LIGHT_LAYER : 0),
+      pinBeam: (on: boolean) => { beamPinned = on; },
       setWaterVisible: (v: boolean) => { if (waterGroup) waterGroup.visible = v; },
       setCoverageActive: (v: boolean) => {
         if (ground) {
@@ -3453,6 +3536,7 @@ export function createPlayScene(o: {
     dispose() {
       sceneAlive = false;
       scientistAnimator?.dispose();
+      avatarRig.dispose();
       labScene.remove(scientistHolder);
       planetScene.remove(scientistHolder);
       for (const v of views.values()) unbuild(v);

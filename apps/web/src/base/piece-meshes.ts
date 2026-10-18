@@ -9,6 +9,7 @@ import { pieceAt, structureEnv, BENCH_REACH, relays } from './world';
 import { WalkWorld, type PlacedPiece } from './walk';
 import { planFrameLegs } from './foundation-legs';
 import { FRAME_PAD_HEIGHT_M } from './foundation-frame';
+import { slideDoor } from './panel-pieces';
 import {
   globalKitPieceCache,
   computeSkirt,
@@ -16,6 +17,10 @@ import {
   KIT_PIVOT_OFFSETS,
   type Box,
 } from './kit-pieces';
+
+/** The sliding door's run, in seconds, and the leaf's travel (m): its own width, so the doorway is clear once open. */
+const DOOR_SLIDE_SECONDS = 0.4;
+const DOOR_LEAF_TRAVEL = 1.4;
 
 interface ActivePieceEntry {
   colliders: readonly Box[];
@@ -26,8 +31,9 @@ interface ActivePieceEntry {
   yaw: number;
   skirt: number;
   parts?: Record<string, THREE.Object3D>;
-  doorAngle?: number;
-  targetDoorAngle?: number;
+  /** The sliding door's open state, 0 shut to 1 open (slideDoor), eased toward targetDoorOpen. */
+  doorOpen?: number;
+  targetDoorOpen?: number;
   isTinted?: boolean;
 }
 
@@ -180,7 +186,7 @@ export class PieceMeshManager {
         const activeLamps: THREE.Mesh[] = [];
         const parts: Record<string, THREE.Object3D> = {};
         const isDoor = piece.kind === 'door';
-        const doorAngle = isDoor && piece.open ? (-100 * Math.PI) / 180 : 0;
+        const doorOpen = isDoor && piece.open ? 1 : 0;
 
         const template = globalKitPieceCache.getTemplate(piece.kind, world.stage, skirt);
 
@@ -200,7 +206,7 @@ export class PieceMeshManager {
             const templateLeaf = template.group.getObjectByName('door-leaf');
             if (templateLeaf) {
               const leafClone = templateLeaf.clone(true);
-              leafClone.rotation.y = doorAngle;
+              slideDoor(leafClone, doorOpen, DOOR_LEAF_TRAVEL);
               offsetGroup.add(leafClone);
               parts.leaf = leafClone;
             }
@@ -236,8 +242,8 @@ export class PieceMeshManager {
           yaw: totalYaw,
           skirt,
           parts: Object.keys(parts).length > 0 ? parts : undefined,
-          doorAngle,
-          targetDoorAngle: doorAngle,
+          doorOpen,
+          targetDoorOpen: doorOpen,
           isTinted: false,
         };
         this.pieceMap.set(piece.id, entry);
@@ -250,7 +256,7 @@ export class PieceMeshManager {
           entry.dynamicRoot.updateMatrixWorld(true);
         }
         if (piece.kind === 'door') {
-          entry.targetDoorAngle = piece.open ? (-100 * Math.PI) / 180 : 0;
+          entry.targetDoorOpen = piece.open ? 1 : 0;
         }
       }
 
@@ -394,17 +400,17 @@ export class PieceMeshManager {
       }
     }
 
-    // Door swing ease over 0.4s
+    // Door slide: the leaf runs sideways into its pocket over DOOR_SLIDE_SECONDS (TICKET-05; the hinge swing is gone)
     for (const entry of this.pieceMap.values()) {
-      if (entry.kind === 'door' && entry.parts?.leaf && entry.targetDoorAngle !== undefined) {
-        const cur = entry.doorAngle ?? 0;
-        const target = entry.targetDoorAngle;
+      if (entry.kind === 'door' && entry.parts?.leaf && entry.targetDoorOpen !== undefined) {
+        const cur = entry.doorOpen ?? 0;
+        const target = entry.targetDoorOpen;
         if (Math.abs(cur - target) > 0.001) {
-          const maxStep = ((Math.PI * 100) / 180 / 0.4) * dt;
+          const maxStep = dt / DOOR_SLIDE_SECONDS;
           const diff = target - cur;
           const next = Math.abs(diff) <= maxStep ? target : cur + Math.sign(diff) * maxStep;
-          entry.doorAngle = next;
-          entry.parts.leaf.rotation.y = next;
+          entry.doorOpen = next;
+          slideDoor(entry.parts.leaf, next, DOOR_LEAF_TRAVEL);
         }
       }
     }

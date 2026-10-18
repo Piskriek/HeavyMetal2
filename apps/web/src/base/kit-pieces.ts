@@ -10,6 +10,7 @@ import { createGenFixture, genLevelForStage } from '../assets/gen-props';
 import { getGenSync } from '../assets/gen';
 import { latticeGenId } from './lattice-gen';
 import { foundationDeckGroup, foundationLegGroup, foundationPadGroup } from './foundation-frame';
+import { gunmetalPanel, getPanelMaterials } from './panel-pieces';
 
 export type Box = basekit.Box;
 export type Socket = basegear.Socket;
@@ -121,24 +122,43 @@ export function computeSkirt(
   return rounded;
 }
 
-/** The door's hinge knuckles, procedural: they reach past the leaf's box, so the generated leaf does not carry them. */
-function doorKnuckles(m: basekit.LabMaterials): THREE.Mesh[] {
-  const out: THREE.Mesh[] = [];
-  for (const y of [0.35, 1.15, 1.95]) {
-    const plate = new THREE.BoxGeometry(0.055, 0.15, 0.04);
-    plate.translate(0.02, y, 0.05);
-    const pin = new THREE.CylinderGeometry(0.026, 0.026, 0.18, 12);
-    pin.translate(0, y, 0.05);
-    out.push(new THREE.Mesh(plate, m.copper), new THREE.Mesh(pin, m.gunmetal));
+/** TICKET-05 (BB-06, BB-08): the kinds that stand as square-section gunmetal panels (panel-pieces.ts), not white slabs. */
+const GUNMETAL_KINDS: ReadonlySet<Kind> = new Set<Kind>(['windowWall', 'door', 'halfWall', 'gable']);
+const GUNMETAL_SIZE: Readonly<Record<'windowWall' | 'door' | 'halfWall' | 'gable', { readonly w: number; readonly h: number; readonly d: number }>> = {
+  windowWall: { w: 4, h: 3, d: 0.25 },
+  door: { w: 4, h: 3, d: 0.25 },
+  halfWall: { w: 4, h: 1.5, d: 0.25 },
+  gable: { w: 4, h: 3, d: 0.25 },
+};
+
+/**
+ * TICKET-05: the gunmetal panel replaces the basekit mesh of its kind. The basekit piece keeps its colliders (the caller reads
+ * them) and its status lamp, which moves onto the panel; the door's lamp keeps the lintel block it was mounted on.
+ */
+function gunmetalKit(
+  kind: keyof typeof GUNMETAL_SIZE,
+  res: { readonly group: THREE.Group; readonly lamps: readonly THREE.Mesh[] },
+): { group: THREE.Group; lamps: THREE.Mesh[] } {
+  const panel = gunmetalPanel(kind, GUNMETAL_SIZE[kind]);
+  const lamps = [...res.lamps];
+  if (kind === 'door') {
+    const block = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.18, 0.2), getPanelMaterials().trim);
+    block.name = 'door-lintel-block';
+    block.position.set(2, 2.56, 0.025);
+    panel.group.add(block);
   }
-  return out;
+  for (const child of res.group.children) {
+    if (child instanceof THREE.Mesh && !lamps.includes(child)) child.geometry.dispose();
+  }
+  for (const lamp of lamps) panel.group.add(lamp);
+  return { group: panel.group, lamps };
 }
 
 /**
  * TASK-10b: the lattice piece's visible mesh becomes its generated model, placed where the procedural mesh was
- * (same group, before the pivot offset). Lamps, colliders and sockets stay procedural. Two kinds keep their own
- * procedural parts: the ramp keeps its paint (handrails, posts, mid rails) on the generated deck, and the door leaf
- * keeps its hinge knuckles. Nothing changes when the kind stays procedural or the asset is not loaded yet.
+ * (same group, before the pivot offset). Lamps, colliders and sockets stay procedural. The ramp keeps its own paint
+ * (handrails, posts, mid rails) on the generated deck. The TICKET-05 gunmetal kinds are not swapped. Nothing changes when
+ * the kind stays procedural or the asset is not loaded yet.
  */
 function swapLatticeMesh(
   kind: Kind,
@@ -149,25 +169,13 @@ function swapLatticeMesh(
   m: basekit.LabMaterials,
 ): void {
   // TASK-26: the foundation keeps its industrial frame; its generated model (with a skirt of ribs) is not used.
-  if (kind === 'foundation') return;
+  // TICKET-05: the gunmetal panels keep their own look; their generated models would paint white over them.
+  if (kind === 'foundation' || GUNMETAL_KINDS.has(kind)) return;
   const id = latticeGenId(kind, skirt);
   if (!id) return;
   const gen = getGenSync(id, genLevelForStage(stage));
   if (!gen) return;
   gen.name = `gen-${id}`;
-
-  if (kind === 'door') {
-    const leaf = group.getObjectByName('door-leaf');
-    if (!(leaf instanceof THREE.Group)) return;
-    for (const child of [...leaf.children]) {
-      if (child instanceof THREE.Mesh) {
-        leaf.remove(child);
-        child.geometry.dispose();
-      }
-    }
-    leaf.add(gen, ...doorKnuckles(m));
-    return;
-  }
 
   // the ramp's handrails and posts are paint; everything else on the ramp is the deck, which the generated model replaces
   const keepPaint = kind === 'ramp';
@@ -386,26 +394,29 @@ export class KitPieceCache {
       }
       case 'gable': {
         const res = basekit.gable(bkm, { stage });
-        rawGroup = res.group;
+        const panel = gunmetalKit('gable', res);
+        rawGroup = panel.group;
         rawColliders = res.colliders;
-        rawLamps = res.lamps;
+        rawLamps = panel.lamps;
         break;
       }
       case 'halfWall': {
         const res = basekit2.halfWall(bkm, { stage });
-        rawGroup = res.group;
+        const panel = gunmetalKit('halfWall', res);
+        rawGroup = panel.group;
         rawColliders = res.colliders;
-        rawLamps = res.lamps;
+        rawLamps = panel.lamps;
         break;
       }
       case 'windowWall': {
         const res = basekit2.windowWall(bkm, { stage });
-        rawGroup = res.group;
+        const panel = gunmetalKit('windowWall', res);
+        rawGroup = panel.group;
         rawColliders = [
           ...res.colliders,
           { min: [0.8, 1, -0.1], max: [3.2, 2.2, 0.1] },
         ];
-        rawLamps = res.lamps;
+        rawLamps = panel.lamps;
         break;
       }
       case 'doorframe': {
@@ -416,10 +427,12 @@ export class KitPieceCache {
         break;
       }
       case 'door': {
+        // TICKET-05: a sliding door (slideDoor), so its leaf has no hinge knuckles; the leaf is the panel's 'door-leaf'
         const res = basekit2.door(bkm, { stage });
-        rawGroup = res.group;
+        const panel = gunmetalKit('door', res);
+        rawGroup = panel.group;
         rawColliders = res.colliders;
-        rawLamps = res.lamps;
+        rawLamps = panel.lamps;
         break;
       }
       case 'railing': {

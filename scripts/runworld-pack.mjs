@@ -20,7 +20,15 @@ const SRC = path.join(ROOT, 'zips', 'runworld', 'assets');
 const LOW = path.join(ROOT, 'apps', 'web', 'src', 'assets', 'gen');
 const HD = path.join(ROOT, 'apps', 'web', 'public', 'hd');
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs', 'runworld', 'assets.json'), 'utf8'));
-const only = process.argv.slice(2);
+// Packing writes inline lows into the single file, so a bare run that packs EVERY asset with levels on disk can blow the
+// 16 MB cap (2026-10-18: 79 unreferenced vista props, about 5 MB, sat untracked in gen/ and broke PLAY.bat's build).
+// Name the ids you mean to pack, or pass --all on purpose.
+const all = process.argv.includes('--all');
+const only = process.argv.slice(2).filter((a) => a !== '--all');
+if (!all && only.length === 0) {
+  console.log('usage: node scripts/runworld-pack.mjs <id ...>   (or --all to pack every asset with levels on disk)');
+  process.exit(2);
+}
 
 await Promise.all([MeshoptEncoder.ready, MeshoptDecoder.ready]);
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder, 'meshopt.decoder': MeshoptDecoder });

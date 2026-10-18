@@ -1,9 +1,13 @@
 /**
- * The beam's ground visuals (TASK-21d, P0-VFX-01): a ring decal where the beam lands, showing the stroke's radius, coloured by mode
- * (Seal's amber while sealing); and in Extract, a stream of 16 dark chunks that spiral from the hit point into the muzzle. The ring
- * samples the ground under it, so it lies on a slope instead of cutting into it. The stream is one instanced draw call.
+ * The beam's ground and muzzle-to-hit visuals (TASK-21d, P0-VFX-01; TICKET-05 Item E):
+ * - a ring decal where the beam lands, showing the stroke's radius, coloured by mode (Seal's amber while sealing);
+ *   the ring samples the ground under it, so it lies on a slope instead of cutting into it (POL-30, `slopeLiftAt`);
+ * - in Extract, a stream of 16 dark chunks that spiral from the hit point into the muzzle (one instanced draw call);
+ * - a tapered glowing beam core from the muzzle to the hit (`setCore`), coloured by mode, with a deterministic flicker and
+ *   a glowing hotspot at the hit point, drawn in both first and third person.
  *
- * The placement math is pure (streamChunk, streamPosition) and tested; the meshes are three.js objects owned by the scene.
+ * The placement math is pure (streamChunk, streamPosition, beamFlicker, coreRadiusAt) and tested; the meshes are three.js
+ * objects owned by the scene.
  */
 import * as THREE from 'three';
 import { BEAM_COLOURS, type BeamMode } from '@hm/beamkit';
@@ -15,6 +19,11 @@ export const STREAM_COUNT = 16;
 const RING_WIDTH = 0.14;
 export const RING_LIFT = 0.06;
 const STREAM_LOOPS_PER_SECOND = 0.55;
+
+/** Tapered beam core radii (metres) at the muzzle (u = 0) and the hit point (u = 1), and the hit's hotspot radius. */
+export const CORE_MUZZLE_RADIUS = 0.022;
+export const CORE_HIT_RADIUS = 0.064;
+export const CORE_HOTSPOT_RADIUS = 0.16;
 
 /**
  * POL-30: Computes the slope-compensated vertical lift at `(x, z)` so the brush ring
@@ -39,9 +48,21 @@ export function slopeLiftAt(
   return baseLift * Math.sqrt(1 + slope * slope) + slope * 0.09 + chord + 0.02;
 }
 
-/** The ring's colour: the mode's, or Seal's amber while sealing. */
-export function ringColourOf(mode: BeamMode, sealing: boolean): string {
+/** The ring's and the beam core's colour: the mode's, or Seal's amber while sealing. */
+export function ringColourOf(mode: BeamMode, sealing = false): string {
   return sealing ? BEAM_COLOURS.seal : BEAM_COLOURS[mode];
+}
+
+/** Deterministic multi-frequency flicker factor in [0.82, 1.18] at `t` seconds (no Math.random). */
+export function beamFlicker(t: number): number {
+  const time = Number.isFinite(t) ? t : 0;
+  return 1 + 0.1 * Math.sin(time * 23.7) + 0.05 * Math.cos(time * 41.3 + 0.9) + 0.03 * Math.sin(time * 67.1 + 2.1);
+}
+
+/** The beam core's tapered outer radius at normalized distance `u` in [0, 1] (0 = muzzle, 1 = hit) at `t` seconds. */
+export function coreRadiusAt(u: number, t = 0): number {
+  const k = Math.max(0, Math.min(1, Number.isFinite(u) ? u : 0));
+  return (CORE_MUZZLE_RADIUS + (CORE_HIT_RADIUS - CORE_MUZZLE_RADIUS) * k) * beamFlicker(t);
 }
 
 /** A stream chunk at a time: u from the hit (0) to the muzzle (1), its radius and angle about the beam, and its size (0 hides it). */
@@ -102,6 +123,15 @@ export interface BeamVisuals {
   ringColour(): string | null;
   /** Whether the stream is drawn now. */
   streamShown(): boolean;
+  /**
+   * Shows the tapered glowing core from `muzzle` to `hit` with a hot spot at `hit`, coloured by `mode` (`ringColourOf(mode,
+   * sealing)`), with a deterministic flicker at `t` seconds; null on either end hides it.
+   */
+  setCore(muzzle: THREE.Vector3 | null, hit: THREE.Vector3 | null, mode: BeamMode, t: number, sealing?: boolean): void;
+  /** Whether the beam core is drawn now. */
+  coreShown(): boolean;
+  /** The beam core's active colour, or null while it is hidden. */
+  coreColour(): string | null;
   dispose(): void;
 }
 
@@ -155,6 +185,70 @@ export function createBeamVisuals(scene: THREE.Scene, keep: Keep): BeamVisuals {
   const muzzleScratch = new THREE.Vector3();
   const placing = newStreamScratch();
 
+  // ---- the tapered core & the hit's hotspot (TICKET-05 Item E). CylinderGeometry(radiusTop, radiusBottom, 1): +Y (+0.5) is
+  // at the hit (wider), -Y (-0.5) at the muzzle (narrower); the mesh is oriented from the muzzle to the hit and stretched to the length.
+  const coreOuterGeometry = keep(new THREE.CylinderGeometry(CORE_HIT_RADIUS, CORE_MUZZLE_RADIUS, 1, 12, 1, true));
+  const coreOuterMaterial = keep(new THREE.MeshBasicMaterial({
+    color: BEAM_COLOURS.extract,
+    transparent: true,
+    opacity: 0.72,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+  }));
+  const coreOuter = new THREE.Mesh(coreOuterGeometry, coreOuterMaterial);
+  coreOuter.name = 'beam-core-outer';
+  coreOuter.frustumCulled = false;
+  coreOuter.visible = false;
+  coreOuter.renderOrder = 5;
+  scene.add(coreOuter);
+
+  const coreInnerGeometry = keep(new THREE.CylinderGeometry(CORE_HIT_RADIUS * 0.42, CORE_MUZZLE_RADIUS * 0.48, 1, 8, 1, true));
+  const coreInnerMaterial = keep(new THREE.MeshBasicMaterial({
+    color: '#ffffff',
+    transparent: true,
+    opacity: 0.92,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+  }));
+  const coreInner = new THREE.Mesh(coreInnerGeometry, coreInnerMaterial);
+  coreInner.name = 'beam-core-inner';
+  coreInner.frustumCulled = false;
+  coreInner.visible = false;
+  coreInner.renderOrder = 6;
+  scene.add(coreInner);
+
+  const hotspotGeometry = keep(new THREE.SphereGeometry(CORE_HOTSPOT_RADIUS, 12, 10));
+  const hotspotMaterial = keep(new THREE.MeshBasicMaterial({
+    color: BEAM_COLOURS.extract,
+    transparent: true,
+    opacity: 0.88,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  }));
+  const hotspot = new THREE.Mesh(hotspotGeometry, hotspotMaterial);
+  hotspot.name = 'beam-core-hotspot';
+  hotspot.frustumCulled = false;
+  hotspot.visible = false;
+  hotspot.renderOrder = 6;
+  scene.add(hotspot);
+
+  let coreShownColour: string | null = null;
+  const upAxis = new THREE.Vector3(0, 1, 0);
+  const coreDir = new THREE.Vector3();
+  const coreMid = new THREE.Vector3();
+  const coreQuat = new THREE.Quaternion();
+  const whiteColor = new THREE.Color('#ffffff');
+  const modeColor = new THREE.Color();
+
+  const hideCore = (): void => {
+    coreOuter.visible = false;
+    coreInner.visible = false;
+    hotspot.visible = false;
+    coreShownColour = null;
+  };
+
   return {
     setRing(centre, radius, colour, heightAt) {
       if (centre === null || !(radius > 0)) {
@@ -202,11 +296,60 @@ export function createBeamVisuals(scene: THREE.Scene, keep: Keep): BeamVisuals {
       stream.instanceMatrix.needsUpdate = true;
       stream.visible = true;
     },
+    setCore(muzzle, hit, mode, t, sealing = false) {
+      if (muzzle === null || hit === null) {
+        hideCore();
+        return;
+      }
+      coreDir.copy(hit).sub(muzzle);
+      const len = coreDir.length();
+      if (!(len > 1e-4)) {
+        hideCore();
+        return;
+      }
+
+      const colour = ringColourOf(mode, sealing);
+      if (coreShownColour !== colour) {
+        modeColor.set(colour);
+        coreOuterMaterial.color.copy(modeColor);
+        hotspotMaterial.color.copy(modeColor);
+        coreInnerMaterial.color.copy(modeColor).lerp(whiteColor, 0.65);
+        coreShownColour = colour;
+      }
+
+      const flicker = beamFlicker(t);
+      coreDir.multiplyScalar(1 / len);
+      coreMid.copy(muzzle).addScaledVector(coreDir, len * 0.5);
+      coreQuat.setFromUnitVectors(upAxis, coreDir);
+
+      coreOuter.position.copy(coreMid);
+      coreOuter.quaternion.copy(coreQuat);
+      coreOuter.scale.set(flicker, len, flicker);
+      coreOuterMaterial.opacity = Math.max(0.5, Math.min(0.95, 0.72 * flicker));
+      coreOuter.visible = true;
+
+      const innerFlicker = 0.9 + 0.2 * Math.sin((Number.isFinite(t) ? t : 0) * 37.0);
+      coreInner.position.copy(coreMid);
+      coreInner.quaternion.copy(coreQuat);
+      coreInner.scale.set(innerFlicker, len, innerFlicker);
+      coreInner.visible = true;
+
+      const spotPulse = 0.85 + 0.3 * (flicker - 0.82);
+      hotspot.position.copy(hit);
+      hotspot.scale.set(spotPulse, spotPulse, spotPulse);
+      hotspotMaterial.opacity = Math.max(0.65, Math.min(1.0, 0.86 * flicker));
+      hotspot.visible = true;
+    },
+    coreShown: () => coreOuter.visible && hotspot.visible,
+    coreColour: () => (coreOuter.visible ? coreShownColour : null),
     ringColour: () => (ring.visible ? ringShown : null),
     streamShown: () => stream.visible,
     dispose() {
       scene.remove(ring);
       scene.remove(stream);
+      scene.remove(coreOuter);
+      scene.remove(coreInner);
+      scene.remove(hotspot);
     },
   };
 }

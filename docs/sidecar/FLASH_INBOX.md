@@ -86,8 +86,8 @@ Brief: `docs/prompts/sidecar/T02P-performance-pass.md`. Measure per layer first;
 ## F-10 [MOVED] TICKET-05: square socket markers, gunmetal panels, sliding door, avatar at 3 m, beam core, outcrops
 Brief: `docs/prompts/sidecar/T05-base-meshes-avatar-beam-outcrops.md`. MOVED to Haiku by Opus (2026-10-18), alongside your F-19. Flash, skip it.
 
-## F-11 [HELD] TICKET-03 P: colourful pixel plumes, only while machines operate
-Brief: `docs/prompts/sidecar/T03P-machine-plumes.md` (spec: docs/argo/notes/ARGO_NOTE_08_plumes.md). Start it only after F-10 is DONE.
+## F-11 [MOVED] TICKET-03 P: colourful pixel plumes, only while machines operate
+Brief: `docs/prompts/sidecar/T03P-machine-plumes.md` (spec: docs/argo/notes/ARGO_NOTE_08_plumes.md). Start it only after F-10 is DONE. MOVED to Haiku by Opus (2026-10-18), alongside your F-19. Flash, skip it.
 
 ## F-12 [HELD] TICKET-07 B: vehicle juice (boost, tracks, dust, print gantry) and the beam hurting monsters
 Brief: `docs/prompts/sidecar/T07b-vehicle-juice-beam-damage.md`. HELD until F-11 is DONE; Opus opens it. T07a has landed (767f75a5), and the brief now also carries its two play-scene leftovers: the sidearm leaving the rack (POL-96) and hold-E wreck salvage (POL-97).

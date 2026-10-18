@@ -167,6 +167,60 @@ try {
     await host.screenshot({ path: path.join(shots, 'grid-host-card.png') });
     await guest.screenshot({ path: path.join(shots, 'grid-guest-card.png') });
 
+    // Lead Architect controls on the host's Grid: Demote, a Field Observer's build refused, Promote, Undo, the default
+    // guest role, and Kick. The friend is the only non-self roster chip, so its buttons are the first on the page.
+    const roleOf = (page) => page.evaluate(() => window.__outpost.state()?.roles ?? []);
+    const friendToggle = host.locator('[data-testid^="pg-role-toggle-"]').first();
+    const hasToggle = await friendToggle.waitFor({ timeout: T(15000) }).then(() => true).catch(() => false);
+    check('the Lead Architect sees Demote beside the friend on the Grid', hasToggle && (await friendToggle.innerText()).trim() === 'Demote', hasToggle ? (await friendToggle.innerText()).trim() : null);
+    if (hasToggle) {
+      await friendToggle.click();
+      await host.waitForFunction(() => (window.__outpost.state()?.roles ?? []).includes('visitor'), null, { timeout: T(15000) }).catch(() => null);
+      await guest.waitForFunction(() => (window.__outpost.state()?.roles ?? []).includes('visitor'), null, { timeout: T(15000) }).catch(() => null);
+      check('Demote makes the friend a Field Observer on both pages', (await roleOf(host)).includes('visitor') && (await roleOf(guest)).includes('visitor'), [await roleOf(host), await roleOf(guest)]);
+
+      const versionBeforeRefusal = (await host.evaluate(() => window.__outpost.state()?.version)) ?? -1;
+      const refusal = await guest.evaluate((c) => window.__outpost.send(c), {
+        t: 'place',
+        at: { x: 8, z: 8 },
+        blueprint: STARTER,
+        piece: { s: structure, kind: 'foundation', i: 2, j: -2, k: 0, r: 0 },
+      });
+      await host.waitForTimeout(T(500));
+      const versionAfterRefusal = (await host.evaluate(() => window.__outpost.state()?.version)) ?? -2;
+      check("a Field Observer's build is refused", refusal?.refused === true && refusal.why === 'visitor-read-only' && versionAfterRefusal === versionBeforeRefusal, refusal);
+
+      await friendToggle.click();
+      await host.waitForFunction(() => !(window.__outpost.state()?.roles ?? []).includes('visitor'), null, { timeout: T(15000) }).catch(() => null);
+      await guest.waitForFunction(() => !(window.__outpost.state()?.roles ?? []).includes('visitor'), null, { timeout: T(15000) }).catch(() => null);
+      check('Promote gives the friend Co-Builder back on both pages', !(await roleOf(host)).includes('visitor') && !(await roleOf(guest)).includes('visitor'), [await roleOf(host), await roleOf(guest)]);
+
+      const undoButton = host.locator('[data-testid^="pg-undo-"]').first();
+      const versionBeforeUndo = (await host.evaluate(() => window.__outpost.state()?.version)) ?? 0;
+      await undoButton.click();
+      await host.waitForFunction((v) => (window.__outpost.state()?.version ?? 0) > v, versionBeforeUndo, { timeout: T(15000) }).catch(() => null);
+      const afterUndo = await host.evaluate(() => window.__outpost.state());
+      check("Undo reverts the friend's last build on the room", (afterUndo?.version ?? 0) > versionBeforeUndo, [versionBeforeUndo, afterUndo?.version]);
+
+      const defaultRow = host.locator('[data-testid="pg-default-role-row"]');
+      check('the Grid states the default role for new joiners', (await defaultRow.count()) === 1 && (await defaultRow.innerText()).includes('Co-Builder'), await defaultRow.innerText().catch(() => null));
+      await host.locator('[data-testid="pg-default-role-toggle"]').click();
+      await defaultRow.filter({ hasText: 'Field Observer' }).waitFor({ timeout: T(15000) }).catch(() => null);
+      check('the default role changes to Field Observer', (await defaultRow.innerText()).includes('Field Observer'), (await defaultRow.innerText()).trim());
+      await host.locator('[data-testid="pg-default-role-toggle"]').click();
+      await defaultRow.filter({ hasText: 'Co-Builder' }).waitFor({ timeout: T(15000) }).catch(() => null);
+
+      await host.locator('[data-testid^="pg-roster-chip"]').first().scrollIntoViewIfNeeded().catch(() => null);
+      await host.screenshot({ path: path.join(shots, 'grid-host-roster.png') });
+
+      await host.locator('[data-testid^="pg-kick-"]').first().click();
+      await host.waitForFunction(() => (window.__outpost.state()?.roles ?? []).length === 1, null, { timeout: T(15000) }).catch(() => null);
+      check('Kick removes the friend from the room', (await roleOf(host)).length === 1, await roleOf(host));
+      await guest.waitForFunction(() => { const s = window.__outpost.state(); return s === null || s.connection === 'disconnected'; }, null, { timeout: T(15000) }).catch(() => null);
+      const kickedState = await guest.evaluate(() => window.__outpost.state());
+      check('the kicked friend is disconnected', kickedState === null || kickedState.connection === 'disconnected', kickedState?.connection ?? null);
+    }
+
     await host.screenshot({ path: path.join(shots, 'host.png') });
     await guest.screenshot({ path: path.join(shots, 'guest.png') });
   }

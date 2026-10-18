@@ -180,3 +180,43 @@ test('the Lead Architect\'s terrain change reaches the guests, and the worlds st
   assert.equal(guest.state().confirmedHash, computeWorldHash(h.room.getWorld()));
   assert.equal(host.state().confirmedHash, computeWorldHash(h.room.getWorld()));
 });
+
+test('Phase 2 convergence: role demotion, promotion, and Lead Architect undoAuthor keep all clients on the room hash', async () => {
+  const { h, host, guest } = await startSession(sculptNear(-20, 35, 0.6));
+  assert.ok(tryBuild(host, { t: 'grant', stock: [{ item: 'ore', n: 1500 }, { item: 'prim-cube', n: 80 }, { item: 'map-basalt', n: 80 }] }));
+  assert.ok(tryBuild(host, { t: 'shelter', cx: 8, cz: 8, yaw: 0 }));
+  const structure = host.state().confirmedWorld.base.structures[0]!.id;
+
+  // Co-Builder places a foundation beside the shelter
+  assert.ok(
+    tryBuild(guest, {
+      t: 'place',
+      at: { x: 8, z: 8 },
+      blueprint: STARTER,
+      piece: { s: structure, kind: 'foundation', i: 1, j: 0, k: 0, r: 0 } as never,
+    }),
+  );
+  assert.equal(host.state().confirmedHash, computeWorldHash(h.room.getWorld()));
+  assert.equal(guest.state().confirmedHash, computeWorldHash(h.room.getWorld()));
+
+  // Demote guest to Field Observer ('visitor'): build is refused
+  host.setRole('cb-1', 'visitor');
+  assert.equal(guest.state().role, 'visitor');
+  assert.equal(
+    tryBuild(guest, {
+      t: 'place',
+      at: { x: 8, z: 8 },
+      blueprint: STARTER,
+      piece: { s: structure, kind: 'foundation', i: 0, j: 1, k: 0, r: 0 } as never,
+    }),
+    false,
+  );
+  assert.equal(guest.state().lastRefusal?.why, 'visitor-read-only');
+
+  // Promote back to Co-Builder and Lead Architect undoes cb-1's earlier foundation
+  host.setRole('cb-1', 'cobuilder');
+  assert.equal(guest.state().role, 'cobuilder');
+  assert.equal(host.undoAuthor('cb-1'), true);
+  assert.equal(host.state().confirmedHash, computeWorldHash(h.room.getWorld()));
+  assert.equal(guest.state().confirmedHash, computeWorldHash(h.room.getWorld()));
+});

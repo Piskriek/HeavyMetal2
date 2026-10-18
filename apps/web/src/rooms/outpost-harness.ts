@@ -95,7 +95,16 @@ export class OutpostHarness {
     this.protocol = {
       broadcast: (type: string, data: unknown) => this.route(null, type, data),
       sendTo: (playerId: string, type: string, data: unknown) => this.route(playerId, type, data),
-      kick: () => {},
+      // queued behind the kicked message, so the kicked player hears why before its callbacks go (as on RUN, the
+      // message is delivered first and the disconnect follows it)
+      kick: (playerId: string, reason?: string) => {
+        this.onWire(() => {
+          const cb = this.callbacks.get(playerId);
+          this.callbacks.delete(playerId);
+          cb?.onDisconnect?.();
+          void this.protocol.handleLeave(playerId, (reason as LeaveReason) ?? 'kick');
+        });
+      },
       lock: () => { this.locked = true; },
       unlock: () => { this.locked = false; },
       persist: (state: Record<string, unknown>) => { this.persisted = overWire(state); },

@@ -1,10 +1,12 @@
 // ============================================================================
 // File: apps/web/src/net/protocol.ts
-// Plan 36 Phase 1 (Co-op Outpost Room — Protocol, Role Table & Guardrails):
+// Plan 36 Phase 1 & Phase 2 (Co-op Outpost Room — Protocol, Role Table & Guardrails):
 // - Typed message union in both directions (never a payload field named 'type')
 // - Version and world-hash checks
 // - Role table using Lead Architect, Co-Builder, and Field Observer names
 // - canRun(role, cmd, world, actorId) with Co-Builder guardrails
+// - Phase 2 messages: kickPlayer, setDefaultRole, undoAuthor, beamIntent (POL-114),
+//   kicked, and usernames map on welcome/snapshot/roleChanged (POL-117)
 // Pure TypeScript: zero DOM, zero timers, zero I/O.
 // ============================================================================
 
@@ -103,7 +105,8 @@ export type WireBaseEvent =
   | { readonly kind: 'forged'; readonly item: string }
   | { readonly kind: 'fitted'; readonly slot: PartSlot; readonly item: string | null }
   | { readonly kind: 'granted'; readonly stock: readonly L.Stack[]; readonly lost: readonly L.Stack[] }
-  | { readonly kind: 'salvaged'; readonly stock: readonly L.Stack[] };
+  | { readonly kind: 'salvaged'; readonly stock: readonly L.Stack[] }
+  | { readonly kind: 'switched'; readonly machine: number; readonly on: boolean };
 
 /** Converts a `BaseEvent` (which uses `type`) into a `WireBaseEvent` (which uses `kind`, never `type`). */
 export function toWireEvent(e: BaseEvent): WireBaseEvent {
@@ -158,6 +161,8 @@ export function toWireEvent(e: BaseEvent): WireBaseEvent {
       return { kind: 'granted', stock: e.stock, lost: e.lost };
     case 'salvaged':
       return { kind: 'salvaged', stock: e.stock };
+    case 'switched':
+      return { kind: 'switched', machine: e.machine, on: e.on };
   }
 }
 
@@ -214,6 +219,8 @@ export function fromWireEvent(w: WireBaseEvent): BaseEvent {
       return { type: 'granted', stock: w.stock, lost: w.lost };
     case 'salvaged':
       return { type: 'salvaged', stock: w.stock };
+    case 'switched':
+      return { type: 'switched', machine: w.machine, on: w.on };
   }
 }
 
@@ -276,6 +283,38 @@ export interface SetRoleMessage {
   readonly role: OutpostRole;
 }
 
+/** Client -> Server: Lead Architect changes the default role assigned to newly joining guests. */
+export interface SetDefaultRoleMessage {
+  readonly type: 'setDefaultRole';
+  readonly role: OutpostRole;
+}
+
+/** Client -> Server: Lead Architect removes a player from the room. */
+export interface KickPlayerMessage {
+  readonly type: 'kickPlayer';
+  readonly targetId: string;
+  readonly reason?: string;
+}
+
+/** Client -> Server: Lead Architect reverts the most recent standing build placed by `targetId`. */
+export interface UndoAuthorMessage {
+  readonly type: 'undoAuthor';
+  readonly targetId: string;
+}
+
+/**
+ * Client -> Server (POL-114): sets or clears this player's active Extraction Beam harvest intent
+ * and plot power shares so the room's authoritative tick timer advances machines & harvest without
+ * 10 Hz client tick round-trips.
+ */
+export interface BeamIntentMessage {
+  readonly type: 'beamIntent';
+  readonly at: { readonly x: number; readonly z: number };
+  readonly beam: { readonly node: number; readonly power: number } | null;
+  readonly power?: Readonly<Record<number, number>>;
+  readonly latched?: readonly number[];
+}
+
 /** Client -> Server: Lead Architect seeds the room with their current local BaseWorld on creation. */
 export interface SeedWorldMessage {
   readonly type: 'seedWorld';
@@ -324,6 +363,10 @@ export type ClientMessage =
   | PoseMessage
   | ResyncRequestMessage
   | SetRoleMessage
+  | SetDefaultRoleMessage
+  | KickPlayerMessage
+  | UndoAuthorMessage
+  | BeamIntentMessage
   | SeedWorldMessage
   | TerrainMessage
   | HelloMessage
@@ -339,6 +382,8 @@ export interface WelcomeMessage {
   readonly worldHash: string;
   readonly world: BaseWorld;
   readonly roles: Readonly<Record<string, OutpostRole>>;
+  readonly usernames?: Readonly<Record<string, string>>;
+  readonly defaultGuestRole?: OutpostRole;
   readonly placedBy: Readonly<Record<number, string>>;
   readonly shiftLog: readonly ShiftLogEntry[];
 }
@@ -354,9 +399,10 @@ export interface EventsMessage {
   readonly cmd: BaseCommand;
   readonly events: readonly WireBaseEvent[];
   readonly placedByPatch?: Readonly<Record<number, string>>;
+  readonly shiftLog?: readonly ShiftLogEntry[];
 }
 
-/** Server -> Sender Only: command refusal (role guardrail or world.ts refusal). */
+/** Server -> Sender Only: command refusal (role guardrail, rate limit, or world.ts refusal). */
 export interface RefusedMessage {
   readonly type: 'refused';
   readonly proto: number;
@@ -383,7 +429,10 @@ export interface SnapshotMessage {
   readonly worldHash: string;
   readonly world: BaseWorld;
   readonly roles: Readonly<Record<string, OutpostRole>>;
+  readonly usernames?: Readonly<Record<string, string>>;
+  readonly defaultGuestRole?: OutpostRole;
   readonly placedBy: Readonly<Record<number, string>>;
+  readonly shiftLog?: readonly ShiftLogEntry[];
 }
 
 /** Server -> Sender Only: a message the room could not act on that is not a command (not the Lead Architect, a terrain too large). */
@@ -399,6 +448,17 @@ export interface RoleChangedMessage {
   readonly targetId: string;
   readonly role: OutpostRole;
   readonly roles: Readonly<Record<string, OutpostRole>>;
+  readonly usernames?: Readonly<Record<string, string>>;
+  readonly defaultGuestRole?: OutpostRole;
+}
+
+/** Server -> All Clients (and kicked target): player removed by the Lead Architect. */
+export interface KickedMessage {
+  readonly type: 'kicked';
+  readonly targetId: string;
+  readonly reason: string;
+  readonly roles: Readonly<Record<string, OutpostRole>>;
+  readonly usernames?: Readonly<Record<string, string>>;
 }
 
 export type ServerMessage =
@@ -408,6 +468,7 @@ export type ServerMessage =
   | PresenceMessage
   | SnapshotMessage
   | RoleChangedMessage
+  | KickedMessage
   | TerrainMessage
   | NoticeMessage
   | ChunkMessage;

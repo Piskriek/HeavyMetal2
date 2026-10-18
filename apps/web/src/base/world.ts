@@ -85,6 +85,8 @@ export interface Machine {
   readonly jobs: readonly Job[];
   /** Finished output the network had no room for; the player collects it. */
   readonly out: readonly L.Stack[];
+  /** Whether the machine's power switch is on (default true for existing saves; POL-73). */
+  readonly on?: boolean;
 }
 
 export interface WorldEnv {
@@ -137,7 +139,9 @@ export type BaseCommand =
   /** Puts stock into the bridge store (the campaign's Act V kit, TASK-22). Logged, so a replay holds the same stock; what does not fit is dropped. */
   | { readonly t: 'grant'; readonly stock: readonly L.Stack[] }
   /** Salvage from a cleared lab prop (TASK-23c, logged): the pack first, then the network in reach. All or nothing: a refused salvage keeps the prop standing. */
-  | { readonly t: 'salvage'; readonly at: Point; readonly stock: readonly L.Stack[] };
+  | { readonly t: 'salvage'; readonly at: Point; readonly stock: readonly L.Stack[] }
+  /** Switches a base hardpoint machine on or off (POL-73). */
+  | { readonly t: 'switch'; readonly machine: number; readonly on: boolean };
 
 export type BaseEvent =
   | { readonly type: 'refused'; readonly cmd: BaseCommand['t']; readonly why: string; readonly short?: readonly L.Stack[] }
@@ -165,7 +169,8 @@ export type BaseEvent =
   | { readonly type: 'forged'; readonly item: string }
   | { readonly type: 'fitted'; readonly slot: PartSlot; readonly item: string | null }
   | { readonly type: 'granted'; readonly stock: readonly L.Stack[]; readonly lost: readonly L.Stack[] }
-  | { readonly type: 'salvaged'; readonly stock: readonly L.Stack[] };
+  | { readonly type: 'salvaged'; readonly stock: readonly L.Stack[] }
+  | { readonly type: 'switched'; readonly machine: number; readonly on: boolean };
 
 export interface Applied { readonly world: BaseWorld; readonly events: readonly BaseEvent[] }
 
@@ -365,6 +370,8 @@ export function apply(w: BaseWorld, env: WorldEnv, cmd: BaseCommand): Applied {
       return grantStock(w, cmd);
     case 'salvage':
       return salvage(w, env, cmd);
+    case 'switch':
+      return switchMachine(w, cmd);
     default: {
       const unknown: never = cmd;
       return refuse(w, (unknown as BaseCommand).t, 'unknown-cmd');
@@ -592,7 +599,7 @@ function tick(w: BaseWorld, env: WorldEnv, cmd: Extract<BaseCommand, { t: 'tick'
   let vehicles = w.vehicles, nextVehicle = w.nextVehicle;
   const speed = env.timeScale !== undefined && Number.isFinite(env.timeScale) && env.timeScale > 0 ? env.timeScale : 1;
   const machines = w.machines.map((m) => {
-    if (m.jobs.length === 0) return m;
+    if (m.on === false || m.jobs.length === 0) return m;
     // terraformers get their share from the plot's power grid; the fabricator runs while a relay reaches it
     // a sapper holding the machine halves its share (P0-MON-03)
     const held = cmd.latched?.includes(m.id) ? 0.5 : 1;
@@ -664,6 +671,14 @@ function collect(w: BaseWorld, id: number): Applied {
   }
   if (n === 0) return refuse(w, 'collect', 'too-heavy');
   return next(w, { player, machines: w.machines.map((x) => (x.id === id ? { ...x, out: left } : x)) }, [{ type: 'collected', machine: id, n }]);
+}
+
+function switchMachine(w: BaseWorld, cmd: Extract<BaseCommand, { t: 'switch' }>): Applied {
+  const m = w.machines.find((x) => x.id === cmd.machine);
+  if (!m) return refuse(w, 'switch', 'no-machine');
+  const on = Boolean(cmd.on);
+  const machines = w.machines.map((x) => (x.id === m.id ? { ...x, on } : x));
+  return next(w, { machines }, [{ type: 'switched', machine: m.id, on }]);
 }
 
 // ---------------------------------------------------------------------------------------------- layouts and the starter shelter

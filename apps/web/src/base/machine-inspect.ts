@@ -144,6 +144,18 @@ function isRelayReached(world: BaseWorld, env: WorldEnv, stationId: number): boo
   return allRelays.some((r) => Math.hypot(r.x - at.x, r.z - at.z) <= r.range);
 }
 
+/**
+ * Computes the linked storage capacity (in items) across the boxes on the station's network (POL-77),
+ * so network stock never overflows a hardcoded /100 or /200 cap.
+ */
+function networkItemCap(world: BaseWorld, netIds: readonly number[], itemId: string, currentCount: number): number {
+  const stackSize = ITEMS[itemId]?.stack ?? 100;
+  const linkedBoxes = world.boxes.filter((b) => netIds.includes(b.id));
+  const boxSlots = linkedBoxes.reduce((acc, b) => acc + b.slots.length, 0);
+  const effectiveSlots = boxSlots > 0 ? boxSlots : BIN_SLOTS;
+  return Math.max(stackSize, effectiveSlots * stackSize, currentCount);
+}
+
 function findStationFeedHopper(
   world: BaseWorld,
   env: WorldEnv,
@@ -154,8 +166,9 @@ function findStationFeedHopper(
   if (m && m.out.length > 0) {
     const first = m.out[0]!;
     const totalOut = m.out.reduce((acc, s) => acc + s.n, 0);
+    const outStack = ITEMS[first.item]?.stack ?? 100;
     return {
-      hopper: { item: first.item, n: totalOut, cap: BIN_SLOTS },
+      hopper: { item: first.item, n: totalOut, cap: Math.max(BIN_SLOTS * outStack, totalOut) },
       hasFeed: true,
     };
   }
@@ -173,7 +186,7 @@ function findStationFeedHopper(
   if (stationKind === 'water') {
     const oreCount = countOf('ore');
     return {
-      hopper: { item: 'ore', n: oreCount, cap: 200 },
+      hopper: { item: 'ore', n: oreCount, cap: networkItemCap(world, netIds, 'ore', oreCount) },
       hasFeed: oreCount > 0,
     };
   }
@@ -209,7 +222,7 @@ function findStationFeedHopper(
 
   const itemName = ITEMS[bestItem]?.name ?? bestItem;
   return {
-    hopper: { item: itemName, n: bestCount, cap: 100 },
+    hopper: { item: itemName, n: bestCount, cap: networkItemCap(world, netIds, bestItem, bestCount) },
     hasFeed: canAffordAny || bestCount > 0,
   };
 }
@@ -231,12 +244,12 @@ export function inspectMachine(world: BaseWorld, env: BaseEnv, id: number): Mach
 
     const actions: InspectAction[] =
       baseMachine.kind === 'mill' || baseMachine.kind === 'press'
-        ? ['refine']
+        ? ['refine', 'toggle']
         : baseMachine.kind === 'fabricator'
-          ? ['fabricate']
-          : [];
+          ? ['fabricate', 'toggle']
+          : ['toggle'];
 
-    const isSwitchedOn = env.on?.[id] ?? true;
+    const isSwitchedOn = (env.on?.[id] ?? baseMachine.on ?? true) !== false;
     const { hopper, hasFeed } = findStationFeedHopper(world, env, id, baseMachine.kind);
 
     if (!isSwitchedOn) {

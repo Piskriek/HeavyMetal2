@@ -2,7 +2,7 @@
  * TICKET-03 (BB-09, BB-10, BB-11): the machine inspector, E routing, the Drafting Table on E, and full-size machines.
  * Boots ?base&kit=1&e2e, founds a structure through the base API (a 4 by 2 foundation grid, a mill pad, a fabricator
  * pad and a drafting bench), then aims at each and presses E. Asserts:
- *  - E on the mill opens the inspector (name and a status pill from the five states; Open refinery; no toggle on a pad);
+ *  - E on the mill opens the inspector (name and a status pill from the five states; Open refinery; the power toggle, POL-73);
  *  - Open refinery opens the refinery; the refinery closes with Esc;
  *  - a crafted job shows RUNNING in the inspector, with the plume pill;
  *  - E on the fabricator opens the inspector; Open fabricator opens the fabricator;
@@ -233,7 +233,7 @@ try {
     const refineryBtn = await page.locator('[data-testid="machine-inspector-open-refinery"]').count();
     const toggleBtn = await page.locator('[data-testid="machine-inspector-toggle"]').count();
     check('inspector offers Open refinery', refineryBtn === 1);
-    check('a pad machine offers no toggle (no world switch yet)', toggleBtn === 0, `toggles=${toggleBtn}`);
+    check('the station offers its power toggle (POL-73: the switch command is in)', toggleBtn === 1, `toggles=${toggleBtn}`);
     await shot(page, 'inspector-mill.png');
     await page.locator('[data-testid="machine-inspector-open-refinery"]').click();
     await refineryModal.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});

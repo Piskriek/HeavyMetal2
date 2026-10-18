@@ -1,6 +1,6 @@
 // ============================================================================
 // File: apps/web/src/net/protocol.test.ts
-// Unit tests for protocol.ts (Plan 36 Phase 1 Deliverable 1).
+// Unit tests for protocol.ts (Plan 36 Phase 1 & Phase 2).
 // ============================================================================
 
 import test from 'node:test';
@@ -37,7 +37,7 @@ test('ROLE_TABLE and ROLE_LABELS use Lead Architect, Co-Builder, and Field Obser
   assert.equal(roleName('visitor'), 'Field Observer');
 });
 
-test('OutpostMessage union never uses "type" as a nested payload field and round-trips WireBaseEvent', () => {
+test('OutpostMessage union never uses "type" as a nested payload field and round-trips WireBaseEvent (including switched)', () => {
   const w0 = withBridgeStore(createWorld(1), TEST_ENV);
   const shelterCmd: BaseCommand = { t: 'shelter', cx: 8, cz: 8, yaw: 0 };
   const applied = apply(w0, TEST_ENV, shelterCmd);
@@ -69,11 +69,32 @@ test('OutpostMessage union never uses "type" as a nested payload field and round
     version: 1,
     worldHash: computeWorldHash(applied.world),
   };
+  const beamIntentMsg: OutpostMessage = {
+    type: 'beamIntent',
+    at: { x: 4, z: 6 },
+    beam: { node: 1, power: 1 },
+    power: { 10: 0.8 },
+  };
+  const kickMsg: OutpostMessage = {
+    type: 'kickPlayer',
+    targetId: 'cb-1',
+    reason: 'Session ended',
+  };
+  const undoMsg: OutpostMessage = {
+    type: 'undoAuthor',
+    targetId: 'cb-1',
+  };
 
   assert.equal(hasNoPayloadTypeField(clientCmdMsg), true);
   assert.equal(hasNoPayloadTypeField(serverEventsMsg), true);
   assert.equal(hasNoPayloadTypeField(serverRefusedMsg), true);
+  assert.equal(hasNoPayloadTypeField(beamIntentMsg), true);
+  assert.equal(hasNoPayloadTypeField(kickMsg), true);
+  assert.equal(hasNoPayloadTypeField(undoMsg), true);
   assert.deepEqual(wireEvents.map(fromWireEvent), applied.events);
+
+  const switchedEvent = { type: 'switched' as const, machine: 7, on: false };
+  assert.deepEqual(fromWireEvent(toWireEvent(switchedEvent)), switchedEvent);
 });
 
 test('verifyVersionAndHash detects version and world-hash mismatches', () => {

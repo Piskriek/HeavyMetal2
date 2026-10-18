@@ -1,11 +1,11 @@
 // ============================================================================
 // File: apps/web/src/rooms/OutpostRoom.ts
-// Plan 36 Phase 1 (Deliverable 2, server-authoritative outpost GameRoom):
-// - Imports only pure modules (base/world.ts apply, net/protocol.ts, base/plot-height.ts, @hm/*).
-// - Checks the sender's role with canRun(), then runs apply() against the plot's ground.
-// - Broadcasts confirmed events with a monotonic version and a worldHash; refusals go to the sender only.
-// - Keeps the plot's terrain (seed and sculpt) from the Lead Architect, and builds its ground with plotHeightAt.
-// - Relays poses at 10 Hz on this.clock (never raw timers); persists through getPersistState and onRestore.
+// Plan 36 Phase 1 & Phase 2 (TICKET-11 server-authoritative OutpostRoom):
+// - Imports only pure modules (base/world.ts apply, net/protocol.ts, net/coop-guardrails.ts, base/plot-height.ts, @hm/*).
+// - Checks sender's role with canRun(), enforces POL-115 seed gate and token-bucket rate limit, then runs apply().
+// - Persists roles, usernames (POL-117), placedBy, shiftLog, undoLog, defaultGuestRole, and terrain.
+// - Supports Lead Architect setRole, setDefaultRole, kickPlayer, and one-click per-author undo (undoAuthor).
+// - Runs authoritative 1 Hz machine & harvest tick on this.clock using client beamIntents (POL-114).
 // ============================================================================
 
 import {
@@ -33,18 +33,33 @@ import {
   frameMessage,
   PROTOCOL_VERSION,
   toWireEvent,
+  type BeamIntentMessage,
   type OutpostMessage,
   type OutpostRole,
   type PeerPose,
   type ShiftLogEntry,
   type TerrainState,
 } from '../net/protocol';
+import {
+  DEFAULT_RATE_LIMIT,
+  findNextUndoCommandsForAuthor,
+  recordAuthorBuild,
+  TokenBucketLimiter,
+  type RateLimitConfig,
+  type UndoLogEntry,
+} from '../net/coop-guardrails';
 
 export const PRESENCE_HZ = 10;
 export const PRESENCE_INTERVAL_MS = 1000 / PRESENCE_HZ; // 100 ms
 export const PRESENCE_TIMER = 'outpost-presence-10hz';
+
+export const OUTPOST_TICK_HZ = 1;
+export const OUTPOST_TICK_INTERVAL_MS = 1000 / OUTPOST_TICK_HZ; // 1000 ms
+export const OUTPOST_TICK_TIMER = 'outpost-world-tick-1hz';
+
 const MAX_SHIFT_LOG = 5;
 const DEFAULT_MAX_PLAYERS = 4;
+
 /**
  * The longest sculpt text the room accepts. A 256-cell field carries a few kilobytes for a plot with some cuts; the cap only bounds
  * what one owner can make the room store and send to every visitor.
@@ -65,9 +80,12 @@ export interface OutpostPersistSnapshot {
   readonly world: BaseWorld;
   readonly version: number;
   readonly ownerId: string;
+  readonly defaultGuestRole?: OutpostRole;
   readonly roles: Readonly<Record<string, OutpostRole>>;
+  readonly usernames?: Readonly<Record<string, string>>;
   readonly placedBy: Readonly<Record<number, string>>;
   readonly shiftLog: readonly ShiftLogEntry[];
+  readonly undoLog?: readonly UndoLogEntry[];
   readonly terrain: TerrainState;
 }
 
@@ -82,9 +100,15 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
   private ownerId = '';
   private defaultGuestRole: OutpostRole = 'cobuilder';
   private roles: Record<string, OutpostRole> = {};
+  private usernames: Record<string, string> = {};
   private placedBy: Record<number, string> = {};
   private poses = new Map<string, PeerPose>();
   private shiftLog: ShiftLogEntry[] = [];
+  private undoLog: UndoLogEntry[] = [];
+  private beamIntents = new Map<string, BeamIntentMessage>();
+  private lastPowerShare: Record<number, number> = {};
+  private lastLatched: readonly number[] = [];
+  private rateLimiter = new TokenBucketLimiter(DEFAULT_RATE_LIMIT);
   private clockTickMs = 0;
   /** Frames arriving from each sender, joined back into whole messages. */
   private inbound = new Map<string, FrameAssembler>();
@@ -96,10 +120,11 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
 
   override onCreate(): void {
     this.log.info('outpost room created', { roomId: this.roomId, roomType: this.roomType });
-    this.startPresenceClock();
+    this.startClocks();
   }
 
   override onPlayerJoin(player: Player): void {
+    this.usernames[player.id] = player.username || player.id;
     if (!this.ownerId) {
       this.ownerId = player.id;
       this.roles[player.id] = 'owner';
@@ -112,8 +137,15 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
 
     this.sendFramed(player.id, this.welcomeFor(player.id));
     this.sendFramed(player.id, { type: 'terrain', seed: this.terrain.seed, sculpt: this.terrain.sculpt });
-    // everyone learns who joined, and the role they hold, so each roster is complete
-    this.broadcast({ type: 'roleChanged', targetId: player.id, role: this.roleOf(player.id), roles: { ...this.roles } });
+    // everyone learns who joined, their username (POL-117), and the role they hold, so each roster is complete
+    this.broadcast({
+      type: 'roleChanged',
+      targetId: player.id,
+      role: this.roleOf(player.id),
+      roles: { ...this.roles },
+      usernames: { ...this.usernames },
+      defaultGuestRole: this.defaultGuestRole,
+    });
 
     if (this.playerCount >= this.maxPlayers()) this.lock();
   }
@@ -133,9 +165,11 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
     switch (msg.type) {
       case 'pose': {
         if (![msg.x, msg.y, msg.z, msg.yaw].every(Number.isFinite)) return;
+        const uname = sender.username || this.usernames[sender.id] || sender.id;
+        this.usernames[sender.id] = uname;
         this.poses.set(sender.id, {
           id: sender.id,
-          username: sender.username || sender.id,
+          username: uname,
           role: this.roleOf(sender.id),
           x: msg.x,
           y: msg.y,
@@ -144,6 +178,28 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
           look: typeof msg.look === 'string' && msg.look ? msg.look : 'default',
           at: this.clockTickMs,
         });
+        return;
+      }
+
+      case 'beamIntent': {
+        if (this.roleOf(sender.id) === 'visitor') return;
+        if (!msg.at || ![msg.at.x, msg.at.z].every(Number.isFinite)) return;
+        if (msg.power && typeof msg.power === 'object') {
+          this.lastPowerShare = { ...msg.power };
+        }
+        if (Array.isArray(msg.latched)) {
+          this.lastLatched = [...msg.latched];
+        }
+        if (msg.beam === null) {
+          this.beamIntents.delete(sender.id);
+        } else if (
+          typeof msg.beam === 'object' &&
+          Number.isInteger(msg.beam.node) &&
+          Number.isFinite(msg.beam.power) &&
+          msg.beam.power > 0
+        ) {
+          this.beamIntents.set(sender.id, msg);
+        }
         return;
       }
 
@@ -160,7 +216,10 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
           worldHash: this.worldHash(),
           world: this.world,
           roles: { ...this.roles },
+          usernames: { ...this.usernames },
+          defaultGuestRole: this.defaultGuestRole,
           placedBy: { ...this.placedBy },
+          shiftLog: [...this.shiftLog],
         });
         this.sendFramed(sender.id, { type: 'terrain', seed: this.terrain.seed, sculpt: this.terrain.sculpt });
         return;
@@ -176,7 +235,112 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
         this.roles[msg.targetId] = msg.role;
         const existingPose = this.poses.get(msg.targetId);
         if (existingPose) this.poses.set(msg.targetId, { ...existingPose, role: msg.role });
-        this.broadcast({ type: 'roleChanged', targetId: msg.targetId, role: msg.role, roles: { ...this.roles } });
+        if (msg.role === 'visitor') {
+          this.beamIntents.delete(msg.targetId);
+        }
+        this.broadcast({
+          type: 'roleChanged',
+          targetId: msg.targetId,
+          role: msg.role,
+          roles: { ...this.roles },
+          usernames: { ...this.usernames },
+          defaultGuestRole: this.defaultGuestRole,
+        });
+        this.save();
+        return;
+      }
+
+      case 'setDefaultRole': {
+        if (this.roleOf(sender.id) !== 'owner') {
+          this.notice(sender.id, 'owner-only');
+          return;
+        }
+        if (msg.role !== 'cobuilder' && msg.role !== 'visitor') return;
+        this.defaultGuestRole = msg.role;
+        this.broadcast({
+          type: 'roleChanged',
+          targetId: this.ownerId,
+          role: 'owner',
+          roles: { ...this.roles },
+          usernames: { ...this.usernames },
+          defaultGuestRole: this.defaultGuestRole,
+        });
+        this.save();
+        return;
+      }
+
+      case 'kickPlayer': {
+        if (this.roleOf(sender.id) !== 'owner') {
+          this.notice(sender.id, 'owner-only');
+          return;
+        }
+        if (!msg.targetId || msg.targetId === this.ownerId) return;
+        const reason = typeof msg.reason === 'string' && msg.reason.trim() ? msg.reason.trim() : 'Removed by Lead Architect';
+        delete this.roles[msg.targetId];
+        this.poses.delete(msg.targetId);
+        this.inbound.delete(msg.targetId);
+        this.beamIntents.delete(msg.targetId);
+        this.rateLimiter.clearPlayer(msg.targetId);
+
+        const kickedMsg: OutpostMessage = {
+          type: 'kicked',
+          targetId: msg.targetId,
+          reason,
+          roles: { ...this.roles },
+          usernames: { ...this.usernames },
+        };
+        this.sendTo(msg.targetId, kickedMsg);
+        this.broadcast(kickedMsg);
+        this.kick(msg.targetId, reason);
+        this.save();
+        return;
+      }
+
+      case 'undoAuthor': {
+        if (this.roleOf(sender.id) !== 'owner') {
+          this.notice(sender.id, 'owner-only');
+          return;
+        }
+        if (!msg.targetId) return;
+        const plan = findNextUndoCommandsForAuthor(this.world, this.placedBy, this.undoLog, msg.targetId);
+        if (!plan || plan.commands.length === 0) {
+          this.notice(sender.id, 'nothing-to-undo');
+          return;
+        }
+        this.undoLog = plan.remainingLog;
+        let undidAny = false;
+        for (const removeCmd of plan.commands) {
+          if (!this.world.base.pieces.some((p) => p.id === removeCmd.id)) continue;
+          const applied = apply(this.world, this.env, removeCmd);
+          if (applied.events.some((e) => e.type === 'refused')) continue;
+          this.world = applied.world;
+          this.version += 1;
+          undidAny = true;
+
+          const afterPieces = new Set(this.world.base.pieces.map((p) => p.id));
+          for (const key of Object.keys(this.placedBy)) {
+            const numId = Number(key);
+            if (!afterPieces.has(numId)) delete this.placedBy[numId];
+          }
+
+          const targetName = this.usernames[msg.targetId] ?? msg.targetId;
+          this.recordShiftEntry(sender, 'owner', `undo(${targetName})`);
+          this.broadcastFramed({
+            type: 'events',
+            proto: PROTOCOL_VERSION,
+            version: this.version,
+            worldHash: this.worldHash(),
+            actorId: sender.id,
+            seq: 0,
+            cmd: removeCmd,
+            events: applied.events.map(toWireEvent),
+            shiftLog: [...this.shiftLog],
+          });
+        }
+        if (!undidAny) {
+          this.notice(sender.id, 'undo-refused');
+          return;
+        }
         this.save();
         return;
       }
@@ -205,7 +369,10 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
           worldHash: this.worldHash(),
           world: this.world,
           roles: { ...this.roles },
+          usernames: { ...this.usernames },
+          defaultGuestRole: this.defaultGuestRole,
           placedBy: { ...this.placedBy },
+          shiftLog: [...this.shiftLog],
         });
         this.save();
         return;
@@ -245,6 +412,23 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
       return;
     }
     const role = this.roleOf(sender.id);
+
+    // 1. Token-bucket rate limit check for non-owners
+    const rateVerdict = this.rateLimiter.tryConsume(sender.id, role, this.clockTickMs);
+    if (!rateVerdict.ok) {
+      this.sendTo(sender.id, {
+        type: 'refused',
+        proto: PROTOCOL_VERSION,
+        seq,
+        cmdKind: cmd.t,
+        why: rateVerdict.why,
+        version: this.version,
+        worldHash: this.worldHash(),
+      });
+      return;
+    }
+
+    // 2. Role guardrail check
     let applied: Applied;
     try {
       const roleVerdict = canRun(role, cmd, this.world, sender.id, this.placedBy);
@@ -260,6 +444,21 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
         });
         return;
       }
+
+      // 3. POL-115: Hold non-owner commands until the Lead Architect seeds the room (version > 0)
+      if (role !== 'owner' && this.version === 0) {
+        this.sendTo(sender.id, {
+          type: 'refused',
+          proto: PROTOCOL_VERSION,
+          seq,
+          cmdKind: cmd.t,
+          why: 'waiting-for-host-seed',
+          version: this.version,
+          worldHash: this.worldHash(),
+        });
+        return;
+      }
+
       applied = apply(this.world, this.env, cmd);
     } catch {
       // a command the rules cannot read is refused, never allowed to break the room
@@ -287,17 +486,31 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
     this.version += 1;
 
     const placedByPatch: Record<number, string> = {};
+    const newPieceIds: number[] = [];
     const afterPieces = new Set<number>();
     for (const p of this.world.base.pieces) {
       afterPieces.add(p.id);
       if (!beforePieces.has(p.id)) {
         this.placedBy[p.id] = sender.id;
         placedByPatch[p.id] = sender.id;
+        newPieceIds.push(p.id);
       }
     }
     for (const id of Object.keys(this.placedBy)) {
       const numId = Number(id);
       if (!afterPieces.has(numId)) delete this.placedBy[numId];
+    }
+
+    if (newPieceIds.length > 0) {
+      this.undoLog = recordAuthorBuild(this.undoLog, {
+        actorId: sender.id,
+        username: sender.username || this.usernames[sender.id] || sender.id,
+        role,
+        version: this.version,
+        cmdKind: cmd.t,
+        pieceIds: newPieceIds,
+        at: this.clockTickMs,
+      });
     }
 
     if (sender.id !== this.ownerId && cmd.t !== 'tick' && cmd.t !== 'hotbar') {
@@ -314,15 +527,67 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
       cmd,
       events: applied.events.map(toWireEvent),
       ...(Object.keys(placedByPatch).length > 0 ? { placedByPatch } : {}),
+      shiftLog: [...this.shiftLog],
     });
 
     if (cmd.t !== 'tick' && cmd.t !== 'hotbar') this.save();
+  }
+
+  /**
+   * POL-114: Server-authoritative 1 Hz machine & Extraction Beam tick on `this.clock`.
+   * Runs only when the room is seeded (`version > 0`) and has active machine jobs or an active `beamIntent`,
+   * and broadcasts an `'events'` frame only when state changes or work progresses.
+   */
+  public flushWorldTick(dtSec = OUTPOST_TICK_INTERVAL_MS / 1000): void {
+    if (this.version === 0) return;
+    const hasRunningMachine = this.world.machines.some((m) => m.on !== false && m.jobs.length > 0);
+    const activeIntent = [...this.beamIntents.entries()].find(([pid, intent]) => {
+      const p = this.players.get(pid);
+      return (!p || p.connected) && this.roleOf(pid) !== 'visitor' && intent.beam !== null;
+    });
+
+    if (!hasRunningMachine && !activeIntent) return;
+
+    const actorId = activeIntent ? activeIntent[0] : (this.ownerId || 'server');
+    const at = activeIntent ? activeIntent[1].at : { x: 0, z: 0 };
+    const beam = activeIntent ? activeIntent[1].beam : null;
+    const power: Record<number, number> = { ...this.lastPowerShare };
+    for (const m of this.world.machines) {
+      if (power[m.id] === undefined) power[m.id] = 1;
+    }
+
+    const tickCmd: BaseCommand = {
+      t: 'tick',
+      at,
+      dt: dtSec,
+      beam,
+      power,
+      ...(this.lastLatched.length > 0 ? { latched: this.lastLatched } : {}),
+    };
+
+    const applied = apply(this.world, this.env, tickCmd);
+    if (applied.events.some((e) => e.type === 'refused')) return;
+
+    this.world = applied.world;
+    this.version += 1;
+    this.broadcastFramed({
+      type: 'events',
+      proto: PROTOCOL_VERSION,
+      version: this.version,
+      worldHash: this.worldHash(),
+      actorId,
+      seq: 0,
+      cmd: tickCmd,
+      events: applied.events.map(toWireEvent),
+    });
+    if (applied.events.length > 0) this.save();
   }
 
   override onPlayerLeave(player: Player, reason: LeaveReason): void {
     this.log.info('player left outpost', { id: player.id, reason });
     this.poses.delete(player.id);
     this.inbound.delete(player.id);
+    this.beamIntents.delete(player.id);
     if (this.playerCount < this.maxPlayers()) this.unlock();
   }
 
@@ -335,9 +600,12 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
       world: this.world,
       version: this.version,
       ownerId: this.ownerId,
+      defaultGuestRole: this.defaultGuestRole,
       roles: { ...this.roles },
+      usernames: { ...this.usernames },
       placedBy: { ...this.placedBy },
       shiftLog: [...this.shiftLog],
+      undoLog: [...this.undoLog],
       terrain: { ...this.terrain },
     };
     return snapshot as unknown as Record<string, unknown>;
@@ -353,8 +621,14 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
     if (typeof snapshot.ownerId === 'string') {
       this.ownerId = snapshot.ownerId;
     }
+    if (snapshot.defaultGuestRole === 'cobuilder' || snapshot.defaultGuestRole === 'visitor') {
+      this.defaultGuestRole = snapshot.defaultGuestRole;
+    }
     if (snapshot.roles && typeof snapshot.roles === 'object') {
       this.roles = { ...(snapshot.roles as Record<string, OutpostRole>) };
+    }
+    if (snapshot.usernames && typeof snapshot.usernames === 'object') {
+      this.usernames = { ...(snapshot.usernames as Record<string, string>) };
     }
     if (snapshot.placedBy && typeof snapshot.placedBy === 'object') {
       this.placedBy = { ...(snapshot.placedBy as Record<number, string>) };
@@ -362,12 +636,15 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
     if (Array.isArray(snapshot.shiftLog)) {
       this.shiftLog = [...(snapshot.shiftLog as ShiftLogEntry[])].slice(-MAX_SHIFT_LOG);
     }
+    if (Array.isArray(snapshot.undoLog)) {
+      this.undoLog = [...(snapshot.undoLog as UndoLogEntry[])];
+    }
     const saved = snapshot.terrain as Partial<TerrainState> | undefined;
     if (saved && Number.isInteger(saved.seed) && typeof saved.sculpt === 'string') {
       this.terrain = { seed: saved.seed as number, sculpt: saved.sculpt };
     }
     this.env = groundEnv(this.terrain);
-    this.startPresenceClock();
+    this.startClocks();
   }
 
   /** Relays current peer poses to all connected players at 10 Hz. */
@@ -379,6 +656,18 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
       peers: [...this.poses.values()],
       serverTime: this.clockTickMs,
     });
+  }
+
+  public setRateLimit(config: RateLimitConfig): void {
+    this.rateLimiter.setConfig(config);
+  }
+
+  public getUndoLog(): readonly UndoLogEntry[] {
+    return [...this.undoLog];
+  }
+
+  public getUsernames(): Readonly<Record<string, string>> {
+    return { ...this.usernames };
   }
 
   private worldHash(): string {
@@ -417,6 +706,8 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
       worldHash: this.worldHash(),
       world: this.world,
       roles: { ...this.roles },
+      usernames: { ...this.usernames },
+      defaultGuestRole: this.defaultGuestRole,
       placedBy: { ...this.placedBy },
       shiftLog: [...this.shiftLog],
     };
@@ -426,8 +717,9 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
     return this.config?.maxPlayers ?? DEFAULT_MAX_PLAYERS;
   }
 
-  private startPresenceClock(): void {
+  private startClocks(): void {
     this.clock.setInterval(PRESENCE_TIMER, () => this.flushPresence(), PRESENCE_INTERVAL_MS);
+    this.clock.setInterval(OUTPOST_TICK_TIMER, () => this.flushWorldTick(), OUTPOST_TICK_INTERVAL_MS);
   }
 
   private assemblerFor(playerId: string): FrameAssembler {
@@ -460,10 +752,11 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
   }
 
   private recordShiftEntry(sender: Player, role: OutpostRole, cmdKind: string): void {
-    const summary = `${sender.username || sender.id} ran ${cmdKind} (v${this.version})`;
+    const uname = sender.username || this.usernames[sender.id] || sender.id;
+    const summary = `${uname} ran ${cmdKind} (v${this.version})`;
     this.shiftLog.push({
       actorId: sender.id,
-      username: sender.username || sender.id,
+      username: uname,
       role,
       summary,
       version: this.version,

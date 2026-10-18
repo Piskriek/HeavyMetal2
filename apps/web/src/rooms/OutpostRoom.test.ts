@@ -1,15 +1,17 @@
 // ============================================================================
 // File: apps/web/src/rooms/OutpostRoom.test.ts
-// Unit tests for OutpostRoom (plan 36 Phase 1, Deliverable 2), driven through the real GameRoom base class by the harness.
+// Unit tests for OutpostRoom (plan 36 Phase 1 & Phase 2 / TICKET-11), driven through
+// the real GameRoom base class by OutpostHarness.
 // ============================================================================
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorld, hashWorld, withBridgeStore, apply, type BaseWorld } from '../base/world';
 import { OUTPOST_PLOT_SEED, plotHeightAt } from '../base/plot-height';
+import { STARTER } from '../base/catalog';
 import { computeWorldHash, frameMessage, FrameAssembler, PROTOCOL_VERSION, type OutpostMessage } from '../net/protocol';
 import { OutpostHarness } from './outpost-harness';
-import { PRESENCE_INTERVAL_MS, PRESENCE_TIMER } from './OutpostRoom';
+import { OUTPOST_TICK_TIMER, PRESENCE_INTERVAL_MS, PRESENCE_TIMER } from './OutpostRoom';
 
 /** Sends a message the way the client does: in as many frames as it needs. */
 function sendFramed(t: { send(m: OutpostMessage): void }, msg: OutpostMessage, id = 1): void {
@@ -31,11 +33,15 @@ test('the room is a real GameRoom: the platform joins players and the first join
   void h.transport('cb-1', 'BuilderBob').on({});
   assert.equal(h.room.roleOf('host-1'), 'owner');
   assert.equal(h.room.roleOf('cb-1'), 'cobuilder');
+  // POL-117: usernames are recorded at join time before any pose message
+  assert.equal(h.room.getUsernames()['host-1'], 'LeadGoblin');
+  assert.equal(h.room.getUsernames()['cb-1'], 'BuilderBob');
   // a fresh world is too big for one frame, so the welcome is chunked; the terrain follows it in one frame
   assert.ok(h.sentTo('cb-1', 'chunk').length > 1);
   assert.equal(h.sentTo('cb-1', 'terrain').length, 1);
   assert.equal(h.sentTo('host-1', 'terrain').length, 1);
   assert.ok(h.clock.has(PRESENCE_TIMER), 'the presence relay runs on the room clock');
+  assert.ok(h.clock.has(OUTPOST_TICK_TIMER), 'the world tick runs on the room clock');
 });
 
 test('a command runs on the server, is confirmed to everyone, and a visitor refusal reaches only the visitor', () => {
@@ -158,4 +164,132 @@ test('the room restores its world, roles and terrain after a restart', () => {
   assert.deepEqual(again.room.getTerrain(), { seed: 7, sculpt: 'abc' });
   const next = apply(again.room.getWorld(), { heightAt: () => 0, bridge: { x: 0, z: 0, range: 60 } }, { t: 'hotbar', index: 3 });
   assert.equal(next.events[0]!.type, 'hotbar');
+});
+
+test('POL-115: a Co-Builder command before the Lead Architect seeds the room (version === 0) is refused with waiting-for-host-seed', () => {
+  const h = new OutpostHarness();
+  const host = h.transport('host-1', 'LeadGoblin');
+  const cobuilder = h.transport('cb-1', 'BuilderBob');
+  host.on({});
+  cobuilder.on({});
+
+  h.deliveries.length = 0;
+  cobuilder.send({
+    type: 'cmd',
+    proto: PROTOCOL_VERSION,
+    seq: 1,
+    baseVersion: 0,
+    cmd: { t: 'shelter', cx: 8, cz: 8, yaw: 0 },
+  } as OutpostMessage);
+  const refusals = h.sentTo('cb-1', 'refused');
+  assert.equal(refusals.length, 1);
+  assert.equal(refusals[0]!.data.why, 'waiting-for-host-seed');
+  assert.equal(h.room.getVersion(), 0);
+});
+
+test('Phase 2: token-bucket rate limiter refuses non-owner bursts past capacity and refills when clock advances', () => {
+  const h = new OutpostHarness();
+  h.room.setRateLimit({ capacity: 3, refillPerSec: 10 });
+  const host = h.transport('host-1', 'LeadGoblin');
+  const cobuilder = h.transport('cb-1', 'BuilderBob');
+  host.on({});
+  cobuilder.on({});
+
+  host.send({ type: 'cmd', proto: PROTOCOL_VERSION, seq: 1, baseVersion: 0, cmd: { t: 'shelter', cx: 8, cz: 8, yaw: 0 } } as OutpostMessage);
+  assert.equal(h.room.getVersion(), 1);
+
+  h.deliveries.length = 0;
+  for (let i = 1; i <= 4; i++) {
+    cobuilder.send({
+      type: 'cmd',
+      proto: PROTOCOL_VERSION,
+      seq: i,
+      baseVersion: i,
+      cmd: { t: 'hotbar', index: i % 9 },
+    } as OutpostMessage);
+  }
+  const refusals = h.sentTo('cb-1', 'refused');
+  assert.equal(refusals.length, 1, 'the 4th command in the same tick is rate-limited');
+  assert.equal(refusals[0]!.data.why, 'rate-limited');
+
+  // Fire PRESENCE_TIMER (100 ms -> +1 token at 10 tokens/sec)
+  h.clock.fire(PRESENCE_TIMER);
+  h.deliveries.length = 0;
+  cobuilder.send({
+    type: 'cmd',
+    proto: PROTOCOL_VERSION,
+    seq: 5,
+    baseVersion: h.room.getVersion(),
+    cmd: { t: 'hotbar', index: 2 },
+  } as OutpostMessage);
+  assert.equal(h.sentTo('cb-1', 'refused').length, 0, 'refilled token allows the next command');
+});
+
+test('Phase 2: Lead Architect can undo a Co-Builder last build and kick a player; non-owners cannot', () => {
+  const h = new OutpostHarness();
+  const host = h.transport('host-1', 'LeadGoblin');
+  const cobuilder = h.transport('cb-1', 'BuilderBob');
+  host.on({});
+  cobuilder.on({});
+
+  host.send({
+    type: 'cmd',
+    proto: PROTOCOL_VERSION,
+    seq: 1,
+    baseVersion: 0,
+    cmd: { t: 'grant', stock: [{ item: 'ore', n: 500 }] },
+  } as OutpostMessage);
+  host.send({
+    type: 'cmd',
+    proto: PROTOCOL_VERSION,
+    seq: 2,
+    baseVersion: 1,
+    cmd: { t: 'shelter', cx: 8, cz: 8, yaw: 0 },
+  } as OutpostMessage);
+  const stId = h.room.getWorld().base.structures[0]!.id;
+  const countAfterShelter = h.room.getWorld().base.pieces.length;
+
+  // Co-Builder places an extra foundation beside the shelter
+  cobuilder.send({
+    type: 'cmd',
+    proto: PROTOCOL_VERSION,
+    seq: 1,
+    baseVersion: 2,
+    cmd: { t: 'place', at: { x: 8, z: 8 }, blueprint: STARTER, piece: { s: stId, kind: 'foundation', i: 1, j: 0, k: 0, r: 0 } },
+  } as OutpostMessage);
+  assert.equal(h.room.getWorld().base.pieces.length, countAfterShelter + 1);
+
+  // Co-Builder cannot undo or kick
+  cobuilder.send({ type: 'undoAuthor', targetId: 'host-1' } as OutpostMessage);
+  assert.equal(h.sentTo('cb-1', 'notice').at(-1)?.data.why, 'owner-only');
+  cobuilder.send({ type: 'kickPlayer', targetId: 'host-1' } as OutpostMessage);
+  assert.equal(h.sentTo('cb-1', 'notice').at(-1)?.data.why, 'owner-only');
+
+  // Lead Architect undoes Co-Builder's placement
+  host.send({ type: 'undoAuthor', targetId: 'cb-1' } as OutpostMessage);
+  assert.equal(h.room.getWorld().base.pieces.length, countAfterShelter, 'Co-Builder piece was removed by undoAuthor');
+
+  // Lead Architect kicks Co-Builder
+  host.send({ type: 'kickPlayer', targetId: 'cb-1', reason: 'Griefing' } as OutpostMessage);
+  assert.equal(h.players.has('cb-1'), false, 'kicked player was removed from the room');
+});
+
+test('POL-114: server-side OUTPOST_TICK_TIMER advances active beam harvest without client tick commands', () => {
+  const h = new OutpostHarness();
+  const host = h.transport('host-1', 'LeadGoblin');
+  host.on({});
+  sendFramed(host, { type: 'seedWorld', proto: PROTOCOL_VERSION, world: hostBase() }, 1);
+  const vBefore = h.room.getVersion();
+  const node = h.room.getWorld().field.nodes[0]!;
+
+  host.send({
+    type: 'beamIntent',
+    at: { x: node.x, z: node.z },
+    beam: { node: node.id, power: 5 },
+  } as OutpostMessage);
+
+  h.deliveries.length = 0;
+  h.clock.fire(OUTPOST_TICK_TIMER);
+  assert.equal(h.room.getVersion(), vBefore + 1);
+  assert.ok(h.deliveries.some((d) => d.type === 'events'));
 });

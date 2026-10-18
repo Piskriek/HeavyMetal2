@@ -2,11 +2,31 @@
 // is, and which plots are your neighbours. There is no server of ours on RUN, so every player's game works this out
 // for itself, from the same list of published plots, and gets the same answer. Pure: no platform, no DOM.
 
+import { kv } from '../storage/profile-storage';
+
 /** Metres between neighbouring slots on the spiral: the closest two plots stand 1.55 x this apart (162 m: two plots and a gap). */
 export const SLOT_SPACING = 105;
 /** The smallest the planet ever is (metres): the first players already see a far horizon. */
 export const MIN_PLANET_RADIUS = 12000;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+
+/** Storage keys shared between Main Menu, Planetary Grid, and Play Screen (POL-84, POL-85). */
+export const SLOT_STORAGE_KEY = 'hm.setmix.planet.slot';
+export const CLAIMS_STORAGE_KEY = 'hm.setmix.planet.claims';
+export const PLAY_SYNC_STORAGE_KEY = 'hm.setmix.play.sync';
+
+export interface StorageLike {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+}
+
+/** The Synced (shared Planetary Grid) or Desynced (solo branch) mode of the play screen (POL-85). */
+export type PlaySyncMode = 'synced' | 'desynced';
+
+/** The player's own key-value storage, namespaced by the active profile (profile-storage's kv, the only place that touches localStorage). */
+function defaultStorage(): StorageLike {
+  return { getItem: (key) => kv.get(key), setItem: (key, value) => kv.set(key, value) };
+}
 
 /**
  * Where slot `k` is on the planet's map (metres from the first plot). A sunflower spiral: slots fill outward evenly,
@@ -49,6 +69,112 @@ export function resolveSlots(claims: readonly PlotClaim[]): ReadonlyMap<string, 
     out.set(c.id, slot);
   }
   return out;
+}
+
+/**
+ * Claims and resolves a deterministic sector slot for `plotId` against `existingClaims` (POL-84).
+ * If `plotId` is already in `existingClaims`, preserves its claim; otherwise appends a new claim asking
+ * for a deterministic starting index derived from `plotId` (or `existingClaims.length`).
+ */
+export function claimPlotSlot(
+  plotId: string,
+  existingClaims: readonly PlotClaim[] = [],
+  createdAt = 1,
+  preferredSlot?: number,
+): {
+  readonly slot: number;
+  readonly coords: { readonly x: number; readonly z: number };
+  readonly claims: readonly PlotClaim[];
+} {
+  const cleanId = plotId.trim() || 'local-outpost';
+  let claims = [...existingClaims];
+  if (!claims.some((c) => c.id === cleanId)) {
+    let defaultWants = claims.length;
+    if (preferredSlot !== undefined && Number.isFinite(preferredSlot) && preferredSlot >= 0) {
+      defaultWants = Math.floor(preferredSlot);
+    } else if (claims.length === 0) {
+      // Derive a stable non-negative sector index (1..24) from the plot code hash when no prior claims exist
+      let h = 2166136261;
+      for (let i = 0; i < cleanId.length; i++) {
+        h = Math.imul(h ^ cleanId.charCodeAt(i), 16777619) >>> 0;
+      }
+      defaultWants = (h % 24) + 1;
+    }
+    claims = [...claims, { id: cleanId, createdAt, wants: defaultWants }];
+  }
+  const resolved = resolveSlots(claims);
+  const slot = resolved.get(cleanId) ?? 0;
+  return {
+    slot,
+    coords: slotPosition(slot),
+    claims,
+  };
+}
+
+/** Reads the player's claimed planetary sector slot from storage, or null if unclaimed (POL-84). */
+export function readStoredSlot(storage: StorageLike | null = defaultStorage()): number | null {
+  if (!storage) return null;
+  const raw = storage.getItem(SLOT_STORAGE_KEY);
+  if (raw === null || raw.trim() === '') return null;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 ? n : null;
+}
+
+/** Claims a sector slot via `resolveSlots` when a plot publishes and stores it in `hm.setmix.planet.slot` (POL-84). */
+export function claimAndStoreSlot(
+  plotId: string,
+  storage: StorageLike | null = defaultStorage(),
+  createdAt = 1,
+): number {
+  const existingSlot = readStoredSlot(storage);
+  let existingClaims: PlotClaim[] = [];
+  if (storage) {
+    try {
+      const rawClaims = storage.getItem(CLAIMS_STORAGE_KEY);
+      if (rawClaims) {
+        const parsed = JSON.parse(rawClaims) as unknown;
+        if (Array.isArray(parsed)) existingClaims = parsed as PlotClaim[];
+      }
+    } catch {
+      existingClaims = [];
+    }
+  }
+  const result = claimPlotSlot(
+    plotId,
+    existingClaims,
+    createdAt,
+    existingSlot !== null ? existingSlot : undefined,
+  );
+  if (storage) {
+    try {
+      storage.setItem(SLOT_STORAGE_KEY, String(result.slot));
+      storage.setItem(CLAIMS_STORAGE_KEY, JSON.stringify(result.claims));
+    } catch {
+      // ignore quota errors
+    }
+  }
+  return result.slot;
+}
+
+/** Reads the remembered Synced/Desynced mode from `hm.setmix.play.sync` (POL-85). */
+export function readPlaySyncMode(storage: StorageLike | null = defaultStorage()): PlaySyncMode {
+  if (!storage) return 'desynced';
+  return storage.getItem(PLAY_SYNC_STORAGE_KEY) === 'synced' ? 'synced' : 'desynced';
+}
+
+/** Writes the remembered Synced/Desynced mode to `hm.setmix.play.sync` from either the Grid or the Play HUD (POL-85). */
+export function writePlaySyncMode(
+  mode: PlaySyncMode,
+  storage: StorageLike | null = defaultStorage(),
+): PlaySyncMode {
+  if (storage) {
+    try {
+      storage.setItem(PLAY_SYNC_STORAGE_KEY, mode);
+    } catch {
+      // ignore storage errors
+    }
+  }
+  return mode;
 }
 
 /**

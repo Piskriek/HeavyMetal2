@@ -1,15 +1,17 @@
 // ============================================================================
 // File: apps/web/src/shell/planetary-grid.tsx
-// TICKET-08a (OPUS_NOTE_13 Item A — MENU-01 / DEC-12):
+// TICKET-08a & TICKET-11 (Plan 36 Phase 2 — Planetary Grid Co-Op Controls):
 // Honest 3-column Planetary Grid screen:
-//  1. Your Enclave: plot code with Copy, slot on the shared planet, Synced/Desynced toggle
-//  2. Visit: paste a friend's code (validated with checkPlotCode / decodePlot), Visit, recent codes
+//  1. Your Enclave: plot code with Copy, slot on the shared planet (POL-84),
+//     Synced/Desynced toggle (POL-85), and Shared Outpost co-op controls
+//     (Promote/Demote, per-author Undo, Kick, and Default Guest Role toggle).
+//  2. Visit: paste a friend's code (validated with checkPlotCode / decodePlot) or 6-char room code
 //  3. Spawn Point: Earth Lab or Moon Gate
 // ============================================================================
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { slotPosition } from '../crafter/shared-planet';
-import { ROLE_LABELS } from '../net/protocol';
+import { readStoredSlot, slotPosition, writePlaySyncMode } from '../crafter/shared-planet';
+import { ROLE_LABELS, type OutpostRole } from '../net/protocol';
 import {
   coopAvailable,
   currentOutpostSession,
@@ -66,6 +68,15 @@ export const PlanetaryGridScreen: React.FC<PlanetaryGridScreenProps> = ({
   const [coopNote, setCoopNote] = useState<string | null>(null);
   const [roomCopied, setRoomCopied] = useState(false);
   const [, setLiveTick] = useState(0);
+
+  // POL-84: the sector slot this save has claimed. A claim is made when the outpost publishes (claimAndStoreSlot), so
+  // Synced only shows a claim that is already stored: a fresh save reads UNCLAIMED until it publishes.
+  const effectiveSlot = useMemo(() => {
+    if (slot !== null && slot >= 0) return slot;
+    if (syncMode !== 'synced') return null;
+    const stored = readStoredSlot();
+    return stored !== null && stored >= 0 ? stored : null;
+  }, [slot, syncMode]);
 
   useEffect(() => subscribeOutpostSession(() => setSession(currentOutpostSession())), []);
 
@@ -124,6 +135,31 @@ export const PlanetaryGridScreen: React.FC<PlanetaryGridScreenProps> = ({
     setTimeout(() => setRoomCopied(false), 2000);
   };
 
+  const handleToggleRole = (targetId: string, currentRole: OutpostRole) => {
+    if (!session || !session.host) return;
+    const nextRole: OutpostRole = currentRole === 'cobuilder' ? 'visitor' : 'cobuilder';
+    session.client.setRole(targetId, nextRole);
+  };
+
+  const handleUndoAuthor = (targetId: string, name: string) => {
+    if (!session || !session.host) return;
+    session.client.undoAuthor(targetId);
+    setCoopNote(`Reverted the last piece placed by ${name}.`);
+  };
+
+  const handleKickPlayer = (targetId: string, name: string) => {
+    if (!session || !session.host) return;
+    session.client.kickPlayer(targetId, 'Removed by Lead Architect');
+    setCoopNote(`Removed ${name} from the room.`);
+  };
+
+  const handleToggleDefaultRole = () => {
+    if (!session || !session.host) return;
+    const cur = session.client.state().defaultGuestRole ?? 'cobuilder';
+    const next: OutpostRole = cur === 'cobuilder' ? 'visitor' : 'cobuilder';
+    session.client.setDefaultRole(next);
+  };
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -148,7 +184,7 @@ export const PlanetaryGridScreen: React.FC<PlanetaryGridScreenProps> = ({
       : { tone: 'err', canSubmit: false, text: check.why ?? '' };
   const liveState = session ? session.client.state() : null;
   const roster = session ? rosterOf(session.client) : [];
-  const coords = slot !== null && slot >= 0 ? slotPosition(slot) : null;
+  const coords = effectiveSlot !== null && effectiveSlot >= 0 ? slotPosition(effectiveSlot) : null;
 
   const handleCopy = () => {
     if (!myCode) return;
@@ -217,7 +253,10 @@ export const PlanetaryGridScreen: React.FC<PlanetaryGridScreenProps> = ({
                   className={`pg-sync-btn${syncMode === 'synced' ? ' is-active synced' : ''}`}
                   aria-pressed={syncMode === 'synced'}
                   onClick={() => {
-                    if (syncMode !== 'synced') onToggleSync();
+                    if (syncMode !== 'synced') {
+                      writePlaySyncMode('synced');
+                      onToggleSync();
+                    }
                   }}
                   data-testid="pg-sync-synced"
                 >
@@ -228,7 +267,10 @@ export const PlanetaryGridScreen: React.FC<PlanetaryGridScreenProps> = ({
                   className={`pg-sync-btn${syncMode === 'desynced' ? ' is-active desynced' : ''}`}
                   aria-pressed={syncMode === 'desynced'}
                   onClick={() => {
-                    if (syncMode !== 'desynced') onToggleSync();
+                    if (syncMode !== 'desynced') {
+                      writePlaySyncMode('desynced');
+                      onToggleSync();
+                    }
                   }}
                   data-testid="pg-sync-desynced"
                 >
@@ -244,9 +286,9 @@ export const PlanetaryGridScreen: React.FC<PlanetaryGridScreenProps> = ({
 
             <div className="pg-card">
               <div className="pg-field-label">PLANETARY SECTOR SLOT</div>
-              {slot !== null && coords ? (
+              {effectiveSlot !== null && coords ? (
                 <div className="pg-slot-readout" data-testid="pg-slot-readout">
-                  <strong className="pg-slot-id">SECTOR #{slot}</strong>
+                  <strong className="pg-slot-id">SECTOR #{effectiveSlot}</strong>
                   <span className="pg-slot-coords">
                     ({Math.round(coords.x)} m, {Math.round(coords.z)} m from origin crater)
                   </span>
@@ -281,6 +323,19 @@ export const PlanetaryGridScreen: React.FC<PlanetaryGridScreenProps> = ({
                     </span>
                     <span className="pg-mode-desc">{session.host ? 'Lead Architect' : liveState.roleLabel}</span>
                   </div>
+                  {session.host ? (
+                    <div className="pg-coop-row" data-testid="pg-default-role-row">
+                      <span className="pg-mode-desc">New guests join as: {ROLE_LABELS[liveState.defaultGuestRole ?? 'cobuilder']}</span>
+                      <button
+                        type="button"
+                        className="pg-mini-btn"
+                        onClick={handleToggleDefaultRole}
+                        data-testid="pg-default-role-toggle"
+                      >
+                        {liveState.defaultGuestRole === 'visitor' ? 'Allow Co-Build' : 'Observer Only'}
+                      </button>
+                    </div>
+                  ) : null}
                   <p className="pg-mode-desc">
                     {session.host
                       ? 'Friends type this code in Visit to build on your outpost with you.'
@@ -291,6 +346,37 @@ export const PlanetaryGridScreen: React.FC<PlanetaryGridScreenProps> = ({
                       <li key={p.id} className={`pg-chip role-${p.role}${p.self ? ' is-self' : ''}`} data-testid="pg-roster-chip">
                         <span className="pg-chip-name">{p.name}</span>
                         <span className="pg-chip-role">{ROLE_LABELS[p.role]}</span>
+                        {session.host && !p.self ? (
+                          <span className="pg-chip-actions">
+                            <button
+                              type="button"
+                              className="pg-mini-btn"
+                              onClick={() => handleToggleRole(p.id, p.role)}
+                              title={p.role === 'cobuilder' ? 'Demote to Field Observer' : 'Promote to Co-Builder'}
+                              data-testid={`pg-role-toggle-${p.id}`}
+                            >
+                              {p.role === 'cobuilder' ? 'Demote' : 'Promote'}
+                            </button>
+                            <button
+                              type="button"
+                              className="pg-mini-btn"
+                              onClick={() => handleUndoAuthor(p.id, p.name)}
+                              title={`Undo last piece placed by ${p.name}`}
+                              data-testid={`pg-undo-${p.id}`}
+                            >
+                              Undo
+                            </button>
+                            <button
+                              type="button"
+                              className="pg-mini-btn"
+                              onClick={() => handleKickPlayer(p.id, p.name)}
+                              title={`Remove ${p.name} from room`}
+                              data-testid={`pg-kick-${p.id}`}
+                            >
+                              Kick
+                            </button>
+                          </span>
+                        ) : null}
                       </li>
                     ))}
                   </ul>

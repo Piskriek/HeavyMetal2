@@ -1,12 +1,12 @@
 // ============================================================================
 // File: apps/web/src/net/outpost-client.ts
-// Plan 36 Phase 1 (Deliverable 3, the client outpost network layer):
-// connectOutpost('host' | code) returns { send(cmd), onEvents(cb), onPresence(cb), state(), leave() } and more.
+// Plan 36 Phase 1 & Phase 2 (TICKET-11 client outpost network layer):
+// connectOutpost('host' | code) returns { send(cmd), onEvents(cb), onPresence(cb), state(), leave() } and Phase 2 controls:
 // - Predict and confirm: a command applies locally at once (apply() on the plot's ground), then the room's events confirm it.
-// - Terrain: the ground follows the room's terrain (the Lead Architect's seed and sculpt), through plotHeightAt.
-// - Resync on a version or world-hash mismatch, and on reconnect.
-// - Reconnect states: 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'error'.
-// - 100 ms buffered presence interpolation for remote avatars.
+// - Phase 2 Lead Architect controls: setRole, setDefaultRole, kickPlayer, undoAuthor.
+// - POL-114: sendBeamIntent(intent) for server-authoritative machine & harvest ticks.
+// - POL-115: holds non-owner builds while version === 0 ('waiting-for-host-seed').
+// - POL-117: tracks player usernames from welcome/snapshot/roleChanged so roster names show before movement.
 // The RUN SDK is loaded only when a room is connected for real: nothing from it loads when this module is imported.
 // ============================================================================
 
@@ -82,6 +82,7 @@ export interface OutpostClientState {
   readonly playerId: string | null;
   readonly role: OutpostRole;
   readonly roleLabel: 'Lead Architect' | 'Co-Builder' | 'Field Observer';
+  readonly defaultGuestRole: OutpostRole;
   readonly version: number;
   readonly world: BaseWorld;
   readonly confirmedWorld: BaseWorld;
@@ -91,12 +92,14 @@ export interface OutpostClientState {
   readonly resyncCount: number;
   readonly peers: readonly PeerPose[];
   readonly roles: Readonly<Record<string, OutpostRole>>;
+  readonly usernames: Readonly<Record<string, string>>;
   readonly placedBy: Readonly<Record<number, string>>;
   readonly shiftLog: readonly ShiftLogEntry[];
   readonly terrain: TerrainState;
   readonly lastRefusal: { readonly cmdKind: BaseCommand['t']; readonly why: string } | null;
   readonly lastNotice: string | null;
   readonly lastError: string | null;
+  readonly kickedReason: string | null;
 }
 
 export type EventsCallback = (
@@ -117,7 +120,16 @@ export type PresenceCallback = (
 export interface OutpostClient {
   send(cmd: BaseCommand): Applied;
   sendPose(pose: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly look?: string }): void;
+  sendBeamIntent(intent: {
+    readonly at: { readonly x: number; readonly z: number };
+    readonly beam: { readonly node: number; readonly power: number } | null;
+    readonly power?: Readonly<Record<number, number>>;
+    readonly latched?: readonly number[];
+  }): void;
   setRole(targetId: string, role: OutpostRole): void;
+  setDefaultRole(role: OutpostRole): boolean;
+  kickPlayer(targetId: string, reason?: string): boolean;
+  undoAuthor(targetId: string): boolean;
   /**
    * The Lead Architect's terrain: the plot's seed and the beam save's sculpt text. The room applies it in order and relays it, and
    * this client's ground changes when the room's copy comes back. False (and nothing sent) for anyone but the Lead Architect.
@@ -254,12 +266,14 @@ export async function connectOutpost(
   let roomCode: string | null = room.roomCode ?? normalizedCode;
   let playerId: string | null = options.playerId ?? room.playerId ?? (isHost ? 'host' : null);
   let role: OutpostRole = isHost ? 'owner' : 'cobuilder';
+  let defaultGuestRole: OutpostRole = 'cobuilder';
   let version = 0;
   let terrain: TerrainState = { seed: OUTPOST_PLOT_SEED, sculpt: '' };
   let env: WorldEnv = groundEnvFor(terrain);
   let confirmedWorld: BaseWorld = options.initialWorld ?? withBridgeStore(createWorld(1), env);
   let predictedWorld: BaseWorld = confirmedWorld;
   let roles: Record<string, OutpostRole> = playerId ? { [playerId]: role } : {};
+  let usernames: Record<string, string> = {};
   let placedBy: Record<number, string> = {};
   let shiftLog: ShiftLogEntry[] = [];
   let peers: PeerPose[] = [];
@@ -270,6 +284,7 @@ export async function connectOutpost(
   let lastRefusal: { readonly cmdKind: BaseCommand['t']; readonly why: string } | null = null;
   let lastNotice: string | null = null;
   let lastError: string | null = null;
+  let kickedReason: string | null = null;
   /** Whether the first welcome has come: the host seeds and sends its terrain once, on that one. */
   let greeted = false;
 
@@ -304,6 +319,7 @@ export async function connectOutpost(
     playerId,
     role,
     roleLabel: roleName(role),
+    defaultGuestRole,
     version,
     world: predictedWorld,
     confirmedWorld,
@@ -313,12 +329,14 @@ export async function connectOutpost(
     resyncCount,
     peers,
     roles: { ...roles },
+    usernames: { ...usernames },
     placedBy: { ...placedBy },
     shiftLog: [...shiftLog],
     terrain: { ...terrain },
     lastRefusal,
     lastNotice,
     lastError,
+    kickedReason,
   });
 
   const emitState = (): void => {
@@ -348,15 +366,15 @@ export async function connectOutpost(
   const handle = (msg: OutpostMessage): void => {
     switch (msg.type) {
       case 'welcome': {
-        // a welcome can come twice (on joining, and again for hello): each one refreshes the seat and the room's world, and
-        // our own unconfirmed commands stay on top of it
         const first = !greeted;
         greeted = true;
         playerId = msg.playerId;
         role = msg.role;
+        if (msg.defaultGuestRole) defaultGuestRole = msg.defaultGuestRole;
         version = msg.version;
         confirmedWorld = msg.world;
         roles = { ...msg.roles };
+        if (msg.usernames) usernames = { ...usernames, ...msg.usernames };
         placedBy = { ...msg.placedBy };
         shiftLog = [...msg.shiftLog];
         recomputePredictedWorld();
@@ -380,7 +398,10 @@ export async function connectOutpost(
         version = msg.version;
         confirmedWorld = msg.world;
         roles = { ...msg.roles };
+        if (msg.usernames) usernames = { ...usernames, ...msg.usernames };
+        if (msg.defaultGuestRole) defaultGuestRole = msg.defaultGuestRole;
         placedBy = { ...msg.placedBy };
+        if (msg.shiftLog) shiftLog = [...msg.shiftLog];
         pending.length = 0;
         predictedWorld = confirmedWorld;
         emitState();
@@ -418,6 +439,14 @@ export async function connectOutpost(
         version = msg.version;
         if (msg.placedByPatch) {
           placedBy = { ...placedBy, ...msg.placedByPatch };
+        }
+        if (msg.shiftLog) {
+          shiftLog = [...msg.shiftLog];
+        }
+        const afterIds = new Set(confirmedWorld.base.pieces.map((p) => p.id));
+        for (const k of Object.keys(placedBy)) {
+          const numId = Number(k);
+          if (!afterIds.has(numId)) delete placedBy[numId];
         }
         recomputePredictedWorld();
 
@@ -478,6 +507,9 @@ export async function connectOutpost(
 
       case 'presence': {
         lastServerTime = msg.serverTime;
+        for (const p of msg.peers) {
+          if (p.username) usernames[p.id] = p.username;
+        }
         const remotePeers = msg.peers.filter((p) => p.id !== playerId);
         for (const p of remotePeers) {
           const list = poseHistory.get(p.id) ?? [];
@@ -498,8 +530,25 @@ export async function connectOutpost(
 
       case 'roleChanged': {
         roles = { ...msg.roles };
+        if (msg.usernames) usernames = { ...usernames, ...msg.usernames };
+        if (msg.defaultGuestRole) defaultGuestRole = msg.defaultGuestRole;
         if (playerId && msg.targetId === playerId) {
           role = msg.role;
+        }
+        emitState();
+        return;
+      }
+
+      case 'kicked': {
+        roles = { ...msg.roles };
+        if (msg.usernames) usernames = { ...usernames, ...msg.usernames };
+        poseHistory.delete(msg.targetId);
+        peers = peers.filter((p) => p.id !== msg.targetId);
+        if (playerId && msg.targetId === playerId) {
+          kickedReason = msg.reason;
+          connectionState = 'disconnected';
+          // a kicked player does not come back on its own: leave, so the SDK's reconnect loop stops too
+          room.leave();
         }
         emitState();
         return;
@@ -518,12 +567,10 @@ export async function connectOutpost(
   };
 
   room.on({
-    // the room's broadcasts to everyone come through onMessage
     onMessage(raw: OutpostMessage) {
       receive(raw);
     },
 
-    // the room's messages to this player alone (the welcome, snapshots, terrain, refusals) come through onPrivateMessage
     onPrivateMessage(raw: OutpostMessage) {
       receive(raw);
     },
@@ -535,11 +582,13 @@ export async function connectOutpost(
     },
 
     onReconnecting() {
+      if (kickedReason !== null) return; // a kicked player stays out (the room removed its seat)
       connectionState = 'reconnecting';
       emitState();
     },
 
     onReconnected() {
+      if (kickedReason !== null) return;
       connectionState = 'connected';
       requestResync();
     },
@@ -574,24 +623,36 @@ export async function connectOutpost(
         return { world: predictedWorld, events: [refused] };
       }
 
+      // POL-115: Hold non-owner builds while the room has not been seeded yet (version === 0)
+      if (role !== 'owner' && version === 0) {
+        const refused: BaseEvent = { type: 'refused', cmd: cmd.t, why: 'waiting-for-host-seed' };
+        lastRefusal = { cmdKind: cmd.t, why: 'waiting-for-host-seed' };
+        sendFramed({ type: 'cmd', proto: PROTOCOL_VERSION, seq, baseVersion: version, cmd });
+        emitState();
+        return { world: predictedWorld, events: [refused] };
+      }
+
       // 1. Predict locally FIRST and queue in pending before sending over the wire
       const optimistic = apply(predictedWorld, env, cmd);
       const wasRefused = optimistic.events.some((e) => e.type === 'refused');
-      if (!wasRefused) {
-        pending.push({ seq, baseVersion: version, cmd });
-        predictedWorld = optimistic.world;
-        for (const cb of eventListeners) {
-          cb(optimistic.events, {
-            version,
-            actorId: actor,
-            confirmed: false,
-            seq,
-          });
-        }
+      if (wasRefused) {
+        emitState();
+        return optimistic;
+      }
+
+      pending.push({ seq, baseVersion: version, cmd });
+      predictedWorld = optimistic.world;
+      for (const cb of eventListeners) {
+        cb(optimistic.events, {
+          version,
+          actorId: actor,
+          confirmed: false,
+          seq,
+        });
       }
       emitState();
 
-      // 2. Dispatch to server authority
+      // 2. Dispatch valid predicted command to server authority
       sendFramed({ type: 'cmd', proto: PROTOCOL_VERSION, seq, baseVersion: version, cmd });
 
       return optimistic;
@@ -608,8 +669,37 @@ export async function connectOutpost(
       });
     },
 
+    sendBeamIntent(intent): void {
+      if (role === 'visitor') return;
+      sendFramed({
+        type: 'beamIntent',
+        at: intent.at,
+        beam: intent.beam,
+        ...(intent.power ? { power: intent.power } : {}),
+        ...(intent.latched ? { latched: intent.latched } : {}),
+      });
+    },
+
     setRole(targetId: string, nextRole: OutpostRole): void {
       sendFramed({ type: 'setRole', targetId, role: nextRole });
+    },
+
+    setDefaultRole(nextRole: OutpostRole): boolean {
+      if (role !== 'owner') return false;
+      sendFramed({ type: 'setDefaultRole', role: nextRole });
+      return true;
+    },
+
+    kickPlayer(targetId: string, reason?: string): boolean {
+      if (role !== 'owner' || !targetId || targetId === playerId) return false;
+      sendFramed({ type: 'kickPlayer', targetId, ...(reason ? { reason } : {}) });
+      return true;
+    },
+
+    undoAuthor(targetId: string): boolean {
+      if (role !== 'owner' || !targetId) return false;
+      sendFramed({ type: 'undoAuthor', targetId });
+      return true;
     },
 
     setTerrain(next: TerrainState): boolean {

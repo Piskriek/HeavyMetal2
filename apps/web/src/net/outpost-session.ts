@@ -27,12 +27,17 @@ export interface RosterEntry {
   readonly self: boolean;
 }
 
-/** The room's players: the roles the room holds, the presence names where they are known, and this player. */
+/** The room's players: the roles and join usernames (POL-117) the room holds, presence names where known, and this player. */
 export function rosterOf(client: OutpostClient): RosterEntry[] {
   const state = client.state();
   const byId = new Map<string, { name: string; role: OutpostRole }>();
-  for (const [id, role] of Object.entries(state.roles)) byId.set(id, { name: 'Friend', role });
-  for (const peer of state.peers) byId.set(peer.id, { name: peer.username || 'Friend', role: peer.role });
+  for (const [id, role] of Object.entries(state.roles)) {
+    const known = state.usernames?.[id];
+    byId.set(id, { name: known && known.trim() ? known : 'Friend', role });
+  }
+  for (const peer of state.peers) {
+    byId.set(peer.id, { name: peer.username || state.usernames?.[peer.id] || 'Friend', role: peer.role });
+  }
   if (state.playerId) byId.set(state.playerId, { name: 'You', role: state.role });
   return [...byId.entries()].map(([id, p]) => ({ id, name: p.name, role: p.role, self: id === state.playerId }));
 }
@@ -132,12 +137,17 @@ if (typeof window !== 'undefined') {
     host: async (): Promise<string | null> => (await hostOutpostSession()).code,
     join: async (code: string): Promise<string | null> => (await joinOutpostSession(code)).code,
     leave: (): void => leaveOutpostSession(),
-    /** Sends a command through the live session; the answer is what the client predicted. */
-    send: (cmd: BaseCommand): { readonly refused: boolean; readonly version: number } | null => {
+    /** Sends a command through the live session; the answer is what the client predicted, and why it was refused (if it was). */
+    send: (cmd: BaseCommand): { readonly refused: boolean; readonly why: string | null; readonly version: number } | null => {
       const session = currentOutpostSession();
       if (!session) return null;
       const applied = session.client.send(cmd);
-      return { refused: applied.events.some((e) => e.type === 'refused'), version: session.client.state().version };
+      const refusal = applied.events.find((e) => e.type === 'refused');
+      return {
+        refused: refusal !== undefined,
+        why: refusal && refusal.type === 'refused' ? refusal.why : null,
+        version: session.client.state().version,
+      };
     },
     /** The confirmed world's hash, the version, and the roster as the room sees it. */
     state: (): { readonly hash: string; readonly version: number; readonly roles: readonly string[]; readonly connection: string; readonly structure: number | null; readonly player: string | null; readonly roleKeys: readonly string[]; readonly peers: number } | null => {

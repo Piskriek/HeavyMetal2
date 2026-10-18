@@ -149,7 +149,7 @@ MOVED to Haiku by Opus (2026-10-18): Flash hadn't taken it. Flash, skip it. Brie
   2. In a session, the play screen still shows "SOLO DESYNCED". Show the session instead (for example "CO-OP · room S2JE7V"), and keep the Sync button hidden or disabled while in a room.
   Take a shot of both pages in a session, and look at them; `test-campaign` must stay at zero HUD overlaps.
 
-## F-20 [OPEN] Small sweep: POL-175, POL-174, POL-99 (no play-scene, no play.tsx)
+## F-20 [TAKEN] Small sweep: POL-175, POL-174, POL-99 (no play-scene, no play.tsx)
 Brief: none separate; the job is this list. Each item's detail is in `docs/DEFERRED_POLISH_REGISTRY.md`.
 Lanes right now: a Haiku owns `play-scene.ts` and `machine-props.ts` (T03P follow-up); another Haiku owns `play.tsx`, `apps/web/src/credits/`, `lab-room.ts`, `goblin-front.tsx` and the HUD zone files (T14). Never touch those.
 - **POL-175:** `studio.css` has a global `button:hover:not(:disabled) { background: #efeee7 }` that lights every button in the app on hover (the Grid's dark buttons turned light). Scope it to the Studio's root. Then check the Studio, the Grid and Settings still look right on hover (shots), and remove T11b's Grid-only override in `planetary-grid.css` if it's no longer needed.

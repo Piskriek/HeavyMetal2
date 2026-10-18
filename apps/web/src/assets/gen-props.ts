@@ -99,6 +99,10 @@ export const CORE_GEN_ASSETS: readonly string[] = [
   'repeater',
   'drafting',
   'weapon-bench',
+  // TICKET-13: the perimeter turret's three packed parts (turret-view.ts), preloaded behind the same loading bar
+  'turret-base',
+  'turret-yoke',
+  'turret-gun',
 ];
 
 export type CoreGenAsset = string;

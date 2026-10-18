@@ -4,6 +4,7 @@
  *   - a perimeter turret on a roof corner (a floor held by walls) places, and it hits a swarmer 30 m away;
  *   - the same turret ignores a swarmer inside the gate's 25 m safe dome (its hp does not drop while it stands there);
  *   - the turret's shots go through the monsters' own hit path (the swarmer dies, its drop is the leaksim archetype's);
+ *   - each turret is built from the three packed parts (base, yoke, gun), not the fallback, and its base plate meets its yoke;
  *   - four turrets on the Low tier: frames per second and the cost of one frame (the perf script's readback method);
  *   - shots (the turret tracking with its laser, the turret from three sides on the roof, the projector and the push), each
  *     looked at by eye; the subject is in view when the camera faces it within 0.85 (cosine), HUD hidden;
@@ -99,6 +100,41 @@ const lookAt = async (px, pz, tx, tz, pitch = 0) => {
     dot = await facing(tx, tz);
   }
   return dot;
+};
+
+/** The 3-D cosine between the camera's view and the direction to (tx, ty, tz): 1 when the subject is dead centre. */
+const facing3 = (tx, ty, tz) =>
+  page.evaluate(({ tx, ty, tz }) => {
+    const sc = window.__playScene?.debug?.planetScene?.();
+    if (!sc) return 0;
+    let cam = null;
+    sc.traverse((o) => { if (o.isPerspectiveCamera && o.parent === sc) cam = o; });
+    if (!cam) return 0;
+    const e = cam.matrixWorld.elements;
+    const f = [-e[8], -e[9], -e[10]];
+    const d = [tx - e[12], ty - e[13], tz - e[14]];
+    const fl = Math.hypot(f[0], f[1], f[2]) || 1, dl = Math.hypot(d[0], d[1], d[2]) || 1;
+    return (f[0] * d[0] + f[1] * d[1] + f[2] * d[2]) / (fl * dl);
+  }, { tx, ty, tz });
+
+/** Teleports to (px, pz) facing the subject at (tx, ty, tz), and keeps the pitch that centres it best (first person). */
+const lookAt3 = async (px, pz, tx, ty, tz) => {
+  const yaw = yawToward(px, pz, tx, tz);
+  const pitches = [0.15, 0.3, 0.45, 0.6];
+  let best = { dot: -1, pitch: pitches[0] };
+  for (const pitch of pitches) {
+    await page.evaluate(([x, z, yw, pt]) => window.hmPlay.go('planet', x, z, yw, pt), [px, pz, yaw, pitch]);
+    await sleep(300);
+    await firstPerson();
+    const dot = await facing3(tx, ty, tz);
+    if (dot > best.dot) best = { dot, pitch };
+  }
+  if (best.pitch !== pitches[pitches.length - 1]) {
+    await page.evaluate(([x, z, yw, pt]) => window.hmPlay.go('planet', x, z, yw, pt), [px, pz, yaw, best.pitch]);
+    await sleep(300);
+    best.dot = await facing3(tx, ty, tz);
+  }
+  return best.dot;
 };
 
 const hudCleanShot = (on) =>
@@ -244,6 +280,40 @@ try {
   check('no HUD zone overlaps at the stage-push shot', pushOv.length === 0, JSON.stringify(pushOv).slice(0, 120));
   await hudCleanShot(false);
 
+  // ---- the turrets are the packed parts (base, yoke, gun) and not the fallback; each base plate meets its yoke
+  const turretParts = await page.evaluate(() => {
+    const sc = window.__playScene?.debug?.planetScene?.();
+    // the world span of an object's meshes, from each mesh's bounding box and world matrix (column-major elements)
+    const span = (obj) => {
+      let lo = Infinity, hi = -Infinity;
+      obj.updateWorldMatrix(true, true);
+      obj.traverse((m) => {
+        if (!m.isMesh || !m.geometry) return;
+        if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+        const bb = m.geometry.boundingBox;
+        const e = m.matrixWorld.elements;
+        for (const x of [bb.min.x, bb.max.x]) for (const y of [bb.min.y, bb.max.y]) for (const z of [bb.min.z, bb.max.z]) {
+          const wy = e[1] * x + e[5] * y + e[9] * z + e[13];
+          lo = Math.min(lo, wy);
+          hi = Math.max(hi, wy);
+        }
+      });
+      return { lo, hi };
+    };
+    const out = [];
+    sc?.traverse((o) => {
+      if (!o.name || !o.name.startsWith('perimeter-turret-')) return;
+      const base = o.children.find((c) => c.name === 'turret-base');
+      const yoke = o.children.find((c) => c.name === 'turret-yoke');
+      out.push({ name: o.name, y: o.matrixWorld.elements[13], src: o.userData.partSource ?? null, base: base ? span(base) : null, yoke: yoke ? span(yoke) : null });
+    });
+    return out;
+  });
+  check('each turret is built from the packed parts (base, yoke and gun), not the fallback', turretParts.length === 4 && turretParts.every((t) => t.src && t.src.base === 'gen' && t.src.yoke === 'gen' && t.src.gun === 'gen'), turretParts.map((t) => `${t.name}: ${t.src ? [t.src.base, t.src.yoke, t.src.gun].join('/') : 'none'}`).join('; '));
+  const gap = turretParts.map((t) => (t.base && t.yoke ? t.base.hi - t.yoke.lo : NaN));
+  check('each base plate meets its yoke (the base top is the yoke bottom, within 3 cm)', gap.length === 4 && gap.every((g) => Math.abs(g) < 0.03), gap.map((g) => g.toFixed(3)).join(' '));
+  const turretY = turretParts[0]?.y ?? 2.6;
+
   // ---- the turret ranges: a swarmer 30 m out (outside the dome), and one inside the gate's dome (18 m from the gate)
   const T = { x: B.x + 10, z: B.z + 2 }; // corner (3, 1) of the roof, one level up
   const outside = { x: T.x + 30, z: T.z };
@@ -288,11 +358,13 @@ try {
   console.log(`info: the sapper is ${sapperAlive ? 'alive' : 'already down'} at the tracking shot`);
 
   // three sides, each on clear ground (the roof cell's walls are never between the camera and the turret)
-  for (const [name, px, pz] of [['east', T.x + 6, T.z], ['north', T.x, T.z + 6], ['south-west', T.x - 8, T.z - 8]]) {
-    const dot = await lookAt(px, pz, T.x, T.z, 0.1);
-    const ov = await shot(`ticket13-turret-wall-top-${name}`);
-    check(`the roof turret from the ${name} is in view (cosine >= 0.85)`, dot >= 0.85, `cosine ${dot.toFixed(2)}`);
-    check(`no HUD zone overlaps at the ${name} shot`, ov.length === 0, JSON.stringify(ov).slice(0, 120));
+  // close-ups of the roof turret: from the side (east, 3.2 m) and from two three-quarter views (north-east and north-west),
+  // the turret centred, its base plate, pedestal, yoke and gun in view
+  for (const [name, px, pz] of [['side', T.x + 3.2, T.z], ['three-quarter', T.x + 2.5, T.z + 2.5], ['three-quarter-west', T.x - 2.2, T.z + 2.6]]) {
+    const dot = await lookAt3(px, pz, T.x, turretY + 0.8, T.z);
+    const ov = await shot(`ticket13-turret-close-${name}`);
+    check(`the roof turret, close from the ${name}, is in view (3-D cosine >= 0.9)`, dot >= 0.9, `cosine ${dot.toFixed(2)}`);
+    check(`no HUD zone overlaps at the close ${name} shot`, ov.length === 0, JSON.stringify(ov).slice(0, 120));
   }
 
   await hudCleanShot(false);

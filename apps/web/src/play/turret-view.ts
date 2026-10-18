@@ -7,6 +7,7 @@
 
 import * as THREE from 'three';
 import * as S from '@hm/structure';
+import { getGenSync, loadGen, type GenLevel } from '../assets/gen';
 import {
   stepTurretBrain,
   type TurretSolidBox,
@@ -27,6 +28,11 @@ export interface TurretInstance3D {
   readonly barrelGroup: THREE.Group;
   readonly laserLine: THREE.Line;
   update(input: Omit<TurretBrainInput, 'turret'>): TurretBrainOutput;
+  /** Puts a generated model on a part, in place of its fallback. */
+  setPart(part: TurretPart, obj: THREE.Object3D): void;
+  /** Whether a part is the generated model or still the fallback. */
+  partSource(part: TurretPart): TurretPartSource;
+  disposed(): boolean;
   dispose(): void;
 }
 
@@ -85,12 +91,38 @@ export function createCodeBarrelAndShroud(): THREE.Group {
   return g;
 }
 
+/** The three packed parts, by their registry ids (apps/web/src/assets/gen/registry.json). */
+export const TURRET_PART_IDS = { base: 'turret-base', yoke: 'turret-yoke', gun: 'turret-gun' } as const;
+export const TURRET_PARTS: readonly TurretPart[] = ['base', 'yoke', 'gun'];
+export type TurretPart = keyof typeof TURRET_PART_IDS;
+export type TurretPartSource = 'gen' | 'fallback';
+
 /**
- * Assembles a 3-part Perimeter Defense Turret at a Sheet-13 wall corner/roof socket
- * or Hauler rear socket.
- * - `baseMesh`: `turret-base` (0.9 m bolted plate + hazard pedestal, fixed)
- * - `yokeMesh`: `turret-yoke` (0.75 m square U-yoke, yaws around +Y at YAW_AXIS_HEIGHT_M)
- * - `gunMesh`:  `turret-gun` (0.9 m receiver + left ammo box, pitches at TRUNNION_HEIGHT_ON_YOKE_M)
+ * The generated model of a part from the cache (the best level loaded), or null while it is not loaded yet. The
+ * preload (CORE_GEN_ASSETS, behind the loading bar) fills the cache; a turret placed before it finished gets the fallback
+ * and swaps the model in with loadMissingTurretParts.
+ */
+export function cachedTurretPart(part: TurretPart): THREE.Group | null {
+  const id = TURRET_PART_IDS[part];
+  return getGenSync(id, 'high') ?? getGenSync(id, 'mid') ?? getGenSync(id, 'low');
+}
+
+/** Loads the generated model of every part still on its fallback and swaps it in (TICKET-13). */
+export function loadMissingTurretParts(inst: TurretInstance3D, level: GenLevel = 'low'): void {
+  for (const part of TURRET_PARTS) {
+    if (inst.partSource(part) === 'gen') continue;
+    loadGen(TURRET_PART_IDS[part], level)
+      .then((obj) => { if (!inst.disposed()) inst.setPart(part, obj); })
+      .catch((err: unknown) => console.warn(`turret part ${part} stays on its fallback:`, err));
+  }
+}
+
+/**
+ * Assembles a 3-part Perimeter Defense Turret on a corner socket (TICKET-13). Each part is the generated model when it is
+ * in memory; otherwise it is a complete fallback built from boxes and pins, sized to the packed parts' measured geometry:
+ * the base plate and pedestal up to the turntable (0.672 m), the yoke's bridge and two arms up to the trunnions (0.639 m
+ * above the turntable), the gun body in the 0.486 m gap between the arms, and a pin from each side of the gun into an arm.
+ * So the base, yoke and gun always touch, whichever parts are loaded. Each part's source is in root.userData.partSource.
  */
 export function createTurretInstance3D(opts: {
   readonly id: number;
@@ -105,74 +137,80 @@ export function createTurretInstance3D(opts: {
   root.position.set(opts.position.x, opts.position.y, opts.position.z);
   if (opts.parent) opts.parent.add(root);
 
+  const C = TURRET_SOCKET_CONSTANTS;
   const fallbackMat = new THREE.MeshStandardMaterial({ color: 0x454c57, roughness: 0.65, metalness: 0.45 });
+  const piece = (geo: THREE.BufferGeometry, x: number, y: number, z: number, rotZ = 0): THREE.Mesh => {
+    const m = new THREE.Mesh(geo, fallbackMat);
+    m.position.set(x, y, z);
+    m.rotation.z = rotZ;
+    m.userData.fallback = true;
+    return m;
+  };
+  const box = (w: number, h: number, d: number, x: number, y: number, z: number): THREE.Mesh => piece(new THREE.BoxGeometry(w, h, d), x, y, z);
 
-  // 1. Fixed Base (`turret-base`)
+  // 1. Fixed base: the plate (0.9 m square, 0.2 m high) and the pedestal up to the turntable top
   const baseGroup = new THREE.Group();
   baseGroup.name = 'turret-base';
-  if (opts.baseMesh) {
-    baseGroup.add(opts.baseMesh);
-  } else {
-    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.28, 0.9), fallbackMat);
-    plate.position.y = 0.14;
-    baseGroup.add(plate);
-  }
+  const plateH = 0.2;
+  const pedestalH = C.YAW_AXIS_HEIGHT_M - plateH;
+  baseGroup.add(box(0.9, plateH, 0.9, 0, plateH / 2, 0), box(0.5, pedestalH, 0.5, 0, plateH + pedestalH / 2, 0));
   root.add(baseGroup);
 
-  // 2. Yawing U-Yoke (`turret-yoke`)
+  // 2. Yawing yoke: its origin is the turntable top; a bridge on the turntable and two arms up to the trunnions
   const yokePivot = new THREE.Group();
   yokePivot.name = 'turret-yoke';
-  yokePivot.position.set(0, TURRET_SOCKET_CONSTANTS.YAW_AXIS_HEIGHT_M, 0);
-  if (opts.yokeMesh) {
-    yokePivot.add(opts.yokeMesh);
-  } else {
-    const yokeBox = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.54, 0.42), fallbackMat);
-    yokeBox.position.y = 0.27;
-    yokePivot.add(yokeBox);
-  }
+  yokePivot.position.set(0, C.YAW_AXIS_HEIGHT_M, 0);
+  const trunnionY = C.TRUNNION_HEIGHT_ON_YOKE_M;
+  yokePivot.add(box(0.6, 0.06, 0.34, 0, 0.03, 0));
+  for (const side of [-1, 1]) yokePivot.add(box(0.07, trunnionY, 0.12, side * 0.278, trunnionY / 2, 0));
   root.add(yokePivot);
 
-  // 3. Pitching Gun Receiver (`turret-gun`) at trunnions
+  // 3. Pitching gun at the trunnions: the body (its origin at GUN_MESH_OFFSET_FROM_PIVOT_M, bottom centre), two pins
   const gunPivot = new THREE.Group();
   gunPivot.name = 'turret-gun';
-  gunPivot.position.set(0, TURRET_SOCKET_CONSTANTS.TRUNNION_HEIGHT_ON_YOKE_M, 0);
-  // the gun mesh's origin sits GUN_MESH_OFFSET_FROM_PIVOT_M from the trunnion pivot, so the pivot bosses sit on the axis
-  const [gx, gy, gz] = TURRET_SOCKET_CONSTANTS.GUN_MESH_OFFSET_FROM_PIVOT_M;
-  if (opts.gunMesh) {
-    opts.gunMesh.position.set(gx, gy, gz);
-    gunPivot.add(opts.gunMesh);
-  } else {
-    const gunBox = new THREE.Mesh(new THREE.BoxGeometry(0.87, 0.508, 0.9), fallbackMat);
-    gunBox.position.set(gx, gy, gz);
-    gunPivot.add(gunBox);
-  }
-
-  // 4. Procedural Code Barrel + Square Muzzle Shroud at BARREL_COLLAR_OFFSET_M
+  gunPivot.position.set(0, trunnionY, 0);
+  const [gx, gy, gz] = C.GUN_MESH_OFFSET_FROM_PIVOT_M;
+  gunPivot.add(box(0.42, 0.508, 0.9, gx, gy + 0.254, gz));
+  for (const side of [-1, 1]) gunPivot.add(piece(new THREE.CylinderGeometry(0.03, 0.03, 0.05, 12), side * 0.23, 0, 0, Math.PI / 2));
+  // the procedural round barrel and square shroud, on the collar at BARREL_COLLAR_OFFSET_M
   const barrelGroup = createCodeBarrelAndShroud();
-  const [bx, by, bz] = TURRET_SOCKET_CONSTANTS.BARREL_COLLAR_OFFSET_M;
+  const [bx, by, bz] = C.BARREL_COLLAR_OFFSET_M;
   barrelGroup.position.set(bx, by, bz);
   gunPivot.add(barrelGroup);
   yokePivot.add(gunPivot);
 
-  // 5. #ffc13d Targeting Laser Line in world space
-  const laserGeo = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(),
-    new THREE.Vector3(0, 0, 1),
-  ]);
-  const laserMat = new THREE.LineBasicMaterial({
-    color: TURRET_LASER_HEX,
-    transparent: true,
-    opacity: 0.88,
-  });
+  // 4. The #ffc13d targeting laser, in the root's frame
+  const laserGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, 1)]);
+  const laserMat = new THREE.LineBasicMaterial({ color: TURRET_LASER_HEX, transparent: true, opacity: 0.88 });
   const laserLine = new THREE.Line(laserGeo, laserMat);
   laserLine.name = 'turret-laser';
   laserLine.visible = false;
   laserLine.frustumCulled = false;
   root.add(laserLine);
 
+  // the part sources, and the swap: a generated model replaces that part's fallback (its boxes and pins are removed)
+  const sources: Record<TurretPart, TurretPartSource> = { base: 'fallback', yoke: 'fallback', gun: 'fallback' };
+  root.userData.partSource = sources;
+  const hosts: Record<TurretPart, THREE.Group> = { base: baseGroup, yoke: yokePivot, gun: gunPivot };
+  const setPart = (part: TurretPart, obj: THREE.Object3D): void => {
+    const host = hosts[part];
+    for (const child of [...host.children]) if (child.userData.fallback === true) host.remove(child);
+    // a holder keeps the model's own placement (a tweak wraps it) apart from the part's place on its host
+    const holder = new THREE.Group();
+    holder.name = `turret-${part}-gen`;
+    holder.add(obj);
+    if (part === 'gun') holder.position.set(gx, gy, gz);
+    host.add(holder);
+    sources[part] = 'gen';
+  };
+  if (opts.baseMesh) setPart('base', opts.baseMesh);
+  if (opts.yokeMesh) setPart('yoke', opts.yokeMesh);
+  if (opts.gunMesh) setPart('gun', opts.gunMesh);
+
   let currentYaw = 0;
   let currentPitch = 0;
   let cooldownLeftS = 0;
+  let gone = false;
 
   return {
     id: opts.id,
@@ -204,18 +242,8 @@ export function createTurretInstance3D(opts: {
       if (out.laserActive && out.laserTo) {
         laserLine.visible = true;
         const posAttr = laserGeo.getAttribute('position') as THREE.BufferAttribute;
-        posAttr.setXYZ(
-          0,
-          out.laserFrom.x - root.position.x,
-          out.laserFrom.y - root.position.y,
-          out.laserFrom.z - root.position.z,
-        );
-        posAttr.setXYZ(
-          1,
-          out.laserTo.x - root.position.x,
-          out.laserTo.y - root.position.y,
-          out.laserTo.z - root.position.z,
-        );
+        posAttr.setXYZ(0, out.laserFrom.x - root.position.x, out.laserFrom.y - root.position.y, out.laserFrom.z - root.position.z);
+        posAttr.setXYZ(1, out.laserTo.x - root.position.x, out.laserTo.y - root.position.y, out.laserTo.z - root.position.z);
         posAttr.needsUpdate = true;
       } else {
         laserLine.visible = false;
@@ -223,7 +251,11 @@ export function createTurretInstance3D(opts: {
 
       return out;
     },
+    setPart,
+    partSource: (part) => sources[part],
+    disposed: () => gone,
     dispose() {
+      gone = true;
       laserGeo.dispose();
       laserMat.dispose();
       if (root.parent) root.parent.remove(root);

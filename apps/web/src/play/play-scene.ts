@@ -72,9 +72,9 @@ import {
   createGenFabricator,
   genLevelForStage,
 } from '../assets/gen-props';
-import { genLevelFor, getGenSync } from '../assets/gen';
+import { genLevelFor } from '../assets/gen';
 // ---- TICKET-13 Window C imports: the perimeter turret (its parts, its safe domes and its grid draw)
-import { createTurretInstance3D, turretSolidBoxes, type TurretInstance3D } from './turret-view';
+import { cachedTurretPart, createTurretInstance3D, loadMissingTurretParts, turretSolidBoxes, type TurretInstance3D } from './turret-view';
 import { gateDome as turretGateDome, poweredPylonDomes, type TurretSolidBox } from '@hm/plotsim';
 import { turretGridDrawKw } from '../base/world';
 import { RIFT_LAYER, riftDepthUniforms } from './rift';
@@ -1623,19 +1623,21 @@ export function createPlayScene(o: {
       mount.inst.dispose();
       turretMounts.delete(id);
     }
-    const level = genLevelFor('low');
     for (const [id, p] of wanted) {
       if (turretMounts.has(id) || !base) continue;
       const at = pieceAt(base, p);
       if (!at) continue;
+      // the packed parts from the cache (the preload behind the loading bar); a part not loaded yet is its fallback, and
+      // the model is swapped in as soon as it arrives
       const inst = createTurretInstance3D({
         id,
         position: at,
         parent: planetScene,
-        baseMesh: getGenSync('turret-base', level),
-        yokeMesh: getGenSync('turret-yoke', level),
-        gunMesh: getGenSync('turret-gun', level),
+        baseMesh: cachedTurretPart('base'),
+        yokeMesh: cachedTurretPart('yoke'),
+        gunMesh: cachedTurretPart('gun'),
       });
+      loadMissingTurretParts(inst);
       turretMounts.set(id, { inst, at });
     }
     turretSolidList = base ? turretSolidBoxes(base, (p) => pieceAt(base, p)) : [];

@@ -10,7 +10,7 @@
 - **(b) Running:**
   - **Haiku T06b:** packs and adopts the generated sheet 07 breaker panel, isolator, console and lever (`docs/prompts/sidecar/T06b-sheet07-power-models.md`).
   - **Flash F-09** (the performance pass) is still taken. F-10 to F-14 (all `play-scene.ts`) queue behind it: T05, the plumes, T07b with POL-96 and 97, the lab aim, and the co-op hooks.
-- **(c) Argo:** his Gemini chat began returning empty replies (likely full), so ARGO_NOTE_10 (the TICKET-09 onward plan) never arrived. The fresh-chat handoff is `docs/argo/notes/ARGO_HANDOFF_2026-10-18.md` (also in Setmix). The owner decides who starts the new chat.
+- **(c) Argo:** his Gemini chat began returning empty replies (likely full), so ARGO_NOTE_10 (the TICKET-09 onward plan) never arrived. The fresh-chat handoff is `docs/argo/notes/ARGO_HANDOFF_2026-10-18.md` (also in Setmix). The owner OK'd a fresh chat, and Opus started it on 18 October: https://gemini.google.com/app/77f3bf1cb56ba86c (Task mode, model Argon), seeded with the handoff, START_HERE, RULES and CLAUDE.md from Setmix.
 - **(d) Polish:** the registry runs to POL-117. The ranges in use are POL-101 to 110 (T06), POL-111 to 120 (co-op) and POL-121 to 130 (T06b).
 
 ## 17 Oct Checkpoint (read first)

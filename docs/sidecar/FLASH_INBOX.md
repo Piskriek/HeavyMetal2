@@ -36,6 +36,10 @@ Only Opus adds jobs here. Flash changes only a job's status word. The old board 
   - Examples: `scripts/test-on-3dpc.sh "npm test"`, `scripts/test-on-3dpc.sh "npm run build && node scripts/test-campaign.mjs"`.
   - When another worker (Haiku) is editing in the same tree, add `--only "<your paths>"`. The snapshot is then HEAD plus only your files, so the other worker's half-done edits don't break your run. Example: `scripts/test-on-3dpc.sh --only "packages/groundshader apps/web/src/play/play-scene.ts apps/web/src/play/plot-ground.ts" "npm test"`.
   - Use it for `npm test`, `npm run build` and every browser test. Run only quick checks on the laptop (typecheck, a single unit file).
+  - **When the worker is busy, the run goes to the laptop (owner, 2026-10-18, commit `1a637270`).** If the worker's lock is held, or SSH can't reach it, the script runs your command on the laptop at once instead of queueing, and prints `[laptop] ...` first. The laptop has its own lock, so two laptop runs never overlap. If both machines are busy, it waits for whichever frees first.
+    - A laptop run uses the shared working tree as it is, not your `--only` snapshot. If it fails outside your own files (another worker's half-done edit), re-run that check with `--worker-only`, which waits for the worker's clean snapshot.
+    - Use `--worker-only` for timings too (fps, GPU ms).
+    - A run you started before `1a637270` still queues the old way: stop it and run it again.
   - Screenshots stay on the worker. To look at one, copy it back: `scp -i ~/.ssh/id_ed25519_fidelity RAMPAGE@192.168.0.8 (see scripts/worker.env):/c/MarbleGp/<path> <local path>`.
 - **Verify before you report:**
   - `npm run typecheck` (0 errors);

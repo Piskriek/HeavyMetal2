@@ -172,3 +172,20 @@ Append one entry per job, in the format in `FLASH_INBOX.md`. Newest at the botto
 - Changes from brief: None. Moved gameplay refusals out of `say()` into `showStatusToast()` with `formatRefusalToast()` player-friendly sentences.
 - Decisions left: None. F-17 complete.
 
+### [2026-10-18 17:40] F-20 [DONE] Small sweep: POL-175, POL-174, POL-99 (no play-scene, no play.tsx)
+- Commits: `d2b9ea0d` ("fix(polish): scope studio button hover, dispose peer geometries, and capture clean rift shots (POL-175, POL-174, POL-99)")
+- Checks:
+  - `npm run typecheck`: 0 errors
+  - `npm test` on 3D PC: 2,930 pass (2,926 unit, 19 speed tests, 0 fail)
+  - `npm run build` on 3D PC: 14.94 MB single-file bundle (cap 16 MB)
+  - `node scripts/test-ticket07a.mjs` on 3D PC: 17/17 pass (armory rail facing 1.00, rift dot 1.00, clean closeups)
+  - `node scripts/test-studio-tabs.mjs` on 3D PC: 41/41 pass
+  - `node --import tsx scripts/test-grid-menus.mjs` on 3D PC: 32/32 pass (Settings: 0 light surfaces, Community: 0)
+- Shots (`shots-run/`):
+  - `ticket07a-armory-rail-closeup.png`: First person, armory rail & shotgun centered, 0 avatar/mesh obstruction.
+  - `ticket07a-rift-open-closeup.png`: Centered 8m close-up of open rift glitch tower, HUD hidden, dot 1.00.
+  - `ticket07a-rift-sealing-closeup.png`: Clean shot of sealing rift with gold amber core and pinned seal.
+  - `grid-menus/settings.png`: Completely dark-glass settings modal, transparent range slider backgrounds.
+  - `grid-menus/grid-screen.png`: Dark enclave directory, no light button hovers.
+- Changes from brief: Kept `input[type=range]` transparent background in `studio.css` and `dark-forms.css` so range sliders never inherit light UA surfaces in dark modals.
+- Decisions left: None. F-20 complete.

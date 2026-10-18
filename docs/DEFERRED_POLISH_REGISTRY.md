@@ -203,6 +203,7 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 - **Seen:** TICKET-07a. `shots-run/ticket07a-armory-rail.png` and `ticket07a-rift-open.png` are framed by the HUD and the toast; at stage 0's 1-bit look the rift and the sidearm holster are hard to read.
 - **Expected:** a clean close-up of the holster and of the rift (open and sealing) for review.
 - Sidecar Task: POL-99 - add `?cleanShot=1` close-ups of the armory rail and of a near leak (open and sealing) to the ticket test, and save them beside the others.
+- **Done in F-20 (Gemini-Flash, d2b9ea0d):** added clean close-up captures with first-person perspective, hidden HUD overlays, and verified camera facing (`facing >= 0.9` for armory rail, `dot >= 0.85` for near open/sealing rifts) to `scripts/test-ticket07a.mjs`. Saved `ticket07a-armory-rail-closeup.png`, `ticket07a-rift-open-closeup.png`, `ticket07a-rift-sealing-closeup.png`, and `ticket07a-rift-sealed-closeup.png`.
 
 ### POL-100: the rift at stage 0 reads as white circle outlines (Argo's call)
 - **Seen:** TICKET-07a (`shots-run/ticket07a-rift-open.png`). Under the stage 0a wireframe look, the open rift at 12 m draws as two or three white pixel circle outlines, not a vertical glitch-sliced tear.
@@ -304,10 +305,12 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 ### POL-174: remote-peers.ts leaks geometry per join
 - **Seen:** T11b. Each rig's materials are disposed when a peer leaves, but not its geometry.
 - Sidecar Task: POL-174 - dispose the rig geometry with the materials.
+- **Done in F-20 (Gemini-Flash, d2b9ea0d):** avatar rig geometries (`bodyGeo`, `helmetGeo`, `visorGeo`, `ringGeo`) are stored on the rig and disposed in `disposeRig()` alongside materials when a peer leaves or on controller dispose. Verified with unit test in `apps/web/src/play/remote-peers.test.ts` (tracked 4 geometries and 3 materials receiving `'dispose'` events).
 
 ### POL-175: a global Studio CSS rule lights every button app-wide on hover
 - **Seen:** T11b. `studio.css` has `button:hover:not(:disabled) { background: #efeee7 }`, which turned the Grid's dark buttons light on hover. T11b added Grid-only hover rules; the global rule remains.
 - Sidecar Task: POL-175 - scope that rule to the Studio's root (and check the Studio still looks right).
+- **Done in F-20 (Gemini-Flash, d2b9ea0d):** scoped studio button rules (`button:hover:not(:disabled)`, `button.on`, `button.go`, `button.danger`) and inputs in `apps/web/src/studio.css` to `.maker`, `.sx`, and `.studio-root`. Range sliders set `background: transparent; border: 0` in `studio.css` and `dark-forms.css`. Verified with `scripts/test-grid-menus.mjs` (0 light surfaces in Settings, 0 in Community) and `scripts/test-studio-tabs.mjs` (41/41 pass).
 
 ### POL-144: the planet view's draw calls rose (DONE, c0012b66)
 - **Cause** (TPOL's Haiku, after Opus's bisect skipped a commit):

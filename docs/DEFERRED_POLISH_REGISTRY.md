@@ -317,3 +317,11 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
   - the rift mesh is culled again, with a hand-set bounding sphere;
   - test-base-building locks the quality tier at low, so step 6 measures batching (now 68 against 80).
 - **Left as designed:** the governor raising ground detail when there's frame-rate headroom is the toggle rule's Auto. On the min-spec laptop it stays low.
+
+### POL-261: plume questions for Argo after T03P (572f4434)
+- **Rates:** Argo's rate x lifetime gives far fewer pixels than before (mill 50, was 220). The plumes read sparser. Confirm or raise.
+- **Sheet 12 vs ARGO_NOTE_08:** the sheet shows no pixels from the power unit or the pylon; Argo specifies violet steam and corona sparks. T03P followed Argo. Confirm.
+- **Hoppers:** the drill (its ore leaves at the tray), the projector, the heavy projector and the pylon have no feed hopper. Brief 29 says every machine gets one. Decide which really feed.
+- **Gravity:** `@hm/plume` is rise-only, so the drill's ballistic sparks and the falling press and pylon pixels aren't reproduced. A gravity option in @hm/plume would be a small package change.
+- **Cost:** cadence-driven pours rebuild the instance buffer every frame (+0.11 ms GPU on the 3D PC). A count uniform in @hm/plume would remove it.
+- Sidecar Task: POL-261 - Argo rules on the first three; a sidecar does the @hm/plume changes.

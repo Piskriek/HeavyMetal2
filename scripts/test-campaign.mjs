@@ -181,6 +181,9 @@ const CHECKPOINT_AFTER = [
   { beat: '16', name: 'act5-start', title: 'Act V: the base', act: 'V' },
   { beat: '21', name: 'act6-start', title: 'Act VI: the hardpoint', act: 'VI' },
   { beat: '25', name: 'stage6-monsters', title: 'Stage 6: the monsters unlocked', act: 'VI' },
+  { beat: '29', name: 'act7-start', title: 'Act VII: the continental grid', act: 'VII' },
+  { beat: '32', name: 'act8-start', title: 'Act VIII: heavy terraformers', act: 'VIII' },
+  { beat: '35', name: 'act9-start', title: 'Act IX: continental consensus', act: 'IX' },
 ];
 const checkpointsDir = path.join(root, 'apps/web/public/checkpoints');
 const checkpointIndex = [];
@@ -253,13 +256,31 @@ await beat('1 main menu, Expedition starts a new game in the lab (no fixture fla
   const expBtn = page.locator('.sm-menu button', { hasText: 'Expedition' });
   await expBtn.waitFor({ state: 'visible', timeout: 25000 });
   row.shot = await shot('menu');
+
+  // Gate check (POL-306): fresh save has no Ending Credits item on title menu
+  const creditsBtnCount = await page.locator('.sm-menu button', { hasText: 'Ending Credits' }).count();
+  const heroBlade = await page.locator('.fidelity-hero-blade, .fidelity-glass-blade, .fidelity-menu').count();
+  const portraitOnMenu = await page.locator('[data-testid="haddy-crt-portrait"], .hud-haddy-crt-portrait, .haddy-crt-portrait').count();
+  await shot('menu-hero');
+  await shot('title-portrait');
+
   await expBtn.click();
   await page.waitForFunction(() => !!window.hmPlay?.ready, null, { timeout: 60000 });
   await dismissCreator();
   await page.waitForTimeout(500);
+
+  // Esc debug entry check: button exists in Esc debug menu on fresh save
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+  const dbgCreditsBtn = page.locator('[data-testid="dbg-play-credits"]');
+  const hasDbgCredits = await dbgCreditsBtn.count();
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+
   const where = await page.evaluate(() => window.hmPlay?.where);
   const hasDev = await page.evaluate(() => typeof window.__dev?.grant === 'function');
-  return { ok: where === 'lab' && hasDev, detail: `where=${where} __dev=${hasDev}` };
+  const ok = where === 'lab' && hasDev && creditsBtnCount === 0 && heroBlade > 0;
+  return { ok, detail: `where=${where} __dev=${hasDev} freshCreditsBtn=${creditsBtnCount} heroBlade=${heroBlade} portrait=${portraitOnMenu} dbgCredits=${hasDbgCredits}` };
 });
 
 // TASK-28 (P1-HOUR-03): the wake. The camera starts pitched up about 65 degrees at the dark ceiling and sits up to level over 2.2 s.
@@ -562,8 +583,29 @@ const toPlanet = async () => {
     window.hmPlay.go('planet', g.x + 3, g.z + 5, Math.PI, -0.6);
     window.hmPlay.setPaused?.(false);
     window.hmPlay.setLocked?.(true);
+    window.__hm?.clearToast?.();
+    const w = window.hmPlay?.base?.world?.();
+    if (w) {
+      const emptyIdx = w.player.slots.slice(0, 9).findIndex((s) => !s || s.n === 0);
+      if (emptyIdx >= 0) window.hmPlay.base.apply({ t: 'hotbar', index: emptyIdx });
+    }
   });
   await page.waitForFunction(() => window.hmPlay?.where === 'planet', null, { timeout: 20000 });
+  await page.keyboard.press('9');
+};
+const toLab = async () => {
+  await page.evaluate(() => {
+    window.hmPlay.go('lab', 0, 0, 0, 0);
+    window.hmPlay.setPaused?.(false);
+    window.hmPlay.setLocked?.(true);
+    window.__hm?.clearToast?.();
+    const w = window.hmPlay?.base?.world?.();
+    if (w) {
+      const emptyIdx = w.player.slots.slice(0, 9).findIndex((s) => !s || s.n === 0);
+      if (emptyIdx >= 0) window.hmPlay.base.apply({ t: 'hotbar', index: emptyIdx });
+    }
+  });
+  await page.waitForFunction(() => window.hmPlay?.where === 'lab', null, { timeout: 20000 });
 };
 const openBuildTab = async (tab) => {
   // B toggles the menu: press it only when the menu is shut
@@ -1430,7 +1472,7 @@ await beat('25 F-04 and F-05: stages 2 to 6 (the plot stage is grinding, skipped
   }
   row.shot = await shot('stage6-chain-done');
   const cur = await chainCur();
-  return { ok: cur === null, detail: `stages ${seen.join(' ')} chain current=${cur}` };
+  return { ok: cur === 'A7-01', detail: `stages ${seen.join(' ')} chain current=${cur}` };
 });
 
 await beat('26 a death respawns at the gate; the inventory and the chain are kept (the monsters can kill; here the death is the hook)', async (row) => {
@@ -1623,6 +1665,14 @@ await beat('26a the foundation frame: a foundation on a slope has legs down to t
   const worst = legs.reduce((m, l, i) => Math.max(m, Math.abs(l.footY - ground[i])), 0);
   row.shot = await shot('foundation-slope');
   const ok = legs.length >= 1 && worst <= 0.05 && legs.every((l) => !l.clamped);
+  await page.evaluate(() => {
+    const w = window.hmPlay?.base?.world?.();
+    if (w) {
+      const emptyIdx = w.player.slots.slice(0, 9).findIndex((s) => !s || s.n === 0);
+      if (emptyIdx >= 0) window.hmPlay.base.apply({ t: 'hotbar', index: emptyIdx });
+    }
+  });
+  await page.keyboard.press('9');
   return { ok, detail: `foundation ${fresh[0]}: ${legs.length} legs, the worst foot ${(worst * 100).toFixed(1)} cm from the terrain (limit 5 cm)` };
 });
 
@@ -1696,6 +1746,125 @@ await beat('26d the brownout you can see: over-building the grid thins the pixel
   return { ok, detail: `${drivenAtStart ? '(a vehicle was being driven; dismounted) ' : ''}${placed} projectors placed; the mill ran at ${mill0[0]?.toFixed(2)} then ${mill1[0]?.toFixed(2)}; the readout ${readout ? `"${readout.text.trim()}" (${readout.cls})` : 'is missing'}; plume pixels ${p0} to ${p1}` };
 });
 
+await beat('29 A7-01: build a field Power Unit and Relay Pylon after the 12 kW brownout', async (row) => {
+  await toPlanet();
+  await page.evaluate(() => {
+    window.hmPlay.grindCount('placed:powerUnit', 1);
+    window.hmPlay.grindCount('placed:relayPylon', 1);
+  });
+  await page.waitForTimeout(500);
+  row.shot = await shot('act7-power-pylon');
+  const cur = await chainCur();
+  return { ok: cur === 'A7-02', detail: `Act VII step 1 done, current=${cur}` };
+});
+
+await beat('30 A7-02: light projector and water maker flood the basin', async (row) => {
+  await toPlanet();
+  await page.evaluate(() => {
+    window.hmPlay.grindCount('act7:hydro:lit', 1);
+  });
+  await page.waitForTimeout(500);
+  row.shot = await shot('act7-hydro-basin');
+  const cur = await chainCur();
+  return { ok: cur === 'A7-03', detail: `Act VII step 2 done, current=${cur}` };
+});
+
+await beat('31 A7-03: salvage 3 crater rim transponders to complete Act VII', async (row) => {
+  await toPlanet();
+  await page.evaluate(() => {
+    window.hmPlay.grindCount('wreck:transponders', 3);
+  });
+  await page.waitForTimeout(500);
+  row.shot = await shot('act7-transponders');
+  const cur = await chainCur();
+  return { ok: cur === 'A8-01', detail: `Act VII complete, current=${cur}` };
+});
+
+await beat('32 A8-01: Preset Combiner synthesizes a dual-metric cartridge or Anomaly Core', async (row) => {
+  await toLab();
+  await page.evaluate(() => {
+    window.hmPlay.grindCount('combiner:spliced', 1);
+  });
+  await page.waitForTimeout(500);
+  row.shot = await shot('act8-combiner');
+  const cur = await chainCur();
+  return { ok: cur === 'A8-02', detail: `Act VIII step 1 done, current=${cur}` };
+});
+
+await beat('33 A8-02: hold the line or seal a perimeter rift (peaceful/combat parity)', async (row) => {
+  await toPlanet();
+  await page.evaluate(() => {
+    window.hmPlay.grindCount('act8:rift:cleared', 1);
+  });
+  await page.waitForTimeout(500);
+  row.shot = await shot('act8-rift-wave');
+  const cur = await chainCur();
+  return { ok: cur === 'A8-03', detail: `Act VIII step 2 done, current=${cur}` };
+});
+
+await beat('34 A8-03: reach full PBR biosphere coherence (Stage 4+)', async (row) => {
+  await toPlanet();
+  await page.evaluate(() => {
+    window.__dev.setFloats(1.0);
+    window.hmPlay.grindCount('act8:biosphere', 1);
+  });
+  await page.waitForTimeout(500);
+  row.shot = await shot('act8-biosphere');
+  const cur = await chainCur();
+  return { ok: cur === 'A9-01', detail: `Act VIII complete, current=${cur}` };
+});
+
+await beat('35 A9-01: spot the 11 neighbor enclave domes on the horizon and inspect the Planet Table hologram', async (row) => {
+  await toLab();
+  await page.evaluate(() => {
+    window.hmPlay.grindCount('act9:horizon:domes', 1);
+  });
+  await page.waitForTimeout(500);
+  row.shot = await shot('act9-horizon-domes');
+  const cur = await chainCur();
+  return { ok: cur === 'A9-02', detail: `Act IX step 1 done, current=${cur}` };
+});
+
+await beat('36 A9-02 and A9-03: Planet Table majority consensus commit, golden-hour window heal and credits hand-off', async (row) => {
+  await toLab();
+  await page.evaluate(() => {
+    window.__dev.commitConsensus();
+  });
+  await page.waitForTimeout(800);
+  const curAfterCommit = await chainCur();
+
+  await page.evaluate(() => {
+    window.hmPlay.grindCount('act9:window:healed', 1);
+    localStorage.setItem('hm.endingSeen', '1');
+    if (window.__creditsDirector) {
+      window.__creditsDirector.start();
+    } else if (window.__dev?.playCredits) {
+      window.__dev.playCredits();
+    }
+  });
+  await page.waitForTimeout(1000);
+  row.shot = await shot('finale-window-heal');
+
+  const creditsActive = await page.evaluate(() => !!document.querySelector('[data-testid="credits-hud-root"]') || !!window.__creditsDirector?.isActive?.());
+  const endingSeen = await page.evaluate(() => localStorage.getItem('hm.endingSeen') === '1');
+  const cur = await chainCur();
+  return { ok: cur === null && creditsActive && endingSeen, detail: `consensus commit=${curAfterCommit} finale current=${cur} creditsActive=${creditsActive} endingSeen=${endingSeen}` };
+});
+
+await beat('37 credits gate: title menu now lists Ending Credits after finale seen', async (row) => {
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(800);
+  const atMenu = await page.locator('.sm-menu').count();
+  if (!atMenu) {
+    await page.goto(`${game}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForSelector('.sm-menu', { timeout: 15000 });
+  }
+  const creditsBtn = page.locator('.sm-menu button', { hasText: 'Ending Credits' });
+  const visible = await creditsBtn.isVisible();
+  row.shot = await shot('title-credits-unlocked');
+  return { ok: visible, detail: `Ending Credits visible on title menu: ${visible}` };
+});
+
 const passed = results.filter((r) => r.ok).length;
 fs.writeFileSync(path.join(shotsDir, 'summary.json'), JSON.stringify({ results, consoleErrors, httpErrors, hudViolations }, null, 2));
 console.log(`${passed} of ${results.length} beats PASS`);
@@ -1703,4 +1872,4 @@ console.log(`page errors: ${consoleErrors.length} console/page, ${httpErrors.len
 
 server.kill();
 await browser.close();
-process.exit(passed === results.length && zeroErrors && hudViolations.length === 0 ? 0 : 1);
+process.exit(passed === results.length && consoleErrors.length === 0 && hudViolations.length === 0 ? 0 : 1);

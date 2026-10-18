@@ -306,12 +306,21 @@ export class CreditsDirector {
   }
 }
 
-// Expose `window.__credits` hook for headless verification (`scripts/test-credits-video.mjs`)
+// POL-305: Expose `window.__credits` hook only under debug / e2e / localhost
 if (typeof window !== 'undefined') {
-  (window as unknown as { __credits?: unknown }).__credits = {
-    getStateAt: (t: number) => getCreditsStateAt(t, DEFAULT_OUTRO_META),
-    actions: OLD_MONITOR_ACTIONS,
-    playOverclocked: playMonitorOverclocked,
-    stopOverclocked: stopMonitorOverclocked,
-  };
+  const isDebug =
+    Boolean(import.meta.env?.DEV) ||
+    (typeof location !== 'undefined' &&
+      (new URLSearchParams(location.search).has('e2e') ||
+        location.hostname === 'localhost' ||
+        location.hostname === '127.0.0.1'));
+  if (isDebug) {
+    (window as unknown as { __credits?: unknown }).__credits = {
+      getStateAt: (t: number) => getCreditsStateAt(t, DEFAULT_OUTRO_META),
+      actions: OLD_MONITOR_ACTIONS,
+      playOverclocked: playMonitorOverclocked,
+      stopOverclocked: stopMonitorOverclocked,
+    };
+  }
 }
+

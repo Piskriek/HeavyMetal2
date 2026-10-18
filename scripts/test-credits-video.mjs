@@ -50,6 +50,7 @@ await page.addInitScript(() => {
   Element.prototype.requestPointerLock = function () {
     return Promise.reject(new Error('pointer lock stubbed'));
   };
+  localStorage.setItem('hm.endingSeen', '1');
 });
 const pageErrors = [];
 page.on('pageerror', (err) => pageErrors.push(err.message));

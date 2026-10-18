@@ -374,6 +374,16 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 - **Expected:** Keep E as it is. In T16, J's credits replay waits for `endingSeen`. Check the bars' placement up close.
 - **Done in F-23 (Gemini-Flash):** In `apps/web/src/credits/credits-hud.tsx`, J's credits replay button is locked/disabled with reason "Available once campaign finale is reached" when `endingSeen` is false. On title screen (`homeMenu` in `goblin-front.tsx`), Ending Credits item is hidden until `endingSeen` is true. Esc debug menu has "Play ending credits" for preview anytime. Verified in `test-credits-video.mjs` (47/47) and `test-campaign.mjs`.
 
+### POL-241: Act VII to IX campaign progression and credits gate (DONE)
+- **Seen:** T16 part a (F-23). Acts VII to IX campaign steps added with questline logic, consensus commit, golden-hour window heal, and credits director transition.
+- **Done in F-23 (Gemini-Flash):**
+  - Integrated Act VII, VIII, IX steps into `packages/questline` (`act789-chain.ts`) and merged into `campaign-chain.ts`.
+  - Added Dr. Gwen Haddy CRT portrait and diptych frosted glass hero in `goblin-front.tsx`.
+  - Added endingSeen credits gate to title menu and J jukebox replay (POL-305, POL-306).
+  - Wired consensus commit, evaluateFinaleWindowHeal, and creditsDirector in `play.tsx`.
+  - Verified 54 of 54 campaign beats pass with 0 HUD violations, 0 console errors, 0 HTTP errors in `test-campaign.mjs`.
+  - Verified credits video test 47 of 47 pass in `test-credits-video.mjs`.
+
 ### POL-291: the perimeter turret's bill and unlock (confirmed, not open)
 - **Ruling:** ARGO_NOTE_17, section c: 40 ore, 2 prim-cube and 1 prim-column; unlocked at stage 2. Argo confirmed the bill as set.
 - **Built in T13a (2026-10-18):** `catalog.ts` (PIECE_ORE 40, PIECE_EXTRA, PIECE_STAGE turret 2, the column family). `world.ts` `build()` refuses a turret below stage 2 ("locked").

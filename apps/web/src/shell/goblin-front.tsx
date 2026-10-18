@@ -86,19 +86,21 @@ const FIDELITY_MENU: readonly MenuItem[] = [
 
 const RACING_ITEM: MenuItem = { id: 'racing', label: 'Goblin Racing', says: 'Race goblins in glass balls round an island.' };
 
-/** The menu for a version of the game: Goblin Racing remains accessible if specifically requested. */
-export function homeMenu(edition: Edition): readonly MenuItem[] {
-  return edition === 'goblin-racing' ? [RACING_ITEM, ...FIDELITY_MENU] : FIDELITY_MENU;
-}
-
 import { ProfileChip } from './profile-chip';
 import { FidelityLogo } from './fidelity-logo';
+import { HaddyCrtPortrait } from './haddy-crt-portrait';
+
+/** The menu for a version of the game: Goblin Racing remains accessible if specifically requested. */
+export function homeMenu(edition: Edition, endingSeen = false): readonly MenuItem[] {
+  const base = endingSeen ? FIDELITY_MENU : FIDELITY_MENU.filter((m) => m.id !== 'credits');
+  return edition === 'goblin-racing' ? [RACING_ITEM, ...base] : base;
+}
 
 /**
  * The FIDELITY home: The base game of the SetMix Multiverse.
- * Operates over the Lunar Observation Lab backdrop, presenting the comprehensive
- * mission suite (Expedition [Desynced], Planetary Grid [Synced], Studio, Workshop, Community, Settings)
- * and real-time substrate telemetry.
+ * POL-01 & POL-64: Features the split Lab Wasteland Glitch Window + Stage 4/6 Twin Gate Hero
+ * backdrop and the frosted glass navigation blade (`fidelity-glass-blade`), plus POL-40's
+ * Dr. Gwen Haddy CRT portrait slot.
  */
 export function SetMixHome(props: {
   readonly onExpedition?: () => void;
@@ -109,6 +111,7 @@ export function SetMixHome(props: {
   readonly onSettings: () => void;
   /** The title's Ending Credits item: the video plays in the play screen (TICKET-14). */
   readonly onCredits?: () => void;
+  readonly endingSeen?: boolean;
   readonly credits: number;
   // Compatibility props:
   readonly onPlay?: () => void;
@@ -121,6 +124,7 @@ export function SetMixHome(props: {
   readonly onManageProfiles?: () => void;
   readonly onSwitching?: (name: string) => void;
 }): ReactElement {
+
   const act: Record<MenuId, (() => void) | undefined> = {
     expedition: props.onExpedition ?? props.onPlay,
     play: props.onPlay,
@@ -141,36 +145,109 @@ export function SetMixHome(props: {
         <svg className="sm-leader" aria-hidden="true"><circle ref={props.leader.ring} r="0" /><line ref={props.leader.line} /></svg>
       ) : null}
 
-      {/* Brand Header */}
-      <div className="sm-brand fidelity-brand">
-        <div className="fidelity-brand-lockup">
-          <FidelityLogo size={58} glow />
-          <div className="fidelity-brand-text">
-            <b>FIDELITY</b>
-            <i>A SetMix System // Substrate Research Initiative</i>
-          </div>
-        </div>
+      {/* POL-01 & POL-64: Main Menu Hero Diptych (Wasteland Glitch Window + Stage 4/6 Twin Gate Portal) */}
+      <div
+        className="fidelity-menu-hero"
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          pointerEvents: 'none',
+          overflow: 'hidden',
+          background:
+            'radial-gradient(circle at 68% 46%, rgba(61, 200, 255, 0.18) 0%, rgba(180, 107, 255, 0.12) 28%, rgba(5, 8, 15, 0.92) 74%)',
+        }}
+      >
+        {/* Observation Window Wasteland Glitch Pockets (Left/Upper Backdrop) */}
+        <div
+          className="fidelity-hero-wasteland-window"
+          style={{
+            position: 'absolute',
+            top: '8%',
+            right: '6%',
+            width: '56%',
+            height: '34%',
+            border: '1px solid rgba(56, 189, 248, 0.28)',
+            background:
+              'linear-gradient(135deg, rgba(16, 23, 38, 0.78) 0%, rgba(14, 116, 144, 0.22) 52%, rgba(245, 158, 11, 0.18) 100%)',
+            boxShadow: 'inset 0 0 36px rgba(56, 189, 248, 0.16)',
+          }}
+        />
+        {/* Stage 4/6 Twin Gate Portal Arch & Lush Pine Canopy Silhouette (Center-Right Hero) */}
+        <div
+          className="fidelity-hero-gate-arch"
+          style={{
+            position: 'absolute',
+            bottom: '10%',
+            right: '18%',
+            width: 240,
+            height: 320,
+            border: '3px solid rgba(255, 193, 61, 0.72)',
+            borderBottom: '6px solid rgba(124, 255, 77, 0.65)',
+            borderRadius: '12px 12px 2px 2px',
+            boxShadow:
+              '0 0 48px rgba(255, 193, 61, 0.28), inset 0 0 64px rgba(61, 200, 255, 0.32)',
+            background:
+              'linear-gradient(180deg, rgba(56, 189, 248, 0.28) 0%, rgba(16, 185, 129, 0.26) 65%, rgba(124, 255, 77, 0.32) 100%)',
+          }}
+        />
       </div>
 
-      {/* Primary Navigation Suite */}
-      <nav className="sm-menu fidelity-menu" aria-label="FIDELITY Operations">
-        {homeMenu(EDITION).map((m, i) => (
-          <Fragment key={m.id}>
-            <button
-              style={{ ['--i' as string]: i }}
-              onClick={act[m.id]}
-              disabled={!act[m.id]}
-              className={m.badge ? 'has-badge' : ''}
-            >
-              <div className="sm-menu-label-row">
-                <b>{m.label}</b>
-                {m.badge ? <span className="fidelity-badge">{m.badge}</span> : null}
-              </div>
-              <small>{m.says}</small>
-            </button>
-          </Fragment>
-        ))}
-      </nav>
+      {/* POL-64: Frosted Glass Blade housing Brand Header & Primary Navigation Suite */}
+      <div
+        className="fidelity-glass-blade"
+        style={{
+          position: 'relative',
+          zIndex: 2,
+          backdropFilter: 'blur(14px)',
+          WebkitBackdropFilter: 'blur(14px)',
+          background: 'rgba(8, 12, 20, 0.74)',
+          borderRight: '1px solid rgba(61, 200, 255, 0.22)',
+          padding: '24px 28px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 18,
+          maxWidth: 440,
+        }}
+      >
+        {/* Brand Header */}
+        <div className="sm-brand fidelity-brand">
+          <div className="fidelity-brand-lockup">
+            <FidelityLogo size={58} glow />
+            <div className="fidelity-brand-text">
+              <b>FIDELITY</b>
+              <i>A SetMix System // Substrate Research Initiative</i>
+            </div>
+          </div>
+        </div>
+
+        {/* POL-40: Dr. Gwen Haddy CRT Portrait Slot */}
+        <HaddyCrtPortrait
+          subtitleText="Portal link stable at 12 kW. Eleven neighbor domes on the horizon."
+          stage={6}
+        />
+
+        {/* Primary Navigation Suite */}
+        <nav className="sm-menu fidelity-menu" aria-label="FIDELITY Operations">
+          {homeMenu(EDITION, props.endingSeen).map((m, i) => (
+            <Fragment key={m.id}>
+              <button
+                style={{ ['--i' as string]: i }}
+                onClick={act[m.id]}
+                disabled={!act[m.id]}
+                className={m.badge ? 'has-badge' : ''}
+              >
+                <div className="sm-menu-label-row">
+                  <b>{m.label}</b>
+                  {m.badge ? <span className="fidelity-badge">{m.badge}</span> : null}
+                </div>
+                <small>{m.says}</small>
+              </button>
+            </Fragment>
+          ))}
+        </nav>
+      </div>
+
 
       {/* Live Substrate Telemetry HUD (Right Observation Panel) */}
       <aside className="fidelity-telemetry-hud" aria-label="Substrate Telemetry">

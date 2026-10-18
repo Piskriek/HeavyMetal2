@@ -365,3 +365,5 @@ export function targets(q: Questline): string[] {
   }
   return result;
 }
+
+export * from './act789-chain';

@@ -123,6 +123,10 @@ import {
 } from '../audio/game-audio';
 import { CreditsDirector, OldMonitorJukeboxModal, isMonitorOverclockedPlaying, playMonitorOverclocked, stopMonitorOverclocked } from '../credits';
 import { CreditsPlayer } from '../credits/credits-player';
+import { HaddyCrtPortrait } from '../shell/haddy-crt-portrait';
+import { evaluateContinentalConsensus, evaluateFinaleWindowHeal } from './planet-table-hologram';
+import { PLANET_TABLE_AT } from './lab-room';
+import { isBiosphereCoherent } from '@hm/questline';
 import { fidelityRules, FIDELITY_LINE_IDS } from '@hm/narrator';
 import { HudZone, CompassRibbon, FloatsPill, MachineLabel, SyncWord } from '../base/ui/hud-zones';
 import {
@@ -181,6 +185,8 @@ const STAGE_SAYS: readonly string[] = [
 /** What the world shows, for the chain's derived counters (TASK-22, campaign-chain.ts). */
 function worldEvidence(w: BaseWorld, plot: PlotState): Evidence {
   const stacks = [...w.player.slots, ...w.boxes.flatMap((b) => b.slots), ...Object.values(w.equipment)];
+  const localS = { Pxd: plot.points.pxd, Vtx: plot.points.vtx, Lx: plot.points.lx, Aq: plot.points.aq };
+  const bio = isBiosphereCoherent(localS);
   return {
     stage: plot.stage,
     drillsRunning: plot.machines.filter((m) => m.kind === 'drill' && m.on).length,
@@ -188,6 +194,7 @@ function worldEvidence(w: BaseWorld, plot: PlotState): Evidence {
     vehicleKinds: w.vehicles.map((v) => v.kind),
     sidearm: !!w.equipment.sidearm,
     itemIds: stacks.flatMap((st) => (st ? [st.item] : [])),
+    biosphereStage4: bio,
   };
 }
 
@@ -385,6 +392,16 @@ export function PlayScreen(props: {
   const [jukeboxOpen, setJukeboxOpen] = useState(false);
   const jukeboxRef = useRef(false);
   jukeboxRef.current = jukeboxOpen;
+  const [endingSeen, setEndingSeen] = useState<boolean>(() => {
+    if (typeof localStorage === 'undefined') return false;
+    return localStorage.getItem('hm.endingSeen') === '1' || kv.get('hm.endingSeen') === '1';
+  });
+  const finaleRef = useRef<{
+    active: boolean;
+    startWallMs: number;
+    voiceTriggered: boolean;
+    done: boolean;
+  } | null>(null);
   /** The credits' director, made once per screen. Its three tracks are read in the background, so a replay starts at once. */
   const prepareCredits = (): CreditsDirector | null => {
     const scene = sceneRef.current;
@@ -410,7 +427,10 @@ export function PlayScreen(props: {
     setJukeboxOpen(false);
     document.exitPointerLock?.();
     gameAudio.setMusicContext('silent');
-    (window as unknown as { __creditsDirector?: CreditsDirector }).__creditsDirector = director;
+    const allowCreditsHook = debugHooks || (typeof location !== 'undefined' && (location.hostname === 'localhost' || location.hostname === '127.0.0.1'));
+    if (allowCreditsHook) {
+      (window as unknown as { __creditsDirector?: CreditsDirector }).__creditsDirector = director;
+    }
     void director.loadAssets().then(() => {
       if (creditsRef.current === run) director.start(false);
     });
@@ -422,6 +442,10 @@ export function PlayScreen(props: {
     run.director.stop();
     creditsRef.current = null;
     setCreditsRun(null);
+    const allowCreditsHook = debugHooks || (typeof location !== 'undefined' && (location.hostname === 'localhost' || location.hostname === '127.0.0.1'));
+    if (allowCreditsHook) {
+      delete (window as unknown as { __creditsDirector?: CreditsDirector }).__creditsDirector;
+    }
     const scene = sceneRef.current;
     const save = creditsSaveRef.current;
     if (scene && save) {
@@ -1202,6 +1226,7 @@ useEffect(() => {
 
     refreshBaseView();
     persistBaseWorld(false);
+    (baseViewSource as WorldViewSource)?.notify?.();
     return res;
   }, [say, baseViewSource, getBaseEnv, commit, incrementPlacedCounter, persistBaseWorld, refreshBaseView]);
 
@@ -2329,6 +2354,31 @@ useEffect(() => {
       // TICKET-14: while the credits play, the video drives the camera and the scene's looks before the frame is drawn
       const creditsNow = creditsRef.current;
       if (creditsNow?.director.isActive()) creditsNow.director.stepAtTime(undefined, dt);
+
+      // TICKET-16 Part a: 12-second golden-hour reality convergence at the observation window (A9-02 -> A9-03 -> credits)
+      if (finaleRef.current?.active) {
+        const fin = finaleRef.current;
+        const elapsedSec = (performance.now() - fin.startWallMs) / 1000;
+        const heal = evaluateFinaleWindowHeal(elapsedSec);
+
+        // PART-B HOOK: connect Lab observation window golden-hour heal visual
+        // scene.labRoom?.setStorm?.(heal.windowStormHeal0to1);
+
+        if (heal.shouldTriggerEpilogueVoice && !fin.voiceTriggered) {
+          fin.voiceTriggered = true;
+          narratorRef.current?.trigger('act9:finale-handoff');
+        }
+
+        if (heal.shouldStartCredits && !fin.done) {
+          fin.done = true;
+          fin.active = false;
+          updateChain((c) => bump(c, COUNT.finaleWindowHealed, 1));
+          if (typeof localStorage !== 'undefined') localStorage.setItem('hm.endingSeen', '1');
+          kv.set('hm.endingSeen', '1');
+          setEndingSeen(true);
+          startCredits('lab');
+        }
+      }
       const isAltCam = keys.has('AltLeft') || keys.has('AltRight');
       const flyUp = (keys.has('Space') ? 1 : 0) - (keys.has('ControlLeft') || keys.has('ControlRight') ? 1 : 0);
       const axis = (a: string[], b: string[]) => (a.some((k) => keys.has(k)) ? 1 : 0) - (b.some((k) => keys.has(k)) ? 1 : 0);
@@ -2423,7 +2473,8 @@ useEffect(() => {
       if (out.event === 'sync-lost') {
         s = returned(s);
         say('Sync lost', 'The gate pulled you back. Your sync refills in the lab.');
-        // the zero-loss recall (TASK-26): Argo's line as a subtitle only, not voiced; nothing in the pack is touched (flagged for the owner)
+        // the zero-loss recall (TASK-26 / POL-57): Argo's line as a subtitle only, plus trigger for narrator
+        narratorRef.current?.trigger('sync:recall');
         narratorRef.current?.showSubtitleOnly('recall-zero', 'Pulled your buffer back before the static ate you. Stay near the relay line or drop a pylon.', 8);
         setBuilding(null);
         setMenu(false);
@@ -2561,7 +2612,8 @@ useEffect(() => {
           if (e.type === 'ore-out' && !visitingRef.current) say('Out of ore', 'Hold E on a boulder, or build a rock drill.');
           if (e.type === 'underpowered' && !visitingRef.current) {
             say('Not enough power', 'Build a power unit, or switch a machine off.');
-            // Dr. Haddy's power prompt, once per shortage: subtitle only (Argo's line, not voiced; flagged for the owner, TASK-26)
+            // Dr. Haddy's power prompt (TASK-26 / POL-57): 12 kW Gate brownout bark trigger
+            narratorRef.current?.trigger('power:brownout');
             narratorRef.current?.showSubtitleOnly('power-short', "There goes the Gate's twelve-kilowatt breaker. Drop a Power Unit on the line before the plumes stall out.", 8);
           }
         }
@@ -3322,6 +3374,36 @@ useEffect(() => {
         }
         return;
       }
+      // Planet Table consensus commit (TICKET-16, A9-02)
+      if (e.code === 'KeyE' && liveWhereRef.current === 'lab') {
+        const at = sceneRef.current?.debug.position();
+        const nearTable = at && Math.hypot(at.x - PLANET_TABLE_AT.x, at.z - PLANET_TABLE_AT.z) <= 3.2;
+        if (hud.aimedProp?.id === 'planet-table' || nearTable) {
+          const localS = {
+            Pxd: stateRef.current.plot.points.pxd,
+            Vtx: stateRef.current.plot.points.vtx,
+            Lx: stateRef.current.plot.points.lx,
+            Aq: stateRef.current.plot.points.aq,
+          };
+          const consensus = evaluateContinentalConsensus(localS);
+          if (consensus.isReadyToCommit || stepDone(stateRef.current.chain, 'A9-01')) {
+            updateChain((c) => bump(c, COUNT.consensusCommitted, 1));
+            say('Consensus Committed', `Continental consensus reached (${consensus.consensusPct.toFixed(0)}%). Committing Sector 04 branch...`);
+            narratorRef.current?.trigger('act9:consensus-commit');
+            if (!finaleRef.current?.active) {
+              finaleRef.current = {
+                active: true,
+                startWallMs: performance.now(),
+                voiceTriggered: false,
+                done: false,
+              };
+            }
+          } else {
+            say('Consensus Incomplete', `Continental consensus at ${consensus.consensusPct.toFixed(0)}% (85% required). Reach Stage 4+ biosphere coherence first.`);
+          }
+          return;
+        }
+      }
       if (e.code === 'KeyE') {
         const driving = sceneRef.current?.getDrivingVehicle();
         if (driving) {
@@ -3734,6 +3816,20 @@ useEffect(() => {
         sceneRef.current?.setVegetationSetting(v);
       },
       getBiomeCounts: () => sceneRef.current?.getBiomeCounts() ?? null,
+      playCredits: (): void => { startCredits('title'); },
+      commitConsensus: (): void => {
+        updateChain((c) => bump(c, COUNT.consensusCommitted, 1));
+        say('Consensus Committed', 'Continental consensus reached (85%+). Committing Sector 04 branch...');
+        narratorRef.current?.trigger('act9:consensus-commit');
+        if (!finaleRef.current?.active) {
+          finaleRef.current = {
+            active: true,
+            startWallMs: performance.now(),
+            voiceTriggered: false,
+            done: false,
+          };
+        }
+      },
     };
     debugApiRef.current = dev;
     if (debugHooks) (window as unknown as { __dev?: unknown }).__dev = dev;
@@ -3781,7 +3877,15 @@ useEffect(() => {
           open
           overclockedPlaying={isMonitorOverclockedPlaying()}
           elapsedSec={performance.now() / 1000}
-          onPlayCredits={() => { setJukeboxOpen(false); startCredits('lab'); }}
+          endingSeen={endingSeen}
+          onPlayCredits={() => {
+            if (!endingSeen) {
+              say('Playback Locked', 'The Ending Credits replay unlocks after witnessing the campaign finale.');
+              return;
+            }
+            setJukeboxOpen(false);
+            startCredits('lab');
+          }}
           onPlayOverclocked={toggleMonitorOverclocked}
           onClose={() => setJukeboxOpen(false)}
         />
@@ -3854,6 +3958,13 @@ useEffect(() => {
         <>
           {!hideOverlays && drivingSpeed === null && (
             <HudZone zone="top-left">
+            <HaddyCrtPortrait
+              activeLineId={subtitle?.id}
+              subtitleText={subtitle?.cleanText}
+              isSpeaking={Boolean(subtitle)}
+              isWarningGlitch={subtitle?.id?.startsWith('BARK') || subtitle?.id === 'power-short' || subtitle?.id === 'recall-zero'}
+              stage={hud.plot.stage}
+            />
             <section className="play-goal" aria-live="polite" data-hud-zone="top-left">
               <h2>{visiting ? `Visiting ${visiting.snapshot.owner}’s plot` : goal.title}</h2>
               <p>{visiting ? 'Read-only visit. Walk back through the gate to return to your lab.' : goal.hint}</p>

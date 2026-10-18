@@ -139,6 +139,19 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   /** A Planetary Grid entry (a visit or a spawn) for the play screen to apply once the lab is ready. Cleared when the player leaves play. */
   const [playEntry, setPlayEntry] = useState<PlayEntry | null>(null);
   useEffect(() => { if (screen !== 'play') setPlayEntry(null); }, [screen]);
+  /** Whether the campaign finale has played: gates the Ending Credits item on the title menu (POL-306). */
+  const endingSeen = useMemo(() => {
+    if (typeof localStorage === 'undefined') return false;
+    try {
+      if (localStorage.getItem('hm.endingSeen') === '1') return true;
+      const raw = kv.get(SAVE_KEY);
+      if (!raw) return false;
+      const save = JSON.parse(raw);
+      return Boolean(save?.endingSeen || save?.chain?.progress?.finished?.includes('A9-03'));
+    } catch {
+      return false;
+    }
+  }, [screen]);
   /** The grid's facts, read once each time the grid opens (the save and the recent codes are not re-read on every render). */
   const gridView = useMemo(() => (screen === 'grid' ? readGridView() : null), [screen]);
   /** The Goblin Racing island: the world its menu orbits (its own map, never mixed with your islands). */
@@ -383,6 +396,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
           <SetMixHome
             leader={{ line: leaderLine, ring: leaderRing }}
             credits={profile.credits}
+            endingSeen={endingSeen}
             onExpedition={() => { origin.current = 'home'; setPlaySyncMode('desynced'); go('play'); }}
             onCredits={() => { origin.current = 'home'; setPlaySyncMode('desynced'); setPlayEntry({ kind: 'credits' }); go('play'); }}
             onGrid={toGrid}

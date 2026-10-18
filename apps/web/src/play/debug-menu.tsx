@@ -34,6 +34,8 @@ export interface DebugApi {
   placeMob(kind: Archetype, distance?: number): number;
   /** Queues a vehicle print at the fabricator (the bill goes to the bridge store). Returns what happened, in words. */
   printVehicle(kind: VehicleKind): string;
+  /** Plays the ending credits sequence immediately (Esc debug menu / tests). */
+  playCredits?: () => void;
 }
 
 export interface DebugMenuProps {
@@ -286,6 +288,7 @@ export function DebugMenu({ api, chain, stage, where, instantBuilds, onInstantBu
             </div>
             <div className="dbg-row">
               <button type="button" onClick={() => { api.refill(); notify('Sync and health refilled'); bump(); }} data-testid="dbg-refill">Refill sync and health</button>
+              <button type="button" onClick={() => { api.playCredits?.(); onClose(); }} data-testid="dbg-play-credits">Play ending credits</button>
             </div>
             <div className="dbg-field">
               <span className="dbg-label">Teleport</span>

@@ -36,6 +36,15 @@ export const COUNT = {
   dormantSealed: 'leak:dormant:sealed',
   /** Any other leak is sealed (the substrate drop). */
   leakSealed: 'leak:sealed',
+  /** Act VII–IX counters (Brief 35 / TICKET-16). */
+  hydroBasinLit: 'act7:hydro:lit',
+  wreckTransponders: 'wreck:transponders',
+  splicedCores: 'combiner:spliced',
+  riftOrWaveCleared: 'act8:rift:cleared',
+  biosphereStage4: 'act8:biosphere',
+  horizonDomesSeen: 'act9:horizon:domes',
+  consensusCommitted: 'act9:consensus:committed',
+  finaleWindowHealed: 'act9:window:healed',
 } as const;
 
 /** Placed-piece counters are `placed:<kind>` (e.g. `placed:foundation`). */
@@ -62,6 +71,15 @@ export const STEP_TEXT: Readonly<Record<string, { readonly title: string; readon
   'F-03': { title: 'Make your first gun', hint: 'Weapon bench: craft a frame and a core, fit them into the gun, equip it to the sidearm, then swap one part.' },
   'F-04': { title: 'Unlock the hauler', hint: 'Stage 4 opens the hauler at the fabricator. Its bin rides on the bridge.' },
   'F-05': { title: 'Unlock the crawler', hint: 'Stage 6 opens the crawler at the fabricator.' },
+  'A7-01': { title: 'Break the 12 kW ceiling', hint: 'Build a field Power Unit and wire a Relay Pylon so high-flux machines do not brown out the Gate.' },
+  'A7-02': { title: 'Ignite the sky and flood the basin', hint: 'Run a Light Projector and Water Maker until Lx >= 0.65 and Aq >= 0.40, pooling water in the East basin.' },
+  'A7-03': { title: 'Salvage 3 crater rim transponders', hint: 'Drive the Scout Rover to 3 perimeter wrecks and hold E on their transponders to recover Bridge logs and cores.' },
+  'A8-01': { title: 'Synthesize a dual cartridge in the Combiner', hint: 'In the Lab Preset Combiner, fuse two cartridges or synthesize a peaceful Anomaly Core.' },
+  'A8-02': { title: 'Hold the line or seal a perimeter rift', hint: 'Seal an active rift with the Beam Tool (Seal mode) or clear a perimeter wave with a weapon or turret.' },
+  'A8-03': { title: 'Reach full PBR biosphere (Stage 4+)', hint: 'Push all four floats above Stage 4 (Pxd >= 0.85, Vtx >= 0.85, Lx >= 0.85, Aq >= 0.75) so trees and fauna bloom.' },
+  'A9-01': { title: 'Spot the 11 lights on the horizon', hint: 'Look out at the 11 neighbor enclave domes glowing on the 4.2 km lunar horizon, then walk back through the Twin Gate.' },
+  'A9-02': { title: 'Commit majority consensus at the Planet Table', hint: 'Press E on the round Planet Table in the Lab once continental consensus hits 85%+.' },
+  'A9-03': { title: 'Watch the observation window heal', hint: 'Look through the Lab observation window as the Breach storm heals into golden hour and "Four Floats" begins.' },
 };
 
 /**
@@ -110,6 +128,39 @@ export const CHAIN: Questline = {
         { id: 'F-03', text: STEP_TEXT['F-03']!.title, until: every(at(placedKey('weaponBench'), 1), at(COUNT.forged, 2), at(COUNT.equipSidearm, 1), at(COUNT.fitted, 2)) },
         { id: 'F-04', text: STEP_TEXT['F-04']!.title, until: at(COUNT.stage, 4) },
         { id: 'F-05', text: STEP_TEXT['F-05']!.title, until: at(COUNT.stage, 6) },
+      ],
+      reward: {},
+    },
+    {
+      id: 'act7',
+      title: 'Act VII: the grid and the flood',
+      requires: { done: 'act6' },
+      steps: [
+        { id: 'A7-01', text: STEP_TEXT['A7-01']!.title, until: every(at(placedKey('powerUnit'), 1), at(placedKey('relayPylon'), 1)) },
+        { id: 'A7-02', text: STEP_TEXT['A7-02']!.title, until: at(COUNT.hydroBasinLit, 1) },
+        { id: 'A7-03', text: STEP_TEXT['A7-03']!.title, until: at(COUNT.wreckTransponders, 3) },
+      ],
+      reward: {},
+    },
+    {
+      id: 'act8',
+      title: 'Act VIII: the splice and the canopy',
+      requires: { done: 'act7' },
+      steps: [
+        { id: 'A8-01', text: STEP_TEXT['A8-01']!.title, until: at(COUNT.splicedCores, 1) },
+        { id: 'A8-02', text: STEP_TEXT['A8-02']!.title, until: at(COUNT.riftOrWaveCleared, 1) },
+        { id: 'A8-03', text: STEP_TEXT['A8-03']!.title, until: at(COUNT.biosphereStage4, 1) },
+      ],
+      reward: {},
+    },
+    {
+      id: 'act9',
+      title: 'Act IX: majority consensus',
+      requires: { done: 'act8' },
+      steps: [
+        { id: 'A9-01', text: STEP_TEXT['A9-01']!.title, until: at(COUNT.horizonDomesSeen, 1) },
+        { id: 'A9-02', text: STEP_TEXT['A9-02']!.title, until: at(COUNT.consensusCommitted, 1) },
+        { id: 'A9-03', text: STEP_TEXT['A9-03']!.title, until: at(COUNT.finaleWindowHealed, 1) },
       ],
       reward: {},
     },
@@ -247,7 +298,18 @@ export function completeStepChain(c: Chain): Chain {
 
 // ---------------------------------------------------------------------------------------------------------- gates
 /** A feature the chain unlocks. A locked item says why (`gateReason`). */
-export type Feature = 'rifle' | 'structures' | 'drafting' | 'heavy' | 'fabricator' | 'weaponBench' | 'monsters';
+export type Feature =
+  | 'rifle'
+  | 'structures'
+  | 'drafting'
+  | 'heavy'
+  | 'fabricator'
+  | 'weaponBench'
+  | 'monsters'
+  | 'combiner'
+  | 'heavyTerraformers'
+  | 'consensusTable'
+  | 'freeplay';
 
 /** What opens each feature: a plot stage, and a chain step that must be finished. */
 export const GATES: Readonly<Record<Feature, { readonly stage?: number; readonly after?: string }>> = {
@@ -258,6 +320,10 @@ export const GATES: Readonly<Record<Feature, { readonly stage?: number; readonly
   fabricator: { stage: 2, after: 'B-07' },
   weaponBench: { after: 'F-01' },
   monsters: { after: 'F-03' },
+  combiner: { after: 'A7-03' },
+  heavyTerraformers: { stage: 3, after: 'A8-01' },
+  consensusTable: { stage: 4, after: 'A8-03' },
+  freeplay: { after: 'A9-03' },
 };
 
 /** Why a feature is locked, in the player's words; null when it is open. The stage reason comes first. */
@@ -286,6 +352,15 @@ export interface Evidence {
   readonly sidearm: boolean;
   /** Item ids the player holds (pack, equipment, bins): a raw pixel or a drafted blueprint shows here. */
   readonly itemIds: readonly string[];
+  /** Optional Act VII–IX world evidence (TICKET-16). */
+  readonly hydroBasinLit?: boolean;
+  readonly wreckTransponders?: number;
+  readonly splicedCores?: number;
+  readonly riftOrWaveCleared?: boolean;
+  readonly biosphereStage4?: boolean;
+  readonly horizonDomesSeen?: boolean;
+  readonly consensusCommitted?: boolean;
+  readonly finaleWindowHealed?: boolean;
 }
 
 /**
@@ -305,6 +380,14 @@ export function evidence(e: Evidence): Record<string, number> {
   // pixels into the bridge store, so holding one no longer proves a harvest (TASK-23c found the chain skipping B-04 after
   // a seal). Only the base's `harvested` event counts it; an old save harvests once more, as it re-places pieces.
   if (e.itemIds.some((id) => id.startsWith('bp:') && id !== 'bp:starter')) out[COUNT.drafted] = 1;
+  if (e.hydroBasinLit) out[COUNT.hydroBasinLit] = 1;
+  if (e.wreckTransponders !== undefined && e.wreckTransponders > 0) out[COUNT.wreckTransponders] = e.wreckTransponders;
+  if (e.splicedCores !== undefined && e.splicedCores > 0) out[COUNT.splicedCores] = e.splicedCores;
+  if (e.riftOrWaveCleared) out[COUNT.riftOrWaveCleared] = 1;
+  if (e.biosphereStage4) out[COUNT.biosphereStage4] = 1;
+  if (e.horizonDomesSeen) out[COUNT.horizonDomesSeen] = 1;
+  if (e.consensusCommitted) out[COUNT.consensusCommitted] = 1;
+  if (e.finaleWindowHealed) out[COUNT.finaleWindowHealed] = 1;
   return out;
 }
 

@@ -249,6 +249,7 @@ export interface OldMonitorModalProps {
   readonly open: boolean;
   readonly overclockedPlaying: boolean;
   readonly elapsedSec?: number;
+  readonly endingSeen?: boolean;
   readonly onPlayCredits: () => void;
   readonly onPlayOverclocked: () => void;
   readonly onClose: () => void;
@@ -256,13 +257,14 @@ export interface OldMonitorModalProps {
 
 /**
  * Lab `old-monitor` Jukebox modal for `play.tsx` offering:
- * - `[Play Ending Credits: "Four Floats" (v4b)]`
+ * - `[Play Ending Credits: "Four Floats" (v4b)]` (locked until endingSeen)
  * - `[Play "Four Floats (Overclocked)"]` with the 4-colour equaliser.
  */
 export const OldMonitorJukeboxModal: React.FC<OldMonitorModalProps> = ({
   open,
   overclockedPlaying,
   elapsedSec = 0,
+  endingSeen = true,
   onPlayCredits,
   onPlayOverclocked,
   onClose,
@@ -297,19 +299,33 @@ export const OldMonitorJukeboxModal: React.FC<OldMonitorModalProps> = ({
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {OLD_MONITOR_ACTIONS.map((act) => (
-          <button
-            key={act.id}
-            type="button"
-            data-testid={`monitor-action-${act.id}`}
-            onClick={act.id === 'play-credits' ? onPlayCredits : onPlayOverclocked}
-            className="credits-card"
-            style={{ padding: '10px 14px', textAlign: 'left', cursor: 'pointer' }}
-          >
-            <div style={{ fontWeight: 700, fontSize: 13 }}>[{act.label}]</div>
-            <div style={{ fontSize: 11, color: 'var(--hud-text-dim)', marginTop: 2 }}>{act.description}</div>
-          </button>
-        ))}
+        {OLD_MONITOR_ACTIONS.map((act) => {
+          const isCredits = act.id === 'play-credits';
+          const locked = isCredits && endingSeen === false;
+          return (
+            <button
+              key={act.id}
+              type="button"
+              data-testid={`monitor-action-${act.id}`}
+              disabled={locked}
+              onClick={locked ? undefined : isCredits ? onPlayCredits : onPlayOverclocked}
+              className={`credits-card${locked ? ' locked' : ''}`}
+              style={{
+                padding: '10px 14px',
+                textAlign: 'left',
+                cursor: locked ? 'not-allowed' : 'pointer',
+                opacity: locked ? 0.45 : 1,
+              }}
+            >
+              <div style={{ fontWeight: 700, fontSize: 13 }}>
+                [{act.label}] {locked ? '· LOCKED (FINALE REQUIRED)' : ''}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--hud-text-dim)', marginTop: 2 }}>
+                {locked ? 'Witness the Act IX campaign finale to unlock replay access.' : act.description}
+              </div>
+            </button>
+          );
+        })}
         <button
           type="button"
           data-testid="monitor-close-btn"

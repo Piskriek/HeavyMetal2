@@ -1,5 +1,21 @@
 # RESUME: start here (fresh session)
 
+## 18 Oct, afternoon (read first)
+- **Landed today:**
+  - TICKET-12 (F-16 and F-17, Flash);
+  - co-op Phase 2 (T11a and T11b);
+  - TPOL;
+  - TRIFT: the rift works; a wreck truck had been blocking it, so wrecks now stay 15 m from leaks;
+  - T10: wall pathing, the wave band, the foregrip IK;
+  - voice batch V1 (A7-01 to A9-03 and two barks);
+  - Dr. Haddy's portrait.
+- **The build is 14.92 MiB.** The 3D PC is at 192.168.0.8 (`scripts/worker.env`).
+- **The pack script refuses a bare run now.** 79 orphan vista lows, about 5 MB, had broken PLAY.bat's build; they're in `zips/orphan-pack-2026-10-18`.
+- **Argo** (chat https://gemini.google.com/app/77f3bf1cb56ba86c): every ticket in his plan (09 to 16) is delivered, staged and briefed.
+- **Running:** Flash's F-19 (T14, the credits, plus the co-op HUD fixes) and Haiku T05 (play-scene).
+- **The play-scene queue,** one writer at a time: T05 → T03P (plumes) → T09b (audio wiring; needs `play.tsx` after F-19) → T07b (F-12) → F-13 (the lab aim) → T15 (the choir) → T16 (Acts VII to IX, which also hides the Ending Credits item until the finale).
+- **Still to plan:** TICKET-13 (heavy terraformers and turrets) needs asset batch B1 (sheets 17, 19 and 20).
+
 ## 18 Oct, morning (read first)
 - **Landed:**
   - **F-09:** stage 6 on Low goes from 34 to 150 fps, from a layout key so the cover doesn't rebuild on every 0.1 s tick. The B key reads the scene's live position, and long toasts stay out of the space clear around the crosshair (479d8ae0).

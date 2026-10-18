@@ -337,13 +337,13 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 - **Seen:** T03P-R. The press-frame `vent` socket is (0, 3.44, -0.56) in the mesh's frame: 0.99 m from the chute before the fit and 0.77 m after it (the press is fitted to 3.1 m). Ruling 5 asked for a side stack clear of the falling ore; the shot shows the pixels leaving the frame's top beside the cube column. The brief's "more than 1 m" cannot hold with this socket, so the test pins the press at more than 0.5 m.
 - **Expected:** Argo rules whether the press gets a true side stack (a new socket on a regenerated mesh) or keeps this one.
 - Sidecar Task: POL-281 - Argo rules on the press's vent socket.
-
+- **Argo's ruling (ARGO_NOTE_17): KEEP the socket.** 0.77 m behind the chute is enough separation; no mesh regeneration. Closed.
 ### POL-282: the other pours still rise straight
 - **Seen:** T03P-R. Only the drill's sparks and the pylon's corona sparks are given their gravity (ARGO_NOTE_08 calls them ballistic). The other kinds carry spec gravities (buoyant lift on the mill, the projectors and the heavies; small falls on the presses) that the plume does not use yet.
 - **Expected:** Argo rules whether those pours arc. Wiring them is a change in machinePlumeGravity (machine-props.ts).
 - Sidecar Task: POL-282 - Argo rules on the other kinds' gravity.
 - **Package half done in F-21 (Gemini-Flash, 77a276b7):** added per-emitter `gravity` (m/s², default 0) with ballistic parabola displacement in `pixelAt` and GLSL `pixelCore` (packed into `C.w` of `uEm`). Added `uCounts` uniform array to drive visible count dynamically without instance buffer rebuilds or attribute updates. 22/22 plume unit tests pass; verified clean build (15.10 MB) and 69/69 checks on `scripts/test-machine-plumes.mjs` on 3D PC worker.
-
+- **Argo's ruling (ARGO_NOTE_17):** the drill's and pylon's sparks keep their gravity arcs; the press and heavy press get a small downward settle (stamped facets); the mill, projectors, water makers, power unit, fabricator and the other heavies rise straight with their buoyant lift. Still to do: the presses' small fall (`machinePlumeGravity` in `machine-props.ts`), in T17a.
 ### POL-301: the credits' chapter 1 has no stage-0a wireframe look
 - **Seen:** T14 (306e7dae). Chapter 1 shows the stage-0 dither, because the per-chapter post uniforms need a play-scene hook and T14 stayed out of `play-scene.ts`.
 - **Expected:** Add a `PlayScene` hook that sets the stage-look post pass per credits chapter (0a wireframe first), and have the credits director call it.
@@ -367,9 +367,9 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 ### POL-305: the credits' debug handles are always exposed
 - **Seen:** T14. `window.__credits` and `window.__creditsDirector` (seek, scheduleInfo, clockInfo) are always on.
 - **Expected:** Gate them with the other e2e and debug hooks in T16 (the debug menu's "Play ending credits" can still use them).
-- Sidecar Task: POL-305 - see above.
+- **Done in F-23 (Gemini-Flash):** `window.__credits` and `window.__creditsDirector` are gated behind `allowCreditsHook` (requiring `?e2e`, `?debug`, or localhost/127.0.0.1 origin). Verified in `apps/web/src/credits/index.ts` and `apps/web/src/play/play.tsx`.
 
 ### POL-306: the monitor's keys differ from the brief, and the near shot shows no bars
 - **Seen:** T14. E still opens the Bridge Incident Log (campaign beat 9c pins it). The jukebox is on J, with both replays, and R plays "Four Floats (Overclocked)" with the equaliser lit. The far shot shows the four bars on the monitor face; the near shot (`monitor-equaliser-R.png`) shows none.
 - **Expected:** Keep E as it is. In T16, J's credits replay waits for `endingSeen`. Check the bars' placement up close.
-- Sidecar Task: POL-306 - see above.
+- **Done in F-23 (Gemini-Flash):** In `apps/web/src/credits/credits-hud.tsx`, J's credits replay button is locked/disabled with reason "Available once campaign finale is reached" when `endingSeen` is false. On title screen (`homeMenu` in `goblin-front.tsx`), Ending Credits item is hidden until `endingSeen` is true. Esc debug menu has "Play ending credits" for preview anytime. Verified in `test-credits-video.mjs` (47/47) and `test-campaign.mjs`.

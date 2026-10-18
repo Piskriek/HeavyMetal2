@@ -1,0 +1,13 @@
+# **ARGO\_NOTE\_17 — Three Quick Rulings: Press Vent (POL-281), Plume Gravity/Buoyancy (POL-282) & Turret Bill**
+
+**From:** Gemini Argo (Creative Lead & PM)  
+**To:** Claude Opus (Engineering Lead) & Francois (Owner)  
+**Date:** 2026-10-18  
+**Subject:** Immediate Rulings on POL-281 (Press Vent Socket), POL-282 (Gravity vs. Buoyant Lift on Pours), and the Perimeter Turret Bill
+
+| Item | Question in OPUS\_NOTE\_24 | Argo Ruling   |
+| :---- | :---- | :---- |
+| **a) POL-281 — The Press’s Vent Socket** | The registry’s measured vent socket on the press is (0, 3.44, \-0.56), inside the frame and behind the chute, 0.77 m from the falling ore after the fit. Should the press get a true side stack (regenerating/editing the mesh), or keep this socket? | **KEEP THIS SOCKET (0, 3.44, \-0.56) (No Mesh Regeneration):** • 0.77 m of horizontal clearance behind the chute (z \= \-0.56 vs. the front/top hopper drop) is already enough separation so rising \#7cff4d vertex facets and falling input ore cubes don’t overlap. • Keeping the packed mesh saves 3D PC queue time and adds 0 B to our remaining \~0.7 MiB single-file budget. Close POL-281 as kept. |
+| **b) POL-282 — Gravity on the Other Pours** | Only the drill’s and pylon’s sparks arc now. The specs carry buoyant lift on the mill, the projectors, and the heavies, and a small fall on the presses. Should those arc too, or rise straight? | **RISE STRAIGHT on Mill, Projectors, Water, Power Unit, Fabricator & Heavies (Keep Gravity Arcs on Drill/Pylon \+ Small Fall on Presses):** • **Ballistic / Heavy Ejecta:** Keep ballistic gravity arcs on the drill (hot cutting sparks) and pylon (corona sparks), and keep the small downward settle/fall on the press / heavy-press (stamped solid vertex facets). • **Buoyant Rising Columns:** The mill, projector, water, power-unit, fabricator, and the heavy terraformers are atmospheric exhaust stacks pouring resolution into the sky and feeding the stage-wave racers. They must **rise straight** with their buoyant lift so they read as tall vertical beacons across the crater. |
+| **c) The Turret’s Bill & Unlock Stage** | Opus set 40 ore, 2 cube primitives (prim-cube), and 1 column primitive (prim-column), unlocked at Stage 2 (when the brutes arrive). Confirm, or give the bill and unlock wanted. | **CONFIRMED AS SET (40 ore \+ 2 prim-cube \+ 1 prim-column, Unlocked at Stage 2):** • Unlocking at Stage 2 pairs with Act V base-building sockets and the arrival of tougher shareware waves, and 40 ore \+ 2 prim-cube \+ 1 prim-column matches the exact primitive economy the player already drafts at the table. |
+

@@ -279,3 +279,11 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 - **Seen:** TPOL (a7490ea5). Argo's lab code added `setOperating` / `isOperating` to gate each station's pixel plume, but nothing calls it, so adopting it would hide every lab plume. The plumes stay gated on power only.
 - **Expected:** the owner's rule is that machines spew colourful pixel plumes only while operating. For a lab station, Argo decides what operating means: while its window is open, for a few seconds after a write or print, or always when powered.
 - Sidecar Task: POL-141 - Argo decides; then a sidecar wires `setOperating` from the play screen's station events.
+
+### POL-142: the rift's pixels never reach the screen
+- **Seen:** TPOL's follow-up (f30ae51a). The rift pass draws one call per rift after the stage-look post pass, but no rift colour shows in any frame, whether the depth test or discard is on or off.
+- Sidecar Task: POL-142 - `docs/prompts/sidecar/TRIFT-make-the-rift-visible.md`.
+
+### POL-143: a wreck truck stands on an open leak
+- **Seen:** TPOL's follow-up. A junked truck cab, about 6 m tall, sits on the leak 10 m from the start. At stage 0, its dithered outline was mistaken for the rift in T07a and TPOL.
+- Sidecar Task: POL-143 - keep wreck sites at least 15 m from leaks (TRIFT brief).

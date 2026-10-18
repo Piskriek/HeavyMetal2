@@ -148,3 +148,17 @@ MOVED to Haiku by Opus (2026-10-18): Flash hadn't taken it. Flash, skip it. Brie
   1. The co-op roster chip (Room code, Connected, the players and their roles, Leave room) sits on top of the stage metrics panel in the top right. Move it into a free HUD zone (see hud-zones-logic), and keep it compact.
   2. In a session, the play screen still shows "SOLO DESYNCED". Show the session instead (for example "CO-OP · room S2JE7V"), and keep the Sync button hidden or disabled while in a room.
   Take a shot of both pages in a session, and look at them; `test-campaign` must stay at zero HUD overlaps.
+
+## F-20 [OPEN] Small sweep: POL-175, POL-174, POL-99 (no play-scene, no play.tsx)
+Brief: none separate; the job is this list. Each item's detail is in `docs/DEFERRED_POLISH_REGISTRY.md`.
+Lanes right now: a Haiku owns `play-scene.ts` and `machine-props.ts` (T03P follow-up); another Haiku owns `play.tsx`, `apps/web/src/credits/`, `lab-room.ts`, `goblin-front.tsx` and the HUD zone files (T14). Never touch those.
+- **POL-175:** `studio.css` has a global `button:hover:not(:disabled) { background: #efeee7 }` that lights every button in the app on hover (the Grid's dark buttons turned light). Scope it to the Studio's root. Then check the Studio, the Grid and Settings still look right on hover (shots), and remove T11b's Grid-only override in `planetary-grid.css` if it's no longer needed.
+- **POL-174:** `apps/web/src/play/remote-peers.ts` disposes each rig's materials when a peer leaves, but not its geometry. Dispose the geometry too, and add a unit check that join then leave frees both.
+- **POL-99:** add clean close-up shots (HUD hidden, first person, the subject verified in view: no avatar, rifle rings, dome or wreck blocking) of the armory rail and holster, and of a near open leak and a sealing one, to `scripts/test-ticket07a.mjs`, saved beside its other shots. TRIFT's `scripts/pol95-103-rift-shots.mjs` already has the facing and avatar-hiding logic: reuse it.
+- Test: `npm test`, `test-ticket07a`, `test-studio-tabs`, `test-grid-menus` and `test-coop-outpost`, through `scripts/test-on-3dpc.sh --only "<your paths>"` (the worker is at 192.168.0.8, from `scripts/worker.env`). Look at every shot. Use POL-271 to POL-280 for new registry entries. Never run `scripts/runworld-pack.mjs` without explicit ids.
+
+## F-21 [HELD] @hm/plume: a gravity option and a count uniform (POL-261's package half)
+Brief: none separate; see POL-261 in the registry. HELD until the T03P follow-up (base hardpoint plumes) lands; Opus opens it.
+- A per-emitter gravity option, so the drill's ballistic sparks and the falling press and pylon pixels can be reproduced (ARGO_NOTE_08 describes them).
+- A count uniform, so a cadence change doesn't rebuild the instance buffer every frame (+0.11 ms GPU today).
+- Keep the API backward compatible; the play-scene emitters adopt it in a later step.

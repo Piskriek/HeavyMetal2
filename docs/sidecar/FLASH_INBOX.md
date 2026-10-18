@@ -105,3 +105,12 @@ Brief: none separate; the job is this list. Co-op Phase 1 landed at ad9eacec and
 - **POL-111:** `plot-ground.ts` takes its terrain constants (`PAINT_ORIGIN` and the formula) from `plot-height.ts`.
 - **Remote avatars:** draw each peer from `client.samplePeers()` (100 ms behind) with the existing avatar mesh, inside the Low budget.
 - Test: extend `scripts/test-coop-outpost.mjs` so a guest sees the host's sculpt and the host's avatar. Run it, `npm test` and `test-campaign` (45 of 45) through `scripts/test-on-3dpc.sh --only`.
+
+## F-15 [OPEN] Studio hardening (POL-87, 88, 90 to 93): no play files
+Brief: none separate; the job is this list. Each item's detail is in `docs/DEFERRED_POLISH_REGISTRY.md`. This job touches only `apps/web/src/studio/`, `apps/web/studio-server/`, `apps/web/src/shell/planetary-grid.tsx` and `audio-tab.tsx` (their CSS only), and the Studio tests. Never touch the F-09 files (Haiku has them) or anything under `apps/web/src/play/`.
+- **POL-88:** add `scene-layouts` to the write-back allowlist (`apps/web/studio-server/write-back.ts`, with a schema check like the tweaks), and point the Scene tab's Save at it when the route is writable. The built game keeps its per-browser save and Copy JSON.
+- **POL-91:** an error boundary around each Studio workspace that shows the error and keeps the other tabs alive.
+- **POL-90:** Scene transform edits and gizmo drags go on the Studio's undo stack.
+- **POL-92:** `four-angle.ts` and `studio-thumbs.ts` share one offscreen WebGL renderer (the GTX 950M can't spare a second context).
+- **POL-87 and POL-93:** one style source per screen. Move the pure helpers out of `planetary-grid.tsx`, `audio-tab.tsx`, `look-tab.tsx` and `scene-tab.tsx` into modules without CSS, so their tests import only those, then import each `.css` file and drop the embedded strings.
+- Test: extend `scripts/test-studio-tabs.mjs` (Save writes the project file in dev; a thrown workspace leaves the others usable; undo restores a moved copy). Run it, `test-grid-menus`, `npm test` and `test-campaign` (45 of 45) through `scripts/test-on-3dpc.sh --only "<your paths>"`. Typecheck on the laptop.

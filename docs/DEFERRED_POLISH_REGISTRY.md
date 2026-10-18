@@ -308,3 +308,8 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 ### POL-175: a global Studio CSS rule lights every button app-wide on hover
 - **Seen:** T11b. `studio.css` has `button:hover:not(:disabled) { background: #efeee7 }`, which turned the Grid's dark buttons light on hover. T11b added Grid-only hover rules; the global rule remains.
 - Sidecar Task: POL-175 - scope that rule to the Studio's root (and check the Studio still looks right).
+
+### POL-144: TPOL raised the planet view's draw calls (base-building step 6 fails)
+- **Seen:** a bisect on 2026-10-18. test-base-building's draw calls went from 45 to 59 (1 piece) and from 72 to 95 (200 pieces, limit 80) at TPOL (a7490ea5). They stay at about 94 through T11b, TRIFT and T10.
+- **Expected:** under 80 at 200 pieces again.
+- Sidecar Task: POL-144 - TPOL's Haiku diagnoses it per pass. A fix outside play-scene.ts lands now; a play-scene.ts fix goes after T03P.

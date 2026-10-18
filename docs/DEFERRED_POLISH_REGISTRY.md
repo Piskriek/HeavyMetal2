@@ -278,7 +278,8 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 ### POL-141: what "operating" means for a lab station's plume (Argo's call)
 - **Seen:** TPOL (a7490ea5). Argo's lab code added `setOperating` / `isOperating` to gate each station's pixel plume, but nothing calls it, so adopting it would hide every lab plume. The plumes stay gated on power only.
 - **Expected:** the owner's rule is that machines spew colourful pixel plumes only while operating. For a lab station, Argo decides what operating means: while its window is open, for a few seconds after a write or print, or always when powered.
-- Sidecar Task: POL-141 - Argo decides; then a sidecar wires `setOperating` from the play screen's station events.
+- **Argo's call (ARGO_NOTE_14, 2026-10-18):** a lab station is operating while its window is open, and for 3.5 s after a write, combine, catalogue or print completes, gated on power > 0.25. It is not continuous whenever the breaker is on.
+- Sidecar Task: POL-141 - in `PlayScene.setLabActivity(act)`, forward each station's flag to `labMachines.setOperating(id, act.<id> > 0)`, and keep the 3.5 s tail in the play screen's station events (ARGO_NOTE_14 §1 has the snippet).
 
 ### POL-142: the rift's pixels never reach the screen
 - **Seen:** TPOL's follow-up (f30ae51a). The rift pass draws one call per rift after the stage-look post pass, but no rift colour shows in any frame, whether the depth test or discard is on or off.
@@ -287,3 +288,23 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 ### POL-143: a wreck truck stands on an open leak
 - **Seen:** TPOL's follow-up. A junked truck cab, about 6 m tall, sits on the leak 10 m from the start. At stage 0, its dithered outline was mistaken for the rift in T07a and TPOL.
 - Sidecar Task: POL-143 - keep wreck sites at least 15 m from leaks (TRIFT brief).
+
+### POL-171: the room's gate pad sits at the origin until the host's first terrain arrives
+- **Seen:** T11b (51206f27). A host's build on the pad in that window could be predicted against a different pad.
+- Sidecar Task: POL-171 - send the gate pose with the seed when the room is hosted, not only with the first sculpt.
+
+### POL-172: a guest who goes to the lab leaves a stale avatar on the host's plot
+- **Seen:** T11b. Poses are sent only on the plot.
+- Sidecar Task: POL-172 - send a "left the plot" presence (or stop sending poses), and hide that peer's avatar on the other pages.
+
+### POL-173: a guest's local terrain cuts aren't shared
+- **Seen:** T11b. During a session, a guest's sculpt stays local and is dropped on leaving. Only the Lead Architect's sculpt syncs.
+- Sidecar Task: POL-173 - decide with Argo whether Co-Builders may sculpt the host's plot. If so, route their strokes through the room like the host's.
+
+### POL-174: remote-peers.ts leaks geometry per join
+- **Seen:** T11b. Each rig's materials are disposed when a peer leaves, but not its geometry.
+- Sidecar Task: POL-174 - dispose the rig geometry with the materials.
+
+### POL-175: a global Studio CSS rule lights every button app-wide on hover
+- **Seen:** T11b. `studio.css` has `button:hover:not(:disabled) { background: #efeee7 }`, which turned the Grid's dark buttons light on hover. T11b added Grid-only hover rules; the global rule remains.
+- Sidecar Task: POL-175 - scope that rule to the Studio's root (and check the Studio still looks right).

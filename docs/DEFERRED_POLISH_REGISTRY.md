@@ -281,11 +281,11 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 - **Argo's call (ARGO_NOTE_14, 2026-10-18):** a lab station is operating while its window is open, and for 3.5 s after a write, combine, catalogue or print completes, gated on power > 0.25. It is not continuous whenever the breaker is on.
 - Sidecar Task: POL-141 - in `PlayScene.setLabActivity(act)`, forward each station's flag to `labMachines.setOperating(id, act.<id> > 0)`, and keep the 3.5 s tail in the play screen's station events (ARGO_NOTE_14 §1 has the snippet).
 
-### POL-142: the rift's pixels never reach the screen
+### POL-142: the rift's pixels never reach the screen (DONE in TRIFT, 30e9196d: the rift was fine; a wreck truck in front of it failed the depth test)
 - **Seen:** TPOL's follow-up (f30ae51a). The rift pass draws one call per rift after the stage-look post pass, but no rift colour shows in any frame, whether the depth test or discard is on or off.
 - Sidecar Task: POL-142 - `docs/prompts/sidecar/TRIFT-make-the-rift-visible.md`.
 
-### POL-143: a wreck truck stands on an open leak
+### POL-143: a wreck truck stands on an open leak (DONE in TRIFT, 30e9196d: wrecks stay 15 m from leaks)
 - **Seen:** TPOL's follow-up. A junked truck cab, about 6 m tall, sits on the leak 10 m from the start. At stage 0, its dithered outline was mistaken for the rift in T07a and TPOL.
 - Sidecar Task: POL-143 - keep wreck sites at least 15 m from leaks (TRIFT brief).
 

@@ -9,7 +9,8 @@
 - `apps/web/src/rooms/`: `OutpostRoom.ts`, `outpost-harness.ts`, and their tests;
 - `apps/web/src/base/`: `world.ts` (the switch command, POL-73), `machine-inspect.ts` (POL-77) and its test (POL-74), `plot-height.ts` (POL-111 constants, POL-112 gate pad) and its test;
 - `apps/web/src/crafter/shared-planet.ts` (POL-84 slots, POL-85 sync mode);
-- `apps/web/src/play/remote-peers.ts` and its test (the avatar controller; T11b wires it into the scene).
+- `apps/web/src/play/remote-peers.ts` and its test (the avatar controller; T11b wires it into the scene);
+- `apps/web/src/shell/planetary-grid.tsx`: Flash's F-15 has landed (5e77ed14), so merge Argo's roster logic onto F-15's version now: Lead Architect promote and demote, per-author undo, kick, the default guest role, roster names (POL-117), and the slot and sync persistence (POL-84, POL-85). Use F-15's style source (`planetary-grid-data.ts` and the `.css` file). Load the frontend-design skill (`frontend-design:frontend-design`) before any UI change, and keep the Grid's look.
 
 ## Fix while installing
 1. **`machine-inspect.test.ts`** imports `createPlot` (and maybe more) from `@hm/plotsim`, which doesn't export it. Argo's context had no plotsim. Rewrite those lines against plotsim's real exports, and keep his test cases.
@@ -20,19 +21,18 @@
 ## Not in this part (T11b, after F-09 and F-15)
 - `play-scene.ts` Window B: the avatars, `importBeamField`, the gate pad pose, and no local ticks in a session (ARGO_NOTE_11 §3);
 - `play.tsx`, the session wiring (`sendBeamIntent` instead of local ticks);
-- `apps/web/src/shell/planetary-grid.tsx`, the roster controls: Flash's F-15 is restyling it.
 
 **Until T11b lands,** a co-op session still sends client ticks, so the room may tick twice. That only affects RUN co-op sessions, never solo play, and T11b fixes it.
 
 ## Verify
 - **Unit:** all of Argo's suites green in the repo, including the convergence harness: roles, kicks, the rate limit, undo, the 1 Hz server tick, and the room waiting for the host's seed (POL-115).
-- **Co-op browser test:** `scripts/test-coop-outpost.mjs` (the RUN-mode dev server, two pages) still passes. Add a check that a Field Observer's build is refused.
+- **Co-op browser test:** `scripts/test-coop-outpost.mjs` (the RUN-mode dev server, two pages) still passes. Add checks that a Field Observer's build is refused, and that promote, demote, kick and undo work from the Grid. Take shots of the roster controls and look at them.
 - Run typecheck on the laptop. Run the rest through `scripts/test-on-3dpc.sh --only "<your paths>" "npm run build && …"`: `npm test`, `test-coop-outpost`, `test-machine-inspector`, `test-grid-menus` and `test-campaign` (45 of 45). Report the plain and RUN build sizes.
 
 ## Stay inside
 The files listed under "This part installs".
 - Never touch `play-scene.ts` or `play.tsx`: F-09 has them.
-- Never touch `apps/web/src/studio/`, `apps/web/studio-server/` or `planetary-grid.*`: Flash's F-15 has them.
+- Never touch `apps/web/src/studio/` or `apps/web/studio-server/`: Flash's next job will be there.
 - Never touch the audio files or packages: T09a has them.
 - Never register, deploy or publish anything on RUN.
 - Use POL-161 to POL-170 for any new registry entries.

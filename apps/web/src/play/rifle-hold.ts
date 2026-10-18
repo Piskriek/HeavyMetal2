@@ -28,3 +28,11 @@ export function handPose(grip: THREE.Vector3, muzzle: THREE.Vector3): RiflePose 
   const position = grip.clone().applyQuaternion(quaternion).negate();
   return { position, quaternion };
 }
+
+export {
+  solveLeftArmForegripIk,
+  solveTwoBoneIk,
+  type Bone3DLike,
+  type TwoBoneIkInput,
+  type TwoBoneIkSolution,
+} from '../avatar/two-bone-ik';

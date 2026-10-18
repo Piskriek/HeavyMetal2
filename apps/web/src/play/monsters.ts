@@ -6,7 +6,7 @@
  * No monster is shown with the words "Monster Mash" (the owner, 13 October): the sprites are monsters, the setting is Monsters.
  */
 import * as THREE from 'three';
-import { ARCHETYPES, addLeak, createWorld, hurt as leakHurt, placeMob, raycast, step as leakStep, type Archetype, type Event as LeakEvent, type Input as LeakInput, type Mob, type Solid, type World } from '@hm/leaksim';
+import { ARCHETYPES, addLeak, boltBlockedBySolids, createWorld, hurt as leakHurt, placeMob, raycast, step as leakStep, type Archetype, type Event as LeakEvent, type Input as LeakInput, type Mob, type NavGrid, type Solid, type World } from '@hm/leaksim';
 import { createMonsterRenderer, type MonsterMob, type MonsterRenderer } from '../monsters/renderer';
 import { hash32, skinFor } from '../monsters/adapter';
 import { GATE_DOME_RADIUS, eraForStage, kindsForEra, leakSites, clearOfGate, dropStack, hitBearing, monsterCap, DORMANT_REWARD, SEAL_REWARD, DEFAULT_MONSTERS, type LeakSite, type MonstersSetting, type Point, type SafeZone } from '../monsters/policy';
@@ -17,8 +17,8 @@ import type { WeaponStats } from '../base/weapons';
 
 export type { MonstersSetting } from '../monsters/policy';
 
-import { SEAL_REACH, PROXIMITY_SPAWN_RADIUS, PROXIMITY_SPAWN_INTERVAL, maxMobsPerLeak, spawnPolicy, beamDamage } from './monster-rules';
-export { SEAL_REACH, PROXIMITY_SPAWN_RADIUS, PROXIMITY_SPAWN_INTERVAL, maxMobsPerLeak, spawnPolicy, beamDamage };
+import { SEAL_REACH, PROXIMITY_SPAWN_RADIUS, PROXIMITY_SPAWN_INTERVAL, maxMobsPerLeak, spawnPolicy, beamDamage, fightOverlayParamsForStage, type FightOverlayTuning } from './monster-rules';
+export { SEAL_REACH, PROXIMITY_SPAWN_RADIUS, PROXIMITY_SPAWN_INTERVAL, maxMobsPerLeak, spawnPolicy, beamDamage, fightOverlayParamsForStage, type FightOverlayTuning };
 
 export interface MonsterMarker {
   readonly id: number;
@@ -111,6 +111,8 @@ export interface MonstersSystem {
   setMachines(machines: readonly { readonly id: number; readonly x: number; readonly z: number; readonly hu?: number }[]): void;
   /** The built footprints the ground monsters keep out of (P0-MON-03): the base's boxes, from `footprintSolids`. */
   setSolids(solids: readonly Solid[]): void;
+  /** The base's world-aligned navigation grid (`navFor` in `base/navgrid.ts`) for routing around built walls (POL-32). */
+  setNav?(nav: NavGrid | null): void;
   /** The graphics budget: the most living monsters (`monsterCap`). */
   setQuality(quality: string): void;
   /** The leak the beam is held on (its id from `leakUnder`), or null. The brain seals it while the player is within SEAL_REACH. */
@@ -455,6 +457,8 @@ export function createMonsters(options: {
   let safe: SafeZone[] = [];
   let machines: { id: number; x: number; z: number; hu: number }[] = [];
   let solids: readonly Solid[] = [];
+  let navGrid: NavGrid | null = null;
+  let overlayTuning: FightOverlayTuning = fightOverlayParamsForStage(stage);
   let sealingLeak: number | null = null;
   let world: World = createWorld(seed);
   const siteLeak = new Map<number, number>();
@@ -473,6 +477,8 @@ export function createMonsters(options: {
 
   const renderer: MonsterRenderer = createMonsterRenderer(planetScene, { budget: { animated: 24, perSkin: 24 } });
   renderer.setStage(stage);
+  planetScene.userData.monsterRemapStrength = overlayTuning.remapStrength;
+  (renderer as unknown as { setRemapStrength?: (v: number) => void }).setRemapStrength?.(overlayTuning.remapStrength);
   const domeMat = new THREE.MeshBasicMaterial({ color: 0xffc13d, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide });
   const dome = new THREE.Mesh(new THREE.RingGeometry(GATE_DOME_RADIUS - 0.6, GATE_DOME_RADIUS, 160), domeMat);
   dome.rotation.x = -Math.PI / 2;
@@ -544,9 +550,10 @@ export function createMonsters(options: {
   const addRing = (mob: Mob, ranged: boolean): void => {
     const old = rings.get(mob.id);
     if (old) planetScene.remove(old.mesh);
-    const geom = new THREE.RingGeometry(0.55, 0.8, 28);
+    // POL-37: stage-tuned telegraph ring thickness and opacity so Stage 1 fights never smear pink
+    const geom = new THREE.RingGeometry(overlayTuning.ringInnerR, overlayTuning.ringOuterR, 28);
     geom.rotateX(-Math.PI / 2);
-    const mat = new THREE.MeshBasicMaterial({ color: ranged ? colourOf.ranged : colourOf.melee, transparent: true, opacity: 0.85, depthWrite: false });
+    const mat = new THREE.MeshBasicMaterial({ color: ranged ? colourOf.ranged : colourOf.melee, transparent: true, opacity: overlayTuning.ringMaxOpacity, depthWrite: false });
     const mesh = new THREE.Mesh(geom, mat);
     mesh.position.set(mob.x, groundHeightAt(mob.x, mob.z) + 0.05, mob.z);
     planetScene.add(mesh);
@@ -625,7 +632,7 @@ export function createMonsters(options: {
       if (e.t !== 'death') continue;
       killed += 1;
       stats = { ...stats, mobsDefeated: stats.mobsDefeated + 1 };
-      particles.burst(new THREE.Vector3(before.pos.x, before.pos.y + 0.8, before.pos.z), 14, before.era === 'sprite' ? 0xe8e8e8 : 0x7dd3fc, 3.2);
+      particles.burst(new THREE.Vector3(before.pos.x, before.pos.y + 0.8, before.pos.z), overlayTuning.burstCount, before.era === 'sprite' ? 0xe8e8e8 : 0x7dd3fc, 3.2);
       handlers.onDeath?.({ ...before, phase: 'dead', hp: 0 }, dropStack(e.drop));
     }
     return { killed };
@@ -646,7 +653,7 @@ export function createMonsters(options: {
       const pulse = 1 + 0.5 * ((r.t * 4) % 1);
       r.mesh.position.set(mob.x, groundHeightAt(mob.x, mob.z) + 0.05, mob.z);
       r.mesh.scale.setScalar(pulse);
-      (r.mesh.material as THREE.MeshBasicMaterial).opacity = 0.35 + 0.5 * ((r.t * 4) % 1);
+      (r.mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(overlayTuning.ringMaxOpacity, 0.25 + (overlayTuning.ringMaxOpacity - 0.25) * ((r.t * 4) % 1));
     }
   };
 
@@ -667,7 +674,9 @@ export function createMonsters(options: {
       const a = (unit(shotSeq * 131 + p * 17) * 2 - 1) * w.spread;
       const dx = ux * Math.cos(a) - uz * Math.sin(a);
       const dz = ux * Math.sin(a) + uz * Math.cos(a);
-      const id = raycast(world, origin, { x: dx, z: dz }, w.range);
+      const wallHit = solids.length > 0 ? boltBlockedBySolids(origin.x, origin.z, origin.x + dx * w.range, origin.z + dz * w.range, solids, 0.04) : null;
+      const effRange = wallHit && wallHit.blocked ? wallHit.t * w.range : w.range;
+      const id = raycast(world, origin, { x: dx, z: dz }, effRange);
       if (id === null) continue;
       const dmg = Math.round(w.damage[0] + (w.damage[1] - w.damage[0]) * unit(shotSeq * 911 + p * 29 + 7));
       const r = hitMob(id, dmg);
@@ -787,6 +796,9 @@ export function createMonsters(options: {
     reload() { ammo = weapon?.magazine ?? 0; },
     setFidelityStage(s) {
       stage = Math.max(0, Math.min(6, Math.floor(s)));
+      overlayTuning = fightOverlayParamsForStage(stage);
+      planetScene.userData.monsterRemapStrength = overlayTuning.remapStrength;
+      (renderer as unknown as { setRemapStrength?: (v: number) => void }).setRemapStrength?.(overlayTuning.remapStrength);
       renderer.setStage(stage);
     },
     setSetting(s) { setting = s; },
@@ -826,6 +838,7 @@ export function createMonsters(options: {
     setSafeZones(zones) { safe = zones.map((z) => ({ x: z.x, z: z.z, r: z.r })); },
     setMachines(list) { machines = list.map((m) => ({ id: m.id, x: m.x, z: m.z, hu: m.hu ?? 0 })); },
     setSolids(list) { solids = list; },
+    setNav(nav) { navGrid = nav; },
     setQuality(q) { cap = monsterCap(q); },
     setSealing(leak) { sealingLeak = leak; },
     leakUnder(origin, dir, range) {
@@ -857,6 +870,7 @@ export function createMonsters(options: {
         machines: machines.map((m) => ({ id: m.id, x: m.x, z: m.z, hu: m.hu })),
         safe,
         solids,
+        ...(navGrid ? { nav: navGrid } : {}),
         sealing: sealingLeak,
         cap,
       };

@@ -13,8 +13,31 @@ export const RING_SEGMENTS = 72;
 export const STREAM_COUNT = 16;
 /** The ring band's width (m), its lift above the ground (m) so it never flickers, and the stream's loops a second. */
 const RING_WIDTH = 0.14;
-const RING_LIFT = 0.06;
+export const RING_LIFT = 0.06;
 const STREAM_LOOPS_PER_SECOND = 0.55;
+
+/**
+ * POL-30: Computes the slope-compensated vertical lift at `(x, z)` so the brush ring
+ * stays proud of sloped and creased terrain triangles instead of reading dashed on slopes.
+ */
+export function slopeLiftAt(
+  heightAt: (x: number, z: number) => number,
+  x: number,
+  z: number,
+  baseLift = RING_LIFT,
+): number {
+  const eps = 0.35;
+  const hc = heightAt(x, z);
+  const hx0 = heightAt(x - eps, z);
+  const hx1 = heightAt(x + eps, z);
+  const hz0 = heightAt(x, z - eps);
+  const hz1 = heightAt(x, z + eps);
+  const dhdx = (hx1 - hx0) / (2 * eps);
+  const dhdz = (hz1 - hz0) / (2 * eps);
+  const slope = Math.hypot(dhdx, dhdz);
+  const chord = Math.max(0, 0.5 * (hx0 + hx1) - hc, 0.5 * (hz0 + hz1) - hc);
+  return baseLift * Math.sqrt(1 + slope * slope) + slope * 0.09 + chord + 0.02;
+}
 
 /** The ring's colour: the mode's, or Seal's amber while sealing. */
 export function ringColourOf(mode: BeamMode, sealing: boolean): string {
@@ -148,7 +171,7 @@ export function createBeamVisuals(scene: THREE.Scene, keep: Keep): BeamVisuals {
           const x = centre.x + co * r, z = centre.z + si * r;
           const o = (2 * s + k) * 3;
           ringPositions[o] = x;
-          ringPositions[o + 1] = heightAt(x, z) + RING_LIFT;
+          ringPositions[o + 1] = heightAt(x, z) + slopeLiftAt(heightAt, x, z, RING_LIFT);
           ringPositions[o + 2] = z;
         }
       }

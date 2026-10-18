@@ -14,6 +14,10 @@ export const POST_FRAGMENT = /* glsl */ `
   /** The wave's front on the ground (metres from its centre; < 0 none, > 1e6 done), then on the sky (the sine of the elevation it
    *  has climbed to, from just below the horizon to the zenith): it never pops, it sweeps out to the horizon and up the sky. */
   uniform float uWaveR, uSkyRise, uGlitch, uTime, uLost;
+  /** P1-LIGHT-04: triggering metric colour for the 6 m leading wave band (#ff3d8a, #7cff4d, #ffc13d, #3dc8ff)
+   *  and the 30 m / 1 s local brightening wave when a machine first activates. */
+  uniform vec3 uWaveBandColour, uLocalWaveCentre, uLocalWaveColour;
+  uniform float uLocalWaveR, uLocalWaveStrength;
   /** The stage's look outside the wave (and everywhere when no wave runs), and the look the wave brings: x and y = one look pixel
    *  in uv (the stage's resolution), z = colour levels (0 = all), w = 1 for stage 0's dither. */
   uniform vec4 uLookOut, uLookIn;
@@ -97,10 +101,12 @@ export const POST_FRAGMENT = /* glsl */ `
     float size = 6.2831853 / cells;
     float raw = bayer4(vec2(floor(atan(dir.x, dir.z) / size), floor(asin(clamp(dir.y, -1.0, 1.0)) / size)));
     float thr = raw + 0.18 * ramp(L, 60.0, 600.0);
-    // the scan ring: inside it the world is resolved; outside it is wire, dissolving one bit at a time after the ring holds
+    // the scan ring (POL-52): inside it the world is resolved; the visible ring fades out as it reaches 350 m rather than holding
     float Ls = length((P - uScanCentre).xz);
     float resolved = (uScanR >= 0.0 && Ls < uScanR) ? 1.0 : 0.0;
     float wire = resolved > 0.5 ? 0.0 : step(raw, uWireMix);
+    float scanRingFade = 1.0 - ramp(uScanR, 310.0, 350.0);
+    float scanRingBand = (uScanR >= 0.0 && uScanR < 350.0) ? smoothstep(2.5, 0.0, abs(Ls - uScanR)) * scanRingFade : 0.0;
     // the lum: mostly the facet's sun light (the form, world-locked), a little of the planet's colour at the cell (its texture)
     vec3 rgb = texture2D(uColour, c).rgb;
     float tone = ramp(luma(pow(rgb, vec3(1.0 / 2.2))), 0.14, 0.6);
@@ -115,7 +121,7 @@ export const POST_FRAGMENT = /* glsl */ `
     vec2 gd = abs(fract(g - 0.5) - 0.5) / max(gGridFw, vec2(1e-4));
     float grid = (1.0 - min(min(gd.x, gd.y), 1.0)) * (1.0 - ramp(length(Pp - cam), 60.0, 180.0)) * 0.45;
     vec3 wireCol = mix(black, ink, max(edge, grid));
-    return mix(dither, wireCol, wire);
+    return mix(dither, wireCol, wire) + ink * (scanRingBand * 0.35);
   }
 
   /** The suit cam's colour on the planet's picture (plan 25): the lateral chromatic aberration in the corners only, a 3x3
@@ -193,24 +199,41 @@ export const POST_FRAGMENT = /* glsl */ `
       float d = texture2D(uDepth, uv).x;
       // the sky writes no depth: what is drawn is ground (the plot, the plains, the neighbours), what is not is sky
       bool sky = d >= 0.99999;
-      float inside = 0.0, front = 0.0;
+      float inside = 0.0, front = 0.0, waveGrid = 0.0;
       if (uWaveR > 1e6) inside = 1.0;
       else if (uWaveR >= 0.0) {
         if (!sky) {
           float dist = length(worldAt(uv, d) - uWaveCentre);
           inside = step(dist, uWaveR);
-          // the band of light widens as the front races out, so far away it still shows
-          front = smoothstep(max(6.0, uWaveR * 0.04), 0.0, uWaveR - dist);
+          // P1-LIGHT-04: 6 m leading band with glowing wireframe grid over the ground at the front
+          float bandSpan = max(6.0, uWaveR * 0.04);
+          front = smoothstep(bandSpan, 0.0, abs(uWaveR - dist)) * step(dist, uWaveR + 1.5);
+          vec2 wg = gPix.xz / 1.5;
+          vec2 wgd = abs(fract(wg - 0.5) - 0.5) / max(gGridFw * 1.333, vec2(1e-4));
+          float wLine = 1.0 - min(min(wgd.x, wgd.y), 1.0);
+          waveGrid = front * (0.42 + 0.58 * wLine);
         } else {
           // the sky: the front climbs from the horizon to the zenith once the ground is crossed
           vec3 ray = normalize(worldAt(uv, 1.0) - uCamWorld[3].xyz);
           inside = step(ray.y, uSkyRise);
           front = smoothstep(0.07, 0.0, uSkyRise - ray.y);
+          waveGrid = front * inside;
         }
       }
-      // inside the wave the stage it brings, outside the stage the plot shows; the front is a band of light where the new look arrives
+      // inside the wave the stage it brings, outside the stage the plot shows; the front is a 6 m wireframe band in the triggering metric's colour
       c = inside > 0.5 ? lookAt(uLookIn, uv) : lookAt(uLookOut, uv);
-      c += vec3(1.0, 0.24, 0.54) * front * inside * 0.32;
+      vec3 waveCol = dot(uWaveBandColour, uWaveBandColour) > 1e-4 ? uWaveBandColour : vec3(1.0, 0.239, 0.541);
+      c += waveCol * waveGrid * 0.45;
+      // P1-LIGHT-04: 30 m, 1 s local brightening wave when a machine first activates (brightens only; does not change stage look)
+      if (!sky && uLocalWaveR >= 0.0 && uLocalWaveR <= 30.5 && uLocalWaveStrength > 0.0) {
+        float lDist = length(gPix - uLocalWaveCentre);
+        float lBand = smoothstep(4.5, 0.0, abs(uLocalWaveR - lDist));
+        vec2 lg = gPix.xz / 1.5;
+        vec2 lgd = abs(fract(lg - 0.5) - 0.5) / max(gGridFw * 1.333, vec2(1e-4));
+        float lLine = 1.0 - min(min(lgd.x, lgd.y), 1.0);
+        vec3 localCol = dot(uLocalWaveColour, uLocalWaveColour) > 1e-4 ? uLocalWaveColour : waveCol;
+        c += localCol * lBand * (0.35 + 0.65 * lLine) * uLocalWaveStrength * 0.42;
+      }
     }
     if (uSuitCam > 0.0) c = suitCam(c, uv);
     // static where sync is going, and a white-out when it is lost
@@ -349,3 +372,114 @@ export const PIECE_HOLO_FRAGMENT = /* glsl */ `
   }
 `;
 
+// ============================================================================
+// Pure Math & Timing Helpers for P1-LIGHT-04 & POL-52 (Brief 30 Unit Tests)
+// ============================================================================
+
+export type WaveMetricKey = 'pxd' | 'vtx' | 'lx' | 'aq' | 'pixels' | 'vertices' | 'light' | 'water';
+
+export const STAGE_WAVE_BAND_WIDTH_M = 6.0;
+export const STAGE_WAVE_PLOT_REACH_M = 450.0;
+export const STAGE_WAVE_PLOT_SECONDS = 4.5;
+export const SCAN_RING_FADE_START_M = 310.0;
+export const SCAN_RING_MAX_R_M = 350.0;
+export const LOCAL_MACHINE_WAVE_MAX_R_M = 30.0;
+export const LOCAL_MACHINE_WAVE_DURATION_S = 1.0;
+
+/** Canonical metric RGB triples (#ff3d8a, #7cff4d, #ffc13d, #3dc8ff). */
+export const WAVE_METRIC_RGB: Readonly<Record<'pxd' | 'vtx' | 'lx' | 'aq', readonly [number, number, number]>> = {
+  pxd: [1.0, 0.2392, 0.5412], // #ff3d8a
+  vtx: [0.4863, 1.0, 0.302],  // #7cff4d
+  lx: [1.0, 0.7569, 0.2392],  // #ffc13d
+  aq: [0.2392, 0.7843, 1.0],  // #3dc8ff
+};
+
+export const WAVE_METRIC_HEX: Readonly<Record<'pxd' | 'vtx' | 'lx' | 'aq', string>> = {
+  pxd: '#ff3d8a',
+  vtx: '#7cff4d',
+  lx: '#ffc13d',
+  aq: '#3dc8ff',
+};
+
+/** Returns the normalised RGB triple for a triggering metric (`#ff3d8a` default). */
+export function waveBandColourFor(metric?: WaveMetricKey | string | null): readonly [number, number, number] {
+  switch (metric) {
+    case 'vtx':
+    case 'vertices':
+      return WAVE_METRIC_RGB.vtx;
+    case 'lx':
+    case 'light':
+      return WAVE_METRIC_RGB.lx;
+    case 'aq':
+    case 'water':
+      return WAVE_METRIC_RGB.aq;
+    case 'pxd':
+    case 'pixels':
+    default:
+      return WAVE_METRIC_RGB.pxd;
+  }
+}
+
+/**
+ * POL-52: Fade factor (1 -> 0) for the Stage 0 scan ring as it approaches its 350 m maximum radius,
+ * so the ring fades out smoothly at 350 m instead of holding visibly.
+ */
+export function scanRingFadeAt(radiusM: number): number {
+  if (!Number.isFinite(radiusM) || radiusM < 0 || radiusM >= SCAN_RING_MAX_R_M) return 0;
+  if (radiusM <= SCAN_RING_FADE_START_M) return 1;
+  const t = (radiusM - SCAN_RING_FADE_START_M) / (SCAN_RING_MAX_R_M - SCAN_RING_FADE_START_M);
+  return 1 - t * t * (3 - 2 * t);
+}
+
+/**
+ * P1-LIGHT-04: Evaluates the 6 m leading stage-wave band at `distM` when the wave front is at `waveRadiusM`.
+ */
+export function stageWaveBandAt(
+  distM: number,
+  waveRadiusM: number,
+  metric?: WaveMetricKey | string | null,
+): {
+  readonly inside: boolean;
+  readonly bandWidthM: number;
+  readonly bandFactor: number;
+  readonly colour: readonly [number, number, number];
+} {
+  const colour = waveBandColourFor(metric);
+  const bandWidthM = Math.max(STAGE_WAVE_BAND_WIDTH_M, waveRadiusM * 0.04);
+  if (waveRadiusM < 0) {
+    return { inside: false, bandWidthM: STAGE_WAVE_BAND_WIDTH_M, bandFactor: 0, colour };
+  }
+  if (waveRadiusM > 1e6) {
+    return { inside: true, bandWidthM: STAGE_WAVE_BAND_WIDTH_M, bandFactor: 0, colour };
+  }
+  const inside = distM <= waveRadiusM;
+  const delta = Math.abs(waveRadiusM - distM);
+  if (delta >= bandWidthM || distM > waveRadiusM + 1.5) {
+    return { inside, bandWidthM, bandFactor: 0, colour };
+  }
+  const u = 1 - delta / bandWidthM;
+  const bandFactor = u * u * (3 - 2 * u);
+  return { inside, bandWidthM, bandFactor, colour };
+}
+
+/**
+ * P1-LIGHT-04: Evaluates the 30 m, 1.0 s local brightening wave triggered when a machine first activates.
+ */
+export function localMachineWaveAt(
+  elapsedSec: number,
+  metric?: WaveMetricKey | string | null,
+): {
+  readonly active: boolean;
+  readonly radiusM: number;
+  readonly strength: number;
+  readonly colour: readonly [number, number, number];
+} {
+  const colour = waveBandColourFor(metric);
+  if (!Number.isFinite(elapsedSec) || elapsedSec < 0 || elapsedSec >= LOCAL_MACHINE_WAVE_DURATION_S) {
+    return { active: false, radiusM: -1, strength: 0, colour };
+  }
+  const u = elapsedSec / LOCAL_MACHINE_WAVE_DURATION_S;
+  const radiusM = LOCAL_MACHINE_WAVE_MAX_R_M * (1 - (1 - u) * (1 - u));
+  const strength = 1 - u;
+  return { active: true, radiusM, strength, colour };
+}

@@ -11,6 +11,53 @@ import type { MachineKind, Metric } from '@hm/plotsim';
 import { type GenLevel, getGenSync } from '../assets/gen';
 import { machineSize } from '../base/machine-inspect';
 
+export type MachineLedStatus = 'running' | 'warn' | 'unpowered';
+
+export const HOUSING_LED_COLOURS: Readonly<Record<MachineLedStatus, string>> = {
+  running: '#22c55e',   // Green: running with power & feed
+  warn: '#f59e0b',      // Amber blink: no ore, idle, or brownout
+  unpowered: '#ef4444', // Red: unpowered / disconnected
+};
+
+/**
+ * Per-kind housing surface anchor [x, y, z] in metres (fitted prop frame) where the
+ * square status LED sits on the front face of the housing (POL-39).
+ */
+export const HOUSING_LED_ANCHOR: Readonly<Record<MachineKind, readonly [number, number, number]>> = {
+  drill: [0.38, 1.35, 0.92],
+  mill: [0.44, 1.32, 0.96],
+  pylon: [0.0, 1.25, 0.42],
+  press: [0.46, 1.38, 1.02],
+  power: [0.42, 1.30, 0.98],
+  projector: [0.34, 1.42, 0.82],
+  water: [0.52, 1.34, 1.08],
+  'heavy-mill': [0.95, 2.15, 2.28],
+  'heavy-press': [1.02, 2.25, 2.38],
+  'heavy-projector': [0.88, 2.35, 2.22],
+  'heavy-water': [1.08, 2.20, 2.46],
+};
+
+/** Pure evaluator for the square housing status LED colour & intensity (POL-39). */
+export function housingLedState(
+  running: number,
+  connected: boolean,
+  satisfaction = 1,
+  timeSec = 0,
+): { readonly status: MachineLedStatus; readonly colour: string; readonly intensity: number } {
+  if (!connected) {
+    return { status: 'unpowered', colour: HOUSING_LED_COLOURS.unpowered, intensity: 0.85 };
+  }
+  if (running <= 0.05 || satisfaction < 0.99) {
+    const blinkOn = Math.sin(timeSec * Math.PI * 4) >= -0.1;
+    return {
+      status: 'warn',
+      colour: HOUSING_LED_COLOURS.warn,
+      intensity: blinkOn ? 0.9 : 0.2,
+    };
+  }
+  return { status: 'running', colour: HOUSING_LED_COLOURS.running, intensity: 0.95 };
+}
+
 export interface MachineProp {
   readonly group: THREE.Group;
   /** Where its cable comes in (the prop's own frame); a pylon's is the box at its foot. */
@@ -20,10 +67,16 @@ export interface MachineProp {
   /** A pylon's line attachment, for the spans between pylons. */
   readonly top: THREE.Vector3 | null;
   readonly lamps: readonly THREE.Mesh[];
+  /** Square emissive status LED mesh mounted on the housing (POL-39). */
+  readonly statusLed?: THREE.Mesh;
+  /** Housing LED anchor in the prop's frame (POL-39). */
+  readonly ledAnchor?: THREE.Vector3;
   /** Moves what moves while it runs (0..1 how hard it runs), t in seconds. */
   animate(t: number, running: number): void;
   /** Lights its lamps, 0..1. */
   light(glow: number): void;
+  /** Updates the square housing status LED from live telemetry (POL-39). */
+  setStatusLed?(running: number, connected: boolean, satisfaction?: number, t?: number): void;
 }
 
 /** The metric a machine's pixels raise (null: it pours none). */
@@ -94,13 +147,72 @@ function fitToTable(p: MachineProp, kind: MachineKind): MachineProp {
   const toGroup = new THREE.Matrix4().copy(p.group.matrixWorld).invert();
   const box = new THREE.Box3().setFromObject(inner).applyMatrix4(toGroup);
   const native = box.max.y - box.min.y;
-  if (!(native > 1e-6)) return p;
-  const s = target / native;
-  const lift = box.min.y * (1 - s);
+  const s = native > 1e-6 ? target / native : 1;
+  const lift = native > 1e-6 ? box.min.y * (1 - s) : 0;
   inner.scale.setScalar(s);
   inner.position.set(0, lift, 0);
-  const at = (v: THREE.Vector3): THREE.Vector3 => v.clone().multiplyScalar(s).add(new THREE.Vector3(0, lift, 0));
-  return { ...p, power: at(p.power), vent: p.vent ? at(p.vent) : null, top: p.top ? at(p.top) : null };
+  const scalePt = (v: THREE.Vector3): THREE.Vector3 => v.clone().multiplyScalar(s).add(new THREE.Vector3(0, lift, 0));
+
+  // POL-39: Mount square emissive status LED on the housing surface anchor
+  const anchorTuple = HOUSING_LED_ANCHOR[kind] ?? HOUSING_LED_ANCHOR.mill;
+  const ledAnchor = new THREE.Vector3(anchorTuple[0], anchorTuple[1], anchorTuple[2]);
+  const isHeavy = kind.startsWith('heavy-');
+  const ledSize = isHeavy ? 0.18 : 0.13;
+  const ledGeo = new THREE.BoxGeometry(ledSize, ledSize, 0.045);
+  const ledMat = new THREE.MeshStandardMaterial({
+    color: HOUSING_LED_COLOURS.unpowered,
+    emissive: HOUSING_LED_COLOURS.unpowered,
+    emissiveIntensity: 0.85,
+    roughness: 0.2,
+    metalness: 0.1,
+  });
+  const statusLed = new THREE.Mesh(ledGeo, ledMat);
+  statusLed.name = 'housing-status-led';
+  statusLed.position.copy(ledAnchor);
+  p.group.add(statusLed);
+
+  let lastConnected = true;
+  let lastSatisfaction = 1;
+
+  const setStatusLed = (running: number, connected: boolean, satisfaction = 1, t = 0): void => {
+    lastConnected = connected;
+    lastSatisfaction = satisfaction;
+    const st = housingLedState(running, connected, satisfaction, t);
+    ledMat.color.set(st.colour);
+    ledMat.emissive.set(st.colour);
+    ledMat.emissiveIntensity = st.intensity;
+    statusLed.userData.ledStatus = st.status;
+  };
+
+  const baseAnimate = p.animate;
+  const baseLight = p.light;
+
+  return {
+    ...p,
+    power: scalePt(p.power),
+    vent: p.vent ? scalePt(p.vent) : null,
+    top: p.top ? scalePt(p.top) : null,
+    lamps: [...p.lamps, statusLed],
+    statusLed,
+    ledAnchor,
+    animate(t, running) {
+      baseAnimate(t, running);
+      if (kind !== 'pylon') {
+        setStatusLed(running, lastConnected, lastSatisfaction, t);
+      }
+    },
+    light(glow) {
+      baseLight(glow);
+      if (glow > 0.5) {
+        setStatusLed(1, true, 1, 0);
+      } else if (glow > 0.05) {
+        setStatusLed(0, true, 0.5, 0);
+      } else {
+        setStatusLed(0, false, 0, 0);
+      }
+    },
+    setStatusLed,
+  };
 }
 
 /** The prop for a machine at a stage (0 or 1: chunky low poly; from 2: full detail), standing its real height (fitToTable). */

@@ -59,3 +59,50 @@ export function beamDamage(
   const dps = 18 * falloff;
   return dps * dt;
 }
+
+export interface FightOverlayTuning {
+  /** Stage-look colour remap strength (tuned down at Stage 1 so monsters never smear pink; 0.20 at Stage 6). */
+  readonly remapStrength: number;
+  /** Maximum opacity of the wind-up telegraph ring under the monster (POL-37). */
+  readonly ringMaxOpacity: number;
+  /** Inner and outer radii (m) of the wind-up telegraph ring. */
+  readonly ringInnerR: number;
+  readonly ringOuterR: number;
+  /** Death particle count scaled by stage so low-res Stage 1 silhouettes stay crisp. */
+  readonly burstCount: number;
+}
+
+/**
+ * Pure stage-dependent fight-overlay tuning (POL-37):
+ * - At Stage 0–1 (coarse 240p / 10-level posterisation), `remapStrength` is lowered to `0.12`
+ *   and telegraph ring opacity is capped at `0.55` so sprites and early-3D monsters never read as a pink smear.
+ * - At Stage 4–6 (high-res 24-bit colour), `remapStrength` uses Brief 30's canonical `0.20` and full particle bursts.
+ */
+export function fightOverlayParamsForStage(stage: number): FightOverlayTuning {
+  const s = Number.isFinite(stage) ? Math.max(0, Math.min(6, Math.floor(stage))) : 1;
+  if (s <= 1) {
+    return {
+      remapStrength: 0.12,
+      ringMaxOpacity: 0.55,
+      ringInnerR: 0.62,
+      ringOuterR: 0.78,
+      burstCount: 8,
+    };
+  }
+  if (s <= 3) {
+    return {
+      remapStrength: 0.16,
+      ringMaxOpacity: 0.68,
+      ringInnerR: 0.58,
+      ringOuterR: 0.79,
+      burstCount: 11,
+    };
+  }
+  return {
+    remapStrength: 0.20,
+    ringMaxOpacity: 0.78,
+    ringInnerR: 0.55,
+    ringOuterR: 0.80,
+    burstCount: 14,
+  };
+}

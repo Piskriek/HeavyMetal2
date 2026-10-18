@@ -1,3 +1,24 @@
+import {
+  boltBlockedBySolids,
+  findPathAroundWalls,
+  gridLineClear,
+  navFromSolids,
+  nextWaypointAroundWalls,
+  segmentHitsSolid,
+  type BoltHit,
+  type NavGrid,
+} from './wall-pathfinder';
+export {
+  boltBlockedBySolids,
+  findPathAroundWalls,
+  gridLineClear,
+  navFromSolids,
+  nextWaypointAroundWalls,
+  segmentHitsSolid,
+  type BoltHit,
+  type NavGrid,
+};
+
 export type Archetype = 'charger' | 'spitter' | 'swarmer' | 'flyer' | 'brute' | 'sapper';
 export type Aggression = 'off' | 'calm' | 'normal' | 'hard';
 export type Phase = 'roam' | 'chase' | 'windup' | 'attack' | 'recover' | 'pain' | 'dead';
@@ -157,6 +178,8 @@ export interface Input {
   readonly walkable?: (x: number, z: number) => boolean;
   /** The built footprints the ground monsters stay out of. */
   readonly solids?: readonly Solid[];
+  /** Optional world-aligned navigation grid from `navFor(base, center)` for wall pathfinding (POL-32). */
+  readonly nav?: NavGrid;
   /** The most living monsters this frame (the graphics budget); defaults to MAX_MOBS. */
   readonly cap?: number;
 }
@@ -761,7 +784,23 @@ export function step(
       nextX = clamped.x;
       nextZ = clamped.z;
     } else {
-      const stepped = steerGround(m.x, m.z, baseAngle, stepLen, input.safe, input.walkable, input.solids ?? [], spec.radius);
+      const solidsList = input.solids ?? [];
+      let steerAngle = baseAngle;
+      if (solidsList.length > 0 || input.nav) {
+        const wp = nextWaypointAroundWalls(
+          { x: m.x, z: m.z },
+          { x: moveTargetX, z: moveTargetZ },
+          solidsList,
+          spec.radius,
+          input.nav,
+        );
+        const wdx = wp.x - m.x;
+        const wdz = wp.z - m.z;
+        if (Math.hypot(wdx, wdz) > 1e-4) {
+          steerAngle = Math.atan2(wdz, wdx);
+        }
+      }
+      const stepped = steerGround(m.x, m.z, steerAngle, stepLen, input.safe, input.walkable, solidsList, spec.radius);
       nextX = stepped.x;
       nextZ = stepped.z;
     }
@@ -847,6 +886,9 @@ export function step(
 
     // a bolt breaks on the dome's edge: it never flies in, and never hits anyone inside
     if (inSafe(bx, bz)) continue;
+
+    // POL-33: a bolt breaks when its segment hits a built wall or solid footprint
+    if (solids.length > 0 && boltBlockedBySolids(b.x, b.z, bx, bz, solids).blocked) continue;
 
     if (input.player.alive && Math.hypot(bx - input.player.x, bz - input.player.z) <= 0.6) {
       events.push({ t: 'hitPlayer', mob: b.from, damage: b.damage });

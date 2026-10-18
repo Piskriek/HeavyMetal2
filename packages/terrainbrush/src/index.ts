@@ -543,3 +543,12 @@ export function decodeField(text: string): Field | null {
   if (pos !== bytes.length) return null; // trailing data
   return { size, cell, delta, paint, amount };
 }
+
+export {
+  snapBorderHeights,
+  stitchChunkBorder,
+  stitchChunkCandidates,
+  type BorderEdge,
+  type ChunkMeshCandidate,
+  type NeighbourStrides,
+} from './seam-stitch';

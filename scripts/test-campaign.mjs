@@ -316,8 +316,15 @@ await beat('3 looking at the power wall gives A1-02', async (row) => {
   const ok = await waitSub('A1-02', 4000);
   await page.waitForTimeout(700);
   row.shot = await shot('power-wall');
-  // TASK-28: the dark lab from here, before the lever (the powered shot in beat 4 is taken from the same place)
-  darkLuma = await meanLuma(await shot('lab-dark-before-power'));
+  // TASK-28: the dark lab from here, before the lever (the powered shot in beat 4 is taken from the same place).
+  // T14's red emergency strobe pulses in the dark lab, so one shot's luma depends on the strobe's phase (47 at a peak
+  // failed beat 4 by 1.2). Sample across a strobe cycle and keep the darkest: the lab's own light, strobe off.
+  const darkSamples = [];
+  for (let i = 0; i < 4; i++) {
+    darkSamples.push(await meanLuma(await shot(i === 0 ? 'lab-dark-before-power' : `lab-dark-before-power-${i}`)));
+    if (i < 3) await page.waitForTimeout(280);
+  }
+  darkLuma = Math.min(...darkSamples);
   return { ok, detail: `A1-02 seen=${ok}` };
 });
 

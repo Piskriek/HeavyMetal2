@@ -31,6 +31,7 @@ import {
   computeWorldHash,
   FrameAssembler,
   frameMessage,
+  isGatePose,
   PROTOCOL_VERSION,
   toWireEvent,
   type BeamIntentMessage,
@@ -38,6 +39,7 @@ import {
   type OutpostRole,
   type PeerPose,
   type ShiftLogEntry,
+  type TerrainMessage,
   type TerrainState,
 } from '../net/protocol';
 import {
@@ -68,12 +70,24 @@ export const MAX_TERRAIN_CHARS = 200_000;
 
 const DEFAULT_TERRAIN: TerrainState = { seed: OUTPOST_PLOT_SEED, sculpt: '' };
 
-/** The room's ground: the plot's heights (plotHeightAt, the same formula as the clients) and the Quantum Gate at the origin. */
+/** The room's ground: the plot's heights (plotHeightAt, the same formula as the clients, with the gate's pad, POL-112) and the Quantum Gate at the origin. */
 function groundEnv(terrain: TerrainState): WorldEnv {
   return {
-    heightAt: plotHeightAt({ seed: terrain.seed, sculpt: terrain.sculpt }),
+    heightAt: plotHeightAt({ seed: terrain.seed, sculpt: terrain.sculpt, gate: terrain.gate }),
     bridge: { x: 0, z: 0, range: BRIDGE_RANGE },
   };
+}
+
+/** The terrain as the wire carries it: to a joiner, on a resync, and to everyone when the Lead Architect changes it. */
+function terrainMessage(terrain: TerrainState): TerrainMessage {
+  return { type: 'terrain', seed: terrain.seed, sculpt: terrain.sculpt, ...(terrain.gate ? { gate: terrain.gate } : {}) };
+}
+
+/** Whether two terrains are the same ground: the seed, the sculpt text and the gate's pose. */
+function sameTerrain(a: TerrainState, b: TerrainState): boolean {
+  if (a.seed !== b.seed || a.sculpt !== b.sculpt) return false;
+  if (!a.gate || !b.gate) return a.gate === b.gate;
+  return a.gate.x === b.gate.x && a.gate.z === b.gate.z && a.gate.yaw === b.gate.yaw;
 }
 
 export interface OutpostPersistSnapshot {
@@ -136,7 +150,7 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
     }
 
     this.sendFramed(player.id, this.welcomeFor(player.id));
-    this.sendFramed(player.id, { type: 'terrain', seed: this.terrain.seed, sculpt: this.terrain.sculpt });
+    this.sendFramed(player.id, terrainMessage(this.terrain));
     // everyone learns who joined, their username (POL-117), and the role they hold, so each roster is complete
     this.broadcast({
       type: 'roleChanged',
@@ -221,7 +235,7 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
           placedBy: { ...this.placedBy },
           shiftLog: [...this.shiftLog],
         });
-        this.sendFramed(sender.id, { type: 'terrain', seed: this.terrain.seed, sculpt: this.terrain.sculpt });
+        this.sendFramed(sender.id, terrainMessage(this.terrain));
         return;
       }
 
@@ -384,14 +398,16 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
           return;
         }
         if (!Number.isInteger(msg.seed) || typeof msg.sculpt !== 'string') return;
+        if (msg.gate !== undefined && !isGatePose(msg.gate)) return;
         if (msg.sculpt.length > MAX_TERRAIN_CHARS) {
           this.notice(sender.id, 'terrain-too-large');
           return;
         }
-        if (msg.seed === this.terrain.seed && msg.sculpt === this.terrain.sculpt) return;
-        this.terrain = { seed: msg.seed, sculpt: msg.sculpt };
+        const next: TerrainState = { seed: msg.seed, sculpt: msg.sculpt, ...(msg.gate ? { gate: { x: msg.gate.x, z: msg.gate.z, yaw: msg.gate.yaw } } : {}) };
+        if (sameTerrain(next, this.terrain)) return;
+        this.terrain = next;
         this.env = groundEnv(this.terrain);
-        this.broadcastFramed({ type: 'terrain', seed: this.terrain.seed, sculpt: this.terrain.sculpt });
+        this.broadcastFramed(terrainMessage(this.terrain));
         this.save();
         return;
       }
@@ -641,7 +657,7 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
     }
     const saved = snapshot.terrain as Partial<TerrainState> | undefined;
     if (saved && Number.isInteger(saved.seed) && typeof saved.sculpt === 'string') {
-      this.terrain = { seed: saved.seed as number, sculpt: saved.sculpt };
+      this.terrain = { seed: saved.seed as number, sculpt: saved.sculpt, ...(isGatePose(saved.gate) ? { gate: saved.gate } : {}) };
     }
     this.env = groundEnv(this.terrain);
     this.startClocks();

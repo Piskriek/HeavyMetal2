@@ -810,17 +810,35 @@ useEffect(() => {
     });
   };
   /** The edits and the port as the save holds them now (the scene owns the field). */
-  /** The host's sculpt goes up to the room whenever it changes: the room keeps it with the plot and relays it to the guests. */
+  // ---- Window B (TICKET-11, co-op): the plot's sculpt is the Lead Architect's, shared through the room
+  /**
+   * The Lead Architect's sculpt goes up to the room whenever it changes: the room keeps it with the plot and its gate's pose (POL-112), and
+   * relays it to the guests. Only the room's owner sends it, and only once the plot is made (so an empty scene never clears the room's).
+   */
   const pushTerrain = (): void => {
     const session = outpostRef.current;
-    if (!session?.host) return;
-    const sculpt = sceneRef.current?.beamFieldText() ?? '';
+    const scene = sceneRef.current;
+    if (!session || !scene || !scene.beamFieldReady() || session.client.state().role !== 'owner') return;
+    const sculpt = scene.beamFieldText();
     if (sculpt === lastTerrainRef.current) return;
     lastTerrainRef.current = sculpt;
-    session.client.setTerrain({ seed: OUTPOST_PLOT_SEED, sculpt });
+    session.client.setTerrain({ seed: OUTPOST_PLOT_SEED, sculpt, gate: scene.gatePose() });
+    // the sculpt text keeps each cut to a centimetre (encodeField), so the Lead Architect's ground takes those same values too: the
+    // room and every guest then stand on exactly the ground the host builds on
+    scene.importBeamField(sculpt);
+  };
+  /** A guest's plot takes the room's sculpt, now and whenever the Lead Architect changes it. The owner's own sculpt is the source, so it is left alone. */
+  const importRoomTerrain = (): void => {
+    const session = outpostRef.current;
+    if (!session || session.client.state().role === 'owner') return;
+    sceneRef.current?.importBeamField(session.client.state().terrain.sculpt);
   };
   const flushBeam = (): void => {
-    saveBeam(sceneRef.current?.beamFieldText() ?? '', beamPortRef.current ? beamPortRef.current.cartridge : null);
+    // a guest's device keeps its own beam save in a session: the room's sculpt is not written to it
+    const session = outpostRef.current;
+    if (!session || session.client.state().role === 'owner') {
+      saveBeam(sceneRef.current?.beamFieldText() ?? '', beamPortRef.current ? beamPortRef.current.cartridge : null);
+    }
     pushTerrain();
   };
   /**
@@ -1112,29 +1130,38 @@ useEffect(() => {
     let offState: (() => void) | null = null;
     let offEvents: (() => void) | null = null;
     let terrainTimer: ReturnType<typeof setInterval> | null = null;
+    let offTerrain: (() => void) | null = null;
     const unbind = (): void => {
       offState?.();
       offEvents?.();
+      offTerrain?.();
       if (terrainTimer !== null) clearInterval(terrainTimer);
       offState = null;
       offEvents = null;
+      offTerrain = null;
       terrainTimer = null;
     };
     const attach = (): void => {
       const session = currentOutpostSession();
       if (session === bound) return;
       const wasInSession = bound !== null;
+      const wasOwner = bound !== null && bound.client.state().role === 'owner';
       unbind();
       bound = session;
       outpostRef.current = session;
       if (session) {
         if (session.host) {
-          // a new room takes this base once; the sculpt goes up now and whenever it changes (the scene may still be loading)
+          // a new room takes this base once; the sculpt goes up when the plot is made, and again whenever it changes
           session.client.seedWorld(baseWorldRef.current);
           lastTerrainRef.current = null;
           pushTerrain();
-          terrainTimer = setInterval(pushTerrain, 1000);
+          terrainTimer = setInterval(() => {
+            if (lastTerrainRef.current === null) pushTerrain();
+          }, 1000);
         }
+        // Window B (TICKET-11, co-op): a guest's plot is the room's sculpt, now and after each change the Lead Architect makes
+        offTerrain = session.client.onTerrain(() => importRoomTerrain());
+        importRoomTerrain();
         baseWorldRef.current = session.client.state().world;
         refreshBaseView();
         offState = session.client.onStateChange((state) => {
@@ -1159,6 +1186,8 @@ useEffect(() => {
         // the session ended: the host's save takes the room's world, and this screen shows this device's own base again
         writePendingHostSave();
         lastTerrainRef.current = null;
+        // Window B: a guest's plot goes back to the sculpt this device saved (the room's was only shown in the session)
+        if (!wasOwner) sceneRef.current?.importBeamField(loadBeamSave().field ?? '');
         baseWorldRef.current = initBaseWorld();
         refreshBaseView();
       }
@@ -1521,6 +1550,8 @@ useEffect(() => {
       return undefined;
     }
     sceneRef.current = scene;
+    // Window B (TICKET-11, co-op): a guest who opens play in a session takes the room's sculpt as the scene is made
+    importRoomTerrain();
     // the props saved for this profile: the cleared clutter is gone, the sealed leaks' wrecks stand restored (TASK-23c)
     scene.setProps(propsRef.current);
     if (typeof window !== 'undefined') {
@@ -1738,6 +1769,10 @@ useEffect(() => {
     window.addEventListener('mousedown', onMouseDown); window.addEventListener('mouseup', onMouseUp);
     // the base the monsters last kept their footprints from (rebuilt when the base changes, P0-MON-03)
     let solidsBase: BaseWorld['base'] | null = null;
+    // Window B (TICKET-11, POL-114): what this screen last sent the room in a session (the beam intent, and the pose's clock)
+    let coopIntentKey: string | null = null;
+    let coopIntentAt: { x: number; z: number } | null = null;
+    let coopPoseClock = 0;
     const loop = (ms: number): void => {
       if (cancelled) return;
       const frameMs = ms - last;
@@ -1746,6 +1781,16 @@ useEffect(() => {
       pieceManagerRef.current.update(dt);
       const w = baseWorldRef.current;
       const playerPos = scene.debug.position();
+      const coop = currentOutpostSession();
+      // Window B (TICKET-11, co-op): this player's pose goes to the room ten times a second, while they stand on the plot
+      if (coop) {
+        coopPoseClock += dt;
+        const pose = coopPoseClock >= 0.1 ? scene.playerPose() : null;
+        if (pose) {
+          coopPoseClock = 0;
+          coop.client.sendPose(pose);
+        }
+      }
 
       // a held beam core fires on every tick it can (its 0.1 s cooldown paces it), not once per pull (TASK-23b-2)
       if (isLmbDownRef.current && scene.monsters.isEquipped() && scene.monsters.getWeaponStats()?.mode === 'beam') fireWeapon();
@@ -1786,8 +1831,26 @@ useEffect(() => {
           scene.monsters.setSolids(footprintSolids(w.base));
         }
         const latched = w.machines.filter((m) => scene.monsters.isLatched(m.id)).map((m) => m.id);
+        // Window B (TICKET-11, POL-114): in a session the room ticks the machines and the harvest once a second, on its own clock. This
+        // screen sends its beam intent instead, when the target or the power shares change (and as the player walks on a beam), so the
+        // world never advances twice. Solo play still ticks here, as before.
+        if (coop) {
+          const beam = isMining && targetNode ? { node: targetNode.id, power: 1 } : null;
+          const at = { x: playerPos.x, z: playerPos.z };
+          const key = JSON.stringify({ beam, power: powerMap, latched });
+          const walked = coopIntentAt === null || Math.hypot(at.x - coopIntentAt.x, at.z - coopIntentAt.z) > 1;
+          if (key !== coopIntentKey || (beam !== null && walked)) {
+            coopIntentKey = key;
+            coopIntentAt = at;
+            coop.client.sendBeamIntent({ at, beam, power: powerMap, latched });
+          }
+        } else {
+          coopIntentKey = null;
+          coopIntentAt = null;
+        }
         while (harvestAccRef.current >= 0.1) {
           harvestAccRef.current -= 0.1;
+          if (coop) continue;
           dispatchBaseRef.current({
             t: 'tick',
             at: { x: playerPos.x, z: playerPos.z },

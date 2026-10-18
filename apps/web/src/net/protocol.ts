@@ -323,12 +323,31 @@ export interface SeedWorldMessage {
 }
 
 /**
- * The plot's terrain: its seed and the beam save's sculpt text (encodeField). Only the Lead Architect sends it (on hosting, and
- * after each finished sculpt stroke); the room stores it, rebuilds its ground with plotHeightAt, and relays it to everyone.
+ * The Moon Twin Gate's pose on the plot: x and z in metres, yaw in radians (the gate's rotation.y). Its footing pad is levelled
+ * there (POL-112), so the room and every client must hold the same pose or their grounds disagree.
+ */
+export interface GatePose {
+  readonly x: number;
+  readonly z: number;
+  readonly yaw: number;
+}
+
+/** Whether a value is a finite gate pose (the room checks what a Lead Architect sends before it stores it). */
+export function isGatePose(value: unknown): value is GatePose {
+  if (typeof value !== 'object' || value === null) return false;
+  const g = value as Partial<Record<keyof GatePose, unknown>>;
+  return Number.isFinite(g.x) && Number.isFinite(g.z) && Number.isFinite(g.yaw);
+}
+
+/**
+ * The plot's terrain: its seed and the beam save's sculpt text (encodeField), and the gate's pose for the footing pad (POL-112).
+ * Only the Lead Architect sends it (on hosting, and after each finished sculpt stroke); the room stores it, rebuilds its ground
+ * with plotHeightAt, and relays it to everyone. Without a gate the pad is at the origin with yaw 0.
  */
 export interface TerrainState {
   readonly seed: number;
   readonly sculpt: string;
+  readonly gate?: GatePose;
 }
 
 /**

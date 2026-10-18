@@ -526,6 +526,17 @@
 }
 .pg-chip-name { color: #f4f8ff; font-weight: 600; }
 .pg-chip-role { color: #94a3b8; }
+/* TICKET-11 (T11b): at 1280 px the role stays on one line and the Demote, Undo and Kick buttons stay in one row, not a second one.
+   The chip gives up width to its name (an ellipsis), never to its role or its buttons, and its buttons are compact so the row fits the card. */
+.pg-chip { flex-wrap: nowrap; white-space: nowrap; max-width: 100%; box-sizing: border-box; }
+.pg-chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pg-chip-role { white-space: nowrap; flex: none; }
+.pg-chip-actions { display: inline-flex; flex: none; flex-wrap: nowrap; align-items: center; gap: 3px; }
+.pg-chip-actions .pg-mini-btn { padding: 2px 7px; font-size: 10px; }
+/* the shell's global button:hover (studio.css) turns every button light; the Grid's buttons keep their dark style when hovered */
+.pg-mini-btn:hover:not(:disabled) { background: rgba(61, 200, 255, 0.28); border-color: rgba(61, 200, 255, 0.7); color: #e0f7ff; }
+.pg-action-btn.primary:hover:not(:disabled) { background: linear-gradient(180deg, #5dd6ff, #0ea5e9); border-color: #7dd3fc; color: #040810; }
+.pg-action-btn.secondary:hover:not(:disabled) { background: rgba(61, 200, 255, 0.24); border-color: rgba(61, 200, 255, 0.6); color: #e0f7ff; }
 .pg-chip.role-owner { border-color: rgba(255, 193, 61, 0.45); }
 .pg-chip.role-owner .pg-chip-role { color: #ffc13d; }
 .pg-chip.role-cobuilder { border-color: rgba(61, 200, 255, 0.4); }

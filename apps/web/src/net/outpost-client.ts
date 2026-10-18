@@ -175,7 +175,7 @@ function hashOf(world: BaseWorld): string {
 /** The ground a client builds on for a terrain: the plot's heights, and the Quantum Gate at the origin. */
 function groundEnvFor(terrain: TerrainState): WorldEnv {
   return {
-    heightAt: plotHeightAt({ seed: terrain.seed, sculpt: terrain.sculpt }),
+    heightAt: plotHeightAt({ seed: terrain.seed, sculpt: terrain.sculpt, gate: terrain.gate }),
     bridge: { x: 0, z: 0, range: BRIDGE_RANGE },
   };
 }
@@ -356,7 +356,7 @@ export async function connectOutpost(
   };
 
   const applyTerrain = (next: TerrainState): void => {
-    terrain = { seed: next.seed, sculpt: next.sculpt };
+    terrain = { seed: next.seed, sculpt: next.sculpt, ...(next.gate ? { gate: next.gate } : {}) };
     env = groundEnvFor(terrain);
     recomputePredictedWorld();
     for (const cb of terrainListeners) cb({ ...terrain });
@@ -387,7 +387,7 @@ export async function connectOutpost(
           }
           // the host's plot terrain goes up with the seed; the room relays it back to everyone, this client included
           if (isHost && options.terrain && msg.role === 'owner') {
-            sendFramed({ type: 'terrain', seed: options.terrain.seed, sculpt: options.terrain.sculpt });
+            sendFramed({ type: 'terrain', seed: options.terrain.seed, sculpt: options.terrain.sculpt, ...(options.terrain.gate ? { gate: options.terrain.gate } : {}) });
           }
         }
         emitState();
@@ -409,7 +409,7 @@ export async function connectOutpost(
       }
 
       case 'terrain': {
-        applyTerrain({ seed: msg.seed, sculpt: msg.sculpt });
+        applyTerrain({ seed: msg.seed, sculpt: msg.sculpt, ...(msg.gate ? { gate: msg.gate } : {}) });
         return;
       }
 
@@ -704,7 +704,7 @@ export async function connectOutpost(
 
     setTerrain(next: TerrainState): boolean {
       if (role !== 'owner') return false;
-      sendFramed({ type: 'terrain', seed: next.seed, sculpt: next.sculpt });
+      sendFramed({ type: 'terrain', seed: next.seed, sculpt: next.sculpt, ...(next.gate ? { gate: next.gate } : {}) });
       return true;
     },
 

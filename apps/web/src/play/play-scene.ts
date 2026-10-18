@@ -69,6 +69,11 @@ import {
 } from '../assets/gen-props';
 import { genLevelFor } from '../assets/gen';
 import { RIFT_LAYER, riftDepthUniforms } from './rift';
+// ---- Window B (TICKET-11, co-op): the other players' avatars, the room's sculpt, and the gate's pose for the room
+import { createRemotePeersController, type RemotePeersController } from './remote-peers';
+import { currentOutpostSession } from '../net/outpost-session';
+import { PAINT_CELL, PAINT_CELLS } from '../base/plot-height';
+import { emptyField, encodeField } from '@hm/terrainbrush';
 
 export type Where = 'lab' | 'planet';
 /** What the screen gives the scene each frame. */
@@ -261,6 +266,15 @@ export interface PlayScene {
   setBeamKeepOut(zones: readonly KeepOutZone[]): void;
   /** The sculpt edits and the paint as text, for the save (empty before the plot is made). */
   beamFieldText(): string;
+  // ---- Window B (TICKET-11, co-op)
+  /** The room's sculpt replaces this plot's (encodeField text; '' is the plot as made). Held until the plot is made. */
+  importBeamField(text: string): void;
+  /** Whether the plot is made, so beamFieldText is the plot's own sculpt. */
+  beamFieldReady(): boolean;
+  /** The Moon Twin Gate's pose on the plot (x, z in metres, yaw in radians): the footing pad's place (POL-112). */
+  gatePose(): { readonly x: number; readonly z: number; readonly yaw: number };
+  /** This player's pose for the room: the ground under their feet and the suit's facing (the yaw + PI the suit is drawn at). Null in the lab. */
+  playerPose(): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number } | null;
   /** Seal (TASK-21d): while on, the rifle's rib and the ground ring show Seal's amber. TASK-23b-2 calls it at a leak; nothing here seals. */
   setBeamSealing(on: boolean): void;
   /**
@@ -346,6 +360,8 @@ export interface PlayScene {
     paintedCells(): number;
     /** How many plot cells carry a sculpt edit (a cut or a raise), and the edit under a point in metres (negative: cut). */
     sculptedCells(): number;
+    /** Window B (TICKET-11, co-op): the remote avatars standing on the plot. */
+    remotePeers(): number;
     groundEdit(x: number, z: number): number;
     /** The height of the rendered ground (its chunk meshes) under (x, z), or null off the plot. */
     surfaceAt(x: number, z: number): number | null;
@@ -500,6 +516,8 @@ export function createPlayScene(o: {
   twin.group.rotation.y = Math.atan2(-view.x, -view.y);
   const gateYawDelta = twin.group.rotation.y;
   planetScene.add(twin.group);
+  // ---- Window B (TICKET-11, co-op): the other players stand on the plot as avatars (none outside a session)
+  const remotePeers: RemotePeersController = createRemotePeersController(planetScene);
   let planetGateM = new THREE.Matrix4(), toPlanet = new THREE.Matrix4(), toLab = new THREE.Matrix4();
   /** TICKET-01 B: the moon's solids, each with its own frame: the twin's uprights and each field machine's footprint (rebuildPlanetStatic). */
   let planetSolids: { readonly m: readonly number[]; readonly boxes: readonly Box[] }[] = [];
@@ -1103,6 +1121,8 @@ export function createPlayScene(o: {
   // the save waits here until the plot is made (setPlanet).
   const beamVisuals: BeamVisuals = createBeamVisuals(planetScene, keep);
   let pendingBeamField: string | null = o.beamField ?? null;
+  /** Window B (TICKET-11): the sculpt text last applied with importBeamField (a repeat of it is skipped). */
+  let importedBeamText: string | null = null;
   let heldMode: BeamMode = 'extract';
   let beamSealingNow = false;
   /** The rifle's sway, bob and vibration (first person), and its rest pose and scratch objects. */
@@ -2873,6 +2893,9 @@ export function createPlayScene(o: {
         const id = wrecks.aimProp(pos, new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion), 14);
         if (id) aimedProp = { id, salvage: false };
       }
+      // ---- Window B (TICKET-11, co-op): the other players' avatars, from the live session's samples (none outside a session)
+      const coopSession = currentOutpostSession();
+      remotePeers.setRemotePeers(coopSession ? coopSession.client.samplePeers() : []);
       const ev = pendingEvent;
       pendingEvent = null;
       return {
@@ -2991,6 +3014,33 @@ export function createPlayScene(o: {
     },
     beamFieldText() {
       return ground ? ground.exportField() : '';
+    },
+    // ---- Window B (TICKET-11, co-op)
+    importBeamField(text) {
+      if (!ground) {
+        pendingBeamField = text;
+        return;
+      }
+      const field = text.length > 0 ? text : encodeField(emptyField(PAINT_CELLS, PAINT_CELL));
+      // the text last applied is skipped (exportField is always the encoded, centimetre-rounded field, so it cannot tell)
+      if (field === importedBeamText) return;
+      if (!ground.importField(field)) return;
+      importedBeamText = field;
+      // the footing pad stands on the ground as it now is (POL-112), so the room's plotHeightAt gives the same height under the gate
+      const gy = ground.heightAt(twin.group.position.x, twin.group.position.z);
+      padTop = gy + 0.25;
+      twin.group.position.y = gy;
+      syncPlanetMatrices();
+    },
+    beamFieldReady() {
+      return ground !== null;
+    },
+    gatePose() {
+      return { x: twin.group.position.x, z: twin.group.position.z, yaw: twin.group.rotation.y };
+    },
+    playerPose() {
+      if (where !== 'planet') return null;
+      return { x: pos.x, y: groundAt(pos.x, pos.z), z: pos.z, yaw: yaw + Math.PI };
     },
     setBeamSealing(on) {
       beamSealingNow = on;
@@ -3153,6 +3203,7 @@ export function createPlayScene(o: {
       rifleIn: () => (!heldBeam.group.visible ? 'none' : heldBeam.group.parent === viewRig ? 'view' : rifleHand !== null && heldBeam.group.parent === rifleHand ? 'hand' : 'none'),
       paintedCells: () => ground?.paintedCells() ?? 0,
       sculptedCells: () => ground?.sculptedCells() ?? 0,
+      remotePeers: () => remotePeers.getAvatarCount(),
       groundEdit: (x, z) => ground?.editAt(x, z) ?? 0,
       surfaceAt: (x, z) => ground?.surfaceAt(x, z) ?? null,
       groundSettled: () => ground?.settled() ?? false,
@@ -3283,6 +3334,7 @@ export function createPlayScene(o: {
       ground?.dispose();
       holo.dispose();
       room.dispose();
+      remotePeers.dispose();
       for (const x of owned) x.dispose();
       for (const mat of Object.values(m)) (mat as THREE.Material).dispose();
       for (const v of vehicleViews.values()) {

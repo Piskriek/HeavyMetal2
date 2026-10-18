@@ -7,6 +7,8 @@ import { chunkMesh, chunksAround, createTerrain, type Terrain } from '@hm/plotte
 import { createGroundMaterial, makeGroundTextures, setCoverage, setGroundPaint, setStage as setGroundStage, type CoverTextures } from '@hm/groundshader';
 import { apply as brushApply, decodeField, emptyField, encodeField, heightAt as brushHeightAt, type BrushOp, type Field, type Rules } from '@hm/terrainbrush';
 import { drop } from '../crafter/planet';
+// POL-111: the terrain's constants (the boulder span and the paint grid) are plot-height.ts's, shared with the room
+import { BOULDER_SPAN, PAINT_CELL, PAINT_CELLS, PAINT_ORIGIN } from '../base/plot-height';
 import { smoothModel, type SmoothId } from '../crafter/smooth-models';
 import { boulderBeamRate, runStroke, SCULPT_RULES, STROKE_RADIUS } from './beam-tool';
 import { keptOut, type KeepOutZone } from './beam-keepout';
@@ -83,8 +85,6 @@ export interface PlotGround {
 
 /** Chunk cells and the finest chunk; the horizon is about 4 km away on a 12 km planet. */
 const CELLS = 32, MIN_SIZE = 16, SKIRT = 2, EXTENT = 4096;
-/** Boulders stand within this square round the gate. */
-const BOULDER_SPAN = 320;
 /** Each boulder holds about 40 ore when full. */
 export const BOULDER_INITIAL_ORE = 40;
 /**
@@ -181,7 +181,7 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
 
   // the paint layer (TASK-21): a grid of 2.5 m cells over the boulder span, painted through @hm/terrainbrush by the beam and
   // shown by the ground shader from two textures (colour with a painted flag, and roughness), so a stroke rewrites texels only
-  const PAINT_CELLS = 256, PAINT_CELL = BOULDER_SPAN / PAINT_CELLS, PAINT_ORIGIN = -BOULDER_SPAN / 2;
+  // (PAINT_CELLS, PAINT_CELL and PAINT_ORIGIN come from base/plot-height.ts, one source for the room and the scene: POL-111)
   /** Frames since a stroke changed the paint (the textures go up about ten times a second while the beam paints). */
   let paintDirtyFrames = -1;
   const PAINT_RULES: Rules = { maxDepth: 0, maxHeight: 0, orePerCubicMetre: 0, ratePerSecond: 0 };

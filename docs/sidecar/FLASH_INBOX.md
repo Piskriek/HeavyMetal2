@@ -142,8 +142,8 @@ This job touches only `apps/web/src/base/ui/` (`radial-menu.*`, `hud-zones*`), `
 ## F-18 [MOVED] TICKET-10: the wave band, monster wall pathing, the foregrip IK, play-scene Window A
 Brief: `docs/prompts/sidecar/T10-wave-band-monster-nav-window-a.md` (Argo's bundle and ARGO_NOTE_12). MOVED to Haiku by Opus (2026-10-18), so it can run alongside your F-19 (no shared files). Flash, skip it. Read the brief's "copy or merge" section first: never copy Argo's play-scene.ts.
 
-## F-19 [OPEN] TICKET-14: the real-time credits video, the lab monitor jukebox, the title entry
-Brief: `docs/prompts/sidecar/T14-credits-video.md` (Argo's bundle and ARGO_NOTE_13). OPEN since 2026-10-18: T11b has landed (51206f27). Do F-19 before F-18: T14 doesn't touch play-scene.ts, so it can run alongside TRIFT. Read the brief's font section first: check the embedded font's origin and rename it before shipping anything.
+## F-19 [MOVED] TICKET-14: the real-time credits video, the lab monitor jukebox, the title entry
+MOVED to Haiku by Opus (2026-10-18): Flash hadn't taken it. Flash, skip it. Brief: `docs/prompts/sidecar/T14-credits-video.md` (Argo's bundle and ARGO_NOTE_13). OPEN since 2026-10-18: T11b has landed (51206f27). Do F-19 before F-18: T14 doesn't touch play-scene.ts, so it can run alongside TRIFT. Read the brief's font section first: check the embedded font's origin and rename it before shipping anything.
 - **Also, two co-op HUD fixes from T11b's shots** (play.tsx and the HUD zones only):
   1. The co-op roster chip (Room code, Connected, the players and their roles, Leave room) sits on top of the stage metrics panel in the top right. Move it into a free HUD zone (see hud-zones-logic), and keep it compact.
   2. In a session, the play screen still shows "SOLO DESYNCED". Show the session instead (for example "CO-OP · room S2JE7V"), and keep the Sync button hidden or disabled while in a room.

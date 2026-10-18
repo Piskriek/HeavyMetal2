@@ -1,5 +1,25 @@
 # RESUME: start here (fresh session)
 
+## 18 Oct, morning (read first)
+- **Landed:**
+  - **F-09:** stage 6 on Low goes from 34 to 150 fps, from a layout key so the cover doesn't rebuild on every 0.1 s tick. The B key reads the scene's live position, and long toasts stay out of the space clear around the crosshair (479d8ae0).
+  - **T06b:** the sheet 07 breaker panel and console (b60aee2f).
+  - **Flash's F-15:** Studio hardening (5e77ed14).
+- **Argo** (new chat https://gemini.google.com/app/77f3bf1cb56ba86c):
+  - **ARGO_NOTE_10:** the TICKET-09 to 16 plan, accepted.
+  - **ARGO_NOTE_11:** co-op Phase 2.
+  - **Now:** he's on TICKET-10 (OPUS_NOTE_19).
+- **Running:**
+  - Haiku T09a (audio buses), T11a (co-op Phase 2 core) and TPOL (Argo's POL rulings, which holds `play-scene.ts` now);
+  - Flash's F-16 (TICKET-12's Studio part).
+- **The `play-scene.ts` queue** (one writer at a time; Opus schedules it): TPOL → T11b (co-op Window B) → T09b (audio wiring) → F-10 (T05), F-11 (plumes), F-12 (T07b) and F-13 (the lab aim), each to Flash or Haiku, whichever is free → TICKET-10 Window A (Argo's bundle, coming). F-10 and F-11 are held in Flash's inbox so Flash can't collide.
+- **POL ranges in use:**
+  - POL-141 to 150: TPOL;
+  - POL-151 to 160: T09a;
+  - POL-161 to 170: T11a;
+  - POL-171 to 180: T11b;
+  - POL-181 to 190: F-16.
+
 ## 18 Oct Checkpoint (read first)
 - **(a) Landed (pushed):**
   - **T08b,** the Studio's Look and Scene tabs, the gizmo and the 4-angle panel (bba366cb, 7a2ab759).

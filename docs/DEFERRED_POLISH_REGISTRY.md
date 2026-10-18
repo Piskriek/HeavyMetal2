@@ -207,7 +207,8 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 ### POL-100: the rift at stage 0 reads as white circle outlines (Argo's call)
 - **Seen:** TICKET-07a (`shots-run/ticket07a-rift-open.png`). Under the stage 0a wireframe look, the open rift at 12 m draws as two or three white pixel circle outlines, not a vertical glitch-sliced tear.
 - **Expected:** the tear reads at every stage. One option: S-Space ignores the stage look (it's foreign data bleeding through), drawn in its own vivid palette.
-- Sidecar Task: POL-100 - Argo decides the rift's look per stage; then fold it into POL-98's rift rework (merged geometry, a few draw calls).
+- **Argo's call (2026-10-18):** the rift is a foreign tear through the lunar capture medium, so it bypasses the stage look and the wireframe pass at every stage (0a to 6). It always draws as a jagged, stepped-glitch tear in its own vivid unlit S-Space palette: electric magenta `#FF1E8E`, cyan `#00F0FF`, and a deep violet `#2A0845` core, merged or instanced into a single draw call (which also resolves POL-98).
+- Sidecar Task: POL-100 - rework `rift.ts` and `leak-visual.ts` to Argo's call: one merged or instanced mesh, drawn after the stage-look pass (or excluded from it), in the S-Space palette at every stage. Check it at stages 0a, 0b, 3 and 6, and the DRAWS count near an open leak.
 
 ### POL-111: plot-ground.ts should take its terrain constants from base/plot-height.ts
 - **Seen:** plan 36 Phase 1 (co-op). `apps/web/src/base/plot-height.ts` copies `BOULDER_SPAN`, `PAINT_CELLS` and the paint origin from `play/plot-ground.ts`, so the room and the clients can build on the same ground. The two copies can drift.

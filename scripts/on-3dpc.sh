@@ -11,7 +11,7 @@
 set -euo pipefail
 cmd="${1:?usage: scripts/on-3dpc.sh \"<command>\"}"
 branch="$(git rev-parse --abbrev-ref HEAD)"
-. "$(git rev-parse --show-toplevel)/scripts/worker.env"
+. "$(git rev-parse --show-toplevel)/scripts/worker.env"; WORKER_IP="${WORKER_IP%$''}"
 ssh -i ~/.ssh/id_ed25519_fidelity -o BatchMode=yes -o ConnectTimeout=10 -o LogLevel=ERROR "RAMPAGE@${WORKER_IP}" "
   until mkdir /tmp/worker.lock 2>/dev/null; do sleep 5; done; trap 'rmdir /tmp/worker.lock' EXIT
   cd /c/MarbleGp && git checkout -q -- . && git checkout -q $branch && git pull -q --ff-only || exit 90

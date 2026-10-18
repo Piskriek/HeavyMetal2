@@ -127,3 +127,14 @@ This job touches only `apps/web/src/studio/`, `apps/web/studio-server/`, `packag
 - Load the frontend-design skill before UI work, and keep the Studio's look.
 - Test: extend `scripts/test-studio-tabs.mjs` (a flag writes `assets.json` in dev; a snapped socket persists and shows; the material sliders change the preview at constant mean luminance; the gizmo drag moves a copy). Run it, `npm test` and `test-campaign` (45 of 45) through `scripts/test-on-3dpc.sh --only "<your paths>"`. Typecheck on the laptop. Use POL-181 to POL-190 for new registry entries.
 - **Added by Opus:** the Look tab half of POL-95, since you're in the Studio. In `look-tab.tsx`, add `levelsLabel` ("12" at stage 1, "24" at stage 2, "Full (24-bit)" at stages 3 to 6) in place of the literal "0". Argo's version is in `arena-gathered/argo-pol95-103/apps/web/src/studio/look-tab.tsx` and its test. Merge it onto your current file. Haiku's TPOL does the groundshader half.
+
+## F-17 [OPEN] TICKET-12 (HUD part): POL-78, 79, 80, 82 and 43, no play-scene
+Brief: none separate; the job is this list. Each item's detail is in `docs/DEFERRED_POLISH_REGISTRY.md`, and TICKET-12's row is in `docs/argo/notes/ARGO_NOTE_10_next_batch_ticket09_onward.md`.
+This job touches only `apps/web/src/base/ui/` (`radial-menu.*`, `hud-zones*`), `apps/web/src/play/controls-grid.*`, `apps/web/src/play/play.css`, and `play.tsx` (the toast, ticker and radial props only). Never touch `play-scene.ts`, the lab or vista files, `rift.ts` or `packages/groundshader` (Haiku TPOL has them), or `apps/web/src/net/`, `rooms/` or the audio files.
+- **POL-78:** the Esc pause panel shows the whole controls grid at 1280 x 720: three columns or a scroll inside the panel, never cut off.
+- **POL-79:** radial slice labels wrap onto two lines instead of truncating ("Weapon bench", not "Weapon ben...").
+- **POL-80:** the Apply radial with an empty rack shows one clear empty state ("No written cartridges: write one at the preset bench") instead of filler placeholders.
+- **POL-82:** refused actions ("Cannot place: ...", "Missing: ...") show as a compact HUD toast in the status zone, not a giant title card. F-09 already sized long titles down; this moves refusals out of the title card entirely.
+- **POL-43:** the bottom-right ticker shows linked-bin counts (for example "Ore 24 (+140)"). Pickup toasts stay as they are.
+- Load the frontend-design skill before UI work, and keep the HUD's look (plan 28's skins).
+- Test: extend `scripts/test-build-ux.mjs` (or the HUD test that covers these) so the grid is fully visible at 1280 x 720, a long radial label wraps, the empty Apply state shows, a refused placement raises the compact toast (no title card), and the ticker shows a linked count. Take shots and look at them. Run it, `npm test` and `test-campaign` (45 of 45, zero HUD overlaps) through `scripts/test-on-3dpc.sh --only "<your paths>"`. Typecheck on the laptop. Use POL-211 to POL-220 for new registry entries.

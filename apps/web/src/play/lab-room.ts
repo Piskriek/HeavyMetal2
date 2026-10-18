@@ -46,7 +46,7 @@ import * as kit from '@hm/labkit';
 import type { Box, Prop } from '@hm/labkit';
 import { operatorConsole as consoleMillOperatorConsole } from '@hm/consolemill';
 import { type GenLevel, genLevelFor, getGenSync, loadGen } from '../assets/gen';
-import { createLabVista, VISTA_LEVEL, type LabVista, type WindowView } from './lab-vista';
+import { createLabVista, VISTA_LEVEL, vistaHdModelsMissing, type LabVista, type WindowView } from './lab-vista';
 import { CLUTTER, CLUTTER_MODELS, type ClutterItem } from './lab-clutter';
 import { createMonitorEqualizer3D, isMonitorOverclockedPlaying, type MonitorEqualizer3D } from '../credits/monitor-jukebox';
 import { coilLevels, darkStrobe, POWER_OFF, strobeSweepZ, type Power } from './lab-power';
@@ -1336,6 +1336,12 @@ export function createLabRoom(o: {
     vista.adoptGenerated();
   };
   adoptGenerated();
+  // after the preload (the lab's and the play screen's both call the room's adoptGenerated then): an HD-pack window model
+  // that did not load leaves the window in its Static view, the storm plane with no boxes (T17a, no page error)
+  const adoptLoaded = (): void => {
+    adoptGenerated();
+    if (vistaHdModelsMissing()) setWindowView('static');
+  };
 
   const aimClutter = (origin: THREE.Vector3, dir: THREE.Vector3, reach: number): string | null => {
     const roots = [...clutterEntries.values()].filter((e) => e.state === 'standing').map((e) => e.prop.group);
@@ -1384,7 +1390,7 @@ export function createLabRoom(o: {
     setPower,
     power: (): Power => lastPower,
     coilsLit: (): boolean[] => gate.coils.map((c) => ((c.material as THREE.MeshStandardMaterial).emissiveIntensity ?? 0) > 0.5),
-    adoptGenerated,
+    adoptGenerated: adoptLoaded,
     setStorm,
     setWindowView,
     setPlaneFallback,

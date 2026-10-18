@@ -5,6 +5,10 @@
  * beside index.html; when the pack is missing (or the page is opened from disk, where the browser blocks fetches),
  * every request falls back to low.
  *
+ * The single-file diet (T17a, 2026-10-18): an asset the registry marks `inline: false` (the window's vista and the
+ * scenery that only the lab and the Studio show) has no inline low. Its low is `hd/<id>/low.glb`, fetched on demand,
+ * cached like the HD levels. With no pack, that load rejects: the lab's window then falls back to its Static view.
+ *
  * Studio tweaks (2026-10-12): every instance of an asset gets its saved tweak (`studio-data/asset-tweaks.json`, written
  * by the Studio's Changes panel) applied to its own clone: offset, scale and turn on a wrapper group, the material
  * fields on cloned materials. An asset without a tweak is returned exactly as its file has it.
@@ -24,6 +28,8 @@ export interface GenInfo {
   /** Lattice pieces only: the procedural kit piece's box they were fitted to, and the piece kind. */
   readonly box?: readonly [readonly [number, number, number], readonly [number, number, number]];
   readonly kind?: string;
+  /** `false`: the low level is not inlined; it lives at `hd/<id>/low.glb` (docs/runworld/assets.json, T17a). Absent: inlined. */
+  readonly inline?: boolean;
 }
 export const GEN: Readonly<Record<string, GenInfo>> = registry as unknown as Record<string, GenInfo>;
 /**
@@ -128,16 +134,27 @@ async function loadScene(url: string): Promise<THREE.Group> {
   return gltf.scene;
 }
 
+/**
+ * A model whose low is not inlined (`inline: false`): its `hd/<id>/low.glb`. The pack is probed first, so a missing pack costs
+ * one request and no network at all from a file:// page, and the load rejects.
+ */
+async function loadHdLow(id: string): Promise<THREE.Group> {
+  if (!(await probeHd())) throw new Error(`${id} lives in the HD pack, which is not reachable`);
+  return loadScene(new URL(`hd/${id}/low.glb`, typeof document !== 'undefined' ? document.baseURI : 'http://localhost/').href);
+}
+
 async function loadRaw(id: string, level: GenLevel): Promise<THREE.Group> {
-  const low = lowUrl(id);
-  if (!low) throw new Error(`unknown generated asset: ${id}`);
+  const hdLow = GEN[id]?.inline === false;
+  const low = hdLow ? undefined : lowUrl(id);
+  if (!hdLow && !low) throw new Error(`unknown generated asset: ${id}`);
   const want: GenLevel = level !== 'low' && (await probeHd()) ? level : 'low';
   const key = `${id}|${want}`;
   let p = cache.get(key);
   if (!p) {
+    const lowLoad = (): Promise<THREE.Group> => (hdLow ? loadHdLow(id) : loadScene(low ?? ''));
     p = want === 'low'
-      ? loadScene(low)
-      : loadScene(new URL(`hd/${id}/${want}.gltf`, typeof document !== 'undefined' ? document.baseURI : 'http://localhost/').href).catch(() => loadScene(low));
+      ? lowLoad()
+      : loadScene(new URL(`hd/${id}/${want}.gltf`, typeof document !== 'undefined' ? document.baseURI : 'http://localhost/').href).catch(lowLoad);
     cache.set(key, p);
   }
   const loaded = await p;

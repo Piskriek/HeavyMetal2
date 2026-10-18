@@ -2,12 +2,15 @@
 //   node scripts/runworld-pack.mjs [id ...]
 // For each asset in docs/runworld/assets.json that has low/mid/high levels in zips/runworld/assets/<id>/:
 //  - low:  apps/web/src/assets/gen/<id>.glb, a self-contained GLB that the single-file build inlines (the game is
-//          playable from the one HTML file with the faceted low models);
+//          playable from the one HTML file with the faceted low models). An asset flagged `"inline": false` in
+//          docs/runworld/assets.json keeps its low out of the single file: apps/web/public/hd/<id>/low.glb, fetched on
+//          demand like the mid and high (assets/gen.ts), for the models only a window or a Studio tab shows;
 //  - HD:   apps/web/public/hd/<id>/{mid,high}.gltf + .bin, copied beside index.html as the optional HD pack. Both
 //          levels point at ONE shared colour map and ONE metal/roughness map (color.webp, mr.webp); only the baked
 //          normal map is per level (normal-mid.webp, normal-high.webp). The UVs are the same on every level, so
 //          sharing costs no quality and the browser downloads each shared texture once.
-//  - apps/web/src/assets/gen/registry.json: id, class, real size (m), the lattice box for structures.
+//  - apps/web/src/assets/gen/registry.json: id, class, real size (m), the lattice box for structures, and
+//    `"inline": false` for a flagged asset.
 import fs from 'node:fs';
 import path from 'node:path';
 import { NodeIO, getBounds } from '@gltf-transform/core';
@@ -72,10 +75,17 @@ for (const a of manifest.assets.filter((x) => only.length === 0 || only.includes
   if (!lum.ok && !a.lumOk) { console.log(`${a.id}: NOT PACKED, luminance (${lum.why})`); refused.push(a.id); continue; }
   const low = await io.read(path.join(d, 'low.glb'));
   paint(low);
-  await io.write(path.join(LOW, `${a.id}.glb`), low);
+  const inline = a.inline !== false;
   const out = path.join(HD, a.id);
   fs.rmSync(out, { recursive: true, force: true });
   fs.mkdirSync(out, { recursive: true });
+  if (inline) {
+    await io.write(path.join(LOW, `${a.id}.glb`), low);
+  } else {
+    // a flagged asset's low is an HD-pack file, so no stale inline copy may stay in the single file's source
+    fs.rmSync(path.join(LOW, `${a.id}.glb`), { force: true });
+    await io.write(path.join(out, 'low.glb'), low);
+  }
   // high first, so the shared colour and metal/roughness files on disk are high's (1024 px); mid's same-named
   // images are written first and then replaced, which is why mid is written before high
   const mid = await io.read(path.join(d, 'mid.glb')), high = await io.read(path.join(d, 'high.glb'));
@@ -86,10 +96,11 @@ for (const a of manifest.assets.filter((x) => only.length === 0 || only.includes
   await io.write(path.join(out, 'mid.gltf'), mid);
   await io.write(path.join(out, 'high.gltf'), high);
   const b = getBounds(high.getRoot().getDefaultScene() ?? high.getRoot().listScenes()[0]);
-  registry[a.id] = { class: a.class, size: [b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]].map((v) => Math.round(v * 1000) / 1000), ...(a.box ? { box: a.box, kind: a.kind } : {}) };
+  registry[a.id] = { class: a.class, size: [b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]].map((v) => Math.round(v * 1000) / 1000), ...(a.box ? { box: a.box, kind: a.kind } : {}), ...(inline ? {} : { inline: false }) };
   const kb = (f) => Math.round(fs.statSync(f).size / 1024);
   const hdKb = fs.readdirSync(out).reduce((n, f) => n + kb(path.join(out, f)), 0);
-  console.log(`${a.id}: low ${kb(path.join(LOW, `${a.id}.glb`))} KB inline, HD ${hdKb} KB`);
+  const lowKb = inline ? kb(path.join(LOW, `${a.id}.glb`)) : kb(path.join(out, 'low.glb'));
+  console.log(`${a.id}: low ${lowKb} KB ${inline ? 'inline' : 'in the HD pack (inline: false)'}, HD ${hdKb} KB`);
   packed++;
 }
 

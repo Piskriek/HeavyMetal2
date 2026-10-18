@@ -1207,7 +1207,8 @@
       10.1,
       9.01,
       23.266
-    ]
+    ],
+    "inline": false
   },
   "chiller-block": {
     "class": "vista",
@@ -1215,7 +1216,8 @@
       3.132,
       2.991,
       3.124
-    ]
+    ],
+    "inline": false
   },
   "shipping-container": {
     "class": "vista",
@@ -1223,7 +1225,8 @@
       2.361,
       2.598,
       5.598
-    ]
+    ],
+    "inline": false
   },
   "pylon-tower": {
     "class": "vista",
@@ -1249,7 +1252,8 @@
           0.87
         ]
       }
-    ]
+    ],
+    "inline": false
   },
   "overpass-segment": {
     "class": "vista",
@@ -1257,7 +1261,8 @@
       5.946,
       8.996,
       8.511
-    ]
+    ],
+    "inline": false
   },
   "rubble-slab": {
     "class": "vista",
@@ -1289,7 +1294,8 @@
       3.988,
       3.994,
       3.95
-    ]
+    ],
+    "inline": false
   },
   "substation-block-a": {
     "class": "vista",
@@ -1297,7 +1303,8 @@
       5.975,
       5.996,
       5.254
-    ]
+    ],
+    "inline": false
   },
   "cooling-tower-square-b": {
     "class": "vista",
@@ -1305,7 +1312,8 @@
       10.064,
       7.99,
       9.381
-    ]
+    ],
+    "inline": false
   },
   "gantry-crane-solid-a": {
     "class": "vista",
@@ -1313,7 +1321,8 @@
       9.955,
       9.995,
       7.006
-    ]
+    ],
+    "inline": false
   },
   "billboard-blank-b": {
     "class": "vista",
@@ -1321,7 +1330,8 @@
       3.496,
       5,
       0.84
-    ]
+    ],
+    "inline": false
   },
   "warehouse-small-b": {
     "class": "vista",
@@ -1329,7 +1339,8 @@
       7.752,
       6.989,
       7.799
-    ]
+    ],
+    "inline": false
   },
   "road-section-a": {
     "class": "vista",
@@ -1337,7 +1348,8 @@
       5.065,
       2,
       4.991
-    ]
+    ],
+    "inline": false
   },
   "sign-gantry-b": {
     "class": "vista",
@@ -1345,7 +1357,8 @@
       2.993,
       2.998,
       0.414
-    ]
+    ],
+    "inline": false
   },
   "fuel-tank-square-b": {
     "class": "vista",
@@ -1353,7 +1366,8 @@
       2.984,
       3.995,
       3.134
-    ]
+    ],
+    "inline": false
   },
   "boulder-block-b": {
     "class": "vista",
@@ -1361,7 +1375,8 @@
       1.993,
       1.998,
       1.991
-    ]
+    ],
+    "inline": false
   },
   "lab-bunker-a": {
     "class": "vista",
@@ -1369,7 +1384,8 @@
       8.881,
       9.001,
       8.958
-    ]
+    ],
+    "inline": false
   },
   "radar-panel-b": {
     "class": "vista",
@@ -1385,7 +1401,8 @@
       5.148,
       3.997,
       4.717
-    ]
+    ],
+    "inline": false
   },
   "conveyor-housing-b": {
     "class": "vista",
@@ -1393,7 +1410,8 @@
       4.342,
       5.995,
       11.947
-    ]
+    ],
+    "inline": false
   },
   "wrecked-truck-cab-c": {
     "class": "vista",
@@ -1433,7 +1451,8 @@
       2.29,
       2.397,
       2.377
-    ]
+    ],
+    "inline": false
   },
   "comms-mast-solid-a": {
     "class": "vista",
@@ -1441,7 +1460,8 @@
       4.651,
       11.995,
       4.493
-    ]
+    ],
+    "inline": false
   },
   "wrecked-van-a": {
     "class": "vista",
@@ -1457,7 +1477,8 @@
       6.194,
       5.995,
       6.135
-    ]
+    ],
+    "inline": false
   },
   "silo-square-a": {
     "class": "vista",
@@ -1465,7 +1486,8 @@
       9.591,
       11.995,
       9.522
-    ]
+    ],
+    "inline": false
   },
   "checkpoint-booth-a": {
     "class": "vista",
@@ -1473,7 +1495,8 @@
       2.321,
       2.497,
       2.368
-    ]
+    ],
+    "inline": false
   },
   "office-block-ruin-b": {
     "class": "vista",
@@ -1481,7 +1504,8 @@
       13.844,
       14.98,
       12.983
-    ]
+    ],
+    "inline": false
   },
   "gas-cabinet-c": {
     "class": "prop",

@@ -1166,7 +1166,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a long windowless datacentre hall seen from outside: a flat-roofed rectangular concrete-and-steel building about 9 metres tall and four times as long as it is tall, a row of chunky square cooling units standing on the roof, flush square louvre panels along the walls (solid slats, NO holes), one big shut square roller door, weathered grey with dust drifted against its base, abandoned, no lettering",
-      "note": "outside the lab window (owner 2026-10-12: a planned 3D wasteland scene, docs/WINDOW_SCENE_PLAN.md); seen from 20 m to 2 km, so the low level is what shows"
+      "note": "outside the lab window (owner 2026-10-12: a planned 3D wasteland scene, docs/WINDOW_SCENE_PLAN.md); seen from 20 m to 2 km, so the low level is what shows",
+      "inline": false
     },
     {
       "id": "chiller-block",
@@ -1181,7 +1182,8 @@
         1500,
         2200,
         3000
-      ]
+      ],
+      "inline": false
     },
     {
       "id": "shipping-container",
@@ -1191,7 +1193,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a steel shipping container about 12 metres long and 2.6 metres tall, shallow square corrugated sides, shut flush doors at one end with flat square lock bars set into the doors (NO round bars), weathered rust-orange paint, dented, NO lettering, NO logos",
-      "note": "outside the lab window (owner 2026-10-12: a planned 3D wasteland scene, docs/WINDOW_SCENE_PLAN.md); seen from 20 m to 2 km, so the low level is what shows"
+      "note": "outside the lab window (owner 2026-10-12: a planned 3D wasteland scene, docs/WINDOW_SCENE_PLAN.md); seen from 20 m to 2 km, so the low level is what shows",
+      "inline": false
     },
     {
       "id": "pylon-tower",
@@ -1201,7 +1204,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a tall SOLID square steel power pylon about 24 metres tall: a tapering square box-section column (NOT a lattice, NO open frame, NO holes) with two thick square cross-arms near the top and square insulator blocks under the arm ends, NO cables, standing on a square concrete footing, weathered grey steel, abandoned",
-      "note": "outside the lab window (owner 2026-10-12: a planned 3D wasteland scene, docs/WINDOW_SCENE_PLAN.md); seen from 20 m to 2 km, so the low level is what shows"
+      "note": "outside the lab window (owner 2026-10-12: a planned 3D wasteland scene, docs/WINDOW_SCENE_PLAN.md); seen from 20 m to 2 km, so the low level is what shows",
+      "inline": false
     },
     {
       "id": "overpass-segment",
@@ -1211,7 +1215,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a broken section of an elevated concrete highway: one thick square concrete pier holding a chunky flat deck slab whose far end is snapped off in a clean jagged break, square concrete barrier blocks along the deck edges, NO rebar, NO railings, NO lamps, weathered grey concrete with dust, abandoned",
-      "note": "outside the lab window (owner 2026-10-12: a planned 3D wasteland scene, docs/WINDOW_SCENE_PLAN.md); seen from 20 m to 2 km, so the low level is what shows"
+      "note": "outside the lab window (owner 2026-10-12: a planned 3D wasteland scene, docs/WINDOW_SCENE_PLAN.md); seen from 20 m to 2 km, so the low level is what shows",
+      "inline": false
     },
     {
       "id": "rubble-slab",
@@ -1526,7 +1531,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a small square portable site office cabin with a shut door and one square shuttered window, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing",
+      "inline": false
     },
     {
       "id": "water-tank-square-a",
@@ -1536,7 +1542,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a square steel water tank on a solid square concrete base, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing",
+      "inline": false
     },
     {
       "id": "water-tank-square-b",
@@ -1556,7 +1563,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a solid square box-section comms mast with flat square antenna panels near the top, on a square footing, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing",
+      "inline": false
     },
     {
       "id": "comms-mast-solid-b",
@@ -1576,7 +1584,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a square electrical substation building, flat roof, flush louvre panels, a shut square door, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing",
+      "inline": false
     },
     {
       "id": "substation-block-b",
@@ -1606,7 +1615,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a square concrete cooling tower block, slightly tapered, flat open top rim, solid walls, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing",
+      "inline": false
     },
     {
       "id": "wrecked-van-a",
@@ -1677,7 +1687,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a container gantry crane made of thick solid square box beams, two legs and a top beam, no cables, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing",
+      "inline": false
     },
     {
       "id": "gantry-crane-solid-b",
@@ -1707,7 +1718,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a big square blank billboard panel on two thick square steel posts, no picture, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing",
+      "inline": false
     },
     {
       "id": "warehouse-small-a",
@@ -1727,7 +1739,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a small flat-roofed square warehouse with a shut roller door, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing",
+      "inline": false
     },
     {
       "id": "chimney-square-a",
@@ -1757,7 +1770,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a short cracked square slab of asphalt road with a kerb block on one side, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing",
+      "inline": false
     },
     {
       "id": "road-section-b",
@@ -1787,7 +1801,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a road sign gantry of thick square box beams over two square posts, the sign panels blank, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing",
+      "inline": false
     },
     {
       "id": "datacentre-annex-a",
@@ -1807,7 +1822,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a small square windowless datacentre annex block with roof cooling boxes, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing",
+      "inline": false
     },
     {
       "id": "fuel-tank-square-a",
@@ -1827,7 +1843,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a square steel fuel storage tank on square saddles, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing",
+      "inline": false
     },
     {
       "id": "boulder-block-a",
@@ -1847,7 +1864,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a big angular grey rock block with flat broken faces, chunky, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing",
+      "inline": false
     },
     {
       "id": "crater-rim-chunk-a",
@@ -1877,7 +1895,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a square concrete research bunker with a flat roof and a shut square blast door, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing",
+      "inline": false
     },
     {
       "id": "lab-bunker-b",
@@ -1917,7 +1936,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a small square concrete pump house with a flat roof and shut door, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing",
+      "inline": false
     },
     {
       "id": "pump-house-b",
@@ -1947,7 +1967,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a long square enclosed conveyor housing on square legs, solid, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing",
+      "inline": false
     },
     {
       "id": "silo-square-a",
@@ -1957,7 +1978,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a square concrete storage silo with a flat roof cap, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing",
+      "inline": false
     },
     {
       "id": "silo-square-b",
@@ -1997,7 +2019,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a square guard checkpoint booth with dark windows and a flat roof, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option a (2026-10-12), UNREVIEWED: review four angles before packing",
+      "inline": false
     },
     {
       "id": "checkpoint-booth-b",
@@ -2027,7 +2050,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "a square three storey concrete office block, windows dark, one top corner broken off cleanly, square sections, solid and chunky, NO holes, NO cloth, NO small loose parts, NO lettering, weathered and dusty from years out of use",
-      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing"
+      "note": "overnight option b (2026-10-12), UNREVIEWED: review four angles before packing",
+      "inline": false
     },
     {
       "id": "workbench-old-c",

@@ -107,6 +107,24 @@ try {
   check('nearestStation finds the preset rack from its wall', near.rack === 'preset-rack', JSON.stringify(near));
   check('nearestStation finds nothing from the middle of the room', near.middle === null, JSON.stringify(near));
 
+  // ---- T17a: the window's models that live in the HD pack (registry inline: false). With the pack they are generated models
+  // in the window; without it (dist/hd moved away) every such model is a box and the window opens in its Static view (dust 0).
+  const hdOnly = Object.entries(JSON.parse(fs.readFileSync(path.join(root, 'apps/web/src/assets/gen/registry.json'), 'utf8')))
+    .filter(([, v]) => v.inline === false).map(([id]) => id);
+  const hdPresent = fs.existsSync(path.join(root, 'apps/web/dist/hd', 'cooling-tower-square-b', 'low.glb'));
+  const windowSets = await page.evaluate(() => window.__playScene.room.vista.debugSets());
+  const hdSets = windowSets.filter((s) => hdOnly.includes(s.id));
+  const hdSources = [...new Set(hdSets.map((s) => s.source))];
+  const vistaDust = await page.evaluate(() => window.__playScene.room.vista.stats().dust);
+  console.log('T17a window models (HD pack only):', JSON.stringify({ hdPresent, hdOnly: hdOnly.length, sets: hdSets.length, sources: hdSources, dust: vistaDust }));
+  check(`the window has the HD-pack models it places (${hdSets.length} sets, ${hdOnly.length} HD-pack models in the registry)`, hdSets.length >= 13);
+  if (hdPresent) {
+    check('with the HD pack, every HD-pack window model is a generated model (T17a)', hdSets.length > 0 && hdSets.every((s) => s.source === 'gen'), JSON.stringify(hdSources));
+  } else {
+    check('without the HD pack, the window opens in its Static view (no dust, T17a)', vistaDust === 0, `dust ${vistaDust}`);
+    check('without the HD pack, the HD-pack window models are boxes, not missing (T17a)', hdSets.every((s) => s.source === 'box'), JSON.stringify(hdSources));
+  }
+
   // The lowest world-space corner of every station rig (its userData.stationId group), from the meshes' boxes and matrices.
   const rigs = await page.evaluate(() => {
     const out = {};

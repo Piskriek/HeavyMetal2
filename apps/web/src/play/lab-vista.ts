@@ -127,6 +127,14 @@ export async function preloadVista(level: GenLevel): Promise<void> {
   await preloadSkins(WALKER_SKINS);
 }
 
+/**
+ * Whether a vista model that lives only in the HD pack (`inline: false`, T17a) did not load: no pack, or a failed fetch. Read
+ * after preloadVista; the room then shows the window's Static view, which needs no model, rather than boxes in place of them.
+ */
+export function vistaHdModelsMissing(): boolean {
+  return [...VISTA_ASSETS, ...CROSSWIND, ...VORTEX].some((id) => GEN[id]?.inline === false && getGenSync(id, VISTA_LEVEL) === null);
+}
+
 /** The monsters' budget in the window: the nearest six animate (every walker, on the low end), and a sprite skin holds four. */
 export const VISTA_MONSTER_BUDGET: MonsterRenderBudget = { animated: 6, perSkin: 4 };
 

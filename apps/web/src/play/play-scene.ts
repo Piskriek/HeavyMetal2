@@ -371,6 +371,10 @@ export interface PlayScene {
     waterVisible(): boolean;
     hasWaterMesh(): boolean;
     coverageActive(): boolean;
+    planetScene(): THREE.Scene;
+    labScene(): THREE.Scene;
+    setWaterVisible(v: boolean): void;
+    setCoverageActive(v: boolean): void;
     pixelLightCount(): number;
     testPieceAim(pieceId: number): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null;
     setAltCam(eye: { readonly x: number; readonly y: number; readonly z: number }, pitch: number, yaw: number, target?: { readonly x: number; readonly y: number; readonly z: number }): void;
@@ -2999,6 +3003,15 @@ export function createPlayScene(o: {
       waterVisible: () => (waterGroup ? waterGroup.visible : false),
       hasWaterMesh: () => waterMesh !== null,
       coverageActive: () => Boolean(ground?.material.uniforms.uCoverOn?.value === 1),
+      planetScene: () => planetScene,
+      labScene: () => labScene,
+      setWaterVisible: (v: boolean) => { if (waterGroup) waterGroup.visible = v; },
+      setCoverageActive: (v: boolean) => {
+        if (ground) {
+          ground.material.uniforms.uCoverOn!.value = v ? 1 : 0;
+          ground.material.uniformsNeedUpdate = true;
+        }
+      },
       where: () => where,
       position: () => pos.clone(),
       facing: () => yaw,

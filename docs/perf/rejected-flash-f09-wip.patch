@@ -1,0 +1,501 @@
+diff --git a/apps/web/src/play/play-scene.ts b/apps/web/src/play/play-scene.ts
+index 09a95f85..221021a3 100644
+--- a/apps/web/src/play/play-scene.ts
++++ b/apps/web/src/play/play-scene.ts
+@@ -371,6 +371,10 @@ export interface PlayScene {
+     waterVisible(): boolean;
+     hasWaterMesh(): boolean;
+     coverageActive(): boolean;
++    planetScene(): THREE.Scene;
++    labScene(): THREE.Scene;
++    setWaterVisible(v: boolean): void;
++    setCoverageActive(v: boolean): void;
+     pixelLightCount(): number;
+     testPieceAim(pieceId: number): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null;
+     setAltCam(eye: { readonly x: number; readonly y: number; readonly z: number }, pitch: number, yaw: number, target?: { readonly x: number; readonly y: number; readonly z: number }): void;
+@@ -1259,12 +1263,9 @@ export function createPlayScene(o: {
+   let cachedBiomeInput: BiomeInput | null = null;
+   let activeBase: S.Base | null = null;
+ 
+-  const buildDefaultBiomeInput = (g: PlotGround): BiomeInput => {
+-    const n = 256;
+-    const cellM = 1;
+-    const x0 = -128;
+-    const z0 = -128;
+-
++  // The layout the default biome input is built from: machines, keep-outs, water sources and tier. Cheap (no terrain sampling), so the cover
++  // and the scatter can check whether it has moved before they bake anything from it.
++  const defaultLayout = () => {
+     const machinesList: { x: number; z: number; r: number }[] = [];
+     const waterSourcesList: { x: number; z: number }[] = [];
+ 
+@@ -1320,20 +1321,25 @@ export function createPlayScene(o: {
+     }
+ 
+     const effectiveTier = vegSetting === 'off' ? 'low' : vegSetting === 'high' ? 'high' : 'low';
++    return { machines: machinesList, keepouts: keepoutsList, waterSources: waterSourcesList, tier: effectiveTier };
++  };
++  const defaultLayoutKeyOf = (L: ReturnType<typeof defaultLayout>): string => JSON.stringify([L.machines, L.keepouts, L.waterSources, L.tier]);
++  const buildDefaultBiomeInput = (g: PlotGround): BiomeInput => {
++    const L = defaultLayout();
+     return buildBiomeInput({
+       heightAt: (x, z) => g.heightAt(x, z),
+-      x0,
+-      z0,
+-      n,
+-      cellM,
+-      machines: machinesList,
+-      keepouts: keepoutsList,
+-      waterSources: waterSourcesList,
+-      waterVolume: waterSourcesList.length > 0 ? 60 : 0,
++      x0: -128,
++      z0: -128,
++      n: 256,
++      cellM: 1,
++      machines: L.machines,
++      keepouts: L.keepouts,
++      waterSources: L.waterSources,
++      waterVolume: L.waterSources.length > 0 ? 60 : 0,
+       stage: 6,
+       s: { pxd: 0.5, vtx: 0.5, lx: 0.5, aq: 0.5 },
+       seed: 7,
+-      tier: effectiveTier,
++      tier: L.tier,
+     });
+   };
+ 
+@@ -1375,12 +1381,14 @@ export function createPlayScene(o: {
+     const size = input.n * input.cellM;
+     const x0 = -size * 0.5;
+     const z0 = -size * 0.5;
++    const isLowTier = detail.groundBudget <= 75000 || vegSetting === 'off' || vegSetting === 'low';
+     ground.setCoverage({
+       tex,
+       x0,
+       z0,
+       size,
+       tiles: coverTiles,
++      lowTier: isLowTier,
+     });
+   };
+ 
+@@ -1426,11 +1434,13 @@ export function createPlayScene(o: {
+       }
+       const hydroTerrain: HydroTerrain = { size: n, cell: cellM, heights: terrainHeights };
+       const w = flood(hydroTerrain, waterSources, vol);
++      const isLowTier = detail.groundBudget <= 75000 || vegSetting === 'off' || vegSetting === 'low';
+       waterGroup = buildWaterSurfaces(w, (wx, wz) => ground!.heightAt(wx, wz), stageNum, {
+         x0,
+         z0,
+         cellM,
+         sunDir: SUN,
++        lowTier: isLowTier,
+       });
+       waterGroup.visible = stageNum >= 4;
+       waterMesh = waterGroup.getObjectByName('hydro-water-mesh') as THREE.Mesh | null;
+@@ -1440,7 +1450,9 @@ export function createPlayScene(o: {
+ 
+   const bakeCoverage = (): void => {
+     if (!ground) return;
+-    const input = cachedBiomeInput ?? buildDefaultBiomeInput(ground);
++    const layoutKey = defaultLayoutKeyOf(defaultLayout());
++    const input = buildDefaultBiomeInput(ground);
++    lastBiomeKey = lastCoverKey = layoutKey;
+     cachedBiomeInput = input;
+     for (let s = 0; s <= 6; s++) {
+       stageCoverTextures[s] = bakeStageCoverage(s, input);
+@@ -1449,8 +1461,16 @@ export function createPlayScene(o: {
+     buildAndAttachWaterSurfaces(shown);
+   };
+ 
++  // A base tick (ten a second in play) and a stage's wave call these with the layout often unchanged: when the key has not moved, nothing is baked
++  // again (before this, every tick re-baked the seven covers and the scatter, which took most of the frame on the laptop)
++  let lastBiomeKey = '';
++  let lastCoverKey = '';
+   const scheduleCoverRebuild = (): void => {
+     if (!ground) return;
++    const coverKey = defaultLayoutKeyOf(defaultLayout());
++    if (coverKey === lastCoverKey) return;
++    lastCoverKey = coverKey;
++    cachedBiomeInput = buildDefaultBiomeInput(ground);
+     if (coverSliceTimer) clearTimeout(coverSliceTimer);
+     let sIdx = 0;
+     const stepCover = (): void => {
+@@ -1483,6 +1503,9 @@ export function createPlayScene(o: {
+     biomeRebuildTimer = setTimeout(() => {
+       biomeRebuildTimer = null;
+       if (!biomeView || !ground) return;
++      const biomeKey = defaultLayoutKeyOf(defaultLayout());
++      if (biomeKey === lastBiomeKey) return;
++      lastBiomeKey = biomeKey;
+       const input = buildDefaultBiomeInput(ground);
+       cachedBiomeInput = input;
+       biomeView.build(input, false);
+@@ -2870,6 +2893,10 @@ export function createPlayScene(o: {
+       room.setWindowView(d.windowView);
+       fitLooks();
+       ground?.setBudget(d.groundBudget);
++      const waterMat = waterMesh ? (waterMesh.material as THREE.ShaderMaterial) : null;
++      if (waterMat?.uniforms?.uLowTier) {
++        waterMat.uniforms.uLowTier.value = (d.groundBudget <= 75000 || vegSetting === 'off' || vegSetting === 'low') ? 1.0 : 0.0;
++      }
+       plume.setMode(d.plumes);
+       plume.setDensity(d.plumeDensity);
+       labPlume.setMode(d.plumes);
+@@ -2999,6 +3026,15 @@ export function createPlayScene(o: {
+       waterVisible: () => (waterGroup ? waterGroup.visible : false),
+       hasWaterMesh: () => waterMesh !== null,
+       coverageActive: () => Boolean(ground?.material.uniforms.uCoverOn?.value === 1),
++      planetScene: () => planetScene,
++      labScene: () => labScene,
++      setWaterVisible: (v: boolean) => { if (waterGroup) waterGroup.visible = v; },
++      setCoverageActive: (v: boolean) => {
++        if (ground) {
++          ground.material.uniforms.uCoverOn!.value = v ? 1 : 0;
++          ground.material.uniformsNeedUpdate = true;
++        }
++      },
+       where: () => where,
+       position: () => pos.clone(),
+       facing: () => yaw,
+@@ -3171,6 +3207,7 @@ export function createPlayScene(o: {
+     },
+     buildBiome(input) {
+       cachedBiomeInput = input;
++      lastBiomeKey = lastCoverKey = '';
+       if (biomeView) {
+         biomeView.build(input);
+         biomeView.setStage(shown);
+@@ -3181,6 +3218,14 @@ export function createPlayScene(o: {
+       const effectiveTier = v === 'off' ? 'off' : v === 'high' ? 'high' : 'low';
+       biomeView?.setTier(effectiveTier);
+       biomeView?.setStage(shown);
++      const isLow = detail.groundBudget <= 75000 || v === 'off' || v === 'low';
++      if (ground?.material.uniforms.uCoverLow) {
++        ground.material.uniforms.uCoverLow.value = isLow ? 1 : 0;
++      }
++      const waterMat = waterMesh ? (waterMesh.material as THREE.ShaderMaterial) : null;
++      if (waterMat?.uniforms?.uLowTier) {
++        waterMat.uniforms.uLowTier.value = isLow ? 1.0 : 0.0;
++      }
+     },
+     getBiomeCounts() {
+       return biomeView ? biomeView.counts() : { total: 0, trees: 0, byKind: { tuft: 0, bush: 0, pine: 0, oak: 0, birch: 0 } };
+diff --git a/apps/web/src/play/plot-biome-view.ts b/apps/web/src/play/plot-biome-view.ts
+index b7f20e37..c952e65d 100644
+--- a/apps/web/src/play/plot-biome-view.ts
++++ b/apps/web/src/play/plot-biome-view.ts
+@@ -322,15 +322,19 @@ export function createPlotBiomeView(
+       const dist = Math.hypot(worldX, worldZ);
+ 
+       if (s.kind === 'tuft') {
+-        // Tufts on Low within 20 m; Mid/High within 30 m
+-        const maxDist = bakeTier === 'low' ? 20 : 30;
++        // Tufts on Low within 18 m; Mid/High within 30 m
++        const maxDist = bakeTier === 'low' ? 18 : 30;
+         if (dist > maxDist) continue;
+         groups.get('tuft')!.push({ ...s, worldX, worldZ });
+       } else if (s.kind === 'bush') {
++        // Bushes on Low: cap distance to 65 m
++        if (bakeTier === 'low' && dist > 65) continue;
+         groups.get('bush')!.push({ ...s, worldX, worldZ });
+       } else if (s.kind === 'pine' || s.kind === 'oak' || s.kind === 'birch') {
+-        // Near under 60 m, far beyond 60 m
+-        const targetId = dist < 60 ? `${s.kind}_near` : `${s.kind}_far`;
++        // Trees on Low: cull beyond 75 m, and switch to far LOD earlier (25 m vs 60 m)
++        if (bakeTier === 'low' && dist > 75) continue;
++        const nearDist = bakeTier === 'low' ? 25 : 60;
++        const targetId = dist < nearDist ? `${s.kind}_near` : `${s.kind}_far`;
+         groups.get(targetId)?.push({ ...s, worldX, worldZ });
+       }
+     }
+diff --git a/apps/web/src/play/plot-ground.ts b/apps/web/src/play/plot-ground.ts
+index 9f006193..4805287c 100644
+--- a/apps/web/src/play/plot-ground.ts
++++ b/apps/web/src/play/plot-ground.ts
+@@ -31,6 +31,7 @@ export interface PlotGround {
+     readonly z0: number;
+     readonly size: number;
+     readonly tiles?: CoverTextures;
++    readonly lowTier?: boolean;
+   } | null): void;
+   /** The ground's height at x, z, the planet's curve included. */
+   heightAt(x: number, z: number): number;
+@@ -128,7 +129,7 @@ interface TrackedBoulder {
+ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number; readonly sunDir: THREE.Vector3; readonly stage: number; readonly textureSize: number; readonly budget: number; readonly cover?: CoverTextures }): PlotGround {
+   const terrain = createTerrain({ seed: o.seed });
+   const textures = makeGroundTextures({ size: o.textureSize, seed: o.seed });
+-  const material = createGroundMaterial(textures, { stage: Math.max(1, o.stage), sunDir: o.sunDir, cover: o.cover });
++  const material = createGroundMaterial(textures, { stage: Math.max(1, o.stage), sunDir: o.sunDir, cover: o.cover, lowTier: o.budget <= 75000 });
+   const group = new THREE.Group();
+   scene.add(group);
+   const chunks = new Map<string, THREE.Mesh>();
+@@ -300,9 +301,11 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
+       ore: BOULDER_INITIAL_ORE,
+     });
+   });
++  const models = [0, 1, 2].map((shape) => smoothModel(`boulder${shape}` as SmoothId));
+   const rocks: THREE.InstancedMesh[] = byShape.map((list, shape) => {
+-    const model = smoothModel(`boulder${shape}` as SmoothId);
+-    const im = new THREE.InstancedMesh(model.near, rockMat, Math.max(1, list.length));
++    const model = models[shape]!;
++    const geo = budget <= 75000 ? model.far : model.near;
++    const im = new THREE.InstancedMesh(geo, rockMat, Math.max(1, list.length));
+     list.forEach((mm, k) => im.setMatrixAt(k, mm));
+     im.count = list.length;
+     im.computeBoundingSphere();
+@@ -406,7 +409,18 @@ export function createPlotGround(scene: THREE.Scene, o: { readonly seed: number;
+     },
+     setBudget(next) {
+       if (next === budget) return;
++      const wasLow = budget <= 75000;
+       budget = next;
++      const isLow = budget <= 75000;
++      if (wasLow !== isLow) {
++        rocks.forEach((im, shape) => {
++          im.geometry = isLow ? models[shape]!.far : models[shape]!.near;
++        });
++      }
++      if (material.uniforms.uCoverLow) {
++        material.uniforms.uCoverLow.value = isLow ? 1 : 0;
++        material.uniformsNeedUpdate = true;
++      }
+       if (Number.isFinite(lastX)) plan(lastX, lastZ);
+     },
+     setVisible(on) { group.visible = on; },
+diff --git a/apps/web/src/play/water-surfaces.ts b/apps/web/src/play/water-surfaces.ts
+index 712e9cd8..6128591c 100644
+--- a/apps/web/src/play/water-surfaces.ts
++++ b/apps/web/src/play/water-surfaces.ts
+@@ -14,6 +14,7 @@ export interface WaterSurfaceOptions {
+   readonly z0?: number;
+   readonly cellM?: number;
+   readonly sunDir?: THREE.Vector3;
++  readonly lowTier?: boolean;
+ }
+ 
+ const WATER_SURFACE_VERTEX = /* glsl */ `
+@@ -42,6 +43,7 @@ const WATER_SURFACE_FRAGMENT = /* glsl */ `
+   uniform vec3 uSkyColour;
+   uniform float uStage;
+   uniform float uTime;
++  uniform float uLowTier;
+ 
+   varying vec3 vWorldPos;
+   varying float vDepth;
+@@ -55,16 +57,22 @@ const WATER_SURFACE_FRAGMENT = /* glsl */ `
+ 
+   void main() {
+     // Discard completely dry exterior skirt vertices
+-    if (vDepth <= 0.002 && vStream <= 0.002) {
++    if (uLowTier <= 0.5 && vDepth <= 0.002 && vStream <= 0.002) {
+       discard;
+     }
+ 
+-    // Dual capillary wave normal for sun glint
++    // Capillary wave normal for sun glint: cheaper single wave on low tier
+     vec2 p = vWorldPos.xz;
+-    float w1 = sin(p.x * 1.9 + p.y * 1.3 + uTime * 1.8);
+-    float w2 = cos(p.x * 2.7 - p.y * 2.1 - uTime * 1.4);
+-    float w3 = sin((p.x - p.y) * 4.3 + uTime * 2.3);
+-    vec3 N = normalize(vec3((w1 * 0.5 + w2 * 0.3 + w3 * 0.2) * 0.06, 1.0, (w2 * 0.5 - w1 * 0.3 + w3 * 0.2) * 0.06));
++    vec3 N;
++    if (uLowTier > 0.5) {
++      float w1 = sin((p.x + p.y) * 1.8 + uTime * 1.5);
++      N = vec3(w1 * 0.04, 1.0, -w1 * 0.03);
++    } else {
++      float w1 = sin(p.x * 1.9 + p.y * 1.3 + uTime * 1.8);
++      float w2 = cos(p.x * 2.7 - p.y * 2.1 - uTime * 1.4);
++      float w3 = sin((p.x - p.y) * 4.3 + uTime * 2.3);
++      N = normalize(vec3((w1 * 0.5 + w2 * 0.3 + w3 * 0.2) * 0.06, 1.0, (w2 * 0.5 - w1 * 0.3 + w3 * 0.2) * 0.06));
++    }
+ 
+     vec3 L = normalize(uSunDir);
+     vec3 V = normalize(cameraPosition - vWorldPos);
+@@ -84,13 +92,13 @@ const WATER_SURFACE_FRAGMENT = /* glsl */ `
+ 
+     // Fresnel sky reflection + shoreline foam rim
+     float NdotV = max(dot(N, V), 0.05);
+-    float fresnel = 0.06 + 0.65 * pow(1.0 - NdotV, 4.0);
++    float fresnel = uLowTier > 0.5 ? (0.10 + 0.40 * (1.0 - NdotV)) : (0.06 + 0.65 * pow(1.0 - NdotV, 4.0));
+     float diffuse = 0.55 + 0.45 * max(dot(N, L), 0.0);
+     vec3 baseLit = mix(waterCol * diffuse, uSkyColour, fresnel * 0.45);
+ 
+     // Crisp solar specular glint
+     float NdotH = max(dot(N, H), 0.0);
+-    float glint = pow(NdotH, 96.0) * 1.35 + pow(NdotH, 16.0) * 0.18;
++    float glint = uLowTier > 0.5 ? (NdotH * NdotH * NdotH * NdotH * 0.85) : (pow(NdotH, 96.0) * 1.35 + pow(NdotH, 16.0) * 0.18);
+     vec3 finalCol = baseLit + vec3(1.0, 0.95, 0.82) * glint;
+ 
+     // Soft depth-faded shoreline alpha (0 at water's edge -> 0.88 in deep basin)
+@@ -287,14 +295,20 @@ export function buildWaterSurfaces(
+     return vIdx;
+   };
+ 
+-  for (let z = 0; z < n - 1; z++) {
+-    const row = z * n;
+-    for (let x = 0; x < n - 1; x++) {
+-      if (!includeCell[row + x]) continue;
++  const step = options?.lowTier ? 2 : 1;
++  for (let z = 0; z < n - step; z += step) {
++    for (let x = 0; x < n - step; x += step) {
++      let anyIncluded = false;
++      for (let dz = 0; dz < step && !anyIncluded; dz++) {
++        for (let dx = 0; dx < step && !anyIncluded; dx++) {
++          if (includeCell[(z + dz) * n + (x + dx)]) anyIncluded = true;
++        }
++      }
++      if (!anyIncluded) continue;
+       const v00 = getOrAddVertex(x, z);
+-      const v10 = getOrAddVertex(x + 1, z);
+-      const v01 = getOrAddVertex(x, z + 1);
+-      const v11 = getOrAddVertex(x + 1, z + 1);
++      const v10 = getOrAddVertex(x + step, z);
++      const v01 = getOrAddVertex(x, z + step);
++      const v11 = getOrAddVertex(x + step, z + step);
+       indices.push(v00, v01, v10, v10, v01, v11);
+     }
+   }
+@@ -313,7 +327,7 @@ export function buildWaterSurfaces(
+     fragmentShader: WATER_SURFACE_FRAGMENT,
+     transparent: true,
+     depthWrite: false,
+-    side: THREE.DoubleSide,
++    side: options?.lowTier ? THREE.FrontSide : THREE.DoubleSide,
+     uniforms: {
+       uSunDir: { value: sunDir },
+       uShallowColour: { value: new THREE.Color('#3dc8ff') },
+@@ -321,6 +335,7 @@ export function buildWaterSurfaces(
+       uSkyColour: { value: new THREE.Color('#8db9de') },
+       uStage: { value: stage },
+       uTime: { value: 0 },
++      uLowTier: { value: options?.lowTier ? 1.0 : 0.0 },
+     },
+   });
+ 
+diff --git a/packages/groundshader/src/index.ts b/packages/groundshader/src/index.ts
+index f14d0c9d..8686f20d 100644
+--- a/packages/groundshader/src/index.ts
++++ b/packages/groundshader/src/index.ts
+@@ -632,6 +632,7 @@ const FRAGMENT_SHADER = /* glsl */ `
+   uniform vec2 uCoverMetres;
+   uniform vec4 uCoverRect;
+   uniform float uCoverOn;
++  uniform float uCoverLow;
+ 
+   in vec3 vWorldPosition;
+   in vec3 vWorldNormal;
+@@ -809,10 +810,14 @@ const FRAGMENT_SHADER = /* glsl */ `
+       vec2 coverUv = (vWorldPosition.xz - uCoverRect.xy) / max(uCoverRect.zw, vec2(0.001));
+       if (coverUv.x >= 0.0 && coverUv.x <= 1.0 && coverUv.y >= 0.0 && coverUv.y <= 1.0) {
+         // Organic domain-warped macro breakup so cell edges and patches never read as a flat tint
+-        float mCoarse = macroNoise(vWorldPosition.xz * 0.085, 11.3);
+-        float mFine = macroNoise(vWorldPosition.xz * 0.31, 27.9);
+-        float mBreak = mCoarse * 0.65 + mFine * 0.35;
+-        vec2 jitterUv = coverUv + (vec2(mCoarse, mFine) - 0.5) * (1.25 / max(uCoverRect.zw, vec2(1.0)));
++        float mBreak = 0.5;
++        vec2 jitterUv = coverUv;
++        if (uCoverLow <= 0.5) {
++          float mCoarse = macroNoise(vWorldPosition.xz * 0.085, 11.3);
++          float mFine = macroNoise(vWorldPosition.xz * 0.31, 27.9);
++          mBreak = mCoarse * 0.65 + mFine * 0.35;
++          jitterUv = coverUv + (vec2(mCoarse, mFine) - 0.5) * (1.25 / max(uCoverRect.zw, vec2(1.0)));
++        }
+         vec4 cov = texture(uCoverMask, clamp(jitterUv, 0.0, 1.0));
+ 
+         float mossMask = cov.g;
+@@ -820,31 +825,39 @@ const FRAGMENT_SHADER = /* glsl */ `
+         float wetMask = cov.a;
+ 
+         if (mossMask > 0.01 || grassMask > 0.01) {
+-          vec2 mossUv = materialUv(vWorldPosition, geometricNormal, uCoverMetres.x, 6.0);
+-          vec2 grassUv = materialUv(vWorldPosition, geometricNormal, uCoverMetres.y, 7.0);
++          vec2 mossUv = uCoverLow > 0.5 ? vWorldPosition.xz / uCoverMetres.x : materialUv(vWorldPosition, geometricNormal, uCoverMetres.x, 6.0);
++          vec2 grassUv = uCoverLow > 0.5 ? vWorldPosition.xz / uCoverMetres.y : materialUv(vWorldPosition, geometricNormal, uCoverMetres.y, 7.0);
+ 
+           vec4 mossAH = texture(uCoverAlbedoHeight, vec3(mossUv, 0.0));
+-          vec4 mossNR = uStage > 1.0 ? texture(uCoverNormalRough, vec3(mossUv, 0.0)) : vec4(0.5, 0.5, 1.0, 0.86);
+           vec4 grassAH = texture(uCoverAlbedoHeight, vec3(grassUv, 1.0));
+-          vec4 grassNR = uStage > 1.0 ? texture(uCoverNormalRough, vec3(grassUv, 1.0)) : vec4(0.5, 0.5, 1.0, 0.72);
+-
+-          // Macro hue & brightness variation across the plot
+-          vec3 mossTint = mix(vec3(0.82, 0.90, 0.76), vec3(1.18, 1.15, 0.92), mBreak);
+-          vec3 grassTint = mix(vec3(0.80, 0.94, 0.72), vec3(1.22, 1.16, 0.86), mBreak);
+-          vec3 mossCol = mossAH.rgb * mossTint;
+-          vec3 grassCol = grassAH.rgb * grassTint;
+-
+-          // Height-biased transition so moss creeps into regolith crevices first, then grass crowns on top
+-          float mossW = smoothstep(0.08, 0.72, mossMask + (mossAH.a - baseHeight) * 0.32 + (mBreak - 0.5) * 0.22) * smoothstep(0.0, 0.08, mossMask);
+-          float grassW = smoothstep(0.08, 0.68, grassMask + (grassAH.a - 0.45) * 0.35 + (mBreak - 0.5) * 0.24) * smoothstep(0.0, 0.08, grassMask);
+ 
+-          albedo = mix(albedo, mossCol, mossW);
+-          mappedNormal = mix(mappedNormal, mossNR.rgb * 2.0 - 1.0, mossW);
+-          roughness = mix(roughness, mossNR.a, mossW);
+-
+-          albedo = mix(albedo, grassCol, grassW);
+-          mappedNormal = mix(mappedNormal, grassNR.rgb * 2.0 - 1.0, grassW);
+-          roughness = mix(roughness, grassNR.a, grassW);
++          if (uCoverLow > 0.5) {
++            float mossW = smoothstep(0.10, 0.65, mossMask) * step(0.01, mossMask);
++            float grassW = smoothstep(0.10, 0.65, grassMask) * step(0.01, grassMask);
++            albedo = mix(mix(albedo, mossAH.rgb, mossW), grassAH.rgb, grassW);
++            roughness = mix(mix(roughness, 0.86, mossW), 0.72, grassW);
++          } else {
++            vec4 mossNR = uStage > 1.0 ? texture(uCoverNormalRough, vec3(mossUv, 0.0)) : vec4(0.5, 0.5, 1.0, 0.86);
++            vec4 grassNR = uStage > 1.0 ? texture(uCoverNormalRough, vec3(grassUv, 1.0)) : vec4(0.5, 0.5, 1.0, 0.72);
++
++            // Macro hue & brightness variation across the plot
++            vec3 mossTint = mix(vec3(0.82, 0.90, 0.76), vec3(1.18, 1.15, 0.92), mBreak);
++            vec3 grassTint = mix(vec3(0.80, 0.94, 0.72), vec3(1.22, 1.16, 0.86), mBreak);
++            vec3 mossCol = mossAH.rgb * mossTint;
++            vec3 grassCol = grassAH.rgb * grassTint;
++
++            // Height-biased transition so moss creeps into regolith crevices first, then grass crowns on top
++            float mossW = smoothstep(0.08, 0.72, mossMask + (mossAH.a - baseHeight) * 0.32 + (mBreak - 0.5) * 0.22) * smoothstep(0.0, 0.08, mossMask);
++            float grassW = smoothstep(0.08, 0.68, grassMask + (grassAH.a - 0.45) * 0.35 + (mBreak - 0.5) * 0.24) * smoothstep(0.0, 0.08, grassMask);
++
++            albedo = mix(albedo, mossCol, mossW);
++            mappedNormal = mix(mappedNormal, mossNR.rgb * 2.0 - 1.0, mossW);
++            roughness = mix(roughness, mossNR.a, mossW);
++
++            albedo = mix(albedo, grassCol, grassW);
++            mappedNormal = mix(mappedNormal, grassNR.rgb * 2.0 - 1.0, grassW);
++            roughness = mix(roughness, grassNR.a, grassW);
++          }
+         }
+ 
+         // Wetness channel A: dampens regolith/moss albedo and lowers roughness near water
+@@ -916,6 +929,7 @@ export function createGroundMaterial(
+     skyColour?: THREE.Color;
+     groundColour?: THREE.Color;
+     cover?: CoverTextures;
++    lowTier?: boolean;
+   },
+ ): THREE.ShaderMaterial {
+   const covTex = o.cover ?? getDefaultCoverTextures();
+@@ -951,6 +965,7 @@ export function createGroundMaterial(
+         uCoverMetres: { value: new THREE.Vector2(covTex.metres[0], covTex.metres[1]) },
+         uCoverRect: { value: new THREE.Vector4(0, 0, 1, 1) },
+         uCoverOn: { value: 0 },
++        uCoverLow: { value: o.lowTier ? 1 : 0 },
+       },
+     ]),
+   });
+@@ -973,6 +988,7 @@ export function setCoverage(
+     readonly z0: number;
+     readonly size: number;
+     readonly tiles?: CoverTextures;
++    readonly lowTier?: boolean;
+   } | null,
+ ): void {
+   if (!cover) {
+@@ -1010,6 +1026,9 @@ export function setCoverage(
+     cover.size,
+   );
+   material.uniforms.uCoverOn!.value = 1;
++  if (cover.lowTier !== undefined && material.uniforms.uCoverLow) {
++    material.uniforms.uCoverLow.value = cover.lowTier ? 1 : 0;
++  }
+   material.uniformsNeedUpdate = true;
+ }
+ 

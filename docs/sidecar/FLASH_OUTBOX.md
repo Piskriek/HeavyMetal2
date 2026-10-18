@@ -120,3 +120,20 @@ Append one entry per job, in the format in `FLASH_INBOX.md`. Newest at the botto
 - Changes from brief: None. Prebaked stage coverage textures (0-6) behind loading step in `play.tsx`; time-sliced mask updates on machine/structure changes; old crater disc hidden at stage 4+.
 - Decisions left: None. Ready for next ticket.
 
+### [2026-10-18 07:10] F-15 [DONE] Studio hardening (POL-87, 88, 90 to 93): no play files
+- Commits: `5e77ed14` ("feat(studio): harden studio suite with layout write-back, error boundary, undo, and shared offscreen renderer (POL-87, POL-88, POL-90 to POL-93)")
+- Checks:
+  - `npm run typecheck`: 0 errors
+  - `npm test`: 2,840 unit pass, 0 fail, 19/19 performance checks pass
+  - `npm run build`: 14.84 MB single-file bundle (cap 16 MB)
+  - `node scripts/test-studio-tabs.mjs` on 3D PC: 30 of 30 checks pass (Look A/B split, 0 panel overflow, layout save/reload, undo restores moved copy, dev write-back writes `Dev Outpost` to `scene-layouts.json`, error boundary catches crash & keeps tabs alive, 4-angle renders)
+  - `node --import tsx scripts/test-grid-menus.mjs` on 3D PC: ALL CHECKS PASS
+  - `node scripts/test-campaign.mjs` on 3D PC: 45 of 45 beats PASS, 0 console/http errors, 0 HUD overlaps (`apps/web/public/checkpoints/` restored)
+- Features delivered:
+  - POL-88: Added `scene-layouts` to dev write-back with `checkSceneLayouts` validation; Scene tab saves to server in dev.
+  - POL-90: Scene inputs & gizmo drags push to Studio undo/redo stack; wired to top bar buttons & shortcuts (Ctrl+Z/Ctrl+Shift+Z/Ctrl+Y).
+  - POL-91: `StudioErrorBoundary` wraps each workspace tab; crashed tab shows error card and allows switching/recovery without crashing suite.
+  - POL-92: Shared `offscreen-renderer.ts` singleton with queued rendering for `four-angle.ts` and `studio-thumbs.ts`.
+  - POL-87 & POL-93: Extracted pure data/helpers into `-data.ts` modules for test isolation without CSS; replaced inline styles with CSS modules.
+- Decisions left: None. F-15 complete.
+

@@ -106,7 +106,7 @@ Brief: none separate; the job is this list. Co-op Phase 1 landed at ad9eacec and
 - **Remote avatars:** draw each peer from `client.samplePeers()` (100 ms behind) with the existing avatar mesh, inside the Low budget.
 - Test: extend `scripts/test-coop-outpost.mjs` so a guest sees the host's sculpt and the host's avatar. Run it, `npm test` and `test-campaign` (45 of 45) through `scripts/test-on-3dpc.sh --only`.
 
-## F-15 [OPEN] Studio hardening (POL-87, 88, 90 to 93): no play files
+## F-15 [DONE] Studio hardening (POL-87, 88, 90 to 93): no play files
 Brief: none separate; the job is this list. Each item's detail is in `docs/DEFERRED_POLISH_REGISTRY.md`. This job touches only `apps/web/src/studio/`, `apps/web/studio-server/`, `apps/web/src/shell/planetary-grid.tsx` and `audio-tab.tsx` (their CSS only), and the Studio tests. Never touch the F-09 files (Haiku has them) or anything under `apps/web/src/play/`.
 - **POL-88:** add `scene-layouts` to the write-back allowlist (`apps/web/studio-server/write-back.ts`, with a schema check like the tweaks), and point the Scene tab's Save at it when the route is writable. The built game keeps its per-browser save and Copy JSON.
 - **POL-91:** an error boundary around each Studio workspace that shows the error and keeps the other tabs alive.

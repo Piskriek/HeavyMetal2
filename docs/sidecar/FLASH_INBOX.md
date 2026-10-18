@@ -83,8 +83,8 @@ Brief: `docs/prompts/sidecar/T02BE-coverage-water.md`. Start it only after F-07 
 > **Reassigned to Haiku by Opus, 2026-10-18 02:50:** Flash has made no change since 17:54 on 17 October. Haiku finishes from Flash's uncommitted work in progress (play-scene.ts, plot-ground.ts, plot-biome-view.ts, water-surfaces.ts, packages/groundshader). Flash: don't resume F-09; take F-10 when it is DONE.
 Brief: `docs/prompts/sidecar/T02P-performance-pass.md`. Measure per layer first; expensive looks go behind Graphics settings with Auto, never deleted.
 
-## F-10 [HELD] TICKET-05: square socket markers, gunmetal panels, sliding door, avatar at 3 m, beam core, outcrops
-Brief: `docs/prompts/sidecar/T05-base-meshes-avatar-beam-outcrops.md`. HELD by Opus (2026-10-18): play-scene.ts has one writer at a time, and Opus schedules it (Haiku is on TPOL now, then T11b). Opus opens F-10 when play-scene.ts is free for Flash.
+## F-10 [MOVED] TICKET-05: square socket markers, gunmetal panels, sliding door, avatar at 3 m, beam core, outcrops
+Brief: `docs/prompts/sidecar/T05-base-meshes-avatar-beam-outcrops.md`. MOVED to Haiku by Opus (2026-10-18), alongside your F-19. Flash, skip it.
 
 ## F-11 [HELD] TICKET-03 P: colourful pixel plumes, only while machines operate
 Brief: `docs/prompts/sidecar/T03P-machine-plumes.md` (spec: docs/argo/notes/ARGO_NOTE_08_plumes.md). Start it only after F-10 is DONE.

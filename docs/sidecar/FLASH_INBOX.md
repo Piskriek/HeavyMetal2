@@ -161,8 +161,17 @@ Lanes right now: a Haiku owns `play-scene.ts` and `machine-props.ts` (T03P follo
 - **POL-99:** add clean close-up shots (HUD hidden, first person, the subject verified in view: no avatar, rifle rings, dome or wreck blocking) of the armory rail and holster, and of a near open leak and a sealing one, to `scripts/test-ticket07a.mjs`, saved beside its other shots. TRIFT's `scripts/pol95-103-rift-shots.mjs` already has the facing and avatar-hiding logic: reuse it.
 - Test: `npm test`, `test-ticket07a`, `test-studio-tabs`, `test-grid-menus` and `test-coop-outpost`, through `scripts/test-on-3dpc.sh --only "<your paths>"` (the worker is at 192.168.0.8, from `scripts/worker.env`). Look at every shot. Use POL-271 to POL-280 for new registry entries. Never run `scripts/runworld-pack.mjs` without explicit ids.
 
-## F-21 [HELD] @hm/plume: a gravity option and a count uniform (POL-261's package half)
-Brief: none separate; see POL-261 in the registry. HELD until the T03P follow-up (base hardpoint plumes) lands; Opus opens it.
-- A per-emitter gravity option, so the drill's ballistic sparks and the falling press and pylon pixels can be reproduced (ARGO_NOTE_08 describes them).
-- A count uniform, so a cadence change doesn't rebuild the instance buffer every frame (+0.11 ms GPU today).
-- Keep the API backward compatible; the play-scene emitters adopt it in a later step.
+## F-21 [OPEN] @hm/plume: a gravity option and a count uniform (POL-261's package half)
+Brief: none separate; the job is this list, with POL-261 in `docs/DEFERRED_POLISH_REGISTRY.md` and the drill, press and pylon notes in `docs/argo/notes/ARGO_NOTE_08_plumes.md`. The T03P follow-up has landed (44b6107f).
+Lanes right now: a Haiku owns `play.tsx`, `apps/web/src/credits/`, `lab-room.ts`, `goblin-front.tsx` and the HUD zone files (T14). Stay inside `packages/plume/` (its `src/index.ts` and `tests/plume.test.ts`). Don't touch `play-scene.ts`; the emitters adopt the new options in a later step.
+- **Gravity:** an optional per-emitter `gravity` (m/s², default 0, so every emitter today is unchanged) that bends `pixelAt`'s rise into a ballistic arc: launch up and out, then fall. It must stay a pure function of (emitter, index, time), so a pixel's position never depends on frame history.
+- **A count uniform:** changing how many pixels an emitter shows (a cadence pulse, T15's beat) must not rebuild the instance buffer each frame. Allocate once at the emitter's maximum and drive the visible count through a uniform or the draw range. Today's cadence-driven pours cost +0.11 ms GPU on the 3D PC.
+- **Keep the API backward compatible.** Every current caller compiles and draws exactly as before.
+- **Tests** (in `plume.test.ts`): gravity 0 equals today's output for a sample of pixels; a gravity pixel rises, then falls below its peak; changing the count makes no new buffer (spy on the allocation, or count the buffers).
+- **Check:** `npm run typecheck`, then `scripts/test-on-3dpc.sh --only "packages/plume" "npm test"` and `scripts/test-on-3dpc.sh --only "packages/plume" "npm run build && node scripts/test-machine-plumes.mjs"` (69 of 69 today). Report the build size.
+
+## F-22 [OPEN] Finish POL-99: the close-ups with the HUD really hidden (after F-21)
+Opus's review of F-20: the four close-ups in `scripts/test-ticket07a.mjs` frame their subjects, but the HUD is NOT hidden in any of them (the stage panel, the leak radar, health, the ticker, the compass and a Dr. Haddy subtitle all show). The sealed shot also has two monsters in front of the rift.
+- Hide every HUD layer and the subtitle for these four captures only, and restore them right after (the other shots in the test keep the HUD). Find the HUD's root elements in the page; don't add game code for it.
+- Take the sealed shot with no monster between the camera and the rift (clear them through the debug hooks first, or pick a moment with none in the frustum, and check it).
+- Stay inside `scripts/test-ticket07a.mjs`. Check: `scripts/test-on-3dpc.sh --only "scripts/test-ticket07a.mjs" "npm run build && node scripts/test-ticket07a.mjs"` (17 of 17), and copy the four shots back to look at each one before you report. Update POL-99 in the registry when it's done.

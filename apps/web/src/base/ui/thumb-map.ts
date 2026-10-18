@@ -149,6 +149,9 @@ export const REGISTRY_ASSET_IDS: ReadonlySet<string> = new Set<string>([
   'tool-mallet',
   'tool-scanner',
   'tool-screwdriver',
+  'turret-base',
+  'turret-yoke',
+  'turret-gun',
 ]);
 
 /**

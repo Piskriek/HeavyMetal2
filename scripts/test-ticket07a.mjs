@@ -73,12 +73,52 @@ const setCleanShot = async (clean = true) => {
   await page.evaluate((c) => {
     window.__hm?.hideOverlays?.(c);
     const scene = window.__playScene;
-    if (!scene) return;
-    const sc = scene.debug.planetScene?.() ?? scene.debug.scene?.();
-    if (sc) {
-      let cam = null;
-      sc.traverse((o) => { if (o.isPerspectiveCamera && o.parent === sc) cam = o; });
-      if (cam) cam.children.forEach((child) => { child.visible = !c; });
+    if (scene) {
+      for (const getScene of [scene.debug?.labScene, scene.debug?.planetScene, scene.debug?.scene]) {
+        const sc = getScene?.();
+        if (sc) {
+          let cam = null;
+          sc.traverse((o) => { if (o.isPerspectiveCamera && o.parent === sc) cam = o; });
+          if (cam) cam.children.forEach((child) => { child.visible = !c; });
+        }
+      }
+    }
+    const styleId = '__clean_shot_hud_hide__';
+    let style = document.getElementById(styleId);
+    if (c) {
+      if (!style) {
+        style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+          .play[data-hud-root] > *:not(canvas):not(.play-canvas),
+          .mentor-subtitle,
+          [data-testid="mentor-subtitle"],
+          [data-hud-zone],
+          .compass-ribbon,
+          .sync-word,
+          .floats-pill,
+          .play-sync-indicator,
+          .play-sync,
+          .play-plot,
+          .play-goal,
+          .play-dot,
+          .play-prompt,
+          .play-toast,
+          .hm-status-toast,
+          .radio-hud-btn,
+          .leak-radar,
+          .play-indicators,
+          [data-testid="weapon-hud-badge"],
+          [data-hud-root] > *:not(canvas):not(.play-canvas) {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    } else {
+      style?.remove();
     }
   }, clean);
 };
@@ -175,6 +215,8 @@ try {
     await ensureFirstPerson();
     const dot = await faceLeak(open, 8);
     check('POL-99: near open leak in view (facing >= 0.85, first person)', dot >= 0.85 && !(await avatarVisible()), `dot ${dot.toFixed(2)}`);
+    // POL-99: clear any ambient monsters before taking the open and sealing leak shots
+    await page.evaluate(() => window.__playScene?.monsters?.clearMobs());
     await setCleanShot(true);
     await page.waitForTimeout(100);
     await page.screenshot({ path: `${shots}ticket07a-rift-open.png` });
@@ -215,16 +257,19 @@ try {
       await teleport('planet', sealTarget.x + 6, sealTarget.z, 0, 0);
       await page.waitForTimeout(400);
       await dev('sealLeak', sealTarget.id, 9);
-      await dev('setMonstersSetting', 'normal');
       const sealed = await leakById(sealTarget.id);
       check('a held seal shuts the leak', sealed?.state === 'sealed', `state ${sealed?.state}`);
       await ensureFirstPerson();
       await faceLeak(sealed, 8);
+      // POL-99: clear all monsters so none stand between the camera and the rift
+      await page.evaluate(() => window.__playScene?.monsters?.clearMobs());
       await setCleanShot(true);
       await page.waitForTimeout(100);
       await page.screenshot({ path: `${shots}ticket07a-rift-sealed.png` });
       await page.screenshot({ path: `${shots}ticket07a-rift-sealed-closeup.png` });
       await setCleanShot(false);
+      // Restore monsters to normal for the subsequent proximity check
+      await dev('setMonstersSetting', 'normal');
       const others = (await dev('leaks')).filter((l) => !l.dormant && l.state !== 'sealed' && Math.hypot(l.x - sealed.x, l.z - sealed.z) < 60);
       if (others.length === 0) {
         const sBefore = (await dev('stats')).mobsSpawned;

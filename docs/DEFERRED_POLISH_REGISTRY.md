@@ -408,3 +408,38 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 - **Seen:** T13a. The stage push is in plotsim (ruling 06, `stage-up` to 4 on the first running heavy projector). The push shot, taken about a second after the install, shows the projector running, with its amber plume, and the sky going dark with stars. The stage-4 water shows in the east shot. The wave band itself is not clearly visible in any shot.
 - **Expected:** Argo reviews the wave band and the stage-4 sky on a settled shot, and the owner says whether the mid-wave dark sky is intended.
 - Sidecar Task: POL-297 - Argo reviews the push shots (shots-run/ticket13-stage-push.png).
+
+### T17a closures (TICKET-17 part a, 18 October 2026)
+- **POL-27 (size watch):** the single file goes from 15.141 MiB (15,876,595 bytes) to 13.667 MiB (14,331,315 bytes). 24 vista and scenery lows moved to `public/hd/<id>/low.glb` (`inline: false`); `scripts/size-report.mjs` gives the breakdown.
+- **POL-83:** `.play[data-hud-root]` was already scoped at HEAD (since 767f75a5). T17a scopes the last bare `.play kbd` rule to the same root. The Studio tabs suite passes 41 of 41.
+- **POL-115:** verified, not changed. The client and OutpostRoom both refuse a non-owner build while version is 0 (`waiting-for-host-seed`). test-coop-outpost checks it: 30 of 30.
+- **POL-117:** verified, not changed. The room's join broadcast carries the username and `rosterOf` shows it. test-coop-outpost checks the host's roster names.
+- **POL-282 (presses):** `machinePlumeGravity` now lets the press and heavy press settle (0.2 and 0.3). The other pours still rise straight. test-machine-plumes: 121 of 121.
+
+### POL-311: the no-pack window is the Static view, by design (T17a)
+- **Seen:** T17a. With `public/hd` absent, the lab window opens in its Static storm plane with no boxes. The 24 HD-only models show in the Full view only with the pack.
+- **Expected:** Argo confirms the Static fallback is the right no-pack look, or asks for cheaper inline stand-ins for the window's hero props.
+- Sidecar Task: POL-311 - Argo rules on the no-pack window.
+
+### POL-312: the pack script's `inline: false` path is written but not yet run (T17a)
+- **Seen:** T17a. `scripts/runworld-pack.mjs` writes a flagged asset's low to `hd/<id>/low.glb` and records `inline: false`. The 24 existing lows were moved with `git mv` (byte-identical), so the script was not run on them.
+- **Expected:** the next re-pack of one flagged id (an explicit id) checks the new path: low.glb lands in `hd/`, the `gen/` copy is removed, and the registry keeps `inline: false`.
+- Sidecar Task: POL-312 - run the pack on one flagged id when its source changes.
+
+### POL-313: legacy loader labels replaced (T17a), wording to confirm
+- **Seen:** T17a, POL-71. `lab.tsx`: "Waking the goblin" and "Waking the animals" now read "Loading the lab models". `crafter.tsx`: "Waking the animals" now reads "Loading the wildlife".
+- **Expected:** Opus confirms the two labels.
+- Sidecar Task: POL-313 - confirm the wording.
+
+### POL-314: the no-pack lab window's draw calls sit at the 185 budget (T17a)
+- **Seen:** T17a, the lab overhaul run: 184 draw calls with the pack, 185 without it (the budget is at most 185).
+- **Expected:** re-measure after the next lab change; the budget is not raised quietly.
+- Sidecar Task: POL-314 - watch the count in test-lab-overhaul.
+
+### Closures recorded by Opus (18 October 2026, evening)
+These landed earlier but were never marked here, so ARGO_NOTE_18 planned them again.
+- **Done in F-15 (Gemini-Flash, 5e77ed14):** POL-87 and POL-93 (one CSS source per screen), POL-88 (the Scene tab saves to `scene-layouts`), POL-90 (Scene edits on the undo stack), POL-91 (an error boundary per Studio tab), POL-92 (one shared offscreen renderer).
+- **Done in F-16 (Gemini-Flash, d529852f):** POL-21 (scenedoc structural sharing), POL-86 (the `levels.json` write route), POL-89 (machine and structure sockets in the registry), POL-94 (the gizmo drag test).
+- **Done in F-17 (Gemini-Flash, 60c47826):** POL-43 (the linked-bin count in the ticker), POL-78 (the 3-column controls grid), POL-79 (radial labels wrap), POL-80 (the empty-rack state), POL-82 (refusals as a compact toast).
+- **Still open from TICKET-18:** POL-35, POL-44, POL-45 and POL-46 (Argo is writing the bundle).
+- **POL-313:** the wording "Loading the lab models" and "Loading the wildlife" is confirmed (Opus).

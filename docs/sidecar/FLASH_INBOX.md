@@ -138,3 +138,6 @@ This job touches only `apps/web/src/base/ui/` (`radial-menu.*`, `hud-zones*`), `
 - **POL-43:** the bottom-right ticker shows linked-bin counts (for example "Ore 24 (+140)"). Pickup toasts stay as they are.
 - Load the frontend-design skill before UI work, and keep the HUD's look (plan 28's skins).
 - Test: extend `scripts/test-build-ux.mjs` (or the HUD test that covers these) so the grid is fully visible at 1280 x 720, a long radial label wraps, the empty Apply state shows, a refused placement raises the compact toast (no title card), and the ticker shows a linked count. Take shots and look at them. Run it, `npm test` and `test-campaign` (45 of 45, zero HUD overlaps) through `scripts/test-on-3dpc.sh --only "<your paths>"`. Typecheck on the laptop. Use POL-211 to POL-220 for new registry entries.
+
+## F-18 [HELD] TICKET-10: the wave band, monster wall pathing, the foregrip IK, play-scene Window A
+Brief: `docs/prompts/sidecar/T10-wave-band-monster-nav-window-a.md` (Argo's bundle and ARGO_NOTE_12). HELD: play-scene.ts has one writer at a time, and Haiku's T11b holds it now. Opus opens F-18 when T11b lands. Read the brief's "copy or merge" section first: never copy Argo's play-scene.ts.

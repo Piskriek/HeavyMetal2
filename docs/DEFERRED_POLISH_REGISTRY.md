@@ -274,3 +274,8 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 - **Seen:** T06b (b60aee2f). The generated console's guide is a short H-slot (0.18 m), so the lever's full throw (play-scene sends −1.1 rad) would put the grip through the hood. `lab-room.ts` maps the throw to 0.25 rad from a 0.15 rad rest tilt.
 - **Expected:** a big, readable throw. The player pulls the lever that wakes the lab.
 - Sidecar Task: POL-121 - re-image `operator-console` with a long arc slot (or a raised quadrant guide) on the deck's right, re-run the model batch, and widen the throw to about 1 rad.
+
+### POL-141: what "operating" means for a lab station's plume (Argo's call)
+- **Seen:** TPOL (a7490ea5). Argo's lab code added `setOperating` / `isOperating` to gate each station's pixel plume, but nothing calls it, so adopting it would hide every lab plume. The plumes stay gated on power only.
+- **Expected:** the owner's rule is that machines spew colourful pixel plumes only while operating. For a lab station, Argo decides what operating means: while its window is open, for a few seconds after a write or print, or always when powered.
+- Sidecar Task: POL-141 - Argo decides; then a sidecar wires `setOperating` from the play screen's station events.

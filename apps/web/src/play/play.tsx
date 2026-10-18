@@ -59,7 +59,7 @@ import { currentOutpostSession, leaveOutpostSession, rosterOf, subscribeOutpostS
 import { startCampaignWorld } from '../base/campaign-world';
 import { BaseHud } from '../base/ui/base-hud';
 import { footprintSolids, HARDPOINT_HALF } from '../base/navgrid';
-import { createWorldViewSource, WorldViewSource, formatRefusalToast } from '../base/world-view';
+import { createWorldViewSource, WorldViewSource, formatRefusalToast, formatWhy } from '../base/world-view';
 import {
   apply, pieceAt, pieceAtIn, preview, withBridgeStore, BRIDGE_RANGE, BRIDGE_STORE,
   BEAM_RANGE, structureEnv, planGhosts, layoutPieces, roomAt, machineAt, INSTANT_TIME_SCALE,
@@ -105,7 +105,7 @@ const SCULPT_LABEL: Readonly<Record<SculptTool, string>> = { carve: 'Carve', rai
 /** One slice of the X radial (TICKET-04): what it picks, its picture when it has one, and why it is locked. */
 interface RadialItem { readonly id: string; readonly label: string; readonly ref: ThumbRef | null; readonly locked: string | null }
 /** What the X radial shows right now, built from the held rifle's mode or the held blueprint; `pick` runs on the chosen slice. */
-interface RadialSpec { readonly hint: string; readonly items: readonly RadialItem[]; readonly pick: (id: string) => void }
+interface RadialSpec { readonly hint: string; readonly items: readonly RadialItem[]; readonly emptyState?: string | { readonly message: string; readonly icon?: string } | null; readonly pick: (id: string) => void }
 /** How long Z is held to remove the aimed piece (TICKET-04). A tap removes nothing. */
 const REMOVE_HOLD_MS = 500;
 import {
@@ -476,6 +476,17 @@ export function PlayScreen(props: {
   const envRef = useRef<Env | null>(null);
   const placeRef = useRef<((kind: MachineKind, x: number, z: number, yaw: number) => boolean) | null>(null);
   const [toast, setToast] = useState<{ readonly text: string; readonly sub: string; readonly id: number } | null>(null);
+  const [statusToast, setStatusToast] = useState<{ readonly text: string; readonly id: number } | null>(null);
+  const statusToastTimerRef = useRef<number | null>(null);
+  const showStatusToast = useCallback((text: string) => {
+    if (statusToastTimerRef.current !== null) window.clearTimeout(statusToastTimerRef.current);
+    const id = Date.now();
+    setStatusToast({ text, id });
+    statusToastTimerRef.current = window.setTimeout(() => {
+      setStatusToast((cur) => (cur?.id === id ? null : cur));
+      statusToastTimerRef.current = null;
+    }, 3000);
+  }, []);
   const isMashTest = typeof location !== 'undefined' && (new URLSearchParams(location.search).has('mash') || new URLSearchParams(location.search).has('monstermash'));
   const isDevSeed = typeof location !== 'undefined' && new URLSearchParams(location.search).get('kit') === '1';
   /** The debug switch (TASK-20): `window.__dev` exists in dev builds and when the URL has `?e2e`. Players never get it. */
@@ -1004,7 +1015,7 @@ useEffect(() => {
         // in a session the room answers every command, and that answer shows the refusal once (the session's listener below)
         if (session) continue;
         console.warn('[dispatchBase refused]', ev);
-        say(formatRefusalToast(ev));
+        showStatusToast(formatRefusalToast(ev));
         gameAudio.playRefuse();
         narratorRef.current?.trigger('build:refused');
       } else if (ev.type === 'placed') {
@@ -1136,7 +1147,7 @@ useEffect(() => {
           const me = session.client.state().playerId;
           for (const ev of events) {
             if (ev.type === 'refused' && meta.actorId === me) {
-              say(formatRefusalToast(ev));
+              showStatusToast(formatRefusalToast(ev));
               gameAudio.playRefuse();
               narratorRef.current?.trigger('build:refused');
             } else if (ev.type === 'removed' && meta.actorId !== me) {
@@ -1167,14 +1178,14 @@ useEffect(() => {
     const { snap, short } = lp.prev;
     if (!snap.ok || short.length > 0) {
       if (short.length > 0) {
-        say(`Missing: ${short.map((s) => `${s.n} ${ITEMS[s.item]?.name ?? s.item}`).join(', ')}`);
+        showStatusToast(`Missing: ${short.map((s) => `${s.n} ${ITEMS[s.item]?.name ?? s.item}`).join(', ')}`);
       } else if (snap.why) {
-        say(`Cannot place: ${snap.why}`);
+        showStatusToast(formatWhy(snap.why));
       }
       return false;
     }
     const lock = gateReason(snap.mode === 'place' && snap.piece.kind === 'weaponBench' ? 'weaponBench' : 'structures', stateRef.current.chain, plotRef.current.stage);
-    if (lock) { say('Locked', lock); return false; }
+    if (lock) { showStatusToast(`Locked: ${lock}`); return false; }
     if (snap.mode === 'place') {
       let finalR = snap.piece.r;
       if (
@@ -2878,13 +2889,21 @@ useEffect(() => {
         items.push({ id: c.id, label: c.name, ref: { item: `cartridge:${c.preset}`, tint: presetLook(c.preset)?.colour }, locked: null });
       }
       const empty = items.length === 0;
+      if (empty) {
+        return {
+          hint: 'Beam port',
+          items: [],
+          emptyState: 'No written cartridges: write one at the preset bench',
+          pick: () => {},
+        };
+      }
       // a radial with one slice is half a wheel: a locked slice fills the other half
       while (items.length < 2) {
         items.push({
           id: `pad-${items.length}`,
-          label: empty ? 'Rack empty' : 'Free slot',
+          label: 'Free slot',
           ref: null,
-          locked: empty ? 'Write a cartridge at the preset bench in the lab' : 'Write another cartridge to fill this slot',
+          locked: 'Write another cartridge to fill this slot',
         });
       }
       return {
@@ -3679,10 +3698,21 @@ useEffect(() => {
               ) : (() => {
                 const hasDrill = plotRef.current.machines.some((m) => m.kind === 'drill');
                 const outOfOreNoDrill = hud.plot.ore <= 0 && !hasDrill;
+                const linkedOre = (() => {
+                  const w = baseWorldRef.current;
+                  if (!w?.boxes) return 0;
+                  let sum = 0;
+                  for (const b of w.boxes) {
+                    for (const s of b.slots) {
+                      if (s && s.item === 'ore') sum += s.n;
+                    }
+                  }
+                  return sum;
+                })();
                 return (
                   <>
-                    <p className={`play-ore${outOfOreNoDrill ? ' out-of-ore' : ''}`}>
-                      <b>{Math.floor(hud.plot.ore)}</b> ore <span>{signed(hud.plot.oreRate)}/s</span>
+                    <p className={`play-ore${outOfOreNoDrill ? ' out-of-ore' : ''}`} data-testid="plot-ore-ticker">
+                      <b>{Math.floor(hud.plot.ore)}</b> ore{linkedOre > 0 ? <span className="play-ore-linked"> (+{linkedOre})</span> : null} <span>{signed(hud.plot.oreRate)}/s</span>
                       {outOfOreNoDrill ? <em className="play-ore-warn">Out of ore: hold E on a boulder, or build a rock drill</em> : null}
                     </p>
                     <p className={`play-power${hud.plot.satisfaction < 0.999 ? ' short' : ''}`}><b>{hud.plot.demand.toFixed(0)}</b> of {hud.plot.supply.toFixed(0)} kW <span className="play-power-pct">{Math.round(hud.plot.satisfaction * 100)}%</span></p>
@@ -4260,6 +4290,7 @@ useEffect(() => {
             <RadialMenu
               slices={radial.items.map((it, i) => ({ id: it.id, label: it.label, thumb: radialThumbs[i] ?? null, locked: it.locked }))}
               hint={radial.hint}
+              emptyState={radial.emptyState}
               onPick={(id) => { radial.pick(id); closeRadial(); }}
               onClose={closeRadial}
             />
@@ -4689,6 +4720,12 @@ useEffect(() => {
             />
           )}
           {toast && !isAnyBaseWindowOpen && !hideOverlays ? <div key={toast.id} className={`play-toast${toast.text === 'Sync lost' ? ' lost' : ''}${toast.text.length > 20 ? ' long' : ''}`} role="status" data-hud-zone="title"><b>{toast.text}</b>{toast.sub ? <span>{toast.sub}</span> : null}</div> : null}
+          {statusToast && !isAnyBaseWindowOpen && !hideOverlays ? (
+            <div key={statusToast.id} className="hm-status-toast" role="status" data-testid="status-toast">
+              <span className="hm-status-toast-icon">⚠</span>
+              <span className="hm-status-toast-text">{statusToast.text}</span>
+            </div>
+          ) : null}
           {baseWorldVersion > 0 && <span style={{ display: 'none' }} data-base-version={baseWorldVersion} />}
         </>
       ) : null}

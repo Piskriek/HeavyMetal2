@@ -19,9 +19,15 @@ export interface RadialSlice {
   readonly locked?: string | null;
 }
 
+export interface RadialEmptyState {
+  readonly message: string;
+  readonly icon?: string;
+}
+
 export interface RadialMenuProps {
   readonly slices: readonly RadialSlice[];
   readonly hint: string;
+  readonly emptyState?: RadialEmptyState | string | null;
   readonly onPick: (id: string) => void;
   readonly onClose: () => void;
 }
@@ -63,6 +69,7 @@ function buildWedgePath(
 export const RadialMenu: React.FC<RadialMenuProps> = ({
   slices,
   hint,
+  emptyState,
   onPick,
   onClose,
 }) => {
@@ -169,97 +176,121 @@ export const RadialMenu: React.FC<RadialMenuProps> = ({
         className="hm-radial-wheel"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* SVG Wedge Sectors */}
-        <svg
-          className="hm-radial-svg"
-          viewBox="0 0 380 380"
-          aria-hidden="true"
-        >
-          <circle
-            cx="190"
-            cy="190"
-            r="176"
-            className="hm-radial-outer-ring"
-          />
-          {clampedSlices.map((slice, idx) => {
-            const centerRad = idx * stepRad;
-            const startRad = centerRad - stepRad / 2 + gapRad;
-            const endRad = centerRad + stepRad / 2 - gapRad;
-            const isSelected = activeIndex === idx;
-            const isLocked = Boolean(slice.locked);
-            const d = buildWedgePath(190, 190, 62, 170, startRad, endRad);
-
-            return (
-              <path
-                key={slice.id}
-                d={d}
-                className={`hm-radial-wedge${isSelected ? ' is-active' : ''}${isLocked ? ' is-locked' : ''}`}
-                onMouseEnter={() => setActiveIndex(idx)}
-                onClick={() => {
-                  if (!isLocked) onPick(slice.id);
-                }}
-              />
-            );
-          })}
-        </svg>
-
-        {/* Slice Content Nodes (Thumbnail + UI Label) */}
-        {clampedSlices.map((slice, idx) => {
-          const centerRad = idx * stepRad;
-          const pos = polarToCartesian(190, 190, WHEEL_RADIUS - 22, centerRad);
-          const isSelected = activeIndex === idx;
-          const isLocked = Boolean(slice.locked);
-
-          return (
-            <button
-              key={slice.id}
-              type="button"
-              className={`hm-radial-slice${isSelected ? ' is-active' : ''}${isLocked ? ' is-locked' : ''}`}
-              style={{
-                left: `${(pos.x / 380) * 100}%`,
-                top: `${(pos.y / 380) * 100}%`,
-              }}
-              onMouseEnter={() => setActiveIndex(idx)}
-              onClick={() => {
-                if (!isLocked) onPick(slice.id);
-              }}
-              aria-disabled={isLocked}
-              data-testid={`radial-slice-${slice.id}`}
-            >
-              {slice.thumb ? (
-                <img
-                  src={slice.thumb}
-                  alt=""
-                  className="hm-radial-slice-thumb"
-                  draggable={false}
-                />
-              ) : (
-                <span className="hm-radial-slice-dot" aria-hidden="true" />
-              )}
-              <span className="hm-radial-slice-label">{slice.label}</span>
-              {isLocked && (
-                <span className="hm-radial-slice-lock-tag">LOCKED</span>
-              )}
-            </button>
-          );
-        })}
-
-        {/* Centre Telemetry Hub */}
-        <div className="hm-radial-hub" data-testid="radial-hub">
-          <span className="hm-radial-hub-hint">{hint}</span>
-          <strong className="hm-radial-hub-title">
-            {activeSlice ? activeSlice.label : 'Move mouse to select'}
-          </strong>
-          {activeSlice?.locked ? (
-            <span className="hm-radial-hub-locked" data-testid="radial-locked-reason">
-              {activeSlice.locked}
-            </span>
-          ) : (
+        {clampedSlices.length === 0 ? (
+          <div className="hm-radial-empty-card" data-testid="radial-empty-state">
+            <div className="hm-radial-empty-icon" aria-hidden="true">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="4" y="2" width="16" height="20" rx="3" />
+                <line x1="8" y1="6" x2="16" y2="6" />
+                <line x1="8" y1="10" x2="16" y2="10" />
+                <circle cx="12" cy="15" r="2" />
+              </svg>
+            </div>
+            <strong className="hm-radial-empty-title">{hint}</strong>
+            <p className="hm-radial-empty-msg" data-testid="radial-empty-msg">
+              {typeof emptyState === 'string'
+                ? emptyState
+                : emptyState?.message ?? 'No written cartridges: write one at the preset bench'}
+            </p>
             <span className="hm-radial-hub-keys">
-              <kbd>Click</kbd> or release <kbd>X</kbd> · <kbd>Esc</kbd> Cancel
+              <kbd>Esc</kbd> or release <kbd>X</kbd> to close
             </span>
-          )}
-        </div>
+          </div>
+        ) : (
+          <>
+            {/* SVG Wedge Sectors */}
+            <svg
+              className="hm-radial-svg"
+              viewBox="0 0 380 380"
+              aria-hidden="true"
+            >
+              <circle
+                cx="190"
+                cy="190"
+                r="176"
+                className="hm-radial-outer-ring"
+              />
+              {clampedSlices.map((slice, idx) => {
+                const centerRad = idx * stepRad;
+                const startRad = centerRad - stepRad / 2 + gapRad;
+                const endRad = centerRad + stepRad / 2 - gapRad;
+                const isSelected = activeIndex === idx;
+                const isLocked = Boolean(slice.locked);
+                const d = buildWedgePath(190, 190, 62, 170, startRad, endRad);
+
+                return (
+                  <path
+                    key={slice.id}
+                    d={d}
+                    className={`hm-radial-wedge${isSelected ? ' is-active' : ''}${isLocked ? ' is-locked' : ''}`}
+                    onMouseEnter={() => setActiveIndex(idx)}
+                    onClick={() => {
+                      if (!isLocked) onPick(slice.id);
+                    }}
+                  />
+                );
+              })}
+            </svg>
+
+            {/* Slice Content Nodes (Thumbnail + UI Label) */}
+            {clampedSlices.map((slice, idx) => {
+              const centerRad = idx * stepRad;
+              const pos = polarToCartesian(190, 190, WHEEL_RADIUS - 22, centerRad);
+              const isSelected = activeIndex === idx;
+              const isLocked = Boolean(slice.locked);
+
+              return (
+                <button
+                  key={slice.id}
+                  type="button"
+                  className={`hm-radial-slice${isSelected ? ' is-active' : ''}${isLocked ? ' is-locked' : ''}`}
+                  style={{
+                    left: `${(pos.x / 380) * 100}%`,
+                    top: `${(pos.y / 380) * 100}%`,
+                  }}
+                  onMouseEnter={() => setActiveIndex(idx)}
+                  onClick={() => {
+                    if (!isLocked) onPick(slice.id);
+                  }}
+                  aria-disabled={isLocked}
+                  data-testid={`radial-slice-${slice.id}`}
+                >
+                  {slice.thumb ? (
+                    <img
+                      src={slice.thumb}
+                      alt=""
+                      className="hm-radial-slice-thumb"
+                      draggable={false}
+                    />
+                  ) : (
+                    <span className="hm-radial-slice-dot" aria-hidden="true" />
+                  )}
+                  <span className="hm-radial-slice-label">{slice.label}</span>
+                  {isLocked && (
+                    <span className="hm-radial-slice-lock-tag">LOCKED</span>
+                  )}
+                </button>
+              );
+            })}
+
+            {/* Centre Telemetry Hub */}
+            <div className="hm-radial-hub" data-testid="radial-hub">
+              <span className="hm-radial-hub-hint">{hint}</span>
+              <strong className="hm-radial-hub-title">
+                {activeSlice ? activeSlice.label : 'Move mouse to select'}
+              </strong>
+              {activeSlice?.locked ? (
+                <span className="hm-radial-hub-locked" data-testid="radial-locked-reason">
+                  {activeSlice.locked}
+                </span>
+              ) : (
+                <span className="hm-radial-hub-keys">
+                  <kbd>Click</kbd> or release <kbd>X</kbd> · <kbd>Esc</kbd> Cancel
+                </span>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

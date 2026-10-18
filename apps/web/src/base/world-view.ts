@@ -53,13 +53,24 @@ export function toItemView(id: string): ItemView {
   };
 }
 
-export function formatRefusalToast(event: Extract<BaseEvent, { type: 'refused' }>): string {
-  if (event.why === 'short' && event.short && event.short.length > 0) {
-    const s = event.short[0]!;
-    const name = ITEMS[s.item]?.name ?? s.item;
-    return `Missing: ${s.n} ${name}`;
-  }
-  switch (event.why) {
+export function formatWhy(why: string): string {
+  switch (why) {
+    case 'same-stage':
+      return 'Already at this stage';
+    case 'occupied':
+      return 'Cannot place: Space is occupied';
+    case 'ground':
+      return 'Cannot place: Ground in the way';
+    case 'steep':
+      return 'Cannot place: Terrain is too steep';
+    case 'overlap':
+      return 'Cannot place: Overlaps another structure';
+    case 'needs-floor':
+      return 'Cannot place: Requires a floor';
+    case 'needs-pad':
+      return 'Cannot place: Requires a 2x2 foundation pad';
+    case 'unsupported':
+      return 'Cannot place: Insufficient structural support';
     case 'no-blueprint':
       return 'No blueprint equipped';
     case 'wrong-kind':
@@ -67,7 +78,11 @@ export function formatRefusalToast(event: Extract<BaseEvent, { type: 'refused' }
     case 'not-empty':
       return 'Empty the bin first';
     case 'would-spill':
-      return 'A full bin would fall';
+      return 'Cannot deconstruct: Stored contents would fall';
+    case 'has-machine':
+      return 'Cannot deconstruct: Machine installed on piece';
+    case 'would-drop-machine':
+      return 'Cannot deconstruct: Machine above would fall';
     case 'no-bench':
       return 'Stand at a Drafting Table';
     case 'known':
@@ -80,8 +95,6 @@ export function formatRefusalToast(event: Extract<BaseEvent, { type: 'refused' }
       return 'Storage bin full';
     case 'bad-slot':
       return 'Invalid slot';
-    case 'occupied':
-      return 'Slot occupied';
     case 'wrong-slot':
       return 'Incompatible equipment slot';
     case 'nothing':
@@ -90,9 +103,34 @@ export function formatRefusalToast(event: Extract<BaseEvent, { type: 'refused' }
       return 'Inventory full';
     case 'missing':
       return 'Piece not found';
-    default:
-      return `Action refused: ${event.why}`;
+    case 'no-hardpoint':
+      return 'Must be installed on a hardpoint';
+    case 'no-machine':
+      return 'Machine not found';
+    case 'queue-full':
+      return 'Fabrication queue full';
+    case 'locked':
+      return 'Technology locked at current stage';
+    case 'no-bridge-store':
+      return 'Bridge storage unavailable';
+    case 'not-a-door':
+      return 'Target is not a door';
+    case 'no-plan':
+      return 'Plan not found';
+    default: {
+      const clean = why.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      return `Action refused: ${clean}`;
+    }
   }
+}
+
+export function formatRefusalToast(event: Extract<BaseEvent, { type: 'refused' }>): string {
+  if (event.why === 'short' && event.short && event.short.length > 0) {
+    const s = event.short[0]!;
+    const name = ITEMS[s.item]?.name ?? s.item;
+    return `Missing: ${s.n} ${name}`;
+  }
+  return formatWhy(event.why);
 }
 
 export interface WorldViewSourceOptions {

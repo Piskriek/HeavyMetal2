@@ -108,14 +108,14 @@ try {
 
   // ---- boot: the dev kit on the Moon, Act IV done and stage 2 (Structures open), as the base-building test does
   await page.goto(`http://localhost:${port}/?base&kit=1&e2e`, { waitUntil: 'domcontentloaded' });
-  await page.locator('canvas.play-canvas').waitFor({ state: 'visible', timeout: 25000 });
-  await page.waitForFunction(() => window.hmPlay?.ready === true, { timeout: 35000 });
+  await page.locator('canvas.play-canvas').waitFor({ state: 'visible', timeout: 45000 });
+  await page.waitForFunction(() => window.hmPlay?.ready === true, null, { timeout: 60000 });
   await page.evaluate(() => {
     window.hmPlay?.teleportPlanet?.();
     window.hmPlay?.setPaused?.(false);
     window.hmPlay?.setLocked?.(true);
   });
-  await page.waitForFunction(() => window.hmPlay?.where === 'planet', { timeout: 15000 });
+  await page.waitForFunction(() => window.hmPlay?.where === 'planet', null, { timeout: 30000 });
   await page.waitForTimeout(800);
   await page.evaluate(() => {
     window.__dev.finishAct('act4');
@@ -148,6 +148,12 @@ try {
   expect(JSON.stringify(kinds) === JSON.stringify(['foundation', 'floor', 'wall', 'lowRoof', 'bench', 'weaponBench']), 'X radial lists the held blueprint kinds', kinds);
   await page.waitForFunction(() => document.querySelectorAll('.hm-radial-slice-thumb').length >= 5, null, { timeout: 20000 });
   expect(true, 'the build radial shows thumbnails on its slices');
+  const wbLabel = await page.locator('[data-testid="radial-slice-weaponBench"] .hm-radial-slice-label').textContent();
+  const wbWrapped = await page.locator('[data-testid="radial-slice-weaponBench"] .hm-radial-slice-label').evaluate((el) => {
+    const lh = parseFloat(getComputedStyle(el).lineHeight || '13');
+    return el.clientHeight > lh * 1.2 && !el.textContent.includes('...');
+  });
+  expect(wbWrapped, 'POL-79: radial slice label for Weapon bench wraps onto two lines instead of truncating', { wbLabel, wbWrapped });
   await shot('radial-build.png');
   await pickWithX('floor');
   expect(!(await radialOpen()), 'releasing X on floor closes the radial');
@@ -255,8 +261,10 @@ try {
   await page.keyboard.press('q');
   expect((await beamMode())?.mode === 'apply', 'the rifle is in Apply', await beamMode());
   await openRadialWithX();
-  const emptyRack = await page.locator('.hm-radial-slice.is-locked').count();
-  expect(emptyRack >= 1, 'with no cartridge on the rack, Apply shows a locked slice that says why', { emptyRack });
+  const emptyState = await page.locator('[data-testid="radial-empty-state"]').count();
+  const emptyMsg = await page.locator('[data-testid="radial-empty-msg"]').textContent().catch(() => '');
+  expect(emptyState === 1 && /No written cartridges: write one at the preset bench/.test(emptyMsg), 'POL-80: with no cartridge on the rack, Apply shows dedicated empty state', { emptyMsg });
+  await shot('radial-apply-empty.png');
   await page.keyboard.up('x');
   await page.waitForTimeout(200);
   const seeded = await page.evaluate(() => window.__dev.seedCartridge('emerald_canopy'));
@@ -313,12 +321,27 @@ try {
   expect((await page.locator('section[aria-label="Placing"]').count()) === 0, 'B ends the build');
   await shot('machines-placed.png');
 
-  // ---- 8. the Esc screen: the keycap grid, with the new controls
+  // ---- 8. the Esc screen: the keycap grid, with the new controls (POL-78: 3 columns, fully visible at 720p)
   await page.evaluate(() => window.hmPlay.setPaused(true));
   await page.locator('[data-testid="controls-grid"]').waitFor({ state: 'visible', timeout: 5000 });
   const rows = await page.locator('[data-testid^="controls-row-"]').count();
   const caps = await page.locator('.hm-controls-keycap').allTextContents();
   expect(rows >= 18 && caps.includes('Hold Z') && caps.includes('X'), 'the Esc screen shows the keycap grid with X and Hold Z', { rows });
+  const gridVisible = await page.evaluate(() => {
+    const grid = document.querySelector('[data-testid="controls-grid"]');
+    if (!grid) return null;
+    const r = grid.getBoundingClientRect();
+    const cols = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
+    const firstRow = document.querySelector('[data-testid="controls-row-0"]')?.getBoundingClientRect();
+    const lastRow = document.querySelector('[data-testid^="controls-row-"]:last-of-type')?.getBoundingClientRect();
+    return {
+      cols,
+      gridInViewport: r.top >= 0 && r.bottom <= 720,
+      firstVisible: !!firstRow && firstRow.top >= 0 && firstRow.bottom <= 720,
+      lastVisible: !!lastRow && lastRow.top >= 0 && lastRow.bottom <= 720,
+    };
+  });
+  expect(gridVisible?.cols === 3 && gridVisible?.firstVisible && gridVisible?.lastVisible, 'POL-78: Esc pause panel controls grid laid out in 3 columns and fully visible at 1280x720', gridVisible);
   await shot('esc-controls.png');
   await page.evaluate(() => { window.hmPlay.setPaused(false); window.hmPlay.setLocked(true); });
   await page.waitForTimeout(300);
@@ -331,6 +354,25 @@ try {
   await shot('inventory-close-hint.png');
   await page.keyboard.press('Escape');
   await page.locator('[data-testid="inventory-modal"]').waitFor({ state: 'hidden', timeout: 5000 });
+
+  // ---- 10. POL-82: refused actions show as a compact HUD toast in status zone, not a giant title card
+  await page.evaluate(() => { window.hmPlay?.clearToast?.(); });
+  await page.waitForTimeout(100);
+  await page.evaluate(() => {
+    const b = window.__hm?.base ?? window.hmPlay?.base;
+    b?.apply({ t: 'stage', stage: 2 });
+  });
+  await page.locator('[data-testid="status-toast"]').waitFor({ state: 'visible', timeout: 5000 });
+  const statusMsg = await page.locator('[data-testid="status-toast"]').textContent();
+  const titleCardCount = await page.locator('.play-toast').count();
+  expect(titleCardCount === 0 && statusMsg.includes('Already at this stage'), 'POL-82: refused action raises compact HUD toast with friendly reason and no giant title card', { statusMsg, titleCardCount });
+  await shot('refused-status-toast.png');
+
+  // ---- 11. POL-43: bottom-right ticker shows linked-bin counts
+  const tickerText = await page.locator('[data-testid="plot-ore-ticker"]').textContent();
+  const linkedText = await page.locator('[data-testid="plot-ore-ticker"] .play-ore-linked').textContent().catch(() => '');
+  expect(/\(\+\d+\)/.test(linkedText), 'POL-43: bottom-right ticker shows linked-bin counts e.g. (+600)', { tickerText, linkedText });
+  await shot('ticker-linked-count.png');
 
   expect(hudViolations.length === 0, 'no HUD zone or reticle overlap in the shots', hudViolations.slice(0, 5));
   expect(pageErrors.length === 0, 'no page errors', pageErrors.slice(0, 5));

@@ -27,6 +27,7 @@ interface PeerAvatarRig {
   readonly bodyMat: THREE.MeshStandardMaterial;
   readonly visorMat: THREE.MeshBasicMaterial;
   readonly ringMat: THREE.MeshBasicMaterial;
+  readonly geometries: readonly THREE.BufferGeometry[];
   readonly headGroup: THREE.Group;
   role: OutpostRole;
   username: string;
@@ -91,10 +92,20 @@ function createAvatarRig(peer: PeerPose): PeerAvatarRig {
     bodyMat,
     visorMat,
     ringMat,
+    geometries: [bodyGeo, helmetGeo, visorGeo, ringGeo],
     headGroup,
     role: peer.role,
     username: peer.username,
   };
+}
+
+function disposeRig(rig: PeerAvatarRig): void {
+  for (const geo of rig.geometries) {
+    geo.dispose();
+  }
+  rig.bodyMat.dispose();
+  rig.visorMat.dispose();
+  rig.ringMat.dispose();
 }
 
 /**
@@ -140,9 +151,7 @@ export function createRemotePeersController(parent?: THREE.Object3D): RemotePeer
     for (const [id, rig] of rigs.entries()) {
       if (!activeIds.has(id)) {
         group.remove(rig.root);
-        rig.bodyMat.dispose();
-        rig.visorMat.dispose();
-        rig.ringMat.dispose();
+        disposeRig(rig);
         rigs.delete(id);
       }
     }

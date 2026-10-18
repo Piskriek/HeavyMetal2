@@ -104,6 +104,8 @@
 .dark-modal input[type='range'] {
   width: 100%;
   accent-color: #3dc8ff;
+  background: transparent;
+  border: 0;
   cursor: pointer;
 }
 

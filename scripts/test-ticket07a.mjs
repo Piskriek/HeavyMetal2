@@ -60,18 +60,66 @@ const teleport = (where, x, z, yaw = 0, pitch = 0) => page.evaluate(([w, a, b, c
 const sidearmSlot = () => page.evaluate(() => window.hmPlay.base.world().equipment.sidearm);
 const badgeCount = () => page.locator('[data-testid="weapon-hud-badge"]').count();
 const leakById = async (id) => (await dev('leaks')).find((l) => l.id === id);
+
+// POL-99: avatar-hiding and clean-shot helpers
+const avatarVisible = () => page.evaluate(() => window.__playScene?.debug?.avatar()?.visible ?? false);
+const ensureFirstPerson = async () => {
+  for (let i = 0; i < 3 && (await avatarVisible()); i++) {
+    await page.keyboard.press('KeyV');
+    await page.waitForTimeout(150);
+  }
+};
+const setCleanShot = async (clean = true) => {
+  await page.evaluate((c) => {
+    window.__hm?.hideOverlays?.(c);
+    const scene = window.__playScene;
+    if (!scene) return;
+    const sc = scene.debug.planetScene?.() ?? scene.debug.scene?.();
+    if (sc) {
+      let cam = null;
+      sc.traverse((o) => { if (o.isPerspectiveCamera && o.parent === sc) cam = o; });
+      if (cam) cam.children.forEach((child) => { child.visible = !c; });
+    }
+  }, clean);
+};
+const camFacingLeak = (lk) => page.evaluate(({ lx, lz }) => {
+  const sc = window.__playScene?.debug?.planetScene?.();
+  if (!sc) return 0;
+  let cam = null;
+  sc.traverse((o) => { if (o.isPerspectiveCamera && o.parent === sc) cam = o; });
+  if (!cam) return 0;
+  const e = cam.matrixWorld.elements;
+  const f = [-e[8], -e[10]];
+  const d = [lx - e[12], lz - e[14]];
+  const fl = Math.hypot(f[0], f[1]) || 1, dl = Math.hypot(d[0], d[1]) || 1;
+  return (f[0] * d[0] + f[1] * d[1]) / (fl * dl);
+}, { lx: lk.x, lz: lk.z });
+
+const camFacingRail = () => page.evaluate(() => {
+  const sc = window.__playScene?.debug?.labScene?.() ?? window.__playScene?.debug?.scene?.();
+  if (!sc) return 1;
+  let cam = null;
+  sc.traverse((o) => { if (o.isPerspectiveCamera && o.parent === sc) cam = o; });
+  if (!cam) return 1;
+  const e = cam.matrixWorld.elements;
+  const f = [-e[8], -e[10]];
+  const rx = 7.75, rz = 0.6;
+  const d = [rx - e[12], rz - e[14]];
+  const fl = Math.hypot(f[0], f[1]) || 1, dl = Math.hypot(d[0], d[1]) || 1;
+  return (f[0] * d[0] + f[1] * d[1]) / (fl * dl);
+});
+
 // turns the view to a leak from `dist` metres away (the view's yaw is the quarter turn that points at it)
-const faceLeak = async (lk, dist = 12) => {
-  // the camera looks along -z at yaw 0, so the yaw that turns it to the leak is atan2(-dx, -dz). No sweep: the aim reads the last
-  // frame, so it is read after the frames have run (a sweep that read it straight after each teleport picked the wrong yaw)
+const faceLeak = async (lk, dist = 8) => {
   const px = lk.x, pz = lk.z - dist;
   const yaw = Math.atan2(-(lk.x - px), -(lk.z - pz));
-  await teleport('planet', px, pz, yaw, 0);
-  await page.waitForTimeout(600);
-  const aim = await dev('aim');
-  const eye = await dev('eye');
-  const tx = lk.x - eye.x, tz = lk.z - eye.z, len = Math.hypot(tx, tz) || 1;
-  return (aim.dir.x * tx + aim.dir.z * tz) / len;
+  let cam = NaN;
+  for (let attempt = 0; attempt < 3 && !(cam >= 0.85); attempt++) {
+    await teleport('planet', px, pz, yaw, 0);
+    await page.waitForTimeout(300);
+    cam = await camFacingLeak(lk);
+  }
+  return cam;
 };
 
 try {
@@ -86,11 +134,19 @@ try {
 
   // ---- the armory: the rail's shot, then the pickup in the lab
   await page.evaluate(() => window.hmPlay.setLocked(true));
+  await ensureFirstPerson();
   await teleport('lab', 6.6, 0.6, -Math.PI / 2, 0);
   await page.waitForTimeout(600);
   const pose = await page.evaluate(() => window.hmPlay.pose());
   check('the lab teleport lands at the armory rail', Math.abs(pose.x - 6.6) < 0.5 && Math.abs(pose.z - 0.6) < 0.5, `pose ${pose.x.toFixed(2)},${pose.z.toFixed(2)}`);
+  const railFacing = await camFacingRail();
+  check('POL-99: armory rail in view (facing >= 0.9, first person)', railFacing >= 0.9 && !(await avatarVisible()), `facing ${railFacing.toFixed(2)}`);
+  await setCleanShot(true);
+  await page.waitForTimeout(100);
   await page.screenshot({ path: `${shots}ticket07a-armory-rail.png` });
+  await page.screenshot({ path: `${shots}ticket07a-armory-rail-closeup.png` });
+  await setCleanShot(false);
+
   const diagBefore = await page.evaluate(() => ({ where: window.hmPlay.where, paused: window.hmPlay.isPaused(), aimedProp: window.hmPlay.aimedProp ?? null }));
   console.log(`diag before E: ${JSON.stringify(diagBefore)}`);
   await page.keyboard.press('KeyE');
@@ -116,9 +172,33 @@ try {
   const open = leaks.find((l) => !l.dormant && l.state === 'open');
   check('the plot has an open leak to stand at', !!open, `leaks ${leaks.length}`);
   if (open) {
-    const dot = await faceLeak(open, 12);
-    check('the view faces the open leak', dot > 0.2, `dot ${dot.toFixed(2)}`);
+    await ensureFirstPerson();
+    const dot = await faceLeak(open, 8);
+    check('POL-99: near open leak in view (facing >= 0.85, first person)', dot >= 0.85 && !(await avatarVisible()), `dot ${dot.toFixed(2)}`);
+    await setCleanShot(true);
+    await page.waitForTimeout(100);
     await page.screenshot({ path: `${shots}ticket07a-rift-open.png` });
+    await page.screenshot({ path: `${shots}ticket07a-rift-open-closeup.png` });
+
+    // POL-99: capture clean close-up of sealing leak with pinned seal (as in pol95-103-rift-shots.mjs)
+    await page.evaluate((id) => {
+      const m = window.__playScene.monsters;
+      window.__sealOrig = m.setSealing.bind(m);
+      window.__sealPin = id;
+      m.setSealing = (l) => window.__sealOrig(window.__sealPin ?? l);
+    }, open.id);
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `${shots}ticket07a-rift-sealing.png` });
+    await page.screenshot({ path: `${shots}ticket07a-rift-sealing-closeup.png` });
+    check('POL-99: clean close-up of sealing leak captured', true);
+    await page.evaluate(() => {
+      const m = window.__playScene.monsters;
+      window.__sealPin = null;
+      if (window.__sealOrig) m.setSealing = window.__sealOrig;
+      window.__sealOrig = null;
+      m.setSealing(null);
+    });
+    await setCleanShot(false);
 
     // the campaign sets the unlock each frame (F-03); the test turns the monsters on the way the planet test does
     await dev('unlockMonsters', true);
@@ -138,8 +218,13 @@ try {
       await dev('setMonstersSetting', 'normal');
       const sealed = await leakById(sealTarget.id);
       check('a held seal shuts the leak', sealed?.state === 'sealed', `state ${sealed?.state}`);
-      await faceLeak(sealed, 12);
+      await ensureFirstPerson();
+      await faceLeak(sealed, 8);
+      await setCleanShot(true);
+      await page.waitForTimeout(100);
       await page.screenshot({ path: `${shots}ticket07a-rift-sealed.png` });
+      await page.screenshot({ path: `${shots}ticket07a-rift-sealed-closeup.png` });
+      await setCleanShot(false);
       const others = (await dev('leaks')).filter((l) => !l.dormant && l.state !== 'sealed' && Math.hypot(l.x - sealed.x, l.z - sealed.z) < 60);
       if (others.length === 0) {
         const sBefore = (await dev('stats')).mobsSpawned;

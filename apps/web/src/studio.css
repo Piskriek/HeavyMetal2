@@ -14,16 +14,17 @@ body { background: var(--paper); color: var(--text); font: 13px/1.4 Inter, 'Helv
 ::selection { background: #d9d9bc; color: #20231f; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* controls */
-button { font: 500 12px/1 Inter, sans-serif; color: var(--text); background: transparent; border: 1px solid var(--line); border-radius: 0; padding: 7px 11px; letter-spacing: .02em; transition: background .12s, border-color .12s, color .12s; }
-button:hover:not(:disabled) { background: #efeee7; border-color: #c9c7bc; }
-button.on { background: var(--text); color: var(--paper); border-color: var(--text); }
-button.go, .maker .go { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-button.go:hover:not(:disabled) { background: #b25636; border-color: #b25636; }
-button.danger, .maker .danger { background: transparent; color: var(--danger); border-color: var(--danger); }
-input, select, textarea { font: inherit; color: var(--text); background: #fff; border: 1px solid var(--line); border-radius: 0; padding: 5px 8px; }
-input[type=range] { padding: 0; accent-color: var(--accent); background: transparent; border: 0; }
-input[type=checkbox] { accent-color: var(--accent); }
+/* controls: scoped to Studio / Maker roots (POL-175: no global bleed to Grid or Settings) */
+.maker button, .sx button, .studio-root button { font: 500 12px/1 Inter, sans-serif; color: var(--text); background: transparent; border: 1px solid var(--line); border-radius: 0; padding: 7px 11px; letter-spacing: .02em; transition: background .12s, border-color .12s, color .12s; }
+.maker button:hover:not(:disabled), .sx button:hover:not(:disabled), .studio-root button:hover:not(:disabled) { background: #efeee7; border-color: #c9c7bc; }
+.maker button.on, .sx button.on, .studio-root button.on { background: var(--text); color: var(--paper); border-color: var(--text); }
+.maker button.go, .sx button.go, .studio-root button.go, .maker .go { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.maker button.go:hover:not(:disabled), .sx button.go:hover:not(:disabled), .studio-root button.go:hover:not(:disabled) { background: #b25636; border-color: #b25636; }
+.maker button.danger, .sx button.danger, .studio-root button.danger, .maker .danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+.maker input, .maker select, .maker textarea, .sx input, .sx select, .sx textarea, .studio-root input, .studio-root select, .studio-root textarea { font: inherit; color: var(--text); background: #fff; border: 1px solid var(--line); border-radius: 0; padding: 5px 8px; }
+input[type=range] { padding: 0; background: transparent; border: 0; }
+.maker input[type=range], .sx input[type=range], .studio-root input[type=range] { accent-color: var(--accent); }
+.maker input[type=checkbox], .sx input[type=checkbox], .studio-root input[type=checkbox] { accent-color: var(--accent); }
 .hint { color: var(--dim); font-size: 11px; }
 kbd { border-radius: 0; }
 

@@ -98,7 +98,7 @@ Brief: none separate; the job is this list. HELD until Haiku's T06 (`docs/prompt
 - `play.tsx`: the E prompt comes from the station's `prompt`. E on `fabricator` opens the existing `FabricatorModal`; E on `planet-table` opens the Planetary Grid screen (08a's). Weapon Bench keeps its existing armory path.
 - Test: extend `scripts/test-lab-overhaul.mjs` (T06's) so aiming at each of the six stations shows its prompt and E opens its window. Run it, `npm test` and `test-campaign` (45 of 45) through `scripts/test-on-3dpc.sh --only`.
 
-## F-14 [HELD] Co-op play-scene hooks (plan 36 Phase 1 leftovers)
+## F-14 [MOVED] Co-op play-scene hooks (plan 36 Phase 1 leftovers): moved to Haiku T11b (docs/prompts/sidecar/T11b-coop-phase2-play-wiring.md); Flash, skip it
 Brief: none separate; the job is this list. Co-op Phase 1 landed at ad9eacec and 955395aa (Haiku, T36P1). The details are in POL-111 to POL-117 in `docs/DEFERRED_POLISH_REGISTRY.md`. HELD until F-13 is DONE; Opus opens it.
 - **POL-113:** a guest's live ground loads the host's sculpt. Add `importBeamField` (or reuse the beam-save load path) to `PlayScene`, and call it from the session's terrain event in `play.tsx`.
 - **POL-112:** the gate's footing pad (`groundAt` in `play-scene.ts`, |x| < 1.9, |z| < 1.25) moves into the pure `apps/web/src/base/plot-height.ts`, and `play-scene.ts` calls it, so the room and the scene agree on the pad. Add the 50-point check: `plotHeightAt` equals `scene.heightAt` in the browser.
@@ -114,3 +114,15 @@ Brief: none separate; the job is this list. Each item's detail is in `docs/DEFER
 - **POL-92:** `four-angle.ts` and `studio-thumbs.ts` share one offscreen WebGL renderer (the GTX 950M can't spare a second context).
 - **POL-87 and POL-93:** one style source per screen. Move the pure helpers out of `planetary-grid.tsx`, `audio-tab.tsx`, `look-tab.tsx` and `scene-tab.tsx` into modules without CSS, so their tests import only those, then import each `.css` file and drop the embedded strings.
 - Test: extend `scripts/test-studio-tabs.mjs` (Save writes the project file in dev; a thrown workspace leaves the others usable; undo restores a moved copy). Run it, `test-grid-menus`, `npm test` and `test-campaign` (45 of 45) through `scripts/test-on-3dpc.sh --only "<your paths>"`. Typecheck on the laptop.
+
+## F-16 [OPEN] TICKET-12 (Studio part): brief 31's remaining Studio work, plus POL-86, POL-94 and POL-21
+Brief: `docs/prompts/sidecar/31-studio-bench-and-sockets.md`. What's left of it is listed in `docs/argo/notes/ARGO_NOTE_10_next_batch_ticket09_onward.md` §2B and its TICKET-12 row; T08b and your F-15 already covered the 4-angle grid, the Look scrubber, the Scene tab, the gizmo, the error boundary, undo and the shared renderer.
+This job touches only `apps/web/src/studio/`, `apps/web/studio-server/`, `packages/scenedoc/` and the registry generator. Never touch `apps/web/src/play/`, `apps/web/src/net/`, `apps/web/src/rooms/`, `apps/web/src/shell/planetary-grid*` (Haiku T11a) or the audio files (Haiku T09a).
+- **P0-STUDIO-01 part 2:** one-click fix flags (fix: mirror-z, fix: plain-back, reach: 3, hold, lumOk) written through the Changes panel to `docs/runworld/assets.json` via studio-server, and the surface-luminance gate badge (low >= 0.18, and low/high >= 0.85).
+- **P1-STUDIO-03 part 2 and POL-89:** click-to-snap socket authoring on a model's face (hopper, exhaust, cable, mount), saved through studio-server; the registry generator emits machine and structure sockets, so the gizmo shows them on machines too.
+- **P1-STUDIO-04:** the two-tier Material Designer. Tier 1: macro sliders (hue, grain, weathering, roughness, bump) and a two-cartridge combiner on `@hm/vault` spheres. Tier 2: the `@hm/texgraph` node graph with a constant-mean-luminance (D21) Potato-to-Ultra preview.
+- **O3:** a per-skin monster `remapStrength` slider (0 to 1, default 0.20) in the monster bench, with dev write-back.
+- **POL-86:** a dev write route for `levels.json`. **POL-94:** automate a gizmo pointer drag in `test-studio-tabs.mjs`. **POL-21:** structural sharing in `@hm/scenedoc`.
+- **Pure modules, with unit tests:** `apps/web/src/studio/material-macro-math.ts` (the 5-slider transform, the combiner math, the D21 preview) and `apps/web/src/studio/flag-and-socket-schema.ts` (validators for the fix flags, the luminance gate and the snapped `sockets.json`).
+- Load the frontend-design skill before UI work, and keep the Studio's look.
+- Test: extend `scripts/test-studio-tabs.mjs` (a flag writes `assets.json` in dev; a snapped socket persists and shows; the material sliders change the preview at constant mean luminance; the gizmo drag moves a copy). Run it, `npm test` and `test-campaign` (45 of 45) through `scripts/test-on-3dpc.sh --only "<your paths>"`. Typecheck on the laptop. Use POL-181 to POL-190 for new registry entries.

@@ -14,7 +14,7 @@ This replaces Flash's held F-14: mark F-14 in `docs/sidecar/FLASH_INBOX.md` as "
 3. **POL-111:** `plot-ground.ts` imports its terrain constants from `plot-height.ts`.
 4. **From T11a's report (9fe9bac4):**
    - **The gate pose must match on both sides.** The room's `groundEnv` calls `plotHeightAt` without a gate, so its footing pad sits at the origin with yaw 0. Send the Moon Twin Gate's pose with the host's terrain message (`{ seed, sculpt, gate: { x, z, yaw } }`), store and persist it in the room, and pass it to `plotHeightAt` there too. The 50-point check then covers the pad on both sides.
-   - **The Grid's roster chip:** at 1280 px, "Co-Builder" wraps onto two lines and Kick drops to a second row. Add the rule to `planetary-grid.css` (for example, nowrap on `.pg-chip-role` and a compact `.pg-chip-actions`), and take a shot.
+   - **The Grid's roster chip:** at 1280 px, "Co-Builder" wraps onto two lines and Kick drops to a second row. Add the rule to `planetary-grid.css` (for example, nowrap on `.pg-chip-role` and a compact `.pg-chip-actions`), and take a shot. Also, the "Observer Only" default-guest-role button renders light, out of the Grid's dark style (Opus saw it in T11a's shot). Style it like the Grid's other secondary buttons.
    - **The size cap is 16 MiB** (1024² bytes, `MAX_MB` in `vite.config.ts`), not 16,000,000 bytes. After T11a, the RUN build is 15,939,100 bytes (15.20 MiB) and the plain build 14.86 MiB. Report both after the avatars.
    - `claimAndStoreSlot` has no caller yet: POL-84's publish path isn't wired. Leave it, and note it in your report.
 

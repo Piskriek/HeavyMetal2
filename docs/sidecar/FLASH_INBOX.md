@@ -83,10 +83,10 @@ Brief: `docs/prompts/sidecar/T02BE-coverage-water.md`. Start it only after F-07 
 > **Reassigned to Haiku by Opus, 2026-10-18 02:50:** Flash has made no change since 17:54 on 17 October. Haiku finishes from Flash's uncommitted work in progress (play-scene.ts, plot-ground.ts, plot-biome-view.ts, water-surfaces.ts, packages/groundshader). Flash: don't resume F-09; take F-10 when it is DONE.
 Brief: `docs/prompts/sidecar/T02P-performance-pass.md`. Measure per layer first; expensive looks go behind Graphics settings with Auto, never deleted.
 
-## F-10 [OPEN] TICKET-05: square socket markers, gunmetal panels, sliding door, avatar at 3 m, beam core, outcrops
-Brief: `docs/prompts/sidecar/T05-base-meshes-avatar-beam-outcrops.md`. Start it only after F-09 is DONE (both touch play-scene).
+## F-10 [HELD] TICKET-05: square socket markers, gunmetal panels, sliding door, avatar at 3 m, beam core, outcrops
+Brief: `docs/prompts/sidecar/T05-base-meshes-avatar-beam-outcrops.md`. HELD by Opus (2026-10-18): play-scene.ts has one writer at a time, and Opus schedules it (Haiku is on TPOL now, then T11b). Opus opens F-10 when play-scene.ts is free for Flash.
 
-## F-11 [OPEN] TICKET-03 P: colourful pixel plumes, only while machines operate
+## F-11 [HELD] TICKET-03 P: colourful pixel plumes, only while machines operate
 Brief: `docs/prompts/sidecar/T03P-machine-plumes.md` (spec: docs/argo/notes/ARGO_NOTE_08_plumes.md). Start it only after F-10 is DONE.
 
 ## F-12 [HELD] TICKET-07 B: vehicle juice (boost, tracks, dust, print gantry) and the beam hurting monsters
@@ -126,3 +126,4 @@ This job touches only `apps/web/src/studio/`, `apps/web/studio-server/`, `packag
 - **Pure modules, with unit tests:** `apps/web/src/studio/material-macro-math.ts` (the 5-slider transform, the combiner math, the D21 preview) and `apps/web/src/studio/flag-and-socket-schema.ts` (validators for the fix flags, the luminance gate and the snapped `sockets.json`).
 - Load the frontend-design skill before UI work, and keep the Studio's look.
 - Test: extend `scripts/test-studio-tabs.mjs` (a flag writes `assets.json` in dev; a snapped socket persists and shows; the material sliders change the preview at constant mean luminance; the gizmo drag moves a copy). Run it, `npm test` and `test-campaign` (45 of 45) through `scripts/test-on-3dpc.sh --only "<your paths>"`. Typecheck on the laptop. Use POL-181 to POL-190 for new registry entries.
+- **Added by Opus:** the Look tab half of POL-95, since you're in the Studio. In `look-tab.tsx`, add `levelsLabel` ("12" at stage 1, "24" at stage 2, "Full (24-bit)" at stages 3 to 6) in place of the literal "0". Argo's version is in `arena-gathered/argo-pol95-103/apps/web/src/studio/look-tab.tsx` and its test. Merge it onto your current file. Haiku's TPOL does the groundshader half.

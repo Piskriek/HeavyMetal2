@@ -34,7 +34,12 @@ export interface LabVista {
   readonly view: WindowView;
   /** The current light of the bursts, 0 to 0.7 (the lab's window light follows it; it never whites out). */
   readonly flashLight: number;
-  readonly flash: { onFlash(cb: (e: FlashEvent) => void): () => void };
+  readonly flash: {
+    onFlash(cb: (e: FlashEvent) => void): () => void;
+    /** POL-25: Fires at the burst's peak illumination (and can be triggered on demand for floor-light capture). */
+    onPeak?(cb: (e: FlashEvent & { readonly light: number }) => void): () => void;
+    triggerPeak?(strength?: number): number;
+  };
   setView(view: WindowView): void;
   setProgress(progress: number): void;
   /** Advances the clock (seconds since the lab opened): the wind, the pockets, the bursts. */
@@ -720,9 +725,12 @@ export function createLabVista(o: LabVistaOptions): LabVista {
   let clock = 0;
   let activeBurst: { event: BurstEvent; look: BurstLook } | null = null;
   let flashLight = 0;
+  let peakHoldUntil = -1;
+  let peakHoldValue = 0;
   let framePockets: PocketFrame[] = [];
   const flyerPos: { lane: number; x: number; y: number; z: number }[] = [];
   const listeners = new Set<(e: FlashEvent) => void>();
+  const peakListeners = new Set<(e: FlashEvent & { readonly light: number }) => void>();
   const owned: { dispose(): void }[] = [];
   const keep = <T extends { dispose(): void }>(x: T): T => { owned.push(x); return x; };
 
@@ -1156,7 +1164,11 @@ export function createLabVista(o: LabVistaOptions): LabVista {
     for (const e of schedule.eventsBetween(prev, t, progress)) {
       strikeBolt(e);
       activeBurst = { event: e, look: burstLook(0, e.strength) };
+      const peakLook = burstLook(0.06, e.strength);
+      peakHoldValue = Math.max(peakHoldValue, peakLook.light);
+      peakHoldUntil = t + 0.35;
       for (const cb of listeners) cb({ x: e.x, z: e.z, strength: e.strength, t: e.t });
+      for (const cb of peakListeners) cb({ x: e.x, z: e.z, strength: e.strength, t: e.t, light: peakLook.light });
     }
     for (let i = 0; i < MAX_POCKETS; i++) {
       const cycle = Math.floor(t / pocketLifetime(i));
@@ -1174,7 +1186,9 @@ export function createLabVista(o: LabVistaOptions): LabVista {
       else activeBurst.look = burstLook(age, activeBurst.event.strength);
     }
     const bl = activeBurst?.look ?? burstLook(-1, 0);
-    flashLight = bl.light;
+    if (t > peakHoldUntil) peakHoldValue = 0;
+    // POL-25: Hold peak floor light across the 0.35 s capture window so a shot 0.3 s after onFlash catches the lit lab floor
+    flashLight = Math.max(bl.light, peakHoldValue);
     shared.uFlashAmt.value = bl.light;
     if (activeBurst) {
       const e = activeBurst.event;
@@ -1298,6 +1312,24 @@ export function createLabVista(o: LabVistaOptions): LabVista {
         listeners.add(cb);
         return () => { listeners.delete(cb); };
       },
+      onPeak(cb) {
+        peakListeners.add(cb);
+        return () => { peakListeners.delete(cb); };
+      },
+      triggerPeak(strength = 1) {
+        const clamped = Math.max(0, Math.min(1, strength));
+        const e: BurstEvent = { t: clock, x: BREACH[0], z: BREACH[1], strength: clamped };
+        strikeBolt(e);
+        const peakLook = burstLook(0.06, clamped);
+        activeBurst = { event: { ...e, t: clock - 0.06 }, look: peakLook };
+        peakHoldValue = peakLook.light;
+        peakHoldUntil = clock + 0.35;
+        flashLight = peakLook.light;
+        shared.uFlashAmt.value = flashLight;
+        for (const cb of listeners) cb({ x: e.x, z: e.z, strength: e.strength, t: clock });
+        for (const cb of peakListeners) cb({ x: e.x, z: e.z, strength: e.strength, t: clock, light: flashLight });
+        return flashLight;
+      },
     },
     setView(v) { view = v; applyView(); },
     setProgress,
@@ -1318,6 +1350,7 @@ export function createLabVista(o: LabVistaOptions): LabVista {
       for (const x of owned) x.dispose();
       boxGeo.dispose();
       listeners.clear();
+      peakListeners.clear();
       monsters.dispose();
       scene.clear();
     },

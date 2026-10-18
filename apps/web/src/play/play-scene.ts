@@ -19,7 +19,7 @@ import { createLabRoom, GATE_AT, PLANET_TABLE_AT, POWER_OFF, POWER_ON, POWER_SEC
 import { WAKE_SECONDS, wakeLift, type Power } from './lab-power';
 import { preloadVista, VISTA_LEVEL, type WindowView } from './lab-vista';
 import { createPlotHolo, type PlotHolo } from './plot-holo';
-import { COLOUR_MARK_FRAGMENT, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_OFF_FRAGMENT, OPENING_OFF_VERTEX, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX } from './portal-shaders';
+import { COLOUR_MARK_FRAGMENT, localMachineWaveAt, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_OFF_FRAGMENT, OPENING_OFF_VERTEX, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX, scanRingFadeAt, waveBandColourFor } from './portal-shaders';
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
 import { disposeProp, lineSpan, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
 import { beadSpeed, plumeCount, spanPoint, spanSag } from './brownout-visual';
@@ -30,6 +30,9 @@ import { loadScientistAnimations, type ClipName } from '../avatar/scientist/anim
 import { createScientistAnimator, type OneShotKind, type ScientistAnimator } from '../avatar/scientist/animator';
 import { loadRifleAnimations } from '../avatar/astro/rifle-clips';
 import { handPose, viewPose } from './rifle-hold';
+import { footprintSolids, navFor } from '../base/navgrid';
+import { solveLeftArmForegripIk } from '../avatar/two-bone-ik';
+import { slopeLiftAt } from './beam-visuals';
 import { BEAM_START, BEAM_STROKE_RANGE, STROKE_RADIUS, strokeOf, type SculptTool } from './beam-tool';
 import { keepOutZones, type KeepOutZone } from './beam-keepout';
 import { createBeamVisuals, ringColourOf, type BeamVisuals } from './beam-visuals';
@@ -1168,6 +1171,7 @@ export function createPlayScene(o: {
       for (const mat of rifleMats) { mat.envMap = inHand ? roomEnvMap : null; mat.envMapIntensity = RIFLE_HAND_ENV; mat.needsUpdate = true; }
     }
   };
+  let leftUpperArm: THREE.Object3D | null = null, leftForeArm: THREE.Object3D | null = null;
   /**
    * In third person the grip socket sits on the right hand and the barrel points from it to the left hand (the foregrip): each
    * frame the rifle turns so its foregrip socket lies toward the left hand's bone, after the clip has posed the arms.
@@ -1184,6 +1188,139 @@ export function createPlayScene(o: {
     heldBeam.group.position.copy(heldBeam.sockets.grip).applyQuaternion(q).negate();
     heldBeam.group.updateMatrixWorld(true);
   };
+  // ============================================================================
+  // TICKET-10 WINDOW A (Self-Contained Hooks 1..5 for OPUS_NOTE_19)
+  // ============================================================================
+  const activatedMachineIds = new Set<number>();
+  let localMachineWaveStart = -1;
+  let localMachineWaveMetric: string | null = null;
+  let lastTriggerMetric: string | null = 'pxd';
+
+  // Hook 1: Wave band metric colour, 30 m / 1 s machine activation pulse, & 350 m scan ring fade (P1-LIGHT-04, POL-52)
+  const syncWaveAndLocalPulseUniforms = (nowSec: number, scanRadius: number): void => {
+    const waveRgb = waveBandColourFor(lastTriggerMetric);
+    postUniforms.uWaveBandColour.value.set(waveRgb[0], waveRgb[1], waveRgb[2]);
+    if (scanRadius >= 350 && scanRingFadeAt(scanRadius) <= 0) {
+      postUniforms.uScanR.value = 350;
+    }
+    if (localMachineWaveStart >= 0) {
+      const pulse = localMachineWaveAt(nowSec - localMachineWaveStart, localMachineWaveMetric);
+      if (!pulse.active) {
+        localMachineWaveStart = -1;
+        postUniforms.uLocalWaveR.value = -1;
+        postUniforms.uLocalWaveStrength.value = 0;
+      } else {
+        postUniforms.uLocalWaveR.value = pulse.radiusM;
+        postUniforms.uLocalWaveStrength.value = pulse.strength;
+        postUniforms.uLocalWaveColour.value.set(pulse.colour[0], pulse.colour[1], pulse.colour[2]);
+      }
+    }
+  };
+
+  const noteMachineActivationPulse = (mId: number, kind: MachineKind, x: number, z: number, runningNow: number): void => {
+    const metric = PIXELS_OF[kind];
+    if (runningNow > 0.05 && !activatedMachineIds.has(mId)) {
+      activatedMachineIds.add(mId);
+      if (metric) {
+        lastTriggerMetric = metric;
+        localMachineWaveMetric = metric;
+        localMachineWaveStart = clock;
+        postUniforms.uLocalWaveCentre.value.set(x, groundAt(x, z), z);
+      }
+    }
+  };
+
+  // Hook 2: Vista static-burst floor peak light in the Lab (+12 gain per unit of flash, capped at 0.7; POL-25)
+  const vistaFloorFlashLight = new THREE.PointLight('#b8f2ff', 0, 18, 1.3);
+  vistaFloorFlashLight.position.set(0, 2.8, -5.4);
+  labScene.add(vistaFloorFlashLight);
+  let vistaFlashPeakHold = 0;
+  let vistaFlashPeakUntil = -1;
+  room.vista.flash.onFlash((e) => {
+    const peakUnit = Math.min(0.7, e.strength * 0.7);
+    vistaFlashPeakHold = Math.max(vistaFlashPeakHold, peakUnit);
+    vistaFlashPeakUntil = clock + 0.35;
+  });
+  const applyVistaFlashFloorPeak = (nowSec: number): void => {
+    if (nowSec > vistaFlashPeakUntil) vistaFlashPeakHold = 0;
+    const flashUnit = Math.min(0.7, Math.max(room.vista.flashLight, vistaFlashPeakHold));
+    vistaFloorFlashLight.intensity = flashUnit * 12.0;
+    vistaFloorFlashLight.visible = where === 'lab' && flashUnit > 0.005;
+  };
+
+  // Hook 3: Third-person left-arm analytical 2-bone IK to the rifle's foregrip socket (POL-28)
+  const foregripWorldScratch = new THREE.Vector3();
+  const poleWorldScratch = new THREE.Vector3();
+  const applyThirdPersonForegripIk = (): void => {
+    if (
+      cameraView !== 'third' ||
+      !heldBeam.group.visible ||
+      heldBeam.group.parent !== rifleHand ||
+      !leftUpperArm ||
+      !leftForeArm ||
+      !leftHand
+    ) {
+      return;
+    }
+    heldBeam.group.updateMatrixWorld(true);
+    foregripWorldScratch.copy(heldBeam.sockets.foregrip).applyMatrix4(heldBeam.group.matrixWorld);
+    // Elbow pole sits down, left, and slightly behind the chest in world space
+    poleWorldScratch.set(-0.42, 0.88, -0.22).applyMatrix4(scientistHolder.matrixWorld);
+    solveLeftArmForegripIk(leftUpperArm, leftForeArm, leftHand, foregripWorldScratch, poleWorldScratch);
+  };
+
+  // Hook 4: Slope-lifted Extract/Sculpt ground ring so sloped crater walls never read dashed (POL-30)
+  const updateSlopeLiftedBeamRing = (
+    aimed: { readonly x: number; readonly z: number } | null,
+    radius: number,
+    colour: string,
+  ): void => {
+    beamVisuals.setRing(
+      aimed,
+      radius,
+      colour,
+      (x, z) => groundAt(x, z) + Math.max(0, slopeLiftAt(groundAt, x, z, 0.06) - 0.06),
+    );
+  };
+
+  // Hook 5: Feed base navgrid & built footprint solids into monsters so walkers route around walls & bolts stop on walls (POL-32, POL-33)
+  const syncMonstersNavAndSolids = (base: S.Base | null): void => {
+    const baseSolids = base ? footprintSolids(base) : [];
+    const machineSolids = [...views.values()].map((v) => {
+      const fp = machineFootprint(v.m.kind);
+      const hu = 0.5 * (fp.max[0] - fp.min[0]);
+      const hv = 0.5 * (fp.max[2] - fp.min[2]);
+      return {
+        x: v.m.x,
+        z: v.m.z,
+        ux: Math.cos(v.m.yaw),
+        uz: Math.sin(v.m.yaw),
+        hu,
+        hv,
+      };
+    });
+    monsters.setSolids([...baseSolids, ...machineSolids]);
+    monsters.setMachines(
+      [...views.values()].map((v) => {
+        const fp = machineFootprint(v.m.kind);
+        return {
+          id: v.m.id,
+          x: v.m.x,
+          z: v.m.z,
+          hu: 0.5 * Math.max(fp.max[0] - fp.min[0], fp.max[2] - fp.min[2]),
+        };
+      }),
+    );
+    if (base) {
+      const nav = navFor(base, { x: twin.group.position.x, z: twin.group.position.z }, 64, 0.5);
+      monsters.setNav?.(nav);
+    } else {
+      monsters.setNav?.(null);
+    }
+  };
+  // ============================================================================
+  // END TICKET-10 WINDOW A
+  // ============================================================================
   // a key light fixed to the camera, up and to the right of the rifle, and a sky fill: the rifle reads at every stage
   const viewKey = new THREE.PointLight('#ffffff', 2.4, 6, 1.6);
   viewKey.position.set(0.7, 0.55, 0.1);
@@ -1226,6 +1363,9 @@ export function createPlayScene(o: {
     uColour: { value: planetRT.texture as THREE.Texture }, uDepth: { value: planetRT.depthTexture as THREE.Texture | null }, uLab: { value: labRT.texture as THREE.Texture },
     uRes: { value: new THREE.Vector2(16, 16) }, uInvProj: { value: new THREE.Matrix4() }, uCamWorld: { value: new THREE.Matrix4() },
     uWaveCentre: { value: new THREE.Vector3() }, uWaveR: { value: -1 }, uSkyRise: { value: -1 }, uGlitch: { value: 0 }, uTime: { value: 0 }, uLost: { value: 0 },
+    uWaveBandColour: { value: new THREE.Vector3(1.0, 0.2392, 0.5412) },
+    uLocalWaveCentre: { value: new THREE.Vector3() }, uLocalWaveColour: { value: new THREE.Vector3(1.0, 0.2392, 0.5412) },
+    uLocalWaveR: { value: -1 }, uLocalWaveStrength: { value: 0 },
     uLookOut: { value: new THREE.Vector4(0.01, 0.01, 0, 1) }, uLookIn: { value: new THREE.Vector4(0.01, 0.01, 0, 1) },
     uSunDir: { value: SUN.clone() }, uGatePos: { value: new THREE.Vector3() }, uScanCentre: { value: new THREE.Vector3() },
     uScanR: { value: -1 }, uWireMix: { value: 1 }, uFovY: { value: THREE.MathUtils.degToRad(camera.fov) },
@@ -1583,6 +1723,8 @@ export function createPlayScene(o: {
       scientistAnimator = createScientistAnimator(group, new Map([...clips, ...rifleClips]));
       rifleHand = group.getObjectByName('mixamorigRightHand') ?? null;
       leftHand = group.getObjectByName('mixamorigLeftHand') ?? null;
+      leftUpperArm = group.getObjectByName('mixamorigLeftArm') ?? null;
+      leftForeArm = group.getObjectByName('mixamorigLeftForeArm') ?? null;
       attachRifle();
     }
   ).catch((err) => {
@@ -1974,10 +2116,13 @@ export function createPlayScene(o: {
           triggerScanWave(scanWave, clock, { x: p.x, y: p.y, z: p.z });
         }
       }
-      // pixels pour from every pixel machine while it runs; lamps show which run
+      if (changed) syncMonstersNavAndSolids(activeBase);
+      // pixels pour from every pixel machine while it runs; lamps and housing status LEDs (POL-39) show which run
       for (const v of views.values()) {
         const r = running.get(v.m.id) ?? 0;
+        noteMachineActivationPulse(v.m.id, v.m.kind, v.m.x, v.m.z, r);
         if ((r > 0.05) !== (v.running > 0.05)) v.prop.light(r > 0.05 ? 1 : 0.1);
+        v.prop.setStatusLed?.(r, connected.has(v.m.id), satisfaction, clock);
         v.running = r;
         if (v.glow) {
           v.glow.visible = detail.plumeGlow && r > 0.05;
@@ -2078,6 +2223,7 @@ export function createPlayScene(o: {
       // the sanctuaries: the gate dome, and each sealed room's life support (B-07)
       const lifeSupport = base ? base.pieces.filter((p) => p.kind === 'lifeSupport').map((p) => pieceAt(base, p)).filter((p): p is { x: number; y: number; z: number } => p !== null) : [];
       monsters.setSafeZones(monsterSafeZones({ x: twin.group.position.x, z: twin.group.position.z }, lifeSupport));
+      syncMonstersNavAndSolids(base);
       scheduleBiomeRebuild();
       scheduleCoverRebuild();
     },
@@ -2595,6 +2741,7 @@ export function createPlayScene(o: {
           rifle: { held: heldBeam.group.visible, aiming: rifleAimingNow, firing: rifleFiringNow },
         });
         holdRifleInHand();
+        applyThirdPersonForegripIk();
       }
 
       if (drivingVehicleId === null) roverArmOn = false;
@@ -2725,6 +2872,7 @@ export function createPlayScene(o: {
       postUniforms.uScanR.value = scan.radius;
       postUniforms.uWireMix.value = scan.wireMix;
       postUniforms.uScanCentre.value.set(scanWave.centre.x, scanWave.centre.y, scanWave.centre.z);
+      syncWaveAndLocalPulseUniforms(now, scan.radius);
       postUniforms.uGatePos.value.copy(twin.group.position);
       const profile = suitCamProfile(detail.suitCam, detail.suitCamTier);
       camera.getWorldDirection(suitLook);
@@ -2757,6 +2905,7 @@ export function createPlayScene(o: {
       postUniforms.uLost.value = Math.max(0, 1 - (now - lostAt) / 0.6);
       openingUniforms.uTime.value = now;
       room.update(now, dt);
+      applyVistaFlashFloorPeak(now);
       const mainPower = powerT >= 0 ? powerAt(powerT).main : (gateOn ? 1 : 0);
       holo.update(now, dt, mainPower, waveTo >= 0 ? r : -1);
       // the ground's chunks follow you on the planet; from the lab, they stay round the gate
@@ -2772,9 +2921,9 @@ export function createPlayScene(o: {
       }
       // the rim and the floor (P0-LIGHT-01) are on in stages 0 to 2 only
       setRimFloorOn(shown <= 2);
-      // the ring under the beam: the stroke's radius where the held rifle lands, coloured by its mode (Seal's amber while sealing)
+      // the ring under the beam (POL-30): slope-lifted where the held rifle lands, coloured by its mode (Seal's amber while sealing)
       const beamAimed = heldBeam.group.visible && where === 'planet' ? aimGround(BEAM_STROKE_RANGE) : null;
-      beamVisuals.setRing(beamAimed ? { x: beamAimed.x, z: beamAimed.z } : null, STROKE_RADIUS, ringColourOf(heldMode, beamSealingNow), groundAt);
+      updateSlopeLiftedBeamRing(beamAimed ? { x: beamAimed.x, z: beamAimed.z } : null, STROKE_RADIUS, ringColourOf(heldMode, beamSealingNow));
       labScene.environmentIntensity = room.envLevel();
       syncSuitEnv(where === 'planet');
       world?.update(now, dt, where === 'planet' ? camera.position : virtual.position);

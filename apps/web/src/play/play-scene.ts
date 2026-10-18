@@ -1263,12 +1263,9 @@ export function createPlayScene(o: {
   let cachedBiomeInput: BiomeInput | null = null;
   let activeBase: S.Base | null = null;
 
-  const buildDefaultBiomeInput = (g: PlotGround): BiomeInput => {
-    const n = 256;
-    const cellM = 1;
-    const x0 = -128;
-    const z0 = -128;
-
+  // The layout the default biome input is built from: machines, keep-outs, water sources and tier. Cheap (no terrain sampling), so the cover
+  // and the scatter can check whether it has moved before they bake anything from it.
+  const defaultLayout = () => {
     const machinesList: { x: number; z: number; r: number }[] = [];
     const waterSourcesList: { x: number; z: number }[] = [];
 
@@ -1324,20 +1321,25 @@ export function createPlayScene(o: {
     }
 
     const effectiveTier = vegSetting === 'off' ? 'low' : vegSetting === 'high' ? 'high' : 'low';
+    return { machines: machinesList, keepouts: keepoutsList, waterSources: waterSourcesList, tier: effectiveTier as BiomeInput['tier'] };
+  };
+  const defaultLayoutKeyOf = (L: ReturnType<typeof defaultLayout>): string => JSON.stringify([L.machines, L.keepouts, L.waterSources, L.tier]);
+  const buildDefaultBiomeInput = (g: PlotGround): BiomeInput => {
+    const L = defaultLayout();
     return buildBiomeInput({
       heightAt: (x, z) => g.heightAt(x, z),
-      x0,
-      z0,
-      n,
-      cellM,
-      machines: machinesList,
-      keepouts: keepoutsList,
-      waterSources: waterSourcesList,
-      waterVolume: waterSourcesList.length > 0 ? 60 : 0,
+      x0: -128,
+      z0: -128,
+      n: 256,
+      cellM: 1,
+      machines: L.machines,
+      keepouts: L.keepouts,
+      waterSources: L.waterSources,
+      waterVolume: L.waterSources.length > 0 ? 60 : 0,
       stage: 6,
       s: { pxd: 0.5, vtx: 0.5, lx: 0.5, aq: 0.5 },
       seed: 7,
-      tier: effectiveTier,
+      tier: L.tier,
     });
   };
 
@@ -1368,6 +1370,9 @@ export function createPlayScene(o: {
 
   const applyCoverage = (stageNum: number): void => {
     if (!ground) return;
+    // the water is built once per layout now (not at every base tick), so its look follows the stage here, as it did when it was rebuilt
+    const waterUniforms = waterMesh ? (waterMesh.material as THREE.ShaderMaterial).uniforms : null;
+    if (waterUniforms?.uStage) waterUniforms.uStage.value = stageNum;
     const s = Math.max(0, Math.min(6, Math.floor(stageNum)));
     const input = cachedBiomeInput ?? buildDefaultBiomeInput(ground);
     cachedBiomeInput = input;
@@ -1444,7 +1449,9 @@ export function createPlayScene(o: {
 
   const bakeCoverage = (): void => {
     if (!ground) return;
-    const input = cachedBiomeInput ?? buildDefaultBiomeInput(ground);
+    const layoutKey = defaultLayoutKeyOf(defaultLayout());
+    const input = buildDefaultBiomeInput(ground);
+    lastBiomeKey = lastCoverKey = layoutKey;
     cachedBiomeInput = input;
     for (let s = 0; s <= 6; s++) {
       stageCoverTextures[s] = bakeStageCoverage(s, input);
@@ -1453,8 +1460,17 @@ export function createPlayScene(o: {
     buildAndAttachWaterSurfaces(shown);
   };
 
+  // A base tick (ten a second in play) calls these with the layout unchanged: when the key has not moved, nothing is baked again. Before this,
+  // every tick restarted the sliced cover bake, which never got past stage 3, so stages 4 to 6 kept the cover of the first pass and the bake
+  // and the scatter ran about 13 times a second (most of the frame on the laptop).
+  let lastBiomeKey = '';
+  let lastCoverKey = '';
   const scheduleCoverRebuild = (): void => {
     if (!ground) return;
+    const coverKey = defaultLayoutKeyOf(defaultLayout());
+    if (coverKey === lastCoverKey) return;
+    lastCoverKey = coverKey;
+    cachedBiomeInput = buildDefaultBiomeInput(ground);
     if (coverSliceTimer) clearTimeout(coverSliceTimer);
     let sIdx = 0;
     const stepCover = (): void => {
@@ -1487,6 +1503,9 @@ export function createPlayScene(o: {
     biomeRebuildTimer = setTimeout(() => {
       biomeRebuildTimer = null;
       if (!biomeView || !ground) return;
+      const biomeKey = defaultLayoutKeyOf(defaultLayout());
+      if (biomeKey === lastBiomeKey) return;
+      lastBiomeKey = biomeKey;
       const input = buildDefaultBiomeInput(ground);
       cachedBiomeInput = input;
       biomeView.build(input, false);
@@ -3184,6 +3203,7 @@ export function createPlayScene(o: {
     },
     buildBiome(input) {
       cachedBiomeInput = input;
+      lastBiomeKey = lastCoverKey = '';
       if (biomeView) {
         biomeView.build(input);
         biomeView.setStage(shown);

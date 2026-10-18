@@ -66,7 +66,9 @@
 
 /* moments: big, centred above the crosshair, gone in three seconds */
 .play-toast { position: absolute; left: 50%; top: 72px; transform: translateX(-50%); display: grid; justify-items: center; gap: 6px; text-align: center; pointer-events: none; text-shadow: 0 2px 8px rgba(0, 0, 0, .75); animation: play-toast 3s var(--ease-out) both; z-index: 500; }
-.play-toast b { font-family: var(--font-setmix); font-size: clamp(30px, 4.4vw, 54px); font-weight: 800; letter-spacing: -0.02em; }
+.play-toast b { font-family: var(--font-setmix); font-size: clamp(30px, min(4.4vw, 7.6vh), 54px); font-weight: 800; letter-spacing: -0.02em; }
+/* a long title wraps to two lines, not four: the toast stays above the reticle's clear zone (48 px square at the centre) */
+.play-toast.long b { font-size: clamp(26px, min(3.2vw, 5.6vh), 40px); }
 .play-toast span { font-size: 15px; color: rgba(232, 238, 241, .9); max-width: 44ch; }
 .play-toast.lost b { color: var(--amber); animation: play-tear .5s steps(3) 2; }
 @keyframes play-toast { 0% { opacity: 0; transform: translate(-50%, 8px); } 10%, 82% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }

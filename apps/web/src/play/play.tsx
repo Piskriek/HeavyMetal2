@@ -390,6 +390,8 @@ export function PlayScreen(props: {
   const [skinGlitch, setSkinGlitch] = useState(false);
   const whereRef = useRef<Hud['where']>('lab');
   whereRef.current = hud.where;
+  // the scene's own where, set every frame: the HUD state (hud) is written at most every 90 ms, so a key pressed on arrival reads this instead
+  const liveWhereRef = useRef<Hud['where']>('lab');
   // a stage title card holds the radio line that follows it (P0-HOUR-02): the line waits until the card's 3 s are up
   const titleCardUntilRef = useRef(0);
   const subtitleHoldRef = useRef<{ id: string; text: string; cleanText: string } | null>(null);
@@ -2181,6 +2183,7 @@ useEffect(() => {
             vehicleInput,
           }
         : { move: { x: 0, z: 0 }, look: { dx: 0, dy: 0 }, run: false });
+      liveWhereRef.current = out.where;
       if (out.drivingVehicle) {
         setDrivingSpeed(out.drivingVehicle.speed);
         driveAccRef.current += out.drivingVehicle.speed * dt;
@@ -3122,7 +3125,7 @@ useEffect(() => {
         return;
       }
       // a lore prop (TASK-23c): a tap on E reads a fixture's or a transponder's log; a salvage prop is held, never tapped
-      if (e.code === 'KeyE' && hud.aimedProp && aimedPropActs(hud.aimedProp, hud.where) && hud.aimed === null && !hud.atLever && !hud.atDial) {
+      if (e.code === 'KeyE' && hud.aimedProp && aimedPropActs(hud.aimedProp, liveWhereRef.current) && hud.aimed === null && !hud.atLever && !hud.atDial) {
         if (!hud.aimedProp.salvage) {
           const entry = loreFor(hud.aimedProp.id);
           if (entry) openLog(entry.log);
@@ -3201,12 +3204,12 @@ useEffect(() => {
           narratorRef.current?.trigger('gate:open');
           setDialOpen(true);
           freeMouse();
-        } else if (hud.where === 'planet' && hud.aimed !== null && panel === null) {
+        } else if (liveWhereRef.current === 'planet' && hud.aimed !== null && panel === null) {
           sceneRef.current?.playAction('button');
           setInspect({ src: 'plot', id: hud.aimed });
           setMenu(false);
           freeMouse();
-        } else if (hud.where === 'lab' && hud.aimedLab !== null && labPanel === null) {
+        } else if (liveWhereRef.current === 'lab' && hud.aimedLab !== null && labPanel === null) {
           sceneRef.current?.playAction('button');
           setLabPanel(hud.aimedLab);
           freeMouse();
@@ -3216,7 +3219,7 @@ useEffect(() => {
         // The extraction rifle (TASK-21): out in hand on the planet; racked on the lab wall until its place in the story.
         const rifleLock = gateReason('rifle', stateRef.current.chain, plotRef.current.stage);
         if (rifleLock) { say('The beam is on the armory rack', rifleLock); return; }
-        if (hud.where !== 'planet') {
+        if (liveWhereRef.current !== 'planet') {
           say('The beam stays racked on the lab wall', 'It comes down to the planet later.');
           return;
         }
@@ -3242,7 +3245,7 @@ useEffect(() => {
         sceneRef.current.nudgeGhost((dir[0] ?? 0) * 0.5, (dir[1] ?? 0) * 0.5);
         return;
       }
-      if (e.code === 'KeyB' && hud.where === 'planet') {
+      if (e.code === 'KeyB' && liveWhereRef.current === 'planet') {
         if (visitingRef.current) {
           say(`Visiting ${visitingRef.current.snapshot.owner}'s plot`, 'Visits are read-only.');
           return;
@@ -4685,7 +4688,7 @@ useEffect(() => {
               onClose={() => setWeaponBenchOpen(false)}
             />
           )}
-          {toast && !isAnyBaseWindowOpen && !hideOverlays ? <div key={toast.id} className={`play-toast${toast.text === 'Sync lost' ? ' lost' : ''}`} role="status" data-hud-zone="title"><b>{toast.text}</b>{toast.sub ? <span>{toast.sub}</span> : null}</div> : null}
+          {toast && !isAnyBaseWindowOpen && !hideOverlays ? <div key={toast.id} className={`play-toast${toast.text === 'Sync lost' ? ' lost' : ''}${toast.text.length > 20 ? ' long' : ''}`} role="status" data-hud-zone="title"><b>{toast.text}</b>{toast.sub ? <span>{toast.sub}</span> : null}</div> : null}
           {baseWorldVersion > 0 && <span style={{ display: 'none' }} data-base-version={baseWorldVersion} />}
         </>
       ) : null}

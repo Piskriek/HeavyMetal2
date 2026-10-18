@@ -21,7 +21,7 @@ import { preloadVista, VISTA_LEVEL, type WindowView } from './lab-vista';
 import { createPlotHolo, type PlotHolo } from './plot-holo';
 import { COLOUR_MARK_FRAGMENT, localMachineWaveAt, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_OFF_FRAGMENT, OPENING_OFF_VERTEX, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX, scanRingFadeAt, waveBandColourFor } from './portal-shaders';
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
-import { disposeProp, FABRICATOR_PLUME, FABRICATOR_VENT, FEED_CUBES_FULL, feedCubeCount, feedCubeProgress, lineSpan, machinePlumeCount, machinePlumeCountOf, machinePlumeLook, machinePlumeLookOf, machinePlumeSpec, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
+import { disposeProp, FABRICATOR_PLUME, FABRICATOR_VENT, FEED_CUBES_FULL, feedCubeCount, feedCubeProgress, lineSpan, machinePlumeCount, machinePlumeCountOf, machinePlumeGravity, machinePlumeLook, machinePlumeLookOf, machinePlumeSpec, machinePlumeSteady, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
 import { beadSpeed, spanPoint, spanSag } from './brownout-visual';
 import { castHeightfield, castSpheres, createRoverArmState, nearestHit, stepRoverArm, type CastSphere, type RoverArmState, type Vec3 as RoverVec3 } from './rover-camera';
 import { createExposureState, createScanWave, exposureTargetLuminance, gateOrLabFactor, markScanWaveDone, scanFrame, stepExposure, suitCamMix, suitCamProfile, suitCamStrength, triggerScanWave, type ExposureState, type ScanWave, type SuitCamSetting } from './stage-look';
@@ -182,6 +182,8 @@ const WIND = { x: 0.94, z: 0.35, speed: 3.3 };
 /** Each machine's pour now comes from its own kind's look and count (machine-props.ts, ARGO_NOTE_08). */
 /** Most machines the feed hoppers draw at once (one instanced draw for every hopper's cubes). */
 const MAX_FEED_MACHINES = 48;
+/** Base fabricators with a print head to drop ore on (ARGO_NOTE_16 ruling 3): their cubes share the feed mesh after the machines'. */
+const MAX_FEED_FABRICATORS = 8;
 
 export interface PlayScene {
   /** Puts the planet in place (once, after its looks are baked). */
@@ -357,10 +359,11 @@ export interface PlayScene {
     detail(): Detail & { readonly planet: readonly [number, number]; readonly pixels: number };
     /** Machines standing on the plot, and how many pour pixels now. */
     machines(): { readonly standing: number; readonly pouring: number };
-    /** Each machine's pour (ARGO_NOTE_08): its kind, whether its emitter is up, its pixel count now, its colour, its vent and its feed cubes. */
-    plumes(): readonly { readonly kind: string; readonly emitting: boolean; readonly pour: number; readonly colour: string; readonly base: readonly [number, number]; readonly vent: readonly [number, number, number] | null; readonly feed: readonly [number, number, number] | null; readonly feedCubes: number }[];
-    /** Each base fabricator: its print state, whether its plume is up, its pixels now, and its vent in the world. */
-    fabricators(): readonly { readonly id: number; readonly printing: boolean; readonly emitting: boolean; readonly pour: number; readonly vent: readonly [number, number, number] }[];
+    /** Each machine's pour (ARGO_NOTE_08): its kind, whether its emitter is up, its pixel count now, its colour, its vent and its feed cubes.
+     *  steady: its live count at full run (rate x lifetime, ARGO_NOTE_16 ruling 1); foot and yaw place its prop, so a test can read the registry's vent. */
+    plumes(): readonly { readonly kind: string; readonly emitting: boolean; readonly pour: number; readonly steady: number; readonly arc: number; readonly colour: string; readonly base: readonly [number, number]; readonly foot: readonly [number, number, number]; readonly yaw: number; readonly vent: readonly [number, number, number] | null; readonly feed: readonly [number, number, number] | null; readonly feedCubes: number }[];
+    /** Each base fabricator: its print state, whether its plume is up, its pixels now, its vent and its feed (the print head's top) in the world, and its cubes. */
+    fabricators(): readonly { readonly id: number; readonly printing: boolean; readonly emitting: boolean; readonly pour: number; readonly colour: string; readonly vent: readonly [number, number, number]; readonly feed: readonly [number, number, number] | null; readonly feedCubes: number }[];
     holo(): { readonly visible: boolean; readonly machines: number };
     view(): 'first' | 'third';
     clipWeight(name: ClipName): number;
@@ -597,7 +600,8 @@ export function createPlayScene(o: {
     wheelAngle: number;
   }
 
-  /** emitter: the fabricator's plume while it prints; pour: its pixels now; vent: its exhaust, in the world. */
+  /** emitter: the fabricator's plume while it prints; pour: its pixels now; vent: its exhaust, in the world; feedAt: where the ore
+   *  lands on the print head, relative to the head's origin (station frame). */
   interface FabricatorView {
     id: number;
     group: THREE.Group;
@@ -606,6 +610,7 @@ export function createPlayScene(o: {
     emitter: number | null;
     pour: number;
     vent: THREE.Vector3;
+    feedAt: THREE.Vector3 | null;
   }
 
   const vehicleViews = new Map<number, VehicleView>();
@@ -700,13 +705,22 @@ export function createPlayScene(o: {
     if (view.printing && view.emitter === null) {
       view.emitter = plume.add({
         at: [vent.x, vent.y, vent.z], colour: FABRICATOR_PLUME.colour, ...machinePlumeLookOf(FABRICATOR_PLUME),
-        count: machinePlumeCountOf(FABRICATOR_PLUME, 1, clock), startAt: clock + 0.6,
+        count: machinePlumeCountOf(FABRICATOR_PLUME, 1, clock), maxCount: machinePlumeSteady(FABRICATOR_PLUME), startAt: clock + 0.6,
       });
     } else if (!view.printing && view.emitter !== null) {
       plume.remove(view.emitter);
       view.emitter = null;
       view.pour = 0;
     }
+  };
+  /** Where the ore lands on a print head, relative to the head's origin (the station frame): the top of its box, centred. The head
+   *  slides along the gantry while it prints, so the drop follows it (the cubes are placed each frame from the head's position). */
+  const headFeedOffset = (station: FabricatorStationMesh): THREE.Vector3 | null => {
+    const head = station.parts['head'];
+    if (!head) return null;
+    station.group.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(head);
+    return new THREE.Vector3((box.min.x + box.max.x) / 2 - head.position.x, box.max.y - head.position.y, (box.min.z + box.max.z) / 2 - head.position.z);
   };
   function setFabricators(list: readonly { readonly id: number; readonly x: number; readonly z: number; readonly yaw: number; readonly printing: boolean }[]): void {
     lastFabricatorsList = list;
@@ -717,10 +731,11 @@ export function createPlayScene(o: {
       if (!view) {
         const activeLevel = genLevelForStage(shown, currentQuality);
         const station = createGenFabricator(activeLevel, Math.max(2, shown), roverMaterials);
+        const feedAt = headFeedOffset(station); // measured while the station still stands at the origin, so the box is in its frame
         station.group.position.set(f.x, groundAt(f.x, f.z), f.z);
         station.group.rotation.set(0, f.yaw, 0);
         fabricatorsGroup.add(station.group);
-        view = { id: f.id, group: station.group, station, printing: f.printing, emitter: null, pour: 0, vent: new THREE.Vector3() };
+        view = { id: f.id, group: station.group, station, printing: f.printing, emitter: null, pour: 0, vent: new THREE.Vector3(), feedAt };
         fabricatorViews.set(f.id, view);
       } else {
         view.printing = f.printing;
@@ -846,47 +861,62 @@ export function createPlayScene(o: {
   // the feed hoppers (brief 29, item 6): dark grey ore cubes drop into each hopper while its machine consumes; the count follows the
   // run share (0 when the machine is off or out of ore). One instanced draw for every hopper.
   const feedMat = keep(new THREE.MeshLambertMaterial({ color: '#3b3f46' }));
-  const feedMesh = keep(new THREE.InstancedMesh(keep(new THREE.BoxGeometry(1, 1, 1)), feedMat, MAX_FEED_MACHINES * FEED_CUBES_FULL));
+  const feedMesh = keep(new THREE.InstancedMesh(keep(new THREE.BoxGeometry(1, 1, 1)), feedMat, (MAX_FEED_MACHINES + MAX_FEED_FABRICATORS) * FEED_CUBES_FULL));
   feedMesh.count = 0;
   feedMesh.visible = false;
   feedMesh.frustumCulled = false;
   feedMesh.name = 'machine-feed-cubes';
   planetScene.add(feedMesh);
   const feedM = new THREE.Matrix4(), feedQ = new THREE.Quaternion(), feedS = new THREE.Vector3(), feedP = new THREE.Vector3();
+  const feedWorld = new THREE.Vector3(), feedHeadLocal = new THREE.Vector3();
+  /** The ore's landing point on a fabricator's print head this frame (the head slides, so it is read from the head's position). */
+  const fabricatorFeedAt = (f: FabricatorView): THREE.Vector3 | null => {
+    const head = f.station.parts['head'];
+    if (!head || !f.feedAt) return null;
+    feedHeadLocal.copy(head.position).add(f.feedAt);
+    return feedWorld.copy(feedHeadLocal).applyMatrix4(f.group.matrixWorld);
+  };
+  /** One feed's cubes into its slots: the first `drop` of FEED_CUBES_FULL fall onto the feed point, the rest are hidden. Returns the live ones. */
+  const writeFeedCubes = (source: number, feed: THREE.Vector3 | null, drop: number, t: number): number => {
+    let live = 0;
+    for (let c = 0; c < FEED_CUBES_FULL; c++) {
+      const slot = source * FEED_CUBES_FULL + c;
+      if (feed === null || c >= drop) {
+        feedM.makeScale(0, 0, 0);
+      } else {
+        const p = feedCubeProgress(t, c, FEED_CUBES_FULL);
+        const q = Math.min(1, Math.max(0, (p - 0.8) / 0.2));
+        const size = 0.08 * (1 - q * q * (3 - 2 * q));
+        feedP.set(feed.x + Math.sin(c * 2.1) * 0.03, feed.y + 0.9 * (1 - p * p), feed.z);
+        feedS.setScalar(size);
+        feedM.compose(feedP, feedQ, feedS);
+        live++;
+      }
+      feedMesh.setMatrixAt(slot, feedM);
+    }
+    return live;
+  };
   /** Each frame: every pour's pixel count (one number from machine-props: rate x life x run share x cadence, T15 multiplies it by the beat)
-   *  and every feed hopper's cubes. */
+   *  and every feed hopper's cubes: the machines' first, then the base fabricators' (into their print heads, while they print). */
   const tickMachinePlumes = (t: number): void => {
     for (const f of fabricatorViews.values()) {
       if (f.emitter !== null) { f.pour = machinePlumeCountOf(FABRICATOR_PLUME, 1, t); plume.setCount(f.emitter, f.pour); }
     }
-    let i = 0;
+    let sources = 0;
     let live = 0;
     for (const v of views.values()) {
       if (v.emitter !== null) {
         v.pour = machinePlumeCount(v.m.kind, v.share, t);
         plume.setCount(v.emitter, v.pour);
       }
-      if (i >= MAX_FEED_MACHINES) break;
-      const feed = v.feed;
-      const drop = feedCubeCount(v.share);
-      for (let c = 0; c < FEED_CUBES_FULL; c++) {
-        const slot = i * FEED_CUBES_FULL + c;
-        if (feed === null || c >= drop) {
-          feedM.makeScale(0, 0, 0);
-        } else {
-          const p = feedCubeProgress(t, c, FEED_CUBES_FULL);
-          const q = Math.min(1, Math.max(0, (p - 0.8) / 0.2));
-          const size = 0.08 * (1 - q * q * (3 - 2 * q));
-          feedP.set(feed.x + Math.sin(c * 2.1) * 0.03, feed.y + 0.9 * (1 - p * p), feed.z);
-          feedS.setScalar(size);
-          feedM.compose(feedP, feedQ, feedS);
-          live++;
-        }
-        feedMesh.setMatrixAt(slot, feedM);
-      }
-      i++;
+      if (sources >= MAX_FEED_MACHINES) break;
+      live += writeFeedCubes(sources++, v.feed, feedCubeCount(v.share), t);
     }
-    feedMesh.count = i * FEED_CUBES_FULL;
+    for (const f of fabricatorViews.values()) {
+      if (sources >= MAX_FEED_MACHINES + MAX_FEED_FABRICATORS) break;
+      live += writeFeedCubes(sources++, fabricatorFeedAt(f), feedCubeCount(f.printing ? 1 : 0), t);
+    }
+    feedMesh.count = sources * FEED_CUBES_FULL;
     feedMesh.visible = live > 0;
     if (feedMesh.count > 0) feedMesh.instanceMatrix.needsUpdate = true;
   };
@@ -967,7 +997,11 @@ export function createPlayScene(o: {
   const addPlume = (v: MachineView, vent: THREE.Vector3, startAt: number): number => {
     const look = machinePlumeLook(v.m.kind);
     v.pour = machinePlumeCount(v.m.kind, v.share, clock);
-    return plume.add({ at: [vent.x, vent.y, vent.z], colour: machinePlumeSpec(v.m.kind).colour, ...look, count: v.pour, startAt });
+    // maxCount is the steady count: the per-frame count never exceeds it, so setCount only moves the count uniform (no rebuild)
+    return plume.add({
+      at: [vent.x, vent.y, vent.z], colour: machinePlumeSpec(v.m.kind).colour, ...look, count: v.pour, startAt,
+      maxCount: machinePlumeSteady(machinePlumeSpec(v.m.kind)), gravity: machinePlumeGravity(v.m.kind),
+    });
   };
   const unbuild = (v: MachineView): void => {
     planetScene.remove(v.prop.group);
@@ -3522,19 +3556,32 @@ export function createPlayScene(o: {
       gatePlanet: () => ({ x: twin.group.position.x, z: twin.group.position.z }),
       detail: () => ({ ...detail, planet: [postUniforms.uRes.value.x, postUniforms.uRes.value.y] as const, pixels: plume.stats().pixels }),
       machines: () => { let pouring = 0; for (const v of views.values()) if (v.emitter !== null) pouring++; return { standing: views.size, pouring }; },
-      fabricators: () => [...fabricatorViews.values()].map((f) => ({
-        id: f.id, printing: f.printing, emitting: f.emitter !== null, pour: f.pour, vent: [f.vent.x, f.vent.y, f.vent.z] as const,
-      })),
-      plumes: () => [...views.values()].map((v) => ({
-        kind: v.m.kind,
-        emitting: v.emitter !== null,
-        pour: v.pour,
-        colour: machinePlumeSpec(v.m.kind).colour,
-        base: [v.m.x, v.m.z] as const,
-        vent: v.vent ? [v.vent.x, v.vent.y, v.vent.z] as const : null,
-        feed: v.feed ? [v.feed.x, v.feed.y, v.feed.z] as const : null,
-        feedCubes: v.feed ? feedCubeCount(v.share) : 0,
-      })),
+      fabricators: () => [...fabricatorViews.values()].map((f) => {
+        const feed = fabricatorFeedAt(f);
+        return {
+          id: f.id, printing: f.printing, emitting: f.emitter !== null, pour: f.pour, colour: FABRICATOR_PLUME.colour,
+          vent: [f.vent.x, f.vent.y, f.vent.z] as const,
+          feed: feed ? [feed.x, feed.y, feed.z] as const : null,
+          feedCubes: feed ? feedCubeCount(f.printing ? 1 : 0) : 0,
+        };
+      }),
+      plumes: () => [...views.values()].map((v) => {
+        const spec = machinePlumeSpec(v.m.kind);
+        return {
+          kind: v.m.kind,
+          emitting: v.emitter !== null,
+          pour: v.pour,
+          steady: machinePlumeSteady(spec),
+          arc: v.emitter !== null ? machinePlumeGravity(v.m.kind) : 0,
+          colour: spec.colour,
+          base: [v.m.x, v.m.z] as const,
+          foot: [v.prop.group.position.x, v.prop.group.position.y, v.prop.group.position.z] as const,
+          yaw: v.m.yaw,
+          vent: v.vent ? [v.vent.x, v.vent.y, v.vent.z] as const : null,
+          feed: v.feed ? [v.feed.x, v.feed.y, v.feed.z] as const : null,
+          feedCubes: v.feed ? feedCubeCount(v.share) : 0,
+        };
+      }),
       holo: () => holo.debug(),
       view: () => cameraView,
       clipWeight: (name: ClipName) => scientistAnimator?.getClipWeight(name) ?? 0,

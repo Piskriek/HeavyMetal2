@@ -73,7 +73,8 @@ test('a machine prop stands its height in the group that the scene moves (positi
 
 const CADENCES: readonly PlumeCadence[] = ['continuous', 'ram-fast', 'ram-heavy', 'shimmer', 'chatter', 'crackle'];
 /** The kinds that take material in: their feed hopper is where the ore cubes drop. */
-const FEEDS: readonly MachineKind[] = ['mill', 'heavy-mill', 'press', 'heavy-press', 'water', 'heavy-water', 'power'];
+// the kinds that take ore in (ARGO_NOTE_16 ruling 3: the power unit takes none, its feed hopper is gone)
+const FEEDS: readonly MachineKind[] = ['mill', 'heavy-mill', 'press', 'heavy-press', 'water', 'heavy-water'];
 
 test('every kind has a plume spec whose colour is the inspector colour, with the note\'s rates and cadences', () => {
   for (const kind of ALL_KINDS) {

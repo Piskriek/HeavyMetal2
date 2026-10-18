@@ -65,8 +65,9 @@ export interface MachineProp {
   readonly power: THREE.Vector3;
   /** Where its pixels pour out (pixel machines), its steam (the power unit), or null. */
   readonly vent: THREE.Vector3 | null;
-  /** Where its ore goes in (the feed hopper, dark grey cubes drop into it while it consumes), or null (a drill or a projector takes none).
-   *  Optional only for the unused gen-asset builder in assets/gen-props.ts, which predates the feed socket. */
+  /** Where its ore goes in (the feed hopper, dark grey cubes drop into it while it consumes), or null: a drill, a projector, the power
+   *  unit and a pylon take none (ARGO_NOTE_16 ruling 3). Optional only for the unused gen-asset builder in assets/gen-props.ts, which
+   *  predates the feed socket. */
   readonly feed?: THREE.Vector3 | null;
   /** A pylon's line attachment, for the spans between pylons. */
   readonly top: THREE.Vector3 | null;
@@ -107,18 +108,22 @@ export interface MachinePlumeSpec {
   readonly cadence: PlumeCadence;
 }
 
+/**
+ * The live count of each kind is rate x lifetime at full run (ARGO_NOTE_16 ruling 1, POL-261). The starter press, the projector
+ * and the water maker keep their T03P numbers (the ruling does not list them).
+ */
 export const MACHINE_PLUME_SPECS: Readonly<Record<MachineKind, MachinePlumeSpec>> = {
-  mill: { colour: '#ff3d8a', rate: 28, speed: 2.4, spread: 0.22, pixelSize: 0.11, gravity: -0.4, lifetime: 1.8, cadence: 'continuous' },
-  'heavy-mill': { colour: '#ff3d8a', rate: 64, speed: 3.6, spread: 0.30, pixelSize: 0.16, gravity: -0.6, lifetime: 2.4, cadence: 'continuous' },
+  mill: { colour: '#ff3d8a', rate: 56, speed: 2.4, spread: 0.22, pixelSize: 0.11, gravity: -0.4, lifetime: 2.5, cadence: 'continuous' },
+  'heavy-mill': { colour: '#ff3d8a', rate: 72, speed: 3.6, spread: 0.30, pixelSize: 0.16, gravity: -0.6, lifetime: 2.5, cadence: 'continuous' },
   press: { colour: '#7cff4d', rate: 32, speed: 2.8, spread: 0.48, pixelSize: 0.12, gravity: 0.2, lifetime: 1.4, cadence: 'ram-fast' },
-  'heavy-press': { colour: '#7cff4d', rate: 72, speed: 4.0, spread: 0.58, pixelSize: 0.18, gravity: 0.3, lifetime: 1.8, cadence: 'ram-heavy' },
+  'heavy-press': { colour: '#7cff4d', rate: 72, speed: 4.0, spread: 0.58, pixelSize: 0.18, gravity: 0.3, lifetime: 2.5, cadence: 'ram-heavy' },
   projector: { colour: '#ffc13d', rate: 26, speed: 3.4, spread: 0.14, pixelSize: 0.10, gravity: -0.8, lifetime: 2.2, cadence: 'shimmer' },
-  'heavy-projector': { colour: '#ffc13d', rate: 60, speed: 4.8, spread: 0.18, pixelSize: 0.16, gravity: -1.1, lifetime: 2.8, cadence: 'shimmer' },
+  'heavy-projector': { colour: '#ffc13d', rate: 80, speed: 4.8, spread: 0.18, pixelSize: 0.16, gravity: -1.1, lifetime: 2.5, cadence: 'shimmer' },
   water: { colour: '#3dc8ff', rate: 34, speed: 1.9, spread: 0.52, pixelSize: 0.14, gravity: -0.2, lifetime: 2.0, cadence: 'continuous' },
-  'heavy-water': { colour: '#3dc8ff', rate: 78, speed: 2.9, spread: 0.65, pixelSize: 0.20, gravity: -0.3, lifetime: 2.6, cadence: 'continuous' },
-  drill: { colour: '#ff7b3d', rate: 30, speed: 3.2, spread: 0.62, pixelSize: 0.09, gravity: 4.5, lifetime: 0.9, cadence: 'chatter' },
-  power: { colour: '#b46bff', rate: 36, speed: 3.5, spread: 0.25, pixelSize: 0.12, gravity: -0.5, lifetime: 1.7, cadence: 'continuous' },
-  pylon: { colour: '#5ce1e6', rate: 12, speed: 1.1, spread: 0.75, pixelSize: 0.07, gravity: 1.2, lifetime: 0.55, cadence: 'crackle' },
+  'heavy-water': { colour: '#3dc8ff', rate: 72, speed: 2.9, spread: 0.65, pixelSize: 0.20, gravity: -0.3, lifetime: 2.5, cadence: 'continuous' },
+  drill: { colour: '#ff7b3d', rate: 48, speed: 3.2, spread: 0.62, pixelSize: 0.09, gravity: 4.5, lifetime: 2.0, cadence: 'chatter' },
+  power: { colour: '#b46bff', rate: 56, speed: 3.5, spread: 0.25, pixelSize: 0.12, gravity: -0.5, lifetime: 2.0, cadence: 'continuous' },
+  pylon: { colour: '#5ce1e6', rate: 30, speed: 1.1, spread: 0.75, pixelSize: 0.07, gravity: 1.2, lifetime: 1.2, cadence: 'crackle' },
 };
 
 export function machinePlumeSpec(kind: MachineKind): MachinePlumeSpec {
@@ -162,11 +167,11 @@ export function machinePlumeLook(kind: MachineKind): PlumeEmitterLook {
 }
 
 /**
- * The base fabricator is not in ARGO_NOTE_08. Until Argo names its plume, it pours this neutral look (the mill's rhythm, in a
- * warm white) while it prints: printing is operating, so the pour follows the print state alone.
+ * The base fabricator is not in ARGO_NOTE_08. It pours Synthesis Violet (METRIC_COLOURS.all, ARGO_NOTE_16 ruling 4) at 64/s for
+ * 2.0 s (128 live, ruling 1) while it prints: printing is operating, so the pour follows the print state alone.
  */
 export const FABRICATOR_PLUME: MachinePlumeSpec = {
-  colour: '#e6e9ee', rate: 28, speed: 2.2, spread: 0.22, pixelSize: 0.11, gravity: -0.4, lifetime: 1.8, cadence: 'continuous',
+  colour: '#b46bff', rate: 64, speed: 2.2, spread: 0.22, pixelSize: 0.11, gravity: -0.4, lifetime: 2.0, cadence: 'continuous',
 };
 
 /**
@@ -187,20 +192,40 @@ export function machinePlumeCount(kind: MachineKind, run: number, t: number): nu
   return machinePlumeCountOf(MACHINE_PLUME_SPECS[kind], run, t);
 }
 
+/** A pour's steady live count, rate x lifetime at full run: the emitter's maxCount, so a count change never rebuilds its buffers. */
+export function machinePlumeSteady(s: MachinePlumeSpec): number {
+  return Math.round(s.rate * s.lifetime);
+}
+
+/**
+ * The ballistic pours (ARGO_NOTE_08): the drill's slag sparks and the pylon's corona sparks fall on their own arcs, under the
+ * spec's gravity. The other pours rise with no arc (gravity 0, as before) until Argo rules on them.
+ */
+const BALLISTIC_KINDS: ReadonlySet<MachineKind> = new Set<MachineKind>(['drill', 'pylon']);
+export function machinePlumeGravity(kind: MachineKind): number {
+  return BALLISTIC_KINDS.has(kind) ? MACHINE_PLUME_SPECS[kind].gravity : 0;
+}
+
 /**
  * The feed hoppers of the generated meshes, in each asset's own frame: the sockets the asset registry (apps/web/src/assets/gen/
- * registry.json) measures on each model, checked against close shots (T03P follow-up). Each mesh's origin is its base, so a
- * hardpoint machine adds the ring height. The old raycast from the side missed the funnels: it landed on the tank top.
+ * registry.json) measures on each model, checked against close shots (T03P follow-up). The old raycast from the side missed the
+ * funnels: it landed on the tank top.
  */
 const GEN_FEED: Readonly<Record<'mill' | 'press' | 'water', readonly [number, number, number]>> = {
   mill: [0, 4.16, 0],
   press: [0, 4.26, 0],
   water: [3.05, 1.6, 0],
 };
-const genFeed = (which: keyof typeof GEN_FEED, base: number): THREE.Vector3 => {
-  const [x, y, z] = GEN_FEED[which];
-  return new THREE.Vector3(x, y + base, z);
+/**
+ * The exhaust vents of the mill and the press, in the same frame: their measured side stacks (registry.json). The pixels pour from
+ * here, so the top opening takes only the falling ore cubes (ARGO_NOTE_16 ruling 5).
+ */
+const GEN_VENT: Readonly<Record<'mill' | 'press', readonly [number, number, number]>> = {
+  mill: [1.715, 2.28, -0.48],
+  press: [0, 3.44, -0.56],
 };
+/** A measured socket in a generated mesh's frame. Each mesh's origin is its base, so a hardpoint machine adds the ring height. */
+const genPoint = (p: readonly [number, number, number], base: number): THREE.Vector3 => new THREE.Vector3(p[0], p[1] + base, p[2]);
 
 /** Ore cubes falling into a feed hopper: at most this many at full run, one drop cycle takes FEED_DROP_SEC. */
 export const FEED_CUBES_FULL = 4;
@@ -365,10 +390,10 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
         const isHeavy = kind === 'heavy-mill';
         if (isHeavy) gen.position.copy(lift);
         group.add(gen);
-        // the ore goes in at the top hopper (genFeed: the asset's measured socket); the pixels come out of the rear stack (the power cable is at the rear)
+        // the ore goes in at the top hopper; the pixels come out of the side stack (GEN_VENT, the measured socket: ARGO_NOTE_16 ruling 5)
         const base = isHeavy ? RING_TOP_Y : 0;
-        const vent = findMachineVent(gen, base, 0, -0.6);
-        const feed = genFeed('mill', base);
+        const vent = genPoint(GEN_VENT.mill, base);
+        const feed = genPoint(GEN_FEED.mill, base);
         const power = new THREE.Vector3(0, base + 0.2, -1.8);
         return {
           group,
@@ -417,9 +442,9 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
         ram1.position.set(-0.55, restY, 0);
         ram2.position.set(0.55, restY, 0);
         group.add(ram1, ram2);
-        // sheet 12: rock in at the side tray, pixels out of the rear vent
-        const vent = findMachineVent(group, baseY, 0, -0.5);
-        const feed = genFeed('press', baseY);
+        // the rock goes in at the top chute; the pixels come out of the measured side stack (GEN_VENT, ARGO_NOTE_16 ruling 5)
+        const vent = genPoint(GEN_VENT.press, baseY);
+        const feed = genPoint(GEN_FEED.press, baseY);
         const power = new THREE.Vector3(0, baseY + 0.2, 0.8);
         return {
           group,
@@ -529,7 +554,7 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
         group.add(gen);
         // sheet 12: the ore comes in at the side screw, the cyan pixels out of the top-rear vent
         const vent = findMachineVent(gen, baseY, 0, -0.6);
-        const feed = genFeed('water', baseY);
+        const feed = genPoint(GEN_FEED.water, baseY);
         const power = new THREE.Vector3(0, baseY + 0.2, 0.8);
         return {
           group,
@@ -569,8 +594,9 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
       return { group: p.group, power: at(p.sockets, 'power')!, vent, feed: null, top: null, lamps: p.lamps, animate: (t, run) => { p.bit.rotation.y = t * 9 * run; }, light: (g) => p.lamps.forEach((l) => field.setLamp(l, g)) };
     }
     case 'power': {
+      // the power unit takes no ore in (ARGO_NOTE_16 ruling 3): no feed hopper, and its violet steam comes off the steam socket
       const p = field.powerUnit(m, { stage: st });
-      return { group: p.group, power: at(p.sockets, 'out')!, vent: at(p.sockets, 'steam'), feed: at(p.sockets, 'feed'), top: null, lamps: p.lamps, animate: still, light: (g) => p.lamps.forEach((l) => field.setLamp(l, g)) };
+      return { group: p.group, power: at(p.sockets, 'out')!, vent: at(p.sockets, 'steam'), feed: null, top: null, lamps: p.lamps, animate: still, light: (g) => p.lamps.forEach((l) => field.setLamp(l, g)) };
     }
     case 'pylon': {
       // a pylon takes no material in: its corona sparks come off the top insulator, under load

@@ -330,6 +330,18 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 - **Gravity:** `@hm/plume` is rise-only, so the drill's ballistic sparks and the falling press and pylon pixels aren't reproduced. A gravity option in @hm/plume would be a small package change.
 - **Cost:** cadence-driven pours rebuild the instance buffer every frame (+0.11 ms GPU on the 3D PC). A count uniform in @hm/plume would remove it.
 - Sidecar Task: POL-261 - Argo rules on the first three; a sidecar does the @hm/plume changes.
+- **Done (T03P-R, Argo's ARGO_NOTE_16 rulings 1 to 5, in the T03P-R commit):** the live counts are rate x life (drill 96, texture mill 140, power unit 112, pylon 36, heavy press, mill and water 180, heavy projector 200, fabricator 128). The power unit keeps its violet steam and the pylon its corona sparks. The power unit's feed hopper is gone; ore drops only at the mill, the press, the water maker, their heavy kinds and the fabricator's print head. The fabricator pours Synthesis Violet #b46bff. The mill and the press pour from their registry side stacks, and the top opening takes the cubes. The package half is F-21 (77a276b7): the drill's sparks and the pylon's corona sparks arc under gravity, and a count uniform stops the per-frame rebuilds (the old +0.11 ms). Checks: scripts/test-machine-plumes.mjs 120 of 120. Timing on the worker (RTX 3080, stage 6 Low, --fps-only): 0.74 ms GPU, 126 draw calls.
+- **Still open from POL-261:** POL-281 (the press's vent socket) and POL-282 (gravity on the other kinds).
+
+### POL-281: the press's registry vent sits inside its frame, behind the chute
+- **Seen:** T03P-R. The press-frame `vent` socket is (0, 3.44, -0.56) in the mesh's frame: 0.99 m from the chute before the fit and 0.77 m after it (the press is fitted to 3.1 m). Ruling 5 asked for a side stack clear of the falling ore; the shot shows the pixels leaving the frame's top beside the cube column. The brief's "more than 1 m" cannot hold with this socket, so the test pins the press at more than 0.5 m.
+- **Expected:** Argo rules whether the press gets a true side stack (a new socket on a regenerated mesh) or keeps this one.
+- Sidecar Task: POL-281 - Argo rules on the press's vent socket.
+
+### POL-282: the other pours still rise straight
+- **Seen:** T03P-R. Only the drill's sparks and the pylon's corona sparks are given their gravity (ARGO_NOTE_08 calls them ballistic). The other kinds carry spec gravities (buoyant lift on the mill, the projectors and the heavies; small falls on the presses) that the plume does not use yet.
+- **Expected:** Argo rules whether those pours arc. Wiring them is a change in machinePlumeGravity (machine-props.ts).
+- Sidecar Task: POL-282 - Argo rules on the other kinds' gravity.
 - **Package half done in F-21 (Gemini-Flash, 77a276b7):** added per-emitter `gravity` (m/s², default 0) with ballistic parabola displacement in `pixelAt` and GLSL `pixelCore` (packed into `C.w` of `uEm`). Added `uCounts` uniform array to drive visible count dynamically without instance buffer rebuilds or attribute updates. 22/22 plume unit tests pass; verified clean build (15.10 MB) and 69/69 checks on `scripts/test-machine-plumes.mjs` on 3D PC worker.
 
 ### POL-301: the credits' chapter 1 has no stage-0a wireframe look

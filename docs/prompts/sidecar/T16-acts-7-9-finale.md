@@ -19,7 +19,12 @@
 3. **POL-70:** the Planet Table hologram shows the 11 enclaves and the 85 % consensus.
 4. **The finale hands off into the credits video (T14),** then post-credits freeplay.
 5. **POL-57:** the 0 % voice recall and the 12 kW brownout barks are wired.
-6. **POL-38:** commit the voice files' `.mp3.json` metadata where the narrator expects it (or move it out of `public/` as the asset notes say). Follow the repo's existing pattern.
+6. **Gate the credits behind the finale (Opus, 2026-10-18, after the owner questioned an always-visible button):**
+   - T14 adds an "Ending Credits" item to the title screen. Hide it until the finale has played: A9-03 sets a saved `endingSeen` flag.
+   - Add "Play ending credits" to the Esc debug menu, so the owner and the tests can preview it any time.
+   - The lab monitor's R (the Overclocked jukebox) stays available; its E (the credits replay) also waits for `endingSeen`.
+   - The test: a fresh save shows no Ending Credits item; after the finale it appears; the debug entry works on a fresh save.
+7. **POL-38:** commit the voice files' `.mp3.json` metadata where the narrator expects it (or move it out of `public/` as the asset notes say). Follow the repo's existing pattern.
 
 ## Verify
 - **Extend `scripts/test-campaign.mjs`** with A7-01 to A9-03 through the debug checkpoints. The whole campaign must pass, the old 45 beats plus the new ones, with zero console errors and zero HUD overlaps.

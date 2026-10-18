@@ -84,6 +84,9 @@
       "@hm/audio": [
         "packages/audio/src/index.ts"
       ],
+      "@hm/audiomix": [
+        "packages/audiomix/src/index.ts"
+      ],
       "@hm/trackedit": [
         "packages/trackedit/src/index.ts"
       ],

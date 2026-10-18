@@ -147,6 +147,7 @@ export default defineConfig(async ({ mode }) => ({
       '@hm/lightplace': p('../../packages/lightplace/src/index.ts'),
       '@hm/voxelcsg': p('../../packages/voxelcsg/src/index.ts'),
       '@hm/soundscape': p('../../packages/soundscape/src/index.ts'),
+      '@hm/audiomix': p('../../packages/audiomix/src/index.ts'),
       '@hm/npcbrain': p('../../packages/npcbrain/src/index.ts'),
       '@hm/particles': p('../../packages/particles/src/index.ts'),
       '@hm/selectset': p('../../packages/selectset/src/index.ts'),

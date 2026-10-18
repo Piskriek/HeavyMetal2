@@ -456,3 +456,5 @@ export function springStep(s: Spring, target: number, k: number, c: number, dt: 
   }
   return { x, v };
 }
+
+export * from './print-sweep';

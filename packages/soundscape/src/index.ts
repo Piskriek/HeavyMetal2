@@ -258,3 +258,4 @@ export const AMBIENCES: readonly { id: string; name: string; layers: Layer[] }[]
     ],
   },
 ];
+export * from './stage-ambience';

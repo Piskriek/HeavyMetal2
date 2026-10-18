@@ -1,5 +1,6 @@
-// The wreck sites on the plot (TASK-23c, TICKET-07 Item F): every leak (TASK-23b-2) sits in a cluster of two to four wasteland props, and four scenery-only
-// sites hold clusters with no leak. Pure: the same plot gives the same layout, and the test pins it. The runtime (play/wrecks.ts)
+// The wreck sites on the plot (TASK-23c, TICKET-07 Item F): every leak (TASK-23b-2) has a cluster of two to four wasteland props, and four scenery-only
+// sites hold clusters with no leak. POL-143: a leak's cluster stands at least WRECK_CLEAR_OF_LEAK (15 m) from every leak, so the leak's rift
+// stands in the open, in view. Pure: the same plot gives the same layout, and the test pins it. The runtime (play/wrecks.ts)
 // builds the props and swaps their models.
 //
 // The owner's junk-model ladder: a leak's junk is broken until it is sealed. Its rung is one below its plot's stage; sealing lifts it
@@ -11,6 +12,9 @@ import { loreFor } from './lore-logs';
 
 /** Scenery-only sites (no leak), numbered after the leak sites (their index is LEAK_SITE_COUNT and on). */
 export const SCENERY_SITE_COUNT = 4;
+
+/** POL-143: no wreck (its junk, its props, its transponder) within this many metres of any leak, so the leak's rift stands in view. */
+export const WRECK_CLEAR_OF_LEAK = 15;
 
 /** The four lunar wreck transponders (Argo's micro-logs, P0-LORE-01): each on the leak site named, as a packed prop. */
 export const TRANSPONDERS: readonly { readonly id: string; readonly model: string; readonly site: number }[] = [
@@ -182,21 +186,33 @@ export function wreckSites(seed: number, gate: Point): WreckSite[] {
     const members: WreckMember[] = [];
     const base = unit(mix(h, 3)) * Math.PI * 2;
     const tr = TRANSPONDERS.find((t) => t.site === site.index);
-    members.push({ model: site.junk, x: site.x, z: site.z, yaw: unit(mix(h, 5)) * Math.PI * 2, tilt: 0, sink: 0, junk: true });
+    // POL-143: no wreck within WRECK_CLEAR_OF_LEAK of any leak (the rift stands in the open, in view); the cluster goes round it at a ring
+    const spot = (angle: number, ring: number): Point | null => {
+      for (let t = 0; t < 16; t++) {
+        const r = ring + (t >> 2) * 1.5;
+        const p = { x: site.x + Math.cos(angle + t * 0.45) * r, z: site.z + Math.sin(angle + t * 0.45) * r };
+        if (leaks.every((l) => Math.hypot(p.x - l.x, p.z - l.z) >= WRECK_CLEAR_OF_LEAK) && Math.hypot(p.x - gate.x, p.z - gate.z) >= MIN_GATE_DISTANCE) return p;
+      }
+      return null;
+    };
+    const ring = WRECK_CLEAR_OF_LEAK + 0.6;
+    const jp = spot(base, ring);
+    if (jp) members.push({ model: site.junk, x: jp.x, z: jp.z, yaw: unit(mix(h, 5)) * Math.PI * 2, tilt: 0, sink: 0, junk: true });
     if (tr) {
-      const a = base + Math.PI * 0.5;
-      members.push({ model: tr.model, x: site.x + Math.cos(a) * 2.4, z: site.z + Math.sin(a) * 2.4, yaw: unit(mix(h, 7)) * Math.PI * 2, tilt: 0.22, sink: 0.25, transponder: tr.id, junk: false });
+      const tp = spot(base + Math.PI * 0.5, ring + 1);
+      if (tp) members.push({ model: tr.model, x: tp.x, z: tp.z, yaw: unit(mix(h, 7)) * Math.PI * 2, tilt: 0.22, sink: 0.25, transponder: tr.id, junk: false });
     }
     const neighbours = total - members.length;
     for (let k = 0; k < neighbours; k++) {
       const a = base + (k * Math.PI * 2) / Math.max(1, neighbours) + unit(mix(h, 11 + k)) * 0.6;
-      const r = 3.0 + unit(mix(h, 13 + k)) * 1.8;
+      const np = spot(a, ring + 1 + unit(mix(h, 13 + k)) * 3);
+      if (!np) continue;
       const model = NEIGHBOUR_MODELS[mix(h, 17 + k) % NEIGHBOUR_MODELS.length]!;
       const isTruckOrVan = model.includes('truck') || model.includes('van');
       members.push({
         model,
-        x: site.x + Math.cos(a) * r,
-        z: site.z + Math.sin(a) * r,
+        x: np.x,
+        z: np.z,
         yaw: unit(mix(h, 19 + k)) * Math.PI * 2,
         tilt: isTruckOrVan ? 0.24 : unit(mix(h, 23 + k)) < 0.3 ? 0.12 : 0,
         sink: isTruckOrVan ? 0.38 : 0,

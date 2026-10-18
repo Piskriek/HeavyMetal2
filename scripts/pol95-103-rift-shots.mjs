@@ -64,7 +64,7 @@ const camFacing = (lk) => page.evaluate(({ lx, lz }) => {
 }, { lx: lk.x, lz: lk.z });
 
 // stands `dist` metres south of the leak, looking north at it; the yaw is atan2(-dx, -dz) (the camera looks along -z at yaw 0)
-const DIST = 10;
+const DIST = 8;
 const faceLeak = async (lk) => {
   const px = lk.x, pz = lk.z - DIST;
   const yaw = Math.atan2(-(lk.x - px), -(lk.z - pz));
@@ -83,7 +83,7 @@ const boot = async () => {
   await page.waitForSelector('canvas', { timeout: 30000 });
   await page.waitForFunction(() => !!window.__dev && !!window.hmPlay && !!window.__playScene, null, { timeout: 35000 });
   await frames(30);
-  await page.evaluate(() => { window.__hm?.hideOverlays?.(true); });
+  await page.evaluate(() => { window.__hm?.hideOverlays?.(true); window.hmPlay.setLocked(true); });
   // first person: the avatar's holder is shown only in the third-person view, so V until it is hidden
   for (let i = 0; i < 3 && (await avatarVisible()); i++) {
     await page.keyboard.press('KeyV');
@@ -112,13 +112,26 @@ try {
     await page.evaluate((seq) => { for (const v of seq) window.__playScene.setFidelityStage(v); }, st.seq);
     const facing = await faceLeak(open);
     await frames(30);
+    await page.evaluate(() => {
+      let cam = null;
+      window.__playScene.debug.planetScene().traverse((o) => { if (o.isPerspectiveCamera && o.parent === window.__playScene.debug.planetScene()) cam = o; });
+      cam.children.forEach((c) => { c.visible = false; });
+    });
+    await frames(10);
+    // the frame's draw calls (renderer.info, the DRAWS readout), the median of five frames
+    const drawSamples = [];
+    for (let i = 0; i < 5; i++) { await frames(2); drawSamples.push(await page.evaluate(() => window.__playScene.debug.stats().calls)); }
+    const draws = drawSamples.slice().sort((a, b) => a - b)[2];
     await page.screenshot({ path: `${outDir}rift-s${st.label}-open.png` });
-    console.log(`SHOT ${JSON.stringify({ stage: st.label, state: 'open', leak: open.id, dist: DIST, camFacing: Math.round(facing * 100) / 100, avatar: await avatarVisible() })}`);
-    await page.evaluate((id) => window.__playScene.monsters.setSealing(id), open.id);
+    console.log(`SHOT ${JSON.stringify({ stage: st.label, state: 'open', leak: open.id, dist: DIST, camFacing: Math.round(facing * 100) / 100, avatar: await avatarVisible(), drawsNearOpenLeak8m: draws, drawSamples })}`);
+    // the play screen sets the seal every frame from the aim (play.tsx): pin it for the shot, then release it
+    await page.evaluate((id) => { const m = window.__playScene.monsters; window.__sealOrig = m.setSealing.bind(m); window.__sealPin = id; m.setSealing = (l) => window.__sealOrig(window.__sealPin ?? l); }, open.id);
     await frames(40);
     await page.screenshot({ path: `${outDir}rift-s${st.label}-sealing.png` });
-    await page.evaluate(() => window.__playScene.monsters.setSealing(null));
-    console.log(`SHOT ${JSON.stringify({ stage: st.label, state: 'sealing', leak: open.id, dist: DIST })}`);
+    await page.evaluate(() => { const m = window.__playScene.monsters; window.__sealPin = null; if (window.__sealOrig) m.setSealing = window.__sealOrig; window.__sealOrig = null; m.setSealing(null); });
+    const sealRead = await page.evaluate((l) => { let u = null; window.__playScene.debug.planetScene().traverse((o) => { if (o.name === 'rift-unified-mesh' && Math.abs(o.matrixWorld.elements[12] - l.x) < 0.5 && Math.abs(o.matrixWorld.elements[14] - l.z) < 0.5) u = o.material.uniforms.uState.value; }); return u; }, { x: open.x, z: open.z });
+    const sealLeak = (await dev('leaks')).find((l) => l.id === open.id);
+    console.log(`SHOT ${JSON.stringify({ stage: st.label, state: 'sealing', leak: open.id, dist: DIST, uState: sealRead, leakState: sealLeak?.state ?? null })}`);
   }
   if (pageErrors.length) {
     console.log(`PAGE ERRORS ${pageErrors.length}: ${pageErrors.slice(0, 3).join(' | ')}`);

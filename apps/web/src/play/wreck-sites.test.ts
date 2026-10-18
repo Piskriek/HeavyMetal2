@@ -4,7 +4,7 @@ import { MIN_GATE_DISTANCE, LEAK_SITE_COUNT, leakSites } from '../monsters/polic
 import { readFileSync } from 'node:fs';
 
 const GEN: Record<string, unknown> = JSON.parse(readFileSync(new URL('../assets/gen/registry.json', import.meta.url), 'utf8'));
-import { NEIGHBOUR_MODELS, SCENERY_SITE_COUNT, TRANSPONDERS, isBroken, rungLevel, stageRung, wreckModels, wreckRung, wreckSites } from './wreck-sites';
+import { NEIGHBOUR_MODELS, SCENERY_SITE_COUNT, TRANSPONDERS, WRECK_CLEAR_OF_LEAK, isBroken, rungLevel, stageRung, wreckModels, wreckRung, wreckSites } from './wreck-sites';
 
 const GATE = { x: 0, z: 0 };
 const SEED = 7;
@@ -73,4 +73,18 @@ test('the ladder: a leak is broken one rung below its stage until sealed; a seal
   assert.equal(rungLevel(wreckRung(4, true, true)), 'mid');
   assert.equal(rungLevel(wreckRung(6, true, true)), 'high');
   assert.equal(rungLevel(0), 'low');
+});
+
+test('POL-143: no wreck (junk, prop or transponder) within 15 m of any leak, on any plot (the rift stands in view)', () => {
+  for (const seed of [SEED, 1, 2, 3, 99, 1234]) {
+    const leaks = leakSites(seed, GATE);
+    for (const site of wreckSites(seed, GATE)) {
+      for (const m of site.members) {
+        for (const l of leaks) {
+          const d = Math.hypot(m.x - l.x, m.z - l.z);
+          assert.ok(d >= WRECK_CLEAR_OF_LEAK, `seed ${seed}: ${m.model} of site ${site.index} is ${d.toFixed(1)} m from leak ${l.index}`);
+        }
+      }
+    }
+  }
 });

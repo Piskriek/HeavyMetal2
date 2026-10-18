@@ -62,18 +62,16 @@ const badgeCount = () => page.locator('[data-testid="weapon-hud-badge"]').count(
 const leakById = async (id) => (await dev('leaks')).find((l) => l.id === id);
 // turns the view to a leak from `dist` metres away (the view's yaw is the quarter turn that points at it)
 const faceLeak = async (lk, dist = 12) => {
-  let best = { yaw: 0, dot: -2 };
-  for (const yaw of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
-    await teleport('planet', lk.x, lk.z - dist, yaw, 0);
-    const aim = await dev('aim');
-    const eye = await dev('eye');
-    const tx = lk.x - eye.x, tz = lk.z - eye.z, len = Math.hypot(tx, tz) || 1;
-    const dot = (aim.dir.x * tx + aim.dir.z * tz) / len;
-    if (dot > best.dot) best = { yaw, dot };
-  }
-  await teleport('planet', lk.x, lk.z - dist, best.yaw, 0);
-  await page.waitForTimeout(400);
-  return best.dot;
+  // the camera looks along -z at yaw 0, so the yaw that turns it to the leak is atan2(-dx, -dz). No sweep: the aim reads the last
+  // frame, so it is read after the frames have run (a sweep that read it straight after each teleport picked the wrong yaw)
+  const px = lk.x, pz = lk.z - dist;
+  const yaw = Math.atan2(-(lk.x - px), -(lk.z - pz));
+  await teleport('planet', px, pz, yaw, 0);
+  await page.waitForTimeout(600);
+  const aim = await dev('aim');
+  const eye = await dev('eye');
+  const tx = lk.x - eye.x, tz = lk.z - eye.z, len = Math.hypot(tx, tz) || 1;
+  return (aim.dir.x * tx + aim.dir.z * tz) / len;
 };
 
 try {

@@ -18,7 +18,7 @@
 2. **`coop-guardrails.test.ts`, the POL-85 case:** it expects 'synced' and reads back 'desynced', most likely because there's no localStorage in Node. Inject the storage (a small get/set interface with a Map in tests) rather than touching a global.
 3. **`outpost-client.test.ts`** doesn't parse (line 58, column 105: likely an apostrophe inside a single-quoted string). Fix the quoting.
 
-## Not in this part (T11b, after F-09 and F-15)
+## Not in this part (T11b, after F-09)
 - `play-scene.ts` Window B: the avatars, `importBeamField`, the gate pad pose, and no local ticks in a session (ARGO_NOTE_11 §3);
 - `play.tsx`, the session wiring (`sendBeamIntent` instead of local ticks);
 

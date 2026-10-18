@@ -1,4 +1,4 @@
-# T11b: co-op Phase 2, the play-scene window and the Grid's roster controls (TICKET-11, part B)
+# T11b: co-op Phase 2, the play-scene window and the play wiring (TICKET-11, part B)
 
 **Spec:** `docs/argo/notes/ARGO_NOTE_11_ticket11_coop_phase2.md` §3 (the play-scene spec). **Source:** `arena-gathered/argo-ticket11/`. **Start only after T11a and F-09 have landed** (T11a also took the Grid's roster controls, since F-15 landed first).
 

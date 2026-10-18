@@ -27,7 +27,8 @@ export type Kind =
   | 'roofInner'
   | 'gable'
   | 'ridgeCap'
-  | 'weaponBench';
+  | 'weaponBench'
+  | 'turret';
 
 export interface Material {
   readonly vKeep: number;
@@ -196,7 +197,8 @@ function isKind(value: unknown): value is Kind {
     value === 'roofInner' ||
     value === 'gable' ||
     value === 'ridgeCap' ||
-    value === 'weaponBench'
+    value === 'weaponBench' ||
+    value === 'turret'
   );
 }
 
@@ -470,6 +472,12 @@ function occupied(base: Base, candidate: Omit<Piece, 'id'>): boolean {
       return true;
     }
 
+    // a turret stands on a corner socket: one per corner and level
+    if (candidate.kind === 'turret' && existing.kind === 'turret') {
+      if (existing.i === candidate.i && existing.j === candidate.j && existing.k === candidate.k) return true;
+      continue;
+    }
+
     if (!isFixtureKind(candidate.kind) || !isFixtureKind(existing.kind)) continue;
     if (existing.k !== candidate.k) continue;
 
@@ -711,6 +719,24 @@ function supportValues(
       addCellSupport(targetIndex, s, i, j - 1, k, true);
       addCellSupport(targetIndex, s, i - 1, j - 1, k, true);
       if (k > 0) addPillarSupport(targetIndex, s, i, j, k - 1, true);
+      continue;
+    }
+
+    if (piece.kind === 'turret') {
+      // a corner socket (TICKET-13): the floor cells round the corner at its level hold it, or, on a wall top, the walls
+      // (and any pillar) that stand on that corner one level down. Nothing else holds it, so it never floats.
+      const { s, i, j, k } = piece;
+      addCellSupport(targetIndex, s, i - 1, j - 1, k, true);
+      addCellSupport(targetIndex, s, i, j - 1, k, true);
+      addCellSupport(targetIndex, s, i - 1, j, k, true);
+      addCellSupport(targetIndex, s, i, j, k, true);
+      if (k > 0) {
+        addEdgeSupport(targetIndex, s, i, j, k - 1, 0, true);
+        addEdgeSupport(targetIndex, s, i - 1, j, k - 1, 0, true);
+        addEdgeSupport(targetIndex, s, i, j, k - 1, 1, true);
+        addEdgeSupport(targetIndex, s, i, j - 1, k - 1, 1, true);
+        addPillarSupport(targetIndex, s, i, j, k - 1, true);
+      }
       continue;
     }
 
@@ -1280,7 +1306,8 @@ export function snap(
         if (isEdgeKind(kind)) {
           append(i, j, 0, (i + 0.5) * CELL, j * CELL);
           append(i, j, 1, i * CELL, (j + 0.5) * CELL);
-        } else if (kind === 'pillar') {
+        } else if (kind === 'pillar' || kind === 'turret') {
+          // a turret takes a corner socket too: the wall tops' corners and joints (TICKET-13)
           append(i, j, 0, i * CELL, j * CELL);
         } else if (kind === 'hardpoint') {
           append(i, j, rotation, (i + 1) * CELL, (j + 1) * CELL);
@@ -1428,6 +1455,7 @@ const CODEC_KINDS: readonly Kind[] = [
   'gable',
   'ridgeCap',
   'weaponBench',
+  'turret',
 ];
 
 function codecValidationError(

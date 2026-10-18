@@ -62,3 +62,20 @@ export function weaponStats(loadout: Readonly<Record<PartSlot, string | null>>):
     magazine: beam ? cell * 5 : cell,
   };
 }
+
+/**
+ * The scatter sidearm (TICKET-13, close defence against swarmers and chargers): a square weapon frame, a burst core, a
+ * scatter barrel (7 pellets a shot), an iron sight and a compact cell. The weapon bench forges it from `wpn-frame`,
+ * `core-burst` and `barrel-scatter`; the sight and cell are the first of their kinds. Its numbers are weaponStats(loadout).
+ */
+export const SCATTER_SIDEARM_PRESET: {
+  readonly id: 'sidearm-scatter';
+  readonly name: 'Scatter Sidearm';
+  readonly parts: { readonly frame: 'wpn-frame'; readonly core: 'core-burst'; readonly barrel: 'barrel-scatter' };
+  readonly loadout: Readonly<Record<PartSlot, string>>;
+} = Object.freeze({
+  id: 'sidearm-scatter',
+  name: 'Scatter Sidearm',
+  parts: Object.freeze({ frame: 'wpn-frame', core: 'core-burst', barrel: 'barrel-scatter' }),
+  loadout: Object.freeze({ core: 'core-burst', barrel: 'barrel-scatter', sight: 'sight-iron', cell: 'cell-compact' }),
+} as const);

@@ -186,6 +186,8 @@ export const KIND_THUMB_ASSETS: Readonly<Record<string, string>> = {
   gable: 'gable',
   ridgeCap: 'ridge-cap',
   weaponBench: 'weapon-bench',
+  // TICKET-13: the perimeter turret's thumbnail is its packed base plate
+  turret: 'turret-base',
 };
 
 /**

@@ -495,3 +495,45 @@ export function loadLab(json: unknown): LabState | null {
   if (combiner !== null && (k === null || !combinerHolds(k, byId))) return null;
   return { v: 1, time, nextId, cartridges: [...byId.values()], bench: b, combiner: k, catalogueUntil };
 }
+
+// ---------------------------------------------------------------------------
+// Peaceful combiner recipes (TICKET-13, P1-LOOP-05)
+// ---------------------------------------------------------------------------
+
+/**
+ * A combiner recipe that makes a monster-drop item from salvage (ore) and a blank cartridge, with no fight. The drops it
+ * matches are leaksim's, mapped to items in apps/web/src/monsters/policy.ts (pxd-mono, vtx-rough and anomaly-core).
+ * `plotsim`'s verifyPeacefulDropParity checks that every drop has one of these and a seal reward, so Aggression 'off' or
+ * 'calm' never blocks progress. Items are plain ids; the lab's inventory and cartridges stay as they are.
+ */
+export interface PeacefulCombinerRecipe {
+  readonly id: string;
+  readonly title: string;
+  readonly inputs: readonly { readonly item: string; readonly n: number }[];
+  readonly output: { readonly item: string; readonly n: number };
+  readonly description: string;
+}
+
+export const PEACEFUL_COMBINER_RECIPES: readonly PeacefulCombinerRecipe[] = Object.freeze([
+  {
+    id: 'combiner-peaceful-pxd-mono',
+    title: 'Synthesize 1-bit pixel fragment',
+    inputs: [{ item: 'ore', n: 8 }, { item: 'cartridge-blank', n: 1 }],
+    output: { item: 'pxd-mono', n: 8 },
+    description: 'Extracts monochrome pixel fragments from raw lunar ore and a blank cartridge, without a fight.',
+  },
+  {
+    id: 'combiner-peaceful-vtx-rough',
+    title: 'Synthesize rough vertex shard',
+    inputs: [{ item: 'ore', n: 10 }, { item: 'cartridge-blank', n: 1 }],
+    output: { item: 'vtx-rough', n: 6 },
+    description: 'Presses raw ore into coarse vertex shards, without a fight.',
+  },
+  {
+    id: 'combiner-peaceful-anomaly-core',
+    title: 'Synthesize anomaly core',
+    inputs: [{ item: 'ore', n: 20 }, { item: 'pxd-mono', n: 4 }, { item: 'cartridge-blank', n: 1 }],
+    output: { item: 'anomaly-core', n: 1 },
+    description: 'Fuses salvaged substrate and a blank cartridge into a stable anomaly core, without combat.',
+  },
+] as const);

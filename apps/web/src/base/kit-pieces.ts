@@ -220,6 +220,8 @@ export const KIT_PIVOT_OFFSETS: Record<Kind, [number, number, number]> = {
   stairs: [-2, 0, -2],
   lifeSupport: [-2, 0, -2],
   weaponBench: [-2, 0, -2],
+  // TICKET-13: the turret is drawn by play/turret-view.ts; its origin is the corner socket (pieceAt)
+  turret: [0, 0, 0],
 };
 
 /**
@@ -477,6 +479,14 @@ export class KitPieceCache {
           rawLamps = res.lamps;
           rawSockets = res.sockets;
         }
+        break;
+      }
+      case 'turret': {
+        // TICKET-13: the perimeter turret's parts (base, yoke, gun, barrel) are drawn by its own instance in play/turret-view.ts
+        rawGroup = new THREE.Group();
+        rawColliders = [];
+        rawLamps = [];
+        rawSockets = [];
         break;
       }
       default: {

@@ -14,7 +14,8 @@ import { hashValue } from '@hm/kernel';
 import * as L from '@hm/lattice';
 import * as S from '@hm/structure';
 import * as F from '@hm/substrate';
-import { DRAFT_ORE, EQUIP, FIELD_RADIUS, HEAVY, HEAVY_BILL, ITEMS, MAPS, MATERIALS, PIECE_EXTRA, PIECE_ORE, PRIMITIVES, QUEUE_MAX, RECIPE_BY_ID, STARTER, blueprint, blueprintId, pieceCost, FABRICATOR_BILL, FORGE_BY_ID, PART_SLOTS, VEHICLE, type Blueprint, type MapId, type PartSlot, type PrimitiveId, type StationKind, type VehicleKind } from './catalog';
+import { TURRET_POWER_DRAW_KW } from '@hm/plotsim';
+import { DRAFT_ORE, EQUIP, FIELD_RADIUS, HEAVY, HEAVY_BILL, ITEMS, MAPS, MATERIALS, PIECE_EXTRA, PIECE_ORE, PIECE_STAGE, PRIMITIVES, QUEUE_MAX, RECIPE_BY_ID, STARTER, blueprint, blueprintId, pieceCost, FABRICATOR_BILL, FORGE_BY_ID, PART_SLOTS, VEHICLE, type Blueprint, type MapId, type PartSlot, type PrimitiveId, type StationKind, type VehicleKind } from './catalog';
 import { EQUIP_SLOTS, type EquipSlot, type SlotRef } from './view';
 
 export const PLAYER = -1;
@@ -241,10 +242,18 @@ export function pieceAtIn(st: S.Structure, p: Pick<S.Piece, 'kind' | 'i' | 'j' |
   // half wall are wall-type too: at the cell centre they stood 2 m inside the wall line, so aimed rays hit the wall behind.
   const local = p.kind === 'wall' || p.kind === 'airlock' || p.kind === 'halfWall' || p.kind === 'windowWall' || p.kind === 'doorframe' || p.kind === 'door'
     ? (p.r === 0 ? [(p.i + 0.5) * C, p.j * C] : [p.i * C, (p.j + 0.5) * C])
-    : p.kind === 'pillar' ? [p.i * C, p.j * C]
+    : p.kind === 'pillar' || p.kind === 'turret' ? [p.i * C, p.j * C]
       : p.kind === 'hardpoint' ? [(p.i + 1) * C, (p.j + 1) * C]
         : [(p.i + 0.5) * C + (p.dx ?? 0) / 100, (p.j + 0.5) * C + (p.dz ?? 0) / 100];
   return S.toWorld(st, local[0]!, local[1]!, p.k);
+}
+
+/**
+ * The kW the base's perimeter turrets draw from the plot grid (TICKET-13: 2 kW each). The plot's budget reads it through
+ * `Env.extraDrawKw`, so the turrets count against the same 12 kW the HUD shows.
+ */
+export function turretGridDrawKw(base: S.Base): number {
+  return TURRET_POWER_DRAW_KW * base.pieces.filter((p) => p.kind === 'turret').length;
 }
 
 export function relays(w: BaseWorld, env: WorldEnv): L.Relay[] {
@@ -393,6 +402,8 @@ function build(w: BaseWorld, env: WorldEnv, cmd: Extract<BaseCommand, { t: 'foun
   const kind: S.Kind = cmd.t === 'found' ? 'foundation' : cmd.piece.kind;
   const bill = pieceCost(bp, kind);
   if (!bill) return refuse(w, cmd.t, 'wrong-kind');
+  // a piece with a plot stage (the perimeter turret opens at stage 2, TICKET-13) waits for it
+  if ((PIECE_STAGE[kind] ?? 0) > w.stage) return refuse(w, cmd.t, 'locked');
   const senv = structureEnv(env);
   const r = cmd.t === 'found'
     ? S.found(w.base, senv, cmd.cx, cmd.cz, cmd.yaw, bp.mat)

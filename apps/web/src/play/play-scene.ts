@@ -72,7 +72,11 @@ import {
   createGenFabricator,
   genLevelForStage,
 } from '../assets/gen-props';
-import { genLevelFor } from '../assets/gen';
+import { genLevelFor, getGenSync } from '../assets/gen';
+// ---- TICKET-13 Window C imports: the perimeter turret (its parts, its safe domes and its grid draw)
+import { createTurretInstance3D, turretSolidBoxes, type TurretInstance3D } from './turret-view';
+import { gateDome as turretGateDome, poweredPylonDomes, type TurretSolidBox } from '@hm/plotsim';
+import { turretGridDrawKw } from '../base/world';
 import { RIFT_LAYER, riftDepthUniforms } from './rift';
 // ---- Window B (TICKET-11, co-op): the other players' avatars, the room's sculpt, and the gate's pose for the room
 import { createRemotePeersController, type RemotePeersController } from './remote-peers';
@@ -1585,6 +1589,95 @@ export function createPlayScene(o: {
   let vegSetting: 'auto' | 'off' | 'low' | 'high' = o.vegetation ?? 'auto';
   let cachedBiomeInput: BiomeInput | null = null;
   let activeBase: S.Base | null = null;
+
+  // ---- TICKET-13 WINDOW C (the perimeter turret and the blue-sky wave's focus). One labelled section: each turret stands on
+  // a corner socket of the base, draws its 2 kW from the grid, steps its brain every planet frame and hits through the
+  // monsters' own damage path (hurtMob). The gate's 25 m dome and the powered pylons' 15 m domes are never fired into.
+  const turretMounts = new Map<number, { readonly inst: TurretInstance3D; readonly at: { readonly x: number; readonly y: number; readonly z: number } }>();
+  let turretBaseSeen: S.Base | null | undefined = undefined;
+  let turretSolidList: readonly TurretSolidBox[] = [];
+  let projectorSeen = false;
+  let blueSkyDecidedWave = -2;
+  let blueSkyWaveOn = false;
+  // the plot's grid for the turrets: the same supply and demand plotsim solves (the gate, the power units' ore share, the
+  // field machines that are wired and on), plus the turrets' own draw. A brownout slows every turret's rate of fire.
+  const turretGridSatisfaction = (): number => {
+    let supply: number = GATE.supply;
+    let demand = 0;
+    for (const v of views.values()) {
+      if (!lastConnected.has(v.m.id) || !v.m.on) continue;
+      const k = KINDS[v.m.kind];
+      if (k.draw < 0) supply += -k.draw * v.share;
+      else demand += k.draw;
+    }
+    const total = demand + (activeBase ? turretGridDrawKw(activeBase) : 0);
+    return total <= 0 ? 1 : Math.min(1, supply / total);
+  };
+  const syncTurretMounts = (base: S.Base | null): void => {
+    if (turretBaseSeen === base) return;
+    turretBaseSeen = base;
+    const wanted = new Map<number, S.Piece>();
+    for (const p of base?.pieces ?? []) if (p.kind === 'turret') wanted.set(p.id, p);
+    for (const [id, mount] of turretMounts) {
+      if (wanted.has(id)) continue;
+      mount.inst.dispose();
+      turretMounts.delete(id);
+    }
+    const level = genLevelFor('low');
+    for (const [id, p] of wanted) {
+      if (turretMounts.has(id) || !base) continue;
+      const at = pieceAt(base, p);
+      if (!at) continue;
+      const inst = createTurretInstance3D({
+        id,
+        position: at,
+        parent: planetScene,
+        baseMesh: getGenSync('turret-base', level),
+        yokeMesh: getGenSync('turret-yoke', level),
+        gunMesh: getGenSync('turret-gun', level),
+      });
+      turretMounts.set(id, { inst, at });
+    }
+    turretSolidList = base ? turretSolidBoxes(base, (p) => pieceAt(base, p)) : [];
+  };
+  // ruling 06: the blue-sky wave starts at the first heavy light projector that runs (the plot's stage push is in plotsim)
+  const focusBlueSkyWave = (): void => {
+    if (waveTo < 0) {
+      blueSkyWaveOn = false;
+      return;
+    }
+    const projector = [...views.values()].find((v) => v.m.kind === 'heavy-projector' && v.share > 0);
+    if (projector) projectorSeen = true;
+    if (projectorSeen && blueSkyDecidedWave !== waveStart && waveTo >= 4) {
+      blueSkyDecidedWave = waveStart;
+      blueSkyWaveOn = projector !== undefined;
+    }
+    if (blueSkyWaveOn && projector) postUniforms.uWaveCentre.value.set(projector.m.x, groundAt(projector.m.x, projector.m.z), projector.m.z);
+  };
+  // one planet frame: the brains step, and the shots go through the monsters' damage path
+  const stepTurrets = (dt: number, player: { readonly x: number; readonly z: number }): void => {
+    syncTurretMounts(activeBase);
+    focusBlueSkyWave();
+    if (turretMounts.size === 0) return;
+    const sat = turretGridSatisfaction();
+    const mobs = monsters.getMobList().map((m) => ({ id: m.id, kind: m.kind, x: m.pos.x, y: m.pos.y, z: m.pos.z, hp: m.hp, phase: m.phase }));
+    const gate = turretGateDome({ x: twin.group.position.x, z: twin.group.position.z });
+    const extraSafeDomes = poweredPylonDomes([...views.values()].map((v) => v.m), lastConnected).map((d) => ({ x: d.x, z: d.z, r: d.radius, kind: 'pylon' as const }));
+    for (const { inst, at } of turretMounts.values()) {
+      // the turret's own mount is not a wall to shoot past: the boxes that hold its corner are left out
+      const solids = turretSolidList.filter((b) => !(at.x >= b.minX - 0.3 && at.x <= b.maxX + 0.3 && at.z >= b.minZ - 0.3 && at.z <= b.maxZ + 0.3));
+      const out = inst.update({
+        satisfaction0to1: sat,
+        dt,
+        mobs,
+        gateDome: { x: gate.x, z: gate.z, r: gate.radius },
+        extraSafeDomes,
+        player,
+        solids,
+      });
+      if (out.fired && out.targetId !== null && out.damageDealt > 0) monsters.hurtMob(out.targetId, out.damageDealt);
+    }
+  };
 
   // The layout the default biome input is built from: machines, keep-outs, water sources and tier. Cheap (no terrain sampling), so the cover
   // and the scatter can check whether it has moved before they bake anything from it.
@@ -3103,6 +3196,7 @@ export function createPlayScene(o: {
       if (where === 'planet') {
         camera.getWorldDirection(monsterFwd);
         monsters.update(dt, { x: pos.x, z: pos.z, yaw: Math.atan2(monsterFwd.x, monsterFwd.z), alive: playerAlive }, camera);
+        stepTurrets(dt, pos); // TICKET-13 Window C: the perimeter turrets (their section is after activeBase)
       }
       postUniforms.uTime.value = now;
       postUniforms.uGlitch.value = where === 'planet' ? Math.max(0, Math.min(1, (0.4 - sync) / 0.4)) : 0;

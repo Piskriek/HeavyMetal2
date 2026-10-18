@@ -20,6 +20,8 @@
 // Data
 // ---------------------------------------------------------------------------------------------
 
+import { evaluateHeavyProjectorBlueSkyPush } from './blue-sky';
+
 export type Metric = 'pxd' | 'vtx' | 'lx' | 'aq';
 export const METRICS: readonly Metric[] = ['pxd', 'vtx', 'lx', 'aq'];
 
@@ -112,6 +114,8 @@ export interface PlotState {
   readonly oreOut?: true;
   /** Present (true) while the machines ask for more power than there is: lets 'underpowered' be announced once. */
   readonly underpowered?: true;
+  /** Present (true) once a heavy light projector has run on this plot: the blue-sky push (ruling 06) fires only once. */
+  readonly blueSky?: true;
 }
 
 export interface Env {
@@ -119,6 +123,11 @@ export interface Env {
   readonly plotRadius: number;
   richness(x: number, z: number): number; // 0..1
   affinity?(cartridge: string, metric: Metric): number; // default 1
+  /**
+   * kW the base draws from the same grid (TICKET-13: each built perimeter turret, 2 kW). Read at each solve, so the
+   * budget follows the base as it grows. Absent: nothing is drawn.
+   */
+  extraDrawKw?(): number;
 }
 
 export type PlotEvent =
@@ -226,6 +235,7 @@ interface Solved {
  */
 function solve(s: PlotState, env: Env, h: number): Solved {
   const sources = powerSources(s, env);
+  const extraDraw = Math.max(0, env.extraDrawKw?.() ?? 0);
   const connected = new Set<number>();
   const live: Machine[] = [];
   for (const m of s.machines) {
@@ -238,7 +248,7 @@ function solve(s: PlotState, env: Env, h: number): Solved {
 
   const pass = (oreFactor: number) => {
     let supply: number = GATE.supply;
-    let demand = 0;
+    let demand = extraDraw;
     for (const m of live) {
       const draw = KINDS[m.kind].draw;
       if (draw < 0) supply -= draw * oreFactor;
@@ -390,6 +400,18 @@ function advance(s: PlotState, env: Env, h: number, events: PlotEvent[]): PlotSt
     stage = 1;
     events.push({ type: 'stage-up', stage });
   }
+  // ruling 06: the first heavy light projector that runs pushes the plot to the blue sky (at least stage 4), once
+  const projectors = s.machines.filter((m) => m.kind === 'heavy-projector' && (z.run.get(m.id) ?? 0) > 0);
+  const blueSkyPush = evaluateHeavyProjectorBlueSkyPush({
+    heavyProjectorsRunning: projectors.length,
+    hadHeavyProjectorBefore: s.blueSky === true,
+    currentStage: stage,
+    projectorPos: projectors[0] ?? { x: 0, z: 0 },
+  });
+  if (blueSkyPush.shouldTriggerBlueSkyWave && blueSkyPush.targetStage > stage) {
+    stage = blueSkyPush.targetStage;
+    events.push({ type: 'stage-up', stage });
+  }
   while (stage >= 1 && stage < LAST_STAGE && meets(STAGES[stage + 1], points)) {
     stage += 1;
     events.push({ type: 'stage-up', stage });
@@ -405,6 +427,7 @@ function advance(s: PlotState, env: Env, h: number, events: PlotEvent[]): PlotSt
     nextId: s.nextId,
     ...(starved ? { oreOut: true as const } : {}),
     ...(short ? { underpowered: true as const } : {}),
+    ...(s.blueSky === true || blueSkyPush.shouldTriggerBlueSkyWave ? { blueSky: true as const } : {}),
   };
 }
 
@@ -542,3 +565,7 @@ export function loadPlot(raw: unknown): PlotState {
 
 // The safe domes (TASK-26): the gate's 25 m dome, the powered pylons' and the shelter's 15 m domes, the sync rates.
 export * from './safe-dome';
+export * from './blue-sky';
+export * from './turret-brain';
+export * from './vehicle-bay';
+export * from './peaceful-drops';

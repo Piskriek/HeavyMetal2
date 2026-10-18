@@ -47,7 +47,7 @@ const PRIMITIVE_NAMES: Readonly<Record<PrimitiveId, readonly [string, number]>> 
 export const FAMILY: Readonly<Record<PrimitiveId, readonly Kind[]>> = {
   // the cube family: slabs and panels, beside foundation, floor and wall (TASK-13)
   cube: ['foundation', 'floor', 'wall', 'bin', 'halfWall', 'windowWall', 'doorframe', 'door', 'gable'],
-  column: ['pillar', 'repeater'],
+  column: ['pillar', 'repeater', 'turret'],
   // the beam family: the ramp and the stairs, and the roofs (sloped and long pieces, TASK-13)
   beam: ['ramp', 'stairs', 'roof', 'lowRoof', 'roofOuter', 'roofInner', 'ridgeCap'],
   chassis: ['airlock', 'hardpoint', 'bench', 'lifeSupport', 'weaponBench'],
@@ -60,11 +60,16 @@ export const PIECE_ORE: Readonly<Record<Kind, number>> = {
   // Railing and ladder stay out of the families: the owner has not been asked about them.
   halfWall: 7, windowWall: 14, doorframe: 10, door: 14, railing: 4, ladder: 6, stairs: 16, lifeSupport: 30,
   roof: 14, lowRoof: 10, roofOuter: 12, roofInner: 12, gable: 8, ridgeCap: 3, weaponBench: 30,
+  // TICKET-13: the perimeter turret, on a corner socket (a wall top or a floor corner); 2 kW of grid power
+  turret: 40,
 };
 export const PIECE_EXTRA: Readonly<Partial<Record<Kind, readonly { readonly item: string; readonly n: number }[]>>> = {
   hardpoint: [{ item: 'prim-beam', n: 4 }, { item: 'prim-chassis', n: 2 }],
   repeater: [{ item: 'prim-column', n: 2 }],
+  turret: [{ item: 'prim-cube', n: 2 }, { item: 'prim-column', n: 1 }],
 };
+/** The plot stage that opens a piece (none: open from the start). The perimeter turret opens at stage 2 (TICKET-13). */
+export const PIECE_STAGE: Readonly<Partial<Record<Kind, number>>> = { turret: 2 };
 
 /** Drafting a blueprint consumes one primitive, one map and some ore. */
 export const DRAFT_ORE = 10;

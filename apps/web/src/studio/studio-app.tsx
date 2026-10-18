@@ -26,6 +26,8 @@ import { forgetFourAngle } from './four-angle';
 import { LookTab } from './look-tab';
 import { SceneTab } from './scene-tab';
 import { StudioErrorBoundary } from './studio-error-boundary';
+import { MaterialDesigner } from './material-designer';
+import { MonsterTab } from './monster-tab';
 import './studio-app.css';
 
 const ENDPOINT = '/__studio/data/asset-tweaks';
@@ -36,7 +38,7 @@ const KEYMAP_KEY = 'studio.keymap';
 const DEFAULT_LAYOUT = { left: 290, right: 320, changes: 210 };
 const LIMITS = { left: [200, 480], right: [240, 520], changes: [120, 420] } as const;
 
-type Workspace = 'assets' | 'scene' | 'look' | 'moon' | 'audio';
+type Workspace = 'assets' | 'scene' | 'look' | 'audio' | 'material' | 'monsters' | 'moon';
 /** The sound library as public/audio/levels.json holds it (the wrapper keeps its note). */
 type AudioDoc = { readonly about?: string; readonly levels: Readonly<Record<string, AudioLevelEntry>> };
 type Status = { readonly tone: 'ok' | 'warn' | 'err'; readonly text: string };
@@ -270,15 +272,29 @@ export function StudioApp({ onBack, renderPrototype }: {
     return () => { live = false; };
   }, [workspace, audioDoc, audioError]);
 
-  /** A gain or loop change: kept in memory until the JSON is copied into the project (the dev Assets route writes asset-tweaks.json only). */
+  /** A gain or loop change: saved via /__studio/data/levels in dev, or kept in memory in the build. */
   const changeAudio = useCallback((id: string, patch: AudioPatch) => {
     setAudioDoc((d) => {
       const cur = d?.levels[id];
       if (!d || !cur) return d;
-      return { ...d, levels: { ...d.levels, [id]: { ...cur, ...patch } } };
+      const nextDoc = { ...d, levels: { ...d.levels, [id]: { ...cur, ...patch } } };
+      if (writable === true) {
+        fetch('/__studio/data/levels', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(nextDoc),
+        })
+          .then((r) => {
+            if (!r.ok) setAudioNote(`Could not save levels (HTTP ${r.status})`);
+            else setAudioNote(`Saved ${id} to levels.json`);
+          })
+          .catch((e: unknown) => {
+            setAudioNote(`Could not save levels (${e instanceof Error ? e.message : 'network error'})`);
+          });
+      }
+      return nextDoc;
     });
-    setAudioNote(null);
-  }, []);
+  }, [writable]);
 
   const copyAudioJson = useCallback(async () => {
     if (!audioDoc) return;
@@ -500,7 +516,8 @@ export function StudioApp({ onBack, renderPrototype }: {
   const selFields = selProps && selected ? (
     <Details id={selected} props={selProps} simple={mode === 'simple'} onField={setField} onPick={applyPreset} presets={PRESETS}
       subject={benchInfo === undefined ? undefined : benchInfo === null ? null : benchInfo.entry.subject}
-      budgets={benchInfo?.entry.budgets ?? null} />
+      budgets={benchInfo?.entry.budgets ?? null}
+      writable={writable === true} />
   ) : null;
 
   const style = {
@@ -521,6 +538,8 @@ export function StudioApp({ onBack, renderPrototype }: {
           <button type="button" aria-pressed={workspace === 'scene'} onClick={() => setWorkspace('scene')}>Scene</button>
           <button type="button" aria-pressed={workspace === 'look'} onClick={() => setWorkspace('look')}>Look</button>
           <button type="button" aria-pressed={workspace === 'audio'} onClick={() => setWorkspace('audio')}>Audio</button>
+          <button type="button" aria-pressed={workspace === 'material'} onClick={() => setWorkspace('material')}>Materials</button>
+          <button type="button" aria-pressed={workspace === 'monsters'} onClick={() => setWorkspace('monsters')}>Monsters</button>
           <button type="button" aria-pressed={workspace === 'moon'} onClick={() => setWorkspace('moon')}>Moon (prototype)</button>
         </nav>
         <span className="sx-grow" />
@@ -616,13 +635,21 @@ export function StudioApp({ onBack, renderPrototype }: {
           <div className="sx-audio-pane">
             <div className="sx-audio-bar">
               <p role="status">{audioNote ?? (writable === true
-                ? 'Dev build: edits stay in this session. Copy the JSON into public/audio/levels.json to keep them.'
+                ? 'Dev build: edits write directly to public/audio/levels.json.'
                 : 'Built game: the levels are listed and previewed here, not edited.')}</p>
               <button type="button" onClick={() => void copyAudioJson()} disabled={!audioDoc} title="Copy the whole levels.json, edits included">Copy JSON</button>
             </div>
             {audioError ? <p className="sx-banner" role="alert">{audioError}</p> : null}
             {audioDoc ? <AudioTab levels={audioDoc.levels} writable={writable === true} onChange={changeAudio} /> : null}
           </div>
+        </StudioErrorBoundary>
+      ) : workspace === 'material' ? (
+        <StudioErrorBoundary key="material" tabName="Materials">
+          <MaterialDesigner />
+        </StudioErrorBoundary>
+      ) : workspace === 'monsters' ? (
+        <StudioErrorBoundary key="monsters" tabName="Monsters">
+          <MonsterTab writable={writable === true} />
         </StudioErrorBoundary>
       ) : (
         <StudioErrorBoundary key="assets" tabName="Assets">

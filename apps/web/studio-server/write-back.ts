@@ -14,16 +14,23 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { checkTweaks, FIELDS, isNeutral } from './tweak-schema';
 import { checkSceneLayouts } from './scene-layout-schema';
+import { checkFixFlags, checkSnappedSockets } from '../src/studio/flag-and-socket-schema';
 
 export const ROUTE = '/__studio/data/';
 export const MAX_BODY = 2 * 1024 * 1024;
 /** A name must match this before it is looked up: lowercase letters, digits and dashes only. */
 export const NAME = /^[a-z0-9-]+$/;
 
+export type WriteKind = 'tweaks' | 'layouts' | 'levels' | 'asset-flags' | 'sockets' | 'monster-tweaks';
+
 /** The writable files. Adding one here is the only way to make a new name writable. */
-export const ALLOWED: Readonly<Record<string, { readonly file: string; readonly kind: 'tweaks' | 'layouts' }>> = {
+export const ALLOWED: Readonly<Record<string, { readonly file: string; readonly kind: WriteKind }>> = {
   'asset-tweaks': { file: 'asset-tweaks.json', kind: 'tweaks' },
   'scene-layouts': { file: 'scene-layouts.json', kind: 'layouts' },
+  'levels': { file: 'levels.json', kind: 'levels' },
+  'asset-flags': { file: 'assets.json', kind: 'asset-flags' },
+  'sockets': { file: 'sockets.json', kind: 'sockets' },
+  'monster-tweaks': { file: 'monster-tweaks.json', kind: 'monster-tweaks' },
 };
 
 export interface StudioPaths {
@@ -31,6 +38,10 @@ export interface StudioPaths {
   readonly dataDir: string;
   /** apps/web/src/assets/gen/registry.json: the asset ids that exist. */
   readonly registryFile: string;
+  /** apps/web/public/audio/levels.json: audio levels. */
+  readonly audioLevelsFile?: string;
+  /** docs/runworld/assets.json: the asset pipeline manifest. */
+  readonly manifestFile?: string;
 }
 
 export interface Request {
@@ -66,16 +77,34 @@ function registryIds(file: string): Set<string> {
   return new Set(Object.keys(data));
 }
 
+function writeAtomic(file: string, content: string): void {
+  const dir = path.dirname(file);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tmp, content, 'utf8');
+  fs.renameSync(tmp, file);
+}
+
+function resolveFilePath(entry: { readonly file: string; readonly kind: WriteKind }, paths: StudioPaths): string {
+  if (entry.kind === 'levels') {
+    return paths.audioLevelsFile ?? path.resolve(paths.dataDir, '../public/audio/levels.json');
+  }
+  if (entry.kind === 'asset-flags') {
+    return paths.manifestFile ?? path.resolve(paths.dataDir, '../../../docs/runworld/assets.json');
+  }
+  return path.join(paths.dataDir, entry.file);
+}
+
 /** The reply for one request, or null when the path is not the Studio's. */
 export async function handleStudioRequest(req: Request, paths: StudioPaths): Promise<Reply | null> {
   if (!req.path.startsWith(ROUTE)) return null;
   const name = req.path.slice(ROUTE.length);
   if (!NAME.test(name)) return json(404, { ok: false, why: 'no such studio file' });
-  const entry =Object.prototype.hasOwnProperty.call(ALLOWED, name) ? ALLOWED[name] : undefined;
+  const entry = Object.prototype.hasOwnProperty.call(ALLOWED, name) ? ALLOWED[name] : undefined;
   if (!entry) return json(404, { ok: false, why: 'no such studio file' });
   const refused = localRefusal(req);
   if (refused) return refused;
-  const file = path.join(paths.dataDir, entry.file);
+  const file = resolveFilePath(entry, paths);
 
   if (req.method === 'GET') {
     if (!fs.existsSync(file)) return { status: 200, body: '{}' };
@@ -100,6 +129,7 @@ export async function handleStudioRequest(req: Request, paths: StudioPaths): Pro
     return json(422, { ok: false, why: 'the body is not valid JSON' });
   }
   const ids = registryIds(paths.registryFile);
+
   if (entry.kind === 'tweaks') {
     const check = checkTweaks(data, ids);
     if (!check.ok) return json(422, { ok: false, why: check.why });
@@ -116,9 +146,7 @@ export async function handleStudioRequest(req: Request, paths: StudioPaths): Pro
       if (Object.keys(kept).length > 0) out[id] = kept;
     }
     const body = `${JSON.stringify(out, null, 2)}\n`;
-    const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
-    fs.writeFileSync(tmp, body, 'utf8');
-    fs.renameSync(tmp, file);
+    writeAtomic(file, body);
     return json(200, { ok: true, file: entry.file, assets: Object.keys(out).length });
   }
 
@@ -127,11 +155,102 @@ export async function handleStudioRequest(req: Request, paths: StudioPaths): Pro
     if (!check.ok) return json(422, { ok: false, why: check.why });
 
     const body = `${JSON.stringify(check.value, null, 2)}\n`;
-    const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
-    fs.writeFileSync(tmp, body, 'utf8');
-    fs.renameSync(tmp, file);
+    writeAtomic(file, body);
     return json(200, { ok: true, file: entry.file, layouts: Object.keys(check.value).length });
+  }
+
+  if (entry.kind === 'levels') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return json(422, { ok: false, why: 'levels must be an object' });
+    }
+    const rawObj = data as Record<string, unknown>;
+    const levelsMap = 'levels' in rawObj && typeof rawObj['levels'] === 'object' && rawObj['levels'] !== null
+      ? (rawObj['levels'] as Record<string, unknown>)
+      : rawObj;
+
+    for (const [id, val] of Object.entries(levelsMap)) {
+      if (!val || typeof val !== 'object' || typeof (val as Record<string, unknown>)['gain'] !== 'number') {
+        return json(422, { ok: false, why: `audio level for "${id}" must contain a numeric gain` });
+      }
+    }
+
+    const outDoc = typeof rawObj['about'] === 'string'
+      ? { about: rawObj['about'], levels: levelsMap }
+      : { levels: levelsMap };
+
+    const body = `${JSON.stringify(outDoc, null, 2)}\n`;
+    writeAtomic(file, body);
+    return json(200, { ok: true, file: entry.file, levels: Object.keys(levelsMap).length });
+  }
+
+  if (entry.kind === 'asset-flags') {
+    const check = checkFixFlags(data, ids);
+    if (!check.ok) return json(422, { ok: false, why: check.why });
+
+    if (!fs.existsSync(file)) return json(404, { ok: false, why: 'assets.json manifest file not found' });
+    const manifest = JSON.parse(fs.readFileSync(file, 'utf8')) as { assets: Array<Record<string, unknown>> };
+    if (!Array.isArray(manifest.assets)) {
+      return json(422, { ok: false, why: 'manifest assets must be an array' });
+    }
+
+    let updated = 0;
+    for (const a of manifest.assets) {
+      const assetId = typeof a['id'] === 'string' ? a['id'] : '';
+      const patch = check.value[assetId];
+      if (!patch) continue;
+
+      if (patch.fix !== undefined) {
+        if (patch.fix.length > 0) a['fix'] = [...patch.fix];
+        else delete a['fix'];
+      }
+      if (patch.reach !== undefined) a['reach'] = patch.reach;
+      if (patch.hold !== undefined) {
+        if (patch.hold) a['hold'] = true;
+        else delete a['hold'];
+      }
+      if (patch.lumOk !== undefined) {
+        if (patch.lumOk) a['lumOk'] = true;
+        else delete a['lumOk'];
+      }
+      updated++;
+    }
+
+    const body = `${JSON.stringify(manifest, null, 2)}\n`;
+    writeAtomic(file, body);
+    return json(200, { ok: true, file: entry.file, updated });
+  }
+
+  if (entry.kind === 'sockets') {
+    const check = checkSnappedSockets(data, ids);
+    if (!check.ok) return json(422, { ok: false, why: check.why });
+
+    const body = `${JSON.stringify(check.value, null, 2)}\n`;
+    writeAtomic(file, body);
+    return json(200, { ok: true, file: entry.file, assets: Object.keys(check.value).length });
+  }
+
+  if (entry.kind === 'monster-tweaks') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return json(422, { ok: false, why: 'monster-tweaks must be an object keyed by skin id' });
+    }
+    const record = data as Record<string, unknown>;
+    for (const [skinId, val] of Object.entries(record)) {
+      if (
+        !val ||
+        typeof val !== 'object' ||
+        typeof (val as Record<string, unknown>)['remapStrength'] !== 'number' ||
+        (val as { remapStrength: number }).remapStrength < 0 ||
+        (val as { remapStrength: number }).remapStrength > 1
+      ) {
+        return json(422, { ok: false, why: `monster "${skinId}" must have remapStrength between 0 and 1` });
+      }
+    }
+
+    const body = `${JSON.stringify(data, null, 2)}\n`;
+    writeAtomic(file, body);
+    return json(200, { ok: true, file: entry.file, monsters: Object.keys(record).length });
   }
 
   return json(400, { ok: false, why: 'unsupported write kind' });
 }
+

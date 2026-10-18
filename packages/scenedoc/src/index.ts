@@ -244,9 +244,89 @@ interface WNode {
   props: Record<string, unknown>;
 }
 
+class DraftNodes {
+  private readonly base: Readonly<Record<string, DocNode>>;
+  private readonly mutated = new Map<string, WNode | null>();
+  private count: number;
+
+  constructor(base: Readonly<Record<string, DocNode>>) {
+    this.base = base;
+    this.count = Object.keys(base).length;
+  }
+
+  has(id: string): boolean {
+    const m = this.mutated.get(id);
+    if (m !== undefined) return m !== null;
+    return own(this.base, id);
+  }
+
+  get(id: string): WNode | undefined {
+    const m = this.mutated.get(id);
+    if (m !== undefined) return m === null ? undefined : m;
+    if (own(this.base, id)) {
+      const b = this.base[id]!;
+      const w: WNode = {
+        id: b.id,
+        type: b.type,
+        name: b.name,
+        parent: b.parent,
+        children: b.children as string[],
+        props: b.props as Record<string, unknown>,
+      };
+      return w;
+    }
+    return undefined;
+  }
+
+  set(id: string, node: WNode): void {
+    if (!this.has(id)) this.count++;
+    this.mutated.set(id, node);
+  }
+
+  delete(id: string): boolean {
+    if (!this.has(id)) return false;
+    this.count--;
+    this.mutated.set(id, null);
+    return true;
+  }
+
+
+  get size(): number {
+    return this.count;
+  }
+
+  *[Symbol.iterator](): IterableIterator<[string, WNode]> {
+    for (const [id, m] of this.mutated) {
+      if (m !== null) yield [id, m];
+    }
+    for (const id of Object.keys(this.base)) {
+      if (!this.mutated.has(id)) {
+        yield [id, this.get(id)!];
+      }
+    }
+  }
+
+  isMutated(): boolean {
+    return this.mutated.size > 0;
+  }
+
+  finish(): Readonly<Record<string, DocNode>> {
+    if (this.mutated.size === 0) return this.base;
+    const out: Record<string, DocNode> = { ...this.base };
+    for (const [id, m] of this.mutated) {
+      if (m === null) {
+        delete out[id];
+      } else {
+        out[id] = m;
+      }
+    }
+    return out;
+  }
+}
+
 interface Draft {
   readonly reg: Registry;
-  readonly nodes: Map<string, WNode>;
+  readonly nodes: DraftNodes;
   roots: string[];
   rootsOwned: boolean;
   /** Ids whose children array was copied in this draft, so it may be edited in place. */
@@ -258,11 +338,9 @@ interface Draft {
 }
 
 function toDraft(reg: Registry, doc: Doc): Draft {
-  const nodes = new Map<string, WNode>();
-  for (const [id, n] of Object.entries(doc.nodes)) nodes.set(id, n as WNode);
   return {
     reg,
-    nodes,
+    nodes: new DraftNodes(doc.nodes),
     roots: doc.roots as string[],
     rootsOwned: false,
     owned: new Set<string>(),
@@ -274,8 +352,9 @@ function toDraft(reg: Registry, doc: Doc): Draft {
 }
 
 function finish(d: Draft): Doc {
-  return { v: 1, nextId: d.nextId, roots: d.roots, nodes: Object.fromEntries(d.nodes) };
+  return { v: 1, nextId: d.nextId, roots: d.roots, nodes: d.nodes.finish() };
 }
+
 
 function note(d: Draft, id: string, kind: Change['kind']): void {
   const key = kind + ' ' + id;

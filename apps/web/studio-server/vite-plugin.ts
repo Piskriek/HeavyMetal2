@@ -17,6 +17,8 @@ const root = path.resolve(here, '../../..');
 const paths = {
   dataDir: path.join(here, '../src/studio-data'),
   registryFile: path.join(here, '../src/assets/gen/registry.json'),
+  audioLevelsFile: path.resolve(here, '../public/audio/levels.json'),
+  manifestFile: path.resolve(root, 'docs/runworld/assets.json'),
 };
 const mock = process.env.STUDIO_BENCH_MOCK === '1';
 const benchDir = process.env.STUDIO_BENCH_DIR || undefined;

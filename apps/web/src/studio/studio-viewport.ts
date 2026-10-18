@@ -54,6 +54,7 @@ export interface ViewportHooks {
   readonly onDragStart: () => void;
   readonly onDrag: (next: Partial<Transform>) => void;
   readonly onDragEnd: () => void;
+  readonly onFaceClick?: (hit: { point: Vec3; normal: Vec3 }) => void;
 }
 
 /** Keymaps: which keys pick a tool, and how the mouse moves the camera. Maya is also the default for W/E/R. */
@@ -136,6 +137,8 @@ export class StudioViewport {
     window.addEventListener('keyup', this.onKeyUp);
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(host);
+    (this.host as unknown as Record<string, unknown>).__viewport = this;
+    (this.renderer.domElement as unknown as Record<string, unknown>).__viewport = this;
     this.resize();
     this.loop();
   }
@@ -215,7 +218,43 @@ export class StudioViewport {
     this.dist = 6;
   }
 
+  getGizmoScreenPoint(handle: 'x' | 'y' | 'z' | 'pivot' = 'x'): { x: number; y: number } | null {
+    const p = this.pivot();
+    if (!p) return null;
+    const len = this.gizmoLength(p);
+    const pos = new THREE.Vector3(p[0], p[1], p[2]);
+    if (handle === 'x') pos.x += 0.5 * len;
+    else if (handle === 'y') pos.y += 0.5 * len;
+    else if (handle === 'z') pos.z += 0.5 * len;
+    pos.project(this.camera);
+    if (pos.z < -1 || pos.z > 1) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    return {
+      x: rect.left + ((pos.x + 1) / 2) * rect.width,
+      y: rect.top + ((1 - pos.y) / 2) * rect.height,
+    };
+  }
+
+  raycastFace(e: PointerEvent): { point: Vec3; normal: Vec3 } | null {
+    const r = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    this.raycaster.setFromCamera(ndc, this.camera);
+    const hits = this.raycaster.intersectObjects(this.copyRoot.children, true);
+    for (const h of hits) {
+      if (!h.point || !h.face) continue;
+      const pt: Vec3 = [h.point.x, h.point.y, h.point.z];
+      const norm = h.face.normal.clone();
+      if (h.object) {
+        const normMatrix = new THREE.Matrix3().getNormalMatrix(h.object.matrixWorld);
+        norm.applyMatrix3(normMatrix).normalize();
+      }
+      return { point: pt, normal: [norm.x, norm.y, norm.z] };
+    }
+    return null;
+  }
+
   dispose(): void {
+    delete (this.host as unknown as Record<string, unknown>).__viewport;
     this.ro.disconnect();
     this.clearCopies();
     this.normalMat.dispose();
@@ -457,6 +496,13 @@ export class StudioViewport {
       this.renderer.domElement.setPointerCapture(e.pointerId);
       e.preventDefault();
       return;
+    }
+    if (e.button === 0 && this.hooks.onFaceClick) {
+      const hit = this.raycastFace(e);
+      if (hit) {
+        this.hooks.onFaceClick(hit);
+        return;
+      }
     }
     const pivot = this.pivot();
     if (e.button !== 0 || !this.transform || !pivot) return;

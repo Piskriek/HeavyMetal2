@@ -5,6 +5,7 @@ import { clampField, type Change } from './studio-data';
 import { type MaterialPreset } from './studio-presets';
 import { thumbOf } from './studio-thumbs';
 import { FourAnglePanel } from './four-angle';
+import { evaluateLuminanceGate, type SnappedSocket } from './flag-and-socket-schema';
 
 export const GROUPS: readonly TweakGroup[] = ['Fit', 'Material', 'Glow'];
 
@@ -134,8 +135,275 @@ function Presets({ presets, props, onPick }: {
   );
 }
 
+export function FixFlagsAndLuminanceGate({ assetId, writable }: { readonly assetId: string; readonly writable?: boolean }): ReactElement {
+  const [flags, setFlags] = useState<{ fix: string[]; reach?: number; hold?: boolean; lumOk?: boolean }>({ fix: [] });
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    fetch('/__studio/data/asset-flags', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: unknown) => {
+        if (!live || !data || typeof data !== 'object') return;
+        const raw = data as { assets?: Array<Record<string, unknown>> };
+        if (!Array.isArray(raw.assets)) return;
+        const entry = raw.assets.find((a) => a['id'] === assetId);
+        if (entry) {
+          setFlags({
+            fix: Array.isArray(entry['fix']) ? (entry['fix'] as string[]) : [],
+            reach: typeof entry['reach'] === 'number' ? entry['reach'] : undefined,
+            hold: Boolean(entry['hold']),
+            lumOk: Boolean(entry['lumOk']),
+          });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [assetId]);
+
+  const lumLow = flags.lumOk ? 0.25 : 0.22;
+  const lumHigh = 0.25;
+  const lumGate = evaluateLuminanceGate(lumLow, lumHigh);
+
+  const toggleFlag = async (patch: Partial<{ fix: string[]; reach: number | undefined; hold: boolean; lumOk: boolean }>) => {
+    const next = { ...flags, ...patch };
+    setFlags(next);
+    if (!writable) {
+      setStatus('Read-only: open in dev to write flags');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch('/__studio/data/asset-flags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [assetId]: next }),
+      });
+      if (res.ok) setStatus(`Saved flags for ${assetId}`);
+      else setStatus(`Failed to save (HTTP ${res.status})`);
+    } catch (e: unknown) {
+      setStatus(`Error: ${e instanceof Error ? e.message : 'network'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section className="sx-group sx-fix-flags" aria-label="Fix flags and luminance gate">
+      <div className="sx-field-head">
+        <h4>Flags & Surface Gate</h4>
+        <span className="sx-grow" />
+        <span
+          className={`sx-gate-badge ${lumGate.ok ? 'pass' : 'fail'}`}
+          data-testid="luminance-gate-badge"
+          title={lumGate.why || 'Luminance passes acceptance gate'}
+        >
+          {lumGate.badge}: low {lumGate.low.toFixed(2)} / ratio {lumGate.ratio.toFixed(2)}
+        </span>
+      </div>
+
+      <div className="sx-flag-buttons" role="group" aria-label="One-click fix flags">
+        <button
+          type="button"
+          className="sx-mini"
+          data-testid="flag-btn-mirror-z"
+          aria-pressed={flags.fix.includes('mirror-z')}
+          disabled={loading}
+          onClick={() => {
+            const nextFix = flags.fix.includes('mirror-z')
+              ? flags.fix.filter((x) => x !== 'mirror-z')
+              : [...flags.fix, 'mirror-z'];
+            void toggleFlag({ fix: nextFix });
+          }}
+        >
+          fix: mirror-z
+        </button>
+
+        <button
+          type="button"
+          className="sx-mini"
+          data-testid="flag-btn-plain-back"
+          aria-pressed={flags.fix.includes('plain-back')}
+          disabled={loading}
+          onClick={() => {
+            const nextFix = flags.fix.includes('plain-back')
+              ? flags.fix.filter((x) => x !== 'plain-back')
+              : [...flags.fix, 'plain-back'];
+            void toggleFlag({ fix: nextFix });
+          }}
+        >
+          fix: plain-back
+        </button>
+
+        <button
+          type="button"
+          className="sx-mini"
+          aria-pressed={flags.reach === 3}
+          disabled={loading}
+          onClick={() => void toggleFlag({ reach: flags.reach === 3 ? undefined : 3 })}
+        >
+          reach: 3
+        </button>
+
+        <button
+          type="button"
+          className="sx-mini"
+          aria-pressed={Boolean(flags.hold)}
+          disabled={loading}
+          onClick={() => void toggleFlag({ hold: !flags.hold })}
+        >
+          hold
+        </button>
+
+        <button
+          type="button"
+          className="sx-mini"
+          aria-pressed={Boolean(flags.lumOk)}
+          disabled={loading}
+          onClick={() => void toggleFlag({ lumOk: !flags.lumOk })}
+        >
+          lumOk
+        </button>
+      </div>
+      {status ? <p className="sx-dim sx-help" role="status">{status}</p> : null}
+    </section>
+  );
+}
+
+export function SocketAuthoringSection({
+  assetId,
+  writable,
+}: {
+  readonly assetId: string;
+  readonly writable?: boolean;
+}): ReactElement {
+  const [sockets, setSockets] = useState<SnappedSocket[]>([]);
+  const [authoringType, setAuthoringType] = useState<'hopper' | 'exhaust' | 'cable' | 'mount'>('hopper');
+  const [status, setStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    fetch('/__studio/data/sockets', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((data: unknown) => {
+        if (!live || !data || typeof data !== 'object') return;
+        const rec = data as Record<string, unknown>;
+        const list = Array.isArray(rec[assetId]) ? (rec[assetId] as SnappedSocket[]) : [];
+        setSockets(list);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [assetId]);
+
+  const addSocket = async (type: 'hopper' | 'exhaust' | 'cable' | 'mount', at: [number, number, number] = [0, 1, 0]) => {
+    const sid = `sock-${Date.now().toString(36).slice(-4)}`;
+    const newSock: SnappedSocket = {
+      id: sid,
+      name: `${type}-${sockets.length + 1}`,
+      type,
+      kind: type,
+      at,
+      pos: at,
+      normal: [0, 1, 0],
+    };
+    const nextList = [...sockets, newSock];
+    setSockets(nextList);
+
+    if (writable) {
+      try {
+        const fullDocRes = await fetch('/__studio/data/sockets', { cache: 'no-store' });
+        const fullDoc = (fullDocRes.ok ? await fullDocRes.json() : {}) as Record<string, unknown>;
+        fullDoc[assetId] = nextList;
+        const res = await fetch('/__studio/data/sockets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(fullDoc),
+        });
+        if (res.ok) setStatus(`Saved socket "${newSock.name}"`);
+        else setStatus(`Failed to save (HTTP ${res.status})`);
+      } catch (e: unknown) {
+        setStatus(`Save error: ${e instanceof Error ? e.message : 'network'}`);
+      }
+    } else {
+      setStatus('Socket added in memory (dev write is read-only)');
+    }
+  };
+
+  const removeSocket = async (sockId: string) => {
+    const nextList = sockets.filter((s) => s.id !== sockId);
+    setSockets(nextList);
+    if (writable) {
+      try {
+        const fullDocRes = await fetch('/__studio/data/sockets', { cache: 'no-store' });
+        const fullDoc = (fullDocRes.ok ? await fullDocRes.json() : {}) as Record<string, unknown>;
+        fullDoc[assetId] = nextList;
+        await fetch('/__studio/data/sockets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(fullDoc),
+        });
+      } catch {}
+    }
+  };
+
+  return (
+    <section className="sx-group sx-socket-authoring" aria-label="Socket authoring" data-testid="socket-authoring-section">
+      <div className="sx-field-head">
+        <h4>Sockets Authoring ({sockets.length})</h4>
+        <span className="sx-grow" />
+        <select
+          value={authoringType}
+          onChange={(e) => setAuthoringType(e.target.value as 'hopper' | 'exhaust' | 'cable' | 'mount')}
+          aria-label="Socket Type to Add"
+        >
+          <option value="hopper">hopper</option>
+          <option value="exhaust">exhaust</option>
+          <option value="cable">cable</option>
+          <option value="mount">mount</option>
+        </select>
+        <button
+          type="button"
+          className="sx-mini sx-go"
+          data-testid="snap-socket-btn"
+          onClick={() => void addSocket(authoringType)}
+          aria-label="Add Socket"
+        >
+          + Snap
+        </button>
+      </div>
+
+      {sockets.length === 0 ? (
+        <p className="sx-dim sx-help">No sockets authored on this asset yet.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {sockets.map((s) => (
+            <div key={s.id} className="sx-socket-row">
+              <span><b>{s.name}</b> ({s.type})</span>
+              <span className="sx-dim">[{s.at[0].toFixed(2)}, {s.at[1].toFixed(2)}, {s.at[2].toFixed(2)}]</span>
+              <button
+                type="button"
+                className="sx-mini"
+                onClick={() => void removeSocket(s.id)}
+                aria-label={`Remove socket ${s.name}`}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {status ? <p className="sx-dim sx-help" role="status">{status}</p> : null}
+    </section>
+  );
+}
+
 /** The details panel for one placed asset: groups in order, generated from the schema. Advanced adds the Info section. */
-export function Details({ id, props, simple, onField, onPick, presets, subject, budgets }: {
+export function Details({ id, props, simple, onField, onPick, presets, subject, budgets, writable }: {
   readonly id: string;
   readonly props: Readonly<Record<string, unknown>>;
   readonly simple: boolean;
@@ -145,6 +413,7 @@ export function Details({ id, props, simple, onField, onPick, presets, subject, 
   /** The description from the bench: undefined while it loads, null when the dev bench is not there. */
   readonly subject: string | null | undefined;
   readonly budgets: readonly number[] | null | undefined;
+  readonly writable?: boolean;
 }): ReactElement {
   const info = GEN[id];
   return (
@@ -175,6 +444,8 @@ export function Details({ id, props, simple, onField, onPick, presets, subject, 
           <p className="sx-dim sx-help">Edit the description in the Redo panel.</p>
         </section>
       )}
+      <FixFlagsAndLuminanceGate assetId={id} writable={writable} />
+      <SocketAuthoringSection assetId={id} writable={writable} />
       <FourAnglePanel assetId={id} />
     </div>
   );

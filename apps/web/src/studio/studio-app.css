@@ -446,3 +446,50 @@
 @media (max-width: 900px) {
   .sx-scene-pane { grid-template-columns: minmax(0, 1fr); grid-template-rows: 60vh minmax(0, 1fr); }
 }
+
+/* Fix Flags and Surface Luminance Gate (P0-STUDIO-01) */
+.sx-gate-badge {
+  font: 700 11px/1 var(--sx-display);
+  padding: 3px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+}
+.sx-gate-badge.pass {
+  background: rgba(111, 227, 160, 0.15);
+  color: var(--sx-ok);
+  border: 1px solid rgba(111, 227, 160, 0.35);
+}
+.sx-gate-badge.fail {
+  background: rgba(255, 122, 107, 0.15);
+  color: var(--sx-err);
+  border: 1px solid rgba(255, 122, 107, 0.35);
+}
+.sx-flag-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.sx-socket-authoring {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  background: rgba(8, 12, 18, 0.6);
+  border: 1px solid var(--sx-line);
+  border-radius: 6px;
+}
+.sx-socket-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: rgba(16, 24, 34, 0.7);
+}
+

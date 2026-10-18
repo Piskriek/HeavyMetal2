@@ -306,3 +306,17 @@ test('load refuses cycles, unlisted nodes and newer type versions, and fills def
   const badProp = { ...base, nodes: { ...base.nodes, a: { ...base.nodes.a, props: { power: 500 } } } };
   assert.equal(load(reg, badProp), null);
 });
+
+test('POL-21: structural sharing preserves object identity for unchanged nodes across edits', () => {
+  const d0 = emptyDoc();
+  const { doc: d1 } = apply(reg, d0, { op: 'create', type: 'machine', id: 'm1' });
+  const { doc: d2 } = apply(reg, d1, { op: 'create', type: 'machine', id: 'm2' });
+  const { doc: d3 } = apply(reg, d2, { op: 'rename', id: 'm2', name: 'Renamed M2' });
+
+  // Unchanged node m1 must retain identical object reference across d2 -> d3
+  assert.strictEqual(d3.nodes['m1'], d2.nodes['m1'], 'm1 node reference should be preserved via structural sharing');
+  assert.notStrictEqual(d3.nodes['m2'], d2.nodes['m2'], 'm2 node reference should change');
+  assert.equal(d3.nodes['m2']!.name, 'Renamed M2');
+});
+
+

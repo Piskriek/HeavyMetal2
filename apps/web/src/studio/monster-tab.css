@@ -1,0 +1,138 @@
+/* ============================================================================
+ * Monster Tab Styles (FIDELITY Studio O3)
+ * ==========================================================================*/
+.sx-monster-tab {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  background: var(--sx-bg);
+  position: relative;
+  overflow: hidden;
+}
+
+.sx-monster-roster-list {
+  width: 280px;
+  border-right: 1px solid var(--sx-line);
+  background: var(--sx-panel);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 12px;
+  gap: 8px;
+}
+
+.sx-monster-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--sx-line);
+  background: rgba(10, 16, 24, 0.5);
+  cursor: pointer;
+  color: var(--sx-text);
+  font-size: 12px;
+  transition: all 0.15s ease;
+}
+
+.sx-monster-item:hover {
+  background: rgba(30, 42, 58, 0.6);
+  border-color: var(--sx-line-hi);
+}
+
+.sx-monster-item[aria-selected='true'] {
+  background: var(--sx-amber-soft);
+  border-color: rgba(255, 197, 61, 0.5);
+  color: var(--sx-amber);
+}
+
+.sx-monster-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  gap: 20px;
+  max-width: 680px;
+  overflow-y: auto;
+}
+
+.sx-monster-card {
+  background: var(--sx-panel);
+  border: 1px solid var(--sx-line);
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sx-monster-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--sx-line);
+  padding-bottom: 12px;
+}
+
+.sx-monster-card-head h3 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: 0.05em;
+}
+
+.sx-monster-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.sx-monster-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(8, 12, 18, 0.5);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--sx-line);
+}
+
+.sx-monster-meta-item span:first-child {
+  font-size: 11px;
+  color: var(--sx-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sx-monster-meta-item span:last-child {
+  font-family: var(--sx-display);
+  font-size: 13px;
+  color: var(--sx-text);
+}
+
+.sx-monster-remap-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(8, 12, 18, 0.6);
+  padding: 16px;
+  border-radius: 6px;
+  border: 1px solid var(--sx-line);
+}
+
+.sx-monster-status {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.sx-monster-status.ok {
+  background: rgba(111, 227, 160, 0.15);
+  color: var(--sx-ok);
+  border: 1px solid rgba(111, 227, 160, 0.3);
+}
+
+.sx-monster-status.err {
+  background: rgba(255, 122, 107, 0.15);
+  color: var(--sx-err);
+  border: 1px solid rgba(255, 122, 107, 0.3);
+}

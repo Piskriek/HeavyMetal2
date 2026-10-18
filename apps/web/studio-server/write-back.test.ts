@@ -13,8 +13,12 @@ function setup(): { paths: StudioPaths; dir: string; file: string; cleanup: () =
   fs.mkdirSync(dataDir);
   const registryFile = path.join(dir, 'registry.json');
   fs.writeFileSync(registryFile, JSON.stringify(IDS));
+  const audioLevelsFile = path.join(dir, 'levels.json');
+  fs.writeFileSync(audioLevelsFile, JSON.stringify({ about: 'audio levels', levels: {} }));
+  const manifestFile = path.join(dir, 'assets.json');
+  fs.writeFileSync(manifestFile, JSON.stringify({ assets: [{ id: 'scout-body', file: 'scout.glb' }, { id: 'hauler-body', file: 'hauler.glb' }] }));
   return {
-    paths: { dataDir, registryFile },
+    paths: { dataDir, registryFile, audioLevelsFile, manifestFile },
     dir,
     file: path.join(dataDir, 'asset-tweaks.json'),
     cleanup: () => fs.rmSync(dir, { recursive: true, force: true }),
@@ -179,4 +183,132 @@ test('scene-layouts write-back: GET empty, POST valid layouts, read back, and re
     assert.equal(dupItem?.status, 422);
   } finally { s.cleanup(); }
 });
+
+test('levels write-back: GET empty/initial, POST valid audio levels, and reject invalid', async () => {
+  const s = setup();
+  try {
+    const getRes = await handleStudioRequest(req({ method: 'GET', path: '/__studio/data/levels', readBody: async () => '' }), s.paths);
+    assert.equal(getRes?.status, 200);
+    assert.ok(getRes?.body.includes('audio levels'));
+
+    // POST valid levels
+    const validLevels = {
+      about: 'audio levels',
+      levels: {
+        'ambient/wind': { gain: 0.75 },
+        'engine/rev': { gain: 1.2 },
+      },
+    };
+    const postRes = await handleStudioRequest(
+      req({ path: '/__studio/data/levels', body: JSON.stringify(validLevels) }),
+      s.paths
+    );
+    assert.equal(postRes?.status, 200);
+
+    const getBack = await handleStudioRequest(req({ method: 'GET', path: '/__studio/data/levels', readBody: async () => '' }), s.paths);
+    assert.equal(getBack?.status, 200);
+    const readBack = JSON.parse(String(getBack?.body));
+    assert.equal(readBack.levels['ambient/wind']?.gain, 0.75);
+
+    // Rejects invalid levels (non-numeric gain)
+    const badRes = await handleStudioRequest(
+      req({ path: '/__studio/data/levels', body: JSON.stringify({ levels: { 'engine/rev': { gain: 'loud' } } }) }),
+      s.paths
+    );
+    assert.equal(badRes?.status, 422);
+  } finally { s.cleanup(); }
+});
+
+test('asset-flags write-back: POST patches assets in manifest, GET reads manifest back, and rejects bad flags', async () => {
+  const s = setup();
+  try {
+    // Valid patch: add fix flags, reach, hold, lumOk to scout-body
+    const patch = {
+      'scout-body': {
+        fix: ['fix: mirror-z', 'reach: 3'],
+        reach: 3,
+        hold: true,
+        lumOk: true,
+      },
+    };
+    const postRes = await handleStudioRequest(
+      req({ path: '/__studio/data/asset-flags', body: JSON.stringify(patch) }),
+      s.paths
+    );
+    assert.equal(postRes?.status, 200);
+
+    // Read back manifest file
+    const manifest = JSON.parse(fs.readFileSync(s.paths.manifestFile!, 'utf8'));
+    const scout = manifest.assets.find((a: any) => a.id === 'scout-body');
+    assert.deepEqual(scout.fix, ['mirror-z']);
+    assert.equal(scout.reach, 3);
+    assert.equal(scout.hold, true);
+    assert.equal(scout.lumOk, true);
+
+    // Unknown asset rejected
+    const badRes = await handleStudioRequest(
+      req({ path: '/__studio/data/asset-flags', body: JSON.stringify({ 'ghost-asset': { hold: true } }) }),
+      s.paths
+    );
+    assert.equal(badRes?.status, 422);
+  } finally { s.cleanup(); }
+});
+
+test('sockets write-back: POST valid sockets, GET reads back, and rejects bad socket data', async () => {
+  const s = setup();
+  try {
+    const sockets = {
+      'scout-body': [
+        { kind: 'mount', pos: [0, 0.5, -1.2], normal: [0, 1, 0] },
+        { kind: 'exhaust', pos: [0, 0.2, 1.5], normal: [0, 0, 1] },
+      ],
+    };
+    const postRes = await handleStudioRequest(
+      req({ path: '/__studio/data/sockets', body: JSON.stringify(sockets) }),
+      s.paths
+    );
+    assert.equal(postRes?.status, 200);
+
+    const getRes = await handleStudioRequest(req({ method: 'GET', path: '/__studio/data/sockets', readBody: async () => '' }), s.paths);
+    assert.equal(getRes?.status, 200);
+    const readBack = JSON.parse(String(getRes?.body));
+    assert.equal(readBack['scout-body']?.length, 2);
+    assert.equal(readBack['scout-body'][0].kind, 'mount');
+
+    // Rejects invalid socket kind
+    const badKind = await handleStudioRequest(
+      req({ path: '/__studio/data/sockets', body: JSON.stringify({ 'scout-body': [{ kind: 'laser', pos: [0, 0, 0], normal: [0, 1, 0] }] }) }),
+      s.paths
+    );
+    assert.equal(badKind?.status, 422);
+  } finally { s.cleanup(); }
+});
+
+test('monster-tweaks write-back: POST valid remapStrength, GET reads back, and rejects out-of-range', async () => {
+  const s = setup();
+  try {
+    const tweaks = {
+      'ogro': { remapStrength: 0.35 },
+      'demon': { remapStrength: 0.15 },
+    };
+    const postRes = await handleStudioRequest(
+      req({ path: '/__studio/data/monster-tweaks', body: JSON.stringify(tweaks) }),
+      s.paths
+    );
+    assert.equal(postRes?.status, 200);
+
+    const getRes = await handleStudioRequest(req({ method: 'GET', path: '/__studio/data/monster-tweaks', readBody: async () => '' }), s.paths);
+    assert.equal(getRes?.status, 200);
+    const readBack = JSON.parse(String(getRes?.body));
+    assert.equal(readBack['ogro']?.remapStrength, 0.35);
+
+    // Rejects out of range remapStrength (> 1 or < 0)
+    const badRange = await handleStudioRequest(
+      req({ path: '/__studio/data/monster-tweaks', body: JSON.stringify({ 'ogro': { remapStrength: 1.5 } }) }),
+      s.paths
+    );
+    assert.equal(badRange?.status, 422);
+  } finally { s.cleanup(); }
+});
+
 

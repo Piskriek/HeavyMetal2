@@ -12,7 +12,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import type * as THREE from 'three';
 import { ASSET_TWEAKS, GEN, loadGenRaw } from '../assets/gen';
-import { VEHICLE_FIT } from '../assets/gen-props';
 import { kv } from '../storage/profile-storage';
 import type { Copy, StudioViewport, Transform } from './studio-viewport';
 import {
@@ -47,20 +46,10 @@ export {
   type SceneItem,
 };
 
-/**
- * Sockets for the rover bodies, from the game's own fit table (gen-props). The packed registry carries no sockets, so
- * without this the gizmo would have nothing to mark on those assets.
- */
-const SOCKETS_BY_ASSET: Readonly<Record<string, RegistryEntry['sockets']>> = {
-  'scout-body': VEHICLE_FIT.scout.sockets,
-  'hauler-body': VEHICLE_FIT.hauler.sockets,
-  'crawler-body': VEHICLE_FIT.crawler.sockets,
-};
-
-/** The registry entry for one placed asset, with its sockets from the registry or the fit table. */
+/** The registry entry for one placed asset, with its sockets from the registry. */
 function entryFor(assetId: string, registry: Readonly<Record<string, RegistryEntry>>): RegistryEntry {
   const base = registry[assetId] ?? {};
-  return { ...base, id: assetId, sockets: base.sockets ?? SOCKETS_BY_ASSET[assetId] };
+  return { ...base, id: assetId, sockets: base.sockets };
 }
 
 /** The saved layouts from this browser, each one checked again; the starters when there are none. */

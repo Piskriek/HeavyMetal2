@@ -84,6 +84,39 @@ for (const a of manifest.assets.filter((x) => only.length === 0 || only.includes
   console.log(`${a.id}: low ${kb(path.join(LOW, `${a.id}.glb`))} KB inline, HD ${hdKb} KB`);
   packed++;
 }
+
+export const MACHINE_AND_STRUCTURE_SOCKETS = {
+  'scout-body': [{ name: 'seat', at: [0, 0.27, -0.1] }],
+  'hauler-body': [{ name: 'seat', at: [-0.45, 0.6, 1.9] }, { name: 'seat', at: [0.45, 0.6, 1.9] }, { name: 'dish', at: [0, 1.13, -0.3] }],
+  'crawler-body': [{ name: 'seat', at: [0.35, 0.55, -1.5] }, { name: 'drill', at: [0, 0.45, 3.6] }, { name: 'mast', at: [0.4, 1.75, -1.5] }],
+  'mill': [{ name: 'hopper', at: [0, 4.16, 0] }, { name: 'vent', at: [1.715, 2.28, -0.48] }, { name: 'power', at: [0, 0.1, -1.58] }],
+  'press-frame': [{ name: 'chute', at: [0, 4.26, 0] }, { name: 'vent', at: [0, 3.44, -0.56] }, { name: 'power', at: [-0.56, 0.24, 1] }],
+  'projector-mast': [{ name: 'lens', at: [0, 4.362, 0.562] }, { name: 'vent', at: [0, 3.821, -0.598] }, { name: 'power', at: [-0.56, 0.24, 0.88] }],
+  'watermaker': [{ name: 'hopper', at: [3.05, 1.6, 0] }, { name: 'vent', at: [0, 3.155, -0.58] }, { name: 'power', at: [-0.11, 0.24, 0.88] }],
+  'fabricator-frame': [{ name: 'bed', at: [0, 0.7, 0] }, { name: 'power', at: [-2.4, 0.55, -2.6] }],
+  'pylon-tower': [{ name: 'top', at: [1.02, 5.76, 0] }, { name: 'box', at: [0.78, 0.5, 0.87] }],
+  'operator-console': [{ name: 'cable', at: [0, 0.35, -0.23] }],
+  'relay-cabinet': [{ name: 'cable-top', at: [0, 1.95, 0] }, { name: 'cable-bottom', at: [0, 0.02, -0.19] }],
+  'breaker-panel': [{ name: 'in', at: [-0.27, 0.23, 0] }, { name: 'out', at: [0.27, 1.64, 0] }],
+  'capacitor-bank': [{ name: 'out', at: [1.02, 0.89, 0] }],
+  'control-box': [{ name: 'cable', at: [0, -0.265, 0.04] }],
+  'hardpoint': [{ name: 'mount', at: [4, 0.78, 4] }, { name: 'power', at: [7.96, 0.35, 3.22] }],
+  'bin': [{ name: 'link', at: [2, 2.18, 2] }],
+  'drafting': [{ name: 'screen', at: [2.035, 0.97, 2] }],
+  'repeater': [{ name: 'top', at: [2, 6.99, 2] }, { name: 'box', at: [2, 0.68, 2.83] }],
+  'gate': [{ name: 'rear-junction', at: [1.075, 0.37, -0.5] }],
+};
+
+const socketsDataFile = path.join(ROOT, 'apps', 'web', 'src', 'studio-data', 'sockets.json');
+const authoredSockets = fs.existsSync(socketsDataFile) ? JSON.parse(fs.readFileSync(socketsDataFile, 'utf8')) : {};
+
+for (const [id, entry] of Object.entries(registry)) {
+  const socks = authoredSockets[id] ?? MACHINE_AND_STRUCTURE_SOCKETS[id];
+  if (socks) {
+    entry.sockets = socks;
+  }
+}
+
 fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2) + '\n');
 console.log(`packed ${packed}; registry has ${Object.keys(registry).length} assets`);
 if (refused.length) {

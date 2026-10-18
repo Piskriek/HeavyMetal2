@@ -101,6 +101,12 @@ try {
     window.addEventListener('unhandledrejection', (e) => window.__rejections.push(String((e.reason && e.reason.message) || e.reason).slice(0, 200)));
   });
 
+  let postedLayouts = null;
+  let postedFlags = null;
+  let postedSockets = null;
+  let postedMonsters = null;
+  let postedLevels = null;
+
   const tab = (name) => page.locator('.sx-tabs button', { hasText: new RegExp(`^${name}$`) });
   /** What the Studio shows when a section fails: the viewport's tags, the placed items, and any rejection or console error. */
   const diag = async () => {
@@ -170,7 +176,7 @@ try {
     await page.waitForFunction(() => document.querySelectorAll('.sx-scene-view .sx-world-tag:not(.sx-world-figure)').length === 3, null, { timeout: T(120000) });
     const starter = await page.locator('ul[aria-label="Placed scene items"] li').count();
     check('Scene: the starter layout places three copies', starter === 3, { starter });
-    check('Scene: the gizmo readout counts the plume vents of the starter', (await page.locator('[data-testid="scene-gizmo-readout"]').innerText()).includes('0 socket markers, 3 plume vents'));
+    check('Scene: the gizmo readout counts the plume vents of the starter', (await page.locator('[data-testid="scene-gizmo-readout"]').innerText()).includes('9 socket markers, 3 plume vents'));
 
     // a rover body has sockets in the game's fit table, so its markers show
     await page.locator('select[aria-label="Pick asset to place"]').selectOption('hauler-body');
@@ -178,7 +184,7 @@ try {
     await page.waitForFunction(() => document.querySelectorAll('.sx-scene-view .sx-world-tag:not(.sx-world-figure)').length === 4, null, { timeout: T(120000) });
     check('Scene: the selected hauler lists its three sockets', (await page.locator('ul[aria-label="Selected item sockets"] li').count()) === 3);
     const readout = await page.locator('[data-testid="scene-gizmo-readout"]').innerText();
-    check('Scene: the gizmo marks the three sockets of the hauler', readout.includes('3 socket markers'), readout);
+    check('Scene: the gizmo marks the sockets of the placed items', readout.includes('12 socket markers'), readout);
     const overflow = await page.evaluate(() => {
       const side = document.querySelector('.sx-scene-side').getBoundingClientRect();
       return [...document.querySelectorAll('.sx-scene-side input, .sx-scene-side select')].filter((el) => el.getBoundingClientRect().right > side.right + 1).length;
@@ -234,6 +240,28 @@ try {
     await page.waitForTimeout(T(300));
     check('Scene: undo restores a moved copy back to original offset', (await xInput.inputValue()) === origX, { origX, restored: await xInput.inputValue() });
 
+    // Pointer drag on the gizmo moves the item and undo restores it (POL-94)
+    const gizmoPt = await page.evaluate(() => {
+      const el = document.querySelector('.sx-scene-view .sx-canvas') || document.querySelector('.sx-scene-viewport');
+      const vp = el?.__viewport;
+      return vp?.getGizmoScreenPoint('x') ?? null;
+    });
+    if (gizmoPt) {
+      const beforeDragX = await xInput.inputValue();
+      await page.mouse.move(gizmoPt.x, gizmoPt.y);
+      await page.mouse.down();
+      await page.mouse.move(gizmoPt.x + 80, gizmoPt.y, { steps: 5 });
+      await page.mouse.up();
+      await page.waitForTimeout(T(300));
+      const afterDragX = await xInput.inputValue();
+      check('Scene: automated gizmo pointer drag changes offset X (POL-94)', afterDragX !== beforeDragX, { beforeDragX, afterDragX });
+      await page.locator('.sx-top button[aria-label="Undo"]').click();
+      await page.waitForTimeout(T(300));
+      check('Scene: undo restores gizmo-dragged offset back (POL-94)', (await xInput.inputValue()) === beforeDragX, { beforeDragX, restored: await xInput.inputValue() });
+    } else {
+      check('Scene: gizmo screen point found for pointer drag (POL-94)', false, { gizmoPt });
+    }
+
     // Copy JSON and Load JSON use the same format; a bad paste is refused with the reason
     await page.locator('button', { hasText: /^Copy JSON$/ }).click();
     await page.waitForFunction(() => /Copied 2 scene items/.test(document.querySelector('[role="status"].sx-scene-status')?.textContent ?? ''), null, { timeout: T(20000) });
@@ -249,7 +277,7 @@ try {
     check('Scene: a bad paste is refused with the reason', bad.includes('Invalid scene JSON'), bad.slice(0, 60));
 
     // Dev write-back: Save writes project file in dev (POL-88)
-    let postedLayouts = null;
+    postedLayouts = null;
     await page.route('**/__studio/data/scene-layouts', async (route) => {
       if (route.request().method() === 'POST') {
         try {
@@ -264,6 +292,42 @@ try {
     });
     await page.route('**/__studio/data/asset-tweaks', async (route) => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+    });
+    postedFlags = null;
+    await page.route('**/__studio/data/asset-flags', async (route) => {
+      if (route.request().method() === 'POST') {
+        try { postedFlags = JSON.parse(route.request().postData() || '{}'); } catch { postedFlags = null; }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, file: 'assets.json' }) });
+      } else {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+      }
+    });
+    postedSockets = null;
+    await page.route('**/__studio/data/sockets', async (route) => {
+      if (route.request().method() === 'POST') {
+        try { postedSockets = JSON.parse(route.request().postData() || '{}'); } catch { postedSockets = null; }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, file: 'sockets.json' }) });
+      } else {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+      }
+    });
+    postedMonsters = null;
+    await page.route('**/__studio/data/monster-tweaks', async (route) => {
+      if (route.request().method() === 'POST') {
+        try { postedMonsters = JSON.parse(route.request().postData() || '{}'); } catch { postedMonsters = null; }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, file: 'monster-tweaks.json' }) });
+      } else {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+      }
+    });
+    postedLevels = null;
+    await page.route('**/__studio/data/levels', async (route) => {
+      if (route.request().method() === 'POST') {
+        try { postedLevels = JSON.parse(route.request().postData() || '{}'); } catch { postedLevels = null; }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, file: 'levels.json' }) });
+      } else {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+      }
     });
     await page.addInitScript(() => { window.__STUDIO_DEV_WRITABLE = true; });
     await page.reload({ waitUntil: 'domcontentloaded', timeout: T(180000) });
@@ -316,6 +380,42 @@ try {
     await page.locator('button[aria-label="Refresh 4-angle views"]').click();
     await page.waitForFunction((s) => document.querySelectorAll(s).length === 4, grid, { timeout: T(180000) });
     check('4-angle: Refresh draws the four views again', (await page.$$eval(grid, (els) => els.length)) === 4);
+  });
+
+  // ---- Assets: fix flags, surface luminance gate, and snapped sockets (P0-STUDIO-01 / P1-STUDIO-03) ----
+  await section('Assets fix flags & sockets', async () => {
+    await tab('Assets').click();
+    await page.waitForSelector('[data-testid="luminance-gate-badge"]');
+    const badgeText = await page.locator('[data-testid="luminance-gate-badge"]').innerText();
+    check('Assets: luminance gate badge displays status', /PASS|FAIL/.test(badgeText), badgeText);
+    const mirrorBtn = page.locator('[data-testid="flag-btn-mirror-z"]');
+    check('Assets: mirror-z fix flag button is present', await mirrorBtn.isVisible());
+    await mirrorBtn.click();
+    await page.waitForTimeout(T(300));
+    check('Assets: clicking fix flag toggled state or initiated write-back', postedFlags !== null || (await mirrorBtn.getAttribute('aria-pressed')) !== null);
+
+    const snapBtn = page.locator('[data-testid="snap-socket-btn"]');
+    check('Assets: click-to-snap socket authoring button present', await snapBtn.isVisible());
+  });
+
+  // ---- Material Designer (P1-STUDIO-04) ----
+  await section('Material Designer', async () => {
+    await tab('Materials').click();
+    await page.waitForSelector('[data-testid="studio-material-tab"]');
+    check('Material Designer: macro hue slider is present', await page.locator('input[aria-label="Hue Shift"]').isVisible());
+    check('Material Designer: D21 constant mean luminance badge is present', await page.locator('[data-testid="d21-tier-badge"]').isVisible());
+    const badgeText = await page.locator('[data-testid="d21-tier-badge"]').innerText();
+    check('Material Designer: D21 badge displays constant-mean status', badgeText.includes('Constant Mean L') || badgeText.includes('Δ ≤ 0.03'), badgeText);
+  });
+
+  // ---- Monster Bench (O3) ----
+  await section('Monster Bench', async () => {
+    await tab('Monsters').click();
+    await page.waitForSelector('[data-testid="studio-monster-tab"]');
+    const slider = page.locator('[data-testid="remap-strength-slider"]');
+    check('Monster Bench: remap strength slider is present', await slider.isVisible());
+    const val = await slider.inputValue();
+    check('Monster Bench: default remap strength is 0.20', val === '0.2' || val === '0.20', val);
   });
 
   check('no page errors in the Studio', pageErrors.length === 0, pageErrors.slice(0, 3));

@@ -19,6 +19,8 @@ export interface LookFrame {
   readonly ground: GroundStage & {
     readonly uStage: number;
     readonly coverOn: number;
+    /** Human-readable colour quantisation readout ('12', '24', or 'Full (24-bit)' when levels === 0, POL-95). */
+    readonly levelsLabel: string;
   };
   readonly sky: {
     readonly zenith: readonly [number, number, number];
@@ -75,6 +77,7 @@ export function lookFrame(stage: number, sunElevDeg: number, sunAzimuthDeg = 35)
       ...g,
       uStage: Math.max(1, Math.min(6, clampedStage)),
       coverOn: clampedStage >= 2 ? 1 : 0,
+      levelsLabel: g.levels > 0 ? String(Math.round(g.levels)) : 'Full (24-bit)',
     },
     sky: {
       zenith: s.zenith,

@@ -370,7 +370,7 @@ export function LookTab({ assetId }: LookTabProps): ReactElement {
           />
           <div className="sx-look-readout-grid">
             <div className="sx-look-kv"><span>Texels/m</span><b>{frameA.ground.texelsPerMetre.toFixed(1)}</b></div>
-            <div className="sx-look-kv"><span>Levels</span><b>{Math.round(frameA.ground.levels)}</b></div>
+            <div className="sx-look-kv"><span>Levels</span><b>{frameA.ground.levelsLabel}</b></div>
             <div className="sx-look-kv"><span>Normals</span><b>{frameA.ground.normalStrength.toFixed(2)}</b></div>
             <div className="sx-look-kv"><span>Specular</span><b>{frameA.ground.specular.toFixed(2)}</b></div>
             <div className="sx-look-kv"><span>Triplanar</span><b>{frameA.ground.triplanar ? 'On' : 'Off'}</b></div>

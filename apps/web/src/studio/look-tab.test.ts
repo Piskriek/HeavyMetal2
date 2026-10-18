@@ -13,6 +13,7 @@ test('lookFrame returns ground, sky, and assetLevel across stages 0..6 and sun e
   assert.equal(s1.assetLevel, 'low');
   assert.equal(s1.level, 'low');
   assert.equal(s1.ground.nearest, true);
+  assert.equal(s1.ground.levelsLabel, '12');
   assert.equal(s1.ground.triplanar, false);
   assert.equal(s1.sky.density, 0);
   assert.deepEqual(s1.sky.zenith, [0, 0, 0]);
@@ -22,12 +23,15 @@ test('lookFrame returns ground, sky, and assetLevel across stages 0..6 and sun e
   assert.equal(s3.assetLevel, 'mid');
   assert.equal(s3.ground.nearest, false);
   assert.equal(s3.ground.triplanar, true);
+  assert.equal(s3.ground.levelsLabel, 'Full (24-bit)');
   assert.ok(s3.sky.density > 0 && s3.sky.density < 1);
   assert.ok(s3.sky.zenith[2] > s3.sky.zenith[0], 'Rayleigh sky zenith is bluer than red at stage 3');
 
   const s6 = lookFrame(6, 45);
   assert.equal(s6.assetLevel, 'high');
   assert.equal(s6.sky.density, 1);
+  assert.equal(s6.ground.levels, 0);
+  assert.equal(s6.ground.levelsLabel, 'Full (24-bit)');
   assert.ok(s6.ground.texelsPerMetre > s1.ground.texelsPerMetre);
   assert.ok(s6.ground.normalStrength > s1.ground.normalStrength);
 

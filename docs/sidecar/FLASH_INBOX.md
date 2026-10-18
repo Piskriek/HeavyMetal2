@@ -170,7 +170,7 @@ Lanes right now: a Haiku owns `play.tsx`, `apps/web/src/credits/`, `lab-room.ts`
 - **Tests** (in `plume.test.ts`): gravity 0 equals today's output for a sample of pixels; a gravity pixel rises, then falls below its peak; changing the count makes no new buffer (spy on the allocation, or count the buffers).
 - **Check:** `npm run typecheck`, then `scripts/test-on-3dpc.sh --only "packages/plume" "npm test"` and `scripts/test-on-3dpc.sh --only "packages/plume" "npm run build && node scripts/test-machine-plumes.mjs"` (69 of 69 today). Report the build size.
 
-## F-22 [TAKEN] Finish POL-99: the close-ups with the HUD really hidden (after F-21)
+## F-22 [DONE] Finish POL-99: the close-ups with the HUD really hidden (after F-21)
 Opus's review of F-20: the four close-ups in `scripts/test-ticket07a.mjs` frame their subjects, but the HUD is NOT hidden in any of them (the stage panel, the leak radar, health, the ticker, the compass and a Dr. Haddy subtitle all show). The sealed shot also has two monsters in front of the rift.
 - Hide every HUD layer and the subtitle for these four captures only, and restore them right after (the other shots in the test keep the HUD). Find the HUD's root elements in the page; don't add game code for it.
 - Take the sealed shot with no monster between the camera and the rift (clear them through the debug hooks first, or pick a moment with none in the frustum, and check it).

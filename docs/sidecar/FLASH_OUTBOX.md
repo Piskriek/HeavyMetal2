@@ -207,3 +207,17 @@ Append one entry per job, in the format in `FLASH_INBOX.md`. Newest at the botto
   - Tests verify gravity 0 equality, ballistic flight peak/fall, and zero buffer allocations on count changes.
 - Decisions left: None. Ready for F-22.
 
+### [2026-10-18 19:04] F-22 [DONE] Finish POL-99: the close-ups with the HUD really hidden
+- Commits: `b0760ed3` ("test(ticket07a): hide all HUD overlays and clear monsters for POL-99 close-ups (POL-99)")
+- Checks:
+  - `npm run build && node scripts/test-ticket07a.mjs` on 3D PC: 17/17 checks pass, 0 fail, 2 skipped, 0 page errors
+  - Build size: 15.10 MB (15,838.00 kB, cap 16 MB)
+- Shots (`shots-run/`):
+  - `ticket07a-armory-rail-closeup.png`: 100% pristine first-person framing of rail & holsters; zero HUD, zero crosshair dot, zero subtitles.
+  - `ticket07a-rift-open-closeup.png`: Centered 8m close-up of open glitch tower rift; zero compass, stage pill, vitals, or subtitles.
+  - `ticket07a-rift-sealing-closeup.png`: Clean golden amber core of sealing rift; zero HUD elements or subtitles.
+  - `ticket07a-rift-sealed-closeup.png`: Clear line of sight to the sealed rift base with zero monsters obstructing view; monsters kept 'off' and active mobs cleared during capture.
+- Changes from brief: None. Verified all HUD layers and Dr. Haddy subtitle are completely hidden for close-ups and restored immediately after.
+- Decisions left: None. POL-99 complete.
+
+

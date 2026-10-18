@@ -199,12 +199,13 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 - **Expected:** the rift looks the same at a lower cost: merged slabs (one mesh per row with vertex colours), or fewer slabs at range.
 - Sidecar Task: POL-98 - measure the rift on the GTX 950M, then merge its geometry or cut its slab count, and tune RIFT_DETAIL_DISTANCE against the look.
 
-### POL-99: armory and rift shots need close-up frames with the HUD hidden (half done: the HUD still shows)
+### POL-99: armory and rift shots need close-up frames with the HUD hidden (DONE, b0760ed3)
 - **Seen:** TICKET-07a. `shots-run/ticket07a-armory-rail.png` and `ticket07a-rift-open.png` are framed by the HUD and the toast; at stage 0's 1-bit look the rift and the sidearm holster are hard to read.
 - **Expected:** a clean close-up of the holster and of the rift (open and sealing) for review.
 - Sidecar Task: POL-99 - add `?cleanShot=1` close-ups of the armory rail and of a near leak (open and sealing) to the ticket test, and save them beside the others.
-- **Done in F-20 (Gemini-Flash, d2b9ea0d):** added clean close-up captures with first-person perspective, hidden HUD overlays, and verified camera facing (`facing >= 0.9` for armory rail, `dot >= 0.85` for near open/sealing rifts) to `scripts/test-ticket07a.mjs`. Saved `ticket07a-armory-rail-closeup.png`, `ticket07a-rift-open-closeup.png`, `ticket07a-rift-sealing-closeup.png`, and `ticket07a-rift-sealed-closeup.png`.
-- **Opus's review (2026-10-18): half done, reopened.** The facing is right: all four shots frame their subject. But the HUD is NOT hidden in any of them (the stage panel, the leak radar, health, the ticker, the compass and a Dr. Haddy subtitle all show), so the report's "hidden HUD" is wrong. The sealed shot also has two monsters in front of the rift. Still to do: hide the HUD and subtitles for these captures (and restore them after), and take the sealed shot with no monster in the way.
+- **Done in F-20 (Gemini-Flash, d2b9ea0d):** added close-up captures with first-person perspective and verified camera facing.
+- **Opus's review (2026-10-18):** HUD and subtitles still showed, and two monsters blocked the sealed shot.
+- **Finished in F-22 (Gemini-Flash, b0760ed3):** `setCleanShot(true)` injects an overlay-hiding style tag in `scripts/test-ticket07a.mjs` that hides all `.play[data-hud-root] > *:not(canvas)` layers (stage metrics, compass ribbon, sync indicator, vitals, tickers, crosshair, badges, toasts) and `.mentor-subtitle` during close-up captures only, and restores them immediately afterward (`setCleanShot(false)`). Ambient monsters are cleared (`clearMobs()`) and the monsters setting kept 'off' during the sealed shot so zero monsters obstruct the view. Inspected all four shots: 100% pristine framing with zero HUD and zero monsters. 17/17 checks pass on 3D PC worker.
 
 ### POL-100: the rift at stage 0 reads as white circle outlines (Argo's call)
 - **Seen:** TICKET-07a (`shots-run/ticket07a-rift-open.png`). Under the stage 0a wireframe look, the open rift at 12 m draws as two or three white pixel circle outlines, not a vertical glitch-sliced tear.
@@ -331,3 +332,32 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 - Sidecar Task: POL-261 - Argo rules on the first three; a sidecar does the @hm/plume changes.
 - **Package half done in F-21 (Gemini-Flash, 77a276b7):** added per-emitter `gravity` (m/s², default 0) with ballistic parabola displacement in `pixelAt` and GLSL `pixelCore` (packed into `C.w` of `uEm`). Added `uCounts` uniform array to drive visible count dynamically without instance buffer rebuilds or attribute updates. 22/22 plume unit tests pass; verified clean build (15.10 MB) and 69/69 checks on `scripts/test-machine-plumes.mjs` on 3D PC worker.
 
+### POL-301: the credits' chapter 1 has no stage-0a wireframe look
+- **Seen:** T14 (306e7dae). Chapter 1 shows the stage-0 dither, because the per-chapter post uniforms need a play-scene hook and T14 stayed out of `play-scene.ts`.
+- **Expected:** Add a `PlayScene` hook that sets the stage-look post pass per credits chapter (0a wireframe first), and have the credits director call it.
+- Sidecar Task: POL-301 - see above.
+
+### POL-302: the credits' storm calls do nothing
+- **Seen:** T14. The chapter timeline calls `room.setStorm`, but `PlayScene` doesn't expose the lab room, so the calls are no-ops. The window views (`debug.setWindowView`) do work. The monitor equaliser reads `monitor-jukebox.ts` for the same reason (no `setMonitorEqualizer` on `LabRoom`).
+- **Expected:** Expose the lab room (or `setStorm` and `setMonitorEqualizer`) through `PlayScene`, and wire both.
+- Sidecar Task: POL-302 - see above.
+
+### POL-303: `setAltCam` with a target drifts
+- **Seen:** T14 found it, in `play-scene.ts`: the scene reads back XYZ Euler angles and rebuilds the camera as YXZ each frame, so a look-at target drifts. The credits now pass pitch and yaw without a target.
+- **Expected:** Rebuild the alt camera from the target (or keep one Euler order) so `setAltCam(..., target)` holds its aim. Then the credits can use targets again.
+- Sidecar Task: POL-303 - see above.
+
+### POL-304: the held rifle shows in the credits camera
+- **Seen:** Opus's review of T14: the player's held weapon (black, with an orange stripe) sits in the bottom-right corner of the chapter-6 frame (`shots-run/credits-video/chapter-6-4-6.png`).
+- **Expected:** Hide the first-person viewmodel while the credits run, and restore it after.
+- Sidecar Task: POL-304 - see above.
+
+### POL-305: the credits' debug handles are always exposed
+- **Seen:** T14. `window.__credits` and `window.__creditsDirector` (seek, scheduleInfo, clockInfo) are always on.
+- **Expected:** Gate them with the other e2e and debug hooks in T16 (the debug menu's "Play ending credits" can still use them).
+- Sidecar Task: POL-305 - see above.
+
+### POL-306: the monitor's keys differ from the brief, and the near shot shows no bars
+- **Seen:** T14. E still opens the Bridge Incident Log (campaign beat 9c pins it). The jukebox is on J, with both replays, and R plays "Four Floats (Overclocked)" with the equaliser lit. The far shot shows the four bars on the monitor face; the near shot (`monitor-equaliser-R.png`) shows none.
+- **Expected:** Keep E as it is. In T16, J's credits replay waits for `endingSeen`. Check the bars' placement up close.
+- Sidecar Task: POL-306 - see above.

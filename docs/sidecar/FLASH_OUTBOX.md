@@ -218,6 +218,22 @@ Append one entry per job, in the format in `FLASH_INBOX.md`. Newest at the botto
   - `ticket07a-rift-sealing-closeup.png`: Clean golden amber core of sealing rift; zero HUD elements or subtitles.
   - `ticket07a-rift-sealed-closeup.png`: Clear line of sight to the sealed rift base with zero monsters obstructing view; monsters kept 'off' and active mobs cleared during capture.
 - Changes from brief: None. Verified all HUD layers and Dr. Haddy subtitle are completely hidden for close-ups and restored immediately after.
-- Decisions left: None. POL-99 complete.
+### [2026-10-18 22:05] F-23 [DONE] TICKET-16 part a: Acts VII to IX, the finale hand-off, the menu hero, the portrait and the credits gate
+- Commits: `b4a125ce` ("feat(questline): Acts VII to IX campaign progression, finale hand-off and credits gate (T16 part a, F-23)")
+- Checks:
+  - `npm run typecheck`: 0 errors
+  - `packages/questline/tests/charm-and-act789.test.ts`: 4 of 4 pass
+  - `npm run build && node scripts/test-credits-video.mjs`: 47 of 47 pass, 0 page errors
+  - `npm run build && node scripts/test-campaign.mjs` on 3D PC: 54 of 54 beats PASS, 0 console errors, 0 http errors, 0 HUD overlaps
+  - Build size: 15.15 MB (15,885 kB, cap 16 MB)
+- Features delivered:
+  - Installed Act VII (A7-01..A7-03), Act VIII (A8-01..A8-03), and Act IX (A9-01..A9-03) in `@hm/questline` with complete charm predicates.
+  - Merged campaign chain steps and evidence into `campaign-chain.ts` and `play.tsx` (drills running, machine kinds, vehicle kinds, sidearm, items, biosphereStage4).
+  - Added Dr. Gwen Haddy CRT portrait and diptych frosted glass hero in `goblin-front.tsx`.
+  - Gated title menu "Ending Credits" item and jukebox J credits replay behind `endingSeen` (POL-305, POL-306).
+  - Added "Play ending credits" under World in Esc debug menu (`dbg-play-credits`).
+  - Added Planet Table consensus commit, 12 s golden-hour window heal loop (`evaluateFinaleWindowHeal`), epilogue voice, and credits director transition in `play.tsx`.
+  - Added beats 29-37 in `test-campaign.mjs` validating all new progression milestones and credits gating.
+- Decisions left: None. Ready for T16 part b (play-scene.ts Window E domes, hologram mount, and POL-301/302).
 
 

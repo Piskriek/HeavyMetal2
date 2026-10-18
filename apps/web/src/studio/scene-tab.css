@@ -93,7 +93,7 @@
 
 .sx-scene-vec-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -103,6 +103,14 @@
   gap: 3px;
   font-size: 11px;
   color: var(--sx-dim, #6c8193);
+  min-width: 0;
+}
+
+.sx-scene-tab input,
+.sx-scene-tab select {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .sx-scene-socket-list {

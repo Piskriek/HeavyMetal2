@@ -5,7 +5,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { bakeLookTestCoverage, lookFrame, stageAssetLevel } from './look-tab';
+import { bakeLookTestCoverage, lookFrame, stageAssetLevel } from './look-tab-data';
 
 test('lookFrame returns ground, sky, and assetLevel across stages 0..6 and sun elevations', () => {
   const s1 = lookFrame(1, 25);

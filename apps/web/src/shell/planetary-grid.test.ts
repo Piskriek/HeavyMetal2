@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { encodePlot } from '../play/plot-code';
 import { newPlot, place } from '@hm/plotsim';
-import { checkPlotCode } from './planetary-grid';
+import { checkPlotCode } from './planetary-grid-data';
 
 test('checkPlotCode rejects empty, whitespace, and corrupt plot codes with clear reasons', () => {
   const empty = checkPlotCode('');

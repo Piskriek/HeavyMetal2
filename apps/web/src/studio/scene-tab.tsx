@@ -9,12 +9,11 @@
 // Pure helpers: serializeScene and parseScene, with round-trip and bad-input rejection.
 // ============================================================================
 
-import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import type * as THREE from 'three';
 import { ASSET_TWEAKS, GEN, loadGenRaw } from '../assets/gen';
 import { VEHICLE_FIT } from '../assets/gen-props';
 import { kv } from '../storage/profile-storage';
-import { round3 } from './studio-data';
 import type { Copy, StudioViewport, Transform } from './studio-viewport';
 import {
   normalizeSockets,
@@ -25,174 +24,28 @@ import {
   type SocketPlumeGizmoHandle,
 } from './socket-plume-gizmo';
 
-const STYLE_ID = 'hm-studio-scene-tab-styles';
-const STYLE_CSS = `
-.sx-scene-tab { display: flex; flex-direction: column; gap: 12px; padding: 12px; color: var(--sx-text, #d7e3ee); font: 400 13px/1.45 var(--sx-ui, Inter, system-ui, sans-serif); min-height: 0; overflow-y: auto; }
-.sx-scene-card { display: flex; flex-direction: column; gap: 8px; padding: 11px 12px; background: rgba(10, 15, 22, 0.76); border: 1px solid var(--sx-line, #1c2734); border-radius: 8px; }
-.sx-scene-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.sx-scene-head h3 { margin: 0; font: 600 12px/1 var(--sx-display, Oxanium, sans-serif); letter-spacing: 0.06em; text-transform: uppercase; color: var(--sx-text, #d7e3ee); }
-.sx-scene-row { display: flex; align-items: center; gap: 6px; }
-.sx-scene-row input[type='text'] { flex: 1; }
-.sx-scene-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; }
-.sx-scene-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border-radius: 6px; background: rgba(16, 23, 33, 0.72); border: 1px solid transparent; }
-.sx-scene-item.on { background: var(--sx-amber-soft, rgba(255, 197, 61, 0.14)); border-color: rgba(255, 197, 61, 0.5); }
-.sx-scene-item-btn { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: transparent !important; border: 0 !important; padding: 2px 4px !important; text-align: left; color: var(--sx-text, #d7e3ee); }
-.sx-scene-vec-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.sx-scene-vec-field { min-width: 0; }
-.sx-scene-tab input, .sx-scene-tab select { min-width: 0; width: 100%; box-sizing: border-box; }
-.sx-scene-vec-field { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--sx-dim, #6c8193); }
-.sx-scene-socket-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 11px; }
-.sx-scene-socket-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 7px; border-radius: 4px; background: rgba(5, 8, 12, 0.6); border: 1px solid rgba(44, 61, 81, 0.5); }
-.sx-scene-plume-chip { display: inline-flex; align-items: center; gap: 6px; font: 600 11px/1 var(--sx-display, Oxanium, monospace); }
-.sx-scene-plume-dot { width: 10px; height: 10px; border-radius: 2px; border: 1px solid rgba(255, 255, 255, 0.35); }
-.sx-scene-status { font-size: 11px; padding: 5px 8px; border-radius: 5px; background: rgba(95, 212, 255, 0.12); border: 1px solid rgba(95, 212, 255, 0.35); color: var(--sx-cyan, #5fd4ff); }
-.sx-scene-status.err { background: rgba(255, 122, 107, 0.14); border-color: rgba(255, 122, 107, 0.45); color: var(--sx-err, #ff7a6b); }
-`;
+import './scene-tab.css';
+import {
+  LAYOUTS_KEY,
+  STARTER_SCENES,
+  normalizeTransform,
+  parseScene,
+  serializeScene,
+  validateSceneDoc,
+  type SceneDoc,
+  type SceneItem,
+} from './scene-tab-data';
 
-function ensureSceneStyles(): void {
-  if (typeof document !== 'undefined' && !document.getElementById(STYLE_ID)) {
-    const el = document.createElement('style');
-    el.id = STYLE_ID;
-    el.textContent = STYLE_CSS;
-    document.head.appendChild(el);
-  }
-}
-
-export interface SceneItem {
-  readonly id: string;
-  readonly assetId: string;
-  readonly t: Transform;
-}
-
-export interface SceneDoc {
-  readonly name: string;
-  readonly items: readonly SceneItem[];
-}
-
-/** Saved layouts live in this browser (the Studio's own draft store). The dev write-back has no route for them yet. */
-const LAYOUTS_KEY = 'studio.scene-layouts';
-
-function normalizeTransform(raw: unknown, label: string): Transform {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    throw new Error(`${label}: transform "t" must be an object`);
-  }
-  const obj = raw as Record<string, unknown>;
-  const off = obj.offset;
-  if (
-    !Array.isArray(off) ||
-    off.length !== 3 ||
-    typeof off[0] !== 'number' ||
-    typeof off[1] !== 'number' ||
-    typeof off[2] !== 'number' ||
-    !Number.isFinite(off[0]) ||
-    !Number.isFinite(off[1]) ||
-    !Number.isFinite(off[2])
-  ) {
-    throw new Error(`${label}: transform offset must be a 3-number tuple [x, y, z]`);
-  }
-  const yaw = obj.yaw;
-  if (typeof yaw !== 'number' || !Number.isFinite(yaw)) {
-    throw new Error(`${label}: transform yaw must be a finite number`);
-  }
-  const scale = obj.scale;
-  if (typeof scale !== 'number' || !Number.isFinite(scale) || scale <= 0) {
-    throw new Error(`${label}: transform scale must be a positive finite number`);
-  }
-  return {
-    offset: [round3(off[0]), round3(off[1]), round3(off[2])],
-    yaw: round3(yaw),
-    scale: round3(scale),
-  };
-}
-
-function validateSceneDoc(input: unknown): SceneDoc {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    throw new Error('SceneDoc must be a JSON object');
-  }
-  const obj = input as Record<string, unknown>;
-  if (typeof obj.name !== 'string' || obj.name.trim().length === 0) {
-    throw new Error('SceneDoc "name" must be a non-empty string');
-  }
-  if (!Array.isArray(obj.items)) {
-    throw new Error('SceneDoc "items" must be an array');
-  }
-
-  const seenIds = new Set<string>();
-  const items: SceneItem[] = obj.items.map((raw, idx) => {
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-      throw new Error(`items[${idx}] must be an object`);
-    }
-    const r = raw as Record<string, unknown>;
-    if (typeof r.id !== 'string' || r.id.trim().length === 0) {
-      throw new Error(`items[${idx}].id must be a non-empty string`);
-    }
-    if (typeof r.assetId !== 'string' || r.assetId.trim().length === 0) {
-      throw new Error(`items[${idx}].assetId must be a non-empty string`);
-    }
-    const id = r.id.trim();
-    if (seenIds.has(id)) {
-      throw new Error(`Duplicate SceneItem id "${id}"`);
-    }
-    seenIds.add(id);
-    return {
-      id,
-      assetId: r.assetId.trim(),
-      t: normalizeTransform(r.t, `items[${idx}]`),
-    };
-  });
-
-  return {
-    name: obj.name.trim(),
-    items,
-  };
-}
-
-/**
- * Pure helper (TICKET-08b Item B):
- * Validates and serializes a `SceneDoc` to canonical 2-space indented JSON with a trailing newline.
- */
-export function serializeScene(doc: SceneDoc): string {
-  const clean = validateSceneDoc(doc);
-  return `${JSON.stringify(clean, null, 2)}\n`;
-}
-
-/**
- * Pure helper (TICKET-08b Item B):
- * Parses and validates a `SceneDoc` from a JSON string (or raw object).
- * Throws an `Error` if the input is malformed or fails schema validation.
- */
-export function parseScene(input: string | unknown): SceneDoc {
-  let parsed: unknown = input;
-  if (typeof input === 'string') {
-    if (input.trim().length === 0) {
-      throw new Error('Empty scene JSON string');
-    }
-    try {
-      parsed = JSON.parse(input);
-    } catch (err) {
-      throw new Error(`Invalid scene JSON: ${(err as Error).message}`);
-    }
-  }
-  return validateSceneDoc(parsed);
-}
-
-const STARTER_SCENES: readonly SceneDoc[] = [
-  {
-    name: 'Outpost Production Pad',
-    items: [
-      { id: 'mill-1', assetId: 'mill', t: { offset: [-3.5, 0, 0], yaw: 0, scale: 1 } },
-      { id: 'press-1', assetId: 'press-frame', t: { offset: [3.5, 0, 0], yaw: 90, scale: 1 } },
-      { id: 'water-1', assetId: 'watermaker', t: { offset: [0, 0, -5.5], yaw: 0, scale: 1 } },
-    ],
-  },
-  {
-    name: 'Rover Bay Inspection',
-    items: [
-      { id: 'scout-1', assetId: 'scout-body', t: { offset: [-2.5, 0, 0], yaw: 20, scale: 1 } },
-      { id: 'hauler-1', assetId: 'hauler-body', t: { offset: [2.8, 0, 0], yaw: -15, scale: 1 } },
-    ],
-  },
-];
+export {
+  LAYOUTS_KEY,
+  STARTER_SCENES,
+  normalizeTransform,
+  parseScene,
+  serializeScene,
+  validateSceneDoc,
+  type SceneDoc,
+  type SceneItem,
+};
 
 /**
  * Sockets for the rover bodies, from the game's own fit table (gen-props). The packed registry carries no sockets, so
@@ -239,12 +92,20 @@ function writeLayouts(list: readonly SceneDoc[]): void {
   }
 }
 
+export interface SceneUndoHooks {
+  readonly undo: () => void;
+  readonly redo: () => void;
+  readonly canUndo: boolean;
+  readonly canRedo: boolean;
+}
+
 export interface SceneTabProps {
   readonly viewport?: StudioViewport | null;
   readonly registry?: Readonly<Record<string, RegistryEntry>>;
   readonly writable?: boolean | null;
   readonly socketsGizmoOn?: boolean;
   readonly onToggleSocketsGizmo?: (on: boolean) => void;
+  readonly onUndoRef?: (hooks: SceneUndoHooks) => void;
 }
 
 export function SceneTab({
@@ -253,8 +114,8 @@ export function SceneTab({
   writable = false,
   socketsGizmoOn,
   onToggleSocketsGizmo,
+  onUndoRef,
 }: SceneTabProps): ReactElement {
-  ensureSceneStyles();
 
   const [layouts, setLayouts] = useState<SceneDoc[]>(readLayouts);
   const [scene, setScene] = useState<SceneDoc>(() => STARTER_SCENES[0]!);
@@ -264,6 +125,81 @@ export function SceneTab({
   const [gizmoTally, setGizmoTally] = useState<{ readonly markers: number; readonly plumes: number }>({ markers: 0, plumes: 0 });
   const [importText, setImportText] = useState<string>('');
   const [status, setStatus] = useState<{ readonly tone: 'ok' | 'err'; readonly text: string } | null>(null);
+
+  const [undoStack, setUndoStack] = useState<SceneDoc[]>([]);
+  const [redoStack, setRedoStack] = useState<SceneDoc[]>([]);
+  const dragStartSceneRef = useRef<SceneDoc | null>(null);
+  const sceneRef = useRef<SceneDoc>(scene);
+  sceneRef.current = scene;
+
+  const pushUndo = useCallback((prev: SceneDoc): void => {
+    setUndoStack((u) => [...u, prev]);
+    setRedoStack([]);
+  }, []);
+
+  const undo = useCallback((): void => {
+    setUndoStack((u) => {
+      if (u.length === 0) return u;
+      const prev = u[u.length - 1]!;
+      const nextU = u.slice(0, -1);
+      setRedoStack((r) => [...r, sceneRef.current]);
+      setScene(prev);
+      return nextU;
+    });
+  }, []);
+
+  const redo = useCallback((): void => {
+    setRedoStack((r) => {
+      if (r.length === 0) return r;
+      const next = r[r.length - 1]!;
+      const nextR = r.slice(0, -1);
+      setUndoStack((u) => [...u, sceneRef.current]);
+      setScene(next);
+      return nextR;
+    });
+  }, []);
+
+  useEffect(() => {
+    onUndoRef?.({
+      undo,
+      redo,
+      canUndo: undoStack.length > 0,
+      canRedo: redoStack.length > 0,
+    });
+  }, [undo, redo, undoStack.length, redoStack.length, onUndoRef]);
+
+  // Load project scene layouts when dev write-back is enabled
+  useEffect(() => {
+    if (!writable) return undefined;
+    let cancelled = false;
+    fetch('/__studio/data/scene-layouts')
+      .then(async (res) => {
+        if (!res.ok) return;
+        const data: unknown = await res.json();
+        if (cancelled) return;
+        if (data && typeof data === 'object') {
+          const rawList = Array.isArray(data) ? data : Object.values(data);
+          const parsed: SceneDoc[] = [];
+          for (const item of rawList) {
+            try {
+              parsed.push(parseScene(item));
+            } catch {
+              // ignore malformed entries
+            }
+          }
+          if (parsed.length > 0) {
+            setLayouts(parsed);
+            writeLayouts(parsed);
+          }
+        }
+      })
+      .catch(() => {
+        // dev write route not present or blocked
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [writable]);
 
   const showGizmo = socketsGizmoOn ?? localGizmoOn;
   const toggleGizmo = (next: boolean): void => {
@@ -383,21 +319,38 @@ export function SceneTab({
     }));
   };
 
+  const updateItemTransformWithUndo = (id: string, patch: Partial<Transform>): void => {
+    pushUndo(sceneRef.current);
+    updateItemTransform(id, patch);
+  };
+
   // The viewport's gizmo drags the selected item, as the Assets workspace drags its asset.
   useEffect(() => {
     if (!viewport) return undefined;
     viewport.setHooks({
-      onDragStart: () => undefined,
+      onDragStart: () => {
+        dragStartSceneRef.current = sceneRef.current;
+      },
       onDrag: (next) => {
         if (selectedId) updateItemTransform(selectedId, next);
       },
-      onDragEnd: () => undefined,
+      onDragEnd: () => {
+        if (dragStartSceneRef.current) {
+          const before = JSON.stringify(dragStartSceneRef.current);
+          const after = JSON.stringify(sceneRef.current);
+          if (before !== after) {
+            pushUndo(dragStartSceneRef.current);
+          }
+          dragStartSceneRef.current = null;
+        }
+      },
     });
     return undefined;
-  }, [viewport, selectedId]);
+  }, [viewport, selectedId, pushUndo]);
 
   const addItem = (): void => {
     if (!assetToAdd) return;
+    pushUndo(sceneRef.current);
     const prefix = assetToAdd.split('-')[0] ?? 'item';
     let n = scene.items.length + 1;
     let nextId = `${prefix}-${n}`;
@@ -416,6 +369,7 @@ export function SceneTab({
   };
 
   const removeItem = (id: string): void => {
+    pushUndo(sceneRef.current);
     setScene((prev) => {
       const nextItems = prev.items.filter((i) => i.id !== id);
       if (selectedId === id) {
@@ -425,19 +379,43 @@ export function SceneTab({
     });
   };
 
-  // The dev write-back accepts only asset-tweaks.json, so a layout is kept in this browser. Copy JSON takes it to the project.
-  const saveLayout = (): void => {
+  // POL-88: writes to dev route /__studio/data/scene-layouts when writable, otherwise local storage fallback
+  const saveLayout = async (): Promise<void> => {
     try {
       const clean = parseScene(serializeScene(scene));
       const idx = layouts.findIndex((l) => l.name === clean.name);
       const next = idx >= 0 ? layouts.map((l, i) => (i === idx ? clean : l)) : [...layouts, clean];
       setLayouts(next);
       writeLayouts(next);
+
+      if (writable) {
+        try {
+          const res = await fetch('/__studio/data/scene-layouts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(next),
+          });
+          if (!res.ok) {
+            const errData = (await res.json().catch(() => ({}))) as { why?: string };
+            throw new Error(errData.why ?? `Server error ${res.status}`);
+          }
+          setStatus({
+            tone: 'ok',
+            text: `Saved "${clean.name}" to project file (scene-layouts.json).`,
+          });
+          return;
+        } catch (postErr) {
+          setStatus({
+            tone: 'err',
+            text: `Saved "${clean.name}" in this browser (server write failed: ${(postErr as Error).message}). Copy JSON keeps it.`,
+          });
+          return;
+        }
+      }
+
       setStatus({
         tone: 'ok',
-        text: writable
-          ? `Saved "${clean.name}" in this browser. Scene files have no project route yet: Copy JSON keeps it.`
-          : `Saved "${clean.name}" in this browser. Copy JSON keeps it.`,
+        text: `Saved "${clean.name}" in this browser. Copy JSON keeps it.`,
       });
     } catch (err) {
       setStatus({ tone: 'err', text: (err as Error).message });
@@ -660,7 +638,7 @@ export function SceneTab({
                       activeItem.t.offset[2],
                     ];
                     next[i] = Number(e.target.value) || 0;
-                    updateItemTransform(activeItem.id, { offset: next });
+                    updateItemTransformWithUndo(activeItem.id, { offset: next });
                   }}
                 />
               </label>
@@ -673,7 +651,7 @@ export function SceneTab({
                 type="number"
                 step={15}
                 value={activeItem.t.yaw}
-                onChange={(e) => updateItemTransform(activeItem.id, { yaw: Number(e.target.value) || 0 })}
+                onChange={(e) => updateItemTransformWithUndo(activeItem.id, { yaw: Number(e.target.value) || 0 })}
               />
             </label>
             <label className="sx-scene-vec-field">
@@ -685,7 +663,7 @@ export function SceneTab({
                 max={5}
                 value={activeItem.t.scale}
                 onChange={(e) =>
-                  updateItemTransform(activeItem.id, {
+                  updateItemTransformWithUndo(activeItem.id, {
                     scale: Math.max(0.05, Number(e.target.value) || 1),
                   })
                 }

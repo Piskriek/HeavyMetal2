@@ -12,6 +12,7 @@
 import { createElement, useEffect, useState, type ReactElement } from 'react';
 import * as THREE from 'three';
 import { loadGenRaw } from '../assets/gen';
+import { enqueueOffscreenRender, getSharedOffscreenRenderer } from './offscreen-renderer';
 
 export type Vec3Tuple = readonly [number, number, number] & {
   readonly x: number;
@@ -151,31 +152,7 @@ export function anglePoses(bbox: BBoxInput, fovDeg = 30): FourAnglePoses {
 
 const cache = new Map<string, FourAngleShots>();
 const pending = new Map<string, Promise<FourAngleShots>>();
-let chain: Promise<unknown> = Promise.resolve();
-let renderer: THREE.WebGLRenderer | null = null;
-let scene: THREE.Scene | null = null;
-let camera: THREE.PerspectiveCamera | null = null;
 const listeners = new Set<(assetId?: string) => void>();
-
-function ensureOffscreen(size: number): {
-  renderer: THREE.WebGLRenderer;
-  scene: THREE.Scene;
-  camera: THREE.PerspectiveCamera;
-} {
-  if (!renderer || !scene || !camera) {
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' });
-    renderer.setPixelRatio(1);
-    renderer.setClearColor(0x000000, 0);
-    scene = new THREE.Scene();
-    scene.add(new THREE.HemisphereLight(0xd6ecff, 0x18120a, 1.4));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.6);
-    sun.position.set(3, 6, 4);
-    scene.add(sun);
-    camera = new THREE.PerspectiveCamera(30, 1, 0.01, 200);
-  }
-  renderer.setSize(size, size, false);
-  return { renderer, scene, camera };
-}
 
 /** Clears cached 4-angle shots for one asset (or all assets) after a redo and notifies mounted FourAnglePanels. */
 export function forgetFourAngle(assetId?: string): void {
@@ -198,7 +175,7 @@ async function drawFourAngles(assetId: string, size: number): Promise<FourAngleS
   if (typeof document === 'undefined') return empty;
   try {
     const raw = await loadGenRaw(assetId, 'low');
-    const { renderer: r, scene: s, camera: c } = ensureOffscreen(size);
+    const { renderer: r, scene: s, camera: c } = getSharedOffscreenRenderer(size);
     const model = raw.clone(true);
     s.add(model);
     try {
@@ -238,8 +215,7 @@ export function fourAngleShots(assetId: string, size = 256): Promise<FourAngleSh
   const running = pending.get(key);
   if (running) return running;
 
-  const p: Promise<FourAngleShots> = chain.then(() => drawFourAngles(assetId, size));
-  chain = p.catch(() => undefined);
+  const p: Promise<FourAngleShots> = enqueueOffscreenRender(() => drawFourAngles(assetId, size));
   pending.set(key, p);
   void p.then((shots) => {
     if (shots.front) cache.set(key, shots);

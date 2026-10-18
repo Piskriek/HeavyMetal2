@@ -17,182 +17,31 @@ import {
   makeGroundTextures,
   setCoverage,
   setStage as setGroundStage,
-  stageLook,
-  type GroundStage,
 } from '@hm/groundshader';
-import { bakePlotBiome, type BiomeBake } from '@hm/plotbiome';
-import { density as skyDensityOf, skyUniforms } from '@hm/sky';
 import { ASSET_TWEAKS, applyAssetTweak, GEN, loadGenRaw, type GenLevel } from '../assets/gen';
 
-const STYLE_ID = 'hm-studio-look-tab-styles';
-const STYLE_CSS = `
-.sx-look { flex: 1; min-height: 0; display: grid; grid-template-columns: 340px minmax(0, 1fr); background: var(--sx-bg, #05080c); color: var(--sx-text, #d7e3ee); font: 400 13px/1.45 var(--sx-ui, Inter, system-ui, sans-serif); overflow: hidden; }
-.sx-look-sidebar { display: flex; flex-direction: column; gap: 14px; padding: 14px; background: var(--sx-panel, rgba(12, 17, 24, 0.86)); border-right: 1px solid var(--sx-line, #1c2734); overflow-y: auto; min-height: 0; }
-.sx-look-section { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: rgba(10, 15, 22, 0.72); border: 1px solid var(--sx-line, #1c2734); border-radius: 8px; }
-.sx-look-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.sx-look-head h3 { margin: 0; font: 600 12px/1 var(--sx-display, Oxanium, sans-serif); letter-spacing: 0.06em; text-transform: uppercase; color: var(--sx-text, #d7e3ee); }
-.sx-look-badge { font: 600 11px/1 var(--sx-display, Oxanium, monospace); color: var(--sx-amber, #ffc53d); padding: 3px 7px; border-radius: 4px; background: var(--sx-amber-soft, rgba(255, 197, 61, 0.14)); border: 1px solid rgba(255, 197, 61, 0.4); font-variant-numeric: tabular-nums; }
-.sx-look-badge.cyan { color: var(--sx-cyan, #5fd4ff); background: rgba(95, 212, 255, 0.12); border-color: rgba(95, 212, 255, 0.4); }
-.sx-look-stage-pills { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-.sx-look-stage-pills button { padding: 5px 0; font: 600 11px/1 var(--sx-display, Oxanium, sans-serif); text-align: center; }
-.sx-look-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
-.sx-look-readout-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; font-size: 11px; margin-top: 4px; }
-.sx-look-kv { display: flex; justify-content: space-between; gap: 6px; padding: 4px 6px; background: rgba(5, 8, 12, 0.55); border-radius: 4px; border: 1px solid rgba(44, 61, 81, 0.45); }
-.sx-look-kv span { color: var(--sx-dim, #6c8193); }
-.sx-look-kv b { font: 600 11px/1.2 var(--sx-display, Oxanium, monospace); color: var(--sx-text, #d7e3ee); font-variant-numeric: tabular-nums; }
-.sx-look-swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 4px; }
-.sx-look-swatch { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10px; color: var(--sx-dim, #6c8193); }
-.sx-look-swatch-chip { width: 100%; height: 20px; border-radius: 4px; border: 1px solid var(--sx-line-hi, #2c3d51); }
-.sx-look-stage-wrap { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #060a10; overflow: hidden; }
-.sx-look-canvas-host { position: relative; flex: 1; min-height: 0; overflow: hidden; }
-.sx-look-canvas-host canvas { display: block; width: 100%; height: 100%; }
-.sx-look-ab-divider { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--sx-amber, #ffc53d); box-shadow: 0 0 12px rgba(255, 197, 61, 0.75); pointer-events: none; z-index: 4; }
-.sx-look-ab-pill { position: absolute; top: 12px; padding: 5px 10px; border-radius: 6px; background: rgba(8, 12, 18, 0.85); border: 1px solid var(--sx-line-hi, #2c3d51); font: 600 11px/1.2 var(--sx-display, Oxanium, sans-serif); color: var(--sx-text, #d7e3ee); pointer-events: none; z-index: 5; }
-.sx-look-ab-pill.left { left: 12px; border-color: rgba(255, 197, 61, 0.5); color: var(--sx-amber, #ffc53d); }
-.sx-look-ab-pill.right { right: 12px; border-color: rgba(95, 212, 255, 0.5); color: var(--sx-cyan, #5fd4ff); }
-`;
+import './look-tab.css';
+import {
+  LookFrame,
+  clamp,
+  stageAssetLevel,
+  lookFrame,
+  bakeLookTestCoverage,
+  PATCH_CELLS,
+  PATCH_CELL_M,
+  PATCH_SPAN,
+} from './look-tab-data';
 
-function ensureLookStyles(): void {
-  if (typeof document !== 'undefined' && !document.getElementById(STYLE_ID)) {
-    const el = document.createElement('style');
-    el.id = STYLE_ID;
-    el.textContent = STYLE_CSS;
-    document.head.appendChild(el);
-  }
-}
-
-export interface LookFrame {
-  readonly stage: number;
-  readonly sunElevDeg: number;
-  readonly sunDir: readonly [number, number, number];
-  readonly ground: GroundStage & {
-    readonly uStage: number;
-    readonly coverOn: number;
-  };
-  readonly sky: {
-    readonly zenith: readonly [number, number, number];
-    readonly horizon: readonly [number, number, number];
-    readonly sunGlow: readonly [number, number, number];
-    readonly sunColour: readonly [number, number, number];
-    readonly density: number;
-  };
-  readonly assetLevel: GenLevel;
-  /** Alias for assetLevel. */
-  readonly level: GenLevel;
-}
-
-const clamp = (n: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, n));
-
-/** Maps a planetary fidelity stage (`0..6`) to the packed asset LOD (`low`, `mid`, `high`). */
-export function stageAssetLevel(stage: number): GenLevel {
-  const s = clamp(Number.isFinite(stage) ? stage : 0, 0, 6);
-  if (s < 2) return 'low';
-  if (s < 4) return 'mid';
-  return 'high';
-}
-
-/**
- * Pure helper (TICKET-08b Item A):
- * Returns the uniform values for the ground (`stageLook`), the sky (`skyUniforms` + `density`),
- * the unit sun direction vector, and the asset level (`low` | `mid` | `high`) for a given
- * planetary stage (`0..6`) and sun elevation angle in degrees (`-90..90`).
- */
-export function lookFrame(stage: number, sunElevDeg: number, sunAzimuthDeg = 35): LookFrame {
-  const clampedStage = clamp(Number.isFinite(stage) ? stage : 0, 0, 6);
-  const clampedElev = clamp(Number.isFinite(sunElevDeg) ? sunElevDeg : 32, -90, 90);
-  const elevRad = (clampedElev * Math.PI) / 180;
-  const azRad = ((Number.isFinite(sunAzimuthDeg) ? sunAzimuthDeg : 35) * Math.PI) / 180;
-
-  const cosE = Math.cos(elevRad);
-  const sinE = Math.sin(elevRad);
-  const sunDir: readonly [number, number, number] = [
-    cosE * Math.cos(azRad),
-    sinE,
-    cosE * Math.sin(azRad),
-  ];
-
-  const g = stageLook(clampedStage);
-  const s = skyUniforms(sunDir, clampedStage);
-  const dens = skyDensityOf(clampedStage);
-  const assetLevel = stageAssetLevel(clampedStage);
-
-  return {
-    stage: clampedStage,
-    sunElevDeg: clampedElev,
-    sunDir,
-    ground: {
-      ...g,
-      uStage: Math.max(1, Math.min(6, clampedStage)),
-      coverOn: clampedStage >= 2 ? 1 : 0,
-    },
-    sky: {
-      zenith: s.zenith,
-      horizon: s.horizon,
-      sunGlow: s.sunGlow,
-      sunColour: s.sunColour,
-      density: dens,
-    },
-    assetLevel,
-    level: assetLevel,
-  };
-}
-
-const PATCH_CELLS = 32;
-const PATCH_CELL_M = 1.25;
-const PATCH_SPAN = PATCH_CELLS * PATCH_CELL_M;
-
-/** Bakes a deterministic `@hm/plotbiome` coverage mask for the Studio Look test plot. */
-export function bakeLookTestCoverage(stage: number, seed = 42): {
-  readonly bake: BiomeBake;
-  readonly height: Float32Array;
-  readonly water: Uint8Array;
-  readonly n: number;
-  readonly cellM: number;
-  readonly x0: number;
-  readonly z0: number;
-  readonly span: number;
-} {
-  const n = PATCH_CELLS;
-  const cellM = PATCH_CELL_M;
-  const span = PATCH_SPAN;
-  const x0 = -span / 2;
-  const z0 = -span / 2;
-  const height = new Float32Array(n * n);
-  const water = new Uint8Array(n * n);
-  const clampedStage = clamp(stage, 0, 6);
-
-  for (let j = 0; j < n; j++) {
-    const z = z0 + (j + 0.5) * cellM;
-    for (let i = 0; i < n; i++) {
-      const x = x0 + (i + 0.5) * cellM;
-      const r = Math.hypot(x, z);
-      const apron = Math.min(1, Math.max(0, (r - 3.5) / 8));
-      const h = apron * (0.45 * Math.sin(x * 0.19) * Math.cos(z * 0.17) + 0.25 * Math.cos((x + z) * 0.14));
-      height[j * n + i] = h;
-      // Small pond near (6.5, -5.5) in centered coords
-      if (Math.hypot(x - 6.5, z + 5.5) <= 4.2) {
-        water[j * n + i] = 255;
-      }
-    }
-  }
-
-  const tier = clampedStage >= 4 ? "high" : clampedStage >= 2 ? "mid" : "low";
-  const sMetric = clamp(clampedStage / 6, 0, 1);
-  const bake = bakePlotBiome({
-    n,
-    cellM,
-    height,
-    water,
-    stage: clampedStage,
-    s: { pxd: sMetric, vtx: sMetric, lx: sMetric, aq: sMetric },
-    machines: [{ x: span / 2, z: span / 2, r: 2.8 }],
-    keepouts: [],
-    seed,
-    tier,
-  });
-
-  return { bake, height, water, n, cellM, x0, z0, span };
-}
+export {
+  type LookFrame,
+  clamp,
+  stageAssetLevel,
+  lookFrame,
+  bakeLookTestCoverage,
+  PATCH_CELLS,
+  PATCH_CELL_M,
+  PATCH_SPAN,
+};
 
 function linearRgbToHex(rgb: readonly [number, number, number]): string {
   const toByte = (v: number): number => {
@@ -211,7 +60,6 @@ export interface LookTabProps {
 }
 
 export function LookTab({ assetId }: LookTabProps): ReactElement {
-  ensureLookStyles();
   const [stageA, setStageA] = useState<number>(3);
   const [stageB, setStageB] = useState<number>(5);
   const [sunElevDeg, setSunElevDeg] = useState<number>(28);

@@ -5,7 +5,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseScene, serializeScene, type SceneDoc } from './scene-tab';
+import { parseScene, serializeScene, type SceneDoc } from './scene-tab-data';
 
 test('serializeScene and parseScene round-trip a valid SceneDoc with normalized transforms', () => {
   const doc: SceneDoc = {

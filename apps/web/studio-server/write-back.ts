@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { checkTweaks, FIELDS, isNeutral } from './tweak-schema';
+import { checkSceneLayouts } from './scene-layout-schema';
 
 export const ROUTE = '/__studio/data/';
 export const MAX_BODY = 2 * 1024 * 1024;
@@ -20,8 +21,9 @@ export const MAX_BODY = 2 * 1024 * 1024;
 export const NAME = /^[a-z0-9-]+$/;
 
 /** The writable files. Adding one here is the only way to make a new name writable. */
-export const ALLOWED: Readonly<Record<string, { readonly file: string; readonly kind: 'tweaks' }>> = {
+export const ALLOWED: Readonly<Record<string, { readonly file: string; readonly kind: 'tweaks' | 'layouts' }>> = {
   'asset-tweaks': { file: 'asset-tweaks.json', kind: 'tweaks' },
+  'scene-layouts': { file: 'scene-layouts.json', kind: 'layouts' },
 };
 
 export interface StudioPaths {
@@ -97,23 +99,39 @@ export async function handleStudioRequest(req: Request, paths: StudioPaths): Pro
   } catch {
     return json(422, { ok: false, why: 'the body is not valid JSON' });
   }
-  const check = checkTweaks(data, registryIds(paths.registryFile));
-  if (!check.ok) return json(422, { ok: false, why: check.why });
+  const ids = registryIds(paths.registryFile);
+  if (entry.kind === 'tweaks') {
+    const check = checkTweaks(data, ids);
+    if (!check.ok) return json(422, { ok: false, why: check.why });
 
-  // canonical form: sorted asset ids, no empty entries, two-space indent, one trailing newline
-  const out: Record<string, unknown> = {};
-  for (const id of Object.keys(check.value).sort()) {
-    const fields = (check.value[id] ?? {}) as Record<string, unknown>;
-    const kept: Record<string, unknown> = {};
-    for (const f of FIELDS) {
-      const v = fields[f.key];
-      if (v !== undefined && !isNeutral(f, v)) kept[f.key] = v;
+    // canonical form: sorted asset ids, no empty entries, two-space indent, one trailing newline
+    const out: Record<string, unknown> = {};
+    for (const id of Object.keys(check.value).sort()) {
+      const fields = (check.value[id] ?? {}) as Record<string, unknown>;
+      const kept: Record<string, unknown> = {};
+      for (const f of FIELDS) {
+        const v = fields[f.key];
+        if (v !== undefined && !isNeutral(f, v)) kept[f.key] = v;
+      }
+      if (Object.keys(kept).length > 0) out[id] = kept;
     }
-    if (Object.keys(kept).length > 0) out[id] = kept;
+    const body = `${JSON.stringify(out, null, 2)}\n`;
+    const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(tmp, body, 'utf8');
+    fs.renameSync(tmp, file);
+    return json(200, { ok: true, file: entry.file, assets: Object.keys(out).length });
   }
-  const body = `${JSON.stringify(out, null, 2)}\n`;
-  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(tmp, body, 'utf8');
-  fs.renameSync(tmp, file);
-  return json(200, { ok: true, file: entry.file, assets: Object.keys(out).length });
+
+  if (entry.kind === 'layouts') {
+    const check = checkSceneLayouts(data, ids);
+    if (!check.ok) return json(422, { ok: false, why: check.why });
+
+    const body = `${JSON.stringify(check.value, null, 2)}\n`;
+    const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(tmp, body, 'utf8');
+    fs.renameSync(tmp, file);
+    return json(200, { ok: true, file: entry.file, layouts: Object.keys(check.value).length });
+  }
+
+  return json(400, { ok: false, why: 'unsupported write kind' });
 }

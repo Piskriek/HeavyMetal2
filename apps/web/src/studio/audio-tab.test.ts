@@ -13,7 +13,7 @@ import {
   dbToLinear,
   normalizeAudioLevels,
   type AudioLevels,
-} from './audio-tab';
+} from './audio-tab-data';
 
 const candidatePaths = [
   path.resolve(process.cwd(), 'apps/web/public/audio/levels.json'),

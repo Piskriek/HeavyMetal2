@@ -460,3 +460,98 @@
   box-shadow: none;
   border-color: rgba(255, 255, 255, 0.14);
 }
+
+/* the shared-outpost card (plan 36, Phase 1): the same dark glass and type as the 08a cards above */
+.pg-coop { border-color: rgba(61, 200, 255, 0.24); }
+.pg-coop-code {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(4, 7, 13, 0.85);
+  border: 1px solid rgba(61, 200, 255, 0.4);
+  border-radius: 6px;
+}
+.pg-coop-code code {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: #e0f7ff;
+}
+.pg-coop-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.pg-coop-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+.pg-coop-state::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #64748b;
+}
+.pg-coop-state[data-state='connected']::before { background: #7cff4d; box-shadow: 0 0 8px #7cff4d; }
+.pg-coop-state[data-state='reconnecting']::before,
+.pg-coop-state[data-state='connecting']::before { background: #ffc13d; }
+.pg-coop-state[data-state='error']::before,
+.pg-coop-state[data-state='disconnected']::before { background: #fb7185; }
+.pg-roster {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pg-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(6, 10, 18, 0.7);
+  font-size: 11px;
+}
+.pg-chip-name { color: #f4f8ff; font-weight: 600; }
+.pg-chip-role { color: #94a3b8; }
+.pg-chip.role-owner { border-color: rgba(255, 193, 61, 0.45); }
+.pg-chip.role-owner .pg-chip-role { color: #ffc13d; }
+.pg-chip.role-cobuilder { border-color: rgba(61, 200, 255, 0.4); }
+.pg-chip.role-cobuilder .pg-chip-role { color: #3dc8ff; }
+.pg-chip.is-self { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22); }
+.pg-plain-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #94a3b8;
+}
+.pg-validation.is-note {
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #cbd5e1;
+}
+.pg-action-btn:focus-visible,
+.pg-sync-btn:focus-visible,
+.pg-mini-btn:focus-visible,
+.pg-back-btn:focus-visible {
+  outline: 2px solid #3dc8ff;
+  outline-offset: 2px;
+}
+.pg-action-btn.secondary:disabled,
+.pg-action-btn.primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+

@@ -5,30 +5,11 @@
  */
 import * as THREE from 'three';
 import { loadGenRaw } from '../assets/gen';
+import { enqueueOffscreenRender, getSharedOffscreenRenderer } from './offscreen-renderer';
 
 const SIZE = 96;
 const done = new Map<string, string>();
 const pending = new Map<string, Promise<string | null>>();
-let chain: Promise<unknown> = Promise.resolve();
-let renderer: THREE.WebGLRenderer | null = null;
-let scene: THREE.Scene | null = null;
-let camera: THREE.PerspectiveCamera | null = null;
-
-function ensure(): { renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera } {
-  if (!renderer || !scene || !camera) {
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' });
-    renderer.setPixelRatio(1);
-    renderer.setSize(SIZE, SIZE, false);
-    renderer.setClearColor(0x000000, 0);
-    scene = new THREE.Scene();
-    scene.add(new THREE.HemisphereLight(0xd6ecff, 0x18120a, 1.4));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.6);
-    sun.position.set(3, 6, 4);
-    scene.add(sun);
-    camera = new THREE.PerspectiveCamera(30, 1, 0.01, 200);
-  }
-  return { renderer, scene, camera };
-}
 
 /** One thumbnail as a data URL, or null for an asset that cannot be drawn. Cached after the first render. */
 export function thumbOf(id: string): Promise<string | null> {
@@ -36,8 +17,7 @@ export function thumbOf(id: string): Promise<string | null> {
   if (hit) return Promise.resolve(hit);
   const running = pending.get(id);
   if (running) return running;
-  const p: Promise<string | null> = chain.then(() => draw(id)).catch(() => null);
-  chain = p;
+  const p = enqueueOffscreenRender(() => draw(id)).catch(() => null);
   pending.set(id, p);
   void p.then((url) => { if (url) done.set(id, url); pending.delete(id); });
   return p;
@@ -51,7 +31,7 @@ export function forgetThumb(id: string): void {
 
 async function draw(id: string): Promise<string | null> {
   const raw = await loadGenRaw(id, 'low');
-  const { renderer: r, scene: s, camera: c } = ensure();
+  const { renderer: r, scene: s, camera: c } = getSharedOffscreenRenderer(SIZE);
   const model = raw.clone(true);
   s.add(model);
   try {

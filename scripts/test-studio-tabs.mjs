@@ -90,8 +90,9 @@ let exitCode = 0;
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await context.newPage();
-  page.setDefaultTimeout(T(60000));
-  page.on('pageerror', (err) => pageErrors.push(err.message.slice(0, 200)));
+  page.on('pageerror', (err) => {
+    if (!err.message.includes('Simulated workspace crash')) pageErrors.push(err.message.slice(0, 200));
+  });
   const consoleErrors = [];
   page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text().slice(0, 200)); });
   // a rejected promise in the Studio is not an uncaught error, so it is recorded here as well
@@ -222,6 +223,17 @@ try {
     await page.waitForFunction(() => document.querySelectorAll('.sx-scene-view .sx-world-tag:not(.sx-world-figure)').length === 2, null, { timeout: T(120000) });
     fs.writeFileSync(path.join(shots, 'scene-layout-restored.png'), await page.locator('[data-testid="studio-scene-tab"]').locator('xpath=ancestor::aside').screenshot());
 
+    // Undo restores a moved copy (POL-90)
+    await page.locator('ul[aria-label="Placed scene items"] li button.sx-scene-item-btn', { hasText: 'mill-1' }).click();
+    const xInput = page.locator('label.sx-scene-vec-field', { hasText: 'Offset X' }).locator('input');
+    const origX = await xInput.inputValue();
+    await xInput.fill('4.75');
+    await xInput.dispatchEvent('change');
+    check('Scene: transform input changed offset X', (await xInput.inputValue()) === '4.75');
+    await page.locator('.sx-top button[aria-label="Undo"]').click();
+    await page.waitForTimeout(T(300));
+    check('Scene: undo restores a moved copy back to original offset', (await xInput.inputValue()) === origX, { origX, restored: await xInput.inputValue() });
+
     // Copy JSON and Load JSON use the same format; a bad paste is refused with the reason
     await page.locator('button', { hasText: /^Copy JSON$/ }).click();
     await page.waitForFunction(() => /Copied 2 scene items/.test(document.querySelector('[role="status"].sx-scene-status')?.textContent ?? ''), null, { timeout: T(20000) });
@@ -235,6 +247,57 @@ try {
     await page.locator('button', { hasText: /^Load JSON$/ }).click();
     const bad = await page.locator('[role="status"].sx-scene-status').innerText();
     check('Scene: a bad paste is refused with the reason', bad.includes('Invalid scene JSON'), bad.slice(0, 60));
+
+    // Dev write-back: Save writes project file in dev (POL-88)
+    let postedLayouts = null;
+    await page.route('**/__studio/data/scene-layouts', async (route) => {
+      if (route.request().method() === 'POST') {
+        try {
+          postedLayouts = JSON.parse(route.request().postData() || '[]');
+        } catch {
+          postedLayouts = null;
+        }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, file: 'scene-layouts.json', layouts: 1 }) });
+      } else {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+      }
+    });
+    await page.route('**/__studio/data/asset-tweaks', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+    });
+    await page.addInitScript(() => { window.__STUDIO_DEV_WRITABLE = true; });
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: T(180000) });
+    await page.waitForSelector('.sx', { timeout: T(120000) });
+    await tab('Scene').click();
+    await page.waitForSelector('[data-testid="studio-scene-tab"]');
+    await page.locator('input[aria-label="Scene layout name"]').fill('Dev Outpost');
+    await page.locator('.sx-scene-card button.sx-go').click();
+    await page.waitForFunction(() => /Saved "Dev Outpost" to project file/.test(document.querySelector('[role="status"].sx-scene-status')?.textContent ?? ''), null, { timeout: T(20000) });
+    const savedDev = await page.locator('[role="status"].sx-scene-status').innerText();
+    check('Scene: Save writes project file in dev', savedDev.includes('Saved "Dev Outpost" to project file (scene-layouts.json)'), savedDev);
+    check('Scene: dev write-back sent layout to server', postedLayouts !== null && Array.isArray(postedLayouts) && postedLayouts.some((l) => l.name === 'Dev Outpost'), postedLayouts?.map((l) => l.name));
+  });
+
+  // ---- Studio ErrorBoundary: a thrown workspace leaves others usable (POL-91) ----
+  await section('Error boundary', async () => {
+    // 1. Crash Look workspace from Scene and verify ErrorBoundary displays fallback
+    await page.evaluate(() => { window.__STUDIO_THROW_WORKSPACE = 'Look'; });
+    await tab('Look').click();
+    await page.waitForSelector('[data-testid="studio-error-boundary-look"]', { timeout: T(30000) });
+    const errText = await page.locator('[data-testid="studio-error-boundary-look"]').innerText();
+    check('Error boundary: catches workspace crash and displays error', /workspace "look" error/i.test(errText), errText.slice(0, 80));
+
+    // 2. While Look is crashed, switching to Scene tab remains completely usable
+    await tab('Scene').click();
+    await page.waitForSelector('[data-testid="studio-scene-tab"]', { timeout: T(30000) });
+    const sceneUsable = await page.locator('input[aria-label="Scene layout name"]').isVisible();
+    check('Error boundary: thrown workspace leaves others usable', sceneUsable);
+
+    // 3. Clear fault, switch back to Look, and verify workspace renders cleanly
+    await page.evaluate(() => { window.__STUDIO_THROW_WORKSPACE = undefined; });
+    await tab('Look').click();
+    await page.waitForSelector('[data-testid="studio-look-tab"]', { timeout: T(30000) });
+    check('Error boundary: switching back to workspace restores it', await page.locator('[data-testid="studio-look-tab"]').isVisible());
   });
 
   // ---- Assets: the 4-angle review of a machine, and its refresh ----

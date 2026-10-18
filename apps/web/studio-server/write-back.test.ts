@@ -114,3 +114,69 @@ test('a body over 2 MB is refused with 413', async () => {
     assert.equal(fs.existsSync(s.file), false);
   } finally { s.cleanup(); }
 });
+
+test('scene-layouts write-back: GET empty, POST valid layouts, read back, and reject invalid', async () => {
+  const s = setup();
+  const layoutsFile = path.join(s.paths.dataDir, 'scene-layouts.json');
+  try {
+    // GET of missing file returns 200 with '{}'
+    const getEmpty = await handleStudioRequest(req({ method: 'GET', path: '/__studio/data/scene-layouts', readBody: async () => '' }), s.paths);
+    assert.equal(getEmpty?.status, 200);
+    assert.equal(getEmpty?.body, '{}');
+
+    // POST valid scene layout
+    const validDoc = {
+      'Outpost Alpha': {
+        name: 'Outpost Alpha',
+        items: [
+          { id: 'scout-1', assetId: 'scout-body', t: { offset: [1.2345, 0, -2.5], yaw: 45, scale: 1 } },
+        ],
+      },
+    };
+    const postRes = await handleStudioRequest(
+      req({ path: '/__studio/data/scene-layouts', body: JSON.stringify(validDoc) }),
+      s.paths
+    );
+    assert.equal(postRes?.status, 200);
+    assert.ok(fs.existsSync(layoutsFile));
+
+    // GET reads it back
+    const getBack = await handleStudioRequest(req({ method: 'GET', path: '/__studio/data/scene-layouts', readBody: async () => '' }), s.paths);
+    assert.equal(getBack?.status, 200);
+    const readBack = JSON.parse(String(getBack?.body));
+    assert.equal(readBack['Outpost Alpha']?.name, 'Outpost Alpha');
+    assert.equal(readBack['Outpost Alpha']?.items[0]?.id, 'scout-1');
+    assert.deepEqual(readBack['Outpost Alpha']?.items[0]?.t?.offset, [1.235, 0, -2.5]);
+
+    // Rejects unknown asset
+    const badAsset = await handleStudioRequest(
+      req({
+        path: '/__studio/data/scene-layouts',
+        body: JSON.stringify({
+          'Bad': { name: 'Bad', items: [{ id: 'x', assetId: 'ghost-asset', t: { offset: [0, 0, 0], yaw: 0, scale: 1 } }] },
+        }),
+      }),
+      s.paths
+    );
+    assert.equal(badAsset?.status, 422);
+
+    // Rejects duplicate item id
+    const dupItem = await handleStudioRequest(
+      req({
+        path: '/__studio/data/scene-layouts',
+        body: JSON.stringify({
+          'Dup': {
+            name: 'Dup',
+            items: [
+              { id: 'dup', assetId: 'scout-body', t: { offset: [0, 0, 0], yaw: 0, scale: 1 } },
+              { id: 'dup', assetId: 'hauler-body', t: { offset: [1, 0, 0], yaw: 0, scale: 1 } },
+            ],
+          },
+        }),
+      }),
+      s.paths
+    );
+    assert.equal(dupItem?.status, 422);
+  } finally { s.cleanup(); }
+});
+

@@ -8,122 +8,36 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-const STYLE_ID = "hm-studio-audio-tab-styles";
-const STYLE_CSS = "/* ============================================================================\n * File: apps/web/src/studio/audio-tab.css\n * TICKET-08a (OPUS_NOTE_13 Item C — STUDIO-01):\n * Studio Audio tab dark telemetry styling matching studio-app.css.\n * ============================================================================ */\n\n.sx-audio-tab {\n  flex: 1;\n  min-height: 0;\n  display: grid;\n  grid-template-columns: 380px 1fr;\n  background: var(--sx-bg, #05080c);\n  color: var(--sx-text, #d7e3ee);\n  font-family: var(--sx-ui, 'Inter', system-ui, sans-serif);\n  overflow: hidden;\n}\n\n.sx-audio-sidebar {\n  display: flex;\n  flex-direction: column;\n  min-height: 0;\n  background: var(--sx-panel, rgba(12, 17, 24, 0.86));\n  border-right: 1px solid var(--sx-line, #1c2734);\n}\n\n.sx-audio-controls-head {\n  display: flex;\n  flex-direction: column;\n  gap: 10px;\n  padding: 14px;\n  border-bottom: 1px solid var(--sx-line, #1c2734);\n}\n\n.sx-audio-title-row {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n}\n\n.sx-audio-title-row h2 {\n  margin: 0;\n  font-family: var(--sx-display, 'Oxanium', sans-serif);\n  font-size: 13px;\n  font-weight: 700;\n  letter-spacing: 0.05em;\n  text-transform: uppercase;\n}\n\n.sx-audio-count {\n  font-family: var(--sx-display, 'Oxanium', monospace);\n  font-size: 11px;\n  color: var(--sx-amber, #ffc53d);\n}\n\n.sx-audio-search {\n  width: 100%;\n  padding: 7px 10px;\n  background: #0a1017;\n  border: 1px solid var(--sx-line-hi, #2c3d51);\n  border-radius: 6px;\n  color: var(--sx-text, #d7e3ee);\n  font-size: 12px;\n}\n\n.sx-audio-cats {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 5px;\n}\n\n.sx-audio-cat-btn {\n  padding: 4px 8px;\n  font-size: 11px;\n  border-radius: 5px;\n  background: rgba(20, 28, 38, 0.85);\n  border: 1px solid var(--sx-line-hi, #2c3d51);\n  color: var(--sx-dim, #6c8193);\n  cursor: pointer;\n}\n\n.sx-audio-cat-btn.is-active {\n  background: rgba(255, 197, 61, 0.14);\n  border-color: rgba(255, 197, 61, 0.55);\n  color: var(--sx-amber, #ffc53d);\n}\n\n.sx-audio-list {\n  list-style: none;\n  margin: 0;\n  padding: 8px;\n  overflow-y: auto;\n  flex: 1;\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n}\n\n.sx-audio-row {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 10px;\n  padding: 8px 10px;\n  border-radius: 6px;\n  background: rgba(15, 22, 32, 0.65);\n  border: 1px solid transparent;\n  cursor: pointer;\n}\n\n.sx-audio-row:hover {\n  background: rgba(24, 34, 48, 0.85);\n  border-color: var(--sx-line-hi, #2c3d51);\n}\n\n.sx-audio-row.is-selected {\n  background: rgba(95, 212, 255, 0.1);\n  border-color: rgba(95, 212, 255, 0.45);\n}\n\n.sx-audio-row.is-playing {\n  border-color: var(--sx-amber, #ffc53d);\n}\n\n.sx-audio-row-main {\n  display: flex;\n  flex-direction: column;\n  gap: 3px;\n  min-width: 0;\n}\n\n.sx-audio-id {\n  font-family: ui-monospace, Consolas, monospace;\n  font-size: 12px;\n  color: #f4f8ff;\n}\n\n.sx-audio-badges {\n  display: flex;\n  gap: 6px;\n  font-family: var(--sx-display, 'Oxanium', monospace);\n  font-size: 10px;\n}\n\n.sx-audio-badge.gain {\n  color: var(--sx-cyan, #5fd4ff);\n}\n\n.sx-audio-badge.loop {\n  color: var(--sx-dim, #6c8193);\n}\n\n.sx-audio-btn {\n  padding: 4px 10px;\n  font-family: var(--sx-display, 'Oxanium', sans-serif);\n  font-size: 11px;\n  font-weight: 700;\n  border-radius: 5px;\n  cursor: pointer;\n}\n\n.sx-audio-btn.is-play {\n  background: rgba(95, 212, 255, 0.14);\n  border: 1px solid rgba(95, 212, 255, 0.4);\n  color: var(--sx-cyan, #5fd4ff);\n}\n\n.sx-audio-btn.is-stop {\n  background: rgba(255, 122, 107, 0.18);\n  border: 1px solid rgba(255, 122, 107, 0.45);\n  color: var(--sx-err, #ff7a6b);\n}\n\n.sx-audio-inspector {\n  padding: 24px;\n  overflow-y: auto;\n  display: flex;\n  flex-direction: column;\n}\n\n.sx-audio-card {\n  max-width: 640px;\n  width: 100%;\n  display: flex;\n  flex-direction: column;\n  gap: 20px;\n  padding: 20px 22px;\n  background: var(--sx-panel, rgba(12, 17, 24, 0.9));\n  border: 1px solid var(--sx-line-hi, #2c3d51);\n  border-radius: 10px;\n}\n\n.sx-audio-card-head {\n  display: flex;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 12px;\n  padding-bottom: 14px;\n  border-bottom: 1px solid var(--sx-line, #1c2734);\n}\n\n.sx-audio-cat-tag {\n  display: inline-block;\n  margin-bottom: 4px;\n  font-family: var(--sx-display, 'Oxanium', sans-serif);\n  font-size: 10px;\n  font-weight: 700;\n  letter-spacing: 0.08em;\n  text-transform: uppercase;\n  color: var(--sx-cyan, #5fd4ff);\n}\n\n.sx-audio-card-head h3 {\n  margin: 0;\n  font-family: ui-monospace, Consolas, monospace;\n  font-size: 18px;\n  color: #f4f8ff;\n}\n\n.sx-audio-mode-badge {\n  padding: 3px 8px;\n  border-radius: 4px;\n  font-family: var(--sx-display, 'Oxanium', sans-serif);\n  font-size: 10px;\n  font-weight: 700;\n  letter-spacing: 0.06em;\n}\n\n.sx-audio-mode-badge.writable {\n  background: rgba(111, 227, 160, 0.14);\n  border: 1px solid rgba(111, 227, 160, 0.4);\n  color: var(--sx-ok, #6fe3a0);\n}\n\n.sx-audio-mode-badge.readonly {\n  background: rgba(255, 197, 61, 0.14);\n  border: 1px solid rgba(255, 197, 61, 0.4);\n  color: var(--sx-amber, #ffc53d);\n}\n\n.sx-audio-transport {\n  display: flex;\n  align-items: center;\n  flex-wrap: wrap;\n  gap: 16px;\n  padding: 12px 14px;\n  background: rgba(5, 8, 12, 0.75);\n  border: 1px solid var(--sx-line, #1c2734);\n  border-radius: 8px;\n}\n\n.sx-audio-transport-btn {\n  padding: 8px 16px;\n  font-family: var(--sx-display, 'Oxanium', sans-serif);\n  font-size: 12px;\n  font-weight: 700;\n  border-radius: 6px;\n  cursor: pointer;\n}\n\n.sx-audio-transport-btn.is-play {\n  background: linear-gradient(180deg, #ffd060, #e9a92a);\n  border: 1px solid #ffd060;\n  color: #1b1403;\n}\n\n.sx-audio-transport-btn.is-stop {\n  background: rgba(255, 122, 107, 0.22);\n  border: 1px solid rgba(255, 122, 107, 0.55);\n  color: #ff7a6b;\n}\n\n.sx-audio-loop-toggle {\n  display: inline-flex;\n  align-items: center;\n  gap: 7px;\n  font-size: 12px;\n  cursor: pointer;\n}\n\n.sx-audio-rms {\n  margin-left: auto;\n  font-size: 12px;\n  color: var(--sx-dim, #6c8193);\n}\n\n.sx-audio-rms b {\n  font-family: var(--sx-display, 'Oxanium', monospace);\n  color: var(--sx-text, #d7e3ee);\n}\n\n.sx-audio-field-group {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n}\n\n.sx-audio-field-header {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  font-size: 12px;\n  font-weight: 600;\n}\n\n.sx-audio-linear-readout {\n  font-family: var(--sx-display, 'Oxanium', monospace);\n  font-size: 11px;\n  color: var(--sx-dim, #6c8193);\n}\n\n.sx-audio-control-row {\n  display: grid;\n  grid-template-columns: 1fr 88px;\n  align-items: center;\n  gap: 12px;\n}\n\n.sx-audio-loop-grid {\n  display: grid;\n  grid-template-columns: 1fr 1fr;\n  gap: 14px;\n}\n\n.sx-audio-loop-field {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  font-size: 12px;\n  color: var(--sx-dim, #6c8193);\n}\n\n.sx-audio-error {\n  margin: 0;\n  padding: 8px 10px;\n  border-radius: 6px;\n  background: rgba(255, 122, 107, 0.14);\n  border: 1px solid rgba(255, 122, 107, 0.4);\n  color: #ff7a6b;\n  font-size: 12px;\n}\n\n.sx-audio-empty {\n  padding: 40px;\n  color: var(--sx-dim, #6c8193);\n  font-size: 13px;\n}\n";
-if (typeof document !== "undefined" && !document.getElementById(STYLE_ID)) {
-  const el = document.createElement("style");
-  el.id = STYLE_ID;
-  el.textContent = STYLE_CSS;
-  document.head.appendChild(el);
-}
+import './audio-tab.css';
+import {
+  audioCategoryOf,
+  clampAudioPatch,
+  dbToLinear,
+  normalizeAudioLevels,
+  CATEGORY_LABELS,
+  type AudioCategory,
+  type AudioLevelEntry,
+  type AudioLevels,
+  type AudioPatch,
+} from './audio-tab-data';
 
-export interface AudioLevelEntry {
-  readonly gain: number;
-  readonly rms?: number;
-  readonly start?: number;
-  readonly end?: number;
-  readonly loopStart?: number;
-  readonly loopEnd?: number;
-}
-
-export type AudioLevels =
-  | Readonly<Record<string, AudioLevelEntry>>
-  | {
-      readonly about?: string;
-      readonly levels: Readonly<Record<string, AudioLevelEntry>>;
-    };
-
-export interface AudioPatch {
-  readonly gain?: number;
-  readonly loopStart?: number;
-  readonly loopEnd?: number;
-}
+export {
+  audioCategoryOf,
+  clampAudioPatch,
+  dbToLinear,
+  normalizeAudioLevels,
+  CATEGORY_LABELS,
+  type AudioCategory,
+  type AudioLevelEntry,
+  type AudioLevels,
+  type AudioPatch,
+};
 
 export interface AudioTabProps {
   readonly levels: AudioLevels;
   readonly writable: boolean;
   readonly onChange: (id: string, patch: AudioPatch) => void;
 }
-
-export type AudioCategory = 'all' | 'music' | 'machines' | 'combat' | 'vehicles' | 'ui';
-
-/** Converts decibels (`-36` to `+18` dB) into linear Web Audio gain (`10^(dB / 20)`). */
-export function dbToLinear(db: number): number {
-  if (!Number.isFinite(db)) return 1;
-  const clamped = Math.max(-48, Math.min(24, db));
-  return Math.pow(10, clamped / 20);
-}
-
-/** Normalizes either `{ levels: Record<...> }` or a flat `Record<string, AudioLevelEntry>` into a clean map. */
-export function normalizeAudioLevels(
-  input: AudioLevels | null | undefined
-): Readonly<Record<string, AudioLevelEntry>> {
-  if (!input || typeof input !== 'object') return {};
-  if ('levels' in input && input.levels && typeof input.levels === 'object' && !('gain' in input.levels)) {
-    return input.levels as Readonly<Record<string, AudioLevelEntry>>;
-  }
-  return input as Readonly<Record<string, AudioLevelEntry>>;
-}
-
-/** Classifies a sound ID from `levels.json` into a filterable Studio bus category. */
-export function audioCategoryOf(id: string): Exclude<AudioCategory, 'all'> {
-  if (id.startsWith('music-')) return 'music';
-  if (
-    id.includes('motor-') ||
-    id.includes('skid') ||
-    id.includes('impact')
-  ) {
-    return 'vehicles';
-  }
-  if (
-    id.includes('fire-') ||
-    id.includes('reload') ||
-    id.includes('empty') ||
-    id.includes('beam') ||
-    id.includes('storm')
-  ) {
-    return 'combat';
-  }
-  if (
-    id.includes('mill') ||
-    id.includes('press') ||
-    id.includes('projector') ||
-    id.includes('watermaker') ||
-    id.includes('fabricator') ||
-    id.includes('breaker') ||
-    id.includes('relay') ||
-    id.includes('lever') ||
-    id.includes('capacitor') ||
-    id.includes('gate-')
-  ) {
-    return 'machines';
-  }
-  return 'ui';
-}
-
-/** Clamps a gain/loop patch to safe finite ranges. */
-export function clampAudioPatch(patch: AudioPatch): AudioPatch {
-  const out: { gain?: number; loopStart?: number; loopEnd?: number } = {};
-  if (patch.gain !== undefined && Number.isFinite(patch.gain)) {
-    out.gain = Math.round(Math.max(-36, Math.min(18, patch.gain)) * 10) / 10;
-  }
-  if (patch.loopStart !== undefined && Number.isFinite(patch.loopStart)) {
-    out.loopStart = Math.round(Math.max(0, patch.loopStart) * 1000) / 1000;
-  }
-  if (patch.loopEnd !== undefined && Number.isFinite(patch.loopEnd)) {
-    out.loopEnd = Math.round(Math.max(0, patch.loopEnd) * 1000) / 1000;
-  }
-  return out;
-}
-
-const CATEGORY_LABELS: Readonly<Record<AudioCategory, string>> = {
-  all: 'All Sounds',
-  music: 'Music',
-  machines: 'Machines & Lab',
-  combat: 'Beam & Combat',
-  vehicles: 'Vehicles',
-  ui: 'Build & UI',
-};
 
 export const AudioTab: React.FC<AudioTabProps> = ({
   levels,

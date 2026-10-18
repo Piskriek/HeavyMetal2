@@ -25,6 +25,7 @@ import { forgetThumb } from './studio-thumbs';
 import { forgetFourAngle } from './four-angle';
 import { LookTab } from './look-tab';
 import { SceneTab } from './scene-tab';
+import { StudioErrorBoundary } from './studio-error-boundary';
 import './studio-app.css';
 
 const ENDPOINT = '/__studio/data/asset-tweaks';
@@ -136,6 +137,8 @@ export function StudioApp({ onBack, renderPrototype }: {
   /** The Scene workspace's own viewport: created when the tab opens, handed to the Scene tab. */
   const sceneHostRef = useRef<HTMLDivElement>(null);
   const [sceneVp, setSceneVp] = useState<StudioViewport | null>(null);
+  const sceneUndoRef = useRef<{ undo: () => void; redo: () => void; canUndo: boolean; canRedo: boolean } | null>(null);
+  const [, setSceneUndoTick] = useState(0);
   const raws = useRef(new Map<string, Group>());
   const loading = useRef(new Set<string>());
   const failed = useRef(new Set<string>());
@@ -240,7 +243,11 @@ export function StudioApp({ onBack, renderPrototype }: {
   // ---- writability: the dev endpoint answers with JSON. The built game has no such route, so it does not ask (the
   // request was a 404 in every built session, and it failed the campaign test's no-HTTP-error check) ----
   useEffect(() => {
-    if (import.meta.env?.DEV !== true) { setWritable(false); return undefined; }
+    const isDev =
+      import.meta.env?.DEV === true ||
+      (typeof window !== 'undefined' &&
+        (window as unknown as { __STUDIO_DEV_WRITABLE?: boolean }).__STUDIO_DEV_WRITABLE === true);
+    if (!isDev) { setWritable(false); return undefined; }
     let live = true;
     fetch(ENDPOINT, { cache: 'no-store' })
       .then((r) => { if (live) setWritable(r.ok && (r.headers.get('content-type') ?? '').includes('json')); })
@@ -429,10 +436,23 @@ export function StudioApp({ onBack, renderPrototype }: {
       const k = e.key.toLowerCase();
       if ((e.ctrlKey || e.metaKey) && k === 'z') {
         e.preventDefault();
-        setHist((h) => (e.shiftKey ? redo(REGISTRY, h) : undo(REGISTRY, h)).history);
+        if (workspace === 'scene') {
+          if (e.shiftKey) sceneUndoRef.current?.redo();
+          else sceneUndoRef.current?.undo();
+        } else {
+          setHist((h) => (e.shiftKey ? redo(REGISTRY, h) : undo(REGISTRY, h)).history);
+        }
         return;
       }
-      if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); setHist((h) => redo(REGISTRY, h).history); return; }
+      if ((e.ctrlKey || e.metaKey) && k === 'y') {
+        e.preventDefault();
+        if (workspace === 'scene') {
+          sceneUndoRef.current?.redo();
+        } else {
+          setHist((h) => redo(REGISTRY, h).history);
+        }
+        return;
+      }
       if (e.ctrlKey || e.metaKey || e.altKey || workspace !== 'assets') return;
       if (k === 'delete' || k === 'backspace') {
         const id = selRef.current;
@@ -504,11 +524,34 @@ export function StudioApp({ onBack, renderPrototype }: {
           <button type="button" aria-pressed={workspace === 'moon'} onClick={() => setWorkspace('moon')}>Moon (prototype)</button>
         </nav>
         <span className="sx-grow" />
-        {workspace === 'assets' ? <>
+        {workspace === 'assets' || workspace === 'scene' ? <>
         <div className="sx-cluster">
-          <button type="button" onClick={() => setHist((h) => undo(REGISTRY, h).history)} disabled={!undoLabel} title={undoLabel ? `Undo: ${undoLabel} (Ctrl+Z)` : 'Nothing to undo'} aria-label="Undo">Undo</button>
-          <button type="button" onClick={() => setHist((h) => redo(REGISTRY, h).history)} disabled={!redoLabel} title={redoLabel ? `Redo: ${redoLabel} (Ctrl+Shift+Z)` : 'Nothing to redo'} aria-label="Redo">Redo</button>
+          <button
+            type="button"
+            onClick={() => {
+              if (workspace === 'scene') sceneUndoRef.current?.undo();
+              else setHist((h) => undo(REGISTRY, h).history);
+            }}
+            disabled={workspace === 'scene' ? !sceneUndoRef.current?.canUndo : !undoLabel}
+            title={workspace === 'scene' ? 'Undo transform (Ctrl+Z)' : (undoLabel ? `Undo: ${undoLabel} (Ctrl+Z)` : 'Nothing to undo')}
+            aria-label="Undo"
+          >
+            Undo
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (workspace === 'scene') sceneUndoRef.current?.redo();
+              else setHist((h) => redo(REGISTRY, h).history);
+            }}
+            disabled={workspace === 'scene' ? !sceneUndoRef.current?.canRedo : !redoLabel}
+            title={workspace === 'scene' ? 'Redo transform (Ctrl+Shift+Z)' : (redoLabel ? `Redo: ${redoLabel} (Ctrl+Shift+Z)` : 'Nothing to redo')}
+            aria-label="Redo"
+          >
+            Redo
+          </button>
         </div>
+        {workspace === 'assets' ? (
         <div className="sx-cluster">
           <label className="sx-select"><span>Keys</span>
             <select value={keymap} onChange={(e) => setKeymap(e.target.value as Keymap)} aria-label="Keymap">
@@ -520,10 +563,15 @@ export function StudioApp({ onBack, renderPrototype }: {
             <button type="button" aria-pressed={mode === 'advanced'} onClick={() => setMode('advanced')}>Advanced</button>
           </div>
         </div>
+        ) : null}
         <div className="sx-cluster">
-          <button type="button" onClick={() => setLayout({ ...DEFAULT_LAYOUT })} title="Put the panels back as they start">Classic layout</button>
-          <button type="button" className="sx-go" onClick={() => void accept(changes)} disabled={changes.length === 0 || busy || !writable}
-            title={writable ? 'Save every pending change to the project' : 'Open STUDIO.bat to save changes'}>Save{changes.length > 0 ? ` (${changes.length})` : ''}</button>
+          {workspace === 'assets' ? (
+            <>
+              <button type="button" onClick={() => setLayout({ ...DEFAULT_LAYOUT })} title="Put the panels back as they start">Classic layout</button>
+              <button type="button" className="sx-go" onClick={() => void accept(changes)} disabled={changes.length === 0 || busy || !writable}
+                title={writable ? 'Save every pending change to the project' : 'Open STUDIO.bat to save changes'}>Save{changes.length > 0 ? ` (${changes.length})` : ''}</button>
+            </>
+          ) : null}
           <button type="button" onClick={onBack}>Back to the lab</button>
         </div>
         </> : <div className="sx-cluster">
@@ -538,134 +586,151 @@ export function StudioApp({ onBack, renderPrototype }: {
       ) : null}
 
       {workspace === 'moon' ? (
-        <div className="sx-proto">{renderPrototype()}</div>
+        <StudioErrorBoundary key="moon" tabName="Moon">
+          <div className="sx-proto">{renderPrototype()}</div>
+        </StudioErrorBoundary>
       ) : workspace === 'scene' ? (
-        <div className="sx-tab-pane sx-scene-pane">
-          <div className="sx-view sx-scene-view" ref={sceneHostRef} />
-          <aside className="sx-panel sx-scene-side" aria-label="Scene tab">
-            <SceneTab viewport={sceneVp} writable={writable === true} />
-          </aside>
-        </div>
+        <StudioErrorBoundary key="scene" tabName="Scene">
+          <div className="sx-tab-pane sx-scene-pane">
+            <div className="sx-view sx-scene-view" ref={sceneHostRef} />
+            <aside className="sx-panel sx-scene-side" aria-label="Scene tab">
+              <SceneTab
+                viewport={sceneVp}
+                writable={writable === true}
+                onUndoRef={(hooks) => {
+                  sceneUndoRef.current = hooks;
+                  setSceneUndoTick((t) => t + 1);
+                }}
+              />
+            </aside>
+          </div>
+        </StudioErrorBoundary>
       ) : workspace === 'look' ? (
-        <div className="sx-tab-pane">
-          <LookTab assetId={selected} />
-        </div>
+        <StudioErrorBoundary key="look" tabName="Look">
+          <div className="sx-tab-pane">
+            <LookTab assetId={selected} />
+          </div>
+        </StudioErrorBoundary>
       ) : workspace === 'audio' ? (
-        <div className="sx-audio-pane">
-          <div className="sx-audio-bar">
-            <p role="status">{audioNote ?? (writable === true
-              ? 'Dev build: edits stay in this session. Copy the JSON into public/audio/levels.json to keep them.'
-              : 'Built game: the levels are listed and previewed here, not edited.')}</p>
-            <button type="button" onClick={() => void copyAudioJson()} disabled={!audioDoc} title="Copy the whole levels.json, edits included">Copy JSON</button>
+        <StudioErrorBoundary key="audio" tabName="Audio">
+          <div className="sx-audio-pane">
+            <div className="sx-audio-bar">
+              <p role="status">{audioNote ?? (writable === true
+                ? 'Dev build: edits stay in this session. Copy the JSON into public/audio/levels.json to keep them.'
+                : 'Built game: the levels are listed and previewed here, not edited.')}</p>
+              <button type="button" onClick={() => void copyAudioJson()} disabled={!audioDoc} title="Copy the whole levels.json, edits included">Copy JSON</button>
+            </div>
+            {audioError ? <p className="sx-banner" role="alert">{audioError}</p> : null}
+            {audioDoc ? <AudioTab levels={audioDoc.levels} writable={writable === true} onChange={changeAudio} /> : null}
           </div>
-          {audioError ? <p className="sx-banner" role="alert">{audioError}</p> : null}
-          {audioDoc ? <AudioTab levels={audioDoc.levels} writable={writable === true} onChange={changeAudio} /> : null}
-        </div>
+        </StudioErrorBoundary>
       ) : (
-        <div className="sx-body">
-          <aside className="sx-left sx-panel" aria-label="Content and outliner">
-            <section className="sx-block">
-              <h2>Content</h2>
-              <ContentBrowser query={query} onQuery={setQuery} placed={placed} onPlace={place} selected={selected}
-                cls={cls} onClass={setCls} versions={versions} />
-            </section>
-            <section className="sx-block sx-outline">
-              <h2>Scene <span className="sx-count">{doc.roots.length}</span></h2>
-              <Outliner rows={outlineRows} selected={selected} onSelect={setSelected} onRemove={removeId} />
-            </section>
-          </aside>
+        <StudioErrorBoundary key="assets" tabName="Assets">
+          <div className="sx-body">
+            <aside className="sx-left sx-panel" aria-label="Content and outliner">
+              <section className="sx-block">
+                <h2>Content</h2>
+                <ContentBrowser query={query} onQuery={setQuery} placed={placed} onPlace={place} selected={selected}
+                  cls={cls} onClass={setCls} versions={versions} />
+              </section>
+              <section className="sx-block sx-outline">
+                <h2>Scene <span className="sx-count">{doc.roots.length}</span></h2>
+                <Outliner rows={outlineRows} selected={selected} onSelect={setSelected} onRemove={removeId} />
+              </section>
+            </aside>
 
-          <div className="sx-split vertical" role="separator" aria-orientation="vertical" aria-label="Resize the content panel" tabIndex={0}
-            onPointerDown={startResize('left')} />
+            <div className="sx-split vertical" role="separator" aria-orientation="vertical" aria-label="Resize the content panel" tabIndex={0}
+              onPointerDown={startResize('left')} />
 
-          <div className="sx-center">
-            <div className="sx-view" ref={hostRef}>
-              <div className="sx-tools" role="toolbar" aria-label="Tools">
-                <div className="sx-seg" role="group" aria-label="Transform tool">
-                  {(['move', 'rotate', 'scale'] as const).map((t) => (
-                    <button key={t} type="button" aria-pressed={tool === t} onClick={() => setTool(t)} disabled={!selected || comparing !== null}>
-                      {t === 'move' ? 'Move' : t === 'rotate' ? 'Turn' : 'Scale'} <kbd>{shortcut(t)}</kbd>
-                    </button>
-                  ))}
-                </div>
-                <div className="sx-seg" role="group" aria-label="Detail level">
-                  {(['low', 'mid', 'high', 'all'] as const).map((l) => (
-                    <button key={l} type="button" aria-pressed={level === l} onClick={() => setLevel(l)} disabled={comparing !== null}>
-                      {l === 'all' ? 'All three' : LEVEL_LABEL[l]}
-                    </button>
-                  ))}
-                </div>
-                <div className="sx-seg" role="group" aria-label="Surface">
-                  {(['solid', 'wire', 'normals'] as const).map((o) => (
-                    <button key={o} type="button" aria-pressed={overlay === o} onClick={() => setOverlay(o)}>
-                      {o === 'solid' ? 'Solid' : o === 'wire' ? 'Wireframe' : 'Normals'}
-                    </button>
-                  ))}
-                </div>
-                <button type="button" aria-pressed={inContext} onClick={() => setInContext((v) => !v)} disabled={!selected} title="Show the asset where the game uses it">In context</button>
-                <button type="button" onClick={() => vpRef.current?.focus()} disabled={!selected} title="Frame the selected asset (F)">Frame <kbd>F</kbd></button>
-              </div>
-
-              {loadingModels ? (
-                <div className="sx-loading" role="status">
-                  <span>Loading the model</span>
-                  <i aria-hidden="true" />
-                </div>
-              ) : null}
-
-              {!selected ? (
-                <div className="sx-empty-view">
-                  <h2>Nothing selected</h2>
-                  <p>Double-click an asset in Content to place it here. Then drag its arrows to move it, the ring to turn it, the cube to scale it.</p>
-                </div>
-              ) : null}
-
-              {selected && selProps ? (
-                <div className="sx-telemetry" aria-label="Selected asset readout">
-                  <div className="sx-tm-head"><span>{comparing ? `${selected}, old against new` : selected}</span><span className="sx-dim">{GEN[selected]?.class}</span></div>
-                  <dl>
-                    {comparing ? null : <>
-                      <div><dt>Offset</dt><dd>{fmtValue(fieldFor('offset')!, selProps.offset)}</dd></div>
-                      <div><dt>Turn</dt><dd>{fmtValue(fieldFor('yaw')!, selProps.yaw)}</dd></div>
-                      <div><dt>Scale</dt><dd>{fmtValue(fieldFor('scale')!, selProps.scale)}</dd></div>
-                    </>}
-                    {copyStats.map((s) => (
-                      <div key={s.label}><dt>{s.label} triangles</dt><dd>{s.triangles.toLocaleString('en-GB')}<small>{budgetOf(s.label)}</small></dd></div>
+            <div className="sx-center">
+              <div className="sx-view" ref={hostRef}>
+                <div className="sx-tools" role="toolbar" aria-label="Tools">
+                  <div className="sx-seg" role="group" aria-label="Transform tool">
+                    {(['move', 'rotate', 'scale'] as const).map((t) => (
+                      <button key={t} type="button" aria-pressed={tool === t} onClick={() => setTool(t)} disabled={!selected || comparing !== null}>
+                        {t === 'move' ? 'Move' : t === 'rotate' ? 'Turn' : 'Scale'} <kbd>{shortcut(t)}</kbd>
+                      </button>
                     ))}
-                    <div><dt>Real size</dt><dd>{GEN[selected] ? `${GEN[selected]!.size[0].toFixed(2)} x ${GEN[selected]!.size[1].toFixed(2)} x ${GEN[selected]!.size[2].toFixed(2)} m` : '-'}</dd></div>
-                  </dl>
-                  <p className="sx-dim">{comparing ? 'Old is the archived model, new is the one packed now. Both are shown as they were made.' : KEYMAPS[keymap].nav}</p>
+                  </div>
+                  <div className="sx-seg" role="group" aria-label="Detail level">
+                    {(['low', 'mid', 'high', 'all'] as const).map((l) => (
+                      <button key={l} type="button" aria-pressed={level === l} onClick={() => setLevel(l)} disabled={comparing !== null}>
+                        {l === 'all' ? 'All three' : LEVEL_LABEL[l]}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="sx-seg" role="group" aria-label="Surface">
+                    {(['solid', 'wire', 'normals'] as const).map((o) => (
+                      <button key={o} type="button" aria-pressed={overlay === o} onClick={() => setOverlay(o)}>
+                        {o === 'solid' ? 'Solid' : o === 'wire' ? 'Wireframe' : 'Normals'}
+                      </button>
+                    ))}
+                  </div>
+                  <button type="button" aria-pressed={inContext} onClick={() => setInContext((v) => !v)} disabled={!selected} title="Show the asset where the game uses it">In context</button>
+                  <button type="button" onClick={() => vpRef.current?.focus()} disabled={!selected} title="Frame the selected asset (F)">Frame <kbd>F</kbd></button>
                 </div>
-              ) : null}
-            </div>
 
-            <div className="sx-split horizontal" role="separator" aria-orientation="horizontal" aria-label="Resize the changes panel" tabIndex={0}
-              onPointerDown={startResize('changes')} />
+                {loadingModels ? (
+                  <div className="sx-loading" role="status">
+                    <span>Loading the model</span>
+                    <i aria-hidden="true" />
+                  </div>
+                ) : null}
 
-            <ChangesPanel changes={changes} writable={writable === true} busy={busy} status={status}
-              onAccept={(rows) => void accept(rows)} onDiscard={discard} onDiscardAll={() => discard(changes)} />
-          </div>
+                {!selected ? (
+                  <div className="sx-empty-view">
+                    <h2>Nothing selected</h2>
+                    <p>Double-click an asset in Content to place it here. Then drag its arrows to move it, the ring to turn it, the cube to scale it.</p>
+                  </div>
+                ) : null}
 
-          <div className="sx-split vertical" role="separator" aria-orientation="vertical" aria-label="Resize the details panel" tabIndex={0}
-            onPointerDown={startResize('right')} />
-
-          <aside className="sx-right sx-panel" aria-label="Details">
-            <div className="sx-right-tabs" role="tablist" aria-label="Right panel">
-              <button type="button" role="tab" aria-selected={rightTab === 'details'} onClick={() => setRightTab('details')}>Details</button>
-              <button type="button" role="tab" aria-selected={rightTab === 'redo'} onClick={() => setRightTab('redo')}>Redo model</button>
-            </div>
-            {rightTab === 'details' ? (<>
-              <div className="sx-block-head">
-                <h2>Details</h2>
-                <span className="sx-dim">{mode === 'simple' ? 'Simple' : 'Advanced'}</span>
+                {selected && selProps ? (
+                  <div className="sx-telemetry" aria-label="Selected asset readout">
+                    <div className="sx-tm-head"><span>{comparing ? `${selected}, old against new` : selected}</span><span className="sx-dim">{GEN[selected]?.class}</span></div>
+                    <dl>
+                      {comparing ? null : <>
+                        <div><dt>Offset</dt><dd>{fmtValue(fieldFor('offset')!, selProps.offset)}</dd></div>
+                        <div><dt>Turn</dt><dd>{fmtValue(fieldFor('yaw')!, selProps.yaw)}</dd></div>
+                        <div><dt>Scale</dt><dd>{fmtValue(fieldFor('scale')!, selProps.scale)}</dd></div>
+                      </>}
+                      {copyStats.map((s) => (
+                        <div key={s.label}><dt>{s.label} triangles</dt><dd>{s.triangles.toLocaleString('en-GB')}<small>{budgetOf(s.label)}</small></dd></div>
+                      ))}
+                      <div><dt>Real size</dt><dd>{GEN[selected] ? `${GEN[selected]!.size[0].toFixed(2)} x ${GEN[selected]!.size[1].toFixed(2)} x ${GEN[selected]!.size[2].toFixed(2)} m` : '-'}</dd></div>
+                    </dl>
+                    <p className="sx-dim">{comparing ? 'Old is the archived model, new is the one packed now. Both are shown as they were made.' : KEYMAPS[keymap].nav}</p>
+                  </div>
+                ) : null}
               </div>
-              {selFields ?? <p className="sx-dim sx-empty">Select an asset in Scene to see its values.</p>}
-              {selected && undoLabel ? <p className="sx-dim sx-last">Last edit: {undoLabel}</p> : null}
-            </>) : (
-              <RedoPanel id={selected} comparing={comparing} onCompare={setComparing} onChanged={onAssetChanged} />
-            )}
-          </aside>
-        </div>
+
+              <div className="sx-split horizontal" role="separator" aria-orientation="horizontal" aria-label="Resize the changes panel" tabIndex={0}
+                onPointerDown={startResize('changes')} />
+
+              <ChangesPanel changes={changes} writable={writable === true} busy={busy} status={status}
+                onAccept={(rows) => void accept(rows)} onDiscard={discard} onDiscardAll={() => discard(changes)} />
+            </div>
+
+            <div className="sx-split vertical" role="separator" aria-orientation="vertical" aria-label="Resize the details panel" tabIndex={0}
+              onPointerDown={startResize('right')} />
+
+            <aside className="sx-right sx-panel" aria-label="Details">
+              <div className="sx-right-tabs" role="tablist" aria-label="Right panel">
+                <button type="button" role="tab" aria-selected={rightTab === 'details'} onClick={() => setRightTab('details')}>Details</button>
+                <button type="button" role="tab" aria-selected={rightTab === 'redo'} onClick={() => setRightTab('redo')}>Redo model</button>
+              </div>
+              {rightTab === 'details' ? (<>
+                <div className="sx-block-head">
+                  <h2>Details</h2>
+                  <span className="sx-dim">{mode === 'simple' ? 'Simple' : 'Advanced'}</span>
+                </div>
+                {selFields ?? <p className="sx-dim sx-empty">Select an asset in Scene to see its values.</p>}
+                {selected && undoLabel ? <p className="sx-dim sx-last">Last edit: {undoLabel}</p> : null}
+              </>) : (
+                <RedoPanel id={selected} comparing={comparing} onCompare={setComparing} onChanged={onAssetChanged} />
+              )}
+            </aside>
+          </div>
+        </StudioErrorBoundary>
       )}
     </div>
   );

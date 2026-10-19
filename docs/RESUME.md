@@ -8,7 +8,7 @@
   - F-23: TICKET-16 part a. Opus fixed its localStorage use, the chain test and a CRLF file.
   - The campaign's beat 4 samples the dark lab at the strobe's low.
 - **Flash's queue** (`docs/sidecar/FLASH_INBOX.md`, strictly in order, Flash the only play-scene writer): F-24 (the title portrait over the logo, POL-292), F-12 (T07b), F-13 (the lab aim), F-25 (T09b), F-26 (T16b), F-27 (T15), F-28 (T13b).
-- **Argo** is writing three bundles (OPUS_NOTE_25): TICKET-19 (Window F), TICKET-18's rest (POL-35, 44, 45, 46) and TICKET-21 (avatar import, with research first). They'll be in My Drive's root: move them to Setmix, unpack with the path-checked script, stage, then brief.
+- **Argo** DELIVERED (ARGO_NOTE_19, Drive id 1JmxMSPeVy-jWQntdgFMeKR4pUPmj6K7xro-CjlA, 13 of 13 tests; three bundles in My Drive's root, not yet moved). Since then he's on TICKET-22 (POL-49 yaw-stable dither, window-g hooks) and ARGO_NOTE_20 (the turret plate overhang). The three bundles (OPUS_NOTE_25): TICKET-19 (Window F), TICKET-18's rest (POL-35, 44, 45, 46) and TICKET-21 (avatar import, with research first). They'll be in My Drive's root: move them to Setmix, unpack with the path-checked script, stage, then brief.
 - **On return:** verify Flash's reports (shots, `npm test` line, campaign); collect Argo's bundles; POL-298-style question for Argo: the turret plate overhangs a thin wall-top corner.
 
 ## 18 Oct, evening (read first)

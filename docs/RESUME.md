@@ -1,5 +1,16 @@
 # RESUME: start here (fresh session)
 
+## 19 Oct, early (read first: Opus paused about 24 h for usage)
+- **Landed and pushed (verified on the 3D PC):** npm test 2,953 pass, 0 fail; the campaign 54 of 54; test-ticket13 38 of 38; the build 13.69 MB.
+  - T13a: the turret (the real models, preloaded), the blue-sky push, peaceful drops, the scatter sidearm.
+  - T17a: the single-file diet, 15.14 to 13.67 MiB (24 vista and unused lows to the HD pack).
+  - T03P-R: Argo's plume rulings.
+  - F-23: TICKET-16 part a. Opus fixed its localStorage use, the chain test and a CRLF file.
+  - The campaign's beat 4 samples the dark lab at the strobe's low.
+- **Flash's queue** (`docs/sidecar/FLASH_INBOX.md`, strictly in order, Flash the only play-scene writer): F-24 (the title portrait over the logo, POL-292), F-12 (T07b), F-13 (the lab aim), F-25 (T09b), F-26 (T16b), F-27 (T15), F-28 (T13b).
+- **Argo** is writing three bundles (OPUS_NOTE_25): TICKET-19 (Window F), TICKET-18's rest (POL-35, 44, 45, 46) and TICKET-21 (avatar import, with research first). They'll be in My Drive's root: move them to Setmix, unpack with the path-checked script, stage, then brief.
+- **On return:** verify Flash's reports (shots, `npm test` line, campaign); collect Argo's bundles; POL-298-style question for Argo: the turret plate overhangs a thin wall-top corner.
+
 ## 18 Oct, evening (read first)
 - **Landed:** the T03P follow-up (the fabricator pours while printing, feeds from the registry's measured sockets, 44b6107f); Flash's F-20 (POL-175 and 174; POL-99 half done, the HUD still shows); and `test-on-3dpc.sh` falls back to the laptop when the worker is busy (owner), running as one function so a mid-run edit can't break it.
 - **TICKET-13:** the heavy machines and the gantry were already packed. Sheet 20 had no turret, so Opus drew P-41 (`panels/20/20-turret-s6.png`) and split it into turret-base, turret-yoke and turret-gun (images approved; the barrel is built in code). OPUS_NOTE_23 and `ticket13-context.json` are in Setmix; Argo is on it (ARGO_NOTE_16 first: the turret ruling and five plume answers).

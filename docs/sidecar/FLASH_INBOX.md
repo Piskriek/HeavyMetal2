@@ -93,10 +93,10 @@ Brief: `docs/prompts/sidecar/T05-base-meshes-avatar-beam-outcrops.md`. MOVED to 
 ## F-11 [MOVED] TICKET-03 P: colourful pixel plumes, only while machines operate
 Brief: `docs/prompts/sidecar/T03P-machine-plumes.md` (spec: docs/argo/notes/ARGO_NOTE_08_plumes.md). Start it only after F-10 is DONE. MOVED to Haiku by Opus (2026-10-18), alongside your F-19. Flash, skip it.
 
-## F-12 [HELD] TICKET-07 B: vehicle juice (boost, tracks, dust, print gantry) and the beam hurting monsters
+## F-12 [OPEN] TICKET-07 B: vehicle juice (boost, tracks, dust, print gantry) and the beam hurting monsters
 Brief: `docs/prompts/sidecar/T07b-vehicle-juice-beam-damage.md`. HELD until F-11 is DONE; Opus opens it. T07a has landed (767f75a5), and the brief now also carries its two play-scene leftovers: the sidearm leaving the rack (POL-96) and hold-E wreck salvage (POL-97).
 
-## F-13 [HELD] TICKET-06 hooks: aim the lab's Hardware Fabricator and Planet Table
+## F-13 [OPEN] TICKET-06 hooks: aim the lab's Hardware Fabricator and Planet Table
 Brief: none separate; the job is this list. HELD until Haiku's T06 (`docs/prompts/sidecar/T06-lab-overhaul.md`) has landed and F-12 is DONE; Opus opens it.
 - `play-scene.ts`: replace the hardcoded `targets` list in the lab aim (the `aimedLab` block) with `room.aimStation(pos, dir)` from T06's `lab-room.ts`, and widen `LabMachineKind` to `LabStationId` (`lab-machines.ts`). The rack, bench and combiner must keep working.
 - `play.tsx`: the E prompt comes from the station's `prompt`. E on `fabricator` opens the existing `FabricatorModal`; E on `planet-table` opens the Planetary Grid screen (08a's). Weapon Bench keeps its existing armory path.
@@ -189,3 +189,34 @@ Lanes right now: nobody else is in `goblin-front.tsx`, `haddy-crt-portrait.tsx` 
 - **The title portrait:** on the title screen, Dr. Haddy's CRT portrait card sits over the FIDELITY logo, and the logo hides its text (Opus's shot: `shots-run/t16a/title-fresh.png`, from `scripts/probe-t16a-shots.mjs`). Move it to a free spot that overlaps nothing at 1280x720 and 1920x1080: under the menu list, or under the telemetry panel on the right. Keep the play HUD's portrait where it is (top-left, clear of the stage panel).
 - **POL-292:** the HUD's "N of 12 kW" readout leaves out the turrets' 2 kW each. In play.tsx's Env literal (search for the Env built for the power readout), add `extraDrawKw: () => turretGridDrawKw(<the base world>)`, from `apps/web/src/base/world.ts`. See POL-292 in the registry for the details.
 - **Test:** extend `scripts/probe-t16a-shots.mjs` with a bounding-box check that the title portrait overlaps neither the logo nor the menu, at both sizes. Add a check to `scripts/test-ticket13.mjs` that one built turret adds 2 kW to the HUD readout. Run `npm run typecheck`, then through `scripts/test-on-3dpc.sh --only "<your paths>"`: `npm test` (report the line), the build, the probe and test-ticket13. Copy the title shots back and look at them; put the paths in your report.
+
+> **Opus is away for about 24 hours (from 19 October).** Flash is the ONLY writer of `play-scene.ts` and `play.tsx` until Opus returns: no Haiku runs. Do the open jobs strictly one at a time, in this order: F-24, F-12, F-13, F-25, F-26, F-27, F-28. Each is the next single-writer window. For each job:
+> - run `npm run typecheck`, then `npm test`, the build, the job's own checks and `node scripts/test-campaign.mjs` (54 of 54) through `scripts/test-on-3dpc.sh --only "<your paths>"`;
+> - look at every shot;
+> - report in the outbox with the commit, the `npm test` line, the campaign line and the shot paths;
+> - commit by explicit paths; never push.
+>
+> If a job is blocked, write `[BLOCKED]` with the reason and move to the next. Check `git diff docs/DEFERRED_POLISH_REGISTRY.md` before committing it. Use `kv` (profile-storage), never `localStorage`.
+
+## F-25 [OPEN] T09b: the audio verbs, the ambience and the print sweep wiring
+Brief: `docs/prompts/sidecar/T09b-audio-verbs-sweep-wiring.md` (T09a's buses have landed). The music duck follows MENTOR_MIX: to 0.45, 0.4 s down, 1.2 s up.
+
+## F-26 [OPEN] T16 part b: the 11 enclave domes (Window E), the Planet Table hologram, and T14's play-scene leftovers
+Brief: `docs/prompts/sidecar/T16-acts-7-9-finale.md`, only the parts F-23 left out:
+- Window E: the 11 enclave domes on the 4.2 km horizon (A9-01);
+- mounting `apps/web/src/play/planet-table-hologram.ts` (POL-70: the 11 enclaves and the 85 % consensus);
+- the finale's window-storm heal visual (the hook F-23 left in play.tsx);
+- POL-301 (the per-chapter stage-look hook, so the credits' chapter 1 is the 0a wireframe), POL-302 (expose the lab room's `setStorm` and `setMonitorEqualizer` through `PlayScene`), POL-303 (`setAltCam` with a target drifts: XYZ read-back, YXZ rebuild) and POL-304 (hide the held weapon's viewmodel during the credits).
+Source: `arena-gathered/argo-ticket16/`. Shots: the domes, the hologram, chapter 1 of the credits (wireframe), the credits with no rifle. Also run `node scripts/test-credits-video.mjs`.
+
+## F-27 [OPEN] T15: the harmonic choir, the radio and turbobass (Window D)
+Brief: `docs/prompts/sidecar/T15-harmonic-choir-radio-turbobass.md`. It merges `monsters.ts`, `wreck-sites.ts` and `game-audio.ts` onto the current files (T10, TRIFT, T09b); merge by hand, never copy over. The plume count is one clear number per emitter (`setCount`, F-21's count uniform), so the 144 BPM pulse multiplies it. POL-141 (Argo's ruling): a lab station operates while its window is open, plus a 3.5 s tail, only with power above 0.25.
+
+## F-28 [OPEN] T13b: the vehicle bay (the 3 s gantry print), the scout and hauler rear sockets, POL-50, POL-51 and POL-295
+Spec: brief 32 item 3 (`docs/prompts/sidecar/32-heavy-terraformers-and-turrets.md`) and Argo's `packages/plotsim/src/vehicle-bay.ts` (installed by T13a, not wired: `sampleGantryTimeline`, the socket specs, `MODULAR_SCOUT_SOCKETS`, `VEHICLE_FIT`, `snapAerialToShellY`, and `POL51_ROVER_DRIVE_TEST_PLAN` in `window-c-hooks.ts`).
+- Printing a scout or a hauler at the vehicle fabricator plays the 3 s gantry assembly on the `fabricator-frame` and `fabricator-head` models (the head moves through the timeline; its plume and feed cubes follow it, as T03P-R set up).
+- The scout gets 1 rear socket (a portable linked ore bin or a sync beacon with a 15 m safe dome); the hauler gets 3 (bulk ore or a turret). The socketed items are base items with their existing rules.
+- POL-50: the raycast aerial, the square `[-u-]` yoke in the empty cab, and `VEHICLE_FIT` for the hauler.
+- POL-51: a browser test that fabricates a scout, drives into a crater rim and a built wall, and checks the camera stays at least 0.65 m above the ground and the depth at screen centre stays at least 0.3 m.
+- POL-295: a turret on a pitched roof is supported (or refused).
+Files: `play-scene.ts` (one labelled section), `play.tsx` (the print and sockets), `apps/web/src/base/ui/fabricator-modal.tsx`, `packages/rovergear/`, `apps/web/src/base/world.ts` and `catalog.ts` (the socket items), and a new `scripts/test-ticket13b.mjs`. Shots: the gantry mid-print, a hauler with three socketed items, the scout's beacon dome. Use POL-321 to POL-330.

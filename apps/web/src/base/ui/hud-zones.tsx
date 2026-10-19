@@ -61,7 +61,7 @@ export function FloatsPill(props: {
       <span className="hud-stage-badge" aria-label={`Stage ${props.stage}`}>S{props.stage}</span>
       <ul className="hud-floats-bars">
         {props.floats.map((f, i) => (
-          <li key={f.key} style={{ '--c': f.colour } as CSSProperties} title={`${f.name} ${Math.floor(f.value)}`}>
+          <li key={f.key} data-metric={f.key} style={{ '--c': f.colour } as CSSProperties} title={`${f.name} ${Math.floor(f.value)}`}>
             <span className="hud-float-name">{f.name}</span>
             <i className={`hud-float-bar pat-${patterns[i % patterns.length]}`}>
               <s style={{ width: `${Math.max(0, Math.min(100, f.value))}%` }} />

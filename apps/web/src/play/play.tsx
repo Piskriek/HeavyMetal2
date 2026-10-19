@@ -126,7 +126,7 @@ import { CreditsDirector, OldMonitorJukeboxModal, isMonitorOverclockedPlaying, p
 import { CreditsPlayer } from '../credits/credits-player';
 import { HaddyCrtPortrait } from '../shell/haddy-crt-portrait';
 import { evaluateContinentalConsensus, evaluateFinaleWindowHeal } from './planet-table-hologram';
-import { PLANET_TABLE_AT, stationById } from './lab-room';
+import { stationById } from './lab-room';
 import { PlanetaryGridScreen } from '../shell/planetary-grid';
 import { loadRecentCodes } from '../storage/recent-codes';
 import { isBiosphereCoherent } from '@hm/questline';
@@ -692,6 +692,7 @@ export function PlayScreen(props: {
   useEffect(() => {
     if (!skinTrack.flipped) return;
     setSkinGlitch(true);
+    gameAudio.playSkinDegauss();
     window.setTimeout(() => setSkinGlitch(false), FIDELITY_SHIFT_MS);
   }, [skinTrack]);
   // the build readout drops its wheel and rotation hints while a radio line is on screen (TASK-25: the two bands never meet)
@@ -791,6 +792,34 @@ useEffect(() => {
   }, [radial]);
   useEffect(() => () => {
     if (removeHoldRef.current !== null) window.clearTimeout(removeHoldRef.current);
+  }, []);
+  const lastAmbienceCheckRef = useRef<{ at: number; where: string; stage: number; nearWater: boolean }>({
+    at: -1e9,
+    where: '',
+    stage: -1,
+    nearWater: false,
+  });
+  const syncAmbience = useCallback((forceWhere?: 'lab' | 'planet', forceStage?: number) => {
+    const curWhere = forceWhere ?? (liveWhereRef.current as 'lab' | 'planet' ?? 'lab');
+    const curStage = forceStage ?? plotRef.current.stage;
+    const pts = plotRef.current.points;
+    const floats = {
+      pxd: Math.max(0, Math.min(1, (pts?.pxd ?? 0) / 100)),
+      vtx: Math.max(0, Math.min(1, (pts?.vtx ?? 0) / 100)),
+      lx: Math.max(0, Math.min(1, (pts?.lx ?? 0) / 100)),
+      aq: Math.max(0, Math.min(1, (pts?.aq ?? 0) / 100)),
+    };
+    const nearWater = curWhere === 'planet' && (sceneRef.current?.isNearWater?.() ?? false);
+    const last = lastAmbienceCheckRef.current;
+    if (last.where !== curWhere || last.stage !== curStage || last.nearWater !== nearWater) {
+      lastAmbienceCheckRef.current = { at: performance.now(), where: curWhere, stage: curStage, nearWater };
+      gameAudio.setAmbience({
+        where: curWhere,
+        stage: curStage,
+        floats,
+        nearWater,
+      });
+    }
   }, []);
   const placingLayoutRotationRef = useRef<number>(0);
   const [planPrompt, setPlanPrompt] = useState<string | null>(null);
@@ -1157,6 +1186,9 @@ useEffect(() => {
       } else if (ev.type === 'placed') {
         incrementPlacedCounter(1);
         gameAudio.playPlace({ x: 0, y: 0, z: 0 });
+        if (ev.kind === 'wall' || ev.kind === 'foundation') gameAudio.playWeld({ x: 0, y: 0, z: 0 });
+        if (ev.kind === 'airlock') gameAudio.playAirlock({ x: 0, y: 0, z: 0 });
+        pieceManagerRef.current.triggerPrintSweep(ev.id);
         if (ev.kind === 'foundation') narratorRef.current?.trigger('build:foundation');
         if (ev.kind === 'bin') narratorRef.current?.trigger('bin:linked');
         if (ev.kind === 'airlock' || ev.kind === 'wall') narratorRef.current?.trigger('room:sealed');
@@ -1398,6 +1430,8 @@ useEffect(() => {
         if (hitMarkerTimeout.current) window.clearTimeout(hitMarkerTimeout.current);
         hitMarkerTimeout.current = window.setTimeout(() => setHitMarker(false), 110);
       }
+    } else if (res.reason === 'empty') {
+      gameAudio.playDryFire();
     }
   }, []);
 
@@ -1556,6 +1590,7 @@ useEffect(() => {
         payDrop(drop.item, drop.n);
       },
       onSealed: (mk, reward) => {
+        gameAudio.playSeal();
         for (const r of reward) payDrop(r.item, r.n);
         // the leak's wreck goes up a rung, and the seal is saved for this profile (TASK-23c)
         sceneRef.current?.sealWreck(mk.site);
@@ -2498,21 +2533,28 @@ useEffect(() => {
           narratorRef.current.trigger('moon:enter');
           gameAudio.setMusicContext('moon');
           gameAudio.setMoonStage(plotRef.current.stage);
+          syncAmbience('planet', plotRef.current.stage);
         }
         if (out.event === 'to-lab' || out.event === 'sync-lost') {
           gameAudio.setMusicContext('lab');
+          syncAmbience('lab');
         }
         if (out.event === 'stage-up') {
           triggerStageLine(out.stage);
           gameAudio.setMoonStage(out.stage);
           if (out.stage === 4) narratorRef.current.trigger('fab:hauler');
           if (out.stage === 6) narratorRef.current.trigger('fab:crawler');
+          syncAmbience(undefined, out.stage);
         }
 
         if (prevSyncRef.current >= 0.3 && out.sync < 0.3) {
           narratorRef.current.trigger('sync:low');
         }
         prevSyncRef.current = out.sync;
+      }
+
+      if (ms - lastAmbienceCheckRef.current.at > 500) {
+        syncAmbience();
       }
 
       let s = stateRef.current;
@@ -2834,6 +2876,7 @@ useEffect(() => {
       setStage: (stage: number) => {
         plotRef.current = { ...plotRef.current, stage };
         scene.raiseStage(stage, scene.debug.gatePlanet());
+        syncAmbience(undefined, stage);
         // the stage-up lines a real stage change plays (the plot's own stage-up event is not raised by this skip)
         triggerStageLine(stage);
         if (stage === 4) narratorRef.current?.trigger('fab:hauler');
@@ -2843,6 +2886,7 @@ useEffect(() => {
       setFidelityStage: (stage: number) => {
         plotRef.current = { ...plotRef.current, stage };
         scene.setFidelityStage(stage);
+        syncAmbience(undefined, stage);
       },
       biomeCounts: () => scene.getBiomeCounts(),
       setVegetationSetting: (v: 'auto' | 'off' | 'low' | 'high') => scene.setVegetationSetting(v),
@@ -3611,6 +3655,9 @@ useEffect(() => {
         else if (pieceSessionRef.current) pieceSessionRef.current = false;
         else if (building) stopBuilding();
         return;
+      }
+      if (e.button === 0 && beamHeldRef.current && beamModeRef.current === 'apply' && !beamPortRef.current) {
+        gameAudio.playDryFire();
       }
       if (building && locked) placeNow();
     };

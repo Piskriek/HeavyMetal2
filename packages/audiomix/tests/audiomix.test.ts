@@ -44,6 +44,13 @@ test('the routing: UI and weapons on combat and UI, music on music, ambience on 
   assert.equal(busOfSound('sfx-storm'), 'world');
   assert.equal(busOfSound('sfx-pickup-2'), 'world');
   assert.equal(busOfSound('sfx-impact'), 'world');
+  assert.equal(busOfSound('synth-chord-apply'), 'combatUi');
+  assert.equal(busOfSound('synth-chord-sculpt'), 'combatUi');
+  assert.equal(busOfSound('synth-chord-seal'), 'combatUi');
+  assert.equal(busOfSound('synth-cartridge-snap'), 'combatUi');
+  assert.equal(busOfSound('synth-cartridge-ping'), 'combatUi');
+  assert.equal(busOfSound('synth-skin-degauss'), 'combatUi');
+  assert.equal(busOfSound('synth-gate-charge'), 'world');
 });
 
 test('starting gains: voice and music are the owner mix, the rest are Argo levels in dB', () => {

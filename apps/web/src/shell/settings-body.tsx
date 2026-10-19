@@ -102,9 +102,9 @@ export function SettingsBody(props: {
       </section>
       <section aria-label="Sound">
         <h4>Sound</h4>
-        {volume('master', 'Everything')}
-        {volume('sfx', 'Effects')}
-        {volume('music', 'Music')}
+        {volume('master', 'Maker and racing: everything')}
+        {volume('sfx', 'Maker and racing: effects')}
+        {volume('music', 'Maker and racing: music')}
         <p className="hint">The Moon game's own mix, one level per bus. Her voice is never ducked; the rest step down while she speaks.</p>
         {BUS_IDS.map((bus) => {
           const key = GAME_MIX_KEY[bus];

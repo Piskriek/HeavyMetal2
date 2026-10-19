@@ -228,8 +228,8 @@ try {
   await page.evaluate(() => {
     window.__audio.duckMusic(true);
   });
-  // Wait short ramp
-  await page.waitForTimeout(250);
+  // Wait ramp (MENTOR_MIX is 0.4 s down)
+  await page.waitForTimeout(450);
   let duckBus = await page.evaluate(() => window.__audio.getBuses());
   console.log('Buses during Dr. Haddy narration duck:', duckBus);
   if (duckBus.duck < 0.25 || duckBus.duck > 0.55) {
@@ -241,7 +241,8 @@ try {
   await page.evaluate(() => {
     window.__audio.duckMusic(false);
   });
-  await page.waitForTimeout(650);
+  // Wait restore (MENTOR_MIX is 1.2 s up)
+  await page.waitForTimeout(1300);
   duckBus = await page.evaluate(() => window.__audio.getBuses());
   console.log('Buses after Dr. Haddy narration unduck:', duckBus);
   if (duckBus.duck < 0.85) {

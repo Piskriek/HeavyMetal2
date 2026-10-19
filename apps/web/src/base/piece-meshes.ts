@@ -17,6 +17,7 @@ import {
   KIT_PIVOT_OFFSETS,
   type Box,
 } from './kit-pieces';
+import { PRINT_EDGE_HEX, printFrame } from '@hm/tooljuice';
 
 /** The sliding door's run, in seconds, and the leaf's travel (m): its own width, so the doorway is clear once open. */
 const DOOR_SLIDE_SECONDS = 0.4;
@@ -79,8 +80,19 @@ export class PieceMeshManager {
   /** The batch ids of each foundation's legs and pads (leg and pad ids alternate per corner). */
   private frameParts = new Map<number, number[]>();
   private collapsing: CollapsingPiece[] = [];
+  private printSweeps = new Map<number, { pieceId: number; startT: number; key: string }>();
   private lastStage = 1;
   private batcher: Batcher;
+
+  triggerPrintSweep(pieceId: number): void {
+    const entry = this.pieceMap.get(pieceId);
+    const key = entry ? (entry.kind === 'foundation' ? `foundation|${this.lastStage}|0` : `${entry.kind}|${this.lastStage}|${entry.skirt}`) : '';
+    this.printSweeps.set(pieceId, {
+      pieceId,
+      startT: performance.now() / 1000,
+      key,
+    });
+  }
 
   constructor() {
     this.root = new THREE.Group();
@@ -412,6 +424,51 @@ export class PieceMeshManager {
           entry.doorOpen = next;
           slideDoor(entry.parts.leaf, next, DOOR_LEAF_TRAVEL);
         }
+      }
+    }
+
+    // Print sweep (P0-VFX-02, TASK-29 part A): 0.65 s reveal from base to top with #7cff4d leading edge, then 5 Hz spring settle
+    const nowS = performance.now() / 1000;
+    for (const [id, sweep] of this.printSweeps.entries()) {
+      const entry = this.pieceMap.get(id);
+      if (!entry) {
+        this.printSweeps.delete(id);
+        continue;
+      }
+      const elapsed = nowS - sweep.startT;
+      const frame = printFrame(elapsed);
+      const isFrame = entry.kind === 'foundation';
+      const key = sweep.key || (isFrame ? `foundation|${this.lastStage}|0` : `${entry.kind}|${this.lastStage}|${entry.skirt}`);
+
+      const posY = entry.pos.y + frame.offsetM;
+      const scaleY = frame.clip < 1.0 ? Math.max(0.02, frame.clip) : 1.0;
+      const matrix = new THREE.Matrix4().compose(
+        new THREE.Vector3(entry.pos.x, posY, entry.pos.z),
+        new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), entry.yaw),
+        new THREE.Vector3(1, scaleY, 1)
+      );
+      this.batcher.set(id, key, matrix);
+
+      if (frame.clip < 1.0) {
+        this.batcher.tint(id, new THREE.Color(PRINT_EDGE_HEX));
+      } else {
+        this.batcher.tint(id, null);
+      }
+
+      if (entry.dynamicRoot) {
+        entry.dynamicRoot.position.set(entry.pos.x, posY, entry.pos.z);
+        entry.dynamicRoot.scale.set(1, scaleY, 1);
+      }
+
+      if (frame.settled) {
+        const finalMatrix = new THREE.Matrix4().makeRotationY(entry.yaw).setPosition(entry.pos.x, entry.pos.y, entry.pos.z);
+        this.batcher.set(id, key, finalMatrix);
+        this.batcher.tint(id, null);
+        if (entry.dynamicRoot) {
+          entry.dynamicRoot.position.set(entry.pos.x, entry.pos.y, entry.pos.z);
+          entry.dynamicRoot.scale.set(1, 1, 1);
+        }
+        this.printSweeps.delete(id);
       }
     }
   }

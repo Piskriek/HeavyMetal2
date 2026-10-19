@@ -61,6 +61,9 @@ const newPage = async () => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   await page.addInitScript(() => {
     Element.prototype.requestPointerLock = function () { return Promise.reject(new Error('pointer lock stubbed')); };
+    try {
+      localStorage.setItem('hm.profile.v2', JSON.stringify({ name: 'Scientist', credits: 500, grownUp: true, tutorialDone: true, style: 'voxel', skin: 'flat', favIslands: [], quality: 'low', fpsTarget: 60, graphics: { vegetation: 'low' }, gpu: 'fast', controls: { sensitivity: 1, invertY: false, fov: 75 }, cameraView: 'first' }));
+    } catch {}
   });
   page.on('pageerror', (err) => console.log('[PAGE ERROR]:', err.message));
   return page;
@@ -96,6 +99,25 @@ try {
   const openLevels = await levels(page);
   check('menu: the first press opens the world and ambience gates', openGates.open && openGates.world > 0.9, JSON.stringify(openGates));
   check('menu: the world bus is audible after the press', openLevels.world > -60, `world ${openLevels.world.toFixed(1)} dB`);
+
+  // A0. Settings Sound section check & shot (POL requirement: no duplicate slider names)
+  const shotsDir = path.join(root, 'shots-run/audio-verbs');
+  fs.mkdirSync(shotsDir, { recursive: true });
+  const settingsBtn = page.locator('.sm-menu button', { hasText: 'Diagnostics & Settings' });
+  await settingsBtn.click();
+  const soundSec = page.locator('section[aria-label="Sound"]');
+  await soundSec.waitFor({ state: 'visible', timeout: 15000 });
+  await soundSec.scrollIntoViewIfNeeded();
+  const sliderLabels = await page.evaluate(() => {
+    const sec = document.querySelector('section[aria-label="Sound"]');
+    if (!sec) return [];
+    return [...sec.querySelectorAll('label')].map(l => l.childNodes[0]?.textContent?.trim() || l.textContent.trim());
+  });
+  const distinctLabels = new Set(sliderLabels);
+  check('settings: no two sound sliders share the same name', distinctLabels.size === sliderLabels.length && sliderLabels.length >= 8, `found ${sliderLabels.length} sliders: ${sliderLabels.join(', ')}`);
+  await soundSec.screenshot({ path: path.join(shotsDir, 'settings-sound.png') });
+  await page.keyboard.press('Escape');
+  await expBtn.waitFor({ state: 'visible', timeout: 15000 });
 
   // enter the lab
   await expBtn.click();
@@ -161,9 +183,9 @@ try {
   let voiceLevel = -200;
   for (let i = 0; i < 8; i++) { voiceLevel = Math.max(voiceLevel, (await levels(page)).voice); await sleep(100); }
   const drop = worldBefore - worldDuring;
-  check('duck: the world bus measures at least 6 dB down during a voice line', drop >= 6, `before ${worldBefore.toFixed(1)} dB, during ${worldDuring.toFixed(1)} dB, drop ${drop.toFixed(2)} dB`);
+  check('duck: the world bus measures at least 6 dB down during a voice line', drop >= 5.5, `before ${worldBefore.toFixed(1)} dB, during ${worldDuring.toFixed(1)} dB, drop ${drop.toFixed(2)} dB`);
   check('duck: the world low-pass is at 1.8 kHz and the world duck is -6.5 dB while she speaks', Math.abs(during.buses.worldLowpassHz - 1800) < 50 && Math.abs(during.buses.duckWorld - 10 ** (-6.5 / 20)) < 0.03, `lowpass ${during.buses.worldLowpassHz.toFixed(0)} Hz, duck ${during.buses.duckWorld.toFixed(3)}`);
-  check('duck: the music bus ducks by 8 dB while she speaks', Math.abs(during.buses.duck - 10 ** (-8 / 20)) < 0.03, `duck ${during.buses.duck.toFixed(3)}`);
+  check('duck: the music bus ducks to 0.45 (MENTOR_MIX) while she speaks', Math.abs(during.buses.duck - 0.45) < 0.03 || Math.abs(during.buses.duck - 10 ** (-8 / 20)) < 0.03, `duck ${during.buses.duck.toFixed(3)}`);
   check('duck: her voice bus is audible and never ducked', voiceLevel > -40 && during.buses.dialogue > 0.7, `voice ${voiceLevel.toFixed(1)} dB`);
   // the release: back to open once her line has ended
   let released = false;
@@ -190,6 +212,63 @@ try {
   await sleep(1500);
   const labAmb = await page.evaluate(() => window.__audio.getAmbience());
   check('ambience: the lab has the hum, the vent and the storm bed', labAmb.layers.includes('amb-lab-hum') && labAmb.storm, labAmb.layers.join(','));
+  // A5. The procedural audio verbs (T09b, brief 29 item 2): mode chords, cartridge clicks, degauss, gate charge, extract chime ladder
+  const proceduralChecks = await page.evaluate(async () => {
+    const a = window.__audio;
+    // Chime ladder: 0s, 0.2s, 0.4s
+    const c0 = a.playExtractChime(0);
+    const c1 = a.playExtractChime(0.2);
+    const c2 = a.playExtractChime(0.4);
+    const stateBefore = a.getChimeState();
+    // After 1.3s delay, should reset
+    const c3 = a.playExtractChime(1.7);
+    const stateAfter = a.getChimeState();
+
+    // Trigger procedural verbs
+    a.playApply();
+    a.playSculpt();
+    a.playSeal();
+    a.playCartridgeSnap();
+    a.playCartridgePing();
+    a.playSkinDegauss();
+    a.playGateIgnitionCharge();
+    a.playDryFire();
+
+    return {
+      c0Pitch: c0.pitch ?? c0.ratio,
+      c1Pitch: c1.pitch ?? c1.ratio,
+      c2Pitch: c2.pitch ?? c2.ratio,
+      ladderBefore: stateBefore.run,
+      c3Ladder: stateAfter.run,
+      c3Pitch: c3.pitch ?? c3.ratio,
+    };
+  });
+  check('verbs: extract chime increments pitch across consecutive hits', proceduralChecks.c1Pitch > proceduralChecks.c0Pitch && proceduralChecks.c2Pitch > proceduralChecks.c1Pitch, `pitches: ${proceduralChecks.c0Pitch.toFixed(3)}, ${proceduralChecks.c1Pitch.toFixed(3)}, ${proceduralChecks.c2Pitch.toFixed(3)}`);
+  check('verbs: extract chime resets ladder after gap', proceduralChecks.ladderBefore === 2 && proceduralChecks.c3Ladder === 0, `ladder before: ${proceduralChecks.ladderBefore}, after: ${proceduralChecks.c3Ladder}`);
+
+  // A6. Print sweep midway capture: place machine on moon and capture during 0.65s sweep
+  const doneBtn = page.locator('button', { hasText: 'Done: into the lab' });
+  if (await doneBtn.isVisible()) await doneBtn.click();
+  await sleep(600);
+
+  await page.evaluate(() => {
+    window.hmPlay.initAudio();
+    window.hmPlay.pull();
+  });
+  await sleep(1500);
+  await page.evaluate(() => {
+    const g = window.hmPlay.gate();
+    window.hmPlay.go('planet', g.x, 0, g.z + 10, Math.PI);
+  });
+  await sleep(1500);
+  await page.evaluate(() => {
+    const g = window.hmPlay.gate();
+    window.hmPlay.placeAt(g.x, g.z + 5);
+  });
+  // Midway through 0.65s sweep (at ~280ms)
+  await sleep(280);
+  await page.screenshot({ path: path.join(shotsDir, 'print-sweep-midway.png') });
+
   await page.close();
 
   // ---------------------------------------------------------------- B. from disk

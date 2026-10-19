@@ -15,8 +15,20 @@
 // - window.__audio debug inspection hook (created with the controller, so it exists before the first sound).
 
 import { kv } from '../storage/profile-storage';
-import { BUS_IDS, BUS_START, DUCK, busOfSound, crushForStage, dbToGain, type BusId, type Crush } from '@hm/audiomix';
+import { BUS_IDS, BUS_START, DUCK, busOfSound, crushForStage, dbToGain, chimeRatio, chimeStep, CHIME_IDLE, type BusId, type Crush, type ChimeState } from '@hm/audiomix';
 import { ambiencePlan, reverbImpulse, whiteNoise, type AmbienceLayer, type AmbiencePlan, type AmbienceQuery } from '@hm/soundscape';
+import {
+  SYNTH_APPLY_CHORD,
+  SYNTH_SCULPT_CHORD,
+  SYNTH_SEAL_CHORD,
+  SYNTH_CARTRIDGE_SNAP,
+  SYNTH_CARTRIDGE_PING,
+  SYNTH_SKIN_DEGAUSS,
+  SYNTH_GATE_CHARGE,
+  type ProceduralRecipe,
+  type SfxRecipe,
+} from '@hm/soundpack';
+import { MENTOR_MIX } from './mentor-mix';
 import { BITCRUSH_PROCESSOR, bitcrushModuleUrl } from './bitcrush-worklet';
 
 export interface AudioLevel {
@@ -225,6 +237,10 @@ export class GameAudioController {
   // Positional Voices (max 8)
   private activePositionalVoices: PositionalVoice[] = [];
   private keyedLoops = new Map<string, PositionalVoice>();
+
+  // Procedural Noise & Chime Ladder (T09b)
+  private synthNoiseBuf: AudioBuffer | null = null;
+  private chimeState: ChimeState = CHIME_IDLE;
 
   // Diagnostic & Profiling
   private lastCpuTimeMs = 0;
@@ -536,19 +552,23 @@ export class GameAudioController {
   }
 
   /**
-   * While she speaks (true) or when she stops (false): every bus but the voice ducks by its DUCK depth. The attack is 80 ms and
-   * the release 450 ms (linear ramps, @hm/audiomix). The world bus also drops its low-pass to 1.8 kHz while she talks.
+   * While she speaks (true) or when she stops (false):
+   * - Music follows the owner's ear: MENTOR_MIX.duck (to 0.45, 0.4 s down, 1.2 s up).
+   * - Other buses keep Argo's amounts (combatUi -2 dB, world -6.5 dB, ambience -5 dB) with 80 ms attack and 450 ms release.
+   * - The world bus also drops its low-pass to 1.8 kHz while she talks.
    */
   public duckMusic(ducked: boolean): void {
     if (!this.ctx) return;
     const now = this.ctx.currentTime;
-    const seconds = ducked ? DUCK.attackS : DUCK.releaseS;
-    const nodes: Partial<Record<BusId, GainNode | null>> = { combatUi: this.combatDuck, world: this.worldDuck, ambience: this.ambienceDuck, music: this.musicDuckGain };
-    for (const bus of BUS_IDS) {
-      const node = nodes[bus];
-      if (!node) continue;
-      rampTo(node.gain, ducked ? dbToGain(DUCK.depthDb[bus]) : 1, now, seconds);
+    // Music duck (owner mix: 0.45 fader, 0.4 s down, 1.2 s up)
+    if (this.musicDuckGain) {
+      rampTo(this.musicDuckGain.gain, ducked ? MENTOR_MIX.duck.to : 1, now, ducked ? MENTOR_MIX.duck.downS : MENTOR_MIX.duck.upS);
     }
+    // Other buses duck by DUCK amounts with 80 ms attack and 450 ms release
+    const seconds = ducked ? DUCK.attackS : DUCK.releaseS;
+    if (this.combatDuck) rampTo(this.combatDuck.gain, ducked ? dbToGain(DUCK.depthDb.combatUi) : 1, now, seconds);
+    if (this.worldDuck) rampTo(this.worldDuck.gain, ducked ? dbToGain(DUCK.depthDb.world) : 1, now, seconds);
+    if (this.ambienceDuck) rampTo(this.ambienceDuck.gain, ducked ? dbToGain(DUCK.depthDb.ambience) : 1, now, seconds);
     if (this.worldLp) rampTo(this.worldLp.frequency, ducked ? DUCK.worldLowpassHz : DUCK.worldLowpassOpenHz, now, seconds);
   }
 
@@ -1080,6 +1100,94 @@ export class GameAudioController {
     return src;
   }
 
+  private getSynthNoiseBuffer(): AudioBuffer {
+    if (!this.synthNoiseBuf && this.ctx) {
+      const len = Math.floor(this.ctx.sampleRate * 2);
+      const b = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = b.getChannelData(0);
+      let s = 0x9e3779b9;
+      for (let i = 0; i < len; i++) {
+        s ^= s << 13;
+        s ^= s >>> 17;
+        s ^= s << 5;
+        data[i] = ((s >>> 0) / 0xffffffff) * 2 - 1;
+      }
+      this.synthNoiseBuf = b;
+    }
+    return this.synthNoiseBuf!;
+  }
+
+  /**
+   * Play a procedural recipe (from @hm/soundpack) directly into its routed bus.
+   * Synthesizes transient, tonal body, and mechanical tail layers using Web Audio primitives.
+   */
+  public playRecipe(recipe: ProceduralRecipe | SfxRecipe, options?: { volume?: number; pitch?: number; bus?: BusId }): void {
+    if (!recipe || !Array.isArray(recipe.layers)) return;
+    const c = this.getContext();
+    const t0 = c.currentTime;
+    const userVol = options?.volume !== undefined ? Math.max(0, options.volume) : 1.0;
+    const pitch = options?.pitch !== undefined && options.pitch > 0 ? options.pitch : 1.0;
+    const bus = options?.bus ?? busOfSound(recipe.id);
+    const busNode = this.busNode(bus);
+
+    for (const layer of recipe.layers) {
+      const delay = (layer.delayMs ?? 0) / 1000;
+      const startT = t0 + delay;
+      const attack = layer.attackMs / 1000;
+      const decay = layer.decayMs / 1000;
+      const peakT = startT + Math.max(0.001, attack);
+      const endT = peakT + Math.max(0.005, decay);
+      const targetGain = Math.max(0.0001, layer.gain * userVol);
+
+      const gainNode = c.createGain();
+      gainNode.gain.setValueAtTime(0.0001, startT);
+      gainNode.gain.linearRampToValueAtTime(targetGain, peakT);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, endT);
+
+      let sourceNode: AudioScheduledSourceNode;
+
+      if (layer.wave === 'noise') {
+        const bs = c.createBufferSource();
+        bs.buffer = this.getSynthNoiseBuffer();
+        bs.loop = true;
+        sourceNode = bs;
+      } else {
+        const osc = c.createOscillator();
+        osc.type = layer.wave;
+        if (layer.detune) {
+          osc.detune.setValueAtTime(layer.detune, startT);
+        }
+        const f0 = Math.max(20, Math.min(20000, layer.freq[0] * pitch));
+        const f1 = Math.max(20, Math.min(20000, layer.freq[1] * pitch));
+        osc.frequency.setValueAtTime(f0, startT);
+        if (f0 !== f1 && decay > 0) {
+          osc.frequency.exponentialRampToValueAtTime(f1, endT);
+        }
+        sourceNode = osc;
+      }
+
+      let finalNode: AudioNode = sourceNode;
+      if (layer.filter) {
+        const flt = c.createBiquadFilter();
+        flt.type = layer.filter.type;
+        flt.Q.setValueAtTime(layer.filter.q, startT);
+        const filtF0 = Math.max(20, Math.min(20000, layer.filter.freq[0] * pitch));
+        const filtF1 = Math.max(20, Math.min(20000, layer.filter.freq[1] * pitch));
+        flt.frequency.setValueAtTime(filtF0, startT);
+        if (filtF0 !== filtF1 && decay > 0) {
+          flt.frequency.exponentialRampToValueAtTime(filtF1, endT);
+        }
+        sourceNode.connect(flt);
+        finalNode = flt;
+      }
+
+      finalNode.connect(gainNode).connect(busNode);
+      sourceNode.start(startT);
+      sourceNode.stop(endT + 0.05);
+    }
+    this.recordRecentSound(recipe.id);
+  }
+
   /**
    * Play a 3D spatialized sound using PannerNode (equalpower, inverse distance).
    * Voice budget: Max 8 positional voices. The farthest voice is stolen if budget exceeded.
@@ -1374,6 +1482,27 @@ export class GameAudioController {
     }
   }
 
+  /**
+   * The pickup chime ladder: rising semitone per consecutive chunk, resetting after 1.2 s (capped at 1 octave).
+   * Plays sfx-pickup-1 on the world SFX bus with pitch ratio 2^(semitones/12).
+   */
+  public playExtractChime(atS?: number): { semitones: number; ratio: number; pitch: number } {
+    const t = atS !== undefined ? atS : (this.ctx?.currentTime ?? performance.now() / 1000);
+    const r = chimeStep(this.chimeState, t);
+    this.chimeState = r.state;
+    const ratio = chimeRatio(r.semitones);
+    this.play2d('sfx-pickup-1', { pitch: ratio, volume: 0.9, bus: 'world' });
+    return { semitones: r.semitones, ratio, pitch: ratio };
+  }
+
+  public getChimeState(): ChimeState {
+    return this.chimeState;
+  }
+
+  public resetChime(): void {
+    this.chimeState = CHIME_IDLE;
+  }
+
   // Weapons SFX
   public playWeaponFire(mode: 'semi' | 'burst' | 'beam', pos?: { x: number; y: number; z: number }): void {
     if (mode === 'beam') {
@@ -1403,6 +1532,49 @@ export class GameAudioController {
   public playWeaponEmpty(pos?: { x: number; y: number; z: number }): void {
     if (pos) this.play3d('sfx-empty', pos);
     else this.play2d('sfx-empty');
+  }
+
+  public playDryFire(pos?: { x: number; y: number; z: number }): void {
+    this.playWeaponEmpty(pos);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Procedural Synthesizer Verbs (Brief 29 Item 2, T09b)
+  // ---------------------------------------------------------------------------
+
+  /** Warm major third confirmation chord (C4 + E4) on tool mode Apply. */
+  public playApply(): void {
+    this.playRecipe(SYNTH_APPLY_CHORD);
+  }
+
+  /** Low resonant sweep (180 Hz -> 85 Hz) on tool mode Sculpt. */
+  public playSculpt(): void {
+    this.playRecipe(SYNTH_SCULPT_CHORD);
+  }
+
+  /** High phase-locked tone (dual ~1760 Hz chime) on tool mode Seal. */
+  public playSeal(): void {
+    this.playRecipe(SYNTH_SEAL_CHORD);
+  }
+
+  /** Tactile mechanical seating snap when slotting a cartridge. */
+  public playCartridgeSnap(): void {
+    this.playRecipe(SYNTH_CARTRIDGE_SNAP);
+  }
+
+  /** Spring release ping and acoustic ring when ejecting a cartridge. */
+  public playCartridgePing(): void {
+    this.playRecipe(SYNTH_CARTRIDGE_PING);
+  }
+
+  /** POL-42: 40 ms skin degauss tick on Combat_UI_Bus when HUD skin flips. */
+  public playSkinDegauss(): void {
+    this.playRecipe(SYNTH_SKIN_DEGAUSS);
+  }
+
+  /** POL-67: Rising capacitor-charge pitch during gate ignition (World_SFX_Bus). */
+  public playGateIgnitionCharge(): void {
+    this.playRecipe(SYNTH_GATE_CHARGE, { bus: 'world' });
   }
 
   // Rovers SFX
@@ -1585,6 +1757,18 @@ export class GameAudioController {
       duckMusic: (d: boolean) => this.duckMusic(d),
       play2d: (id: string, opt?: any) => this.play2d(id, opt),
       play3d: (id: string, pos: any, opt?: any) => this.play3d(id, pos, opt),
+      playRecipe: (r: any, opt?: any) => this.playRecipe(r, opt),
+      playExtractChime: (atS?: number) => this.playExtractChime(atS),
+      getChimeState: () => this.getChimeState(),
+      resetChime: () => this.resetChime(),
+      playApply: () => this.playApply(),
+      playSculpt: () => this.playSculpt(),
+      playSeal: () => this.playSeal(),
+      playCartridgeSnap: () => this.playCartridgeSnap(),
+      playCartridgePing: () => this.playCartridgePing(),
+      playSkinDegauss: () => this.playSkinDegauss(),
+      playGateIgnitionCharge: () => this.playGateIgnitionCharge(),
+      playDryFire: () => this.playDryFire(),
     };
   }
 }

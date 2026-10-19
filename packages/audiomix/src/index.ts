@@ -58,6 +58,7 @@ export function busOfSound(id: string): BusId {
   if (id.startsWith('amb-')) return 'ambience';
   if (id.startsWith('sfx-ui-') || id === 'sfx-refuse') return 'combatUi';
   if (id.startsWith('sfx-fire-') || id === 'sfx-reload' || id === 'sfx-empty') return 'combatUi';
+  if (id.startsWith('synth-chord-') || id.startsWith('synth-cartridge-') || id === 'synth-skin-degauss') return 'combatUi';
   return 'world';
 }
 

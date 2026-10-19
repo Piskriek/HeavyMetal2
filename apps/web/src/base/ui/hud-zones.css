@@ -77,6 +77,10 @@
   --hud-c-mix: #aa55ff;
   --hud-bar-pattern: linear-gradient(90deg, currentColor 75%, transparent 75%) 0 0 / 12.5% 100%;
 }
+.play[data-fidelity='1'] .hud-floats-bars li[data-metric='pxd'] { --c: var(--hud-c-pxd, #ff55ff) !important; }
+.play[data-fidelity='1'] .hud-floats-bars li[data-metric='vtx'] { --c: var(--hud-c-vtx, #55ff55) !important; }
+.play[data-fidelity='1'] .hud-floats-bars li[data-metric='lx']  { --c: var(--hud-c-lx, #ffff55) !important; }
+.play[data-fidelity='1'] .hud-floats-bars li[data-metric='aq']  { --c: var(--hud-c-aq, #55ffff) !important; }
 
 /* 2, 256-colour VGA: gunmetal panels with a chiselled bevel and recessed wells. */
 .play[data-fidelity='2'] {

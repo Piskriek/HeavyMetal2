@@ -11,6 +11,7 @@ import type { MachineKind, Metric } from '@hm/plotsim';
 import { type GenLevel, getGenSync } from '../assets/gen';
 import { machineSize } from '../base/machine-inspect';
 import { plumeShare } from './brownout-visual';
+import { PRINT_EDGE_HEX } from '@hm/tooljuice';
 
 export type MachineLedStatus = 'running' | 'warn' | 'unpowered';
 
@@ -82,6 +83,8 @@ export interface MachineProp {
   light(glow: number): void;
   /** Updates the square housing status LED from live telemetry (POL-39). */
   setStatusLed?(running: number, connected: boolean, satisfaction?: number, t?: number): void;
+  /** Apply print sweep frame (T09b, P0-VFX-02): clip 0..1 with #7cff4d leading edge, and vertical offset. */
+  applyPrintSweep?(clip: number, offsetM: number): void;
 }
 
 /** The metric a machine's pixels raise (null: it pours none). */
@@ -342,6 +345,9 @@ function fitToTable(p: MachineProp, kind: MachineKind): MachineProp {
   const baseAnimate = p.animate;
   const baseLight = p.light;
 
+  let edgeMesh: THREE.Mesh | null = null;
+  let baseY: number | null = null;
+
   return {
     ...p,
     power: scalePt(p.power),
@@ -368,6 +374,32 @@ function fitToTable(p: MachineProp, kind: MachineKind): MachineProp {
       }
     },
     setStatusLed,
+    applyPrintSweep(clip: number, offsetM: number): void {
+      if (baseY === null) baseY = p.group.position.y;
+      p.group.position.y = baseY + offsetM;
+      if (clip < 1.0) {
+        inner.scale.set(s, Math.max(0.02, s * clip), s);
+        if (!edgeMesh) {
+          const edgeW = Math.max(1.2, (box.max.x - box.min.x) * s * 1.08);
+          const edgeD = Math.max(1.2, (box.max.z - box.min.z) * s * 1.08);
+          const edgeGeo = new THREE.BoxGeometry(edgeW, 0.05, edgeD);
+          const edgeMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(PRINT_EDGE_HEX), transparent: true, opacity: 0.95 });
+          edgeMesh = new THREE.Mesh(edgeGeo, edgeMat);
+          edgeMesh.name = 'print-sweep-edge';
+          p.group.add(edgeMesh);
+        }
+        edgeMesh.position.set(0, target * clip, 0);
+      } else {
+        inner.scale.setScalar(s);
+        if (edgeMesh) {
+          p.group.remove(edgeMesh);
+          edgeMesh.geometry.dispose();
+          (edgeMesh.material as THREE.Material).dispose();
+          edgeMesh = null;
+        }
+        baseY = null;
+      }
+    },
   };
 }
 

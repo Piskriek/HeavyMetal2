@@ -22,6 +22,7 @@ import { createPlotHolo, type PlotHolo } from './plot-holo';
 import { COLOUR_MARK_FRAGMENT, localMachineWaveAt, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_OFF_FRAGMENT, OPENING_OFF_VERTEX, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX, scanRingFadeAt, waveBandColourFor } from './portal-shaders';
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
 import { disposeProp, FABRICATOR_PLUME, FABRICATOR_VENT, FEED_CUBES_FULL, feedCubeCount, feedCubeProgress, lineSpan, machinePlumeCount, machinePlumeCountOf, machinePlumeGravity, machinePlumeLook, machinePlumeLookOf, machinePlumeSpec, machinePlumeSteady, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
+import { printFrame } from '@hm/tooljuice';
 import { beadSpeed, spanPoint, spanSag } from './brownout-visual';
 import { castHeightfield, castSpheres, createRoverArmState, nearestHit, stepRoverArm, type CastSphere, type RoverArmState, type Vec3 as RoverVec3 } from './rover-camera';
 import { createExposureState, createScanWave, exposureTargetLuminance, gateOrLabFactor, markScanWaveDone, scanFrame, stepExposure, suitCamMix, suitCamProfile, suitCamStrength, triggerScanWave, type ExposureState, type ScanWave, type SuitCamSetting } from './stage-look';
@@ -292,6 +293,8 @@ export interface PlayScene {
   playerPose(): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number } | null;
   /** Seal (TASK-21d): while on, the rifle's rib and the ground ring show Seal's amber. TASK-23b-2 calls it at a leak; nothing here seals. */
   setBeamSealing(on: boolean): void;
+  /** Whether the player is currently near water on the planet (TASK-29 / T09b). */
+  isNearWater(): boolean;
   /**
    * Compiles every shader the frames will need, for each place it draws, behind the loading bar: a compile mid-play is a hitch the
    * display governor would read as a slow machine (and the owner's rule is never to start a screen choppy).
@@ -335,6 +338,8 @@ export interface PlayScene {
   getBiomeCounts(): BiomeInstanceCount;
   /** Bakes the living coverage masks (stages 0 to 6) and hydro water surfaces behind the loading bar (TICKET-02 Items B and E). */
   bakeCoverage(): void;
+  /** Whether the player is close to standing water (lake or active watermaker). */
+  isNearWater(): boolean;
   /** For the tests and the e2e: where you are, and a way to stand somewhere. */
   readonly debug: {
     biomeCounts(): BiomeInstanceCount | null;
@@ -857,7 +862,7 @@ export function createPlayScene(o: {
   // ---- the plot's machines (`@hm/plotsim`): each a prop (machine-props.ts) on the ground, its cable from the node that powers it,
   // the lines between pylons, and the pixels pouring from every pixel machine that runs (one plume for all, `@hm/plume`)
   /** share: the machine's run share as its pour uses it (a pylon's is 1 while its line is under load); pour: the pixels it pours now. */
-  interface MachineView { readonly m: Machine; prop: MachineProp; vent: THREE.Vector3 | null; feed: THREE.Vector3 | null; emitter: number | null; running: number; share: number; pour: number; glow: THREE.Mesh | null; light: THREE.PointLight | null }
+  interface MachineView { readonly m: Machine; prop: MachineProp; vent: THREE.Vector3 | null; feed: THREE.Vector3 | null; emitter: number | null; running: number; share: number; pour: number; glow: THREE.Mesh | null; light: THREE.PointLight | null; printStartT?: number }
   const views = new Map<number, MachineView>();
   // TICKET-01 B: the moon's solids exist from the start (the twin's frame stands before any machine is placed)
   rebuildPlanetStatic();
@@ -947,6 +952,15 @@ export function createPlayScene(o: {
     let sources = 0;
     let live = 0;
     for (const v of views.values()) {
+      if (v.printStartT !== undefined) {
+        const elapsed = t - v.printStartT;
+        const frame = printFrame(elapsed);
+        v.prop.applyPrintSweep?.(frame.clip, frame.offsetM);
+        if (frame.settled) {
+          v.prop.applyPrintSweep?.(1.0, 0.0);
+          delete v.printStartT;
+        }
+      }
       if (v.emitter !== null) {
         v.pour = machinePlumeCount(v.m.kind, v.share, t);
         plume.setCount(v.emitter, v.pour);
@@ -1033,6 +1047,7 @@ export function createPlayScene(o: {
       vent: prop.vent ? prop.vent.clone().applyMatrix4(prop.group.matrixWorld) : null,
       feed: prop.feed ? prop.feed.clone().applyMatrix4(prop.group.matrixWorld) : null,
       emitter: null, running: 0, share: 0, pour: 0, glow, light,
+      printStartT: clock,
     };
   };
   /** One machine's pour (`@hm/plume`): its colour, look and pixel count, all from machine-props.ts (ARGO_NOTE_08). */
@@ -2853,6 +2868,7 @@ export function createPlayScene(o: {
         const before = powerT;
         powerT += dt;
         const crossed = (at: number): boolean => before < at && powerT >= at;
+        if (crossed(0.05)) gameAudio.playLever({ x: -6.5, y: 1.0, z: -7.8 });
         if (crossed(0.2)) gameAudio.playBreaker({ x: -7.4, y: 1.0, z: -1.0 });
         if (crossed(1.2)) {
           gameAudio.startCapacitorHum({ x: -7.2, y: 1.0, z: 1.0 });
@@ -2860,6 +2876,7 @@ export function createPlayScene(o: {
         }
         if (crossed(2.0)) {
           gameAudio.playGateSpool({ x: 0, y: 1.0, z: -1.0 });
+          gameAudio.playGateIgnitionCharge();
           sfx('coil-charge');
         }
         if (crossed(3.8)) sfx('static-burst', { volume: 0.6 });
@@ -3603,6 +3620,14 @@ export function createPlayScene(o: {
       renderer.setRenderTarget(null);
       for (const p of stand) { planetScene.remove(p.group); p.group.traverse((obj) => { const mesh = obj as THREE.Mesh; if (mesh.isMesh) mesh.geometry.dispose(); }); }
       holo.warm(renderer, camera);
+    },
+    isNearWater() {
+      if (where !== 'planet' || !waterGroup || !waterGroup.visible) return false;
+      for (const v of views.values()) {
+        if ((v.m.kind === 'water' || v.m.kind === 'heavy-water') && Math.hypot(v.m.x - pos.x, v.m.z - pos.z) <= 35) return true;
+      }
+      if (Math.hypot(pos.x - (twin.group.position.x - 20), pos.z - (twin.group.position.z + 40)) <= 40) return true;
+      return false;
     },
     debug: {
       setSync: (v: number) => { sync = Math.max(0, Math.min(1, v)); },

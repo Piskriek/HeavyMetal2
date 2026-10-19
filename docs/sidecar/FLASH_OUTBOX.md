@@ -300,5 +300,20 @@ Append one entry per job, in the format in `FLASH_INBOX.md`. Newest at the botto
   - `scripts/test-lab-overhaul.mjs`: Added full verification suite testing teleporting/aiming at each of the 6 stations (`preset-rack`, `preset-bench`, `preset-combiner`, `fabricator`, `planet-table`, `weapon-bench`), confirming prompt text, pressing E to open window, and Escape to close.
 - Next active task in queue: F-25.
 
-
-
+### [2026-10-19 13:25] F-25 [DONE] T09b: the audio verbs, the ambience and the print sweep wiring
+- Commits: `dcb4d523` ("feat(audio): procedural audio verbs, ambience wiring, print sweep, and settings sliders (F-25)")
+- Checks:
+  - `npm run typecheck`: 0 errors
+  - `npm test` on 3D PC worker: 2962 passed, 0 failed, 19 speed tests passed
+  - `npm run build`: 13.71 MB single-file bundle (cap 16 MB)
+  - `scripts/test-audio-buses.mjs`: 26 of 26 checks passed (A0 Settings sound, A5 verbs/chime, A6 print sweep)
+  - `scripts/test-music-sfx.mjs` on 3D PC worker: ALL CHECKS PASSED (duck to 0.45, stage crossfades, 8 voices limit)
+  - `scripts/test-base-building.mjs` on 3D PC worker: ALL CHECKS PASSED (print sweep, ramp walk, 200-piece batched)
+  - `scripts/test-campaign.mjs` on 3D PC worker: 54 of 54 beats PASS, 0 console/http errors, 0 HUD overlaps (`apps/web/public/checkpoints/` restored)
+- Shots (`shots-run/audio-verbs/`):
+  - `settings-sound.png`: 8 distinct sound sliders with unique labels ("Maker and racing: everything", "Maker and racing: effects", "Maker and racing: music", "Voice (Dr. Haddy)", "Combat and UI", "World effects", "Ambience", "Music"); zero name collisions.
+  - `print-sweep-midway.png`: Machine print sweep midway through 0.65 s clip showing animated green `#7cff4d` scanline edge mesh and vertical emergence.
+- Changes from brief:
+  - Attached `#7cff4d` `edgeMesh` lazily only while `clip < 1.0` in `machine-props.ts` so `Box3` bounding-box unit tests are unaffected.
+  - Adjusted `test-music-sfx.mjs` duck wait to 450 ms down and 1300 ms up to match `MENTOR_MIX.duck` (0.4 s down, 1.2 s up).
+- Decisions left: None. Ready for F-26.

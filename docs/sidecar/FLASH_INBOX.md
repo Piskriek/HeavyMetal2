@@ -198,7 +198,7 @@ Lanes right now: nobody else is in `goblin-front.tsx`, `haddy-crt-portrait.tsx` 
 >
 > If a job is blocked, write `[BLOCKED]` with the reason and move to the next. Check `git diff docs/DEFERRED_POLISH_REGISTRY.md` before committing it. Use `kv` (profile-storage), never `localStorage`.
 
-## F-25 [TAKEN] T09b: the audio verbs, the ambience and the print sweep wiring
+## F-25 [DONE] T09b: the audio verbs, the ambience and the print sweep wiring
 Brief: `docs/prompts/sidecar/T09b-audio-verbs-sweep-wiring.md` (T09a's buses have landed). The music duck follows MENTOR_MIX: to 0.45, 0.4 s down, 1.2 s up.
 
 ## F-26 [OPEN] T16 part b: the 11 enclave domes (Window E), the Planet Table hologram, and T14's play-scene leftovers

@@ -96,7 +96,7 @@ Brief: `docs/prompts/sidecar/T03P-machine-plumes.md` (spec: docs/argo/notes/ARGO
 ## F-12 [DONE] TICKET-07 B: vehicle juice (boost, tracks, dust, print gantry) and the beam hurting monsters
 Brief: `docs/prompts/sidecar/T07b-vehicle-juice-beam-damage.md`. HELD until F-11 is DONE; Opus opens it. T07a has landed (767f75a5), and the brief now also carries its two play-scene leftovers: the sidearm leaving the rack (POL-96) and hold-E wreck salvage (POL-97).
 
-## F-13 [TAKEN] TICKET-06 hooks: aim the lab's Hardware Fabricator and Planet Table
+## F-13 [DONE] TICKET-06 hooks: aim the lab's Hardware Fabricator and Planet Table
 Brief: none separate; the job is this list. HELD until Haiku's T06 (`docs/prompts/sidecar/T06-lab-overhaul.md`) has landed and F-12 is DONE; Opus opens it.
 - `play-scene.ts`: replace the hardcoded `targets` list in the lab aim (the `aimedLab` block) with `room.aimStation(pos, dir)` from T06's `lab-room.ts`, and widen `LabMachineKind` to `LabStationId` (`lab-machines.ts`). The rack, bench and combiner must keep working.
 - `play.tsx`: the E prompt comes from the station's `prompt`. E on `fabricator` opens the existing `FabricatorModal`; E on `planet-table` opens the Planetary Grid screen (08a's). Weapon Bench keeps its existing armory path.
@@ -198,7 +198,7 @@ Lanes right now: nobody else is in `goblin-front.tsx`, `haddy-crt-portrait.tsx` 
 >
 > If a job is blocked, write `[BLOCKED]` with the reason and move to the next. Check `git diff docs/DEFERRED_POLISH_REGISTRY.md` before committing it. Use `kv` (profile-storage), never `localStorage`.
 
-## F-25 [OPEN] T09b: the audio verbs, the ambience and the print sweep wiring
+## F-25 [TAKEN] T09b: the audio verbs, the ambience and the print sweep wiring
 Brief: `docs/prompts/sidecar/T09b-audio-verbs-sweep-wiring.md` (T09a's buses have landed). The music duck follows MENTOR_MIX: to 0.45, 0.4 s down, 1.2 s up.
 
 ## F-26 [OPEN] T16 part b: the 11 enclave domes (Window E), the Planet Table hologram, and T14's play-scene leftovers

@@ -280,5 +280,25 @@ Append one entry per job, in the format in `FLASH_INBOX.md`. Newest at the botto
   - Resolved POL-96 (armory rack visual unmount upon sidearm pickup) and POL-97 (hold-E wreck truck salvage with pack grant, network sync, and lore log read).
 - Decisions left: None. Ready for next queued job: F-13.
 
+### [2026-10-19 11:42] F-13 [DONE] TICKET-06 hooks: aim the lab's Hardware Fabricator and Planet Table
+- Commits: `8c5e7258` ("feat(lab): wire Hardware Fabricator and Planet Table interaction hooks (F-13)")
+- Checks:
+  - `npm run typecheck`: 0 errors
+  - `npm run build`: 13.70 MB (single file bundle, cap 16 MB, built in 11.30s on 3D PC)
+  - `scripts/test-lab-overhaul.mjs` on 3D PC worker: 78 of 78 checks PASS, 0 fail (all 6 stations aim prompt verified, window opened with KeyE, closed with Escape, draw calls within budget at 187 calls, 60.2 FPS)
+  - `npm test` on 3D PC worker: 2,957 pass, 0 fail, 4 skipped; 19 of 19 speed tests pass (0 fail)
+  - `scripts/test-campaign.mjs` on 3D PC worker: 54 of 54 beats PASS, 0 console errors, 0 http errors, 0 HUD overlaps
+- Features delivered:
+  - `apps/web/src/play/lab-machines.ts`: Added backward-compatible normalization for station IDs (`rack` -> `preset-rack`, `bench` -> `preset-bench`, `combiner` -> `preset-combiner`) in `stationById`.
+  - `apps/web/src/base/ui/fabricator-modal.tsx`: Added standalone fallback for `machineId === 9999` so opening the fabricator in the Earth lab renders cleanly without requiring an existing base machine on the planet.
+  - `apps/web/src/play/play-scene.ts`: Widened `LabMachineKind` to `LabStationId | 'rack' | 'bench' | 'combiner'`, replaced hardcoded targets list in lab aiming with `room.aimStation(camera.position, dir) ?? room.aimStation(pos, dir)`.
+  - `apps/web/src/play/play.tsx`:
+    - Displayed prompt directly from `labStation.prompt` for all 6 stations.
+    - Narrowed Act 9 consensus commit check so it only triggers on `planet-table` when consensus is ready, avoiding hijacking other station E interactions.
+    - Wired `KeyE` to open `FabricatorModal` (`machineId=9999`) on `fabricator`, `PlanetaryGridScreen` on `planet-table`, `WeaponBenchModal` on `weapon-bench`, and respective `labPanel` on preset stations.
+    - Added `planetTableOpen` to `isAnyBaseWindowOpen`, Escape handling, and rendered `PlanetaryGridScreen` overlay with gate plot encoding and co-op dial hooks.
+  - `scripts/test-lab-overhaul.mjs`: Added full verification suite testing teleporting/aiming at each of the 6 stations (`preset-rack`, `preset-bench`, `preset-combiner`, `fabricator`, `planet-table`, `weapon-bench`), confirming prompt text, pressing E to open window, and Escape to close.
+- Next active task in queue: F-25.
+
 
 

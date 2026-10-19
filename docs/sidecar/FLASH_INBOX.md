@@ -201,7 +201,7 @@ Lanes right now: nobody else is in `goblin-front.tsx`, `haddy-crt-portrait.tsx` 
 ## F-25 [DONE] T09b: the audio verbs, the ambience and the print sweep wiring
 Brief: `docs/prompts/sidecar/T09b-audio-verbs-sweep-wiring.md` (T09a's buses have landed). The music duck follows MENTOR_MIX: to 0.45, 0.4 s down, 1.2 s up.
 
-## F-26 [OPEN] T16 part b: the 11 enclave domes (Window E), the Planet Table hologram, and T14's play-scene leftovers
+## F-26 [DONE] T16 part b: the 11 enclave domes (Window E), the Planet Table hologram, and T14's play-scene leftovers
 Brief: `docs/prompts/sidecar/T16-acts-7-9-finale.md`, only the parts F-23 left out:
 - Window E: the 11 enclave domes on the 4.2 km horizon (A9-01);
 - mounting `apps/web/src/play/planet-table-hologram.ts` (POL-70: the 11 enclaves and the 85 % consensus);

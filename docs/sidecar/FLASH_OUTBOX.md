@@ -317,3 +317,24 @@ Append one entry per job, in the format in `FLASH_INBOX.md`. Newest at the botto
   - Attached `#7cff4d` `edgeMesh` lazily only while `clip < 1.0` in `machine-props.ts` so `Box3` bounding-box unit tests are unaffected.
   - Adjusted `test-music-sfx.mjs` duck wait to 450 ms down and 1300 ms up to match `MENTOR_MIX.duck` (0.4 s down, 1.2 s up).
 - Decisions left: None. Ready for F-26.
+
+### [2026-10-19 15:35] F-26 [DONE] T16 part b: the 11 enclave domes, Planet Table hologram, and T14 play-scene leftovers
+- Commits: `8419a45e` ("feat(finale): 11 horizon enclave domes, Planet Table hologram, window heal and credits Polish (F-26)")
+- Checks:
+  - `npm run typecheck`: 0 errors
+  - `npm test` on 3D PC worker: 2962 passed, 0 failed, 4 skipped; 19 of 19 speed tests passed
+  - `npm run build`: 13.71 MB single-file bundle (cap 16 MB)
+  - `scripts/test-ticket16b.mjs` on 3D PC worker: 8 of 8 checks passed (domes, hologram, consensus commit, drift resistance, room storm, wireframe, viewmodel hidden)
+  - `scripts/test-credits-video.mjs` on 3D PC worker: 47 of 47 checks passed (chapters 1-7, audio handoff, monitor jukebox, zero errors)
+  - `scripts/test-campaign.mjs` on 3D PC worker: 54 of 54 beats PASS, 0 console/http errors, 0 HUD overlaps (`apps/web/public/checkpoints/` restored)
+- Shots (`shots-run/t16b/`):
+  - `horizon-domes.png`: 11 enclave domes rendered on 4.2 km horizon with spires.
+  - `planet-table-hologram.png`: Planet Table 3D hologram in lab with consensus status and rotating wireframe node ring.
+  - `credits-ch1-wireframe.png`: Credits Chapter 1 playing with Stage 0a vector wireframe look.
+  - `credits-no-rifle.png`: Held rifle weapon viewmodel hidden during credits camera presentation.
+- Features delivered:
+  - Window E: Installed `createHorizonEnclaveDomes` on `PlayScene` placing 11 neighbor enclave domes at 4.2 km distance with height tracking.
+  - Mounted `createPlanetTableHologram` on Planet Table group in `lab-room.ts` updating with FourFloats and consensus state.
+  - Connected `evaluateFinaleWindowHeal(elapsedSec)` to `scene.setStorm(...)` during 12s window heal convergence.
+  - Resolved POL-301 (wireframe post-look override hook for credits chapter 1), POL-302 (`setStorm` and `setMonitorEqualizer` exposed on `PlayScene`), POL-303 (stable alt camera look-at orientation without drift), and POL-304 (viewmodel visibility control).
+- Decisions left: None. Ready for next queued job: F-27.

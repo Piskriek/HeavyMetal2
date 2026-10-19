@@ -30,6 +30,8 @@ interface BaseHudProps {
   weaponStats?: WeaponStats | null;
   ammo?: { current: number; max: number } | null;
   drivingSpeed?: number | null;
+  drivingBoostEnergy?: number;
+  drivingBoosting?: boolean;
   /** The held extraction rifle takes the mouse: the build readout (CANNOT PLACE, the wheel hint) is hidden while it is out. */
   buildHidden?: boolean;
   /** Why the drafting table is locked (TASK-22), or null when it is open. K then says the reason. */
@@ -60,6 +62,8 @@ export const BaseHud: React.FC<BaseHudProps> = ({
   weaponStats = null,
   ammo = null,
   drivingSpeed = null,
+  drivingBoostEnergy,
+  drivingBoosting = false,
   buildHidden = false,
   draftingLock = null,
   onLocked,
@@ -263,7 +267,19 @@ export const BaseHud: React.FC<BaseHudProps> = ({
           <span style={{ fontSize: 15, fontWeight: 800, color: '#f8fafc', letterSpacing: '0.05em' }}>
             {Math.abs(drivingSpeed).toFixed(1)} <span style={{ fontSize: 10, color: '#94a3b8' }}>m/s</span>
           </span>
-          <span style={{ fontSize: 9, color: '#cbd5e1', marginTop: 2 }}>[E] EXIT</span>
+          {drivingBoostEnergy !== undefined && (
+            <div data-testid="speed-hud-boost" style={{ width: '100%', minWidth: 64, height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2, overflow: 'hidden', marginTop: 3 }}>
+              <div style={{
+                width: `${Math.round(Math.max(0, Math.min(1, drivingBoostEnergy)) * 100)}%`,
+                height: '100%',
+                background: drivingBoosting ? '#38bdf8' : '#f59e0b',
+                transition: 'width 0.05s linear',
+              }} />
+            </div>
+          )}
+          <span style={{ fontSize: 9, color: drivingBoosting ? '#38bdf8' : '#cbd5e1', marginTop: 2 }}>
+            {drivingBoosting ? 'BOOSTING' : '[E] EXIT'}
+          </span>
         </div>
       )}
 

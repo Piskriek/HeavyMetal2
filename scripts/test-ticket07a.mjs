@@ -197,6 +197,8 @@ try {
   check('E at the rail takes the sidearm into the sidearm slot', slot?.item === 'wpn-shotgun' && slot?.n === 1, `slot ${JSON.stringify(slot)}, before ${JSON.stringify(diagBefore)}, after ${JSON.stringify(diagAfter)}`);
   const toast = await page.locator('.play-toast').first().textContent().catch(() => '');
   check('the pickup says so (the toast)', /sidearm/i.test(toast ?? ''), `toast "${toast}"`);
+  const armoryTaken = await page.evaluate(() => window.__playScene?.debug?.armoryTaken?.() ?? false);
+  check('armory rack visual hide after pickup', armoryTaken === true, `armoryTaken ${armoryTaken}`);
 
   // ---- the badge on the planet, now that a sidearm is in the slot
   await teleport('planet', 0, 0, 0, 0);
@@ -297,9 +299,29 @@ try {
   check('the play screen root is still positioned absolute', scoped.rootPos === 'absolute', `root ${scoped.rootPos}`);
   check('a bare .play element is no longer styled as the play screen', scoped.strayPos !== 'absolute', `stray ${scoped.strayPos}`);
 
-  // ---- moved to T07b (both need play-scene.ts, which Flash owns): the wreck hold-E salvage, and the armory rack's visual hide
-  skipped.push('wreck hold-E salvage on a truck: moved to T07b (needs play-scene.ts hooks)');
-  skipped.push('armory rack visual hide after pickup: moved to T07b (needs a play-scene.ts hook)');
+  // ---- POL-97: wreck hold-E salvage on a truck
+  const truck = await page.evaluate(() => {
+    return window.__playScene?.debug?.wrecks?.debugBuilt?.()?.find((b) => b.model.includes('truck') && b.salvage && !b.salvaged) ?? null;
+  });
+  check('found a salvageable wreck truck on the planet', !!truck, truck ? `${truck.id} (${truck.model}) at ${truck.x},${truck.z}` : 'none');
+  if (truck) {
+    const px = truck.x, pz = truck.z - 3.5;
+    const yaw = Math.atan2(-(truck.x - px), -(truck.z - pz));
+    await teleport('planet', px, pz, yaw, -0.1);
+    await page.waitForTimeout(600);
+    const aimed = await page.evaluate(() => window.hmPlay.aimedProp);
+    check('aimed at the wreck truck', aimed === truck.id, `aimed ${aimed}, expected ${truck.id}`);
+
+    await page.keyboard.down('KeyE');
+    await page.waitForTimeout(1600);
+    await page.keyboard.up('KeyE');
+    await page.waitForTimeout(600);
+
+    const truckAfter = await page.evaluate((id) => {
+      return window.__playScene?.debug?.wrecks?.debugBuilt?.()?.find((b) => b.id === id) ?? null;
+    }, truck.id);
+    check('wreck hold-E salvage on a truck', truckAfter?.salvaged === true, `salvaged ${truckAfter?.salvaged}`);
+  }
 
   check('no page errors', pageErrors.length === 0, pageErrors.slice(0, 3).join(' | '));
   console.log(`\n${passed} checks pass, 0 fail, ${skipped.length} skipped:`);

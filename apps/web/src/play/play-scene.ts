@@ -42,6 +42,9 @@ import { FEEL_START, feelStep, type RifleFeelState } from './rifle-feel';
 import { applyRimFloor, setRimFloorOn, rimFloorOn } from './rim-floor';
 import { createMonsters, type MonstersSystem } from './monsters';
 import { createWrecks, type WreckSystem } from './wrecks';
+import { type WreckInteraction } from './wreck-sites';
+import { boostedInput, tireTracks, wheelRoost, printGantry, type TireTracks, type WheelRoost, type PrintGantry } from './vehicle-juice';
+import { beamDamage, SEAL_REACH } from './monster-rules';
 import { clutterById } from './lab-clutter';
 import { safeZones as monsterSafeZones } from '../monsters/policy';
 import { pieceAt } from '../base/world';
@@ -95,7 +98,7 @@ export interface Controls {
   /** Build camera controls (Alt held) */
   readonly altCam?: boolean;
   readonly flyUp?: number;
-  readonly vehicleInput?: { throttle: number; steer: number; brake: boolean };
+  readonly vehicleInput?: { throttle: number; steer: number; brake: boolean; boost?: boolean };
 }
 export type LabMachineKind = 'rack' | 'bench' | 'combiner';
 
@@ -131,7 +134,7 @@ export interface FrameOut {
   readonly inDome: boolean;
   /** Sync is at or below 30% outside a dome: the return arrow shows in the compass (TASK-26). */
   readonly warn: boolean;
-  readonly drivingVehicle?: { readonly id: number; readonly kind: RoverKind; readonly speed: number } | null;
+  readonly drivingVehicle?: { readonly id: number; readonly kind: RoverKind; readonly speed: number; readonly boostEnergy?: number; readonly boosting?: boolean } | null;
 }
 
 /** What the display governor and Settings change while you play: how the machines' pixels are drawn, and the ground's triangles. */
@@ -320,8 +323,12 @@ export interface PlayScene {
   setFabricators(fabricators: readonly { readonly id: number; readonly x: number; readonly z: number; readonly yaw: number; readonly printing: boolean }[]): void;
   enterVehicle(id: number): boolean;
   exitVehicle(): { readonly id: number; readonly x: number; readonly z: number; readonly yaw: number } | null;
-  getDrivingVehicle(): { readonly id: number; readonly kind: RoverKind; readonly speed: number } | null;
+  getDrivingVehicle(): { readonly id: number; readonly kind: RoverKind; readonly speed: number; readonly boostEnergy?: number; readonly boosting?: boolean } | null;
   getNearVehicle(reach?: number): { readonly id: number; readonly kind: RoverKind } | null;
+  /** POL-96: marks the sidearm on the armory rail taken or standing. */
+  setSidearmTaken(taken: boolean): void;
+  /** POL-97: salvages the targeted wreck truck, returning its stock. */
+  salvageWreck(id: string): (NonNullable<WreckInteraction['salvage']> & { readonly log?: string }) | null;
   /** The plot's biome scatter view (TICKET-02 item F). */
   buildBiome(input: BiomeInput): void;
   setVegetationSetting(v: 'auto' | 'off' | 'low' | 'high'): void;
@@ -351,6 +358,13 @@ export interface PlayScene {
     setWindowView(view: WindowView): void;
     /** The wreck sites sealed so far. */
     sealedWrecks(): readonly number[];
+    armoryTaken(): boolean;
+    readonly wrecks: WreckSystem;
+    aimWreck(reach?: number): ReturnType<NonNullable<WreckSystem['aimWreck']>>;
+    tracks(): TireTracks;
+    roost(): WheelRoost;
+    gantries(): readonly PrintGantry[];
+    roverBoostEnergy(): number;
     groundTriangles(): number; showGround(on: boolean): void; where(): Where; position(): THREE.Vector3; teleport(where: Where, x: number, z: number, yaw: number, pitch?: number): void; sync(): number;
     stats(): { readonly triangles: number; readonly calls: number }; wave(): number; gatePlanet(): { x: number; z: number };
     /** The way the player faces (the scene's yaw, radians). */
@@ -435,6 +449,7 @@ export function createPlayScene(o: {
   /** The sculpt edits and the paint as saved (encodeField text), applied when the plot is made; null for a fresh plot. */
   readonly beamField?: string | null;
   readonly vegetation?: 'auto' | 'off' | 'low' | 'high';
+  readonly hasSidearm?: boolean;
 }): PlayScene {
   const renderer = new THREE.WebGLRenderer({ canvas: o.canvas, antialias: o.antialias, powerPreference: o.powerPreference });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -460,6 +475,7 @@ export function createPlayScene(o: {
   const openingMat = keep(new THREE.ShaderMaterial({ vertexShader: OPENING_VERTEX, fragmentShader: OPENING_FRAGMENT, uniforms: openingUniforms, side: THREE.DoubleSide }));
   const labScene = new THREE.Scene();
   const room: LabRoom = createLabRoom({ textureSize: o.textureSize, portalMaterial: openingMat, quality: currentQuality, windowView: o.detail.windowView });
+  if (o.hasSidearm) room.armory.setTaken(true);
   labScene.add(room.group);
   // a burst of static (lab-vista.ts) is heard after its distance divided by the speed of sound
   let sceneAlive = true;
@@ -590,6 +606,14 @@ export function createPlayScene(o: {
 
   const roverMaterials = createRovergearMaterials();
 
+  // T07b: Vehicle juice (tyre tracks, dust roost, boost, print gantry)
+  const tracks: TireTracks = tireTracks({ scene: planetScene, heightAt: (x, z) => groundAt(x, z) });
+  const roost: WheelRoost = wheelRoost({ scene: planetScene });
+  const activeGantries: PrintGantry[] = [];
+  let isInitialVehiclesSync = true;
+  let roverBoostEnergy = 1.0;
+  let isRoverBoosting = false;
+
   interface VehicleView {
     id: number;
     kind: RoverKind;
@@ -681,6 +705,19 @@ export function createPlayScene(o: {
       if (!view) {
         view = buildVehicleView(v);
         vehicleViews.set(v.id, view);
+        if (!isInitialVehiclesSync) {
+          view.group.visible = false;
+          const gy = groundAt(v.x, v.z);
+          const gantry = printGantry({ x: v.x, y: gy, z: v.z, scene: planetScene, duration: 1.6 });
+          activeGantries.push(gantry);
+          const vRef = view;
+          gantry.play(() => {
+            vRef.group.visible = true;
+            const idx = activeGantries.indexOf(gantry);
+            if (idx !== -1) activeGantries.splice(idx, 1);
+            gantry.dispose();
+          });
+        }
       } else if (drivingVehicleId !== v.id) {
         view.x = v.x;
         view.z = v.z;
@@ -690,6 +727,7 @@ export function createPlayScene(o: {
         view.group.rotation.set(0, v.yaw, 0);
       }
     }
+    isInitialVehiclesSync = false;
     for (const [id, view] of vehicleViews.entries()) {
       if (!keepIds.has(id) && drivingVehicleId !== id) {
         vehiclesGroup.remove(view.group);
@@ -800,11 +838,11 @@ export function createPlayScene(o: {
     return null;
   }
 
-  function getDrivingVehicle(): { readonly id: number; readonly kind: RoverKind; readonly speed: number } | null {
+  function getDrivingVehicle(): { readonly id: number; readonly kind: RoverKind; readonly speed: number; readonly boostEnergy?: number; readonly boosting?: boolean } | null {
     if (drivingVehicleId === null) return null;
     const view = vehicleViews.get(drivingVehicleId);
     if (!view) return null;
-    return { id: drivingVehicleId, kind: view.kind, speed: currentSpeed };
+    return { id: drivingVehicleId, kind: view.kind, speed: currentSpeed, boostEnergy: roverBoostEnergy, boosting: isRoverBoosting };
   }
 
   function getNearVehicle(reach = 3.5): { readonly id: number; readonly kind: RoverKind } | null {
@@ -2719,6 +2757,7 @@ export function createPlayScene(o: {
           beamSparkMesh.position.copy(vTo);
           beamSparkUniforms.uColour.value.set(beamCol);
           beamSparkMesh.visible = true;
+
         } else {
           beamCoreMesh.visible = false;
           beamSparkMesh.visible = false;
@@ -2870,7 +2909,12 @@ export function createPlayScene(o: {
           // VEH-02: A/Left (move.x < 0) is -1 (turn left), D/Right is +1 (turn right); see Input.steer in @hm/rover
           const steer = c.vehicleInput?.steer ?? (c.move.x < -0.05 ? -1 : c.move.x > 0.05 ? 1 : 0);
           const brake = c.vehicleInput?.brake ?? false;
-          const input = { throttle, steer, brake };
+          const boost = c.vehicleInput?.boost ?? c.run ?? false;
+          const rawInput = { throttle, steer, brake };
+          const boosted = boostedInput(rawInput, boost, roverBoostEnergy, dt);
+          roverBoostEnergy = boosted.energy;
+          isRoverBoosting = boosted.boosting;
+          const input = { throttle: boosted.throttle, steer: boosted.steer, brake: boosted.brake };
 
           vehicleAcc += Math.min(dt, 0.1);
           while (vehicleAcc >= ROVER_DT) {
@@ -2895,12 +2939,14 @@ export function createPlayScene(o: {
 
           vView.group.position.set(drivingState.p[0], drivingState.p[1], drivingState.p[2]);
           vView.group.quaternion.set(qx, qy, qz, qw);
+          vView.group.updateMatrixWorld(true);
 
           const wheelRadius = vView.mesh.wheelRadius;
           vView.wheelAngle += (currentSpeed * dt) / wheelRadius;
           const maxSteer = ROVERS[vView.kind].maxSteer;
           const steerAngle = -steer * maxSteer;
 
+          const wheelWorldPos = new THREE.Vector3();
           for (let i = 0; i < vView.wheelPivots.length; i++) {
             const hub = vView.mesh.hubs[i];
             const pivot = vView.wheelPivots[i];
@@ -2910,6 +2956,12 @@ export function createPlayScene(o: {
                 pivot.rotation.y = steerAngle;
               }
               wheel.rotation.x = vView.wheelAngle;
+              pivot.getWorldPosition(wheelWorldPos);
+              const gy = groundAt(wheelWorldPos.x, wheelWorldPos.z);
+              if (Math.abs(currentSpeed) > 0.3 && Math.abs(wheelWorldPos.y - gy) < wheelRadius * 3.0) {
+                tracks.add({ x: wheelWorldPos.x, y: gy, z: wheelWorldPos.z }, [0, 1, 0], vView.kind === 'hauler' ? 0.45 : 0.35, vView.yaw);
+                roost.emit({ x: wheelWorldPos.x, y: gy, z: wheelWorldPos.z }, currentSpeed, Math.abs(steer) * 0.4, dt);
+              }
             }
           }
 
@@ -2924,7 +2976,11 @@ export function createPlayScene(o: {
           pos.z = drivingState.p[2];
           pos.y = drivingState.p[1] + EYE;
         }
-      } else if (debugAltCam && altCamPos) {
+      } else {
+        isRoverBoosting = false;
+        roverBoostEnergy = Math.min(1, roverBoostEnergy + 0.25 * dt);
+      }
+      if (debugAltCam && altCamPos) {
         // Locked by debug.setAltCam
       } else if (c.altCam && where === 'planet') {
         if (!altCamPos) {
@@ -3199,6 +3255,23 @@ export function createPlayScene(o: {
         camera.getWorldDirection(monsterFwd);
         monsters.update(dt, { x: pos.x, z: pos.z, yaw: Math.atan2(monsterFwd.x, monsterFwd.z), alive: playerAlive }, camera);
         stepTurrets(dt, pos); // TICKET-13 Window C: the perimeter turrets (their section is after activeBase)
+        // T07b Item 5: continuous beam damage to monsters in extract mode
+        if (rifleFiringNow && heldMode === 'extract' && !beamSealingNow) {
+          const dmg = beamDamage('extract', dt, SEAL_REACH * 0.5, false);
+          if (dmg > 0) {
+            monsters.beamHit(
+              { x: camera.position.x, z: camera.position.z },
+              { x: monsterFwd.x, z: monsterFwd.z },
+              SEAL_REACH,
+              dmg
+            );
+          }
+        }
+      }
+      tracks.update(dt);
+      roost.update(dt);
+      for (let i = activeGantries.length - 1; i >= 0; i--) {
+        activeGantries[i]!.update(dt);
       }
       postUniforms.uTime.value = now;
       postUniforms.uGlitch.value = where === 'planet' ? Math.max(0, Math.min(1, (0.4 - sync) / 0.4)) : 0;
@@ -3340,8 +3413,14 @@ export function createPlayScene(o: {
         const id = room.aimClutter(pos, new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion), 3.4);
         if (id) aimedProp = { id, salvage: clutterById(id)?.role === 'salvage' };
       } else if (where === 'planet' && !building) {
-        const id = wrecks.aimProp(pos, new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion), 14);
-        if (id) aimedProp = { id, salvage: false };
+        const camDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        const aimed = wrecks.aimWreck?.(pos, camDir, 14);
+        if (aimed) {
+          aimedProp = { id: aimed.id, salvage: Boolean(aimed.interaction.salvage) };
+        } else {
+          const id = wrecks.aimProp(pos, camDir, 14);
+          if (id) aimedProp = { id, salvage: false };
+        }
       }
       // ---- Window B (TICKET-11, co-op): the other players' avatars, from the live session's samples (none outside a session)
       const coopSession = currentOutpostSession();
@@ -3365,7 +3444,13 @@ export function createPlayScene(o: {
         aimedProp,
         stage: shown,
         event: ev,
-        drivingVehicle: drivingVehicleId !== null && drivingState ? { id: drivingVehicleId, kind: vehicleViews.get(drivingVehicleId)!.kind, speed: currentSpeed } : null,
+        drivingVehicle: drivingVehicleId !== null && drivingState ? {
+          id: drivingVehicleId,
+          kind: vehicleViews.get(drivingVehicleId)!.kind,
+          speed: currentSpeed,
+          boostEnergy: roverBoostEnergy,
+          boosting: isRoverBoosting,
+        } : null,
       };
     },
     resize(width, height, pixelRatio) {
@@ -3546,6 +3631,13 @@ export function createPlayScene(o: {
       setWake: (t: number) => { wakeT = t; },
       setWindowView: (view) => room.setWindowView(view),
       sealedWrecks: () => wrecks.sealedSites(),
+      armoryTaken: () => room.armory.isTaken(),
+      wrecks,
+      aimWreck: (reach: number = 14) => wrecks.aimWreck?.(camera.position, new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion), reach) ?? null,
+      tracks: () => tracks,
+      roost: () => roost,
+      gantries: () => activeGantries,
+      roverBoostEnergy: () => roverBoostEnergy,
       groundTriangles: () => ground?.triangles() ?? 0,
       showGround: (on) => ground?.setVisible(on),
       waterVisible: () => (waterGroup ? waterGroup.visible : false),
@@ -3849,6 +3941,10 @@ export function createPlayScene(o: {
           m.dispose();
         }
       }
+      tracks.dispose();
+      roost.dispose();
+      for (const g of activeGantries) g.dispose();
+      activeGantries.length = 0;
     },
     monsters,
     setPlayerAlive(alive: boolean) { playerAlive = alive; },
@@ -3867,6 +3963,12 @@ export function createPlayScene(o: {
     aimLeak(range: number): number | null {
       camera.getWorldDirection(monsterFwd);
       return monsters.leakUnder({ x: camera.position.x, z: camera.position.z }, { x: monsterFwd.x, z: monsterFwd.z }, range);
+    },
+    setSidearmTaken(taken: boolean) {
+      room.armory.setTaken(taken);
+    },
+    salvageWreck(id: string) {
+      return wrecks.salvageWreck?.(id) ?? null;
     },
     setVehicles,
     setFabricators,

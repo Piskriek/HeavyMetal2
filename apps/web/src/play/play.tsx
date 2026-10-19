@@ -749,6 +749,7 @@ useEffect(() => {
   /** The extraction rifle (TASK-21): out in hand or racked, and its mode. The mouse and wheel handlers read the refs. */
   const beamHeldRef = useRef(false);
   const beamModeRef = useRef<BeamMode>('extract');
+  const forceBeamFiringRef = useRef(false);
   const [beamHud, setBeamHud] = useState<{ readonly held: boolean; readonly mode: BeamMode }>({ held: false, mode: 'extract' });
   /** The sculpt tool (TASK-21d): carve, raise or smooth. The frame loop reads the ref; the chip reads the state. */
   const sculptToolRef = useRef<SculptTool>('carve');
@@ -766,6 +767,10 @@ useEffect(() => {
   const setBeamHeld = (held: boolean, mode: BeamMode): void => {
     beamHeldRef.current = held;
     beamModeRef.current = mode;
+    if (held && sceneRef.current?.monsters.isEquipped()) {
+      sceneRef.current?.monsters.equip(false);
+      setGunEquipped(false);
+    }
     sceneRef.current?.setBeamHeld(held, mode);
     setBeamHud({ held, mode });
   };
@@ -867,6 +872,8 @@ useEffect(() => {
   const [, setInspectTick] = useState(0);
   const [weaponBenchOpen, setWeaponBenchOpen] = useState(false);
   const [drivingSpeed, setDrivingSpeed] = useState<number | null>(null);
+  const [drivingBoostEnergy, setDrivingBoostEnergy] = useState<number | undefined>(undefined);
+  const [drivingBoosting, setDrivingBoosting] = useState(false);
   const [baseWorldVersion, setBaseWorldVersion] = useState(0);
   const [baseWindowOpen, setBaseWindowOpen] = useState(false);
   const [beamHarvest, setBeamHarvest] = useState<{ count: number; name: string; fading?: boolean } | null>(null);
@@ -1444,31 +1451,52 @@ useEffect(() => {
   const closeDatabank = useCallback((): void => setDatabank(null), []);
   // a salvage prop goes into the pack first (the base's salvage command, logged); refused whole when it does not fit, and the prop stays
   const clearProp = useCallback((id: string): void => {
-    const item = clutterById(id);
     const scene = sceneRef.current;
-    if (!item || item.role !== 'salvage' || !scene || propsRef.current.cleared.includes(id)) return;
-    // TASK-26: the salvage's ore is the plot's ore (the stock the boulders, the beam and a drill's cost share), so a player with no ore
-    // can always reach a drill here; the primitives go into the pack, refused whole when they do not fit, as before
-    const split = salvageSplit(item);
-    const cmd: BaseCommand = { t: 'salvage', at: SALVAGE_AT, stock: [...split.pack] };
-    if (split.pack.length > 0) {
+    if (!scene || propsRef.current.cleared.includes(id)) return;
+    const item = clutterById(id);
+    if (item) {
+      if (item.role !== 'salvage') return;
+      // TASK-26: the salvage's ore is the plot's ore (the stock the boulders, the beam and a drill's cost share), so a player with no ore
+      // can always reach a drill here; the primitives go into the pack, refused whole when they do not fit, as before
+      const split = salvageSplit(item);
+      const cmd: BaseCommand = { t: 'salvage', at: SALVAGE_AT, stock: [...split.pack] };
+      if (split.pack.length > 0) {
+        const res = apply(baseWorldRef.current, getBaseEnv(), cmd);
+        if (!res || res.events.some((e) => e.type === 'refused')) {
+          say('The pack is full', 'Make room for the salvage, then hold E again.');
+          gameAudio.playRefuse();
+          return;
+        }
+      }
+      if (!scene.dissolveClutter(id)) return;
+      if (split.pack.length > 0) dispatchBase(cmd);
+      if (split.plotOre > 0) plotRef.current = { ...plotRef.current, ore: Math.min(1e5, plotRef.current.ore + split.plotOre) };
+      savePropsSave(clearedProp(propsRef.current, id));
+      commit(withLab(withPlot(stateRef.current, plotRef.current), labRef.current));
+      const lines: string[] = [];
+      if (split.plotOre > 0) lines.push(`${split.plotOre} ore went to your plot`);
+      if (split.pack.length > 0) lines.push(`${split.pack.map((st) => `${st.n} ${ITEMS[st.item]?.name ?? st.item}`).join(', ')} went into your pack`);
+      say(`${item.label.charAt(0).toUpperCase()}${item.label.slice(1)} salvaged`, `${lines.join('; ')}.`);
+      if (item.log) openLog(item.log);
+    } else {
+      // POL-97: wreck truck hold-E salvage on the planet
+      const salvage = scene.salvageWreck(id);
+      if (!salvage) return;
+      const cmd: BaseCommand = { t: 'salvage', at: SALVAGE_AT, stock: [{ item: salvage.item, n: salvage.n }] };
       const res = apply(baseWorldRef.current, getBaseEnv(), cmd);
       if (!res || res.events.some((e) => e.type === 'refused')) {
         say('The pack is full', 'Make room for the salvage, then hold E again.');
         gameAudio.playRefuse();
         return;
       }
+      dispatchBase(cmd);
+      savePropsSave(clearedProp(propsRef.current, id));
+      commit(withLab(withPlot(stateRef.current, plotRef.current), labRef.current));
+      const itemName = ITEMS[salvage.item]?.name ?? salvage.item;
+      say('Wreck salvaged', `${salvage.n} ${itemName} went into your pack.`);
+      const log = salvage.log ?? loreFor(id)?.log;
+      if (log) openLog(log);
     }
-    if (!scene.dissolveClutter(id)) return;
-    if (split.pack.length > 0) dispatchBase(cmd);
-    if (split.plotOre > 0) plotRef.current = { ...plotRef.current, ore: Math.min(1e5, plotRef.current.ore + split.plotOre) };
-    savePropsSave(clearedProp(propsRef.current, id));
-    commit(withLab(withPlot(stateRef.current, plotRef.current), labRef.current));
-    const lines: string[] = [];
-    if (split.plotOre > 0) lines.push(`${split.plotOre} ore went to your plot`);
-    if (split.pack.length > 0) lines.push(`${split.pack.map((st) => `${st.n} ${ITEMS[st.item]?.name ?? st.item}`).join(', ')} went into your pack`);
-    say(`${item.label.charAt(0).toUpperCase()}${item.label.slice(1)} salvaged`, `${lines.join('; ')}.`);
-    if (item.log) openLog(item.log);
   }, [dispatchBase, getBaseEnv, say, openLog, savePropsSave, commit]);
   clearPropRef.current = clearProp;
 
@@ -1493,6 +1521,7 @@ useEffect(() => {
       say('The sidearm stays in storage', 'Move it from your inventory into the sidearm slot.');
       return;
     }
+    sceneRef.current?.setSidearmTaken(true);
     narratorRef.current?.trigger('tool:pickup');
     say('Combat sidearm taken', 'It sits in the sidearm slot. Its rounds show bottom left on the planet.');
   }, [dispatchBase, getBaseEnv, say]);
@@ -1657,12 +1686,16 @@ useEffect(() => {
         avatar: stateRef.current.avatar,
         beamField: loadBeamSave().field,
         vegetation: (props.profile.graphics.vegetation as 'auto' | 'off' | 'low' | 'high' | undefined) ?? 'auto',
+        hasSidearm: Boolean(baseWorldRef.current.equipment.sidearm),
       });
     } catch {
       setFailed(true);
       return undefined;
     }
     sceneRef.current = scene;
+    if (baseWorldRef.current.equipment.sidearm) {
+      scene.setSidearmTaken(true);
+    }
     // Window B (TICKET-11, co-op): a guest who opens play in a session takes the room's sculpt as the scene is made
     importRoomTerrain();
     // the props saved for this profile: the cleared clutter is gone, the sealed leaks' wrecks stand restored (TASK-23c)
@@ -1844,7 +1877,7 @@ useEffect(() => {
     const onMouseDown = (e: MouseEvent): void => {
       if (e.button === 0 && document.pointerLockElement === canvas) {
         isLmbDownRef.current = true;
-        if (scene.monsters.isEquipped()) {
+        if (scene.monsters.isEquipped() && !beamHeldRef.current) {
           scene.monsters.setTrigger(true);
           fireWeapon();
         } else {
@@ -1922,9 +1955,10 @@ useEffect(() => {
       const targetNode = forceBeamRef.current !== null
         ? (w.field.nodes.find((n) => n.id === forceBeamRef.current) ?? aimedNode)
         : aimedNode;
-      const isMining = (isLmbDownRef.current || forceBeamRef.current !== null) && hasBeam && targetNode !== null && !scene.monsters.isEquipped();
-      scene.setBeamFiring((isMining || beamBoulderTargetRef.current !== null) && beamHeldRef.current);
-      scene.setBeamAiming(isLmbDownRef.current && beamHeldRef.current);
+      const isMining = (isLmbDownRef.current || forceBeamRef.current !== null) && hasBeam && targetNode !== null && (!scene.monsters.isEquipped() || beamHeldRef.current);
+      const isFiringBeam = (isLmbDownRef.current && beamHeldRef.current) || forceBeamFiringRef.current;
+      scene.setBeamFiring(isMining || beamBoulderTargetRef.current !== null || isFiringBeam);
+      scene.setBeamAiming((isLmbDownRef.current || forceBeamFiringRef.current) && beamHeldRef.current);
 
       if (harvestAccRef.current >= 0.1) {
         const powerMap: Record<number, number> = {};
@@ -1990,6 +2024,11 @@ useEffect(() => {
       } else if (beamBoulderTargetRef.current !== null) {
         // the rifle takes ore from a boulder (amber) or paints the ground (the preset's colour): the beam runs from the muzzle to it
         scene.setBeam(scene.beamMuzzle(), beamBoulderTargetRef.current, beamModeRef.current, beamBoulderTargetRef.current.colour, true);
+      } else if (isFiringBeam) {
+        const muzzle = scene.beamMuzzle();
+        const fwd = scene.aimGround().dir;
+        const target = { x: muzzle.x + fwd.x * 20, y: muzzle.y, z: muzzle.z + fwd.z * 20 };
+        scene.setBeam(muzzle, target, beamModeRef.current, (beamModeRef.current as string) === 'seal' ? '#f59e0b' : '#38bdf8', true);
       } else {
         scene.setBeam(null, null, 'extract', '#ffffff', false);
       }
@@ -2392,6 +2431,7 @@ useEffect(() => {
         throttle: axis(['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']),
         steer: axis(['KeyD', 'ArrowRight'], ['KeyA', 'ArrowLeft']),
         brake: keys.has('Space'),
+        boost: keys.has('ShiftLeft') || keys.has('ShiftRight'),
       } : undefined;
       const out = scene.frame(ms / 1000, dt, live
         ? {
@@ -2406,6 +2446,8 @@ useEffect(() => {
       liveWhereRef.current = out.where;
       if (out.drivingVehicle) {
         setDrivingSpeed(out.drivingVehicle.speed);
+        setDrivingBoostEnergy(out.drivingVehicle.boostEnergy);
+        setDrivingBoosting(Boolean(out.drivingVehicle.boosting));
         driveAccRef.current += out.drivingVehicle.speed * dt;
         if (driveAccRef.current >= 1) {
           const whole = Math.floor(driveAccRef.current);
@@ -2415,6 +2457,8 @@ useEffect(() => {
       } else {
         // every frame, not only when the (closure) value says it is set: a stale null here left the plot readout hidden after a drive
         setDrivingSpeed(null);
+        setDrivingBoostEnergy(undefined);
+        setDrivingBoosting(false);
       }
       dx = 0; dy = 0;
 
@@ -2488,8 +2532,8 @@ useEffect(() => {
       if (out.event === 'stage-up') say(`Stage ${out.stage}`, STAGE_SAYS[out.stage] ?? '');
       if (s !== stateRef.current) commit(withLab(withPlot(s, plotRef.current), labRef.current));
 
-      // ---- a salvage prop in the lab: hold E for a second to clear it (TASK-23c); the salvage goes into the pack, or the prop stays
-  if (live && !visitingRef.current && out.where === 'lab' && out.aimedProp?.salvage && keys.has('KeyE') && !out.atLever) {
+      // ---- a salvage prop in the lab or planet: hold E for a second to clear it (TASK-23c / POL-97); the salvage goes into the pack, or the prop stays
+  if (live && !visitingRef.current && (out.where === 'lab' || out.where === 'planet') && out.aimedProp?.salvage && keys.has('KeyE') && !out.atLever) {
     clearHoldRef.current += dt;
     if (clearHoldRef.current >= CLEAR_HOLD_SECONDS) {
       clearHoldRef.current = 0;
@@ -2761,6 +2805,12 @@ useEffect(() => {
       // read-only pose for the Planetary Grid's spawn check (test-grid-menus): the player's ground x and z, and the facing
       pose: () => { const p = scene.debug.position(); return { x: p.x, z: p.z, yaw: scene.debug.facing() }; },
       gateExit: () => scene.gateExit(),
+      setBeamHeld: (held: boolean, mode: BeamMode = 'extract') => setBeamHeld(held, mode),
+      setBeamFiring: (on: boolean) => {
+        forceBeamFiringRef.current = on;
+        scene.setBeamFiring(on);
+      },
+      setBeamSealing: (on: boolean) => scene.setBeamSealing(on),
       anchors: () => scene.debug.machineAnchors(),
       hideOverlays: (hide: boolean) => setHideOverlays(hide),
       lockAim: () => ({ locked: scene.ghostLocked(), aim: scene.aimPoint() }),
@@ -3868,7 +3918,7 @@ useEffect(() => {
     : hud.atDial ? 'E: plot dial'
     : hud.where === 'planet' && hud.aimed !== null && panel === null ? `E: inspect the ${KINDS[(visiting ? visiting.plot.machines : plotRef.current.machines).find((x) => x.id === hud.aimed)?.kind ?? 'mill'].name.toLowerCase()}`
     : hud.atArmory && hud.aimedLab === null && labPanel === null && !hud.atLever && !hud.atDial && !baseWorldRef.current.equipment.sidearm ? 'E: take the combat sidearm from the armory'
-    : hud.where === 'lab' && hud.aimedProp?.salvage && labPanel === null ? `Hold E: salvage the ${propLabel(hud.aimedProp.id)}`
+    : (hud.where === 'lab' || hud.where === 'planet') && hud.aimedProp?.salvage && labPanel === null ? `Hold E: salvage the ${propLabel(hud.aimedProp.id)}`
     : hud.aimedProp && aimedPropActs(hud.aimedProp, hud.where) && !hud.aimedProp.salvage && labPanel === null && hud.aimed === null ? `E: read the ${propLabel(hud.aimedProp.id)}`
     : hud.where === 'lab' && hud.aimedLab !== null && labPanel === null ? `E: open the ${hud.aimedLab === 'rack' ? 'cartridge rack' : hud.aimedLab === 'bench' ? 'preset bench' : 'preset combiner'}`
     : hud.where === 'planet' && hud.aimedBoulder !== null && !visiting ? 'Hold E: gather ore'
@@ -4907,6 +4957,8 @@ useEffect(() => {
               weaponStats={shouldShowAmmoBadge(baseWorldRef.current.equipment.sidearm) ? weaponStats(baseWorldRef.current.loadout) : null}
               ammo={gunAmmo}
               drivingSpeed={drivingSpeed}
+              drivingBoostEnergy={drivingBoostEnergy}
+              drivingBoosting={drivingBoosting}
               onDispatch={(cmd) => dispatchBase(cmd)}
               onPlaceLayout={(layoutId) => {
                 setPlacingLayoutId(layoutId);

@@ -439,6 +439,8 @@ export interface LabRoom {
   readonly vista: LabVista;
   floorHeight(x: number, z: number): number;
   update(now: number, dt: number): void;
+  /** The South-East armory rack (sidearm holster and cradle). */
+  readonly armory: ArmoryRackResult;
   dispose(): void;
 }
 
@@ -1377,6 +1379,7 @@ export function createLabRoom(o: {
     aimClutter,
     dissolveClutter,
     removeClutter,
+    armory,
     stations: LAB_STATIONS,
     aimStation: (origin, dir, reach = 3.2) => aimLabStation(origin, dir, reach),
     nearestStation: (pos, maxReach) => nearestLabStation(pos, maxReach),

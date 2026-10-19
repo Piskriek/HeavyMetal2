@@ -38,7 +38,9 @@ export interface WreckSystem {
   /** Full interaction details (salvage + log) for the aimed wreck within `reach` metres, or null. */
   aimWreck?(origin: THREE.Vector3, dir: THREE.Vector3, reach: number): AimedWreck | null;
   /** Marks a salvageable wreck member as salvaged and hides its mesh. */
-  salvageWreck?(id: string): WreckInteraction['salvage'] | null;
+  salvageWreck?(id: string): (NonNullable<WreckInteraction['salvage']> & { readonly log?: string }) | null;
+  /** Debug: lists all built wreck props for inspection and testing. */
+  debugBuilt?(): readonly { readonly id: string; readonly model: string; readonly x: number; readonly z: number; readonly salvaged: boolean; readonly salvage?: WreckInteraction['salvage']; readonly log?: string }[];
   /** The rung and the broken look of every site (for the tests and the debug hook). */
   rungs(): readonly { readonly site: number; readonly leak: boolean; readonly sealed: boolean; readonly broken: boolean; readonly rung: number }[];
   /** Loads every wreck model at each level behind the loading bar, then rebuilds the sites with them. */
@@ -212,7 +214,18 @@ export function createWrecks(o: {
       if (!target || target.salvaged || !target.interaction.salvage) return null;
       target.salvaged = true;
       target.root.visible = false;
-      return target.interaction.salvage;
+      return { ...target.interaction.salvage, log: target.interaction.log };
+    },
+    debugBuilt() {
+      return built.map((b) => ({
+        id: b.id,
+        model: b.member.model,
+        x: b.member.x,
+        z: b.member.z,
+        salvaged: b.salvaged,
+        salvage: b.interaction.salvage,
+        log: b.interaction.log,
+      }));
     },
     rungs() {
       return sites.map((site) => ({

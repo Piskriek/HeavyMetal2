@@ -236,4 +236,27 @@ Append one entry per job, in the format in `FLASH_INBOX.md`. Newest at the botto
   - Added beats 29-37 in `test-campaign.mjs` validating all new progression milestones and credits gating.
 - Decisions left: None. Ready for T16 part b (play-scene.ts Window E domes, hologram mount, and POL-301/302).
 
+### [2026-10-19 06:25] F-24 [DONE] Two fixes after F-23: the title portrait covers the logo; the HUD's kW leaves out the turrets (POL-292)
+- Commits: `e847695e` ("fix(t16a): title portrait moved out of logo path; POL-292 turret extraDrawKw added to play HUD")
+- Checks:
+  - `npm run typecheck`: 0 errors
+  - `npm test` on 3D PC worker: 2,957 pass, 0 fail, 4 skipped; 19 speed tests pass (0 fail)
+  - `npm run build` on 3D PC worker: 13.69 MB (single file bundle, cap 16 MB)
+  - `node scripts/probe-t16a-shots.mjs` on 3D PC worker: PASS (title portrait clear of logo and menu at 1280x720 and 1920x1080; ending credits unlock verified; play HUD clear of stage panel; 0 page errors)
+  - `node scripts/test-ticket13.mjs` on 3D PC worker: 39 of 39 checks passed (demand 0 -> 2 kW check for POL-292 passes cleanly; 0 console or page errors)
+- Shots (`docs/shots/t16a/`):
+  - `title-fresh.png`: Dr. Haddy's CRT portrait card sits under the telemetry HUD observation panel on the right (`.fidelity-telemetry-portrait`), >400 px clear of the logo (`.sm-brand`) and the menu (`.sm-menu`).
+  - `title-1080p.png`: Verified zero bounding-box overlap at 1920x1080.
+  - `title-credits-unlocked.png`: Ending Credits menu button present after `endingSeen`, cleanly positioned.
+  - `play-hud-portrait.png`: In-game play HUD Dr. Haddy portrait top-left clear of stage panel.
+- Fixes delivered:
+  - Relocated title CRT portrait from `.fidelity-glass-blade` to the dedicated observation column in `apps/web/src/shell/goblin-front.tsx`.
+  - Added `className` and `style` props support in `apps/web/src/shell/haddy-crt-portrait.tsx`.
+  - Added `extraDrawKw: () => turretGridDrawKw(baseWorldRef.current.base)` to the HUD's `env` literal in `apps/web/src/play/play.tsx`, ensuring each built turret adds 2 kW to the HUD power demand readout.
+  - Extended `scripts/probe-t16a-shots.mjs` with bounding-box overlap assertions across 720p and 1080p.
+  - Added 2 kW power demand step check to `scripts/test-ticket13.mjs`.
+  - Closed POL-292 in `docs/DEFERRED_POLISH_REGISTRY.md`.
+- Decisions left: None. Ready for next queued job: F-12.
+
+
 

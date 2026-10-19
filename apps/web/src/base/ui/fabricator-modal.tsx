@@ -39,7 +39,9 @@ export const FabricatorModal: React.FC<FabricatorModalProps> = ({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const machine = world.machines.find((x) => x.id === machineId);
+  const machine =
+    world.machines.find((x) => x.id === machineId) ??
+    (machineId === 9999 ? { id: 9999, kind: 'fabricator' as const, jobs: [], out: [] } : null);
   if (!machine) return null;
 
   const netIds = networkAt(world, env, at);

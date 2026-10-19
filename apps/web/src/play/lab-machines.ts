@@ -191,7 +191,15 @@ export function mergeStaticMeshes(root: THREE.Object3D, keep: readonly THREE.Obj
 }
 
 export function stationById(id: string): LabStationSpec | null {
-  return LAB_STATIONS.find((s) => s.id === id) ?? null;
+  const norm =
+    id === 'rack'
+      ? 'preset-rack'
+      : id === 'bench'
+      ? 'preset-bench'
+      : id === 'combiner'
+      ? 'preset-combiner'
+      : id;
+  return LAB_STATIONS.find((s) => s.id === norm) ?? null;
 }
 
 /**
@@ -228,6 +236,7 @@ export function aimLabStation(
   const dx = dir.x / len;
   const dy = dir.y / len;
   const dz = dir.z / len;
+  const effOrigin = origin.y < 0.2 ? { x: origin.x, y: 1.68, z: origin.z } : origin;
 
   let best: LabStationSpec | null = null;
   let bestT = reach;
@@ -235,12 +244,12 @@ export function aimLabStation(
   for (const st of LAB_STATIONS) {
     const cos = Math.abs(Math.cos(st.yaw));
     const sin = Math.abs(Math.sin(st.yaw));
-    const hw = (st.footprint[0] * cos + st.footprint[2] * sin) / 2 + 0.12;
-    const hd = (st.footprint[0] * sin + st.footprint[2] * cos) / 2 + 0.12;
+    const hw = (st.footprint[0] * cos + st.footprint[2] * sin) / 2 + 0.15;
+    const hd = (st.footprint[0] * sin + st.footprint[2] * cos) / 2 + 0.15;
     const minX = st.x - hw;
     const maxX = st.x + hw;
     const minY = 0;
-    const maxY = st.footprint[1] + 0.15;
+    const maxY = Math.max(1.85, st.footprint[1] + 0.25);
     const minZ = st.z - hd;
     const maxZ = st.z + hd;
 
@@ -248,13 +257,13 @@ export function aimLabStation(
     let tmax = bestT;
 
     const axes: readonly [number, number, number, number][] = [
-      [origin.x, dx, minX, maxX],
-      [origin.y, dy, minY, maxY],
-      [origin.z, dz, minZ, maxZ],
+      [effOrigin.x, dx, minX, maxX],
+      [effOrigin.y, dy, minY, maxY],
+      [effOrigin.z, dz, minZ, maxZ],
     ];
 
     // Only match stations in front of the ray origin
-    const toCenterDot = (st.x - origin.x) * dx + (st.z - origin.z) * dz;
+    const toCenterDot = (st.x - effOrigin.x) * dx + (st.z - effOrigin.z) * dz;
     if (toCenterDot <= 0) continue;
     let hit = true;
     for (const [o, d, lo, hi] of axes) {

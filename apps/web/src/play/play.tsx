@@ -126,7 +126,9 @@ import { CreditsDirector, OldMonitorJukeboxModal, isMonitorOverclockedPlaying, p
 import { CreditsPlayer } from '../credits/credits-player';
 import { HaddyCrtPortrait } from '../shell/haddy-crt-portrait';
 import { evaluateContinentalConsensus, evaluateFinaleWindowHeal } from './planet-table-hologram';
-import { PLANET_TABLE_AT } from './lab-room';
+import { PLANET_TABLE_AT, stationById } from './lab-room';
+import { PlanetaryGridScreen } from '../shell/planetary-grid';
+import { loadRecentCodes } from '../storage/recent-codes';
 import { isBiosphereCoherent } from '@hm/questline';
 import { fidelityRules, FIDELITY_LINE_IDS } from '@hm/narrator';
 import { HudZone, CompassRibbon, FloatsPill, MachineLabel, SyncWord } from '../base/ui/hud-zones';
@@ -871,6 +873,7 @@ useEffect(() => {
   const [inspect, setInspect] = useState<{ readonly src: 'base' | 'plot'; readonly id: number } | null>(null);
   const [, setInspectTick] = useState(0);
   const [weaponBenchOpen, setWeaponBenchOpen] = useState(false);
+  const [planetTableOpen, setPlanetTableOpen] = useState(false);
   const [drivingSpeed, setDrivingSpeed] = useState<number | null>(null);
   const [drivingBoostEnergy, setDrivingBoostEnergy] = useState<number | undefined>(undefined);
   const [drivingBoosting, setDrivingBoosting] = useState(false);
@@ -994,7 +997,7 @@ useEffect(() => {
     loadBeamCartridge(written);
   };
   const forceBeamRef = useRef<number | null>(null);
-  const isAnyBaseWindowOpen = menu || baseWindowOpen || machinePickerHardpoint !== null || refineryMachineId !== null || fabricatorMachineId !== null || weaponBenchOpen || inspect !== null;
+  const isAnyBaseWindowOpen = menu || baseWindowOpen || machinePickerHardpoint !== null || refineryMachineId !== null || fabricatorMachineId !== null || weaponBenchOpen || planetTableOpen || inspect !== null;
   const hardpointToPlotMachineRef = useRef<Map<number, number>>(new Map());
   const isLmbDownRef = useRef(false);
   const harvestAccRef = useRef(0);
@@ -2867,7 +2870,7 @@ useEffect(() => {
       chain: () => chainView(stateRef.current.chain),
       chainState: () => stateRef.current.chain,
       // a test opens a lab panel (the click on its button is the real action); and skips grinding only (mining 50 units)
-      openLabPanel: (kind: 'rack' | 'bench' | 'combiner' | null) => setLabPanel(kind),
+      openLabPanel: (kind: LabMachineKind | null) => setLabPanel(kind),
       grindCount: (key: string, n: number) => updateChain((c) => bump(c, key, n)),
       die: () => dieNow(),
       detail: () => scene.debug.detail(),
@@ -3318,6 +3321,9 @@ useEffect(() => {
         if (pieceSessionRef.current) { pieceSessionRef.current = false; return; }
         if (building) { stopBuilding(); return; }
         if (menu) { setMenu(false); return; }
+        if (planetTableOpen) { setPlanetTableOpen(false); return; }
+        if (fabricatorMachineId !== null) { setFabricatorMachineId(null); return; }
+        if (weaponBenchOpen) { setWeaponBenchOpen(false); return; }
         if (dialOpen) { setDialOpen(false); return; }
         if (panel !== null) { setPanel(null); return; }
         if (labPanel !== null) { setLabPanel(null); return; }
@@ -3430,31 +3436,25 @@ useEffect(() => {
         return;
       }
       // Planet Table consensus commit (TICKET-16, A9-02)
-      if (e.code === 'KeyE' && liveWhereRef.current === 'lab') {
-        const at = sceneRef.current?.debug.position();
-        const nearTable = at && Math.hypot(at.x - PLANET_TABLE_AT.x, at.z - PLANET_TABLE_AT.z) <= 3.2;
-        if (hud.aimedProp?.id === 'planet-table' || nearTable) {
-          const localS = {
-            Pxd: stateRef.current.plot.points.pxd,
-            Vtx: stateRef.current.plot.points.vtx,
-            Lx: stateRef.current.plot.points.lx,
-            Aq: stateRef.current.plot.points.aq,
-          };
-          const consensus = evaluateContinentalConsensus(localS);
-          if (consensus.isReadyToCommit || stepDone(stateRef.current.chain, 'A9-01')) {
-            updateChain((c) => bump(c, COUNT.consensusCommitted, 1));
-            say('Consensus Committed', `Continental consensus reached (${consensus.consensusPct.toFixed(0)}%). Committing Sector 04 branch...`);
-            narratorRef.current?.trigger('act9:consensus-commit');
-            if (!finaleRef.current?.active) {
-              finaleRef.current = {
-                active: true,
-                startWallMs: performance.now(),
-                voiceTriggered: false,
-                done: false,
-              };
-            }
-          } else {
-            say('Consensus Incomplete', `Continental consensus at ${consensus.consensusPct.toFixed(0)}% (85% required). Reach Stage 4+ biosphere coherence first.`);
+      if (e.code === 'KeyE' && liveWhereRef.current === 'lab' && hud.aimedLab === 'planet-table') {
+        const localS = {
+          Pxd: stateRef.current.plot.points.pxd,
+          Vtx: stateRef.current.plot.points.vtx,
+          Lx: stateRef.current.plot.points.lx,
+          Aq: stateRef.current.plot.points.aq,
+        };
+        const consensus = evaluateContinentalConsensus(localS);
+        if (consensus.isReadyToCommit || stepDone(stateRef.current.chain, 'A9-01')) {
+          updateChain((c) => bump(c, COUNT.consensusCommitted, 1));
+          say('Consensus Committed', `Continental consensus reached (${consensus.consensusPct.toFixed(0)}%). Committing Sector 04 branch...`);
+          narratorRef.current?.trigger('act9:consensus-commit');
+          if (!finaleRef.current?.active) {
+            finaleRef.current = {
+              active: true,
+              startWallMs: performance.now(),
+              voiceTriggered: false,
+              done: false,
+            };
           }
           return;
         }
@@ -3536,10 +3536,22 @@ useEffect(() => {
           setInspect({ src: 'plot', id: hud.aimed });
           setMenu(false);
           freeMouse();
-        } else if (liveWhereRef.current === 'lab' && hud.aimedLab !== null && labPanel === null) {
+        } else if (liveWhereRef.current === 'lab' && hud.aimedLab !== null && labPanel === null && fabricatorMachineId === null && !planetTableOpen && !weaponBenchOpen) {
           sceneRef.current?.playAction('button');
-          setLabPanel(hud.aimedLab);
-          freeMouse();
+          if (hud.aimedLab === 'fabricator') {
+            setFabricatorMachineId(9999);
+            freeMouse();
+          } else if (hud.aimedLab === 'planet-table') {
+            setPlanetTableOpen(true);
+            freeMouse();
+          } else if (hud.aimedLab === 'weapon-bench') {
+            setWeaponBenchOpen(true);
+            freeMouse();
+          } else {
+            const p = hud.aimedLab === 'preset-rack' ? 'rack' : hud.aimedLab === 'preset-bench' ? 'bench' : hud.aimedLab === 'preset-combiner' ? 'combiner' : hud.aimedLab;
+            setLabPanel(p);
+            freeMouse();
+          }
         }
       }
       if (e.code === 'KeyG') {
@@ -3912,6 +3924,7 @@ useEffect(() => {
   const goal = chainNow.current && !visiting ? { title: chainNow.current.title, hint: chainNow.current.hint } : plotGoal;
   const chainNext = !visiting && chainNow.current ? chainNow.next?.title ?? null : null;
   const syncLit = Math.ceil(hud.sync * SYNC_BLOCKS);
+  const labStation = hud.where === 'lab' && hud.aimedLab !== null ? stationById(hud.aimedLab) : null;
   const prompt = building
     ? (hud.ghost?.ok ? `Click or E: build the ${KINDS[building].name.toLowerCase()}` : hud.ghost?.why || 'Aim at the ground near the gate.')
     : hud.atLever ? 'E: pull the main lever'
@@ -3920,7 +3933,7 @@ useEffect(() => {
     : hud.atArmory && hud.aimedLab === null && labPanel === null && !hud.atLever && !hud.atDial && !baseWorldRef.current.equipment.sidearm ? 'E: take the combat sidearm from the armory'
     : (hud.where === 'lab' || hud.where === 'planet') && hud.aimedProp?.salvage && labPanel === null ? `Hold E: salvage the ${propLabel(hud.aimedProp.id)}`
     : hud.aimedProp && aimedPropActs(hud.aimedProp, hud.where) && !hud.aimedProp.salvage && labPanel === null && hud.aimed === null ? `E: read the ${propLabel(hud.aimedProp.id)}`
-    : hud.where === 'lab' && hud.aimedLab !== null && labPanel === null ? `E: open the ${hud.aimedLab === 'rack' ? 'cartridge rack' : hud.aimedLab === 'bench' ? 'preset bench' : 'preset combiner'}`
+    : labStation !== null && labPanel === null && fabricatorMachineId === null && !planetTableOpen && !weaponBenchOpen ? labStation.prompt
     : hud.where === 'planet' && hud.aimedBoulder !== null && !visiting ? 'Hold E: gather ore'
     : '';
 
@@ -4303,10 +4316,10 @@ useEffect(() => {
             const labEnv: LabEnv = { presets: VAULT, stage: plotRef.current.stage, powered: stateRef.current.gateOn };
             const close = (): void => { setLabPanel(null); lock(); };
 
-            if (labPanel === 'rack') {
+            if (labPanel === 'rack' || labPanel === 'preset-rack') {
               const blankCheck = canMakeBlank(labRef.current, plotRef.current.ore);
               return (
-                <section className="play-machine" aria-label="Cartridge Rack">
+                <section className="play-machine lab-panel-rack" aria-label="Cartridge Rack">
                   <h3>Cartridge Rack</h3>
                   {chainView(state.chain).current?.id === 'A4-01' ? (
                     <button
@@ -4375,13 +4388,13 @@ useEffect(() => {
               );
             }
 
-            if (labPanel === 'bench') {
+            if (labPanel === 'bench' || labPanel === 'preset-bench') {
               const job = labRef.current.bench;
               if (job !== null) {
                 const p = VAULT_BY_ID.get(job.preset ?? '');
                 const pct = Math.min(100, Math.round((job.done / job.needs) * 100));
                 return (
-                  <section className="play-machine" aria-label="Preset Bench">
+                  <section className="play-machine lab-panel-bench" aria-label="Preset Bench">
                     <h3>Preset Bench</h3>
                     <p>
                       Writing <b>{p?.name ?? job.preset}</b> ({job.done.toFixed(1)}s / {job.needs}s)
@@ -4402,7 +4415,7 @@ useEffect(() => {
                 : { ok: false, why: !activeBlank ? 'No blank cartridges available on the rack. Make one at the rack.' : 'Pick a preset to write.' };
 
               return (
-                <section className="play-machine" aria-label="Preset Bench">
+                <section className="play-machine lab-panel-bench" aria-label="Preset Bench">
                   <h3>Preset Bench</h3>
                   <p>Writes an authored terraforming preset onto a blank cartridge.</p>
                   <div className="play-carts">
@@ -4465,12 +4478,12 @@ useEffect(() => {
               );
             }
 
-            if (labPanel === 'combiner') {
+            if (labPanel === 'combiner' || labPanel === 'preset-combiner') {
               const job = labRef.current.combiner;
               if (job !== null) {
                 const pct = Math.min(100, Math.round((job.done / job.needs) * 100));
                 return (
-                  <section className="play-machine" aria-label="Preset Combiner">
+                  <section className="play-machine lab-panel-combiner" aria-label="Preset Combiner">
                     <h3>Preset Combiner</h3>
                     <p>
                       Mixing {job.inputs.length} cartridges ({job.done.toFixed(1)}s / {job.needs}s)
@@ -4498,7 +4511,7 @@ useEffect(() => {
               }
 
               return (
-                <section className="play-machine" aria-label="Preset Combiner">
+                <section className="play-machine lab-panel-combiner" aria-label="Preset Combiner">
                   <h3>Preset Combiner</h3>
                   <p>Mixes 2 to 4 written cartridges into one enhanced cartridge.</p>
                   <div className="play-carts">
@@ -5080,6 +5093,31 @@ useEffect(() => {
               onClose={() => setWeaponBenchOpen(false)}
             />
           )}
+          {planetTableOpen && (() => {
+            const gate = envRef.current?.gate ?? sceneRef.current?.debug.gatePlanet() ?? { x: 0, z: 0 };
+            const r = state.avatar && plotRef.current.machines.length > 0 ? encodePlot(stateRef.current, gate) : null;
+            return (
+              <div className="shell-layer shell-ui" style={{ zIndex: 1000 }}>
+                <PlanetaryGridScreen
+                  myCode={r && r.ok ? r.code : null}
+                  codeNote={r && !r.ok ? r.why : undefined}
+                  gateOn={state.gateOn}
+                  slot={null}
+                  syncMode={syncMode}
+                  recent={loadRecentCodes()}
+                  onToggleSync={() => {
+                    setSyncMode((prev) => (prev === 'synced' ? 'desynced' : 'synced'));
+                  }}
+                  onVisit={(code) => {
+                    setPlanetTableOpen(false);
+                    dialRef.current?.(code);
+                  }}
+                  onSpawn={() => setPlanetTableOpen(false)}
+                  onBack={() => setPlanetTableOpen(false)}
+                />
+              </div>
+            );
+          })()}
           {toast && !isAnyBaseWindowOpen && !hideOverlays ? <div key={toast.id} className={`play-toast${toast.text === 'Sync lost' ? ' lost' : ''}${toast.text.length > 20 ? ' long' : ''}`} role="status" data-hud-zone="title"><b>{toast.text}</b>{toast.sub ? <span>{toast.sub}</span> : null}</div> : null}
           {statusToast && !isAnyBaseWindowOpen && !hideOverlays ? (
             <div key={statusToast.id} className="hm-status-toast" role="status" data-testid="status-toast">

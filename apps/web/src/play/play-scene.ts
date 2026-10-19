@@ -15,7 +15,7 @@ import { createPlotGround, type BoulderInfo, type PlotGround } from './plot-grou
 import { fx as sfx } from '../maker/feedback';
 import { gameAudio } from '../audio/game-audio';
 import * as kit from '@hm/labkit';
-import { createLabRoom, GATE_AT, PLANET_TABLE_AT, POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, preloadLabGenerated, ROOM, type LabRoom } from './lab-room';
+import { createLabRoom, GATE_AT, PLANET_TABLE_AT, POWER_OFF, POWER_ON, POWER_SECONDS, powerAt, preloadLabGenerated, ROOM, type LabRoom, type LabStationId } from './lab-room';
 import { WAKE_SECONDS, wakeLift, type Power } from './lab-power';
 import { preloadVista, VISTA_LEVEL, type WindowView } from './lab-vista';
 import { createPlotHolo, type PlotHolo } from './plot-holo';
@@ -100,7 +100,7 @@ export interface Controls {
   readonly flyUp?: number;
   readonly vehicleInput?: { throttle: number; steer: number; brake: boolean; boost?: boolean };
 }
-export type LabMachineKind = 'rack' | 'bench' | 'combiner';
+export type LabMachineKind = LabStationId | 'rack' | 'bench' | 'combiner';
 
 /** What the scene tells the screen each frame. */
 export interface FrameOut {
@@ -3391,21 +3391,8 @@ export function createPlayScene(o: {
         } else if (gateOn) {
           atDial = atConsole;
         }
-        const targets: [LabMachineKind, THREE.Vector3, number, number][] = [
-          ['rack', new THREE.Vector3(7.5, 1.2, -7.0), 1.6, 4.0],
-          ['bench', new THREE.Vector3(7.5, 0.85, -5.0), 1.2, 3.8],
-          ['combiner', new THREE.Vector3(7.5, 0.9, -3.4), 1.0, 3.5],
-        ];
-        let bestLab = 4.5;
-        for (const [kind, targetPos, radius, maxDist] of targets) {
-          const c = targetPos.clone().sub(pos);
-          const t = c.dot(dir);
-          if (t <= 0 || t >= bestLab || t > maxDist) continue;
-          if (c.addScaledVector(dir, -t).length() < radius + 0.35) {
-            bestLab = t;
-            aimedLab = kind;
-          }
-        }
+        const st = room.aimStation(camera.position, dir) ?? room.aimStation(pos, dir);
+        if (st) aimedLab = st.id;
       }
       // what you are looking at to read or salvage (TASK-23c): a lab prop, or a transponder on its wreck
       let aimedProp: { id: string; salvage: boolean } | null = null;

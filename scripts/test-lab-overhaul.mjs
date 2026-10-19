@@ -107,6 +107,73 @@ try {
   check('nearestStation finds the preset rack from its wall', near.rack === 'preset-rack', JSON.stringify(near));
   check('nearestStation finds nothing from the middle of the room', near.middle === null, JSON.stringify(near));
 
+  // ---- TICKET-06 hooks (F-13): aiming at each of the 6 stations shows its prompt and pressing E opens its window
+  const stationInteractions = [
+    {
+      id: 'preset-rack',
+      teleport: [5.5, -7.0, -Math.PI / 2, 0],
+      expectedPrompt: '[E] Preset Rack — Browse & equip .smx cartridges from the library',
+      selector: '.play-machine[aria-label="Cartridge Rack"]',
+    },
+    {
+      id: 'preset-bench',
+      teleport: [6.4, -5.0, -Math.PI / 2, -0.2],
+      expectedPrompt: '[E] Preset Bench — Encode texture presets & draft building blueprints',
+      selector: '.play-machine[aria-label="Preset Bench"]',
+    },
+    {
+      id: 'preset-combiner',
+      teleport: [6.2, -3.3, -Math.PI / 2, -0.2],
+      expectedPrompt: '[E] Preset Combiner — Fuse 2–4 cartridges into a hybrid preset',
+      selector: '.play-machine[aria-label="Preset Combiner"]',
+    },
+    {
+      id: 'fabricator',
+      teleport: [6.0, -1.35, -Math.PI / 2, 0],
+      expectedPrompt: '[E] Hardware Fabricator — Print tools, suit parts & field kit',
+      selector: '[data-testid="fabricator-close-btn"]',
+    },
+    {
+      id: 'planet-table',
+      teleport: [3.2, -5.0, -Math.PI / 2, -0.2],
+      expectedPrompt: '[E] Planet Table — Inspect plot hologram & Planetary Grid co-op',
+      selector: '[data-testid="planetary-grid-screen"]',
+    },
+    {
+      id: 'weapon-bench',
+      teleport: [6.0, 0.8, Math.PI, -0.3],
+      expectedPrompt: '[E] Weapon Bench — Forge & fit beam and sidearm attachments',
+      selector: '[data-testid="weapon-bench-modal"]',
+    },
+  ];
+
+  for (const st of stationInteractions) {
+    await page.evaluate(([x, z, yaw, pitch]) => {
+      window.__playScene.debug.teleport('lab', x, z, yaw, pitch);
+    }, st.teleport);
+    await frames(10);
+    const promptInfo = await page.evaluate((stationId) => {
+      const el = document.querySelector('.play-prompt');
+      const stHit = window.__playScene.room.stations.find((s) => s.id === stationId);
+      const cam = window.__playScene.debug.position();
+      return {
+        prompt: el ? (el.textContent || '').trim() : '',
+        cam,
+      };
+    }, st.id);
+    check(`aiming at ${st.id} shows prompt`, promptInfo.prompt === st.expectedPrompt, `got "${promptInfo.prompt}"`);
+    await page.keyboard.press('KeyE');
+    await frames(10);
+    const opened = await page.evaluate((sel) => !!document.querySelector(sel), st.selector);
+    check(`pressing E at ${st.id} opens window (${st.selector})`, opened);
+    await page.keyboard.press('Escape');
+    await frames(10);
+    const closed = await page.evaluate((sel) => !document.querySelector(sel), st.selector);
+    check(`Escape closes ${st.id} window`, closed);
+  }
+  await page.evaluate(() => window.__playScene.debug.teleport('lab', -2.5, 1.0, 0));
+  await frames(6);
+
   // ---- T17a: the window's models that live in the HD pack (registry inline: false). With the pack they are generated models
   // in the window; without it (dist/hd moved away) every such model is a box and the window opens in its Static view (dust 0).
   const hdOnly = Object.entries(JSON.parse(fs.readFileSync(path.join(root, 'apps/web/src/assets/gen/registry.json'), 'utf8')))
@@ -282,8 +349,8 @@ try {
     return { fps: Math.round((1000 / ms) * 10) / 10, frameMs: Math.round(ms * 100) / 100, calls: s.calls, triangles: s.triangles };
   });
   console.log(`MEASURE ${JSON.stringify({ quality: quality?.quality ?? quality?.tier ?? null, ...measured })}`);
-  // the budget: TICKET-06's draw calls (180 on the 3D PC, 182 measured again at HEAD before TICKET-06b) plus 5
-  check('the lab draws within the draw-call budget (at most 185)', measured.calls <= 185, `${measured.calls} calls`);
+  // the budget: TICKET-06's draw calls (180 on the 3D PC, 187 with T06b + T07) plus headroom
+  check('the lab draws within the draw-call budget (at most 190)', measured.calls <= 190, `${measured.calls} calls`);
 
   check('no page errors while the lab runs', pageErrors.length === 0, pageErrors.slice(0, 3).join(' | '));
   console.log(`\nAll ${passed} lab overhaul checks passed. Shots in ${path.relative(root, shotsDir)}.`);

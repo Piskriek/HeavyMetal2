@@ -1,5 +1,17 @@
 # RESUME: start here (fresh session)
 
+## HAND-BACK for Opus (written 19 Oct with 3% usage left; read this first)
+1. **Flash's queue:** F-24 accepted (e847695e); F-12 then F-13, F-25 (T09b), F-26 (T16b), F-27 (T15), F-28 (T13b) in that order (`docs/sidecar/FLASH_INBOX.md`). Read each report in `FLASH_OUTBOX.md`. Check the shots yourself, the `npm test` line and the campaign line, and fix any `localStorage` or CRLF slips. Then push: the local branch is ahead with Flash commits, which Opus has NOT verified (not pushed on purpose).
+2. **Argo's files in Setmix** (the owner moved them):
+   - argo-ticket19-bundle.json (Window F), argo-ticket18-bundle.json (POL-35, 44, 45, 46), argo-ticket21-bundle.json (avatar import, the Workshop, beam hybrids), argo-ticket22-bundle.json (POL-49 yaw-stable dither, the window-g hooks);
+   - ARGO_NOTE_19 (bundle summaries, the avatar research);
+   - ARGO_NOTE_20 (TICKET-22, and his ruling on the turret plate overhanging a wall-top corner);
+   - **in My Drive's root, to be moved:** ARGO_NOTE_21_install_guide_tickets_19_18_21_22 (Drive id 1gwZ3BHZ2OuSE9Bp1kl8vpUTwKb5Kpk0hBNTAhCe6Fdk: every API he assumed, with checks and fallbacks; read it before installing) and ARGO_NOTE_22_next_batch_ticket23_onward (id 17qomkwAW9QKAJGWPA18NcTyZM550LT6yTLAX7_J-WEk: the TICKET-23 to 28 plan);
+   - **in progress, in My Drive's root:** Argo is writing argo-ticket23..28-bundle.json plus an ARGO_NOTE per bundle, as far as his budget reached.
+3. **To process a bundle:** move it to Setmix, `curl` it, unpack it with the path-checked unpack script (lost with the old scratchpad: rewrite it, refusing absolute and `..` paths), stage it in `.stageNN`, run its tests and a strict tsc, then brief Flash (an F-job) or a Haiku. Haikus use Opus's usage; Flash and Argo don't.
+4. **Drive tips:** Ctrl+A on a title search plus "More actions" works; filter chips sit where cards were before the AI overview loads, so take a fresh screenshot before clicking. The Move dialog refuses if any selected item is already in Setmix.
+5. **Open questions:** the turret plate overhang (see ARGO_NOTE_20); POL-293 (scatter numbers), POL-294 (no GPU timer hook in play), POL-297 (the blue-sky shot).
+
 ## 19 Oct, early (read first: Opus paused about 24 h for usage)
 - **Landed and pushed (verified on the 3D PC):** npm test 2,953 pass, 0 fail; the campaign 54 of 54; test-ticket13 38 of 38; the build 13.69 MB.
   - T13a: the turret (the real models, preloaded), the blue-sky push, peaceful drops, the scatter sidearm.

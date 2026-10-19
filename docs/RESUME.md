@@ -10,7 +10,8 @@
    - **in progress, in My Drive's root:** Argo is writing argo-ticket23..28-bundle.json plus an ARGO_NOTE per bundle, as far as his budget reached.
 3. **To process a bundle:** move it to Setmix, `curl` it, unpack it with the path-checked unpack script (lost with the old scratchpad: rewrite it, refusing absolute and `..` paths), stage it in `.stageNN`, run its tests and a strict tsc, then brief Flash (an F-job) or a Haiku. Haikus use Opus's usage; Flash and Argo don't.
 4. **Drive tips:** Ctrl+A on a title search plus "More actions" works; filter chips sit where cards were before the AI overview loads, so take a fresh screenshot before clicking. The Move dialog refuses if any selected item is already in Setmix.
-5. **Open questions:** the turret plate overhang (see ARGO_NOTE_20); POL-293 (scatter numbers), POL-294 (no GPU timer hook in play), POL-297 (the blue-sky shot).
+5. **Owner directive (19 Oct): "bring your own agent" is critical to the Studio**, which must be very agent-friendly, because Opus and the owner will use it together to make the game look good (see project0.city; memory studio-agent-friendly). Research it, then plan it with Argo as a priority ticket.
+6. **Open questions:** the turret plate overhang (see ARGO_NOTE_20); POL-293 (scatter numbers), POL-294 (no GPU timer hook in play), POL-297 (the blue-sky shot).
 
 ## 19 Oct, early (read first: Opus paused about 24 h for usage)
 - **Landed and pushed (verified on the 3D PC):** npm test 2,953 pass, 0 fail; the campaign 54 of 54; test-ticket13 38 of 38; the build 13.69 MB.

@@ -221,12 +221,6 @@ export function SetMixHome(props: {
           </div>
         </div>
 
-        {/* POL-40: Dr. Gwen Haddy CRT Portrait Slot */}
-        <HaddyCrtPortrait
-          subtitleText="Portal link stable at 12 kW. Eleven neighbor domes on the horizon."
-          stage={6}
-        />
-
         {/* Primary Navigation Suite */}
         <nav className="sm-menu fidelity-menu" aria-label="FIDELITY Operations">
           {homeMenu(EDITION, props.endingSeen).map((m, i) => (
@@ -285,6 +279,14 @@ export function SetMixHome(props: {
         <div className="hud-tile">
           <div className="hud-tile-title">LUNAR PORTAL</div>
           <div className="hud-badge-online">GATE SHIELDED // READY</div>
+        </div>
+
+        {/* POL-40: Dr. Gwen Haddy CRT Portrait Slot */}
+        <div className="fidelity-telemetry-portrait" style={{ marginTop: 2 }}>
+          <HaddyCrtPortrait
+            subtitleText="Portal link stable at 12 kW. Eleven neighbor domes on the horizon."
+            stage={6}
+          />
         </div>
       </aside>
 

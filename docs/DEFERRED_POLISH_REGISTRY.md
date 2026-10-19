@@ -391,8 +391,8 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 
 ### POL-292: the turret's 2 kW does not yet count in the HUD's "N of 12 kW" budget
 - **Seen:** T13a. The plot's budget reads `Env.extraDrawKw` (plotsim, read at each solve). `turretGridDrawKw` (base/world.ts) gives 2 kW per built turret. The play scene's own turret brownout uses the same budget, so the turrets do brown out. The HUD readout (play.tsx) builds its Env without `extraDrawKw`, so the readout does not show the turrets' draw.
-- **Expected:** one line in play.tsx's Env literal (near line 1696): `extraDrawKw: () => turretGridDrawKw(baseWorldRef.current.base)`. play.tsx is T14/Flash's file, so T13a did not touch it.
-- Sidecar Task: POL-292 - T14 or the owner adds the line.
+- **Done in F-24 (Flash, 2026-10-19):** added `extraDrawKw: () => turretGridDrawKw(baseWorldRef.current.base)` to the HUD's `env` literal in `apps/web/src/play/play.tsx`. Verified in `scripts/test-ticket13.mjs` that placing the first turret adds 2 kW to the HUD readout demand.
+
 
 ### POL-293: the scatter sidearm's numbers come from the weapon bench, not Argo's placeholders
 - **Seen:** T13a. `SCATTER_SIDEARM_PRESET` (base/weapons.ts) is a loadout (burst core, scatter barrel, iron sight, compact cell); its numbers are `weaponStats(loadout)`: 7 pellets, 60 m, burst of three, 16 to 22 damage per pellet. Argo's draft had 18 m range and 6 damage, which the weapon bench does not use.

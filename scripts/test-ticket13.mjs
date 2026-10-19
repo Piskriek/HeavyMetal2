@@ -260,8 +260,20 @@ try {
   await apply({ t: 'place', at: { x: pose.x, z: pose.z }, blueprint: 'bp:column:basalt', piece: { s, kind: 'turret', i: 6, j: 6, k: 1, r: 0 } });
   check('a turret over nothing is refused (no floating turret)', (await countPieces('turret')) === 0);
 
-  // the turrets on the roof's corners: (3,1) first, then the other three corners of the roof cell (four in all for the perf run)
-  for (const [i, j] of [[3, 1], [2, 0], [2, 1], [3, 0]]) await apply({ t: 'place', at: { x: pose.x, z: pose.z }, blueprint: 'bp:column:basalt', piece: { s, kind: 'turret', i, j, k: 1, r: 0 } });
+  // the turrets on the roof's corners: (3,1) first, checking that one built turret adds 2 kW to the HUD readout (POL-292)
+  const getHudDemand = () => page.evaluate(() => {
+    const el = document.querySelector('.play-power b');
+    return el ? parseFloat(el.textContent || '0') : null;
+  });
+  const demand0 = await getHudDemand();
+
+  await apply({ t: 'place', at: { x: pose.x, z: pose.z }, blueprint: 'bp:column:basalt', piece: { s, kind: 'turret', i: 3, j: 1, k: 1, r: 0 } });
+  await sleep(600);
+  const demand1 = await getHudDemand();
+  check('one built turret adds 2 kW to the HUD readout (POL-292)', demand0 !== null && demand1 !== null && demand1 - demand0 === 2, `demand ${demand0} -> ${demand1} kW`);
+
+  // then the other three corners of the roof cell (four in all for the perf run)
+  for (const [i, j] of [[2, 0], [2, 1], [3, 0]]) await apply({ t: 'place', at: { x: pose.x, z: pose.z }, blueprint: 'bp:column:basalt', piece: { s, kind: 'turret', i, j, k: 1, r: 0 } });
   check('four perimeter turrets stand on the roof corners', (await countPieces('turret')) === 4, `turrets ${await countPieces('turret')}`);
 
   // the heavy light projector on the hardpoint: the real install (the machine picker's command), which places it on the plot

@@ -63,6 +63,7 @@ import { createWorldViewSource, WorldViewSource, formatRefusalToast, formatWhy }
 import {
   apply, pieceAt, pieceAtIn, preview, withBridgeStore, BRIDGE_RANGE, BRIDGE_STORE,
   BEAM_RANGE, structureEnv, planGhosts, layoutPieces, roomAt, machineAt, INSTANT_TIME_SCALE,
+  turretGridDrawKw,
   type BaseWorld, type BaseCommand, type WorldEnv, type Applied, type Plan,
 } from '../base/world';
 import { PieceMeshManager } from '../base/piece-meshes';
@@ -1717,7 +1718,13 @@ useEffect(() => {
           scene.setBeamCartridge(colour);
           setBeamPort({ name: savedPort.name });
         }
-        env = { gate: scene.debug.gatePlanet(), plotRadius: 500, richness: (x, z) => scene.richness(x, z), affinity: (id, metric) => cartlabAffinityOf(labRef.current, id, metric) };
+        env = {
+          gate: scene.debug.gatePlanet(),
+          plotRadius: 500,
+          richness: (x, z) => scene.richness(x, z),
+          affinity: (id, metric) => cartlabAffinityOf(labRef.current, id, metric),
+          extraDrawKw: () => turretGridDrawKw(baseWorldRef.current.base),
+        };
         envRef.current = env;
         plotRef.current = stateRef.current.plot;
         if (isDevSeed && plotRef.current.machines.length === 0) {

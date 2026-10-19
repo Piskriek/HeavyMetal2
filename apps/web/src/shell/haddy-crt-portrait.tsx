@@ -14,6 +14,8 @@ export interface HaddyCrtPortraitProps {
   readonly isWarningGlitch?: boolean;
   readonly stage?: number;
   readonly portraitUrl?: string;
+  readonly className?: string;
+  readonly style?: React.CSSProperties;
 }
 
 export const HaddyCrtPortrait: React.FC<HaddyCrtPortraitProps> = ({
@@ -23,6 +25,8 @@ export const HaddyCrtPortrait: React.FC<HaddyCrtPortraitProps> = ({
   isWarningGlitch = false,
   stage = 6,
   portraitUrl = 'ui/haddy-portrait.webp',
+  className = '',
+  style = {},
 }) => {
   const [imgFailed, setImgFailed] = useState(false);
 
@@ -43,7 +47,7 @@ export const HaddyCrtPortrait: React.FC<HaddyCrtPortraitProps> = ({
 
   return (
     <div
-      className="hud-haddy-crt-portrait"
+      className={`hud-haddy-crt-portrait${className ? ` ${className}` : ''}`}
       data-line-id={activeLineId ?? ''}
       data-speaking={isSpeaking ? 'true' : 'false'}
       style={{
@@ -56,7 +60,9 @@ export const HaddyCrtPortrait: React.FC<HaddyCrtPortraitProps> = ({
         borderLeft: `3px solid ${borderColor}`,
         borderRadius: 4,
         maxWidth: 360,
+        boxSizing: 'border-box',
         pointerEvents: 'none',
+        ...style,
       }}
     >
       {/* Square 56x56 CRT Bezel */}

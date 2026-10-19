@@ -49,6 +49,7 @@ import { type GenLevel, genLevelFor, getGenSync, loadGen } from '../assets/gen';
 import { createLabVista, VISTA_LEVEL, vistaHdModelsMissing, type LabVista, type WindowView } from './lab-vista';
 import { CLUTTER, CLUTTER_MODELS, type ClutterItem } from './lab-clutter';
 import { createMonitorEqualizer3D, isMonitorOverclockedPlaying, type MonitorEqualizer3D } from '../credits/monitor-jukebox';
+import { createPlanetTableHologram, type PlanetTableHologram3D, type FourFloats } from './planet-table-hologram';
 import { coilLevels, darkStrobe, POWER_OFF, strobeSweepZ, type Power } from './lab-power';
 import { overhangBoxes, type Bounds3D } from './static-colliders';
 export {
@@ -425,10 +426,16 @@ export interface LabRoom {
   adoptGenerated(): void;
   /** The storm as progress 0 to 1 (the flat picture in Static; the vista's progress in Full and Lite). */
   setStorm(progress: number): void;
+  /** POL-302: sets the old monitor equaliser active or direct bar levels. */
+  setMonitorEqualizer(bars?: readonly number[] | boolean): void;
   /** What the window shows (plan §9: Full, Lite or Static). */
   setWindowView(view: WindowView): void;
   /** Shows the flat storm plane in the window's opening whatever the view (the planet seen through the gate: no hole, R8). */
   setPlaneFallback(on: boolean): void;
+  /** POL-70: 3D Planet Table Hologram instance. */
+  readonly hologram: PlanetTableHologram3D;
+  setFloats(floats: FourFloats): void;
+  setConsensusCommitted(committed: boolean): void;
   /** The lab clutter (TASK-23c): the prop the ray meets within `reach` metres (a fixture or a salvage prop), or null. Lab metres. */
   aimClutter(origin: THREE.Vector3, dir: THREE.Vector3, reach: number): string | null;
   /** Starts a salvage prop's dissolve (about a second; it then leaves the lab). False for a fixture or a prop that is not standing. */
@@ -934,11 +941,9 @@ export function createLabRoom(o: {
     roughness: 0.4,
     metalness: 0.3,
   }));
-  const hologramMat = keep(new THREE.MeshStandardMaterial({
-    color: '#0a2430', emissive: new THREE.Color('#7ff0ff'), emissiveIntensity: 0, transparent: true, opacity: 0, depthWrite: false,
-  }));
-  const hologramPlate = new THREE.Mesh(keep(new THREE.CylinderGeometry(0.4, 0.4, 0.006, 32)), hologramMat);
-  hologramPlate.visible = false;
+  const planetTableHolo = createPlanetTableHologram(pTable.group);
+  let currentFloats: FourFloats = { Pxd: 0, Vtx: 0, Lx: 0, Aq: 0 };
+  let consensusCommitted = false;
   const tableDisc = pTable.lamps[0];
   if (tableDisc) tableDisc.material = tableDiscMat;
 
@@ -952,13 +957,12 @@ export function createLabRoom(o: {
     const plate = genFor('planet-table');
     if (!plate) return false;
     groundModelAt(plate, 0);
-    replaceVisual(pTable.group, plate);
+    replaceVisual(pTable.group, plate, [planetTableHolo.group]);
     pTable.lamps.length = 0;
     const disc = new THREE.Mesh(keep(new THREE.CylinderGeometry(0.42, 0.42, 0.01, 32)), tableDiscMat);
     disc.position.set(0, 1.1 + 0.005, 0);
     plate.add(disc);
-    hologramPlate.position.set(0, 1.1 + 0.012, 0);
-    plate.add(hologramPlate);
+    plate.add(planetTableHolo.group);
     return true;
   });
 
@@ -1291,9 +1295,7 @@ export function createLabRoom(o: {
     }
 
     tableDiscMat.emissiveIntensity = p.main * 0.22;
-    hologramMat.opacity = 0.75 * p.hologram;
-    hologramMat.emissiveIntensity = 1.6 * p.hologram;
-    hologramPlate.visible = p.hologram > 0.001;
+    planetTableHolo.group.visible = p.hologram > 0.001;
     pTable.lamps.slice(1).forEach((l) => kit.setLamp(l, p.main > 0.5 ? 1 : 0));
 
     pulseUniforms.uPower.value = p.pulse;
@@ -1395,6 +1397,25 @@ export function createLabRoom(o: {
     coilsLit: (): boolean[] => gate.coils.map((c) => ((c.material as THREE.MeshStandardMaterial).emissiveIntensity ?? 0) > 0.5),
     adoptGenerated: adoptLoaded,
     setStorm,
+    setMonitorEqualizer: (bars?: readonly number[] | boolean): void => {
+      if (monitorEq) {
+        if (typeof bars === 'boolean') {
+          monitorEq.setActive(bars);
+        } else if (Array.isArray(bars)) {
+          monitorEq.setActive(true);
+          const heights = bars;
+          for (let i = 0; i < 4; i++) {
+            const b = monitorEq.group.children[i] as THREE.Mesh | undefined;
+            if (b) b.scale.y = heights[i] ?? 1;
+          }
+        } else {
+          monitorEq.setActive(false);
+        }
+      }
+    },
+    hologram: planetTableHolo,
+    setFloats: (f: FourFloats): void => { currentFloats = f; },
+    setConsensusCommitted: (committed: boolean): void => { consensusCommitted = committed; },
     setWindowView,
     setPlaneFallback,
     vista,
@@ -1408,6 +1429,7 @@ export function createLabRoom(o: {
         monitorEq.setActive(isMonitorOverclockedPlaying());
         monitorEq.update(now);
       }
+      planetTableHolo.update(now, currentFloats, consensusCommitted);
       // desk.lever carries the play scene's full throw; the swing takes back all but the travel (the swing sits inside desk.lever)
       leverSwing.rotation.x = desk.lever.rotation.x * (LEVER_TRAVEL / LEVER_THROW - 1);
       for (const rig of machineRigs) {
@@ -1428,6 +1450,7 @@ export function createLabRoom(o: {
     },
     dispose() {
       vista.dispose();
+      planetTableHolo.dispose();
       for (const x of owned) x.dispose();
       group.traverse((obj) => {
         const mesh = obj as THREE.Mesh;

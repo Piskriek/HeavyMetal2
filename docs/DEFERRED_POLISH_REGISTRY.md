@@ -347,22 +347,22 @@ When Claude Opus identifies a micro-polish or tuning item that would distract fr
 ### POL-301: the credits' chapter 1 has no stage-0a wireframe look
 - **Seen:** T14 (306e7dae). Chapter 1 shows the stage-0 dither, because the per-chapter post uniforms need a play-scene hook and T14 stayed out of `play-scene.ts`.
 - **Expected:** Add a `PlayScene` hook that sets the stage-look post pass per credits chapter (0a wireframe first), and have the credits director call it.
-- Sidecar Task: POL-301 - see above.
+- **Done in F-26 (Gemini-Flash):** Added `setWireframeLook(enabled: boolean | null)` to `PlayScene` and wired into post-pass uniforms (`uWireframeMix = 1.0` when enabled). Called in `ch1ColdBoot` and cleared in `ch2OneBitFacets` and on credits exit. Verified by `scripts/test-ticket16b.mjs` and `scripts/test-credits-video.mjs`.
 
 ### POL-302: the credits' storm calls do nothing
 - **Seen:** T14. The chapter timeline calls `room.setStorm`, but `PlayScene` doesn't expose the lab room, so the calls are no-ops. The window views (`debug.setWindowView`) do work. The monitor equaliser reads `monitor-jukebox.ts` for the same reason (no `setMonitorEqualizer` on `LabRoom`).
 - **Expected:** Expose the lab room (or `setStorm` and `setMonitorEqualizer`) through `PlayScene`, and wire both.
-- Sidecar Task: POL-302 - see above.
+- **Done in F-26 (Gemini-Flash):** Exposed `room`, `setStorm`, and `setMonitorEqualizer` on `PlayScene` delegating to `LabRoom`. Connected finale window-storm heal visual in `play.tsx` via `evaluateFinaleWindowHeal(elapsedSec)`. Verified in `scripts/test-ticket16b.mjs`.
 
 ### POL-303: `setAltCam` with a target drifts
 - **Seen:** T14 found it, in `play-scene.ts`: the scene reads back XYZ Euler angles and rebuilds the camera as YXZ each frame, so a look-at target drifts. The credits now pass pitch and yaw without a target.
 - **Expected:** Rebuild the alt camera from the target (or keep one Euler order) so `setAltCam(..., target)` holds its aim. Then the credits can use targets again.
-- Sidecar Task: POL-303 - see above.
+- **Done in F-26 (Gemini-Flash):** Retained `altCamTarget` in `setAltCam` and re-applied `camera.lookAt(target.x, target.y, target.z)` directly on every frame before `camera.updateMatrixWorld(true)`. Drift measured at diff=0 across multi-frame test in `scripts/test-ticket16b.mjs`.
 
 ### POL-304: the held rifle shows in the credits camera
 - **Seen:** Opus's review of T14: the player's held weapon (black, with an orange stripe) sits in the bottom-right corner of the chapter-6 frame (`shots-run/credits-video/chapter-6-4-6.png`).
 - **Expected:** Hide the first-person viewmodel while the credits run, and restore it after.
-- Sidecar Task: POL-304 - see above.
+- **Done in F-26 (Gemini-Flash):** Added `setViewModelVisible(visible: boolean)` to `PlayScene` to toggle `viewModelHidden`, skipping viewmodel positioning/rendering when hidden. Called on `CreditsDirector.start()` and restored on `stop()`. Verified in `scripts/test-ticket16b.mjs`.
 
 ### POL-305: the credits' debug handles are always exposed
 - **Seen:** T14. `window.__credits` and `window.__creditsDirector` (seek, scheduleInfo, clockInfo) are always on.

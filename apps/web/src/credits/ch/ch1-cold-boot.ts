@@ -25,6 +25,7 @@ export const ch1ColdBoot: ChapterDriver = {
   apply(scene, state, eye, lookAt) {
     if (!scene) return;
     scene.setFidelityStage?.(0);
+    scene.setWireframeLook?.(true);
     scene.setCameraView?.(state.activeShot.id === 'SHOT-1C' ? 'third' : 'first');
     scene.setBeamHeld?.(false, 'extract');
     scene.setLabActivity?.({ bench: 0, combiner: 0, rack: 0 });

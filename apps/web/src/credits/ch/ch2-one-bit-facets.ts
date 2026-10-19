@@ -24,6 +24,7 @@ export const ch2OneBitFacets: ChapterDriver = {
   },
   apply(scene, state, eye, lookAt) {
     if (!scene) return;
+    scene.setWireframeLook?.(false);
     const isEga = state.activeShot.id !== 'SHOT-2A';
     scene.setFidelityStage?.(isEga ? 1 : 0);
     const firingBeam = state.activeShot.id === 'SHOT-2A';

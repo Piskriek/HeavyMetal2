@@ -2444,8 +2444,8 @@ useEffect(() => {
         const elapsedSec = (performance.now() - fin.startWallMs) / 1000;
         const heal = evaluateFinaleWindowHeal(elapsedSec);
 
-        // PART-B HOOK: connect Lab observation window golden-hour heal visual
-        // scene.labRoom?.setStorm?.(heal.windowStormHeal0to1);
+        // TICKET-16 part b: connect Lab observation window golden-hour heal visual
+        scene.setStorm(heal.windowStormHeal0to1);
 
         if (heal.shouldTriggerEpilogueVoice && !fin.voiceTriggered) {
           fin.voiceTriggered = true;

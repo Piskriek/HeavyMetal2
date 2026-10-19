@@ -23,6 +23,12 @@ import { COLOUR_MARK_FRAGMENT, localMachineWaveAt, MARK_VERTEX, OPENING_FRAGMENT
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
 import { disposeProp, FABRICATOR_PLUME, FABRICATOR_VENT, FEED_CUBES_FULL, feedCubeCount, feedCubeProgress, lineSpan, machinePlumeCount, machinePlumeCountOf, machinePlumeGravity, machinePlumeLook, machinePlumeLookOf, machinePlumeSpec, machinePlumeSteady, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
 import { printFrame } from '@hm/tooljuice';
+import {
+  createHorizonEnclaveDomes,
+  type FourFloats,
+  type HorizonEnclaveDomes3D,
+  type PlanetTableHologram3D,
+} from './planet-table-hologram';
 import { beadSpeed, spanPoint, spanSag } from './brownout-visual';
 import { castHeightfield, castSpheres, createRoverArmState, nearestHit, stepRoverArm, type CastSphere, type RoverArmState, type Vec3 as RoverVec3 } from './rover-camera';
 import { createExposureState, createScanWave, exposureTargetLuminance, gateOrLabFactor, markScanWaveDone, scanFrame, stepExposure, suitCamMix, suitCamProfile, suitCamStrength, triggerScanWave, type ExposureState, type ScanWave, type SuitCamSetting } from './stage-look';
@@ -295,6 +301,24 @@ export interface PlayScene {
   setBeamSealing(on: boolean): void;
   /** Whether the player is currently near water on the planet (TASK-29 / T09b). */
   isNearWater(): boolean;
+  /** POL-301: Stage 0a wireframe post-pass look override (true = wireframe, false = normal, null = auto). */
+  setWireframeLook(enabled: boolean | null): void;
+  /** POL-304: Controls visibility of the first-person held weapon viewmodel. */
+  setViewModelVisible(visible: boolean): void;
+  /** POL-302: sets storm progress (0..1) on the lab room observation window. */
+  setStorm(progress: number): void;
+  /** POL-302: sets the old monitor equaliser active or direct bar levels. */
+  setMonitorEqualizer(bars?: readonly number[] | boolean): void;
+  /** POL-302: exposes the lab room methods. */
+  readonly room?: {
+    setStorm(progress: number): void;
+    setMonitorEqualizer(bars?: readonly number[] | boolean): void;
+    setWindowView(view: WindowView): void;
+  };
+  setConsensusCommitted(committed: boolean): void;
+  isConsensusCommitted(): boolean;
+  /** Window E #1: returns the 11 horizon enclave domes instance. */
+  getHorizonDomes(): HorizonEnclaveDomes3D;
   /**
    * Compiles every shader the frames will need, for each place it draws, behind the loading bar: a compile mid-play is a hitch the
    * display governor would read as a slow machine (and the owner's rule is never to start a screen choppy).
@@ -441,6 +465,11 @@ export interface PlayScene {
     groundHeight(x: number, z: number): number;
     /** A third-person side view at `metres` from the character (null: back to the over-the-shoulder camera). For the shots. */
     sideShot(metres: number | null): void;
+    horizonDomes(): HorizonEnclaveDomes3D;
+    planetTableHologram(): PlanetTableHologram3D;
+    setFourFloats(floats: FourFloats): void;
+    isViewModelVisible(): boolean;
+    isWireframeLook(): boolean | null;
   };
   dispose(): void;
 }
@@ -1222,12 +1251,23 @@ export function createPlayScene(o: {
   let piecesGroup: THREE.Group | null = null;
   let activeWalkWorld: WalkWorld | null = null;
   let altCamPos: THREE.Vector3 | null = null;
+  let altCamTarget: THREE.Vector3 | null = null;
   let isSheltered = false;
   /** TASK-26: the starter shelter's dome centre, and the scratch list of the domes round the player each frame. */
   let shelterDome: { x: number; z: number } | null = null;
   const domeBuf: DomeSource[] = [];
   let debugAltCam = false;
   let sideShotM: number | null = null;
+  let wireframeLookOverride: boolean | null = null;
+  let viewModelHidden = false;
+
+  // ============================================================================
+  // Window E: 11 Neighbor Enclave Domes on the 4.2 km Lunar Horizon (T16b / A9-01)
+  // ============================================================================
+  const horizonDomes: HorizonEnclaveDomes3D = createHorizonEnclaveDomes(planetScene);
+  keep(horizonDomes);
+  let currentFloats: FourFloats = { Pxd: 0, Vtx: 0, Lx: 0, Aq: 0 };
+  let consensusCommitted = false;
 
   const planGhostMat = keep(new THREE.MeshBasicMaterial({
     color: 0x00f0ff,
@@ -2209,7 +2249,7 @@ export function createPlayScene(o: {
 
   /** The held rifle over the picture: its own pass, depth cleared so no wall or ground cuts it, its own lights (TASK-21). */
   const drawViewModel = (cam: THREE.PerspectiveCamera): void => {
-    if (!heldBeam.group.visible) return;
+    if (!heldBeam.group.visible || viewModelHidden) return;
     viewRig.position.copy(cam.position);
     viewRig.quaternion.copy(cam.quaternion);
     renderer.autoClear = false;
@@ -2396,6 +2436,13 @@ export function createPlayScene(o: {
       scanWave = createScanWave();
       if (s.plot.stage >= 1 || stage0IsDithered(s.plot.machines.length)) markScanWaveDone(scanWave);
       plotLx = plotLevel(s.plot, 'lx');
+      currentFloats = {
+        Pxd: plotLevel(s.plot, 'pxd'),
+        Vtx: plotLevel(s.plot, 'vtx'),
+        Lx: plotLevel(s.plot, 'lx'),
+        Aq: plotLevel(s.plot, 'aq'),
+      };
+      room.setFloats(currentFloats);
       room.setStorm(Math.min(1, Math.max(0, stage / 6)));
       gameAudio.updateStormVolume(1.0 - Math.min(1, Math.max(0, stage / 6)));
       waveTo = -1;
@@ -2448,6 +2495,13 @@ export function createPlayScene(o: {
       if (changed || !sameNet) { relay(connected); lastConnected = new Set(connected); }
       holo.setPlot(plot, running, connected);
       plotLx = plotLevel(plot, 'lx');
+      currentFloats = {
+        Pxd: plotLevel(plot, 'pxd'),
+        Vtx: plotLevel(plot, 'vtx'),
+        Lx: plotLevel(plot, 'lx'),
+        Aq: plotLevel(plot, 'aq'),
+      };
+      room.setFloats(currentFloats);
       // the first machine standing on stage 0 starts the scan wave from its own spot (0a to 0b, the same rule as the HUD's skin); past stage 0 the world is resolved
       if (plot.stage >= 1) markScanWaveDone(scanWave);
       else if (!scanWave.done && scanWave.startSec === null && stage0IsDithered(plot.machines.length)) {
@@ -3119,7 +3173,11 @@ export function createPlayScene(o: {
       if (drivingVehicleId === null) roverArmOn = false;
       if (altCamPos) {
         camera.position.copy(altCamPos);
-        camera.rotation.set(pitch, yaw, 0, 'YXZ');
+        if (altCamTarget) {
+          camera.lookAt(altCamTarget.x, altCamTarget.y, altCamTarget.z);
+        } else {
+          camera.rotation.set(pitch, yaw, 0, 'YXZ');
+        }
       } else if (drivingVehicleId !== null && drivingState) {
         const vView = vehicleViews.get(drivingVehicleId);
         if (vView) {
@@ -3241,8 +3299,8 @@ export function createPlayScene(o: {
       postUniforms.uSkyRise.value = wave.sky;
       // stage 0's scan wave (0a to 0b), the gate's amber pool, the sun, and the suit cam's optics (plan 25)
       const scan = scanFrame(scanWave, now);
-      postUniforms.uScanR.value = scan.radius;
-      postUniforms.uWireMix.value = scan.wireMix;
+      postUniforms.uScanR.value = wireframeLookOverride === true ? -1 : scan.radius;
+      postUniforms.uWireMix.value = wireframeLookOverride === true ? 1.0 : wireframeLookOverride === false ? 0.0 : scan.wireMix;
       postUniforms.uScanCentre.value.set(scanWave.centre.x, scanWave.centre.y, scanWave.centre.z);
       syncWaveAndLocalPulseUniforms(now, scan.radius);
       postUniforms.uGatePos.value.copy(twin.group.position);
@@ -3269,6 +3327,8 @@ export function createPlayScene(o: {
         if (mat.uniforms?.uTime) mat.uniforms.uTime.value = now;
       }
       if (where === 'planet') {
+        horizonDomes.group.visible = true;
+        horizonDomes.update(now, currentFloats, (x, z) => groundAt(x, z));
         camera.getWorldDirection(monsterFwd);
         monsters.update(dt, { x: pos.x, z: pos.z, yaw: Math.atan2(monsterFwd.x, monsterFwd.z), alive: playerAlive }, camera);
         stepTurrets(dt, pos); // TICKET-13 Window C: the perimeter turrets (their section is after activeBase)
@@ -3629,6 +3689,17 @@ export function createPlayScene(o: {
       if (Math.hypot(pos.x - (twin.group.position.x - 20), pos.z - (twin.group.position.z + 40)) <= 40) return true;
       return false;
     },
+    setWireframeLook(enabled) { wireframeLookOverride = enabled; },
+    setViewModelVisible(visible) { viewModelHidden = !visible; },
+    setStorm: (p: number) => room.setStorm(p),
+    setMonitorEqualizer: (b) => room.setMonitorEqualizer(b),
+    room,
+    setConsensusCommitted: (committed) => {
+      consensusCommitted = committed;
+      room.setConsensusCommitted(committed);
+    },
+    isConsensusCommitted: () => consensusCommitted,
+    getHorizonDomes: () => horizonDomes,
     debug: {
       setSync: (v: number) => { sync = Math.max(0, Math.min(1, v)); },
       plumePixels: () => plume.stats().pixels,
@@ -3843,6 +3914,7 @@ export function createPlayScene(o: {
       setAltCam(eye, p, y, target) {
         debugAltCam = true;
         altCamPos = new THREE.Vector3(eye.x, eye.y, eye.z);
+        altCamTarget = target ? new THREE.Vector3(target.x, target.y, target.z) : null;
         camera.position.copy(altCamPos);
         if (target) {
           camera.lookAt(target.x, target.y, target.z);
@@ -3858,6 +3930,7 @@ export function createPlayScene(o: {
       clearAltCam() {
         debugAltCam = false;
         altCamPos = null;
+        altCamTarget = null;
       },
       groundHeight: (x, z) => groundAt(x, z),
       /** A third-person side view at `metres` from the character (null: the over-the-shoulder camera). Shots only. */
@@ -3865,6 +3938,14 @@ export function createPlayScene(o: {
       biomeCounts: () => (biomeView ? biomeView.counts() : null),
       biomeTriangles: () => (biomeView ? biomeView.triangles() : 0),
       biomeDrawCalls: () => (biomeView ? biomeView.drawCalls() : 0),
+      horizonDomes: () => horizonDomes,
+      planetTableHologram: () => room.hologram,
+      setFourFloats: (f: FourFloats) => {
+        currentFloats = f;
+        room.setFloats(f);
+      },
+      isViewModelVisible: () => !viewModelHidden,
+      isWireframeLook: () => wireframeLookOverride,
     },
     buildBiome(input) {
       cachedBiomeInput = input;

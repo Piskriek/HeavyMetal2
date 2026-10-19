@@ -135,6 +135,7 @@ export class CreditsDirector {
     this.clockRaw = 0;
     this.startWallMs = typeof performance !== 'undefined' ? performance.now() : 0;
     this.irisEV = 1.0;
+    this.sceneTarget?.setViewModelVisible?.(false);
 
     try {
       const ctx = this.audioCtx ?? gameAudio.getContext();
@@ -192,6 +193,8 @@ export class CreditsDirector {
     }
     this.songSource = null;
     this.loopSource = null;
+    this.sceneTarget?.setViewModelVisible?.(true);
+    this.sceneTarget?.setWireframeLook?.(false);
     this.sceneTarget?.debug?.clearAltCam?.();
   }
 

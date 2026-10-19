@@ -21,6 +21,10 @@ export interface CreditsSceneDriverTarget {
   setBeamFiring?(on: boolean): void;
   setBeamSealing?(on: boolean): void;
   setCameraView?(mode: 'first' | 'third'): void;
+  setWireframeLook?(enabled: boolean | null): void;
+  setViewModelVisible?(visible: boolean): void;
+  setStorm?(progress: number): void;
+  setMonitorEqualizer?(bars?: readonly number[] | boolean): void;
   readonly debug?: {
     teleport?(where: 'lab' | 'planet', x: number, z: number, yaw: number, pitch?: number): void;
     setAltCam?(
@@ -37,6 +41,7 @@ export interface CreditsSceneDriverTarget {
   };
   readonly room?: {
     setStorm?(progress: number): void;
+    setMonitorEqualizer?(bars?: readonly number[] | boolean): void;
     setWindowView?(view: 'static' | 'lite' | 'full'): void;
   };
 }

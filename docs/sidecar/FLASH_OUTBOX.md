@@ -258,5 +258,27 @@ Append one entry per job, in the format in `FLASH_INBOX.md`. Newest at the botto
   - Closed POL-292 in `docs/DEFERRED_POLISH_REGISTRY.md`.
 - Decisions left: None. Ready for next queued job: F-12.
 
+### [2026-10-19 10:28] F-12 [DONE] TICKET-07 B: vehicle juice (boost, tracks, dust, print gantry) and the beam hurting monsters
+- Commits: `dd6f30a0` ("feat(play): vehicle juice, monster beam damage, POL-96 armory rack, and POL-97 wreck salvage (T07b, F-12)")
+- Checks:
+  - `npm run typecheck`: 0 errors
+  - `npm test` on 3D PC worker: 2,957 pass, 0 fail, 4 skipped; 19 speed tests pass (0 fail)
+  - `npm run build` on 3D PC worker: 13.70 MB (single file bundle, cap 16 MB)
+  - `node scripts/test-ticket07a.mjs` on 3D PC worker: 21 of 21 checks pass, 0 fail, 0 skipped
+  - `node scripts/test-ticket07b.mjs` on 3D PC worker: 21 of 21 checks pass, 0 fail (low-spec 60.6 fps, boost 6.69 m/s, tracks 128, roost 157, beam damage 40 -> 29.4 HP, seal mode 0 dmg)
+  - `node scripts/test-campaign.mjs` on 3D PC worker: 54 of 54 beats PASS, 0 console errors, 0 http errors, 0 HUD overlaps
+- Shots (`shots-run/`):
+  - `ticket07b-gantry.png`: 3D print gantry sweep wireframe in action over vehicle spawn pad before vehicle appears.
+  - `ticket07b-boost.png`: Rover boosted driving at 6.7 m/s with cyan energy meter draining and "BOOSTING" indicator illuminated on speed HUD.
+  - `ticket07b-tracks.png`: Continuous tyre track decals imprinted onto terrain along driving path, fading over time.
+  - `ticket07b-dust.png`: Particle roost emitted from active wheels during high-speed driving.
+- Features delivered:
+  - Installed `vehicle-juice.ts` and `vehicle-juice.test.ts` (boosted input with energy drain/recharge, tire tracks decal pool, wheel roost particles, and print gantry animation).
+  - Wired boost state (`drivingBoostEnergy`, `drivingBoosting`) through `play.tsx` and `BaseHud` speedometer with boost bar and "BOOSTING" badge.
+  - Wired tire tracks and wheel roost emitters into `PlayScene` driving update with proper world matrix updates and low-spec 60 FPS performance.
+  - Implemented continuous extraction beam chip-damage to monsters in planet frame loop (`monsters.beamHit` with `beamDamage`), with 0 damage in seal mode.
+  - Resolved POL-96 (armory rack visual unmount upon sidearm pickup) and POL-97 (hold-E wreck truck salvage with pack grant, network sync, and lore log read).
+- Decisions left: None. Ready for next queued job: F-13.
+
 
 

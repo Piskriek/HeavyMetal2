@@ -38,14 +38,38 @@ export const BENCH_OPERATORS: readonly { readonly op: string; readonly label: st
   { op: 'surface-edge-wear-ao', label: 'Edge wear' },
 ];
 
-/** A mesh with each operator applied in order, each at its one-click preset with the given values on top. Unknown ops are skipped. */
+/**
+ * A mesh with each operator applied in order, each at its one-click preset with the given values on top. Unknown ops are
+ * skipped. A mirror with no plane of its own copies the part flush against its own far face: the preset's 0.5 m plane
+ * fits a machine, but would throw a bolt's copy half a metre away.
+ */
 export function applyOps(md: MeshData, ops: readonly OpRef[] | undefined): MeshData {
   let out = md;
   for (const o of ops ?? []) {
     const op = MESH_OPERATORS[o.op];
-    if (op) out = op.apply(out, { ...op.oneClickPreset, ...o.params });
+    if (!op) continue;
+    const params: Record<string, number> = { ...op.oneClickPreset, ...o.params };
+    if (o.op === 'mirror-symmetry' && o.params.planeOffset === undefined) {
+      // the operator rounds its plane to 5 cm steps, so the part is moved to put its far face on the plane at 0 instead
+      const axis = Math.max(0, Math.min(2, Math.round(params.axis ?? 0))) as 0 | 1 | 2;
+      const face = out.max[axis];
+      out = shift(op.apply(shift(out, axis, -face), { ...params, planeOffset: 0 }), axis, face);
+    } else {
+      out = op.apply(out, params);
+    }
   }
   return out;
+}
+
+/** The mesh moved by `d` metres along one axis (its bounds with it). */
+function shift(md: MeshData, axis: 0 | 1 | 2, d: number): MeshData {
+  if (d === 0) return md;
+  const positions = new Float32Array(md.positions);
+  for (let i = axis; i < positions.length; i += 3) positions[i] = positions[i]! + d;
+  const min = [...md.min] as [number, number, number], max = [...md.max] as [number, number, number];
+  min[axis] += d;
+  max[axis] += d;
+  return { ...md, positions, min, max };
 }
 
 /** A plain name for a printed part: its generator and its materials ("Bolt, green"). */

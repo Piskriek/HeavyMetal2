@@ -44,3 +44,13 @@ test('a printed fat green bolt overrides one skid bolt in the capacitor bank', (
 test('a part gets a plain name from its generator and materials', () => {
   assert.equal(partName(FAT_GREEN, (id) => (id === 'green' ? 'Signal green' : id)), 'Bolt, signal green');
 });
+
+test('the bench mirror copies a part flush against its own far face; a plane given by the cartridge is kept', () => {
+  const bracket = buildPart('bracket', {}, 2)!;
+  const w = bracket.max[0] - bracket.min[0];
+  const flush = applyOps(bracket, [{ op: 'mirror-symmetry', params: {} }]);
+  assert.ok(Math.abs(flush.min[0] - bracket.min[0]) < 1e-6, 'the original stays where it was');
+  assert.ok(Math.abs(flush.max[0] - (bracket.max[0] + w)) < 1e-6, `the copy sits right beside it (width ${w}, got ${flush.max[0] - flush.min[0]})`);
+  const far = applyOps(bracket, [{ op: 'mirror-symmetry', params: { planeOffset: 0.5 } }]);
+  assert.ok(far.max[0] > 0.9, 'an explicit plane is used as given');
+});

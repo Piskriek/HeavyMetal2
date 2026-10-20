@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RULES, newLab, makeBlank, canWritePart, startPartWrite, startWrite, canCombine, canSlot, step, loadLab, affinityOf, type LabEnv, type PartSpec, type Preset } from '../src/index';
+import { RULES, newLab, makeBlank, canWritePart, startPartWrite, canPrintPart, printPart, freeBlank, startWrite, canCombine, canSlot, step, loadLab, affinityOf, type LabEnv, type PartSpec, type Preset } from '../src/index';
 
 const P: Preset[] = [{ id: 'mud', name: 'Mud', affinity: { pxd: 1.4 }, minStage: 0 }];
 const env = (o: Partial<LabEnv> = {}): LabEnv => ({ presets: P, stage: 1, powered: true, ...o });
@@ -61,4 +61,21 @@ test('a save round trip keeps part cartridges and part jobs, and refuses broken 
   const broken = JSON.parse(JSON.stringify(s));
   broken.cartridges[0].part.params.headWidth = 'fat';
   assert.equal(loadLab(broken), null);
+});
+
+test('the planet Drafting Table prints a part at once onto a free blank, with no lab power', () => {
+  let s = makeBlank(makeBlank(newLab(), 100).state, 100).state;
+  const [a, b] = s.cartridges.map((c) => c.id) as [string, string];
+  s = startPartWrite(s, env(), a, FAT_GREEN);
+  assert.equal(freeBlank(s), b, 'the blank on the bench is not free');
+  assert.match(canPrintPart(s, a, FAT_GREEN).why, /being written/);
+  s = printPart(s, b, FAT_GREEN);
+  const c = s.cartridges.find((x) => x.id === b)!;
+  assert.equal(c.kind, 'part');
+  assert.deepEqual(c.part, FAT_GREEN);
+  assert.equal(freeBlank(s), null);
+  assert.match(canPrintPart(s, b, FAT_GREEN).why, /not a blank/);
+  assert.equal(canPrintPart(s, 'c99', FAT_GREEN).ok, false);
+  assert.throws(() => printPart(s, b, FAT_GREEN), /not a blank/);
+  assert.deepEqual(loadLab(JSON.parse(JSON.stringify(s))), s, 'a printed part survives a save');
 });

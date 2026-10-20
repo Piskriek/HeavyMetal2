@@ -275,6 +275,45 @@ export function startPartWrite(s: LabState, env: LabEnv, blank: string, part: Pa
   return { ...s, bench: { inputs: [blank], preset: null, done: 0, needs: RULES.writeSeconds, part } };
 }
 
+/**
+ * Whether the planet's Drafting Table can print `part` onto `blank` (ARGO_NOTE_34 D.1). The table draws its blank from
+ * the rack through the quantum bridge and prints at once: no bench job, and the lab's power is not needed. The part's
+ * cost is paid by the caller, from the base's stores.
+ */
+export function canPrintPart(s: LabState, blank: string, part: PartSpec): Check {
+  const c = find(s, blank);
+  if (c === undefined) return no('That cartridge is not in the lab.');
+  if (c.kind !== 'blank') return no(`${c.name} is not a blank: parts go on blanks only.`);
+  if (c.slot !== null) return no('That blank sits in a machine.');
+  const busy = jobOf(s, c.id);
+  if (busy !== null) return no(busyWhy(c, busy));
+  if (!validPart(part)) return no('That part has no generator.');
+  return OK;
+}
+
+/** The first blank the Drafting Table can draw: on the rack, in no machine and no job. */
+export function freeBlank(s: LabState): string | null {
+  for (const c of s.cartridges) if (c.kind === 'blank' && c.slot === null && jobOf(s, c.id) === null) return c.id;
+  return null;
+}
+
+/** Prints `part` onto `blank` at once (the planet's Drafting Table). Throws Error(why) when refused. */
+export function printPart(s: LabState, blank: string, part: PartSpec): LabState {
+  orThrow(canPrintPart(s, blank, part));
+  return { ...s, cartridges: s.cartridges.map((c) => (c.id === blank ? partCartridge(c, part) : c)) };
+}
+
+const partCartridge = (blank: Cartridge, part: PartSpec): Cartridge => ({
+  id: blank.id,
+  name: part.name,
+  kind: 'part',
+  preset: null,
+  from: [],
+  affinity: byMetric(() => 1),
+  slot: blank.slot,
+  part,
+});
+
 export function canCombine(s: LabState, env: LabEnv, ids: readonly string[]): Check {
   if (!env.powered) return no(NO_POWER);
   if (s.combiner !== null) return no('The combiner is busy: wait for its mix to finish.');
@@ -367,16 +406,7 @@ function runBench(s: LabState, env: LabEnv, d: number, events: LabEvent[]): LabS
     const blank = target === undefined ? undefined : find(s, target);
     if (blank === undefined) return { ...s, bench: null };
     events.push({ type: 'written', id: blank.id });
-    const printed: Cartridge = {
-      id: blank.id,
-      name: job.part.name,
-      kind: 'part',
-      preset: null,
-      from: [],
-      affinity: { pxd: 1, vtx: 1, lx: 1, aq: 1 },
-      slot: blank.slot,
-      part: job.part,
-    };
+    const printed = partCartridge(blank, job.part);
     return { ...s, bench: null, cartridges: s.cartridges.map((c) => (c.id === blank.id ? printed : c)) };
   }
   const preset = env.presets.find((p) => p.id === job.preset);

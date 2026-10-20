@@ -10,8 +10,8 @@ Argo's ticket ([ARGO_NOTE_31](../notes/ARGO_NOTE_31.md), bundle in `arena-gather
 ## 2. Licence check (owner rule: legal only; research first)
 | Tool | Licence | Use |
 |---|---|---|
-| [P3-SAM / X-Part (Hunyuan3D-Part)](https://github.com/Tencent-Hunyuan/Hunyuan3D-Part) | Tencent Hunyuan 3D-Part Community Licence (not valid in the EU, UK, South Korea) | **Yes**: the same licence family as the Hunyuan models the 3D PC already runs |
-| [SAMPart3D](https://github.com/Pointcept/SAMPart3D) | MIT | Fallback segmenter (slower: it distils 2D SAM per shape) |
+| [P3-SAM / X-Part (Hunyuan3D-Part)](https://github.com/Tencent-Hunyuan/Hunyuan3D-Part) | Tencent Hunyuan 3D-Part Community Licence, but the backbone is [Sonata](https://github.com/facebookresearch/sonata), whose **weights are CC-BY-NC 4.0** (code Apache 2.0) | **No**: the non-commercial weights carry into P3-SAM |
+| [SAMPart3D](https://github.com/Pointcept/SAMPart3D) | MIT code and MIT [PTv3-object weights](https://huggingface.co/yhyang-myron/SAMPart3D); uses SAM and DINOv2 (both Apache 2.0) | **Yes**: the segmenter. It trains a small head per shape from 16 Blender views (minutes per asset on the GPU) |
 | [HoloPart](https://github.com/VAST-AI-Research/HoloPart) (code and [weights](https://huggingface.co/VAST-AI/HoloPart)) | MIT | Later, to complete hidden part surfaces; needs a face mask from a segmenter |
 | [meshoptimizer / gltfpack](https://github.com/zeux/meshoptimizer) | MIT | Already used (slim-glb) |
 | [QuadriFlow](https://github.com/hjwdzh/QuadriFlow) | BSD-style | Possible, not needed yet |
@@ -20,14 +20,14 @@ Argo's ticket ([ARGO_NOTE_31](../notes/ARGO_NOTE_31.md), bundle in `arena-gather
 | [SAMesh](https://github.com/gtangg12/samesh) | No licence file (all rights reserved) | **No** |
 
 ## 3. The plan
-1. **Segment on the 3D PC (RTX 3080, 12 GB):** P3-SAM in its own folder and venv on E: (`E:\AI\p3sam`, HF cache on E:, since C: has 22 GB free). It is never mixed into the Hunyuan pipeline's environment. Output: a per-face part id for `norm.glb` (`parts.npy`, saved as `parts.json` next to it). It runs only when the worker lock is free and the pipeline's VRAM gate is not in use.
+1. **Segment on the 3D PC (RTX 3080, 12 GB):** SAMPart3D in its own folder and venv on E: (`E:\AI\sampart3d`, HF cache on E:, since C: has 22 GB free). It is never mixed into the Hunyuan pipeline's environment. It also needs Blender for the 16 views, and the 3D PC has none yet. Output: a per-face part id for `norm.glb`, written as `parts.json` next to it ({centroids in glTF axes, labels}, the format `lod-bake.py --parts` reads). It runs only when the worker lock is free and the pipeline's VRAM gate is not in use.
 2. **`lod-bake.py --parts=<parts.json>` (new option, low level only):** separate `norm.glb` by part id, then run the existing cage rebuild (`--retopo=0 --planar=4`, collapse to budget) on each part. Each part's budget is its share of area, floor 12. Join without welding, then do the existing unwrap, colour and normal bake, slim-glb, luminance gate and box snap unchanged. Mid and high stay as they are.
 3. **Opt in per asset:** `"lowParts": true` in `docs/runworld/assets.json`. `runworld-post.mjs` passes `--parts` when the asset has it and a `parts.json` exists.
 4. **Trial first:** fabricator-frame, capacitor-bank, gantry-crane-solid-a, crawler-body. Compare old and new low in a 4-angle render, plus triangles, KB and luminance. Roll out only if the parts read crisp and the bake holds.
 5. **Later:** HoloPart (MIT) or X-Part to close each part's hidden faces where a part was occluded in the fused skin.
 
 ## 4. What to keep from the bundles
-- `packages/studiomesh/src/part-split-retopo.ts`: keep `auditSingleMeshMultiPartAsset` as the Studio's webbing **audit** (it ranks which assets to fix). Its segmenter has the same crease limits, so the Studio inspector should show the P3-SAM parts, not its own split.
+- `packages/studiomesh/src/part-split-retopo.ts`: keep `auditSingleMeshMultiPartAsset` as the Studio's webbing **audit** (it ranks which assets to fix). Its segmenter has the same crease limits, so the Studio inspector should show the SAMPart3D parts, not its own split.
 - `scripts/blender-part-split-retopo.py`: not used; its per-part decimate idea lives on in `lod-bake.py --parts`.
-- `scripts/retopo-multipart-on-3dpc.mjs`: replace with a P3-SAM runner over `test-on-3dpc.sh`'s SSH setup, with the right paths.
+- `scripts/retopo-multipart-on-3dpc.mjs`: replace with a SAMPart3D runner over `test-on-3dpc.sh`'s SSH setup, with the right paths.
 - TICKET-30 (BYOA MCP protocol, the asset bench Regenerate button): it is Studio section 9 work, queued after the planned work. The Regenerate button should call `runworld-post.mjs <id> --levels=low`, which picks up `--parts` by itself.

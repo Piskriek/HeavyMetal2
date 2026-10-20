@@ -197,7 +197,7 @@ if retopo:
         return dense
 
     # --parts=FILE (TICKET-29, docs/argo/plans/37): a generated model is one fused skin, so one collapse across it
-    # melts the gap between two parts into a web. FILE holds a part id per face of norm.glb (from P3-SAM on the 3D
+    # melts the gap between two parts into a web. FILE holds a part id per face of norm.glb (from SAMPart3D on the 3D
     # PC) as {centroids: [x,y,z,...] in glTF axes, labels: [...]}. Each face of the welded copy takes the label of the
     # nearest centroid (import and weld reorder faces), the copy is cut into one object per part, every part is
     # reduced on its own share of the budget (by area, at least 12), and the parts are joined back without welding:

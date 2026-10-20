@@ -64,11 +64,11 @@ export function machinePlumeGravity(kind: PlumeMachineKind): number {
 }
 
 /**
- * POL-281 (ARGO_NOTE_17 Ruling #1): Side-mounted exhaust vent coordinates `[x, y, z]`
- * in the unscaled prop frame for `press` and `heavy-press`, plus the top input hopper
- * chute position `[0, y, 0.30]`. The lateral `+x` offset (`0.68 m` on starter press,
- * `1.15 m` on heavy press) places the exhaust stack > 1.04 m horizontally clear of
- * falling input ore cubeseven after `fitToTable` scaling.
+ * POL-281 (ARGO_NOTE_17 ruling a, "keep this socket"): the exhaust vent `[x, y, z]` in the
+ * unscaled prop frame for `press` and `heavy-press` is the measured stack behind the chute
+ * (no side stack, no mesh change), plus the top input hopper chute `[0, y, 0.30]`. The vent
+ * sits 0.86 m behind the chute, about 0.77 m after the fit: clear of the falling ore.
+ * (machine-props.ts GEN_VENT holds the same socket for the scene.)
  */
 export const PRESS_CHUTE_LOCAL: Readonly<Record<'press' | 'heavy-press', readonly [number, number, number]>> = {
   press: [0, 2.85, 0.30],
@@ -76,8 +76,8 @@ export const PRESS_CHUTE_LOCAL: Readonly<Record<'press' | 'heavy-press', readonl
 };
 
 export const PRESS_SIDE_VENT_LOCAL: Readonly<Record<'press' | 'heavy-press', readonly [number, number, number]>> = {
-  press: [0.68, 3.10, -0.56],
-  'heavy-press': [1.15, 3.44, -0.56],
+  press: [0, 3.44, -0.56],
+  'heavy-press': [0, 3.2, -0.56],
 };
 
 /**

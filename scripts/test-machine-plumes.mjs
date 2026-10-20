@@ -370,7 +370,8 @@ try {
   const printing = await sampleFabricator(FAB.id);
   check('a printing fabricator pours its plume', printing.emitting && printing.pour > 0, `pour ${printing.pour}`);
   check('the fabricator pours violet (#b46bff, ruling 4)', printing.colour === '#b46bff', printing.colour);
-  check(`the fabricator pours its full ${FABRICATOR_LIVE} live (64/s x 2.0 s, ruling 1)`, Math.abs(printing.pour - FABRICATOR_LIVE) <= 1, `pour ${printing.pour}`);
+  // T15's beat breath thins a pour to between 0.77 and 1 of its budget while the choir is locked, and never raises it
+  check(`the fabricator pours up to its full ${FABRICATOR_LIVE} live and never more (64/s x 2.0 s, ruling 1; the T15 beat only thins it)`, printing.pour <= FABRICATOR_LIVE + 1 && printing.pour >= Math.floor(FABRICATOR_LIVE * 0.77) - 1, `pour ${printing.pour}`);
   const printingFab = (await fabs()).find((f) => f.id === FAB.id);
   if (printingFab) {
     const [vx, vy, vz] = printingFab.vent;

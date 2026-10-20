@@ -24,7 +24,6 @@ import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest
 import { disposeProp, FABRICATOR_PLUME, FABRICATOR_VENT, FEED_CUBES_FULL, feedCubeCount, feedCubeProgress, lineSpan, machinePlumeCount, machinePlumeCountOf, machinePlumeGravity, machinePlumeLook, machinePlumeLookOf, machinePlumeSpec, machinePlumeSteady, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
 import { printFrame, beatPulse, evaluateBeatSyncedPlumeModulation } from '@hm/tooljuice';
 import { evaluateHarmonicMachineChoir, type ActiveMachineEmitter, type MachineStemRole } from '@hm/musicbox';
-import { sampleGantryTimeline } from './window-c-hooks';
 import { applyScientistWindowFGate, createWindowFCoopSyncController, type WindowFCoopSyncController } from './window-f-lab-and-coop-hooks';
 import { computeFightOverlayStrength, evaluateMoonAvatarLuminance, evaluateRoverCraterAndWallSafety, getTurretCornerCapParts, resolveTurretCornerMount } from './window-g-final-qa-hooks';
 import { evaluateBlob47SubtileBlend, isVistaFlashAtPeak } from './window-h-autotile-and-scout-hooks';
@@ -1044,17 +1043,13 @@ export function createPlayScene(o: {
     }
     const choirState = evaluateHarmonicMachineChoir(t, pos.x, pos.y, pos.z, activeChoirMachines);
     const choirMod = evaluateBeatSyncedPlumeModulation(choirState.downbeatPulse0to1, choirState.isHarmonicConvergenceLocked);
-    const beatMult = choirState.isHarmonicConvergenceLocked ? (0.85 + 0.3 * beatPulse(t)) * (choirMod.cubeScaleMultiplier / 1.1) : 1;
+    // the breath only thins a pour (at most 1): each pour's count is its ruled live budget (ruling 1: the fabricator's 128),
+    // and the plume pool is sized to those budgets
+    const beatMult = choirState.isHarmonicConvergenceLocked ? Math.min(1, (0.85 + 0.3 * beatPulse(t)) * (choirMod.cubeScaleMultiplier / 1.1)) : 1;
 
+    // the print head already slides along the station's own gantry while it prints (the feed and vent follow it); the
+    // vehicle bay's assembly timeline (sampleGantryTimeline) is in the bay's frame and is not applied to the station's head
     for (const f of fabricatorViews.values()) {
-      // TICKET-13b (Window C): 3.0 s gantry assembly head movement while printing
-      const head = f.station.parts['head'];
-      if (f.printing && head) {
-        const gFrame = sampleGantryTimeline(t % 3.0, 'scout');
-        head.position.set(gFrame.headX, gFrame.headY, gFrame.bridgeZ);
-        f.group.updateMatrixWorld(true);
-        f.vent.set(...FABRICATOR_VENT).add(head.position).applyMatrix4(f.group.matrixWorld);
-      }
       if (f.emitter !== null) {
         f.pour = Math.round(machinePlumeCountOf(FABRICATOR_PLUME, 1, t) * beatMult);
         plume.setCount(f.emitter, f.pour);

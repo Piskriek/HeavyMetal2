@@ -13,12 +13,12 @@ import {
   computeInspectorHopperView,
 } from '../src/machine-led-and-hopper';
 
-test('POL-281: press and heavy-press side exhaust vents clear the top input chute by > 1.0 m even after fitToTable', () => {
-  // Starter press fitted from 3.44 m native to 3.10 m (scale ~0.901)
+test('POL-281 (ruling a, socket kept): the press vents sit behind the top input chute, clear of the ore after fitToTable', () => {
+  // Starter press fitted from 3.44 m native to 3.10 m (scale ~0.901): the ruling's 0.77 m
   const starterClearance = computePressVentChuteClearanceM('press', 3.1 / 3.44);
-  assert.ok(starterClearance > 0.98, `Expected starter press clearance > 0.98 m, got ${starterClearance.toFixed(3)} m`);
-  assert.ok(computePressVentChuteClearanceM('press', 1.0) > 1.05);
-  assert.ok(computePressVentChuteClearanceM('heavy-press', 1.0) > 1.40);
+  assert.ok(starterClearance > 0.75, `Expected starter press clearance > 0.75 m, got ${starterClearance.toFixed(3)} m`);
+  assert.ok(computePressVentChuteClearanceM('press', 1.0) > 0.85);
+  assert.ok(computePressVentChuteClearanceM('heavy-press', 1.0) > 0.85);
 });
 
 test('POL-282: machinePlumeGravity assigns ballistic downward gravity to drill/pylon/press and buoyant lift to mills/projectors/water', () => {

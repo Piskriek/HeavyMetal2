@@ -37,6 +37,12 @@ Every look-and-feel system in the game is built the same way:
 4. Lx: light presets with sliders; the beam applies a light preset to a lamp, then to a plot's sky.
 5. The Studio: one preset editor (schema sliders, the graph view, paint layers) for all four, and the agent API over it.
 
+## 4b. The Studio vs the Drafting Table (the owner, 2026-10-20)
+"what i see in the studio atm is good enough for the drafting table maybe... but the studio needs deep asset manipulation tools, these tools like the base algorithm created models can also have presets so you can smooth a entire model in one go with the smooth preset button... the popular software out there feature loads of presets we need."
+- The current Parts panel (sliders, slot materials, the stage ladder) is the **Drafting Table's** level of control.
+- The **Studio** needs a deep toolset: mesh operators as presets (one click applies to a whole model: smooth, bevel, decimate, remesh, subdivide, mirror, array, solidify, weld, boolean, displace, bend, twist, taper, UV unwrap and pack, paint layers, and more). Each operator is itself a preset with a slider schema, stacked non-destructively like Blender's modifier stack and saved with the asset.
+- **Argo** researches the complete operator and preset set of the popular tools (Blender modifiers and geometry nodes, Houdini SOPs, ZBrush deformers, Substance Painter, Plasticity, Nomad Sculpt, Womp, Spline and others) and designs the Studio's layout and workflow. **Arena battles** code the operators as pure TypeScript (a mesh-operator package, one ticket per family), with Argo polishing and Opus verifying by tests.
+
 ## 5. Research to do first (SOP)
 How the closest games let players author and apply presets, and what players praise and hate in them: Dreams (Media Molecule) for authored graphs and sculpting, Spore's part editors, Space Engineers 2's block variants and colour/skin tool, No Man's Sky's base parts and paint, the Fallout 4 and Starfield workshop and ship builder, and Townscaper for constrained procedural building. Write the findings to a research doc before the Studio preset editor is designed.
 

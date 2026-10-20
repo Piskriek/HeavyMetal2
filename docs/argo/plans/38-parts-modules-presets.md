@@ -42,4 +42,17 @@ This follows [plan 37](37-t29-part-split-low-poly.md). Splitting a fused model a
 - **Prior art found:** `@hm/heavygear` already adds detail by stage (`L.at(4)`, `L.seg(6, 12)`, `L.rep(3, 5)`) and rebuilds a heavy machine per stage, so the heavy press, projector and water maker already gain detail as reality upgrades. They move onto kitspec only if the Studio or the Drafting Table needs to edit them.
 - **Next:** the generated machines (mill, press frame, water maker, the fabricator's frame) are the candidates, after Argo picks their modules and ranks.
 
+## 6. Authoring parts: we model the shape, AI adds the surface (the owner, 2026-10-20)
+"model them in blender... render a few angles of the lows, do pbr higher poly renders... let the 3d machine make a high version... bake the high detail to the low... build a machine with those parts... save that as a preset and then combine 6 with some other preset parts."
+- **1. Shape in Blender, by script** (`scripts/parts/<part>.py`, headless Blender 5.2): one recipe makes the part twice, the low cage (square sections, exact size, sockets as empties) and its high (bevels, inset panel seams, bolt heads, vent slots). Both come from the same recipe, so they line up exactly and the bake has no drift. This replaces asking an image model for the shape; AI shape drift and fused webs cannot happen.
+- **2. Clay renders** of the high from four angles (`render-angles.py`).
+- **3. Restyle** each render with the RUN image model (the render as the reference image): the kit's painted steel, wear and hazard bands, as a PBR-looking image.
+- **4. Paint our own mesh on the 3D PC:** the pipeline's route 1 (`POST /jobs` with `mesh_glb_base64` and `image_base64`, already live: rembg, reduce to 40k faces, Hunyuan3D-2.0 Paint) textures OUR high; nothing generates a new shape.
+- **5. Bake the high's normals and colour onto the low** with `lod-bake.py`'s existing bake (the cage, the 512 px colour and tangent normals). A rank-2 detail (a bolt) is both a mesh, drawn on High, and a bump in its panel's baked normal map, so Low still reads it when the mesh is hidden.
+- **6. Assemble** with @hm/kitspec: parts into modules (panels, bolts and a cylinder into a canister), modules into presets (six canisters, a skid and bus bars into the bank), presets into bigger presets (the bank on the power wall). Every level is a saved JSON spec the Studio and agents can edit.
+
+**UV packing.** Per part: Blender's built-in unwrap and Pack Islands (concave shapes, rotation, margin), already in the bake path; Hunyuan's paint stage unwraps with xatlas (MIT). In the browser (the Studio, later player presets): xatlas compiled to WebAssembly, loaded only by the Studio. Per preset: a deterministic MaxRects rectangle packer in TypeScript (ours) that packs each part's baked maps into one atlas and remaps its UVs, so a preset draws with one material (on a trim-sheet budget).
+
+**First test:** remake the capacitor can this way (a square can with inset panels, bolt heads and a hazard band) and compare it with the image-made can in the same lab shot.
+
 **Ask Argo (creative lead):** which detail goes in which rank for the lab machines and the rovers, whether the stage-to-rank ladder above reads right, and the trim-sheet palette.

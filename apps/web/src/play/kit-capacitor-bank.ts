@@ -34,7 +34,8 @@ export const CAPACITOR_BANK_KIT: Kit = {
     insulator: { source: { kind: 'box', size: [0.075, INSULATOR_H, 0.075] }, material: 'gunmetal', rank: 1 },
     'bus-bar': { source: { kind: 'box', size: [1.3, 0.055, 0.055] }, material: 'copper', rank: 1 },
     'lifting-eye': { source: { kind: 'box', size: [0.07, 0.07, 0.016] }, material: 'gunmetal', rank: 2 },
-    'skid-bolt': { source: { kind: 'box', size: [0.04, 0.02, 0.04] }, material: 'gunmetal', rank: 2 },
+    // a Shape Press bolt (@hm/partgen): its sliders and the beam's part cartridges can change it
+    'skid-bolt': { source: { kind: 'param', gen: 'bolt', params: { headWidth: 0.04, headHeight: 0.02, shankLength: 0 } }, material: 'gunmetal', rank: 2 },
   },
   assemblies: {
     'capacitor-cell': {

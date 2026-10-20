@@ -171,3 +171,24 @@ test('nothing floats: a part with no path of contacts to the ground is flagged, 
   const wallPlane = { min: [-1, 0, -0.06] as const, max: [1, 3, -0.05] as const };
   assert.deepEqual(validate(kit, 'wall', { ground: null, anchors: [wallPlane] }), []);
 });
+
+test('param parts take their bounds from @hm/partgen, and overrides change one copy', () => {
+  const kit: Kit = {
+    parts: {
+      base: { source: { kind: 'box', size: [1, 0.1, 1] }, material: 'steel', rank: 0 },
+      bolt: { source: { kind: 'param', gen: 'bolt', params: { headWidth: 0.04, headHeight: 0.02 } }, material: 'steel', rank: 2 },
+    },
+    assemblies: { p: { children: [{ ref: 'base' }, { ref: 'bolt', key: 'b', at: [0, 0.1, 0], repeat: { count: 2, step: [0.3, 0, 0] } }] } },
+  };
+  assert.deepEqual(validate(kit, 'p'), []);
+  const placed = flatten(kit, 'p', { 'b[1]': { params: { headWidth: 0.1 }, material: 'green' } });
+  const b0 = placed.find((p) => p.path === 'b[0]')!, b1 = placed.find((p) => p.path === 'b[1]')!;
+  assert.equal(b0.material, 'steel');
+  assert.equal(b1.material, 'green');
+  assert.deepEqual(b1.source, { kind: 'param', gen: 'bolt', params: { headWidth: 0.1, headHeight: 0.02 } });
+  const wide = presetBounds(kit, [b1])!;
+  assert.ok(wide.max[0] - wide.min[0] >= 0.1 - 1e-9);
+  // a bolt lifted off the plate by an override floats
+  const lifted: Kit = { ...kit, assemblies: { p: { children: [{ ref: 'base' }, { ref: 'bolt', key: 'b', at: [0, 0.3, 0] }] } } };
+  assert.deepEqual(validate(lifted, 'p').map((i) => i.code), ['floating']);
+});

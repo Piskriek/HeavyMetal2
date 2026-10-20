@@ -11,6 +11,8 @@
  * column-major (the layout of three.js Matrix4.elements); rotations are Euler degrees in three.js 'XYZ' order.
  */
 
+import { buildPart } from '@hm/partgen';
+
 export type Vec3 = readonly [number, number, number];
 /** A 4x4 matrix, column-major (three.js `Matrix4.elements`). */
 export type Mat4 = readonly number[];
@@ -33,15 +35,31 @@ export type PartSource =
   /** A generated model (docs/runworld/assets.json id). Its bounds are measured, so they are given. */
   | { readonly kind: 'gen'; readonly asset: string; readonly bounds: Box3 }
   /** A procedural box, `size` across, standing on its origin (y from 0 to size[1]) and centred in x and z. */
-  | { readonly kind: 'box'; readonly size: Vec3 };
+  | { readonly kind: 'box'; readonly size: Vec3 }
+  /** A Shape Press part: an @hm/partgen generator and its slider values (plan 38 section 7). */
+  | { readonly kind: 'param'; readonly gen: string; readonly params: Readonly<Record<string, number>> };
 
 export interface PartDef {
   readonly source: PartSource;
   /** The material slot (a trim-sheet region or a lab material name); merging groups by it. */
   readonly material: string;
+  /** For a part with several material slots (a param part's `bolts`, `band`): a material per slot; others use `material`. */
+  readonly slotMaterials?: Readonly<Record<string, string>>;
   readonly rank: DetailRank;
   readonly sockets?: Readonly<Record<string, SocketDef>>;
 }
+
+/** What a placed copy changes about its part (the beam's Apply with a part cartridge, plan 38 section 8). */
+export interface PartOverride {
+  /** Slider values merged over a param part's own. */
+  readonly params?: Readonly<Record<string, number>>;
+  /** Another generator for a param part (its params then start from that generator's defaults plus `params`). */
+  readonly gen?: string;
+  readonly material?: string;
+  readonly slotMaterials?: Readonly<Record<string, string>>;
+}
+
+export type Overrides = Readonly<Record<string, PartOverride>>;
 
 export interface Placement {
   /** A part id or an assembly id. */
@@ -76,7 +94,10 @@ export interface PlacedPart {
   /** The path of keys from the preset down, e.g. `cells[1]/can`. */
   readonly path: string;
   readonly part: string;
+  /** The part's source with any override applied (what to build). */
+  readonly source: PartSource;
   readonly material: string;
+  readonly slotMaterials?: Readonly<Record<string, string>>;
   readonly rank: DetailRank;
   /** Part frame to preset frame. */
   readonly matrix: Mat4;
@@ -168,10 +189,32 @@ const frameOf = (s: SocketDef): Mat4 => multiply(translation(s.at), rotation(s.r
 
 /* ------------------------------------------------------------------ parts */
 
-export function partBounds(p: PartDef): Box3 {
-  if (p.source.kind === 'gen') return p.source.bounds;
-  const [x, y, z] = p.source.size;
+/** A source's box in its own frame. A param part's is its rank-0 silhouette (what is always drawn). */
+export function sourceBounds(s: PartSource): Box3 {
+  if (s.kind === 'gen') return s.bounds;
+  if (s.kind === 'param') {
+    const md = buildPart(s.gen, s.params, 0);
+    return md ? { min: md.min, max: md.max } : { min: [0, 0, 0], max: [0, 0, 0] };
+  }
+  const [x, y, z] = s.size;
   return { min: [-x / 2, 0, -z / 2], max: [x / 2, y, z / 2] };
+}
+
+export function partBounds(p: PartDef): Box3 {
+  return sourceBounds(p.source);
+}
+
+/** A part's source with an override applied. */
+export function applyOverride(def: PartDef, o: PartOverride | undefined): { source: PartSource; material: string; slotMaterials?: Readonly<Record<string, string>> } {
+  if (!o) return { source: def.source, material: def.material, ...(def.slotMaterials ? { slotMaterials: def.slotMaterials } : {}) };
+  let source = def.source;
+  if (source.kind === 'param' && (o.params || o.gen)) {
+    source = o.gen && o.gen !== source.gen
+      ? { kind: 'param', gen: o.gen, params: { ...(o.params ?? {}) } }
+      : { kind: 'param', gen: source.gen, params: { ...source.params, ...(o.params ?? {}) } };
+  }
+  const slotMaterials = o.slotMaterials ?? def.slotMaterials;
+  return { source, material: o.material ?? def.material, ...(slotMaterials ? { slotMaterials } : {}) };
 }
 
 /** The axis-aligned box around a part's bounds after `m`. */
@@ -201,10 +244,23 @@ interface Frame {
  * Every part a preset places, in a fixed order (children in order, repeats in order, depth first), with its matrix in
  * the preset's frame. Problems are skipped and reported by validate(); flatten never throws on a bad kit.
  */
-export function flatten(kit: Kit, preset: string): PlacedPart[] {
+export function flatten(kit: Kit, preset: string, overrides?: Overrides): PlacedPart[] {
   const out: PlacedPart[] = [];
   walk(kit, preset, IDENTITY, 0, '', [], out, []);
-  return out;
+  return overrides ? withOverrides(kit, out, overrides) : out;
+}
+
+/** Placed parts with each path's override applied (unknown paths are ignored). */
+function withOverrides(kit: Kit, placed: PlacedPart[], overrides: Overrides): PlacedPart[] {
+  return placed.map((p) => {
+    const o = overrides[p.path];
+    const def = kit.parts[p.part];
+    if (!o || !def) return p;
+    const r = applyOverride(def, o);
+    const { slotMaterials: _drop, ...rest } = p;
+    void _drop;
+    return { ...rest, source: r.source, material: r.material, ...(r.slotMaterials ? { slotMaterials: r.slotMaterials } : {}) };
+  });
 }
 
 function walk(
@@ -273,7 +329,9 @@ function walk(
         out.push({
           path,
           part: c.ref,
+          source: part.source,
           material: part.material,
+          ...(part.slotMaterials ? { slotMaterials: part.slotMaterials } : {}),
           rank: Math.max(rank, part.rank) as DetailRank,
           matrix,
           mirrored: determinant3(matrix) < 0,
@@ -295,6 +353,8 @@ export interface ValidateOptions {
   readonly anchors?: readonly Box3[];
   /** Contact tolerance in metres (default 2 mm). */
   readonly eps?: number;
+  /** Per-path overrides to check the preset with (the beam's changes). */
+  readonly overrides?: Overrides;
 }
 
 const touches = (a: Box3, b: Box3, eps: number): boolean =>
@@ -311,10 +371,11 @@ export function validate(kit: Kit, preset: string, opts: ValidateOptions = {}): 
   const issues: Issue[] = [];
   const placed: PlacedPart[] = [];
   walk(kit, preset, IDENTITY, 0, '', [], placed, issues);
+  const parts = opts.overrides ? withOverrides(kit, placed, opts.overrides) : placed;
   if (issues.length === 0 && placed.length === 0) issues.push({ code: 'empty', at: preset, detail: 'the preset places no parts' });
   const ground = opts.ground === undefined ? 0 : opts.ground;
   const eps = opts.eps ?? 0.002;
-  const boxes = placed.map((p) => transformBox(partBounds(kit.parts[p.part] as PartDef), p.matrix));
+  const boxes = parts.map((p) => transformBox(sourceBounds(p.source), p.matrix));
   if (ground !== null) {
     boxes.forEach((b, i) => {
       if (b.min[1] < ground - eps) issues.push({ code: 'below-ground', at: (placed[i] as PlacedPart).path, detail: `bottom at ${b.min[1].toFixed(3)} m` });
@@ -395,14 +456,12 @@ export function instanceBuckets(placed: readonly PlacedPart[], min = 2): Map<str
 }
 
 /** The box around every placed part, in the preset's frame. */
-export function presetBounds(kit: Kit, placed: readonly PlacedPart[]): Box3 | null {
+export function presetBounds(_kit: Kit, placed: readonly PlacedPart[]): Box3 | null {
   if (placed.length === 0) return null;
   const min = [Infinity, Infinity, Infinity];
   const max = [-Infinity, -Infinity, -Infinity];
   for (const p of placed) {
-    const def = kit.parts[p.part];
-    if (!def) continue;
-    const b = transformBox(partBounds(def), p.matrix);
+    const b = transformBox(sourceBounds(p.source), p.matrix);
     for (let k = 0; k < 3; k++) {
       min[k] = Math.min(min[k] as number, b.min[k] as number);
       max[k] = Math.max(max[k] as number, b.max[k] as number);

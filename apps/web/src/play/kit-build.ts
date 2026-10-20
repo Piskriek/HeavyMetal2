@@ -1,27 +1,36 @@
 /**
  * Builds a @hm/kitspec preset into three.js meshes (plan 38): every placed part is baked into its preset frame and
- * merged with the others that share its material and detail rank, so a preset is a handful of meshes and a rank change
+ * merged with the others that share its material and rank window, so a preset is a handful of meshes and a rank change
  * only flips visibility. Box parts are built here; generated parts are cloned from their loaded model (every mesh in it,
- * with its own material). Mirrored copies get their triangle winding flipped so they still face outwards.
+ * with its own material); Shape Press parts come from @hm/partgen, one variant per rank they can show at (a beam is a
+ * solid bar at rank 0 and a bevelled tube at rank 2), each slot with its own material. Mirrored copies get their winding
+ * flipped. Every vertex carries its placed part's index (`partId`), so a hit names the part (the beam's Apply).
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { flatten, type DetailRank, type Kit, type PartDef } from '@hm/kitspec';
+import { flatten, type DetailRank, type Kit, type Overrides, type PlacedPart } from '@hm/kitspec';
+import { buildPart, type Rank } from '@hm/partgen';
 
 export interface KitBuild {
   readonly group: THREE.Group;
-  /** Shows every part up to `rank` (and hides the rest). */
+  /** Every placed part, in flatten order; `partId` indexes this list. */
+  readonly placed: readonly PlacedPart[];
+  /** Shows what the rank cap draws (and hides the rest). */
   setMaxRank(rank: DetailRank): void;
   /** Draw calls this build makes at `rank` (one per visible mesh). */
   calls(rank: DetailRank): number;
+  /** The placed part a ray hit, from the hit mesh and its face index; null when the mesh is not this build's. */
+  partAt(mesh: THREE.Object3D, faceIndex: number): PlacedPart | null;
 }
 
 export interface KitBuildOptions {
-  /** Materials for box parts, by the part's material name. */
+  /** Materials by name, for box parts, partgen slots and the `material` of a param part. */
   readonly materials: Readonly<Record<string, THREE.Material>>;
   /** A generated asset's loaded model (standing on its base centre), or null while it is not loaded yet. */
   readonly gen: (asset: string) => THREE.Object3D | null;
   readonly maxRank: DetailRank;
+  /** Per-path changes (the beam's Apply with a part cartridge). */
+  readonly overrides?: Overrides;
   /** Registers what the build creates, for disposal with its owner. */
   readonly keep?: <T extends { dispose(): void }>(x: T) => T;
 }
@@ -81,36 +90,72 @@ const commonAttributes = (geos: readonly THREE.BufferGeometry[]): void => {
   }
 };
 
+const tagPart = (g: THREE.BufferGeometry, id: number): void => {
+  const count = (g.getAttribute('position') as THREE.BufferAttribute).count;
+  g.setAttribute('partId', new THREE.BufferAttribute(new Float32Array(count).fill(id), 1));
+};
+
+interface Bucket {
+  readonly material: THREE.Material;
+  /** Visible while lo <= rank cap <= hi. */
+  readonly lo: number;
+  readonly hi: number;
+  readonly geos: THREE.BufferGeometry[];
+}
+
 /**
  * The preset as merged meshes, or null while a generated part's model is not loaded (call again once it is). Mesh names
- * are `kit:<material>|<rank>`; each mesh's `userData.rank` holds its rank.
+ * are `kit:<material>|<lo>-<hi>`; `userData.lo` and `userData.hi` hold each mesh's rank window.
  */
 export function buildKitPreset(kit: Kit, preset: string, o: KitBuildOptions): KitBuild | null {
-  const placed = flatten(kit, preset);
-  const buckets = new Map<string, { material: THREE.Material; rank: DetailRank; geos: THREE.BufferGeometry[] }>();
-  const bucket = (material: THREE.Material, rank: DetailRank, key: string) => {
-    let b = buckets.get(key);
-    if (!b) buckets.set(key, (b = { material, rank, geos: [] }));
-    return b;
+  const placed = flatten(kit, preset, o.overrides);
+  const buckets = new Map<string, Bucket>();
+  const add = (material: THREE.Material, lo: number, hi: number, key: string, g: THREE.BufferGeometry): void => {
+    const k = `${key}|${lo}-${hi}`;
+    let b = buckets.get(k);
+    if (!b) buckets.set(k, (b = { material, lo, hi, geos: [] }));
+    b.geos.push(g);
   };
   const m4 = new THREE.Matrix4();
 
-  for (const p of placed) {
-    const def = kit.parts[p.part] as PartDef;
+  for (let pid = 0; pid < placed.length; pid++) {
+    const p = placed[pid] as PlacedPart;
+    const src = p.source;
     m4.fromArray(p.matrix as number[]);
-    if (def.source.kind === 'box') {
-      const material = o.materials[def.material];
-      if (!material) continue;
-      const [x, y, z] = def.source.size;
-      const g = new THREE.BoxGeometry(x, y, z);
-      g.translate(0, y / 2, 0);
+    const finish = (g: THREE.BufferGeometry): THREE.BufferGeometry => {
       g.applyMatrix4(m4);
       if (p.mirrored) flipWinding(g);
-      bucket(material, p.rank, `${def.material}|${p.rank}`).geos.push(g);
+      tagPart(g, pid);
+      return g;
+    };
+    if (src.kind === 'box') {
+      const material = o.materials[p.material];
+      if (!material) continue;
+      const [x, y, z] = src.size;
+      const g = new THREE.BoxGeometry(x, y, z);
+      g.translate(0, y / 2, 0);
+      add(material, p.rank, 2, p.material, finish(g));
+    } else if (src.kind === 'param') {
+      // one variant per rank this part can show at: the generator's own detail follows the cap
+      for (let gr = p.rank; gr <= 2; gr++) {
+        const md = buildPart(src.gen, src.params, gr as Rank);
+        if (!md) break;
+        for (const slot of md.slots) {
+          const matName = p.slotMaterials?.[slot.name] ?? p.material;
+          const material = o.materials[matName];
+          if (!material || slot.count === 0) continue;
+          const g = new THREE.BufferGeometry();
+          g.setAttribute('position', new THREE.BufferAttribute(md.positions.slice(), 3));
+          g.setAttribute('normal', new THREE.BufferAttribute(md.normals.slice(), 3));
+          g.setAttribute('uv', new THREE.BufferAttribute(md.uvs.slice(), 2));
+          g.setIndex(new THREE.BufferAttribute(md.indices.slice(slot.start, slot.start + slot.count), 1));
+          add(material, gr, gr === 2 ? 2 : gr, matName, finish(g));
+        }
+      }
     } else {
-      const asset = def.source.asset;
-      const model = o.gen(asset);
+      const model = o.gen(src.asset);
       if (!model) return null;
+      const asset = src.asset;
       model.updateMatrixWorld(true);
       const rootInv = new THREE.Matrix4().copy(model.matrixWorld).invert();
       model.traverse((obj) => {
@@ -119,9 +164,7 @@ export function buildKitPreset(kit: Kit, preset: string, o: KitBuildOptions): Ki
         const g = mesh.geometry.clone();
         toFloat(g);
         g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(rootInv, mesh.matrixWorld));
-        g.applyMatrix4(m4);
-        if (p.mirrored) flipWinding(g);
-        bucket(mesh.material, p.rank, `gen:${asset}:${mesh.material.uuid}|${p.rank}`).geos.push(g);
+        add(mesh.material, p.rank, 2, `gen:${asset}:${mesh.material.uuid}`, finish(g));
       });
     }
   }
@@ -137,18 +180,31 @@ export function buildKitPreset(kit: Kit, preset: string, o: KitBuildOptions): Ki
     o.keep?.(merged);
     const mesh = new THREE.Mesh(merged, b.material);
     mesh.name = `kit:${key}`;
-    mesh.userData.rank = b.rank;
-    mesh.visible = b.rank <= o.maxRank;
+    mesh.userData.lo = b.lo;
+    mesh.userData.hi = b.hi;
     meshes.push(mesh);
     group.add(mesh);
   }
-  return {
+  const shows = (mesh: THREE.Mesh, rank: number): boolean => (mesh.userData.lo as number) <= rank && rank <= (mesh.userData.hi as number);
+  const build: KitBuild = {
     group,
+    placed,
     setMaxRank(rank) {
-      for (const mesh of meshes) mesh.visible = (mesh.userData.rank as number) <= rank;
+      for (const mesh of meshes) mesh.visible = shows(mesh, rank);
     },
     calls(rank) {
-      return meshes.filter((mesh) => (mesh.userData.rank as number) <= rank).length;
+      return meshes.filter((mesh) => shows(mesh, rank)).length;
+    },
+    partAt(hit, faceIndex) {
+      const mesh = hit as THREE.Mesh;
+      if (!meshes.includes(mesh)) return null;
+      const ids = mesh.geometry.getAttribute('partId') as THREE.BufferAttribute | undefined;
+      const index = mesh.geometry.getIndex();
+      if (!ids || !index) return null;
+      const v = index.getX(faceIndex * 3);
+      return placed[Math.round(ids.getX(v))] ?? null;
     },
   };
+  build.setMaxRank(o.maxRank);
+  return build;
 }

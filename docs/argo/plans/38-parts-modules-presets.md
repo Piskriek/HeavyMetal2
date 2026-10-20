@@ -55,4 +55,12 @@ This follows [plan 37](37-t29-part-split-low-poly.md). Splitting a fused model a
 
 **First test:** remake the capacitor can this way (a square can with inset panels, bolt heads and a hazard band) and compare it with the image-made can in the same lab shot.
 
+## 7. Parametric parts: the Shape Press makes shapes as the Texture Mill makes materials (the owner, 2026-10-20)
+"these models will be to the shape press machine as the textures are to the texture mill... a bolt that is code so you can move sliders to change the length or the head width."
+- **The pairing:** the Texture Mill's cartridges are procedural materials (`@hm/texgraph`: a pure graph that evaluates to maps). The Shape Press's output becomes procedural parts: `@hm/partgen`, pure generators that evaluate parameters to a mesh. Shape from the press, skin from the mill; a preset combines both (the Drafting Table milestone, CLAUDE.md section 6).
+- **A generator** = an id, a parameter schema (name, unit, min, max, step, default) and a pure function `params -> { positions, normals, uvs, indices }` at a detail rank. One recipe gives the low and the high (a bolt's chamfer and thread rings are rank 2), so a bake lines up. First set: `bolt` (shank length and diameter, head width and height, head square or hex), `panel` (width, height, thickness, bevel, inset seam, bolt rows), `can` (width, depth, height, edge bevel, bands), `beam` (square tube: length, section, wall), `plate`, `bracket`, `grille`, `pipe` (square section by default; round only where function needs it).
+- **Sliders for free:** the Studio's details panel and the Drafting Table build their sliders from the schema; an agent sets the same values as JSON. A kitspec part gains `source: { kind: 'param', gen, params }` beside `gen` and `box`.
+- **In the game:** the Shape Press spends Vtx to print a part, priced by its triangles and volume at the current stage; the Texture Mill spends Pxd for its material. The stage still caps the rank, so a stage-1 bolt is a plain block and a stage-4 bolt gets its chamfer.
+- **Surfaces:** parametric parts take the Mill's procedural materials and the kit trim sheet (box-projected UVs from the generator), so moving a slider never needs a re-bake. The AI-painted bake (section 6) is for fixed hero parts.
+
 **Ask Argo (creative lead):** which detail goes in which rank for the lab machines and the rovers, whether the stage-to-rank ladder above reads right, and the trim-sheet palette.

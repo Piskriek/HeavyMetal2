@@ -6,6 +6,7 @@
 // Each frame the far side is drawn from a virtual camera into a texture, and the near side shows it in the opening.
 import * as THREE from 'three';
 import type { Overrides, PlacedPart } from '@hm/kitspec';
+import type { KitBuild } from './kit-build';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { Stage } from '@hm/fidelity';
 import type { StageLook } from '../crafter/looks';
@@ -354,12 +355,17 @@ export interface PlayScene {
   stepMonsters(seconds: number): void;
   /** The leak the view is aimed at, within `range` m, or null (the beam's Seal hold). */
   aimLeak(range: number): number | null;
-  /** TICKET-32: the lab kit part the view is aimed at within `reach` m (its kit, path and generator), or null (always null off the lab). */
+  /**
+   * TICKET-32: the kit part the view is aimed at within `reach` m (its kit, path and generator), or null: the lab's kits,
+   * or on the plot a kit-built machine (its kit id is `plot:<machine id>@<built>`).
+   */
   aimKitPart(reach: number): { readonly kit: string; readonly path: string; readonly gen: string | null } | null;
   /** Rebuilds a lab kit with the beam's per-part overrides; false while its parts are not loaded yet. */
   setKitOverrides(kit: string, overrides: Overrides): boolean;
   /** A lab kit's placed parts as last built. */
   kitPlaced(kit: string): readonly PlacedPart[];
+  /** Rebuilds every machine on the plot (the debug switch for the kit frames). */
+  rebuildMachines(): void;
   /** Immediately sets the world and mob visual fidelity stage (0 to 6). */
   setFidelityStage(stage: number): void;
   setVehicles(vehicles: readonly { readonly id: number; readonly kind: RoverKind; readonly x: number; readonly z: number; readonly yaw: number }[]): void;
@@ -952,6 +958,13 @@ export function createPlayScene(o: {
   /** share: the machine's run share as its pour uses it (a pylon's is 1 while its line is under load); pour: the pixels it pours now. */
   interface MachineView { readonly m: Machine; prop: MachineProp; vent: THREE.Vector3 | null; feed: THREE.Vector3 | null; emitter: number | null; running: number; share: number; pour: number; glow: THREE.Mesh | null; light: THREE.PointLight | null; printStartT?: number }
   const views = new Map<number, MachineView>();
+  /**
+   * The beam's part overrides on the plot's kit-built machines (plan 38, ARGO_NOTE_34 D.1), by plot kit id: the machine's
+   * id and the time it was built, so a new plot that reuses an id does not inherit an old machine's parts.
+   */
+  const plotKitOverrides = new Map<string, Overrides>();
+  const plotKitKey = (mm: Machine): string => `plot:${mm.id}@${mm.built}`;
+  const kitBuildOf = (v: MachineView): KitBuild | null => (v.prop as MachineProp & { build?: KitBuild }).build ?? null;
   // TICKET-01 B: the moon's solids exist from the start (the twin's frame stands before any machine is placed)
   rebuildPlanetStatic();
   let cables: THREE.Mesh[] = [];
@@ -1135,7 +1148,7 @@ export function createPlayScene(o: {
     if (u['uTime']) u['uTime'].value = time;
   };
   const build = (mm: Machine): MachineView => {
-    const prop = machineProp(m, mm.kind, propStage, genLevelForStage(shown, currentQuality));
+    const prop = machineProp(m, mm.kind, propStage, genLevelForStage(shown, currentQuality), plotKitOverrides.get(plotKitKey(mm)));
     prop.group.position.set(mm.x, groundAt(mm.x, mm.z) - 0.05, mm.z);
     prop.group.rotation.y = mm.yaw;
     planetScene.add(prop.group);
@@ -1257,29 +1270,32 @@ export function createPlayScene(o: {
     planetScene.add(twin.group);
     syncPlanetMatrices();
   };
+  /** Rebuilds one machine's prop (a new stage, or new kit parts), keeping how hard it runs and its pour. */
+  const rebuildView = (id: number, v: MachineView): MachineView => {
+    const running = v.running, emitter = v.emitter, share = v.share;
+    v.emitter = null;
+    unbuild(v);
+    const nv = build(v.m);
+    nv.running = running; nv.emitter = emitter; nv.share = share;
+    if (running > 0.05) nv.prop.light(1);
+    if (nv.glow) {
+      nv.glow.visible = detail.plumeGlow && running > 0.05;
+      setGlowStrength(nv.glow, Math.min(1.0, running) * 0.75);
+    }
+    if (nv.light) {
+      nv.light.visible = detail.pixelLights && running > 0.05;
+      nv.light.intensity = nv.light.visible ? running * 12.0 : 0;
+    }
+    views.set(id, nv);
+    return nv;
+  };
   /** Rebuilds every machine and the twin gate at the detail of the stage the plot shows (chunky until stage 2). */
   const rebuildProps = (stageShown: number): void => {
     const want = stageShown <= 1 ? 1 : 6;
     rebuildTwin(want);
     if (stageShown === propStage) return;
     propStage = stageShown;
-    for (const [id, v] of views) {
-      const running = v.running, emitter = v.emitter, share = v.share;
-      v.emitter = null;
-      unbuild(v);
-      const nv = build(v.m);
-      nv.running = running; nv.emitter = emitter; nv.share = share;
-      if (running > 0.05) nv.prop.light(1);
-      if (nv.glow) {
-        nv.glow.visible = detail.plumeGlow && running > 0.05;
-        setGlowStrength(nv.glow, Math.min(1.0, running) * 0.75);
-      }
-      if (nv.light) {
-        nv.light.visible = detail.pixelLights && running > 0.05;
-        nv.light.intensity = nv.light.visible ? running * 12.0 : 0;
-      }
-      views.set(id, nv);
-    }
+    for (const [id, v] of views) rebuildView(id, v);
     relay(lastConnected);
     rebuildPlanetStatic();
 
@@ -4159,16 +4175,37 @@ export function createPlayScene(o: {
       for (let i = 0; i < n; i++) monsters.update(1 / 30, { x: p.x, z: p.z, yaw, alive: playerAlive }, camera);
     },
     aimKitPart(reach: number) {
-      if (where !== 'lab') return null;
       camera.updateMatrixWorld(true);
       const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-      return room.aimKitPart(camera.position, dir, reach);
+      if (where === 'lab') return room.aimKitPart(camera.position, dir, reach);
+      // the plot's kit-built machines: the nearest visible kit mesh along the view names its machine and part
+      const ray = new THREE.Raycaster(camera.position.clone(), dir, 0, reach);
+      let best: { kit: string; path: string; gen: string | null; d: number } | null = null;
+      for (const v of views.values()) {
+        const b = kitBuildOf(v);
+        if (!b) continue;
+        v.prop.group.updateMatrixWorld(true);
+        const hit = ray.intersectObjects(b.group.children.filter((c) => c.visible), false)[0];
+        if (!hit || (best && hit.distance >= best.d) || hit.faceIndex === undefined || hit.faceIndex === null) continue;
+        const p = b.partAt(hit.object, hit.faceIndex);
+        if (p) best = { kit: plotKitKey(v.m), path: p.path, gen: p.source.kind === 'param' ? p.source.gen : null, d: hit.distance };
+      }
+      return best ? { kit: best.kit, path: best.path, gen: best.gen } : null;
     },
     setKitOverrides(kit: string, overrides: Overrides) {
-      return room.setKitOverrides(kit, overrides);
+      if (!kit.startsWith('plot:')) return room.setKitOverrides(kit, overrides);
+      // kept for the machine's next build; a standing machine is rebuilt now, keeping its pour
+      plotKitOverrides.set(kit, overrides);
+      for (const [id, v] of views) if (plotKitKey(v.m) === kit) return kitBuildOf(rebuildView(id, v)) !== null;
+      return true;
+    },
+    rebuildMachines() {
+      for (const [id, v] of [...views]) rebuildView(id, v);
     },
     kitPlaced(kit: string) {
-      return room.kitPlaced(kit);
+      if (!kit.startsWith('plot:')) return room.kitPlaced(kit);
+      for (const v of views.values()) if (plotKitKey(v.m) === kit) return kitBuildOf(v)?.placed ?? [];
+      return [];
     },
     aimLeak(range: number): number | null {
       camera.getWorldDirection(monsterFwd);

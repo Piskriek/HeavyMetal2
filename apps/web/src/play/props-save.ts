@@ -58,7 +58,7 @@ function override(x: unknown): PartOverride | null {
 function kitsOf(x: unknown): Record<string, Overrides> {
   const out: Record<string, Overrides> = {};
   if (!isObj(x)) return out;
-  for (const [kit, paths] of Object.entries(x).slice(0, 32)) {
+  for (const [kit, paths] of Object.entries(x).slice(0, 128)) {
     if (!shortId(kit) || !isObj(paths)) continue;
     const list: Record<string, PartOverride> = {};
     for (const [path, ov] of Object.entries(paths).slice(0, 512)) {

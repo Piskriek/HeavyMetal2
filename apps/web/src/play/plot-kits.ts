@@ -24,8 +24,12 @@ export const HEAVY_KITS: Partial<Record<MachineKind, { readonly kit: Kit; readon
   'heavy-water': { kit: WATERMAKER_FRAME_KIT, preset: 'watermaker-frame' },
 };
 
-/** The kit frames are on by default; the debug switch turns them off to compare with the bare cores. */
-let kitFrames = true;
+/**
+ * The kit frames are off until Argo refits them to the real cores (TICKET-39b): the specs assumed a mill body of
+ * +-1.72 m, but the generated mill is a +-1.1 m body on a +-2.0 m plinth, so the door, the status bar and the junction
+ * box hang in the air in front of it. The debug switch (__dev.kitFrames) turns them on to test the beam's Apply.
+ */
+let kitFrames = false;
 export const setKitFrames = (on: boolean): void => { kitFrames = on; };
 export const kitFramesOn = (): boolean => kitFrames;
 

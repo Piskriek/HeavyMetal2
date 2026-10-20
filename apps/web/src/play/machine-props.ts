@@ -13,6 +13,7 @@ import { machineSize } from '../base/machine-inspect';
 import { plumeShare } from './brownout-visual';
 import { PRINT_EDGE_HEX } from '@hm/tooljuice';
 import { heavyKitProp } from './plot-kits';
+import type { Overrides } from '@hm/kitspec';
 
 export type MachineLedStatus = 'running' | 'warn' | 'unpowered';
 
@@ -405,12 +406,15 @@ function fitToTable(p: MachineProp, kind: MachineKind): MachineProp {
   };
 }
 
-/** The prop for a machine at a stage (0 or 1: chunky low poly; from 2: full detail), standing its real height (fitToTable). */
-export function machineProp(m: lab.LabMaterials, kind: MachineKind, stage: number, genLevel: GenLevel = 'low'): MachineProp {
-  return fitToTable(buildMachineProp(m, kind, stage, genLevel), kind);
+/**
+ * The prop for a machine at a stage (0 or 1: chunky low poly; from 2: full detail), standing its real height (fitToTable).
+ * A kit-built machine takes the beam's part overrides (plan 38: a printed part fitted onto a bolt or a panel).
+ */
+export function machineProp(m: lab.LabMaterials, kind: MachineKind, stage: number, genLevel: GenLevel = 'low', overrides?: Overrides): MachineProp {
+  return fitToTable(buildMachineProp(m, kind, stage, genLevel, overrides), kind);
 }
 
-function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number, genLevel: GenLevel): MachineProp {
+function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number, genLevel: GenLevel, overrides?: Overrides): MachineProp {
   const st = stage <= 1 ? 1 : 6;
   const still = (): void => undefined;
   const lift = new THREE.Vector3(0, RING_TOP_Y, 0);
@@ -420,7 +424,7 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
     case 'mill': {
       // a kit frame around the generated core (plan 38, TICKET-39), when the core has loaded
       if (kind === 'heavy-mill') {
-        const kitted = heavyKitProp(kind, stage, genLevel, RING_TOP_Y);
+        const kitted = heavyKitProp(kind, stage, genLevel, RING_TOP_Y, overrides);
         if (kitted) return kitted;
       }
       const gen = getGenSync('mill', genLevel);
@@ -470,7 +474,7 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
     case 'press': {
       // a kit frame around the generated core (plan 38, TICKET-39), when the core has loaded
       if (kind === 'heavy-press') {
-        const kitted = heavyKitProp(kind, stage, genLevel, RING_TOP_Y);
+        const kitted = heavyKitProp(kind, stage, genLevel, RING_TOP_Y, overrides);
         if (kitted) return kitted;
       }
       const frame = getGenSync('press-frame', genLevel);
@@ -591,7 +595,7 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
     case 'water': {
       // a kit frame around the generated core (plan 38, TICKET-39), when the core has loaded
       if (kind === 'heavy-water') {
-        const kitted = heavyKitProp(kind, stage, genLevel, RING_TOP_Y);
+        const kitted = heavyKitProp(kind, stage, genLevel, RING_TOP_Y, overrides);
         if (kitted) return kitted;
       }
       const gen = getGenSync('watermaker', genLevel);

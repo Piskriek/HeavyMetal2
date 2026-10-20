@@ -164,21 +164,77 @@ try {
   await page.evaluate(() => window.__hmHud?.openDrafting?.());
   await page.locator('[data-testid="drafting-tab-parts"]').click();
   await page.waitForSelector('[data-testid="drafting-parts-panel"] [data-testid="bench-parts"]');
-  await page.locator('[data-testid="bench-gen-panel"]').click();
-  await page.locator('[data-testid="bench-mat-plate-hazard"]').click();
+  await page.locator('[data-testid="bench-gen-can"]').click();
+  await page.locator('[data-testid="bench-mat-body-hazard"]').click();
   await page.screenshot({ path: path.join(shotsDir, 'drafting-parts.png') });
-  check('the Drafting Table can print a hazard panel', await page.locator('[data-testid="bench-print"]').isEnabled(),
+  check('the Drafting Table can print a hazard can', await page.locator('[data-testid="bench-print"]').isEnabled(),
     await page.locator('.hm-draft-parts .play-why').textContent().catch(() => ''));
   await page.locator('[data-testid="bench-print"]').click();
   await frames(5);
-  check('the table spends 12 raw vertices and 10 raw pixels (a medium component)', (await stock('vtx-rough')) === vtxPlanet - 12 && (await stock('pxd-mono')) === pxdPlanet - 10,
+  check('the table spends 20 raw vertices and 15 raw pixels (a primary solid)', (await stock('vtx-rough')) === vtxPlanet - 20 && (await stock('pxd-mono')) === pxdPlanet - 15,
     `vtx ${await stock('vtx-rough')}, pxd ${await stock('pxd-mono')}`);
   const tablePort = await page.evaluate(() => window.__dev.port());
-  check('the printed panel goes straight into the rifle port, and the bolt cartridge back on the rack', tablePort?.part?.gen === 'panel' && tablePort.part.slotMaterials.plate === 'hazard'
+  check('the printed can goes straight into the rifle port, and the bolt cartridge back on the rack', tablePort?.part?.gen === 'can' && tablePort.part.slotMaterials.body === 'hazard'
     && (await page.evaluate(() => window.hmPlay.state().lab.cartridges.some((c) => c.kind === 'part' && c.part.gen === 'bolt' && c.slot === null))), JSON.stringify(tablePort));
   check('with no free blank left the table says where to make one', !(await page.locator('[data-testid="bench-print"]').isEnabled())
     && /lab rack/.test((await page.locator('.hm-draft-parts .play-why').textContent().catch(() => '')) ?? ''));
   await page.keyboard.press('Escape');
+
+  // ---- Apply on a planet kit machine (TICKET-39 frames, switched on here: they ship off until TICKET-39b refits them):
+  // the printed panel fitted onto a printable part of a heavy mill's frame, saved under the machine's plot kit id
+  await page.evaluate(() => { window.__dev.kitFrames(true); window.hmPlay.give?.(2000); window.hmPlay.setStage?.(6); });
+  await frames(10);
+  let mill = null;
+  for (const [x, z] of [[30, 6], [28, -8], [-30, 14], [-26, 20], [24, -20]]) {
+    if (await page.evaluate(([px, pz]) => window.hmPlay.placeAt(px, pz, 'heavy-mill'), [x, z])) { mill = [x, z]; break; }
+  }
+  const millRow = mill ? await page.evaluate(([px, pz]) => window.hmPlay.state().plot.machines.find((m) => m.kind === 'heavy-mill' && Math.abs(m.x - px) < 0.01 && Math.abs(m.z - pz) < 0.01) ?? null, mill) : null;
+  const millKit = millRow ? `plot:${millRow.id}@${millRow.built}` : null;
+  await frames(20);
+  const millParts = async () => (millKit ? await page.evaluate((k) => window.__dev.kitPlaced(k), millKit) : []);
+  const millBefore = await millParts();
+  check('a heavy mill stands on the plot in its kit frame', !!millKit && millBefore.some((p) => p.path === 'core') && millBefore.some((p) => p.gen !== null), `${millKit}: ${millBefore.length} parts`);
+  // walk round the mill until the beam's aim names a part that matches `want`
+  const findHit = async (want, pitches = [-0.05, -0.15, 0.05]) => {
+    if (!mill) return null;
+    for (let i = 0; i < 16; i++) {
+      const ang = (i / 16) * Math.PI * 2;
+      for (const r of [4.5, 6]) {
+        const px = mill[0] + Math.sin(ang) * r, pz = mill[1] + Math.cos(ang) * r;
+        const yaw = Math.atan2(px - mill[0], pz - mill[1]);
+        for (const pitch of pitches) {
+          await page.evaluate(([xx, zz, yy, pp]) => window.__playScene.debug.teleport('planet', xx, zz, yy, pp), [px, pz, yaw, pitch]);
+          await frames(2);
+          const hit = await page.evaluate(() => window.__dev.aimKitPart());
+          if (hit && hit.kit === millKit && want(hit)) return hit;
+        }
+      }
+    }
+    return null;
+  };
+  const other = await findHit((h) => h.gen && h.gen !== 'can', [0.7, 0.55, 0.4, 0.2, -0.3, -0.45]);
+  const refused = other ? await page.evaluate(() => window.__dev.applyPart(false)) : -1;
+  await frames(5);
+  const otherAfter = other ? (await millParts()).find((p) => p.path === other.path) : null;
+  check('a can cartridge fired at a part of another kind is refused (like for like)', !!other && refused === 0 && otherAfter?.gen === other.gen,
+    other ? `${other.path} (${other.gen}): ${refused}` : 'no other part found');
+  const partHit = await findHit((h) => h.gen === 'can');
+  check('the beam can aim at a can of the mill frame (a column)', !!partHit, partHit ? partHit.path : 'none');
+  await page.screenshot({ path: path.join(shotsDir, 'planet-aimed-part.png') });
+  const fitted = partHit ? await page.evaluate(() => window.__dev.applyPart(false)) : 0;
+  await frames(10);
+  const millAfter = await millParts();
+  const hazardParts = millAfter.filter((p) => p.material === 'hazard');
+  check('a tap fits the printed hazard can onto that part, and only it', fitted === 1 && hazardParts.length === 1 && hazardParts[0].path === partHit?.path && hazardParts[0].gen === 'can',
+    JSON.stringify(hazardParts));
+  await page.screenshot({ path: path.join(shotsDir, 'planet-hazard-part.png') });
+  // a stage change rebuilds the machine; the fitted part is saved and stays
+  await page.evaluate(() => window.hmPlay.setStage?.(5));
+  await frames(20);
+  const savedPaths = await page.evaluate((k) => Object.keys(window.__dev.kitOverrides()[k] ?? {}), millKit);
+  const rebuilt = (await millParts()).filter((p) => p.material === 'hazard');
+  check('the fitted part is saved and survives a rebuild', savedPaths.includes(partHit?.path) && rebuilt.length === 1 && rebuilt[0].path === partHit?.path,
+    `${JSON.stringify(savedPaths)} ${JSON.stringify(rebuilt.map((p) => p.path))}`);
 
   check('no page errors', pageErrors.length === 0, pageErrors.slice(0, 3).join(' | '));
 } catch (err) {

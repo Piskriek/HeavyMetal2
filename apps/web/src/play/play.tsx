@@ -42,6 +42,8 @@ import {
   type PartSpec,
 } from '@hm/cartlab';
 import { BenchParts } from './bench-parts';
+import { setKitFrames } from './plot-kits';
+import { GENERATORS } from '@hm/partgen';
 import { overrideFromPart, partBill } from './part-cartridge';
 import { PART_SWATCHES } from './part-swatches';
 import { fx } from '../maker/feedback';
@@ -1531,6 +1533,12 @@ useEffect(() => {
     }
     if (!hit.gen) {
       say('That piece takes no part cartridge', 'Part cartridges fit the printed parts: bolts, panels, brackets, grilles.');
+      return 0;
+    }
+    // like for like: a bolt cartridge fits bolts (a panel fired at a column would take away what holds the crown up)
+    if (hit.gen !== part.gen) {
+      const name = (gen: string): string => (GENERATORS[gen]?.label ?? gen).toLowerCase();
+      say(`That is a ${name(hit.gen)}`, `This cartridge fits ${name(part.gen)} parts. Print a ${name(hit.gen)} at the bench to change it.`);
       return 0;
     }
     const paths = broadcast
@@ -3913,6 +3921,11 @@ useEffect(() => {
         material: p.material,
       })),
       kitOverrides: () => propsRef.current.kits ?? {},
+      /** Turns the heavy machines' kit frames on or off (off until TICKET-39b refits them) and rebuilds the plot's machines. */
+      kitFrames: (on: boolean): void => {
+        setKitFrames(on);
+        sceneRef.current?.rebuildMachines();
+      },
       aimKitPart: () => sceneRef.current?.aimKitPart(BEAM_STROKE_RANGE) ?? null,
       /** Fires the part in the port as a tap (one part) or a hold (every part of that kind), as on release. */
       applyPart: (broadcast: boolean): number => applyPartShotRef.current(broadcast),

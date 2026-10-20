@@ -335,3 +335,6 @@ export function stickFigure(pose: Pose): { segments: Segment[]; head: { x: numbe
   const headAng = lean + B.head.rx;
   return { segments: segs, head: { x: neckX + Math.sin(headAng) * 0.08, y: neckY - Math.cos(headAng) * 0.08, r: 0.07 } };
 }
+
+// TICKET-21 (POL-12): Universal .glb / .vrm humanoid 6-bone retargeting helpers
+export * from './bone-retarget-map';

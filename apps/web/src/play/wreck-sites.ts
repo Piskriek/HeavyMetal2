@@ -206,7 +206,7 @@ export function wreckSites(seed: number, gate: Point): WreckSite[] {
     if (jp) members.push({ model: site.junk, x: jp.x, z: jp.z, yaw: unit(mix(h, 5)) * Math.PI * 2, tilt: 0, sink: 0, junk: true });
     if (tr) {
       const tp = spot(base + Math.PI * 0.5, ring + 1);
-      const siteTape = WRECK_TAPE_BY_SITE[`site-${site.index}`] ?? WRECK_TAPE_BY_TRANSPONDER[tr.id];
+      const siteTape = WRECK_TAPE_BY_SITE[site.index] ?? WRECK_TAPE_BY_TRANSPONDER[tr.id];
       if (tp) members.push({ model: tr.model, x: tp.x, z: tp.z, yaw: unit(mix(h, 7)) * Math.PI * 2, tilt: 0.22, sink: 0.25, transponder: tr.id, ...(siteTape ? { tape: siteTape } : {}), junk: false });
     }
     const neighbours = total - members.length;

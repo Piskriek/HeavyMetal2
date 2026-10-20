@@ -133,7 +133,7 @@ import { isBiosphereCoherent } from '@hm/questline';
 import { fidelityRules, FIDELITY_LINE_IDS } from '@hm/narrator';
 import { HudZone, CompassRibbon, FloatsPill, MachineLabel, SyncWord } from '../base/ui/hud-zones';
 import { DiegeticRadioTunerWidget } from '../shell/diegetic-radio-tuner-widget';
-import { getTapeById } from '@hm/content';
+import { COLLECTIBLE_MUSIC_TAPES, resolveRadioArrangementStyle } from '@hm/content';
 import {
   FIDELITY_SHIFT_MS,
   fidelitySkinFor,
@@ -2295,9 +2295,9 @@ useEffect(() => {
       }
 
       // 6. 4 Hz Room pressure & life-support check (D14)
-      const nowSec = performance.now();
-      if (nowSec - lastRoomCheckTimeRef.current >= 250) {
-        lastRoomCheckTimeRef.current = nowSec;
+      const nowRoomMs = performance.now();
+      if (nowRoomMs - lastRoomCheckTimeRef.current >= 250) {
+        lastRoomCheckTimeRef.current = nowRoomMs;
         if (scene.debug.where() === 'planet') {
           const bEnv = getBaseEnv();
           const feetY = playerPos.y - 1.7;
@@ -3494,9 +3494,9 @@ useEffect(() => {
         if (!hud.aimedProp.salvage) {
           const tapeId = sceneRef.current?.collectWreckTape(hud.aimedProp.id) ?? null;
           if (tapeId) {
-            const tape = getTapeById(tapeId);
+            const tape = COLLECTIBLE_MUSIC_TAPES.find((t) => t.id === tapeId) ?? null;
             setCollectedTapes((prev) => (prev.includes(tapeId) ? prev : [...prev, tapeId]));
-            if (tape) say('Cassette Tape Recovered', `${tape.title} (${tape.durationSec}s) added to Field Radio.`);
+            if (tape) say('Cassette Tape Recovered', `${tape.title} (${tape.frequencyMhz}) added to Field Radio.`);
           }
           const entry = loreFor(hud.aimedProp.id);
           if (entry) openLog(entry.log);
@@ -4934,9 +4934,26 @@ useEffect(() => {
                 </div>
                 <div style={{ padding: '0 16px 12px' }}>
                   <DiegeticRadioTunerWidget
-                    unlockedStage={plot.stage}
-                    collectedTapeIds={collectedTapes}
-                    onPlayFmNote={(freq, ratio, index, dur) => gameAudio.playBridgeFmNote(freq, ratio, index, dur)}
+                    activeTapeId={collectedTapes[0] ?? 'tape-01-setmix-theme'}
+                    unlockedTapeIds={collectedTapes}
+                    arrangement={
+                      resolveRadioArrangementStyle(
+                        collectedTapes[0] ?? 'tape-01-setmix-theme',
+                        { Pxd: hud.plot.levels.pxd, Vtx: hud.plot.levels.vtx, Lx: hud.plot.levels.lx, Aq: hud.plot.levels.aq },
+                        false,
+                        hud.where === 'lab',
+                      ).arrangement
+                    }
+                    stemGains={{
+                      'shape-press-bass': hud.plot.levels.vtx,
+                      'texture-mill-arp': hud.plot.levels.pxd,
+                      'light-projector-pad': hud.plot.levels.lx,
+                      'water-maker-lead': hud.plot.levels.aq,
+                    }}
+                    isHarmonicConvergenceLocked={hud.plot.stage >= 4}
+                    downbeatPulse0to1={0.5}
+                    onSelectTape={() => gameAudio.playBridgeFmNote(440, 2, 1.5, 0.25)}
+                    onTriggerTurboBass={() => sceneRef.current?.triggerTurboBass()}
                   />
                 </div>
                 <div className="radio-log-list">

@@ -32,6 +32,9 @@ export interface HopperView {
   readonly item: string;
   readonly n: number;
   readonly cap: number;
+  /** POL-77: Additional stock held in linked network bins beyond the local 100-item hopper buffer. */
+  readonly linkedReserve?: number;
+  readonly totalAvailable?: number;
 }
 
 export interface MachineInspect {
@@ -148,6 +151,7 @@ function isRelayReached(world: BaseWorld, env: WorldEnv, stationId: number): boo
  * Computes the linked storage capacity (in items) across the boxes on the station's network (POL-77),
  * so network stock never overflows a hardcoded /100 or /200 cap.
  */
+void networkItemCap;
 function networkItemCap(world: BaseWorld, netIds: readonly number[], itemId: string, currentCount: number): number {
   const stackSize = ITEMS[itemId]?.stack ?? 100;
   const linkedBoxes = world.boxes.filter((b) => netIds.includes(b.id));
@@ -185,8 +189,16 @@ function findStationFeedHopper(
 
   if (stationKind === 'water') {
     const oreCount = countOf('ore');
+    const localCap = ITEMS.ore?.stack ?? 100;
+    const shownN = Math.min(localCap, oreCount);
     return {
-      hopper: { item: 'ore', n: oreCount, cap: networkItemCap(world, netIds, 'ore', oreCount) },
+      hopper: {
+        item: 'ore',
+        n: shownN,
+        cap: localCap,
+        linkedReserve: Math.max(0, oreCount - shownN),
+        totalAvailable: oreCount,
+      },
       hasFeed: oreCount > 0,
     };
   }
@@ -221,8 +233,16 @@ function findStationFeedHopper(
   }
 
   const itemName = ITEMS[bestItem]?.name ?? bestItem;
+  const localCap = ITEMS[bestItem]?.stack ?? 100;
+  const shownN = Math.min(localCap, bestCount);
   return {
-    hopper: { item: itemName, n: bestCount, cap: networkItemCap(world, netIds, bestItem, bestCount) },
+    hopper: {
+      item: itemName,
+      n: shownN,
+      cap: localCap,
+      linkedReserve: Math.max(0, bestCount - shownN),
+      totalAvailable: bestCount,
+    },
     hasFeed: canAffordAny || bestCount > 0,
   };
 }

@@ -122,7 +122,20 @@ export function createRemotePeersController(parent?: THREE.Object3D): RemotePeer
   const setRemotePeers = (peers: readonly PeerPose[]): void => {
     const activeIds = new Set<string>();
     for (const peer of peers) {
-      if (!peer || !peer.id) continue;
+      // POL-172: hide peers who entered the Earth Lab (inLab / leftPlot) or lack finite plot coordinates
+      const peerExt = peer as PeerPose & { readonly inLab?: boolean; readonly leftPlot?: boolean };
+      if (
+        !peer ||
+        !peer.id ||
+        peerExt.inLab === true ||
+        peerExt.leftPlot === true ||
+        !Number.isFinite(peer.x) ||
+        !Number.isFinite(peer.y) ||
+        !Number.isFinite(peer.z) ||
+        !Number.isFinite(peer.yaw)
+      ) {
+        continue;
+      }
       activeIds.add(peer.id);
       let rig = rigs.get(peer.id);
       if (!rig) {

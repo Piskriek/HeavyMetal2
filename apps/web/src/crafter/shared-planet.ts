@@ -206,3 +206,40 @@ export const PLOT_TAG = 'setmix-plot';
 export function gameOrbit(g: number): { readonly system: number; readonly orbit: number } {
   return { system: Math.floor(g / 8), orbit: g % 8 };
 }
+
+// ---- TICKET-26 (POL-16 & POL-84): Sector Readout & Friend Adjacency Rearrangement
+import {
+  formatClaimedSectorReadout,
+  rearrangeFriendsAdjacentToSlot,
+  type SectorReadout,
+} from '@hm/coopnet/gate-dialer';
+
+export { formatClaimedSectorReadout, rearrangeFriendsAdjacentToSlot, type SectorReadout };
+
+/**
+ * POL-84: Returns the formatted `SECTOR #NN // <dist> m <octant>` readout for the active profile's
+ * claimed slot (or claims one automatically when `autoClaimPlotId` is provided).
+ */
+export function getActiveSectorReadout(
+  storage: StorageLike | null = defaultStorage(),
+  autoClaimPlotId?: string,
+): SectorReadout | null {
+  let slot = readStoredSlot(storage);
+  if (slot === null && autoClaimPlotId) {
+    slot = claimAndStoreSlot(autoClaimPlotId, storage);
+  }
+  if (slot === null) return null;
+  return formatClaimedSectorReadout(slot, slotPosition(slot));
+}
+
+/**
+ * POL-16: Rearranges the given friend plot IDs onto the nearest sunflower-spiral neighbour slots
+ * within `350 m` of `hostSlot`.
+ */
+export function arrangeFriendsNearHost(
+  hostSlot: number,
+  friendIds: readonly string[],
+): ReadonlyMap<string, number> {
+  const near = neighbourSlots(hostSlot, 350);
+  return rearrangeFriendsAdjacentToSlot(hostSlot, near, friendIds);
+}

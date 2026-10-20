@@ -1,0 +1,26 @@
+/* ============================================================================
+ * File: apps/web/src/play/scoped-play-root.css
+ * TICKET-24 (POL-83 & POL-64):
+ * 1. POL-83: Scopes the full-viewport `.play` rule strictly to `.play[data-hud-root]`
+ *    (or `.play-screen-root`) so buttons with class `.play` in Studio/Audio tabs
+ *    never inherit `position: absolute; inset: 0`.
+ * 2. POL-64: Frosted architectural glass blade behind the left-hand Main Menu buttons.
+ * ============================================================================ */
+
+.play[data-hud-root],
+.play[data-fidelity] {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.menu-glass-blade {
+  position: relative;
+  z-index: 2;
+  max-width: 420px;
+  min-height: 100vh;
+  padding: 48px 36px;
+  background: linear-gradient(180deg, rgba(12, 16, 24, 0.78) 0%, rgba(8, 11, 18, 0.88) 100%);
+  border-right: 1px solid rgba(127, 240, 255, 0.22);
+  box-shadow: 12px 0 36px rgba(0, 0, 0, 0.55);
+}

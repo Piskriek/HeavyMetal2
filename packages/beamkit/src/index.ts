@@ -743,3 +743,4 @@ export function beamEffect(o?: { readonly pixels?: number }): BeamFx {
 
   return { object: points, set, update, dispose };
 }
+export * from './hybrid-cartridge-modes';

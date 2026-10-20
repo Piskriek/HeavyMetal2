@@ -427,3 +427,9 @@ body[data-subtitle-up] .play .hm-build-wheel-hint,
 body[data-subtitle-up] .play .hm-build-rot-hint { display: none; }
 /* the build readout holds for a title card, as CANNOT PLACE does (body[data-title-up], set by every toast for 3 s) */
 body[data-title-up] .play .hm-build-readout-hud { display: none; }
+
+/* TICKET-18 (POL-44): leak bearing ticks on compass & rover drift badge */
+.hud-compass-leak { position: absolute; top: 2px; width: 4px; height: 10px; transform: translateX(-50%); background: #b46bff; box-shadow: 0 0 6px #b46bff; }
+.hud-compass-leak.edge { opacity: 0.65; }
+.hud-driving-badge { display: inline-flex; gap: 8px; align-items: center; padding: 4px 10px; background: rgba(12,16,22,0.82); border: 1px solid #3dc8ff; }
+.hud-driving-drift { color: #ffc13d; }

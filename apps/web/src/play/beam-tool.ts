@@ -1,12 +1,28 @@
 /**
- * The extraction beam as a tool (TASK-21): its three modes, the sculpt sub-modes, and the stroke each mode makes. Pure and
- * deterministic (no clock, no random): the scene asks what a stroke does, and @hm/terrainbrush does the ground and the ore.
- *
- * Extract is the existing harvest (the field nodes, `BEAM_RANGE`), so it has no stroke here. Apply paints the loaded
- * cartridge's preset under the aim point and costs no ore. Sculpt carves (gains ore), raises (costs ore) or smooths.
+ * The extraction beam as a tool (TASK-21 + TICKET-21 P2-VEH-06 Hybrid Cartridge Modes):
+ * its three modes, the sculpt sub-modes, and the stroke each mode makes, plus the two
+ * spliced Weapon+Tool hybrid cartridge modes (`Scatter Excavator` wide-cone carve and
+ * `Color Spewer` wide-radius terrain paint).
+ * Pure and deterministic (no clock, no random): the scene asks what a stroke does, and
+ * @hm/terrainbrush does the ground and the ore.
  */
 import { apply as brushApply, type BrushKind, type BrushOp, type Field, type Result, type Rules } from '@hm/terrainbrush';
 import type { BeamMode } from '@hm/beamkit';
+import {
+  HYBRID_CARTRIDGES,
+  isHybridCartridge,
+  resolveHybridCartridge,
+  type HybridCartridgeKind,
+  type HybridCartridgeSpec,
+} from '@hm/beamkit/hybrid-cartridge-modes';
+
+export {
+  HYBRID_CARTRIDGES,
+  isHybridCartridge,
+  resolveHybridCartridge,
+  type HybridCartridgeKind,
+  type HybridCartridgeSpec,
+};
 
 /** The beam reaches this far (metres), held out in front of the player. */
 export const BEAM_STROKE_RANGE = 25;
@@ -69,8 +85,36 @@ function brushOf(tool: SculptTool): BrushKind {
 /**
  * The stroke a held beam makes at `aim` (ground metres) for `dt` seconds, or null when the mode makes none (Extract, or
  * Apply with an empty port). `strength` scales how much a stroke moves (1 is the tool as made).
+ *
+ * P2-VEH-06 (TICKET-21): When a spliced Weapon+Tool hybrid cartridge is slotted (`hybrid:scatter-excavator` or
+ * `hybrid:color-spewer`), `strokeOf` automatically upgrades the stroke radius and strength for wide-cone excavation
+ * or wide-radius rapid terrain painting!
  */
 export function strokeOf(state: BeamState, aim: { readonly x: number; readonly z: number }, dt: number, strength = 1): BrushOp | null {
+  const hybrid = resolveHybridCartridge(state.cartridge);
+  if (hybrid) {
+    if (hybrid.kind === 'scatter-excavator' && (state.mode === 'sculpt' || state.mode === 'apply')) {
+      return {
+        kind: 'carve',
+        x: aim.x,
+        z: aim.z,
+        radius: STROKE_RADIUS * hybrid.radiusMultiplier,
+        strength: strength * hybrid.strengthMultiplier,
+        dt,
+      };
+    }
+    if (hybrid.kind === 'color-spewer' && (state.mode === 'apply' || state.mode === 'sculpt')) {
+      return {
+        kind: 'paint',
+        x: aim.x,
+        z: aim.z,
+        radius: STROKE_RADIUS * hybrid.radiusMultiplier,
+        strength: strength * hybrid.strengthMultiplier,
+        dt,
+        preset: hybrid.paintPreset,
+      };
+    }
+  }
   if (state.mode === 'extract') return null;
   if (state.mode === 'apply') {
     if (!state.cartridge) return null;

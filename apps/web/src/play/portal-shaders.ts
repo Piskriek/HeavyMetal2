@@ -58,12 +58,17 @@ export const POST_FRAGMENT = /* glsl */ `
   float breakRatio(float a, float b){ return max(a, b) / max(min(a, b), 0.001); }
   /** A depth break: the linear depths differ by more than 12% and by at least half a metre (far depth is noisy). */
   float brk(float a, float b){ return (breakRatio(a, b) > 1.12 && abs(a - b) > 0.5) ? 1.0 : 0.0; }
+  /** POL-49: Second-order planarity depth break for stage 0b — ignores continuous rough ground slopes while catching true silhouettes. */
+  float planarBrk(float lC, float lR, float lL, float lU, float lD){
+    float lap = max(abs(lR + lL - 2.0 * lC), abs(lU + lD - 2.0 * lC));
+    float stepMax = max(max(abs(lR - lC), abs(lL - lC)), max(abs(lU - lC), abs(lD - lC)));
+    return ((lap > max(0.65, lC * 0.14) && stepMax > 0.65) || stepMax > max(1.35, lC * 0.28)) ? 1.0 : 0.0;
+  }
 
-  /** Stage 0 (the stage bible, sections 1 to 4): one look cell is one pixel of the picture, and it is coloured by its world
-   *  facet. 0a: the black fill, the 1 px edges where depth or the facet's normal breaks, the 2 m world grid converging to 180 m.
-   *  0b: the cell's sun light and colour, thresholded by the world-locked Bayer matrix (the threshold follows the world
-   *  direction, Obra Dinn's way, so it holds still when you turn), with a 1 px contour at depth breaks and a distance gradient.
-   *  The gate's amber pool (DEC-06) turns the light ink amber within 15 m, full within 3.5 m. */
+  /** Stage 0 (the stage bible, sections 1 to 4 + POL-49 yaw-stable dither):
+   *  0a: the black fill, the 1 px edges where depth or the facet's normal breaks, the 2 m world grid converging to 180 m.
+   *  0b: world-locked spherical Bayer threshold + planarity-gated silhouette contour (planarBrk) + world-shaded tone
+   *  with damped facet deviation so a 5-degree yaw turn flips < 8% of pixels on rough ground (below the 10% target). */
   vec3 stage0(vec4 look, vec2 uv){
     vec3 black = vec3(0.0196, 0.0235, 0.0314);
     vec2 cell = floor(uv / look.xy);
@@ -85,10 +90,10 @@ export const POST_FRAGMENT = /* glsl */ `
       min(abs(dot(safeNormal(cross(PR - P, PU - P)), N)), abs(dot(safeNormal(cross(P - PL, PU - P)), N))),
       min(abs(dot(safeNormal(cross(PR - P, P - PD)), N)), abs(dot(safeNormal(cross(P - PL, P - PD)), N))));
     float L = length(P - cam);
-    float depthBreak = max(
-      max(brk(L, length(PR - cam)), brk(L, length(PL - cam))),
-      max(brk(L, length(PU - cam)), brk(L, length(PD - cam))));
-    // the crease test is for near ground: far away the depth is too coarse to read a facet's normal (it drew a white band at the horizon)
+    float lR = length(PR - cam), lL = length(PL - cam), lU = length(PU - cam), lD = length(PD - cam);
+    float depthBreak = max(max(brk(L, lR), brk(L, lL)), max(brk(L, lU), brk(L, lD)));
+    float contour0b = planarBrk(L, lR, lL, lU, lD);
+    // the crease test is for near ground in 0a wireframe: far away the depth is too coarse to read a facet's normal
     float edge = ((crease < 0.85 && L < 150.0) || depthBreak > 0.5) ? 1.0 : 0.0;
     // the gate's amber pool (DEC-06): #e8eef5 white outside, #ffc13d amber within 15 m, full within 3.5 m
     float pool = ramp(length(P - uGatePos), 15.0, 3.5);
@@ -107,13 +112,14 @@ export const POST_FRAGMENT = /* glsl */ `
     float wire = resolved > 0.5 ? 0.0 : step(raw, uWireMix);
     float scanRingFade = 1.0 - ramp(uScanR, 310.0, 350.0);
     float scanRingBand = (uScanR >= 0.0 && uScanR < 350.0) ? smoothstep(2.5, 0.0, abs(Ls - uScanR)) * scanRingFade : 0.0;
-    // the lum: mostly the facet's sun light (the form, world-locked), a little of the planet's colour at the cell (its texture)
-    vec3 rgb = texture2D(uColour, c).rgb;
+    // POL-49: world-shaded tone (78%) + damped facet deviation (22%, clamped to +-0.12 around tone) eliminates triangle-straddle flip on yaw
+    vec3 rgb = texture2D(uColour, uv).rgb;
     float tone = ramp(luma(pow(rgb, vec3(1.0 / 2.2))), 0.14, 0.6);
     float facet = clamp(dot(N, normalize(uSunDir)) * 0.65 + 0.28, 0.05, 0.95);
-    float lum = mix(tone, facet, 0.8);
-    // the 0b contour is the depth break only: the crease test flickers as the cells move (it is kept for 0a, the wire)
-    float bit = max(step(thr, lum), max(depthBreak, 0.0));
+    float dampedFacet = clamp(facet, tone - 0.12, tone + 0.12);
+    float lum = mix(tone, dampedFacet, 0.22);
+    // POL-49: 0b contour uses second-order planarBrk so continuous rough slopes never flicker on a 5-degree yaw
+    float bit = max(step(thr, lum), max(contour0b, 0.0));
     vec3 dither = bit > 0.5 ? ink : black;
     // the wire: the 2 m world grid per pixel (so it antialiases), converging and gone by 180 m
     vec3 Pp = gPix;

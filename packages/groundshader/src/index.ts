@@ -1068,3 +1068,5 @@ export function meanAlbedo(tex: GroundTextures, material: number): [number, numb
   const scale = 1 / (tex.size * tex.size);
   return [red * scale, green * scale, blue * scale];
 }
+export * from './yaw-stable-dither';
+export * from './blob47-autotile';

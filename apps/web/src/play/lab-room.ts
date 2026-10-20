@@ -3,12 +3,17 @@ export { armoryRack, shouldShowAmmoBadge, ARMORY_RAIL_POS, ARMORY_PICKUP_REACH, 
 import {
   aimLabStation,
   buildCableDrop,
+  buildCapacitorBusBars,
+  buildConsoleLeverQuadrant,
   buildGateRibbedCoils,
   buildHardwareFabricatorProp,
+  buildRelayBeaconHousing,
+  buildRibbedFloorCoverTreads,
   createRightWallMachineRig,
   LAB_STATIONS,
   mergeStaticMeshes,
   nearestLabStation,
+  POWER_WALL_SHEET07_ORDER,
   RIGHT_WALL_MACHINES,
   stationById,
   type LabMachineRig,
@@ -16,6 +21,7 @@ import {
   type LabStationSpec,
   type RightWallMachineId,
 } from './lab-machines';
+import { applyMonitorEqualizerNearShotFix } from './window-g-final-qa-hooks';
 export {
   aimLabStation,
   LAB_STATIONS,
@@ -85,9 +91,10 @@ const LEVER_AT: readonly [number, number, number] = [0.336, 0.826, 0.203];
  * The play scene throws the pivot by LEVER_THROW (1.1 rad); the H-slot in the guide box is only 0.18 m long, so the lever travels
  * LEVER_TRAVEL (0.25 rad, about 0.08 m along the slot) for that throw. Without the scale the grip would leave the slot.
  */
-const LEVER_REST_TILT = 0.15;
+// POL-121: Rest tilt +0.42 rad and travel 0.95 rad so OFF -> ON sweeps ~54 deg inside its quadrant slot
+const LEVER_REST_TILT = 0.42;
 const LEVER_THROW = 1.1;
-const LEVER_TRAVEL = 0.25;
+export const LEVER_TRAVEL = 0.95;
 /** The breaker panel's isolator spindle, on the hazard plate's knob, in the panel's frame (sheet 07, measured on the packed model). */
 const ISOLATOR_AT: readonly [number, number, number] = [0.262, 1.12, 0.32];
 /** The handle's hub centre sits 0.072 m to the left of its origin: the handle is turned to stand on the spindle, with the hub centred on it. */
@@ -437,7 +444,7 @@ export interface LabRoom {
   setFloats(floats: FourFloats): void;
   setConsensusCommitted(committed: boolean): void;
   /** POL-141: Gate a right-wall Lab station's 3D pixel plume on whether it is actively operating. */
-  setStationOperating(id: RightWallMachineId | LabStationId, on: boolean): void;
+  setStationOperating(id: RightWallMachineId | LabStationId | 'rack' | 'bench' | 'combiner', on: boolean): void;
   /** The lab clutter (TASK-23c): the prop the ray meets within `reach` metres (a fixture or a salvage prop), or null. Lab metres. */
   aimClutter(origin: THREE.Vector3, dir: THREE.Vector3, reach: number): string | null;
   /** Starts a salvage prop's dissolve (about a second; it then leaves the lab). False for a fixture or a prop that is not standing. */
@@ -481,7 +488,15 @@ export function createLabRoom(o: {
   };
   /** Replaces a group's visual children with a generated model, keeping the children listed. */
   const replaceVisual = (targetGroup: THREE.Object3D, gen: THREE.Object3D, kept: readonly THREE.Object3D[] = []): void => {
-    for (const child of [...targetGroup.children]) if (!kept.includes(child)) targetGroup.remove(child);
+    for (const child of [...targetGroup.children]) {
+      if (!kept.includes(child)) {
+        child.traverse((obj) => {
+          const mesh = obj as THREE.Mesh;
+          if (mesh.isMesh && mesh.geometry) mesh.geometry.dispose();
+        });
+        targetGroup.remove(child);
+      }
+    }
     targetGroup.add(gen);
   };
   /** LAB-10: overhang collider fit. */
@@ -515,6 +530,8 @@ export function createLabRoom(o: {
       if (it.ground !== false) {
         groundModelAt(g, 0);
       }
+      // POL-104 & POL-105: Merge static meshes inside swapped generated GLBs by material so Lab stays well under 185 draw calls
+      mergeStaticMeshes(g, it.kept ?? [], keep);
       replaceVisual(it.p.group, g, it.kept ?? []);
       fitOverhang(it.p);
     });
@@ -717,7 +734,11 @@ export function createLabRoom(o: {
   };
 
   // ---- West Wall: The Power Wall (Sheet 07, south to north — grounded & cabled)
+  void POWER_WALL_SHEET07_ORDER;
   const bank = place(kit.capacitorBank(m), -7.2, 1.0, -Math.PI / 2);
+  // POL-66: Copper bus bars linking the 3 Capacitor Bank cells into one coherent bank + overhead tray trunk
+  const bankBusBars = buildCapacitorBusBars(m, keep);
+  bank.group.add(bankBusBars);
   const breaker = place(kit.breakerPanel(m), -7.4, -1.0, -Math.PI / 2);
 
   // Grounded steel support plinth under the 4 Relay Cabinets (y = 0 to 0.72 m) so relay cabinets never float on the wall
@@ -747,10 +768,10 @@ export function createLabRoom(o: {
   ] as const) {
     westDrops.add(buildCableDrop(m, cx, cz, topY, 4.2));
   }
-  mergeStaticMeshes(westDrops); // draw-call budget (TICKET-06): the eight drops are three meshes, one per material
+  mergeStaticMeshes(westDrops, [], keep); // draw-call budget (TICKET-06): the eight drops are three meshes, one per material
   group.add(westDrops);
 
-  swaps.push(() => swapAll([{ p: bank, id: 'capacitor-bank' }]));
+  swaps.push(() => swapAll([{ p: bank, id: 'capacitor-bank', kept: [bankBusBars] }]));
   // The breaker panel (sheet 07): the isolator turns about its spindle (the panel's normal) and the three sub-breakers flip in their sockets.
   // The panel's own model carries the hazard plate, the knob and the sockets; the code adds only the moving parts and the socket collars.
   const isolator = new THREE.Group();
@@ -766,6 +787,8 @@ export function createLabRoom(o: {
     if (!panel || !handle) return false;
     panel.rotation.y = WEST_WALL_TURN;
     groundModelAt(panel, 0);
+    mergeStaticMeshes(panel, [], keep);
+    mergeStaticMeshes(handle, [], keep);
     replaceVisual(breaker.group, panel);
     fitOverhang(breaker);
     // The isolator: the handle's column is turned to the panel's normal and its hub centred on the spindle
@@ -792,9 +815,16 @@ export function createLabRoom(o: {
       pivot.add(bat);
       panel.add(pivot);
     });
-    mergeStaticMeshes(collars);
+    mergeStaticMeshes(collars, [], keep);
     panel.add(collars);
     return true;
+  });
+  // POL-69: Caged amber (#ffc13d) beacon housings mounted on top of the 4 Relay Cabinets
+  const relayHousings = relays.map((r) => {
+    const bh = buildRelayBeaconHousing(m, keep);
+    r.group.add(bh.group);
+    r.lamps.push(...bh.beacons);
+    return bh;
   });
   swaps.push(() => {
     const gens = genAll(relays.map(() => 'relay-cabinet'));
@@ -804,10 +834,12 @@ export function createLabRoom(o: {
       const gen = gens[i]!;
       gen.rotation.y = WEST_WALL_TURN;
       groundModelAt(gen, 0);
-      replaceVisual(r.group, gen);
+      mergeStaticMeshes(gen, [], keep);
+      const bh = relayHousings[i]!;
+      replaceVisual(r.group, gen, [bh.group]);
       const pair = [lamp('#ffc13d', -0.12, 1.13, 0.262), lamp('#ffc13d', 0.12, 1.13, 0.262)];
       gen.add(...pair);
-      relayLamps.push(...pair);
+      relayLamps.push(...pair, ...bh.beacons);
     });
     lamps.relays = relayLamps;
     return true;
@@ -818,6 +850,7 @@ export function createLabRoom(o: {
     const boxLamps: THREE.Mesh[] = [];
     boxes.forEach((b, i) => {
       const gen = gens[i]!;
+      mergeStaticMeshes(gen, [], keep);
       replaceVisual(b.group, gen);
       gen.rotation.y = WEST_WALL_TURN;
       const pair = [lamp('#22cc44', -0.07, 0.36, 0.13), lamp('#ee2222', 0.07, 0.36, 0.13)];
@@ -845,7 +878,7 @@ export function createLabRoom(o: {
         pad.add(key);
       }
     }
-    mergeStaticMeshes(pad);
+    mergeStaticMeshes(pad, [], keep);
     pad.position.set(KEYPAD_AT[0], KEYPAD_AT[1], KEYPAD_AT[2]);
     pad.rotation.x = HOOD_TILT;
     return pad;
@@ -856,9 +889,11 @@ export function createLabRoom(o: {
     if (!body || !lever) return false;
     body.rotation.y = WEST_WALL_TURN;
     groundModelAt(body, 0);
+    mergeStaticMeshes(body, [], keep);
+    mergeStaticMeshes(lever, [], keep);
     replaceVisual(desk.group, body);
     fitOverhang(desk);
-    // The throw lever: the play scene turns this pivot about X; the axle block is sunk in the guide box, so only the arms and grip show
+    // The throw lever (POL-121): widened 0.95 rad sweep through a raised quadrant slot guide
     desk.lever.clear();
     leverSwing.clear();
     lever.rotation.x = LEVER_REST_TILT;
@@ -866,6 +901,7 @@ export function createLabRoom(o: {
     desk.lever.add(leverSwing);
     desk.lever.position.set(LEVER_AT[0], LEVER_AT[1], LEVER_AT[2]);
     body.add(desk.lever);
+    body.add(buildConsoleLeverQuadrant(m, keep, LEVER_AT));
     body.add(buildKeypad());
     // The hood's CRT is painted on the model, so the console carries no lamp of its own
     lamps.desk = [];
@@ -886,10 +922,10 @@ export function createLabRoom(o: {
   pTable.group.userData.stationId = 'planet-table';
 
   const machineRigs: readonly LabMachineRig[] = [
-    createRightWallMachineRig('preset-rack', rack, m),
-    createRightWallMachineRig('preset-bench', bench, m),
-    createRightWallMachineRig('preset-combiner', combiner, m),
-    createRightWallMachineRig('fabricator', fabricator, m),
+    createRightWallMachineRig('preset-rack', rack, m, keep),
+    createRightWallMachineRig('preset-bench', bench, m, keep),
+    createRightWallMachineRig('preset-combiner', combiner, m, keep),
+    createRightWallMachineRig('fabricator', fabricator, m, keep),
   ];
 
   // Vertical square-section conduit drops from East overhead cable tray (y = 4.2) to all 4 East-wall machines & armory rail
@@ -903,23 +939,22 @@ export function createLabRoom(o: {
   ] as const) {
     eastDrops.add(buildCableDrop(m, cx, cz, topY, 4.2));
   }
-  mergeStaticMeshes(eastDrops); // draw-call budget (TICKET-06): the five drops are three meshes, one per material
+  mergeStaticMeshes(eastDrops, [], keep); // draw-call budget (TICKET-06 & POL-105): the five drops are three meshes, registered in keep
   group.add(eastDrops);
 
   // Floor covers carrying power from West Power Wall -> Gate Plinth -> East Studio Bay & Planet Table (nothing wireless!)
-  const covers = [
-    // Main feed from breaker/relays to plinth west side (-2.5, -1.0)
-    kit.floorCover(m, [[-7.2, -1.0], [-2.5, -1.0]], 0.32),
-    // Capacitor bank to breaker along west wall
-    kit.floorCover(m, [[-7.2, 1.0], [-7.2, -1.0]], 0.28),
-    // Operator console to relays along west wall
-    kit.floorCover(m, [[-6.5, -7.8], [-7.2, -7.8], [-7.2, -5.3]], 0.25),
-    // Gate plinth east side (2.5, -1.0) to East wall Studio trunk and Planet Table
-    kit.floorCover(m, [[2.5, -1.0], [7.0, -1.0]], 0.28),
-    kit.floorCover(m, [[7.0, -7.0], [7.0, -1.0]], 0.26),
-    kit.floorCover(m, [[5.0, -1.0], [5.0, -4.0]], 0.24),
-  ];
+  const coverRuns = [
+    { points: [[-7.2, -1.0], [-2.5, -1.0]] as const, width: 0.32 },
+    { points: [[-7.2, 1.0], [-7.2, -1.0]] as const, width: 0.28 },
+    { points: [[-6.5, -7.8], [-7.2, -7.8], [-7.2, -5.3]] as const, width: 0.25 },
+    { points: [[2.5, -1.0], [7.0, -1.0]] as const, width: 0.28 },
+    { points: [[7.0, -7.0], [7.0, -1.0]] as const, width: 0.26 },
+    { points: [[5.0, -1.0], [5.0, -4.0]] as const, width: 0.24 },
+  ] as const;
+  const covers = coverRuns.map((r) => kit.floorCover(m, r.points.map((pt) => [pt[0], pt[1]]), r.width));
   for (const c of covers) group.add(c.group);
+  // POL-68: Transverse ribbed steel tread bars across all floor cable covers (1 merged static mesh)
+  group.add(buildRibbedFloorCoverTreads(coverRuns, m, keep));
 
   const pulseUniforms = { uTime: { value: 0 }, uPower: { value: 0 } };
   const pulseMat = keep(new THREE.ShaderMaterial({
@@ -963,6 +998,7 @@ export function createLabRoom(o: {
     pTable.lamps.length = 0;
     const disc = new THREE.Mesh(keep(new THREE.CylinderGeometry(0.42, 0.42, 0.01, 32)), tableDiscMat);
     disc.position.set(0, 1.1 + 0.005, 0);
+    mergeStaticMeshes(plate, [], keep);
     plate.add(disc);
     plate.add(planetTableHolo.group);
     return true;
@@ -993,11 +1029,14 @@ export function createLabRoom(o: {
     tool.position.set(0, 0.62, 0);
     tool.rotation.y = Math.PI / 2;
     railGroup.add(rail, tool);
+    mergeStaticMeshes(railGroup, [], keep);
     return true;
   });
 
   const armory = armoryRack(m);
   armory.group.getObjectByName('armory-beam-cradle')?.removeFromParent();
+  const keptSidearm = [armory.group.getObjectByName('armory-sidearm') ?? armory.group.getObjectByName('sidearm')].filter((x): x is THREE.Object3D => x !== null);
+  mergeStaticMeshes(armory.group, keptSidearm, keep);
   place({ group: armory.group, colliders: armory.colliders, sockets: [], lamps: [] }, ARMORY_RAIL_POS.x, ARMORY_RAIL_POS.z, 0, ARMORY_RAIL_POS.y);
 
   const weaponBench = place(kit.presetBench(m), 6.0, 2.4, Math.PI);
@@ -1057,8 +1096,8 @@ export function createLabRoom(o: {
     prop.group.userData.clutterId = item.id;
     if (item.id === 'old-monitor') {
       monitorEq = createMonitorEqualizer3D(prop.group);
-      // on the screen plane, a couple of centimetres proud of the glass
-      monitorEq.group.position.set(0, 0.33, 0.25);
+      // POL-306: seat equaliser bars at z = 0.268 with frustumCulled = false & polygonOffset
+      applyMonitorEqualizerNearShotFix(monitorEq.group);
     }
     const before = colliders.length;
     place(prop, placedX, placedZ, placedYaw, 0);
@@ -1071,6 +1110,7 @@ export function createLabRoom(o: {
       const gen = genFor(item.model);
       if (!gen) return false;
       groundModelAt(gen, 0);
+      mergeStaticMeshes(gen, [], keep);
       // the monitor's equaliser stays on the swapped model's screen
       replaceVisual(prop.group, gen, item.id === 'old-monitor' && monitorEq ? [monitorEq.group] : []);
       return true;
@@ -1418,7 +1458,7 @@ export function createLabRoom(o: {
     hologram: planetTableHolo,
     setFloats: (f: FourFloats): void => { currentFloats = f; },
     setConsensusCommitted: (committed: boolean): void => { consensusCommitted = committed; },
-    setStationOperating: (id: RightWallMachineId | LabStationId, on: boolean): void => {
+    setStationOperating: (id: RightWallMachineId | LabStationId | 'rack' | 'bench' | 'combiner', on: boolean): void => {
       const norm = id === 'rack' ? 'preset-rack' : id === 'bench' ? 'preset-bench' : id === 'combiner' ? 'preset-combiner' : id;
       const rig = machineRigs.find((r) => r.spec.id === norm);
       rig?.setOperating(on);

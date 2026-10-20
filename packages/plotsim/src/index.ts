@@ -569,3 +569,4 @@ export * from './blue-sky';
 export * from './turret-brain';
 export * from './vehicle-bay';
 export * from './peaceful-drops';
+export * from './machine-led-and-hopper';

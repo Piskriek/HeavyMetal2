@@ -226,7 +226,8 @@ const GEN_FEED: Readonly<Record<'mill' | 'press' | 'water', readonly [number, nu
  */
 const GEN_VENT: Readonly<Record<'mill' | 'press', readonly [number, number, number]>> = {
   mill: [1.715, 2.28, -0.48],
-  press: [0, 3.44, -0.56],
+  // POL-281 (ARGO_NOTE_17 Ruling #1): Side-mounted exhaust vent at x = +0.68 m (>1.0 m clear of hopper chute)
+  press: [0.68, 3.44, -0.56],
 };
 /** A measured socket in a generated mesh's frame. Each mesh's origin is its base, so a hardpoint machine adds the ring height. */
 const genPoint = (p: readonly [number, number, number], base: number): THREE.Vector3 => new THREE.Vector3(p[0], p[1] + base, p[2]);
@@ -476,7 +477,7 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
         ram2.position.set(0.55, restY, 0);
         group.add(ram1, ram2);
         // the rock goes in at the top chute; the pixels come out of the measured side stack (GEN_VENT, ARGO_NOTE_16 ruling 5)
-        const vent = genPoint(GEN_VENT.press, baseY);
+        const vent = genPoint(isHeavy ? [1.15, GEN_VENT.press[1], GEN_VENT.press[2]] : GEN_VENT.press, baseY);
         const feed = genPoint(GEN_FEED.press, baseY);
         const power = new THREE.Vector3(0, baseY + 0.2, 0.8);
         return {
@@ -497,7 +498,8 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
         const p = heavygear.heavyPress(m as any, { stage: st });
         p.group.position.y += RING_TOP_Y;
         const rawPower = at(p.sockets, 'power') ?? new THREE.Vector3(0, 0, 0.76);
-        const rawVent = at(p.sockets, 'vent') ?? new THREE.Vector3(0, 3.2, -0.56);
+        // POL-281 (ARGO_NOTE_17 Ruling #1): Offset exhaust vent laterally (+1.15 m heavy-press)
+        const rawVent = at(p.sockets, 'vent') ?? new THREE.Vector3(1.15, 3.2, -0.56);
         const rawFeed = at(p.sockets, 'chute', 'hopper', 'feed') ?? new THREE.Vector3(0, 4.26, 0);
         const ram = p.parts?.ram;
         const restY = ram?.position.y ?? 0;
@@ -654,3 +656,21 @@ export function disposeProp(p: MachineProp): void {
     if (p.lamps.includes(mesh)) (mesh.material as THREE.Material).dispose();
   });
 }
+
+/**
+ * POL-282 (ARGO_NOTE_17 Ruling #2): Per-machine plume gravity (m/s^2).
+ */
+export const MACHINE_PLUME_GRAVITY: Readonly<Record<MachineKind | 'fabricator', number>> = Object.freeze({
+  drill: -3.6,
+  pylon: -4.8,
+  press: -0.65,
+  'heavy-press': -0.75,
+  mill: 0.35,
+  'heavy-mill': 0.42,
+  water: 0.55,
+  'heavy-water': 0.65,
+  projector: 0.70,
+  'heavy-projector': 0.75,
+  power: 0.40,
+  fabricator: 0.30,
+});

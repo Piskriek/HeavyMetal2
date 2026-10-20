@@ -178,6 +178,13 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
   private handle(sender: Player, msg: OutpostMessage): void {
     switch (msg.type) {
       case 'pose': {
+        // POL-172: When a guest or host steps into the Earth Lab, clear their plot avatar & active beam intent
+        const poseFlags = msg as { readonly inLab?: boolean; readonly leftPlot?: boolean };
+        if (poseFlags.inLab === true || poseFlags.leftPlot === true) {
+          this.poses.delete(sender.id);
+          this.beamIntents.delete(sender.id);
+          return;
+        }
         if (![msg.x, msg.y, msg.z, msg.yaw].every(Number.isFinite)) return;
         const uname = sender.username || this.usernames[sender.id] || sender.id;
         this.usernames[sender.id] = uname;
@@ -372,6 +379,26 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
           this.notice(sender.id, 'bad-world');
           return;
         }
+        // POL-171: Accept optional gate pose (and seed/sculpt) with seedWorld so the footing pad sits at
+        // the host's Moon Twin Gate immediately, before the first sculpt arrives.
+        const seedExtras = msg as {
+          readonly gate?: unknown;
+          readonly seed?: unknown;
+          readonly sculpt?: unknown;
+        };
+        if (seedExtras.gate !== undefined && isGatePose(seedExtras.gate)) {
+          const nextSeed = Number.isInteger(seedExtras.seed) ? (seedExtras.seed as number) : this.terrain.seed;
+          const nextSculpt =
+            typeof seedExtras.sculpt === 'string' && seedExtras.sculpt.length <= MAX_TERRAIN_CHARS
+              ? seedExtras.sculpt
+              : this.terrain.sculpt;
+          this.terrain = {
+            seed: nextSeed,
+            sculpt: nextSculpt,
+            gate: { x: seedExtras.gate.x, z: seedExtras.gate.z, yaw: seedExtras.gate.yaw },
+          };
+          this.env = groundEnv(this.terrain);
+        }
         this.world = msg.world;
         this.version = 1;
         this.placedBy = {};
@@ -388,12 +415,17 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
           placedBy: { ...this.placedBy },
           shiftLog: [...this.shiftLog],
         });
+        if (this.terrain.gate) {
+          this.broadcastFramed(terrainMessage(this.terrain));
+        }
         this.save();
         return;
       }
 
       case 'terrain': {
-        if (this.roleOf(sender.id) !== 'owner') {
+        // POL-173: Both Lead Architect ('owner') and Co-Builders ('cobuilder') may sculpt and paint the shared plot
+        const senderRole = this.roleOf(sender.id);
+        if (senderRole !== 'owner' && senderRole !== 'cobuilder') {
           this.notice(sender.id, 'owner-only');
           return;
         }

@@ -76,26 +76,33 @@ test('a command runs on the server, is confirmed to everyone, and a visitor refu
   assert.equal(cbRefusal[0]!.data.why, 'owner-piece-protected');
 });
 
-test('only the Lead Architect sets the terrain; the room keeps it, relays it, and builds its ground on it', () => {
+test('Lead Architect and Co-Builders set the terrain (POL-173); visitors are refused; the room keeps and relays it', () => {
   const h = new OutpostHarness();
   const host = h.transport('host-1', 'LeadGoblin');
   const cobuilder = h.transport('cb-1', 'BuilderBob');
+  const visitor = h.transport('vis-1', 'GuestVisitor');
   host.on({});
   cobuilder.on({});
+  visitor.on({});
+  host.send({ type: 'setRole', targetId: 'vis-1', role: 'visitor' } as OutpostMessage);
 
   h.deliveries.length = 0;
-  cobuilder.send({ type: 'terrain', seed: 7, sculpt: 'x' } as OutpostMessage);
-  assert.equal(h.sentTo('cb-1', 'notice')[0]!.data.why, 'owner-only');
-  assert.equal(h.room.getTerrain().sculpt, '', 'a co-builder cannot change the ground');
+  visitor.send({ type: 'terrain', seed: 7, sculpt: 'x' } as OutpostMessage);
+  assert.equal(h.sentTo('vis-1', 'notice')[0]!.data.why, 'owner-only');
+  assert.equal(h.room.getTerrain().sculpt, '', 'a visitor cannot change the ground');
 
   h.deliveries.length = 0;
   host.send({ type: 'terrain', seed: 7, sculpt: 'abc' } as OutpostMessage);
-  assert.deepEqual(h.deliveries.filter((d) => d.type === 'terrain').map((d) => d.recipient).sort(), ['cb-1', 'host-1']);
+  assert.deepEqual(h.deliveries.filter((d) => d.type === 'terrain').map((d) => d.recipient).sort(), ['cb-1', 'host-1', 'vis-1']);
   assert.deepEqual(h.room.getTerrain(), { seed: 7, sculpt: 'abc' });
 
   h.deliveries.length = 0;
   host.send({ type: 'terrain', seed: 7, sculpt: 'abc' } as OutpostMessage);
   assert.equal(h.deliveries.length, 0, 'the same terrain is not sent again');
+
+  h.deliveries.length = 0;
+  cobuilder.send({ type: 'terrain', seed: 7, sculpt: 'def' } as OutpostMessage);
+  assert.equal(h.room.getTerrain().sculpt, 'def', 'a co-builder can sculpt the shared plot (POL-173)');
 
   host.send({ type: 'terrain', seed: 7, sculpt: 'a'.repeat(200_001) } as OutpostMessage);
   assert.equal(h.sentTo('host-1', 'notice').at(-1)!.data.why, 'terrain-too-large');

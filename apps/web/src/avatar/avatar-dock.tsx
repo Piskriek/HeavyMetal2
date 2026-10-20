@@ -1,5 +1,5 @@
-import { useEffect, useState, type ReactElement } from 'react';
-import { Plus } from 'lucide-react';
+import { useEffect, useRef, useState, type DragEvent, type ReactElement } from 'react';
+import { Plus, Upload } from 'lucide-react';
 import { AVATAR_KINDS, kindOf, lookVariablesFor, looksFor, nameProblem, type AvatarKind, type AvatarLook, type LookSlot } from '@hm/avatarlook';
 import { PresetPreview } from '../build/cards';
 import { lookOf } from '../build/catalog';
@@ -8,12 +8,21 @@ import { saveLook, usePlayer, wearLook } from '../build/player';
 import { fx } from '../maker/feedback';
 import { NewChooser, type NewWay } from '../shell/new-thing';
 import { PartsPicker } from './parts-picker';
+import {
+  getActiveCustomAvatarId,
+  importCustomAvatarFile,
+  listCustomAvatars,
+  removeCustomAvatar,
+  setActiveCustomAvatarId,
+  subscribeCustomAvatars,
+  type CustomAvatarRecord,
+} from './custom-avatar-store';
 
 /**
- * Avatar mode (the Avatar tab, P; owner 2026-10-03, E11): the camera turns to face your avatar like a mirror, and this dock sits beside it.
- * On top, your characters: every avatar you own, whole, one click to swap, and "New avatar". Below, the avatar you are wearing, ready to
- * change: its ready-made looks, its colours, what it wears, how it moves. A new avatar is made here too, three ways (Quick setup, Setup
- * wizard, Manual), and the avatar in the world shows each choice as you make it.
+ * Avatar mode (the Avatar tab, P; owner 2026-10-03, E11 + TICKET-21 POL-12 Universal .glb / .vrm Drag & Drop):
+ * The camera turns to face your avatar like a mirror, and this dock sits beside it.
+ * On top, your characters: every avatar you own (with Hazmat Scientist as the default avatar), imported .glb/.vrm rigs
+ * retargeted to @hm/anim's 6 locomotion bones and stored in IndexedDB, and "New avatar".
  */
 type Tab = 'looks' | 'colours' | 'wears' | 'moves';
 const TABS: readonly { readonly id: Tab; readonly name: string }[] = [
@@ -36,23 +45,116 @@ export function AvatarDock(props: {
   const kind = kindOf(look);
   const [tab, setTab] = useState<Tab>('looks');
   const [making, setMaking] = useState(false);
+  const [customAvatars, setCustomAvatars] = useState<readonly CustomAvatarRecord[]>([]);
+  const [activeCustomId, setActiveCustomId] = useState<string | null>(() => getActiveCustomAvatarId());
+  const [dragOver, setDragOver] = useState(false);
+  const [dropStatus, setDropStatus] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const refresh = (): void => {
+      setActiveCustomId(getActiveCustomAvatarId());
+      void listCustomAvatars().then((list) => {
+        if (mounted) setCustomAvatars(list);
+      });
+    };
+    refresh();
+    const unsub = subscribeCustomAvatars(refresh);
+    return () => {
+      mounted = false;
+      unsub();
+    };
+  }, []);
+
+  const handleFiles = async (files: FileList | null): Promise<void> => {
+    const file = files?.[0];
+    if (!file) return;
+    const bytes = await file.arrayBuffer();
+    const res = await importCustomAvatarFile(file.name, bytes);
+    if (!res.ok) {
+      setDropStatus(res.error);
+      fx('ui-error');
+      return;
+    }
+    setDropStatus(`Imported ${res.record.name} (${res.record.format.toUpperCase()}, ${res.record.mappedCount}/6 bones retargeted)`);
+    fx('ui-success');
+  };
+
+  const onDrop = (e: DragEvent<HTMLElement>): void => {
+    e.preventDefault();
+    setDragOver(false);
+    void handleFiles(e.dataTransfer?.files ?? null);
+  };
+
   const change = (patch: Partial<AvatarLook>): void => { saveLook({ ...look, ...patch }); };
   return (
-    <aside className="avatar-dock" aria-label="Your avatar">
+    <aside
+      className={`avatar-dock${dragOver ? ' is-drag-over' : ''}`}
+      aria-label="Your avatar"
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={onDrop}
+    >
       <section className="ad-crew" aria-label="Your characters">
         <h3>Your characters</h3>
         <div className="ad-row">
           {p.looks.map((l) => (
-            <button key={l.id} className={l.id === p.lookId && !making ? 'on' : ''} aria-pressed={l.id === p.lookId && !making} title={`${l.name} (${kindName(kindOf(l))})`}
-              onClick={() => { setMaking(false); if (l.id !== p.lookId) { wearLook(l.id); fx('select'); } }}>
+            <button
+              key={l.id}
+              className={l.id === p.lookId && !making && !activeCustomId ? 'on' : ''}
+              aria-pressed={l.id === p.lookId && !making && !activeCustomId}
+              title={`${l.name} (${kindName(kindOf(l))})`}
+              onClick={() => {
+                setMaking(false);
+                setActiveCustomAvatarId(null);
+                if (l.id !== p.lookId) { wearLook(l.id); fx('select'); }
+              }}
+            >
               <PresetPreview p={{ kind: 'look', look: l }} size={56} />
               <span>{l.name}</span>
+            </button>
+          ))}
+          {customAvatars.map((ca) => (
+            <button
+              key={ca.id}
+              className={activeCustomId === ca.id && !making ? 'on' : ''}
+              aria-pressed={activeCustomId === ca.id && !making}
+              title={`${ca.name} (${ca.format.toUpperCase()} — ${ca.mappedCount}/6 bones)`}
+              onClick={() => {
+                setMaking(false);
+                setActiveCustomAvatarId(ca.id);
+                fx('select');
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                void removeCustomAvatar(ca.id);
+              }}
+            >
+              <Upload size={18} strokeWidth={1.5} />
+              <span>{ca.name}</span>
             </button>
           ))}
           <button className={`ad-new${making ? ' on' : ''}`} aria-pressed={making} onClick={() => setMaking(true)}>
             <Plus size={20} strokeWidth={1.4} /><span>New avatar</span>
           </button>
+          <button
+            type="button"
+            className="ad-import-glb"
+            title="Drag & drop any .glb or .vrm avatar, or click to browse (POL-12)"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload size={18} strokeWidth={1.4} /><span>Drop .glb / .vrm</span>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".glb,.vrm"
+            style={{ display: 'none' }}
+            onChange={(e) => { void handleFiles(e.target.files); }}
+          />
         </div>
+        {dropStatus ? <p className="hint" role="status">{dropStatus}</p> : null}
       </section>
 
       {making ? (

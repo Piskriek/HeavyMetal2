@@ -142,7 +142,11 @@ export const LAB_STATIONS: readonly LabStationSpec[] = [
  * children are merged on their own), and a material whose meshes will not merge stays as it was. Returns how many merged meshes it added.
  * The merged geometry is not in the room's keep list, so the room's dispose does not free it (POL-105).
  */
-export function mergeStaticMeshes(root: THREE.Object3D, keep: readonly THREE.Object3D[] = []): number {
+export function mergeStaticMeshes(
+  root: THREE.Object3D,
+  keep: readonly THREE.Object3D[] = [],
+  registerDisposable?: <T extends { dispose(): void }>(x: T) => T,
+): number {
   root.updateWorldMatrix(true, true);
   const skip = new Set<THREE.Object3D>(keep);
   const leaves: THREE.Mesh[] = [];
@@ -175,9 +179,13 @@ export function mergeStaticMeshes(root: THREE.Object3D, keep: readonly THREE.Obj
       return g;
     });
     const merged = mergeGeometries(geos, false);
+    // POL-105: always dispose temporary cloned geometries after mergeGeometries
+    geos.forEach((g) => g.dispose());
     if (!merged) {
-      geos.forEach((g) => g.dispose());
       continue;
+    }
+    if (registerDisposable) {
+      registerDisposable(merged);
     }
     for (const mesh of list) mesh.removeFromParent();
     const out = new THREE.Mesh(merged, mat);
@@ -317,6 +325,7 @@ export function createRightWallMachineRig(
   id: RightWallMachineId,
   baseProp: Prop,
   m: LabMaterials,
+  registerDisposable?: <T extends { dispose(): void }>(x: T) => T,
 ): LabMachineRig {
   const spec = RIGHT_WALL_MACHINES.find((s) => s.id === id)!;
   baseProp.group.userData.stationId = spec.id;
@@ -484,7 +493,17 @@ export function createRightWallMachineRig(
 
   // Draw-call budget (TICKET-06): the static dressing that shares a material becomes one mesh each. The moving part and the plume stay
   // separate (they move or switch on by themselves); the glow materials are shared objects, so setPowered still lights them.
-  mergeStaticMeshes(dressGroup, movingPart ? [movingPart, plumeGroup] : [plumeGroup]);
+  // POL-66: Dedicated front-facing metric-colour status lamp bar so preset-bench (#ff3d8a),
+  // preset-combiner (#b46bff), and fabricator (#7cff4d) light unmistakably on power-on even after GLB swap.
+  const statusBar = new THREE.Mesh(
+    new THREE.BoxGeometry(fw * 0.62, 0.045, 0.024),
+    makeGlowMat(spec.pixelColor),
+  );
+  statusBar.name = `station-metric-lamp:${id}`;
+  statusBar.position.set(0, id === 'preset-rack' ? 2.12 : 1.24, fd * 0.46);
+  dressGroup.add(statusBar);
+
+  mergeStaticMeshes(dressGroup, movingPart ? [movingPart, plumeGroup] : [plumeGroup], registerDisposable);
 
   // Ensure initial height alignment
   return {
@@ -685,7 +704,166 @@ export function buildGateRibbedCoils(
 
   // Draw-call budget (TICKET-06): the collars and the 36 rib separators are dark steel and never move, so they become one mesh.
   // The six coil blocks keep their own draw call (each has its own emissive material, lit bottom to top by coilLevels).
-  mergeStaticMeshes(housings);
+  mergeStaticMeshes(housings, coils, keep);
 
   return { housings, coils };
+}
+
+export const POWER_WALL_SHEET07_ORDER = [
+  { id: 'capacitor-bank', z: 1.0 },
+  { id: 'breaker-panel', z: -1.0 },
+  { id: 'relay-cabinet-1', z: -2.6 },
+  { id: 'relay-cabinet-2', z: -3.5 },
+  { id: 'relay-cabinet-3', z: -4.4 },
+  { id: 'relay-cabinet-4', z: -5.3 },
+  { id: 'control-box-1', z: -6.1 },
+  { id: 'control-box-2', z: -6.7 },
+  { id: 'operator-console', z: -7.8 },
+] as const;
+
+/**
+ * POL-65: Builds 3 heavy square-section copper bus bars + dark-steel ceramic standoffs mounted on
+ * the Capacitor Bank's upper bus header (Sheet 07), merged per material so they cost only 2 draw calls.
+ */
+export function buildCapacitorBusBars(
+  m: LabMaterials,
+  keep: <T extends { dispose(): void }>(x: T) => T,
+): THREE.Group {
+  const busGroup = new THREE.Group();
+  busGroup.name = 'capacitor-bus-bars';
+  const barGeo = keep(new THREE.BoxGeometry(0.055, 0.055, 1.48));
+  const riserGeo = keep(new THREE.BoxGeometry(0.048, 0.28, 0.048));
+  const insulatorGeo = keep(new THREE.BoxGeometry(0.075, 0.09, 0.075));
+
+  for (const [idx, xOff] of [-0.14, 0, 0.14].entries()) {
+    const bar = new THREE.Mesh(barGeo, m.copper);
+    bar.position.set(xOff, 1.66 + idx * 0.045, 0);
+    busGroup.add(bar);
+
+    for (const zOff of [-0.52, 0, 0.52]) {
+      const insulator = new THREE.Mesh(insulatorGeo, m.darkSteel);
+      insulator.position.set(xOff, 1.54, zOff);
+      const riser = new THREE.Mesh(riserGeo, m.copper);
+      riser.position.set(xOff, 1.58, zOff);
+      busGroup.add(insulator, riser);
+    }
+  }
+  mergeStaticMeshes(busGroup, [], keep);
+  return busGroup;
+}
+
+/**
+ * POL-69: Builds a caged amber beacon housing (#ffc13d) for the top of each Relay Cabinet (Sheet 07).
+ * Returns the static housing group and the two amber lamp meshes driven by the relay power sweep.
+ */
+export function buildRelayBeaconHousing(
+  m: LabMaterials,
+  keep: <T extends { dispose(): void }>(x: T) => T,
+): { readonly group: THREE.Group; readonly beacons: THREE.Mesh[] } {
+  const g = new THREE.Group();
+  g.name = 'relay-beacon-housing';
+  const baseGeo = keep(new THREE.BoxGeometry(0.11, 0.035, 0.11));
+  const cagePostGeo = keep(new THREE.BoxGeometry(0.014, 0.095, 0.014));
+  const cageCapGeo = keep(new THREE.BoxGeometry(0.105, 0.016, 0.105));
+  const lensGeo = keep(new THREE.BoxGeometry(0.068, 0.078, 0.068));
+
+  const beacons: THREE.Mesh[] = [];
+  for (const bx of [-0.12, 0.12]) {
+    const plinth = new THREE.Mesh(baseGeo, m.darkSteel);
+    plinth.position.set(bx, 1.21, 0.12);
+    g.add(plinth);
+    for (const [px, pz] of [
+      [-0.042, -0.042],
+      [0.042, -0.042],
+      [-0.042, 0.042],
+      [0.042, 0.042],
+    ] as const) {
+      const post = new THREE.Mesh(cagePostGeo, m.gunmetal);
+      post.position.set(bx + px, 1.27, 0.12 + pz);
+      g.add(post);
+    }
+    const cap = new THREE.Mesh(cageCapGeo, m.gunmetal);
+    cap.position.set(bx, 1.32, 0.12);
+    g.add(cap);
+
+    const lensMat = keep(
+      new THREE.MeshStandardMaterial({
+        color: '#281805',
+        emissive: new THREE.Color('#ffc13d'),
+        emissiveIntensity: 0,
+        roughness: 0.28,
+        metalness: 0.15,
+      }),
+    );
+    const lens = new THREE.Mesh(lensGeo, lensMat);
+    lens.position.set(bx, 1.265, 0.12);
+    g.add(lens);
+    beacons.push(lens);
+  }
+  mergeStaticMeshes(g, beacons, keep);
+  return { group: g, beacons };
+}
+
+/**
+ * POL-68: Adds transverse ribbed steel tread bars across the Lab's floor cable covers so they read as
+ * Sheet 07 ribbed steel floor covers, merged into a single static mesh (1 draw call total).
+ */
+export function buildRibbedFloorCoverTreads(
+  runs: readonly { readonly points: readonly (readonly [number, number])[]; readonly width: number }[],
+  m: LabMaterials,
+  keep: <T extends { dispose(): void }>(x: T) => T,
+): THREE.Group {
+  const root = new THREE.Group();
+  root.name = 'floor-cover-steel-ribs';
+  const ribStep = 0.38;
+
+  for (const run of runs) {
+    for (let i = 0; i < run.points.length - 1; i++) {
+      const [x0, z0] = run.points[i]!;
+      const [x1, z1] = run.points[i + 1]!;
+      const dx = x1 - x0;
+      const dz = z1 - z0;
+      const len = Math.hypot(dx, dz);
+      if (len < 0.2) continue;
+      const yaw = Math.atan2(dx, dz);
+      const count = Math.max(2, Math.floor(len / ribStep));
+      const ribGeo = keep(new THREE.BoxGeometry(run.width * 0.92, 0.012, 0.036));
+      for (let k = 1; k < count; k++) {
+        const t = k / count;
+        const rib = new THREE.Mesh(ribGeo, m.gunmetal);
+        rib.position.set(x0 + dx * t, 0.034, z0 + dz * t);
+        rib.rotation.y = yaw;
+        root.add(rib);
+      }
+    }
+  }
+  mergeStaticMeshes(root, [], keep);
+  return root;
+}
+
+/**
+ * POL-121: Builds a raised dark-steel quadrant guide slot around the Operator Console's throw lever
+ * so the widened ~0.95 rad throw sweeps through a prominent mechanical arc guide without clipping.
+ */
+export function buildConsoleLeverQuadrant(
+  m: LabMaterials,
+  keep: <T extends { dispose(): void }>(x: T) => T,
+  leverAt: readonly [number, number, number],
+): THREE.Group {
+  const g = new THREE.Group();
+  g.name = 'console-lever-quadrant';
+  const cheekGeo = keep(new THREE.BoxGeometry(0.016, 0.14, 0.34));
+  const endStopGeo = keep(new THREE.BoxGeometry(0.068, 0.11, 0.024));
+  for (const sx of [-0.026, 0.026]) {
+    const cheek = new THREE.Mesh(cheekGeo, m.darkSteel);
+    cheek.position.set(leverAt[0] + sx, leverAt[1] + 0.04, leverAt[2] - 0.02);
+    g.add(cheek);
+  }
+  for (const sz of [-0.17, 0.13]) {
+    const stop = new THREE.Mesh(endStopGeo, m.gunmetal);
+    stop.position.set(leverAt[0], leverAt[1] + 0.05, leverAt[2] + sz);
+    g.add(stop);
+  }
+  mergeStaticMeshes(g, [], keep);
+  return g;
 }

@@ -401,6 +401,45 @@
       ],
       "@hm/plotbiome": [
         "packages/plotbiome/src/index.ts"
+      ],
+      "@hm/hudmath": [
+        "packages/hudmath/src/index.ts"
+      ],
+      "@hm/hudmath/*": [
+        "packages/hudmath/src/*"
+      ],
+      "@hm/coopnet": [
+        "packages/coopnet/src/index.ts"
+      ],
+      "@hm/coopnet/*": [
+        "packages/coopnet/src/*"
+      ],
+      "@hm/bridgekit": [
+        "packages/bridgekit/src/index.ts"
+      ],
+      "@hm/bridgekit/*": [
+        "packages/bridgekit/src/*"
+      ],
+      "@hm/orbital": [
+        "packages/orbital/src/index.ts"
+      ],
+      "@hm/orbital/*": [
+        "packages/orbital/src/*"
+      ],
+      "@hm/beamkit/*": [
+        "packages/beamkit/src/*"
+      ],
+      "@hm/groundshader/*": [
+        "packages/groundshader/src/*"
+      ],
+      "@hm/plotsim/*": [
+        "packages/plotsim/src/*"
+      ],
+      "@hm/content/*": [
+        "packages/content/src/*"
+      ],
+      "@hm/tooljuice/*": [
+        "packages/tooljuice/src/*"
       ]
     },
     "jsx": "react-jsx"

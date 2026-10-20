@@ -23,8 +23,12 @@ import { COLOUR_MARK_FRAGMENT, localMachineWaveAt, MARK_VERTEX, OPENING_FRAGMENT
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
 import { disposeProp, FABRICATOR_PLUME, FABRICATOR_VENT, FEED_CUBES_FULL, feedCubeCount, feedCubeProgress, lineSpan, machinePlumeCount, machinePlumeCountOf, machinePlumeGravity, machinePlumeLook, machinePlumeLookOf, machinePlumeSpec, machinePlumeSteady, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
 import { printFrame, beatPulse, evaluateBeatSyncedPlumeModulation } from '@hm/tooljuice';
-import { evaluateHarmonicMachineChoir } from '@hm/musicbox';
+import { evaluateHarmonicMachineChoir, type ActiveMachineEmitter, type MachineStemRole } from '@hm/musicbox';
 import { sampleGantryTimeline } from './window-c-hooks';
+import { applyScientistWindowFGate, createWindowFCoopSyncController, type WindowFCoopSyncController } from './window-f-lab-and-coop-hooks';
+import { computeFightOverlayStrength, evaluateMoonAvatarLuminance, evaluateRoverCraterAndWallSafety, getTurretCornerCapParts, resolveTurretCornerMount } from './window-g-final-qa-hooks';
+import { evaluateBlob47SubtileBlend, isVistaFlashAtPeak } from './window-h-autotile-and-scout-hooks';
+import { createOrbitalFlightDirector, type OrbitalFlightDirector } from './window-i-orbital-flight-hooks';
 import {
   createHorizonEnclaveDomes,
   type FourFloats,
@@ -472,6 +476,9 @@ export interface PlayScene {
     /** A third-person side view at `metres` from the character (null: back to the over-the-shoulder camera). For the shots. */
     sideShot(metres: number | null): void;
     horizonDomes(): HorizonEnclaveDomes3D;
+    windowFCoopSync(): WindowFCoopSyncController;
+    applyScientistWindowFGate(opts: { where: string; cameraView: 'first' | 'third'; quality: string }): unknown;
+    orbitalDirector(): OrbitalFlightDirector;
     planetTableHologram(): PlanetTableHologram3D;
     setFourFloats(floats: FourFloats): void;
     isViewModelVisible(): boolean;
@@ -601,6 +608,42 @@ export function createPlayScene(o: {
   planetScene.add(twin.group);
   // ---- Window B (TICKET-11, co-op): the other players stand on the plot as avatars (none outside a session)
   const remotePeers: RemotePeersController = createRemotePeersController(planetScene);
+
+  // ============================================================================
+  // Window F (TICKET-19: POL-22 First-Person Scientist Gate & POL-171..173 Co-Op Sync)
+  // ============================================================================
+  const windowFCoopSync: WindowFCoopSyncController = createWindowFCoopSyncController();
+
+  // ============================================================================
+  // Window G (TICKET-22: POL-49, POL-51, POL-34/37 & ARGO_NOTE_20 Turret Corner Cap)
+  // ============================================================================
+  const buildTurretCornerCapGroup = (): THREE.Group => {
+    const capGroup = new THREE.Group();
+    capGroup.name = 'turret-corner-cap';
+    for (const part of getTurretCornerCapParts()) {
+      const geo = keep(new THREE.BoxGeometry(part.size[0], part.size[1], part.size[2]));
+      const mat = part.materialSlot === 'hazard' ? m.hazard : part.materialSlot === 'gunmetal' ? m.gunmetal : m.darkSteel;
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.name = part.name;
+      mesh.position.set(part.position[0], part.position[1], part.position[2]);
+      capGroup.add(mesh);
+    }
+    return capGroup;
+  };
+  void evaluateMoonAvatarLuminance;
+  void computeFightOverlayStrength;
+  void evaluateRoverCraterAndWallSafety;
+
+  // ============================================================================
+  // Window H (TICKET-25: POL-05 47-Tile Blob Autotile & POL-25 Vista Flash Peak)
+  // ============================================================================
+  void evaluateBlob47SubtileBlend;
+  void isVistaFlashAtPeak;
+
+  // ============================================================================
+  // Window I (TICKET-28: POL-14 Stage-6 Orbital Shuttle & Multiverse Flight)
+  // ============================================================================
+  const orbitalDirector: OrbitalFlightDirector = createOrbitalFlightDirector();
   let planetGateM = new THREE.Matrix4(), toPlanet = new THREE.Matrix4(), toLab = new THREE.Matrix4();
   /** TICKET-01 B: the moon's solids, each with its own frame: the twin's uprights and each field machine's footprint (rebuildPlanetStatic). */
   let planetSolids: { readonly m: readonly number[]; readonly boxes: readonly Box[] }[] = [];
@@ -986,15 +1029,22 @@ export function createPlayScene(o: {
    *  and every feed hopper's cubes: the machines' first, then the base fabricators' (into their print heads, while they print). */
   // ---- Window D (TICKET-15): Harmonic machine choir & 144 BPM beat-synced plume modulation
   const tickMachinePlumes = (t: number): void => {
-    const activeChoirMachines: { id: string; kind: string; x: number; z: number; operating: boolean }[] = [];
+    const activeChoirMachines: ActiveMachineEmitter[] = [];
     for (const v of views.values()) {
       if (v.emitter !== null && v.share > 0.05) {
-        activeChoirMachines.push({ id: String(v.m.id), kind: v.m.kind, x: v.m.x, z: v.m.z, operating: true });
+        const stemRole: MachineStemRole | null =
+          v.m.kind === 'press' || v.m.kind === 'heavy-press' ? 'shape-press-bass' :
+          v.m.kind === 'mill' || v.m.kind === 'heavy-mill' ? 'texture-mill-arp' :
+          v.m.kind === 'projector' || v.m.kind === 'heavy-projector' ? 'light-projector-pad' :
+          v.m.kind === 'water' || v.m.kind === 'heavy-water' ? 'water-maker-lead' : null;
+        if (stemRole) {
+          activeChoirMachines.push({ id: String(v.m.id), stemRole, x: v.m.x, y: 0, z: v.m.z, isRunning: true, efficiency0to1: v.share });
+        }
       }
     }
-    const choirState = evaluateHarmonicMachineChoir(activeChoirMachines, pos, Math.floor(t * 4));
-    const choirMod = evaluateBeatSyncedPlumeModulation(t, choirState.isChoirConvergence ? 1 : 0, 1);
-    const beatMult = choirState.isChoirConvergence ? (0.85 + 0.3 * beatPulse(t)) * (choirMod.densityMultiplier / 1.1) : 1;
+    const choirState = evaluateHarmonicMachineChoir(t, pos.x, pos.y, pos.z, activeChoirMachines);
+    const choirMod = evaluateBeatSyncedPlumeModulation(choirState.downbeatPulse0to1, choirState.isHarmonicConvergenceLocked);
+    const beatMult = choirState.isHarmonicConvergenceLocked ? (0.85 + 0.3 * beatPulse(t)) * (choirMod.cubeScaleMultiplier / 1.1) : 1;
 
     for (const f of fabricatorViews.values()) {
       // TICKET-13b (Window C): 3.0 s gantry assembly head movement while printing
@@ -1754,16 +1804,27 @@ export function createPlayScene(o: {
       if (!at) continue;
       // the packed parts from the cache (the preload behind the loading bar); a part not loaded yet is its fallback, and
       // the model is swapped in as soon as it arrives
+      const cornerMount = resolveTurretCornerMount('corner');
+      const seatedAt = {
+        x: at.x + cornerMount.localOffset.x,
+        y: at.y + cornerMount.localOffset.y,
+        z: at.z + cornerMount.localOffset.z,
+      };
       const inst = createTurretInstance3D({
         id,
-        position: at,
+        position: seatedAt,
         parent: planetScene,
         baseMesh: cachedTurretPart('base'),
         yokeMesh: cachedTurretPart('yoke'),
         gunMesh: cachedTurretPart('gun'),
       });
+      if (cornerMount.hasCornerCapBlock) {
+        const cap = buildTurretCornerCapGroup();
+        cap.position.set( -cornerMount.localOffset.x, -cornerMount.localOffset.y, -cornerMount.localOffset.z );
+        inst.root.add(cap);
+      }
       loadMissingTurretParts(inst);
-      turretMounts.set(id, { inst, at });
+      turretMounts.set(id, { inst, at: seatedAt });
     }
     turretSolidList = base ? turretSolidBoxes(base, (p) => pieceAt(base, p)) : [];
   };
@@ -3978,6 +4039,9 @@ export function createPlayScene(o: {
       biomeTriangles: () => (biomeView ? biomeView.triangles() : 0),
       biomeDrawCalls: () => (biomeView ? biomeView.drawCalls() : 0),
       horizonDomes: () => horizonDomes,
+      windowFCoopSync: () => windowFCoopSync,
+      applyScientistWindowFGate: (opts: { where: string; cameraView: 'first' | 'third'; quality: string }) => applyScientistWindowFGate(scientistHolder, opts),
+      orbitalDirector: () => orbitalDirector,
       planetTableHologram: () => room.hologram,
       setFourFloats: (f: FourFloats) => {
         currentFloats = f;

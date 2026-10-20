@@ -912,23 +912,25 @@ export function createMonsters(options: {
     getStats: () => stats,
     world: () => world,
     knockbackSwarmers(origin, radiusM = 12, pushDistanceM = 4) {
-      const inputs = world.mobs.map((m) => ({
-        id: String(m.id),
-        kind: m.kind,
-        x: m.x,
-        z: m.z,
-      }));
-      const res = applyTurboBassSwarmerKnockback(origin, inputs, radiusM, pushDistanceM);
-      if (res.affectedSwarmerCount > 0) {
+      const inputs = world.mobs
+        .filter((m) => m.kind === 'swarmer')
+        .map((m) => ({
+          id: m.id,
+          x: m.x,
+          z: m.z,
+        }));
+      const res = applyTurboBassSwarmerKnockback(origin.x, origin.z, 1.0, inputs, radiusM, pushDistanceM);
+      const knockedMap = new Map(res.filter((r) => r.wasKnockedBack).map((r) => [r.id, r]));
+      if (knockedMap.size > 0) {
         world = {
           ...world,
-          mobs: world.mobs.map((m, i) => {
-            const u = res.entities[i];
-            return u && u.pushed ? { ...m, x: u.x, z: u.z } : m;
+          mobs: world.mobs.map((m) => {
+            const u = knockedMap.get(m.id);
+            return u ? { ...m, x: u.newX, z: u.newZ } : m;
           }),
         };
       }
-      return res.affectedSwarmerCount;
+      return knockedMap.size;
     },
     clearMobs() {
       world = { ...world, mobs: [], bolts: [] };

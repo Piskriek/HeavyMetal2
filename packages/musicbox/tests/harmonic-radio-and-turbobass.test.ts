@@ -15,7 +15,7 @@ import {
   SETMIX_SONG_BPM,
   SETMIX_SONG_KEY,
   type ActiveMachineEmitter,
-} from '../harmonic-machine-choir';
+} from '../src/harmonic-machine-choir';
 import {
   COLLECTIBLE_MUSIC_TAPES,
   radioBusForContext,
@@ -23,14 +23,14 @@ import {
   tapeForTransponder,
   tapeForWreckSite,
   WRECK_TAPE_BY_SITE,
-} from '../../../content/src/diegetic-radio-and-tapes';
+} from '../../content/src/diegetic-radio-and-tapes';
 import {
   applyTurboBassSwarmerKnockback,
   beatPulse,
   evaluateBeatSyncedPlumeModulation,
   TURBO_BASS_BUS,
-} from '../../../tooljuice/src/beat-synced-plume-and-turbobass';
-import { BUS_START, busOfSound } from '../../../audiomix/src/index';
+} from '../../tooljuice/src/beat-synced-plume-and-turbobass';
+import { BUS_START, busOfSound } from '../../audiomix/src/index';
 
 describe('Outer Wilds-Style 4-Machine Harmonic Convergence Choir (144 BPM)', () => {
   it('locks SETMIX_SONG_BPM to 144 in D Major and locks Harmonic Convergence when all 4 machine types run within 35m', () => {

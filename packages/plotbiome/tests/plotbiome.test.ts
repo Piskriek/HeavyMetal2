@@ -416,6 +416,55 @@ test('13. Determinism, seed sensitivity, and no NaNs', () => {
   }
 });
 
+/** FNV-1a over raw bytes, as 8 hex digits. */
+function fnv1a(bytes: Uint8Array, h = 0x811c9dc5): number {
+  for (let k = 0; k < bytes.length; k++) h = Math.imul(h ^ bytes[k]!, 0x01000193) >>> 0;
+  return h;
+}
+
+/** One hash of the whole bake: every cover byte, then each scatter item's kind and its five numbers bit for bit. */
+function bakeHash(input: BiomeInput): string {
+  const { cover, scatter } = bakePlotBiome(input);
+  const kinds: ScatterKind[] = ['tuft', 'bush', 'pine', 'oak', 'birch'];
+  const nums = new Float64Array(scatter.length * 6);
+  scatter.forEach((s, k) => nums.set([kinds.indexOf(s.kind), s.x, s.z, s.scale, s.yaw, s.appear], k * 6));
+  const h = fnv1a(new Uint8Array(nums.buffer), fnv1a(cover));
+  return `${scatter.length}:${h.toString(16).padStart(8, '0')}`;
+}
+
+test('14. Output hashes: cover bytes and scatter list are unchanged across seeds, stages, tiers and sizes', () => {
+  const dryN = 80;
+  const cases: [string, BiomeInput][] = [
+    ['n128 seed42 stage6 mid', makeTestInput()],
+    ['n128 seed42 stage6 low', makeTestInput({ tier: 'low' })],
+    ['n256 seed777 stage6 high', makeTestInput({ n: 256, stage: 6, tier: 'high', seed: 777 })],
+    ['n256 seed702 stage6 high', makeTestInput({ n: 256, stage: 6, tier: 'high', seed: 702 })],
+    ['n96 cell1.5 seed9 stage4.3 mid', makeTestInput({ n: 96, cellM: 1.5, stage: 4.3, seed: 9 })],
+    ['n64 seed5 stage2.5 low', makeTestInput({ n: 64, stage: 2.5, tier: 'low', seed: 5 })],
+    ['n100 cell0.75 seed13 stage5.5 high', makeTestInput({ n: 100, cellM: 0.75, stage: 5.5, tier: 'high', seed: 13 })],
+    ['n64 seed21 stage1.5', makeTestInput({ n: 64, stage: 1.5, seed: 21 })],
+    ['n48 seed8 stage3.1 low aq', makeTestInput({ n: 48, stage: 3.1, seed: 8, s: { pxd: 0.1, vtx: 0.9, lx: 0.2, aq: 0.05 } })],
+    ['n80 dry seed3 stage6 high', makeTestInput({ n: dryN, water: new Uint8Array(dryN * dryN), seed: 3, tier: 'high' })],
+    ['n72 bare seed4 stage6 mid', makeTestInput({ n: 72, machines: [], keepouts: [], seed: 4 })],
+  ];
+  // scatter count : FNV-1a hash, captured from the bake before the speed work of 20 October 2026
+  const golden: Record<string, string> = {
+    'n128 seed42 stage6 mid': '602:1693163d',
+    'n128 seed42 stage6 low': '600:fc4034cb',
+    'n256 seed777 stage6 high': '1297:bec0de53',
+    'n256 seed702 stage6 high': '1287:6883e26e',
+    'n96 cell1.5 seed9 stage4.3 mid': '147:3d0ddca4',
+    'n64 seed5 stage2.5 low': '24:72866e34',
+    'n100 cell0.75 seed13 stage5.5 high': '448:41348c5f',
+    'n64 seed21 stage1.5': '0:06a0de9c',
+    'n48 seed8 stage3.1 low aq': '280:d506c4c7',
+    'n80 dry seed3 stage6 high': '586:6966104e',
+    'n72 bare seed4 stage6 mid': '428:155cb21e',
+  };
+  const actual = Object.fromEntries(cases.map(([name, input]) => [name, bakeHash(input)]));
+  assert.deepEqual(actual, golden);
+});
+
 test('performance: n=256, stage 6, tier high runs in under 40 ms in Node', () => {
   const input = makeTestInput({ n: 256, cellM: 1, stage: 6, tier: 'high', seed: 777 });
   // Warmup

@@ -175,87 +175,20 @@ if retopo:
     # --planar=D: dissolve near-flat regions first (faces within D degrees merge), so a panel becomes a few clean faces
     # and the collapse spends the budget on edges and curves: the cage for hard-surface parts (owner 2026-10-11)
     planar = next((a for a in argv if a.startswith('--planar=')), None)
-
-    def reduce(obj, budget):
-        bpy.ops.object.select_all(action='DESELECT')
-        obj.select_set(True)
-        bpy.context.view_layer.objects.active = obj
-        if planar:
-            pd = obj.modifiers.new('planar', 'DECIMATE')
-            pd.decimate_type = 'DISSOLVE'
-            pd.angle_limit = math.radians(float(planar.split('=')[1]))
-            bpy.ops.object.modifier_apply(modifier=pd.name)
-            tri = obj.modifiers.new('tri', 'TRIANGULATE')
-            bpy.ops.object.modifier_apply(modifier=tri.name)
-        dense = sum(len(p.vertices) - 2 for p in obj.data.polygons)
-        if budget < dense:
-            dec = obj.modifiers.new('decimate', 'DECIMATE')
-            dec.decimate_type = 'COLLAPSE'
-            dec.ratio = budget / dense
-            dec.use_collapse_triangulate = True
-            bpy.ops.object.modifier_apply(modifier=dec.name)
-        return dense
-
-    # --parts=FILE (TICKET-29, docs/argo/plans/37): a generated model is one fused skin, so one collapse across it
-    # melts the gap between two parts into a web. FILE holds a part id per face of norm.glb (from SAMPart3D on the 3D
-    # PC) as {centroids: [x,y,z,...] in glTF axes, labels: [...]}. Each face of the welded copy takes the label of the
-    # nearest centroid (import and weld reorder faces), the copy is cut into one object per part, every part is
-    # reduced on its own share of the budget (by area, at least 12), and the parts are joined back without welding:
-    # still one mesh and one draw call, and no edge collapses across two parts.
-    parts_arg = next((a for a in argv if a.startswith('--parts=')), None)
-    if parts_arg:
-        import json
-        from mathutils import kdtree
-        spec = json.load(open(parts_arg.split('=', 1)[1]))
-        cs, labels = spec['centroids'], spec['labels']
-        tree = kdtree.KDTree(len(labels))
-        for i in range(len(labels)):
-            # glTF is Y-up, Blender Z-up: the importer maps (x, y, z) to (x, -z, y)
-            tree.insert((cs[3 * i], -cs[3 * i + 2], cs[3 * i + 1]), i)
-        tree.balance()
-        import bmesh
-        mw = low.matrix_world
-        # the label rides on a face attribute, which survives each separate (face indices do not)
-        attr = low.data.attributes.new('part', 'INT', 'FACE')
-        areas = {}
-        for p in low.data.polygons:
-            k = labels[tree.find(mw @ p.center)[1]]
-            attr.data[p.index].value = k
-            areas[k] = areas.get(k, 0.0) + p.area
-        ids = sorted(areas)
-        total = sum(areas.values()) or 1.0
-        pieces, dense = [], 0
-        for k in ids:
-            bpy.ops.object.select_all(action='DESELECT')
-            low.select_set(True)
-            bpy.context.view_layer.objects.active = low
-            bpy.ops.object.mode_set(mode='EDIT')
-            bm = bmesh.from_edit_mesh(low.data)
-            layer = bm.faces.layers.int['part']
-            for f in bm.faces:
-                f.select_set(False)
-            for f in bm.faces:
-                if f[layer] == k:
-                    f.select_set(True)
-            bm.select_flush_mode()
-            bmesh.update_edit_mesh(low.data)
-            bpy.ops.mesh.separate(type='SELECTED')
-            bpy.ops.object.mode_set(mode='OBJECT')
-            piece = next(o for o in bpy.context.selected_objects if o is not low)
-            dense += reduce(piece, max(12, round(target * areas[k] / total)))
-            pieces.append(piece)
-        bpy.ops.object.select_all(action='DESELECT')
-        for o in pieces:
-            o.select_set(True)
-        low.select_set(True)
-        bpy.context.view_layer.objects.active = low
-        bpy.ops.object.join()
-        low = bpy.context.view_layer.objects.active
-        low.name = 'low'
-        low.data.attributes.remove(low.data.attributes['part'])
-        print(f'parts: {len(ids)} parts, {sum(len(p.vertices) - 2 for p in low.data.polygons)} triangles')
-    else:
-        dense = reduce(low, target)
+    if planar:
+        pd = low.modifiers.new('planar', 'DECIMATE')
+        pd.decimate_type = 'DISSOLVE'
+        pd.angle_limit = math.radians(float(planar.split('=')[1]))
+        bpy.ops.object.modifier_apply(modifier=pd.name)
+        tri = low.modifiers.new('tri', 'TRIANGULATE')
+        bpy.ops.object.modifier_apply(modifier=tri.name)
+    dense = sum(len(p.vertices) - 2 for p in low.data.polygons)
+    if target < dense:
+        dec = low.modifiers.new('decimate', 'DECIMATE')
+        dec.decimate_type = 'COLLAPSE'
+        dec.ratio = target / dense
+        dec.use_collapse_triangulate = True
+        bpy.ops.object.modifier_apply(modifier=dec.name)
     low.data.uv_layers.new(name='UVMap')
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='SELECT')

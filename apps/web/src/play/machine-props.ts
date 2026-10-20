@@ -12,6 +12,7 @@ import { type GenLevel, getGenSync } from '../assets/gen';
 import { machineSize } from '../base/machine-inspect';
 import { plumeShare } from './brownout-visual';
 import { PRINT_EDGE_HEX } from '@hm/tooljuice';
+import { heavyKitProp } from './plot-kits';
 
 export type MachineLedStatus = 'running' | 'warn' | 'unpowered';
 
@@ -417,6 +418,11 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
   switch (kind) {
     case 'heavy-mill':
     case 'mill': {
+      // a kit frame around the generated core (plan 38, TICKET-39), when the core has loaded
+      if (kind === 'heavy-mill') {
+        const kitted = heavyKitProp(kind, stage, genLevel, RING_TOP_Y);
+        if (kitted) return kitted;
+      }
       const gen = getGenSync('mill', genLevel);
       if (gen) {
         const group = new THREE.Group();
@@ -462,6 +468,11 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
     }
     case 'heavy-press':
     case 'press': {
+      // a kit frame around the generated core (plan 38, TICKET-39), when the core has loaded
+      if (kind === 'heavy-press') {
+        const kitted = heavyKitProp(kind, stage, genLevel, RING_TOP_Y);
+        if (kitted) return kitted;
+      }
       const frame = getGenSync('press-frame', genLevel);
       const ram1 = getGenSync('press-ram', genLevel);
       const ram2 = getGenSync('press-ram', genLevel);
@@ -578,6 +589,11 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
     }
     case 'heavy-water':
     case 'water': {
+      // a kit frame around the generated core (plan 38, TICKET-39), when the core has loaded
+      if (kind === 'heavy-water') {
+        const kitted = heavyKitProp(kind, stage, genLevel, RING_TOP_Y);
+        if (kitted) return kitted;
+      }
       const gen = getGenSync('watermaker', genLevel);
       if (gen) {
         const group = new THREE.Group();

@@ -73,6 +73,7 @@ export const REGISTRY_ASSET_IDS: ReadonlySet<string> = new Set<string>([
   'hardpoint',
   'gate',
   'capacitor-bank',
+  'capacitor-can',
   'breaker-panel',
   'breaker-handle',
   'relay-cabinet',

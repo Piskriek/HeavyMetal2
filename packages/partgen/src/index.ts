@@ -14,7 +14,8 @@ export type V3 = readonly [number, number, number];
 export interface ParamSpec {
   readonly key: string;
   readonly label: string;
-  readonly unit: 'm' | 'count' | 'choice';
+  /** m: metres; deg: degrees; factor: a unitless ratio or scale; count: whole numbers; choice: an index into `choices`. */
+  readonly unit: 'm' | 'deg' | 'factor' | 'count' | 'choice';
   readonly min: number;
   readonly max: number;
   readonly step: number;

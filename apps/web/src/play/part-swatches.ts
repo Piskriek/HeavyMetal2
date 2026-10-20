@@ -19,6 +19,8 @@ export const swatchName = (id: string): string => PART_SWATCHES.find((s) => s.id
 export function formatValue(spec: ParamSpec, v: number): string {
   if (spec.unit === 'choice') return spec.choices?.[Math.round(v - spec.min)] ?? String(v);
   if (spec.unit === 'count') return String(Math.round(v));
+  if (spec.unit === 'deg') return `${Math.round(v)}°`;
+  if (spec.unit === 'factor') return v.toFixed(2);
   return spec.max <= 0.5 ? `${Math.round(v * 1000 * 10) / 10} mm` : `${v.toFixed(2)} m`;
 }
 
@@ -26,4 +28,6 @@ export function formatValue(spec: ParamSpec, v: number): string {
 export const DEFAULT_SLOT_MATERIAL: Readonly<Record<string, string>> = {
   metal: 'gunmetal', plate: 'paint', bolts: 'gunmetal', body: 'paint', trim: 'darkSteel', band: 'hazard', steel: 'darkSteel',
   frame: 'darkSteel', slats: 'gunmetal', duct: 'paint', flange: 'darkSteel',
+  // slots the mesh operators add (surface-edge-wear-ao): worn edges show bare metal, the base band gathers dirt
+  'edge-wear': 'gunmetal', 'cavity-dirt': 'darkSteel',
 };

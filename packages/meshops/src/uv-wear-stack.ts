@@ -34,7 +34,7 @@ export interface OperatorStackLayer {
 const pSpec = (
   key: string,
   label: string,
-  unit: 'm' | 'count' | 'choice',
+  unit: ParamSpec['unit'],
   min: number,
   max: number,
   step: number,
@@ -196,50 +196,99 @@ export const surfaceEdgeWearAndCavity: MeshOperator = {
   params: [
     pSpec('edgeWearWidth', 'Edge wear width', 'm', 0.002, 0.08, 0.002, 0.014),
     pSpec('baseDirtHeight', 'Base dirt band', 'm', 0.0, 0.35, 0.01, 0.06),
+    pSpec('sharpDeg', 'Sharp edge angle', 'deg', 5, 90, 1, 30),
   ],
-  oneClickPreset: { edgeWearWidth: 0.014, baseDirtHeight: 0.06 },
+  oneClickPreset: { edgeWearWidth: 0.014, baseDirtHeight: 0.06, sharpDeg: 30 },
   namedPresets: {
-    'industrial-edge-wear': { edgeWearWidth: 0.014, baseDirtHeight: 0.06 },
-    'heavy-battle-wear': { edgeWearWidth: 0.032, baseDirtHeight: 0.14 },
+    'industrial-edge-wear': { edgeWearWidth: 0.014, baseDirtHeight: 0.06, sharpDeg: 30 },
+    'heavy-battle-wear': { edgeWearWidth: 0.032, baseDirtHeight: 0.14, sharpDeg: 25 },
   },
+  /**
+   * Wear lands only on sharp edges: open borders, and creases where the two faces meet at more than `sharpDeg`. A
+   * triangle with no sharp edge passes through untouched; on one with sharp edges, a strip `edgeWearWidth` wide is cut off
+   * each sharp edge (clipped in the triangle's own plane), so the strips and the core tile the triangle exactly. Flat
+   * triangulation diagonals never wear, and the triangle count grows only along the creases.
+   */
   apply(mesh, given = {}) {
     const p = resolveParams(this.params, given);
     const wearW = p.edgeWearWidth as number;
     const dirtH = p.baseDirtHeight as number;
+    const cosSharp = Math.cos(((p.sharpDeg as number) * Math.PI) / 180);
     const dirtCutoffY = mesh.min[1] + dirtH;
 
     const slotOrder = [...mesh.slots.map((s) => s.name)];
     if (!slotOrder.includes('edge-wear')) slotOrder.push('edge-wear');
     if (dirtH > 0 && !slotOrder.includes('cavity-dirt')) slotOrder.push('cavity-dirt');
-
     const b = new MeshBuilder(slotOrder);
-    const slotList =
-      mesh.slots.length > 0 ? mesh.slots : [{ name: 'metal', start: 0, count: mesh.indices.length }];
+    const slotList = mesh.slots.length > 0 ? mesh.slots : [{ name: 'metal', start: 0, count: mesh.indices.length }];
 
+    const P = (i: number): V3 => [mesh.positions[i * 3]!, mesh.positions[i * 3 + 1]!, mesh.positions[i * 3 + 2]!];
+    const key = (v: V3): string => `${Math.round(v[0] * 1e5)},${Math.round(v[1] * 1e5)},${Math.round(v[2] * 1e5)}`;
+    const sub = (a: V3, c: V3): V3 => [a[0] - c[0], a[1] - c[1], a[2] - c[2]];
+    const dot = (a: V3, c: V3): number => a[0] * c[0] + a[1] * c[1] + a[2] * c[2];
+    const cross = (a: V3, c: V3): V3 => [a[1] * c[2] - a[2] * c[1], a[2] * c[0] - a[0] * c[2], a[0] * c[1] - a[1] * c[0]];
+    const unit = (a: V3): V3 => {
+      const l = Math.hypot(a[0], a[1], a[2]) || 1;
+      return [a[0] / l, a[1] / l, a[2] / l];
+    };
+
+    // every triangle's corners and face normal, and which triangles share each (welded) edge
+    const tris: { v: [V3, V3, V3]; n: V3; slot: string }[] = [];
     for (const sl of slotList) {
       for (let i = sl.start; i + 2 < sl.start + sl.count; i += 3) {
-        const i0 = mesh.indices[i]!, i1 = mesh.indices[i + 1]!, i2 = mesh.indices[i + 2]!;
-        const p0: V3 = [mesh.positions[i0 * 3]!, mesh.positions[i0 * 3 + 1]!, mesh.positions[i0 * 3 + 2]!];
-        const p1: V3 = [mesh.positions[i1 * 3]!, mesh.positions[i1 * 3 + 1]!, mesh.positions[i1 * 3 + 2]!];
-        const p2: V3 = [mesh.positions[i2 * 3]!, mesh.positions[i2 * 3 + 1]!, mesh.positions[i2 * 3 + 2]!];
-
-        const cx = (p0[0] + p1[0] + p2[0]) / 3;
-        const cy = (p0[1] + p1[1] + p2[1]) / 3;
-        const cz = (p0[2] + p1[2] + p2[2]) / 3;
-        const r = Math.max(1e-4, Math.hypot(p0[0] - cx, p0[1] - cy, p0[2] - cz));
-        const shrink = Math.max(0.65, 1 - wearW / r);
-
-        const q0: V3 = [cx + (p0[0] - cx) * shrink, cy + (p0[1] - cy) * shrink, cz + (p0[2] - cz) * shrink];
-        const q1: V3 = [cx + (p1[0] - cx) * shrink, cy + (p1[1] - cy) * shrink, cz + (p1[2] - cz) * shrink];
-        const q2: V3 = [cx + (p2[0] - cx) * shrink, cy + (p2[1] - cy) * shrink, cz + (p2[2] - cz) * shrink];
-
-        const coreSlot = dirtH > 0 && cy <= dirtCutoffY ? 'cavity-dirt' : sl.name;
-        b.poly(coreSlot, [q0, q1, q2]);
-        b.poly('edge-wear', [p0, p1, q1, q0]);
-        b.poly('edge-wear', [p1, p2, q2, q1]);
-        b.poly('edge-wear', [p2, p0, q0, q2]);
+        const v: [V3, V3, V3] = [P(mesh.indices[i]!), P(mesh.indices[i + 1]!), P(mesh.indices[i + 2]!)];
+        tris.push({ v, n: unit(cross(sub(v[1], v[0]), sub(v[2], v[0]))), slot: sl.name });
       }
     }
+    const edgeKey = (a: V3, c: V3): string => {
+      const ka = key(a), kc = key(c);
+      return ka < kc ? `${ka}|${kc}` : `${kc}|${ka}`;
+    };
+    const byEdge = new Map<string, number[]>();
+    tris.forEach((t, ti) => {
+      for (let e = 0; e < 3; e++) {
+        const k = edgeKey(t.v[e]!, t.v[(e + 1) % 3]!);
+        const list = byEdge.get(k);
+        if (list) list.push(ti);
+        else byEdge.set(k, [ti]);
+      }
+    });
+
+    /** Keeps the part of `poly` where dot(p - o, d) is on the given side of `w` (Sutherland–Hodgman against one plane). */
+    const clip = (poly: V3[], o: V3, d: V3, w: number, keepBeyond: boolean): V3[] => {
+      const side = (q: V3): number => (dot(sub(q, o), d) - w) * (keepBeyond ? 1 : -1);
+      const out: V3[] = [];
+      for (let i = 0; i < poly.length; i++) {
+        const a = poly[i]!, c = poly[(i + 1) % poly.length]!;
+        const sa = side(a), sc = side(c);
+        if (sa >= 0) out.push(a);
+        if ((sa >= 0) !== (sc >= 0)) {
+          const t = sa / (sa - sc);
+          out.push([a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t, a[2] + (c[2] - a[2]) * t]);
+        }
+      }
+      return out;
+    };
+
+    tris.forEach((t, ti) => {
+      const cy = (t.v[0][1] + t.v[1][1] + t.v[2][1]) / 3;
+      const coreSlot = dirtH > 0 && cy <= dirtCutoffY ? 'cavity-dirt' : t.slot;
+      let core: V3[] = [t.v[0], t.v[1], t.v[2]];
+      for (let e = 0; e < 3; e++) {
+        const a = t.v[e]!, c = t.v[(e + 1) % 3]!, opposite = t.v[(e + 2) % 3]!;
+        const others = (byEdge.get(edgeKey(a, c)) ?? []).filter((o) => o !== ti);
+        const sharp = others.length === 0 || others.some((o) => dot(t.n, tris[o]!.n) < cosSharp);
+        if (!sharp) continue;
+        // the in-plane direction from this edge into the triangle
+        let d = unit(cross(t.n, sub(c, a)));
+        if (dot(d, sub(opposite, a)) < 0) d = [-d[0], -d[1], -d[2]];
+        const strip = clip(core, a, d, wearW, false);
+        if (strip.length >= 3) b.poly('edge-wear', strip);
+        core = clip(core, a, d, wearW, true);
+        if (core.length < 3) break;
+      }
+      if (core.length >= 3) b.poly(coreSlot, core);
+    });
     return b.build();
   },
 };

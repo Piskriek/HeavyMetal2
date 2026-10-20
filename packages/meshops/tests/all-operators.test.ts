@@ -63,3 +63,25 @@ test('the registry holds the six families, every operator with a schema and a on
     assert.ok(Array.isArray(op.params), op.id);
   }
 });
+
+test('edge wear lands on sharp edges only: a cube keeps a clean square in each face, its diagonals untouched', async () => {
+  const { MeshBuilder, addBox } = await import('@hm/partgen');
+  const b = new MeshBuilder(['metal']);
+  addBox(b, 'metal', [-0.5, 0, -0.5], [0.5, 1, 0.5]);
+  const cube = b.build();
+  const op = MESH_OPERATORS['surface-edge-wear-ao']!;
+  const md = op.apply(cube, { edgeWearWidth: 0.05, baseDirtHeight: 0, sharpDeg: 30 });
+  const area = (slot: string): number => {
+    const s = md.slots.find((x) => x.name === slot);
+    let a = 0;
+    for (let i = s?.start ?? 0; s && i < s.start + s.count; i += 3) {
+      const P = (k: number) => [md.positions[md.indices[k]! * 3]!, md.positions[md.indices[k]! * 3 + 1]!, md.positions[md.indices[k]! * 3 + 2]!];
+      const [p0, p1, p2] = [P(i), P(i + 1), P(i + 2)] as [number[], number[], number[]];
+      const u = [p1[0]! - p0[0]!, p1[1]! - p0[1]!, p1[2]! - p0[2]!], v = [p2[0]! - p0[0]!, p2[1]! - p0[1]!, p2[2]! - p0[2]!];
+      a += Math.hypot(u[1]! * v[2]! - u[2]! * v[1]!, u[2]! * v[0]! - u[0]! * v[2]!, u[0]! * v[1]! - u[1]! * v[0]!) / 2;
+    }
+    return a;
+  };
+  assert.ok(Math.abs(area('edge-wear') - 6 * (1 - 0.9 * 0.9)) < 1e-6, `wear area ${area('edge-wear')}`);
+  assert.ok(Math.abs(area('metal') - 6 * 0.81) < 1e-6, `clean area ${area('metal')}`);
+});

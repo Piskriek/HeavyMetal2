@@ -199,3 +199,92 @@
 @media (prefers-reduced-motion: reduce) {
   .sx .sx-part-stops button span { transition: none; }
 }
+
+/* ---- the Part | Stack switch and the operator stack (ARGO_NOTE_34 section 3: the Studio's modifier stack) ---- */
+.sx-part-panels { align-self: flex-start; }
+.sx-part-error {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 122, 107, 0.5);
+  border-radius: 8px;
+  background: rgba(40, 12, 10, 0.85);
+  color: var(--sx-err);
+  font: 500 12px/1.4 var(--sx-ui);
+}
+.sx-part-stack { flex: 1; min-height: 0; }
+.sx-part-add {
+  display: grid;
+  gap: 6px;
+}
+.sx-part-add select,
+.sx-part-layer-body select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--sx-line-hi);
+  border-radius: 6px;
+  background: #0a1017;
+  color: var(--sx-text);
+}
+.sx-part-empty {
+  margin: 0;
+  font: 400 12px/1.5 var(--sx-ui);
+  color: var(--sx-dim);
+}
+.sx-part-layers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sx-part-layer {
+  border: 1px solid var(--sx-line-hi);
+  border-radius: 8px;
+  background: var(--sx-raise);
+}
+.sx-part-layer.muted { opacity: 0.55; }
+.sx-part-layer-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+}
+.sx-part-layer-head input[type='checkbox'] { accent-color: var(--sx-amber); }
+.sx .sx-part-layer-name {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: 600 13px/1.2 var(--sx-ui);
+  color: var(--sx-text);
+}
+.sx-part-layer-name em {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--sx-dim);
+}
+.sx-part-layer-tools { display: inline-flex; gap: 4px; }
+.sx .sx-part-layer-tools button {
+  padding: 3px 6px;
+  font-size: 10px;
+  line-height: 1;
+}
+.sx-part-layer-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 10px 10px;
+  border-top: 1px solid var(--sx-line);
+}
+.sx-part-layer-about {
+  margin: 4px 0 0;
+  font: 400 12px/1.45 var(--sx-ui);
+  color: var(--sx-dim);
+}

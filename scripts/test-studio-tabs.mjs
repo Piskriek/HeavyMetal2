@@ -193,6 +193,21 @@ try {
       await page.locator(`[data-testid="part-gen-${g}"]`).click();
       check(`Parts: the ${g} builds at stage 6`, /[1-9][0-9,]* triangles/.test(await readout()), await readout());
     }
+    // the operator stack (ARGO_NOTE_34): edge wear on the can adds its slots, and Copy as JSON carries the stack
+    await page.locator('[data-testid="part-gen-can"]').click();
+    const plain = await readout();
+    await page.locator('[data-testid="part-panel-stack"]').click();
+    await page.locator('[data-testid="part-add-op"]').selectOption('surface-edge-wear-ao');
+    check('Parts: an edge wear layer joins the stack', (await page.locator('[data-testid="part-layer-0"]').count()) === 1);
+    check('Parts: the stack changes the can', (await readout()) !== plain, `${plain} -> ${await readout()}`);
+    await page.locator('[data-testid="part-panel-part"]').click();
+    const slotRows = await page.locator('section[aria-label="Materials"] .sx-part-label').allInnerTexts();
+    check('Parts: the wear adds its material slots (edge wear, cavity dirt)', slotRows.includes('Edge wear') && slotRows.includes('Cavity dirt'), slotRows.join(', '));
+    await page.locator('[data-testid="part-copy"]').click();
+    const stackJson = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '');
+    let stackCart = null;
+    try { stackCart = JSON.parse(stackJson); } catch { stackCart = null; }
+    check('Parts: Copy as JSON carries the stack and its ops', stackCart?.stack?.[0]?.operatorId === 'surface-edge-wear-ao' && stackCart?.ops?.[0]?.op === 'surface-edge-wear-ao', stackJson.slice(0, 120));
   });
 
   // ---- Scene: the viewport, the placed copies, the gizmo, and save, reload and load ----

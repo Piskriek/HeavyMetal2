@@ -910,6 +910,7 @@
       2,
       1.053
     ],
+    "inline": false,
     "sockets": [
       {
         "name": "out",

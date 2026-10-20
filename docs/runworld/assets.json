@@ -784,7 +784,8 @@
       "axis": "height",
       "view": "three-quarter",
       "subject": "the capacitor bank on its own: three tall SQUARE-SECTION capacitor cans (box-shaped with bevelled edges) standing side by side on a steel skid with hazard-striped edges, their tops joined by flat solid copper bus bars on short square insulator blocks; NO round cans, NO porcelain discs, NO cables, NO loops. In the base kit family style: warm light-grey painted steel, dark grey trim, amber hazard bands",
-      "note": "sheet 21 approved with the square rule (owner 2026-10-11)"
+      "note": "sheet 21 approved with the square rule (owner 2026-10-11); not inlined since 2026-10-20: the lab builds the bank as a kit from capacitor-can (plan 38); kept for the Studio and thumbnails",
+      "inline": false
     },
     {
       "id": "capacitor-can",

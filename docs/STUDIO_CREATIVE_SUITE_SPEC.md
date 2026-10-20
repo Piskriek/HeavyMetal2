@@ -245,3 +245,7 @@ The owner can change any of these at a word; they are recorded in `docs/OWNER_AS
 3. **S1b tune the game in place:** click any object in the lab, a base or a vehicle in Play, move it with the gizmo, and tune the stage looks, lighting and audio levels (the presets refactor). Everything goes through the Changes panel.
 4. **S1c onwards:** the look workspaces (materials, lighting and post, VFX), then S2 to S5 as in section 5.
 5. **Players later:** the same tools, saving to the player's profile and sharing by code (`presetcodec`), once the owner has used them.
+
+## 9. Studio todo (owner, 2026-10-19/20)
+- **Bring Your Own Agent (critical, not pressing; owner 20 Oct: "added to the studio todo's", after the planned work).** The Studio must be very agent-friendly: Opus and the owner will polish the game through it. Build on 8b's "Ours" line: the Studio's document and commands as an MCP-style API (read the scene, list commands, run a command onto the `scenedoc` stack, read the Changes diff, accept or reject a row), with the same hooks for any agent the player brings. The owner pointed to `project0.city` as a reference. Research it, Babylon.js Editor's MCP and Roblox Assistant first (SOP), and plan it with Argo before any build.
+- **Low-poly cleanup feeds S1a.** TICKET-29's per-part pipeline (split, un-weld, retopo each part, repack unwelded) writes the `low` slot. The asset bench's "Regenerate > levels" button should call the same pipeline for one model once it exists.

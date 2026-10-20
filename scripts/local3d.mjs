@@ -24,7 +24,7 @@ const tokenFile = path.join(ROOT, '.local3d-token');
 const token = String(stored.token || (fs.existsSync(tokenFile) ? fs.readFileSync(tokenFile, 'utf8') : '')).trim();
 if (!token) { console.log('no 3D AI token: connect it in the Studio (its Redo panel), or put it in .local3d-token (one line)'); process.exit(2); }
 // the worker's address lives in scripts/worker.env (one place for all the worker scripts)
-const workerIp = (/^WORKER_IP=(S+)/m.exec(fs.readFileSync(path.join(ROOT, 'scripts', 'worker.env'), 'utf8')) ?? [])[1] ?? '192.168.0.8';
+const workerIp = (/^WORKER_IP=(\S+)/m.exec(fs.readFileSync(path.join(ROOT, 'scripts', 'worker.env'), 'utf8')) ?? [])[1] ?? '192.168.0.8';
 const BASE = (process.env.LOCAL3D_URL ?? '').trim() || stored.url || `http://${workerIp}:8082`;
 const auth = { Authorization: `Bearer ${token}` };
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs', 'runworld', 'assets.json'), 'utf8'));

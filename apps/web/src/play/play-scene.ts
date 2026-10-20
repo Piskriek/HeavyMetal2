@@ -1310,14 +1310,17 @@ export function createPlayScene(o: {
       setVehicles(lastVehiclesList);
     }
 
-    if (lastFabricatorsList.length > 0) {
-      for (const [id, view] of fabricatorViews.entries()) {
-        if (view.emitter !== null) plume.remove(view.emitter);
-        fabricatorsGroup.remove(view.group);
-        fabricatorViews.delete(id);
-      }
-      setFabricators(lastFabricatorsList);
+    refreshFabricators();
+  };
+  /** Rebuilds every fabricator station (a new stage, or the kit frames switched). */
+  const refreshFabricators = (): void => {
+    if (lastFabricatorsList.length === 0) return;
+    for (const [id, view] of fabricatorViews.entries()) {
+      if (view.emitter !== null) plume.remove(view.emitter);
+      fabricatorsGroup.remove(view.group);
+      fabricatorViews.delete(id);
     }
+    setFabricators(lastFabricatorsList);
   };
   let lastConnected: ReadonlySet<number> = new Set();
 
@@ -4201,6 +4204,7 @@ export function createPlayScene(o: {
     },
     rebuildMachines() {
       for (const [id, v] of [...views]) rebuildView(id, v);
+      refreshFabricators();
     },
     kitPlaced(kit: string) {
       if (!kit.startsWith('plot:')) return room.kitPlaced(kit);

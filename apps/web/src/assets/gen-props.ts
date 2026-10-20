@@ -31,6 +31,7 @@ import {
 } from '../play/machine-props';
 import type { Box, Socket, KitPieceResult } from '../base/kit-pieces';
 import { latticeGenAssets } from '../base/lattice-gen';
+import { kitFabricator } from '../play/plot-kits';
 
 // ---------------------------------------------------------------------------
 // THE SCOUT, ASSEMBLED FROM PARTS (TASK-15)
@@ -471,6 +472,26 @@ export function createGenFabricator(
   stage: number = 6,
   materials?: RovergearMaterials
 ): FabricatorStationMesh {
+  // Argo's frame kit (TICKET-39) when the kit frames are on: the same sockets, its carriage as the sliding head
+  const kit = kitFabricator(level, stage, RING_TOP_Y);
+  if (kit) {
+    const lampAt = (name: string, fallback: readonly [number, number, number]): readonly [number, number, number] => {
+      const s = kit.sockets[name]?.at;
+      return s ? [s[0] ?? 0, s[1] ?? 0, s[2] ?? 0] : fallback;
+    };
+    const lamps = [createLampDisc(lampAt('lampLeft', [-2.7, RING_TOP_Y + 4.95, 0])), createLampDisc(lampAt('lampRight', [2.7, RING_TOP_Y + 4.95, 0]))];
+    for (const l of lamps) kit.group.add(l);
+    return {
+      group: kit.group,
+      colliders: [{ min: [-3.7, 0, -3.2], max: [3.7, 5, 3.2] }],
+      sockets: [
+        { name: 'bed', at: [0, RING_TOP_Y + 0.7, 0] },
+        { name: 'power', at: [-2.4, RING_TOP_Y + 0.55, -2.6] },
+      ],
+      lamps,
+      parts: { head: kit.head },
+    };
+  }
   const m = materials ?? createRovergearMaterials();
   const frameGen = getGenSync('fabricator-frame', level);
   const headGen = getGenSync('fabricator-head', level);

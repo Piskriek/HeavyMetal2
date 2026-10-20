@@ -6,10 +6,12 @@
  * (ARGO_NOTE_34 4d), and their parts take part cartridges like the lab's capacitor bank.
  */
 import * as THREE from 'three';
-import { presetSockets, type Kit, type Overrides } from '@hm/kitspec';
+import { flatten, maxRank, presetSockets, transformPoint, type Kit, type Overrides } from '@hm/kitspec';
 import type { MachineKind } from '@hm/plotsim';
 import { type GenLevel, getGenSync } from '../assets/gen';
-import { kitMachineProp } from './kit-machine';
+import { buildKitPreset } from './kit-build';
+import { kitMachineProp, tierOfLevel } from './kit-machine';
+import { FABRICATOR_FRAME_KIT } from './kit-fabricator-frame';
 import type { MachineProp } from './machine-props';
 import { KIT_TRIM_PALETTE } from './kit-trim-palette';
 import { MILL_FRAME_KIT } from './kit-mill-frame';
@@ -52,6 +54,58 @@ export function plotKitMaterials(): Readonly<Record<string, THREE.Material>> {
   out.lamp = new THREE.MeshStandardMaterial({ color: '#14181f', emissive: '#7cff4d', emissiveIntensity: 0.2, roughness: 0.3 });
   materials = out;
   return out;
+}
+
+/** The kit with one child taken out of an assembly; the later children's `on.child` indices are renumbered. */
+export function withoutChild(kit: Kit, assembly: string, key: string): Kit {
+  const a = kit.assemblies[assembly];
+  const i = a ? a.children.findIndex((c) => c.key === key) : -1;
+  if (!a || i < 0) return kit;
+  if (a.children.some((c) => c.on?.child === i)) throw new Error(`${key} carries other parts`);
+  const children = a.children
+    .filter((_, j) => j !== i)
+    .map((c) => (c.on && c.on.child > i ? { ...c, on: { ...c.on, child: c.on.child - 1 } } : c));
+  return { ...kit, assemblies: { ...kit.assemblies, [assembly]: { ...a, children } } };
+}
+
+const FAB_PRESET = 'fabricator-frame';
+const FAB_WITHOUT_HEAD = withoutChild(FABRICATOR_FRAME_KIT, FAB_PRESET, 'carriage');
+const FAB_HEAD: Kit = {
+  parts: { 'head-carriage': FABRICATOR_FRAME_KIT.parts['head-carriage']! },
+  assemblies: { carriage: { children: [{ ref: 'head-carriage', key: 'carriage' }] } },
+};
+
+/**
+ * The vehicle fabricator from Argo's frame kit (TICKET-39): the frame merged as one build, its print-head carriage built
+ * on its own and hung where the frame places it, so the scene can slide it along the gantry while it prints. Null while
+ * the frames are off. `head` is the carriage's holder (its rest x is 0, as the scene's animation expects).
+ */
+export function kitFabricator(genLevel: GenLevel, stage: number, ringY: number): {
+  readonly group: THREE.Group;
+  readonly head: THREE.Object3D;
+  readonly sockets: Readonly<Record<string, { readonly at: readonly number[] }>>;
+} | null {
+  if (!kitFrames) return null;
+  const rank = maxRank(stage, tierOfLevel(genLevel));
+  const opts = { materials: plotKitMaterials(), gen: (asset: string) => getGenSync(asset, genLevel), maxRank: rank };
+  const frame = buildKitPreset(FAB_WITHOUT_HEAD, FAB_PRESET, opts);
+  const carriage = buildKitPreset(FAB_HEAD, 'carriage', opts);
+  const rest = flatten(FABRICATOR_FRAME_KIT, FAB_PRESET).find((p) => p.path === 'carriage');
+  if (!frame || !carriage || !rest) return null;
+  const group = new THREE.Group();
+  group.name = 'kit-fabricator';
+  frame.group.position.y = ringY;
+  group.add(frame.group);
+  const head = new THREE.Group();
+  head.name = 'kit-fabricator-head';
+  const at = transformPoint(rest.matrix, [0, 0, 0]);
+  head.position.set(0, at[1] + ringY, at[2]);
+  carriage.group.position.x = at[0];
+  head.add(carriage.group);
+  group.add(head);
+  const sockets: Record<string, { at: readonly number[] }> = {};
+  for (const [name, s] of Object.entries(presetSockets(FABRICATOR_FRAME_KIT, FAB_PRESET))) sockets[name] = { at: [s.at[0], s.at[1] + ringY, s.at[2]] };
+  return { group, head, sockets };
 }
 
 /**

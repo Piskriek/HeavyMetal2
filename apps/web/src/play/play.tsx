@@ -759,6 +759,8 @@ useEffect(() => {
   const beamHeldRef = useRef(false);
   const beamModeRef = useRef<BeamMode>('extract');
   const forceBeamFiringRef = useRef(false);
+  /** The test hook's seal (hmPlay.setBeamSealing): the frame loop seals on a leak's column, or while this is set. */
+  const forceBeamSealingRef = useRef(false);
   const [beamHud, setBeamHud] = useState<{ readonly held: boolean; readonly mode: BeamMode }>({ held: false, mode: 'extract' });
   /** The sculpt tool (TASK-21d): carve, raise or smooth. The frame loop reads the ref; the chip reads the state. */
   const sculptToolRef = useRef<SculptTool>('carve');
@@ -2618,7 +2620,7 @@ useEffect(() => {
         const leakAim = live && !visitingRef.current && out.where === 'planet' && beamHeldRef.current && beamModeRef.current === 'extract' && isLmbDownRef.current && !scene.monsters.isEquipped() ? scene.aimLeak(BEAM_RANGE) : null;
         sealAimRef.current = leakAim;
         scene.monsters.setSealing(leakAim);
-        scene.setBeamSealing(leakAim !== null);
+        scene.setBeamSealing(leakAim !== null || forceBeamSealingRef.current);
         const boulderId = leakAim === null && live &&!visitingRef.current && out.where === 'planet' && beamHeldRef.current && beamModeRef.current === 'extract' && isLmbDownRef.current && !scene.monsters.isEquipped() && scene.aimNode(baseWorldRef.current.field, BEAM_RANGE) === null
           ? scene.aimBoulder(BEAM_STROKE_RANGE)
           : null;
@@ -2872,7 +2874,11 @@ useEffect(() => {
         forceBeamFiringRef.current = on;
         scene.setBeamFiring(on);
       },
-      setBeamSealing: (on: boolean) => scene.setBeamSealing(on),
+      // the frame loop sets the seal every frame from the leak under the beam, so the hook holds it (as setBeamFiring does)
+      setBeamSealing: (on: boolean) => {
+        forceBeamSealingRef.current = on;
+        scene.setBeamSealing(on);
+      },
       anchors: () => scene.debug.machineAnchors(),
       hideOverlays: (hide: boolean) => setHideOverlays(hide),
       lockAim: () => ({ locked: scene.ghostLocked(), aim: scene.aimPoint() }),

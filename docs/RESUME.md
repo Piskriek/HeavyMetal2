@@ -1,6 +1,20 @@
 # RESUME: start here (fresh session)
 
-## OPUS STATE (20 Oct evening; read this first)
+## OPUS STATE (21 Oct; read this first)
+- **Branch pushed, green:** typecheck clean; 3,109 unit + 23 speed tests pass (two timing tests fail only while the browser pane renders the game: close it before `npm test`); single file 13.80 MB of 16. `test-part-cartridge` 28/28, lab-overhaul 78/78, studio-tabs 52/52, base-building, machine-inspector 27/27, machine-plumes 121/121.
+- **Pre-existing failure (not ours, fails at HEAD 6043d0c7 too):** `test-base-tabs` cannot aim the camera at the hardpoint (2/4).
+- **New today:**
+  - **Previews drive play (owner rule, memory `previews-drive-play`, plan 39 item 7):** the bench Parts page has a live turntable of the printed part (`part-preview.tsx`, its own small WebGL context only while open), hover/focus try-on (a tag; leave restores, click keeps), part thumbnails, materials as lit balls.
+  - **The planet Drafting Table's Parts tab** prints a part at once from a rack blank into the rifle (`printPart`/`freeBlank` in cartlab).
+  - **Part cartridges on planet kit machines** (kit id `plot:<id>@<built>`), **like for like** (a cartridge fits only its own generator).
+  - **Material cartridges paint a part's skin** (plan 39 step 2, `vault-skin.ts`): tap = the part's body slot, hold = every part that wore the same material; the preset's evaluated 64 px tile on Medium/High, flat look on Low.
+  - **The bench mirror** copies a part flush against its own far face.
+- **TICKET-39 installed** (Argo's kits: fabricator, mill/press/watermaker frames, hauler, crawler, trim palette; his 32 tests pass). The heavies and the fabricator build from them in `plot-kits.ts`, **but the frames ship OFF** (`kitFrames=false`; `__dev.kitFrames(true)` for tests): measured against the real cores, face parts float (the mill is a +-1.1 m body on a +-2.0 m plinth, not +-1.72). **Argo is on TICKET-39b** (refit from my raycast profiles, OPUS_NOTE_36, sent in chat 21 Oct). When it lands: unpack, run kits.test + plot-kits.test, turn the frames on, look at each machine from four sides, run machine-plumes + part-cartridge. Open palette questions to him: trim bands (banded texture vs own materials) and a planet environment map vs the 0.35 metal cap. Hauler/crawler not wired yet (check their mounts against the measured wheel/arm after 39b).
+- **Next:** plan 39 step 3 (Aq: species presets, research first; note `applyTreePresetAt` with sliders regrows the shared species mesh, so per-tree variants need their own slots) and step 4 (Lx: light presets); then Bring Your Own Agent (Studio section 9; TICKET-30 in `arena-gathered/argo-ticket30/`).
+- **Deferred by Argo (4e):** viewmodel inertia / hit-stop and the 256-slot linked storage pool.
+- **Agents:** Flash 0% for 7 days. Web Argo via chat `77f3bf1cb56ba86c` and the Drive folder Setmix.
+
+## OPUS STATE (20 Oct evening; superseded by 21 Oct above)
 - **Branch pushed and green:** typecheck clean, 3,064 unit tests + 23 speed tests pass, single file 13.76 MB of 16. Merged today: the fix-3 session (lab draw calls 181, HUD portrait, beam test on the X radial) and the plotbiome session (bake 38.9 -> 16.9 ms, bit-identical).
 - **Installed from Argo (ARGO_NOTE_34):** `@hm/meshops` (27 Studio operators in 6 families, TICKET-33..38) and the TICKET-31 foliage patch (`@hm/treegen` + `plot-biome-view.ts`, growTree bit-identical over 48 trees). Bugs fixed on install: plane-slice-clip zero-area polygons; surface-edge-wear-ao wore every edge (now only sharp edges, clipped in-plane); operator slider units (partgen `deg`/`factor`).
 - **TICKET-32 (the fat-green-bolt loop) works end to end:** the lab bench's Parts page prints a part cartridge (Argo's cost tiers in raw vertices and raw pixels, base `pay` command); R and the X radial load it; in the lab, Apply tap = one part, hold 0.45 s or Shift = every part of that generator on the machine; overrides in the props save; the port keeps its part over a reload. `scripts/test-part-cartridge.mjs` 13/13.

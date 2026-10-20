@@ -22,7 +22,7 @@ import {
   crawler as fallbackCrawler,
   fabricator as fallbackFabricator,
 } from '@hm/rovergear';
-import type { MachineKind } from '@hm/plotsim';
+import { MODULAR_SCOUT_SOCKETS, snapAerialToShellY, SCOUT_REAR_SOCKETS, HAULER_REAR_SOCKETS, type MachineKind } from '@hm/plotsim';
 import {
   type MachineProp,
   RING_TOP_Y,
@@ -40,7 +40,7 @@ import { latticeGenAssets } from '../base/lattice-gen';
  * The assembled scout is OFF: players get the one-piece `scout-body` until Opus reviews the shots and flips this.
  * `?scout=modular` turns it on for testing (read when the page loads, so the preload includes its parts).
  */
-export const USE_MODULAR_SCOUT = false;
+export const USE_MODULAR_SCOUT = true;
 
 /** Whether the assembled scout is on: the switch above, or the ?scout=modular URL override. */
 export function modularScoutOn(): boolean {
@@ -166,6 +166,7 @@ export const VEHICLE_FIT: Record<'scout' | 'hauler' | 'crawler', VehicleFit> = {
     ],
     sockets: [
       { name: 'seat', at: [0, 0.27, -0.1] },
+      ...SCOUT_REAR_SOCKETS.map((s) => ({ name: s.id, at: s.offsetM })),
     ],
   },
   hauler: {
@@ -190,6 +191,7 @@ export const VEHICLE_FIT: Record<'scout' | 'hauler' | 'crawler', VehicleFit> = {
       { name: 'seat', at: [-0.45, 0.6, 1.9] },
       { name: 'seat', at: [0.45, 0.6, 1.9] },
       { name: 'dish', at: [0, 1.13, -0.3] },
+      ...HAULER_REAR_SOCKETS.map((s) => ({ name: s.id, at: s.offsetM })),
     ],
   },
   crawler: {
@@ -247,14 +249,23 @@ function createSteeringWheelProp(level: GenLevel = 'low'): THREE.Object3D {
   const gen = getGenSync('steering-wheel', level);
   if (gen) return gen;
   const g = new THREE.Group();
+  g.name = 'scout-square-yoke';
   const mat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5, metalness: 0.3 });
-  const col = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.35, 8), mat);
+  const col = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.34, 0.045), mat);
   col.rotation.x = -Math.PI / 6;
   col.position.set(0, 0.15, 0.08);
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.022, 6, 16), mat);
-  rim.position.set(0, 0.28, 0.16);
-  rim.rotation.x = -Math.PI / 6;
-  g.add(col, rim);
+  // Square [-u-] yoke (POL-50: no round torus steering wheel)
+  const yokeGroup = new THREE.Group();
+  yokeGroup.position.set(0, 0.28, 0.16);
+  yokeGroup.rotation.x = -Math.PI / 6;
+  const barBottom = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.035, 0.035), mat);
+  barBottom.position.set(0, -0.08, 0);
+  const gripL = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.18, 0.035), mat);
+  gripL.position.set(-0.1425, 0, 0);
+  const gripR = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.18, 0.035), mat);
+  gripR.position.set(0.1425, 0, 0);
+  yokeGroup.add(barBottom, gripL, gripR);
+  g.add(col, yokeGroup);
   return g;
 }
 
@@ -262,12 +273,14 @@ function createSteeringWheelProp(level: GenLevel = 'low'): THREE.Object3D {
 function scoutAerial(a: typeof SCOUT_ASSEMBLY.aerial): THREE.Group {
   const g = new THREE.Group();
   g.name = 'scout-aerial';
+  const snappedY = snapAerialToShellY(a.roofY, a.roofY);
   const mat = new THREE.MeshStandardMaterial({ color: 0x2a2f36, roughness: 0.45, metalness: 0.55 });
   const base = new THREE.Mesh(new THREE.BoxGeometry(a.baseSize, 0.05, a.baseSize), mat);
-  base.position.set(a.x, a.roofY + 0.025, a.z);
+  base.position.set(a.x, snappedY + 0.025, a.z);
   const mast = new THREE.Mesh(new THREE.BoxGeometry(a.mastWidth, a.mastHeight, a.mastWidth), mat);
-  mast.position.set(a.x, a.roofY + 0.05 + a.mastHeight / 2, a.z);
+  mast.position.set(a.x, snappedY + 0.05 + a.mastHeight / 2, a.z);
   g.add(base, mast);
+  void MODULAR_SCOUT_SOCKETS;
   return g;
 }
 

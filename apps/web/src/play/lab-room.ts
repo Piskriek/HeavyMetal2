@@ -436,6 +436,8 @@ export interface LabRoom {
   readonly hologram: PlanetTableHologram3D;
   setFloats(floats: FourFloats): void;
   setConsensusCommitted(committed: boolean): void;
+  /** POL-141: Gate a right-wall Lab station's 3D pixel plume on whether it is actively operating. */
+  setStationOperating(id: RightWallMachineId | LabStationId, on: boolean): void;
   /** The lab clutter (TASK-23c): the prop the ray meets within `reach` metres (a fixture or a salvage prop), or null. Lab metres. */
   aimClutter(origin: THREE.Vector3, dir: THREE.Vector3, reach: number): string | null;
   /** Starts a salvage prop's dissolve (about a second; it then leaves the lab). False for a fixture or a prop that is not standing. */
@@ -1416,6 +1418,11 @@ export function createLabRoom(o: {
     hologram: planetTableHolo,
     setFloats: (f: FourFloats): void => { currentFloats = f; },
     setConsensusCommitted: (committed: boolean): void => { consensusCommitted = committed; },
+    setStationOperating: (id: RightWallMachineId | LabStationId, on: boolean): void => {
+      const norm = id === 'rack' ? 'preset-rack' : id === 'bench' ? 'preset-bench' : id === 'combiner' ? 'preset-combiner' : id;
+      const rig = machineRigs.find((r) => r.spec.id === norm);
+      rig?.setOperating(on);
+    },
     setWindowView,
     setPlaneFallback,
     vista,

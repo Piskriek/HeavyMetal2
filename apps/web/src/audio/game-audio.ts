@@ -1534,6 +1534,81 @@ export class GameAudioController {
     else this.play2d('sfx-empty');
   }
 
+/** TICKET-15 (POL-40): Harmonic machine choir step note on music bus. */
+  public playChoirStep(freqHz: number, gain = 0.08): void {
+    const ctx = this.getContext();
+    const dest = this.musicBus;
+    if (!ctx || !dest || ctx.state !== 'running') return;
+    if (!Number.isFinite(freqHz) || freqHz <= 0) return;
+    this.recentSoundLog.push('synth-choir-convergence');
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freqHz, now);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.linearRampToValueAtTime(Math.min(0.2, Math.max(0.01, gain)), now + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.19);
+    osc.connect(g);
+    g.connect(dest);
+    osc.start(now);
+    osc.stop(now + 0.2);
+  }
+
+  /** TICKET-15 (POL-03): 2-op FM synthesizer note for diegetic radio & cassette tapes on music bus. */
+  public playBridgeFmNote(freqHz: number, modRatio = 2, modIndex = 1.8, durationSec = 0.22): void {
+    const ctx = this.getContext();
+    const dest = this.musicBus;
+    if (!ctx || !dest || ctx.state !== 'running') return;
+    if (!Number.isFinite(freqHz) || freqHz <= 0) return;
+    this.recentSoundLog.push('synth-radio-fm');
+    const now = ctx.currentTime;
+    const dur = Math.max(0.05, Math.min(2.0, durationSec));
+    const carrier = ctx.createOscillator();
+    const mod = ctx.createOscillator();
+    const modGain = ctx.createGain();
+    const outGain = ctx.createGain();
+    carrier.type = 'sine';
+    mod.type = 'sine';
+    carrier.frequency.setValueAtTime(freqHz, now);
+    mod.frequency.setValueAtTime(freqHz * modRatio, now);
+    modGain.gain.setValueAtTime(freqHz * modIndex, now);
+    modGain.gain.exponentialRampToValueAtTime(0.01, now + dur);
+    outGain.gain.setValueAtTime(0.0001, now);
+    outGain.gain.linearRampToValueAtTime(0.07, now + 0.012);
+    outGain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    mod.connect(modGain);
+    modGain.connect(carrier.frequency);
+    carrier.connect(outGain);
+    outGain.connect(dest);
+    mod.start(now);
+    carrier.start(now);
+    mod.stop(now + dur + 0.01);
+    carrier.stop(now + dur + 0.01);
+  }
+
+  /** TICKET-15: [V] Key Turbo Bass sub-drop pulse (55 Hz -> 27.5 Hz) on combatUi bus. */
+  public playTurboBassPulse(): void {
+    const ctx = this.getContext();
+    const dest = this.combatBus;
+    if (!ctx || !dest || ctx.state !== 'running') return;
+    this.recentSoundLog.push('sfx-turbobass-drop');
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(55.0, now);
+    osc.frequency.exponentialRampToValueAtTime(27.5, now + 0.38);
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.linearRampToValueAtTime(0.32, now + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
+    osc.connect(g);
+    g.connect(dest);
+    osc.start(now);
+    osc.stop(now + 0.44);
+  }
+
+
   public playDryFire(pos?: { x: number; y: number; z: number }): void {
     this.playWeaponEmpty(pos);
   }
@@ -1769,6 +1844,9 @@ export class GameAudioController {
       playSkinDegauss: () => this.playSkinDegauss(),
       playGateIgnitionCharge: () => this.playGateIgnitionCharge(),
       playDryFire: () => this.playDryFire(),
+      playChoirStep: (f: number, g?: number) => this.playChoirStep(f, g),
+      playBridgeFmNote: (f: number, r?: number, idx?: number, d?: number) => this.playBridgeFmNote(f, r, idx, d),
+      playTurboBassPulse: () => this.playTurboBassPulse(),
     };
   }
 }

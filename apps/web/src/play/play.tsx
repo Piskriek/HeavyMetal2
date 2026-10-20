@@ -132,6 +132,8 @@ import { loadRecentCodes } from '../storage/recent-codes';
 import { isBiosphereCoherent } from '@hm/questline';
 import { fidelityRules, FIDELITY_LINE_IDS } from '@hm/narrator';
 import { HudZone, CompassRibbon, FloatsPill, MachineLabel, SyncWord } from '../base/ui/hud-zones';
+import { DiegeticRadioTunerWidget } from '../shell/diegetic-radio-tuner-widget';
+import { getTapeById } from '@hm/content';
 import {
   FIDELITY_SHIFT_MS,
   fidelitySkinFor,
@@ -509,6 +511,8 @@ export function PlayScreen(props: {
   // a placement session: a piece picked from the build ribbon. Its pill and the open drawer hold the radio line back.
   const pieceSessionRef = useRef(false);
   const [radioLogOpen, setRadioLogOpen] = useState(false);
+  const [collectedTapes, setCollectedTapes] = useState<string[]>([]);
+  const labWindowClosedAtRef = useRef<{ bench: number; combiner: number; rack: number; fabricator: number }>({ bench: -10, combiner: -10, rack: -10, fabricator: -10 });
   const [journalOpen, setJournalOpen] = useState(false);
   /** The debug menu (Esc, then Debug menu): the testers' panel, in every build. Its hooks are set by the dev effect below. */
   const [debugOpen, setDebugOpen] = useState(false);
@@ -2692,7 +2696,18 @@ useEffect(() => {
           say(`The ${e.machine} stopped: no power.`, 'Turn on the gate to resume.');
         }
       }
-      scene.setLabActivity(labActivity(labRef.current, labEnv));
+      const rawLabAct = labActivity(labRef.current, labEnv);
+      const nowSec = performance.now() * 0.001;
+      if (labPanel === 'bench') labWindowClosedAtRef.current.bench = nowSec;
+      if (labPanel === 'combiner') labWindowClosedAtRef.current.combiner = nowSec;
+      if (labPanel === 'rack') labWindowClosedAtRef.current.rack = nowSec;
+      if (fabricatorMachineId === 9999) labWindowClosedAtRef.current.fabricator = nowSec;
+      scene.setLabActivity({
+        bench: rawLabAct.bench > 0 || (nowSec - labWindowClosedAtRef.current.bench) <= 3.5 ? 1 : 0,
+        combiner: rawLabAct.combiner > 0 || (nowSec - labWindowClosedAtRef.current.combiner) <= 3.5 ? 1 : 0,
+        rack: rawLabAct.rack > 0 || (nowSec - labWindowClosedAtRef.current.rack) <= 3.5 ? 1 : 0,
+        fabricator: (nowSec - labWindowClosedAtRef.current.fabricator) <= 3.5 ? 1 : 0,
+      });
       // ---- the plot runs, in the lab too
       if (env && stateRef.current.step !== 'create') {
         const r = stepPlot(plotRef.current, env, dt);
@@ -3459,6 +3474,9 @@ useEffect(() => {
         return;
       }
       if (e.code === 'KeyV') {
+        if (liveWhereRef.current === 'planet') {
+          sceneRef.current?.triggerTurboBass();
+        }
         const current = sceneRef.current?.getCameraView() ?? 'first';
         const next = current === 'first' ? 'third' : 'first';
         sceneRef.current?.setCameraView(next);
@@ -3474,6 +3492,12 @@ useEffect(() => {
       // a lore prop (TASK-23c): a tap on E reads a fixture's or a transponder's log; a salvage prop is held, never tapped
       if (e.code === 'KeyE' && hud.aimedProp && aimedPropActs(hud.aimedProp, liveWhereRef.current) && hud.aimed === null && !hud.atLever && !hud.atDial) {
         if (!hud.aimedProp.salvage) {
+          const tapeId = sceneRef.current?.collectWreckTape(hud.aimedProp.id) ?? null;
+          if (tapeId) {
+            const tape = getTapeById(tapeId);
+            setCollectedTapes((prev) => (prev.includes(tapeId) ? prev : [...prev, tapeId]));
+            if (tape) say('Cassette Tape Recovered', `${tape.title} (${tape.durationSec}s) added to Field Radio.`);
+          }
           const entry = loreFor(hud.aimedProp.id);
           if (entry) openLog(entry.log);
         }
@@ -4907,6 +4931,13 @@ useEffect(() => {
                       }}
                     />
                   </div>
+                </div>
+                <div style={{ padding: '0 16px 12px' }}>
+                  <DiegeticRadioTunerWidget
+                    unlockedStage={plot.stage}
+                    collectedTapeIds={collectedTapes}
+                    onPlayFmNote={(freq, ratio, index, dur) => gameAudio.playBridgeFmNote(freq, ratio, index, dur)}
+                  />
                 </div>
                 <div className="radio-log-list">
                   {heardLogs.length === 0 ? (

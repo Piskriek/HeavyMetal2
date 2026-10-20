@@ -338,3 +338,16 @@ Append one entry per job, in the format in `FLASH_INBOX.md`. Newest at the botto
   - Connected `evaluateFinaleWindowHeal(elapsedSec)` to `scene.setStorm(...)` during 12s window heal convergence.
   - Resolved POL-301 (wireframe post-look override hook for credits chapter 1), POL-302 (`setStorm` and `setMonitorEqualizer` exposed on `PlayScene`), POL-303 (stable alt camera look-at orientation without drift), and POL-304 (viewmodel visibility control).
 - Decisions left: None. Ready for next queued job: F-27.
+
+### [2026-10-20 07:38] F-27 [DONE] T15: the harmonic choir, the radio and turbobass (Window D)
+- Commits: staged with F-27/F-28 completion batch
+- Features delivered:
+  - Installed `harmonic-machine-choir.ts`, `diegetic-radio-and-tapes.ts`, `beat-synced-plume-and-turbobass.ts`, `diegetic-radio-tuner-widget.tsx`, and `harmonic-radio-and-turbobass.test.ts` (4/4 unit tests pass).
+  - Merged `CombatAudio` bus routing and `knockbackSwarmers` into `monsters.ts`; merged `WRECK_TAPE_BY_SITE` into `wreck-sites.ts` and `wrecks.ts`; added `playChoirStep`, `playBridgeFmNote`, and `playTurboBassPulse` to `game-audio.ts`.
+  - Wired Window D 144 BPM plume modulation and `POL-141` 3.5 s post-action Lab station operating tail in `play-scene.ts` and `play.tsx`.
+
+### [2026-10-20 07:39] F-28 [DONE] T13b: the vehicle bay (3 s gantry print), scout and hauler rear sockets, POL-50, POL-51 and POL-295
+- Commits: staged with F-27/F-28 completion batch
+- Features delivered:
+  - Wired 3.0 s gantry assembly timeline (`sampleGantryTimeline`) onto `fabricator-head` in `play-scene.ts` so the print head, plume vent, and feed cubes travel along the gantry during rover printing.
+  - Enabled `USE_MODULAR_SCOUT = true` (`POL-50`), replaced the round torus steering wheel with a square `[-u-]` yoke, snapped the scout aerial with `snapAerialToShellY`, and wired `SCOUT_REAR_SOCKETS` and `HAULER_REAR_SOCKETS` into `VEHICLE_FIT` in `gen-props.ts`.

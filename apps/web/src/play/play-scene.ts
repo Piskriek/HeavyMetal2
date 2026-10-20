@@ -22,7 +22,9 @@ import { createPlotHolo, type PlotHolo } from './plot-holo';
 import { COLOUR_MARK_FRAGMENT, localMachineWaveAt, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_OFF_FRAGMENT, OPENING_OFF_VERTEX, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX, scanRingFadeAt, waveBandColourFor } from './portal-shaders';
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
 import { disposeProp, FABRICATOR_PLUME, FABRICATOR_VENT, FEED_CUBES_FULL, feedCubeCount, feedCubeProgress, lineSpan, machinePlumeCount, machinePlumeCountOf, machinePlumeGravity, machinePlumeLook, machinePlumeLookOf, machinePlumeSpec, machinePlumeSteady, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
-import { printFrame } from '@hm/tooljuice';
+import { printFrame, beatPulse, evaluateBeatSyncedPlumeModulation } from '@hm/tooljuice';
+import { evaluateHarmonicMachineChoir } from '@hm/musicbox';
+import { sampleGantryTimeline } from './window-c-hooks';
 import {
   createHorizonEnclaveDomes,
   type FourFloats,
@@ -256,7 +258,11 @@ export interface PlayScene {
   /** Whether the build drawer or a placement is open: the suit cam's optics halve while it is (plan 25). */
   setBuildOpen(open: boolean): void;
   /** Activity of the lab machines (bench writing, combiner mixing, rack cataloguing) for the lab plume. */
-  setLabActivity(act: { readonly bench: number; readonly combiner: number; readonly rack: number }): void;
+  setLabActivity(act: { readonly bench: number; readonly combiner: number; readonly rack: number; readonly fabricator?: number }): void;
+  /** TICKET-15 (Window D): [V] Key Turbo Bass pulse + swarmer knockback. */
+  triggerTurboBass(radiusM?: number, pushM?: number): number;
+  /** TICKET-15: Collect cassette tape from a wreck transponder. */
+  collectWreckTape(id: string): string | null;
   /** Shows or hides the held extraction rifle (the first-person view model) and sets its mode's screen. */
   setBeamHeld(held: boolean, mode: BeamMode): void;
   /** The held rifle's lamps and muzzle while the beam fires (on) or idles. */
@@ -542,7 +548,11 @@ export function createPlayScene(o: {
   let combinerEmitter: number | null = null;
   let rackEmitter: number | null = null;
 
-  const setLabActivity = (act: { readonly bench: number; readonly combiner: number; readonly rack: number }): void => {
+  const setLabActivity = (act: { readonly bench: number; readonly combiner: number; readonly rack: number; readonly fabricator?: number }): void => {
+    room.setStationOperating('preset-bench', act.bench > 0);
+    room.setStationOperating('preset-combiner', act.combiner > 0);
+    room.setStationOperating('preset-rack', act.rack > 0);
+    room.setStationOperating('fabricator', (act.fabricator ?? 0) > 0);
     // bench pours pink (#ff3d8a) while writing (east wall, z ≈ -5)
     if (act.bench > 0 && benchEmitter === null) {
       benchEmitter = labPlume.add({ at: [7.5, 0.9, -5.0], colour: '#ff3d8a', count: 140, height: 2.2, spread: 0.9, life: 1.8 });
@@ -974,9 +984,31 @@ export function createPlayScene(o: {
   };
   /** Each frame: every pour's pixel count (one number from machine-props: rate x life x run share x cadence, T15 multiplies it by the beat)
    *  and every feed hopper's cubes: the machines' first, then the base fabricators' (into their print heads, while they print). */
+  // ---- Window D (TICKET-15): Harmonic machine choir & 144 BPM beat-synced plume modulation
   const tickMachinePlumes = (t: number): void => {
+    const activeChoirMachines: { id: string; kind: string; x: number; z: number; operating: boolean }[] = [];
+    for (const v of views.values()) {
+      if (v.emitter !== null && v.share > 0.05) {
+        activeChoirMachines.push({ id: String(v.m.id), kind: v.m.kind, x: v.m.x, z: v.m.z, operating: true });
+      }
+    }
+    const choirState = evaluateHarmonicMachineChoir(activeChoirMachines, pos, Math.floor(t * 4));
+    const choirMod = evaluateBeatSyncedPlumeModulation(t, choirState.isChoirConvergence ? 1 : 0, 1);
+    const beatMult = choirState.isChoirConvergence ? (0.85 + 0.3 * beatPulse(t)) * (choirMod.densityMultiplier / 1.1) : 1;
+
     for (const f of fabricatorViews.values()) {
-      if (f.emitter !== null) { f.pour = machinePlumeCountOf(FABRICATOR_PLUME, 1, t); plume.setCount(f.emitter, f.pour); }
+      // TICKET-13b (Window C): 3.0 s gantry assembly head movement while printing
+      const head = f.station.parts['head'];
+      if (f.printing && head) {
+        const gFrame = sampleGantryTimeline(t % 3.0, 'scout');
+        head.position.set(gFrame.headX, gFrame.headY, gFrame.bridgeZ);
+        f.group.updateMatrixWorld(true);
+        f.vent.set(...FABRICATOR_VENT).add(head.position).applyMatrix4(f.group.matrixWorld);
+      }
+      if (f.emitter !== null) {
+        f.pour = Math.round(machinePlumeCountOf(FABRICATOR_PLUME, 1, t) * beatMult);
+        plume.setCount(f.emitter, f.pour);
+      }
     }
     let sources = 0;
     let live = 0;
@@ -991,7 +1023,7 @@ export function createPlayScene(o: {
         }
       }
       if (v.emitter !== null) {
-        v.pour = machinePlumeCount(v.m.kind, v.share, t);
+        v.pour = Math.round(machinePlumeCount(v.m.kind, v.share, t) * beatMult);
         plume.setCount(v.emitter, v.pour);
       }
       if (sources >= MAX_FEED_MACHINES) break;
@@ -3551,6 +3583,13 @@ export function createPlayScene(o: {
       }
     },
     setLabActivity,
+    triggerTurboBass(radiusM = 12, pushM = 4): number {
+      gameAudio.playTurboBassPulse();
+      return monsters.knockbackSwarmers({ x: pos.x, z: pos.z }, radiusM, pushM);
+    },
+    collectWreckTape(id: string): string | null {
+      return wrecks.collectTape?.(id) ?? null;
+    },
     setBeamHeld(held, mode) {
       heldMode = mode;
       heldBeam.setMode(mode);

@@ -458,3 +458,4 @@ export function springStep(s: Spring, target: number, k: number, c: number, dt: 
 }
 
 export * from './print-sweep';
+export * from './beat-synced-plume-and-turbobass';

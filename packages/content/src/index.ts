@@ -25,3 +25,4 @@ export function seedsOfKind(kind: PresetSeed['kind']): PresetSeed[] {
 export function findSeed(name: string): PresetSeed | undefined {
   return SEED_MAP.get(name);
 }
+export * from './diegetic-radio-and-tapes';

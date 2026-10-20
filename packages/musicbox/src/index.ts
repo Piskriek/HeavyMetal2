@@ -239,3 +239,4 @@ export function makeSong(seed: number, style: Style, key = 60): Song {
     notes,
   };
 }
+export * from './harmonic-machine-choir';

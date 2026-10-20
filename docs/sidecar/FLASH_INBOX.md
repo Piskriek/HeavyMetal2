@@ -209,10 +209,10 @@ Brief: `docs/prompts/sidecar/T16-acts-7-9-finale.md`, only the parts F-23 left o
 - POL-301 (the per-chapter stage-look hook, so the credits' chapter 1 is the 0a wireframe), POL-302 (expose the lab room's `setStorm` and `setMonitorEqualizer` through `PlayScene`), POL-303 (`setAltCam` with a target drifts: XYZ read-back, YXZ rebuild) and POL-304 (hide the held weapon's viewmodel during the credits).
 Source: `arena-gathered/argo-ticket16/`. Shots: the domes, the hologram, chapter 1 of the credits (wireframe), the credits with no rifle. Also run `node scripts/test-credits-video.mjs`.
 
-## F-27 [OPEN] T15: the harmonic choir, the radio and turbobass (Window D)
+## F-27 [DONE] T15: the harmonic choir, the radio and turbobass (Window D)
 Brief: `docs/prompts/sidecar/T15-harmonic-choir-radio-turbobass.md`. It merges `monsters.ts`, `wreck-sites.ts` and `game-audio.ts` onto the current files (T10, TRIFT, T09b); merge by hand, never copy over. The plume count is one clear number per emitter (`setCount`, F-21's count uniform), so the 144 BPM pulse multiplies it. POL-141 (Argo's ruling): a lab station operates while its window is open, plus a 3.5 s tail, only with power above 0.25.
 
-## F-28 [OPEN] T13b: the vehicle bay (the 3 s gantry print), the scout and hauler rear sockets, POL-50, POL-51 and POL-295
+## F-28 [DONE] T13b: the vehicle bay (the 3 s gantry print), the scout and hauler rear sockets, POL-50, POL-51 and POL-295
 Spec: brief 32 item 3 (`docs/prompts/sidecar/32-heavy-terraformers-and-turrets.md`) and Argo's `packages/plotsim/src/vehicle-bay.ts` (installed by T13a, not wired: `sampleGantryTimeline`, the socket specs, `MODULAR_SCOUT_SOCKETS`, `VEHICLE_FIT`, `snapAerialToShellY`, and `POL51_ROVER_DRIVE_TEST_PLAN` in `window-c-hooks.ts`).
 - Printing a scout or a hauler at the vehicle fabricator plays the 3 s gantry assembly on the `fabricator-frame` and `fabricator-head` models (the head moves through the timeline; its plume and feed cubes follow it, as T03P-R set up).
 - The scout gets 1 rear socket (a portable linked ore bin or a sync beacon with a 15 m safe dome); the hauler gets 3 (bulk ore or a turret). The socketed items are base items with their existing rules.

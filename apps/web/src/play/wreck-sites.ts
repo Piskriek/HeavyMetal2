@@ -9,6 +9,7 @@
 import { LEAK_SITE_COUNT, MIN_GATE_DISTANCE, leakSites, type Point } from '../monsters/policy';
 import { hash32 } from '../monsters/adapter';
 import { loreFor } from './lore-logs';
+import { WRECK_TAPE_BY_SITE, WRECK_TAPE_BY_TRANSPONDER } from '@hm/content';
 
 /** Scenery-only sites (no leak), numbered after the leak sites (their index is LEAK_SITE_COUNT and on). */
 export const SCENERY_SITE_COUNT = 4;
@@ -44,6 +45,8 @@ export interface WreckMember {
   readonly transponder?: string;
   /** The leak's junk model: the centre of a leak site. */
   readonly junk: boolean;
+  /** TICKET-15: Collectible cassette tape ID unlocked when reading this wreck's transponder. */
+  readonly tape?: string;
 }
 
 export interface WreckSite {
@@ -72,6 +75,7 @@ export interface WreckInteraction {
     readonly secs: number;
   };
   readonly log?: string;
+  readonly tape?: string;
 }
 
 /** An integer hash, deterministic in its inputs (the same as the monsters' hash32 family). */
@@ -158,7 +162,7 @@ const WRECK_SALVAGE_TABLE: Readonly<Record<string, { readonly item: string; read
  * Wreck trucks and vans provide both hold-E salvage and a readable Bridge Incident Log.
  */
 export function wreckInteract(
-  member: Pick<WreckMember, 'model'> & { readonly transponder?: string; readonly x?: number; readonly z?: number }
+  member: Pick<WreckMember, 'model'> & { readonly transponder?: string; readonly tape?: string; readonly x?: number; readonly z?: number }
 ): WreckInteraction {
   const trLore = member.transponder ? loreFor(member.transponder) : null;
   const spec = WRECK_SALVAGE_TABLE[member.model];
@@ -170,9 +174,11 @@ export function wreckInteract(
       ? { item: 'ore', n: 10, secs: 1.4 }
       : undefined;
 
+  const tape = member.tape ?? (member.transponder ? WRECK_TAPE_BY_TRANSPONDER[member.transponder] : undefined);
   return {
     ...(salvage ? { salvage } : {}),
     ...(log ? { log } : {}),
+    ...(tape ? { tape } : {}),
   };
 }
 
@@ -200,7 +206,8 @@ export function wreckSites(seed: number, gate: Point): WreckSite[] {
     if (jp) members.push({ model: site.junk, x: jp.x, z: jp.z, yaw: unit(mix(h, 5)) * Math.PI * 2, tilt: 0, sink: 0, junk: true });
     if (tr) {
       const tp = spot(base + Math.PI * 0.5, ring + 1);
-      if (tp) members.push({ model: tr.model, x: tp.x, z: tp.z, yaw: unit(mix(h, 7)) * Math.PI * 2, tilt: 0.22, sink: 0.25, transponder: tr.id, junk: false });
+      const siteTape = WRECK_TAPE_BY_SITE[`site-${site.index}`] ?? WRECK_TAPE_BY_TRANSPONDER[tr.id];
+      if (tp) members.push({ model: tr.model, x: tp.x, z: tp.z, yaw: unit(mix(h, 7)) * Math.PI * 2, tilt: 0.22, sink: 0.25, transponder: tr.id, ...(siteTape ? { tape: siteTape } : {}), junk: false });
     }
     const neighbours = total - members.length;
     for (let k = 0; k < neighbours; k++) {

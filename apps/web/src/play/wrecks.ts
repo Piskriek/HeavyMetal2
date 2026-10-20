@@ -39,6 +39,8 @@ export interface WreckSystem {
   aimWreck?(origin: THREE.Vector3, dir: THREE.Vector3, reach: number): AimedWreck | null;
   /** Marks a salvageable wreck member as salvaged and hides its mesh. */
   salvageWreck?(id: string): (NonNullable<WreckInteraction['salvage']> & { readonly log?: string }) | null;
+  /** TICKET-15: Collects the cassette tape from a wreck transponder by member ID. */
+  collectTape?(id: string): string | null;
   /** Debug: lists all built wreck props for inspection and testing. */
   debugBuilt?(): readonly { readonly id: string; readonly model: string; readonly x: number; readonly z: number; readonly salvaged: boolean; readonly salvage?: WreckInteraction['salvage']; readonly log?: string }[];
   /** The rung and the broken look of every site (for the tests and the debug hook). */
@@ -56,6 +58,7 @@ interface Built {
   readonly root: THREE.Group;
   readonly interaction: WreckInteraction;
   salvaged: boolean;
+  tapeCollected: boolean;
   key: string;
 }
 
@@ -148,6 +151,7 @@ export function createWrecks(o: {
         root,
         interaction,
         salvaged: false,
+        tapeCollected: false,
         key: '',
       });
     });
@@ -215,6 +219,12 @@ export function createWrecks(o: {
       target.salvaged = true;
       target.root.visible = false;
       return { ...target.interaction.salvage, log: target.interaction.log };
+    },
+    collectTape(id: string) {
+      const target = built.find((b) => !b.tapeCollected && b.id === id && b.interaction.tape);
+      if (!target || !target.interaction.tape) return null;
+      target.tapeCollected = true;
+      return target.interaction.tape;
     },
     debugBuilt() {
       return built.map((b) => ({

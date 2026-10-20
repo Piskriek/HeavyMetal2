@@ -12,6 +12,7 @@ import { hash32, skinFor } from '../monsters/adapter';
 import { GATE_DOME_RADIUS, eraForStage, kindsForEra, leakSites, clearOfGate, dropStack, hitBearing, monsterCap, DORMANT_REWARD, SEAL_REWARD, DEFAULT_MONSTERS, type LeakSite, type MonstersSetting, type Point, type SafeZone } from '../monsters/policy';
 import { createLeakVisuals, type LeakVisuals } from '../monsters/leak-visual';
 import { gameAudio } from '../audio/game-audio';
+import { applyTurboBassSwarmerKnockback } from '@hm/tooljuice';
 import type { Era } from '../monsters/roster';
 import type { WeaponStats } from '../base/weapons';
 
@@ -132,6 +133,8 @@ export interface MonstersSystem {
   getStats(): MonsterStats;
   /** The brain's world, for the tests and the replay check. */
   world(): World;
+  /** TICKET-15: [V] Key Turbo Bass knockback against nearby stage-0/1 Swarmers. Returns count pushed. */
+  knockbackSwarmers(origin: { readonly x: number; readonly z: number }, radiusM?: number, pushDistanceM?: number): number;
   clearMobs(): void;
   dispose(): void;
 }
@@ -140,20 +143,11 @@ export interface MonstersSystem {
 // Procedural Web Audio FX Synthesizer
 // -----------------------------------------------------------------------------
 class CombatAudio {
-  private ctx: AudioContext | null = null;
-
   private init(): AudioContext | null {
-    if (!this.ctx && typeof AudioContext !== 'undefined') {
-      try {
-        this.ctx = new AudioContext();
-      } catch {
-        // audio context blocked or unsupported
-      }
-    }
-    if (this.ctx && this.ctx.state === 'suspended') {
-      void this.ctx.resume();
-    }
-    return this.ctx;
+    return gameAudio.getContext();
+  }
+  private dest(ctx: AudioContext): AudioNode {
+    return gameAudio.getCombatBus() ?? ctx.destination;
   }
 
   playShotgunBlast(): void {
@@ -169,7 +163,7 @@ class CombatAudio {
     gainOsc.gain.setValueAtTime(0.7, now);
     gainOsc.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
     osc.connect(gainOsc);
-    gainOsc.connect(ctx.destination);
+    gainOsc.connect(this.dest(ctx));
     osc.start(now);
     osc.stop(now + 0.35);
 
@@ -190,7 +184,7 @@ class CombatAudio {
     noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
     noise.connect(filter);
     filter.connect(noiseGain);
-    noiseGain.connect(ctx.destination);
+    noiseGain.connect(this.dest(ctx));
     noise.start(now);
 
     setTimeout(() => {
@@ -204,7 +198,7 @@ class CombatAudio {
       clickGain.gain.setValueAtTime(0.25, t);
       clickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
       click.connect(clickGain);
-      clickGain.connect(ctx.destination);
+      clickGain.connect(this.dest(ctx));
       click.start(t);
       click.stop(t + 0.07);
     }, 180);
@@ -222,7 +216,7 @@ class CombatAudio {
     gain.gain.setValueAtTime(0.3, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(this.dest(ctx));
     osc.start(now);
     osc.stop(now + 0.14);
   }
@@ -241,7 +235,7 @@ class CombatAudio {
     gain.gain.exponentialRampToValueAtTime(0.14, now + 0.25);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(this.dest(ctx));
     osc.start(now);
     osc.stop(now + 0.37);
   }
@@ -917,6 +911,25 @@ export function createMonsters(options: {
     },
     getStats: () => stats,
     world: () => world,
+    knockbackSwarmers(origin, radiusM = 12, pushDistanceM = 4) {
+      const inputs = world.mobs.map((m) => ({
+        id: String(m.id),
+        kind: m.kind,
+        x: m.x,
+        z: m.z,
+      }));
+      const res = applyTurboBassSwarmerKnockback(origin, inputs, radiusM, pushDistanceM);
+      if (res.affectedSwarmerCount > 0) {
+        world = {
+          ...world,
+          mobs: world.mobs.map((m, i) => {
+            const u = res.entities[i];
+            return u && u.pushed ? { ...m, x: u.x, z: u.z } : m;
+          }),
+        };
+      }
+      return res.affectedSwarmerCount;
+    },
     clearMobs() {
       world = { ...world, mobs: [], bolts: [] };
       renderer.sync([], () => '');

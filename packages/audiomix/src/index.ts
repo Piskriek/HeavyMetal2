@@ -54,7 +54,8 @@ export const DUCK: {
 
 /** Which bus a sound plays on. The voice bus is fed by the narrator's chain, not by a sound id. */
 export function busOfSound(id: string): BusId {
-  if (id.startsWith('music-')) return 'music';
+  if (id.startsWith('music-') || id.startsWith('synth-radio-') || id.startsWith('tape-') || id === 'synth-choir-convergence') return 'music';
+  if (id.startsWith('sfx-turbobass') || id === 'sfx-bass-pulse') return 'combatUi';
   if (id.startsWith('amb-')) return 'ambience';
   if (id.startsWith('sfx-ui-') || id === 'sfx-refuse') return 'combatUi';
   if (id.startsWith('sfx-fire-') || id === 'sfx-reload' || id === 'sfx-empty') return 'combatUi';

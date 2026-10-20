@@ -304,6 +304,7 @@ export interface LabMachineRig {
   readonly dressGroup: THREE.Group;
   readonly plumeGroup: THREE.Group;
   setPowered(power01: number): void;
+  setOperating(on: boolean): void;
   animate(now: number, power01: number): void;
 }
 
@@ -351,6 +352,8 @@ export function createRightWallMachineRig(
   const plumeGroup = new THREE.Group();
   plumeGroup.name = `station-plume:${id}`;
   plumeGroup.visible = false;
+  let isOperating = false;
+  let lastPower01 = 0;
   const plumeMat = new THREE.MeshBasicMaterial({
     color: new THREE.Color(spec.pixelColor),
     transparent: true,
@@ -491,7 +494,8 @@ export function createRightWallMachineRig(
     plumeGroup,
     setPowered(power01: number): void {
       const p = Math.max(0, Math.min(1, power01));
-      plumeGroup.visible = p > 0.25;
+      lastPower01 = p;
+      plumeGroup.visible = isOperating && p > 0.25;
       plumeMat.opacity = 0.85 * p;
       for (const mat of accentLamps) {
         mat.emissiveIntensity = 1.8 * p;
@@ -503,13 +507,18 @@ export function createRightWallMachineRig(
         }
       }
     },
+    setOperating(on: boolean): void {
+      isOperating = on;
+      plumeGroup.visible = isOperating && lastPower01 > 0.25;
+    },
     animate(now: number, power01: number): void {
       const p = Math.max(0, Math.min(1, power01));
-      if (p <= 0.05) {
+      lastPower01 = p;
+      if (p <= 0.05 || !isOperating) {
         plumeGroup.visible = false;
         return;
       }
-      plumeGroup.visible = p > 0.25;
+      plumeGroup.visible = isOperating && p > 0.25;
       for (let i = 0; i < pixelSpec.length; i++) {
         const pc = pixelSpec[i]!;
         const cycle = (now * pc.speed + pc.phase / (Math.PI * 2)) % 1;

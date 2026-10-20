@@ -37,6 +37,8 @@ interface BaseHudProps {
   /** Why the drafting table is locked (TASK-22), or null when it is open. K then says the reason. */
   draftingLock?: string | null;
   onLocked?: (why: string) => void;
+  /** The Drafting Table's Parts page (ARGO_NOTE_34 D.1: the planet table prints part cartridges), drawn by the play screen. */
+  draftingParts?: React.ReactNode;
 }
 
 export type OpenWindow = 'none' | 'inventory' | 'drafting' | 'lattice';
@@ -67,6 +69,7 @@ export const BaseHud: React.FC<BaseHudProps> = ({
   buildHidden = false,
   draftingLock = null,
   onLocked,
+  draftingParts,
 }) => {
   const [view, setView] = useState<BaseView>(() => source.get());
   const [openWindow, setOpenWindow] = useState<OpenWindow>('none');
@@ -306,6 +309,7 @@ export const BaseHud: React.FC<BaseHudProps> = ({
           onDispatch={onDispatch}
           onPlaceLayout={onPlaceLayout}
           onToast={onToast}
+          partsPage={draftingParts}
           onClose={() => setOpenWindow('none')}
         />
       )}

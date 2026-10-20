@@ -778,6 +778,132 @@ button.hm-quick-stack-btn:active,
   box-shadow: 0 0 10px var(--base-cyan-glow);
 }
 
+/* The Parts tab (ARGO_NOTE_34 D.1): the lab bench's Parts page (play/bench-parts.tsx) in the table's cyan vocabulary.
+   :where() keeps the base button rule weaker than the page's own (the swatches, the chips). */
+.hm-draft-parts {
+  --power: var(--base-cyan);
+  max-height: min(64vh, 620px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.hm-draft-parts .bench-parts.with-side {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+/* the side column: where the blank comes from, then the part's name, its cost and Print, always in view */
+.hm-draft-parts .bench-parts-side {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--base-bg-surface);
+  padding: 16px;
+  border-radius: var(--base-radius-md);
+  border: 1px solid var(--base-border-subtle);
+}
+.hm-draft-parts .hm-draft-parts-blank {
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--base-border-subtle);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--base-text-secondary);
+}
+.hm-draft-parts-blank b {
+  color: var(--base-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.hm-draft-parts-blank.empty b {
+  color: #f87171;
+}
+.hm-draft-parts .bench-parts-side .part-preview {
+  aspect-ratio: 1;
+  margin: 0;
+  border-color: var(--base-cyan-hairline);
+  background: radial-gradient(110% 90% at 50% 30%, #2f4250, #0f171f 85%);
+}
+.hm-draft-parts .bench-parts-side .bench-parts-cost {
+  margin: 0;
+  color: var(--base-text-secondary);
+}
+.hm-draft-parts .bench-parts-side .bench-parts-cost-sep {
+  display: none;
+}
+.hm-draft-parts .bench-parts-side .bench-parts-cost b {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 15px;
+  color: var(--base-text-primary);
+}
+.hm-draft-parts .bench-parts-side .play-machine-actions {
+  margin: 0;
+}
+.hm-draft-parts .bench-parts-side button.go {
+  width: 100%;
+  margin: 0;
+}
+.hm-draft-parts .bench-parts-side .play-why {
+  margin: 0;
+}
+.hm-draft-parts .bench-parts-main {
+  background: var(--base-bg-surface);
+  padding: 16px;
+  border-radius: var(--base-radius-md);
+  border: 1px solid var(--base-border-subtle);
+}
+.hm-draft-parts .play-carts h4 {
+  font-family: 'Oxanium', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--base-cyan);
+}
+.hm-draft-parts :where(button) {
+  padding: 8px 12px;
+  background: var(--base-bg-slot);
+  border: 1px solid var(--base-border-subtle);
+  border-radius: var(--base-radius-sm);
+  color: var(--base-text-primary);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.hm-draft-parts :where(button):hover,
+.hm-draft-parts :where(button):focus-visible {
+  border-color: var(--base-cyan-hairline);
+  background: var(--base-bg-slot-hover);
+  outline: none;
+}
+.hm-draft-parts :where(button):focus-visible {
+  box-shadow: 0 0 0 2px var(--base-cyan);
+}
+.hm-draft-parts .play-carts button.on {
+  border-color: var(--base-cyan);
+  background: var(--base-bg-slot-active);
+  box-shadow: 0 0 8px var(--base-cyan-glow);
+}
+.hm-draft-parts button.go {
+  background: var(--base-cyan);
+  border-color: transparent;
+  color: #04161c;
+  font-weight: 700;
+}
+.hm-draft-parts button.go:disabled {
+  background: var(--base-bg-slot);
+  border-color: var(--base-border-subtle);
+  color: var(--base-text-muted);
+  cursor: not-allowed;
+}
+@media (max-width: 900px) {
+  .hm-draft-parts .bench-parts.with-side {
+    grid-template-columns: 1fr;
+  }
+  .hm-draft-parts .bench-parts-side {
+    position: static;
+  }
+}
+
 .hm-layouts-tab-panel {
   display: flex;
   flex-direction: column;

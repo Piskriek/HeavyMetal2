@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { BaseActions, DraftView, LatticeView } from '../view';
 import type { Applied, BaseCommand, BaseWorld, Point } from '../world';
 import { layoutPieces, pieceAt } from '../world';
-import { Compass, Hammer, X, LayoutGrid, Copy, Play, ArrowDownToLine, Plus } from 'lucide-react';
+import { Compass, Hammer, X, LayoutGrid, Copy, Play, ArrowDownToLine, Plus, Cog } from 'lucide-react';
 import { ItemGlyph } from './item-glyph';
 import { CloseHint } from './hud-bits';
 
@@ -17,6 +17,8 @@ interface DraftingWindowProps {
   onDispatch?: (cmd: BaseCommand) => Applied | void;
   onPlaceLayout?: (layoutId: string) => void;
   onToast?: (title: string, sub?: string) => void;
+  /** The Parts page, when the table prints part cartridges; the tab shows only when it is given. */
+  partsPage?: React.ReactNode;
   onClose: () => void;
 }
 
@@ -115,11 +117,12 @@ export const DraftingWindow: React.FC<DraftingWindowProps> = ({
   onDispatch,
   onPlaceLayout,
   onToast,
+  partsPage,
   onClose,
 }) => {
   const [, setTick] = useState(0);
   const currentWorld = getWorld ? getWorld() : world;
-  const [activeTab, setActiveTab] = useState<'blueprints' | 'layouts'>('blueprints');
+  const [activeTab, setActiveTab] = useState<'blueprints' | 'layouts' | 'parts'>('blueprints');
   const [selectedPrim, setSelectedPrim] = useState<string | null>('prim_cube');
   const [selectedMap, setSelectedMap] = useState<string | null>('map_basalt');
 
@@ -280,9 +283,21 @@ export const DraftingWindow: React.FC<DraftingWindowProps> = ({
           >
             <LayoutGrid size={14} /> Layouts {layouts.length > 0 ? `(${layouts.length})` : ''}
           </button>
+          {partsPage ? (
+            <button
+              className={`hm-draft-tab-btn ${activeTab === 'parts' ? 'active' : ''}`}
+              onClick={() => setActiveTab('parts')}
+              data-testid="drafting-tab-parts"
+            >
+              <Cog size={14} /> Parts
+            </button>
+          ) : null}
         </div>
 
-        {activeTab === 'blueprints' ? (
+        {activeTab === 'parts' && partsPage ? (
+          /* Parts: the planet table prints part cartridges (ARGO_NOTE_34 D.1) */
+          <div className="hm-draft-parts" data-testid="drafting-parts-panel">{partsPage}</div>
+        ) : activeTab === 'blueprints' ? (
           /* 3-Column Blueprints Layout */
           <div className="hm-drafting-layout">
             {/* Column 1: Primitives */}

@@ -31,6 +31,9 @@ import {
   startWrite,
   canWritePart,
   startPartWrite,
+  canPrintPart,
+  printPart,
+  freeBlank,
   step as stepCartlab,
   unslot,
   type Cartridge,
@@ -1046,7 +1049,8 @@ useEffect(() => {
     sceneRef.current?.setBeamCartridge(beamPortRef.current.colour);
     sceneRef.current?.playAction('reload');
     beamDirtyRef.current = true;
-    say(`Loaded: ${written.name}`, port ? `${port.name} went back on the rack.` : 'Hold the left button in Apply to paint.');
+    say(`Loaded: ${written.name}`, port ? `${port.name} went back on the rack.`
+      : part ? 'Fire Apply at a machine part: a tap fits one, a hold or Shift fits every part of its kind.' : 'Hold the left button in Apply to paint.');
   };
   const reloadBeam = (): void => {
     const written = writtenOnRack(labRef.current);
@@ -1541,6 +1545,35 @@ useEffect(() => {
   };
   const applyPartShotRef = useRef<(broadcast: boolean) => number>(() => 0);
   applyPartShotRef.current = applyPartShot;
+  /** Whether the base's stores (the pack and the linked bins) hold a part's cost: a dry run of the base's `pay` command. */
+  const partStockCheck = (spec: PartSpec): { readonly ok: boolean; readonly why: string } => {
+    const at = sceneRef.current?.debug.position() ?? { x: 0, z: 0 };
+    const dry = apply(baseWorldRef.current, getBaseEnv(), { t: 'pay', at, bill: partBill(spec), reason: 'part' });
+    const refused = dry.events.find((ev) => ev.type === 'refused');
+    if (refused && refused.type === 'refused') {
+      const named = (refused.short ?? []).map((x) => `${x.n} ${x.item === 'vtx-rough' ? 'raw vertices' : x.item === 'pxd-mono' ? 'raw pixels' : x.item}`);
+      return { ok: false, why: `Short of ${named.join(' and ') || 'raw stock'}.` };
+    }
+    return { ok: true, why: '' };
+  };
+  const payForPart = (spec: PartSpec): void => {
+    const at = sceneRef.current?.debug.position() ?? { x: 0, z: 0 };
+    dispatchBase({ t: 'pay', at, bill: partBill(spec), reason: `part:${spec.gen}` });
+  };
+  /**
+   * The planet's Drafting Table prints a part (ARGO_NOTE_34 D.1): it draws a blank from the rack through the quantum
+   * bridge, pays the part's raw vertices and raw pixels, prints at once, and puts the cartridge in the rifle's port.
+   */
+  const printPartOnTable = (spec: PartSpec): void => {
+    const blank = freeBlank(labRef.current);
+    if (blank === null || !canPrintPart(labRef.current, blank, spec).ok || !partStockCheck(spec).ok) return;
+    payForPart(spec);
+    const next = printPart(labRef.current, blank, spec);
+    labRef.current = next;
+    commit(withLab(stateRef.current, next));
+    const printed = next.cartridges.find((c) => c.id === blank);
+    if (printed) loadBeamCartridge(printed);
+  };
   const openLog = useCallback((log: string): void => {
     if (!propsRef.current.logs.includes(log)) savePropsSave(readLog(propsRef.current, log));
     setDatabank(log);
@@ -1987,8 +2020,8 @@ useEffect(() => {
           scene.monsters.setTrigger(true);
           fireWeapon();
         } else {
-          // A part cartridge in Apply, in the lab (TICKET-32): the shot is decided on release (tap = one part, hold or Shift = all of that kind)
-          if (beamHeldRef.current && beamModeRef.current === 'apply' && beamPortRef.current?.part && whereRef.current === 'lab') {
+          // A part cartridge in Apply (TICKET-32): the shot is decided on release (tap = one part, hold or Shift = all of that kind)
+          if (beamHeldRef.current && beamModeRef.current === 'apply' && beamPortRef.current?.part) {
             partShotRef.current = { t0: performance.now(), shift: e.shiftKey };
             return;
           }
@@ -2713,7 +2746,8 @@ useEffect(() => {
       // ---- Apply (TASK-21): the held rifle paints the loaded cartridge's preset under the aim point (radius 3 m); it costs no ore
       {
         const port = beamPortRef.current;
-        const aim = live && !visitingRef.current && out.where === 'planet' && beamHeldRef.current && beamModeRef.current === 'apply' && isLmbDownRef.current && port !== null
+        // a part cartridge paints nothing: its shot fits a part on release (applyPartShot)
+        const aim = live && !visitingRef.current && out.where === 'planet' && beamHeldRef.current && beamModeRef.current === 'apply' && isLmbDownRef.current && port !== null && !port.part
           ? scene.beamAim(BEAM_STROKE_RANGE)
           : null;
         if (aim && port) {
@@ -4653,20 +4687,11 @@ useEffect(() => {
                       check={(spec) => {
                         if (!activeBlank) return { ok: false, why: 'No blanks on the rack. Make a blank at the rack first.' };
                         const c = canWritePart(labRef.current, labEnv, activeBlank, spec);
-                        if (!c.ok) return c;
-                        const at = sceneRef.current?.debug.position() ?? { x: 0, z: 0 };
-                        const dry = apply(baseWorldRef.current, getBaseEnv(), { t: 'pay', at, bill: partBill(spec), reason: 'part' });
-                        const refused = dry.events.find((ev) => ev.type === 'refused');
-                        if (refused && refused.type === 'refused') {
-                          const named = (refused.short ?? []).map((x) => `${x.n} ${x.item === 'vtx-rough' ? 'raw vertices' : x.item === 'pxd-mono' ? 'raw pixels' : x.item}`);
-                          return { ok: false, why: `Short of ${named.join(' and ') || 'raw stock'}.` };
-                        }
-                        return { ok: true, why: '' };
+                        return c.ok ? partStockCheck(spec) : c;
                       }}
                       onPrint={(spec: PartSpec) => {
                         if (!activeBlank) return;
-                        const at = sceneRef.current?.debug.position() ?? { x: 0, z: 0 };
-                        dispatchBase({ t: 'pay', at, bill: partBill(spec), reason: `part:${spec.gen}` });
+                        payForPart(spec);
                         const next = startPartWrite(labRef.current, labEnv, activeBlank, spec);
                         labRef.current = next;
                         commit(withLab(stateRef.current, next));
@@ -5229,6 +5254,27 @@ useEffect(() => {
               buildHidden={beamHud.held}
               draftingLock={gateReason('drafting', state.chain, hud.plot.stage)}
               onLocked={(why) => say('Drafting table locked', why)}
+              draftingParts={(() => {
+                const blanks = labRef.current.cartridges.filter((c) => c.kind === 'blank' && c.slot === null).length;
+                const free = freeBlank(labRef.current);
+                return (
+                  <BenchParts
+                    printLabel="Print cartridge"
+                    firstStep={1}
+                    side={(
+                      <p className={`hm-draft-parts-blank${free === null ? ' empty' : ''}`} data-testid="drafting-parts-blank">
+                        <b>{blanks}</b> {blanks === 1 ? 'blank' : 'blanks'} on the lab rack, linked through the quantum bridge. Print takes one and loads the part into the beam rifle.
+                      </p>
+                    )}
+                    check={(spec) => {
+                      if (free === null) return { ok: false, why: 'No free blank on the lab rack. Make one at the rack in the lab.' };
+                      const c = canPrintPart(labRef.current, free, spec);
+                      return c.ok ? partStockCheck(spec) : c;
+                    }}
+                    onPrint={printPartOnTable}
+                  />
+                );
+              })()}
               world={baseWorldRef.current}
               at={sceneRef.current?.debug.position() ?? { x: 0, z: 0 }}
               currentStructureId={currentAimedStructureIdRef.current}

@@ -99,6 +99,16 @@ try {
   await page.locator('[data-testid="bench-param-headWidth"]').fill('0.12');
   await page.locator('[data-testid="bench-mat-metal-green"]').click();
   await page.locator('[data-testid="bench-op-chamfer-hard-edges"]').click();
+  // previews drive play (the owner, 2026-10-20): a live view of the part, chips with thumbnails, a hover try-on
+  check('the Parts page shows a live preview of the part, with its size', await page.locator('[data-testid="part-preview"] canvas').isVisible()
+    && /mm/.test((await page.locator('.part-preview figcaption').textContent()) ?? ''));
+  const thumbs = await page.waitForFunction(() => document.querySelectorAll('.bench-parts-gens img').length, null, { timeout: 5000 }).then((h) => h.jsonValue(), () => 0);
+  check('every part chip carries a thumbnail', thumbs === 7, `${thumbs} of 7`);
+  await page.locator('[data-testid="bench-mat-metal-copper"]').hover();
+  const trying = await page.locator('[data-testid="part-preview-trying"]').textContent().catch(() => '');
+  await page.locator('[data-testid="bench-parts"] h4').first().hover();
+  const after = await page.locator('[data-testid="part-preview-trying"]').count();
+  check('hovering a material tries it on in the preview; leaving puts it back', /copper/i.test(trying ?? '') && after === 0, `${trying} / ${after}`);
   await page.screenshot({ path: path.join(shotsDir, 'bench-parts.png') });
   check('the bench can print the fat green bolt', await page.locator('[data-testid="bench-print"]').isEnabled());
   await page.locator('[data-testid="bench-print"]').click();
@@ -144,6 +154,31 @@ try {
   const all = await bolts();
   check('a hold changes every bolt on the bank', !!hit2 && n2 === 4 && all.every((b) => b.material === 'green'), `${n2} changed; ${JSON.stringify(all.map((b) => b.material))}`);
   await page.screenshot({ path: path.join(shotsDir, 'all-green-bolts.png') });
+
+  // ---- the planet's Drafting Table prints a part at once (ARGO_NOTE_34 D.1): a blank from the rack, the cost from the stores, into the port
+  await page.evaluate(() => { window.__dev.seedBlank(); window.__dev.grantStock('vtx-rough', 40); window.__dev.grantStock('pxd-mono', 40); });
+  await page.evaluate(() => { window.hmPlay.teleportPlanet?.(); window.hmPlay.setPaused?.(false); });
+  await page.waitForFunction(() => window.hmPlay?.where === 'planet', null, { timeout: 15000 });
+  await frames(10);
+  const vtxPlanet = await stock('vtx-rough'), pxdPlanet = await stock('pxd-mono');
+  await page.evaluate(() => window.__hmHud?.openDrafting?.());
+  await page.locator('[data-testid="drafting-tab-parts"]').click();
+  await page.waitForSelector('[data-testid="drafting-parts-panel"] [data-testid="bench-parts"]');
+  await page.locator('[data-testid="bench-gen-panel"]').click();
+  await page.locator('[data-testid="bench-mat-plate-hazard"]').click();
+  await page.screenshot({ path: path.join(shotsDir, 'drafting-parts.png') });
+  check('the Drafting Table can print a hazard panel', await page.locator('[data-testid="bench-print"]').isEnabled(),
+    await page.locator('.hm-draft-parts .play-why').textContent().catch(() => ''));
+  await page.locator('[data-testid="bench-print"]').click();
+  await frames(5);
+  check('the table spends 12 raw vertices and 10 raw pixels (a medium component)', (await stock('vtx-rough')) === vtxPlanet - 12 && (await stock('pxd-mono')) === pxdPlanet - 10,
+    `vtx ${await stock('vtx-rough')}, pxd ${await stock('pxd-mono')}`);
+  const tablePort = await page.evaluate(() => window.__dev.port());
+  check('the printed panel goes straight into the rifle port, and the bolt cartridge back on the rack', tablePort?.part?.gen === 'panel' && tablePort.part.slotMaterials.plate === 'hazard'
+    && (await page.evaluate(() => window.hmPlay.state().lab.cartridges.some((c) => c.kind === 'part' && c.part.gen === 'bolt' && c.slot === null))), JSON.stringify(tablePort));
+  check('with no free blank left the table says where to make one', !(await page.locator('[data-testid="bench-print"]').isEnabled())
+    && /lab rack/.test((await page.locator('.hm-draft-parts .play-why').textContent().catch(() => '')) ?? ''));
+  await page.keyboard.press('Escape');
 
   check('no page errors', pageErrors.length === 0, pageErrors.slice(0, 3).join(' | '));
 } catch (err) {

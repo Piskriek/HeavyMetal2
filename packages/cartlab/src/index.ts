@@ -53,15 +53,30 @@ export interface Preset {
  * given, and from = the inputs' ids. A blank: name 'Blank', preset null, from [],
  * every affinity 1.
  */
+/**
+ * A Shape Press part written onto a blank (plans 38 and 39, TICKET-32): a part generator with its slider values, a
+ * material per slot, and the one-click operators applied on top. The beam's Apply puts it onto a placed part. Kept
+ * structural here (no imports): @hm/partgen and @hm/meshops read it.
+ */
+export interface PartSpec {
+  readonly name: string;
+  readonly gen: string;
+  readonly params: Readonly<Record<string, number>>;
+  readonly slotMaterials: Readonly<Record<string, string>>;
+  readonly ops: readonly { readonly op: string; readonly params: Readonly<Record<string, number>> }[];
+}
+
 export interface Cartridge {
   readonly id: string;
   readonly name: string;
-  readonly kind: 'blank' | 'preset' | 'mix';
+  readonly kind: 'blank' | 'preset' | 'mix' | 'part';
   readonly preset: string | null;
   readonly from: readonly string[];
   readonly affinity: Readonly<Record<Metric, number>>;
   /** null: in the rack. A number: in that plot machine. */
   readonly slot: number | null;
+  /** Kind 'part' only: the part it carries. */
+  readonly part?: PartSpec;
 }
 
 /**
@@ -78,6 +93,8 @@ export interface Job {
   readonly preset: string | null;
   readonly done: number;
   readonly needs: number;
+  /** A bench job writing a part instead of a preset. */
+  readonly part?: PartSpec;
 }
 
 export interface LabState {
@@ -152,12 +169,12 @@ type PausedJob = Job & { readonly stalled: true };
 const isPaused = (job: Job): boolean => 'stalled' in job && job.stalled === true;
 
 const paused = (job: Job): Job => {
-  const p: PausedJob = { inputs: job.inputs, preset: job.preset, done: job.done, needs: job.needs, stalled: true };
+  const p: PausedJob = { inputs: job.inputs, preset: job.preset, done: job.done, needs: job.needs, stalled: true, ...(job.part ? { part: job.part } : {}) };
   return p;
 };
 
 /** The job after it has run: a running job is never marked stalled. */
-const running = (job: Job, done: number): Job => ({ inputs: job.inputs, preset: job.preset, done, needs: job.needs });
+const running = (job: Job, done: number): Job => ({ inputs: job.inputs, preset: job.preset, done, needs: job.needs, ...(job.part ? { part: job.part } : {}) });
 
 const presetAffinity = (p: Preset): Record<Metric, number> =>
   byMetric((m) => {
@@ -239,6 +256,25 @@ export function startWrite(s: LabState, env: LabEnv, blank: string, preset: stri
   return { ...s, bench: { inputs: [blank], preset, done: 0, needs: RULES.writeSeconds } };
 }
 
+/** Whether the bench can print `part` onto `blank` (the part's cost is paid by the caller, from the base's stores). */
+export function canWritePart(s: LabState, env: LabEnv, blank: string, part: PartSpec): Check {
+  if (!env.powered) return no(NO_POWER);
+  if (s.bench !== null) return no('The bench is busy: wait for its write to finish.');
+  const c = find(s, blank);
+  if (c === undefined) return no('That cartridge is not in the lab.');
+  if (c.kind !== 'blank') return no(`${c.name} is not a blank: parts go on blanks only.`);
+  const busy = jobOf(s, c.id);
+  if (busy !== null) return no(busyWhy(c, busy));
+  if (!validPart(part)) return no('That part has no generator.');
+  return OK;
+}
+
+/** Puts a blank and a part on the bench. Throws Error(why) when refused. */
+export function startPartWrite(s: LabState, env: LabEnv, blank: string, part: PartSpec): LabState {
+  orThrow(canWritePart(s, env, blank, part));
+  return { ...s, bench: { inputs: [blank], preset: null, done: 0, needs: RULES.writeSeconds, part } };
+}
+
 export function canCombine(s: LabState, env: LabEnv, ids: readonly string[]): Check {
   if (!env.powered) return no(NO_POWER);
   if (s.combiner !== null) return no('The combiner is busy: wait for its mix to finish.');
@@ -253,6 +289,7 @@ export function canCombine(s: LabState, env: LabEnv, ids: readonly string[]): Ch
     inputs.push(c);
   }
   if (inputs.some((c) => c.kind === 'blank')) return no('A blank has nothing to mix: write a preset on it first.');
+  if (inputs.some((c) => c.kind === 'part')) return no('A part cartridge goes in the beam rifle, not the combiner.');
   for (const c of inputs) {
     if (c.slot !== null) return no(`${c.name} is in a machine: take it out first.`);
     const busy = jobOf(s, c.id);
@@ -271,6 +308,7 @@ export function canSlot(s: LabState, id: string, machine: number): Check {
   const c = find(s, id);
   if (c === undefined) return no('That cartridge is not in the lab.');
   if (c.kind === 'blank') return no('A blank does nothing: write a preset on it first.');
+  if (c.kind === 'part') return no('A part cartridge goes in the beam rifle, not a machine.');
   if (c.slot !== null) return no(`${c.name} is already in a machine: take it out first.`);
   const busy = jobOf(s, c.id);
   if (busy !== null) return no(busyWhy(c, busy));
@@ -323,6 +361,24 @@ function runBench(s: LabState, env: LabEnv, d: number, events: LabEvent[]): LabS
   const job = s.bench;
   if (job === null) return s;
   const done = job.done + d;
+  if (job.part !== undefined) {
+    if (done < job.needs) return { ...s, bench: running(job, done) };
+    const target = job.inputs[0];
+    const blank = target === undefined ? undefined : find(s, target);
+    if (blank === undefined) return { ...s, bench: null };
+    events.push({ type: 'written', id: blank.id });
+    const printed: Cartridge = {
+      id: blank.id,
+      name: job.part.name,
+      kind: 'part',
+      preset: null,
+      from: [],
+      affinity: { pxd: 1, vtx: 1, lx: 1, aq: 1 },
+      slot: blank.slot,
+      part: job.part,
+    };
+    return { ...s, bench: null, cartridges: s.cartridges.map((c) => (c.id === blank.id ? printed : c)) };
+  }
   const preset = env.presets.find((p) => p.id === job.preset);
   if (done < job.needs || preset === undefined) {
     // Still writing, or the preset has gone from env.presets: the job never fails,
@@ -415,12 +471,58 @@ const stringList = (x: unknown): string[] | null => {
   return out;
 };
 
+const numberRecord = (x: unknown): Record<string, number> | null => {
+  if (!isRecord(x)) return null;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(x)) {
+    if (!isNumber(v)) return null;
+    out[k] = v;
+  }
+  return out;
+};
+
+const stringRecord = (x: unknown): Record<string, string> | null => {
+  if (!isRecord(x)) return null;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(x)) {
+    if (!isString(v)) return null;
+    out[k] = v;
+  }
+  return out;
+};
+
+/** A part spec read back from JSON, or null when any field has the wrong shape. */
+function loadPart(x: unknown): PartSpec | null {
+  if (!isRecord(x)) return null;
+  const { name, gen, params, slotMaterials, ops } = x;
+  if (!isString(name) || !isString(gen) || gen.length === 0) return null;
+  const p = numberRecord(params), sm = stringRecord(slotMaterials);
+  if (p === null || sm === null || !isList(ops)) return null;
+  const list: { op: string; params: Record<string, number> }[] = [];
+  for (const o of ops) {
+    if (!isRecord(o) || !isString(o.op)) return null;
+    const op = numberRecord(o.params);
+    if (op === null) return null;
+    list.push({ op: o.op, params: op });
+  }
+  return { name, gen, params: p, slotMaterials: sm, ops: list };
+}
+
+function validPart(part: PartSpec): boolean {
+  return loadPart(part) !== null;
+}
+
 function loadCartridge(x: unknown, nextId: number): Cartridge | null {
   if (!isRecord(x)) return null;
   const { id, name, kind, preset, from, affinity, slot } = x;
   if (!isString(id) || !isString(name)) return null;
   const n = CARTRIDGE_ID.exec(id)?.[1];
   if (n === undefined || !(Number(n) < nextId)) return null; // only ids already handed out
+  if (kind === 'part') {
+    const part = loadPart(x.part);
+    if (part === null || preset !== null || slot !== null) return null; // a part never names a preset or sits in a machine
+    return { id, name, kind, preset: null, from: [], affinity: { pxd: 1, vtx: 1, lx: 1, aq: 1 }, slot: null, part };
+  }
   if (kind !== 'blank' && kind !== 'preset' && kind !== 'mix') return null;
   if (preset !== null && !isString(preset)) return null;
   if ((kind === 'preset') !== (preset !== null)) return null; // only a written preset names one
@@ -443,7 +545,13 @@ function loadJob(x: unknown): Job | null {
   if (preset !== null && !isString(preset)) return null;
   if (!isNumber(done) || done < 0 || !isNumber(needs) || needs < 0) return null;
   if (stalled !== undefined && typeof stalled !== 'boolean') return null;
-  const job: Job = { inputs: ids, preset, done, needs };
+  let part: PartSpec | undefined;
+  if (x.part !== undefined) {
+    const p = loadPart(x.part);
+    if (p === null || preset !== null) return null;
+    part = p;
+  }
+  const job: Job = { inputs: ids, preset, done, needs, ...(part ? { part } : {}) };
   return stalled === true ? paused(job) : job;
 }
 
@@ -451,7 +559,8 @@ function loadJob(x: unknown): Job | null {
 function benchHolds(job: Job, byId: ReadonlyMap<string, Cartridge>): boolean {
   const [id, ...rest] = job.inputs;
   const c = id === undefined ? undefined : byId.get(id);
-  return job.preset !== null && rest.length === 0 && c !== undefined && c.kind === 'blank';
+  // a bench job writes either a preset or a part, onto one blank
+  return (job.preset !== null) !== (job.part !== undefined) && rest.length === 0 && c !== undefined && c.kind === 'blank';
 }
 
 /** The combiner holds 2 to 4 different written cartridges from the rack. */
@@ -459,12 +568,13 @@ function combinerHolds(job: Job, byId: ReadonlyMap<string, Cartridge>): boolean 
   const n = job.inputs.length;
   return (
     job.preset === null &&
+    job.part === undefined &&
     n >= RULES.minInputs &&
     n <= RULES.maxInputs &&
     new Set(job.inputs).size === n &&
     job.inputs.every((id) => {
       const c = byId.get(id);
-      return c !== undefined && c.kind !== 'blank' && c.slot === null;
+      return c !== undefined && c.kind !== 'blank' && c.kind !== 'part' && c.slot === null;
     })
   );
 }

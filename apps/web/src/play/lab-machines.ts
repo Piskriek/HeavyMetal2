@@ -173,29 +173,59 @@ export function mergeStaticMeshes(
   let added = 0;
   for (const [mat, list] of byMaterial) {
     if (list.length < 2 || mat.transparent) continue;
-    const geos = list.map((mesh) => {
+    const temps: THREE.BufferGeometry[] = [];
+    let geos = list.map((mesh) => {
       const g = mesh.geometry.clone();
       g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, mesh.matrixWorld));
+      temps.push(g);
       return g;
     });
-    const merged = mergeGeometries(geos, false);
+    // One material can mix indexed geometry (three's boxes and shapes) with unindexed (labkit's props): those all merge unindexed
+    if (geos.some((g) => g.index) && geos.some((g) => !g.index)) {
+      geos = geos.map((g) => {
+        if (!g.index) return g;
+        const flat = g.toNonIndexed();
+        temps.push(flat);
+        return flat;
+      });
+    }
+    // Only geometries with the same vertex layout merge into one buffer, so an odd one out keeps its own mesh and the rest still merge
+    const byLayout = new Map<string, { readonly meshes: THREE.Mesh[]; readonly geos: THREE.BufferGeometry[] }>();
+    geos.forEach((g, i) => {
+      const key = vertexLayout(g);
+      const set = byLayout.get(key) ?? { meshes: [], geos: [] };
+      set.meshes.push(list[i]!);
+      set.geos.push(g);
+      byLayout.set(key, set);
+    });
+    for (const set of byLayout.values()) {
+      if (set.geos.length < 2) continue;
+      const merged = mergeGeometries(set.geos, false);
+      if (!merged) continue;
+      if (registerDisposable) {
+        registerDisposable(merged);
+      }
+      for (const mesh of set.meshes) mesh.removeFromParent();
+      const out = new THREE.Mesh(merged, mat);
+      out.name = `${root.name || 'static'}:merged`;
+      out.castShadow = set.meshes[0]!.castShadow;
+      out.receiveShadow = set.meshes[0]!.receiveShadow;
+      root.add(out);
+      added += 1;
+    }
     // POL-105: always dispose temporary cloned geometries after mergeGeometries
-    geos.forEach((g) => g.dispose());
-    if (!merged) {
-      continue;
-    }
-    if (registerDisposable) {
-      registerDisposable(merged);
-    }
-    for (const mesh of list) mesh.removeFromParent();
-    const out = new THREE.Mesh(merged, mat);
-    out.name = `${root.name || 'static'}:merged`;
-    out.castShadow = list[0]!.castShadow;
-    out.receiveShadow = list[0]!.receiveShadow;
-    root.add(out);
-    added += 1;
+    temps.forEach((g) => g.dispose());
   }
   return added;
+}
+
+/** A geometry's vertex layout: its attributes' names, sizes and array types (mergeGeometries needs them all to agree). */
+function vertexLayout(g: THREE.BufferGeometry): string {
+  const attrs = Object.keys(g.attributes).sort().map((name) => {
+    const a = g.getAttribute(name);
+    return `${name}:${a.itemSize}:${a.array.constructor.name}:${a.normalized ? 1 : 0}`;
+  });
+  return `${attrs.join('|')}${Object.keys(g.morphAttributes).length > 0 ? '|morph' : ''}`;
 }
 
 export function stationById(id: string): LabStationSpec | null {
@@ -669,6 +699,7 @@ export function buildGateRibbedCoils(
   const coilD = 0.14;
   const finGeo = keep(new THREE.BoxGeometry(coilW, coilH, coilD));
   const collarGeo = keep(new THREE.BoxGeometry(coilW + 0.05, coilH + 0.05, coilD * 0.65));
+  const ribGeo = keep(new THREE.BoxGeometry(coilW + 0.012, 0.018, coilD + 0.012));
 
   for (const [cx, cy, cz] of positions) {
     const collar = new THREE.Mesh(collarGeo, m.darkSteel);
@@ -690,10 +721,7 @@ export function buildGateRibbedCoils(
     // Add 6 dark-steel rib separators so each block reads as a 3D ribbed copper coil stack, never a flat rectangle
     for (let r = 0; r < 6; r++) {
       const ry = -coilH / 2 + ((r + 0.5) * coilH) / 6;
-      const rib = new THREE.Mesh(
-        keep(new THREE.BoxGeometry(coilW + 0.012, 0.018, coilD + 0.012)),
-        m.darkSteel,
-      );
+      const rib = new THREE.Mesh(ribGeo, m.darkSteel);
       rib.position.set(0, ry, 0);
       coilBlock.add(rib);
     }
@@ -703,8 +731,9 @@ export function buildGateRibbedCoils(
   }
 
   // Draw-call budget (TICKET-06): the collars and the 36 rib separators are dark steel and never move, so they become one mesh.
-  // The six coil blocks keep their own draw call (each has its own emissive material, lit bottom to top by coilLevels).
-  mergeStaticMeshes(housings, coils, keep);
+  // The six coil blocks keep their own draw call (each has its own emissive material, lit bottom to top by coilLevels). The coils are
+  // not passed as kept subtrees: that would skip their ribs (36 draws); a coil block has children, so it is never merged itself.
+  mergeStaticMeshes(housings, [], keep);
 
   return { housings, coils };
 }

@@ -768,8 +768,8 @@ export function createLabRoom(o: {
   ] as const) {
     westDrops.add(buildCableDrop(m, cx, cz, topY, 4.2));
   }
-  mergeStaticMeshes(westDrops, [], keep); // draw-call budget (TICKET-06): the eight drops are three meshes, one per material
-  group.add(westDrops);
+  // draw-call budget (TICKET-06): the eight drops are in the shell, so they merge into its meshes, one per material
+  shell.add(westDrops);
 
   swaps.push(() => swapAll([{ p: bank, id: 'capacitor-bank', kept: [bankBusBars] }]));
   // The breaker panel (sheet 07): the isolator turns about its spindle (the panel's normal) and the three sub-breakers flip in their sockets.
@@ -908,9 +908,9 @@ export function createLabRoom(o: {
     return true;
   });
 
-  // Overhead square cable trays along BOTH West wall (-7.6) and East wall (+7.55) at y = 4.2 m
-  group.add(kit.cableTray(m, [-7.6, 1.2], [-7.6, -8.2], 4.2, ROOM.height).group);
-  group.add(kit.cableTray(m, [7.55, -8.2], [7.55, 1.2], 4.2, ROOM.height).group);
+  // Overhead square cable trays along BOTH West wall (-7.6) and East wall (+7.55) at y = 4.2 m (in the shell: merged with it per material)
+  shell.add(kit.cableTray(m, [-7.6, 1.2], [-7.6, -8.2], 4.2, ROOM.height).group);
+  shell.add(kit.cableTray(m, [7.55, -8.2], [7.55, 1.2], 4.2, ROOM.height).group);
 
   // ---- East Wall: The Four Distinct, Grounded, Cabled, E-Interactable Studio & Fabrication Machines (Sheet 07)
   const rack = place(kit.presetRack(m), 7.45, -7.0, Math.PI / 2);
@@ -939,8 +939,8 @@ export function createLabRoom(o: {
   ] as const) {
     eastDrops.add(buildCableDrop(m, cx, cz, topY, 4.2));
   }
-  mergeStaticMeshes(eastDrops, [], keep); // draw-call budget (TICKET-06 & POL-105): the five drops are three meshes, registered in keep
-  group.add(eastDrops);
+  // draw-call budget (TICKET-06): the five drops are in the shell, so they merge into its meshes, one per material
+  shell.add(eastDrops);
 
   // Floor covers carrying power from West Power Wall -> Gate Plinth -> East Studio Bay & Planet Table (nothing wireless!)
   const coverRuns = [
@@ -951,10 +951,12 @@ export function createLabRoom(o: {
     { points: [[7.0, -7.0], [7.0, -1.0]] as const, width: 0.26 },
     { points: [[5.0, -1.0], [5.0, -4.0]] as const, width: 0.24 },
   ] as const;
+  // The covers and their treads are in the shell (draw-call budget): the six covers' bodies, hazard edges and pulse slots merge across
+  // the covers and with the shell, one mesh per material (the pulse slots share one material and carry their own UVs)
   const covers = coverRuns.map((r) => kit.floorCover(m, r.points.map((pt) => [pt[0], pt[1]]), r.width));
-  for (const c of covers) group.add(c.group);
-  // POL-68: Transverse ribbed steel tread bars across all floor cable covers (1 merged static mesh)
-  group.add(buildRibbedFloorCoverTreads(coverRuns, m, keep));
+  for (const c of covers) shell.add(c.group);
+  // POL-68: Transverse ribbed steel tread bars across all floor cable covers (merged into the shell's gunmetal)
+  shell.add(buildRibbedFloorCoverTreads(coverRuns, m, keep));
 
   const pulseUniforms = { uTime: { value: 0 }, uPower: { value: 0 } };
   const pulseMat = keep(new THREE.ShaderMaterial({
@@ -1415,8 +1417,9 @@ export function createLabRoom(o: {
   };
 
   // Draw-call budget (TICKET-06): the shell's panels that share a material become one mesh each. The storm plane stays on its own
-  // (syncPlane shows and hides it); the transparent materials are never merged (their draw order matters).
-  mergeStaticMeshes(shell, [stormPlane]);
+  // (syncPlane shows and hides it); the transparent materials are never merged (their draw order matters). The cable trays, the drops,
+  // the floor covers and their treads are in the shell too, so they add no draw call of their own. The merged geometry is kept (POL-105).
+  mergeStaticMeshes(shell, [stormPlane], keep);
 
   return {
     envLevel: () => 0.03 + lastPower.main * 0.2,

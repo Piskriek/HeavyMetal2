@@ -196,6 +196,7 @@ export default defineConfig(async ({ mode }) => ({
       '@hm/plotsim': p('../../packages/plotsim/src/index.ts'),
       '@hm/structure': p('../../packages/structure/src/index.ts'),
       '@hm/lattice': p('../../packages/lattice/src/index.ts'),
+      '@hm/kitspec': p('../../packages/kitspec/src/index.ts'),
       '@hm/substrate': p('../../packages/substrate/src/index.ts'),
       '@hm/basegear': p('../../packages/basegear/src/index.ts'),
       '@hm/heavygear': p('../../packages/heavygear/src/index.ts'),

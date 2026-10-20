@@ -226,7 +226,7 @@ test('ridge cap straddles z = 0 about 0.5 m wide; gable is a 0.25 m triangle wal
   }
 });
 
-test('roof set is deterministic and builds in under 30 ms at stage 6', () => {
+test('performance: roof set is deterministic and builds in under 30 ms at stage 6', () => {
   for (const stage of [1, 6]) {
     const x = buildRoofs(stage); const y = buildRoofs(stage);
     for (const k of ROOF_NAMES) {
@@ -465,7 +465,7 @@ test('building is deterministic', () => {
   }
 });
 
-test('every piece builds in under 30 ms at stage 6 (best of three, after warm-up)', () => {
+test('performance: every piece builds in under 30 ms at stage 6 (best of three, after warm-up)', () => {
   const makers: Array<[string, () => Piece]> = [
     ['foundation', () => foundation(m, { stage: 6, skirt: 3 })],
     ['wall', () => wall(m, { stage: 6 })],

@@ -101,7 +101,7 @@ const cone = (size: number, cell: number): Terrain => grid(size, cell, (x, z) =>
 const ridges = (size: number, cell: number): Terrain =>
   grid(size, cell, (x, z) => 20 * Math.sin(x / 9) * Math.cos(z / 11) + 8 * Math.sin((x + z) / 5) + 0.15 * x);
 
-test('regression: overflow between hollows always settles — 48 x 48, four sources, in under 100 ms', () => {
+test('performance: regression, overflow between hollows always settles — 48 x 48, four sources, in under 100 ms', () => {
   const t = ridges(48, 7.8);
   const src: Source[] = [{ x: 7, z: 7, share: 1 }, { x: 37, z: 11, share: 1 }, { x: 24, z: 24, share: 2 }, { x: 11, z: 41, share: 1 }];
   const t0 = performance.now();

@@ -416,7 +416,7 @@ test('13. Determinism, seed sensitivity, and no NaNs', () => {
   }
 });
 
-test('14. Performance: n=256, stage 6, tier high runs in under 40 ms in Node', () => {
+test('performance: n=256, stage 6, tier high runs in under 40 ms in Node', () => {
   const input = makeTestInput({ n: 256, cellM: 1, stage: 6, tier: 'high', seed: 777 });
   // Warmup
   bakePlotBiome(input);

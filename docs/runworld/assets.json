@@ -790,7 +790,7 @@
       "id": "capacitor-can",
       "panel": "21/44-power-wall.png",
       "class": "lab",
-      "size": 1.4,
+      "size": 1,
       "axis": "height",
       "view": "three-quarter",
       "budgets": [
@@ -801,7 +801,7 @@
       "ref": "asset:capacitor-bank",
       "symmetric": true,
       "note": "plan 38 kit pilot (owner 2026-10-20: one capacitor block placed several times): the can alone; skid, terminal caps, standoffs and bus bars are code (@hm/kitspec)",
-      "subject": "ONE capacitor can on its own, exactly like one of the cans in the reference: a tall SQUARE-SECTION capacitor can (a box with bevelled vertical edges) about 1.4 metres tall and 0.45 metres square, a flat closed top plate with nothing on it, a dark grey base band and a thin amber hazard band near the top; NO round can, NO terminals, NO bus bars, NO skid, NO cables, NO lettering, NO second can. In the base kit family style: warm light-grey painted steel, dark grey trim, amber hazard bands"
+      "subject": "ONE capacitor can on its own, exactly like one of the cans in the reference: a tall SQUARE-SECTION capacitor can (a box with bevelled vertical edges) about 1 metre tall and half a metre square, a flat closed top plate with nothing on it, a dark grey base band and a thin amber hazard band near the top; NO round can, NO terminals, NO bus bars, NO skid, NO cables, NO lettering, NO second can. In the base kit family style: warm light-grey painted steel, dark grey trim, amber hazard bands"
     },
     {
       "id": "breaker-panel",

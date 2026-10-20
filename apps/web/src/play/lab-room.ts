@@ -3,7 +3,6 @@ export { armoryRack, shouldShowAmmoBadge, ARMORY_RAIL_POS, ARMORY_PICKUP_REACH, 
 import {
   aimLabStation,
   buildCableDrop,
-  buildCapacitorBusBars,
   buildConsoleLeverQuadrant,
   buildGateRibbedCoils,
   buildHardwareFabricatorProp,
@@ -22,6 +21,9 @@ import {
   type RightWallMachineId,
 } from './lab-machines';
 import { applyMonitorEqualizerNearShotFix } from './window-g-final-qa-hooks';
+import { maxRank, type Tier } from '@hm/kitspec';
+import { buildKitPreset } from './kit-build';
+import { CAPACITOR_BANK_KIT } from './kit-capacitor-bank';
 export {
   aimLabStation,
   LAB_STATIONS,
@@ -136,7 +138,7 @@ export const WEAPON_BENCH_SET: readonly string[] = [
 ];
 
 export const LAB_GEN_ASSETS: readonly string[] = [
-  'gate', 'capacitor-bank', 'breaker-panel', 'breaker-handle', 'relay-cabinet', 'control-box', 'operator-console', 'console-lever',
+  'gate', 'capacitor-can', 'breaker-panel', 'breaker-handle', 'relay-cabinet', 'control-box', 'operator-console', 'console-lever',
   'preset-rack', 'preset-bench', 'preset-combiner', 'planet-table', 'her-desk', 'cot', 'wall-radio', 'armory-rail', 'weapon-bench', 'weapon-frame',
   ...WEAPON_BENCH_SET, ...CLUTTER_MODELS,
 ];
@@ -736,9 +738,6 @@ export function createLabRoom(o: {
   // ---- West Wall: The Power Wall (Sheet 07, south to north — grounded & cabled)
   void POWER_WALL_SHEET07_ORDER;
   const bank = place(kit.capacitorBank(m), -7.2, 1.0, -Math.PI / 2);
-  // POL-66: Copper bus bars linking the 3 Capacitor Bank cells into one coherent bank + overhead tray trunk
-  const bankBusBars = buildCapacitorBusBars(m, keep);
-  bank.group.add(bankBusBars);
   const breaker = place(kit.breakerPanel(m), -7.4, -1.0, -Math.PI / 2);
 
   // Grounded steel support plinth under the 4 Relay Cabinets (y = 0 to 0.72 m) so relay cabinets never float on the wall
@@ -757,7 +756,7 @@ export function createLabRoom(o: {
   // Vertical square-section conduit drops from West overhead cable tray (y = 4.2) to every West-wall unit
   const westDrops = new THREE.Group();
   for (const [cx, cz, topY] of [
-    [-7.35, 1.0, 1.85],
+    [-7.49, 1.0, 1.345], // lands on the capacitor bank's wall-side bus bar (kit-capacitor-bank.ts: bar top 1.345 m)
     [-7.45, -1.0, 2.05],
     [-7.6, -2.6, 2.02],
     [-7.6, -3.5, 2.02],
@@ -771,7 +770,22 @@ export function createLabRoom(o: {
   // draw-call budget (TICKET-06): the eight drops are in the shell, so they merge into its meshes, one per material
   shell.add(westDrops);
 
-  swaps.push(() => swapAll([{ p: bank, id: 'capacitor-bank', kept: [bankBusBars] }]));
+  // Plan 38 pilot: the bank is a kit (kit-capacitor-bank.ts): one generated can placed six times, the skid, caps, insulators
+  // and bus bars as square-section code. The lab is shielded, so it shows its full stage; the Graphics tier sets the
+  // detail rank (Low draws ranks 0-1, so the lifting eyes and bolts go).
+  const detailTier: Tier = o.quality === 'low' || o.quality === 'medium' ? o.quality : 'high';
+  swaps.push(() => {
+    const built = buildKitPreset(CAPACITOR_BANK_KIT, 'capacitor-bank', {
+      materials: { darkSteel: m.darkSteel, gunmetal: m.gunmetal, copper: m.copper, hazard: m.hazard },
+      gen: genFor,
+      maxRank: maxRank(6, detailTier),
+      keep,
+    });
+    if (!built) return false;
+    replaceVisual(bank.group, built.group);
+    fitOverhang(bank);
+    return true;
+  });
   // The breaker panel (sheet 07): the isolator turns about its spindle (the panel's normal) and the three sub-breakers flip in their sockets.
   // The panel's own model carries the hazard plate, the knob and the sockets; the code adds only the moving parts and the socket collars.
   const isolator = new THREE.Group();

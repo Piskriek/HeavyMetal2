@@ -1,9 +1,25 @@
 /* The preset bench's Parts page (bench-parts.tsx), in the bench window's own vocabulary (play.css .play-carts). */
 .bench-parts-gens {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   gap: 6px;
   margin-bottom: 8px;
+}
+/* a part chip: its thumbnail (rendered by part-preview.tsx) beside its name */
+.bench-parts .bench-parts-gens button {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
+  padding: 4px 8px 4px 4px;
+}
+.bench-parts-gens img,
+.bench-parts-gens i {
+  display: block;
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  background: radial-gradient(120% 100% at 50% 35%, rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0.3));
 }
 /* selected: the bench's power colour on the border and a light text (the window's .on rule left the text dark on dark) */
 .bench-parts .bench-parts-gens button.on,
@@ -60,12 +76,18 @@
   font-size: 12px;
 }
 
+/* the materials as lit balls (materialBall in part-swatches.ts): the shine tells metal from paint before a click */
 .bench-parts-swatches button {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   padding: 0;
-  border-radius: 5px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  transition: transform 0.12s ease;
+}
+.bench-parts-swatches button:hover,
+.bench-parts-swatches button:focus-visible {
+  transform: scale(1.15);
 }
 .bench-parts-swatches button[aria-checked='true'] {
   outline: 2px solid var(--power);
@@ -79,4 +101,66 @@
 }
 .bench-parts-cost b {
   color: rgba(232, 238, 241, 0.95);
+}
+
+/* the live preview (part-preview.tsx): the part on a dark stage, its size and triangle count under it */
+.part-preview {
+  position: relative;
+  margin: 0 0 10px;
+  aspect-ratio: 2 / 1;
+  /* a mid-grey studio backdrop, so dark steel reads as well as paint */
+  background: radial-gradient(110% 90% at 50% 30%, #34424f, #121920 85%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.part-preview canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+.part-preview canvas:active {
+  cursor: grabbing;
+}
+.part-preview figcaption {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(232, 238, 241, 0.7);
+  pointer-events: none;
+}
+
+/* a try-on in progress: a tag over the view says what is shown and that a click keeps it */
+.part-preview-trying {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  max-width: calc(100% - 12px);
+  padding: 3px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: rgba(232, 238, 241, 0.95);
+  background: rgba(4, 8, 12, 0.72);
+  pointer-events: none;
+}
+.part-preview.trying {
+  border-color: var(--power);
+}
+@media (prefers-reduced-motion: reduce) {
+  .bench-parts-swatches button {
+    transition: none;
+  }
+  .bench-parts-swatches button:hover,
+  .bench-parts-swatches button:focus-visible {
+    transform: none;
+  }
 }

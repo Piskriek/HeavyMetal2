@@ -14,22 +14,13 @@ import { GENERATORS, resolveParams, triangleCount, type MeshData, type ParamSpec
 import { evaluateOperatorStack, MESH_OPERATORS, OPERATOR_FAMILIES, type OperatorStackLayer } from '@hm/meshops';
 import { maxRank } from '@hm/kitspec';
 import { DEFAULT_SLOT_MATERIAL, formatValue, PART_SWATCHES } from '../play/part-swatches';
+import { partGeometry } from '../play/part-preview';
 import './part-designer.css';
 
 const STAGES = [0, 1, 2, 3, 4, 5, 6] as const;
 const RANK_NAMES = ['Silhouette', 'Forms', 'Small details'] as const;
 const RANK_SHORT = ['R0', 'R1', 'R2'] as const;
 const slotLabel = (s: string): string => (s[0]!.toUpperCase() + s.slice(1)).replace(/-/g, ' ');
-
-function toGeometry(md: MeshData, slotNames: readonly string[]): THREE.BufferGeometry {
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(md.positions, 3));
-  g.setAttribute('normal', new THREE.BufferAttribute(md.normals, 3));
-  g.setAttribute('uv', new THREE.BufferAttribute(md.uvs, 2));
-  g.setIndex(new THREE.BufferAttribute(md.indices, 1));
-  for (const s of md.slots) g.addGroup(s.start, s.count, Math.max(0, slotNames.indexOf(s.name)));
-  return g;
-}
 
 /** A part's stack run safely: an operator that throws leaves the mesh as it was before it, and says which one. */
 function runStack(base: MeshData, stack: readonly OperatorStackLayer[], rank: Rank): { mesh: MeshData; error: string | null } {
@@ -158,7 +149,7 @@ export const PartDesigner: React.FC = () => {
     const v = viewRef.current;
     if (!v) return;
     const old = v.part.geometry;
-    v.part.geometry = toGeometry(mesh, slotNames);
+    v.part.geometry = partGeometry(mesh, slotNames);
     old.dispose();
     v.part.material = slotNames.map((s) => v.mats.get(slotMaterials[s] ?? 'paint') as THREE.Material);
   }, [mesh, slotNames, slotMaterials]);

@@ -15,6 +15,23 @@ export const PART_SWATCHES: readonly { readonly id: string; readonly name: strin
 
 export const swatchName = (id: string): string => PART_SWATCHES.find((s) => s.id === id)?.name ?? id;
 
+/**
+ * A swatch drawn as a small lit ball (a CSS background), so a player sees the material before trying it on: the highlight
+ * tightens and brightens as the surface gets smoother, metals darken toward the rim and catch a horizon band.
+ */
+export function materialBall(s: { readonly color: string; readonly metal: number; readonly rough: number }): string {
+  const smooth = 1 - Math.max(0, Math.min(1, s.rough));
+  const spot = Math.round(10 + (1 - smooth) * 34);
+  const hi = (0.2 + smooth * 0.7).toFixed(2);
+  const metal = s.metal > 0.5;
+  const layers = [
+    `radial-gradient(circle at 34% 28%, rgba(255, 255, 255, ${hi}) 0%, rgba(255, 255, 255, 0) ${spot}%)`,
+    ...(metal ? ['linear-gradient(172deg, rgba(255, 255, 255, 0) 52%, rgba(255, 255, 255, 0.16) 58%, rgba(255, 255, 255, 0) 66%)'] : []),
+    `radial-gradient(circle at 46% 40%, ${s.color} 30%, rgba(0, 0, 0, ${metal ? 0.78 : 0.5}) 100%)`,
+  ];
+  return layers.join(', ');
+}
+
 /** A slider value as people read it: millimetres for small parts, metres for big ones. */
 export function formatValue(spec: ParamSpec, v: number): string {
   if (spec.unit === 'choice') return spec.choices?.[Math.round(v - spec.min)] ?? String(v);

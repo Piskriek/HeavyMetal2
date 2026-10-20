@@ -13,6 +13,8 @@ Every look-and-feel system in the game is built the same way:
 5. **New designs are graphs, not code** (nodes plus exposed sliders), so a player's or an agent's design is safe to share by code, to sync with the shared world, and to validate. The Studio's bring-your-own-agent API (STUDIO_CREATIVE_SUITE_SPEC section 9) edits these graphs.
 6. **The world stores overrides:** a placed thing keeps its preset id plus per-path overrides, in the plot save, synced as JSON.
 
+**Preset inception (the owner):** "the studio is where you have maximum control. thats been the idea all along, preset inception." Presets are made of presets at every level: a part's sliders, a module of parts, a machine of modules, a base of machines, and likewise a material of layers, a light rig of lamps, a biome of species. The Drafting Table exposes a slice of this in play; the Studio exposes every level, with the player's own AI.
+
 ## 2. The four factories
 | Float | Machine | Preset | Engine (have / to build) | The beam applies it to |
 |---|---|---|---|---|

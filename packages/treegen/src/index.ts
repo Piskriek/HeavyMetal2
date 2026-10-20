@@ -17,11 +17,94 @@ import * as THREE from 'three';
 
 export type Species = 'pine' | 'oak' | 'birch';
 
+export interface TreeParamSpec {
+  readonly key: string;
+  readonly label: string;
+  readonly unit: 'm' | 'count' | 'choice';
+  readonly min: number;
+  readonly max: number;
+  readonly step: number;
+  readonly default: number;
+  readonly choices?: readonly string[];
+}
+
+export type TreeSliderParams = Readonly<Record<string, number>>;
+
+export interface FoliageSpeciesPreset {
+  readonly id: string;
+  readonly label: string;
+  readonly species: Species;
+  readonly params: TreeSliderParams;
+  readonly barkColor: readonly [number, number, number];
+  readonly leafColor: readonly [number, number, number];
+}
+
+export const TREE_PARAM_SPECS: readonly TreeParamSpec[] = [
+  { key: 'height', label: 'Height', unit: 'm', min: 1.5, max: 18.0, step: 0.5, default: 8.5 },
+  { key: 'crownSpread', label: 'Crown spread', unit: 'm', min: 0.5, max: 1.8, step: 0.05, default: 1.0 },
+  { key: 'crownBase', label: 'Crown base', unit: 'm', min: 0.1, max: 0.65, step: 0.05, default: 0.22 },
+  { key: 'trunkLean', label: 'Trunk lean', unit: 'm', min: 0.0, max: 0.4, step: 0.02, default: 0.12 },
+  { key: 'branchDensity', label: 'Branch density', unit: 'm', min: 0.5, max: 1.5, step: 0.05, default: 1.0 },
+  { key: 'leafScale', label: 'Leaf cluster size', unit: 'm', min: 0.5, max: 1.6, step: 0.05, default: 1.0 },
+  { key: 'windSway', label: 'Wind sway', unit: 'm', min: 0.0, max: 2.0, step: 0.1, default: 1.0 },
+  {
+    key: 'tint',
+    label: 'Canopy palette',
+    unit: 'choice',
+    min: 0,
+    max: 3,
+    step: 1,
+    default: 0,
+    choices: ['emerald', 'autumn-gold', 'birch-lime', 'hydro-teal'],
+  },
+];
+
+export function resolveTreeSliderParams(given: TreeSliderParams = {}): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const s of TREE_PARAM_SPECS) {
+    const raw = given[s.key];
+    let v = typeof raw === 'number' && Number.isFinite(raw) ? raw : s.default;
+    v = Math.min(s.max, Math.max(s.min, v));
+    if (s.step > 0) v = s.min + Math.round((v - s.min) / s.step) * s.step;
+    out[s.key] = Math.min(s.max, Math.max(s.min, Number(v.toFixed(6))));
+  }
+  return out;
+}
+
+export const FOLIAGE_SPECIES_PRESETS: Readonly<Record<string, FoliageSpeciesPreset>> = Object.freeze({
+  pine: {
+    id: 'pine',
+    label: 'Alpine Conifer Pine',
+    species: 'pine',
+    params: resolveTreeSliderParams({ height: 10.0, crownSpread: 1.0, crownBase: 0.15, trunkLean: 0.02, branchDensity: 1.0, leafScale: 1.0, windSway: 0.8, tint: 0 }),
+    barkColor: [0.26, 0.18, 0.14],
+    leafColor: [0.12, 0.28, 0.14],
+  },
+  oak: {
+    id: 'oak',
+    label: 'Broadleaf Canopy Oak',
+    species: 'oak',
+    params: resolveTreeSliderParams({ height: 8.5, crownSpread: 1.0, crownBase: 0.2, trunkLean: 0.16, branchDensity: 1.0, leafScale: 1.0, windSway: 1.0, tint: 0 }),
+    barkColor: [0.34, 0.26, 0.18],
+    leafColor: [0.25, 0.52, 0.20],
+  },
+  birch: {
+    id: 'birch',
+    label: 'Silver Spire Birch',
+    species: 'birch',
+    params: resolveTreeSliderParams({ height: 7.5, crownSpread: 1.0, crownBase: 0.26, trunkLean: 0.06, branchDensity: 1.0, leafScale: 1.0, windSway: 1.2, tint: 2 }),
+    barkColor: [0.85, 0.82, 0.75],
+    leafColor: [0.42, 0.65, 0.22],
+  },
+});
+
 export interface TreeOptions {
   readonly species: Species;
   readonly seed: number;
   readonly height: number;
   readonly detail: 0 | 1 | 2 | 3;
+  /** Optional slider overrides from a Water Maker Aq foliage cartridge or Studio preset. */
+  readonly sliders?: TreeSliderParams;
 }
 
 /** A segment of a limb; r0 at the start, r1 at the end. */
@@ -363,8 +446,25 @@ interface Tip {
   alive: boolean;
 }
 
-const growSkeleton = (species: Species, seed: number): Skel => {
-  const S = SPEC[species];
+const applySlidersToSpec = (base: Spec, sliders?: TreeSliderParams): Spec => {
+  if (!sliders) return base;
+  const p = resolveTreeSliderParams(sliders);
+  const spread = p.crownSpread ?? 1.0;
+  const density = p.branchDensity ?? 1.0;
+  const leafSc = p.leafScale ?? 1.0;
+  return {
+    ...base,
+    crownR: base.crownR * spread,
+    crownBase: clamp(p.crownBase ?? base.crownBase, 0.08, 0.75),
+    trunkLean: p.trunkLean ?? base.trunkLean,
+    attractors: Math.max(80, Math.round(base.attractors * density)),
+    splitP: clamp(base.splitP * (0.75 + 0.25 * density), 0.2, 0.92),
+    leafSize: base.leafSize * leafSc,
+  };
+};
+
+const growSkeleton = (species: Species, seed: number, sliders?: TreeSliderParams): Skel => {
+  const S = applySlidersToSpec(SPEC[species], sliders);
   const rng = new Rng(Math.floor(seed) * 1013 + SALT[species]);
   const lump: Lump = { a: rng.range(0, 6.283), b: rng.range(0, 6.283), c: rng.range(0, 6.283), amp: S.lumps };
 
@@ -965,24 +1065,50 @@ class Mesh {
   readonly pos: number[] = [];
   readonly nor: number[] = [];
   readonly uv: number[] = [];
+  readonly sphNor: number[] = [];
+  readonly faceNor: number[] = [];
+  readonly windAo: number[] = [];
+  readonly atlasUv: number[] = [];
 
-  vertex(p: Vec, n: Vec, u: number, v: number): void {
+  vertex(
+    p: Vec,
+    n: Vec,
+    u: number,
+    v: number,
+    sn: Vec = n,
+    fn: Vec = n,
+    w: readonly [number, number, number, number] = [0, 0, 1, -1],
+    au: number = u,
+    av: number = v,
+  ): void {
     this.pos.push(p[0], p[1], p[2]);
     this.nor.push(n[0], n[1], n[2]);
     this.uv.push(u, v);
+    this.sphNor.push(sn[0], sn[1], sn[2]);
+    this.faceNor.push(fn[0], fn[1], fn[2]);
+    this.windAo.push(w[0], w[1], w[2], w[3]);
+    this.atlasUv.push(au, av);
   }
 
   /** One triangle with one normal for all three corners. */
-  flat(a: Vec, b: Vec, c: Vec, ua: Vec, ub: Vec, uc: Vec): void {
+  flat(
+    a: Vec,
+    b: Vec,
+    c: Vec,
+    ua: Vec,
+    ub: Vec,
+    uc: Vec,
+    w: readonly [number, number, number, number] = [0, 0, 1, -1],
+  ): void {
     const n = norm(
       (b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]),
       (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]),
       (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]),
       UP,
     );
-    this.vertex(a, n, ua[0], ua[1]);
-    this.vertex(b, n, ub[0], ub[1]);
-    this.vertex(c, n, uc[0], uc[1]);
+    this.vertex(a, n, ua[0], ua[1], n, n, w, ua[0], ua[1]);
+    this.vertex(b, n, ub[0], ub[1], n, n, w, ub[0], ub[1]);
+    this.vertex(c, n, uc[0], uc[1], n, n, w, uc[0], uc[1]);
   }
 
   geometry(): THREE.BufferGeometry {
@@ -990,6 +1116,10 @@ class Mesh {
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.pos), 3));
     g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(this.nor), 3));
     g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(this.uv), 2));
+    g.setAttribute('spherizedNormal', new THREE.BufferAttribute(new Float32Array(this.sphNor), 3));
+    g.setAttribute('faceNormal', new THREE.BufferAttribute(new Float32Array(this.faceNor), 3));
+    g.setAttribute('windAndAo', new THREE.BufferAttribute(new Float32Array(this.windAo), 4));
+    g.setAttribute('atlasUv', new THREE.BufferAttribute(new Float32Array(this.atlasUv), 2));
     if (this.pos.length > 0) g.computeBoundingSphere();
     return g;
   }
@@ -1062,16 +1192,19 @@ const buildBark = (chains: readonly Chain[], plan: Plan, flat: boolean): THREE.B
         const D = a1[j] as Vec;
         const u0 = j / sides;
         const u1 = (j + 1) / sides;
+        const phase = ((ci * 0.6180339887) % 1);
+        const w0: readonly [number, number, number, number] = [clamp(A[1] / 10, 0, 1), phase, 0.85, -1];
+        const w1: readonly [number, number, number, number] = [clamp(C[1] / 10, 0, 1), phase, 0.9, -1];
         if (flat) {
-          m.flat(A, B, C, [u0, v0, 0], [u1, v0, 0], [u1, v1, 0]);
-          m.flat(A, C, D, [u0, v0, 0], [u1, v1, 0], [u0, v1, 0]);
+          m.flat(A, B, C, [u0, v0, 0], [u1, v0, 0], [u1, v1, 0], w0);
+          m.flat(A, C, D, [u0, v0, 0], [u1, v1, 0], [u0, v1, 0], w1);
         } else {
-          m.vertex(A, n0[j] as Vec, u0, v0);
-          m.vertex(B, n0[j + 1] as Vec, u1, v0);
-          m.vertex(C, n1[j + 1] as Vec, u1, v1);
-          m.vertex(A, n0[j] as Vec, u0, v0);
-          m.vertex(C, n1[j + 1] as Vec, u1, v1);
-          m.vertex(D, n1[j] as Vec, u0, v1);
+          m.vertex(A, n0[j] as Vec, u0, v0, n0[j] as Vec, n0[j] as Vec, w0);
+          m.vertex(B, n0[j + 1] as Vec, u1, v0, n0[j + 1] as Vec, n0[j + 1] as Vec, w0);
+          m.vertex(C, n1[j + 1] as Vec, u1, v1, n1[j + 1] as Vec, n1[j + 1] as Vec, w1);
+          m.vertex(A, n0[j] as Vec, u0, v0, n0[j] as Vec, n0[j] as Vec, w0);
+          m.vertex(C, n1[j + 1] as Vec, u1, v1, n1[j + 1] as Vec, n1[j + 1] as Vec, w1);
+          m.vertex(D, n1[j] as Vec, u0, v1, n1[j] as Vec, n1[j] as Vec, w1);
         }
       }
     }
@@ -1121,12 +1254,38 @@ const buildCards = (sk: Skel, plan: Plan): THREE.BufferGeometry => {
       const out = norm(ox - cen[0], oy - cen[1], oz - cen[2], face);
       const n = norm(face[0] * 0.3 + out[0], face[1] * 0.3 + out[1], face[2] * 0.3 + out[2], face);
 
-      m.vertex(p00, n, 0, 0);
-      m.vertex(p10, n, 1, 0);
-      m.vertex(p11, n, 1, 1);
-      m.vertex(p00, n, 0, 0);
-      m.vertex(p11, n, 1, 1);
-      m.vertex(p01, n, 0, 1);
+      /* per-vertex spherized normal (85% radial crown dome + 15% card plane normal),
+         true card faceNormal for grazing-angle fade, 2x2 sprig atlas UV, and wind/AO */
+      const quadIdx = (i + c) & 3;
+      const au0 = (quadIdx & 1) * 0.5;
+      const av0 = (quadIdx >> 1) * 0.5;
+      const au1 = au0 + 0.5;
+      const av1 = av0 + 0.5;
+      const crownSpan = Math.max(0.5, sk.nominalTop * sk.S.crownR);
+      const branchPhase = ((i * 0.6180339887 + c * 0.17) % 1);
+      const emitCorner = (pt: Vec, u: number, v: number, au: number, av: number, flutter: number): void => {
+        const dx = pt[0] - cen[0];
+        const dy = (pt[1] - cen[1]) * 1.12 + 0.08 * sk.nominalTop;
+        const dz = pt[2] - cen[2];
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        const radOut: Vec = dist > 1e-6 ? [dx / dist, dy / dist, dz / dist] : face;
+        const sph = norm(
+          radOut[0] * 0.85 + face[0] * 0.15,
+          radOut[1] * 0.85 + face[1] * 0.15,
+          radOut[2] * 0.85 + face[2] * 0.15,
+          n,
+        );
+        const trunkBend = clamp(pt[1] / Math.max(0.5, sk.nominalTop), 0, 1);
+        const ao = clamp(0.35 + 0.65 * (dist / crownSpan), 0.35, 1.0);
+        m.vertex(pt, n, u, v, sph, face, [trunkBend, branchPhase, ao, flutter], au, av);
+      };
+
+      emitCorner(p00, 0, 0, au0, av0, 0.25);
+      emitCorner(p10, 1, 0, au1, av0, 0.25);
+      emitCorner(p11, 1, 1, au1, av1, 1.0);
+      emitCorner(p00, 0, 0, au0, av0, 0.25);
+      emitCorner(p11, 1, 1, au1, av1, 1.0);
+      emitCorner(p01, 0, 1, au0, av1, 1.0);
     }
   }
   return m.geometry();
@@ -1224,8 +1383,14 @@ const buildBlobs = (sk: Skel, plan: Plan): THREE.BufferGeometry => {
       const j = jit[i] as number;
       return [cx + v[0] * rx * j, cy + v[1] * ry * j, cz + v[2] * rz * j] as Vec;
     });
+    const blobWind: readonly [number, number, number, number] = [
+      clamp(cy / Math.max(0.5, sk.nominalTop), 0, 1),
+      ((k * 0.6180339887) % 1),
+      0.85,
+      0.45,
+    ];
     for (const f of ICO_F) {
-      m.flat(pts[f[0]] as Vec, pts[f[1]] as Vec, pts[f[2]] as Vec, [0.18, 0.2, 0], [0.82, 0.24, 0], [0.5, 0.84, 0]);
+      m.flat(pts[f[0]] as Vec, pts[f[1]] as Vec, pts[f[2]] as Vec, [0.18, 0.2, 0], [0.82, 0.24, 0], [0.5, 0.84, 0], blobWind);
     }
   }
   return m.geometry();
@@ -1248,9 +1413,78 @@ const measure = (g: THREE.BufferGeometry): { top: number; rad: number; tris: num
   return { top, rad, tris: a.count / 3 };
 };
 
+export interface DilatedSprigAtlasData {
+  readonly size: number;
+  readonly rgba: Uint8Array;
+}
+
+/**
+ * Generates an edge-dilated 2x2 botanical sprig RGBA8 texture atlas (pine needles,
+ * oak lobes, birch serrated leaves, hydro fronds). Transparent pixels (alpha = 0)
+ * carry dilated leaf RGB so mipmapping never bleeds white/black fringes.
+ */
+export function buildDilatedSprigAtlas(size = 128): DilatedSprigAtlasData {
+  const s = Math.max(32, size);
+  const half = s >> 1;
+  const rgba = new Uint8Array(s * s * 4);
+
+  for (let py = 0; py < s; py++) {
+    for (let px = 0; px < s; px++) {
+      const qx = px >= half ? 1 : 0;
+      const qy = py >= half ? 1 : 0;
+      const qIdx = qy * 2 + qx;
+      const u = ((px % half) / Math.max(1, half - 1)) * 2 - 1;
+      const v = (py % half) / Math.max(1, half - 1);
+
+      const pairs = qIdx === 0 ? 5 : qIdx === 1 ? 3 : qIdx === 2 ? 4 : 4;
+      const stemW = 0.042 * (1 - 0.5 * v);
+      let opaque = v >= 0.03 && v <= 0.88 && Math.abs(u) <= stemW;
+      let veinShade = 0.85;
+
+      for (let p = 0; p < pairs; p++) {
+        const attachV = 0.16 + (p / pairs) * 0.6;
+        const dv = v - attachV;
+        const du = Math.abs(u) - 0.018;
+        const along = du * 0.74 + dv * 0.67;
+        const across = -du * 0.67 + dv * 0.74;
+        const maxLen = 0.43 * (1 - 0.22 * (p / pairs));
+        if (along >= 0 && along <= maxLen) {
+          const t = along / maxLen;
+          const lobe = qIdx === 1 ? 1 + 0.22 * Math.sin(t * Math.PI * 5) : 1;
+          const halfBlade = (qIdx === 0 ? 0.095 : 0.165) * Math.sin(Math.PI * Math.pow(t, 0.72)) * lobe;
+          if (Math.abs(across) <= halfBlade) {
+            opaque = true;
+            veinShade = 0.78 + 0.28 * (1 - Math.abs(across) / Math.max(1e-4, halfBlade));
+          }
+        }
+      }
+      if (v >= 0.52 && v <= 0.96) {
+        const t = (v - 0.52) / 0.44;
+        const halfBlade = (qIdx === 0 ? 0.12 : 0.2) * Math.sin(Math.PI * Math.pow(t, 0.75));
+        if (Math.abs(u) <= halfBlade) {
+          opaque = true;
+          veinShade = 0.82 + 0.24 * (1 - Math.abs(u) / Math.max(1e-4, halfBlade));
+        }
+      }
+
+      const idx = (py * s + px) * 4;
+      // Neutral white-balanced botanical luminance (multiplied by vertex color in shader)
+      // with full RGB edge dilation into alpha=0 texels:
+      const lum = Math.round(clamp((185 + 55 * v) * veinShade, 90, 255));
+      rgba[idx] = Math.round(lum * 0.92);
+      rgba[idx + 1] = lum;
+      rgba[idx + 2] = Math.round(lum * 0.88);
+      rgba[idx + 3] = opaque ? 255 : 0;
+    }
+  }
+  return { size: s, rgba };
+}
+
 export function growTree(o: TreeOptions): Tree {
-  const height = o.height > 0 ? o.height : 1;
-  const sk = growSkeleton(o.species, o.seed);
+  const sliderHeight = o.sliders?.height;
+  const rawHeight = typeof sliderHeight === 'number' && sliderHeight > 0 ? sliderHeight : o.height;
+  const height = rawHeight > 0 ? rawHeight : 1;
+  const sk = growSkeleton(o.species, o.seed, o.sliders);
   scaleSkel(sk, height / sk.nominalTop);
 
   const chains = buildChains(sk);

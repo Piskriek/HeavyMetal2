@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { flatten, type DetailRank, type Kit, type Overrides, type PlacedPart } from '@hm/kitspec';
 import { buildPart, type Rank } from '@hm/partgen';
+import { applyOps } from './part-cartridge';
 
 export interface KitBuild {
   readonly group: THREE.Group;
@@ -138,8 +139,9 @@ export function buildKitPreset(kit: Kit, preset: string, o: KitBuildOptions): Ki
     } else if (src.kind === 'param') {
       // one variant per rank this part can show at: the generator's own detail follows the cap
       for (let gr = p.rank; gr <= 2; gr++) {
-        const md = buildPart(src.gen, src.params, gr as Rank);
-        if (!md) break;
+        const base = buildPart(src.gen, src.params, gr as Rank);
+        if (!base) break;
+        const md = applyOps(base, src.ops);
         for (const slot of md.slots) {
           const matName = p.slotMaterials?.[slot.name] ?? p.material;
           const material = o.materials[matName];

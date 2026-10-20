@@ -37,7 +37,13 @@ export type PartSource =
   /** A procedural box, `size` across, standing on its origin (y from 0 to size[1]) and centred in x and z. */
   | { readonly kind: 'box'; readonly size: Vec3 }
   /** A Shape Press part: an @hm/partgen generator and its slider values (plan 38 section 7). */
-  | { readonly kind: 'param'; readonly gen: string; readonly params: Readonly<Record<string, number>> };
+  | { readonly kind: 'param'; readonly gen: string; readonly params: Readonly<Record<string, number>>; readonly ops?: readonly OpRef[] };
+
+/** A @hm/meshops operator applied on top of a param part, with its slider values (over its one-click preset). */
+export interface OpRef {
+  readonly op: string;
+  readonly params: Readonly<Record<string, number>>;
+}
 
 export interface PartDef {
   readonly source: PartSource;
@@ -55,6 +61,8 @@ export interface PartOverride {
   readonly params?: Readonly<Record<string, number>>;
   /** Another generator for a param part (its params then start from that generator's defaults plus `params`). */
   readonly gen?: string;
+  /** Operators that replace the part's own (the bench's one-click presets). */
+  readonly ops?: readonly OpRef[];
   readonly material?: string;
   readonly slotMaterials?: Readonly<Record<string, string>>;
 }
@@ -208,10 +216,11 @@ export function partBounds(p: PartDef): Box3 {
 export function applyOverride(def: PartDef, o: PartOverride | undefined): { source: PartSource; material: string; slotMaterials?: Readonly<Record<string, string>> } {
   if (!o) return { source: def.source, material: def.material, ...(def.slotMaterials ? { slotMaterials: def.slotMaterials } : {}) };
   let source = def.source;
-  if (source.kind === 'param' && (o.params || o.gen)) {
+  if (source.kind === 'param' && (o.params || o.gen || o.ops)) {
+    const ops = o.ops ?? source.ops;
     source = o.gen && o.gen !== source.gen
-      ? { kind: 'param', gen: o.gen, params: { ...(o.params ?? {}) } }
-      : { kind: 'param', gen: source.gen, params: { ...source.params, ...(o.params ?? {}) } };
+      ? { kind: 'param', gen: o.gen, params: { ...(o.params ?? {}) }, ...(ops ? { ops } : {}) }
+      : { kind: 'param', gen: source.gen, params: { ...source.params, ...(o.params ?? {}) }, ...(ops ? { ops } : {}) };
   }
   const slotMaterials = o.slotMaterials ?? def.slotMaterials;
   return { source, material: o.material ?? def.material, ...(slotMaterials ? { slotMaterials } : {}) };

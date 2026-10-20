@@ -353,6 +353,28 @@ function walk(
   });
 }
 
+/**
+ * Where a preset's sockets are, in its own frame: the top assembly's exposed sockets by name, and every placed part's
+ * sockets as `path.socket` (a machine's vent, feed and power points; plan 38 kit machines). Each is a position and the
+ * socket's full frame.
+ */
+export function presetSockets(kit: Kit, preset: string): Record<string, { readonly at: Vec3; readonly matrix: Mat4 }> {
+  const out: Record<string, { at: Vec3; matrix: Mat4 }> = {};
+  const top = kit.assemblies[preset];
+  for (const [name, s] of Object.entries(top?.sockets ?? {})) {
+    const m = frameOf(s);
+    out[name] = { at: transformPoint(m, [0, 0, 0]), matrix: m };
+  }
+  for (const p of flatten(kit, preset)) {
+    const def = kit.parts[p.part];
+    for (const [name, s] of Object.entries(def?.sockets ?? {})) {
+      const m = multiply(p.matrix, frameOf(s));
+      out[`${p.path}.${name}`] = { at: transformPoint(m, [0, 0, 0]), matrix: m };
+    }
+  }
+  return out;
+}
+
 /* ------------------------------------------------------------------ validation */
 
 export interface ValidateOptions {

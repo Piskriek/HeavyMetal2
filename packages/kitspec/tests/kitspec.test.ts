@@ -192,3 +192,16 @@ test('param parts take their bounds from @hm/partgen, and overrides change one c
   const lifted: Kit = { ...kit, assemblies: { p: { children: [{ ref: 'base' }, { ref: 'bolt', key: 'b', at: [0, 0.3, 0] }] } } };
   assert.deepEqual(validate(lifted, 'p').map((i) => i.code), ['floating']);
 });
+
+test('presetSockets gives the top assembly sockets and every placed part socket in the preset frame', async () => {
+  const { presetSockets } = await import('../src/index');
+  const kit: Kit = {
+    ...bank,
+    assemblies: { ...bank.assemblies, 'capacitor-bank': { ...bank.assemblies['capacitor-bank']!, sockets: { vent: { at: [0, 2, -0.4] } } } },
+  };
+  const s = presetSockets(kit, 'capacitor-bank');
+  assert.deepEqual(s.vent?.at, [0, 2, -0.4]);
+  const top = s['cells[2]/can.top']!.at;
+  assert.ok(Math.abs(top[0] - 0.55) < 1e-9 && Math.abs(top[1] - 1.55) < 1e-9, JSON.stringify(top));
+  assert.ok(s['skid.deck'], 'the skid deck socket is listed');
+});

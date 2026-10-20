@@ -66,10 +66,41 @@ export interface PartSpec {
   readonly ops: readonly { readonly op: string; readonly params: Readonly<Record<string, number>> }[];
 }
 
+/**
+ * A Water Maker species written onto a blank (plan 39 section 6, Aq): a tree species and its treegen slider values. The
+ * beam's Apply regrows a tree with it. Structural here: @hm/treegen reads it.
+ */
+export interface SpeciesSpec {
+  readonly name: string;
+  readonly species: string;
+  readonly params: Readonly<Record<string, number>>;
+}
+
+export type LightPattern = 'steady' | 'pulse' | 'blink' | 'flicker';
+export const LIGHT_PATTERNS: readonly LightPattern[] = Object.freeze(['steady', 'pulse', 'blink', 'flicker'] as const);
+
+/**
+ * A Light Projector preset written onto a blank (plan 39 section 6, Lx): a colour temperature in kelvin, or a signal
+ * colour instead, an intensity and a pattern. The beam's Apply sets a lamp with it.
+ */
+export interface LightSpec {
+  readonly name: string;
+  readonly kelvin: number;
+  /** A signal colour ('#rrggbb') in place of the temperature, or null. */
+  readonly colour: string | null;
+  /** 0 to 3: how bright the lamp glows. */
+  readonly intensity: number;
+  readonly pattern: LightPattern;
+}
+
+/** What the bench prints onto a blank for the beam rifle (plan 39): a part, a species or a light. */
+export type Print = { readonly part: PartSpec } | { readonly species: SpeciesSpec } | { readonly light: LightSpec };
+export type PrintKind = 'part' | 'species' | 'light';
+
 export interface Cartridge {
   readonly id: string;
   readonly name: string;
-  readonly kind: 'blank' | 'preset' | 'mix' | 'part';
+  readonly kind: 'blank' | 'preset' | 'mix' | PrintKind;
   readonly preset: string | null;
   readonly from: readonly string[];
   readonly affinity: Readonly<Record<Metric, number>>;
@@ -77,6 +108,10 @@ export interface Cartridge {
   readonly slot: number | null;
   /** Kind 'part' only: the part it carries. */
   readonly part?: PartSpec;
+  /** Kind 'species' only: the species it carries. */
+  readonly species?: SpeciesSpec;
+  /** Kind 'light' only: the light it carries. */
+  readonly light?: LightSpec;
 }
 
 /**
@@ -93,8 +128,10 @@ export interface Job {
   readonly preset: string | null;
   readonly done: number;
   readonly needs: number;
-  /** A bench job writing a part instead of a preset. */
+  /** A bench job printing a part, a species or a light instead of writing a preset (at most one of the three). */
   readonly part?: PartSpec;
+  readonly species?: SpeciesSpec;
+  readonly light?: LightSpec;
 }
 
 export interface LabState {
@@ -168,13 +205,26 @@ type PausedJob = Job & { readonly stalled: true };
 
 const isPaused = (job: Job): boolean => 'stalled' in job && job.stalled === true;
 
+/** The print a job or a cartridge carries (its own field, to spread), or null. */
+export function printOf(x: { readonly part?: PartSpec; readonly species?: SpeciesSpec; readonly light?: LightSpec }): Print | null {
+  if (x.part !== undefined) return { part: x.part };
+  if (x.species !== undefined) return { species: x.species };
+  if (x.light !== undefined) return { light: x.light };
+  return null;
+}
+export const printKind = (p: Print): PrintKind => ('part' in p ? 'part' : 'species' in p ? 'species' : 'light');
+const printName = (p: Print): string => ('part' in p ? p.part.name : 'species' in p ? p.species.name : p.light.name);
+/** Part, species and light cartridges go in the beam rifle only: never the combiner, never a plot machine. */
+const forTheRifle = (c: Cartridge): boolean => c.kind === 'part' || c.kind === 'species' || c.kind === 'light';
+const RIFLE_ONLY: Readonly<Record<PrintKind, string>> = { part: 'A part cartridge', species: 'A species cartridge', light: 'A light cartridge' };
+
 const paused = (job: Job): Job => {
-  const p: PausedJob = { inputs: job.inputs, preset: job.preset, done: job.done, needs: job.needs, stalled: true, ...(job.part ? { part: job.part } : {}) };
+  const p: PausedJob = { inputs: job.inputs, preset: job.preset, done: job.done, needs: job.needs, stalled: true, ...(printOf(job) ?? {}) };
   return p;
 };
 
 /** The job after it has run: a running job is never marked stalled. */
-const running = (job: Job, done: number): Job => ({ inputs: job.inputs, preset: job.preset, done, needs: job.needs, ...(job.part ? { part: job.part } : {}) });
+const running = (job: Job, done: number): Job => ({ inputs: job.inputs, preset: job.preset, done, needs: job.needs, ...(printOf(job) ?? {}) });
 
 const presetAffinity = (p: Preset): Record<Metric, number> =>
   byMetric((m) => {
@@ -256,23 +306,37 @@ export function startWrite(s: LabState, env: LabEnv, blank: string, preset: stri
   return { ...s, bench: { inputs: [blank], preset, done: 0, needs: RULES.writeSeconds } };
 }
 
-/** Whether the bench can print `part` onto `blank` (the part's cost is paid by the caller, from the base's stores). */
-export function canWritePart(s: LabState, env: LabEnv, blank: string, part: PartSpec): Check {
+/**
+ * Whether the bench can print `print` (a part, a species or a light) onto `blank`. A part's cost is paid by the caller,
+ * from the base's stores; a species or a light costs the blank and the bench's time, as a written preset does.
+ */
+export function canWritePrint(s: LabState, env: LabEnv, blank: string, print: Print): Check {
   if (!env.powered) return no(NO_POWER);
   if (s.bench !== null) return no('The bench is busy: wait for its write to finish.');
-  const c = find(s, blank);
-  if (c === undefined) return no('That cartridge is not in the lab.');
-  if (c.kind !== 'blank') return no(`${c.name} is not a blank: parts go on blanks only.`);
-  const busy = jobOf(s, c.id);
-  if (busy !== null) return no(busyWhy(c, busy));
-  if (!validPart(part)) return no('That part has no generator.');
-  return OK;
+  return blankTakes(s, blank, print);
 }
 
+/** Puts a blank and a print on the bench. Throws Error(why) when refused. */
+export function startPrintWrite(s: LabState, env: LabEnv, blank: string, print: Print): LabState {
+  orThrow(canWritePrint(s, env, blank, print));
+  return { ...s, bench: { inputs: [blank], preset: null, done: 0, needs: RULES.writeSeconds, ...print } };
+}
+
+/** Whether the bench can print `part` onto `blank` (the part's cost is paid by the caller, from the base's stores). */
+export const canWritePart = (s: LabState, env: LabEnv, blank: string, part: PartSpec): Check => canWritePrint(s, env, blank, { part });
 /** Puts a blank and a part on the bench. Throws Error(why) when refused. */
-export function startPartWrite(s: LabState, env: LabEnv, blank: string, part: PartSpec): LabState {
-  orThrow(canWritePart(s, env, blank, part));
-  return { ...s, bench: { inputs: [blank], preset: null, done: 0, needs: RULES.writeSeconds, part } };
+export const startPartWrite = (s: LabState, env: LabEnv, blank: string, part: PartSpec): LabState => startPrintWrite(s, env, blank, { part });
+
+/** Whether a blank on the rack can take the print (not in a machine or a job; the print well formed). */
+function blankTakes(s: LabState, blank: string, print: Print): Check {
+  const c = find(s, blank);
+  if (c === undefined) return no('That cartridge is not in the lab.');
+  if (c.kind !== 'blank') return no(`${c.name} is not a blank: prints go on blanks only.`);
+  if (c.slot !== null) return no('That blank sits in a machine.');
+  const busy = jobOf(s, c.id);
+  if (busy !== null) return no(busyWhy(c, busy));
+  if (!validPrint(print)) return no(`That ${printKind(print)} is not complete.`);
+  return OK;
 }
 
 /**
@@ -281,14 +345,7 @@ export function startPartWrite(s: LabState, env: LabEnv, blank: string, part: Pa
  * cost is paid by the caller, from the base's stores.
  */
 export function canPrintPart(s: LabState, blank: string, part: PartSpec): Check {
-  const c = find(s, blank);
-  if (c === undefined) return no('That cartridge is not in the lab.');
-  if (c.kind !== 'blank') return no(`${c.name} is not a blank: parts go on blanks only.`);
-  if (c.slot !== null) return no('That blank sits in a machine.');
-  const busy = jobOf(s, c.id);
-  if (busy !== null) return no(busyWhy(c, busy));
-  if (!validPart(part)) return no('That part has no generator.');
-  return OK;
+  return blankTakes(s, blank, { part });
 }
 
 /** The first blank the Drafting Table can draw: on the rack, in no machine and no job. */
@@ -300,18 +357,18 @@ export function freeBlank(s: LabState): string | null {
 /** Prints `part` onto `blank` at once (the planet's Drafting Table). Throws Error(why) when refused. */
 export function printPart(s: LabState, blank: string, part: PartSpec): LabState {
   orThrow(canPrintPart(s, blank, part));
-  return { ...s, cartridges: s.cartridges.map((c) => (c.id === blank ? partCartridge(c, part) : c)) };
+  return { ...s, cartridges: s.cartridges.map((c) => (c.id === blank ? printedCartridge(c, { part }) : c)) };
 }
 
-const partCartridge = (blank: Cartridge, part: PartSpec): Cartridge => ({
+const printedCartridge = (blank: Cartridge, print: Print): Cartridge => ({
   id: blank.id,
-  name: part.name,
-  kind: 'part',
+  name: printName(print),
+  kind: printKind(print),
   preset: null,
   from: [],
   affinity: byMetric(() => 1),
   slot: blank.slot,
-  part,
+  ...print,
 });
 
 export function canCombine(s: LabState, env: LabEnv, ids: readonly string[]): Check {
@@ -328,7 +385,8 @@ export function canCombine(s: LabState, env: LabEnv, ids: readonly string[]): Ch
     inputs.push(c);
   }
   if (inputs.some((c) => c.kind === 'blank')) return no('A blank has nothing to mix: write a preset on it first.');
-  if (inputs.some((c) => c.kind === 'part')) return no('A part cartridge goes in the beam rifle, not the combiner.');
+  const rifle = inputs.find(forTheRifle);
+  if (rifle) return no(`${RIFLE_ONLY[rifle.kind as PrintKind]} goes in the beam rifle, not the combiner.`);
   for (const c of inputs) {
     if (c.slot !== null) return no(`${c.name} is in a machine: take it out first.`);
     const busy = jobOf(s, c.id);
@@ -347,7 +405,7 @@ export function canSlot(s: LabState, id: string, machine: number): Check {
   const c = find(s, id);
   if (c === undefined) return no('That cartridge is not in the lab.');
   if (c.kind === 'blank') return no('A blank does nothing: write a preset on it first.');
-  if (c.kind === 'part') return no('A part cartridge goes in the beam rifle, not a machine.');
+  if (forTheRifle(c)) return no(`${RIFLE_ONLY[c.kind as PrintKind]} goes in the beam rifle, not a machine.`);
   if (c.slot !== null) return no(`${c.name} is already in a machine: take it out first.`);
   const busy = jobOf(s, c.id);
   if (busy !== null) return no(busyWhy(c, busy));
@@ -400,13 +458,14 @@ function runBench(s: LabState, env: LabEnv, d: number, events: LabEvent[]): LabS
   const job = s.bench;
   if (job === null) return s;
   const done = job.done + d;
-  if (job.part !== undefined) {
+  const print = printOf(job);
+  if (print !== null) {
     if (done < job.needs) return { ...s, bench: running(job, done) };
     const target = job.inputs[0];
     const blank = target === undefined ? undefined : find(s, target);
     if (blank === undefined) return { ...s, bench: null };
     events.push({ type: 'written', id: blank.id });
-    const printed = partCartridge(blank, job.part);
+    const printed = printedCartridge(blank, print);
     return { ...s, bench: null, cartridges: s.cartridges.map((c) => (c.id === blank.id ? printed : c)) };
   }
   const preset = env.presets.find((p) => p.id === job.preset);
@@ -538,8 +597,45 @@ function loadPart(x: unknown): PartSpec | null {
   return { name, gen, params: p, slotMaterials: sm, ops: list };
 }
 
-function validPart(part: PartSpec): boolean {
-  return loadPart(part) !== null;
+function loadSpecies(x: unknown): SpeciesSpec | null {
+  if (!isRecord(x)) return null;
+  const { name, species, params } = x;
+  if (!isString(name) || !isString(species) || species.length === 0) return null;
+  const p = numberRecord(params);
+  return p === null ? null : { name, species, params: p };
+}
+
+const HEX = /^#[0-9a-f]{6}$/i;
+function loadLight(x: unknown): LightSpec | null {
+  if (!isRecord(x)) return null;
+  const { name, kelvin, colour, intensity, pattern } = x;
+  if (!isString(name) || !isNumber(kelvin) || kelvin < 1000 || kelvin > 12000) return null;
+  if (colour !== null && !(isString(colour) && HEX.test(colour))) return null;
+  if (!isNumber(intensity) || intensity < 0 || intensity > 3) return null;
+  if (!isString(pattern) || !(LIGHT_PATTERNS as readonly string[]).includes(pattern)) return null;
+  return { name, kelvin, colour, intensity, pattern: pattern as LightPattern };
+}
+
+/** The print as saved, checked: 'none' when there is none, null when one is malformed or more than one is set. */
+function loadPrint(x: Readonly<Record<string, unknown>>): Print | null | 'none' {
+  const set = (['part', 'species', 'light'] as const).filter((k) => x[k] !== undefined);
+  if (set.length === 0) return 'none';
+  if (set.length > 1) return null;
+  if (set[0] === 'part') {
+    const p = loadPart(x.part);
+    return p && { part: p };
+  }
+  if (set[0] === 'species') {
+    const p = loadSpecies(x.species);
+    return p && { species: p };
+  }
+  const p = loadLight(x.light);
+  return p && { light: p };
+}
+
+function validPrint(print: Print): boolean {
+  const p = loadPrint(print as unknown as Readonly<Record<string, unknown>>);
+  return p !== null && p !== 'none';
 }
 
 function loadCartridge(x: unknown, nextId: number): Cartridge | null {
@@ -548,10 +644,11 @@ function loadCartridge(x: unknown, nextId: number): Cartridge | null {
   if (!isString(id) || !isString(name)) return null;
   const n = CARTRIDGE_ID.exec(id)?.[1];
   if (n === undefined || !(Number(n) < nextId)) return null; // only ids already handed out
-  if (kind === 'part') {
-    const part = loadPart(x.part);
-    if (part === null || preset !== null || slot !== null) return null; // a part never names a preset or sits in a machine
-    return { id, name, kind, preset: null, from: [], affinity: { pxd: 1, vtx: 1, lx: 1, aq: 1 }, slot: null, part };
+  if (kind === 'part' || kind === 'species' || kind === 'light') {
+    const print = loadPrint(x);
+    // a print names no preset, never sits in a machine, and carries exactly its own kind
+    if (print === null || print === 'none' || printKind(print) !== kind || preset !== null || slot !== null) return null;
+    return { id, name, kind, preset: null, from: [], affinity: { pxd: 1, vtx: 1, lx: 1, aq: 1 }, slot: null, ...print };
   }
   if (kind !== 'blank' && kind !== 'preset' && kind !== 'mix') return null;
   if (preset !== null && !isString(preset)) return null;
@@ -575,13 +672,9 @@ function loadJob(x: unknown): Job | null {
   if (preset !== null && !isString(preset)) return null;
   if (!isNumber(done) || done < 0 || !isNumber(needs) || needs < 0) return null;
   if (stalled !== undefined && typeof stalled !== 'boolean') return null;
-  let part: PartSpec | undefined;
-  if (x.part !== undefined) {
-    const p = loadPart(x.part);
-    if (p === null || preset !== null) return null;
-    part = p;
-  }
-  const job: Job = { inputs: ids, preset, done, needs, ...(part ? { part } : {}) };
+  const print = loadPrint(x);
+  if (print === null || (print !== 'none' && preset !== null)) return null;
+  const job: Job = { inputs: ids, preset, done, needs, ...(print === 'none' ? {} : print) };
   return stalled === true ? paused(job) : job;
 }
 
@@ -589,8 +682,8 @@ function loadJob(x: unknown): Job | null {
 function benchHolds(job: Job, byId: ReadonlyMap<string, Cartridge>): boolean {
   const [id, ...rest] = job.inputs;
   const c = id === undefined ? undefined : byId.get(id);
-  // a bench job writes either a preset or a part, onto one blank
-  return (job.preset !== null) !== (job.part !== undefined) && rest.length === 0 && c !== undefined && c.kind === 'blank';
+  // a bench job writes either a preset or a print (a part, a species or a light), onto one blank
+  return (job.preset !== null) !== (printOf(job) !== null) && rest.length === 0 && c !== undefined && c.kind === 'blank';
 }
 
 /** The combiner holds 2 to 4 different written cartridges from the rack. */
@@ -598,13 +691,13 @@ function combinerHolds(job: Job, byId: ReadonlyMap<string, Cartridge>): boolean 
   const n = job.inputs.length;
   return (
     job.preset === null &&
-    job.part === undefined &&
+    printOf(job) === null &&
     n >= RULES.minInputs &&
     n <= RULES.maxInputs &&
     new Set(job.inputs).size === n &&
     job.inputs.every((id) => {
       const c = byId.get(id);
-      return c !== undefined && c.kind !== 'blank' && c.kind !== 'part' && c.slot === null;
+      return c !== undefined && c.kind !== 'blank' && !forTheRifle(c) && c.slot === null;
     })
   );
 }

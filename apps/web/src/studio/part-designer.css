@@ -1,0 +1,194 @@
+/* The Parts workspace (part-designer.tsx): the Material Designer's twin for the Shape Press. */
+.sx-part {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  background: var(--sx-bg);
+}
+
+.sx-part-view {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(120% 90% at 50% 40%, rgba(24, 36, 52, 0.5) 0%, rgba(5, 8, 12, 0.96) 70%);
+}
+
+.sx-part-view canvas {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: block;
+  cursor: grab;
+}
+.sx-part-view canvas:active { cursor: grabbing; }
+
+/* The stage ladder: the one loud element. Stops 0 to 6 on a rail; the part re-ranks as you step along it. */
+.sx-part-ladder {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 20px 16px;
+  border-top: 1px solid var(--sx-line);
+  background: linear-gradient(180deg, rgba(10, 15, 22, 0.7), rgba(5, 8, 12, 0.95));
+}
+
+.sx-part-stops {
+  position: relative;
+  display: flex;
+  gap: 0;
+  flex: 1;
+  max-width: 560px;
+}
+.sx-part-stops::before {
+  content: '';
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  top: 50%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--sx-line-hi), var(--sx-amber) 140%);
+  transform: translateY(-50%);
+}
+
+.sx .sx-part-stops button {
+  position: relative;
+  flex: 1;
+  display: grid;
+  place-items: center;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.sx .sx-part-stops button span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--sx-line-hi);
+  background: #0a1017;
+  color: var(--sx-dim);
+  font: 600 14px/1 var(--sx-display);
+  transition: transform 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.sx .sx-part-stops button:hover span { border-color: var(--sx-amber); color: var(--sx-text); }
+.sx .sx-part-stops button[aria-pressed='true'] span {
+  border-color: var(--sx-amber);
+  background: var(--sx-amber-soft);
+  color: var(--sx-amber);
+  transform: scale(1.18);
+  box-shadow: 0 0 14px rgba(255, 197, 61, 0.28);
+}
+.sx .sx-part-stops button:focus-visible { outline: none; }
+.sx .sx-part-stops button:focus-visible span { outline: 2px solid var(--sx-cyan); outline-offset: 2px; }
+
+.sx-part-readout {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  min-width: 132px;
+  font: 400 12px/1.3 var(--sx-ui);
+  color: var(--sx-dim);
+}
+.sx-part-readout b {
+  font: 600 16px/1.1 var(--sx-display);
+  color: var(--sx-text);
+}
+
+.sx-part-side {
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--sx-line);
+  background: var(--sx-panel);
+}
+
+.sx-part-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--sx-line);
+}
+.sx-part-head h3 {
+  margin: 0;
+  font: 600 22px/1.1 var(--sx-display);
+  color: var(--sx-text);
+}
+
+.sx-part-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--sx-line);
+  overflow-y: auto;
+}
+.sx-part-section h4 {
+  margin: 0;
+  font: 600 13px/1 var(--sx-ui);
+  color: var(--sx-dim);
+}
+
+.sx-part-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 6px 10px;
+}
+.sx-part-label {
+  font: 500 13px/1.2 var(--sx-ui);
+  color: var(--sx-text);
+}
+.sx-part-row output {
+  font: 500 12px/1 var(--sx-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--sx-amber);
+}
+.sx-part-row input[type='range'] {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: var(--sx-amber);
+}
+.sx-part-row .sx-seg { justify-self: end; }
+
+.sx-part-swatches {
+  display: flex;
+  gap: 6px;
+}
+.sx .sx-part-swatches button {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+.sx .sx-part-swatches button[aria-checked='true'] {
+  outline: 2px solid var(--sx-amber);
+  outline-offset: 2px;
+}
+.sx .sx-part-swatches button:focus-visible { outline: 2px solid var(--sx-cyan); outline-offset: 2px; }
+
+.sx-part-foot {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+@media (max-width: 860px) {
+  .sx-part { flex-direction: column; }
+  .sx-part-side { width: auto; border-left: 0; border-top: 1px solid var(--sx-line); }
+  .sx-part-view { min-height: 340px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sx .sx-part-stops button span { transition: none; }
+}

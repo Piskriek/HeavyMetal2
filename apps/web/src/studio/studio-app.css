@@ -19,6 +19,13 @@
   --sx-err: #ff7a6b;
   --sx-display: Oxanium, 'Segoe UI', system-ui, sans-serif;
   --sx-ui: Inter, 'Segoe UI', system-ui, sans-serif;
+  /* The shell's global `button` and `input` rules use the light theme's variables (dark text on white), which made
+     every unpressed button near-black here. Inside the dark Studio those variables mean the dark tokens. (The old
+     light studio.css no longer targets `.sx` at all: its white hover and terracotta sliders leaked in too.) */
+  --text: var(--sx-text);
+  --dim: var(--sx-dim);
+  --line: var(--sx-line-hi);
+  --paper: var(--sx-bg);
 
   position: absolute;
   inset: 0;

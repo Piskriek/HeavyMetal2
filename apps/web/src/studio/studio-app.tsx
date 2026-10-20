@@ -28,6 +28,7 @@ import { SceneTab } from './scene-tab';
 import { StudioErrorBoundary } from './studio-error-boundary';
 import { MaterialDesigner } from './material-designer';
 import { MonsterTab } from './monster-tab';
+import { PartDesigner } from './part-designer';
 import './studio-app.css';
 
 const ENDPOINT = '/__studio/data/asset-tweaks';
@@ -38,7 +39,7 @@ const KEYMAP_KEY = 'studio.keymap';
 const DEFAULT_LAYOUT = { left: 290, right: 320, changes: 210 };
 const LIMITS = { left: [200, 480], right: [240, 520], changes: [120, 420] } as const;
 
-type Workspace = 'assets' | 'scene' | 'look' | 'audio' | 'material' | 'monsters' | 'moon';
+type Workspace = 'assets' | 'scene' | 'look' | 'audio' | 'material' | 'parts' | 'monsters' | 'moon';
 /** The sound library as public/audio/levels.json holds it (the wrapper keeps its note). */
 type AudioDoc = { readonly about?: string; readonly levels: Readonly<Record<string, AudioLevelEntry>> };
 type Status = { readonly tone: 'ok' | 'warn' | 'err'; readonly text: string };
@@ -539,6 +540,7 @@ export function StudioApp({ onBack, renderPrototype }: {
           <button type="button" aria-pressed={workspace === 'look'} onClick={() => setWorkspace('look')}>Look</button>
           <button type="button" aria-pressed={workspace === 'audio'} onClick={() => setWorkspace('audio')}>Audio</button>
           <button type="button" aria-pressed={workspace === 'material'} onClick={() => setWorkspace('material')}>Materials</button>
+          <button type="button" aria-pressed={workspace === 'parts'} onClick={() => setWorkspace('parts')}>Parts</button>
           <button type="button" aria-pressed={workspace === 'monsters'} onClick={() => setWorkspace('monsters')}>Monsters</button>
           <button type="button" aria-pressed={workspace === 'moon'} onClick={() => setWorkspace('moon')}>Moon (prototype)</button>
         </nav>
@@ -646,6 +648,10 @@ export function StudioApp({ onBack, renderPrototype }: {
       ) : workspace === 'material' ? (
         <StudioErrorBoundary key="material" tabName="Materials">
           <MaterialDesigner />
+        </StudioErrorBoundary>
+      ) : workspace === 'parts' ? (
+        <StudioErrorBoundary key="parts" tabName="Parts">
+          <PartDesigner />
         </StudioErrorBoundary>
       ) : workspace === 'monsters' ? (
         <StudioErrorBoundary key="monsters" tabName="Monsters">

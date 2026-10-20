@@ -169,6 +169,32 @@ try {
     check('Look: both A and B pills show', (await page.locator('.sx-look-ab-pill').count()) === 2);
   });
 
+  // ---- Parts: the Shape Press's parametric parts (plan 38 section 7): sliders, the stage ladder, the part cartridge ----
+  await section('Parts', async () => {
+    await tab('Parts').click();
+    await page.waitForSelector('[data-testid="studio-parts-tab"]');
+    const readout = async () => page.locator('[data-testid="part-readout"]').innerText();
+    await page.locator('[data-testid="part-stage-0"]').click();
+    const low = await readout();
+    check('Parts: stage 0 draws the bolt as its silhouette (a plain block)', low.includes('Silhouette') && low.includes('12 triangles'), low);
+    await page.locator('[data-testid="part-stage-6"]').click();
+    const high = await readout();
+    check('Parts: stage 6 adds the small details (more triangles)', high.includes('Small details') && !high.includes('12 triangles'), high);
+    await page.locator('[data-testid="part-param-headWidth"]').fill('0.12');
+    check('Parts: the head width slider reads 120 mm', (await page.locator('label.sx-part-row', { hasText: 'Head width' }).locator('output').innerText()) === '120 mm');
+    await page.locator('[data-testid="part-mat-metal-green"]').click();
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
+    await page.locator('[data-testid="part-copy"]').click();
+    const json = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '');
+    let cart = null;
+    try { cart = JSON.parse(json); } catch { cart = null; }
+    check('Parts: Copy as JSON gives the fat green bolt cartridge', cart?.gen === 'bolt' && cart?.params?.headWidth === 0.12 && cart?.slotMaterials?.metal === 'green', json.slice(0, 120));
+    for (const g of ['panel', 'can', 'beam']) {
+      await page.locator(`[data-testid="part-gen-${g}"]`).click();
+      check(`Parts: the ${g} builds at stage 6`, /[1-9][0-9,]* triangles/.test(await readout()), await readout());
+    }
+  });
+
   // ---- Scene: the viewport, the placed copies, the gizmo, and save, reload and load ----
   await section('Scene', async () => {
     await tab('Scene').click();

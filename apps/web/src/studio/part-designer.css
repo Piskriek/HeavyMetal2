@@ -122,6 +122,13 @@
   color: var(--sx-text);
 }
 
+/* the generator picker wraps: the Press keeps adding generators */
+.sx-part-gens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .sx-part-section {
   display: flex;
   flex-direction: column;

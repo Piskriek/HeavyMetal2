@@ -180,7 +180,7 @@ export const PartDesigner: React.FC = () => {
       <aside className="sx-part-side" aria-label="Part controls">
         <header className="sx-part-head">
           <h3>{generator.label}</h3>
-          <div className="sx-seg" role="group" aria-label="Part">
+          <div className="sx-part-gens" role="group" aria-label="Part">
             {Object.values(GENERATORS).map((g) => (
               <button key={g.id} type="button" aria-pressed={gen === g.id} onClick={() => setGen(g.id)} data-testid={`part-gen-${g.id}`}>{g.label}</button>
             ))}

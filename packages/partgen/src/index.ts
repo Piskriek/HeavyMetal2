@@ -199,6 +199,23 @@ export function addPrism(b: MeshBuilder, slot: string, sides: number, r: number,
   }
 }
 
+/**
+ * A right-triangle prism along x (a gusset): from x0 to x1, its right angle at (y0, z0), one leg up to (y1, z0) and
+ * one leg along to (y0, z1). z1 may be below z0 (the wedge then leans the other way).
+ */
+export function addWedge(b: MeshBuilder, slot: string, x0: number, x1: number, y0: number, y1: number, z0: number, z1: number): void {
+  const flip = z1 < z0;
+  const tri = (x: number): V3[] => [[x, y0, z0], [x, y0, z1], [x, y1, z0]];
+  const [a0, b0, c0] = tri(x0) as [V3, V3, V3];
+  const [a1, b1, c1] = tri(x1) as [V3, V3, V3];
+  const w = (pts: V3[]): V3[] => (flip ? pts : [...pts].reverse());
+  b.poly(slot, w([a0, c0, b0])); // the -x end
+  b.poly(slot, w([a1, b1, c1])); // the +x end
+  b.poly(slot, w([a0, b0, b1, a1])); // the bottom
+  b.poly(slot, w([a0, a1, c1, c0])); // the upright back
+  b.poly(slot, w([b0, c0, c1, b1])); // the slope
+}
+
 /* ------------------------------------------------------------------ generators */
 
 const m = (key: string, label: string, min: number, max: number, step: number, def: number): ParamSpec => ({ key, label, unit: 'm', min, max, step, default: def });
@@ -343,7 +360,123 @@ export const beam: Generator = {
   },
 };
 
-export const GENERATORS: Readonly<Record<string, Generator>> = Object.freeze({ bolt, panel, can, beam });
+/** A wall vent facing +z, standing on y = 0 with its back on z = 0. Rank 0 a plate, 1 a frame around a recessed back, 2 the slats. */
+export const grille: Generator = {
+  id: 'grille',
+  label: 'Vent grille',
+  slots: ['frame', 'slats'],
+  params: [
+    m('width', 'Width', 0.1, 3, 0.01, 0.6),
+    m('height', 'Height', 0.1, 3, 0.01, 0.4),
+    m('depth', 'Depth', 0.01, 0.3, 0.005, 0.05),
+    m('frame', 'Frame width', 0.01, 0.2, 0.005, 0.04),
+    { key: 'slats', label: 'Slats', unit: 'count', min: 1, max: 24, step: 1, default: 6 },
+    m('slat', 'Slat thickness', 0.003, 0.05, 0.001, 0.012),
+  ],
+  build(given, rank) {
+    const p = resolveParams(this.params, given);
+    const b = new MeshBuilder(this.slots);
+    const w = p.width as number, h = p.height as number, d = p.depth as number;
+    const f = Math.min(p.frame as number, w * 0.3, h * 0.3);
+    if (rank === 0) {
+      addBox(b, 'frame', [-w / 2, 0, 0], [w / 2, h, d]);
+      return b.build();
+    }
+    const back = d * 0.25;
+    addBox(b, 'frame', [-w / 2 + f, f, 0], [w / 2 - f, h - f, back]);
+    addBox(b, 'frame', [-w / 2, 0, 0], [w / 2, f, d]);
+    addBox(b, 'frame', [-w / 2, h - f, 0], [w / 2, h, d]);
+    addBox(b, 'frame', [-w / 2, f, 0], [-w / 2 + f, h - f, d]);
+    addBox(b, 'frame', [w / 2 - f, f, 0], [w / 2, h - f, d]);
+    const n = p.slats as number;
+    if (rank >= 2) {
+      const t = Math.min(p.slat as number, (h - 2 * f) / (n * 2));
+      const gap = (h - 2 * f) / n;
+      for (let i = 0; i < n; i++) {
+        const y = f + gap * (i + 0.5);
+        addBox(b, 'slats', [-w / 2 + f, y - t / 2, back], [w / 2 - f, y + t / 2, d * 0.85]);
+      }
+    }
+    return b.build();
+  },
+};
+
+/** An L-bracket: a foot on y = 0 reaching +z, an upright at z = 0. Rank 0 two slabs, 1 bevelled, 2 a gusset and bolt heads. */
+export const bracket: Generator = {
+  id: 'bracket',
+  label: 'L-bracket',
+  slots: ['steel', 'bolts'],
+  params: [
+    m('width', 'Width', 0.02, 1, 0.005, 0.12),
+    m('upright', 'Upright height', 0.02, 1.5, 0.005, 0.15),
+    m('foot', 'Foot length', 0.02, 1.5, 0.005, 0.12),
+    m('thickness', 'Thickness', 0.003, 0.08, 0.001, 0.012),
+    { key: 'gusset', label: 'Gusset', unit: 'choice', min: 0, max: 1, step: 1, default: 1, choices: ['none', 'gusset'] },
+  ],
+  build(given, rank) {
+    const p = resolveParams(this.params, given);
+    const b = new MeshBuilder(this.slots);
+    const w = p.width as number, up = p.upright as number, ft = p.foot as number, t = p.thickness as number;
+    const bev = rank >= 1 ? t * 0.2 : 0;
+    addBox(b, 'steel', [-w / 2, 0, 0], [w / 2, t, ft], bev);
+    addBox(b, 'steel', [-w / 2, t, 0], [w / 2, up, t], bev);
+    if (rank >= 2) {
+      if (p.gusset === 1) {
+        const gt = Math.min(t, w * 0.3);
+        addWedge(b, 'steel', -gt / 2, gt / 2, t, t + Math.min(up - t, ft) * 0.6, t, t + Math.min(up - t, ft) * 0.6);
+      }
+      const head = Math.min(w * 0.22, 0.03), hh = head * 0.4;
+      const bx = w / 4;
+      for (const x of [-bx, bx]) {
+        addPrism(b, 'bolts', 6, head / Math.sqrt(3), t, t + hh, x, ft * 0.7, Math.PI / 6);
+      }
+    }
+    return b.build();
+  },
+};
+
+/** A square duct along x, its underside on y = 0. Rank 0 a bar, 1 a hollow tube, 2 bolted flanges at both ends. */
+export const duct: Generator = {
+  id: 'duct',
+  label: 'Square duct',
+  slots: ['duct', 'flange', 'bolts'],
+  params: [
+    m('length', 'Length', 0.2, 12, 0.01, 1.5),
+    m('section', 'Section', 0.05, 1.2, 0.005, 0.25),
+    m('wall', 'Wall', 0.003, 0.08, 0.001, 0.01),
+    m('flange', 'Flange lip', 0, 0.2, 0.005, 0.04),
+  ],
+  build(given, rank) {
+    const p = resolveParams(this.params, given);
+    const b = new MeshBuilder(this.slots);
+    const l = p.length as number, s = p.section as number, wl = Math.min(p.wall as number, s * 0.4), lip = p.flange as number;
+    const y0 = rank >= 2 && lip > 0 ? lip : 0;
+    if (rank === 0) {
+      addBox(b, 'duct', [-l / 2, 0, -s / 2], [l / 2, s, s / 2]);
+      return b.build();
+    }
+    addBox(b, 'duct', [-l / 2, y0 + s - wl, -s / 2], [l / 2, y0 + s, s / 2]);
+    addBox(b, 'duct', [-l / 2, y0, -s / 2], [l / 2, y0 + wl, s / 2]);
+    addBox(b, 'duct', [-l / 2, y0 + wl, s / 2 - wl], [l / 2, y0 + s - wl, s / 2]);
+    addBox(b, 'duct', [-l / 2, y0 + wl, -s / 2], [l / 2, y0 + s - wl, -s / 2 + wl]);
+    if (rank >= 2 && lip > 0) {
+      const ft = Math.min(0.02, l * 0.05);
+      const head = Math.min(lip * 0.5, 0.03);
+      for (const x of [-l / 2, l / 2 - ft]) {
+        addBox(b, 'flange', [x, 0, -s / 2 - lip], [x + ft, y0 + s + lip, s / 2 + lip], ft * 0.2);
+        const bx = x + (x < 0 ? ft : 0);
+        const dir = x < 0 ? 1 : -1;
+        for (const [yy, zz] of [[y0 + s + lip / 2, 0], [lip / 2, 0], [y0 + s / 2, s / 2 + lip / 2], [y0 + s / 2, -s / 2 - lip / 2]] as const) {
+          const hb = head / 2;
+          addBox(b, 'bolts', [dir > 0 ? bx : bx - hb, yy - hb, zz - hb], [dir > 0 ? bx + hb : bx, yy + hb, zz + hb]);
+        }
+      }
+    }
+    return b.build();
+  },
+};
+
+export const GENERATORS: Readonly<Record<string, Generator>> = Object.freeze({ bolt, panel, can, beam, grille, bracket, duct });
 
 /** Builds a part from the registry; unknown generators give null. */
 export function buildPart(gen: string, params: Params, rank: Rank): MeshData | null {

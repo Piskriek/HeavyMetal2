@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addBox, addPrism, buildPart, GENERATORS, MeshBuilder, resolveParams, triangleCount, type MeshData, type Rank } from '../src/index';
+import { addBox, addPrism, addWedge, buildPart, GENERATORS, MeshBuilder, resolveParams, triangleCount, type MeshData, type Rank } from '../src/index';
 
 /** Every triangle of a convex closed piece faces away from the piece's centre. */
 function allOutward(md: MeshData): boolean {
@@ -43,6 +43,13 @@ test('plain and chamfered boxes and prisms are closed and face outwards', () => 
     wellFormed(md);
     assert.ok(allOutward(md), `box chamfer ${c}`);
     assert.equal(triangleCount(md), c > 0 ? 6 * 2 + 12 * 2 + 8 : 12);
+  }
+  for (const [z0, z1] of [[0, 0.3], [0.3, 0]]) {
+    const b = new MeshBuilder(['s']);
+    addWedge(b, 's', -0.05, 0.05, 0, 0.2, z0!, z1!);
+    const md = b.build();
+    wellFormed(md);
+    assert.ok(allOutward(md), `wedge ${z0} to ${z1}`);
   }
   for (const sides of [4, 6, 12]) {
     const b = new MeshBuilder(['s']);

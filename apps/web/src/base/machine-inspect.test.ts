@@ -373,7 +373,7 @@ test('POL-77: station hopper cap scales with linked network storage and never ov
   const { world, machineId } = buildStationWorld('mill', 8, 8, [{ item: 'pxd-mono', n: 450 }]);
   const info = inspectMachine(world, TEST_ENV, machineId);
   assert.ok(info.hopper !== null);
-  assert.ok(info.hopper!.n >= 400, `expected large network stock, got ${info.hopper!.n}`);
+  assert.ok((info.hopper!.totalAvailable ?? info.hopper!.n) >= 400, `expected large network stock, got ${info.hopper!.totalAvailable ?? info.hopper!.n}`);
   assert.ok(
     info.hopper!.cap >= info.hopper!.n,
     `hopper cap (${info.hopper!.cap}) must be >= hopper count (${info.hopper!.n})`

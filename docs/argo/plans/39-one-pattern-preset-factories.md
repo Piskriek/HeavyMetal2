@@ -49,3 +49,22 @@ Every look-and-feel system in the game is built the same way:
 How the closest games let players author and apply presets, and what players praise and hate in them: Dreams (Media Molecule) for authored graphs and sculpting, Spore's part editors, Space Engineers 2's block variants and colour/skin tool, No Man's Sky's base parts and paint, the Fallout 4 and Starfield workshop and ship builder, and Townscaper for constrained procedural building. Write the findings to a research doc before the Studio preset editor is designed.
 
 **For Argo (creative lead):** confirm the four factories and their beam targets; the Lx and Aq cartridge ideas are proposals for your call.
+
+## 6. Steps 3 and 4: the build (Opus, 2026-10-21; research in `docs/PRESET_FACTORIES_RESEARCH.md`)
+Steps 1 (Vtx parts) and 2 (Pxd skins on parts) are done. The same loop for the other two floats, in this order:
+
+**Shared first.** The bench preview becomes one turntable (`turntable.ts`) that any page feeds an object: the part, a tree, a lamp. Each page keeps the previews rule (live result, hover try-on, choices drawn as previews).
+
+**Aq: species cartridges.**
+1. `@hm/cartlab`: a cartridge kind `species` carrying `{ name, species, params }` (params resolved through `resolveTreeSliderParams`), written on the bench like a Texture Mill preset (a blank, bench time, gate power; no raw stock), saved and validated like part cartridges.
+2. The bench's **Species** tab: named presets first (one per species plus Autumn oak and Hydro birch), the treegen sliders (height, crown spread, crown base, lean, branch density, leaf size, sway, canopy palette), a live tree growing in the turntable, hover try-on.
+3. The plot's trees: `plot-biome-view` gains **variant slots**: each distinct preset on the plot is its own instanced set (near and far), at most 6; a tree moved into a variant keeps its place, scale and yaw. The overrides (`tree place -> preset`) live in the props save and are re-applied after every rebuild (a stage change).
+4. The beam: a species cartridge in Apply, aimed at a tree (the nearest trunk to the view ray, within reach), regrows that tree on a tap; a hold or Shift regrows every tree of the same kind within 12 m. Like for like: it fits trees only. At the cap it says so.
+5. Tests: cartlab units, the variant slots (a tap moves one instance, the cap), and a browser check (print, load, fire, survives a stage change).
+
+**Lx: light cartridges.**
+1. `@hm/cartlab`: a cartridge kind `light` carrying `{ name, kelvin | colour, intensity, pattern }` (pattern: steady, pulse, blink, flicker).
+2. The bench's **Lights** tab: named presets first (Sodium amber 2000 K, Work white 4000 K, Daylight 5600 K, Cold lab 7500 K, Hazard strobe, Ember flicker), a Kelvin slider drawn warm to cool, the signal colour as a separate mode, a square lamp housing glowing over a floor in the turntable, hover try-on.
+3. Lamps: a kit lamp wears `lx:<kelvin>:<intensity>:<pattern>` as its material, resolved like a skin (one shared emissive material per preset, its pattern animated once a frame for all lamps that wear it, so it stays cheap); real point lights stay the Graphics tier's extra.
+4. The beam: fired at a lamp it sets that lamp; held, every lamp on the machine. Like for like.
+5. Later: a light preset on a plot's sky (sun, fog, exposure), with Argo.

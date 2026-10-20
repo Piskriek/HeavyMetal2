@@ -7,7 +7,9 @@
   - T27: `packages/bridgekit/src/game-detector.ts` + `shell/running-game-bridge-pill.tsx` (running-game detector + bridge pill). No 256-slot linked storage pool.
   - T28: `packages/orbital/src/flight-and-transfer.ts` + `play/window-i-orbital-flight-hooks.ts`. Check the tidal Aq bonus does not add a 5th metric.
   - Ask Argo whether the missing pieces (viewmodel inertia, linked storage pool) are still owed as tickets.
-- **Order at 1 PM:** (1) `npm run typecheck && npm test && npm run build` here, (2) Haiku runs `scripts/test-on-3dpc.sh` per ticket, (3) review the shots myself, then (4) push. After that: plan "Bring Your Own Agent" Studio with Argo (OWNER_ASKS 19 Oct).
+- **Order at 1 PM:** (1) `npm run typecheck && npm test && npm run build` here, (2) Haiku runs `scripts/test-on-3dpc.sh` per ticket, (3) review the shots myself, then (4) push.
+- **Owner, 20 Oct:** finish ALL planned work first. "Bring Your Own Agent" is critical but not pressing: add it to the Studio todo list and don't start it yet. Web Argo is back at 12:13; we continue in this same session after the reset.
+- **Next ticket: TICKET-29, low-poly cleanup** (`argo-ticket29-bundle.json` in the Drive "Setmix" folder; fetch it with the recipe in the Argo Drive relay memory). It is a batch pipeline on 3dpc that turns each `public/hd/<model>.glb` into a sharp `low` slot: (1) split it into parts (PartField / SAMesh), (2) un-weld and close each part's hull (HoloPart or crease-split), (3) retopologize each part to 80-250 planar tris and bake normals and colours from hd (MeshAnything V2 or Blender + QuadriFlow), (4) repack with gltfpack without welding across parts, so `mergeStaticMeshes` still makes 1 draw call. It fits the split-hard-parts and square-sections rules. Research the licences and the GTX/3dpc VRAM needs before installing anything.
 - Flash is at 0% for 7 days. Argon (local Argo) is parked at ~75-80% for 3D/shader debugging. Web Argo has a fresh weekly quota for architecture work and bundles.
 
 

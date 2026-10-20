@@ -30,3 +30,12 @@ test('a save round-trips through its text, and a bad or old save reads as the em
   const dirty = parsePropsSave(JSON.stringify({ v: 1, cleared: ['a', 'a', 7, ''], logs: [null], sealed: [3, 3, -1, 2.5, 'x'] }));
   assert.deepEqual(dirty, { v: 1, cleared: ['a'], logs: [], sealed: [3] });
 });
+
+test('kit overrides (TICKET-32) round-trip, and a malformed one is dropped, not trusted', async () => {
+  const { withKitOverride } = await import('./props-save');
+  const s = withKitOverride(EMPTY_PROPS_SAVE, 'capacitor-bank', ['bolts-left[0]'], { gen: 'bolt', params: { headWidth: 0.12 }, slotMaterials: { metal: 'green' }, ops: [{ op: 'chamfer-hard-edges', params: {} }], material: 'green' });
+  assert.deepEqual(parsePropsSave(serializePropsSave(s)), s);
+  assert.equal(serializePropsSave(EMPTY_PROPS_SAVE).includes('kits'), false, 'no kits key when there are none');
+  const bad = parsePropsSave(JSON.stringify({ v: 1, cleared: [], logs: [], sealed: [], kits: { 'capacitor-bank': { 'bolts-left[0]': { params: { headWidth: 'fat' }, gen: 7 }, x: 'nope' } } }));
+  assert.equal(bad.kits, undefined);
+});

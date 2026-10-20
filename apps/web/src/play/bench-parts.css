@@ -1,0 +1,82 @@
+/* The preset bench's Parts page (bench-parts.tsx), in the bench window's own vocabulary (play.css .play-carts). */
+.bench-parts-gens {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 6px;
+  margin-bottom: 8px;
+}
+/* selected: the bench's power colour on the border and a light text (the window's .on rule left the text dark on dark) */
+.bench-parts .bench-parts-gens button.on,
+.bench-parts .bench-parts-ops button.on,
+.bench-parts .bench-parts-choices button.on {
+  border-color: var(--power);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(232, 238, 241, 0.98);
+}
+.bench-parts .bench-parts-gens button.on b {
+  color: rgba(232, 238, 241, 0.98);
+}
+
+.bench-parts-sliders {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.bench-parts-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 4px 10px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.bench-parts-row output {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--power);
+}
+.bench-parts-row input[type='range'] {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: var(--power);
+}
+
+.bench-parts-choices,
+.bench-parts-ops,
+.bench-parts-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.bench-parts-swatches {
+  flex-wrap: nowrap;
+}
+.bench-parts-ops {
+  margin: 4px 0 6px;
+}
+.bench-parts-ops button,
+.bench-parts-choices button {
+  padding: 5px 9px;
+  font-size: 12px;
+}
+
+.bench-parts-swatches button {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.bench-parts-swatches button[aria-checked='true'] {
+  outline: 2px solid var(--power);
+  outline-offset: 2px;
+}
+
+.bench-parts-cost {
+  margin: 4px 0 10px;
+  font-size: 13px;
+  color: rgba(232, 238, 241, 0.75);
+}
+.bench-parts-cost b {
+  color: rgba(232, 238, 241, 0.95);
+}

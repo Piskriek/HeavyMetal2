@@ -45,7 +45,8 @@ export function averagePalette(palette: readonly string[]): string | null {
  */
 export function writtenOnRack(lab: LabState): Cartridge | null {
   const inJob = new Set<string>([...(lab.bench?.inputs ?? []), ...(lab.combiner?.inputs ?? [])]);
-  return lab.cartridges.find((c) => c.kind === 'preset' && c.slot === null && c.preset !== null && !inJob.has(c.id)) ?? null;
+  // a written preset or a printed part (TICKET-32), first in rack order
+  return lab.cartridges.find((c) => c.slot === null && !inJob.has(c.id) && ((c.kind === 'preset' && c.preset !== null) || (c.kind === 'part' && c.part !== undefined))) ?? null;
 }
 
 /**

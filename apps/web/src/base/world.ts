@@ -142,13 +142,16 @@ export type BaseCommand =
   /** Salvage from a cleared lab prop (TASK-23c, logged): the pack first, then the network in reach. All or nothing: a refused salvage keeps the prop standing. */
   | { readonly t: 'salvage'; readonly at: Point; readonly stock: readonly L.Stack[] }
   /** Switches a base hardpoint machine on or off (POL-73). */
-  | { readonly t: 'switch'; readonly machine: number; readonly on: boolean };
+  | { readonly t: 'switch'; readonly machine: number; readonly on: boolean }
+  /** Pays a bill from the player, then the linked network in reach (TICKET-32: printing a part cartridge). */
+  | { readonly t: 'pay'; readonly at: Point; readonly bill: readonly L.Stack[]; readonly reason: string };
 
 export type BaseEvent =
   | { readonly type: 'refused'; readonly cmd: BaseCommand['t']; readonly why: string; readonly short?: readonly L.Stack[] }
   | { readonly type: 'placed'; readonly id: number; readonly kind: S.Kind }
   | { readonly type: 'removed'; readonly id: number; readonly collapsed: readonly number[]; readonly lost: readonly L.Stack[] }
   | { readonly type: 'drafted'; readonly blueprint: string }
+  | { readonly type: 'paid'; readonly reason: string; readonly bill: readonly L.Stack[] }
   | { readonly type: 'moved'; readonly n: number }
   | { readonly type: 'stacked'; readonly n: number }
   | { readonly type: 'hotbar'; readonly index: number }
@@ -381,6 +384,10 @@ export function apply(w: BaseWorld, env: WorldEnv, cmd: BaseCommand): Applied {
       return salvage(w, env, cmd);
     case 'switch':
       return switchMachine(w, cmd);
+    case 'pay': {
+      const r = pay(w, env, cmd.at, cmd.bill);
+      return r.ok ? next(w, r.patch, [{ type: 'paid', reason: cmd.reason, bill: cmd.bill }]) : refuse(w, cmd.t, 'short', r.short);
+    }
     default: {
       const unknown: never = cmd;
       return refuse(w, (unknown as BaseCommand).t, 'unknown-cmd');

@@ -29,12 +29,18 @@ import {
   slotInto,
   startCombine,
   startWrite,
+  canWritePart,
+  startPartWrite,
   step as stepCartlab,
   unslot,
   type Cartridge,
   type LabEnv,
   type LabState,
+  type PartSpec,
 } from '@hm/cartlab';
+import { BenchParts } from './bench-parts';
+import { overrideFromPart, partBill } from './part-cartridge';
+import { PART_SWATCHES } from './part-swatches';
 import { fx } from '../maker/feedback';
 import { FRESH, METRIC_COLOUR, METRIC_NAME, SAVE_KEY, arrived, created, isFreeDrill, loadState, objective, poweredOn, returned, withLab, withPlot, type PlayState } from './quest';
 import { Journal } from './journal';
@@ -70,7 +76,7 @@ import { PieceMeshManager } from '../base/piece-meshes';
 import { globalKitPieceCache, integrityColorName } from '../base/kit-pieces';
 import { planFrameLegs } from '../base/foundation-legs';
 import { preloadAllGenAssets, genLevelForStage, createGenFixture } from '../assets/gen-props';
-import { PROPS_SAVE_KEY, parsePropsSave, serializePropsSave, clearedProp, readLog, sealedSite, type PropsSave } from './props-save';
+import { PROPS_SAVE_KEY, parsePropsSave, serializePropsSave, clearedProp, readLog, sealedSite, withKitOverride, type PropsSave } from './props-save';
 import { clutterById, salvageSplit } from './lab-clutter';
 import { loreFor } from './lore-logs';
 import { ARMORY_PICKUP_REACH, ARMORY_RAIL_POS, SIDEARM_ITEM_ID, shouldShowAmmoBadge } from './armory-rack';
@@ -248,7 +254,11 @@ function loadBeamSave(): BeamSave {
     const raw = JSON.parse(kv.get(BEAM_SAVE_KEY) ?? 'null') as { readonly v?: unknown; readonly field?: unknown; readonly port?: unknown } | null;
     if (!raw || raw.v !== 1) return { field: null, port: null };
     const p = raw.port as Partial<Cartridge> | null | undefined;
-    const port = p && typeof p === 'object' && typeof p.id === 'string' && typeof p.preset === 'string' && typeof p.name === 'string' ? (p as Cartridge) : null;
+    // a written preset, or a printed part (TICKET-32: its part travels in the port, so it must survive the reload too)
+    const part = p?.part as Partial<PartSpec> | undefined;
+    const partOk = p?.kind === 'part' && !!part && typeof part === 'object' && typeof part.gen === 'string' && typeof part.name === 'string'
+      && !!part.params && typeof part.params === 'object' && !!part.slotMaterials && typeof part.slotMaterials === 'object' && Array.isArray(part.ops);
+    const port = p && typeof p === 'object' && typeof p.id === 'string' && typeof p.name === 'string' && (typeof p.preset === 'string' || partOk) ? (p as Cartridge) : null;
     return { field: typeof raw.field === 'string' && raw.field.length > 0 ? raw.field : null, port };
   } catch {
     return { field: null, port: null };
@@ -574,6 +584,8 @@ export function PlayScreen(props: {
   /** The lab machine whose panel is open ('rack' | 'bench' | 'combiner'). */
   const [labPanel, setLabPanel] = useState<LabMachineKind | null>(null);
   const [benchBlank, setBenchBlank] = useState<string | null>(null);
+  /** The preset bench's page: authored terraforming presets, or Shape Press parts (TICKET-32). */
+  const [benchTab, setBenchTab] = useState<'presets' | 'parts'>('presets');
   const [benchPreset, setBenchPreset] = useState<string | null>(null);
   const [combineIds, setCombineIds] = useState<readonly string[]>([]);
   /** State of visiting another player's plot via code. */
@@ -926,7 +938,10 @@ useEffect(() => {
   const beamOreAccRef = useRef(0);
   const beamOreFlushRef = useRef(0);
   /** The rifle's port (TASK-21): the written cartridge loaded from the lab rack, and its preset and colour. Not saved yet (TASK-21c). */
-  const beamPortRef = useRef<{ readonly cartridge: Cartridge; readonly preset: string; readonly name: string; readonly colour: string } | null>(null);
+  /** The rifle's port: a material preset cartridge (preset set) or a part cartridge (part set, preset ''; TICKET-32). */
+  const beamPortRef = useRef<{ readonly cartridge: Cartridge; readonly preset: string; readonly name: string; readonly colour: string; readonly part?: PartSpec } | null>(null);
+  /** A part shot in progress: when the left button went down and whether Shift was held (tap = one part, hold or Shift = all of that kind). */
+  const partShotRef = useRef<{ readonly t0: number; readonly shift: boolean } | null>(null);
   const [beamPort, setBeamPort] = useState<{ readonly name: string } | null>(null);
   /** The extraction counter: adds to the running count and fades two seconds after the last add (field nodes and boulders). */
   const flashBeamHarvest = (count: number, name: string): void => {
@@ -1012,11 +1027,19 @@ useEffect(() => {
   };
   /** Puts a written cartridge from the lab rack into the rifle's port: R takes the first one, the X radial in Apply the one picked. */
   const loadBeamCartridge = (written: Cartridge): void => {
-    if (written.preset === null) return;
+    const part = written.kind === 'part' ? written.part : undefined;
+    if (written.preset === null && !part) return;
     const port = beamPortRef.current;
     const next = reloadedLab(labRef.current, written, port ? port.cartridge : null);
-    const look = presetLook(written.preset);
-    beamPortRef.current = { cartridge: written, preset: written.preset, name: written.name, colour: look?.colour ?? '#808080' };
+    if (part) {
+      // a part cartridge (TICKET-32): the port glows the part's first material; Apply puts the part on what it is fired at
+      const first = Object.values(part.slotMaterials)[0];
+      const colour = PART_SWATCHES.find((s) => s.id === first)?.color ?? '#9aa4ad';
+      beamPortRef.current = { cartridge: written, preset: '', name: written.name, colour, part };
+    } else {
+      const look = presetLook(written.preset ?? '');
+      beamPortRef.current = { cartridge: written, preset: written.preset ?? '', name: written.name, colour: look?.colour ?? '#808080' };
+    }
     labRef.current = next;
     commit(withLab(withPlot(stateRef.current, plotRef.current), next));
     setBeamPort({ name: written.name });
@@ -1027,7 +1050,7 @@ useEffect(() => {
   };
   const reloadBeam = (): void => {
     const written = writtenOnRack(labRef.current);
-    if (!written || written.preset === null) {
+    if (!written || (written.preset === null && written.kind !== 'part')) {
       say('The port stays empty', 'No written cartridge is on the lab rack. Write one at the bench.');
       return;
     }
@@ -1489,6 +1512,35 @@ useEffect(() => {
     propsRef.current = next;
     kv.set(PROPS_SAVE_KEY, serializePropsSave(next));
   }, []);
+  /**
+   * The beam's Apply with a part cartridge (TICKET-32, ARGO_NOTE_34 D.3): a tap fits the part onto the part aimed at; a
+   * hold (0.45 s or more) or Shift fits it onto every part of that generator on the machine. Returns how many changed.
+   */
+  const applyPartShot = (broadcast: boolean): number => {
+    const scene = sceneRef.current;
+    const part = beamPortRef.current?.part;
+    if (!scene || !part) return 0;
+    const hit = scene.aimKitPart(BEAM_STROKE_RANGE);
+    if (!hit) {
+      say('Nothing to fit', 'Aim at a part of a machine: a bolt, a panel, a can.');
+      return 0;
+    }
+    if (!hit.gen) {
+      say('That piece takes no part cartridge', 'Part cartridges fit the printed parts: bolts, panels, brackets, grilles.');
+      return 0;
+    }
+    const paths = broadcast
+      ? scene.kitPlaced(hit.kit).filter((p) => p.source.kind === 'param' && p.source.gen === hit.gen).map((p) => p.path)
+      : [hit.path];
+    const next = withKitOverride(propsRef.current, hit.kit, paths, overrideFromPart(part));
+    savePropsSave(next);
+    scene.setKitOverrides(hit.kit, next.kits?.[hit.kit] ?? {});
+    say(paths.length === 1 ? `Fitted: ${part.name}` : `Fitted ${paths.length} parts: ${part.name}`,
+      broadcast ? 'Every part of that kind on the machine changed.' : 'Hold the trigger, or Shift, to change every part of that kind.');
+    return paths.length;
+  };
+  const applyPartShotRef = useRef<(broadcast: boolean) => number>(() => 0);
+  applyPartShotRef.current = applyPartShot;
   const openLog = useCallback((log: string): void => {
     if (!propsRef.current.logs.includes(log)) savePropsSave(readLog(propsRef.current, log));
     setDatabank(log);
@@ -1746,6 +1798,8 @@ useEffect(() => {
     importRoomTerrain();
     // the props saved for this profile: the cleared clutter is gone, the sealed leaks' wrecks stand restored (TASK-23c)
     scene.setProps(propsRef.current);
+    // the beam's part overrides on the lab's kit-built props (TICKET-32): stored now, applied as each kit builds
+    for (const [kit, ov] of Object.entries(propsRef.current.kits ?? {})) scene.setKitOverrides(kit, ov);
     if (typeof window !== 'undefined') {
       (window as any).__playScene = scene;
       (window as any).__createGenFixture = createGenFixture;
@@ -1791,7 +1845,13 @@ useEffect(() => {
         scene.setPlanet(look(PLOT, 1), (st: Stage) => look(PLOT, st), NEIGHBOURS.map((plot) => ({ plot, look: look(plot.cartridge, plot.stage) })));
         // the cartridge that was in the rifle's port comes back into it (TASK-21d): it left the rack when it was loaded
         const savedPort = loadBeamSave().port;
-        if (savedPort && savedPort.preset) {
+        if (savedPort && savedPort.kind === 'part' && savedPort.part) {
+          const first = Object.values(savedPort.part.slotMaterials)[0];
+          const colour = PART_SWATCHES.find((s) => s.id === first)?.color ?? '#9aa4ad';
+          beamPortRef.current = { cartridge: savedPort, preset: '', name: savedPort.name, colour, part: savedPort.part };
+          scene.setBeamCartridge(colour);
+          setBeamPort({ name: savedPort.name });
+        } else if (savedPort && savedPort.preset) {
           const colour = presetLook(savedPort.preset)?.colour ?? '#808080';
           beamPortRef.current = { cartridge: savedPort, preset: savedPort.preset, name: savedPort.name, colour };
           scene.setBeamCartridge(colour);
@@ -1927,6 +1987,11 @@ useEffect(() => {
           scene.monsters.setTrigger(true);
           fireWeapon();
         } else {
+          // A part cartridge in Apply, in the lab (TICKET-32): the shot is decided on release (tap = one part, hold or Shift = all of that kind)
+          if (beamHeldRef.current && beamModeRef.current === 'apply' && beamPortRef.current?.part && whereRef.current === 'lab') {
+            partShotRef.current = { t0: performance.now(), shift: e.shiftKey };
+            return;
+          }
           // A held rifle takes the mouse: the beam mines in the frame loop, and the other modes' strokes are the next step.
           if (beamHeldRef.current) return;
           if (placingLayoutRef.current !== null) {
@@ -1958,6 +2023,11 @@ useEffect(() => {
       if (e.button === 0) {
         isLmbDownRef.current = false;
         scene.monsters.setTrigger(false);
+        const shot = partShotRef.current;
+        if (shot) {
+          partShotRef.current = null;
+          applyPartShotRef.current(shot.shift || performance.now() - shot.t0 >= 450);
+        }
       }
     };
     window.addEventListener('keydown', kd); window.addEventListener('keyup', ku); window.addEventListener('mousemove', onMove);
@@ -3216,7 +3286,13 @@ useEffect(() => {
       const inJob = new Set<string>([...(lab.bench?.inputs ?? []), ...(lab.combiner?.inputs ?? [])]);
       const items: RadialItem[] = [];
       for (const c of lab.cartridges) {
-        if (c.kind !== 'preset' || c.slot !== null || c.preset === null || inJob.has(c.id)) continue;
+        if (c.slot !== null || inJob.has(c.id)) continue;
+        if (c.kind === 'part' && c.part) {
+          const first = Object.values(c.part.slotMaterials)[0];
+          items.push({ id: c.id, label: c.name, ref: { item: 'cartridge:part', tint: PART_SWATCHES.find((s) => s.id === first)?.color }, locked: null });
+          continue;
+        }
+        if (c.kind !== 'preset' || c.preset === null) continue;
         items.push({ id: c.id, label: c.name, ref: { item: `cartridge:${c.preset}`, tint: presetLook(c.preset)?.colour }, locked: null });
       }
       const empty = items.length === 0;
@@ -3794,6 +3870,43 @@ useEffect(() => {
        * A test seam (debug switch only): a written preset cartridge goes on the lab rack, so the X radial in Apply has one to
        * offer. Players never reach it (window.__dev exists only in dev builds and under ?e2e).
        */
+      /** TICKET-32 test seams: a lab kit's placed parts (path, generator, material, slider values) and the saved overrides. */
+      kitPlaced: (kit: string) => (sceneRef.current?.kitPlaced(kit) ?? []).map((p) => ({
+        path: p.path,
+        gen: p.source.kind === 'param' ? p.source.gen : null,
+        params: p.source.kind === 'param' ? p.source.params : null,
+        ops: p.source.kind === 'param' ? (p.source.ops ?? []).map((o) => o.op) : [],
+        material: p.material,
+      })),
+      kitOverrides: () => propsRef.current.kits ?? {},
+      aimKitPart: () => sceneRef.current?.aimKitPart(BEAM_STROKE_RANGE) ?? null,
+      /** Fires the part in the port as a tap (one part) or a hold (every part of that kind), as on release. */
+      applyPart: (broadcast: boolean): number => applyPartShotRef.current(broadcast),
+      /** Runs the lab's machines (the bench) for `seconds` of powered time. */
+      stepLab: (seconds: number): void => {
+        const env: LabEnv = { presets: VAULT, stage: plotRef.current.stage, powered: true };
+        const next = stepCartlab(labRef.current, env, seconds).state;
+        labRef.current = next;
+        commit(withLab(stateRef.current, next));
+      },
+      /** Turns the gate on (the bench prints only while it draws power). */
+      powerGate: (): void => commit({ ...stateRef.current, gateOn: true }),
+      /** Puts a blank on the lab rack without spending plot ore. Returns its id. */
+      seedBlank: (): string | null => {
+        const next = makeBlank(labRef.current, Number.MAX_SAFE_INTEGER).state;
+        labRef.current = next;
+        commit(withLab(stateRef.current, next));
+        return next.cartridges[next.cartridges.length - 1]?.id ?? null;
+      },
+      /** Loads a lab cartridge into the rifle's port (the X radial's pick). */
+      loadCartridge: (id: string): boolean => {
+        const c = labRef.current.cartridges.find((x) => x.id === id);
+        if (!c) return false;
+        loadBeamCartridge(c);
+        return beamPortRef.current?.cartridge.id === id;
+      },
+      /** The rifle's port: its cartridge's name and, for a part cartridge, the part. */
+      port: () => (beamPortRef.current ? { name: beamPortRef.current.name, part: beamPortRef.current.part ?? null } : null),
       seedCartridge: (preset: string): boolean => {
         const v = VAULT_BY_ID.get(preset);
         if (!v) return false;
@@ -4513,7 +4626,13 @@ useEffect(() => {
               return (
                 <section className="play-machine lab-panel-bench" aria-label="Preset Bench">
                   <h3>Preset Bench</h3>
-                  <p>Writes an authored terraforming preset onto a blank cartridge.</p>
+                  <div className="play-machine-actions" role="group" aria-label="What the bench writes">
+                    <button className={benchTab === 'presets' ? 'on' : ''} aria-pressed={benchTab === 'presets'} onClick={() => setBenchTab('presets')} data-testid="bench-tab-presets">Presets</button>
+                    <button className={benchTab === 'parts' ? 'on' : ''} aria-pressed={benchTab === 'parts'} onClick={() => setBenchTab('parts')} data-testid="bench-tab-parts">Parts</button>
+                  </div>
+                  <p>{benchTab === 'parts'
+                    ? 'Prints a Shape Press part onto a blank cartridge. Load it in the beam rifle and fire Apply at a part: a tap changes that part, a hold or Shift changes every part of its kind.'
+                    : 'Writes an authored terraforming preset onto a blank cartridge.'}</p>
                   <div className="play-carts">
                     <h4>1. Pick a blank ({blanks.length} available)</h4>
                     <div>
@@ -4529,6 +4648,32 @@ useEffect(() => {
                     </div>
                     {blanks.length === 0 ? <p className="play-why">No blanks on rack. Make a blank at the rack first.</p> : null}
                   </div>
+                  {benchTab === 'parts' ? (
+                    <BenchParts
+                      check={(spec) => {
+                        if (!activeBlank) return { ok: false, why: 'No blanks on the rack. Make a blank at the rack first.' };
+                        const c = canWritePart(labRef.current, labEnv, activeBlank, spec);
+                        if (!c.ok) return c;
+                        const at = sceneRef.current?.debug.position() ?? { x: 0, z: 0 };
+                        const dry = apply(baseWorldRef.current, getBaseEnv(), { t: 'pay', at, bill: partBill(spec), reason: 'part' });
+                        const refused = dry.events.find((ev) => ev.type === 'refused');
+                        if (refused && refused.type === 'refused') {
+                          const named = (refused.short ?? []).map((x) => `${x.n} ${x.item === 'vtx-rough' ? 'raw vertices' : x.item === 'pxd-mono' ? 'raw pixels' : x.item}`);
+                          return { ok: false, why: `Short of ${named.join(' and ') || 'raw stock'}.` };
+                        }
+                        return { ok: true, why: '' };
+                      }}
+                      onPrint={(spec: PartSpec) => {
+                        if (!activeBlank) return;
+                        const at = sceneRef.current?.debug.position() ?? { x: 0, z: 0 };
+                        dispatchBase({ t: 'pay', at, bill: partBill(spec), reason: `part:${spec.gen}` });
+                        const next = startPartWrite(labRef.current, labEnv, activeBlank, spec);
+                        labRef.current = next;
+                        commit(withLab(stateRef.current, next));
+                        say('Printing started', `The bench prints ${spec.name} while powered.`);
+                      }}
+                    />
+                  ) : (<>
                   <div className="play-carts">
                     <h4>2. Pick a preset</h4>
                     <div className="play-select-grid">
@@ -4569,6 +4714,7 @@ useEffect(() => {
                     </button>
                   </div>
                   {!writeCheck.ok && <span className="play-why">{writeCheck.why}</span>}
+                  </>)}
                   <button className="go" onClick={close} style={{ marginTop: '12px' }} autoFocus>Back to the lab</button>
                 </section>
               );

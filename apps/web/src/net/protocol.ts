@@ -106,7 +106,8 @@ export type WireBaseEvent =
   | { readonly kind: 'fitted'; readonly slot: PartSlot; readonly item: string | null }
   | { readonly kind: 'granted'; readonly stock: readonly L.Stack[]; readonly lost: readonly L.Stack[] }
   | { readonly kind: 'salvaged'; readonly stock: readonly L.Stack[] }
-  | { readonly kind: 'switched'; readonly machine: number; readonly on: boolean };
+  | { readonly kind: 'switched'; readonly machine: number; readonly on: boolean }
+  | { readonly kind: 'paid'; readonly reason: string; readonly bill: readonly L.Stack[] };
 
 /** Converts a `BaseEvent` (which uses `type`) into a `WireBaseEvent` (which uses `kind`, never `type`). */
 export function toWireEvent(e: BaseEvent): WireBaseEvent {
@@ -119,6 +120,8 @@ export function toWireEvent(e: BaseEvent): WireBaseEvent {
       return { kind: 'removed', id: e.id, collapsed: e.collapsed, lost: e.lost };
     case 'drafted':
       return { kind: 'drafted', blueprint: e.blueprint };
+    case 'paid':
+      return { kind: 'paid', reason: e.reason, bill: e.bill };
     case 'moved':
       return { kind: 'moved', n: e.n };
     case 'stacked':
@@ -221,6 +224,8 @@ export function fromWireEvent(w: WireBaseEvent): BaseEvent {
       return { type: 'salvaged', stock: w.stock };
     case 'switched':
       return { type: 'switched', machine: w.machine, on: w.on };
+    case 'paid':
+      return { type: 'paid', reason: w.reason, bill: w.bill };
   }
 }
 

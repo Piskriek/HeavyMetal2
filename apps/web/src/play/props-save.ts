@@ -2,6 +2,8 @@
 // that were read, and the leak sites that were sealed (their wreck props restored a rung). Pure: the screen reads and writes the
 // string with kv, and every change returns a new value, so a bad or old save reads as the empty one.
 
+import type { Overrides, PartOverride } from '@hm/kitspec';
+
 export const PROPS_SAVE_KEY = 'hm.setmix.props';
 
 export interface PropsSave {
@@ -12,6 +14,8 @@ export interface PropsSave {
   readonly logs: readonly string[];
   /** Leak site indices whose seal is done. */
   readonly sealed: readonly number[];
+  /** TICKET-32: the beam's part overrides on the lab's kit-built props, by kit id then part path. Omitted when none. */
+  readonly kits?: Readonly<Record<string, Overrides>>;
 }
 
 export const EMPTY_PROPS_SAVE: PropsSave = { v: 1, cleared: [], logs: [], sealed: [] };
@@ -19,20 +23,78 @@ export const EMPTY_PROPS_SAVE: PropsSave = { v: 1, cleared: [], logs: [], sealed
 const strings = (x: unknown): string[] => (Array.isArray(x) ? [...new Set(x.filter((s): s is string => typeof s === 'string' && s.length > 0 && s.length <= 64))] : []);
 const ints = (x: unknown): number[] => (Array.isArray(x) ? [...new Set(x.filter((n): n is number => Number.isInteger(n) && n >= 0 && n < 1000))].sort((a, b) => a - b) : []);
 
+const isObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
+const shortId = (k: string): boolean => k.length > 0 && k.length <= 96;
+const numbers = (x: unknown): Record<string, number> | null => {
+  if (!isObj(x)) return null;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(x)) if (shortId(k) && typeof v === 'number' && Number.isFinite(v)) out[k] = v;
+  return out;
+};
+const texts = (x: unknown): Record<string, string> | null => {
+  if (!isObj(x)) return null;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(x)) if (shortId(k) && typeof v === 'string' && shortId(v)) out[k] = v;
+  return out;
+};
+
+/** One override read back defensively: unknown or malformed fields are dropped; an empty result is null. */
+function override(x: unknown): PartOverride | null {
+  if (!isObj(x)) return null;
+  const o: { -readonly [K in keyof PartOverride]?: PartOverride[K] } = {};
+  if (typeof x.gen === 'string' && shortId(x.gen)) o.gen = x.gen;
+  if (typeof x.material === 'string' && shortId(x.material)) o.material = x.material;
+  const params = numbers(x.params);
+  if (params && Object.keys(params).length > 0) o.params = params;
+  const sm = texts(x.slotMaterials);
+  if (sm && Object.keys(sm).length > 0) o.slotMaterials = sm;
+  if (Array.isArray(x.ops)) {
+    o.ops = x.ops.slice(0, 8).flatMap((op) => (isObj(op) && typeof op.op === 'string' && shortId(op.op) ? [{ op: op.op, params: numbers(op.params) ?? {} }] : []));
+  }
+  return Object.keys(o).length > 0 ? o : null;
+}
+
+/** The kits' overrides from a save: at most 32 kits of 512 parts each. */
+function kitsOf(x: unknown): Record<string, Overrides> {
+  const out: Record<string, Overrides> = {};
+  if (!isObj(x)) return out;
+  for (const [kit, paths] of Object.entries(x).slice(0, 32)) {
+    if (!shortId(kit) || !isObj(paths)) continue;
+    const list: Record<string, PartOverride> = {};
+    for (const [path, ov] of Object.entries(paths).slice(0, 512)) {
+      const o = shortId(path) ? override(ov) : null;
+      if (o) list[path] = o;
+    }
+    if (Object.keys(list).length > 0) out[kit] = list;
+  }
+  return out;
+}
+
 /** The save from its stored text. Anything unreadable, or of another version, is the empty save. */
 export function parsePropsSave(raw: string | null): PropsSave {
   if (!raw) return EMPTY_PROPS_SAVE;
   try {
-    const o = JSON.parse(raw) as { v?: unknown; cleared?: unknown; logs?: unknown; sealed?: unknown } | null;
+    const o = JSON.parse(raw) as { v?: unknown; cleared?: unknown; logs?: unknown; sealed?: unknown; kits?: unknown } | null;
     if (!o || o.v !== 1) return EMPTY_PROPS_SAVE;
-    return { v: 1, cleared: strings(o.cleared), logs: strings(o.logs), sealed: ints(o.sealed) };
+    const kits = kitsOf(o.kits);
+    const base: PropsSave = { v: 1, cleared: strings(o.cleared), logs: strings(o.logs), sealed: ints(o.sealed) };
+    return Object.keys(kits).length > 0 ? { ...base, kits } : base;
   } catch {
     return EMPTY_PROPS_SAVE;
   }
 }
 
 export function serializePropsSave(s: PropsSave): string {
-  return JSON.stringify({ v: 1, cleared: [...s.cleared], logs: [...s.logs], sealed: [...s.sealed] });
+  const kits = s.kits && Object.keys(s.kits).length > 0 ? { kits: s.kits } : {};
+  return JSON.stringify({ v: 1, cleared: [...s.cleared], logs: [...s.logs], sealed: [...s.sealed], ...kits });
+}
+
+/** The save with these parts of a kit overridden (the beam's Apply with a part cartridge: one path, or every match). */
+export function withKitOverride(s: PropsSave, kit: string, paths: readonly string[], ov: PartOverride): PropsSave {
+  const current = s.kits?.[kit] ?? {};
+  const next: Record<string, PartOverride> = { ...current };
+  for (const p of paths) next[p] = ov;
+  return { ...s, kits: { ...(s.kits ?? {}), [kit]: next } };
 }
 
 /** The save with a prop cleared. Clearing a prop twice changes nothing (the same object comes back). */

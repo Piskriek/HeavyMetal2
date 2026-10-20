@@ -5,6 +5,7 @@
 // Two scenes, one walker. Crossing the gate's opening carries you (and the camera) from one gate's frame to the other's.
 // Each frame the far side is drawn from a virtual camera into a texture, and the near side shows it in the opening.
 import * as THREE from 'three';
+import type { Overrides, PlacedPart } from '@hm/kitspec';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { Stage } from '@hm/fidelity';
 import type { StageLook } from '../crafter/looks';
@@ -353,6 +354,12 @@ export interface PlayScene {
   stepMonsters(seconds: number): void;
   /** The leak the view is aimed at, within `range` m, or null (the beam's Seal hold). */
   aimLeak(range: number): number | null;
+  /** TICKET-32: the lab kit part the view is aimed at within `reach` m (its kit, path and generator), or null (always null off the lab). */
+  aimKitPart(reach: number): { readonly kit: string; readonly path: string; readonly gen: string | null } | null;
+  /** Rebuilds a lab kit with the beam's per-part overrides; false while its parts are not loaded yet. */
+  setKitOverrides(kit: string, overrides: Overrides): boolean;
+  /** A lab kit's placed parts as last built. */
+  kitPlaced(kit: string): readonly PlacedPart[];
   /** Immediately sets the world and mob visual fidelity stage (0 to 6). */
   setFidelityStage(stage: number): void;
   setVehicles(vehicles: readonly { readonly id: number; readonly kind: RoverKind; readonly x: number; readonly z: number; readonly yaw: number }[]): void;
@@ -4150,6 +4157,18 @@ export function createPlayScene(o: {
       const yaw = Math.atan2(monsterFwd.x, monsterFwd.z);
       const n = Math.round(seconds * 30);
       for (let i = 0; i < n; i++) monsters.update(1 / 30, { x: p.x, z: p.z, yaw, alive: playerAlive }, camera);
+    },
+    aimKitPart(reach: number) {
+      if (where !== 'lab') return null;
+      camera.updateMatrixWorld(true);
+      const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      return room.aimKitPart(camera.position, dir, reach);
+    },
+    setKitOverrides(kit: string, overrides: Overrides) {
+      return room.setKitOverrides(kit, overrides);
+    },
+    kitPlaced(kit: string) {
+      return room.kitPlaced(kit);
     },
     aimLeak(range: number): number | null {
       camera.getWorldDirection(monsterFwd);

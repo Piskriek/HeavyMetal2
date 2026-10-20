@@ -21,8 +21,9 @@ import {
   type RightWallMachineId,
 } from './lab-machines';
 import { applyMonitorEqualizerNearShotFix } from './window-g-final-qa-hooks';
-import { maxRank, type Tier } from '@hm/kitspec';
-import { buildKitPreset } from './kit-build';
+import { maxRank, type Kit, type Overrides, type PlacedPart, type Tier } from '@hm/kitspec';
+import { buildKitPreset, type KitBuild } from './kit-build';
+import { PART_SWATCHES } from './part-swatches';
 import { CAPACITOR_BANK_KIT } from './kit-capacitor-bank';
 export {
   aimLabStation,
@@ -449,6 +450,12 @@ export interface LabRoom {
   setStationOperating(id: RightWallMachineId | LabStationId | 'rack' | 'bench' | 'combiner', on: boolean): void;
   /** The lab clutter (TASK-23c): the prop the ray meets within `reach` metres (a fixture or a salvage prop), or null. Lab metres. */
   aimClutter(origin: THREE.Vector3, dir: THREE.Vector3, reach: number): string | null;
+  /** Kit-built props (plan 38): the part the ray meets within `reach` lab metres (its kit, path and generator), or null. */
+  aimKitPart(origin: THREE.Vector3, dir: THREE.Vector3, reach: number): { readonly kit: string; readonly path: string; readonly gen: string | null } | null;
+  /** Rebuilds a kit with these per-part overrides (the beam's part cartridges); false while its parts are not loaded yet. */
+  setKitOverrides(kit: string, overrides: Overrides): boolean;
+  /** A kit's placed parts as last built (empty before its first build). */
+  kitPlaced(kit: string): readonly PlacedPart[];
   /** Starts a salvage prop's dissolve (about a second; it then leaves the lab). False for a fixture or a prop that is not standing. */
   dissolveClutter(id: string): boolean;
   /** Takes away the props cleared in an earlier visit, at once (no dissolve). */
@@ -774,18 +781,52 @@ export function createLabRoom(o: {
   // and bus bars as square-section code. The lab is shielded, so it shows its full stage; the Graphics tier sets the
   // detail rank (Low draws ranks 0-1, so the lifting eyes and bolts go).
   const detailTier: Tier = o.quality === 'low' || o.quality === 'medium' ? o.quality : 'high';
-  swaps.push(() => {
-    const built = buildKitPreset(CAPACITOR_BANK_KIT, 'capacitor-bank', {
-      materials: { darkSteel: m.darkSteel, gunmetal: m.gunmetal, copper: m.copper, hazard: m.hazard },
-      gen: genFor,
-      maxRank: maxRank(6, detailTier),
-      keep,
-    });
+  // Every swatch a printed part can carry (TICKET-32: a fat green bolt needs green), beside the lab's own materials
+  const kitMaterials: Record<string, THREE.Material> = { darkSteel: m.darkSteel, gunmetal: m.gunmetal, copper: m.copper, hazard: m.hazard };
+  for (const s of PART_SWATCHES) {
+    kitMaterials[s.id] ??= keep(new THREE.MeshStandardMaterial({ color: s.color, metalness: s.metal, roughness: s.rough }));
+  }
+  /** The lab's kit-built props, by kit id: their prop group, the kit, the latest build and the beam's overrides. */
+  const kits = new Map<string, { group: THREE.Group; kit: Kit; preset: string; build: KitBuild | null; overrides: Overrides }>([
+    ['capacitor-bank', { group: bank.group, kit: CAPACITOR_BANK_KIT, preset: 'capacitor-bank', build: null, overrides: {} }],
+  ]);
+  const rebuildKit = (id: string): boolean => {
+    const k = kits.get(id);
+    if (!k) return false;
+    const built = buildKitPreset(k.kit, k.preset, { materials: kitMaterials, gen: genFor, maxRank: maxRank(6, detailTier), overrides: k.overrides, keep });
     if (!built) return false;
-    replaceVisual(bank.group, built.group);
+    replaceVisual(k.group, built.group);
+    k.build = built;
+    return true;
+  };
+  swaps.push(() => {
+    if (!rebuildKit('capacitor-bank')) return false;
     fitOverhang(bank);
     return true;
   });
+  const aimKitPart = (origin: THREE.Vector3, dir: THREE.Vector3, reach: number): { kit: string; path: string; gen: string | null } | null => {
+    const ray = new THREE.Raycaster(origin, dir.clone().normalize(), 0, reach);
+    let best: { kit: string; path: string; gen: string | null; d: number } | null = null;
+    for (const [id, k] of kits) {
+      if (!k.build) continue;
+      k.group.updateMatrixWorld(true);
+      const meshes = k.build.group.children.filter((c) => c.visible);
+      for (const h of ray.intersectObjects(meshes, false)) {
+        if (best && h.distance >= best.d) break;
+        const p = h.faceIndex === undefined || h.faceIndex === null ? null : k.build.partAt(h.object, h.faceIndex);
+        if (p) best = { kit: id, path: p.path, gen: p.source.kind === 'param' ? p.source.gen : null, d: h.distance };
+        break;
+      }
+    }
+    return best ? { kit: best.kit, path: best.path, gen: best.gen } : null;
+  };
+  const setKitOverrides = (id: string, overrides: Overrides): boolean => {
+    const k = kits.get(id);
+    if (!k) return false;
+    k.overrides = overrides;
+    return k.build === null ? false : rebuildKit(id);
+  };
+  const kitPlaced = (id: string): readonly PlacedPart[] => kits.get(id)?.build?.placed ?? [];
   // The breaker panel (sheet 07): the isolator turns about its spindle (the panel's normal) and the three sub-breakers flip in their sockets.
   // The panel's own model carries the hazard plate, the knob and the sockets; the code adds only the moving parts and the socket collars.
   const isolator = new THREE.Group();
@@ -1438,6 +1479,9 @@ export function createLabRoom(o: {
   return {
     envLevel: () => 0.03 + lastPower.main * 0.2,
     aimClutter,
+    aimKitPart,
+    setKitOverrides,
+    kitPlaced,
     dissolveClutter,
     removeClutter,
     armory,

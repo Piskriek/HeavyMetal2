@@ -24,6 +24,7 @@ import { applyMonitorEqualizerNearShotFix } from './window-g-final-qa-hooks';
 import { maxRank, type Kit, type Overrides, type PlacedPart, type Tier } from '@hm/kitspec';
 import { buildKitPreset, type KitBuild } from './kit-build';
 import { PART_SWATCHES } from './part-swatches';
+import { vaultSkin } from './vault-skin';
 import { CAPACITOR_BANK_KIT } from './kit-capacitor-bank';
 export {
   aimLabStation,
@@ -793,7 +794,10 @@ export function createLabRoom(o: {
   const rebuildKit = (id: string): boolean => {
     const k = kits.get(id);
     if (!k) return false;
-    const built = buildKitPreset(k.kit, k.preset, { materials: kitMaterials, gen: genFor, maxRank: maxRank(6, detailTier), overrides: k.overrides, keep });
+    const built = buildKitPreset(k.kit, k.preset, {
+      materials: kitMaterials, gen: genFor, maxRank: maxRank(6, detailTier), overrides: k.overrides, keep,
+      resolveMaterial: (name) => vaultSkin(name, detailTier !== 'low'),
+    });
     if (!built) return false;
     replaceVisual(k.group, built.group);
     k.build = built;

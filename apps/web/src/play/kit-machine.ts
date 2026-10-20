@@ -16,6 +16,8 @@ export interface KitMachineOptions {
   readonly stage: number;
   readonly genLevel: GenLevel;
   readonly overrides?: Overrides;
+  /** A material the record does not hold, by name (a Texture Mill skin), or null. */
+  readonly resolveMaterial?: (name: string) => THREE.Material | null;
 }
 
 /** The Graphics tier a generated-asset level stands for. */
@@ -29,6 +31,7 @@ export function kitMachineProp(kit: Kit, preset: string, o: KitMachineOptions): 
     gen: o.gen,
     maxRank: rank,
     ...(o.overrides ? { overrides: o.overrides } : {}),
+    ...(o.resolveMaterial ? { resolveMaterial: o.resolveMaterial } : {}),
   });
   if (!build) return null;
   const sockets = presetSockets(kit, preset);

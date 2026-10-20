@@ -43,6 +43,7 @@ import {
 } from '@hm/cartlab';
 import { BenchParts } from './bench-parts';
 import { setKitFrames } from './plot-kits';
+import { bodyMaterial, skinOverride } from './vault-skin';
 import { GENERATORS } from '@hm/partgen';
 import { overrideFromPart, partBill } from './part-cartridge';
 import { PART_SWATCHES } from './part-swatches';
@@ -947,6 +948,8 @@ useEffect(() => {
   const beamPortRef = useRef<{ readonly cartridge: Cartridge; readonly preset: string; readonly name: string; readonly colour: string; readonly part?: PartSpec } | null>(null);
   /** A part shot in progress: when the left button went down and whether Shift was held (tap = one part, hold or Shift = all of that kind). */
   const partShotRef = useRef<{ readonly t0: number; readonly shift: boolean } | null>(null);
+  /** A material cartridge's shot at a machine part (plan 39 step 2), decided on release like a part shot. */
+  const skinShotRef = useRef<{ readonly t0: number; readonly shift: boolean } | null>(null);
   const [beamPort, setBeamPort] = useState<{ readonly name: string } | null>(null);
   /** The extraction counter: adds to the running count and fades two seconds after the last add (field nodes and boulders). */
   const flashBeamHarvest = (count: number, name: string): void => {
@@ -1052,7 +1055,7 @@ useEffect(() => {
     sceneRef.current?.playAction('reload');
     beamDirtyRef.current = true;
     say(`Loaded: ${written.name}`, port ? `${port.name} went back on the rack.`
-      : part ? 'Fire Apply at a machine part: a tap fits one, a hold or Shift fits every part of its kind.' : 'Hold the left button in Apply to paint.');
+      : part ? 'Fire Apply at a machine part: a tap fits one, a hold or Shift fits every part of its kind.' : 'Hold the left button in Apply to paint the ground, or fire it at a machine part to paint the part.');
   };
   const reloadBeam = (): void => {
     const written = writtenOnRack(labRef.current);
@@ -1553,6 +1556,41 @@ useEffect(() => {
   };
   const applyPartShotRef = useRef<(broadcast: boolean) => number>(() => 0);
   applyPartShotRef.current = applyPartShot;
+  /**
+   * The beam's Apply with a material cartridge at a machine part (plan 39 step 2): a tap puts the material on the part's
+   * body (a panel keeps its bolts); a hold or Shift puts it on every part of the machine that wore the same material. A
+   * generated core keeps its own texture. Returns how many parts changed.
+   */
+  const applySkinShot = (broadcast: boolean): number => {
+    const scene = sceneRef.current;
+    const port = beamPortRef.current;
+    if (!scene || !port || port.part || !port.preset) return 0;
+    const hit = scene.aimKitPart(BEAM_STROKE_RANGE);
+    if (!hit) {
+      say('Nothing to paint', 'Aim at a part of a machine: a panel, a column, a skid.');
+      return 0;
+    }
+    const placed = scene.kitPlaced(hit.kit);
+    const target = placed.find((p) => p.path === hit.path);
+    if (!target || target.source.kind === 'gen') {
+      say('The core keeps its own skin', 'A material cartridge paints the parts around it: panels, columns, skids.');
+      return 0;
+    }
+    const was = bodyMaterial(target);
+    const parts = broadcast ? placed.filter((p) => p.source.kind !== 'gen' && bodyMaterial(p) === was) : [target];
+    let next = propsRef.current;
+    for (const p of parts) {
+      const ov = skinOverride(port.preset, p, next.kits?.[hit.kit]?.[p.path]);
+      if (ov) next = withKitOverride(next, hit.kit, [p.path], ov);
+    }
+    savePropsSave(next);
+    scene.setKitOverrides(hit.kit, next.kits?.[hit.kit] ?? {});
+    say(parts.length === 1 ? `Painted: ${port.name}` : `Painted ${parts.length} parts: ${port.name}`,
+      broadcast ? 'Every part that wore the same material changed.' : 'Hold the trigger, or Shift, to paint every part that wears the same material.');
+    return parts.length;
+  };
+  const applySkinShotRef = useRef<(broadcast: boolean) => number>(() => 0);
+  applySkinShotRef.current = applySkinShot;
   /** Whether the base's stores (the pack and the linked bins) hold a part's cost: a dry run of the base's `pay` command. */
   const partStockCheck = (spec: PartSpec): { readonly ok: boolean; readonly why: string } => {
     const at = sceneRef.current?.debug.position() ?? { x: 0, z: 0 };
@@ -2033,6 +2071,12 @@ useEffect(() => {
             partShotRef.current = { t0: performance.now(), shift: e.shiftKey };
             return;
           }
+          // A material cartridge aimed at a machine part paints the part's skin (decided on release); aimed anywhere else
+          // it paints the ground as before
+          if (beamHeldRef.current && beamModeRef.current === 'apply' && beamPortRef.current?.preset && scene.aimKitPart(BEAM_STROKE_RANGE)) {
+            skinShotRef.current = { t0: performance.now(), shift: e.shiftKey };
+            return;
+          }
           // A held rifle takes the mouse: the beam mines in the frame loop, and the other modes' strokes are the next step.
           if (beamHeldRef.current) return;
           if (placingLayoutRef.current !== null) {
@@ -2068,6 +2112,11 @@ useEffect(() => {
         if (shot) {
           partShotRef.current = null;
           applyPartShotRef.current(shot.shift || performance.now() - shot.t0 >= 450);
+        }
+        const skin = skinShotRef.current;
+        if (skin) {
+          skinShotRef.current = null;
+          applySkinShotRef.current(skin.shift || performance.now() - skin.t0 >= 450);
         }
       }
     };
@@ -2755,7 +2804,7 @@ useEffect(() => {
       {
         const port = beamPortRef.current;
         // a part cartridge paints nothing: its shot fits a part on release (applyPartShot)
-        const aim = live && !visitingRef.current && out.where === 'planet' && beamHeldRef.current && beamModeRef.current === 'apply' && isLmbDownRef.current && port !== null && !port.part
+        const aim = live && !visitingRef.current && out.where === 'planet' && beamHeldRef.current && beamModeRef.current === 'apply' && isLmbDownRef.current && port !== null && !port.part && !skinShotRef.current
           ? scene.beamAim(BEAM_STROKE_RANGE)
           : null;
         if (aim && port) {
@@ -3929,6 +3978,8 @@ useEffect(() => {
       aimKitPart: () => sceneRef.current?.aimKitPart(BEAM_STROKE_RANGE) ?? null,
       /** Fires the part in the port as a tap (one part) or a hold (every part of that kind), as on release. */
       applyPart: (broadcast: boolean): number => applyPartShotRef.current(broadcast),
+      /** Fires the material in the port at the aimed machine part, as a tap or a hold (plan 39 step 2). */
+      applySkin: (broadcast: boolean): number => applySkinShotRef.current(broadcast),
       /** Runs the lab's machines (the bench) for `seconds` of powered time. */
       stepLab: (seconds: number): void => {
         const env: LabEnv = { presets: VAULT, stage: plotRef.current.stage, powered: true };

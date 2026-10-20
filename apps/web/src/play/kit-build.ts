@@ -34,7 +34,26 @@ export interface KitBuildOptions {
   readonly overrides?: Overrides;
   /** Registers what the build creates, for disposal with its owner. */
   readonly keep?: <T extends { dispose(): void }>(x: T) => T;
+  /** A material the record does not hold, by name (a Texture Mill skin, `vault:<preset>`), or null. */
+  readonly resolveMaterial?: (name: string) => THREE.Material | null;
 }
+
+/**
+ * A box's face UVs in metres (one tile per metre, as the Shape Press parts' box projection), so a skin's texture keeps
+ * its scale on a long skid and a small cap alike. BoxGeometry's faces run +x, -x, +y, -y, +z, -z, four vertices each.
+ */
+const metricBoxUvs = (g: THREE.BufferGeometry, x: number, y: number, z: number): void => {
+  const uv = g.getAttribute('uv') as THREE.BufferAttribute;
+  const span: readonly (readonly [number, number])[] = [[z, y], [z, y], [x, z], [x, z], [x, y], [x, y]];
+  for (let face = 0; face < 6; face++) {
+    const [su, sv] = span[face]!;
+    for (let k = 0; k < 4; k++) {
+      const i = face * 4 + k;
+      uv.setXY(i, uv.getX(i) * su, uv.getY(i) * sv);
+    }
+  }
+  uv.needsUpdate = true;
+};
 
 const flipWinding = (g: THREE.BufferGeometry): void => {
   const index = g.getIndex();
@@ -110,6 +129,7 @@ interface Bucket {
  */
 export function buildKitPreset(kit: Kit, preset: string, o: KitBuildOptions): KitBuild | null {
   const placed = flatten(kit, preset, o.overrides);
+  const materialOf = (name: string): THREE.Material | null => o.materials[name] ?? o.resolveMaterial?.(name) ?? null;
   const buckets = new Map<string, Bucket>();
   const add = (material: THREE.Material, lo: number, hi: number, key: string, g: THREE.BufferGeometry): void => {
     const k = `${key}|${lo}-${hi}`;
@@ -130,10 +150,11 @@ export function buildKitPreset(kit: Kit, preset: string, o: KitBuildOptions): Ki
       return g;
     };
     if (src.kind === 'box') {
-      const material = o.materials[p.material];
+      const material = materialOf(p.material);
       if (!material) continue;
       const [x, y, z] = src.size;
       const g = new THREE.BoxGeometry(x, y, z);
+      metricBoxUvs(g, x, y, z);
       g.translate(0, y / 2, 0);
       add(material, p.rank, 2, p.material, finish(g));
     } else if (src.kind === 'param') {
@@ -144,7 +165,7 @@ export function buildKitPreset(kit: Kit, preset: string, o: KitBuildOptions): Ki
         const md = applyOps(base, src.ops);
         for (const slot of md.slots) {
           const matName = p.slotMaterials?.[slot.name] ?? p.material;
-          const material = o.materials[matName];
+          const material = materialOf(matName);
           if (!material || slot.count === 0) continue;
           const g = new THREE.BufferGeometry();
           g.setAttribute('position', new THREE.BufferAttribute(md.positions.slice(), 3));

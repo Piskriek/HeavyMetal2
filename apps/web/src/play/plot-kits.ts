@@ -18,6 +18,7 @@ import { MILL_FRAME_KIT } from './kit-mill-frame';
 import { PRESS_FRAME_KIT } from './kit-press-frame';
 import { WATERMAKER_FRAME_KIT } from './kit-watermaker-frame';
 import { PART_SWATCHES } from './part-swatches';
+import { vaultSkin } from './vault-skin';
 
 /** The heavy machines built from a kit, and the preset that is the whole machine. */
 export const HEAVY_KITS: Partial<Record<MachineKind, { readonly kit: Kit; readonly preset: string }>> = {
@@ -87,7 +88,12 @@ export function kitFabricator(genLevel: GenLevel, stage: number, ringY: number):
 } | null {
   if (!kitFrames) return null;
   const rank = maxRank(stage, tierOfLevel(genLevel));
-  const opts = { materials: plotKitMaterials(), gen: (asset: string) => getGenSync(asset, genLevel), maxRank: rank };
+  const opts = {
+    materials: plotKitMaterials(),
+    gen: (asset: string) => getGenSync(asset, genLevel),
+    resolveMaterial: (name: string) => vaultSkin(name, genLevel !== 'low'),
+    maxRank: rank,
+  };
   const frame = buildKitPreset(FAB_WITHOUT_HEAD, FAB_PRESET, opts);
   const carriage = buildKitPreset(FAB_HEAD, 'carriage', opts);
   const rest = flatten(FABRICATOR_FRAME_KIT, FAB_PRESET).find((p) => p.path === 'carriage');
@@ -119,6 +125,7 @@ export function heavyKitProp(kind: MachineKind, stage: number, genLevel: GenLeve
   const prop = kitMachineProp(spec.kit, spec.preset, {
     materials: plotKitMaterials(),
     gen: (asset) => getGenSync(asset, genLevel),
+    resolveMaterial: (name) => vaultSkin(name, genLevel !== 'low'),
     stage,
     genLevel,
     ...(overrides ? { overrides } : {}),

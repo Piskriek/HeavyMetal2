@@ -155,6 +155,37 @@ try {
   check('a hold changes every bolt on the bank', !!hit2 && n2 === 4 && all.every((b) => b.material === 'green'), `${n2} changed; ${JSON.stringify(all.map((b) => b.material))}`);
   await page.screenshot({ path: path.join(shotsDir, 'all-green-bolts.png') });
 
+  // ---- a material cartridge paints a part's skin (plan 39 step 2): a tap one bolt, a hold every bolt that wore the same
+  const skinId = 'red_ochre_silt';
+  const seeded = await page.evaluate((p) => window.__dev.seedCartridge(p), skinId);
+  const skinCart = await page.evaluate((p) => window.hmPlay.state().lab.cartridges.find((c) => c.preset === p)?.id ?? null, skinId);
+  check('a written material cartridge loads into the rifle port', seeded && !!skinCart && await page.evaluate((id) => window.__dev.loadCartridge(id), skinCart));
+  const skinHit = await aimAtSkidBolt();
+  const painted = skinHit ? await page.evaluate(() => window.__dev.applySkin(false)) : 0;
+  await frames(5);
+  const one = (await page.evaluate(() => window.__dev.kitOverrides()['capacitor-bank'] ?? {}))[skinHit?.path ?? ''];
+  check('a tap paints that bolt\'s body with the material, and it keeps its fat chamfered shape', painted === 1 && one?.slotMaterials?.metal === `vault:${skinId}` && one?.params?.headWidth === 0.12,
+    JSON.stringify(one));
+  await page.screenshot({ path: path.join(shotsDir, 'skin-one-bolt.png') });
+  const otherBolt = await (async () => {
+    for (const [x, z] of [[-6.2, 1.9], [-6.2, 0.1]]) {
+      for (let p = 0; p < 4; p++) for (let y = 0; y < 16; y++) {
+        await page.evaluate(([xx, zz, yy, pp]) => window.__playScene.debug.teleport('lab', xx, zz, yy, pp), [x, z, (y / 16) * Math.PI * 2, -0.5 - p * 0.2]);
+        await frames(2);
+        const hit = await page.evaluate(() => window.__dev.aimKitPart());
+        if (hit && hit.path.startsWith('bolts-') && hit.path !== skinHit?.path) return hit;
+      }
+    }
+    return null;
+  })();
+  const broad = otherBolt ? await page.evaluate(() => window.__dev.applySkin(true)) : 0;
+  await frames(5);
+  const ov = await page.evaluate(() => window.__dev.kitOverrides()['capacitor-bank'] ?? {});
+  const boltOvs = Object.entries(ov).filter(([p]) => p.startsWith('bolts-'));
+  check('a hold paints every bolt that wore the same material (the other three green ones)', broad === 3 && boltOvs.length === 4 && boltOvs.every(([, o]) => o.slotMaterials?.metal === `vault:${skinId}`),
+    `${broad}: ${JSON.stringify(boltOvs.map(([p, o]) => [p, o.slotMaterials?.metal]))}`);
+  await page.screenshot({ path: path.join(shotsDir, 'skin-all-bolts.png') });
+
   // ---- the planet's Drafting Table prints a part at once (ARGO_NOTE_34 D.1): a blank from the rack, the cost from the stores, into the port
   await page.evaluate(() => { window.__dev.seedBlank(); window.__dev.grantStock('vtx-rough', 40); window.__dev.grantStock('pxd-mono', 40); });
   await page.evaluate(() => { window.hmPlay.teleportPlanet?.(); window.hmPlay.setPaused?.(false); });

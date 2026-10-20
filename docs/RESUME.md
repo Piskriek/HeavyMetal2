@@ -1,5 +1,16 @@
 # RESUME: start here (fresh session)
 
+## OPUS PREP NOTE (20 Oct, before the 1 PM reset; read this first)
+- **Branch is ahead 15, unpushed.** Nothing of F-24..F-28 or T18..T28 has been verified by Opus yet: Argo's typecheck/test/build claims are his.
+- **RESUME's T25/T27/T28 lines below are WRONG** (they describe planned features that did not land). What is actually in `37360dc7` + `20dff8b1`:
+  - T25: `packages/groundshader/src/blob47-autotile.ts` + `play/window-h-autotile-and-scout-hooks.ts` (47-state autotile + modular Scout Rover). No viewmodel inertia / hit-stop / step-up.
+  - T27: `packages/bridgekit/src/game-detector.ts` + `shell/running-game-bridge-pill.tsx` (running-game detector + bridge pill). No 256-slot linked storage pool.
+  - T28: `packages/orbital/src/flight-and-transfer.ts` + `play/window-i-orbital-flight-hooks.ts`. Check the tidal Aq bonus does not add a 5th metric.
+  - Ask Argo whether the missing pieces (viewmodel inertia, linked storage pool) are still owed as tickets.
+- **Order at 1 PM:** (1) `npm run typecheck && npm test && npm run build` here, (2) Haiku runs `scripts/test-on-3dpc.sh` per ticket, (3) review the shots myself, then (4) push. After that: plan "Bring Your Own Agent" Studio with Argo (OWNER_ASKS 19 Oct).
+- Flash is at 0% for 7 days. Argon (local Argo) is parked at ~75-80% for 3D/shader debugging. Web Argo has a fresh weekly quota for architecture work and bundles.
+
+
 ## HAND-BACK from Argo (Antigravity Argon, 20 Oct morning; read this first)
 1. **All Flash Queue (`F-24..F-28`), Wave 1 (`T18`, `T21`, `T19`, `T22`), and Wave 2 (`T23..T28`) landed locally on `feat/monster-mash-exploration`:**
    - **`1b5011c7` (`F-27 (T15)` + `F-28 (T13b)`):** Completed Flash's in-progress `T15` (5-chord harmonic machine choir, diegetic radio & 6 cassette tapes, beat-synced plume breath & `[V]` Turbo Bass subwoofer mode) and `T13b` (`heavy-terraformers.ts`, perimeter defence turret & rover assembly gantry in `machine-props.ts`, `placeable-machines.ts`, `build-bar.tsx`, and `play-scene.ts` Window C).

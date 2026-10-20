@@ -36,4 +36,10 @@ This follows [plan 37](37-t29-part-split-low-poly.md). Splitting a fused model a
 3. **Then:** the fabricator (one upright, mirrored), the press and mill (heavygear already has their parts), the scout rover (its wheels are already separate), then the props from plan 37's kit list.
 4. **Later:** the asset bench shows a preset's tree and its ranks; the Drafting Table uses the same specs for player-made presets (the base-building milestone).
 
+## 5. Progress
+- **Step 1 done:** `@hm/kitspec` (`af77b277`, 11 tests): specs, sockets, mirrors, repeats, `maxRank`, `draws`, `validate` (nothing floats), merge and instance buckets.
+- **Step 2 done, the capacitor bank** (`d92cce8d`): `capacitor-can` generated once (a RUN image with the old bank as its style reference, local Hunyuan, fitted to 1.0 m: 0.51 x 1.00 x 0.52 m, 23 KB low), placed six times (3 wide, 2 deep, as sheet 21's power wall); the skid, hazard edges, caps, insulators and copper bus bars are code (`apps/web/src/play/kit-capacitor-bank.ts`), built by `kit-build.ts` (dequantises packed meshes, merges per material and rank, flips mirrored winding). The lab's rank follows the Graphics tier only (the lab is shielded, so it is always at its full stage). The fused bank left the single file (`inline: false`, 88 KB saved; the can costs 23). test-lab-overhaul 78/78, 181 draw calls at the gate view.
+- **Prior art found:** `@hm/heavygear` already adds detail by stage (`L.at(4)`, `L.seg(6, 12)`, `L.rep(3, 5)`) and rebuilds a heavy machine per stage, so the heavy press, projector and water maker already gain detail as reality upgrades. They move onto kitspec only if the Studio or the Drafting Table needs to edit them.
+- **Next:** the generated machines (mill, press frame, water maker, the fabricator's frame) are the candidates, after Argo picks their modules and ranks.
+
 **Ask Argo (creative lead):** which detail goes in which rank for the lab machines and the rovers, whether the stage-to-rank ladder above reads right, and the trim-sheet palette.

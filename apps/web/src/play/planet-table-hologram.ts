@@ -112,26 +112,38 @@ export function createPlanetTableHologram(parent?: THREE.Object3D): PlanetTableH
   const ringMesh = new THREE.Mesh(ringGeo, ringMat);
   group.add(ringMesh);
 
-  // 12 enclave beacon nodes (index 0 = player plot at North crown, 1..11 = neighbor enclaves)
+  // 12 enclave beacon nodes (index 0 = player plot at North crown, 1..11 = neighbor enclaves): one instanced mesh with a colour and a
+  // scale per node, so the 12 nodes are one draw call (the lab's draw-call budget, TICKET-06)
   const nodeGeo = new THREE.BoxGeometry(0.036, 0.036, 0.036);
-  const nodeMats: THREE.MeshBasicMaterial[] = [];
-  const nodeMeshes: THREE.Mesh[] = [];
+  const nodeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const nodes = new THREE.InstancedMesh(nodeGeo, nodeMat, NEIGHBOR_ENCLAVE_COUNT + 1);
+  nodes.name = 'planet-table-enclave-nodes';
+  const nodeAt: THREE.Vector3[] = [];
+  const nodeDummy = new THREE.Object3D();
+  const nodeColour = new THREE.Color();
+  const setNode = (i: number, scale: number, colour: THREE.ColorRepresentation): void => {
+    nodeDummy.position.copy(nodeAt[i]!);
+    nodeDummy.scale.setScalar(scale);
+    nodeDummy.updateMatrix();
+    nodes.setMatrixAt(i, nodeDummy.matrix);
+    nodes.setColorAt(i, nodeColour.set(colour));
+  };
 
   for (let i = 0; i <= NEIGHBOR_ENCLAVE_COUNT; i++) {
-    const mat = new THREE.MeshBasicMaterial({ color: i === 0 ? 0x7cff4d : 0x3dc8ff });
-    const mesh = new THREE.Mesh(nodeGeo, mat);
     if (i === 0) {
-      mesh.position.set(0, 0.42, 0);
+      nodeAt.push(new THREE.Vector3(0, 0.42, 0));
     } else {
       const lat = ((i % 3) - 1) * 0.45;
       const lon = (i * Math.PI * 2) / NEIGHBOR_ENCLAVE_COUNT;
       const r = 0.42 * Math.cos(lat);
-      mesh.position.set(Math.cos(lon) * r, 0.42 * Math.sin(lat), Math.sin(lon) * r);
+      nodeAt.push(new THREE.Vector3(Math.cos(lon) * r, 0.42 * Math.sin(lat), Math.sin(lon) * r));
     }
-    globeMesh.add(mesh);
-    nodeMats.push(mat);
-    nodeMeshes.push(mesh);
+    // placed at the largest scale a node takes (a lit one, 1.15) for the culling sphere, then at its rest scale
+    setNode(i, 1.15, i === 0 ? 0x7cff4d : 0x3dc8ff);
   }
+  nodes.computeBoundingSphere();
+  for (let i = 0; i <= NEIGHBOR_ENCLAVE_COUNT; i++) setNode(i, 1, i === 0 ? 0x7cff4d : 0x3dc8ff);
+  globeMesh.add(nodes);
 
   return {
     group,
@@ -147,10 +159,10 @@ export function createPlanetTableHologram(parent?: THREE.Object3D): PlanetTableH
 
       for (let i = 1; i <= NEIGHBOR_ENCLAVE_COUNT; i++) {
         const dome = state.domes[i - 1]!;
-        const mat = nodeMats[i]!;
-        mat.color.set(ready ? '#b46bff' : dome.lit ? dome.accentHex : '#3a4659');
-        nodeMeshes[i]!.scale.setScalar(dome.lit ? 1.15 : 0.75);
+        setNode(i, dome.lit ? 1.15 : 0.75, ready ? '#b46bff' : dome.lit ? dome.accentHex : '#3a4659');
       }
+      nodes.instanceMatrix.needsUpdate = true;
+      if (nodes.instanceColor) nodes.instanceColor.needsUpdate = true;
 
       const promptLabel = committed
         ? `CONSENSUS LOCKED (${state.consensusPct.toFixed(0)}%) // BRANCH LIVE`
@@ -170,7 +182,8 @@ export function createPlanetTableHologram(parent?: THREE.Object3D): PlanetTableH
       ringGeo.dispose();
       ringMat.dispose();
       nodeGeo.dispose();
-      for (const m of nodeMats) m.dispose();
+      nodeMat.dispose();
+      nodes.dispose();
       if (group.parent) group.parent.remove(group);
     },
   };

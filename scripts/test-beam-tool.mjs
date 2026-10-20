@@ -8,9 +8,9 @@
  *   3c the rifle in the character's hand at stage 1: the rim and the floor light the character (21d, a shot);
  *   4 R reloads the port from the lab rack: a written cartridge the rack holds goes into the port, and the port shows its name;
  *   5 Apply paints the loaded preset under the aim point (cells painted, no ore spent);
- *   5b Sculpt (21d): the ring takes Sculpt's colour; carve digs the ground under the aim and gains ore; key 2 raises it and spends
- *     ore; key 3 smooths at no ore cost; the gate pad is kept out; the ring takes each mode's colour and Seal's amber; the cut, the
- *     paint and the port survive a reload;
+ *   5b Sculpt (21d): the ring takes Sculpt's colour; carve digs the ground under the aim and gains ore; Raise, picked on the X radial
+ *     (TICKET-04), builds it up and spends ore; Smooth costs no ore; the gate pad is kept out; the ring takes each mode's colour and
+ *     Seal's amber; the cut, the paint and the port survive a reload;
  *   6 V puts the rifle in the character's hand (third person), the rifle clips play, and the character stands on the ground;
  *   7 the frame rate over two seconds in each mode with the beam firing (the left button held: a boulder, the paint, the cut);
  *   8 G holsters the rifle.
@@ -121,6 +121,23 @@ const ring = () => page.evaluate(() => window.__playScene.debug.ringColour());
 const edit = (p) => page.evaluate(([x, z]) => window.__playScene.debug.groundEdit(x, z), [p.x, p.z]);
 const aimAt = () => page.evaluate(() => window.__playScene.beamAim(25));
 const plotOre = () => page.evaluate(() => window.hmPlay.plot().ore);
+/**
+ * Picks a sculpt tool on the X radial (TICKET-04: keys 1 to 9 always pick the hotbar, X picks carve, raise or smooth): X down with the
+ * mouse parked in a corner, hover the slice, release X. The test reports the canvas as locked, so the mouse moves can turn the view:
+ * the Apply and Sculpt pose (60, 60, yaw 0.3, pitch -0.5) is put back after the pick, so the stroke lands on the same aim point.
+ */
+const pickSculptTool = async (tool) => {
+  await page.mouse.move(4, 4);
+  await page.keyboard.down('x');
+  await page.locator('[data-testid="radial-menu"]').waitFor({ state: 'visible', timeout: 4000 });
+  await wait(150);
+  await page.locator(`[data-testid="radial-slice-${tool}"]`).hover();
+  await wait(120);
+  await page.keyboard.up('x');
+  await wait(250);
+  await page.evaluate(() => window.__playScene.debug.teleport('planet', 60, 60, 0.3, -0.5));
+  await wait(300);
+};
 /** Frames drawn in `ms` milliseconds (requestAnimationFrame), to read the frame rate. */
 const fps = (ms) =>
   page.evaluate(
@@ -359,10 +376,9 @@ try {
   check('the drawn ground follows the cut: the chunk mesh under the aim is at the sculpted height (21d)', surf.mesh !== null && Math.abs(surf.mesh - surf.height) < 0.06, `mesh ${surf.mesh === null ? 'none' : surf.mesh.toFixed(3)} m, height ${surf.height.toFixed(3)} m`);
   await shot('07-sculpt-carved-first-person.png');
 
-  await page.keyboard.press('Digit2');
-  await wait(200);
+  await pickSculptTool('raise');
   c = await chip();
-  check('key 2 picks Raise in Sculpt (the chip shows it)', c?.tool === 'raise', c?.tool ?? 'none');
+  check('the X radial picks Raise in Sculpt (the chip shows it)', c?.tool === 'raise', c?.tool ?? 'none');
   const e2 = await edit(aim0);
   const o2 = await plotOre();
   await page.mouse.down();
@@ -374,10 +390,9 @@ try {
   check('Raise builds the ground up under the aim point (the height rises)', e3 > e2 + 0.05, `${e2.toFixed(2)} m to ${e3.toFixed(2)} m`);
   check('Raise spends ore (the plot\'s ore falls)', o3 < o2, `ore ${o2.toFixed(1)} to ${o3.toFixed(1)}`);
 
-  await page.keyboard.press('Digit3');
-  await wait(200);
+  await pickSculptTool('smooth');
   c = await chip();
-  check('key 3 picks Smooth', c?.tool === 'smooth', c?.tool ?? 'none');
+  check('the X radial picks Smooth', c?.tool === 'smooth', c?.tool ?? 'none');
   await page.mouse.down();
   await page.waitForTimeout(1000);
   await page.mouse.up();
@@ -385,9 +400,8 @@ try {
   // the machines draw the plot's ore too, so the stroke is read on its own: a smooth returns the same balance it was given
   const smooth = await page.evaluate(([x, z]) => window.__playScene.beamSculpt(x, z, 'smooth', 0.5, 50), [aim0.x, aim0.z]);
   check('Smooth costs no ore (its stroke leaves the balance as it was)', smooth.ore === 50 && smooth.gained === 0, JSON.stringify(smooth));
-  await page.keyboard.press('Digit1');
-  await wait(200);
-  check('key 1 picks Carve again', (await chip())?.tool === 'carve');
+  await pickSculptTool('carve');
+  check('the X radial picks Carve again', (await chip())?.tool === 'carve');
 
   // a low look at the cut, from 6 m off the aim point (the shape of the hollow, for the shot)
   await page.evaluate(([x, z]) => {
@@ -416,10 +430,11 @@ try {
   check('the ring is in Apply\'s colour (#ff3d8a)', (await chip())?.mode === 'apply' && (await ring()) === '#ff3d8a', `ring ${await ring()}`);
   await page.keyboard.press('q');
   await wait(200);
-  await page.evaluate(() => window.__playScene.setBeamSealing(true));
+  // the frame loop seals from the leak under the beam every frame (TASK-23b-2), so the seal is held through the game's test hook
+  await page.evaluate(() => window.hmPlay.setBeamSealing(true));
   await wait(200);
   check('Seal turns the ring amber (#ffc13d) while sealing, in any mode', (await ring()) === '#ffc13d', `ring ${await ring()}`);
-  await page.evaluate(() => window.__playScene.setBeamSealing(false));
+  await page.evaluate(() => window.hmPlay.setBeamSealing(false));
   await wait(200);
   check('the ring goes back to the mode\'s colour when the seal is off', (await ring()) === '#7cff4d', `ring ${await ring()}`);
 

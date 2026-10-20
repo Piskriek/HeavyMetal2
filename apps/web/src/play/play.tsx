@@ -148,6 +148,8 @@ import './play.css';
 /** Your plot's cartridge until the ground shader battle lands: sandy desert tones, the nearest in the vault to the concept art's stage 1. */
 const PLOT = 'crater_calcite';
 const SYNC_BLOCKS = 20;
+/** How long Dr. Haddy's portrait stays in the top-left zone after the quest step changes (POL-40, plan 16), in ms. */
+const PORTRAIT_QUEST_PING_MS = 4000;
 /** Other players' plots, 1 km across like yours (owner, 2026-10-07): seen from your plot as greener, wetter patches 1.1 to 3 km away.
  *  Samples until the shared planet is wired (SETMIX_PLAN Phase 5). */
 const NEIGHBOURS: readonly Plot[] = ([
@@ -757,6 +759,8 @@ useEffect(() => {
   const beamHeldRef = useRef(false);
   const beamModeRef = useRef<BeamMode>('extract');
   const forceBeamFiringRef = useRef(false);
+  /** The test hook's seal (hmPlay.setBeamSealing): the frame loop seals on a leak's column, or while this is set. */
+  const forceBeamSealingRef = useRef(false);
   const [beamHud, setBeamHud] = useState<{ readonly held: boolean; readonly mode: BeamMode }>({ held: false, mode: 'extract' });
   /** The sculpt tool (TASK-21d): carve, raise or smooth. The frame loop reads the ref; the chip reads the state. */
   const sculptToolRef = useRef<SculptTool>('carve');
@@ -2616,7 +2620,7 @@ useEffect(() => {
         const leakAim = live && !visitingRef.current && out.where === 'planet' && beamHeldRef.current && beamModeRef.current === 'extract' && isLmbDownRef.current && !scene.monsters.isEquipped() ? scene.aimLeak(BEAM_RANGE) : null;
         sealAimRef.current = leakAim;
         scene.monsters.setSealing(leakAim);
-        scene.setBeamSealing(leakAim !== null);
+        scene.setBeamSealing(leakAim !== null || forceBeamSealingRef.current);
         const boulderId = leakAim === null && live &&!visitingRef.current && out.where === 'planet' && beamHeldRef.current && beamModeRef.current === 'extract' && isLmbDownRef.current && !scene.monsters.isEquipped() && scene.aimNode(baseWorldRef.current.field, BEAM_RANGE) === null
           ? scene.aimBoulder(BEAM_STROKE_RANGE)
           : null;
@@ -2870,7 +2874,11 @@ useEffect(() => {
         forceBeamFiringRef.current = on;
         scene.setBeamFiring(on);
       },
-      setBeamSealing: (on: boolean) => scene.setBeamSealing(on),
+      // the frame loop sets the seal every frame from the leak under the beam, so the hook holds it (as setBeamFiring does)
+      setBeamSealing: (on: boolean) => {
+        forceBeamSealingRef.current = on;
+        scene.setBeamSealing(on);
+      },
       anchors: () => scene.debug.machineAnchors(),
       hideOverlays: (hide: boolean) => setHideOverlays(hide),
       lockAim: () => ({ locked: scene.ghostLocked(), aim: scene.aimPoint() }),
@@ -3994,6 +4002,20 @@ useEffect(() => {
   const chainNow = chainView(state.chain);
   const goal = chainNow.current && !visiting ? { title: chainNow.current.title, hint: chainNow.current.hint } : plotGoal;
   const chainNext = !visiting && chainNow.current ? chainNow.next?.title ?? null : null;
+  // POL-40 (plan 16, the top-left zone): Dr. Haddy's portrait slides in only while she speaks or for a moment when the quest step
+  // changes, so the quest card keeps the top of the zone. It yields while a ghost is placed (as the subtitle yields to the open
+  // drawer): the centre 60% of the screen stays clear for the ghost.
+  const [questPing, setQuestPing] = useState(false);
+  const pingedGoalRef = useRef(goal.title);
+  useEffect(() => {
+    if (pingedGoalRef.current === goal.title) return;
+    pingedGoalRef.current = goal.title;
+    setQuestPing(true);
+    const t = window.setTimeout(() => setQuestPing(false), PORTRAIT_QUEST_PING_MS);
+    return () => window.clearTimeout(t);
+  }, [goal.title]);
+  const placingNow = building !== null || placingLayoutId !== null || pieceSessionRef.current;
+  const portraitIn = (subtitle !== null || questPing) && !placingNow;
   const syncLit = Math.ceil(hud.sync * SYNC_BLOCKS);
   const labStation = hud.where === 'lab' && hud.aimedLab !== null ? stationById(hud.aimedLab) : null;
   const prompt = building
@@ -4097,13 +4119,16 @@ useEffect(() => {
         <>
           {!hideOverlays && drivingSpeed === null && (
             <HudZone zone="top-left">
-            <HaddyCrtPortrait
-              activeLineId={subtitle?.id}
-              subtitleText={subtitle?.cleanText}
-              isSpeaking={Boolean(subtitle)}
-              isWarningGlitch={subtitle?.id?.startsWith('BARK') || subtitle?.id === 'power-short' || subtitle?.id === 'recall-zero'}
-              stage={hud.plot.stage}
-            />
+            {portraitIn ? (
+              <HaddyCrtPortrait
+                className="hud-portrait-in"
+                activeLineId={subtitle?.id}
+                subtitleText={subtitle?.cleanText}
+                isSpeaking={Boolean(subtitle)}
+                isWarningGlitch={subtitle?.id?.startsWith('BARK') || subtitle?.id === 'power-short' || subtitle?.id === 'recall-zero'}
+                stage={hud.plot.stage}
+              />
+            ) : null}
             <section className="play-goal" aria-live="polite" data-hud-zone="top-left">
               <h2>{visiting ? `Visiting ${visiting.snapshot.owner}’s plot` : goal.title}</h2>
               <p>{visiting ? 'Read-only visit. Walk back through the gate to return to your lab.' : goal.hint}</p>

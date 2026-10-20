@@ -158,6 +158,16 @@
 }
 .hud-zone .play-plot { width: 200px; }
 
+/* POL-40 (plan 16): Dr. Haddy's portrait slides into the top-left zone while she speaks or the quest step changes, then leaves. */
+@keyframes hud-portrait-in {
+  from { transform: translateX(-18px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+.hud-zone .hud-portrait-in { animation: hud-portrait-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .hud-zone .hud-portrait-in { animation: none; }
+}
+
 /* 3. The compass ribbon (top-centre). */
 .hud-compass {
   position: relative;

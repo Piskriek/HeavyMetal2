@@ -342,6 +342,9 @@
       "@hm/partgen": [
         "packages/partgen/src/index.ts"
       ],
+      "@hm/meshops": [
+        "packages/meshops/src/index.ts"
+      ],
       "@hm/substrate": [
         "packages/substrate/src/index.ts"
       ],

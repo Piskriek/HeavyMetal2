@@ -198,6 +198,7 @@ export default defineConfig(async ({ mode }) => ({
       '@hm/lattice': p('../../packages/lattice/src/index.ts'),
       '@hm/kitspec': p('../../packages/kitspec/src/index.ts'),
       '@hm/partgen': p('../../packages/partgen/src/index.ts'),
+      '@hm/meshops': p('../../packages/meshops/src/index.ts'),
       '@hm/substrate': p('../../packages/substrate/src/index.ts'),
       '@hm/basegear': p('../../packages/basegear/src/index.ts'),
       '@hm/heavygear': p('../../packages/heavygear/src/index.ts'),

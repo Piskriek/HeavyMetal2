@@ -101,7 +101,9 @@ export class MeshBuilder {
           ny += (a[2] - b[2]) * (a[0] + b[0]);
           nz += (a[0] - b[0]) * (a[1] + b[1]);
         }
-        const len = Math.hypot(nx, ny, nz) || 1;
+        const len = Math.hypot(nx, ny, nz);
+        // a polygon with no area (a slice through an edge, a collapsed cap) draws nothing and has no normal: drop it
+        if (!(len > 1e-12)) continue;
         nx /= len; ny /= len; nz /= len;
         const ax = Math.abs(nx), ay = Math.abs(ny), az = Math.abs(nz);
         const base = pos.length / 3;

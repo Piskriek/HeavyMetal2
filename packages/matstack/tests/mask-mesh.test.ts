@@ -148,3 +148,44 @@ test('deterministic', () => {
   assert.deepEqual([...a.edge], [...b.edge]);
   assert.deepEqual([...a.positions], [...b.positions]);
 });
+
+test('rank 0 flattens a faceted part per face: the big faces stay clean, the thin sides read as worn bevels', async () => {
+  const { flattenMesh, hexToLinear } = await import('../src/index');
+  const plate = (w: number, h: number, d: number): MaskMeshInput =>
+    quads([
+      [[0, 0, d], [w, 0, d], [w, h, d], [0, h, d]],
+      [[w, 0, 0], [0, 0, 0], [0, h, 0], [w, h, 0]],
+      [[w, 0, d], [w, 0, 0], [w, h, 0], [w, h, d]],
+      [[0, 0, 0], [0, 0, d], [0, h, d], [0, h, 0]],
+      [[0, h, d], [w, h, d], [w, h, 0], [0, h, 0]],
+      [[0, 0, 0], [w, 0, 0], [w, 0, d], [0, 0, d]],
+    ]);
+  const mesh = edgeLines(plate(1, 0.02, 1)); // a 1 m square plate, 2 cm thick
+  const flat = { sample: () => ({ grey: 0.5, height: 0.5, rough: 0.5 }) };
+  const noise = { sample: () => 0.5 };
+  const base = { blend: 'normal', opacity: 1, invert: false } as const;
+  const steel = { name: 'paint', colour: '#3c9a5a', metal: 0, rough: 0.5, specular: 0.5 };
+  const bare = { name: 'bare', colour: '#c0c0c0', metal: 1, rough: 0.3, specular: 0.5 };
+  const m = {
+    name: 'worn', base: steel, paint: ['#000000', '#000000'] as [string, string], age: 1,
+    layers: [{
+      name: 'edge wear', surface: bare, opacity: 1, writes: ['colour', 'metal', 'rough'] as const, heightBlend: 0, weathering: false, visible: true,
+      mask: { name: 'edges', inputs: [{ ...base, kind: 'edge', width: 0.03 } as const], balance: 0, contrast: 1, invert: false },
+    }],
+  };
+  const f = flattenMesh(m, mesh, flat, noise);
+  const P = (i: number) => [mesh.positions[i * 3]!, mesh.positions[i * 3 + 1]!, mesh.positions[i * 3 + 2]!];
+  let top = -1, side = -1;
+  for (let t = 0; t < mesh.indices.length; t += 3) {
+    const ys = [0, 1, 2].map((k) => P(mesh.indices[t + k]!)[1]!);
+    if (ys.every((y) => Math.abs(y - 0.02) < 1e-6) && top < 0) top = mesh.indices[t]!;
+    if (ys.some((y) => y < 1e-6) && ys.some((y) => y > 0.019) && side < 0) side = mesh.indices[t]!;
+  }
+  close(f.colour[top * 3]!, hexToLinear('#3c9a5a')[0], 1e-6, 'the big top face keeps its paint');
+  close(f.metal[top]!, 0, 1e-6);
+  close(f.colour[side * 3]!, hexToLinear('#c0c0c0')[0], 1e-6, 'a 2 cm side is all worn bevel');
+  close(f.metal[side]!, 1, 1e-6);
+  // the three corners of a face carry the same flat value
+  const t0 = mesh.indices[0]!, t1 = mesh.indices[1]!;
+  close(f.rough[t0]!, f.rough[t1]!, 0);
+});

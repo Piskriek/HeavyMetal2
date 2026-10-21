@@ -38,6 +38,8 @@ export interface MaskMeshInput {
 }
 
 export interface MaskMesh {
+  /** How it was built: 'lines' gives every triangle its own vertices; 'curvature' keeps the input's indexing. */
+  readonly kind: 'lines' | 'curvature';
   readonly positions: Float32Array;
   readonly normals: Float32Array;
   readonly uvs: Float32Array;
@@ -250,7 +252,7 @@ export function edgeLines(m: MaskMeshInput, o: MaskMeshOptions = {}): MaskMesh {
     indices.push(...idxBySlot[si]!);
     return { name: sl.name, start, count: indices.length - start };
   });
-  return { positions: pos, normals: nor, uvs: uv, indices: new Uint32Array(indices), slots: outSlots, edge, cavity };
+  return { kind: 'lines', positions: pos, normals: nor, uvs: uv, indices: new Uint32Array(indices), slots: outSlots, edge, cavity };
 }
 
 // ------------------------------------------------------------------ curvature
@@ -336,6 +338,7 @@ export function curvatureMasks(m: MaskMeshInput, o: MaskMeshOptions = {}): MaskM
     for (let i = 0; i < n; i++) normals.set(unit(normal[id[i]!]!), i * 3);
   }
   return {
+    kind: 'curvature',
     positions: m.positions.slice(),
     normals,
     uvs,

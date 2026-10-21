@@ -16,6 +16,7 @@
  */
 
 import { EDGE_BAND, MAX_LAYERS, MAX_MASK_INPUTS } from './constants';
+import { EDGE_LINES, lineDistance, type MaskMesh } from './mask-mesh';
 export { EDGE_BAND, MAX_LAYERS, MAX_MASK_INPUTS, MAX_RAMP_STOPS } from './constants';
 export * from './mask-mesh';
 
@@ -456,8 +457,8 @@ export function materialAt(m: MaterialSpec, p: SamplePoint, tiles: TileSource, n
 }
 
 /**
- * Rank 0 (plan 41 section 4.5): the material evaluated at each vertex, for a plain vertex-coloured material.
- * Colour is linear RGB, 3 per point.
+ * The material evaluated at each of the given points. Colour is linear RGB, 3 per point. Rank 0 uses it through
+ * `flattenMesh`; dense meshes flatten per vertex, faceted ones per face.
  */
 export function flatten(
   m: MaterialSpec,
@@ -476,6 +477,64 @@ export function flatten(
     rough[i] = c.rough;
     metal[i] = c.metal;
   });
+  return { colour, rough, metal };
+}
+
+/** Barycentric weights of the 10 interior points of a sixth grid: where a face is sampled to flatten it. */
+const FACE_SAMPLES: readonly (readonly [number, number, number])[] = (() => {
+  const out: [number, number, number][] = [];
+  for (let i = 1; i <= 4; i++) for (let j = 1; i + j <= 5; j++) out.push([i / 6, j / 6, (6 - i - j) / 6]);
+  return out;
+})();
+
+/** The point at barycentric weights w of triangle (a, b, c) of a mask mesh, with every attribute interpolated. */
+export function meshPoint(mesh: MaskMesh, a: number, b: number, c: number, w: readonly [number, number, number]): SamplePoint {
+  const lerp = (arr: ArrayLike<number>, stride: number, k: number): number =>
+    arr[a * stride + k]! * w[0] + arr[b * stride + k]! * w[1] + arr[c * stride + k]! * w[2];
+  const lines = (arr: Float32Array): number[] => Array.from({ length: EDGE_LINES }, (_, k) => lerp(arr, EDGE_LINES, k));
+  const n: [number, number, number] = [lerp(mesh.normals, 3, 0), lerp(mesh.normals, 3, 1), lerp(mesh.normals, 3, 2)];
+  const l = Math.hypot(n[0], n[1], n[2]) || 1;
+  return {
+    uv: [lerp(mesh.uvs, 2, 0), lerp(mesh.uvs, 2, 1)],
+    pos: [lerp(mesh.positions, 3, 0), lerp(mesh.positions, 3, 1), lerp(mesh.positions, 3, 2)],
+    normal: [n[0] / l, n[1] / l, n[2] / l],
+    edge: lineDistance(lines(mesh.edge)),
+    cavity: lineDistance(lines(mesh.cavity)),
+  };
+}
+
+/**
+ * Rank 0 for a whole mask mesh (plan 41 section 4.5), as colour (linear RGB), roughness and metal per vertex:
+ *  - 'lines' meshes: one flat value per face, the mean of the material at 10 interior points. Every corner of a faceted
+ *    part sits on an edge, so per-vertex values would read as all wear; per face, a big panel reads clean and a thin
+ *    chamfer reads worn, as a crisp bevel (the stage 0b and 1 look);
+ *  - 'curvature' meshes: per vertex.
+ */
+export function flattenMesh(
+  m: MaterialSpec,
+  mesh: MaskMesh,
+  tiles: TileSource,
+  noise: NoiseSource,
+): { readonly colour: Float32Array; readonly rough: Float32Array; readonly metal: Float32Array } {
+  const count = mesh.positions.length / 3;
+  if (mesh.kind === 'curvature') {
+    const points = Array.from({ length: count }, (_, i) => meshPoint(mesh, i, i, i, [1, 0, 0]));
+    return flatten(m, points, tiles, noise);
+  }
+  const colour = new Float32Array(count * 3), rough = new Float32Array(count), metal = new Float32Array(count);
+  for (let t = 0; t + 2 < mesh.indices.length; t += 3) {
+    const a = mesh.indices[t]!, b = mesh.indices[t + 1]!, c = mesh.indices[t + 2]!;
+    let r = 0, g = 0, bl = 0, ro = 0, me = 0;
+    for (const w of FACE_SAMPLES) {
+      const ch = materialAt(m, meshPoint(mesh, a, b, c, w), tiles, noise);
+      r += ch.colour[0]; g += ch.colour[1]; bl += ch.colour[2]; ro += ch.rough; me += ch.metal;
+    }
+    const k = 1 / FACE_SAMPLES.length;
+    for (const v of [a, b, c]) {
+      colour[v * 3] = r * k; colour[v * 3 + 1] = g * k; colour[v * 3 + 2] = bl * k;
+      rough[v] = ro * k; metal[v] = me * k;
+    }
+  }
   return { colour, rough, metal };
 }
 

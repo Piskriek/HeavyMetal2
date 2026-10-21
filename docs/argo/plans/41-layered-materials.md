@@ -95,7 +95,8 @@ Units are metres and millimetres, never "0 to 1 of the object", so wear is the s
    - `customProgramCacheKey` is the feature set, so a hundred presets share a handful of programs.
    - Materials still merge by name in `kit-build`, so the lab's draw-call budget (190) holds.
 5. **Detail by rank** (plan 38: drawn = min(stage rank, Graphics tier rank); the lab is shielded, so it follows the tier only):
-   - **Rank 0:** the material **flattened on the CPU** to vertex colours: the same mask maths at each vertex, roughness and metal averaged. One plain material, no textures. Low draws this.
+   - **Rank 0:** the material **flattened on the CPU** to one flat colour per face: the material averaged over the face, with roughness and metal averaged too. One plain material, no textures. Low draws this, and so do stages 0b and 1, whose flat facets it matches; wear then reads as crisp worn bevel faces.
+     - **Why per face, not per vertex (Argo, 2026-10-21):** every vertex of a faceted part sits on an edge, so per-vertex values would make the whole part read as edge wear. Dense cores, which take the curvature way, flatten per vertex.
    - **Rank 1:** the layered shader with surface constants, the noise atlas and bump from the tiles.
    - **Rank 2:** adds tile normals, detail tiles, the physical extras and triplanar noise.
    - Rank changes fade with the world-locked dither (plan 38), never a cut.
@@ -103,14 +104,9 @@ Units are metres and millimetres, never "0 to 1 of the object", so wear is the s
 7. **The toggle rule:** Graphics gains "Materials: Auto / Flat / Layered / Full". Auto picks from the tier and the measured frame time.
 
 ### 4.6 The preview (previews drive play)
-- **A test piece.** Substance shows smart materials on a grooved material ball. Ours is a test piece built from partgen parts:
-  - a skid;
-  - a bevelled panel with a bolt row;
-  - a square-section beam;
-  - a bracket;
-  - a short can.
-
-  It is grounded and about 0.6 m tall, so every mask has something to land on: edges, crevices, tops, the splash zone and the undersides. It is a preset itself (a kit), so Argo can retune it.
+- **A test piece (Argo's call, 2026-10-21).** It is a chamfered industrial shader ball: a ball seated on a square bevelled plinth, with four milled vertical flutes, two bolted flange ears and a recessed top lip. So every mask has something to land on: edges, crevices, tops, the splash zone and the undersides. A plain ball alone would hide the edge and crease masks.
+  - It is a kit preset built from partgen parts, so it can be retuned.
+  - In the world, MILL_V2 (TICKET-40) is the test piece, beside today's mill.
 - **Turntable and thumbnails:** a turntable (the bench's `turntable.ts`), with every choice drawn as a thumbnail through `snapshot`:
   - **a material:** the test piece wearing it;
   - **a layer:** the test piece in neutral grey with that layer;
@@ -147,6 +143,7 @@ Units are metres and millimetres, never "0 to 1 of the object", so wear is the s
   - **A material cartridge:** a tap sets the shot part's slot (like-for-like, as skins do now). A hold sets every part on that machine wearing the same material.
   - **A layer cartridge** adds its layer over whatever the shot part wears: the paint stays, with rust over it. This is the Space Engineers gap. A tap covers the part, and a hold the whole machine.
 - **Overrides** keep material names (`mat:` and `matc:`) in the plot save, under the kits cap (128).
+- **Never an invisible part (Argo, 2026-10-21):** an unknown or broken material name draws a neutral fallback at once and warns, and a test fails on any `mat:` id a kit names that does not resolve.
 
 ### 4.9 The first shelf (Argo tunes the values and names)
 - **Surfaces:**
@@ -252,14 +249,14 @@ Units are metres and millimetres, never "0 to 1 of the object", so wear is the s
   - mask view;
   - Substance calibration: each preset built in Substance Painter on the test piece as the look target, with our render beside it and the values tuned until they match;
   - the ground takes materials too (slope is Up, valleys are Cavities).
-- **P2, proposals for Argo:**
-  - **Weathering over time.** A machine's Age rises with its operating hours, by its plot:
-    - regolith dust on the moon from the first hour;
-    - rust once water is about (Aq, stage 4+);
-    - moss from stage 5;
-    - frost on cold plots.
-    
-    A coat (sealant) slows it, and a solvent cartridge cleans the weathering layers off without touching the paint. The world wears your machines, and you choose to keep the patina or not.
+- **P2, weathering by the world (decided by Argo, 2026-10-21):**
+  - **No decay on a clock.** It would punish players for taking their time, and it would churn state across co-op rooms.
+  - **The stage and the plot's floats drive the environmental layer:**
+    - regolith dust dominates in stages 0 to 2;
+    - damp oxide and grime deepen as Aq rises (stages 3 and 4);
+    - in stages 5 and 6, in high-Aq, high-biomass sectors, moss or lichen settles on cool plinths while running vents stay clean.
+  - **The player's Age slider sits on top,** with hover preview: 0 factory fresh, 0.5 field-seasoned (the default), 1 heavy salvage.
+  - **The solvent cartridge stays a proposal.**
   - **HD pack tiles,** from the owner's Substance work or CC0 scans.
 
 ## 7. Build order and who does what

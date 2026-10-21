@@ -82,9 +82,10 @@ Units are metres and millimetres, never "0 to 1 of the object", so wear is the s
 - **Saved and shared prints carry the full spec.** Named presets may be retuned between versions, but a share code must reproduce exactly. Game kits name presets by id (`mat:field-worn-hazard`). A player's own material is `matc:<code>`, made with `@hm/presetcodec` (a schema, versioned, CRC-checked).
 
 ### 4.5 How it draws (the min-spec laptop decides)
-1. **Mask inputs per vertex, computed once per geometry and cached:**
-   - **Kit parts are low poly,** so a soft edge needs room. A new meshops operator, `edge-band`, splits a band of width w along sharp edges (the existing wear operator's clip, but kept in one slot). It writes `aMask.x` (edge: 1 at the edge, 0 at the band's inner line) and `aMask.y` (cavity: the same for concave creases).
-   - **Dense GLB cores** get `aMask` from per-vertex curvature (normal divergence), with no split.
+1. **Mask inputs per vertex, computed once per geometry and cached** (`@hm/matstack` `maskAttributes`, built 2026-10-21):
+   - **Kit parts:** each triangle gets its own vertices carrying signed distances to up to four nearby sharp-edge lines (`aEdge`, vec4) and four crease lines (`aCavity`, vec4). A signed distance to a line is a plane over the triangle, so it interpolates exactly, and the fragment takes the smallest. On a convex face that is exactly the distance to the face's boundary, corners included. The lines of coplanar neighbours count too, so a face cut along its diagonal still wears along all four sides. The triangle count does not change.
+     - **First try, rejected:** a band split, which was exact but cost 28 times the triangles across partgen's generators (136 times on the grille).
+   - **Dense GLB cores and small knobs** (no face wider than twice the band) get a curvature value in the first slot instead: the sharpest bend, smoothed once, with no split.
    - **Ground, Up and Down** come from object-space position and the world normal in the shader. Kits are built with their origin at the foot, so object y is the height above ground in metres.
 2. **One noise atlas,** 256² RGBA, holds clouds, cells, speckle and scratches. texgraph evaluates it at boot, it is shared by every material, and it is sampled on the parts' metric box UVs, or triplanar on High for GLB cores with island UVs.
 3. **Surface tiles live in one `DataArrayTexture`:** 128² on Medium, 256² on High, with colour or ramp input, height and roughness packed. So a material samples one array whatever its layer count, and the fragment shader stays far under the sampler limit.
@@ -263,8 +264,8 @@ Units are metres and millimetres, never "0 to 1 of the object", so wear is the s
 
 ## 7. Build order and who does what
 1. **Opus: the `@hm/matstack` contract.** Types, slider schemas, the blend formulas written out, and the test oracle (fixed inputs to the expected mask and channel values).
-2. **Arena battle A: the `@hm/matstack` engine.** Validate and clamp, CPU mask and layer evaluation, the flatten, the shelf as data, the presetcodec schema, and tests against the oracle.
-3. **Arena battle B: meshops `edge-band` and `maskAttributes`.** Covers low-poly band splits and dense-mesh curvature. Tests: a 1 m cube's band area and attribute ramp, and that a flat diagonal never wears.
+2. **Done (Opus):** the reference engine (mask, surface, layer and material evaluation, the flatten) and the mask attributes, 17 tests (`3a2e8702`, `c719d174`). Opus wrote both, because the shader must mirror them formula for formula and the attribute layout is the shader's input; Argo was the bottleneck for a battle round-trip.
+3. **Still to write:** validate and clamp, and the presetcodec schema (a code form with every field present, since presetcodec has no unions or optional fields). The shelf as data comes from Argo (section 4.9).
 4. **Opus: the renderer:**
    - `layered-material.ts`;
    - the noise atlas;

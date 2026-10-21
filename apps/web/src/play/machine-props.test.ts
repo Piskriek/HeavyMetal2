@@ -173,3 +173,28 @@ test('the feed and vent sockets: every kind pours from a vent; the material-in k
     }
   }
 });
+
+test('nothing floats: every machine\'s status light sits on its housing, facing out (measured 21 Oct: they hung 0.13 to 1.95 m off)', () => {
+  const m = lab.createMaterials();
+  for (const stage of [1, 6]) {
+    for (const kind of ALL_KINDS) {
+      const p = machineProp(m, kind, stage);
+      p.group.updateMatrixWorld(true);
+      const led = p.group.getObjectByName('housing-status-led')!;
+      const others: THREE.Mesh[] = [];
+      p.group.traverse((o) => { if ((o as THREE.Mesh).isMesh && o !== led) others.push(o as THREE.Mesh); });
+      const at = led.getWorldPosition(new THREE.Vector3());
+      const rc = new THREE.Raycaster();
+      let gap = Infinity;
+      for (let i = 0; i < 24; i++) {
+        for (const y of [-0.6, 0, 0.6]) {
+          const t = (i / 24) * Math.PI * 2;
+          rc.set(at, new THREE.Vector3(Math.cos(t), y, Math.sin(t)).normalize());
+          const h = rc.intersectObjects(others, false)[0];
+          if (h) gap = Math.min(gap, h.distance);
+        }
+      }
+      assert.ok(gap < 0.04, `${kind} at stage ${stage}: the light is ${gap.toFixed(3)} m from the nearest surface`);
+    }
+  }
+});

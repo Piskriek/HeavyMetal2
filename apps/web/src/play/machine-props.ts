@@ -292,6 +292,57 @@ export function findMachineVent(obj: THREE.Object3D, baseY: number, prefX = 0, p
   return new THREE.Vector3(topX, maxY + 0.05, topZ);
 }
 
+/** Where a housing's status light mounts, by machine kind and shape: the rays run once per shape, not once per build. */
+const LED_MOUNTS = new Map<string, { readonly at: THREE.Vector3; readonly normal: THREE.Vector3 } | null>();
+
+/**
+ * The surface a status light mounts on, in the prop's frame, and its outward normal. From in front of the anchor, a ray
+ * back toward the machine at the anchor's height; if that passes through (an open press gap) or meets no front-facing
+ * face, a little higher, lower and nearer the middle; failing those, the nearest surface in any direction from the anchor.
+ */
+function ledMount(group: THREE.Group, inner: THREE.Object3D, kind: MachineKind, anchor: THREE.Vector3): { readonly at: THREE.Vector3; readonly normal: THREE.Vector3 } | null {
+  group.updateMatrixWorld(true);
+  const meshes: THREE.Mesh[] = [];
+  inner.traverse((o) => { if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh); });
+  const toGroup = new THREE.Matrix4().copy(group.matrixWorld).invert();
+  const box = new THREE.Box3().setFromObject(inner).applyMatrix4(toGroup);
+  const key = `${kind}|${box.min.toArray().map((v) => v.toFixed(3)).join(',')}|${box.max.toArray().map((v) => v.toFixed(3)).join(',')}|${meshes.length}`;
+  if (LED_MOUNTS.has(key)) {
+    const m = LED_MOUNTS.get(key)!;
+    return m && { at: m.at.clone(), normal: m.normal.clone() };
+  }
+  const rc = new THREE.Raycaster();
+  const cast = (origin: THREE.Vector3, dir: THREE.Vector3): { at: THREE.Vector3; normal: THREE.Vector3; distance: number } | null => {
+    rc.set(origin.clone().applyMatrix4(group.matrixWorld), dir.clone().transformDirection(group.matrixWorld));
+    const h = rc.intersectObjects(meshes, false)[0];
+    if (!h?.face) return null;
+    const normal = h.face.normal.clone().transformDirection(h.object.matrixWorld).transformDirection(toGroup);
+    if (normal.dot(dir) > 0) normal.negate(); // the side the ray came from
+    return { at: h.point.clone().applyMatrix4(toGroup), normal, distance: h.distance };
+  };
+  let found: { at: THREE.Vector3; normal: THREE.Vector3 } | null = null;
+  const back = new THREE.Vector3(0, 0, -1);
+  search: for (const dy of [0, 0.15, -0.15, 0.3, -0.3, 0.5, -0.5]) {
+    for (const sx of [1, 0.6, 0.3, 0]) {
+      const h = cast(new THREE.Vector3(anchor.x * sx, anchor.y + dy, box.max.z + 1), back);
+      if (h && h.normal.z > 0.5) { found = h; break search; }
+    }
+  }
+  if (!found) {
+    let best: { at: THREE.Vector3; normal: THREE.Vector3; distance: number } | null = null;
+    for (let i = 0; i < 16; i++) {
+      for (const y of [-0.5, 0, 0.5]) {
+        const t = (i / 16) * Math.PI * 2;
+        const h = cast(anchor, new THREE.Vector3(Math.cos(t), y, Math.sin(t)).normalize());
+        if (h && (!best || h.distance < best.distance)) best = h;
+      }
+    }
+    found = best;
+  }
+  LED_MOUNTS.set(key, found && { at: found.at.clone(), normal: found.normal.clone() });
+  return found;
+}
+
 /**
  * Stands a built prop at its real height (machineSize, OPUS_NOTE_09 / BB-09): one uniform scale, its base kept where
  * it was (the ground, or the 0.78 m ring for the heavies). The parts scale with it, and so do the sockets (power,
@@ -329,7 +380,16 @@ function fitToTable(p: MachineProp, kind: MachineKind): MachineProp {
   });
   const statusLed = new THREE.Mesh(ledGeo, ledMat);
   statusLed.name = 'housing-status-led';
-  statusLed.position.copy(ledAnchor);
+  // nothing floats (the owner's rule): the anchor is only where to look; the light sits on the housing's real surface,
+  // facing out of it (measured 21 Oct: the fixed anchors left every light 0.13 to 1.95 m in the air)
+  const mount = ledMount(p.group, inner, kind, ledAnchor);
+  if (mount) {
+    ledAnchor.copy(mount.at);
+    statusLed.position.copy(mount.at).addScaledVector(mount.normal, 0.0245);
+    statusLed.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), mount.normal);
+  } else {
+    statusLed.position.copy(ledAnchor);
+  }
   p.group.add(statusLed);
 
   let lastConnected = true;

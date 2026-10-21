@@ -47,3 +47,20 @@ test('a malformed light or species is refused, and saves keep only well formed p
   both.cartridges[0].species = AUTUMN_OAK;
   assert.equal(loadLab(both), null, 'one print per cartridge');
 });
+
+test('the bench prints a layered material by name; it goes in the rifle only, and a malformed name is refused (plan 41)', () => {
+  const RUST = { name: 'Rust bucket', ref: 'mat:rust-bucket' };
+  let s = makeBlank(makeBlank(newLab(), 100).state, 100).state;
+  const [a, b] = s.cartridges.map((c) => c.id) as [string, string];
+  s = step(startPrintWrite(s, env(), a, { material: RUST }), env(), RULES.writeSeconds).state;
+  const c = s.cartridges[0]!;
+  assert.equal(c.kind, 'material');
+  assert.equal(c.name, 'Rust bucket');
+  assert.deepEqual(printOf(c), { material: RUST });
+  assert.match(canSlot(s, a, 0).why, /material cartridge goes in the beam rifle/);
+  assert.deepEqual(loadLab(JSON.parse(JSON.stringify(s))), s, 'a material cartridge survives a save');
+  for (const ref of ['vault:basalt', 'mat:', 'matc:has spaces', 'mat:x'.padEnd(5000, 'x')]) {
+    assert.equal(canWritePrint(s, env(), b, { material: { name: 'Bad', ref } }).ok, false, ref.slice(0, 20));
+  }
+  assert.equal(canWritePrint(s, env(), b, { material: { name: 'Mine', ref: 'matc:t7Ax_-9' } }).ok, true);
+});

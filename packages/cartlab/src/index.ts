@@ -93,9 +93,23 @@ export interface LightSpec {
   readonly pattern: LightPattern;
 }
 
-/** What the bench prints onto a blank for the beam rifle (plan 39): a part, a species or a light. */
-export type Print = { readonly part: PartSpec } | { readonly species: SpeciesSpec } | { readonly light: LightSpec };
-export type PrintKind = 'part' | 'species' | 'light';
+/**
+ * A Texture Mill material written onto a blank (plan 41): a layered material by its name, a shelf preset's
+ * `mat:<id>` or a player's own `matc:<code>` (@hm/matstack reads it). The beam's Apply puts it on the part it is fired
+ * at. `name` is what people read.
+ */
+export interface MaterialPrintSpec {
+  readonly name: string;
+  readonly ref: string;
+}
+
+/** What the bench prints onto a blank for the beam rifle (plans 39 and 41): a part, a species, a light or a material. */
+export type Print =
+  | { readonly part: PartSpec }
+  | { readonly species: SpeciesSpec }
+  | { readonly light: LightSpec }
+  | { readonly material: MaterialPrintSpec };
+export type PrintKind = 'part' | 'species' | 'light' | 'material';
 
 export interface Cartridge {
   readonly id: string;
@@ -112,6 +126,8 @@ export interface Cartridge {
   readonly species?: SpeciesSpec;
   /** Kind 'light' only: the light it carries. */
   readonly light?: LightSpec;
+  /** Kind 'material' only: the material it carries. */
+  readonly material?: MaterialPrintSpec;
 }
 
 /**
@@ -206,17 +222,26 @@ type PausedJob = Job & { readonly stalled: true };
 const isPaused = (job: Job): boolean => 'stalled' in job && job.stalled === true;
 
 /** The print a job or a cartridge carries (its own field, to spread), or null. */
-export function printOf(x: { readonly part?: PartSpec; readonly species?: SpeciesSpec; readonly light?: LightSpec }): Print | null {
+export function printOf(x: {
+  readonly part?: PartSpec;
+  readonly species?: SpeciesSpec;
+  readonly light?: LightSpec;
+  readonly material?: MaterialPrintSpec;
+}): Print | null {
   if (x.part !== undefined) return { part: x.part };
   if (x.species !== undefined) return { species: x.species };
   if (x.light !== undefined) return { light: x.light };
+  if (x.material !== undefined) return { material: x.material };
   return null;
 }
-export const printKind = (p: Print): PrintKind => ('part' in p ? 'part' : 'species' in p ? 'species' : 'light');
-const printName = (p: Print): string => ('part' in p ? p.part.name : 'species' in p ? p.species.name : p.light.name);
-/** Part, species and light cartridges go in the beam rifle only: never the combiner, never a plot machine. */
-const forTheRifle = (c: Cartridge): boolean => c.kind === 'part' || c.kind === 'species' || c.kind === 'light';
-const RIFLE_ONLY: Readonly<Record<PrintKind, string>> = { part: 'A part cartridge', species: 'A species cartridge', light: 'A light cartridge' };
+export const printKind = (p: Print): PrintKind => ('part' in p ? 'part' : 'species' in p ? 'species' : 'light' in p ? 'light' : 'material');
+const printName = (p: Print): string =>
+  'part' in p ? p.part.name : 'species' in p ? p.species.name : 'light' in p ? p.light.name : p.material.name;
+/** Part, species, light and material cartridges go in the beam rifle only: never the combiner, never a plot machine. */
+const forTheRifle = (c: Cartridge): boolean => c.kind === 'part' || c.kind === 'species' || c.kind === 'light' || c.kind === 'material';
+const RIFLE_ONLY: Readonly<Record<PrintKind, string>> = {
+  part: 'A part cartridge', species: 'A species cartridge', light: 'A light cartridge', material: 'A material cartridge',
+};
 
 const paused = (job: Job): Job => {
   const p: PausedJob = { inputs: job.inputs, preset: job.preset, done: job.done, needs: job.needs, stalled: true, ...(printOf(job) ?? {}) };
@@ -616,9 +641,18 @@ function loadLight(x: unknown): LightSpec | null {
   return { name, kelvin, colour, intensity, pattern: pattern as LightPattern };
 }
 
+/** A material by name: a shelf preset (`mat:`) or a player's code (`matc:`), at most 4000 characters. */
+const MATERIAL_REF = /^matc?:[A-Za-z0-9_-]+$/;
+function loadMaterial(x: unknown): MaterialPrintSpec | null {
+  if (!isRecord(x)) return null;
+  const { name, ref } = x;
+  if (!isString(name) || !isString(ref) || ref.length > 4000 || !MATERIAL_REF.test(ref)) return null;
+  return { name, ref };
+}
+
 /** The print as saved, checked: 'none' when there is none, null when one is malformed or more than one is set. */
 function loadPrint(x: Readonly<Record<string, unknown>>): Print | null | 'none' {
-  const set = (['part', 'species', 'light'] as const).filter((k) => x[k] !== undefined);
+  const set = (['part', 'species', 'light', 'material'] as const).filter((k) => x[k] !== undefined);
   if (set.length === 0) return 'none';
   if (set.length > 1) return null;
   if (set[0] === 'part') {
@@ -629,8 +663,12 @@ function loadPrint(x: Readonly<Record<string, unknown>>): Print | null | 'none' 
     const p = loadSpecies(x.species);
     return p && { species: p };
   }
-  const p = loadLight(x.light);
-  return p && { light: p };
+  if (set[0] === 'light') {
+    const p = loadLight(x.light);
+    return p && { light: p };
+  }
+  const p = loadMaterial(x.material);
+  return p && { material: p };
 }
 
 function validPrint(print: Print): boolean {
@@ -644,7 +682,7 @@ function loadCartridge(x: unknown, nextId: number): Cartridge | null {
   if (!isString(id) || !isString(name)) return null;
   const n = CARTRIDGE_ID.exec(id)?.[1];
   if (n === undefined || !(Number(n) < nextId)) return null; // only ids already handed out
-  if (kind === 'part' || kind === 'species' || kind === 'light') {
+  if (kind === 'part' || kind === 'species' || kind === 'light' || kind === 'material') {
     const print = loadPrint(x);
     // a print names no preset, never sits in a machine, and carries exactly its own kind
     if (print === null || print === 'none' || printKind(print) !== kind || preset !== null || slot !== null) return null;

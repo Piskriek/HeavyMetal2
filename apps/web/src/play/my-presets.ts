@@ -26,7 +26,7 @@ export interface MyPresets {
 
 export const EMPTY_MY_PRESETS: MyPresets = { v: 1, next: 1, list: [] };
 
-const nameOf = (p: Print): string => ('part' in p ? p.part.name : 'species' in p ? p.species.name : p.light.name);
+const nameOf = (p: Print): string => ('part' in p ? p.part.name : 'species' in p ? p.species.name : 'light' in p ? p.light.name : p.material.name);
 /** JSON with every object's keys sorted, at every depth, so equal data always reads the same. */
 const stable = (x: unknown): string => {
   if (Array.isArray(x)) return `[${x.map(stable).join(',')}]`;
@@ -38,12 +38,15 @@ const stable = (x: unknown): string => {
 };
 /** The print's own data with its name left out: two presets that differ only by name are the same preset. */
 const body = (p: Print): string => {
-  const inner = 'part' in p ? p.part : 'species' in p ? p.species : p.light;
+  const inner = 'part' in p ? p.part : 'species' in p ? p.species : 'light' in p ? p.light : p.material;
   const { name: _name, ...rest } = inner as { name: string };
   return stable({ kind: printKind(p), ...rest });
 };
 const named = (p: Print, name: string): Print =>
-  'part' in p ? { part: { ...p.part, name } } : 'species' in p ? { species: { ...p.species, name } } : { light: { ...p.light, name } };
+  'part' in p ? { part: { ...p.part, name } }
+    : 'species' in p ? { species: { ...p.species, name } }
+      : 'light' in p ? { light: { ...p.light, name } }
+        : { material: { ...p.material, name } };
 
 /** The library from its stored text; anything unreadable is the empty library, and each broken preset is dropped. */
 export function parseMyPresets(raw: string | null): MyPresets {
@@ -89,7 +92,7 @@ export function renamePreset(s: MyPresets, id: string, name: string): MyPresets 
 
 export const presetsOf = (s: MyPresets, kind: PrintKind): readonly MyPreset[] => s.list.filter((q) => q.kind === kind);
 
-const PREFIX: Readonly<Record<PrintKind, string>> = { part: 'SMX-PRT-', species: 'SMX-SPC-', light: 'SMX-LGT-' };
+const PREFIX: Readonly<Record<PrintKind, string>> = { part: 'SMX-PRT-', species: 'SMX-SPC-', light: 'SMX-LGT-', material: 'SMX-MAT-' };
 
 const toBase64Url = (text: string): string => {
   const bytes = new TextEncoder().encode(text);

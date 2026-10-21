@@ -3,7 +3,7 @@
  * preset's category; the vault has no roughness of its own). Pure data: no DOM, no clock, no random.
  */
 import { VAULT_BY_ID, type VaultCategory } from '@hm/vault';
-import type { Cartridge, LabState } from '@hm/cartlab';
+import { printOf, type Cartridge, type LabState } from '@hm/cartlab';
 
 /** Roughness by category: liquids and crystals shine, flora and road sit in between, terrain and exotics are matte. */
 export const CATEGORY_ROUGHNESS: Readonly<Record<VaultCategory, number>> = {
@@ -45,8 +45,8 @@ export function averagePalette(palette: readonly string[]): string | null {
  */
 export function writtenOnRack(lab: LabState): Cartridge | null {
   const inJob = new Set<string>([...(lab.bench?.inputs ?? []), ...(lab.combiner?.inputs ?? [])]);
-  // a written preset or a printed part (TICKET-32), first in rack order
-  return lab.cartridges.find((c) => c.slot === null && !inJob.has(c.id) && ((c.kind === 'preset' && c.preset !== null) || (c.kind === 'part' && c.part !== undefined))) ?? null;
+  // a written preset or a print for the rifle (a part, a species, a light), first in rack order
+  return lab.cartridges.find((c) => c.slot === null && !inJob.has(c.id) && ((c.kind === 'preset' && c.preset !== null) || printOf(c) !== null)) ?? null;
 }
 
 /**

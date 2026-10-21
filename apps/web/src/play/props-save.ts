@@ -16,6 +16,14 @@ export interface PropsSave {
   readonly sealed: readonly number[];
   /** TICKET-32: the beam's part overrides on the lab's kit-built props, by kit id then part path. Omitted when none. */
   readonly kits?: Readonly<Record<string, Overrides>>;
+  /** Plan 39 (Aq): the trees the beam regrew, by place key (its spot to the centimetre), and the preset each grows as. */
+  readonly trees?: Readonly<Record<string, TreePreset>>;
+}
+
+/** A species preset a tree grows as: its species and its treegen slider values. */
+export interface TreePreset {
+  readonly species: 'pine' | 'oak' | 'birch';
+  readonly params: Readonly<Record<string, number>>;
 }
 
 export const EMPTY_PROPS_SAVE: PropsSave = { v: 1, cleared: [], logs: [], sealed: [] };
@@ -70,15 +78,28 @@ function kitsOf(x: unknown): Record<string, Overrides> {
   return out;
 }
 
+const SPECIES = new Set(['pine', 'oak', 'birch']);
+const PLACE = /^-?\d{1,7},-?\d{1,7}$/;
+function treesOf(x: unknown): Record<string, TreePreset> {
+  const out: Record<string, TreePreset> = {};
+  if (!isObj(x)) return out;
+  for (const [place, p] of Object.entries(x).slice(0, 4096)) {
+    if (!PLACE.test(place) || !isObj(p) || typeof p.species !== 'string' || !SPECIES.has(p.species)) continue;
+    const params = numbers(p.params);
+    if (params) out[place] = { species: p.species as TreePreset['species'], params };
+  }
+  return out;
+}
+
 /** The save from its stored text. Anything unreadable, or of another version, is the empty save. */
 export function parsePropsSave(raw: string | null): PropsSave {
   if (!raw) return EMPTY_PROPS_SAVE;
   try {
-    const o = JSON.parse(raw) as { v?: unknown; cleared?: unknown; logs?: unknown; sealed?: unknown; kits?: unknown } | null;
+    const o = JSON.parse(raw) as { v?: unknown; cleared?: unknown; logs?: unknown; sealed?: unknown; kits?: unknown; trees?: unknown } | null;
     if (!o || o.v !== 1) return EMPTY_PROPS_SAVE;
-    const kits = kitsOf(o.kits);
+    const kits = kitsOf(o.kits), trees = treesOf(o.trees);
     const base: PropsSave = { v: 1, cleared: strings(o.cleared), logs: strings(o.logs), sealed: ints(o.sealed) };
-    return Object.keys(kits).length > 0 ? { ...base, kits } : base;
+    return { ...base, ...(Object.keys(kits).length > 0 ? { kits } : {}), ...(Object.keys(trees).length > 0 ? { trees } : {}) };
   } catch {
     return EMPTY_PROPS_SAVE;
   }
@@ -86,7 +107,15 @@ export function parsePropsSave(raw: string | null): PropsSave {
 
 export function serializePropsSave(s: PropsSave): string {
   const kits = s.kits && Object.keys(s.kits).length > 0 ? { kits: s.kits } : {};
-  return JSON.stringify({ v: 1, cleared: [...s.cleared], logs: [...s.logs], sealed: [...s.sealed], ...kits });
+  const trees = s.trees && Object.keys(s.trees).length > 0 ? { trees: s.trees } : {};
+  return JSON.stringify({ v: 1, cleared: [...s.cleared], logs: [...s.logs], sealed: [...s.sealed], ...kits, ...trees });
+}
+
+/** The save with these trees regrown as `preset` (the beam's Apply with a species cartridge: one tree, or every match). */
+export function withTrees(s: PropsSave, places: readonly string[], preset: TreePreset): PropsSave {
+  const next: Record<string, TreePreset> = { ...(s.trees ?? {}) };
+  for (const p of places) next[p] = preset;
+  return { ...s, trees: next };
 }
 
 /** The save with these parts of a kit overridden (the beam's Apply with a part cartridge: one path, or every match). */

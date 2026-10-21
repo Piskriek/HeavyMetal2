@@ -770,3 +770,10 @@ export const PEACEFUL_COMBINER_RECIPES: readonly PeacefulCombinerRecipe[] = Obje
     description: 'Fuses salvaged substrate and a blank cartridge into a stable anomaly core, without combat.',
   },
 ] as const);
+
+/** The print a saved cartridge carries (the rifle's port save), checked as a lab save checks it; null when it has none or it is malformed. */
+export function readPrint(x: unknown): Print | null {
+  if (!isRecord(x)) return null;
+  const p = loadPrint(x);
+  return p === 'none' ? null : p;
+}

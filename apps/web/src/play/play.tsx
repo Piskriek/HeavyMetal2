@@ -40,13 +40,21 @@ import {
   type LabEnv,
   type LabState,
   type PartSpec,
+  type SpeciesSpec,
+  type LightSpec,
+  canWritePrint,
+  startPrintWrite,
+  readPrint,
+  printKind,
 } from '@hm/cartlab';
 import { BenchParts } from './bench-parts';
+import { BenchSpecies } from './bench-species';
+import { rifleLook } from './rifle-look';
+import { MAX_TREE_VARIANTS, treeVariantKey } from './plot-biome-view';
 import { setKitFrames } from './plot-kits';
 import { bodyMaterial, skinOverride } from './vault-skin';
 import { GENERATORS } from '@hm/partgen';
 import { overrideFromPart, partBill } from './part-cartridge';
-import { PART_SWATCHES } from './part-swatches';
 import { fx } from '../maker/feedback';
 import { FRESH, METRIC_COLOUR, METRIC_NAME, SAVE_KEY, arrived, created, isFreeDrill, loadState, objective, poweredOn, returned, withLab, withPlot, type PlayState } from './quest';
 import { Journal } from './journal';
@@ -82,7 +90,7 @@ import { PieceMeshManager } from '../base/piece-meshes';
 import { globalKitPieceCache, integrityColorName } from '../base/kit-pieces';
 import { planFrameLegs } from '../base/foundation-legs';
 import { preloadAllGenAssets, genLevelForStage, createGenFixture } from '../assets/gen-props';
-import { PROPS_SAVE_KEY, parsePropsSave, serializePropsSave, clearedProp, readLog, sealedSite, withKitOverride, type PropsSave } from './props-save';
+import { PROPS_SAVE_KEY, parsePropsSave, serializePropsSave, clearedProp, readLog, sealedSite, withKitOverride, withTrees, type PropsSave, type TreePreset } from './props-save';
 import { clutterById, salvageSplit } from './lab-clutter';
 import { loreFor } from './lore-logs';
 import { ARMORY_PICKUP_REACH, ARMORY_RAIL_POS, SIDEARM_ITEM_ID, shouldShowAmmoBadge } from './armory-rack';
@@ -104,7 +112,7 @@ import type { Kind } from '@hm/structure';
 import * as L from '@hm/lattice';
 import { BEAM_COLOURS, type BeamMode } from '@hm/beamkit';
 import { BEAM_STROKE_RANGE, cycleBeamMode, SCULPT_TOOLS, type SculptTool } from './beam-tool';
-import { presetLook, reloadedLab, writtenOnRack } from './beam-port';
+import { reloadedLab, writtenOnRack } from './beam-port';
 import { keepOutZones } from './beam-keepout';
 import { RadialMenu } from '../base/ui/radial-menu';
 import { HoldRing, thumbFor } from '../base/ui/hud-bits';
@@ -260,11 +268,10 @@ function loadBeamSave(): BeamSave {
     const raw = JSON.parse(kv.get(BEAM_SAVE_KEY) ?? 'null') as { readonly v?: unknown; readonly field?: unknown; readonly port?: unknown } | null;
     if (!raw || raw.v !== 1) return { field: null, port: null };
     const p = raw.port as Partial<Cartridge> | null | undefined;
-    // a written preset, or a printed part (TICKET-32: its part travels in the port, so it must survive the reload too)
-    const part = p?.part as Partial<PartSpec> | undefined;
-    const partOk = p?.kind === 'part' && !!part && typeof part === 'object' && typeof part.gen === 'string' && typeof part.name === 'string'
-      && !!part.params && typeof part.params === 'object' && !!part.slotMaterials && typeof part.slotMaterials === 'object' && Array.isArray(part.ops);
-    const port = p && typeof p === 'object' && typeof p.id === 'string' && typeof p.name === 'string' && (typeof p.preset === 'string' || partOk) ? (p as Cartridge) : null;
+    // a written preset, or a print (a part, a species, a light: it travels in the port, so it must survive the reload too)
+    const print = p && (p.kind === 'part' || p.kind === 'species' || p.kind === 'light') ? readPrint(p) : null;
+    const printOk = print !== null && printKind(print) === p?.kind;
+    const port = p && typeof p === 'object' && typeof p.id === 'string' && typeof p.name === 'string' && (typeof p.preset === 'string' || printOk) ? (p as Cartridge) : null;
     return { field: typeof raw.field === 'string' && raw.field.length > 0 ? raw.field : null, port };
   } catch {
     return { field: null, port: null };
@@ -591,7 +598,7 @@ export function PlayScreen(props: {
   const [labPanel, setLabPanel] = useState<LabMachineKind | null>(null);
   const [benchBlank, setBenchBlank] = useState<string | null>(null);
   /** The preset bench's page: authored terraforming presets, or Shape Press parts (TICKET-32). */
-  const [benchTab, setBenchTab] = useState<'presets' | 'parts'>('presets');
+  const [benchTab, setBenchTab] = useState<'presets' | 'parts' | 'species'>('presets');
   const [benchPreset, setBenchPreset] = useState<string | null>(null);
   const [combineIds, setCombineIds] = useState<readonly string[]>([]);
   /** State of visiting another player's plot via code. */
@@ -945,9 +952,11 @@ useEffect(() => {
   const beamOreFlushRef = useRef(0);
   /** The rifle's port (TASK-21): the written cartridge loaded from the lab rack, and its preset and colour. Not saved yet (TASK-21c). */
   /** The rifle's port: a material preset cartridge (preset set) or a part cartridge (part set, preset ''; TICKET-32). */
-  const beamPortRef = useRef<{ readonly cartridge: Cartridge; readonly preset: string; readonly name: string; readonly colour: string; readonly part?: PartSpec } | null>(null);
+  const beamPortRef = useRef<{ readonly cartridge: Cartridge; readonly preset: string; readonly name: string; readonly colour: string; readonly part?: PartSpec; readonly species?: SpeciesSpec; readonly light?: LightSpec } | null>(null);
   /** A part shot in progress: when the left button went down and whether Shift was held (tap = one part, hold or Shift = all of that kind). */
   const partShotRef = useRef<{ readonly t0: number; readonly shift: boolean } | null>(null);
+  /** A species cartridge's shot at a tree (plan 39, Aq), decided on release like a part shot. */
+  const speciesShotRef = useRef<{ readonly t0: number; readonly shift: boolean } | null>(null);
   /** A material cartridge's shot at a machine part (plan 39 step 2), decided on release like a part shot. */
   const skinShotRef = useRef<{ readonly t0: number; readonly shift: boolean } | null>(null);
   const [beamPort, setBeamPort] = useState<{ readonly name: string } | null>(null);
@@ -1035,19 +1044,13 @@ useEffect(() => {
   };
   /** Puts a written cartridge from the lab rack into the rifle's port: R takes the first one, the X radial in Apply the one picked. */
   const loadBeamCartridge = (written: Cartridge): void => {
-    const part = written.kind === 'part' ? written.part : undefined;
-    if (written.preset === null && !part) return;
+    // a written material, or a print (plan 39): a part, a species or a light, each glowing its own colour in the port
+    const look = rifleLook(written);
+    if (!look) return;
     const port = beamPortRef.current;
     const next = reloadedLab(labRef.current, written, port ? port.cartridge : null);
-    if (part) {
-      // a part cartridge (TICKET-32): the port glows the part's first material; Apply puts the part on what it is fired at
-      const first = Object.values(part.slotMaterials)[0];
-      const colour = PART_SWATCHES.find((s) => s.id === first)?.color ?? '#9aa4ad';
-      beamPortRef.current = { cartridge: written, preset: '', name: written.name, colour, part };
-    } else {
-      const look = presetLook(written.preset ?? '');
-      beamPortRef.current = { cartridge: written, preset: written.preset ?? '', name: written.name, colour: look?.colour ?? '#808080' };
-    }
+    beamPortRef.current = { cartridge: written, preset: look.preset, name: written.name, colour: look.colour, ...(look.print ?? {}) };
+    const kind = look.print ? printKind(look.print) : null;
     labRef.current = next;
     commit(withLab(withPlot(stateRef.current, plotRef.current), next));
     setBeamPort({ name: written.name });
@@ -1055,11 +1058,14 @@ useEffect(() => {
     sceneRef.current?.playAction('reload');
     beamDirtyRef.current = true;
     say(`Loaded: ${written.name}`, port ? `${port.name} went back on the rack.`
-      : part ? 'Fire Apply at a machine part: a tap fits one, a hold or Shift fits every part of its kind.' : 'Hold the left button in Apply to paint the ground, or fire it at a machine part to paint the part.');
+      : kind === 'part' ? 'Fire Apply at a machine part: a tap fits one, a hold or Shift fits every part of its kind.'
+        : kind === 'species' ? 'Fire Apply at a tree on the plot: a tap regrows it, a hold or Shift every tree of its kind nearby.'
+          : kind === 'light' ? 'Fire Apply at a machine lamp: a tap sets it, a hold or Shift every lamp on the machine.'
+            : 'Hold the left button in Apply to paint the ground, or fire it at a machine part to paint the part.');
   };
   const reloadBeam = (): void => {
     const written = writtenOnRack(labRef.current);
-    if (!written || (written.preset === null && written.kind !== 'part')) {
+    if (!written || !rifleLook(written)) {
       say('The port stays empty', 'No written cartridge is on the lab rack. Write one at the bench.');
       return;
     }
@@ -1591,6 +1597,39 @@ useEffect(() => {
   };
   const applySkinShotRef = useRef<(broadcast: boolean) => number>(() => 0);
   applySkinShotRef.current = applySkinShot;
+  /**
+   * The beam's Apply with a species cartridge (plan 39, Aq): a tap regrows the tree it is fired at as the cartridge's
+   * species; a hold or Shift every tree of that tree's kind within 12 m. Like for like: it fits trees only. A plot holds
+   * MAX_TREE_VARIANTS species presets at once; a shot that would need one more says so. Returns how many trees changed.
+   */
+  const applySpeciesShot = (broadcast: boolean): number => {
+    const scene = sceneRef.current;
+    const sp = beamPortRef.current?.species;
+    if (!scene || !sp) return 0;
+    if (whereRef.current !== 'planet') {
+      say('No trees here', 'A species cartridge regrows the plot\'s trees: fire it on the moon.');
+      return 0;
+    }
+    const hit = scene.aimTree(BEAM_STROKE_RANGE);
+    if (!hit) {
+      say('No tree in the beam', 'Aim at a tree\'s trunk.');
+      return 0;
+    }
+    const places = broadcast ? scene.treesLike(hit.place, 12) : [hit.place];
+    const next = withTrees(propsRef.current, places, { species: sp.species as TreePreset['species'], params: sp.params });
+    const presets = new Set(Object.values(next.trees ?? {}).map((t) => treeVariantKey(t)));
+    if (presets.size > MAX_TREE_VARIANTS) {
+      say(`The plot holds ${MAX_TREE_VARIANTS} tree presets`, 'Fire one of the presets already growing here, or regrow those trees as this one.');
+      return 0;
+    }
+    savePropsSave(next);
+    scene.setTreeOverrides(next.trees ?? {});
+    say(places.length === 1 ? `Regrown: ${sp.name}` : `Regrew ${places.length} trees: ${sp.name}`,
+      broadcast ? 'Every tree of that kind within 12 m changed.' : 'Hold the trigger, or Shift, to regrow every tree of its kind nearby.');
+    return places.length;
+  };
+  const applySpeciesShotRef = useRef<(broadcast: boolean) => number>(() => 0);
+  applySpeciesShotRef.current = applySpeciesShot;
   /** Whether the base's stores (the pack and the linked bins) hold a part's cost: a dry run of the base's `pay` command. */
   const partStockCheck = (spec: PartSpec): { readonly ok: boolean; readonly why: string } => {
     const at = sceneRef.current?.debug.position() ?? { x: 0, z: 0 };
@@ -1879,6 +1918,7 @@ useEffect(() => {
     scene.setProps(propsRef.current);
     // the beam's part overrides on the lab's kit-built props (TICKET-32): stored now, applied as each kit builds
     for (const [kit, ov] of Object.entries(propsRef.current.kits ?? {})) scene.setKitOverrides(kit, ov);
+    scene.setTreeOverrides(propsRef.current.trees ?? {});
     if (typeof window !== 'undefined') {
       (window as any).__playScene = scene;
       (window as any).__createGenFixture = createGenFixture;
@@ -1924,16 +1964,10 @@ useEffect(() => {
         scene.setPlanet(look(PLOT, 1), (st: Stage) => look(PLOT, st), NEIGHBOURS.map((plot) => ({ plot, look: look(plot.cartridge, plot.stage) })));
         // the cartridge that was in the rifle's port comes back into it (TASK-21d): it left the rack when it was loaded
         const savedPort = loadBeamSave().port;
-        if (savedPort && savedPort.kind === 'part' && savedPort.part) {
-          const first = Object.values(savedPort.part.slotMaterials)[0];
-          const colour = PART_SWATCHES.find((s) => s.id === first)?.color ?? '#9aa4ad';
-          beamPortRef.current = { cartridge: savedPort, preset: '', name: savedPort.name, colour, part: savedPort.part };
-          scene.setBeamCartridge(colour);
-          setBeamPort({ name: savedPort.name });
-        } else if (savedPort && savedPort.preset) {
-          const colour = presetLook(savedPort.preset)?.colour ?? '#808080';
-          beamPortRef.current = { cartridge: savedPort, preset: savedPort.preset, name: savedPort.name, colour };
-          scene.setBeamCartridge(colour);
+        const savedLook = savedPort ? rifleLook(savedPort) : null;
+        if (savedPort && savedLook) {
+          beamPortRef.current = { cartridge: savedPort, preset: savedLook.preset, name: savedPort.name, colour: savedLook.colour, ...(savedLook.print ?? {}) };
+          scene.setBeamCartridge(savedLook.colour);
           setBeamPort({ name: savedPort.name });
         }
         env = {
@@ -2071,6 +2105,11 @@ useEffect(() => {
             partShotRef.current = { t0: performance.now(), shift: e.shiftKey };
             return;
           }
+          // A species cartridge in Apply regrows the tree it is fired at (decided on release: a tap one, a hold its kind nearby)
+          if (beamHeldRef.current && beamModeRef.current === 'apply' && beamPortRef.current?.species) {
+            speciesShotRef.current = { t0: performance.now(), shift: e.shiftKey };
+            return;
+          }
           // A material cartridge aimed at a machine part paints the part's skin (decided on release); aimed anywhere else
           // it paints the ground as before
           if (beamHeldRef.current && beamModeRef.current === 'apply' && beamPortRef.current?.preset && scene.aimKitPart(BEAM_STROKE_RANGE)) {
@@ -2117,6 +2156,11 @@ useEffect(() => {
         if (skin) {
           skinShotRef.current = null;
           applySkinShotRef.current(skin.shift || performance.now() - skin.t0 >= 450);
+        }
+        const tree = speciesShotRef.current;
+        if (tree) {
+          speciesShotRef.current = null;
+          applySpeciesShotRef.current(tree.shift || performance.now() - tree.t0 >= 450);
         }
       }
     };
@@ -2804,7 +2848,7 @@ useEffect(() => {
       {
         const port = beamPortRef.current;
         // a part cartridge paints nothing: its shot fits a part on release (applyPartShot)
-        const aim = live && !visitingRef.current && out.where === 'planet' && beamHeldRef.current && beamModeRef.current === 'apply' && isLmbDownRef.current && port !== null && !port.part && !skinShotRef.current
+        const aim = live && !visitingRef.current && out.where === 'planet' && beamHeldRef.current && beamModeRef.current === 'apply' && isLmbDownRef.current && port !== null && port.preset !== '' && !skinShotRef.current
           ? scene.beamAim(BEAM_STROKE_RANGE)
           : null;
         if (aim && port) {
@@ -3378,13 +3422,10 @@ useEffect(() => {
       const items: RadialItem[] = [];
       for (const c of lab.cartridges) {
         if (c.slot !== null || inJob.has(c.id)) continue;
-        if (c.kind === 'part' && c.part) {
-          const first = Object.values(c.part.slotMaterials)[0];
-          items.push({ id: c.id, label: c.name, ref: { item: 'cartridge:part', tint: PART_SWATCHES.find((s) => s.id === first)?.color }, locked: null });
-          continue;
-        }
-        if (c.kind !== 'preset' || c.preset === null) continue;
-        items.push({ id: c.id, label: c.name, ref: { item: `cartridge:${c.preset}`, tint: presetLook(c.preset)?.colour }, locked: null });
+        const look = rifleLook(c);
+        if (!look) continue;
+        const item = look.print ? `cartridge:${printKind(look.print)}` : `cartridge:${c.preset}`;
+        items.push({ id: c.id, label: c.name, ref: { item, tint: look.colour }, locked: null });
       }
       const empty = items.length === 0;
       if (empty) {
@@ -3980,6 +4021,15 @@ useEffect(() => {
       applyPart: (broadcast: boolean): number => applyPartShotRef.current(broadcast),
       /** Fires the material in the port at the aimed machine part, as a tap or a hold (plan 39 step 2). */
       applySkin: (broadcast: boolean): number => applySkinShotRef.current(broadcast),
+      /** The tree the view is aimed at (plan 39, Aq), and the species shot as a tap or a hold. */
+      aimTree: () => sceneRef.current?.aimTree(BEAM_STROKE_RANGE) ?? null,
+      applySpecies: (broadcast: boolean): number => applySpeciesShotRef.current(broadcast),
+      treeOverrides: () => propsRef.current.trees ?? {},
+      /** Replaces the regrown trees (saved and shown), as the props save holds them. */
+      setTreeOverrides: (trees: Readonly<Record<string, TreePreset>>): void => {
+        savePropsSave({ ...propsRef.current, trees });
+        sceneRef.current?.setTreeOverrides(trees);
+      },
       /** Runs the lab's machines (the bench) for `seconds` of powered time. */
       stepLab: (seconds: number): void => {
         const env: LabEnv = { presets: VAULT, stage: plotRef.current.stage, powered: true };
@@ -4004,7 +4054,7 @@ useEffect(() => {
         return beamPortRef.current?.cartridge.id === id;
       },
       /** The rifle's port: its cartridge's name and, for a part cartridge, the part. */
-      port: () => (beamPortRef.current ? { name: beamPortRef.current.name, part: beamPortRef.current.part ?? null } : null),
+      port: () => (beamPortRef.current ? { name: beamPortRef.current.name, part: beamPortRef.current.part ?? null, species: beamPortRef.current.species ?? null, light: beamPortRef.current.light ?? null } : null),
       seedCartridge: (preset: string): boolean => {
         const v = VAULT_BY_ID.get(preset);
         if (!v) return false;
@@ -4725,12 +4775,15 @@ useEffect(() => {
                 <section className="play-machine lab-panel-bench" aria-label="Preset Bench">
                   <h3>Preset Bench</h3>
                   <div className="play-machine-actions" role="group" aria-label="What the bench writes">
-                    <button className={benchTab === 'presets' ? 'on' : ''} aria-pressed={benchTab === 'presets'} onClick={() => setBenchTab('presets')} data-testid="bench-tab-presets">Presets</button>
+                    <button className={benchTab === 'presets' ? 'on' : ''} aria-pressed={benchTab === 'presets'} onClick={() => setBenchTab('presets')} data-testid="bench-tab-presets">Materials</button>
                     <button className={benchTab === 'parts' ? 'on' : ''} aria-pressed={benchTab === 'parts'} onClick={() => setBenchTab('parts')} data-testid="bench-tab-parts">Parts</button>
+                    <button className={benchTab === 'species' ? 'on' : ''} aria-pressed={benchTab === 'species'} onClick={() => setBenchTab('species')} data-testid="bench-tab-species">Species</button>
                   </div>
                   <p>{benchTab === 'parts'
                     ? 'Prints a Shape Press part onto a blank cartridge. Load it in the beam rifle and fire Apply at a part: a tap changes that part, a hold or Shift changes every part of its kind.'
-                    : 'Writes an authored terraforming preset onto a blank cartridge.'}</p>
+                    : benchTab === 'species'
+                      ? 'Prints a Water Maker species onto a blank cartridge. Load it in the beam rifle and fire Apply at a tree on the plot: a tap regrows that tree, a hold or Shift every tree of its kind nearby.'
+                      : 'Writes an authored terraforming material onto a blank cartridge.'}</p>
                   <div className="play-carts">
                     <h4>1. Pick a blank ({blanks.length} available)</h4>
                     <div>
@@ -4746,7 +4799,21 @@ useEffect(() => {
                     </div>
                     {blanks.length === 0 ? <p className="play-why">No blanks on rack. Make a blank at the rack first.</p> : null}
                   </div>
-                  {benchTab === 'parts' ? (
+                  {benchTab === 'species' ? (
+                    <BenchSpecies
+                      check={(spec) => {
+                        if (!activeBlank) return { ok: false, why: 'No blanks on the rack. Make a blank at the rack first.' };
+                        return canWritePrint(labRef.current, labEnv, activeBlank, { species: spec });
+                      }}
+                      onPrint={(spec: SpeciesSpec) => {
+                        if (!activeBlank) return;
+                        const next = startPrintWrite(labRef.current, labEnv, activeBlank, { species: spec });
+                        labRef.current = next;
+                        commit(withLab(stateRef.current, next));
+                        say('Printing started', `The bench grows ${spec.name} onto the cartridge while powered.`);
+                      }}
+                    />
+                  ) : benchTab === 'parts' ? (
                     <BenchParts
                       check={(spec) => {
                         if (!activeBlank) return { ok: false, why: 'No blanks on the rack. Make a blank at the rack first.' };

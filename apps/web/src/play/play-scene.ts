@@ -71,7 +71,7 @@ import { BEAM_RANGE } from '../base/world';
 import type { WalkWorld } from '../base/walk';
 import { computeGateExitPose, pushCircle, pushCircleInFrame } from './static-colliders';
 import { machineFootprint } from '../base/machine-footprints';
-import { createPlotBiomeView, type PlotBiomeView, type BiomeInstanceCount } from './plot-biome-view';
+import { createPlotBiomeView, type PlotBiomeView, type BiomeInstanceCount, type TreeHit, type TreeVariantSpec } from './plot-biome-view';
 import { buildBiomeInput, type BiomeInput } from './biome-input';
 import { makeCoverTextures } from '@hm/groundshader';
 import { bakePlotBiome } from '@hm/plotbiome';
@@ -366,6 +366,12 @@ export interface PlayScene {
   kitPlaced(kit: string): readonly PlacedPart[];
   /** Rebuilds every machine on the plot (the debug switch for the kit frames). */
   rebuildMachines(): void;
+  /** Plan 39 (Aq): the tree the view is aimed at within `reach` m on the plot (its place, kind and species), or null. */
+  aimTree(reach: number): TreeHit | null;
+  /** The beam's regrown trees, by place key; kept until the plot's biome is built, then re-applied on every rebuild. */
+  setTreeOverrides(overrides: Readonly<Record<string, TreeVariantSpec>>): number;
+  /** The shown trees of the same kind as the tree at `place` within `radiusM` of it (a hold of the beam). */
+  treesLike(place: string, radiusM: number): string[];
   /** Immediately sets the world and mob visual fidelity stage (0 to 6). */
   setFidelityStage(stage: number): void;
   setVehicles(vehicles: readonly { readonly id: number; readonly kind: RoverKind; readonly x: number; readonly z: number; readonly yaw: number }[]): void;
@@ -1782,6 +1788,8 @@ export function createPlayScene(o: {
 
   // ---- plot biome scatter view (TICKET-02 item F)
   let biomeView: PlotBiomeView | null = null;
+  /** The beam's regrown trees (plan 39, Aq), held here so a biome built later still grows them. */
+  let treeOverrides: Readonly<Record<string, TreeVariantSpec>> = {};
   let vegSetting: 'auto' | 'off' | 'low' | 'high' = o.vegetation ?? 'auto';
   let cachedBiomeInput: BiomeInput | null = null;
   let activeBase: S.Base | null = null;
@@ -2527,6 +2535,7 @@ export function createPlayScene(o: {
       cachedBiomeInput = bInput;
       biomeView.build(bInput);
       biomeView.setStage(shown);
+      if (Object.keys(treeOverrides).length > 0) biomeView.setTreeOverrides(treeOverrides);
       if (!stageCoverTextures[0]) {
         applyCoverage(shown);
         buildAndAttachWaterSurfaces(shown);
@@ -4201,6 +4210,19 @@ export function createPlayScene(o: {
       plotKitOverrides.set(kit, overrides);
       for (const [id, v] of views) if (plotKitKey(v.m) === kit) return kitBuildOf(rebuildView(id, v)) !== null;
       return true;
+    },
+    aimTree(reach: number) {
+      if (where !== 'planet' || !biomeView) return null;
+      camera.updateMatrixWorld(true);
+      const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      return biomeView.treeAt([camera.position.x, camera.position.y, camera.position.z], [dir.x, dir.y, dir.z], reach);
+    },
+    setTreeOverrides(overrides) {
+      treeOverrides = overrides;
+      return biomeView ? biomeView.setTreeOverrides(overrides) : 0;
+    },
+    treesLike(place: string, radiusM: number) {
+      return biomeView?.treesLike(place, radiusM) ?? [];
     },
     rebuildMachines() {
       for (const [id, v] of [...views]) rebuildView(id, v);

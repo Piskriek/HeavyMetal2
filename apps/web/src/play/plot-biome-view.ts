@@ -8,6 +8,8 @@ import {
   growTree,
   buildDilatedSprigAtlas,
   FOLIAGE_SPECIES_PRESETS,
+  resolveTreeSliderParams,
+  TREE_PARAM_SPECS,
   type Species,
   type Tree,
   type TreeSliderParams,
@@ -31,14 +33,16 @@ export interface PlotBiomeView {
   setStage(stage: number): void;
   setTier(tier: 'low' | 'mid' | 'high' | 'off'): void;
   setWindTime?(timeSec: number): void;
-  /** Applies a Water Maker (Aq) foliage species preset to the nearest tree(s) within radiusM. Returns count updated. */
-  applyTreePresetAt?(
-    worldX: number,
-    worldZ: number,
-    species: Species,
-    sliders?: TreeSliderParams,
-    radiusM?: number,
-  ): number;
+  /**
+   * The trees the beam has regrown (plan 39 section 6, Aq): a tree's place key to the species preset it now grows as.
+   * Re-applied on every build. Each distinct preset is its own instanced set, at most MAX_TREE_VARIANTS; places whose
+   * preset does not fit are left as grown. Returns how many presets are in use.
+   */
+  setTreeOverrides(overrides: Readonly<Record<string, TreeVariantSpec>>): number;
+  /** The shown tree whose trunk is nearest the ray (within about a metre of it, and `reach` along it), or null. */
+  treeAt(origin: readonly [number, number, number], dir: readonly [number, number, number], reach: number): TreeHit | null;
+  /** The shown trees that grow as the same kind as the tree at `place` (its species, or its preset) within `radiusM` of it. */
+  treesLike(place: string, radiusM: number): string[];
   counts(): BiomeInstanceCount;
   triangles(): number;
   drawCalls(): number;
@@ -52,7 +56,49 @@ interface ScatterItem {
   scale: number;
   yaw: number;
   appear: number;
+  /** Trees only: the place key overrides are saved under. */
+  place?: string;
 }
+
+/** A species preset a tree can grow as (a species cartridge's species and sliders). */
+export interface TreeVariantSpec {
+  readonly species: Species;
+  readonly params: TreeSliderParams;
+}
+
+export interface TreeHit {
+  /** The tree's place key (its spot to the centimetre: stable across rebuilds). */
+  readonly place: string;
+  /** What it grows as: its species, or `species:sliders` for a preset. */
+  readonly kind: string;
+  readonly species: Species;
+  readonly worldX: number;
+  readonly worldZ: number;
+}
+
+/**
+ * A species preset's tree as the plot grows it: the near model (detail 1) or the far impostor, with its bark and canopy
+ * colours. The bench's preview uses the same call, so it shows exactly the tree a cartridge will grow.
+ */
+export function speciesModel(spec: TreeVariantSpec, which: 'near' | 'far'): { geometry: THREE.BufferGeometry; triangles: number } {
+  const preset = FOLIAGE_SPECIES_PRESETS[spec.species] ?? FOLIAGE_SPECIES_PRESETS.oak!;
+  const params = resolveTreeSliderParams(spec.params);
+  const leaf = resolveLeafTintColor(preset.leafColor, params);
+  const tree = growTree({ species: spec.species, seed: TREE_SEEDS[spec.species], height: params.height ?? 8.5, detail: which === 'near' ? 1 : 0, sliders: params });
+  return which === 'near' ? mergeTreeGeometry(tree, preset.barkColor, leaf) : createOctahedralFarImpostorGeometry(tree, preset.barkColor, leaf);
+}
+
+/** How many species presets a plot holds at once (each is two instanced sets: near and far). */
+export const MAX_TREE_VARIANTS = 6;
+/** A tree's place key: its spot to the centimetre (the scatter is deterministic, so it is stable across rebuilds). */
+export const treePlaceKey = (x: number, z: number): string => `${Math.round(x * 100)},${Math.round(z * 100)}`;
+/** A preset's key: its species and every resolved slider, so equal presets share one instanced set. */
+export const treeVariantKey = (spec: TreeVariantSpec): string => {
+  const p = resolveTreeSliderParams(spec.params);
+  return `${spec.species}:${TREE_PARAM_SPECS.map((s) => p[s.key]).join(',')}`;
+};
+const TREE_SEEDS: Readonly<Record<Species, number>> = { pine: 101, oak: 202, birch: 303 };
+const isTree = (k: ScatterKind): k is Species => k === 'pine' || k === 'oak' || k === 'birch';
 
 interface MeshSlot {
   id: string;
@@ -64,7 +110,7 @@ interface MeshSlot {
   trianglesPerInstance: number;
 }
 
-const CANOPY_TINTS: ReadonlyArray<readonly [number, number, number]> = [
+export const CANOPY_TINTS: ReadonlyArray<readonly [number, number, number]> = [
   [0.25, 0.52, 0.20], // 0: emerald
   [0.72, 0.48, 0.16], // 1: autumn-gold
   [0.42, 0.65, 0.22], // 2: birch-lime
@@ -397,19 +443,16 @@ function createTuftTexture(): THREE.DataTexture {
   return tex;
 }
 
-export function createPlotBiomeView(
-  scene: THREE.Scene,
-  o: PlotBiomeViewOptions,
-): PlotBiomeView {
-  let currentTier: 'low' | 'mid' | 'high' | 'off' = o.tier;
-  let currentStage = 0;
-  let lastInput: BiomeInput | null = null;
-
-  const rootGroup = new THREE.Group();
-  rootGroup.name = 'plot-biome-root';
-  scene.add(rootGroup);
-
-  // 1. Shared tree & plant materials with Stage Ladder (0a..6), Wind, Dilated Sprig Atlas & Edge-On Fade:
+/**
+ * The plot's foliage material (TICKET-31): vertex colours, the stage ladder (0a wireframe to 6 PBR), wind sway, the
+ * dilated sprig atlas and the edge-on fade. Shared by the biome view and the bench's tree preview, so the preview shows
+ * a tree exactly as the plot grows it.
+ */
+export function createFoliageMaterial(): {
+  readonly material: THREE.MeshLambertMaterial;
+  readonly uniforms: { readonly uStage: { value: number }; readonly uWindTime: { value: number }; readonly uSprigAtlas: { value: THREE.DataTexture } };
+  dispose(): void;
+} {
   const sprigAtlasTexture = createSprigAtlasTexture();
   const foliageUniforms = {
     uStage: { value: 0 },
@@ -501,6 +544,33 @@ export function createPlotBiomeView(
         `,
       );
   };
+  return {
+    material: plantMaterial,
+    uniforms: foliageUniforms,
+    dispose() {
+      plantMaterial.dispose();
+      sprigAtlasTexture.dispose();
+    },
+  };
+}
+
+export function createPlotBiomeView(
+  scene: THREE.Scene,
+  o: PlotBiomeViewOptions,
+): PlotBiomeView {
+  let currentTier: 'low' | 'mid' | 'high' | 'off' = o.tier;
+  let currentStage = 0;
+  let lastInput: BiomeInput | null = null;
+
+  const rootGroup = new THREE.Group();
+  rootGroup.name = 'plot-biome-root';
+  scene.add(rootGroup);
+
+  // 1. Shared tree & plant materials with Stage Ladder (0a..6), Wind, Dilated Sprig Atlas & Edge-On Fade:
+  const foliage = createFoliageMaterial();
+  const foliageUniforms = foliage.uniforms;
+  const plantMaterial = foliage.material;
+  const sprigAtlasTexture = foliageUniforms.uSprigAtlas.value;
 
   const tuftTexture = createTuftTexture();
   const tuftMaterial = new THREE.MeshLambertMaterial({
@@ -556,8 +626,8 @@ export function createPlotBiomeView(
 
   // 3. Setup InstancedMeshes
   const maxCapacity = 6000;
-  const makeMesh = (geo: THREE.BufferGeometry, mat: THREE.Material): THREE.InstancedMesh => {
-    const mesh = new THREE.InstancedMesh(geo, mat, maxCapacity);
+  const makeMesh = (geo: THREE.BufferGeometry, mat: THREE.Material, capacity = maxCapacity): THREE.InstancedMesh => {
+    const mesh = new THREE.InstancedMesh(geo, mat, capacity);
     mesh.count = 0;
     mesh.visible = false;
     mesh.frustumCulled = false;
@@ -577,6 +647,36 @@ export function createPlotBiomeView(
   ];
 
   const slotById = new Map<string, MeshSlot>(slots.map((s) => [s.id, s]));
+
+  // the beam's regrown trees (plan 39 section 6): one near and one far instanced set per distinct preset
+  interface Variant { readonly key: string; readonly spec: TreeVariantSpec; readonly near: MeshSlot; readonly far: MeshSlot }
+  const VARIANT_CAPACITY = 1024;
+  const variants = new Map<string, Variant>();
+  let treeOverrides: Readonly<Record<string, string>> = {};
+  const growVariant = (key: string, spec: TreeVariantSpec): Variant => {
+    const nearModel = speciesModel(spec, 'near');
+    const farModel = speciesModel(spec, 'far');
+    const slot = (isFar: boolean, model: { geometry: THREE.BufferGeometry; triangles: number }): MeshSlot => ({
+      id: `${key}_${isFar ? 'far' : 'near'}`, kind: spec.species, isFar,
+      mesh: makeMesh(model.geometry, plantMaterial, VARIANT_CAPACITY), appears: [], items: [], trianglesPerInstance: model.triangles,
+    });
+    const v: Variant = { key, spec, near: slot(false, nearModel), far: slot(true, farModel) };
+    for (const sl of [v.near, v.far]) {
+      slots.push(sl);
+      slotById.set(sl.id, sl);
+    }
+    return v;
+  };
+  const dropVariant = (v: Variant): void => {
+    for (const sl of [v.near, v.far]) {
+      rootGroup.remove(sl.mesh);
+      sl.mesh.geometry.dispose();
+      sl.mesh.dispose();
+      slots.splice(slots.indexOf(sl), 1);
+      slotById.delete(sl.id);
+    }
+    variants.delete(v.key);
+  };
 
   const applyStage = (stage: number): void => {
     currentStage = stage;
@@ -609,7 +709,7 @@ export function createPlotBiomeView(
     list.sort((a, b) => a.appear - b.appear);
 
     slot.appears = list.map((item) => item.appear);
-    const n = Math.min(list.length, maxCapacity);
+    const n = Math.min(list.length, slot.mesh.instanceMatrix.count);
 
     for (let i = 0; i < n; i++) {
       const item = list[i]!;
@@ -652,9 +752,14 @@ export function createPlotBiomeView(
         slotById.get('tuft')!.items.push({ ...s, worldX, worldZ });
       } else if (s.kind === 'bush') {
         slotById.get('bush')!.items.push({ ...s, worldX, worldZ });
-      } else if (s.kind === 'pine' || s.kind === 'oak' || s.kind === 'birch') {
-        const targetId = dist < 60 ? `${s.kind}_near` : `${s.kind}_far`;
-        slotById.get(targetId)?.items.push({ ...s, worldX, worldZ });
+      } else if (isTree(s.kind)) {
+        // a tree the beam regrew grows in its preset's set, everything else as scattered
+        const place = treePlaceKey(worldX, worldZ);
+        const variant = variants.get(treeOverrides[place] ?? '');
+        const target = variant
+          ? (dist < 60 ? variant.near : variant.far)
+          : slotById.get(dist < 60 ? `${s.kind}_near` : `${s.kind}_far`);
+        target?.items.push({ ...s, kind: variant ? variant.spec.species : s.kind, worldX, worldZ, place });
       }
     }
 
@@ -695,74 +800,70 @@ export function createPlotBiomeView(
     setWindTime(timeSec: number): void {
       foliageUniforms.uWindTime.value = timeSec;
     },
-    applyTreePresetAt(
-      worldX: number,
-      worldZ: number,
-      species: Species,
-      sliders?: TreeSliderParams,
-      radiusM = 6.0,
-    ): number {
-      const r2 = radiusM * radiusM;
-      let changed = 0;
-      const nearId = `${species}_near`;
-      const farId = `${species}_far`;
-
-      // If custom sliders were supplied on the cartridge, rebuild that species' near geometry:
-      if (sliders) {
-        const preset = FOLIAGE_SPECIES_PRESETS[species] ?? FOLIAGE_SPECIES_PRESETS.oak!;
-        const leafCol = resolveLeafTintColor(preset.leafColor, sliders);
-        const h = typeof sliders.height === 'number' && sliders.height > 0 ? sliders.height : preset.params.height ?? 8.5;
-        const regrown = mergeTreeGeometry(
-          growTree({ species, seed: species === 'pine' ? 101 : species === 'oak' ? 202 : 303, height: h, detail: 1, sliders }),
-          preset.barkColor,
-          leafCol,
-        );
-        const targetSlot = slotById.get(nearId);
-        if (targetSlot) {
-          targetSlot.mesh.geometry.dispose();
-          targetSlot.mesh.geometry = regrown.geometry;
-          targetSlot.trianglesPerInstance = regrown.triangles;
+    setTreeOverrides(overrides: Readonly<Record<string, TreeVariantSpec>>): number {
+      const wanted = new Map<string, TreeVariantSpec>();
+      const byPlace: Record<string, string> = {};
+      for (const [place, spec] of Object.entries(overrides)) {
+        const key = treeVariantKey(spec);
+        if (!wanted.has(key)) {
+          if (wanted.size >= MAX_TREE_VARIANTS) continue;
+          wanted.set(key, spec);
+        }
+        byPlace[place] = key;
+      }
+      for (const v of [...variants.values()]) if (!wanted.has(v.key)) dropVariant(v);
+      for (const [key, spec] of wanted) if (!variants.has(key)) variants.set(key, growVariant(key, spec));
+      treeOverrides = byPlace;
+      if (lastInput) build(lastInput);
+      return wanted.size;
+    },
+    treeAt(origin, dir, reach): TreeHit | null {
+      const [ox, oy, oz] = origin;
+      const [dx, dy, dz] = dir;
+      const len = Math.hypot(dx, dy, dz);
+      const hz = dx * dx + dz * dz;
+      if (len < 1e-9 || hz < 1e-9) return null;
+      let best: { t: number; hit: TreeHit } | null = null;
+      for (const slot of slots) {
+        if (!isTree(slot.kind) || !slot.mesh.visible) continue;
+        for (let i = 0; i < slot.mesh.count; i++) {
+          const item = slot.items[i];
+          if (!item?.place) continue;
+          // the ray's closest approach to the trunk, seen from above; it must pass the trunk below the crown's top
+          const t = ((item.worldX - ox) * dx + (item.worldZ - oz) * dz) / hz;
+          if (t <= 0 || t * len > reach) continue;
+          const side = Math.hypot(ox + t * dx - item.worldX, oz + t * dz - item.worldZ);
+          const ground = o.heightAt(item.worldX, item.worldZ);
+          const y = oy + t * dy;
+          if (side > 0.9 * Math.max(0.6, item.scale) || y < ground - 0.3 || y > ground + 9 * item.scale) continue;
+          if (best && t >= best.t) continue;
+          const kind = treeOverrides[item.place] ?? item.kind;
+          best = { t, hit: { place: item.place, kind, species: item.kind as Species, worldX: item.worldX, worldZ: item.worldZ } };
         }
       }
-
-      // Move any tree within radiusM into the target species slot:
-      const treeSlots = slots.filter((s) => s.kind === 'pine' || s.kind === 'oak' || s.kind === 'birch');
-      const movedNear: ScatterItem[] = [];
-      const movedFar: ScatterItem[] = [];
-
-      for (const s of treeSlots) {
-        const kept: ScatterItem[] = [];
-        for (const item of s.items) {
-          const dx = item.worldX - worldX;
-          const dz = item.worldZ - worldZ;
-          if (dx * dx + dz * dz <= r2) {
-            changed++;
-            const updated: ScatterItem = { ...item, kind: species };
-            if (s.isFar) movedFar.push(updated);
-            else movedNear.push(updated);
-          } else {
-            kept.push(item);
-          }
+      return best?.hit ?? null;
+    },
+    treesLike(place: string, radiusM: number): string[] {
+      let at: ScatterItem | null = null;
+      for (const slot of slots) if (isTree(slot.kind)) for (const item of slot.items) if (item.place === place) at = item;
+      if (!at) return [];
+      const kindOf = (item: ScatterItem): string => treeOverrides[item.place ?? ''] ?? item.kind;
+      const want = kindOf(at), r2 = radiusM * radiusM, out: string[] = [];
+      for (const slot of slots) {
+        if (!isTree(slot.kind)) continue;
+        for (let i = 0; i < slot.mesh.count; i++) {
+          const item = slot.items[i];
+          if (!item?.place || kindOf(item) !== want) continue;
+          const ddx = item.worldX - at.worldX, ddz = item.worldZ - at.worldZ;
+          if (ddx * ddx + ddz * ddz <= r2) out.push(item.place);
         }
-        s.items = kept;
       }
-
-      if (changed > 0) {
-        slotById.get(nearId)?.items.push(...movedNear);
-        slotById.get(farId)?.items.push(...movedFar);
-        for (const s of treeSlots) populateSlot(s);
-        applyStage(currentStage);
-      }
-      return changed;
+      return out;
     },
     counts(): BiomeInstanceCount {
-      const byKind: Record<ScatterKind, number> = {
-        tuft: slotById.get('tuft')?.mesh.count ?? 0,
-        bush: slotById.get('bush')?.mesh.count ?? 0,
-        pine: (slotById.get('pine_near')?.mesh.count ?? 0) + (slotById.get('pine_far')?.mesh.count ?? 0),
-        oak: (slotById.get('oak_near')?.mesh.count ?? 0) + (slotById.get('oak_far')?.mesh.count ?? 0),
-        birch: (slotById.get('birch_near')?.mesh.count ?? 0) + (slotById.get('birch_far')?.mesh.count ?? 0),
-      };
+      // every slot of a kind, the beam's preset sets included
+      const byKind: Record<ScatterKind, number> = { tuft: 0, bush: 0, pine: 0, oak: 0, birch: 0 };
+      for (const slot of slots) byKind[slot.kind] += slot.mesh.count;
       const trees = byKind.pine + byKind.oak + byKind.birch;
       const total = byKind.tuft + byKind.bush + trees;
       return { total, trees, byKind };
@@ -795,6 +896,7 @@ export function createPlotBiomeView(
       birchFar.geometry.dispose();
       bushModel.geometry.dispose();
       tuftModel.geometry.dispose();
+      for (const v of [...variants.values()]) dropVariant(v);
     },
   };
 }

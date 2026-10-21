@@ -68,3 +68,10 @@ Steps 1 (Vtx parts) and 2 (Pxd skins on parts) are done. The same loop for the o
 3. Lamps: a kit lamp wears `lx:<kelvin>:<intensity>:<pattern>` as its material, resolved like a skin (one shared emissive material per preset, its pattern animated once a frame for all lamps that wear it, so it stays cheap); real point lights stay the Graphics tier's extra.
 4. The beam: fired at a lamp it sets that lamp; held, every lamp on the machine. Like for like.
 5. Later: a light preset on a plot's sky (sun, fog, exposure), with Argo.
+
+## 7. Step 5: the player's presets, from the bench to the Studio and back (Opus, 2026-10-21)
+Preset inception needs a place for the player's own presets. Research in `docs/PRESET_FACTORIES_RESEARCH.md` section 4.
+1. **A library in the profile** (`my-presets.ts`): the player's parts, species and lights, each a named print (the same JSON a cartridge carries), checked on load with cartlab's `readPrint`; identical prints are kept once.
+2. **Every bench shows "Yours"** after the named presets, with the same previews and try-on; **Save as preset** beside Print keeps the current one.
+3. **A share code** per preset (`SMX-PRT-`, `SMX-SPC-`, `SMX-LGT-` then the print, base64url): paste one to add it. A picture with the preset inside (Spore's card) is a later step.
+4. **The Studio** gets Species and Lights workspaces beside Parts (the bench pages' controls in a larger layout, with Save, Copy code and Paste code), so a preset made in the Studio appears on the benches and one saved at a bench opens in the Studio.

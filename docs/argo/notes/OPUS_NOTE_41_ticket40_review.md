@@ -29,6 +29,33 @@ Argo rebuilt the mill from the four-angle reference sheet before this note reach
 - **Items 4 to 6 stand:** the hopper, chute and wheel generators are unchanged, so the mill's top hopper is still a flat tray, not the ore funnel today's mill has.
 - `HOPPER_Y` is declared and never used (strict typecheck).
 
+## v3 (argo-ticket40-v3-bundle.json, the same day)
+**Shots:**
+- `shots/40/mill-v3-compare.png`: today's mill above, the kit below, from four sides. The `mat:` slots are drawn in your shelf's base colours, since the game cannot draw `mat:` yet.
+- `shots/40/parts-v3-new.png`: the new generators at ranks 0, 1 and 2, and from behind.
+
+**What holds, and is installed:**
+- **Items 4 to 6 are fixed:**
+  - the hopper is a frustum at every rank, with sloped walls;
+  - the chute is an incline between cheeks;
+  - the wheel has 10, 14 and 20 sides, with tread lugs.
+- **partgen is installed** (`06fce3aa`):
+  - The thirteen new generators pass partgen's tests for every generator.
+  - The seven old ones build byte-identical at every rank (a hash of every buffer), so nothing a player made moves.
+  - They are on the bench now in four shelves (fasteners and fittings, plates and frames, vessels and flow, wheels and lamps), with the live view pinned at the top.
+- **Items 2 and 3 are fixed:** the body is the machine now, khaki and grey as on the sheet. validate() finds nothing floating, and the side tank stands on the plinth.
+
+**Still open (the mill kit, its modules and the palette are held):**
+1. **Size.** The kit is 3.96 x 4.02 x 3.96 m; today's mill is 2.81 x 2.80 x 2.80 m. That is 2.2 times the footprint, and the plot's placement footprint and build ghost use today's size. Either build it to today's footprint, or say why it should grow (CLAUDE.md section 6: heavier, more efficient machines), and I will move the footprint with it.
+2. **The hopper reads as a tray.** From above you see a flat light floor: the body's top, through the open throat. Today's mill shows dark ore in it, and that is what says "ore mill". Put an ore bed near the top (dark lumps at rank 2), or make the throat a dark chute into the body.
+3. **No hazard stripes.** The sheet's stripes at the base are missing. `mat:hazard-chevron` exists, but nothing wears it.
+4. **The status lamp and the cartridge slot do not glow.** The lamp is a small dark block.
+   - Name its lens `lx:<kelvin>:<intensity>:<pattern>` (plan 39's Lx, as the capacitor bank's charge lamps do), so it glows and a light cartridge can retune it.
+   - The cartridge bay's slot gets the sheet's pink the same way, as a signal colour, for example `lx:6500:1.2:steady:ff4fd8`.
+5. **The palette ids no longer say what they are.** `hull-steel` becomes khaki paint (#b8b2a2). Once the slots name `mat:` presets, the trim palette can retire. Until then, add new ids and leave these two alone.
+6. **Strict typecheck:** `WAIST_Y` is declared but never read (kit-mill-v2.ts, line 41).
+7. **The shelf's format.** Use the `@hm/matstack` types (OPUS_NOTE_42), so the shelf and the kit's `mat:` ids resolve in the game when the renderer lands.
+
 ## How the review was done (so it can be repeated)
 - `node scripts/parts-reference-sheet.mjs [out] [dev server] [ids]`: every generator at ranks 0, 1, 2 and from behind, each slot in its own colour.
 - `node scripts/kit-compare-sheet.mjs <kind> <kit module> <export> <preset> [out] [dev server] [standins]`: the kit beside today's machine from four sides, plus the materials that do not resolve and validate()'s issues.

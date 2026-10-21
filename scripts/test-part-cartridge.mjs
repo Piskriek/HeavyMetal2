@@ -102,8 +102,9 @@ try {
   // previews drive play (the owner, 2026-10-20): a live view of the part, chips with thumbnails, a hover try-on
   check('the Parts page shows a live preview of the part, with its size', await page.locator('[data-testid="part-preview"] canvas').isVisible()
     && /mm/.test((await page.locator('.part-preview figcaption').textContent()) ?? ''));
-  const thumbs = await page.waitForFunction(() => document.querySelectorAll('.bench-parts-gens img').length, null, { timeout: 5000 }).then((h) => h.jsonValue(), () => 0);
-  check('every part chip carries a thumbnail', thumbs === 7, `${thumbs} of 7`);
+  const chips = await page.locator('[data-testid^="bench-gen-"]').count();
+  const thumbs = await page.waitForFunction((n) => document.querySelectorAll('.bench-parts-gens img').length >= n && document.querySelectorAll('.bench-parts-gens img').length, chips, { timeout: 8000 }).then((h) => h.jsonValue(), () => 0);
+  check('every part chip carries a thumbnail', chips >= 7 && thumbs === chips, `${thumbs} of ${chips}`);
   await page.locator('[data-testid="bench-mat-metal-copper"]').hover();
   const trying = await page.locator('[data-testid="part-preview-trying"]').textContent().catch(() => '');
   await page.locator('[data-testid="bench-parts"] h4').first().hover();

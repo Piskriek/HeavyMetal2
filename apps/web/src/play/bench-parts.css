@@ -200,9 +200,52 @@
 }
 
 /* the player's own presets after the named ones (plan 39 section 7) */
-.bench-parts-yours {
+.bench-parts-yours,
+.bench-parts-shelf {
   margin: 6px 0 6px;
   font-size: 12px;
   font-weight: 600;
   color: rgba(232, 238, 241, 0.6);
+}
+
+/* The Parts page's shelves: tiles with the thumbnail over the name, denser than the side-by-side chips, so twenty parts
+   fit in a few rows */
+.bench-parts .bench-parts-gens.tiles {
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+}
+.bench-parts .bench-parts-gens.tiles button {
+  grid-template-columns: none;
+  grid-template-rows: 44px auto;
+  justify-items: center;
+  align-content: start;
+  row-gap: 5px;
+  padding: 6px 4px 7px;
+  text-align: center;
+}
+.bench-parts .bench-parts-gens.tiles img,
+.bench-parts .bench-parts-gens.tiles i {
+  width: 44px;
+  height: 44px;
+}
+.bench-parts .bench-parts-gens.tiles b {
+  font-size: 11.5px;
+  line-height: 1.25;
+}
+.bench-parts-shelf {
+  margin-top: 10px;
+}
+
+/* On the lab bench (no side column) the live view leads and stays pinned at the top of the panel while the shelves and
+   sliders scroll under it: every hover and every slider shows on the part (previews drive play) */
+.bench-parts-stage {
+  position: sticky;
+  /* the panel's top padding (.play-machine): pinned flush to its edge, so nothing scrolls by above the view */
+  top: -16px;
+  z-index: 2;
+  padding: 16px 0 10px;
+  background: linear-gradient(rgba(12, 14, 17, 0.98) 86%, rgba(12, 14, 17, 0));
+}
+.bench-parts-stage .part-preview {
+  aspect-ratio: 5 / 2;
+  margin-bottom: 0;
 }

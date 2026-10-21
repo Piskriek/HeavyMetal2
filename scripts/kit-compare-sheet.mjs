@@ -12,7 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const [kind, kitModule, kitExport, preset, outArg, baseArg, standinArg] = process.argv.slice(2);
-// optional, for review only: "a=b,c=d" draws a missing material a as b (to see a shape whose skin does not resolve)
+// optional, for review only: "a=b,c=d" draws a missing material a as b, another material or a flat "#rrggbb" (to see a shape whose skin does not resolve)
 const standins = Object.fromEntries((standinArg ?? '').split(',').filter(Boolean).map((p) => p.split('=')));
 if (!kind || !kitModule || !kitExport || !preset) throw new Error('usage: kind kitModule kitExport preset [out] [devServerUrl]');
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -37,7 +37,14 @@ const result = await page.evaluate(async ([kind, kitModule, kitExport, preset, s
   for (const a of ['mill', 'press-frame', 'press-ram', 'watermaker', 'projector-mast', 'projector-head']) await gen.loadGen?.(a, 'high');
 
   const mats = plotKitMaterials();
-  const resolve = (name) => mats[name] ?? vaultSkin(name, true);
+  // a stand-in may also be a flat colour ('#rrggbb'), for a material the game cannot draw yet (a kit's base colours)
+  const flat = new Map();
+  const hex = (name) => {
+    if (!/^#[0-9a-f]{6}$/i.test(name)) return null;
+    if (!flat.has(name)) flat.set(name, new THREE.MeshStandardMaterial({ color: name, roughness: 0.6, metalness: 0.15 }));
+    return flat.get(name);
+  };
+  const resolve = (name) => mats[name] ?? vaultSkin(name, true) ?? hex(name);
   const drawn = (name) => resolve(name) ?? (standins[name] ? resolve(standins[name]) : null);
   const placed = kitspec.flatten(kit, preset);
   const missing = new Set();

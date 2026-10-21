@@ -47,4 +47,10 @@ export const DEFAULT_SLOT_MATERIAL: Readonly<Record<string, string>> = {
   frame: 'darkSteel', slats: 'gunmetal', duct: 'paint', flange: 'darkSteel',
   // slots the mesh operators add (surface-edge-wear-ao): worn edges show bare metal, the base band gathers dirt
   'edge-wear': 'gunmetal', 'cavity-dirt': 'darkSteel',
+  // TICKET-40's generators (hopper to track), until their slots take layered materials (plan 41)
+  liner: 'darkSteel', trough: 'gunmetal', cheeks: 'paint', shell: 'paint', caps: 'darkSteel', ribs: 'gunmetal',
+  pipe: 'gunmetal', pin: 'gunmetal', mount: 'darkSteel', shaft: 'gunmetal', grip: 'darkSteel', stiles: 'gunmetal',
+  rungs: 'gunmetal', cage: 'darkSteel', hood: 'paint', throat: 'darkSteel', housing: 'darkSteel', lens: 'hazard',
+  guard: 'gunmetal', cable: 'darkSteel', clips: 'gunmetal', gland: 'copper', strap: 'gunmetal', tyre: 'darkSteel',
+  rim: 'hazard', hub: 'gunmetal', tread: 'darkSteel', rollers: 'gunmetal',
 };

@@ -7,7 +7,7 @@
 // thumbnails and the materials are drawn as lit balls, so every choice shows what it would do before it is made.
 import React, { useMemo, useState } from 'react';
 import type { PartSpec } from '@hm/cartlab';
-import { GENERATORS, resolveParams } from '@hm/partgen';
+import { GENERATORS, resolveParams, type Generator } from '@hm/partgen';
 import { BENCH_OPERATORS, PART_COSTS, partName } from './part-cartridge';
 import { DEFAULT_SLOT_MATERIAL, formatValue, materialBall, PART_SWATCHES, swatchName } from './part-swatches';
 import { PartPreview, usePartThumbs } from './part-preview';
@@ -33,6 +33,20 @@ export interface BenchPartsProps {
 /** What the player is trying on: another part, an operator toggled, or a material in one slot. */
 type Trial = { readonly label: string; readonly gen?: string; readonly op?: string; readonly slot?: string; readonly mat?: string; readonly spec?: PartSpec };
 type OpRef = { readonly op: string; readonly params: Readonly<Record<string, number>> };
+
+/** The Parts page's shelves: the generators grouped the way a builder looks for them. A new generator lands in "More parts". */
+const FAMILIES: readonly { readonly name: string; readonly ids: readonly string[] }[] = [
+  { name: 'Fasteners and fittings', ids: ['bolt', 'hinge', 'handle', 'clamp'] },
+  { name: 'Plates and frames', ids: ['panel', 'beam', 'bracket', 'grille', 'louvre', 'ladder'] },
+  { name: 'Vessels and flow', ids: ['can', 'tank', 'pipe', 'duct', 'hopper', 'chute', 'conduit'] },
+  { name: 'Wheels and lamps', ids: ['wheel', 'track', 'lamp'] },
+];
+const SHELVES: readonly { readonly name: string; readonly gens: readonly Generator[] }[] = (() => {
+  const shelved = new Set(FAMILIES.flatMap((f) => f.ids));
+  const out = FAMILIES.map((f) => ({ name: f.name, gens: f.ids.flatMap((id) => (GENERATORS[id] ? [GENERATORS[id]!] : [])) }));
+  const rest = Object.values(GENERATORS).filter((g) => !shelved.has(g.id));
+  return [...out, ...(rest.length ? [{ name: 'More parts', gens: rest }] : [])].filter((s) => s.gens.length > 0);
+})();
 
 export const BenchParts: React.FC<BenchPartsProps> = ({ check, onPrint, printLabel = 'Start printing', side, firstStep = 2, mine = [], onSave }) => {
   const [gen, setGen] = useState('bolt');
@@ -86,23 +100,28 @@ export const BenchParts: React.FC<BenchPartsProps> = ({ check, onPrint, printLab
     <>
       <div className="play-carts">
         <h4>{firstStep}. Pick a part</h4>
-        <div className="bench-parts-gens">
-          {Object.values(GENERATORS).map((x) => (
-            <button key={x.id} className={gen === x.id ? 'on' : ''} onClick={() => { setTrial(null); setGen(x.id); }} data-testid={`bench-gen-${x.id}`}
-              {...(gen === x.id ? {} : tryOn({ label: x.label.toLowerCase(), gen: x.id }))}>
-              {thumbs.get(x.id) ? <img src={thumbs.get(x.id)} alt="" width={40} height={40} /> : <i aria-hidden="true" />}
-              <b>{x.label}</b>
-            </button>
-          ))}
-        </div>
+        {SHELVES.map((shelf) => (
+          <section key={shelf.name} aria-label={shelf.name}>
+            <p className="bench-parts-shelf">{shelf.name}</p>
+            <div className="bench-parts-gens tiles">
+              {shelf.gens.map((x) => (
+                <button key={x.id} className={gen === x.id ? 'on' : ''} onClick={() => { setTrial(null); setGen(x.id); }} data-testid={`bench-gen-${x.id}`}
+                  {...(gen === x.id ? {} : tryOn({ label: x.label.toLowerCase(), gen: x.id }))}>
+                  {thumbs.get(x.id) ? <img src={thumbs.get(x.id)} alt="" width={44} height={44} /> : <i aria-hidden="true" />}
+                  <b>{x.label}</b>
+                </button>
+              ))}
+            </div>
+          </section>
+        ))}
         {mineSpecs.length > 0 ? (
           <>
-            <p className="bench-parts-yours">Yours</p>
-            <div className="bench-parts-gens">
+            <p className="bench-parts-shelf">Yours</p>
+            <div className="bench-parts-gens tiles">
               {mineSpecs.map((m) => (
                 <button key={m.id} onClick={() => pickMine(m.spec)} data-testid={`bench-mine-${m.id}`}
                   {...tryOn({ label: m.spec.name.toLowerCase(), spec: m.spec })}>
-                  {thumbs.get(m.id) ? <img src={thumbs.get(m.id)} alt="" width={40} height={40} /> : <i aria-hidden="true" />}
+                  {thumbs.get(m.id) ? <img src={thumbs.get(m.id)} alt="" width={44} height={44} /> : <i aria-hidden="true" />}
                   <b>{m.spec.name}</b>
                 </button>
               ))}
@@ -113,7 +132,6 @@ export const BenchParts: React.FC<BenchPartsProps> = ({ check, onPrint, printLab
 
       <div className="play-carts">
         <h4>{firstStep + 1}. Shape it</h4>
-        {side ? null : preview}
         <div className="bench-parts-sliders">
           {g.params.map((p) => {
             const v = params[p.key] ?? p.default;
@@ -193,6 +211,11 @@ export const BenchParts: React.FC<BenchPartsProps> = ({ check, onPrint, printLab
       <div className="bench-parts-main">{sections}</div>
     </div>
   ) : (
-    <div className="bench-parts" data-testid="bench-parts">{sections}{footer}</div>
+    // on the lab bench the live view leads the page and stays pinned while the shelves and sliders scroll under it
+    <div className="bench-parts" data-testid="bench-parts">
+      <div className="bench-parts-stage">{preview}</div>
+      {sections}
+      {footer}
+    </div>
   );
 };

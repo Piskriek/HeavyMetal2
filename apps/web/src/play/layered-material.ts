@@ -30,7 +30,8 @@ import {
   maskAttributes,
   rampAt,
   resolveColour,
-  resolveMatPreset,
+  specOfName,
+  CUSTOM_PREFIX,
   seedOffset,
   type ChannelGroup,
   type LayerSpec,
@@ -46,7 +47,7 @@ import {
 export type MatRank = 0 | 1 | 2;
 
 export const MAT_PREFIX = 'mat:';
-export const isLayeredName = (name: string): boolean => name.startsWith(MAT_PREFIX);
+export const isLayeredName = (name: string): boolean => name.startsWith(MAT_PREFIX) || name.startsWith(CUSTOM_PREFIX);
 
 /** A reflection to draw with where the scene has none (the planet): the map and how strong. */
 export interface LayeredEnv {
@@ -611,10 +612,10 @@ export function materialForSpec(spec: MaterialSpec, rank: MatRank, env?: Layered
   return m;
 }
 
-/** The material for a `mat:<id>` name at a rank, a neutral stand-in when the id does not resolve, or null for any other name. */
+/** The material for a `mat:<id>` (shelf) or `matc:<code>` (a player's own) name at a rank, a neutral stand-in when it does not resolve, or null for any other name. */
 export function layeredMaterial(name: string, rank: MatRank, env?: LayeredEnv): THREE.Material | null {
   if (!isLayeredName(name)) return null;
-  const spec = resolveMatPreset(name);
+  const spec = specOfName(name);
   return spec ? materialForSpec(spec, rank, env) : fallback(name);
 }
 

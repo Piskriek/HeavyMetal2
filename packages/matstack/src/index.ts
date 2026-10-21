@@ -15,19 +15,18 @@
  *  - `layers` run bottom to top (the UI lists them top first).
  */
 
-import { EDGE_BAND, MAX_LAYERS, MAX_MASK_INPUTS } from './constants';
+import { BLEND_MODES, CHANNEL_GROUPS, EDGE_BAND, MAX_LAYERS, MAX_MASK_INPUTS, NOISE_KINDS, PAINT_REFS } from './constants';
 import { EDGE_LINES, lineDistance, type MaskMesh } from './mask-mesh';
-export { EDGE_BAND, MAX_LAYERS, MAX_MASK_INPUTS, MAX_RAMP_STOPS } from './constants';
+export { BLEND_MODES, CHANNEL_GROUPS, EDGE_BAND, MAX_LAYERS, MAX_MASK_INPUTS, MAX_RAMP_STOPS, NOISE_KINDS, PAINT_REFS } from './constants';
 export * from './mask-mesh';
 export * from './shelf';
+export * from './codec';
 
 // ------------------------------------------------------------------ specs
 
 export type V3 = readonly [number, number, number];
 export type RGB = readonly [number, number, number];
 
-/** Paint references a surface can use as its colour: the material's first and second paint. */
-export const PAINT_REFS = ['paint1', 'paint2'] as const;
 export type PaintRef = (typeof PAINT_REFS)[number];
 /** '#rrggbb' (sRGB), or a paint reference. */
 export type ColourRef = string;
@@ -75,7 +74,6 @@ export interface SurfaceSpec {
   readonly emit?: { readonly colour: string; readonly intensity: number };
 }
 
-export const NOISE_KINDS = ['clouds', 'cells', 'speckle', 'scratches'] as const;
 export type NoiseKind = (typeof NOISE_KINDS)[number];
 
 /**
@@ -86,7 +84,6 @@ export type NoiseKind = (typeof NOISE_KINDS)[number];
  */
 export const NOISE_FEATURES: Readonly<Record<NoiseKind, number>> = { clouds: 4, cells: 7, speckle: 32, scratches: 23 };
 
-export const BLEND_MODES = ['normal', 'add', 'subtract', 'multiply', 'max', 'min'] as const;
 export type BlendMode = (typeof BLEND_MODES)[number];
 
 interface InputBase {
@@ -123,7 +120,6 @@ export interface MaskSpec {
   readonly invert: boolean;
 }
 
-export const CHANNEL_GROUPS = ['colour', 'metal', 'rough', 'specular', 'height', 'coat', 'fuzz', 'aniso', 'film', 'emit'] as const;
 export type ChannelGroup = (typeof CHANNEL_GROUPS)[number];
 
 export interface LayerSpec {

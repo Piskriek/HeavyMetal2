@@ -220,10 +220,19 @@ export const isHex = (s: string): boolean => HEX_RE.test(s);
 
 /** '#rrggbb' to linear RGB; anything else reads as mid grey (#808080). */
 export function hexToLinear(hex: string): RGB {
+  const hit = linearCache.get(hex);
+  if (hit) return hit;
   const h = isHex(hex) ? hex : '#808080';
   const n = parseInt(h.slice(1), 16);
-  return [srgbToLinear(((n >> 16) & 255) / 255), srgbToLinear(((n >> 8) & 255) / 255), srgbToLinear((n & 255) / 255)];
+  const out: RGB = Object.freeze([srgbToLinear(((n >> 16) & 255) / 255), srgbToLinear(((n >> 8) & 255) / 255), srgbToLinear((n & 255) / 255)] as const);
+  if (linearCache.size < 4096) linearCache.set(hex, out);
+  return out;
 }
+/** Colours already converted (evaluation runs per sample, so each is parsed once). */
+const linearCache = new Map<string, RGB>();
+
+/** Each ramp's stops in order, sorted once per ramp. */
+const sortedStops = new WeakMap<readonly RampStop[], readonly RampStop[]>();
 
 /** A colour reference resolved against the material's paint. */
 export function resolveColour(ref: ColourRef, paint: readonly [string, string]): RGB {
@@ -239,7 +248,8 @@ export function seedOffset(seed: number): readonly [number, number] {
 
 /** The ramp's colour at x, interpolated in linear RGB between the stops either side (stops sorted by `at`). */
 export function rampAt(stops: readonly RampStop[], x: number): RGB {
-  const s = [...stops].sort((a, b) => a.at - b.at);
+  let s = sortedStops.get(stops);
+  if (!s) sortedStops.set(stops, (s = [...stops].sort((a, b) => a.at - b.at)));
   const first = s[0];
   if (!first) return hexToLinear('#808080');
   if (x <= first.at) return hexToLinear(first.colour);
@@ -340,7 +350,9 @@ export function levels(acc: number, balance: number, contrast: number): number {
 /** The mask at a point: the inputs folded from 0 in order, then levels, then the mask's invert. */
 export function maskAt(mask: MaskSpec, p: SamplePoint, noise: NoiseSource): number {
   let acc = 0;
-  for (const input of mask.inputs.slice(0, MAX_MASK_INPUTS)) {
+  const count = Math.min(mask.inputs.length, MAX_MASK_INPUTS);
+  for (let i = 0; i < count; i++) {
+    const input = mask.inputs[i]!;
     const raw = inputValue(input, p, noise);
     acc = blendInput(input.blend, acc, input.invert ? 1 - raw : raw, clamp01(input.opacity));
   }
@@ -428,28 +440,30 @@ const mix3 = (a: RGB, b: RGB, t: number): RGB => [mix(a[0], b[0], t), mix(a[1], 
 /** `below` with a layer's surface mixed over it by weight w, in the channel groups the layer writes. */
 export function blendChannels(below: Channels, over: Channels, w: number, writes: readonly ChannelGroup[]): Channels {
   if (w <= 0) return below;
-  const has = (g: ChannelGroup): boolean => writes.includes(g);
+  const coat = writes.includes('coat'), fuzz = writes.includes('fuzz'), film = writes.includes('film');
   return {
-    colour: has('colour') ? mix3(below.colour, over.colour, w) : below.colour,
-    metal: has('metal') ? mix(below.metal, over.metal, w) : below.metal,
-    rough: has('rough') ? mix(below.rough, over.rough, w) : below.rough,
-    specular: has('specular') ? mix(below.specular, over.specular, w) : below.specular,
-    height: has('height') ? mix(below.height, over.height, w) : below.height,
-    coat: has('coat') ? mix(below.coat, over.coat, w) : below.coat,
-    coatRough: has('coat') ? mix(below.coatRough, over.coatRough, w) : below.coatRough,
-    fuzz: has('fuzz') ? mix(below.fuzz, over.fuzz, w) : below.fuzz,
-    fuzzColour: has('fuzz') ? mix3(below.fuzzColour, over.fuzzColour, w) : below.fuzzColour,
-    aniso: has('aniso') ? mix(below.aniso, over.aniso, w) : below.aniso,
-    film: has('film') ? mix(below.film, over.film, w) : below.film,
-    filmThickness: has('film') ? mix(below.filmThickness, over.filmThickness, w) : below.filmThickness,
-    emit: has('emit') ? mix3(below.emit, over.emit, w) : below.emit,
+    colour: writes.includes('colour') ? mix3(below.colour, over.colour, w) : below.colour,
+    metal: writes.includes('metal') ? mix(below.metal, over.metal, w) : below.metal,
+    rough: writes.includes('rough') ? mix(below.rough, over.rough, w) : below.rough,
+    specular: writes.includes('specular') ? mix(below.specular, over.specular, w) : below.specular,
+    height: writes.includes('height') ? mix(below.height, over.height, w) : below.height,
+    coat: coat ? mix(below.coat, over.coat, w) : below.coat,
+    coatRough: coat ? mix(below.coatRough, over.coatRough, w) : below.coatRough,
+    fuzz: fuzz ? mix(below.fuzz, over.fuzz, w) : below.fuzz,
+    fuzzColour: fuzz ? mix3(below.fuzzColour, over.fuzzColour, w) : below.fuzzColour,
+    aniso: writes.includes('aniso') ? mix(below.aniso, over.aniso, w) : below.aniso,
+    film: film ? mix(below.film, over.film, w) : below.film,
+    filmThickness: film ? mix(below.filmThickness, over.filmThickness, w) : below.filmThickness,
+    emit: writes.includes('emit') ? mix3(below.emit, over.emit, w) : below.emit,
   };
 }
 
 /** The material at a point: the base surface, then each layer bottom to top. */
 export function materialAt(m: MaterialSpec, p: SamplePoint, tiles: TileSource, noise: NoiseSource): Channels {
   let out = surfaceAt(m.base, p, m.paint, tiles);
-  for (const layer of m.layers.slice(0, MAX_LAYERS)) {
+  const count = Math.min(m.layers.length, MAX_LAYERS);
+  for (let i = 0; i < count; i++) {
+    const layer = m.layers[i]!;
     if (!layer.visible) continue;
     const s = surfaceAt(layer.surface, p, m.paint, tiles);
     out = blendChannels(out, s, layerWeight(layer, s.height, p, m.age, noise), layer.writes);
@@ -481,12 +495,20 @@ export function flatten(
   return { colour, rough, metal };
 }
 
-/** Barycentric weights of the 10 interior points of a sixth grid: where a face is sampled to flatten it. */
+/**
+ * Barycentric weights of the 10 interior points of a sixth grid, the centre first and then spread out, so the first k
+ * of them sample a triangle evenly for any k.
+ */
 const FACE_SAMPLES: readonly (readonly [number, number, number])[] = (() => {
   const out: [number, number, number][] = [];
   for (let i = 1; i <= 4; i++) for (let j = 1; i + j <= 5; j++) out.push([i / 6, j / 6, (6 - i - j) / 6]);
-  return out;
+  const spread = (w: readonly number[]): number => Math.max(...w) - Math.min(...w);
+  return out.sort((p, q) => spread(p) - spread(q));
 })();
+
+/** Square metres a flatten sample stands for: a face gets one sample per 10 x 10 cm, from 1 up to MAX_FACE_SAMPLES. */
+export const FLAT_SAMPLE_AREA = 0.01;
+const MAX_FACE_SAMPLES = 8;
 
 /** The point at barycentric weights w of triangle (a, b, c) of a mask mesh, with every attribute interpolated. */
 export function meshPoint(mesh: MaskMesh, a: number, b: number, c: number, w: readonly [number, number, number]): SamplePoint {
@@ -506,9 +528,12 @@ export function meshPoint(mesh: MaskMesh, a: number, b: number, c: number, w: re
 
 /**
  * Rank 0 for a whole mask mesh (plan 41 section 4.5), as colour (linear RGB), roughness and metal per vertex:
- *  - 'lines' meshes: one flat value per face, the mean of the material at 10 interior points. Every corner of a faceted
- *    part sits on an edge, so per-vertex values would read as all wear; per face, a big panel reads clean and a thin
- *    chamfer reads worn, as a crisp bevel (the stage 0b and 1 look);
+ *  - 'lines' meshes: one flat value per face, a face being the coplanar triangles joined by their edges (a quad's two
+ *    triangles are one face, so no diagonal shows). The value is the mean of the material at points spread over the
+ *    face's triangles in proportion to their area, one per FLAT_SAMPLE_AREA (1 to 8), each inside its triangle. Every
+ *    corner of a faceted part sits on an edge, so per-vertex values would read as all wear; per face, a big panel reads
+ *    clean and a thin chamfer reads worn, as a crisp bevel (the stage 0b and 1 look). The cost follows the surface
+ *    area, not the triangle count: a bolt's facets take one sample each.
  *  - 'curvature' meshes: per vertex.
  */
 export function flattenMesh(
@@ -523,17 +548,75 @@ export function flattenMesh(
     return flatten(m, points, tiles, noise);
   }
   const colour = new Float32Array(count * 3), rough = new Float32Array(count), metal = new Float32Array(count);
-  for (let t = 0; t + 2 < mesh.indices.length; t += 3) {
-    const a = mesh.indices[t]!, b = mesh.indices[t + 1]!, c = mesh.indices[t + 2]!;
-    let r = 0, g = 0, bl = 0, ro = 0, me = 0;
-    for (const w of FACE_SAMPLES) {
-      const ch = materialAt(m, meshPoint(mesh, a, b, c, w), tiles, noise);
-      r += ch.colour[0]; g += ch.colour[1]; bl += ch.colour[2]; ro += ch.rough; me += ch.metal;
+  const P = (i: number): V3 => [mesh.positions[i * 3]!, mesh.positions[i * 3 + 1]!, mesh.positions[i * 3 + 2]!];
+  const T = Math.floor(mesh.indices.length / 3);
+  const area = new Float64Array(T);
+  const normal: V3[] = [];
+  for (let t = 0; t < T; t++) {
+    const a = P(mesh.indices[t * 3]!), b = P(mesh.indices[t * 3 + 1]!), c = P(mesh.indices[t * 3 + 2]!);
+    const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const n: V3 = [u[1]! * v[2]! - u[2]! * v[1]!, u[2]! * v[0]! - u[0]! * v[2]!, u[0]! * v[1]! - u[1]! * v[0]!];
+    const l = Math.hypot(n[0], n[1], n[2]);
+    area[t] = l / 2;
+    normal.push(l > 0 ? [n[0] / l, n[1] / l, n[2] / l] : [0, 0, 0]);
+  }
+  // faces: coplanar triangles that share an edge (positions welded at 0.01 mm)
+  const parent = Array.from({ length: T }, (_, i) => i);
+  const find = (i: number): number => {
+    while (parent[i] !== i) i = parent[i] = parent[parent[i]!]!;
+    return i;
+  };
+  const weld = new Int32Array(count);
+  const ids = new Map<string, number>();
+  for (let i = 0; i < count; i++) {
+    const p = P(i);
+    const k = `${Math.round(p[0] * 1e5)},${Math.round(p[1] * 1e5)},${Math.round(p[2] * 1e5)}`;
+    let id = ids.get(k);
+    if (id === undefined) ids.set(k, (id = ids.size));
+    weld[i] = id;
+  }
+  const W = ids.size;
+  const byEdge = new Map<number, number>();
+  for (let t = 0; t < T; t++) {
+    for (let e = 0; e < 3; e++) {
+      const wa = weld[mesh.indices[t * 3 + e]!]!, wb = weld[mesh.indices[t * 3 + ((e + 1) % 3)]!]!;
+      const k = wa < wb ? wa * W + wb : wb * W + wa;
+      const other = byEdge.get(k);
+      if (other === undefined) byEdge.set(k, t);
+      else {
+        const n = normal[t]!, o = normal[other]!;
+        if (n[0] * o[0] + n[1] * o[1] + n[2] * o[2] > 0.99996) parent[find(t)] = find(other);
+      }
     }
-    const k = 1 / FACE_SAMPLES.length;
-    for (const v of [a, b, c]) {
-      colour[v * 3] = r * k; colour[v * 3 + 1] = g * k; colour[v * 3 + 2] = bl * k;
-      rough[v] = ro * k; metal[v] = me * k;
+  }
+  const faces = new Map<number, number[]>();
+  for (let t = 0; t < T; t++) {
+    const g = find(t);
+    const list = faces.get(g);
+    if (list) list.push(t);
+    else faces.set(g, [t]);
+  }
+  for (const tris of faces.values()) {
+    const total = tris.reduce((s, t) => s + area[t]!, 0);
+    const want = Math.max(1, Math.min(MAX_FACE_SAMPLES, Math.round(total / FLAT_SAMPLE_AREA)));
+    // samples per triangle in proportion to its area (at most 10, the grid's size); the largest gets one at least
+    const per = tris.map((t) => Math.min(FACE_SAMPLES.length, Math.round((want * area[t]!) / (total || 1))));
+    if (!per.some((k) => k > 0)) per[tris.reduce((best, t, i) => (area[t]! > area[tris[best]!]! ? i : best), 0)] = 1;
+    let r = 0, g = 0, bl = 0, ro = 0, me = 0, n = 0;
+    tris.forEach((t, i) => {
+      const a = mesh.indices[t * 3]!, b = mesh.indices[t * 3 + 1]!, c = mesh.indices[t * 3 + 2]!;
+      for (const w of FACE_SAMPLES.slice(0, per[i])) {
+        const ch = materialAt(m, meshPoint(mesh, a, b, c, w), tiles, noise);
+        r += ch.colour[0]; g += ch.colour[1]; bl += ch.colour[2]; ro += ch.rough; me += ch.metal; n += 1;
+      }
+    });
+    const k = 1 / n;
+    for (const t of tris) {
+      for (let e = 0; e < 3; e++) {
+        const v = mesh.indices[t * 3 + e]!;
+        colour[v * 3] = r * k; colour[v * 3 + 1] = g * k; colour[v * 3 + 2] = bl * k;
+        rough[v] = ro * k; metal[v] = me * k;
+      }
     }
   }
   return { colour, rough, metal };

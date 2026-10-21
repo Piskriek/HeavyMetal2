@@ -36,6 +36,17 @@ export interface KitBuildOptions {
   readonly keep?: <T extends { dispose(): void }>(x: T) => T;
   /** A material the record does not hold, by name (a Texture Mill skin, `vault:<preset>`), or null. */
   readonly resolveMaterial?: (name: string) => THREE.Material | null;
+  /**
+   * What a material reads from its geometry (a layered material's edge lines and flattened colours), in two steps around
+   * the part's placement. Placements are rigid (moves, turns, mirrors), so `local` may cache by `key`, which names the
+   * part's own shape (a generator with its sliders, rank, operators and slot; a box's size): twenty identical bolts cost
+   * one. `placed` sees the geometry where it stands (its height above the foot, its facing). Each returns the geometry to
+   * go on with. Absent: geometry as built.
+   */
+  readonly layering?: {
+    readonly local: (g: THREE.BufferGeometry, material: THREE.Material, key: string) => THREE.BufferGeometry;
+    readonly placed: (g: THREE.BufferGeometry, material: THREE.Material) => THREE.BufferGeometry;
+  };
 }
 
 /**
@@ -143,11 +154,13 @@ export function buildKitPreset(kit: Kit, preset: string, o: KitBuildOptions): Ki
     const p = placed[pid] as PlacedPart;
     const src = p.source;
     m4.fromArray(p.matrix as number[]);
-    const finish = (g: THREE.BufferGeometry): THREE.BufferGeometry => {
-      g.applyMatrix4(m4);
-      if (p.mirrored) flipWinding(g);
-      tagPart(g, pid);
-      return g;
+    const finish = (g: THREE.BufferGeometry, material: THREE.Material, key: string): THREE.BufferGeometry => {
+      const local = o.layering ? o.layering.local(g, material, key) : g;
+      local.applyMatrix4(m4);
+      if (p.mirrored) flipWinding(local);
+      const ready = o.layering ? o.layering.placed(local, material) : local;
+      tagPart(ready, pid);
+      return ready;
     };
     if (src.kind === 'box') {
       const material = materialOf(p.material);
@@ -156,7 +169,7 @@ export function buildKitPreset(kit: Kit, preset: string, o: KitBuildOptions): Ki
       const g = new THREE.BoxGeometry(x, y, z);
       metricBoxUvs(g, x, y, z);
       g.translate(0, y / 2, 0);
-      add(material, p.rank, 2, p.material, finish(g));
+      add(material, p.rank, 2, p.material, finish(g, material, `box:${x},${y},${z}`));
     } else if (src.kind === 'param') {
       // one variant per rank this part can show at: the generator's own detail follows the cap
       for (let gr = p.rank; gr <= 2; gr++) {
@@ -172,7 +185,8 @@ export function buildKitPreset(kit: Kit, preset: string, o: KitBuildOptions): Ki
           g.setAttribute('normal', new THREE.BufferAttribute(md.normals.slice(), 3));
           g.setAttribute('uv', new THREE.BufferAttribute(md.uvs.slice(), 2));
           g.setIndex(new THREE.BufferAttribute(md.indices.slice(slot.start, slot.start + slot.count), 1));
-          add(material, gr, gr === 2 ? 2 : gr, matName, finish(g));
+          const key = `param:${src.gen}|${JSON.stringify(src.params)}|${JSON.stringify(src.ops ?? [])}|${gr}|${slot.name}`;
+          add(material, gr, gr === 2 ? 2 : gr, matName, finish(g, material, key));
         }
       }
     } else {
@@ -187,7 +201,7 @@ export function buildKitPreset(kit: Kit, preset: string, o: KitBuildOptions): Ki
         const g = mesh.geometry.clone();
         toFloat(g);
         g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(rootInv, mesh.matrixWorld));
-        add(mesh.material, p.rank, 2, `gen:${asset}:${mesh.material.uuid}`, finish(g));
+        add(mesh.material, p.rank, 2, `gen:${asset}:${mesh.material.uuid}`, finish(g, mesh.material, `gen:${asset}:${mesh.uuid}`));
       });
     }
   }

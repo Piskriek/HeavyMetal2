@@ -189,3 +189,24 @@ test('rank 0 flattens a faceted part per face: the big faces stay clean, the thi
   const t0 = mesh.indices[0]!, t1 = mesh.indices[1]!;
   close(f.rough[t0]!, f.rough[t1]!, 0);
 });
+
+test('rank 0 treats a quad as one face: both triangles flatten to the same value, so no diagonal shows', async () => {
+  const { flattenMesh } = await import('../src/index');
+  // a 1 m x 0.1 m face, open on all sides: its two triangles see different edges up close
+  const mesh = edgeLines(quads([[[0, 0, 0.1], [1, 0, 0.1], [1, 0, 0], [0, 0, 0]]]));
+  const base = { blend: 'normal', opacity: 1, invert: false } as const;
+  const paint = { name: 'paint', colour: '#3c9a5a', metal: 0, rough: 0.5, specular: 0.5 };
+  const bare = { name: 'bare', colour: '#c0c0c0', metal: 1, rough: 0.3, specular: 0.5 };
+  const m = {
+    name: 'worn', base: paint, paint: ['#000000', '#000000'] as [string, string], age: 1,
+    layers: [{
+      name: 'edge wear', surface: bare, opacity: 1, writes: ['colour', 'metal'] as const, heightBlend: 0, weathering: false, visible: true,
+      mask: { name: 'edges', inputs: [{ ...base, kind: 'edge', width: 0.04 } as const], balance: 0, contrast: 0, invert: false },
+    }],
+  };
+  const f = flattenMesh(m, mesh, { sample: () => ({ grey: 0.5, height: 0.5, rough: 0.5 }) }, { sample: () => 0.5 });
+  const first = mesh.indices[0]!, second = mesh.indices[3]!;
+  assert.equal(f.metal[first], f.metal[second]);
+  assert.equal(f.colour[first * 3], f.colour[second * 3]);
+  assert.ok(f.metal[first]! > 0 && f.metal[first]! < 1, `a narrow face is part worn: ${f.metal[first]}`);
+});

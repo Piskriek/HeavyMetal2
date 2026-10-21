@@ -111,20 +111,19 @@ export function maskAttributes(m: MaskMeshInput, o: MaskMeshOptions = {}): MaskM
 
 // ------------------------------------------------------------------ edge lines
 
-interface Tri {
-  readonly v: readonly [V3, V3, V3];
-  /** Corner indices into the input, for its normals and UVs. */
-  readonly src: readonly [number, number, number];
-  readonly n: V3;
-  readonly slot: number;
-}
-
 interface SharpEdge {
   readonly a: V3;
   readonly b: V3;
   /** The owning triangle's in-plane unit direction from the edge into the triangle. */
   readonly inward: V3;
   readonly concave: boolean;
+}
+
+/** A sharp edge with the triangle that owns it and its box grown by the band. */
+interface Sharp extends SharpEdge {
+  readonly owner: number;
+  readonly lo: V3;
+  readonly hi: V3;
 }
 
 /**
@@ -135,116 +134,169 @@ interface SharpEdge {
 export function edgeLines(m: MaskMeshInput, o: MaskMeshOptions = {}): MaskMesh {
   const band = o.band ?? EDGE_BAND;
   const cosSharp = Math.cos(((o.sharpDeg ?? 30) * Math.PI) / 180);
-  const P = (i: number): V3 => [m.positions[i * 3]!, m.positions[i * 3 + 1]!, m.positions[i * 3 + 2]!];
   const slots = slotsOf(m);
-
-  const tris: Tri[] = [];
+  const X = m.positions;
+  // triangles: their corners, slot and unit face normal (zero-area ones draw nothing and are dropped)
+  const triSrc: number[] = [], triSlot: number[] = [], triN: number[] = [];
   slots.forEach((sl, si) => {
     for (let i = sl.start; i + 2 < sl.start + sl.count; i += 3) {
-      const src: [number, number, number] = [m.indices[i]!, m.indices[i + 1]!, m.indices[i + 2]!];
-      const v: [V3, V3, V3] = [P(src[0]), P(src[1]), P(src[2])];
-      const n = unit(cross(sub(v[1], v[0]), sub(v[2], v[0])));
-      if (len(n) === 0) continue; // no area: draws nothing
-      tris.push({ v, src, n, slot: si });
+      const a = m.indices[i]!, b = m.indices[i + 1]!, c = m.indices[i + 2]!;
+      const ux = X[b * 3]! - X[a * 3]!, uy = X[b * 3 + 1]! - X[a * 3 + 1]!, uz = X[b * 3 + 2]! - X[a * 3 + 2]!;
+      const vx = X[c * 3]! - X[a * 3]!, vy = X[c * 3 + 1]! - X[a * 3 + 1]!, vz = X[c * 3 + 2]! - X[a * 3 + 2]!;
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      const l = Math.hypot(nx, ny, nz);
+      if (!(l > 1e-12)) continue;
+      triSrc.push(a, b, c);
+      triSlot.push(si);
+      triN.push(nx / l, ny / l, nz / l);
     }
   });
+  const T = triSlot.length;
 
-  // welded edges: which triangles share each
-  const key = (p: V3): string => `${Math.round(p[0] * 1e5)},${Math.round(p[1] * 1e5)},${Math.round(p[2] * 1e5)}`;
-  const edgeKey = (a: V3, b: V3): string => {
-    const ka = key(a), kb = key(b);
-    return ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
+  // welded vertices (positions at 0.01 mm), each keyed once, and the triangles around each welded edge
+  const weld = new Int32Array(X.length / 3);
+  const ids = new Map<string, number>();
+  for (let i = 0; i < weld.length; i++) {
+    const k = `${Math.round(X[i * 3]! * 1e5)},${Math.round(X[i * 3 + 1]! * 1e5)},${Math.round(X[i * 3 + 2]! * 1e5)}`;
+    let id = ids.get(k);
+    if (id === undefined) ids.set(k, (id = ids.size));
+    weld[i] = id;
+  }
+  const W = ids.size;
+  const edgeKey = (a: number, b: number): number => {
+    const wa = weld[a]!, wb = weld[b]!;
+    return wa < wb ? wa * W + wb : wb * W + wa;
   };
-  const byEdge = new Map<string, number[]>();
-  tris.forEach((t, ti) => {
+  const byEdge = new Map<number, number[]>();
+  for (let t = 0; t < T; t++) {
     for (let e = 0; e < 3; e++) {
-      const k = edgeKey(t.v[e]!, t.v[(e + 1) % 3]!);
+      const k = edgeKey(triSrc[t * 3 + e]!, triSrc[t * 3 + ((e + 1) % 3)]!);
       const list = byEdge.get(k);
-      if (list) list.push(ti);
-      else byEdge.set(k, [ti]);
+      if (list) list.push(t);
+      else byEdge.set(k, [t]);
     }
-  });
+  }
 
-  // coplanar groups (union-find over shared edges with matching normals), and each triangle's sharp edges
-  const parent = tris.map((_, i) => i);
+  // coplanar groups (union-find over shared edges with matching normals), and the sharp edges with their owners
+  const parent = new Int32Array(T);
+  for (let t = 0; t < T; t++) parent[t] = t;
   const find = (i: number): number => {
     while (parent[i] !== i) i = parent[i] = parent[parent[i]!]!;
     return i;
   };
   const COPLANAR = Math.cos((0.5 * Math.PI) / 180);
-  const own: SharpEdge[][] = tris.map(() => []);
-  tris.forEach((t, ti) => {
+  const ndot = (t: number, u: number): number =>
+    triN[t * 3]! * triN[u * 3]! + triN[t * 3 + 1]! * triN[u * 3 + 1]! + triN[t * 3 + 2]! * triN[u * 3 + 2]!;
+  const sharps: Sharp[] = [];
+  const own: number[][] = Array.from({ length: T }, () => []);
+  for (let t = 0; t < T; t++) {
+    const n: V3 = [triN[t * 3]!, triN[t * 3 + 1]!, triN[t * 3 + 2]!];
     for (let e = 0; e < 3; e++) {
-      const a = t.v[e]!, b = t.v[(e + 1) % 3]!, opposite = t.v[(e + 2) % 3]!;
-      const others = (byEdge.get(edgeKey(a, b)) ?? []).filter((x) => x !== ti);
-      let inward = unit(cross(t.n, sub(b, a)));
-      if (dot(inward, sub(opposite, a)) < 0) inward = scale(inward, -1);
-      if (others.length === 0) {
-        own[ti]!.push({ a, b, inward, concave: false }); // an open border wears like an edge
-        continue;
-      }
-      let sharp = false, concave = false;
-      for (const x of others) {
-        const u = tris[x]!;
-        if (dot(t.n, u.n) >= COPLANAR) parent[find(ti)] = find(x);
-        if (dot(t.n, u.n) >= cosSharp) continue;
+      const ia = triSrc[t * 3 + e]!, ib = triSrc[t * 3 + ((e + 1) % 3)]!, io = triSrc[t * 3 + ((e + 2) % 3)]!;
+      const a: V3 = [X[ia * 3]!, X[ia * 3 + 1]!, X[ia * 3 + 2]!], b: V3 = [X[ib * 3]!, X[ib * 3 + 1]!, X[ib * 3 + 2]!];
+      const others = byEdge.get(edgeKey(ia, ib))!;
+      let sharp = others.length === 1, concave = false; // an open border wears like an edge
+      for (const u of others) {
+        if (u === t) continue;
+        const d = ndot(t, u);
+        if (d >= COPLANAR) parent[find(t)] = find(u);
+        if (d >= cosSharp) continue;
         sharp = true;
         // the neighbour's far corner in front of this face: the faces fold up into a valley
-        const far = u.v.find((q) => key(q) !== key(a) && key(q) !== key(b)) ?? u.v[0];
-        if (dot(t.n, sub(far, a)) > 1e-7) concave = true;
+        let far = triSrc[u * 3]!;
+        for (let k = 0; k < 3; k++) {
+          const q = triSrc[u * 3 + k]!;
+          if (weld[q] !== weld[ia] && weld[q] !== weld[ib]) far = q;
+        }
+        if (n[0] * (X[far * 3]! - a[0]) + n[1] * (X[far * 3 + 1]! - a[1]) + n[2] * (X[far * 3 + 2]! - a[2]) > 1e-7) concave = true;
       }
-      if (sharp) own[ti]!.push({ a, b, inward, concave });
+      if (!sharp) continue;
+      let inward = unit(cross(n, sub(b, a)));
+      if (dot(inward, [X[io * 3]! - a[0], X[io * 3 + 1]! - a[1], X[io * 3 + 2]! - a[2]]) < 0) inward = scale(inward, -1);
+      own[t]!.push(sharps.length);
+      sharps.push({
+        a, b, inward, concave, owner: t,
+        lo: [Math.min(a[0], b[0]) - band, Math.min(a[1], b[1]) - band, Math.min(a[2], b[2]) - band],
+        hi: [Math.max(a[0], b[0]) + band, Math.max(a[1], b[1]) + band, Math.max(a[2], b[2]) + band],
+      });
     }
-  });
-  const groupEdges = new Map<number, SharpEdge[]>();
-  tris.forEach((_, ti) => {
-    const g = find(ti);
+  }
+  const groupEdges = new Map<number, number[]>();
+  for (let t = 0; t < T; t++) {
+    if (own[t]!.length === 0) continue;
+    const g = find(t);
     const list = groupEdges.get(g);
-    if (list) list.push(...own[ti]!);
-    else groupEdges.set(g, [...own[ti]!]);
-  });
+    if (list) list.push(...own[t]!);
+    else groupEdges.set(g, [...own[t]!]);
+  }
 
-  const signed = (q: V3, e: SharpEdge): number => dot(sub(q, e.a), e.inward);
-  /** How near a triangle comes to an edge segment: its corners, edge midpoints and centre. */
-  const reach = (t: Tri, e: SharpEdge): number => {
-    const [A, B, C] = t.v;
-    const probes: V3[] = [A, B, C, scale(add(A, B), 0.5), scale(add(B, C), 0.5), scale(add(C, A), 0.5), scale(add(add(A, B), C), 1 / 3)];
-    return Math.min(...probes.map((q) => segmentDistance(q, e.a, e.b)));
+  /** The distance from (px, py, pz) to an edge segment, without allocating. */
+  const segDist = (px: number, py: number, pz: number, e: SharpEdge): number => {
+    const abx = e.b[0] - e.a[0], aby = e.b[1] - e.a[1], abz = e.b[2] - e.a[2];
+    const l2 = abx * abx + aby * aby + abz * abz;
+    const s = l2 > 1e-18 ? Math.max(0, Math.min(1, ((px - e.a[0]) * abx + (py - e.a[1]) * aby + (pz - e.a[2]) * abz) / l2)) : 0;
+    return Math.hypot(px - e.a[0] - abx * s, py - e.a[1] - aby * s, pz - e.a[2] - abz * s);
   };
+  const signed = (px: number, py: number, pz: number, e: SharpEdge): number =>
+    (px - e.a[0]) * e.inward[0] + (py - e.a[1]) * e.inward[1] + (pz - e.a[2]) * e.inward[2];
 
-  const n = tris.length * 3;
+  const n = T * 3;
   const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2);
   const edge = new Float32Array(n * EDGE_LINES).fill(FAR), cavity = new Float32Array(n * EDGE_LINES).fill(FAR);
   const idxBySlot: number[][] = slots.map(() => []);
-  let vi = 0;
-  tris.forEach((t, ti) => {
-    const mine = own[ti]!;
-    const neighbours = (groupEdges.get(find(ti)) ?? []).filter((e) => {
-      if (mine.includes(e)) return false;
-      // a line through the triangle would draw a false stripe across it
-      if (t.v.some((q) => signed(q, e) < -1e-6)) return false;
-      // past the edge's ends the line is not the edge: keep it only while the triangle's centre is beside the edge
-      const dir = unit(sub(e.b, e.a));
-      const c = scale(add(add(t.v[0], t.v[1]), t.v[2]), 1 / 3);
-      const along = dot(sub(c, e.a), dir);
-      if (along < -band || along > len(sub(e.b, e.a)) + band) return false;
-      return reach(t, e) < band;
-    });
-    const ranked = [...mine.map((e) => ({ e, d: -1 })), ...neighbours.map((e) => ({ e, d: reach(t, e) })).sort((x, y) => x.d - y.d)];
-    const convex = ranked.filter((r) => !r.e.concave).slice(0, EDGE_LINES).map((r) => r.e);
-    const concave = ranked.filter((r) => r.e.concave).slice(0, EDGE_LINES).map((r) => r.e);
-    for (let c = 0; c < 3; c++) {
-      const q = t.v[c]!, s = t.src[c]!;
-      pos.set(q, vi * 3);
-      const sn: V3 = m.normals ? [m.normals[s * 3]!, m.normals[s * 3 + 1]!, m.normals[s * 3 + 2]!] : t.n;
-      nor.set(sn, vi * 3);
-      if (m.uvs) uv.set([m.uvs[s * 2]!, m.uvs[s * 2 + 1]!], vi * 2);
-      convex.forEach((e, k) => { edge[vi * EDGE_LINES + k] = Math.max(0, signed(q, e)); });
-      concave.forEach((e, k) => { cavity[vi * EDGE_LINES + k] = Math.max(0, signed(q, e)); });
-      idxBySlot[t.slot]!.push(vi);
-      vi += 1;
+  // probes: the corners, the edge midpoints and the centre
+  const cx = new Float64Array(7), cy = new Float64Array(7), cz = new Float64Array(7);
+  for (let t = 0; t < T; t++) {
+    for (let k = 0; k < 3; k++) {
+      const q = triSrc[t * 3 + k]!, r = triSrc[t * 3 + ((k + 1) % 3)]!;
+      cx[k] = X[q * 3]!; cy[k] = X[q * 3 + 1]!; cz[k] = X[q * 3 + 2]!;
+      cx[k + 3] = (X[q * 3]! + X[r * 3]!) / 2; cy[k + 3] = (X[q * 3 + 1]! + X[r * 3 + 1]!) / 2; cz[k + 3] = (X[q * 3 + 2]! + X[r * 3 + 2]!) / 2;
     }
-  });
+    cx[6] = (cx[0]! + cx[1]! + cx[2]!) / 3; cy[6] = (cy[0]! + cy[1]! + cy[2]!) / 3; cz[6] = (cz[0]! + cz[1]! + cz[2]!) / 3;
+    const bx0 = Math.min(cx[0]!, cx[1]!, cx[2]!), bx1 = Math.max(cx[0]!, cx[1]!, cx[2]!);
+    const by0 = Math.min(cy[0]!, cy[1]!, cy[2]!), by1 = Math.max(cy[0]!, cy[1]!, cy[2]!);
+    const bz0 = Math.min(cz[0]!, cz[1]!, cz[2]!), bz1 = Math.max(cz[0]!, cz[1]!, cz[2]!);
+    const reach = (e: SharpEdge): number => {
+      let d = Infinity;
+      for (let k = 0; k < 7; k++) d = Math.min(d, segDist(cx[k]!, cy[k]!, cz[k]!, e));
+      return d;
+    };
+    const near: { readonly e: Sharp; readonly d: number }[] = [];
+    for (const i of groupEdges.get(find(t)) ?? []) {
+      const e = sharps[i]!;
+      if (e.owner === t) continue;
+      // boxes first: most of a group's edges are nowhere near this triangle
+      if (bx1 < e.lo[0] || bx0 > e.hi[0] || by1 < e.lo[1] || by0 > e.hi[1] || bz1 < e.lo[2] || bz0 > e.hi[2]) continue;
+      // a line through the triangle would draw a false stripe across it
+      if (signed(cx[0]!, cy[0]!, cz[0]!, e) < -1e-6 || signed(cx[1]!, cy[1]!, cz[1]!, e) < -1e-6 || signed(cx[2]!, cy[2]!, cz[2]!, e) < -1e-6) continue;
+      // past the edge's ends the line is not the edge: keep it only while the triangle's centre is beside the edge
+      const dx = e.b[0] - e.a[0], dy = e.b[1] - e.a[1], dz = e.b[2] - e.a[2];
+      const L = Math.hypot(dx, dy, dz) || 1;
+      const along = ((cx[6]! - e.a[0]) * dx + (cy[6]! - e.a[1]) * dy + (cz[6]! - e.a[2]) * dz) / L;
+      if (along < -band || along > L + band) continue;
+      const d = reach(e);
+      if (d < band) near.push({ e, d });
+    }
+    near.sort((x, y) => x.d - y.d);
+    const convex: Sharp[] = [], concave: Sharp[] = [];
+    for (const e of [...own[t]!.map((i) => sharps[i]!), ...near.map((r) => r.e)]) {
+      if (e.concave) { if (concave.length < EDGE_LINES) concave.push(e); }
+      else if (convex.length < EDGE_LINES) convex.push(e);
+    }
+    for (let c = 0; c < 3; c++) {
+      const s = triSrc[t * 3 + c]!, vi = t * 3 + c;
+      const px = X[s * 3]!, py = X[s * 3 + 1]!, pz = X[s * 3 + 2]!;
+      pos[vi * 3] = px; pos[vi * 3 + 1] = py; pos[vi * 3 + 2] = pz;
+      const N = m.normals ?? null;
+      nor[vi * 3] = N ? N[s * 3]! : triN[t * 3]!;
+      nor[vi * 3 + 1] = N ? N[s * 3 + 1]! : triN[t * 3 + 1]!;
+      nor[vi * 3 + 2] = N ? N[s * 3 + 2]! : triN[t * 3 + 2]!;
+      if (m.uvs) { uv[vi * 2] = m.uvs[s * 2]!; uv[vi * 2 + 1] = m.uvs[s * 2 + 1]!; }
+      for (let k = 0; k < convex.length; k++) edge[vi * EDGE_LINES + k] = Math.max(0, signed(px, py, pz, convex[k]!));
+      for (let k = 0; k < concave.length; k++) cavity[vi * EDGE_LINES + k] = Math.max(0, signed(px, py, pz, concave[k]!));
+      idxBySlot[triSlot[t]!]!.push(vi);
+    }
+  }
 
   const indices: number[] = [];
   const outSlots = slots.map((sl, si) => {

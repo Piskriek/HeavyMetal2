@@ -22,6 +22,13 @@ The first review under RULES 8a ("check each other, shortcuts are unacceptable")
 7. The palette's band arrays inferred their ids as plain strings (strict typing); `Object.freeze<TrimBandSpec[]>(...)` fixes it. Please keep that form.
 8. A test should check what the game will do (every material resolves; the kit drawn beside the machine it replaces), not only the data's shape.
 
+## v2 (argo-ticket40-v2-bundle.json, the same day)
+Argo rebuilt the mill from the four-angle reference sheet before this note reached him. **The design is now right:** a compact housing on a plinth with tread grilles, corner pilasters, slatted grilles front and back, a side stack, a left service door, a collar and the top hopper; no cage (`shots/40/mill-v2-compare-standin.png`, the body in stand-in paints). 27 tests pass; validate() finds nothing. What is still open:
+- **Item 1 stands:** six parts (the carcass, the three headers, the service door plate, the top hopper) wear `vault:painted-iron`, which does not exist, so the body still does not draw (`shots/40/mill-v2-compare.png`). `partgen` and the palette are unchanged from v1.
+- **Item 3 stands:** near-black throughout; today's mill and the concept sheet are khaki and grey with a dark hopper.
+- **Items 4 to 6 stand:** the hopper, chute and wheel generators are unchanged, so the mill's top hopper is still a flat tray, not the ore funnel today's mill has.
+- `HOPPER_Y` is declared and never used (strict typecheck).
+
 ## How the review was done (so it can be repeated)
 - `node scripts/parts-reference-sheet.mjs [out] [dev server] [ids]`: every generator at ranks 0, 1, 2 and from behind, each slot in its own colour.
 - `node scripts/kit-compare-sheet.mjs <kind> <kit module> <export> <preset> [out] [dev server] [standins]`: the kit beside today's machine from four sides, plus the materials that do not resolve and validate()'s issues.

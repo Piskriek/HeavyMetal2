@@ -49,6 +49,8 @@ import {
 } from '@hm/cartlab';
 import { BenchParts } from './bench-parts';
 import { BenchSpecies } from './bench-species';
+import { BenchLights } from './bench-lights';
+import { isLampPart, lightOverride } from './light-presets';
 import { rifleLook } from './rifle-look';
 import { MAX_TREE_VARIANTS, treeVariantKey } from './plot-biome-view';
 import { setKitFrames } from './plot-kits';
@@ -598,7 +600,7 @@ export function PlayScreen(props: {
   const [labPanel, setLabPanel] = useState<LabMachineKind | null>(null);
   const [benchBlank, setBenchBlank] = useState<string | null>(null);
   /** The preset bench's page: authored terraforming presets, or Shape Press parts (TICKET-32). */
-  const [benchTab, setBenchTab] = useState<'presets' | 'parts' | 'species'>('presets');
+  const [benchTab, setBenchTab] = useState<'presets' | 'parts' | 'species' | 'lights'>('presets');
   const [benchPreset, setBenchPreset] = useState<string | null>(null);
   const [combineIds, setCombineIds] = useState<readonly string[]>([]);
   /** State of visiting another player's plot via code. */
@@ -955,6 +957,8 @@ useEffect(() => {
   const beamPortRef = useRef<{ readonly cartridge: Cartridge; readonly preset: string; readonly name: string; readonly colour: string; readonly part?: PartSpec; readonly species?: SpeciesSpec; readonly light?: LightSpec } | null>(null);
   /** A part shot in progress: when the left button went down and whether Shift was held (tap = one part, hold or Shift = all of that kind). */
   const partShotRef = useRef<{ readonly t0: number; readonly shift: boolean } | null>(null);
+  /** A light cartridge's shot at a lamp (plan 39, Lx), decided on release like a part shot. */
+  const lightShotRef = useRef<{ readonly t0: number; readonly shift: boolean } | null>(null);
   /** A species cartridge's shot at a tree (plan 39, Aq), decided on release like a part shot. */
   const speciesShotRef = useRef<{ readonly t0: number; readonly shift: boolean } | null>(null);
   /** A material cartridge's shot at a machine part (plan 39 step 2), decided on release like a part shot. */
@@ -1630,6 +1634,39 @@ useEffect(() => {
   };
   const applySpeciesShotRef = useRef<(broadcast: boolean) => number>(() => 0);
   applySpeciesShotRef.current = applySpeciesShot;
+  /**
+   * The beam's Apply with a light cartridge (plan 39, Lx): a tap sets the lamp it is fired at to the light; a hold or
+   * Shift every lamp on that machine. Like for like: it fits lamps only. Returns how many lamps changed.
+   */
+  const applyLightShot = (broadcast: boolean): number => {
+    const scene = sceneRef.current;
+    const light = beamPortRef.current?.light;
+    if (!scene || !light) return 0;
+    const hit = scene.aimKitPart(BEAM_STROKE_RANGE);
+    if (!hit) {
+      say('No lamp in the beam', 'Aim at a machine\'s lamp.');
+      return 0;
+    }
+    const placed = scene.kitPlaced(hit.kit);
+    const target = placed.find((p) => p.path === hit.path);
+    if (!target || !isLampPart(target)) {
+      say('That is not a lamp', 'A light cartridge sets lamps: the small glowing lenses on a machine.');
+      return 0;
+    }
+    const lamps = broadcast ? placed.filter(isLampPart) : [target];
+    let next = propsRef.current;
+    for (const p of lamps) {
+      const ov = lightOverride(light, p, next.kits?.[hit.kit]?.[p.path]);
+      if (ov) next = withKitOverride(next, hit.kit, [p.path], ov);
+    }
+    savePropsSave(next);
+    scene.setKitOverrides(hit.kit, next.kits?.[hit.kit] ?? {});
+    say(lamps.length === 1 ? `Set: ${light.name}` : `Set ${lamps.length} lamps: ${light.name}`,
+      broadcast ? 'Every lamp on the machine changed.' : 'Hold the trigger, or Shift, to set every lamp on the machine.');
+    return lamps.length;
+  };
+  const applyLightShotRef = useRef<(broadcast: boolean) => number>(() => 0);
+  applyLightShotRef.current = applyLightShot;
   /** Whether the base's stores (the pack and the linked bins) hold a part's cost: a dry run of the base's `pay` command. */
   const partStockCheck = (spec: PartSpec): { readonly ok: boolean; readonly why: string } => {
     const at = sceneRef.current?.debug.position() ?? { x: 0, z: 0 };
@@ -2105,6 +2142,11 @@ useEffect(() => {
             partShotRef.current = { t0: performance.now(), shift: e.shiftKey };
             return;
           }
+          // A light cartridge in Apply sets the lamp it is fired at (decided on release: a tap one, a hold every lamp on the machine)
+          if (beamHeldRef.current && beamModeRef.current === 'apply' && beamPortRef.current?.light) {
+            lightShotRef.current = { t0: performance.now(), shift: e.shiftKey };
+            return;
+          }
           // A species cartridge in Apply regrows the tree it is fired at (decided on release: a tap one, a hold its kind nearby)
           if (beamHeldRef.current && beamModeRef.current === 'apply' && beamPortRef.current?.species) {
             speciesShotRef.current = { t0: performance.now(), shift: e.shiftKey };
@@ -2161,6 +2203,11 @@ useEffect(() => {
         if (tree) {
           speciesShotRef.current = null;
           applySpeciesShotRef.current(tree.shift || performance.now() - tree.t0 >= 450);
+        }
+        const lamp = lightShotRef.current;
+        if (lamp) {
+          lightShotRef.current = null;
+          applyLightShotRef.current(lamp.shift || performance.now() - lamp.t0 >= 450);
         }
       }
     };
@@ -4024,6 +4071,8 @@ useEffect(() => {
       /** The tree the view is aimed at (plan 39, Aq), and the species shot as a tap or a hold. */
       aimTree: () => sceneRef.current?.aimTree(BEAM_STROKE_RANGE) ?? null,
       applySpecies: (broadcast: boolean): number => applySpeciesShotRef.current(broadcast),
+      /** The light shot as a tap or a hold (plan 39, Lx). */
+      applyLight: (broadcast: boolean): number => applyLightShotRef.current(broadcast),
       treeOverrides: () => propsRef.current.trees ?? {},
       /** Replaces the regrown trees (saved and shown), as the props save holds them. */
       setTreeOverrides: (trees: Readonly<Record<string, TreePreset>>): void => {
@@ -4778,11 +4827,14 @@ useEffect(() => {
                     <button className={benchTab === 'presets' ? 'on' : ''} aria-pressed={benchTab === 'presets'} onClick={() => setBenchTab('presets')} data-testid="bench-tab-presets">Materials</button>
                     <button className={benchTab === 'parts' ? 'on' : ''} aria-pressed={benchTab === 'parts'} onClick={() => setBenchTab('parts')} data-testid="bench-tab-parts">Parts</button>
                     <button className={benchTab === 'species' ? 'on' : ''} aria-pressed={benchTab === 'species'} onClick={() => setBenchTab('species')} data-testid="bench-tab-species">Species</button>
+                    <button className={benchTab === 'lights' ? 'on' : ''} aria-pressed={benchTab === 'lights'} onClick={() => setBenchTab('lights')} data-testid="bench-tab-lights">Lights</button>
                   </div>
                   <p>{benchTab === 'parts'
                     ? 'Prints a Shape Press part onto a blank cartridge. Load it in the beam rifle and fire Apply at a part: a tap changes that part, a hold or Shift changes every part of its kind.'
                     : benchTab === 'species'
                       ? 'Prints a Water Maker species onto a blank cartridge. Load it in the beam rifle and fire Apply at a tree on the plot: a tap regrows that tree, a hold or Shift every tree of its kind nearby.'
+                      : benchTab === 'lights'
+                        ? 'Prints a Light Projector light onto a blank cartridge. Load it in the beam rifle and fire Apply at a machine lamp: a tap sets that lamp, a hold or Shift every lamp on the machine.'
                       : 'Writes an authored terraforming material onto a blank cartridge.'}</p>
                   <div className="play-carts">
                     <h4>1. Pick a blank ({blanks.length} available)</h4>
@@ -4799,7 +4851,21 @@ useEffect(() => {
                     </div>
                     {blanks.length === 0 ? <p className="play-why">No blanks on rack. Make a blank at the rack first.</p> : null}
                   </div>
-                  {benchTab === 'species' ? (
+                  {benchTab === 'lights' ? (
+                    <BenchLights
+                      check={(spec) => {
+                        if (!activeBlank) return { ok: false, why: 'No blanks on the rack. Make a blank at the rack first.' };
+                        return canWritePrint(labRef.current, labEnv, activeBlank, { light: spec });
+                      }}
+                      onPrint={(spec: LightSpec) => {
+                        if (!activeBlank) return;
+                        const next = startPrintWrite(labRef.current, labEnv, activeBlank, { light: spec });
+                        labRef.current = next;
+                        commit(withLab(stateRef.current, next));
+                        say('Printing started', `The bench writes ${spec.name} onto the cartridge while powered.`);
+                      }}
+                    />
+                  ) : benchTab === 'species' ? (
                     <BenchSpecies
                       check={(spec) => {
                         if (!activeBlank) return { ok: false, why: 'No blanks on the rack. Make a blank at the rack first.' };

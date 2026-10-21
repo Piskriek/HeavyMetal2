@@ -17,6 +17,8 @@ const CAN_X = 0.58;
 const ROW_Z = 0.29;
 const CAP_H = 0.06;
 const INSULATOR_H = 0.09;
+/** The charge lamp: 5 cm wide, 3.5 cm tall, 1.2 cm deep. */
+const LAMP = [0.05, 0.035, 0.012] as const;
 const CAN_TOP = SKID_H + CAN_BOUNDS.max[1];
 const BAR_Y = CAN_TOP + CAP_H + INSULATOR_H;
 
@@ -30,7 +32,14 @@ export const CAPACITOR_BANK_KIT: Kit = {
     },
     skid: { source: { kind: 'box', size: [2.0, SKID_H, 1.12] }, material: 'darkSteel', rank: 0 },
     'hazard-edge': { source: { kind: 'box', size: [1.98, 0.098, 0.02] }, material: 'hazard', rank: 1 },
-    'terminal-cap': { source: { kind: 'box', size: [0.2, CAP_H, 0.2] }, material: 'darkSteel', rank: 1, sockets: { stud: { at: [0, CAP_H, 0] } } },
+    'terminal-cap': {
+      source: { kind: 'box', size: [0.2, CAP_H, 0.2] }, material: 'darkSteel', rank: 1,
+      // the stud on top; the charge lamp flush on the face toward the room (the lab stands the bank with its -z side to
+      // the room, its +z side to the wall); a box's origin is its base centre
+      sockets: { stud: { at: [0, CAP_H, 0] }, face: { at: [0, (CAP_H - LAMP[1]) / 2, -(0.1 + LAMP[2] / 2)] } },
+    },
+    // a square charge-indicator lamp on each cell's cap: a light cartridge (plan 39, Lx) sets its colour and pattern
+    'charge-lamp': { source: { kind: 'box', size: [LAMP[0], LAMP[1], LAMP[2]] }, material: 'lamp', rank: 1 },
     insulator: { source: { kind: 'box', size: [0.075, INSULATOR_H, 0.075] }, material: 'gunmetal', rank: 1 },
     'bus-bar': { source: { kind: 'box', size: [1.3, 0.055, 0.055] }, material: 'copper', rank: 1 },
     'lifting-eye': { source: { kind: 'box', size: [0.07, 0.07, 0.016] }, material: 'gunmetal', rank: 2 },
@@ -43,6 +52,7 @@ export const CAPACITOR_BANK_KIT: Kit = {
         { ref: 'capacitor-can', key: 'can' },
         { ref: 'terminal-cap', key: 'cap', on: { child: 0, socket: 'top' } },
         { ref: 'insulator', key: 'insulator', on: { child: 1, socket: 'stud' } },
+        { ref: 'charge-lamp', key: 'lamp', on: { child: 1, socket: 'face' } },
       ],
     },
     'capacitor-bank': {

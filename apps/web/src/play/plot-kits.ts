@@ -19,6 +19,7 @@ import { PRESS_FRAME_KIT } from './kit-press-frame';
 import { WATERMAKER_FRAME_KIT } from './kit-watermaker-frame';
 import { PART_SWATCHES } from './part-swatches';
 import { vaultSkin } from './vault-skin';
+import { lightMaterial } from './light-material';
 
 /** The heavy machines built from a kit, and the preset that is the whole machine. */
 export const HEAVY_KITS: Partial<Record<MachineKind, { readonly kit: Kit; readonly preset: string }>> = {
@@ -91,7 +92,7 @@ export function kitFabricator(genLevel: GenLevel, stage: number, ringY: number):
   const opts = {
     materials: plotKitMaterials(),
     gen: (asset: string) => getGenSync(asset, genLevel),
-    resolveMaterial: (name: string) => vaultSkin(name, genLevel !== 'low'),
+    resolveMaterial: (name: string) => vaultSkin(name, genLevel !== 'low') ?? lightMaterial(name),
     maxRank: rank,
   };
   const frame = buildKitPreset(FAB_WITHOUT_HEAD, FAB_PRESET, opts);
@@ -125,7 +126,7 @@ export function heavyKitProp(kind: MachineKind, stage: number, genLevel: GenLeve
   const prop = kitMachineProp(spec.kit, spec.preset, {
     materials: plotKitMaterials(),
     gen: (asset) => getGenSync(asset, genLevel),
-    resolveMaterial: (name) => vaultSkin(name, genLevel !== 'low'),
+    resolveMaterial: (name) => vaultSkin(name, genLevel !== 'low') ?? lightMaterial(name),
     stage,
     genLevel,
     ...(overrides ? { overrides } : {}),

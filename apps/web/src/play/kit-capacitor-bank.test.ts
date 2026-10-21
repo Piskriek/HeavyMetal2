@@ -21,5 +21,5 @@ test('the bank fits the power wall slot (2.0 x 1.16 m) and stays under the break
 
 test('the kit batches into a few meshes: one per material and rank', () => {
   const keys = [...mergeBuckets(flatten(CAPACITOR_BANK_KIT, 'capacitor-bank')).keys()];
-  assert.deepEqual(keys.sort(), ['copper|1', 'darkSteel|0', 'darkSteel|1', 'gen|0', 'gunmetal|1', 'gunmetal|2', 'hazard|1']);
+  assert.deepEqual(keys.sort(), ['copper|1', 'darkSteel|0', 'darkSteel|1', 'gen|0', 'gunmetal|1', 'gunmetal|2', 'hazard|1', 'lamp|1']);
 });

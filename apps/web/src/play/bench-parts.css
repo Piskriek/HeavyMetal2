@@ -164,3 +164,37 @@
     transform: none;
   }
 }
+
+/* the Lights page (bench-lights.tsx): presets as glowing balls in the chips, a warm-to-cool Kelvin track */
+.bench-lights .bench-parts-gens .bench-light-ball {
+  width: 26px;
+  height: 26px;
+  margin: 7px;
+  border-radius: 50%;
+}
+.bench-light-mode {
+  margin: 0 0 8px;
+}
+.bench-parts-row input[type='range'].bench-kelvin {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+.bench-parts-row input[type='range'].bench-kelvin::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #f1f4f5;
+  border: 2px solid #101214;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+.bench-parts-row input[type='range'].bench-kelvin::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f1f4f5;
+  border: 2px solid #101214;
+}

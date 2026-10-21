@@ -25,6 +25,7 @@ import { maxRank, type Kit, type Overrides, type PlacedPart, type Tier } from '@
 import { buildKitPreset, type KitBuild } from './kit-build';
 import { PART_SWATCHES } from './part-swatches';
 import { vaultSkin } from './vault-skin';
+import { lightMaterial } from './light-material';
 import { CAPACITOR_BANK_KIT } from './kit-capacitor-bank';
 export {
   aimLabStation,
@@ -783,7 +784,11 @@ export function createLabRoom(o: {
   // detail rank (Low draws ranks 0-1, so the lifting eyes and bolts go).
   const detailTier: Tier = o.quality === 'low' || o.quality === 'medium' ? o.quality : 'high';
   // Every swatch a printed part can carry (TICKET-32: a fat green bolt needs green), beside the lab's own materials
-  const kitMaterials: Record<string, THREE.Material> = { darkSteel: m.darkSteel, gunmetal: m.gunmetal, copper: m.copper, hazard: m.hazard };
+  const kitMaterials: Record<string, THREE.Material> = {
+    darkSteel: m.darkSteel, gunmetal: m.gunmetal, copper: m.copper, hazard: m.hazard,
+    // the capacitor bank's charge lamps, until a light cartridge sets one
+    lamp: keep(new THREE.MeshStandardMaterial({ color: '#14181f', emissive: '#3eff8b', emissiveIntensity: 1.2, roughness: 0.3 })),
+  };
   for (const s of PART_SWATCHES) {
     kitMaterials[s.id] ??= keep(new THREE.MeshStandardMaterial({ color: s.color, metalness: s.metal, roughness: s.rough }));
   }
@@ -796,7 +801,7 @@ export function createLabRoom(o: {
     if (!k) return false;
     const built = buildKitPreset(k.kit, k.preset, {
       materials: kitMaterials, gen: genFor, maxRank: maxRank(6, detailTier), overrides: k.overrides, keep,
-      resolveMaterial: (name) => vaultSkin(name, detailTier !== 'low'),
+      resolveMaterial: (name) => vaultSkin(name, detailTier !== 'low') ?? lightMaterial(name),
     });
     if (!built) return false;
     replaceVisual(k.group, built.group);

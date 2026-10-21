@@ -4,6 +4,8 @@
  * signal colour, an intensity and a pattern. Pure: the colour maths and the pattern's glow at a time.
  */
 import type { LightPattern, LightSpec } from '@hm/cartlab';
+import type { PartOverride, PlacedPart } from '@hm/kitspec';
+import { GENERATORS } from '@hm/partgen';
 
 export interface LightPreset extends LightSpec {
   readonly id: string;
@@ -75,4 +77,23 @@ export function lightSpecName(l: Pick<LightSpec, 'kelvin' | 'colour' | 'intensit
   if (named) return named.name;
   const what = l.colour ? `Signal ${l.colour}` : `${Math.round(l.kelvin)} K`;
   return l.pattern === 'steady' ? what : `${what}, ${PATTERN_LABEL[l.pattern].toLowerCase()}`;
+}
+
+/** A lamp the beam can set (like for like): a part drawn in the lamp material or a light preset, or a part with a lens slot. */
+export function isLampPart(p: PlacedPart): boolean {
+  if (p.material === 'lamp' || p.material.startsWith('lx:')) return true;
+  return p.source.kind === 'param' && (GENERATORS[p.source.gen]?.slots.includes('lens') ?? false);
+}
+
+/**
+ * The override that sets a lamp to a light, kept on top of what the part already had: a lamp part takes it whole, a
+ * Shape Press lamp on its lens only (its housing keeps its own). Null for a part that is not a lamp.
+ */
+export function lightOverride(l: Pick<LightSpec, 'kelvin' | 'colour' | 'intensity' | 'pattern'>, p: PlacedPart, existing?: PartOverride): PartOverride | null {
+  if (!isLampPart(p)) return null;
+  const name = lightName(l);
+  if (p.source.kind === 'param' && GENERATORS[p.source.gen]?.slots.includes('lens')) {
+    return { ...existing, slotMaterials: { ...(p.slotMaterials ?? {}), lens: name } };
+  }
+  return { ...existing, material: name };
 }

@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import type { Overrides, PlacedPart } from '@hm/kitspec';
 import type { KitBuild } from './kit-build';
+import { tickLights } from './light-material';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { Stage } from '@hm/fidelity';
 import type { StageLook } from '../crafter/looks';
@@ -3384,6 +3385,8 @@ export function createPlayScene(o: {
           }
         }
       }
+      // ---- the light presets' patterns (plan 39, Lx): one tick for every lamp that wears one, lab or plot
+      tickLights(now);
       // ---- fabricator animation
       for (const fab of fabricatorViews.values()) {
         const head = fab.station.parts['head'];

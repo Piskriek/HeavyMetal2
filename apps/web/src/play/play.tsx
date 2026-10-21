@@ -47,16 +47,19 @@ import {
   readPrint,
   printKind,
   type Print,
+  type MaterialPrintSpec,
 } from '@hm/cartlab';
+import { specOfName } from '@hm/matstack';
 import { BenchParts } from './bench-parts';
 import { BenchSpecies } from './bench-species';
 import { BenchLights } from './bench-lights';
+import { BenchMaterials } from './bench-materials';
 import { MY_PRESETS_KEY, parseMyPresets, presetsOf, savePreset, serializeMyPresets, type MyPresets } from './my-presets';
 import { isLampPart, lightOverride } from './light-presets';
 import { rifleLook } from './rifle-look';
 import { MAX_TREE_VARIANTS, treeVariantKey } from './plot-biome-view';
 import { setKitFrames } from './plot-kits';
-import { bodyMaterial, skinOverride } from './vault-skin';
+import { bodyOverride, bodyMaterial, skinOverride } from './vault-skin';
 import { GENERATORS } from '@hm/partgen';
 import { overrideFromPart, partBill } from './part-cartridge';
 import { fx } from '../maker/feedback';
@@ -603,6 +606,8 @@ export function PlayScreen(props: {
   const [benchBlank, setBenchBlank] = useState<string | null>(null);
   /** The preset bench's page: authored terraforming presets, or Shape Press parts (TICKET-32). */
   const [benchTab, setBenchTab] = useState<'presets' | 'parts' | 'species' | 'lights'>('presets');
+  /** The Materials page's shelf (plan 41): the ground's terraforming materials, or the machines' layered ones. */
+  const [materialShelf, setMaterialShelf] = useState<'ground' | 'machines'>('ground');
   /** The player's own presets (plan 39 section 7): "Yours" on every bench page, kept in the profile. */
   const [myPresets, setMyPresets] = useState<MyPresets>(() => parseMyPresets(kv.get(MY_PRESETS_KEY)));
   /** Keeps a print in the player's presets and says so (or that it was already there). */
@@ -969,11 +974,13 @@ useEffect(() => {
   const beamOreFlushRef = useRef(0);
   /** The rifle's port (TASK-21): the written cartridge loaded from the lab rack, and its preset and colour. Not saved yet (TASK-21c). */
   /** The rifle's port: a material preset cartridge (preset set) or a part cartridge (part set, preset ''; TICKET-32). */
-  const beamPortRef = useRef<{ readonly cartridge: Cartridge; readonly preset: string; readonly name: string; readonly colour: string; readonly part?: PartSpec; readonly species?: SpeciesSpec; readonly light?: LightSpec } | null>(null);
+  const beamPortRef = useRef<{ readonly cartridge: Cartridge; readonly preset: string; readonly name: string; readonly colour: string; readonly part?: PartSpec; readonly species?: SpeciesSpec; readonly light?: LightSpec; readonly material?: MaterialPrintSpec } | null>(null);
   /** A part shot in progress: when the left button went down and whether Shift was held (tap = one part, hold or Shift = all of that kind). */
   const partShotRef = useRef<{ readonly t0: number; readonly shift: boolean } | null>(null);
   /** A light cartridge's shot at a lamp (plan 39, Lx), decided on release like a part shot. */
   const lightShotRef = useRef<{ readonly t0: number; readonly shift: boolean } | null>(null);
+  /** A material cartridge's Apply in progress (plan 41): decided on release, like a part's. */
+  const materialShotRef = useRef<{ readonly t0: number; readonly shift: boolean } | null>(null);
   /** A species cartridge's shot at a tree (plan 39, Aq), decided on release like a part shot. */
   const speciesShotRef = useRef<{ readonly t0: number; readonly shift: boolean } | null>(null);
   /** A material cartridge's shot at a machine part (plan 39 step 2), decided on release like a part shot. */
@@ -1063,7 +1070,7 @@ useEffect(() => {
   };
   /** Puts a written cartridge from the lab rack into the rifle's port: R takes the first one, the X radial in Apply the one picked. */
   const loadBeamCartridge = (written: Cartridge): void => {
-    // a written material, or a print (plan 39): a part, a species or a light, each glowing its own colour in the port
+    // a written material, or a print (plans 39 and 41): a part, a species, a light or a machine material, each glowing its own colour in the port
     const look = rifleLook(written);
     if (!look) return;
     const port = beamPortRef.current;
@@ -1080,6 +1087,7 @@ useEffect(() => {
       : kind === 'part' ? 'Fire Apply at a machine part: a tap fits one, a hold or Shift fits every part of its kind.'
         : kind === 'species' ? 'Fire Apply at a tree on the plot: a tap regrows it, a hold or Shift every tree of its kind nearby.'
           : kind === 'light' ? 'Fire Apply at a machine lamp: a tap sets it, a hold or Shift every lamp on the machine.'
+            : kind === 'material' ? 'Fire Apply at a machine part: a tap dresses it, a hold or Shift every part that wears the same.'
             : 'Hold the left button in Apply to paint the ground, or fire it at a machine part to paint the part.');
   };
   const reloadBeam = (): void => {
@@ -1682,6 +1690,41 @@ useEffect(() => {
   };
   const applyLightShotRef = useRef<(broadcast: boolean) => number>(() => 0);
   applyLightShotRef.current = applyLightShot;
+  /**
+   * The beam's Apply with a layered material (plan 41): a tap puts the material on the part it is fired at (a panel keeps
+   * its bolts); a hold or Shift on every part of the machine that wore the same material. Like for like: a generated
+   * core keeps its own texture. Returns how many parts changed.
+   */
+  const applyMaterialShot = (broadcast: boolean): number => {
+    const scene = sceneRef.current;
+    const mat = beamPortRef.current?.material;
+    if (!scene || !mat) return 0;
+    const hit = scene.aimKitPart(BEAM_STROKE_RANGE);
+    if (!hit) {
+      say('Nothing to dress', 'Aim at a part of a machine: a panel, a column, a skid.');
+      return 0;
+    }
+    const placed = scene.kitPlaced(hit.kit);
+    const target = placed.find((p) => p.path === hit.path);
+    if (!target || target.source.kind === 'gen') {
+      say('The core keeps its own skin', 'A material cartridge dresses the parts around it: panels, columns, skids.');
+      return 0;
+    }
+    const was = bodyMaterial(target);
+    const parts = broadcast ? placed.filter((p) => p.source.kind !== 'gen' && bodyMaterial(p) === was) : [target];
+    let next = propsRef.current;
+    for (const p of parts) {
+      const ov = bodyOverride(mat.ref, p, next.kits?.[hit.kit]?.[p.path]);
+      if (ov) next = withKitOverride(next, hit.kit, [p.path], ov);
+    }
+    savePropsSave(next);
+    scene.setKitOverrides(hit.kit, next.kits?.[hit.kit] ?? {});
+    say(parts.length === 1 ? `Dressed: ${mat.name}` : `Dressed ${parts.length} parts: ${mat.name}`,
+      broadcast ? 'Every part that wore the same material changed.' : 'Hold the trigger, or Shift, to dress every part that wears the same material.');
+    return parts.length;
+  };
+  const applyMaterialShotRef = useRef<(broadcast: boolean) => number>(() => 0);
+  applyMaterialShotRef.current = applyMaterialShot;
   /** Whether the base's stores (the pack and the linked bins) hold a part's cost: a dry run of the base's `pay` command. */
   const partStockCheck = (spec: PartSpec): { readonly ok: boolean; readonly why: string } => {
     const at = sceneRef.current?.debug.position() ?? { x: 0, z: 0 };
@@ -2162,6 +2205,11 @@ useEffect(() => {
             lightShotRef.current = { t0: performance.now(), shift: e.shiftKey };
             return;
           }
+          // A layered material in Apply dresses the part it is fired at (decided on release: a tap one, a hold every part that wore the same)
+          if (beamHeldRef.current && beamModeRef.current === 'apply' && beamPortRef.current?.material) {
+            materialShotRef.current = { t0: performance.now(), shift: e.shiftKey };
+            return;
+          }
           // A species cartridge in Apply regrows the tree it is fired at (decided on release: a tap one, a hold its kind nearby)
           if (beamHeldRef.current && beamModeRef.current === 'apply' && beamPortRef.current?.species) {
             speciesShotRef.current = { t0: performance.now(), shift: e.shiftKey };
@@ -2223,6 +2271,11 @@ useEffect(() => {
         if (lamp) {
           lightShotRef.current = null;
           applyLightShotRef.current(lamp.shift || performance.now() - lamp.t0 >= 450);
+        }
+        const dress = materialShotRef.current;
+        if (dress) {
+          materialShotRef.current = null;
+          applyMaterialShotRef.current(dress.shift || performance.now() - dress.t0 >= 450);
         }
       }
     };
@@ -4088,6 +4141,8 @@ useEffect(() => {
       applySpecies: (broadcast: boolean): number => applySpeciesShotRef.current(broadcast),
       /** The light shot as a tap or a hold (plan 39, Lx). */
       applyLight: (broadcast: boolean): number => applyLightShotRef.current(broadcast),
+      /** The beam's Apply with the material cartridge in the port (plan 41), at what the camera looks at. */
+      applyMaterial: (broadcast: boolean): number => applyMaterialShotRef.current(broadcast),
       treeOverrides: () => propsRef.current.trees ?? {},
       /** The player's own presets (plan 39 section 7), as saved. */
       myPresets: () => parseMyPresets(kv.get(MY_PRESETS_KEY)),
@@ -4120,7 +4175,7 @@ useEffect(() => {
         return beamPortRef.current?.cartridge.id === id;
       },
       /** The rifle's port: its cartridge's name and, for a part cartridge, the part. */
-      port: () => (beamPortRef.current ? { name: beamPortRef.current.name, part: beamPortRef.current.part ?? null, species: beamPortRef.current.species ?? null, light: beamPortRef.current.light ?? null } : null),
+      port: () => (beamPortRef.current ? { name: beamPortRef.current.name, part: beamPortRef.current.part ?? null, species: beamPortRef.current.species ?? null, light: beamPortRef.current.light ?? null, material: beamPortRef.current.material ?? null } : null),
       seedCartridge: (preset: string): boolean => {
         const v = VAULT_BY_ID.get(preset);
         if (!v) return false;
@@ -4852,7 +4907,15 @@ useEffect(() => {
                       ? 'Prints a Water Maker species onto a blank cartridge. Load it in the beam rifle and fire Apply at a tree on the plot: a tap regrows that tree, a hold or Shift every tree of its kind nearby.'
                       : benchTab === 'lights'
                         ? 'Prints a Light Projector light onto a blank cartridge. Load it in the beam rifle and fire Apply at a machine lamp: a tap sets that lamp, a hold or Shift every lamp on the machine.'
-                      : 'Writes an authored terraforming material onto a blank cartridge.'}</p>
+                      : materialShelf === 'machines'
+                        ? 'Prints a machine material onto a blank cartridge: paint, then the wear on top (rust, dust, grime). Load it in the beam rifle and fire Apply at a machine part: a tap dresses that part, a hold or Shift every part that wore the same.'
+                        : 'Writes an authored terraforming material onto a blank cartridge.'}</p>
+                  {benchTab === 'presets' ? (
+                    <div className="bench-parts-choices bench-material-shelf" role="group" aria-label="Materials for">
+                      <button className={materialShelf === 'ground' ? 'on' : ''} aria-pressed={materialShelf === 'ground'} onClick={() => setMaterialShelf('ground')} data-testid="bench-shelf-ground">The ground</button>
+                      <button className={materialShelf === 'machines' ? 'on' : ''} aria-pressed={materialShelf === 'machines'} onClick={() => setMaterialShelf('machines')} data-testid="bench-shelf-machines">Machines</button>
+                    </div>
+                  ) : null}
                   <div className="play-carts">
                     <h4>1. Pick a blank ({blanks.length} available)</h4>
                     <div>
@@ -4898,6 +4961,23 @@ useEffect(() => {
                         labRef.current = next;
                         commit(withLab(stateRef.current, next));
                         say('Printing started', `The bench grows ${spec.name} onto the cartridge while powered.`);
+                      }}
+                    />
+                  ) : benchTab === 'presets' && materialShelf === 'machines' ? (
+                    <BenchMaterials
+                      mine={presetsOf(myPresets, 'material')}
+                      onSave={(print: MaterialPrintSpec) => saveMyPreset({ material: print })}
+                      specOf={specOfName}
+                      check={(print) => {
+                        if (!activeBlank) return { ok: false, why: 'No blanks on the rack. Make a blank at the rack first.' };
+                        return canWritePrint(labRef.current, labEnv, activeBlank, { material: print });
+                      }}
+                      onPrint={(print: MaterialPrintSpec) => {
+                        if (!activeBlank) return;
+                        const next = startPrintWrite(labRef.current, labEnv, activeBlank, { material: print });
+                        labRef.current = next;
+                        commit(withLab(stateRef.current, next));
+                        say('Printing started', `The bench writes ${print.name} onto the cartridge while powered.`);
                       }}
                     />
                   ) : benchTab === 'parts' ? (

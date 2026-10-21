@@ -619,6 +619,16 @@ export function layeredMaterial(name: string, rank: MatRank, env?: LayeredEnv): 
   return spec ? materialForSpec(spec, rank, env) : fallback(name);
 }
 
+/** Drops the materials made for a reflection that is going away (a closed preview), so the cache does not keep them. */
+export function releaseLayeredEnv(env: LayeredEnv): void {
+  const tag = `|${env.map.uuid}@`;
+  for (const [key, m] of cache) {
+    if (!key.includes(tag)) continue;
+    m.dispose();
+    cache.delete(key);
+  }
+}
+
 /** Builds the shared noise atlas now (about 0.2 s), so the first layered material never builds it mid-play. */
 export function warmLayeredMaterials(): void {
   noiseAtlas();

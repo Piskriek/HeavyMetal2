@@ -249,3 +249,116 @@
   aspect-ratio: 5 / 2;
   margin-bottom: 0;
 }
+
+/* The Materials page's Machines shelf (plan 41): the layer stack, one row per layer, top first as a stack reads; the
+   open row shows what the layer is made of and where it lands */
+.bench-material-shelf {
+  margin: 0 0 10px;
+}
+.bench-where-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(232, 238, 241, 0.75);
+}
+.bench-where-toggle input {
+  accent-color: var(--power);
+}
+.bench-layers {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.bench-layer {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.bench-layer.open {
+  border-color: var(--power);
+  background: rgba(255, 255, 255, 0.06);
+}
+.bench-layer.hidden .bench-layer-name,
+.bench-layer.hidden .bench-layer-ball {
+  opacity: 0.45;
+}
+.bench-layer-head {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) 84px auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+}
+.bench-layer-eye {
+  min-width: 36px;
+  padding: 3px 6px;
+  font-size: 11px;
+}
+.bench-layer-eye[aria-pressed='false'] {
+  color: rgba(232, 238, 241, 0.5);
+}
+.bench-layer-ball {
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+}
+.bench-layer-name {
+  display: grid;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.bench-layer-name b {
+  font-size: 13px;
+}
+.bench-layer-name span {
+  overflow: hidden;
+  font-size: 11px;
+  color: rgba(232, 238, 241, 0.6);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bench-layer-head input[type='range'] {
+  width: 100%;
+  accent-color: var(--power);
+}
+.bench-layer-moves {
+  display: flex;
+  gap: 3px;
+}
+.bench-layer-moves button {
+  padding: 3px 6px;
+  font-size: 11px;
+}
+.bench-layer-body {
+  padding: 2px 8px 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.bench-layer-body .bench-parts-swatches {
+  flex-wrap: wrap;
+}
+.bench-age output {
+  min-width: 7em;
+  text-align: right;
+}
+/* the panel's buttons are boxed; a layer's name is the row's title, not a button that looks like one */
+.play-machine .bench-layer-name {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+/* the toggle sits at the foot of the pinned stage, over the fade: a solid strip so nothing scrolls through behind it */
+.bench-parts-stage .bench-where-toggle {
+  margin: 0;
+  padding: 6px 2px 2px;
+  background: rgba(12, 14, 17, 0.98);
+}

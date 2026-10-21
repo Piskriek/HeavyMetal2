@@ -62,18 +62,22 @@ export const bodyMaterial = (p: PlacedPart): string => {
 };
 
 /**
- * The override that puts a skin on a placed part, kept on top of what the part already had (a printed part keeps its
- * shape). A Shape Press part takes it on its body slot only: a painted panel keeps its bolts. A box takes it whole. A
- * generated core takes none (null): its own texture is its skin.
+ * The override that puts a material (any name: a skin, `vault:<preset>`; a layered material, `mat:` or `matc:`) on a
+ * placed part, kept on top of what the part already had (a printed part keeps its shape). A Shape Press part takes it
+ * on its body slot only: a painted panel keeps its bolts. A box takes it whole. A generated core takes none (null): its
+ * own texture is its skin.
  */
-export function skinOverride(presetId: string, p: PlacedPart, existing?: PartOverride): PartOverride | null {
-  const skin = skinName(presetId);
+export function bodyOverride(material: string, p: PlacedPart, existing?: PartOverride): PartOverride | null {
   if (p.source.kind === 'gen') return null;
-  if (p.source.kind === 'box') return { ...existing, material: skin };
+  if (p.source.kind === 'box') return { ...existing, material };
   const slots = GENERATORS[p.source.gen]?.slots ?? [];
   const body = slots[0];
-  if (!body) return { ...existing, material: skin };
+  if (!body) return { ...existing, material };
   const slotMaterials: Record<string, string> = {};
-  for (const s of slots) slotMaterials[s] = s === body ? skin : (p.slotMaterials?.[s] ?? p.material);
+  for (const s of slots) slotMaterials[s] = s === body ? material : (p.slotMaterials?.[s] ?? p.material);
   return { ...existing, slotMaterials };
 }
+
+/** The override that puts a Texture Mill skin on a placed part (bodyOverride with `vault:<preset>`). */
+export const skinOverride = (presetId: string, p: PlacedPart, existing?: PartOverride): PartOverride | null =>
+  bodyOverride(skinName(presetId), p, existing);

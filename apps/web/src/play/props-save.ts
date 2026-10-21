@@ -39,10 +39,12 @@ const numbers = (x: unknown): Record<string, number> | null => {
   for (const [k, v] of Object.entries(x)) if (shortId(k) && typeof v === 'number' && Number.isFinite(v)) out[k] = v;
   return out;
 };
-const texts = (x: unknown): Record<string, string> | null => {
+/** A material's name: a short id, or a player's layered material as its code (`matc:`, plan 41), which runs to about 1.2k. */
+const materialId = (v: unknown): v is string => typeof v === 'string' && (shortId(v) || (v.length <= 4000 && /^matc:[A-Za-z0-9_-]+$/.test(v)));
+const materials = (x: unknown): Record<string, string> | null => {
   if (!isObj(x)) return null;
   const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(x)) if (shortId(k) && typeof v === 'string' && shortId(v)) out[k] = v;
+  for (const [k, v] of Object.entries(x)) if (shortId(k) && materialId(v)) out[k] = v;
   return out;
 };
 
@@ -51,10 +53,10 @@ function override(x: unknown): PartOverride | null {
   if (!isObj(x)) return null;
   const o: { -readonly [K in keyof PartOverride]?: PartOverride[K] } = {};
   if (typeof x.gen === 'string' && shortId(x.gen)) o.gen = x.gen;
-  if (typeof x.material === 'string' && shortId(x.material)) o.material = x.material;
+  if (materialId(x.material)) o.material = x.material;
   const params = numbers(x.params);
   if (params && Object.keys(params).length > 0) o.params = params;
-  const sm = texts(x.slotMaterials);
+  const sm = materials(x.slotMaterials);
   if (sm && Object.keys(sm).length > 0) o.slotMaterials = sm;
   if (Array.isArray(x.ops)) {
     o.ops = x.ops.slice(0, 8).flatMap((op) => (isObj(op) && typeof op.op === 'string' && shortId(op.op) ? [{ op: op.op, params: numbers(op.params) ?? {} }] : []));

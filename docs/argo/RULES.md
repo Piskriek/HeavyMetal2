@@ -24,6 +24,10 @@ Each rule below says where it comes from.
    Write the findings with sources. The pattern is [BASE_BUILDING_RESEARCH](../BASE_BUILDING_RESEARCH.md). (owner, CLAUDE.md §3.4)
 7. **Plan everything first, then execute.** Fold every new ask into the plan docs before anyone builds. (owner, 13 October)
 8. **The owner's words are logged verbatim** in [OWNER_ASKS.md](../OWNER_ASKS.md). Check plans against them.
+8a. **Check each other; no shortcuts (owner, 21 October 2026):** "you guys need to check each other, shortcuts are unacceptable". It came after TICKET-39 kept the old one-piece machine models as cores and bolted kit frames around them, when the intent was machines rebuilt from parts.
+   - **Argo reviews Opus's briefs and plans** against the owner's words before building, and challenges anything that reads as a shortcut.
+   - **Opus reviews Argo's bundles and rulings** before they are installed or turned into briefs: tests against the real packages, a measured fit against the real geometry, a look from four sides, and these rules. Problems go back to be fixed properly, never hidden behind a switch.
+   - **No stopgap without the owner's yes.** If one is truly needed, it is named as a stopgap, with its cost and the ticket that removes it.
 
 ## C. How the world looks
 9. **One natural world, just in lower resolution.** Stages raise the resolution of one believable, natural place; they don't swap it for a different place. A plot is 1 km. ([SETMIX_PLAN lineage](../ACTIVE_ROADMAP.md); owner)

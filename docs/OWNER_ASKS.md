@@ -239,3 +239,10 @@
 - (same day) "oh ill have to start the trial still" / "worth it?" / "kk holding off for now" (Opus: start the Hyper3D trial when brief 32's art pass begins, first a head-to-head with RUN.world on the heavy terraformer)
 - (same day, evening) "if you are waiting for me to confirm somthing, consider it confirmed" (the pending item: committing TASK-24's three new act checkpoints and their index; done in ec3993a4)
 - (same day, evening) "ok, build the \"not built yet\" stuff. we have time"
+
+## 2026-10-20 and 21: previews, parts into machines, no shortcuts
+- (20 Oct) "just checking, there is gona be a preview of the thing where you have those sliders, else the sliders are useless."
+- (20 Oct) "where appropriate we want to use previews to stimulate the players creativity, seeing the material preview and imagining what it would look like will trigger them to try it on the model, not just materials its how we drive the player to customize and play around with settings" (plan 39, pattern item 7)
+- (21 Oct) "just to clarify, are you just doing some basic parts to setup the drafting table interface ? and you plan on doing loads of individual parts then assembling those into parts for machines, and assembling those into the new machines?" / "ok good so you understand the machines get rebuilt with the parts, pls continue"
+- (21 Oct) "argo messed up and did a blend plan" (TICKET-39 kept the old one-piece models as cores and wrapped kit frames around them; Argo proposed TICKET-40, the from-scratch modular rebuild)
+- (21 Oct) "you guys need to check each other, shortcuts are unacceptable" (RULES 8a)

@@ -15,6 +15,10 @@
  *  - `layers` run bottom to top (the UI lists them top first).
  */
 
+import { EDGE_BAND, MAX_LAYERS, MAX_MASK_INPUTS } from './constants';
+export { EDGE_BAND, MAX_LAYERS, MAX_MASK_INPUTS, MAX_RAMP_STOPS } from './constants';
+export * from './mask-mesh';
+
 // ------------------------------------------------------------------ specs
 
 export type V3 = readonly [number, number, number];
@@ -137,11 +141,6 @@ export interface MaterialSpec {
   readonly age: number;
 }
 
-export const MAX_LAYERS = 6;
-export const MAX_MASK_INPUTS = 6;
-export const MAX_RAMP_STOPS = 8;
-/** The widest edge or cavity band, in metres: the geometry carries distances up to this (the `edge-band` operator). */
-export const EDGE_BAND = 0.05;
 
 // ---------------------------------------------------------------- sources
 

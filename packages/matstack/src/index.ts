@@ -19,6 +19,7 @@ import { EDGE_BAND, MAX_LAYERS, MAX_MASK_INPUTS } from './constants';
 import { EDGE_LINES, lineDistance, type MaskMesh } from './mask-mesh';
 export { EDGE_BAND, MAX_LAYERS, MAX_MASK_INPUTS, MAX_RAMP_STOPS } from './constants';
 export * from './mask-mesh';
+export * from './shelf';
 
 // ------------------------------------------------------------------ specs
 

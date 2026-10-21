@@ -25,6 +25,8 @@ import { createPlotHolo, type PlotHolo } from './plot-holo';
 import { COLOUR_MARK_FRAGMENT, localMachineWaveAt, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_OFF_FRAGMENT, OPENING_OFF_VERTEX, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX, scanRingFadeAt, waveBandColourFor } from './portal-shaders';
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
 import { disposeProp, FABRICATOR_PLUME, FABRICATOR_VENT, FEED_CUBES_FULL, feedCubeCount, feedCubeProgress, lineSpan, machinePlumeCount, machinePlumeCountOf, machinePlumeGravity, machinePlumeLook, machinePlumeLookOf, machinePlumeSpec, machinePlumeSteady, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
+import { setPlotEnvironment } from './plot-kits';
+import { warmLayeredMaterials } from './layered-material';
 import { printFrame, beatPulse, evaluateBeatSyncedPlumeModulation } from '@hm/tooljuice';
 import { evaluateHarmonicMachineChoir, type ActiveMachineEmitter, type MachineStemRole } from '@hm/musicbox';
 import { applyScientistWindowFGate, createWindowFCoopSyncController, type WindowFCoopSyncController } from './window-f-lab-and-coop-hooks';
@@ -177,6 +179,8 @@ const SUIT_METAL_CAP = 0.6;
 const SUIT_PLANET_ENV = 1.8;
 /** The room's reflection on the rifle in the hand (third person). */
 const RIFLE_HAND_ENV = 1.2;
+/** The room's reflection on kit-built machines on the planet (plan 41: their metal is the material's own, not capped). */
+const PLOT_KIT_ENV = 1.2;
 /**
  * Each stage's look (the stages raise the resolution of one natural world): how many lines tall the planet is drawn, its colour
  * levels (0 = all) and stage 0's black-and-white dither. Stage 1 is about 240 lines, like a 1990s 3D game, whatever the screen; a
@@ -561,6 +565,7 @@ export function createPlayScene(o: {
   const roomEnvMap = keep(pmrem.fromScene(roomEnv, 0.04).texture);
   labScene.environment = roomEnvMap;
   labScene.environmentIntensity = 0.22;
+  setPlotEnvironment({ map: roomEnvMap, intensity: PLOT_KIT_ENV });
   roomEnv.dispose();
   room.group.updateMatrixWorld(true);
   const labGateM = room.gate.group.matrixWorld.clone();
@@ -3787,6 +3792,8 @@ export function createPlayScene(o: {
     sealWreck: (site) => wrecks.seal(site),
     preloadWrecks: () => wrecks.preload(),
     async preloadLabGenerated() {
+      // the layered materials' noise atlas (plan 41), so the first one never builds it mid-play
+      warmLayeredMaterials();
       await preloadLabGenerated(genLevelFor(currentQuality));
       await preloadVista(VISTA_LEVEL);
       room.adoptGenerated();

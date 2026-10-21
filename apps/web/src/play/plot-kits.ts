@@ -20,6 +20,7 @@ import { WATERMAKER_FRAME_KIT } from './kit-watermaker-frame';
 import { PART_SWATCHES } from './part-swatches';
 import { vaultSkin } from './vault-skin';
 import { lightMaterial } from './light-material';
+import { kitLayering, layeredMaterial, type LayeredEnv } from './layered-material';
 
 /** The heavy machines built from a kit, and the preset that is the whole machine. */
 export const HEAVY_KITS: Partial<Record<MachineKind, { readonly kit: Kit; readonly preset: string }>> = {
@@ -37,26 +38,45 @@ let kitFrames = false;
 export const setKitFrames = (on: boolean): void => { kitFrames = on; };
 export const kitFramesOn = (): boolean => kitFrames;
 
-const PLOT_MAX_METAL = 0.35;
+/**
+ * The reflection plot kits draw with. The planet scene has no environment of its own (its look is the stage's), so,
+ * as Astro's suit does there, kit materials carry the lab's room reflection themselves: a true metal then reads as
+ * metal under the sun instead of black. Set once by the scene, behind the loading bar.
+ */
+let plotEnv: LayeredEnv | null = null;
+export function setPlotEnvironment(env: LayeredEnv): void {
+  plotEnv = env;
+  if (materials) for (const m of Object.values(materials)) reflect(m);
+}
+const reflect = (m: THREE.Material): void => {
+  if (!plotEnv || !(m instanceof THREE.MeshStandardMaterial)) return;
+  m.envMap = plotEnv.map;
+  m.envMapIntensity = plotEnv.intensity;
+  m.needsUpdate = true;
+};
+
 let materials: Record<string, THREE.Material> | null = null;
 /**
- * The materials a plot kit draws with, shared by every machine: Argo's two trim materials (their base colours; the
- * trim sheet's bands come with a banded texture later), the part swatches a part cartridge can put on, and a lamp.
+ * The materials a plot kit draws with, shared by every machine: Argo's trim materials (their base colours; the trim
+ * sheet's bands come with a banded texture later), the part swatches a part cartridge can put on, and a lamp. Each
+ * carries the plot's reflection, so its metalness is the palette's own.
  */
 export function plotKitMaterials(): Readonly<Record<string, THREE.Material>> {
   if (materials) return materials;
-  // the planet scene has no environment map, so a true metal has nothing to reflect and draws black: the plot caps
-  // metalness and keeps the palette's colours, which then read under the sun the way the generated cores' textures do
-  const plotMetal = (metal: number, rough: number) => ({ metalness: Math.min(PLOT_MAX_METAL, metal), roughness: Math.max(0.5, rough) });
   const out: Record<string, THREE.Material> = {};
   for (const t of Object.values(KIT_TRIM_PALETTE)) {
-    out[t.id] = new THREE.MeshStandardMaterial({ color: t.baseHex, ...plotMetal(t.metalness, t.roughness) });
+    out[t.id] = new THREE.MeshStandardMaterial({ color: t.baseHex, metalness: t.metalness, roughness: t.roughness });
   }
-  for (const s of PART_SWATCHES) out[s.id] = new THREE.MeshStandardMaterial({ color: s.color, ...plotMetal(s.metal, s.rough) });
+  for (const s of PART_SWATCHES) out[s.id] = new THREE.MeshStandardMaterial({ color: s.color, metalness: s.metal, roughness: s.rough });
   out.lamp = new THREE.MeshStandardMaterial({ color: '#14181f', emissive: '#7cff4d', emissiveIntensity: 0.2, roughness: 0.3 });
+  for (const m of Object.values(out)) reflect(m);
   materials = out;
   return out;
 }
+
+/** How a plot kit resolves a name the record does not hold: a Texture Mill skin, a lamp, a layered material at `rank`. */
+const plotResolve = (genLevel: GenLevel, rank: 0 | 1 | 2) => (name: string): THREE.Material | null =>
+  vaultSkin(name, genLevel !== 'low') ?? lightMaterial(name) ?? layeredMaterial(name, rank, plotEnv ?? undefined);
 
 /** The kit with one child taken out of an assembly; the later children's `on.child` indices are renumbered. */
 export function withoutChild(kit: Kit, assembly: string, key: string): Kit {
@@ -92,7 +112,8 @@ export function kitFabricator(genLevel: GenLevel, stage: number, ringY: number):
   const opts = {
     materials: plotKitMaterials(),
     gen: (asset: string) => getGenSync(asset, genLevel),
-    resolveMaterial: (name: string) => vaultSkin(name, genLevel !== 'low') ?? lightMaterial(name),
+    resolveMaterial: plotResolve(genLevel, rank),
+    layering: kitLayering,
     maxRank: rank,
   };
   const frame = buildKitPreset(FAB_WITHOUT_HEAD, FAB_PRESET, opts);
@@ -126,7 +147,7 @@ export function heavyKitProp(kind: MachineKind, stage: number, genLevel: GenLeve
   const prop = kitMachineProp(spec.kit, spec.preset, {
     materials: plotKitMaterials(),
     gen: (asset) => getGenSync(asset, genLevel),
-    resolveMaterial: (name) => vaultSkin(name, genLevel !== 'low') ?? lightMaterial(name),
+    resolveMaterial: plotResolve(genLevel, maxRank(stage, tierOfLevel(genLevel))),
     stage,
     genLevel,
     ...(overrides ? { overrides } : {}),

@@ -48,6 +48,12 @@ export type MatRank = 0 | 1 | 2;
 export const MAT_PREFIX = 'mat:';
 export const isLayeredName = (name: string): boolean => name.startsWith(MAT_PREFIX);
 
+/** A reflection to draw with where the scene has none (the planet): the map and how strong. */
+export interface LayeredEnv {
+  readonly map: THREE.Texture;
+  readonly intensity: number;
+}
+
 /** What a layered material carries for kitLayering. */
 interface LayeredInfo {
   readonly spec: MaterialSpec;
@@ -589,22 +595,33 @@ function layeredShaderMaterial(spec: MaterialSpec, rank: 1 | 2): THREE.Material 
   return m;
 }
 
-/** A material spec at a rank (cached by the spec's JSON). */
-export function materialForSpec(spec: MaterialSpec, rank: MatRank): THREE.Material {
-  const key = `${rank}|${JSON.stringify(spec)}`;
+/** A material spec at a rank, with a reflection of its own where the scene has none (cached by the spec's JSON and the reflection). */
+export function materialForSpec(spec: MaterialSpec, rank: MatRank, env?: LayeredEnv): THREE.Material {
+  const key = `${rank}|${env ? `${env.map.uuid}@${env.intensity}` : '-'}|${JSON.stringify(spec)}`;
   const hit = cache.get(key);
   if (hit) return hit;
   const m = rank === 0 ? flatMaterial(spec) : layeredShaderMaterial(spec, rank);
   m.name = `matstack:${spec.name}`;
+  if (env) {
+    const sm = m as THREE.MeshStandardMaterial;
+    sm.envMap = env.map;
+    sm.envMapIntensity = env.intensity;
+  }
   cache.set(key, m);
   return m;
 }
 
 /** The material for a `mat:<id>` name at a rank, a neutral stand-in when the id does not resolve, or null for any other name. */
-export function layeredMaterial(name: string, rank: MatRank): THREE.Material | null {
+export function layeredMaterial(name: string, rank: MatRank, env?: LayeredEnv): THREE.Material | null {
   if (!isLayeredName(name)) return null;
   const spec = resolveMatPreset(name);
-  return spec ? materialForSpec(spec, rank) : fallback(name);
+  return spec ? materialForSpec(spec, rank, env) : fallback(name);
+}
+
+/** Builds the shared noise atlas now (about 0.2 s), so the first layered material never builds it mid-play. */
+export function warmLayeredMaterials(): void {
+  noiseAtlas();
+  noiseTex();
 }
 
 /** Shows one layer's weight in black and white (the bench's mask view), or the material again with -1. */

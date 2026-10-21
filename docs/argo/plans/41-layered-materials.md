@@ -100,7 +100,8 @@ Units are metres and millimetres, never "0 to 1 of the object", so wear is the s
    - **Rank 1:** the layered shader with surface constants, the noise atlas and bump from the tiles.
    - **Rank 2:** adds tile normals, detail tiles, the physical extras and triplanar noise.
    - Rank changes fade with the world-locked dither (plan 38), never a cut.
-6. **Metal needs something to reflect.** The planet gets a small PMREM environment from its stage look's sky and ground colours, rebuilt when the stage changes. Then the 0.35 cap goes.
+6. **Metal needs something to reflect (built 2026-10-21).** The planet scene keeps no environment of its own, because its look is the stage's. Instead, as Astro's suit already does there (TASK-21c), kit materials on the planet carry the lab's room reflection themselves: `setPlotEnvironment`, at 1.2, the rifle's strength. So the 0.35 metal cap is gone.
+   - **Stage-tinted reflection:** a reflection tinted by each stage's sky and ground can replace it once the stage looks call for it, the same way.
 7. **The toggle rule:** Graphics gains "Materials: Auto / Flat / Layered / Full". Auto picks from the tier and the measured frame time.
 
 ### 4.6 The preview (previews drive play)

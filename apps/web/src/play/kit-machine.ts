@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { maxRank, presetSockets, type Kit, type Overrides, type Tier } from '@hm/kitspec';
 import type { GenLevel } from '../assets/gen';
 import { buildKitPreset, type KitBuild } from './kit-build';
+import { kitLayering } from './layered-material';
 import type { MachineProp } from './machine-props';
 
 export interface KitMachineOptions {
@@ -32,6 +33,7 @@ export function kitMachineProp(kit: Kit, preset: string, o: KitMachineOptions): 
     maxRank: rank,
     ...(o.overrides ? { overrides: o.overrides } : {}),
     ...(o.resolveMaterial ? { resolveMaterial: o.resolveMaterial } : {}),
+    layering: kitLayering,
   });
   if (!build) return null;
   const sockets = presetSockets(kit, preset);

@@ -76,9 +76,11 @@ export interface PartPreviewProps {
   readonly spec: PartSpec;
   /** What the player is trying on (hovering), shown as a tag over the view; null when the view shows the part as set. */
   readonly trying?: string | null;
+  /** The player's saved parts: each gets a thumbnail (keyed by its preset id) for its chip, rendered once. */
+  readonly extra?: readonly { readonly id: string; readonly spec: PartSpec }[];
 }
 
-export const PartPreview: React.FC<PartPreviewProps> = ({ spec, trying = null }) => {
+export const PartPreview: React.FC<PartPreviewProps> = ({ spec, trying = null, extra }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewRef = useRef<{ stage: Turntable; part: THREE.Mesh; mats: Map<string, THREE.Material> } | null>(null);
   const mesh = useMemo(() => printedMesh(spec), [spec]);
@@ -101,6 +103,24 @@ export const PartPreview: React.FC<PartPreviewProps> = ({ spec, trying = null })
       viewRef.current = null;
     };
   }, []);
+
+  // the saved parts' chips: a thumbnail each, in their own materials, the first time they are seen
+  useEffect(() => {
+    const v = viewRef.current;
+    if (!v || !extra) return;
+    let added = false;
+    for (const e of extra) {
+      if (THUMBS.has(e.id)) continue;
+      const md = printedMesh(e.spec);
+      if (!md) continue;
+      const names = slotNamesOf(e.spec.gen, md);
+      const mesh = new THREE.Mesh(partGeometry(md, names), names.map((s) => v.mats.get(e.spec.slotMaterials[s] ?? DEFAULT_SLOT_MATERIAL[s] ?? 'paint') ?? v.mats.get('paint')!));
+      THUMBS.set(e.id, snapshot(v.stage, mesh));
+      mesh.geometry.dispose();
+      added = true;
+    }
+    if (added) thumbListeners.forEach((f) => f());
+  }, [extra]);
 
   // the part: rebuilt on every slider, operator or material change, and on every try-on
   useEffect(() => {

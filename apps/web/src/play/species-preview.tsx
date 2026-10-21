@@ -27,11 +27,13 @@ export interface SpeciesPreviewProps {
   readonly spec: SpeciesSpec;
   /** What the player is trying on (hovering), shown as a tag over the view; null when it shows the tree as set. */
   readonly trying?: string | null;
+  /** The player's saved species: each gets a thumbnail (keyed by its preset id) for its chip, rendered once. */
+  readonly extra?: readonly { readonly id: string; readonly spec: SpeciesSpec }[];
 }
 
-export const SpeciesPreview: React.FC<SpeciesPreviewProps> = ({ spec, trying = null }) => {
+export const SpeciesPreview: React.FC<SpeciesPreviewProps> = ({ spec, trying = null, extra }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const viewRef = useRef<{ stage: Turntable; tree: THREE.Mesh } | null>(null);
+  const viewRef = useRef<{ stage: Turntable; tree: THREE.Mesh; foliage: THREE.Material } | null>(null);
   const model = useMemo(() => speciesModel({ species: spec.species as Species, params: spec.params }, 'near'), [spec.species, spec.params]);
 
   // the view: built once per page
@@ -52,7 +54,7 @@ export const SpeciesPreview: React.FC<SpeciesPreviewProps> = ({ spec, trying = n
       }
       thumbListeners.forEach((f) => f());
     }
-    viewRef.current = { stage, tree };
+    viewRef.current = { stage, tree, foliage: foliage.material };
     return () => {
       tree.geometry.dispose();
       foliage.dispose();
@@ -60,6 +62,21 @@ export const SpeciesPreview: React.FC<SpeciesPreviewProps> = ({ spec, trying = n
       viewRef.current = null;
     };
   }, []);
+
+  // the saved species' chips: a thumbnail each, the first time they are seen
+  useEffect(() => {
+    const v = viewRef.current;
+    if (!v || !extra) return;
+    let added = false;
+    for (const e of extra) {
+      if (THUMBS.has(e.id)) continue;
+      const m = speciesModel({ species: e.spec.species as Species, params: e.spec.params }, 'near');
+      THUMBS.set(e.id, snapshot(v.stage, new THREE.Mesh(m.geometry, v.foliage)));
+      m.geometry.dispose();
+      added = true;
+    }
+    if (added) thumbListeners.forEach((f) => f());
+  }, [extra]);
 
   // the tree: regrown on every slider, preset or canopy change, and on every try-on
   useEffect(() => {

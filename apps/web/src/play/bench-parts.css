@@ -198,3 +198,11 @@
   background: #f1f4f5;
   border: 2px solid #101214;
 }
+
+/* the player's own presets after the named ones (plan 39 section 7) */
+.bench-parts-yours {
+  margin: 6px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(232, 238, 241, 0.6);
+}

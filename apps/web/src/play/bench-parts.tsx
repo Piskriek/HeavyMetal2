@@ -11,6 +11,7 @@ import { GENERATORS, resolveParams } from '@hm/partgen';
 import { BENCH_OPERATORS, PART_COSTS, partName } from './part-cartridge';
 import { DEFAULT_SLOT_MATERIAL, formatValue, materialBall, PART_SWATCHES, swatchName } from './part-swatches';
 import { PartPreview, usePartThumbs } from './part-preview';
+import type { MyPreset } from './my-presets';
 import './bench-parts.css';
 
 export interface BenchPartsProps {
@@ -23,26 +24,32 @@ export interface BenchPartsProps {
   readonly side?: React.ReactNode;
   /** The number of the first step on this page (the lab bench's step 1 is picking the blank). */
   readonly firstStep?: number;
+  /** The player's saved parts ("Yours", plan 39 section 7), offered after the generators. */
+  readonly mine?: readonly MyPreset[];
+  /** Keeps the current part in the player's presets. */
+  readonly onSave?: (spec: PartSpec) => void;
 }
 
 /** What the player is trying on: another part, an operator toggled, or a material in one slot. */
-type Trial = { readonly label: string; readonly gen?: string; readonly op?: string; readonly slot?: string; readonly mat?: string };
+type Trial = { readonly label: string; readonly gen?: string; readonly op?: string; readonly slot?: string; readonly mat?: string; readonly spec?: PartSpec };
+type OpRef = { readonly op: string; readonly params: Readonly<Record<string, number>> };
 
-export const BenchParts: React.FC<BenchPartsProps> = ({ check, onPrint, printLabel = 'Start printing', side, firstStep = 2 }) => {
+export const BenchParts: React.FC<BenchPartsProps> = ({ check, onPrint, printLabel = 'Start printing', side, firstStep = 2, mine = [], onSave }) => {
   const [gen, setGen] = useState('bolt');
   const [values, setValues] = useState<Record<string, Record<string, number>>>({});
   const [slots, setSlots] = useState<Record<string, Record<string, string>>>({});
-  const [ops, setOps] = useState<readonly string[]>([]);
+  // each operator keeps its own values, so a preset from the Studio's deeper stack loads whole
+  const [ops, setOps] = useState<readonly OpRef[]>([]);
   const [trial, setTrial] = useState<Trial | null>(null);
   const thumbs = usePartThumbs();
 
   /** The cartridge for a generator with its own sliders and materials, the given operators and one slot's material swapped. */
-  const specOf = (id: string, opList: readonly string[], swap?: { readonly slot: string; readonly mat: string }): PartSpec => {
+  const specOf = (id: string, opList: readonly OpRef[], swap?: { readonly slot: string; readonly mat: string }): PartSpec => {
     const gg = GENERATORS[id] ?? GENERATORS.bolt!;
     const params = resolveParams(gg.params, values[id] ?? {});
     const set = slots[id] ?? Object.fromEntries(gg.slots.map((s) => [s, DEFAULT_SLOT_MATERIAL[s] ?? 'paint']));
     const slotMaterials = swap ? { ...set, [swap.slot]: swap.mat } : set;
-    const base = { gen: gg.id, params, slotMaterials, ops: opList.map((op) => ({ op, params: {} })) };
+    const base = { gen: gg.id, params, slotMaterials, ops: opList };
     return { ...base, name: partName(base, swatchName) };
   };
   const g = GENERATORS[gen] ?? GENERATORS.bolt!;
@@ -51,12 +58,22 @@ export const BenchParts: React.FC<BenchPartsProps> = ({ check, onPrint, printLab
   const slotMaterials = spec.slotMaterials;
   const shown = useMemo(() => {
     if (!trial) return spec;
-    const opList = trial.op ? (ops.includes(trial.op) ? ops.filter((x) => x !== trial.op) : [...ops, trial.op]) : ops;
+    if (trial.spec) return trial.spec;
+    const opList = trial.op ? (ops.some((o) => o.op === trial.op) ? ops.filter((o) => o.op !== trial.op) : [...ops, { op: trial.op, params: {} }]) : ops;
     return specOf(trial.gen ?? gen, opList, trial.slot && trial.mat ? { slot: trial.slot, mat: trial.mat } : undefined);
   }, [trial, spec, ops, gen, values, slots]);
   const can = check(spec);
   const cost = PART_COSTS[gen] ?? { vtx: 20, pxd: 15 };
-  const preview = <PartPreview spec={shown} trying={trial?.label ?? null} />;
+  const mineSpecs = useMemo(() => mine.flatMap((p) => ('part' in p.print ? [{ id: p.id, spec: p.print.part }] : [])), [mine]);
+  const preview = <PartPreview spec={shown} trying={trial?.label ?? null} extra={mineSpecs} />;
+  /** Loads a saved part into the page: its generator, sliders, materials and operators. */
+  const pickMine = (sp: PartSpec): void => {
+    setTrial(null);
+    setGen(sp.gen);
+    setValues((all) => ({ ...all, [sp.gen]: { ...sp.params } }));
+    setSlots((all) => ({ ...all, [sp.gen]: { ...sp.slotMaterials } }));
+    setOps(sp.ops.map((o) => ({ op: o.op, params: { ...o.params } })));
+  };
   /** Hover or focus tries a choice on in the preview; leaving puts the part back as set. */
   const tryOn = (t: Trial) => ({
     onMouseEnter: () => setTrial(t),
@@ -78,6 +95,20 @@ export const BenchParts: React.FC<BenchPartsProps> = ({ check, onPrint, printLab
             </button>
           ))}
         </div>
+        {mineSpecs.length > 0 ? (
+          <>
+            <p className="bench-parts-yours">Yours</p>
+            <div className="bench-parts-gens">
+              {mineSpecs.map((m) => (
+                <button key={m.id} onClick={() => pickMine(m.spec)} data-testid={`bench-mine-${m.id}`}
+                  {...tryOn({ label: m.spec.name.toLowerCase(), spec: m.spec })}>
+                  {thumbs.get(m.id) ? <img src={thumbs.get(m.id)} alt="" width={40} height={40} /> : <i aria-hidden="true" />}
+                  <b>{m.spec.name}</b>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : null}
       </div>
 
       <div className="play-carts">
@@ -113,11 +144,11 @@ export const BenchParts: React.FC<BenchPartsProps> = ({ check, onPrint, printLab
         </div>
         <div className="bench-parts-ops" role="group" aria-label="One-click shaping">
           {BENCH_OPERATORS.map((o) => {
-            const on = ops.includes(o.op);
+            const on = ops.some((x) => x.op === o.op);
             return (
               <button key={o.op} className={on ? 'on' : ''} aria-pressed={on} data-testid={`bench-op-${o.op}`}
                 {...tryOn({ label: on ? `without ${o.label.toLowerCase()}` : o.label.toLowerCase(), op: o.op })}
-                onClick={() => { setTrial(null); setOps((list) => (on ? list.filter((x) => x !== o.op) : [...list, o.op])); }}>
+                onClick={() => { setTrial(null); setOps((list) => (on ? list.filter((x) => x.op !== o.op) : [...list, { op: o.op, params: {} }])); }}>
                 {o.label}
               </button>
             );
@@ -150,6 +181,7 @@ export const BenchParts: React.FC<BenchPartsProps> = ({ check, onPrint, printLab
       </p>
       <div className="play-machine-actions">
         <button className="go" disabled={!can.ok} onClick={() => onPrint(spec)} data-testid="bench-print">{printLabel}</button>
+        {onSave ? <button onClick={() => onSave(spec)} data-testid="bench-save-part">Save as preset</button> : null}
       </div>
       {!can.ok ? <span className="play-why">{can.why}</span> : null}
     </>

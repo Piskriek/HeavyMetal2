@@ -46,10 +46,12 @@ import {
   startPrintWrite,
   readPrint,
   printKind,
+  type Print,
 } from '@hm/cartlab';
 import { BenchParts } from './bench-parts';
 import { BenchSpecies } from './bench-species';
 import { BenchLights } from './bench-lights';
+import { MY_PRESETS_KEY, parseMyPresets, presetsOf, savePreset, serializeMyPresets, type MyPresets } from './my-presets';
 import { isLampPart, lightOverride } from './light-presets';
 import { rifleLook } from './rifle-look';
 import { MAX_TREE_VARIANTS, treeVariantKey } from './plot-biome-view';
@@ -601,6 +603,19 @@ export function PlayScreen(props: {
   const [benchBlank, setBenchBlank] = useState<string | null>(null);
   /** The preset bench's page: authored terraforming presets, or Shape Press parts (TICKET-32). */
   const [benchTab, setBenchTab] = useState<'presets' | 'parts' | 'species' | 'lights'>('presets');
+  /** The player's own presets (plan 39 section 7): "Yours" on every bench page, kept in the profile. */
+  const [myPresets, setMyPresets] = useState<MyPresets>(() => parseMyPresets(kv.get(MY_PRESETS_KEY)));
+  /** Keeps a print in the player's presets and says so (or that it was already there). */
+  const saveMyPreset = (print: Print): void => {
+    const { presets, preset } = savePreset(myPresets, print);
+    if (presets === myPresets) {
+      say('Already in your presets', `${preset.name} is in Yours.`);
+      return;
+    }
+    try { kv.set(MY_PRESETS_KEY, serializeMyPresets(presets)); } catch { /* the list still holds it for this session */ }
+    setMyPresets(presets);
+    say(`Saved: ${preset.name}`, 'It is in Yours on the bench, the Drafting Table and the Studio.');
+  };
   const [benchPreset, setBenchPreset] = useState<string | null>(null);
   const [combineIds, setCombineIds] = useState<readonly string[]>([]);
   /** State of visiting another player's plot via code. */
@@ -4074,6 +4089,8 @@ useEffect(() => {
       /** The light shot as a tap or a hold (plan 39, Lx). */
       applyLight: (broadcast: boolean): number => applyLightShotRef.current(broadcast),
       treeOverrides: () => propsRef.current.trees ?? {},
+      /** The player's own presets (plan 39 section 7), as saved. */
+      myPresets: () => parseMyPresets(kv.get(MY_PRESETS_KEY)),
       /** Replaces the regrown trees (saved and shown), as the props save holds them. */
       setTreeOverrides: (trees: Readonly<Record<string, TreePreset>>): void => {
         savePropsSave({ ...propsRef.current, trees });
@@ -4853,6 +4870,8 @@ useEffect(() => {
                   </div>
                   {benchTab === 'lights' ? (
                     <BenchLights
+                      mine={presetsOf(myPresets, 'light')}
+                      onSave={(spec: LightSpec) => saveMyPreset({ light: spec })}
                       check={(spec) => {
                         if (!activeBlank) return { ok: false, why: 'No blanks on the rack. Make a blank at the rack first.' };
                         return canWritePrint(labRef.current, labEnv, activeBlank, { light: spec });
@@ -4867,6 +4886,8 @@ useEffect(() => {
                     />
                   ) : benchTab === 'species' ? (
                     <BenchSpecies
+                      mine={presetsOf(myPresets, 'species')}
+                      onSave={(spec: SpeciesSpec) => saveMyPreset({ species: spec })}
                       check={(spec) => {
                         if (!activeBlank) return { ok: false, why: 'No blanks on the rack. Make a blank at the rack first.' };
                         return canWritePrint(labRef.current, labEnv, activeBlank, { species: spec });
@@ -4881,6 +4902,8 @@ useEffect(() => {
                     />
                   ) : benchTab === 'parts' ? (
                     <BenchParts
+                      mine={presetsOf(myPresets, 'part')}
+                      onSave={(spec: PartSpec) => saveMyPreset({ part: spec })}
                       check={(spec) => {
                         if (!activeBlank) return { ok: false, why: 'No blanks on the rack. Make a blank at the rack first.' };
                         const c = canWritePart(labRef.current, labEnv, activeBlank, spec);
@@ -5457,6 +5480,8 @@ useEffect(() => {
                 return (
                   <BenchParts
                     printLabel="Print cartridge"
+                    mine={presetsOf(myPresets, 'part')}
+                    onSave={(spec: PartSpec) => saveMyPreset({ part: spec })}
                     firstStep={1}
                     side={(
                       <p className={`hm-draft-parts-blank${free === null ? ' empty' : ''}`} data-testid="drafting-parts-blank">

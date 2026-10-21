@@ -9,6 +9,7 @@ import { CANOPY_TINTS } from './plot-biome-view';
 import { CANOPY_NAMES, formatTreeValue, SPECIES_PRESETS, speciesSpec } from './species-presets';
 import { SpeciesPreview, useSpeciesThumbs } from './species-preview';
 import { materialBall } from './part-swatches';
+import type { MyPreset } from './my-presets';
 import './bench-parts.css';
 
 export interface BenchSpeciesProps {
@@ -18,10 +19,14 @@ export interface BenchSpeciesProps {
   readonly printLabel?: string;
   /** The number of the first step on this page (the lab bench's step 1 is picking the blank). */
   readonly firstStep?: number;
+  /** The player's saved species ("Yours", plan 39 section 7), offered after the named trees. */
+  readonly mine?: readonly MyPreset[];
+  /** Keeps the current species in the player's presets. */
+  readonly onSave?: (spec: SpeciesSpec) => void;
 }
 
 /** What the player is trying on: another named tree, or another canopy. */
-type Trial = { readonly label: string; readonly preset?: string; readonly tint?: number };
+type Trial = { readonly label: string; readonly preset?: string; readonly tint?: number; readonly spec?: SpeciesSpec };
 
 const SLIDERS = TREE_PARAM_SPECS.filter((s) => s.unit !== 'choice');
 const TINT = TREE_PARAM_SPECS.find((s) => s.key === 'tint');
@@ -31,7 +36,7 @@ const canopyBall = (i: number): string => {
   return materialBall({ color: hex, metal: 0, rough: 0.8 });
 };
 
-export const BenchSpecies: React.FC<BenchSpeciesProps> = ({ check, onPrint, printLabel = 'Start printing', firstStep = 2 }) => {
+export const BenchSpecies: React.FC<BenchSpeciesProps> = ({ check, onPrint, printLabel = 'Start printing', firstStep = 2, mine = [], onSave }) => {
   const [presetId, setPresetId] = useState('broadleaf-oak');
   const [species, setSpecies] = useState<Species>('oak');
   const [values, setValues] = useState<Record<string, number>>(() => ({ ...SPECIES_PRESETS[1]!.params }));
@@ -41,11 +46,13 @@ export const BenchSpecies: React.FC<BenchSpeciesProps> = ({ check, onPrint, prin
   const spec = useMemo(() => speciesSpec(species, values), [species, values]);
   const shown = useMemo(() => {
     if (!trial) return spec;
+    if (trial.spec) return trial.spec;
     const p = trial.preset ? SPECIES_PRESETS.find((x) => x.id === trial.preset) : undefined;
     if (p) return speciesSpec(p.species, p.params);
     return speciesSpec(species, { ...values, ...(trial.tint !== undefined ? { tint: trial.tint } : {}) });
   }, [trial, spec, species, values]);
   const can = check(spec);
+  const mineSpecs = useMemo(() => mine.flatMap((p) => ('species' in p.print ? [{ id: p.id, spec: p.print.species }] : [])), [mine]);
   const tryOn = (t: Trial) => ({
     onMouseEnter: () => setTrial(t),
     onMouseLeave: () => setTrial(null),
@@ -74,11 +81,25 @@ export const BenchSpecies: React.FC<BenchSpeciesProps> = ({ check, onPrint, prin
             </button>
           ))}
         </div>
+        {mineSpecs.length > 0 ? (
+          <>
+            <p className="bench-parts-yours">Yours</p>
+            <div className="bench-parts-gens">
+              {mineSpecs.map((m) => (
+                <button key={m.id} data-testid={`bench-mine-${m.id}`} {...tryOn({ label: m.spec.name.toLowerCase(), spec: m.spec })}
+                  onClick={() => { setTrial(null); setPresetId(m.id); setSpecies(m.spec.species as Species); setValues({ ...m.spec.params }); }}>
+                  {thumbs.get(m.id) ? <img src={thumbs.get(m.id)} alt="" width={40} height={40} /> : <i aria-hidden="true" />}
+                  <b>{m.spec.name}</b>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : null}
       </div>
 
       <div className="play-carts">
         <h4>{firstStep + 1}. Shape it</h4>
-        <SpeciesPreview spec={shown} trying={trial?.label ?? null} />
+        <SpeciesPreview spec={shown} trying={trial?.label ?? null} extra={mineSpecs} />
         <div className="bench-parts-sliders">
           {SLIDERS.map((p) => {
             const v = spec.params[p.key] ?? p.default;
@@ -122,6 +143,7 @@ export const BenchSpecies: React.FC<BenchSpeciesProps> = ({ check, onPrint, prin
       </p>
       <div className="play-machine-actions">
         <button className="go" disabled={!can.ok} onClick={() => onPrint(spec)} data-testid="bench-print-species">{printLabel}</button>
+        {onSave ? <button onClick={() => onSave(spec)} data-testid="bench-save-species">Save as preset</button> : null}
       </div>
       {!can.ok ? <span className="play-why">{can.why}</span> : null}
     </div>

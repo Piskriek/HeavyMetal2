@@ -33,6 +33,9 @@ const result = await page.evaluate(async ([kind, kitModule, kitExport, preset, s
   const { buildKitPreset } = await import('/src/play/kit-build.ts');
   const { plotKitMaterials } = await import('/src/play/plot-kits.ts');
   const { vaultSkin } = await import('/src/play/vault-skin.ts');
+  const { lightMaterial } = await import('/src/play/light-material.ts');
+  const lm = await import('/src/play/layered-material.ts');
+  const { RoomEnvironment } = await import('/@fs/C:/MarbleGp/node_modules/three/examples/jsm/environments/RoomEnvironment.js');
   const kit = (await import(kitModule))[kitExport];
   for (const a of ['mill', 'press-frame', 'press-ram', 'watermaker', 'projector-mast', 'projector-head']) await gen.loadGen?.(a, 'high');
 
@@ -44,7 +47,8 @@ const result = await page.evaluate(async ([kind, kitModule, kitExport, preset, s
     if (!flat.has(name)) flat.set(name, new THREE.MeshStandardMaterial({ color: name, roughness: 0.6, metalness: 0.15 }));
     return flat.get(name);
   };
-  const resolve = (name) => mats[name] ?? vaultSkin(name, true) ?? hex(name);
+  // as the game resolves a kit's names: kit swatches, Texture Mill skins, lamps (lx:), layered materials (mat:, rank 2)
+  const resolve = (name) => mats[name] ?? vaultSkin(name, true) ?? lightMaterial(name) ?? lm.layeredMaterial(name, 2) ?? hex(name);
   const drawn = (name) => resolve(name) ?? (standins[name] ? resolve(standins[name]) : null);
   const placed = kitspec.flatten(kit, preset);
   const missing = new Set();
@@ -54,7 +58,7 @@ const result = await page.evaluate(async ([kind, kitModule, kitExport, preset, s
   }
   const issues = kitspec.validate(kit, preset, {}).map((i) => JSON.stringify(i));
   const old = props.machineProp(lab.createMaterials(), kind, 6, 'high').group;
-  const built = buildKitPreset(kit, preset, { materials: mats, gen: (a) => gen.getGenSync(a, 'high'), maxRank: 2, resolveMaterial: (n) => vaultSkin(n, true) ?? (standins[n] ? resolve(standins[n]) : null) });
+  const built = buildKitPreset(kit, preset, { materials: mats, gen: (a) => gen.getGenSync(a, 'high'), maxRank: 2, resolveMaterial: (n) => (standins[n] ? resolve(standins[n]) : null) ?? vaultSkin(n, true) ?? lightMaterial(n) ?? lm.layeredMaterial(n, 2), layering: lm.kitLayering });
   const rows = [{ name: `${kind} (today)`, object: old }, { name: `${preset} (kit)`, object: built.group }];
 
   const V = 360, LABEL = 200, W = LABEL + V * 4, H = V * rows.length;
@@ -67,6 +71,9 @@ const result = await page.evaluate(async ([kind, kitModule, kitExport, preset, s
   renderer.setSize(V, V);
   renderer.setClearColor(0x2b3540, 1);
   const scene = new THREE.Scene();
+  // the lab's reflections, so metal reads as metal
+  scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environmentIntensity = 0.35;
   scene.add(new THREE.HemisphereLight(0xe8f1fa, 0x2a3442, 2.0));
   const sun = new THREE.DirectionalLight(0xfff3e0, 2.6);
   sun.position.set(4, 8, 6);

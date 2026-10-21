@@ -78,6 +78,14 @@ export interface SurfaceSpec {
 export const NOISE_KINDS = ['clouds', 'cells', 'speckle', 'scratches'] as const;
 export type NoiseKind = (typeof NOISE_KINDS)[number];
 
+/**
+ * How many features each noise has across one repeat, so a mask's `scale` (metres per repeat) sets a feature size of
+ * scale / count: clouds are soft blotches (4 across), cells are blobs bright in the middle with dark borders (7 across),
+ * speckle is fine soft grain (32 across), scratches are thin broken lines (23 across). The renderer's noise atlas is
+ * built to match.
+ */
+export const NOISE_FEATURES: Readonly<Record<NoiseKind, number>> = { clouds: 4, cells: 7, speckle: 32, scratches: 23 };
+
 export const BLEND_MODES = ['normal', 'add', 'subtract', 'multiply', 'max', 'min'] as const;
 export type BlendMode = (typeof BLEND_MODES)[number];
 

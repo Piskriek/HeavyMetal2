@@ -376,6 +376,9 @@ float msMaskOf(int l) {
   }
   float c = 0.5 - m.x * 0.5;
   float h = max(0.01, (1.0 - m.y) * 0.5);
+  // where the mask changes faster than a pixel can show (fine noise far away), the threshold widens to filter instead of
+  // glittering; up close (fwidth small) this is matstack's levels exactly
+  h = max(h, fwidth(acc) * 0.75);
   float v = clamp((acc - c) / (2.0 * h) + 0.5, 0.0, 1.0);
   return m.z > 0.5 ? 1.0 - v : v;
 }

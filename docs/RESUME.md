@@ -1,6 +1,69 @@
 # RESUME: start here (fresh session)
 
-## OPUS STATE (21 Oct, later; read this first)
+## OPUS STATE (21 Oct, evening: ON HOLD; read this first)
+- **Hold (owner, 21 Oct ~17:30):** "lets hold here be ready to kickoff again in a while from now". The resources go to the other game first, then back here.
+  - Nothing is running.
+  - The branch is pushed and clean at `4255650c`, except the usual untracked `arena-gathered/`.
+- **The owner's direction being built:** layered machine materials.
+  - His words: "materials should be like machine parts presets, a combo of diffuse/normals/specular/bump/roughness/detail/ramp.. presets like rust/wear/dirt.. ready to apply and tweak .. keep asking yourself, is this modular, and can it be? the game is the cake .. in the bakery we are building". Memory: `modular-everything`.
+  - **Research:** `docs/MATERIAL_LAYERS_RESEARCH.md`.
+  - **Plan:** `docs/argo/plans/41-layered-materials.md`. Its section 7 has the done list and the next list.
+- **Built 21 Oct (all tested):**
+  - **`@hm/matstack`:**
+    - the spec and reference formulas;
+    - mask attributes (edge and crease lines per vertex, no extra triangles);
+    - rank 0 flattened per face;
+    - Argo's shelf (29 surfaces, 11 masks, 16 layers, 16 materials);
+    - material codes (`matc:`, presetcodec).
+
+    29 tests.
+  - **The renderer `layered-material.ts`:**
+    - ranks 0, 1 and 2 (flat, standard, physical);
+    - the mask view;
+    - kit-build's `layering` hook;
+    - wired into lab and plot kit builds;
+    - the plot reflection (the 0.35 metal cap is gone).
+
+    Its GLSL matches matstack pixel for pixel: `scripts/test-layered-material.mjs` 7/7.
+  - **The bench's Materials page, Machines shelf** (the Ground shelf stays the default):
+    - a pinned test piece with mask view, and thumbnails;
+    - paints, the layer stack and age;
+    - Save (Yours) and Print a material cartridge (cartlab `material` print);
+    - beam Apply: a tap dresses one part, a hold every part that wore the same;
+    - plot saves keep `matc:` codes.
+
+    `scripts/test-material-cartridge.mjs` 17/17. Also green: part-cartridge 28/28, lights 12/12, species 11/11, my-presets 10/10, lab-overhaul 78/78.
+  - **partgen:** TICKET-40 v3's 13 new generators are installed (the old 7 build byte-identical). The bench's Parts page shelves the 20 in four families, with the live view pinned on top.
+  - **Review tools:**
+    - `scripts/material-sheet.mjs`;
+    - `scripts/material-coverage.mjs` (each layer's coverage on faces, edges, creases, tops and the splash zone);
+    - `scripts/kit-compare-sheet.mjs`, which draws `mat:` and `lx:` as the game does.
+- **Open, in this order, when we resume:**
+  1. **The perf gate is not yet proven.** `scripts/perf-layered-material.mjs` on the GTX 950M, Medium, 1080p: the median stayed 16.7 ms plain and in six layers, but both are capped at 60 Hz even with vsync flagged off. p95 went from 17.3 to 17.9 ms, and draw calls from 63 to 59. Find an uncapped measurement (Chrome's `--disable-frame-rate-limit`, or GPU timer queries) and re-run before calling it passed.
+  2. **Argo, back at 18:13 on 21 Oct (Argon task mode, chat `77f3bf1cb56ba86c`):** he has not yet read the v4 review. Before typing, clear the stray "Allow" left in his input. The files are in Setmix:
+     - `OPUS_NOTE_41_ticket40_review_v4.md` (1NNqjhQpTg3dC7_BDj0mQTykQtXXo_r7e);
+     - `opus-matstack-coverage.txt` (1l6--QJFfKDKWh-L6Km1e-CNXF_p-VRSD);
+     - `opus-t40v4-review-mill-compare.png` (1JaWtqXZLH6pQp6MT4WY2ORykvM17zoF_);
+     - `opus-matstack-shelf-sheet.png` (1gGUPj0-zi3CmutP44H-6DvfCOvLu5WF9).
+
+     He also has `OPUS_NOTE_44_tile_library.md` (TICKET-41) and `texgraph-index.ts`. Ask him for:
+     - (a) TICKET-40 v5: the `kit-modules.ts` line 444 typing and the `kits.test.ts` palette test;
+     - (b) the shelf's coverage tuning: rust bloom covers 67% of faces, soot never shows, and the ore bed's moon dust makes the hopper read as a light tray;
+     - (c) TICKET-41, the 20 tile graphs and the nodes they need;
+     - (d) his chamfered shader-ball test piece, if he still wants it (the bench uses an interim piece in `material-preview.tsx`).
+
+     The v4 bundle is unpacked in `arena-gathered/argo-ticket40-v4/` (held). Install the mill only after v5 passes the same review.
+  3. **Opus next:**
+     - the layer cartridge (one layer over whatever a part wears);
+     - the Studio Materials workspace (replaces `material-designer.tsx`);
+     - the matstack commands for plan 40 (bring your own agent; Argo approved it with three additions, now in the plan);
+     - then plan 40.
+- **Known stale test:** `scripts/e2e-smoke.mjs` fails on the home screen. It expects the 8 Oct menu list and copy, which the home redesign changed; this is not from the material work.
+- **Infra:**
+  - The 3D PC moved to 192.168.0.5 (`scripts/worker.env`): the router reservation did not hold.
+  - Adobe Substance 3D Painter 7.2.3 is installed there. Whether its licence is active is a question for the owner; it is plan 41's P1 look target.
+
+## OPUS STATE (21 Oct, later; superseded by the evening hold above)
 - **Owner rules added today:** "you guys need to check each other, shortcuts are unacceptable" (RULES 8a, memory `no-shortcuts-cross-check`): every Argo bundle is reviewed before install (tests against our packages, measured fit, four sides, the rules), every brief of mine is open to his challenge, no stopgap without the owner's yes. And the machines get rebuilt from parts (owner: "ok good so you understand the machines get rebuilt with the parts").
 - **Branch pushed, green** at ee64a7e2: 3,117 unit tests; species 11/11, part-cartridge 28/28, beam-tool 61/61, lab-overhaul 78/78, studio-tabs 52/52, machine-plumes 121/121, machine-inspector 27/27, base-building pass. Pre-existing: `test-base-tabs` 2/4 (fails at 6043d0c7 too; a session card is offered).
 - **Done today:** plan 39 steps 1-3 in play.

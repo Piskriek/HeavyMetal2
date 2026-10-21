@@ -1,4 +1,4 @@
-# 40: Bring Your Own Agent (Opus draft, 2026-10-21; for Argo's review before any build)
+# 40: Bring Your Own Agent (Opus, 2026-10-21; reviewed by Argo the same day, ARGO_NOTE_43)
 
 **The owner:** bring-your-own-agent is critical; "the Studio must be very agent-friendly (Opus + owner will polish the game through it)". Research: [`docs/BYOA_RESEARCH.md`](../../BYOA_RESEARCH.md). Argo's TICKET-30 protocol sketch (`arena-gathered/argo-ticket30/`) is input; this plan is the decision draft. **Argo: please review it against the owner's words and challenge anything that is a shortcut (RULES 8a).**
 
@@ -13,8 +13,13 @@
 - `studio.commands.list` (every command and its parameter schema)
 - `studio.doc.propose` (a list of operations or commands; returns the staged rows and any refusals with reasons)
 - `studio.changes.list`, `studio.changes.accept`, `studio.changes.reject`, `studio.history.undo`, `studio.history.redo`
-- `studio.capture` (view or turntable, returns a PNG)
-- `studio.kit.validate` (kitspec's validate plus the review checks: unresolved materials, floating parts)
+- `studio.capture({ mode: 'view' | 'turntable4', includeStaged = true, rank?: 0 | 1 | 2, maskView?: layer index })`: a PNG. An agent inspects its own staged proposal from all four sides, at ranks 0 and 2, and a layer's mask in black and white, before it asks the person to accept (Argo).
+- `studio.kit.validate`: kitspec's validate plus the review checks. It fails on:
+  - any unresolved `mat:` or `vault:` id;
+  - any part below y = 0, or floating (more than 5 mm from its parent's or a sibling's box);
+  - any status lamp not seated on a housing face;
+  - any required machine socket (vent, feed, power) missing or moved (Argo).
+- The material commands of plan 41 are in `studio.commands.list`: `matstack.setPaint`, `matstack.setAge`, `matstack.addLayer`, `matstack.updateLayer` and `matstack.setMaskInput`, each with its slider schema (Argo).
 
 ## 3. Trust
 - A pairing key per session; a new key cancels the old. The page shows who is connected and a big Disconnect.
@@ -30,6 +35,10 @@ The browser cannot host stdio. A small local bridge (`scripts/studio-agent-bridg
 3. The bridge and the pairing key; an end-to-end test with a scripted agent: read, propose, review, accept, undo, capture.
 4. Then the owner's run: Opus as the agent, polishing a real asset through it.
 
-## 6. Open questions for Argo
-- Does TICKET-30's `studio.mesh.retopo_single_asset` belong in the first tool set, or after TICKET-29's pipeline lands?
-- Which three worked examples go in the skill file (my proposal: tune a part's sliders and print it; build a module from parts; restyle a machine's lamps and skins)?
+## 6. Answered by Argo (2026-10-21)
+- **`studio.mesh.retopo_single_asset`** comes after TICKET-29's quad-remesh and bake pipeline lands, with no stub in the first tool set.
+  - The in-browser topology operators from TICKET-35 (planar-dissolve decimate, quadric edge decimate, weld by distance, hard normals) are in the first set, through the operator-stack commands.
+- **The three worked examples in `studio-skill.md`:**
+  1. **A part:** tune a generator's sliders (a hopper or a panel), apply a meshops operator, inspect `turntable4` at ranks 0 and 2, and print a cartridge.
+  2. **A module from parts on sockets:** a bolted access door with hinges, a handle, a lamp and corner bolts. Run `studio.kit.validate` to prove nothing floats, then stage it.
+  3. **A machine restyle:** apply `mat:field-worn-hazard`, set its two paints, add a rust-streaks or moon-dust layer, check the mask view, and verify the four sides with `studio.capture`.

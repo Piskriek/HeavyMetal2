@@ -1,0 +1,80 @@
+noise features per repeat: clouds 4, cells 7, speckle 32, scratches 23
+layer                            face   edge crease    top splash
+mat:lab-fresh (age 0.15)
+  Grime                            0%     0%    78%     0%     0%
+  Edge wear                        0%    88%     0%     0%     0%
+mat:workshop-steel (age 0.42)
+  Grime                            0%     0%    78%     0%     0%
+  Edge wear                        0%    88%     0%     0%     0%
+  Scratches                        8%    85%    11%    11%     8%
+  Oil leaks                       37%    34%    78%     0%    54%
+mat:field-worn-hazard (age 0.48)
+  Grime                            0%     0%    78%     0%     0%
+  Paint chips                      0%    92%     0%     0%     0%
+  Edge wear                        0%    88%     0%     0%     0%
+  Rust bloom                      67%    71%    82%    71%    70%
+  Dirt                             0%     6%     6%     0%    80%
+mat:moon-dusted (age 0.58)
+  Edge wear                        0%    88%     0%     0%     0%
+  Scratches                        9%    85%    11%    11%     8%
+  Grime                            0%     0%    78%     0%     0%
+  Moon dust                        0%     0%     0%    84%     0%
+mat:rust-bucket (age 0.68)
+  Grime                            0%     0%    78%     0%     0%
+  Rust bloom                      68%    71%    82%    71%    70%
+  Rust streaks                    45%    43%    76%     0%    56%
+  Heavy rust                      43%    43%    43%    43%    45%
+  Edge wear                        0%    88%     0%     0%     0%
+mat:furnace (age 0.62)
+  Heat tint                        0%     0%     0%    80%     0%
+  Soot                             0%     0%     0%     0%     0%
+  Heavy rust                      42%    42%    42%    42%    44%
+  Edge wear                        0%    88%     0%     0%     0%
+mat:old-copper (age 0.5)
+  Grime                            0%     0%    78%     0%     0%
+  Verdigris                        0%     0%    84%     0%     0%
+  Edge wear                        0%    88%     0%     0%     0%
+  Scratches                        8%    85%    11%    11%     8%
+mat:oily-engine (age 0.55)
+  Grime                            0%     0%    78%     0%     0%
+  Soot                             0%     0%     0%     0%     0%
+  Oil leaks                       40%    38%    78%     0%    55%
+  Edge wear                        0%    88%     0%     0%     0%
+  Scratches                        9%    85%    11%    11%     8%
+mat:overgrown-relic (age 0.76)
+  Rust bloom                      68%    71%    82%    71%    71%
+  Heavy rust                      44%    43%    43%    43%    46%
+  Dirt                             0%     6%     6%     0%    80%
+  Moss                             0%     0%     0%    88%     0%
+  Edge wear                        0%    88%     0%     0%     0%
+mat:frozen-rig (age 0.64)
+  Paint chips                      0%    92%     0%     0%     0%
+  Grime                            0%     0%    78%     0%     0%
+  Frost                            0%     0%     0%    86%     0%
+  Edge wear                        0%    88%     0%     0%     0%
+mat:brushed-lab-steel (age 0.28)
+  Grime                            0%     0%    78%     0%     0%
+  Scratches                        8%    85%    11%    11%     8%
+  Edge wear                        0%    88%     0%     0%     0%
+mat:carbon-racer (age 0.22)
+  Scratches                        7%    85%    11%    11%     7%
+  Edge wear                        0%    88%     0%     0%     0%
+  Dust                             0%     0%     0%    72%     0%
+mat:hazard-chevron (age 0.45)
+  Grime                            0%     0%    78%     0%     0%
+  Paint chips                      0%    92%     0%     0%     0%
+  Edge wear                        0%    88%     0%     0%     0%
+  Dirt                             0%     6%     6%     0%    80%
+mat:rubber-seal (age 0.4)
+  Grime                            0%     0%    78%     0%     0%
+  Dirt                             0%     6%     6%     0%    80%
+  Moon dust                        0%     0%     0%    84%     0%
+mat:slatted-grille-steel (age 0.52)
+  Grime                            0%     0%    78%     0%     0%
+  Soot                             0%     0%     0%     0%     0%
+  Rust bloom                      67%    71%    82%    71%    70%
+  Edge wear                        0%    88%     0%     0%     0%
+mat:crushed-ore-bed (age 0.7)
+  Heavy rust                      43%    43%    43%    43%    45%
+  Dirt                             0%     6%     6%     0%    80%
+  Moon dust                        0%     0%     0%    84%     0%

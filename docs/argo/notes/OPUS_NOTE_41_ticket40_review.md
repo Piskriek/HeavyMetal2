@@ -56,6 +56,29 @@ Argo rebuilt the mill from the four-angle reference sheet before this note reach
 6. **Strict typecheck:** `WAIST_Y` is declared but never read (kit-mill-v2.ts, line 41).
 7. **The shelf's format.** Use the `@hm/matstack` types (OPUS_NOTE_42), so the shelf and the kit's `mat:` ids resolve in the game when the renderer lands.
 
+## v4 (argo-ticket40-v4-bundle.json, the same day)
+`shots/40/mill-v4-compare.png` is drawn through the game's real layered renderer at rank 2, with the lab's reflections. Your `mat:` slots and `lx:` lamps are now what the game draws, not stand-in colours.
+
+**Fixed:** every v3 point except the two below.
+- 2.80 m, today's footprint.
+- Stripes at the base.
+- The red status lamp and the pink cartridge slot glow.
+- `hull-steel` stays steel.
+- `WAIST_Y` is gone.
+- Every material resolves, and validate() finds nothing floating: 76 parts in 13 draw calls.
+
+**To fix before it lands:**
+1. **Strict typecheck:** `kit-modules.ts` line 444. `Object.freeze({ ... })` widens `kind: 'param'` to `string`, so `MATSTACK_TEST_PIECE_KIT` is not a `Kit`. Annotate the literal as `Kit` (or `kind: 'param' as const`).
+2. **`kits.test.ts` fails** ("defines the 4d two-material trim palette"): it still expects the palette's two materials, and v4 adds khaki-paint and hopper-slate. Update that test with the palette.
+3. **The body reads as rust-brown speckle, not khaki.** The shader is right: its mask view matches matstack pixel for pixel (`scripts/test-layered-material.mjs`). It is the shelf's coverage. `shots/41/material-coverage.txt` (`node --import tsx scripts/material-coverage.mjs`) gives every layer's mean weight on a 2.8 m machine, with the game's own noise:
+   - **Rust bloom** covers 67% of every big face (cells noise alone). A bloom should be small patches, about 5 to 15%: cells times crevices or edges, or a lower balance.
+   - **Oil leaks** cover about 40% of faces. Leaks are streaks under edges and crevices.
+   - **Soot** is 0% everywhere (furnace, oily-engine, slatted grille), so the layer never shows.
+   - **The ore bed's moon dust** covers 84% of its tops, so the hopper reads as a light tray. Ore is dark: keep the dust off it, or keep it very light.
+   - **Holding well:** edge wear (88% on edges, 0% on faces), grime in creases (78%), dust and frost on tops (72 to 88%), and splash-zone dirt (80% at 10 cm above the foot, 0% on faces).
+   - **Scales:** `NOISE_FEATURES` in matstack says how many features each noise has per repeat (clouds 4, cells 7, speckle 32, scratches 23). A mask's `scale` divided by that count is the feature size: your rust bloom's 0.18 m on cells makes 2.6 cm blobs, which read as speckle at machine distance.
+4. **The hazard stripes are flat yellow** until the `stripes` tile exists (TICKET-41). Expected.
+
 ## How the review was done (so it can be repeated)
 - `node scripts/parts-reference-sheet.mjs [out] [dev server] [ids]`: every generator at ranks 0, 1, 2 and from behind, each slot in its own colour.
 - `node scripts/kit-compare-sheet.mjs <kind> <kit module> <export> <preset> [out] [dev server] [standins]`: the kit beside today's machine from four sides, plus the materials that do not resolve and validate()'s issues.

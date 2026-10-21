@@ -49,7 +49,8 @@ import {
   type Print,
   type MaterialPrintSpec,
 } from '@hm/cartlab';
-import { specOfName } from '@hm/matstack';
+import type { PartOverride } from '@hm/kitspec';
+import { LAYER_SHELF, materialName, resolveMatPreset, specOfName } from '@hm/matstack';
 import { BenchParts } from './bench-parts';
 import { BenchSpecies } from './bench-species';
 import { BenchLights } from './bench-lights';
@@ -4141,6 +4142,23 @@ useEffect(() => {
       applySpecies: (broadcast: boolean): number => applySpeciesShotRef.current(broadcast),
       /** The light shot as a tap or a hold (plan 39, Lx). */
       applyLight: (broadcast: boolean): number => applyLightShotRef.current(broadcast),
+      /**
+       * Dresses every part of a kit (its cores excepted) in a shelf material, with shelf layers added on top (plan 41's perf
+       * gate): not saved, the scene only. Returns the parts dressed and the material's name.
+       */
+      dressKit: (kit: string, ref: string, addLayers: readonly string[] = []): { parts: number; name: string } => {
+        const scene = sceneRef.current;
+        const base = resolveMatPreset(ref);
+        if (!scene || !base) return { parts: 0, name: '' };
+        const name = materialName({ ...base, layers: [...base.layers, ...addLayers.flatMap((id) => (LAYER_SHELF[id] ? [LAYER_SHELF[id]!] : []))] });
+        const overrides: Record<string, PartOverride> = {};
+        for (const p of scene.kitPlaced(kit)) {
+          const ov = bodyOverride(name, p);
+          if (ov) overrides[p.path] = ov;
+        }
+        scene.setKitOverrides(kit, overrides);
+        return { parts: Object.keys(overrides).length, name };
+      },
       /** The beam's Apply with the material cartridge in the port (plan 41), at what the camera looks at. */
       applyMaterial: (broadcast: boolean): number => applyMaterialShotRef.current(broadcast),
       treeOverrides: () => propsRef.current.trees ?? {},

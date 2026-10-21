@@ -1,6 +1,21 @@
 # RESUME: start here (fresh session)
 
-## OPUS STATE (21 Oct; read this first)
+## OPUS STATE (21 Oct, later; read this first)
+- **Owner rules added today:** "you guys need to check each other, shortcuts are unacceptable" (RULES 8a, memory `no-shortcuts-cross-check`): every Argo bundle is reviewed before install (tests against our packages, measured fit, four sides, the rules), every brief of mine is open to his challenge, no stopgap without the owner's yes. And the machines get rebuilt from parts (owner: "ok good so you understand the machines get rebuilt with the parts").
+- **Branch pushed, green** at ee64a7e2: 3,117 unit tests; species 11/11, part-cartridge 28/28, beam-tool 61/61, lab-overhaul 78/78, studio-tabs 52/52, machine-plumes 121/121, machine-inspector 27/27, base-building pass. Pre-existing: `test-base-tabs` 2/4 (fails at 6043d0c7 too; a session card is offered).
+- **Done today:** plan 39 steps 1-3 in play.
+  - **Parts (Vtx):** bench and planet Drafting Table print parts; fired at lab and plot kit machines, like for like.
+  - **Skins (Pxd):** a material cartridge paints a part's body.
+  - **Species (Aq):** the bench's Species page (live tree, thumbnails, canopy balls, try-on), species cartridges, a tap or hold regrows trees on the plot, saved by place, at most 6 presets a plot.
+  - **Previews drive play** (live turntable plus hover try-on on every bench page).
+  - **Status lights** now sit on the real housing surface (they floated 0.13 to 1.95 m).
+  - **Tooling:** `scripts/machine-reference-sheet.mjs`, `parts-reference-sheet.mjs`, `kit-compare-sheet.mjs` (the review tools).
+- **TICKET-40 (Argo's from-scratch rebuild) is under review and held** in `arena-gathered/argo-ticket40-v2/` (not installed): v2's mill design is right (compact housing, no cage), but its body names five vault materials that do not exist (so it does not draw), the palette is near-black, and the hopper, chute and wheel generators do not do their jobs. Full findings: `docs/argo/notes/OPUS_NOTE_41_ticket40_review.md` (also in Setmix as OPUS_NOTE_41_ticket40_review_v2.md, with the shots). **Argo hit his usage limit; back 21 Oct 08:13.** First thing then: in his chat (Argon task mode, not Flash), point him at OPUS_NOTE_41 v2 in Setmix and ask for a v3 bundle; then run the same review: unpack, typecheck, `kit-compare-sheet.mjs mill ...` (with MSYS_NO_PATHCONV=1), the parts sheet, and show the owner the pilot only once it passes.
+- **Stopgaps still in the code, removed by TICKET-40:** the frames-around-cores (`HEAVY_KITS` in `plot-kits.ts`, off), the plot kits' 0.35 metal cap (his answer: a planet environment map), flat trim colours (his answer: a banded trim texture). TICKET-39b is superseded.
+- **Next for Opus:** plan 39 step 4 (Lx: the bench's Lights page and light cartridges fired at lamps; `light-presets.ts` and the cartlab light print are ready); then Bring Your Own Agent (Studio section 9; TICKET-30). A session card is offered for player-relative tree near/far (TICKET-31's centre-based rule leaves trees beyond 60 m from the gate as flat impostors).
+- **Agents:** Flash 0% for 7 days. Web Argo via chat `77f3bf1cb56ba86c` (Argon, task mode) and the Drive folder Setmix.
+
+## OPUS STATE (21 Oct, earlier; superseded above)
 - **Branch pushed, green:** typecheck clean; 3,109 unit + 23 speed tests pass (two timing tests fail only while the browser pane renders the game: close it before `npm test`); single file 13.80 MB of 16. `test-part-cartridge` 28/28, lab-overhaul 78/78, studio-tabs 52/52, base-building, machine-inspector 27/27, machine-plumes 121/121.
 - **Pre-existing failure (not ours, fails at HEAD 6043d0c7 too):** `test-base-tabs` cannot aim the camera at the hardpoint (2/4).
 - **New today:**

@@ -261,20 +261,47 @@ Units are metres and millimetres, never "0 to 1 of the object", so wear is the s
   - **HD pack tiles,** from the owner's Substance work or CC0 scans.
 
 ## 7. Build order and who does what
-1. **Opus: the `@hm/matstack` contract.** Types, slider schemas, the blend formulas written out, and the test oracle (fixed inputs to the expected mask and channel values).
-2. **Done (Opus):** the reference engine (mask, surface, layer and material evaluation, the flatten) and the mask attributes, 17 tests (`3a2e8702`, `c719d174`). Opus wrote both, because the shader must mirror them formula for formula and the attribute layout is the shader's input; Argo was the bottleneck for a battle round-trip.
-3. **Still to write:** validate and clamp, and the presetcodec schema (a code form with every field present, since presetcodec has no unions or optional fields). The shelf as data comes from Argo (section 4.9).
-4. **Opus: the renderer:**
-   - `layered-material.ts`;
-   - the noise atlas;
-   - the tile array;
-   - the ranks;
-   - the planet's environment map.
-   
-   **Perf gate on this laptop:** the lab gate view keeps 181 draw calls or fewer, and the layered shader adds at most 1 ms a frame on Medium at 1080p.
-5. **Opus: the bench page:** the test piece, thumbnails, mask view, Yours, codes, cartridges and Apply. Playwright tests in the pattern of `test-my-presets.mjs`.
-6. **Argo: TICKET-40 v3.** Each machine's slots name `mat:` presets, and he tunes the shelf. Arena codes it, Haiku installs it, and Opus verifies it with the review sheets (`machine-reference-sheet`, `kit-compare-sheet`) before the owner sees it.
-7. **The Studio workspace, then section 6's P1 and P2.**
+**Done on 2026-10-21:**
+1. **The `@hm/matstack` contract and reference engine (Opus):** types, the formulas written out, mask, surface, layer and material evaluation, the flatten, and the mask attributes (`3a2e8702`, `c719d174`).
+   - Opus wrote both, because the shader mirrors them formula for formula and the attribute layout is the shader's input.
+   - Rank 0 flattens per face, not per vertex (Argo's catch, `00eba3a5`).
+   - Its cost follows surface area: at most 8 samples a face.
+2. **The shelf (Argo):** 29 surfaces, 11 masks, 16 layers and 16 materials (`be286755`), with a contract test.
+3. **Material codes (Opus):** a player's own material is `matc:<code>` (presetcodec, 550 to 1,230 characters), and a shelf preset keeps `mat:<id>` (`859471e8`).
+4. **The renderer (Opus):** `layered-material.ts` (`def1057c`, `5c2d00c1`, `d0bd18b8`).
+   - **Ranks:** 0 flat, 1 standard and 2 physical.
+   - **Programs:** one per rank, layer count and features, so the 16 materials share 20 programs.
+   - **The geometry hook:** `kitLayering`; edge lines are computed once per part shape.
+   - **Never invisible:** an unresolved name draws a neutral stand-in.
+   - **No glitter:** fine noise far away filters instead.
+   - **Warm-up:** the noise atlas builds behind the loading bar.
+   - **The planet:** kit materials carry the room reflection, so the 0.35 metal cap is gone.
+   - **Parity:** `scripts/test-layered-material.mjs` checks the mask view against matstack pixel for pixel (worst 0.005).
+5. **The bench page and the cartridge (Opus):** `e236fd29`, test 17/17 (`scripts/test-material-cartridge.mjs`).
+   - **The page:** the Materials tab's Machines shelf, with a pinned test piece and mask view, thumbnails, paints, the layer stack, add a layer and age.
+   - **Saves and prints:** Save, and Print as a material cartridge (cartlab's `material` print, `d8de037d`).
+   - **Apply:** a tap dresses a part, and a hold every part that wore the same.
+   - **Plot saves** keep `matc:` codes.
+6. **Review tools:**
+   - `scripts/material-sheet.mjs`: every material at every rank, plus its mask.
+   - `scripts/material-coverage.mjs`: each layer's coverage on faces, edges, creases, tops and the splash zone.
+   - `scripts/kit-compare-sheet.mjs` now draws `mat:` and `lx:` as the game does.
+
+**Next, in order:**
+1. **The perf gate (Opus), not yet measured:** the lab gate view keeps 181 draw calls or fewer, and the layered shader adds at most 1 ms a frame on Medium at 1080p, on this laptop. Measure with the capacitor bank dressed in a six-layer material.
+2. **Argo: the shelf's coverage, then TICKET-40 v5.**
+   - **Coverage:** OPUS_NOTE_41's v4 section; rust bloom covers 67% of faces, and soot never shows.
+   - **v5:** the two type and test fixes. Then the mill lands, and the review sheets show it to the owner.
+3. **Argo: TICKET-41, the tile library** (OPUS_NOTE_44). Until it lands, every tile reads flat.
+4. **Opus:**
+   - the layer cartridge (a single layer over whatever a part wears);
+   - the Studio Materials workspace in place of the slider prototype;
+   - the matstack commands for the agent API (plan 40).
+5. **P1 and P2 (section 6):**
+   - Substance calibration, using Painter 7.2.3 on the 3D PC;
+   - the ground taking materials;
+   - weathering by the world (stage and floats);
+   - a plot-level material table, so a plot's saves hold each custom code once.
 
 ## 8. Ask the owner (resources only)
-**Substance Painter:** it is not on this laptop, and the 3D PC refused SSH on 2026-10-21. Is it installed and licensed on the 3D PC, or should it be? It is the look target for P1 and a source of HD tiles. Nothing in P0 waits on it.
+**Substance Painter:** Adobe Substance 3D Painter 7.2.3 is installed on the 3D PC (found 2026-10-21; the PC is now at 192.168.0.5). Is its Creative Cloud licence active? It is the look target for P1 and a source of HD tiles. Nothing in P0 waits on it.

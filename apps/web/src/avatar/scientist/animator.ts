@@ -122,6 +122,7 @@ export function createScientistAnimator(
   let nextLookAroundTime = 12 + Math.random() * 13; // 12 to 25s
   let lookAroundTimer = 0;
   let isLookingAround = false;
+  let wasJumping = false;
 
   let activeOneShot: {
     kind: OneShotKind;
@@ -277,17 +278,18 @@ export function createScientistAnimator(
     lerpWeight(rifle.strafeR, targetStrafeR * armedScale, dt, locoSpeed);
 
     if (jump) {
-      if (isJumping) {
+      if (isJumping && !wasJumping) {
         jump.reset();
         jump.fadeIn(0.15);
         jump.play();
-      } else {
+      } else if (!isJumping && wasJumping) {
         jump.fadeOut(0.2);
       }
+      wasJumping = isJumping;
     }
 
     // Base idle weight, and the rifle's standing poses: relaxed with it held, aiming with the left button, firing with the beam on
-    const targetIdle = isMoving || isLookingAround || armed || rifleBusy ? 0 : 1;
+    const targetIdle = isMoving || isJumping || isLookingAround || armed || rifleBusy ? 0 : 1;
     lerpWeight(idle, targetIdle, dt, locoSpeed);
     const standingArmed = armed && !isMoving;
     lerpWeight(rifle.idle, standingArmed && !rifleAiming && !rifleFiring ? 1 : 0, dt, locoSpeed);

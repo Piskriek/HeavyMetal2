@@ -20,7 +20,9 @@
     "perf": "node scripts/perf.mjs",
     "bake:setmix": "node --import tsx scripts/bake-setmix.mjs",
     "ui-editor": "node scripts/ui-editor.mjs",
-    "e2e:legacy": "node scripts/e2e-smoke.mjs"
+    "e2e:legacy": "node scripts/e2e-smoke.mjs",
+    "command-center": "node scripts/command-center.mjs",
+    "board": "node scripts/agent-worker.mjs --list"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.5.1",

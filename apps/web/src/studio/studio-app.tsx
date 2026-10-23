@@ -593,9 +593,23 @@ export function StudioApp({ onBack, renderPrototype }: {
                 title={writable ? 'Save every pending change to the project' : 'Open STUDIO.bat to save changes'}>Save{changes.length > 0 ? ` (${changes.length})` : ''}</button>
             </>
           ) : null}
+          <button
+            type="button"
+            onClick={() => window.open('http://localhost:8090', '_blank', 'noopener,noreferrer')}
+            title="Open the Multi-Agent Command Center & GitHub Job Board (COMMAND_CENTER.bat)"
+          >
+            Command Center
+          </button>
           <button type="button" onClick={onBack}>Back to the lab</button>
         </div>
         </> : <div className="sx-cluster">
+          <button
+            type="button"
+            onClick={() => window.open('http://localhost:8090', '_blank', 'noopener,noreferrer')}
+            title="Open the Multi-Agent Command Center & GitHub Job Board (COMMAND_CENTER.bat)"
+          >
+            Command Center
+          </button>
           <button type="button" onClick={onBack}>Back to the lab</button>
         </div>}
       </header>

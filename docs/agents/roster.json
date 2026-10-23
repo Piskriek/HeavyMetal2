@@ -1,0 +1,149 @@
+{
+  "$comment": "Modular agent assignment. Jobs on docs/JOB_BOARD.md name a ROLE (a capability slot), never a model. This file maps each role to whatever model is available in the environment the Overseer woke up in. Edit this file (not the job cards) when models, tools or skills change. Read by scripts/agent-worker.mjs --dispatch and scripts/skill-inventory.mjs. Human guide: docs/agents/ROSTER.md.",
+  "version": 1,
+  "updated": "2026-10-22",
+
+  "roles": {
+    "OVERSEER": {
+      "summary": "The waking session. Keeps the Job Board, the Tech/Skills Radar and every agent's instructions in sync; routes jobs to roles; audits for Modular Preset Inception (RULES 8a). Never spawned; it is whoever reads this file.",
+      "taskShape": "board, radar, routing, audits, cross-session handoff",
+      "reasoning": "high",
+      "legacy": []
+    },
+    "ARCHITECT": {
+      "summary": "Creative and modular-systems lead. Writes plans and preset specs, designs preset shelves (tiles, materials, kits, species, logic), reviews work against docs/OWNER_ASKS.md and RULES 8a.",
+      "taskShape": "ambiguous or open-ended; no spec yet; taste and art direction; cross-domain preset design",
+      "reasoning": "high",
+      "legacy": ["ARGO"]
+    },
+    "ENGINEER": {
+      "summary": "Precision systems engineer. Deterministic core packages, shader/CPU parity, raycasting and perf budgets, repo integration, reviews every BUILDER/RUNNER result before it lands.",
+      "taskShape": "correctness-critical; cross-package; GLSL parity; perf budgets on the GTX 950M; public APIs",
+      "reasoning": "high",
+      "legacy": ["OPUS"]
+    },
+    "BUILDER": {
+      "summary": "Scoped implementer. Turns a written brief into working code across a bounded set of files, keeps typecheck and tests green. Output is a prototype until ENGINEER or ARCHITECT reviews it (CLAUDE.md section 0).",
+      "taskShape": "clear brief; roughly 2-12 files; known patterns; has a Verify command",
+      "reasoning": "medium",
+      "legacy": ["FLASH"]
+    },
+    "RUNNER": {
+      "summary": "Fast mechanical worker. Single-file fixes, E2E script updates, captures, renames, registry and doc chores, bulk search.",
+      "taskShape": "narrow and mechanical; one or two files; exact acceptance check exists",
+      "reasoning": "low",
+      "legacy": ["HAIKU"]
+    },
+    "RIG": {
+      "summary": "Remote hardware worker (the 3D PC, RTX 3080 at 192.168.0.5) for GPU captures, Playwright suites and perf runs the laptop cannot do.",
+      "taskShape": "needs real GPU or long-running visual suites",
+      "reasoning": "low",
+      "legacy": ["3DPC"]
+    },
+    "OWNER": {
+      "summary": "Piskriek. Reviews builds and sheets, unblocks, approves changes to his binding rules.",
+      "taskShape": "approval, taste calls on his own rules, credentials and hardware",
+      "reasoning": "n/a",
+      "legacy": []
+    },
+    "ANY": {
+      "summary": "First available role at or above BUILDER.",
+      "taskShape": "any",
+      "reasoning": "medium",
+      "legacy": []
+    }
+  },
+
+  "environments": {
+    "claude-code": {
+      "detect": "You are running in Claude Code (CLAUDE.md auto-loaded, Agent/Task tool available, slash skills such as /frontend-design).",
+      "spawnTool": "Agent tool (subagent) with model: opus | sonnet | haiku and an effort level. Run in background; one writer per file at a time.",
+      "ladder": {
+        "OVERSEER": { "model": "self", "note": "The main session, usually Claude Opus 5.5 with extended reasoning." },
+        "ARCHITECT": { "model": "self", "fallback": "opus", "note": "Do it in the main session; spawn opus only to parallelise a second spec." },
+        "ENGINEER": { "model": "self", "fallback": "sonnet", "effort": "high", "note": "Main session for integration and review; scoped sub-systems may go to Sonnet (high effort) with an Opus review." },
+        "BUILDER": { "model": "sonnet", "effort": "high", "note": "Claude Sonnet, high effort. Brief = job card + named files + Verify command." },
+        "RUNNER": { "model": "haiku", "effort": "high", "note": "Claude Haiku. Watch usage: Haiku swarms have burned the weekly budget before (OWNER_ASKS, 14 Oct)." },
+        "RIG": { "model": "remote", "note": "bash scripts/test-on-3dpc.sh \"<cmd>\"" }
+      }
+    },
+    "antigravity": {
+      "detect": "You are running in Google Antigravity (.agents/GEMINI.md loaded as a user rule, invoke_subagent tool available). The main model may be Gemini Argon OR Claude Opus 5.5, whichever the owner selected.",
+      "spawnTool": "invoke_subagent with Model: inherit | pro | flash | flash_lite (TypeName self or research).",
+      "ladder": {
+        "OVERSEER": { "model": "self" },
+        "ARCHITECT": { "model": "self", "fallback": "pro" },
+        "ENGINEER": { "model": "self", "fallback": "pro" },
+        "BUILDER": { "model": "flash", "note": "Gemini Flash. If the main model is Claude, Flash is still the cheap builder here." },
+        "RUNNER": { "model": "flash_lite", "note": "Gemini Flash Lite, or a research subagent for read-only sweeps." },
+        "RIG": { "model": "remote", "note": "bash scripts/test-on-3dpc.sh \"<cmd>\"" }
+      }
+    },
+    "remote-3dpc": {
+      "detect": "You are the worker on the 3D PC.",
+      "spawnTool": "none",
+      "ladder": { "RIG": { "model": "self" } }
+    }
+  },
+
+  "routing": {
+    "rules": [
+      "Route by task shape, not by habit: no spec yet -> ARCHITECT; correctness, parity, perf or public API -> ENGINEER; clear brief with a Verify command -> BUILDER; one-file mechanical -> RUNNER; needs real GPU -> RIG.",
+      "Use the cheapest rung that can pass the job's Verify command. Escalate one rung after two failed Verify attempts; never silently skip the check.",
+      "Every BUILDER and RUNNER result is reviewed one rung up before it is marked DONE (REVIEW status in between).",
+      "Load the job's Skills before reasoning. A loaded skill replaces reasoning tokens; a missing skill is a radar item, not a reason to improvise.",
+      "Low weekly usage: push work down one rung and keep the main session for review and integration only.",
+      "One writer per file: play-scene.ts and other hot files are serialised through the Overseer."
+    ],
+    "escalation": ["RUNNER", "BUILDER", "ENGINEER", "ARCHITECT"]
+  },
+
+  "skills": {
+    "$comment": "Skill tags used in a job's **Skills:** field. Each maps to how to load it per environment. 'verified' is refreshed by scripts/skill-inventory.mjs; unverified entries must be checked on wake (JOB-18).",
+    "frontend": {
+      "use": "Any player-facing UI, HUD, Studio panel or Command Center page.",
+      "claude-code": { "invoke": "/frontend-design", "source": "frontend-design@claude-plugins-official", "aka": ["/frontend"] },
+      "antigravity": { "invoke": "CLAUDE.md section 3.2 design guard + generative_ui skill for previews", "source": "builtin" }
+    },
+    "route": {
+      "use": "Wiring a new screen, route or server endpoint (owner reports Claude has a /route skill).",
+      "claude-code": { "invoke": "/route", "source": "unverified: not found in installed plugins on 2026-10-22; run scripts/skill-inventory.mjs and ask the owner where it lives" },
+      "antigravity": { "invoke": "none; follow existing patterns in apps/web/src/shell and scripts/command-center.mjs", "source": "repo" }
+    },
+    "code-review": {
+      "use": "Reviewing a BUILDER/RUNNER result before DONE.",
+      "claude-code": { "invoke": "/code-review", "source": "code-review@claude-plugins-official (available in marketplace; install if missing)" },
+      "antigravity": { "invoke": "research subagent reading the diff against docs/argo/RULES.md", "source": "builtin" }
+    },
+    "feature-dev": {
+      "use": "Multi-step feature with exploration, design and implementation phases.",
+      "claude-code": { "invoke": "/feature-dev", "source": "feature-dev@claude-plugins-official (available in marketplace; install if missing)" },
+      "antigravity": { "invoke": "built-in /plan slash command (not a skill file)", "source": "builtin" }
+    },
+    "visual-verify": {
+      "use": "Any kit, material or stage-look change (4-angle rule).",
+      "claude-code": { "invoke": "node scripts/kit-compare-sheet.mjs / node scripts/material-sheet.mjs", "source": "repo" },
+      "antigravity": { "invoke": "node scripts/kit-compare-sheet.mjs / node scripts/material-sheet.mjs", "source": "repo" }
+    },
+    "e2e": {
+      "use": "Playwright browser checks.",
+      "claude-code": { "invoke": "node scripts/<test>.mjs (see the job's Verify line)", "source": "repo" },
+      "antigravity": { "invoke": "node scripts/<test>.mjs, or /browser for interactive checks", "source": "repo + builtin" }
+    },
+    "perf": {
+      "use": "Frame-time and draw-call budgets on the GTX 950M.",
+      "claude-code": { "invoke": "node scripts/perf-layered-material.mjs", "source": "repo" },
+      "antigravity": { "invoke": "node scripts/perf-layered-material.mjs", "source": "repo" }
+    },
+    "shader": {
+      "use": "GLSL changes that must match CPU reference formulas.",
+      "claude-code": { "invoke": "node scripts/test-layered-material.mjs", "source": "repo" },
+      "antigravity": { "invoke": "node scripts/test-layered-material.mjs", "source": "repo" }
+    },
+    "multiplayer": {
+      "use": "Co-op, rooms and sync play.",
+      "claude-code": { "invoke": "rundot-multiplayer / rundot-syncplay project skills (.claude/skills)", "source": "repo" },
+      "antigravity": { "invoke": "read .claude/skills/rundot-*/SKILL.md directly", "source": "repo" }
+    }
+  }
+}

@@ -158,3 +158,167 @@ export function rearrangeFriendsAdjacentToSlot(
   }
   return result;
 }
+
+// ============================================================================
+// PLAN 42 (OWNER_ASKS 2026-10-22):
+// - Movable Gate placement on Moon & Earth plots (`resolveMovedGatePose`)
+// - Gate Privacy / Iris Lock (`GateAccessMode = 'open' | 'code-only' | 'closed'`)
+// - Deterministic Random Gate Dialing for Explorers (`selectRandomOpenGate`)
+// - Stage-6 Earth Restoration Sandbox Unlock (`isEarthSandboxUnlocked`)
+// ============================================================================
+
+export type GateAccessMode = 'open' | 'code-only' | 'closed';
+
+export type PlotWorldKind = 'moon' | 'earth';
+
+export interface GatePose {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly yaw: number;
+}
+
+export interface GatePlacementResult {
+  readonly ok: boolean;
+  readonly reason?: 'invalid-coords' | 'out-of-plot-bounds';
+  readonly gatePose: GatePose;
+  readonly arrivalPad: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number };
+}
+
+export const DEFAULT_PLOT_RADIUS_M = 480; // 1 km plot diameter with 20 m perimeter margin
+export const GATE_ARRIVAL_PAD_OFFSET_M = 3.5;
+
+/**
+ * Validates and resolves a moved Quantum Archway Gate pose on a player's 1 km Moon or Earth plot,
+ * computing the corresponding arrival pad position 3.5 m in front of the gate along `yaw`.
+ */
+export function resolveMovedGatePose(
+  target: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number },
+  maxRadiusM: number = DEFAULT_PLOT_RADIUS_M,
+): GatePlacementResult {
+  if (
+    !Number.isFinite(target.x) ||
+    !Number.isFinite(target.y) ||
+    !Number.isFinite(target.z) ||
+    !Number.isFinite(target.yaw)
+  ) {
+    return {
+      ok: false,
+      reason: 'invalid-coords',
+      gatePose: { x: 0, y: 0, z: 0, yaw: 0 },
+      arrivalPad: { x: 0, y: 0, z: GATE_ARRIVAL_PAD_OFFSET_M, yaw: 0 },
+    };
+  }
+  const distFromPlotCenter = Math.hypot(target.x, target.z);
+  const limit = Number.isFinite(maxRadiusM) && maxRadiusM > 0 ? maxRadiusM : DEFAULT_PLOT_RADIUS_M;
+  if (distFromPlotCenter > limit) {
+    return {
+      ok: false,
+      reason: 'out-of-plot-bounds',
+      gatePose: { x: 0, y: 0, z: 0, yaw: 0 },
+      arrivalPad: { x: 0, y: 0, z: GATE_ARRIVAL_PAD_OFFSET_M, yaw: 0 },
+    };
+  }
+  const normYaw = Number((((target.yaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)).toFixed(4));
+  const pose: GatePose = {
+    x: Number(target.x.toFixed(3)),
+    y: Number(target.y.toFixed(3)),
+    z: Number(target.z.toFixed(3)),
+    yaw: normYaw,
+  };
+  const padX = Number((pose.x + Math.sin(normYaw) * GATE_ARRIVAL_PAD_OFFSET_M).toFixed(3));
+  const padZ = Number((pose.z + Math.cos(normYaw) * GATE_ARRIVAL_PAD_OFFSET_M).toFixed(3));
+  return {
+    ok: true,
+    gatePose: pose,
+    arrivalPad: { x: padX, y: pose.y, z: padZ, yaw: normYaw },
+  };
+}
+
+export interface PublishedGateListing {
+  readonly code: string;
+  readonly ownerId: string;
+  readonly world: PlotWorldKind;
+  readonly stage: number;
+  readonly access: GateAccessMode;
+}
+
+/**
+ * Checks whether a traveler can dial into `listing` via either direct code dialing (`byCode`)
+ * or random explorer dialing (`random`).
+ * - `'closed'` gates reject all incoming connections (unless the traveler is the plot owner).
+ * - `'code-only'` gates allow direct code dialing (`byCode`), but are excluded from `'random'`.
+ * - `'open'` gates allow both direct code dialing and random explorer dialing.
+ */
+export function canDialPlotGate(
+  listing: PublishedGateListing,
+  mode: 'byCode' | 'random',
+  travelerId?: string,
+): boolean {
+  if (travelerId && travelerId === listing.ownerId) {
+    return true;
+  }
+  if (listing.access === 'closed') {
+    return false;
+  }
+  if (listing.access === 'code-only') {
+    return mode === 'byCode';
+  }
+  return listing.access === 'open';
+}
+
+/**
+ * Deterministic explorer dialer: selects an `'open'` gate from `directory`, excluding the
+ * explorer's current gate (`currentCode`), their own plots (`explorerId`), and recently visited
+ * codes (`recentlyVisited`). If all open gates have been visited, cycles cleanly through the open pool.
+ */
+export function selectRandomOpenGate(
+  directory: readonly PublishedGateListing[],
+  seed: number,
+  options?: {
+    readonly currentCode?: string | null;
+    readonly explorerId?: string;
+    readonly recentlyVisited?: readonly string[];
+  },
+): PublishedGateListing | null {
+  const currentNorm = options?.currentCode ? normalizeGateDialCode(options.currentCode) : null;
+  const explorerId = options?.explorerId?.trim();
+  const openPool = directory.filter((entry) => {
+    const code = normalizeGateDialCode(entry.code);
+    if (!code) return false;
+    if (currentNorm && code === currentNorm) return false;
+    if (explorerId && entry.ownerId === explorerId) return false;
+    return canDialPlotGate(entry, 'random', undefined);
+  });
+
+  if (openPool.length === 0) return null;
+
+  const recentSet = new Set(
+    (options?.recentlyVisited ?? [])
+      .map((c) => normalizeGateDialCode(c))
+      .filter((c): c is string => c !== null),
+  );
+  const unvisited = openPool.filter((entry) => {
+    const code = normalizeGateDialCode(entry.code);
+    return code !== null && !recentSet.has(code);
+  });
+
+  const candidates = unvisited.length > 0 ? unvisited : openPool;
+  // Deterministic 32-bit integer hash from `seed`
+  let h = (Math.trunc(Number.isFinite(seed) ? seed : 0) ^ 0x9e3779b9) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
+  h = (h ^ (h >>> 16)) >>> 0;
+  const idx = h % candidates.length;
+  return candidates[idx] ?? null;
+}
+
+export const EARTH_UNLOCK_FIDELITY_STAGE = 6;
+
+/**
+ * Plan 42: Unlocking all 6 fidelity stages (S1..S6) saves Earth and unlocks full sandbox
+ * building on the player's Earth plot alongside their Moon plot.
+ */
+export function isEarthSandboxUnlocked(highestMoonStageReached: number): boolean {
+  return Number.isFinite(highestMoonStageReached) && highestMoonStageReached >= EARTH_UNLOCK_FIDELITY_STAGE;
+}

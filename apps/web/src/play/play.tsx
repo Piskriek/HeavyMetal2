@@ -377,7 +377,7 @@ const CONTROLS: readonly [string, string][] = [
   ['Hold Z', 'Remove the piece you aim at (keep Z down for half a second)'],
   ['G', 'Draw or holster the extraction beam (the rifle)'], ['Left mouse', 'Hold with the beam out: mine a boulder (Extract), paint the port (Apply), cut or raise the ground (Sculpt)'],
   ['F', 'Build the plan you stand near'], ['T', 'Structural integrity overlay'], ['V', 'First or third person view'],
-  ['Space', 'Brake a vehicle; fire the shotgun when it is equipped'], ['Tab or I', 'Inventory'], ['K', 'Drafting table'],
+  ['Space', 'Jump (on foot); brake a vehicle'], ['Tab or I', 'Inventory'], ['K', 'Drafting table'],
   ['L', 'Lattice storage'], ['1 to 9', 'Hotbar slot, always (sculpt included)'], ['Esc', 'Close the open thing, then pause'],
 ];
 
@@ -2804,6 +2804,7 @@ useEffect(() => {
             move: { x: axis(['KeyD', 'ArrowRight'], ['KeyA', 'ArrowLeft']), z: axis(['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']) },
             look: { dx, dy },
             run: keys.has('ShiftLeft') || keys.has('ShiftRight'),
+            jump: keys.has('Space') && !isAltCam && !drivingVehicle,
             altCam: isAltCam,
             flyUp,
             vehicleInput,
@@ -3799,10 +3800,6 @@ useEffect(() => {
         const bEnv = getBaseEnv();
         pieceManagerRef.current.sync(baseWorldRef.current, bEnv, next);
         say(next ? 'Structural Integrity: ON' : 'Structural Integrity: OFF');
-        return;
-      }
-      if (e.code === 'Space' && locked && gunEquipped && !sceneRef.current?.getDrivingVehicle()) {
-        fireWeapon();
         return;
       }
       if (e.code === 'KeyV') {

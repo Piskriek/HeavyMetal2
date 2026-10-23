@@ -20,11 +20,17 @@ You can read the repo but not run the game or commit. So:
 
 ## 2. Read in this order
 1. **[RULES.md](RULES.md):** every rule the team follows, with its source. The constitution and the owner's rules are binding. Propose changes openly; never quietly plan around them.
-2. **[TOUR.md](TOUR.md):** 18 annotated screenshots of the game now.
-3. **[../../CLAUDE.md](../../CLAUDE.md):** the project's master context (the constitution, the story, the drift guards).
+2. **[../RESUME.md](../RESUME.md):** the live session handoff log (read the top sections first whenever waking up in Antigravity or Claude).
+3. **[../../.agents/GEMINI.md](../../.agents/GEMINI.md) & [../../CLAUDE.md](../../CLAUDE.md):** the master context and role division between Gemini Argo/Flash (Creative & Modular Systems Lead), Claude Opus (Precision Systems Architect), and the Owner (Project Lead & Objective Reviewer).
 4. **[../OWNER_ASKS.md](../OWNER_ASKS.md):** every message the owner has sent, verbatim. It is the source of truth for intent.
-5. **[../ONE_GAME_PLAN.md](../ONE_GAME_PLAN.md):** the current engineering plan and its order. **[../RESUME.md](../RESUME.md)** is the running state log.
-6. **The design and lore docs:**
+5. **The active modular architecture plans (`docs/argo/plans/`):**
+   - [38: Parts, modules, presets](plans/38-parts-modules-presets.md) (`@hm/partgen`, `@hm/kitspec`, `@hm/meshops`);
+   - [39: One pattern: four preset factories](plans/39-one-pattern-preset-factories.md) (`Pxd`, `Vtx`, `Lx`, `Aq`, and `previews-drive-play`);
+   - [40: Bring Your Own Agent](plans/40-bring-your-own-agent.md) (`studio-agent.ts`, `studio-skill.md`, `studio.capture`, `studio.kit.validate`);
+   - [41: Layered materials](plans/41-layered-materials.md) (`@hm/matstack`, `layered-material.ts`);
+   - [42: Modular Stargate progression, Earth endgame sandbox & gate network](plans/42-modular-stargate-earth-endgame.md) (in-game sliders vs. Studio control, Stage-6 Earth restoration, movable/lockable gates, and random explorer gate dialing).
+6. **[TOUR.md](TOUR.md):** annotated screenshots of the early baseline.
+7. **The foundational design and lore docs:**
    - [NARRATIVE_AND_LORE_BIBLE](../NARRATIVE_AND_LORE_BIBLE.md), [NARRATION_SCRIPT](../NARRATION_SCRIPT.md) (approved by the owner);
    - [CARDINAL_CONSTITUTION_AND_STAGES](../CARDINAL_CONSTITUTION_AND_STAGES.md);
    - [BASE_BUILDING_RESEARCH](../BASE_BUILDING_RESEARCH.md), [BASE_BUILDING_ARCHITECTURE](../BASE_BUILDING_ARCHITECTURE.md), [FABRICATOR_RESEARCH](../FABRICATOR_RESEARCH.md);
@@ -33,8 +39,8 @@ You can read the repo but not run the game or commit. So:
    - [STUDIO_CREATIVE_SUITE_SPEC](../STUDIO_CREATIVE_SUITE_SPEC.md);
    - [GRAPHICS_AND_TEXTURE_PIPELINE](../GRAPHICS_AND_TEXTURE_PIPELINE.md), [UI_DESIGN_SYSTEM_AND_TOKENS](../UI_DESIGN_SYSTEM_AND_TOKENS.md);
    - [DLSS5_NEURAL_BAKE_RESEARCH](../DLSS5_NEURAL_BAKE_RESEARCH.md) (parked).
-7. **The concept art** in [`docs/concept/setmix/`](../concept/setmix/): the hero frames 01 to 10, then sheets 12 to 21 in `panels/` (21 is the approved lab redesign).
-8. **[../DEFERRED_POLISH_REGISTRY.md](../DEFERRED_POLISH_REGISTRY.md):** the polish backlog (the POL items).
+8. **The concept art** in [`docs/concept/setmix/`](../concept/setmix/): the hero frames 01 to 10, then sheets 12 to 21 in `panels/` (21 is the approved lab redesign).
+9. **[../DEFERRED_POLISH_REGISTRY.md](../DEFERRED_POLISH_REGISTRY.md):** the polish backlog (the POL items).
 
 ## 3. The game in one paragraph
 Humanity siphoned compute into its simulations through "the Bridge" until reality's own rendering broke: "a simulation cannot sustain simulations running inside of it".

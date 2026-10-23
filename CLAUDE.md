@@ -1,13 +1,13 @@
 # CLAUDE OPUS MASTER CONTEXT & OPERATING DIRECTIVE
 > **NEW SESSION? Read [`docs/RESUME.md`](docs/RESUME.md) first**: the current state, the owner's model rules and the game plan.
-> **Creative lead (since 2026-10-13): Gemini Argo**. His intro, the consolidated rules and his plans live in [`docs/argo/`](docs/argo/START_HERE.md). Approved plans from him become our briefs.
-> **Game**: *FIDELITY: The SetMix Multiverse* (incorporating *The Resolution Crafter* & *Monster Mash*)  
+> **Creative & Modular Systems Lead (since 2026-10-13): Gemini Argo** ([`.agents/GEMINI.md`](.agents/GEMINI.md), [`docs/argo/START_HERE.md`](docs/argo/START_HERE.md)). Sessions alternate between Claude and Antigravity (Gemini) based on usage; keep [`docs/RESUME.md`](docs/RESUME.md) updated at the end of every session so either environment resumes cleanly.
+> **Game**: *FIDELITY: The SetMix Multiverse* (Stargate-style progression campaign & modular preset Studio engine)  
 > **Repository**: `https://github.com/Piskriek/HeavyMetal2`  
 > **Active Branch**: `feat/monster-mash-exploration`  
 > **Root Workspace**: `c:\MarbleGp`  
-> **Sidecar Comms**: [`docs/SIDECAR_COMMS.md`](file:///c:/MarbleGp/docs/SIDECAR_COMMS.md)  
-> **Active Roadmap**: [`docs/ACTIVE_ROADMAP.md`](file:///c:/MarbleGp/docs/ACTIVE_ROADMAP.md)  
-> **Narrative Bible**: [`docs/NARRATIVE_AND_LORE_BIBLE.md`](file:///c:/MarbleGp/docs/NARRATIVE_AND_LORE_BIBLE.md) | Owner words: [`docs/OWNER_ASKS.md`](file:///c:/MarbleGp/docs/OWNER_ASKS.md)
+> **Sidecar Comms & Multi-Agent Job Board**: [`docs/JOB_BOARD.md`](file:///c:/MarbleGp/docs/JOB_BOARD.md) (Launch UI: `COMMAND_CENTER.bat` / `http://localhost:8090`, CLI: `node scripts/agent-worker.mjs --list`) | **Overwatch & Tech Radar**: [`docs/OVERWATCH_TECH_AND_AI_RADAR.md`](file:///c:/MarbleGp/docs/OVERWATCH_TECH_AND_AI_RADAR.md) | [`docs/SIDECAR_COMMS.md`](file:///c:/MarbleGp/docs/SIDECAR_COMMS.md)  
+> **Active Plans**: [`docs/argo/plans/`](file:///c:/MarbleGp/docs/argo/plans/README.md) ([38 Kits](docs/argo/plans/38-parts-modules-presets.md) · [39 Four Factories](docs/argo/plans/39-one-pattern-preset-factories.md) · [40 BYOA](docs/argo/plans/40-bring-your-own-agent.md) · [41 Layered Materials](docs/argo/plans/41-layered-materials.md) · [42 Modular Stargate & Earth Endgame](docs/argo/plans/42-modular-stargate-earth-endgame.md) · [43 Modular Motion, Animation & Logic Presets](docs/argo/plans/43-modular-motion-and-logic-presets.md))  
+> **Narrative Bible**: [`docs/NARRATIVE_AND_LORE_BIBLE.md`](file:///c:/MarbleGp/docs/NARRATIVE_AND_LORE_BIBLE.md) | Owner words: [`docs/OWNER_ASKS.md`](file:///c:/MarbleGp/docs/OWNER_ASKS.md) | Rules: [`docs/argo/RULES.md`](file:///c:/MarbleGp/docs/argo/RULES.md)
 
 ---
 
@@ -26,6 +26,13 @@
    - Deepen physics, collision meshes, stage shaders, and world persistence.
 2. **Do Not Become Passive**: If tests pass and TypeScript compiles, that is the *starting line*, not the finish line. Look at the prototype systems (Studio, Planet Forge, Monster Mash mobs, synced campaign) and elevate them into master-tier production systems.
 3. **Keep Sidecar Comms Synchronized**: Check [`docs/SIDECAR_COMMS.md`](file:///c:/MarbleGp/docs/SIDECAR_COMMS.md) before and after major architectural shifts.
+
+### Modular Roles & Environment Adaptation (owner, 2026-10-22)
+> The names above (Flash, Opus, Argo, Haiku) describe **abilities**, not guaranteed models. Jobs on [`docs/JOB_BOARD.md`](docs/JOB_BOARD.md) name a **Role**; [`docs/agents/roster.json`](docs/agents/roster.json) maps it to a model per environment. Guide: [`docs/agents/ROSTER.md`](docs/agents/ROSTER.md).
+
+- **In Claude Code you may have no Gemini at all.** You are the `OVERSEER` (and usually `ARCHITECT`/`ENGINEER`). Spawn through the Agent tool: `BUILDER` → **Sonnet, high effort**; `RUNNER` → **Haiku, high effort**; `RIG` → `bash scripts/test-on-3dpc.sh`. Review their output before `[DONE]`.
+- **Reason less, lean on skills.** Load the job's `Skills:` first (e.g. `frontend` → `/frontend-design`; `route` → `/route` once located). Skill tags resolve per environment via the roster.
+- **On every wake:** `node scripts/skill-inventory.mjs` (what is installed; MISSING tags), research new Claude Code skills/plugins and models, update the roster, then `node scripts/agent-worker.mjs --dispatch --env claude-code` for the spawn plan.
 
 ---
 
@@ -125,23 +132,26 @@
 
 ---
 
-## 6. PINNED FOR NEXT MILESTONE: BASE-BUILDING, SUBSTRATE HARVESTING & LINKED STORAGE
-> 📌 **Directive from Owner**: Once current plans and Monster Mash stabilization wrap up, do NOT spiral into premature implementation. This architecture is formally pinned as the immediate next major milestone:
+## 6. CURRENT ARCHITECTURAL MILESTONES (PLANS 38–43: "THE BAKERY & THE CAKE")
+> 📌 **Core Mandate (Owner, 2026-10-20 to 2026-10-22)**: The *FIDELITY* Stargate campaign is completely modular—every machine, structure, material, sprite, locomotion/jump gait, animation, code logic rule, audio stem, light, and species is built from recursive **presets inside presets** (`Rung 1 Atoms -> Rung 2 Stack/Curve -> Rung 3 Part/Clip/Stem -> Rung 4 Kit/Assembly -> Rung 5 Cartridge/World`) that players tweak with **sliders + live turntable previews in-game** and control completely inside **The Studio** ([`docs/argo/plans/42-modular-stargate-earth-endgame.md`](docs/argo/plans/42-modular-stargate-earth-endgame.md), [`docs/argo/plans/43-modular-motion-and-logic-presets.md`](docs/argo/plans/43-modular-motion-and-logic-presets.md)).
 
-1. **Freeform Base & Machine Construction (Valheim / Dune: Awakening style)**:
-   - Move away from machine spam: terraformers become **more expensive, heavier, and far more efficient**.
-   - Players build with structural freedom: foundations, walls, ramps, airlocks, and machine hardpoints.
-   - Deploy Arena Codex agent to build the base-building ECS package.
-2. **Substrate Resource Harvesting & Material Synthesis**:
-   - Harvest raw pixels ($\text{Pxd}$) and raw geometry vertices ($\text{Vtx}$) from anomalies and terrain.
-   - Refine raw pixels into **Material Texture Maps** and vertices into **3D Geometric Primitives** (cubes, cylinders, chassis frames).
-   - Combine primitives + maps at a Drafting Table to create custom structural presets.
-3. **Linked Quantum Bridge Storage**:
-   - The lab's quantum bridge technology links all base storage containers into an inter-dimensional shared inventory.
-   - Crafting benches and fabricators pull directly from the linked storage network.
-4. **Player Inventory & Hotbar**:
-   - Proper grid inventory, weight/stacking, hotbar slots, and tool/weapon equipment slots.
-5. **In-Game Vehicle & Weapon Fabricators**:
-   - Vehicles and weapons are researched and built in-game via fabricator benches.
-   - In The Workshop, players can skin their rovers with imported vehicle meshes from their favorite games.
+1. **Universal Recursive Preset Factories ([Plan 38](docs/argo/plans/38-parts-modules-presets.md), [Plan 39](docs/argo/plans/39-one-pattern-preset-factories.md), [Plan 41](docs/argo/plans/41-layered-materials.md), [Plan 43](docs/argo/plans/43-modular-motion-and-logic-presets.md))**:
+   - **Vtx (`@hm/partgen`, `@hm/kitspec`, `@hm/meshops`)**: Parametric parts and operator stacks assembled into modules and machines (`TICKET-40` from-scratch modular rebuilds; no wrapper shortcuts around old cores per `RULES 8a`).
+   - **Pxd & Sprites (`@hm/texgraph`, `@hm/matstack`, `@hm/shareware`, `@hm/skin`, `layered-material.ts`)**: 5-level layered materials (Tile $\to$ Surface $\to$ Mask $\to$ Layer $\to$ Material) and 8-angle Stage 0–2 shareware sprite/billboard generators (`JOB-20`) with edge/cavity vertex attributes, rank 0/1/2 rendering, and `matc:` / `pxdc:` share codes.
+   - **Aq (`@hm/treegen`, `@hm/flora`)**: Parametric species presets with live turntable preview and up to 6 variant slots per plot.
+   - **Lx & Audio (`lx:`, `@hm/soundlab`, `@hm/musicbox`)**: Kelvin warmth, signal colour, intensity, and pulse/flicker lamp/sky presets plus procedural synth & stage music stem presets (`JOB-20`).
+   - **Locomotion, Stage-Quantized Animation & Logic (`@hm/kinematic`, `@hm/anim`, `@hm/triggers`, `@hm/wiregraph`, `@hm/npcbrain` — [Plan 43](docs/argo/plans/43-modular-motion-and-logic-presets.md) / `JOB-19`)**:
+     - `LOCOMOTION_PRESETS` (`earth-standard`, `lunar-ballast`, `lunar-low-g`, `arcade-quake`) with `stepVerticalJump`, `Space` jump, and in-game sliders.
+     - Stage-quantized animation rates (`stageAnimRateHz`: `8 Hz` $S_0 \to$ `12 Hz` $S_1 \to$ `18 Hz` $S_2 \to$ `30 Hz` $S_3 \to$ `60+ Hz` + IK + spring-damper $S_4\text{--}S_6$) and declarative `KitMotionSpec` on `@hm/kitspec` sockets.
+     - Modular logic presets (`logic:`) for Auto-Doors, Turrets, Stargate Iris locks, and Monster Spawners.
+2. **Bring Your Own Agent Studio API ([Plan 40](docs/argo/plans/40-bring-your-own-agent.md))**:
+   - `window.studioAgent`, `scripts/studio-agent-bridge.mjs`, and `studio-skill.md` allowing external coding agents and human creators to inspect (`studio.capture` 4-angle + mask views), validate (`studio.kit.validate`), and propose staged edits to any Studio document or preset.
+3. **Stage-6 Earth Restoration & Dual-World Sandbox ([Plan 42](docs/argo/plans/42-modular-stargate-earth-endgame.md))**:
+   - Progressing through $S_0 \to S_6$ teaches the player how the Studio's procedural tools work.
+   - Unlocking all 6 stages saves Earth, unlocking full sandbox building on both the **Earth Plot** and the **Moon Plot** so players can create custom games with the preset library and share them with the network.
+4. **Movable, Lockable & Random-Dialable Stargates ([Plan 42](docs/argo/plans/42-modular-stargate-earth-endgame.md))**:
+   - Plot owners can **move/reposition their Gate** (`moveGate`) or **close/lock it off** (`gateAccess: 'open' | 'code-only' | 'closed'`).
+   - Explorers can **dial random open gates** (`dialRandomGate` in `@hm/coopnet`) to endlessly explore and compare player worlds across the network.
+5. **Base-Building, Linked Storage & Fabricators**:
+   - Valheim/Dune-style structural pieces (`@hm/structure`, `@hm/basekit`), 256-slot linked quantum bridge storage (`@hm/lattice`, `@hm/bridgekit`), and in-game vehicle/weapon fabricators.
 

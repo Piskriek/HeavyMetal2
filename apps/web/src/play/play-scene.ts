@@ -103,6 +103,7 @@ import { createRemotePeersController, type RemotePeersController } from './remot
 import { currentOutpostSession } from '../net/outpost-session';
 import { PAINT_CELL, PAINT_CELLS } from '../base/plot-height';
 import { emptyField, encodeField } from '@hm/terrainbrush';
+import { createVerticalJumpState, LOCOMOTION_PRESETS, stepVerticalJump } from '@hm/kinematic';
 
 export type Where = 'lab' | 'planet';
 /** What the screen gives the scene each frame. */
@@ -112,6 +113,8 @@ export interface Controls {
   /** Look: mouse movement since the last frame, in pixels. */
   readonly look: { readonly dx: number; readonly dy: number };
   readonly run: boolean;
+  /** On-foot jump (Spacebar). */
+  readonly jump?: boolean;
   /** Build camera controls (Alt held) */
   readonly altCam?: boolean;
   readonly flyUp?: number;
@@ -1375,6 +1378,7 @@ export function createPlayScene(o: {
   let sideShotM: number | null = null;
   let wireframeLookOverride: boolean | null = null;
   let viewModelHidden = false;
+  let jumpState = createVerticalJumpState();
 
   // ============================================================================
   // Window E: 11 Neighbor Enclave Domes on the 4.2 km Lunar Horizon (T16b / A9-01)
@@ -3204,38 +3208,47 @@ export function createPlayScene(o: {
         const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
         pos.x += (fx * c.move.z + rx * c.move.x) * speed;
         pos.z += (fz * c.move.z + rz * c.move.x) * speed;
-        stride += Math.hypot(pos.x - before.x, pos.z - before.z);
-        if (stride > 1.35) {
-          stride = 0;
-          sfx('step-grit', where === 'planet' ? { pitch: 0.85 + Math.random() * 0.25, volume: 0.55 } : { pitch: 1.5 + Math.random() * 0.2, volume: 0.3 });
+        if (jumpState.onGround) {
+          stride += Math.hypot(pos.x - before.x, pos.z - before.z);
+          if (stride > 1.35) {
+            stride = 0;
+            sfx('step-grit', where === 'planet' ? { pitch: 0.85 + Math.random() * 0.25, volume: 0.55 } : { pitch: 1.5 + Math.random() * 0.2, volume: 0.3 });
+          }
         }
       }
 
       if (where === 'lab') {
         collide(pos, before);
         const fh = room.floorHeight(pos.x, pos.z);
-        pos.y = fh + EYE;
+        jumpState = stepVerticalJump(jumpState, { dt, jumpHeld: Boolean(c.jump), maxHeadroomM: 2.1 }, LOCOMOTION_PRESETS['earth-standard']);
+        if (jumpState.justJumped) sfx('step-grit', { pitch: 1.75, volume: 0.35 });
+        if (jumpState.justLanded) sfx('step-grit', { pitch: 1.25, volume: 0.45 });
+        pos.y = fh + EYE + jumpState.heightAboveFloor + jumpState.landingDip;
       } else if (drivingVehicleId === null) {
         // keep to your plot's surroundings; stand on the ground or base
         const r = Math.hypot(pos.x, pos.z);
         if (r > 420) { pos.x *= 420 / r; pos.z *= 420 / r; }
         if (!c.altCam) {
           // TICKET-01 B: the moon's solids (the twin's frame and the field machines), each in its own frame, block first; then the base's walk world
-          const feetY = pos.y - EYE;
+          const feetY = pos.y - EYE - jumpState.heightAboveFloor - jumpState.landingDip;
           let solid = { x: pos.x, z: pos.z };
           for (const sol of planetSolids) solid = pushCircleInFrame(before, solid, feetY, RADIUS, sol.boxes, sol.m);
           pos.x = solid.x;
           pos.z = solid.z;
+          let standY = groundAt(pos.x, pos.z);
           if (activeWalkWorld) {
             const pushed = activeWalkWorld.push(pos.x, pos.z, feetY, 0.35);
             pos.x = pushed.x;
             pos.z = pushed.z;
-            const groundY = groundAt(pos.x, pos.z);
-            const standY = activeWalkWorld.standAt(pos.x, pos.z, feetY, groundY);
-            const target = standY + EYE;
-            pos.y += (target - pos.y) * Math.min(1, dt * 14);
+            standY = activeWalkWorld.standAt(pos.x, pos.z, feetY, standY);
+          }
+          jumpState = stepVerticalJump(jumpState, { dt, jumpHeld: Boolean(c.jump) }, LOCOMOTION_PRESETS['lunar-ballast']);
+          if (jumpState.justJumped) sfx('step-grit', { pitch: 1.25, volume: 0.45 });
+          if (jumpState.justLanded) sfx('step-grit', { pitch: 0.78, volume: 0.6 });
+          if (!jumpState.onGround) {
+            pos.y = standY + EYE + jumpState.heightAboveFloor;
           } else {
-            const target = groundAt(pos.x, pos.z) + EYE;
+            const target = standY + EYE + jumpState.landingDip;
             pos.y += (target - pos.y) * Math.min(1, dt * 14);
           }
         }
@@ -3283,7 +3296,7 @@ export function createPlayScene(o: {
         pendingEvent = 'sync-lost';
       }
       // ---- character model & animator (TASK-07, POL-18)
-      scientistHolder.position.set(pos.x, pos.y - EYE, pos.z);
+      scientistHolder.position.set(pos.x, pos.y - EYE - jumpState.landingDip, pos.z);
       scientistHolder.rotation.set(0, yaw + Math.PI, 0);
       scientistHolder.visible = cameraView === 'third' && !altCamPos && drivingVehicleId === null;
 
@@ -3292,7 +3305,7 @@ export function createPlayScene(o: {
           forward: c.move.z,
           strafe: c.move.x,
           run: c.run,
-          jumping: false,
+          jumping: jumpState.jumping,
           rifle: { held: heldBeam.group.visible, aiming: rifleAimingNow, firing: rifleFiringNow },
         });
         holdRifleInHand();

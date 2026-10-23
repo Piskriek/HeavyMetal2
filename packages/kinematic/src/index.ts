@@ -319,3 +319,6 @@ export function near(boxes: readonly Box[], p: Vec3, margin: number): Box[] {
   }
   return res;
 }
+
+
+export * from './modular-motion';

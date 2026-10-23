@@ -4,11 +4,16 @@ Each rule below says where it comes from.
 - **Binding:** the constitution and the owner's rules. A plan that needs one changed says so openly, as a proposal for the owner.
 - **Engineering-process rules** (git, tests, secrets) are listed so you know them. You won't need to follow them yourself.
 
-## A. The constitution ([CLAUDE.md](../../CLAUDE.md) §1, [CARDINAL_CONSTITUTION_AND_STAGES](../CARDINAL_CONSTITUTION_AND_STAGES.md))
+## A. The constitution ([CLAUDE.md](../../CLAUDE.md) §1, [CARDINAL_CONSTITUTION_AND_STAGES](../CARDINAL_CONSTITUTION_AND_STAGES.md), [plan 42](plans/42-modular-stargate-earth-endgame.md))
 1. **Four floats, one formula.** S = (Pxd, Vtx, Lx, Aq): pixel density, vertex density, light flux, aquatic level. Never a fifth global metric. New looks are tiers or settings, not new metrics.
 2. **Purity is load-bearing.** Simulation packages are deterministic pure functions: no `Date.now`, no `Math.random`, no I/O. That is what makes the synced shared world and the replays work.
 3. **A single-file distribution.** The game builds to one self-contained `index.html`. An optional HD pack sits beside it (owner: "Lean file + HD pack").
-4. **Terraforming is graphical fidelity.** Stages run from 0 (1-bit Bayer dither) through 16-colour EGA, 256-colour VGA and Gouraud to full PBR. Running machines raise the plot's fidelity in a spreading wave.
+4. **Terraforming is graphical fidelity.** Stages run from 0 (0a wireframe, 0b 1-bit Bayer dither) through 16-colour EGA, 256-colour VGA and Gouraud to full PBR. Running machines raise the plot's fidelity in a spreading wave.
+4a. **Complete preset modularity, Stage-6 Earth unlock, and Stargate network (owner, 20–22 October 2026; [plan 39](plans/39-one-pattern-preset-factories.md), [plan 41](plans/41-layered-materials.md), [plan 42](plans/42-modular-stargate-earth-endgame.md)).**
+   - **The game is the cake in the bakery we are building:** Every object in the Stargate campaign (machines, parts, materials, lights, flora, structures, gates) is built from modular algorithmic presets (`@hm/partgen`, `@hm/kitspec`, `@hm/matstack`, `@hm/treegen`, `lx:`).
+   - **Two-tier control:** Players modify presets with curated sliders + live 3D turntable previews at in-game benches/drafting tables (`previews-drive-play`), and have full unrestricted graph/layer/operator control inside the Studio ([plan 40](plans/40-bring-your-own-agent.md)).
+   - **Stage-6 Earth restoration:** Unlocking all 6 fidelity stages saves Earth and unlocks full sandbox building on both the **Earth plot** and the **Moon plot** so players can build custom games and share them with the network.
+   - **Movable, lockable, and random-dialable gates:** Plot owners can reposition their gate or close/lock it off (`open` | `code-only` | `closed`), while explorers can dial random open gates (`@hm/coopnet`) to endlessly explore and compare worlds.
 
 ## B. Who decides
 5. **Argo and Opus decide features (since 14 October 2026).** "its yours and Argo's call to expand on the game/lore and make those decisions". Lore, narration, features, designs and styles are Argo's and Opus's calls. The owner provides resources and unblocking, and reviews the results objectively.

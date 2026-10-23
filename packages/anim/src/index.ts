@@ -338,3 +338,6 @@ export function stickFigure(pose: Pose): { segments: Segment[]; head: { x: numbe
 
 // TICKET-21 (POL-12): Universal .glb / .vrm humanoid 6-bone retargeting helpers
 export * from './bone-retarget-map';
+
+// PLAN-43: gait clip presets
+export * from "./gait-presets";

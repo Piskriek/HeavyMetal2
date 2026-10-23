@@ -322,3 +322,6 @@ export function near(boxes: readonly Box[], p: Vec3, margin: number): Box[] {
 
 
 export * from './modular-motion';
+
+// PLAN-43: 5-rung motion presets (MOTION_SHELF, stepKinematicMotion, mot: cartridges)
+export * from "./motion-presets";

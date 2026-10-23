@@ -271,3 +271,5 @@ export function connect(g: Graph, from: End, to: End): Graph {
   wires.push({ from: { node: from.node, port: from.port }, to: { node: to.node, port: to.port } });
   return { nodes: g.nodes.map(cloneNode), wires };
 }
+// PLAN-43: wiregraph logic presets (WIREGRAPH_SHELF, validateWireGraph, logic: cartridges)
+export * from "./logic-presets";

@@ -217,3 +217,5 @@ export class LogicGraph {
     return fired;
   }
 }
+// PLAN-43: trigger sensor presets
+export * from "./logic-sensors";

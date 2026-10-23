@@ -1,0 +1,3 @@
+/** PLAN-43: @hm/motion re-exports the canonical motion preset ladder from @hm/kinematic (single source of truth). */
+export { MOTION_SHELF, MOTION_PRESET_SCHEMA, KINEMATIC_SCHEMA, JUMP_ARC_SCHEMA, GAIT_CLIP_SCHEMA, createKinematicMotionState, stepKinematicMotion, evaluateGaitClip, validateKinematicSpec, validateJumpArcSpec, validateGaitClipSpec, validateMotionPreset, serializeMotionPreset, parseMotionPreset, motionCartridgeId, resolveMotionCartridge, applyMotionCartridge } from '@hm/kinematic';
+export type { KinematicSpec, JumpArcSpec, GaitClipSpec, MotionPreset, ParamSchema, ParamDescriptor, KinematicMotionState, KinematicMotionInput } from '@hm/kinematic';

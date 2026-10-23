@@ -542,3 +542,5 @@ export function stepMachine(
   weights[state] = toWeight;
   return { state, fade: { ...fade }, weights };
 }
+// PLAN-43: motion preset ladder re-export
+export * from "./motion-presets";

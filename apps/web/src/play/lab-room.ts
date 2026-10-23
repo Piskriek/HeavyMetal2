@@ -4,7 +4,6 @@ import {
   aimLabStation,
   buildCableDrop,
   buildConsoleLeverQuadrant,
-  buildGateRibbedCoils,
   buildHardwareFabricatorProp,
   buildRelayBeaconHousing,
   buildRibbedFloorCoverTreads,
@@ -28,6 +27,7 @@ import { vaultSkin } from './vault-skin';
 import { lightMaterial } from './light-material';
 import { kitLayering, layeredMaterial } from './layered-material';
 import { CAPACITOR_BANK_KIT } from './kit-capacitor-bank';
+import { GATE_KIT } from './kit-gate';
 export {
   aimLabStation,
   LAB_STATIONS,
@@ -86,8 +86,6 @@ const WINDOW = { x0: -7.4, x1: 7.4, y0: 0.4, y1: 3.5 } as const;
 export const GATE_AT = { x: 0, z: -1.0 } as const;
 export const PLANET_TABLE_AT = { x: 5.0, z: -5.0 } as const;
 
-/** The generated gate's doorway (gate.glb, measured in its frame): the portal and the walk-through use it. */
-const GEN_GATE_OPENING = { width: 2.0, height: 2.2, sill: 0.33, z: 0 } as const;
 /** The labkit props on the west and east walls face the wall in the lab frame; their generated models turn half a turn to face the room. */
 const WEST_WALL_TURN = Math.PI;
 /** The operator console's throw lever: the bottom of its axle block, in the slot of the guide box on the deck (sheet 07, measured). */
@@ -718,24 +716,9 @@ export function createLabRoom(o: {
   portal.visible = false;
   gate.group.add(portal);
 
-  // Swapping in gate.glb: uses 6 recessed 3D ribbed copper field-coil blocks (buildGateRibbedCoils), never flat floating orange rectangles
-  swaps.push(() => {
-    const gen = genFor('gate');
-    if (!gen) return false;
-    groundModelAt(gen, 0);
-    replaceVisual(gate.group, gen, [portal]);
-    Object.assign(gate.opening, GEN_GATE_OPENING);
-    portal.geometry = keep(new THREE.PlaneGeometry(GEN_GATE_OPENING.width, GEN_GATE_OPENING.height));
-    portal.position.set(0, GEN_GATE_OPENING.sill + GEN_GATE_OPENING.height / 2, GEN_GATE_OPENING.z);
-    const { housings, coils } = buildGateRibbedCoils(m, keep);
-    gen.add(housings);
-    gate.coils.splice(0, gate.coils.length, ...coils);
-    fitOverhang(gate, [{
-      minX: GATE_AT.x - GEN_GATE_OPENING.width / 2, maxX: GATE_AT.x + GEN_GATE_OPENING.width / 2,
-      minY: 0, maxY: 4, minZ: GATE_AT.z - 2.5, maxZ: GATE_AT.z + 2.5,
-    }]);
-    return true;
-  });
+  // PLAN-42-GATE: the gate is a modular kit (kit-gate.ts), not a swapped GLB: its frame,
+  // six coil lamps, and anchor bolts take mat:/lx:/part: cartridges via aimKitPart /
+  // setKitOverrides like the capacitor bank. The portal surface is preserved across rebuilds.
 
   const floorHeight = (x: number, z: number): number => {
     const dx = Math.abs(x - GATE_AT.x);
@@ -796,6 +779,7 @@ export function createLabRoom(o: {
   /** The lab's kit-built props, by kit id: their prop group, the kit, the latest build and the beam's overrides. */
   const kits = new Map<string, { group: THREE.Group; kit: Kit; preset: string; build: KitBuild | null; overrides: Overrides }>([
     ['capacitor-bank', { group: bank.group, kit: CAPACITOR_BANK_KIT, preset: 'capacitor-bank', build: null, overrides: {} }],
+    ['gate', { group: gate.group, kit: GATE_KIT, preset: 'gate', build: null, overrides: {} }],
   ]);
   const rebuildKit = (id: string): boolean => {
     const k = kits.get(id);
@@ -806,13 +790,31 @@ export function createLabRoom(o: {
       layering: kitLayering,
     });
     if (!built) return false;
-    replaceVisual(k.group, built.group);
-    k.build = built;
+    if (id === 'gate') {
+      replaceVisual(k.group, built.group, [portal]);
+      k.build = built;
+      // The six coil lamps double as the ignition coils (kit order is bottom pair first).
+      const coils = built.group.children.filter(
+        (c): c is THREE.Mesh => (c as THREE.Mesh).isMesh && (c.name.startsWith('kit:lx:') || c.name.startsWith('kit:lamp')),
+      );
+      gate.coils.splice(0, gate.coils.length, ...coils);
+    } else {
+      replaceVisual(k.group, built.group);
+      k.build = built;
+    }
     return true;
   };
   swaps.push(() => {
     if (!rebuildKit('capacitor-bank')) return false;
     fitOverhang(bank);
+    return true;
+  });
+  swaps.push(() => {
+    if (!rebuildKit('gate')) return false;
+    fitOverhang(gate, [{
+      minX: GATE_AT.x - gate.opening.width / 2, maxX: GATE_AT.x + gate.opening.width / 2,
+      minY: 0, maxY: 4, minZ: GATE_AT.z - 2.5, maxZ: GATE_AT.z + 2.5,
+    }]);
     return true;
   });
   const aimKitPart = (origin: THREE.Vector3, dir: THREE.Vector3, reach: number): { kit: string; path: string; gen: string | null } | null => {

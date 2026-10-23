@@ -570,3 +570,5 @@ export * from './turret-brain';
 export * from './vehicle-bay';
 export * from './peaceful-drops';
 export * from './machine-led-and-hopper';
+// PLAN-42-GATE: movable/lockable/random-dialable Stargate + Stage-6 Earth unlock.
+export * from './gate-plot';

@@ -4212,6 +4212,9 @@ export function createPlayScene(o: {
     aimKitPart(reach: number) {
       camera.updateMatrixWorld(true);
       const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      // PLAN-42-GATE: the lab Gate kit ('gate', kit-gate.ts) aims via the room like the
+      // capacitor bank, so mat:/lx:/part: cartridges customize it; plot Twin gates move via
+      // pure movePlotGate/setGateAccessMode (@hm/coopnet) and keep labkit visuals for now.
       if (where === 'lab') return room.aimKitPart(camera.position, dir, reach);
       // the plot's kit-built machines: the nearest visible kit mesh along the view names its machine and part
       const ray = new THREE.Raycaster(camera.position.clone(), dir, 0, reach);
@@ -4228,6 +4231,7 @@ export function createPlayScene(o: {
       return best ? { kit: best.kit, path: best.path, gen: best.gen } : null;
     },
     setKitOverrides(kit: string, overrides: Overrides) {
+      // PLAN-42-GATE: 'gate' (and 'capacitor-bank') rebuild via the room's Gate kit.
       if (!kit.startsWith('plot:')) return room.setKitOverrides(kit, overrides);
       // kept for the machine's next build; a standing machine is rebuilt now, keeping its pour
       plotKitOverrides.set(kit, overrides);

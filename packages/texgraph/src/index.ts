@@ -32,6 +32,11 @@ const NODE_TYPES = new Set([
   "invert",
   "ramp",
   "scaleBias",
+  "scratches",
+  "spots",
+  "hex",
+  "weave",
+  "blur",
 ]);
 
 function isRecord(value: unknown): value is NodeRecord {
@@ -55,6 +60,11 @@ function isColorValue(value: unknown): value is [number, number, number] {
  * Conventions (the ones the stylised set from the Arena agents was authored against, docs/prompts/arena-pbr-textures.md):
  * - u = (x + 0.5) / size, v = (y + 0.5) / size; v grows downward (image rows); everything wraps at the tile edge.
  * - noise: tileable value noise, quintic fade; octave o has period scale * 2^o, seed + 101 o and weight gain^o, normalised by the weights.
+ *   Optional scaleY gives Y its own integer period (and its own octave progression), for directional grains such as brushed metal.
+ * - scratches / spots: hashed wrapped primitives on the unit square. Length, width and radii are tile fractions; angleSpread is in degrees.
+ * - hex: a staggered, wrapping hexagonal Voronoi lattice; edge is f2 - f1 softened by lineWidth, cell is the nearest cell's hashed value.
+ * - weave: centred warp and weft crowns in a 2 x 2 over-under twill; count is rounded to a four-thread repeat so the pattern wraps.
+ * - blur: a wrapped separable box blur, with radius as a fraction of the tile size (0 < radius <= 0.25).
  * - cellular: one point per cell at its centre + (hash - 0.5) * jitter, 3 x 3 search, raw distances in cell units clamped to 1
  *   (f1 is 0 at a cell's point and grows outwards); edge = f2 - f1.
  * - stripes: 0.5 + 0.5 sin(2 pi count t), t = u when vertical; softness below 1 sharpens it with a smoothstep of width softness / 2.
@@ -85,22 +95,37 @@ function hash2(x: number, y: number, seed: number): number {
   return (h >>> 0) / 4294967296;
 }
 
-function noiseImage(size: number, scale: number, octaves: number, gain: number, seed: number): Float32Array {
+function smoothstep01(e0: number, e1: number, x: number): number {
+  if (e0 === e1) return x < e0 ? 0 : 1;
+  const t = clamp01((x - e0) / (e1 - e0));
+  return t * t * (3 - 2 * t);
+}
+
+function noiseImage(size: number, scale: number, octaves: number, gain: number, seed: number, scaleY?: number): Float32Array {
+  const scaleX = Math.max(1, Math.round(scale));
+  const sY = scaleY === undefined ? scaleX : Math.max(1, Math.round(scaleY));
   const out = new Float32Array(size * size);
   const xa = new Int32Array(size), xb = new Int32Array(size), tx = new Float32Array(size);
-  let amplitude = 1, norm = 0, period = Math.max(1, Math.round(scale));
+  // tx was historically stored as float32 while ty stayed a JS number; retain
+  // that precision so graphs without scaleY remain byte-for-byte compatible.
+  const yaArr = new Int32Array(size), ybArr = new Int32Array(size), tyArr = new Float64Array(size);
+  let amplitude = 1, norm = 0;
+  let periodX = scaleX, periodY = sY;
   const count = Math.max(1, Math.min(6, Math.round(octaves || 1)));
   for (let octave = 0; octave < count; octave += 1) {
-    const lattice = new Float32Array(period * period);
+    const lattice = new Float32Array(periodX * periodY);
     const octaveSeed = (seed | 0) + octave * 101;
-    for (let j = 0; j < period; j += 1) for (let i = 0; i < period; i += 1) lattice[j * period + i] = hash2(i, j, octaveSeed);
+    for (let j = 0; j < periodY; j += 1) for (let i = 0; i < periodX; i += 1) lattice[j * periodX + i] = hash2(i, j, octaveSeed);
     for (let x = 0; x < size; x += 1) {
-      const f = ((x + 0.5) / size) * period, i0 = Math.floor(f);
-      xa[x] = i0 % period; xb[x] = (i0 + 1) % period; tx[x] = fade(f - i0);
+      const f = ((x + 0.5) / size) * periodX, i0 = Math.floor(f);
+      xa[x] = ((i0 % periodX) + periodX) % periodX; xb[x] = ((i0 + 1) % periodX + periodX) % periodX; tx[x] = fade(f - i0);
     }
     for (let y = 0; y < size; y += 1) {
-      const f = ((y + 0.5) / size) * period, j0 = Math.floor(f);
-      const ya = (j0 % period) * period, yb = ((j0 + 1) % period) * period, ty = fade(f - j0);
+      const f = ((y + 0.5) / size) * periodY, j0 = Math.floor(f);
+      yaArr[y] = (((j0 % periodY) + periodY) % periodY) * periodX; ybArr[y] = (((j0 + 1) % periodY + periodY) % periodY) * periodX; tyArr[y] = fade(f - j0);
+    }
+    for (let y = 0; y < size; y += 1) {
+      const ya = yaArr[y]!, yb = ybArr[y]!, ty = tyArr[y]!;
       for (let x = 0; x < size; x += 1) {
         const a = lattice[ya + xa[x]!]!, b = lattice[ya + xb[x]!]!, c = lattice[yb + xa[x]!]!, d = lattice[yb + xb[x]!]!;
         const top = a + (b - a) * tx[x]!, bottom = c + (d - c) * tx[x]!;
@@ -109,11 +134,244 @@ function noiseImage(size: number, scale: number, octaves: number, gain: number, 
     }
     norm += amplitude;
     amplitude *= gain;
-    period *= 2;
+    periodX *= 2; periodY *= 2;
   }
   for (let i = 0; i < out.length; i += 1) out[i] = norm > 0 ? out[i]! / norm : 0;
   return out;
 }
+
+function scratchesImage(size: number, count: number, length: number, width: number, angleSpread: number, seed: number): Float32Array {
+  const out = new Float32Array(size * size);
+  const n = Math.max(1, Math.round(count));
+  const halfLength = length * 0.5, halfWidth = width * 0.5;
+  const aa = 0.7 / size, angleRange = angleSpread * Math.PI / 180;
+  const cxArr = new Float32Array(n), cyArr = new Float32Array(n);
+  const cosArr = new Float32Array(n), sinArr = new Float32Array(n);
+  const boundX = new Float32Array(n), boundY = new Float32Array(n);
+  for (let k = 0; k < n; k += 1) {
+    const angle = (hash2(k, 2, seed + 3441) - 0.5) * angleRange;
+    const c = Math.cos(angle), s = Math.sin(angle);
+    cxArr[k] = hash2(k, 0, seed);
+    cyArr[k] = hash2(k, 1, seed + 7919);
+    cosArr[k] = c; sinArr[k] = s;
+    boundX[k] = halfLength * Math.abs(c) + halfWidth + aa;
+    boundY[k] = halfLength * Math.abs(s) + halfWidth + aa;
+  }
+  // Compact segments need only the nearest wrapped centre. If an end or the
+  // stroke can reach past half a tile, a neighbouring image can be closer.
+  const imageRange = halfLength + halfWidth + aa > 0.5 ? 1 : 0;
+  for (let y = 0; y < size; y += 1) {
+    const v = (y + 0.5) / size;
+    for (let x = 0; x < size; x += 1) {
+      const u = (x + 0.5) / size;
+      let best = 0;
+      for (let k = 0; k < n; k += 1) {
+        let baseX = cxArr[k]! - u; baseX -= Math.round(baseX);
+        let baseY = cyArr[k]! - v; baseY -= Math.round(baseY);
+        const c = cosArr[k]!, s = sinArr[k]!, bx = boundX[k]!, by = boundY[k]!;
+        for (let oy = -imageRange; oy <= imageRange; oy += 1) {
+          const dy = baseY + oy;
+          if (Math.abs(dy) > by) continue;
+          for (let ox = -imageRange; ox <= imageRange; ox += 1) {
+            const dx = baseX + ox;
+            if (Math.abs(dx) > bx) continue;
+            // Project the point onto the finite segment, then measure the
+            // perpendicular/end-cap distance in tile units.
+            let along = -(dx * c + dy * s);
+            if (along < -halfLength) along = -halfLength;
+            else if (along > halfLength) along = halfLength;
+            const px = dx + along * c, py = dy + along * s;
+            const d2 = px * px + py * py, outer = halfWidth + aa;
+            if (d2 > outer * outer) continue;
+            const intensity = 1 - smoothstep01(halfWidth - aa, outer, Math.sqrt(d2));
+            if (intensity > best) best = intensity;
+          }
+        }
+        if (best >= 0.999) break;
+      }
+      out[y * size + x] = best;
+    }
+  }
+  return out;
+}
+
+function spotsImage(size: number, count: number, radiusMin: number, radiusMax: number, softness: number, seed: number): Float32Array {
+  const out = new Float32Array(size * size);
+  const n = Math.max(1, Math.round(count));
+  const cxArr = new Float32Array(n), cyArr = new Float32Array(n), rArr = new Float32Array(n), edgeArr = new Float32Array(n);
+  const aa = 0.7 / size;
+  for (let k = 0; k < n; k += 1) {
+    const cx = hash2(k, 0, seed);
+    const cy = hash2(k, 1, seed + 7919);
+    const rr = hash2(k, 2, seed + 3441);
+    const radius = radiusMin + (radiusMax - radiusMin) * rr;
+    // Never let a soft disc collapse to a sub-pixel hard edge: a wrapped disc
+    // on the tile boundary should be no sharper than one inside the tile.
+    const edge = Math.max(softness * radius, aa * 4);
+    cxArr[k] = cx; cyArr[k] = cy; rArr[k] = radius; edgeArr[k] = edge;
+  }
+  for (let y = 0; y < size; y += 1) {
+    const v = (y + 0.5) / size;
+    for (let x = 0; x < size; x += 1) {
+      const u = (x + 0.5) / size;
+      let best = 0;
+      for (let k = 0; k < n; k += 1) {
+        const cx = cxArr[k]!, cy = cyArr[k]!, r = rArr[k]!, edge = edgeArr[k]!;
+        let dx = u - cx; dx -= Math.round(dx);
+        let dy = v - cy; dy -= Math.round(dy);
+        // quick reject via bounding box
+        const bound = r + edge * 0.5 + aa;
+        if (Math.abs(dx) > bound || Math.abs(dy) > bound) continue;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > (r + edge * 0.5 + aa) * (r + edge * 0.5 + aa)) continue;
+        const d = Math.sqrt(d2);
+        const inner = r - edge * 0.5, outer = r + edge * 0.5;
+        const intensity = 1 - smoothstep01(inner, outer, d);
+        if (intensity > best) {
+          best = intensity;
+          if (best >= 0.999) break;
+        }
+      }
+      out[y * size + x] = best;
+    }
+  }
+  return out;
+}
+
+function hexImage(size: number, count: number, lineWidth: number, mode: string, seed: number): Float32Array {
+  const out = new Float32Array(size * size);
+  const nx = Math.max(1, Math.round(count));
+  let ny = Math.round(nx * 1.15470053838);
+  if (ny < 2) ny = 2;
+  if ((ny & 1) === 1) ny += 1;
+  const sx = 1 / nx, sy = 1 / ny;
+  // Keep lattice edges off the tile boundary. Besides looking less mechanical, this
+  // makes the random-cell mode wrap just like any interior cell boundary.
+  const originX = sx * 0.37, originY = sy * 0.29;
+  const aa = 1.2 / size;
+  const lw = Math.max(0, lineWidth);
+  for (let y = 0; y < size; y += 1) {
+    const v = (y + 0.5) / size;
+    const iy0 = Math.floor((v - originY) / sy);
+    for (let x = 0; x < size; x += 1) {
+      const u = (x + 0.5) / size;
+      // collect candidate centers in 3x3 neighbourhood
+      let f1 = 1e9, f2 = 1e9;
+      let bestIx = 0, bestIy = 0;
+      let bestDist2 = 1e9;
+      for (let dy = -1; dy <= 1; dy += 1) {
+        const iyCand = iy0 + dy;
+        const iy = ((iyCand % ny) + ny) % ny;
+        const offCand = (iyCand & 1) ? sx * 0.5 : 0;
+        // estimated ix for this row
+        const ixEst = Math.floor((u - offCand - originX) / sx);
+        for (let dx = -1; dx <= 1; dx += 1) {
+          const ixCand = ixEst + dx;
+          const ix = ((ixCand % nx) + nx) % nx;
+          // Keep the candidate coordinates unwrapped: adjacent periodic images
+          // are distinct candidates, while only the cell hash index wraps.
+          const cx = ixCand * sx + offCand + sx * 0.5 + originX;
+          const cy = iyCand * sy + sy * 0.5 + originY;
+          const ddx = cx - u, ddy = cy - v;
+          const d2 = ddx * ddx + ddy * ddy;
+          const d = Math.sqrt(d2);
+          if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) f2 = d;
+          if (mode === "cell" && d2 < bestDist2) { bestDist2 = d2; bestIx = ix; bestIy = iy; }
+        }
+      }
+      if (mode === "cell") {
+        out[y * size + x] = hash2(bestIx, bestIy, seed);
+      } else {
+        // Zero on a cell edge, rising to one lineWidth inside the cell.
+        out[y * size + x] = smoothstep01(0, Math.max(aa, lw), f2 - f1);
+      }
+    }
+  }
+  return out;
+}
+
+function weaveImage(size: number, count: number, gap: number): Float32Array {
+  const out = new Float32Array(size * size);
+  // A 2 x 2 twill repeats over four threads in each direction. Rounding to a
+  // multiple of four keeps both the weave and its over-under pattern periodic.
+  const n = Math.max(4, Math.round(count / 4) * 4);
+  const threadWidth = Math.max(0.001, 1 - clamp01(gap));
+  const aa = Math.min(threadWidth * 0.5, (1.5 * n) / size);
+  const hGap = 0.16;
+  for (let y = 0; y < size; y += 1) {
+    const v = (y + 0.5) / size;
+    const iy = Math.floor(v * n), fy = v * n - iy;
+    const dy = Math.abs(fy - 0.5) * 2;
+    const weft = 1 - smoothstep01(threadWidth - aa, threadWidth + aa, dy);
+    const weftCrown = Math.sqrt(Math.max(0, 1 - (dy / threadWidth) ** 2));
+    for (let x = 0; x < size; x += 1) {
+      const u = (x + 0.5) / size;
+      const ix = Math.floor(u * n), fx = u * n - ix;
+      const dx = Math.abs(fx - 0.5) * 2;
+      const warp = 1 - smoothstep01(threadWidth - aa, threadWidth + aa, dx);
+      const warpCrown = Math.sqrt(Math.max(0, 1 - (dx / threadWidth) ** 2));
+      const topIsWarp = ((ix + iy) % 4 + 4) % 4 < 2;
+      const warpHeight = 0.46 + warpCrown * 0.14;
+      const weftHeight = 0.44 + weftCrown * 0.14;
+      // At a crossing only the upper thread is visible. Its crown rises above
+      // the single-thread height; the next pair of crossings reverses the order.
+      const crossingHeight = 0.76 + (topIsWarp ? warpCrown : weftCrown) * 0.2;
+      const w = warp, f = weft, cross = w * f;
+      out[y * size + x] =
+        hGap * (1 - w) * (1 - f) +
+        warpHeight * w * (1 - f) +
+        weftHeight * f * (1 - w) +
+        crossingHeight * cross;
+    }
+  }
+  return out;
+}
+
+function boxBlurWrapped(data: Float32Array, size: number, channels: number, radiusPixels: number): Float32Array {
+  if (radiusPixels <= 0) return new Float32Array(data);
+  const r = Math.max(0, Math.round(radiusPixels));
+  const win = 2 * r + 1;
+  const invWin = 1 / win;
+  const tmp = new Float32Array(data.length);
+  // horizontal
+  for (let y = 0; y < size; y += 1) {
+    const row = y * size * channels;
+    for (let c = 0; c < channels; c += 1) {
+      let sum = 0;
+      for (let k = -r; k <= r; k += 1) {
+        const xx = (k + size) % size;
+        sum += data[row + xx * channels + c]!;
+      }
+      tmp[row + c] = sum * invWin;
+      for (let x = 1; x < size; x += 1) {
+        const outX = (x - r - 1 + size) % size;
+        const inX = (x + r) % size;
+        sum += data[row + inX * channels + c]! - data[row + outX * channels + c]!;
+        tmp[row + x * channels + c] = sum * invWin;
+      }
+    }
+  }
+  const out = new Float32Array(data.length);
+  // vertical
+  for (let x = 0; x < size; x += 1) {
+    for (let c = 0; c < channels; c += 1) {
+      let sum = 0;
+      for (let k = -r; k <= r; k += 1) {
+        const yy = (k + size) % size;
+        sum += tmp[yy * size * channels + x * channels + c]!;
+      }
+      out[x * channels + c] = sum * invWin;
+      for (let y = 1; y < size; y += 1) {
+        const outY = (y - r - 1 + size) % size;
+        const inY = (y + r) % size;
+        sum += tmp[inY * size * channels + x * channels + c]! - tmp[outY * size * channels + x * channels + c]!;
+        out[y * size * channels + x * channels + c] = sum * invWin;
+      }
+    }
+  }
+  return out;
+}
+
 
 function cellularImage(size: number, scale: number, jitter: number, mode: string, seed: number): Float32Array {
   const cells = Math.max(1, Math.round(scale)), spread = clamp01(jitter);
@@ -243,7 +501,7 @@ function referencesFor(node: NodeRecord): string[] {
     return refs;
   }
 
-  if (type === "levels" || type === "invert" || type === "ramp" || type === "scaleBias") {
+  if (type === "levels" || type === "invert" || type === "ramp" || type === "scaleBias" || type === "blur") {
     return ["in"];
   }
 
@@ -300,6 +558,52 @@ function checkNodeParameters(node: NodeRecord, errors: string[]): void {
     checkedNumber(node, "octaves", errors, 1, 6, true);
     checkedNumber(node, "gain", errors, 0, 1);
     checkedNumber(node, "seed", errors);
+    if (node.scaleY !== undefined) checkedNumber(node, "scaleY", errors, 1, 64, true);
+    return;
+  }
+
+  if (type === "scratches") {
+    checkedNumber(node, "count", errors, 1, 1000, true);
+    checkedNumber(node, "length", errors, 0, 1);
+    checkedNumber(node, "width", errors, 0, 0.5);
+    checkedNumber(node, "angleSpread", errors, 0, 360);
+    checkedNumber(node, "seed", errors);
+    return;
+  }
+
+  if (type === "spots") {
+    checkedNumber(node, "count", errors, 1, 2000, true);
+    checkedNumber(node, "radiusMin", errors, 0, 0.5);
+    checkedNumber(node, "radiusMax", errors, 0, 0.5);
+    checkedNumber(node, "softness", errors, 0, 1);
+    checkedNumber(node, "seed", errors);
+    if (isFiniteNumber(node.radiusMin) && isFiniteNumber(node.radiusMax) && Number(node.radiusMin) > Number(node.radiusMax)) {
+      errors.push(`node '${id}': 'spots' requires radiusMin to be <= radiusMax`);
+    }
+    return;
+  }
+
+  if (type === "hex") {
+    checkedNumber(node, "count", errors, 1, 64, true);
+    checkedNumber(node, "lineWidth", errors, 0, 0.5);
+    checkedNumber(node, "seed", errors);
+    if (node.mode !== "edge" && node.mode !== "cell") {
+      errors.push(`node '${id}': 'hex' parameter 'mode' must be 'edge' or 'cell'`);
+    }
+    return;
+  }
+
+  if (type === "weave") {
+    checkedNumber(node, "count", errors, 1, 64, true);
+    checkedNumber(node, "gap", errors, 0, 1);
+    return;
+  }
+
+  if (type === "blur") {
+    const validRadius = checkedNumber(node, "radius", errors, 0, 0.25);
+    if (validRadius && Number(node.radius) <= 0) {
+      errors.push(`node '${id}': 'blur' parameter 'radius' must be greater than 0`);
+    }
     return;
   }
 
@@ -575,10 +879,12 @@ export function validateGraph(g: unknown): { ok: boolean; errors: string[] } {
       const type = node.type;
       let result: ValueType | undefined;
 
-      if (type === "noise" || type === "cellular" || type === "grain") {
+      if (type === "noise" || type === "cellular" || type === "grain" || type === "scratches" || type === "spots" || type === "hex" || type === "weave") {
         result = "scalar";
       } else if (type === "stripes" || type === "checker") {
         result = "scalar";
+      } else if (type === "blur") {
+        result = typeof node.in === "string" ? inferType(node.in) : undefined;
       } else if (type === "constant") {
         result = isColorValue(node.value)
           ? "colour"
@@ -759,9 +1065,32 @@ export function evaluateGraph(graph: TexGraph, opts?: EvaluateOptions): Evaluate
     let result: Image;
 
     switch (node.type) {
-      case "noise":
-        result = { colour: false, data: noiseImage(size, num(params, "scale", 1), num(params, "octaves", 1), num(params, "gain", 0.5), nodeSeed(node)) };
+      case "noise": {
+        const scaleY = params.scaleY !== undefined ? num(params, "scaleY", num(params, "scale", 1)) : undefined;
+        result = { colour: false, data: noiseImage(size, num(params, "scale", 1), num(params, "octaves", 1), num(params, "gain", 0.5), nodeSeed(node), scaleY) };
         break;
+      }
+      case "scratches":
+        result = { colour: false, data: scratchesImage(size, num(params, "count", 20), num(params, "length", 0.3), num(params, "width", 0.01), num(params, "angleSpread", 30), nodeSeed(node)) };
+        break;
+      case "spots":
+        result = { colour: false, data: spotsImage(size, num(params, "count", 40), num(params, "radiusMin", 0.02), num(params, "radiusMax", 0.05), num(params, "softness", 0.3), nodeSeed(node)) };
+        break;
+      case "hex":
+        result = { colour: false, data: hexImage(size, num(params, "count", 8), num(params, "lineWidth", 0.04), String(params.mode ?? "edge"), nodeSeed(node)) };
+        break;
+      case "weave":
+        result = { colour: false, data: weaveImage(size, num(params, "count", 8), num(params, "gap", 0.15)) };
+        break;
+      case "blur": {
+        const input = get(String(params.in));
+        const radius = num(params, "radius", 0.05);
+        const rp = Math.round(radius * size);
+        const channels = input.colour ? 3 : 1;
+        const blurred = boxBlurWrapped(input.data, size, channels, rp);
+        result = { colour: input.colour, data: blurred };
+        break;
+      }
 
       case "cellular":
         result = { colour: false, data: cellularImage(size, num(params, "scale", 1), num(params, "jitter", 0.8), String(params.mode), nodeSeed(node)) };
@@ -1046,6 +1375,278 @@ export function channelStats(
     neighbour: insideSamples === 0 ? 0 : insideTotal / insideSamples,
   };
 }
+
+
+/** The procedural grey/height/roughness tiles used by the Plan 41 surface shelf. */
+export const TILE_LIBRARY: Readonly<Record<string, TexGraph>> = Object.freeze({
+  "brushed-metal": {
+    id: "brushed-metal",
+    name: "Brushed metal",
+    nodes: [
+      { id: "brush", type: "noise", scale: 12, scaleY: 48, octaves: 2, gain: 0.5, seed: 11 },
+      { id: "levels", type: "levels", in: "brush", inLow: 0.25, inHigh: 0.75, gamma: 1, outLow: 0, outHigh: 1 },
+      { id: "albedo", type: "ramp", in: "levels", stops: [{ at: 0, r: 0.12, g: 0.12, b: 0.12 }, { at: 1, r: 0.88, g: 0.88, b: 0.88 }] },
+      { id: "height", type: "scaleBias", in: "levels", scale: 0.38, bias: 0.32 },
+      { id: "rough", type: "scaleBias", in: "brush", scale: 0.22, bias: 0.39 },
+    ],
+    out: { albedo: "albedo", height: "height", roughness: "rough" },
+  },
+  "cells": {
+    id: "cells",
+    name: "Cells",
+    nodes: [
+      { id: "cell", type: "cellular", scale: 6, jitter: 0.8, mode: "f1", seed: 13 },
+      { id: "levels", type: "levels", in: "cell", inLow: 0.15, inHigh: 0.75, gamma: 1, outLow: 1, outHigh: 0 },
+      { id: "albedo", type: "ramp", in: "levels", stops: [{ at: 0, r: 0.14, g: 0.14, b: 0.14 }, { at: 1, r: 0.86, g: 0.86, b: 0.86 }] },
+      { id: "height", type: "scaleBias", in: "levels", scale: 0.42, bias: 0.28 },
+      { id: "rough", type: "scaleBias", in: "cell", scale: 0.24, bias: 0.4 },
+    ],
+    out: { albedo: "albedo", height: "height", roughness: "rough" },
+  },
+  "cast-iron": {
+    id: "cast-iron",
+    name: "Cast iron",
+    nodes: [
+      { id: "base", type: "noise", scale: 5, octaves: 3, gain: 0.55, seed: 21 },
+      { id: "pits", type: "spots", count: 55, radiusMin: 0.02, radiusMax: 0.055, softness: 0.3, seed: 22 },
+      { id: "mix", type: "blend", a: "base", b: "pits", mode: "max", amount: 0.65 },
+      { id: "levels", type: "levels", in: "mix", inLow: 0.2, inHigh: 0.8, gamma: 1, outLow: 0, outHigh: 1 },
+      { id: "albedo", type: "ramp", in: "levels", stops: [{ at: 0, r: 0.16, g: 0.16, b: 0.16 }, { at: 1, r: 0.84, g: 0.84, b: 0.84 }] },
+      { id: "height", type: "scaleBias", in: "mix", scale: 0.45, bias: 0.28 },
+      { id: "rough", type: "scaleBias", in: "mix", scale: 0.2, bias: 0.389 },
+    ],
+    out: { albedo: "albedo", height: "height", roughness: "rough" },
+  },
+  "pits": {
+    id: "pits",
+    name: "Pits",
+    nodes: [
+      { id: "spots", type: "spots", count: 70, radiusMin: 0.012, radiusMax: 0.035, softness: 0.22, seed: 31 },
+      { id: "micro", type: "grain", seed: 32 },
+      { id: "textured", type: "blend", a: "spots", b: "micro", mode: "add", amount: 0.15 },
+      { id: "invert", type: "invert", in: "textured" },
+      { id: "albedo", type: "ramp", in: "invert", stops: [{ at: 0, r: 0.18, g: 0.18, b: 0.18 }, { at: 1, r: 0.86, g: 0.86, b: 0.86 }] },
+      { id: "height", type: "scaleBias", in: "textured", scale: -0.45, bias: 0.75 },
+      { id: "rough", type: "scaleBias", in: "textured", scale: 0.26, bias: 0.447 },
+    ],
+    out: { albedo: "albedo", height: "height", roughness: "rough" },
+  },
+  "fine-grain": {
+    id: "fine-grain",
+    name: "Fine grain",
+    nodes: [
+      { id: "noise", type: "noise", scale: 18, octaves: 3, gain: 0.5, seed: 41 },
+      { id: "levels", type: "levels", in: "noise", inLow: 0.2, inHigh: 0.8, gamma: 0.9, outLow: 0, outHigh: 1 },
+      { id: "albedo", type: "ramp", in: "levels", stops: [{ at: 0, r: 0.15, g: 0.15, b: 0.15 }, { at: 1, r: 0.85, g: 0.85, b: 0.85 }] },
+      { id: "height", type: "scaleBias", in: "levels", scale: 0.32, bias: 0.34 },
+      { id: "rough", type: "scaleBias", in: "noise", scale: 0.2, bias: 0.402 },
+    ],
+    out: { albedo: "albedo", height: "height", roughness: "rough" },
+  },
+  "orange-peel": {
+    id: "orange-peel",
+    name: "Orange peel",
+    nodes: [
+      { id: "noise", type: "noise", scale: 6, octaves: 2, gain: 0.5, seed: 51 },
+      { id: "blur", type: "blur", in: "noise", radius: 0.06 },
+      { id: "levels", type: "levels", in: "blur", inLow: 0.25, inHigh: 0.72, gamma: 1, outLow: 0, outHigh: 1 },
+      { id: "albedo", type: "ramp", in: "levels", stops: [{ at: 0, r: 0.17, g: 0.17, b: 0.17 }, { at: 1, r: 0.83, g: 0.83, b: 0.83 }] },
+      { id: "height", type: "scaleBias", in: "blur", scale: 0.35, bias: 0.33 },
+      { id: "rough", type: "scaleBias", in: "blur", scale: 0.18, bias: 0.409 },
+    ],
+    out: { albedo: "albedo", height: "height", roughness: "rough" },
+  },
+  "stripes": {
+    id: "stripes",
+    name: "Stripes",
+    nodes: [
+      { id: "stripes", type: "stripes", count: 2, softness: 0.02, vertical: true, tilt: 2 },
+      { id: "albedo", type: "ramp", in: "stripes", interpolation: "constant", stops: [{ at: 0, r: 0, g: 0, b: 0 }, { at: 1, r: 1, g: 1, b: 1 }] },
+      { id: "height", type: "scaleBias", in: "stripes", scale: 0.5, bias: 0.25 },
+      { id: "rough", type: "scaleBias", in: "stripes", scale: 0.22, bias: 0.39 },
+    ],
+    out: { albedo: "albedo", height: "height", roughness: "rough" },
+  },
+  "rubber-grain": {
+    id: "rubber-grain",
+    name: "Rubber grain",
+    nodes: [
+      { id: "noise1", type: "noise", scale: 10, octaves: 2, gain: 0.5, seed: 61 },
+      { id: "noise2", type: "noise", scale: 18, octaves: 2, gain: 0.5, seed: 62 },
+      { id: "mix", type: "blend", a: "noise1", b: "noise2", mode: "max", amount: 0.6 },
+      { id: "levels", type: "levels", in: "mix", inLow: 0.25, inHigh: 0.75, gamma: 1, outLow: 0, outHigh: 1 },
+      { id: "albedo", type: "ramp", in: "levels", stops: [{ at: 0, r: 0.19, g: 0.19, b: 0.19 }, { at: 1, r: 0.81, g: 0.81, b: 0.81 }] },
+      { id: "height", type: "scaleBias", in: "mix", scale: 0.34, bias: 0.33 },
+      { id: "rough", type: "scaleBias", in: "mix", scale: 0.2, bias: 0.388 },
+    ],
+    out: { albedo: "albedo", height: "height", roughness: "rough" },
+  },
+  "concrete": {
+    id: "concrete",
+    name: "Concrete",
+    nodes: [
+      { id: "cell", type: "cellular", scale: 5, jitter: 0.75, mode: "f1", seed: 71 },
+      { id: "noise", type: "noise", scale: 12, octaves: 2, gain: 0.5, seed: 72 },
+      { id: "mix", type: "blend", a: "cell", b: "noise", mode: "multiply", amount: 0.45 },
+      { id: "levels", type: "levels", in: "mix", inLow: 0.15, inHigh: 0.75, gamma: 1, outLow: 0, outHigh: 1 },
+      { id: "albedo", type: "ramp", in: "levels", stops: [{ at: 0, r: 0.16, g: 0.16, b: 0.16 }, { at: 1, r: 0.84, g: 0.84, b: 0.84 }] },
+      { id: "height", type: "scaleBias", in: "mix", scale: 0.4, bias: 0.3 },
+      { id: "rough", type: "scaleBias", in: "mix", scale: 0.22, bias: 0.43 },
+    ],
+    out: { albedo: "albedo", height: "height", roughness: "rough" },
+  },
+  "carbon-weave": {
+    id: "carbon-weave",
+    name: "Carbon weave",
+    nodes: [
+      { id: "weave", type: "weave", count: 8, gap: 0.12 },
+      { id: "levels", type: "levels", in: "weave", inLow: 0.32, inHigh: 0.82, gamma: 1, outLow: 0, outHigh: 1 },
+      { id: "albedo", type: "ramp", in: "levels", stops: [{ at: 0, r: 0.13, g: 0.13, b: 0.13 }, { at: 1, r: 0.87, g: 0.87, b: 0.87 }] },
+      { id: "height", type: "scaleBias", in: "weave", scale: 0.55, bias: 0.22 },
+      { id: "rough", type: "scaleBias", in: "weave", scale: 0.18, bias: 0.35 },
+    ],
+    out: { albedo: "albedo", height: "height", roughness: "rough" },
+  },
+  "hex-micro": {
+    id: "hex-micro",
+    name: "Hex micro",
+    nodes: [
+      { id: "hex", type: "hex", count: 10, lineWidth: 0.035, mode: "edge", seed: 81 },
+      { id: "levels", type: "levels", in: "hex", inLow: 0.05, inHigh: 0.65, gamma: 1, outLow: 0, outHigh: 1 },
+      { id: "albedo", type: "ramp", in: "levels", stops: [{ at: 0, r: 0.15, g: 0.15, b: 0.15 }, { at: 1, r: 0.85, g: 0.85, b: 0.85 }] },
+      { id: "height", type: "scaleBias", in: "hex", scale: 0.42, bias: 0.3 },
+      { id: "rough", type: "scaleBias", in: "hex", scale: 0.2, bias: 0.366 },
+    ],
+    out: { albedo: "albedo", height: "height", roughness: "rough" },
+  },
+  "flake-scale": {
+    id: "flake-scale",
+    name: "Flake scale",
+    nodes: [
+      { id: "flakes", type: "spots", count: 48, radiusMin: 0.028, radiusMax: 0.068, softness: 0.42, seed: 91 },
+      { id: "micro", type: "grain", seed: 92 },
+      { id: "textured", type: "blend", a: "flakes", b: "micro", mode: "add", amount: 0.25 },
+      { id: "levels", type: "levels", in: "textured", inLow: 0.05, inHigh: 0.85, gamma: 0.9, outLow: 0, outHigh: 1 },
+      { id: "albedo", type: "ramp", in: "levels", stops: [{ at: 0, r: 0.17, g: 0.17, b: 0.17 }, { at: 1, r: 0.83, g: 0.83, b: 0.83 }] },
+      { id: "height", type: "scaleBias", in: "textured", scale: 0.5, bias: 0.28 },
+      { id: "rough", type: "scaleBias", in: "textured", scale: 0.2, bias: 0.421 },
+    ],
+    out: { albedo: "albedo", height: "height", roughness: "rough" },
+  },
+  "grime-clouds": {
+    id: "grime-clouds",
+    name: "Grime clouds",
+    nodes: [
+      { id: "cloud", type: "noise", scale: 3, octaves: 3, gain: 0.6, seed: 101 },
+      { id: "levels", type: "levels", in: "cloud", inLow: 0.45, inHigh: 0.55, gamma: 1, outLow: 0, outHigh: 1 },
+      { id: "albedo", type: "ramp", in: "levels", stops: [{ at: 0, r: 0.14, g: 0.14, b: 0.14 }, { at: 1, r: 0.86, g: 0.86, b: 0.86 }] },
+      { id: "height", type: "scaleBias", in: "cloud", scale: 0.3, bias: 0.38 },
+      { id: "rough", type: "scaleBias", in: "cloud", scale: 0.2, bias: 0.408 },
+    ],
+    out: { albedo: "albedo", height: "height", roughness: "rough" },
+  },
+  "regolith-grain": {
+    id: "regolith-grain",
+    name: "Regolith grain",
+    nodes: [
+      { id: "grain", type: "spots", count: 85, radiusMin: 0.01, radiusMax: 0.024, softness: 0.28, seed: 111 },
+      { id: "micro", type: "grain", seed: 112 },
+      { id: "textured", type: "blend", a: "grain", b: "micro", mode: "add", amount: 0.25 },
+      { id: "levels", type: "levels", in: "textured", inLow: 0.05, inHigh: 0.9, gamma: 1, outLow: 0, outHigh: 1 },
+      { id: "albedo", type: "ramp", in: "levels", stops: [{ at: 0, r: 0.18, g: 0.18, b: 0.18 }, { at: 1, r: 0.82, g: 0.82, b: 0.82 }] },
+      { id: "height", type: "scaleBias", in: "textured", scale: 0.38, bias: 0.35 },
+      { id: "rough", type: "scaleBias", in: "textured", scale: 0.18, bias: 0.462 },
+    ],
+    out: { albedo: "albedo", height: "height", roughness: "rough" },
+  },
+  "moss-clump": {
+    id: "moss-clump",
+    name: "Moss clump",
+    nodes: [
+      { id: "spots", type: "spots", count: 32, radiusMin: 0.03, radiusMax: 0.075, softness: 0.55, seed: 121 },
+      { id: "blur", type: "blur", in: "spots", radius: 0.05 },
+      { id: "micro", type: "grain", seed: 122 },
+      { id: "textured", type: "blend", a: "blur", b: "micro", mode: "add", amount: 0.25 },
+      { id: "levels", type: "levels", in: "textured", inLow: 0.1, inHigh: 0.85, gamma: 0.9, outLow: 0, outHigh: 1 },
+      { id: "albedo", type: "ramp", in: "levels", stops: [{ at: 0, r: 0.16, g: 0.16, b: 0.16 }, { at: 1, r: 0.84, g: 0.84, b: 0.84 }] },
+      { id: "height", type: "scaleBias", in: "textured", scale: 0.48, bias: 0.3 },
+      { id: "rough", type: "scaleBias", in: "textured", scale: 0.2, bias: 0.425 },
+    ],
+    out: { albedo: "albedo", height: "height", roughness: "rough" },
+  },
+  "frost-crystal": {
+    id: "frost-crystal",
+    name: "Frost crystal",
+    nodes: [
+      { id: "hex", type: "hex", count: 7, lineWidth: 0.025, mode: "cell", seed: 131 },
+      { id: "noise", type: "noise", scale: 12, octaves: 2, gain: 0.5, seed: 132 },
+      { id: "mix", type: "blend", a: "hex", b: "noise", mode: "multiply", amount: 0.35 },
+      { id: "levels", type: "levels", in: "mix", inLow: 0.12, inHigh: 0.82, gamma: 1, outLow: 0, outHigh: 1 },
+      { id: "albedo", type: "ramp", in: "levels", stops: [{ at: 0, r: 0.15, g: 0.15, b: 0.15 }, { at: 1, r: 0.85, g: 0.85, b: 0.85 }] },
+      { id: "height", type: "scaleBias", in: "hex", scale: 0.42, bias: 0.32 },
+      { id: "rough", type: "scaleBias", in: "mix", scale: 0.2, bias: 0.42 },
+    ],
+    out: { albedo: "albedo", height: "height", roughness: "rough" },
+  },
+  "mud-splatter": {
+    id: "mud-splatter",
+    name: "Mud splatter",
+    nodes: [
+      { id: "splat", type: "spots", count: 42, radiusMin: 0.02, radiusMax: 0.09, softness: 0.48, seed: 141 },
+      { id: "micro", type: "grain", seed: 142 },
+      { id: "textured", type: "blend", a: "splat", b: "micro", mode: "add", amount: 0.5 },
+      { id: "levels", type: "levels", in: "textured", inLow: 0.05, inHigh: 0.85, gamma: 1, outLow: 0, outHigh: 1 },
+      { id: "albedo", type: "ramp", in: "levels", stops: [{ at: 0, r: 0.17, g: 0.17, b: 0.17 }, { at: 1, r: 0.83, g: 0.83, b: 0.83 }] },
+      { id: "height", type: "scaleBias", in: "textured", scale: 0.46, bias: 0.3 },
+      { id: "rough", type: "scaleBias", in: "textured", scale: 0.2, bias: 0.39 },
+    ],
+    out: { albedo: "albedo", height: "height", roughness: "rough" },
+  },
+  "mineral-crust": {
+    id: "mineral-crust",
+    name: "Mineral crust",
+    nodes: [
+      { id: "cell", type: "cellular", scale: 7, jitter: 0.85, mode: "edge", seed: 151 },
+      { id: "spots", type: "spots", count: 35, radiusMin: 0.015, radiusMax: 0.04, softness: 0.3, seed: 152 },
+      { id: "mix", type: "blend", a: "cell", b: "spots", mode: "max", amount: 0.55 },
+      { id: "micro", type: "grain", seed: 153 },
+      { id: "textured", type: "blend", a: "mix", b: "micro", mode: "add", amount: 0.25 },
+      { id: "levels", type: "levels", in: "textured", inLow: 0.12, inHigh: 0.78, gamma: 1, outLow: 0, outHigh: 1 },
+      { id: "albedo", type: "ramp", in: "levels", stops: [{ at: 0, r: 0.16, g: 0.16, b: 0.16 }, { at: 1, r: 0.84, g: 0.84, b: 0.84 }] },
+      { id: "height", type: "scaleBias", in: "textured", scale: 0.4, bias: 0.32 },
+      { id: "rough", type: "scaleBias", in: "textured", scale: 0.2, bias: 0.415 },
+    ],
+    out: { albedo: "albedo", height: "height", roughness: "rough" },
+  },
+  "scorch-burn": {
+    id: "scorch-burn",
+    name: "Scorch burn",
+    nodes: [
+      { id: "noise", type: "noise", scale: 4, octaves: 3, gain: 0.55, seed: 161 },
+      { id: "warpField", type: "noise", scale: 2, octaves: 2, gain: 0.5, seed: 162 },
+      { id: "warped", type: "warp", in: "noise", warp: "warpField", amount: 0.09 },
+      { id: "levels", type: "levels", in: "warped", inLow: 0.42, inHigh: 0.62, gamma: 0.9, outLow: 0, outHigh: 1 },
+      { id: "albedo", type: "ramp", in: "levels", stops: [{ at: 0, r: 0.14, g: 0.14, b: 0.14 }, { at: 1, r: 0.86, g: 0.86, b: 0.86 }] },
+      { id: "height", type: "scaleBias", in: "warped", scale: 0.36, bias: 0.34 },
+      { id: "rough", type: "scaleBias", in: "warped", scale: 0.2, bias: 0.403 },
+    ],
+    out: { albedo: "albedo", height: "height", roughness: "rough" },
+  },
+  "scratches": {
+    id: "scratches",
+    name: "Scratches",
+    nodes: [
+      { id: "scratches", type: "scratches", count: 62, length: 0.32, width: 0.0035, angleSpread: 28, seed: 171 },
+      { id: "micro", type: "grain", seed: 172 },
+      { id: "textured", type: "blend", a: "scratches", b: "micro", mode: "add", amount: 0.5 },
+      { id: "levels", type: "levels", in: "textured", inLow: 0.05, inHigh: 0.6, gamma: 1, outLow: 0, outHigh: 1 },
+      { id: "albedo", type: "ramp", in: "levels", stops: [{ at: 0, r: 0.18, g: 0.18, b: 0.18 }, { at: 1, r: 0.82, g: 0.82, b: 0.82 }] },
+      { id: "height", type: "scaleBias", in: "textured", scale: 0.42, bias: 0.32 },
+      { id: "rough", type: "scaleBias", in: "textured", scale: 0.2, bias: 0.434 },
+    ],
+    out: { albedo: "albedo", height: "height", roughness: "rough" },
+  },
+});
 
 export const TEXTURE_PRESETS: TexGraph[] = [
   {

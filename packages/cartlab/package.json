@@ -3,5 +3,14 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "main": "src/index.ts"
+  "main": "src/index.ts",
+  "dependencies": {
+    "fflate": "0.8.3",
+    "@hm/gamepreset": "0.0.1",
+    "@hm/kitspec": "0.0.1",
+    "@hm/creature": "0.0.1",
+    "@hm/matstack": "0.0.1",
+    "@hm/partgen": "0.0.1",
+    "@hm/meshops": "0.0.1"
+  }
 }

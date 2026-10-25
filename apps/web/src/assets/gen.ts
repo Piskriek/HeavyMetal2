@@ -101,6 +101,11 @@ function tuneMaterial(src: THREE.Material, t: AssetTweak): THREE.Material {
   return mat;
 }
 
+/** Read-only raw mesh for kit batching. Owners clone geometry; never dispose or mutate this shared asset. */
+export function getGenRawSync(id: string, level: GenLevel = 'low'): THREE.Group | null {
+  return resolved.get(`${id}|${level}`) ?? resolved.get(`${id}|low`) ?? null;
+}
+
 /**
  * Returns a cached asset synchronously if already preloaded, or null. The clone carries the asset's saved tweak.
  */

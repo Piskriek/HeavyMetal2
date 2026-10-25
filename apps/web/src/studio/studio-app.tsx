@@ -10,6 +10,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import type { Group } from 'three';
 import { createHistory, redo, undo, type History, type Op } from '@hm/scenedoc';
 import { SPECS } from '@hm/vault';
+import type { SporeCard } from '@hm/cartlab';
+import { assertPlayablePreset, type MultiverseGamePresetSpec } from '../play/game-presets';
+import { bindSporeCardDrop } from './spore-drop';
+import { SporeWorkbench } from './spore-workbench';
 import { MATERIAL_SHELF } from '@hm/matstack';
 import { ASSET_TWEAKS, GEN, loadGenRaw, type GenLevel } from '../assets/gen';
 import { kv } from '../storage/profile-storage';
@@ -42,7 +46,7 @@ const KEYMAP_KEY = 'studio.keymap';
 const DEFAULT_LAYOUT = { left: 290, right: 320, changes: 210 };
 const LIMITS = { left: [200, 480], right: [240, 520], changes: [120, 420] } as const;
 
-type Workspace = 'assets' | 'scene' | 'look' | 'audio' | 'material' | 'parts' | 'monsters' | 'moon';
+type Workspace = 'assets' | 'scene' | 'look' | 'audio' | 'material' | 'parts' | 'monsters' | 'spores' | 'moon';
 /** The sound library as public/audio/levels.json holds it (the wrapper keeps its note). */
 type AudioDoc = { readonly about?: string; readonly levels: Readonly<Record<string, AudioLevelEntry>> };
 type Status = { readonly tone: 'ok' | 'warn' | 'err'; readonly text: string };
@@ -99,11 +103,14 @@ interface Want {
 
 const EMPTY_SHOW = { anchor: null, transform: null, overlay: 'solid', figure: false, context: 'none', size: [1, 1, 1], reframe: false } as const;
 
-export function StudioApp({ onBack, renderPrototype }: {
+export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
   readonly onBack: () => void;
+  readonly onGamePreset?: (preset: MultiverseGamePresetSpec) => void;
   /** The old prototype (Moon editor), shown as the "Moon (prototype)" workspace. It is not deleted. */
   readonly renderPrototype: () => ReactElement;
 }): ReactElement {
+  const studioRoot = useRef<HTMLDivElement>(null);
+  const [importedSpore, setImportedSpore] = useState<SporeCard | null>(null);
   const [boot] = useState(() => bootHistory());
   const [hist, setHist] = useState<History>(boot);
   const [saved, setSaved] = useState<Saved>(() => ({ ...ASSET_TWEAKS }));
@@ -553,6 +560,24 @@ export function StudioApp({ onBack, renderPrototype }: {
       writable={writable === true} />
   ) : null;
 
+  useEffect(() => {
+    const root = studioRoot.current;
+    if (!root) return;
+    return bindSporeCardDrop(root, {
+      onCard: (card) => {
+        if (card.creation.kind === 'game') {
+          const preset = assertPlayablePreset(card.creation.spec);
+          if (onGamePreset) { onGamePreset(preset); return; }
+        }
+        // Only mutate the selection after decode + strict schemas + audit have all succeeded.
+        // No scene-doc/undo operation is emitted for failed drops (or preview-only successful imports).
+        setImportedSpore(card); setWorkspace('spores');
+        setStatus({ tone: 'ok', text: `Loaded ${card.title} · verified Spore Card` });
+      },
+      onRefusal: ({ title, detail }) => setStatus({ tone: 'err', text: `${title}: ${detail}` }),
+    });
+  }, [onGamePreset]);
+
   const style = {
     '--l': `${layout.left}px`,
     '--r': `${layout.right}px`,
@@ -560,7 +585,7 @@ export function StudioApp({ onBack, renderPrototype }: {
   } as CSSProperties;
 
   return (
-    <div className="sx" style={style} data-workspace={workspace}>
+    <div className="sx" ref={studioRoot} style={style} data-workspace={workspace}>
       <header className="sx-top">
         <div className="sx-brand">
           <span className="sx-mark" aria-hidden="true" />
@@ -574,6 +599,7 @@ export function StudioApp({ onBack, renderPrototype }: {
           <button type="button" aria-pressed={workspace === 'material'} onClick={() => setWorkspace('material')}>Materials</button>
           <button type="button" aria-pressed={workspace === 'parts'} onClick={() => setWorkspace('parts')}>Parts</button>
           <button type="button" aria-pressed={workspace === 'monsters'} onClick={() => setWorkspace('monsters')}>Monsters</button>
+          <button type="button" aria-pressed={workspace === 'spores'} onClick={() => setWorkspace('spores')}>Spore Cards</button>
           <button type="button" aria-pressed={workspace === 'moon'} onClick={() => setWorkspace('moon')}>Moon (prototype)</button>
         </nav>
         <span className="sx-grow" />
@@ -674,7 +700,11 @@ export function StudioApp({ onBack, renderPrototype }: {
         </div>
       ) : null}
 
-      {workspace === 'moon' ? (
+      {workspace === 'spores' ? (
+        <StudioErrorBoundary key="spores" tabName="Spore Cards">
+          <SporeWorkbench imported={importedSpore} onPlay={onGamePreset} />
+        </StudioErrorBoundary>
+      ) : workspace === 'moon' ? (
         <StudioErrorBoundary key="moon" tabName="Moon">
           <div className="sx-proto">{renderPrototype()}</div>
         </StudioErrorBoundary>

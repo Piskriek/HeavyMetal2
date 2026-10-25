@@ -857,8 +857,12 @@ export class GameAudioController {
     // Verify all 7 tracks are loaded
     for (let i = 0; i < 7; i++) {
       if (!this.getBuffer(`music-moon-s${i}`)) {
-        // Asynchronously load if not present and retry
-        void this.preloadMoonAudio().then(() => this.ensureMoonScoreRunning());
+        // A missing/undecodable optional track resolves to null (e.g. an unhydrated Git LFS checkout).
+        // Retry playback only if the load actually filled every track; recursive resolved promises otherwise
+        // starve the browser's task queue forever, including the one shared game's first frame.
+        void this.preloadMoonAudio().then(() => {
+          if (this.currentContext === 'moon' && Array.from({ length: 7 }, (_, track) => this.getBuffer(`music-moon-s${track}`)).every(Boolean)) this.ensureMoonScoreRunning();
+        });
         return;
       }
     }

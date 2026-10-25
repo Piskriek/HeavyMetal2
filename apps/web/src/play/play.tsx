@@ -16,6 +16,10 @@ import { CreateScientist } from '../avatar/create-scientist';
 import type { ClipName } from '../avatar/scientist/anims-loader';
 import type { OneShotKind } from '../avatar/scientist/animator';
 import { createPlayScene, type Detail, type FrameOut, type LabMachineKind, type PlayScene } from './play-scene';
+import { assertPlayablePreset, gateSandboxPreset, type MultiverseGamePresetSpec } from './game-presets';
+import { gameBaseWorld, gamePlayState, NEW_GAME_PROGRESS, stepGameProgress, type GameProgress } from './game-mode';
+import { GameHudBlade } from './game-hud';
+import { bindSporeCardDrop, downloadSporeCard } from '../studio/spore-card';
 import { canPlace, KINDS, level, METRICS, network, place, TARGET, rates, remove as removeMachine, running, setCartridge, setOn, step as stepPlot, type Env, type Machine, type MachineKind, type Metric, type PlotState } from '@hm/plotsim';
 import {
   activity as labActivity,
@@ -424,16 +428,22 @@ export function PlayScreen(props: {
   readonly initialSyncMode?: 'desynced' | 'synced';
   /** Applied once, when the lab is ready (the Planetary Grid's visit or spawn). */
   readonly entry?: PlayEntry;
+  readonly gamePreset?: MultiverseGamePresetSpec;
+  readonly onGamePreset?: (preset: MultiverseGamePresetSpec) => void;
 }): ReactElement {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<PlayScene | null>(null);
   const reduced = useMemo(() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } }, []);
   const tier = useMemo(() => tierFor(props.profile), [props.profile.quality]); // eslint-disable-line react-hooks/exhaustive-deps
   const [syncMode, setSyncMode] = useState<'desynced' | 'synced'>(() => props.initialSyncMode ?? 'desynced');
-  const [state, setState] = useState<PlayState>(loadSaved);
+  const [state, setState] = useState<PlayState>(() => props.gamePreset ? gamePlayState(props.gamePreset) : loadSaved());
+  const featureLock: typeof gateReason = (feature, chain, stage) => props.gamePreset ? null : gateReason(feature, chain, stage);
+  const [gameProgress, setGameProgress] = useState<GameProgress>(NEW_GAME_PROGRESS);
+  const gameProgressRef = useRef(NEW_GAME_PROGRESS);
+  const waveMobIds = useRef<readonly number[]>([]);
   const stateRef = useRef(state);
   const [ready, setReady] = useState(false);
-  const [loading, setLoading] = useState('Opening the lab');
+  const [loading, setLoading] = useState(props.gamePreset ? `Opening ${props.gamePreset.title}` : 'Opening the lab');
   const [failed, setFailed] = useState(false);
   const [locked, setLocked] = useState(false);
   const [paused, setPaused] = useState(false);
@@ -448,6 +458,7 @@ export function PlayScreen(props: {
   // TICKET-14: the credits video. The title's Ending Credits item starts it here, and so does the old monitor's replay.
   // One director per screen. The frame loop steps it before the scene draws; Esc ends it.
   const [creditsRun, setCreditsRun] = useState<CreditsRun | null>(null);
+  const pendingGatePresetRef = useRef<MultiverseGamePresetSpec | null>(null);
   const creditsRef = useRef<CreditsRun | null>(null);
   const creditsDirectorRef = useRef<CreditsDirector | null>(null);
   const creditsSaveRef = useRef<CreditsSave | null>(null);
@@ -520,6 +531,10 @@ export function PlayScreen(props: {
     }
     gameAudio.setMusicContext(save?.where === 'planet' ? 'moon' : 'lab');
     if (run.from === 'title') props.onBack();
+    else if (pendingGatePresetRef.current) {
+      const preset = pendingGatePresetRef.current; pendingGatePresetRef.current = null;
+      props.onGamePreset?.(preset); // first-time campaign credits finish before the shared preset gateway opens
+    }
   };
   const replayCredits = (): void => {
     creditsRef.current?.director.start(false);
@@ -540,7 +555,7 @@ export function PlayScreen(props: {
   // The radio log belongs to the profile's one save. It was keyed by the avatar's name, which is only known after the
   // creator, so a reload read an empty log and the wake (A1-01) played again. One key now; an avatar-keyed log from an
   // older save is read too, so nothing replays for it.
-  const slotKey = 'campaign';
+  const slotKey = props.gamePreset ? `game:${props.gamePreset.id}` : 'campaign';
   const avatarLogKey = state.avatar ? (state.avatar.kind === 'custom' ? state.avatar.key : state.avatar.name) : null;
   const savedHeard = (): string[] => (state.step === 'create' ? [] : [...new Set([...loadRadioLog(slotKey), ...(avatarLogKey ? loadRadioLog(avatarLogKey) : [])])]);
   const narratorRef = useRef<GameNarratorController | null>(null);
@@ -599,6 +614,7 @@ export function PlayScreen(props: {
   }, []);
 
   useEffect(() => {
+    if (props.gamePreset) return; // no campaign narration, intro or radio-log writes in standalone play
     if (!narratorRef.current) {
       const defaultRules = fidelityRules(Object.fromEntries(FIDELITY_LINE_IDS.map((id) => [id, 3])));
       const initialLogs = savedHeard();
@@ -714,9 +730,10 @@ export function PlayScreen(props: {
     }
   }, [isDevSeed]);
 
-  const commit = useCallback((next: PlayState) => { stateRef.current = next; setState(next); save(next); }, []);
+  const commit = useCallback((next: PlayState) => { stateRef.current = next; setState(next); if (!props.gamePreset) save(next); }, [props.gamePreset]);
   /** The campaign chain (TASK-22): change the counters, read the world as evidence, run the questline, save if it moved. */
   const updateChain = useCallback((f: (c: Chain) => Chain) => {
+    if (props.gamePreset) return;
     const before = stateRef.current.chain;
     const next = advanceChain(syncChain(f(before), worldEvidence(baseWorldRef.current, plotRef.current)));
     if (JSON.stringify(next) === JSON.stringify(before)) return;
@@ -805,6 +822,7 @@ useEffect(() => {
 
   /** The base world this profile starts with: its save, or a fresh world (campaign-world.ts). Read once, on mount. */
   const initBaseWorld = (): BaseWorld => {
+    if (props.gamePreset) { hasSaveOnBootRef.current = true; return gameBaseWorld(props.gamePreset); }
     writePendingHostSave();
     let rawSave: string | null = null;
     try {
@@ -819,7 +837,7 @@ useEffect(() => {
   const [initialBase] = useState<BaseWorld>(initBaseWorld);
   const baseWorldRef = useRef<BaseWorld>(initialBase);
   /** The live outpost session, if this screen is in one (plan 36): its base is the room's, and this device's base save is left alone. */
-  const outpostRef = useRef<OutpostSession | null>(currentOutpostSession());
+  const outpostRef = useRef<OutpostSession | null>(props.gamePreset ? null : currentOutpostSession());
   const [, setOutpostTick] = useState(0);
   /** The sculpt text last sent to the room (the host's ground), so a change goes up once. */
   const lastTerrainRef = useRef<string | null>(null);
@@ -961,7 +979,7 @@ useEffect(() => {
 
   const persistBaseWorld = useCallback((force = false) => {
     // in a session the base is the room's: this device's save is left as it was (a guest keeps their own base)
-    if (outpostRef.current) return;
+    if (props.gamePreset || outpostRef.current) return;
     const world = baseWorldRef.current;
     const now = performance.now();
     if (!force && (world.tick === lastSavedTickRef.current || now - lastSaveTimeRef.current < 2000)) {
@@ -1081,6 +1099,7 @@ useEffect(() => {
     sceneRef.current?.importBeamField(session.client.state().terrain.sculpt);
   };
   const flushBeam = (): void => {
+    if (props.gamePreset) return;
     // a guest's device keeps its own beam save in a session: the room's sculpt is not written to it
     const session = outpostRef.current;
     if (!session || session.client.state().role === 'owner') {
@@ -1397,6 +1416,7 @@ useEffect(() => {
   // The shared outpost (plan 36, Phase 1): while a session is open this screen's base is the room's. A guest's own save is never
   // written (persistBaseWorld stands down), so leaving gives them their own base back; the host's save takes the room's on leave.
   useEffect(() => {
+    if (props.gamePreset) return;
     let bound: OutpostSession | null = null;
     let offState: (() => void) | null = null;
     let offEvents: (() => void) | null = null;
@@ -1484,7 +1504,7 @@ useEffect(() => {
       }
       return false;
     }
-    const lock = gateReason(snap.mode === 'place' && snap.piece.kind === 'weaponBench' ? 'weaponBench' : 'structures', stateRef.current.chain, plotRef.current.stage);
+    const lock = featureLock(snap.mode === 'place' && snap.piece.kind === 'weaponBench' ? 'weaponBench' : 'structures', stateRef.current.chain, plotRef.current.stage);
     if (lock) { showStatusToast(`Locked: ${lock}`); return false; }
     if (snap.mode === 'place') {
       let finalR = snap.piece.r;
@@ -1522,11 +1542,12 @@ useEffect(() => {
   tryPlaceBaseRef.current = tryPlaceBase;
 
   // ---- the gun (the sidearm's shotgun), the health, and the monsters' events: the HUD, the narration, the chain, the items
-  const [gunEquipped, setGunEquipped] = useState(false);
+  const [gunEquipped, setGunEquipped] = useState(props.gamePreset?.hudBlade === 'arena-wave-survivor');
   const [hitMarker, setHitMarker] = useState(false);
   const [gunAmmo, setGunAmmo] = useState({ current: 8, max: 8 });
   const hitMarkerTimeout = useRef<number | null>(null);
   // the health: the monsters' hits take it down; it comes back after a quiet spell; the death sends the player back to the gate
+  const gameTimeRef = useRef(0); // milliseconds of simulation, excluding standalone pause time
   const hpRef = useRef<number>(PLAYER_MAX_HP);
   const lastHitRef = useRef(-1e9);
   const lowBarkRef = useRef(-1e9);
@@ -1558,6 +1579,9 @@ useEffect(() => {
   const dieNow = useCallback(() => {
     // a death: the screen takes the player back to the gate; the inventory and the save stay (TASK-22)
     updateChain((c) => playerDied(c));
+    if (props.gamePreset?.hudBlade === 'arena-wave-survivor' && gameProgressRef.current.status !== 'complete') {
+      gameProgressRef.current = NEW_GAME_PROGRESS; setGameProgress(NEW_GAME_PROGRESS);
+    }
     hpRef.current = PLAYER_MAX_HP;
     lastHitRef.current = -1e9;
     setVitals((v) => ({ ...v, hp: PLAYER_MAX_HP }));
@@ -1570,14 +1594,14 @@ useEffect(() => {
       const exit = scene.gateExit(); // GATE-05: out from the gate's back, facing away from it
       scene.debug.teleport('planet', exit.x, exit.z, exit.yaw, 0);
     }
-    say('Pulled back to the gate', 'Your inventory and your progress are kept.');
-  }, [say, updateChain]);
+    say('Pulled back to the gate', props.gamePreset?.hudBlade === 'arena-wave-survivor' ? 'Assault restarted. Survive all ten waves in one life.' : 'Your inventory and your progress are kept.');
+  }, [say, updateChain, props.gamePreset]);
 
   const takeHit = useCallback((damage: number, bearing: number) => {
     const now = performance.now();
     const next = hurtHp(hpRef.current, damage);
     hpRef.current = next;
-    lastHitRef.current = now;
+    lastHitRef.current = props.gamePreset ? gameTimeRef.current : now;
     setVitals({ hp: next, hitAt: now, bearing });
     if (next <= 0) {
       sceneRef.current?.setPlayerAlive(false);
@@ -1589,17 +1613,17 @@ useEffect(() => {
       narratorRef.current?.trigger('health:low');
       updateChain(playerLow);
     }
-  }, [dieNow, updateChain]);
+  }, [dieNow, updateChain, props.gamePreset]);
 
   // ---- the props in the world (TASK-23c): the saved clutter and logs (per profile), the databank, and the hold E that clears a prop
-  const propsRef = useRef<PropsSave>(parsePropsSave(kv.get(PROPS_SAVE_KEY)));
+  const propsRef = useRef<PropsSave>(parsePropsSave(props.gamePreset ? null : kv.get(PROPS_SAVE_KEY)));
   const clearHoldRef = useRef(0);
   const clearPropRef = useRef<(id: string) => void>(() => {});
   const takeSidearmRef = useRef<() => void>(() => {});
   const [databank, setDatabank] = useState<string | null>(null);
   const savePropsSave = useCallback((next: PropsSave): void => {
     propsRef.current = next;
-    kv.set(PROPS_SAVE_KEY, serializePropsSave(next));
+    if (!props.gamePreset) kv.set(PROPS_SAVE_KEY, serializePropsSave(next));
   }, []);
   /**
    * The beam's Apply with a part cartridge (TICKET-32, ARGO_NOTE_34 D.3): a tap fits the part onto the part aimed at; a
@@ -2013,7 +2037,7 @@ useEffect(() => {
   // the Monsters setting (Settings: Off, Calm, Normal, Hard) and the living-monster budget by the graphics tier
   const monstersSetting = usePlaySettings().monsters;
   useEffect(() => {
-    sceneRef.current?.monsters.setSetting(parseMonsters(monstersSetting));
+    sceneRef.current?.monsters.setSetting(props.gamePreset ? (props.gamePreset.hudBlade === 'arena-wave-survivor' ? 'normal' : 'calm') : parseMonsters(monstersSetting));
   }, [ready, monstersSetting]);
   useEffect(() => {
     sceneRef.current?.monsters.setQuality(tier);
@@ -2150,7 +2174,7 @@ useEffect(() => {
   // a spawn moves the player to the lab's spawn point, or out from the moon gate's back, facing away from it
   const entryDone = useRef(false);
   useEffect(() => {
-    if (!ready || !props.entry || entryDone.current) return;
+    if (props.gamePreset || !ready || !props.entry || entryDone.current) return;
     entryDone.current = true;
     const entry = props.entry;
     if (entry.kind === 'credits') {
@@ -2222,23 +2246,29 @@ useEffect(() => {
         groundTexture: low ? 128 : 256,
         detail: detailOf(graphics, tier),
         cameraView: props.profile.cameraView ?? 'first',
+        gamePreset: props.gamePreset,
         avatar: stateRef.current.avatar,
-        beamField: loadBeamSave().field,
+        beamField: props.gamePreset ? null : loadBeamSave().field,
         vegetation: (props.profile.graphics.vegetation as 'auto' | 'off' | 'low' | 'high' | undefined) ?? 'auto',
         hasSidearm: Boolean(baseWorldRef.current.equipment.sidearm),
         // JOB-09: a step through a live horizon at stage six changes worlds; `earth-endgame.ts` decides, the scene only
         // reports that the aperture was crossed. Everything the rule reads is the state the HUD already shows.
-        earthTransit: () => transitArrival(endgameInputNow())?.to ?? null,
+        earthTransit: () => props.gamePreset
+          ? props.gamePreset.id.startsWith('gate:') ? baseWorldRef.current.biome.world === 'earth' ? 'moon' : 'earth' : null
+          : transitArrival(endgameInputNow())?.to ?? null,
         onEarthTransit: (to) => {
+          if (props.gamePreset) { props.onGamePreset?.(gateSandboxPreset(to, props.gamePreset.worldSeed)); return; }
+          const next = gateSandboxPreset(to);
           const scene = sceneRef.current;
           scene?.gateArrival(arrivalSector(to));
           dispatchBaseRef.current({ t: 'setBiome', preset: to === 'earth' ? EARTH_BIOME_PRESET : MOON_BIOME_PRESET });
-          if (to !== 'earth') return;
+          if (to !== 'earth') { props.onGamePreset?.(next); return; }
           // the Multiverse's win: the breach is stable and the traveller is standing on Earth. The roll plays once; the
           // sandbox (building, driving, cartridges) stays open behind it.
           let seen = false;
           try { seen = kv.get('hm.endingSeen') === '1'; } catch { seen = endingSeen; }
-          if (seen) return;
+          if (seen) { props.onGamePreset?.(next); return; }
+          pendingGatePresetRef.current = next;
           try { kv.set('hm.endingSeen', '1'); } catch { /* storage unavailable: the run still counts */ }
           setEndingSeen(true);
           startCreditsRef.current?.('lab');
@@ -2291,6 +2321,7 @@ useEffect(() => {
     const look = (id: string, st: Stage) => bakeLookCached(VAULT_BY_ID.get(id)!, st, device, gridSpacing);
     const steps: [string, () => void | Promise<void>][] = [
       ['Loading voice narration', async () => {
+        if (props.gamePreset) return;
         const { rules } = await preloadMentorVo();
         if (narratorRef.current) {
           (narratorRef.current as any).rules = rules;
@@ -2319,7 +2350,7 @@ useEffect(() => {
       ['Opening the lab', () => {
         scene.setPlanet(look(PLOT, 1), (st: Stage) => look(PLOT, st), NEIGHBOURS.map((plot) => ({ plot, look: look(plot.cartridge, plot.stage) })));
         // the cartridge that was in the rifle's port comes back into it (TASK-21d): it left the rack when it was loaded
-        const savedPort = loadBeamSave().port;
+        const savedPort = props.gamePreset ? null : loadBeamSave().port;
         const savedLook = savedPort ? rifleLook(savedPort) : null;
         if (savedPort && savedLook) {
           beamPortRef.current = { cartridge: savedPort, preset: savedLook.preset, name: savedPort.name, colour: savedLook.colour, ...(savedLook.print ?? {}) };
@@ -2402,6 +2433,7 @@ useEffect(() => {
         }
       }],
       ['Growing the vegetation', () => { scene.bakeCoverage(); }],
+      ...(props.gamePreset ? [[`Configuring ${props.gamePreset.title}`, () => { scene.startGamePreset(); if (props.gamePreset?.hudBlade === 'arena-wave-survivor') scene.monsters.equip(true); }] as [string, () => void]] : []),
       ['Compiling shaders', () => { scene.warm(); }],
     ];
     const hook = { frames: 0, ready: false, step: stateRef.current.step, where: 'lab', sync: 1, wave: -1, triangles: 0, calls: 0, tier: tier as Quality, aimedProp: null as string | null };
@@ -2570,12 +2602,13 @@ useEffect(() => {
     const loop = (ms: number): void => {
       if (cancelled) return;
       const frameMs = ms - last;
-      const dt = Math.min(0.1, frameMs / 1000);
+      const dt = props.gamePreset && pausedRef.current ? 0 : Math.min(0.1, frameMs / 1000);
       last = ms;
+      gameTimeRef.current += dt * 1000;
       pieceManagerRef.current.update(dt);
       const w = baseWorldRef.current;
       const playerPos = scene.debug.position();
-      const coop = currentOutpostSession();
+      const coop = props.gamePreset ? null : currentOutpostSession();
       // Window B (TICKET-11, co-op): this player's pose goes to the room ten times a second, while they stand on the plot
       if (coop) {
         coopPoseClock += dt;
@@ -3075,7 +3108,7 @@ useEffect(() => {
         brake: keys.has('Space'),
         boost: keys.has('ShiftLeft') || keys.has('ShiftRight'),
       } : undefined;
-      const out = scene.frame(ms / 1000, dt, live
+      const out = scene.frame(props.gamePreset ? gameTimeRef.current / 1000 : ms / 1000, dt, live
         ? {
             move: { x: axis(['KeyD', 'ArrowRight'], ['KeyA', 'ArrowLeft']), z: axis(['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']) },
             look: { dx, dy },
@@ -3086,6 +3119,27 @@ useEffect(() => {
             vehicleInput,
           }
         : { move: { x: 0, z: 0 }, look: { dx: 0, dy: 0 }, run: false });
+      if (props.gamePreset && live) {
+        const preset = props.gamePreset;
+        const at = scene.debug.position();
+        const living = new Set(scene.monsters.getMobList().map((m) => m.id));
+        const result = stepGameProgress(preset, gameProgressRef.current, {
+          dt, x: at.x, z: at.z, livingWaveMobs: waveMobIds.current.filter((id) => living.has(id)).length,
+          visibleCreatureIds: preset.hudBlade === 'ecosystem-observer' ? scene.visibleCreatureIds() : [],
+          escaped: out.event === 'to-lab',
+        });
+        gameProgressRef.current = result.state;
+        scene.setCircuitCheckpoint(result.state.checkpoint);
+        if (result.spawnWave) {
+          const count = Math.min(12, 2 + result.spawnWave);
+          waveMobIds.current = Array.from({ length: count }, (_, i) => {
+            const angle = (i / count + preset.worldSeed / 65536) * Math.PI * 2;
+            const kind = i % 3 === 0 ? 'swarmer' : 'charger';
+            return scene.monsters.placeMob(kind, at.x + Math.sin(angle) * 22, at.z + Math.cos(angle) * 22);
+          });
+        }
+        if (hook.frames % 6 === 0 || result.spawnWave) setGameProgress(result.state);
+      }
       liveWhereRef.current = out.where;
       if (out.drivingVehicle) {
         setDrivingSpeed(out.drivingVehicle.speed);
@@ -3362,9 +3416,9 @@ useEffect(() => {
       if (hook.frames % 15 === 0) {
         // the monsters follow the chain (the gate's lock after F-03, the dormant anomaly after the rifle); health comes back when quiet
         const chainNow = stateRef.current.chain;
-        scene.monsters.setUnlocked(chainNow.monstersUnlocked);
-        scene.monsters.setDormantActive(stepDone(chainNow, 'A4-01'));
-        const nowMs = performance.now();
+        scene.monsters.setUnlocked(props.gamePreset ? props.gamePreset.hudBlade === 'arena-wave-survivor' : chainNow.monstersUnlocked);
+        scene.monsters.setDormantActive(!props.gamePreset && stepDone(chainNow, 'A4-01'));
+        const nowMs = props.gamePreset ? gameTimeRef.current : performance.now();
         hpRef.current = regenHp(hpRef.current, (nowMs - lastHitRef.current) / 1000, Math.min(0.5, (nowMs - regenAtRef.current) / 1000));
         regenAtRef.current = nowMs;
         const eye = scene.debug.position();
@@ -3591,6 +3645,8 @@ useEffect(() => {
       teleport: (where: 'lab' | 'planet', x: number, z: number, y: number, p?: number) => scene.debug.teleport(where, x, z, y, p),
       setAltCam: (eye: { x: number; y: number; z: number }, p: number, y: number) => scene.debug.setAltCam(eye, p, y),
       clearAltCam: () => scene.debug.clearAltCam(),
+      gamePreset: () => props.gamePreset ?? null,
+      gameProgress: () => gameProgressRef.current,
       monsters: () => scene.monsters,
       equipShotgun: (on = true) => { scene.monsters.equip(on); setGunEquipped(on); },
       fireShotgun: () => fireWeapon(),
@@ -3768,6 +3824,26 @@ useEffect(() => {
     };
   }, [tier, reduced, props.profile.gpu, props.profile.graphics, props.profile.quality, props.profile.fpsTarget, commit, say]);
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !ready) return;
+    return bindSporeCardDrop(canvas.closest<HTMLElement>('.play') ?? canvas, {
+      onCard: async (card, isCurrent) => {
+        if (card.creation.kind === 'game') {
+          const preset = assertPlayablePreset(card.creation.spec);
+          if (!props.onGamePreset) throw new Error('Game preset switching is unavailable');
+          props.onGamePreset(preset);
+        } else {
+          const scene = sceneRef.current;
+          if (!scene) throw new Error('The world is not ready');
+          await scene.loadSporeCreation(card.creation, isCurrent);
+          say(`Loaded ${card.title}`, `Spore Card by ${card.author} · schema and audit verified`);
+        }
+      },
+      onRefusal: ({ title, detail }) => say(title, detail),
+    });
+  }, [ready, props.onGamePreset, say]);
+
   // ---- pointer lock: click to look round; losing it (Esc) pauses
   useEffect(() => {
     const onLock = (): void => {
@@ -3782,7 +3858,7 @@ useEffect(() => {
   // TASK-28 (P1-HOUR-03): the wake starts once the player has control of the lab (the loading bar is gone and the creator is closed)
   const wokeRef = useRef(false);
   useEffect(() => {
-    if (!ready || creating || wokeRef.current || !sceneRef.current) return;
+    if (props.gamePreset || !ready || creating || wokeRef.current || !sceneRef.current) return;
     wokeRef.current = true;
     sceneRef.current.debug.startWake();
   }, [ready, creating]);
@@ -3872,7 +3948,7 @@ useEffect(() => {
         id: k,
         label: KIND_LABEL[k] ?? k,
         ref: { kind: k },
-        locked: gateReason(k === 'weaponBench' ? 'weaponBench' : 'structures', chain, stage),
+        locked: featureLock(k === 'weaponBench' ? 'weaponBench' : 'structures', chain, stage),
       })),
       pick: (id) => {
         buildKindRef.current = id as Kind;
@@ -4178,7 +4254,7 @@ useEffect(() => {
           }
           // E on a bench opens the Drafting Table through the same lock as K (TICKET-03, BB-11)
           if (p && p.kind === 'bench') {
-            const why = gateReason('drafting', stateRef.current.chain, plotRef.current.stage);
+            const why = featureLock('drafting', stateRef.current.chain, plotRef.current.stage);
             if (why) { say('Drafting table locked', why); return; }
             (window as unknown as { __hmHud?: { openDrafting?: () => void } }).__hmHud?.openDrafting?.();
             freeMouse();
@@ -4233,7 +4309,7 @@ useEffect(() => {
       }
       if (e.code === 'KeyG') {
         // The extraction rifle (TASK-21): out in hand on the planet; racked on the lab wall until its place in the story.
-        const rifleLock = gateReason('rifle', stateRef.current.chain, plotRef.current.stage);
+        const rifleLock = featureLock('rifle', stateRef.current.chain, plotRef.current.stage);
         if (rifleLock) { say('The beam is on the armory rack', rifleLock); return; }
         if (liveWhereRef.current !== 'planet') {
           say('The beam stays racked on the lab wall', 'It comes down to the planet later.');
@@ -4337,7 +4413,7 @@ useEffect(() => {
 
   // auto-teleport to planet surface and equip shotgun when URL has ?mash or ?monstermash
   useEffect(() => {
-    if (ready && typeof location !== 'undefined') {
+    if (ready && !props.gamePreset && typeof location !== 'undefined') {
       const p = new URLSearchParams(location.search);
       if (p.has('mash') || p.has('monstermash') || p.has('spawn_test') || p.has('base') || p.has('building')) {
         const scene = sceneRef.current;
@@ -4713,7 +4789,7 @@ useEffect(() => {
     : '';
 
   return (
-    <div data-hud-root={creditsRun ? undefined : true} data-fidelity={skinTrack.skin} className={`play${ready ? ' ready' : ''}${hud.where === 'planet' ? ' on-planet' : ''}${hud.sync < 0.3 && hud.where === 'planet' ? ' sync-low' : ''}${skinGlitch ? ' hud-glitch' : ''}${creditsRun ? ' credits-on' : ''}`}>
+    <div data-game-preset={props.gamePreset?.id} data-hud-root={creditsRun ? undefined : true} data-fidelity={skinTrack.skin} className={`play${ready ? ' ready' : ''}${hud.where === 'planet' ? ' on-planet' : ''}${hud.sync < 0.3 && hud.where === 'planet' ? ' sync-low' : ''}${skinGlitch ? ' hud-glitch' : ''}${creditsRun ? ' credits-on' : ''}`}>
       {creditsRun ? <CreditsPlayer director={creditsRun.director} onExit={stopCredits} onReplay={replayCredits} /> : null}
       {jukeboxOpen && !creditsRun ? (
         <OldMonitorJukeboxModal
@@ -4734,6 +4810,9 @@ useEffect(() => {
         />
       ) : null}
       {failed ? <p className="play-failed" role="alert">This browser could not start 3D graphics (WebGL 2). Try another browser, or turn on hardware acceleration in its settings.</p> : <canvas ref={canvasRef} className="play-canvas" onClick={() => { if (ready && !creating && !locked) lock(); }} aria-label="The lab, in first person. Click to look around." />}
+      {ready && props.gamePreset && !hideOverlays ? <GameHudBlade preset={props.gamePreset} progress={gameProgress} speed={drivingSpeed} livingMobs={sceneRef.current?.monsters.getMobList().length ?? 0} hp={vitals.hp} ammo={gunAmmo} onPreset={props.onGamePreset} onShare={() => {
+        void downloadSporeCard({ schema: 'hm2:spore-card:v1', title: props.gamePreset!.title, author: 'Multiverse Explorer', creation: { kind: 'game', spec: props.gamePreset! } }).catch((e: unknown) => say('Spore export refused', e instanceof Error ? e.message : 'PNG capture failed'));
+      }} /> : null}
       {!ready && !failed ? <div className="gr-loading play-loading" role="status"><span>{loading}</span><i /></div> : null}
 
       {ready ? (
@@ -4742,17 +4821,17 @@ useEffect(() => {
             const g = gateBearingOf(sceneRef.current);
             return <CompassRibbon relativeDeg={g?.relativeDeg ?? null} distanceM={g?.distanceM ?? null} warn={hud.warn} />;
           })() : null}
-          <SyncWord draining={hud.sync < 0.3} hidden={hud.where !== 'planet'} />
+          <SyncWord draining={hud.sync < 0.3} hidden={hud.where !== 'planet' || (!!props.gamePreset && props.gamePreset.hudBlade !== 'exploration-o2')} />
         </HudZone>
       ) : null}
       {ready ? (
         <HudZone zone="top-right">
-          <FloatsPill
+          {!props.gamePreset || !['race-lap-telemetry', 'arena-wave-survivor'].includes(props.gamePreset.hudBlade) ? <FloatsPill
             stage={hud.plot.stage}
             floats={METRICS.map((m) => ({ key: m, name: METRIC_NAME[m], colour: METRIC_COLOUR[m], value: hud.plot.levels[m] }))}
-          />
+          /> : null}
         {/* In a co-op room the badge names the session, and the branch toggle is gone: the room is the grid (TICKET-11). */}
-        <div className="play-sync-indicator" data-hud-zone="top-right" title={outpostRef.current ? `Co-op room ${outpostRef.current.code ?? ''}: the room's world is shared with everyone in it` : syncMode === 'synced' ? 'Connected to shared 40,000 km planetary substrate' : 'Playing on private local simulation branch'}>
+        <div hidden={!!props.gamePreset} className="play-sync-indicator" data-hud-zone="top-right" title={outpostRef.current ? `Co-op room ${outpostRef.current.code ?? ''}: the room's world is shared with everyone in it` : syncMode === 'synced' ? 'Connected to shared 40,000 km planetary substrate' : 'Playing on private local simulation branch'}>
           {outpostRef.current ? (
             <span className="sync-badge coop" data-testid="play-coop-badge">
               <span className="sync-pulse" />
@@ -4799,7 +4878,7 @@ useEffect(() => {
 
       {ready && !creating ? (
         <>
-          {!hideOverlays && drivingSpeed === null && (
+          {!props.gamePreset && !hideOverlays && drivingSpeed === null && (
             <HudZone zone="top-left">
             {portraitIn ? (
               <HaddyCrtPortrait
@@ -4820,7 +4899,7 @@ useEffect(() => {
             {outpostRef.current ? <OutpostRoster session={outpostRef.current} /> : null}
             </HudZone>
           )}
-          {hud.where === 'planet' && drivingSpeed === null ? (
+          {hud.where === 'planet' && drivingSpeed === null && (!props.gamePreset || props.gamePreset.hudBlade === 'exploration-o2') ? (
             <HudZone zone="bottom-left">
             <div className="play-sync" data-hud-zone="bottom-left" role="meter" aria-label="Sync" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(hud.sync * 100)}>
               <span>Sync</span>
@@ -4910,10 +4989,10 @@ useEffect(() => {
                 onTab={setBuildTab}
                 stage={hud.plot.stage}
                 locks={{
-                  structures: gateReason('structures', state.chain, hud.plot.stage) ?? undefined,
-                  heavy: gateReason('heavy', state.chain, hud.plot.stage) ?? undefined,
+                  structures: featureLock('structures', state.chain, hud.plot.stage) ?? undefined,
+                  heavy: featureLock('heavy', state.chain, hud.plot.stage) ?? undefined,
                 }}
-                kindLock={(kind) => gateReason(kind === 'weaponBench' ? 'weaponBench' : 'structures', state.chain, hud.plot.stage)}
+                kindLock={(kind) => featureLock(kind === 'weaponBench' ? 'weaponBench' : 'structures', state.chain, hud.plot.stage)}
                 machines={machines}
                 blueprints={[...held.values()]}
                 selectedKind={buildKindRef.current}
@@ -5709,11 +5788,11 @@ useEffect(() => {
           ) : null}
           {paused && !journalOpen && !debugOpen && !isAnyBaseWindowOpen ? (
             <div className="play-pause" role="dialog" aria-label="Paused">
-              <h2>Paused</h2>
+              <h2>{props.gamePreset ? props.gamePreset.title : 'Paused'}</h2>
               <div className="play-pause-sync">
                 <span>Simulation Mode:</span>
                 <b className={syncMode === 'synced' ? 'synced' : 'desynced'}>
-                  {syncMode === 'synced' ? 'Planetary Grid (Synced Shared World)' : 'Expedition (Desynced Solo Branch)'}
+                  {props.gamePreset ? 'Standalone preset · campaign save untouched' : syncMode === 'synced' ? 'Planetary Grid (Synced Shared World)' : 'Expedition (Desynced Solo Branch)'}
                 </b>
               </div>
               <section className="play-controls" aria-label="Controls">
@@ -5721,7 +5800,8 @@ useEffect(() => {
                 <ControlsGrid controls={CONTROLS} />
               </section>
               <button className="go" onClick={() => { setJournalOpen(false); lock(); }}>Resume</button>
-              <button
+              {props.gamePreset && props.onGamePreset ? <button type="button" onClick={() => props.onGamePreset?.(props.gamePreset!)}>Restart preset</button> : null}
+              <button hidden={!!props.gamePreset}
                 onClick={() => {
                   const next = syncMode === 'synced' ? 'desynced' : 'synced';
                   setSyncMode(next);
@@ -5734,9 +5814,9 @@ useEffect(() => {
               >
                 {syncMode === 'synced' ? 'Desync to Solo Branch' : 'Sync to Planetary Grid (Majority Merge)'}
               </button>
-              <button type="button" onClick={() => setJournalOpen(true)}>Journal</button>
+              <button hidden={!!props.gamePreset} type="button" onClick={() => setJournalOpen(true)}>Journal</button>
               <button type="button" onClick={() => setDebugOpen(true)} data-testid="debug-open">Debug menu</button>
-              <button
+              <button hidden={!!props.gamePreset}
                 onClick={() => {
                   setRadioLogOpen(true);
                   initNarratorAudio();
@@ -5767,6 +5847,7 @@ useEffect(() => {
 
           {/* Radio Log HUD Button */}
           <button
+            hidden={!!props.gamePreset}
             className={`radio-hud-btn${subtitle ? ' speaking' : ''}`}
             data-hud-zone="top-right"
             style={{
@@ -5940,7 +6021,7 @@ useEffect(() => {
             </div>
           )}
 
-          <MonsterHud hp={vitals.hp} maxHp={PLAYER_MAX_HP} hitAt={vitals.hitAt} hitBearing={vitals.bearing} radar={radar} seal={sealView} />
+          {(!props.gamePreset || props.gamePreset.hudBlade === 'arena-wave-survivor' || props.gamePreset.hudBlade === 'exploration-o2') && !hideOverlays ? <MonsterHud hp={vitals.hp} maxHp={PLAYER_MAX_HP} hitAt={vitals.hitAt} hitBearing={vitals.bearing} radar={radar} seal={sealView} /> : null}
           {gunEquipped && (
             <div className={`play-crosshair${hitMarker ? ' hit' : ''}`}>
               <div className="ch-top" />
@@ -5996,7 +6077,7 @@ useEffect(() => {
               </span>
             </div>
           ) : null}
-          {hud.where === 'planet' && !hideOverlays ? (
+          {hud.where === 'planet' && !hideOverlays && (!props.gamePreset || props.gamePreset.hudBlade === 'sandbox-freeplay' || props.gamePreset.hudBlade === 'exploration-o2') ? (
             <>
               <BaseHud
               source={baseViewSource}
@@ -6008,7 +6089,7 @@ useEffect(() => {
               wheelCycleText={wheelCycleText}
               rotationText={rotationText}
               buildHidden={beamHud.held}
-              draftingLock={gateReason('drafting', state.chain, hud.plot.stage)}
+              draftingLock={featureLock('drafting', state.chain, hud.plot.stage)}
               onLocked={(why) => say('Drafting table locked', why)}
               draftingParts={(() => {
                 const blanks = labRef.current.cartridges.filter((c) => c.kind === 'blank' && c.slot === null).length;
@@ -6072,7 +6153,7 @@ useEffect(() => {
               env={getBaseEnv()}
               at={sceneRef.current?.debug.position() ?? { x: 0, z: 0 }}
               onInstall={(hpId, kind) => {
-                const lock = gateReason(kind === 'fabricator' ? 'fabricator' : 'heavy', stateRef.current.chain, plotRef.current.stage);
+                const lock = featureLock(kind === 'fabricator' ? 'fabricator' : 'heavy', stateRef.current.chain, plotRef.current.stage);
                 if (lock) { say('Locked', lock); setMachinePickerHardpoint(null); return; }
                 dispatchBase({
                   t: 'install',
@@ -6110,7 +6191,7 @@ useEffect(() => {
               env={getBaseEnv()}
               at={sceneRef.current?.debug.position() ?? { x: 0, z: 0 }}
               onCraft={(machId, recipeId) => {
-                const lock = gateReason('heavy', stateRef.current.chain, plotRef.current.stage);
+                const lock = featureLock('heavy', stateRef.current.chain, plotRef.current.stage);
                 if (lock) { say('Locked', lock); return; }
                 dispatchBase({
                   t: 'craft',
@@ -6135,7 +6216,7 @@ useEffect(() => {
               env={getBaseEnv()}
               at={sceneRef.current?.debug.position() ?? { x: 0, z: 0 }}
               onCraft={(mId, rId) => {
-                const lock = gateReason('fabricator', stateRef.current.chain, plotRef.current.stage);
+                const lock = featureLock('fabricator', stateRef.current.chain, plotRef.current.stage);
                 if (lock) { say('Locked', lock); return; }
                 dispatchBase({ t: 'craft', at: sceneRef.current?.debug.position() ?? { x: 0, z: 0 }, machine: mId, recipe: rId });
               }}

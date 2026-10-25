@@ -6,7 +6,13 @@
 // Each frame the far side is drawn from a virtual camera into a texture, and the near side shows it in the opening.
 import * as THREE from 'three';
 import type { Overrides, PlacedPart } from '@hm/kitspec';
-import type { KitBuild } from './kit-build';
+import { buildKitPreset, type KitBuild } from './kit-build';
+import type { SporeCreation } from '@hm/cartlab';
+import { creatureGenomeById } from '@hm/creature';
+import { buildSporeModel, preloadSporeCreation, sporeModelBinding } from '../studio/spore-model';
+import { kitAudit } from '@hm/kitspec/audit';
+import { gameVehicleKind, type MultiverseGamePresetSpec } from './game-presets';
+import { CIRCUIT_CHECKPOINTS, gameCreatureIds, gameSpawn, gameStage } from './game-mode';
 import { tickLights } from './light-material';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { Stage } from '@hm/fidelity';
@@ -29,10 +35,10 @@ import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest
 import { disposeProp, FABRICATOR_PLUME, FABRICATOR_VENT, FEED_CUBES_FULL, feedCubeCount, feedCubeProgress, lineSpan, machinePlumeCount, machinePlumeCountOf, machinePlumeGravity, machinePlumeLook, machinePlumeLookOf, machinePlumeSpec, machinePlumeSteady, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
 import { RAM_CADENCE_RAD } from './kit-motion-specs';
 import { activeLocomotion, locomotionChoice, locomotionSpeed, setLocomotionChoice } from './locomotion';
-import { plotStargate, plotVehicleKit, setPlotEnvironment } from './plot-kits';
+import { plotStargate, plotVehicleKit, setPlotEnvironment, clearPlotEnvironment } from './plot-kits';
 import { STARGATE_APERTURE_R, STARGATE_RING_CENTRE_Y } from './kit-stargate';
 import type { GateAccessMode } from '@hm/coopnet/gate-dialer';
-import { warmLayeredMaterials } from './layered-material';
+import { warmLayeredMaterials, releaseLayeredEnv } from './layered-material';
 import { beatPulse, evaluateBeatSyncedPlumeModulation } from '@hm/tooljuice';
 import { evaluateHarmonicMachineChoir, type ActiveMachineEmitter, type MachineStemRole } from '@hm/musicbox';
 import { applyScientistWindowFGate, createWindowFCoopSyncController, type WindowFCoopSyncController } from './window-f-lab-and-coop-hooks';
@@ -224,6 +230,11 @@ const MAX_FEED_MACHINES = 48;
 const MAX_FEED_FABRICATORS = 8;
 
 export interface PlayScene {
+  /** Rung 5 configures this same renderer, camera, rig, and physics after the ordinary loading pipeline. */
+  startGamePreset(): void;
+  loadSporeCreation(creation: Exclude<SporeCreation, { readonly kind: 'game' }>, isCurrent?: () => boolean): Promise<void>;
+  visibleCreatureIds(): readonly number[];
+  setCircuitCheckpoint(index: number): void;
   /** Puts the planet in place (once, after its looks are baked). */
   setPlanet(base: StageLook, lookFor: (stage: Stage) => StageLook, neighbours: readonly Neighbour[]): void;
   /** The saved state, applied at once: the gate on or off, the plot's machines standing (already running), its stage. */
@@ -561,6 +572,7 @@ export function createPlayScene(o: {
   /** The size of the ground's material tiles (by the starting tier), and the live detail to start with. */
   readonly groundTexture: number; readonly detail: Detail;
   readonly cameraView?: 'first' | 'third';
+  readonly gamePreset?: MultiverseGamePresetSpec;
   readonly avatar?: PlayAvatar | null;
   /** The sculpt edits and the paint as saved (encodeField text), applied when the plot is made; null for a fresh plot. */
   readonly beamField?: string | null;
@@ -575,6 +587,8 @@ export function createPlayScene(o: {
   /** The step through the horizon changed worlds: the caller applies the biome and the arrival sector. */
   readonly onEarthTransit?: (to: 'earth' | 'moon') => void;
 }): PlayScene {
+  const worldSeed = o.gamePreset?.worldSeed ?? 7;
+  const animTime = (t: number): number => o.gamePreset ? Math.floor(t * o.gamePreset.activeRules.stageAnimRateHz) / o.gamePreset.activeRules.stageAnimRateHz : t;
   const renderer = new THREE.WebGLRenderer({ canvas: o.canvas, antialias: o.antialias, powerPreference: o.powerPreference });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.setClearColor(0x000000, 1);
@@ -616,7 +630,8 @@ export function createPlayScene(o: {
   const roomEnv = new RoomEnvironment();
   // one small room reflection, made once (behind the loading bar): the lab's light, and the planet's too (below), so Astro's
   // metal suit reads as armour on the planet instead of black (TASK-21c)
-  const roomEnvMap = keep(pmrem.fromScene(roomEnv, 0.04).texture);
+  const roomEnvTarget = keep(pmrem.fromScene(roomEnv, 0.04));
+  const roomEnvMap = roomEnvTarget.texture;
   labScene.environment = roomEnvMap;
   labScene.environmentIntensity = 0.22;
   setPlotEnvironment({ map: roomEnvMap, intensity: PLOT_KIT_ENV });
@@ -791,13 +806,17 @@ export function createPlayScene(o: {
     camera,
     groundHeightAt: (x, z) => groundAt(x, z),
     initialStage: 1,
-    seed: 7,
+    seed: worldSeed,
+    genomeRoster: o.gamePreset ? gameCreatureIds(o.gamePreset).map((id) => creatureGenomeById(id)!) : undefined,
+    manualSpawnsOnly: !!o.gamePreset,
+    passive: o.gamePreset?.hudBlade === 'ecosystem-observer',
+    animationRateHz: o.gamePreset?.activeRules.stageAnimRateHz,
   });
   let playerAlive = true;
   const monsterFwd = new THREE.Vector3();
-  monsters.setPlot(7, { x: twin.group.position.x, z: twin.group.position.z });
+  monsters.setPlot(worldSeed, { x: twin.group.position.x, z: twin.group.position.z });
   // the wreck sites: the same seed and gate as the leaks (TASK-23c)
-  const wrecks: WreckSystem = createWrecks({ scene: planetScene, groundHeightAt: (x, z) => groundAt(x, z), seed: 7, gate: { x: twin.group.position.x, z: twin.group.position.z }, stage: 1 });
+  const wrecks: WreckSystem = createWrecks({ scene: planetScene, groundHeightAt: (x, z) => groundAt(x, z), seed: worldSeed, gate: { x: twin.group.position.x, z: twin.group.position.z }, stage: 1 });
 
   // ---- Vehicles (@hm/rover & @hm/rovergear) and Station Fabricators
   const vehiclesGroup = new THREE.Group();
@@ -1027,7 +1046,7 @@ export function createPlayScene(o: {
     const hz = Math.cos(view.yaw);
     drivingState = spawnRover(view.kind, view.x, view.z, [hx, hz], {
       height: (gx, gz) => groundAt(gx, gz),
-      g: 1.62,
+      g: o.gamePreset ? 9.81 * o.gamePreset.activeRules.gravityScale : 1.62,
     });
     for (const lamp of view.lamps) setRoverLamp(lamp, 1);
     currentSpeed = 0;
@@ -2084,13 +2103,13 @@ export function createPlayScene(o: {
       waterVolume: L.waterSources.length > 0 ? 60 : 0,
       stage: 6,
       s: { pxd: 0.5, vtx: 0.5, lx: 0.5, aq: 0.5 },
-      seed: 7,
+      seed: worldSeed,
       tier: L.tier,
     });
   };
 
   // ---- living coverage & water surfaces (TICKET-02 items B and E)
-  const coverTiles = makeCoverTextures({ size: 64, seed: 701 });
+  const coverTiles = makeCoverTextures({ size: 64, seed: worldSeed * 100 + 1 });
   const stageCoverTextures: (THREE.DataTexture | null)[] = [null, null, null, null, null, null, null];
   let waterGroup: THREE.Group | null = null;
   let waterMesh: THREE.Mesh | null = null;
@@ -2261,7 +2280,7 @@ export function createPlayScene(o: {
   };
 
   // ---- scientist character model & animation (TASK-07, POL-18)
-  let cameraView: 'first' | 'third' = o.cameraView ?? 'first';
+  let cameraView: 'first' | 'third' = o.gamePreset ? (o.gamePreset.cameraMode === 'first-person-suit' ? 'first' : 'third') : o.cameraView ?? 'first';
   let scientistAnimator: ScientistAnimator | null = null;
   /** The player's suit as a kit build (JOB-24): the beam's target on the suit's own meshes, once the avatar has loaded. */
   let suitBuild: ReturnType<typeof astroSuitBuildFor> | null = null;
@@ -2294,6 +2313,7 @@ export function createPlayScene(o: {
   // TICKET-05 (Item D): the player's avatar loads at 'high' (scientistLevelFor drops it only on Low with fps under 30)
   void Promise.all([createScientistInstance(initialVisor, scientistLevelFor('high')), loadScientistAnimations(), loadRifleAnimations()]).then(
     ([{ group, visorMaterials: vm }, clips, rifleClips]) => {
+      if (!sceneAlive) return;
       // Astro's suit is metal on a dark base: under the planet's 1-bit dither (stage 0) it reads as black. This instance gets its own
       // materials (the creator keeps the baked values), with the metal capped; syncSuitEnv gives them the room's reflection on the planet
       group.traverse((o) => {
@@ -2619,12 +2639,88 @@ export function createPlayScene(o: {
     return pieceHit;
   };
 
+  type SporeModel = { readonly kit: string; build: KitBuild; readonly where: Where; readonly creation: SporeCreation; resources: Set<{ dispose(): void }> };
+  const sporeModels: SporeModel[] = [];
+  const buildImported = (creation: SporeCreation, overrides?: Overrides): { readonly build: KitBuild; readonly resources: SporeModel['resources'] } => {
+    const resources: SporeModel['resources'] = new Set();
+    try {
+      const build = buildSporeModel(creation, <T extends { dispose(): void }>(x: T): T => { resources.add(x); return x; }, { map: roomEnvMap, intensity: 0.45 }, overrides);
+      return { build, resources };
+    } catch (e) { for (const resource of resources) resource.dispose(); throw e; }
+  };
+  const checkpointMaterials: THREE.MeshStandardMaterial[] = [];
+  let playerRigBuild: KitBuild | null = null;
+  let presetStarted = false;
   const api: PlayScene = {
+    async loadSporeCreation(creation, isCurrent = () => true) {
+      await preloadSporeCreation(creation);
+      if (!sceneAlive || !isCurrent()) throw new Error('World closed during Spore import');
+      if (sporeModels.length >= 32) throw new Error('This session already holds 32 Spore creations');
+      const { build, resources } = buildImported(creation);
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      const x = pos.x + forward.x * 5, z = pos.z + forward.z * 5;
+      build.group.position.set(x, where === 'planet' ? groundAt(x, z) : room.floorHeight(x, z), z);
+      (where === 'planet' ? planetScene : labScene).add(build.group);
+      sporeModels.push({ kit: `spore:${sporeModels.length + 1}`, build, resources, creation, where });
+    },
+    visibleCreatureIds() {
+      const sample = new THREE.Vector3();
+      return monsters.getMobList().filter((m) => {
+        if (Math.hypot(m.pos.x - pos.x, m.pos.z - pos.z) > 40) return false;
+        sample.set(m.pos.x, m.pos.y + 0.8, m.pos.z).project(camera);
+        return sample.z >= -1 && sample.z <= 1 && Math.abs(sample.x) < 0.9 && Math.abs(sample.y) < 0.9;
+      }).map((m) => m.id);
+    },
+    setCircuitCheckpoint(index) {
+      checkpointMaterials.forEach((m, i) => { m.color.set(i === index ? '#7cffb4' : '#376075'); m.emissive.set(i === index ? '#196642' : '#000000'); });
+    },
+    startGamePreset() {
+      const preset = o.gamePreset;
+      if (!preset || presetStarted) return;
+      presetStarted = true;
+      api.setFidelityStage(gameStage(preset));
+      const at = gameSpawn(preset);
+      api.debug.teleport('planet', at.x, at.z, at.yaw, -0.08);
+      api.setCameraView(preset.cameraMode === 'first-person-suit' ? 'first' : 'third');
+      const vehicle = gameVehicleKind(preset.playerRigId);
+      if (vehicle) {
+        const entry = [...vehicleViews.values()].find((v) => v.kind === vehicle);
+        if (!entry || !api.enterVehicle(entry.id)) throw new Error('Preset player vehicle is missing');
+      } else if (preset.playerRigId !== 'kit:astro-suit' && preset.playerRigId !== 'astro-suit') {
+        playerRigBuild = buildSporeModel({ kind: 'game', spec: preset }, keep, { map: roomEnvMap, intensity: 0.45 });
+        planetScene.add(playerRigBuild.group);
+        sporeModels.push({ kit: 'player-rig', build: playerRigBuild, creation: { kind: 'game', spec: preset }, resources: new Set(), where: 'planet' });
+      }
+      monsters.setUnlocked(preset.hudBlade === 'arena-wave-survivor');
+      monsters.setSetting(preset.hudBlade === 'arena-wave-survivor' ? 'normal' : 'calm');
+      if (preset.hudBlade === 'ecosystem-observer') {
+        const genomes = gameCreatureIds(preset);
+        const count = Math.max(genomes.length, Math.ceil(preset.activeRules.targetScoreOrTimeSec));
+        for (let i = 0; i < Math.min(24, count); i++) {
+          const angle = i * Math.PI * 2 / count;
+          const g = creatureGenomeById(genomes[i % genomes.length] ?? 'theropod');
+          monsters.placeMob(g?.archetype === 'avian-drone' ? 'flyer' : 'charger', at.x + Math.sin(angle) * 15, at.z + Math.cos(angle) * 15);
+        }
+      }
+      if (preset.activeRules.winCondition === 'checkpoint-circuit') {
+        for (const point of CIRCUIT_CHECKPOINTS) {
+          const mat = keep(new THREE.MeshStandardMaterial({ color: '#376075', metalness: 0.5, roughness: 0.4 }));
+          const checkpoint = buildKitPreset({
+            parts: { post: { source: { kind: 'box', size: [0.4, 5, 0.4] }, material: 'checkpoint', rank: 0 }, bar: { source: { kind: 'box', size: [12.4, 0.4, 0.4] }, material: 'checkpoint', rank: 0 } },
+            assemblies: { main: { children: [{ ref: 'post', at: [-6, 0, 0] }, { ref: 'post', at: [6, 0, 0] }, { ref: 'bar', at: [0, 5, 0] }] } },
+          }, 'main', { materials: { checkpoint: mat }, maxRank: 0, gen: () => null, keep });
+          if (!checkpoint) throw new Error('Cannot build circuit checkpoint');
+          checkpoint.group.position.set(point.x, groundAt(point.x, point.z), point.z);
+          planetScene.add(checkpoint.group); checkpointMaterials.push(mat);
+        }
+        api.setCircuitCheckpoint(0);
+      }
+    },
     setPlanet(base, lookFor, neighbours) {
       if (world) return;
       lookForFn = lookFor;
       // the plot's natural ground (its own terrain and materials); the old world brings the sky, the stars and the neighbours, seated on it
-      const g = createPlotGround(planetScene, { seed: 7, sunDir: SUN, stage: Math.max(1, stage), textureSize: o.groundTexture, budget: detail.groundBudget, cover: coverTiles });
+      const g = createPlotGround(planetScene, { seed: worldSeed, sunDir: SUN, stage: Math.max(1, stage), textureSize: o.groundTexture, budget: detail.groundBudget, cover: coverTiles });
       ground = g;
       // the gate's apron is always kept out (TASK-21d); the play screen adds the structures and machines as the base changes
       g.setKeepOut(keepOutZones({ gate: { x: 0, z: 0 }, structures: [], pieces: [], machines: [] }));
@@ -2881,7 +2977,7 @@ export function createPlayScene(o: {
       syncPlanetMatrices();
       holo.build(ground ?? undefined as unknown as PlotGround, { x: pose.x, z: pose.z });
       ground?.setKeepOut(keepOutZones({ gate: { x: pose.x, z: pose.z }, structures: [], pieces: [], machines: [] }));
-      monsters.setPlot(7, { x: pose.x, z: pose.z });
+      monsters.setPlot(worldSeed, { x: pose.x, z: pose.z });
     },
     setGateAccess(access) {
       if (access === gateAccess) return;
@@ -3243,7 +3339,8 @@ export function createPlayScene(o: {
       pitch = Math.max(-1.45, Math.min(1.45, pitch - c.look.dy * sens));
       // the locomotion preset in force (plan 43, loc:): speed, jump, gravity, air control and the landing spring all read
       // from it, so a switch mid-jump retunes the rest of the arc without resetting the state
-      const loco = activeLocomotion(where);
+      const baseLoco = activeLocomotion(where);
+      const loco = o.gamePreset ? { ...baseLoco, gravityMps2: 9.81 * o.gamePreset.activeRules.gravityScale } : baseLoco;
       const speed = locomotionSpeed(loco, Boolean(c.run), !jumpState.onGround) * dt;
       const before = pos.clone();
 
@@ -3277,7 +3374,7 @@ export function createPlayScene(o: {
           while (vehicleAcc >= ROVER_DT) {
             drivingState = stepRover(drivingState, input, {
               height: (gx, gz) => groundAt(gx, gz),
-              g: 1.62,
+              g: o.gamePreset ? 9.81 * o.gamePreset.activeRules.gravityScale : 1.62,
             });
             vehicleAcc -= ROVER_DT;
           }
@@ -3442,7 +3539,7 @@ export function createPlayScene(o: {
       } else inDomeLast = null;
       stepDomeRipple(dt);
       stepBeads(dt);
-      sync = stepSync(sync, dt, { onPlanet: where === 'planet', stage, nearMachine, inDome: inDomeNow });
+      sync = o.gamePreset && o.gamePreset.hudBlade !== 'exploration-o2' ? 1 : stepSync(sync, dt, { onPlanet: where === 'planet', stage, nearMachine, inDome: inDomeNow });
       // the 30% warning: one soft radio-static burst as the buffer goes down past it, and the return arrow until it is back above
       if (where === 'planet' && !inDomeNow && isWarnLevel(sync)) {
         if (!warnOn) sfx('static-burst', { minGapMs: 1500, volume: 0.35 });
@@ -3462,7 +3559,12 @@ export function createPlayScene(o: {
       // ---- character model & animator (TASK-07, POL-18)
       scientistHolder.position.set(pos.x, pos.y - EYE - jumpState.landingDip, pos.z);
       scientistHolder.rotation.set(0, yaw + Math.PI, 0);
-      scientistHolder.visible = cameraView === 'third' && !altCamPos && drivingVehicleId === null;
+      scientistHolder.visible = !playerRigBuild && cameraView === 'third' && !altCamPos && drivingVehicleId === null;
+      if (playerRigBuild) {
+        playerRigBuild.group.position.set(pos.x, pos.y - EYE, pos.z);
+        playerRigBuild.group.rotation.y = yaw + Math.PI;
+        playerRigBuild.group.visible = cameraView === 'third' && !altCamPos && drivingVehicleId === null;
+      }
 
       if (scientistAnimator && drivingVehicleId === null) {
         scientistAnimator.update(dt, {
@@ -3498,6 +3600,9 @@ export function createPlayScene(o: {
           camera.position.set(arm.camera.x, arm.camera.y, arm.camera.z);
           camera.lookAt(arm.lookAt.x, arm.lookAt.y, arm.lookAt.z);
         }
+      } else if (o.gamePreset?.cameraMode === 'isometric-tactical' && where === 'planet') {
+        camera.position.copy(pos).add(new THREE.Vector3(20, 24, 20));
+        camera.lookAt(pos.x, pos.y - EYE, pos.z);
       } else if (cameraView === 'third') {
         const camRot = new THREE.Euler(pitch, yaw, 0, 'YXZ');
         const rightVec = new THREE.Vector3(1, 0, 0).applyEuler(camRot);
@@ -3511,10 +3616,11 @@ export function createPlayScene(o: {
           const desiredPos = pos.clone()
             .addScaledVector(rightVec, 0.38)
             .addScaledVector(upVec, 0.12)
-            .addScaledVector(backVec, 2.2);
+            .addScaledVector(backVec, o.gamePreset?.cameraMode === 'third-person-orbit' ? 6.5 : 2.2);
           const clampedPos = resolveThirdPersonCamera(pos, desiredPos, where);
           camera.position.copy(clampedPos);
-          camera.rotation.set(pitch, yaw, 0, 'YXZ');
+          if (o.gamePreset?.cameraMode === 'third-person-orbit') camera.lookAt(pos.x, pos.y - 0.5, pos.z);
+          else camera.rotation.set(pitch, yaw, 0, 'YXZ');
         }
       } else {
         camera.position.copy(pos);
@@ -3536,7 +3642,7 @@ export function createPlayScene(o: {
       }
       // ---- machines at work
       for (const v of views.values()) {
-        v.prop.animate(now, v.running, propStage);
+        v.prop.animate(animTime(now), v.running, propStage);
         if (v.running > 0.05) {
           const mPos = { x: v.m.x, y: groundAt(v.m.x, v.m.z), z: v.m.z };
           if (v.m.kind === 'mill' || v.m.kind === 'heavy-mill') {
@@ -3664,7 +3770,7 @@ export function createPlayScene(o: {
       postUniforms.uGlitch.value = where === 'planet' ? Math.max(0, Math.min(1, (0.4 - sync) / 0.4)) : 0;
       postUniforms.uLost.value = Math.max(0, 1 - (now - lostAt) / 0.6);
       openingUniforms.uTime.value = now;
-      room.update(now, dt);
+      room.update(animTime(now), dt);
       applyVistaFlashFloorPeak(now);
       const mainPower = powerT >= 0 ? powerAt(powerT).main : (gateOn ? 1 : 0);
       holo.update(now, dt, mainPower, waveTo >= 0 ? r : -1);
@@ -4301,6 +4407,10 @@ export function createPlayScene(o: {
     },
     dispose() {
       sceneAlive = false;
+      clearPlotEnvironment(roomEnvMap);
+      releaseLayeredEnv({ map: roomEnvMap, intensity: PLOT_KIT_ENV });
+      for (const model of sporeModels) { model.build.group.removeFromParent(); for (const resource of model.resources) resource.dispose(); }
+      sporeModels.length = 0;
       scientistAnimator?.dispose();
       avatarRig.dispose();
       labScene.remove(scientistHolder);
@@ -4391,10 +4501,13 @@ export function createPlayScene(o: {
       // PLAN-42-GATE: the lab Gate kit ('gate', kit-gate.ts) aims via the room like the
       // capacitor bank, so mat:/lx:/part: cartridges customize it; plot Twin gates move via
       // pure movePlotGate/setGateAccessMode (@hm/coopnet) and keep labkit visuals for now.
-      if (where === 'lab') return room.aimKitPart(camera.position, dir, reach);
+      if (where === 'lab') {
+        const hit = aimKit(sporeModels.filter((m) => m.where === 'lab'), camera.position, dir, reach);
+        return hit ?? room.aimKitPart(camera.position, dir, reach);
+      }
       // the plot's kit-built machines, through the two-stage AABB targeter (kit-target.ts): a machine the ray misses costs its box, not
       // its triangles, so every machine on the plot can be aimed at on the min-spec laptop
-      const targetables: KitTargetable[] = [];
+      const targetables: KitTargetable[] = sporeModels.filter((m) => m.where === 'planet');
       // the Gate itself is a kit: its segments, pedestal and chevron lamps take cartridges like a machine
       if (stargate) targetables.push({ kit: 'stargate', build: stargate.build });
       if (suitBuild) targetables.push({ kit: 'astro-suit', build: suitBuild });
@@ -4412,6 +4525,21 @@ export function createPlayScene(o: {
     },
     spriteCardOf: (kitId) => room.spriteCardOf(kitId),
     setKitOverrides(kitId: string, overrides: Overrides) {
+      const imported = sporeModels.find((model) => model.kit === kitId);
+      if (imported) {
+        const binding = sporeModelBinding(imported.creation);
+        if (!kitAudit(binding.kit, { preset: binding.preset, overrides }).ok) return false;
+        // Prepare the complete replacement before swapping. Failed edits leave the old model and its targeter intact.
+        const next = buildImported(imported.creation, overrides);
+        next.build.group.position.copy(imported.build.group.position);
+        next.build.group.quaternion.copy(imported.build.group.quaternion);
+        imported.build.group.parent?.add(next.build.group);
+        imported.build.group.removeFromParent();
+        for (const resource of imported.resources) resource.dispose();
+        imported.build = next.build; imported.resources = next.resources;
+        if (kitId === 'player-rig') playerRigBuild = next.build;
+        return true;
+      }
       // PLAN-42-GATE: the plot's own Gate kit rebuilds in place, keeping its iris state and its pose
       if (kitId === 'stargate') {
         gateKitOverrides.value = overrides;
@@ -4443,6 +4571,8 @@ export function createPlayScene(o: {
       refreshFabricators();
     },
     kitPlaced(kit: string) {
+      const imported = sporeModels.find((model) => model.kit === kit);
+      if (imported) return imported.build.placed;
       if (!kit.startsWith('plot:')) return room.kitPlaced(kit);
       for (const v of views.values()) if (plotKitKey(v.m) === kit) return kitBuildOf(v)?.placed ?? [];
       return [];

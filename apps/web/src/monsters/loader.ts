@@ -133,7 +133,7 @@ const SEMANTIC_PAINT: Readonly<Record<string, PaintSpec>> = Object.freeze({
   'drone-plate': { colour: '#4d5663', metalness: 0.68, roughness: 0.32 },
 });
 
-function resolveCreatureMaterial(name: string, fallbackPresetId: string, cache: Map<string, THREE.MeshStandardMaterial>): THREE.MeshStandardMaterial {
+export function resolveCreatureMaterial(name: string, fallbackPresetId: string, cache: Map<string, THREE.MeshStandardMaterial>): THREE.MeshStandardMaterial {
   const key = `${name}|${fallbackPresetId}`;
   const hit = cache.get(key);
   if (hit) return hit;

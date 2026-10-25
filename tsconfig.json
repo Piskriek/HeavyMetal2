@@ -342,6 +342,12 @@
       "@hm/matstack": [
         "packages/matstack/src/index.ts"
       ],
+      "@hm/kitspec/audit": [
+        "packages/kitspec/src/audit.ts"
+      ],
+      "@hm/gamepreset": [
+        "packages/gamepreset/src/index.ts"
+      ],
       "@hm/kitspec": [
         "packages/kitspec/src/index.ts"
       ],

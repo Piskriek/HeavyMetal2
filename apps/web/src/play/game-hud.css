@@ -1,0 +1,25 @@
+.play[data-game-preset] [hidden] { display: none !important; }
+.multiverse-blade {
+  position: absolute; top: 24px; left: 24px; z-index: 22; width: min(350px, calc(100vw - 48px));
+  padding: 20px; color: #dcecf5; background: linear-gradient(135deg, #102231ee, #080e1aeb);
+  border: 1px solid #3b64777a; border-top: 2px solid #66e3bf; border-radius: 10px;
+  box-shadow: 0 18px 60px #0006, inset 0 0 32px #1d767013; backdrop-filter: blur(12px);
+  font-family: Inter, sans-serif; pointer-events: auto;
+}
+.multiverse-eyebrow { color: #76cbb8; letter-spacing: .15em; font: 10px Oxanium, monospace; display: flex; align-items: center; gap: 8px; }
+.multiverse-eyebrow i { width: 6px; height: 6px; border-radius: 50%; background: #76efbc; box-shadow: 0 0 10px #76efbc80; }
+.multiverse-blade h1 { margin: 12px 0 18px; font: 600 23px/1.1 Oxanium, sans-serif; letter-spacing: -.02em; }
+.multiverse-objective strong { font: 600 16px Oxanium, sans-serif; color: #f0fbff; }
+.multiverse-objective p { margin: 6px 0 16px; font-size: 12px; line-height: 1.6; color: #9bb6c6; }
+.multiverse-readout { display: flex; align-items: center; gap: 14px; border-left: 2px solid #66e3bf; padding: 0 12px; margin-bottom: 16px; }
+.multiverse-readout b { font: 500 48px/.95 Oxanium, monospace; color: #9df4d7; font-variant-numeric: tabular-nums; }
+.multiverse-readout span { font: 10px/1.7 Oxanium, monospace; letter-spacing: .1em; color: #a5c3d4; }
+.multiverse-rules, .multiverse-vitals { display: flex; gap: 10px; padding: 10px 0; border-top: 1px solid #35505a70; font: 10px Oxanium, monospace; letter-spacing: .05em; color: #8ca8bb; }
+.multiverse-vitals { color: #f5bfa1; }
+.multiverse-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 5px 0 12px; }
+.multiverse-actions button, .multiverse-actions select { border: 1px solid #47768380; border-radius: 5px; background: #142a39; color: #c6eee7; padding: 8px; font: 11px Inter, sans-serif; cursor: pointer; }
+.multiverse-actions select { min-width: 0; max-width: 100%; flex: 1; }
+.multiverse-actions button:hover, .multiverse-actions select:hover { background: #1c3b4a; border-color: #76cbb8; }
+.multiverse-actions :focus-visible { outline: 2px solid #9df4d7; outline-offset: 3px; }
+.multiverse-blade small { display: block; font: 9px/1.8 Oxanium, monospace; letter-spacing: .05em; color: #658698; }
+@media (max-width: 700px) { .multiverse-blade { top: 12px; left: 12px; width: min(300px, calc(100vw - 24px)); padding: 14px; } .multiverse-blade h1 { font-size: 19px; margin-bottom: 12px; } }

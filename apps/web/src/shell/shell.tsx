@@ -32,6 +32,7 @@ import { player } from '../build/player';
 import { bigStore } from '../storage/big-store';
 import { ResolutionCrafter } from '../crafter/crafter';
 import { PlayScreen, type PlayEntry } from '../play/play';
+import { assertPlayablePreset, type MultiverseGamePresetSpec } from '../play/game-presets';
 import { encodePlot } from '../play/plot-code';
 import { FRESH, SAVE_KEY, loadState, type PlayState } from '../play/quest';
 import { kv } from '../storage/profile-storage';
@@ -107,11 +108,17 @@ const toPlanet = (a: Activity): PlanetDef => ({ id: a.id, name: a.name, hue: a.p
 /** An island opened for play or editing: its own runtime, so two islands can never share presets. */
 interface World { readonly rt: Runtime; readonly scene: MakerScene; readonly id: string }
 
-export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElement {
+export function Shell(props: { readonly makeRuntime: () => Runtime; readonly standalonePreset?: MultiverseGamePresetSpec; readonly bootError?: string }): ReactElement {
   const { makeRuntime } = props;
   const [world, setWorld] = useState<World | null>(null);
   const [raceRt, setRaceRt] = useState<{ rt: Runtime; fromMap: boolean } | null>(null);
-  const [note, setNote] = useState('');
+  const [note, setNote] = useState(props.bootError ? `Game link refused: ${props.bootError}` : '');
+  const [gamePreset, setGamePreset] = useState(props.standalonePreset);
+  const [gameSession, setGameSession] = useState(0);
+  const openGamePreset = useCallback((value: MultiverseGamePresetSpec): void => {
+    const preset = assertPlayablePreset(value); // refuse before changing screens or session state
+    setGamePreset(preset); setGameSession((n) => n + 1); setScreen('play'); setGalaxyOpacity(0);
+  }, []);
   const registry = useSyncExternalStore(subscribe, () => islands(), () => islands());
   /** A save that could not be written (the device is out of room), in plain words, until closed. */
   const [storageFull, setStorageFull] = useState('');
@@ -123,6 +130,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   useEffect(() => onFork((m) => { setNote(`This island is now yours: "${m.name}". Rename it in My islands.`); window.setTimeout(() => setNote(''), 6000); }), []);
   // ?crafter or ?studio opens testing screens straight away
   const [screen, setScreen] = useState<Screen>(() => {
+    if (props.standalonePreset) return 'play';
+    if (props.bootError) return 'home';
     if (typeof location !== 'undefined') {
       const p = new URLSearchParams(location.search);
       if (p.has('studio')) return 'studio';
@@ -541,7 +550,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
       ) : null}
       {screen === 'play' ? (
         <div className="shell-layer" style={{ zIndex: 4 }}>
-          <PlayScreen profile={profile} onBack={toHome} onStudio={toStudio} initialSyncMode={playSyncMode} entry={playEntry ?? undefined} />
+          <PlayScreen key={gameSession} profile={profile} onBack={() => { setGamePreset(undefined); toHome(); }} onStudio={toStudio} initialSyncMode={gamePreset ? 'desynced' : playSyncMode} entry={playEntry ?? undefined} gamePreset={gamePreset} onGamePreset={openGamePreset} />
         </div>
       ) : null}
       {screen === 'crafter' ? (

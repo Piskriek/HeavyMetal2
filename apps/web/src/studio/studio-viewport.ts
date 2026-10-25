@@ -171,7 +171,11 @@ export class StudioViewport {
         const m = o as THREE.Mesh;
         if (!m.isMesh) return;
         const original = m.material;
-        const solid = Array.isArray(m.material) ? m.material.map((x) => x.clone()) : m.material.clone();
+        // Matstack's layered shaders live in these hooks; Material.clone() intentionally does not copy them.
+        const clone = (mat: THREE.Material): THREE.Material => {
+          const copy = mat.clone(); copy.onBeforeCompile = mat.onBeforeCompile; copy.customProgramCacheKey = mat.customProgramCacheKey; return copy;
+        };
+        const solid = Array.isArray(m.material) ? m.material.map(clone) : clone(m.material);
         if (tuned) (Array.isArray(original) ? original : [original]).forEach((x) => x.dispose());
         m.userData.solid = solid;
         this.solidMats.push(...(Array.isArray(solid) ? solid : [solid]));

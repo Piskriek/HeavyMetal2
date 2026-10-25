@@ -1,5 +1,13 @@
 # RESUME: start here (fresh session)
 
+## 25 Oct Checkpoint (Arena: JOB-26 / Plan 45 implemented; read this first)
+- **Branch/base:** `arena/44905b50-heavymetal2`, based on `016864b6212bca84d1c6c383e41cecefa891b815` of `feat/monster-mash-exploration`. Detailed architecture, security limits, checks and manual follow-ups: [`JOB_26_MULTIVERSE_HANDOFF.md`](JOB_26_MULTIVERSE_HANDOFF.md).
+- **Rung 5 / one engine:** frozen `@hm/gamepreset` schema and four canonical games (`circuit-rally`, `arena-survivor`, `eco-observer`, `sandbox-builder`), `?game=&world=&rig=` gateway, five HUD blades, shared cameras/physics/rosters/objectives, simulation-clock pause/death/restart, fourteen-kit sandbox. Standalone sessions do not overwrite campaign saves/checkpoints. Active campaign endgame horizons reuse the same gateway, after first-time credits.
+- **Spore Cards:** 512² shared-renderer beauty portraits with title/author/seed/audit/six-zone footer; `@hm/cartlab` zTXt `hm2:preset:v1`, fflate level 9, IEEE CRC-32, strict 256 KiB bounded inflate, JSON.parse-only frozen schemas, and the unchanged shared anatomy audit. Canvas and Studio imports are transactional, lifetime-aware and resource-owned. Only the two UV-only mesh operators can cross the current pre-operator anatomy boundary; unsafe geometry-changing operators are explicitly refused.
+- **Final checks (Linux npm equivalents):** typecheck PASS; build PASS **5.68 MB / 16 MB**; direct Spore suite **63/63 PASS**; game/audio regressions **10/10 + 3/3 PASS**. `npm test`: **3,574 regular / 3,568 pass / 2 baseline LFS-pointer failures / 4 skip**, speed **23/23 PASS**. No tests weakened. The same two missing-generated-GLB failures were present before the work.
+- **Browser checks:** all four boots, rover movement, arena hit/pause/wave/death reset, observer quota completion, custom creature rig/seed link, actual PNG export/decode, valid and corrupt drops, and campaign-save isolation passed with zero page errors. Final beauty framing was visually checked. Missing-Moon-audio retry recursion and shared-scene resource teardown were fixed/regression-tested.
+- **Manual follow-ups, not claimed as tested:** full ten-wave live victory; live campaign credits/horizon handoff; hardware performance/art review. Local screenshots/scripts are ignored QA artifacts, not source deliverables. **Never commit `apps/web/dist/index.html`.**
+
 ## 25 Oct Checkpoint (Antigravity Overwatch: Wave 3 Harvested — JOB-06b, JOB-08 Machines, JOB-08b Landed, 15/20 Jobs Complete; read this first)
 - **Wave 3 Harvest & Merge (`arena/1a30b2dd-heavymetal2` -> `feat/monster-mash-exploration` at `3e51a448`):**
   - **Scale:** 3 clean commits (`e3bee29f`, `00c511a8`, `3e51a448`), +2,634 lines / -541 lines across 20 files.

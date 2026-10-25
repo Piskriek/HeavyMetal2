@@ -39,6 +39,14 @@ export function setPlotEnvironment(env: LayeredEnv): void {
   plotEnv = env;
   if (materials) for (const m of Object.values(materials)) reflect(m);
 }
+/** A closed world must not keep its reflection alive in shared trim/material caches. */
+export function clearPlotEnvironment(map: THREE.Texture): void {
+  if (plotEnv?.map !== map) return;
+  plotEnv = null;
+  if (materials) for (const m of Object.values(materials)) if (m instanceof THREE.MeshStandardMaterial) {
+    m.envMap = null; m.needsUpdate = true;
+  }
+}
 const reflect = (m: THREE.Material): void => {
   if (!plotEnv || !(m instanceof THREE.MeshStandardMaterial)) return;
   m.envMap = plotEnv.map;

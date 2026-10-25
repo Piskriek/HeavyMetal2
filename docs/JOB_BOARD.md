@@ -601,16 +601,18 @@ Authored `docs/argo/plans/42-modular-stargate-earth-endgame.md`, synchronized `.
 
 **Completion Note (2026-10-25 15:49):** Procedural monster roster rebuild: 38 species ported to @hm/creature, 5.55 MB static assets purged, 39/39 audit tests pass
 
-## JOB-26 [OPEN] Plan 45: MultiverseGamePresetSpec, main.ts URL Query Gateway & Steganographic PNG Spore Cards
+## JOB-26 [DONE] Plan 45: MultiverseGamePresetSpec, main.ts URL Query Gateway & Steganographic PNG Spore Cards
 - **Role:** ARCHITECT
 - **Skills:** `frontend`, `route`
 - **Priority:** P1
 - **Milestone:** M6
 - **Paths:** `packages/gamepreset, apps/web/src/main.ts, apps/web/src/play/game-presets.ts, apps/web/src/studio/spore-card.ts`
-- **Verify:** `npm.cmd run typecheck && node --import tsx packages/cartlab/tests/spore-card.test.ts`
+- **Verify:** `npm run typecheck && node --import tsx apps/web/src/studio/spore-card.test.ts` (Linux; use `npm.cmd` on Windows). Full `npm test` baseline exceptions are documented in the handoff.
 - **Updated:** 2026-10-25
 
 1. Implement `MultiverseGamePresetSpec` declaring `cameraMode`, `hudBlade`, `playerRigId`, and `activeRules` (circuit racing, wave survivor, ecosystem observer, Stargate escape).
 2. Wire the 6-line dual-gateway router in `apps/web/src/main.ts` parsing `/?world=<seed>&game=<preset>&rig=<kit>`, reusing the existing canvas, shaders, physics, and raycaster while swapping HUD blade and camera controller.
 3. Build `spore-card.ts` in `apps/web/src/studio/`: encode 512x512 turntable snapshots with compressed `fflate` `zTXt` ancillary PNG chunks (`"hm2:preset:v1"`).
 4. Implement secure drag-and-drop decoder: 256 KiB decompression bomb cap, frozen Zod schema validation, `studio.kit.audit` gate, and zero `eval`.
+
+**Completion Note (2026-10-25, Arena):** Implemented on `arena/44905b50-heavymetal2` from `016864b6`: strict frozen `@hm/gamepreset` schema/four games, dual gateway/five HUD blades/shared-engine objectives, 512² Spore beauty + portable `@hm/cartlab` codec/audit and transactional canvas/Studio drop. Typecheck/build PASS (5.68 MB); direct Spore tests 63/63, preset/audio tests 10/10 + 3/3; full suite 3,568 pass/2 unchanged LFS failures/4 skip (3,574 total), speed 23/23. Browser boot/import/save-isolation/actual-export checks passed. Live full assault, campaign-credit handoff and hardware review remain explicit manual checks. Details: [`JOB_26_MULTIVERSE_HANDOFF.md`](JOB_26_MULTIVERSE_HANDOFF.md).

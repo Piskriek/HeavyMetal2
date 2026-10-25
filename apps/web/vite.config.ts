@@ -63,6 +63,8 @@ function requireRoomBundle(): Plugin {
 /** The deployable app: ONE static html file (RUN loads a static build; no server). base './' so it works from a sub-path. */
 export default defineConfig(async ({ mode }) => ({
   base: './',
+  // Arena's live preview is reverse-proxied; keep Vite's host protection while admitting that preview domain.
+  server: { host: '0.0.0.0', allowedHosts: ['.e2b.app'] },
   plugins: [...(await runMultiplayerPlugins(mode)), viteSingleFile(), studioWriteBack(), sizeGate()],
   // which game this build is (src/edition.ts): `HM_EDITION=goblin-racing npm run build` for the Goblin Racing launch; SetMix by default
   define: { __HM_EDITION__: JSON.stringify(process.env.HM_EDITION ?? 'setmix') },
@@ -197,6 +199,8 @@ export default defineConfig(async ({ mode }) => ({
       '@hm/plotsim': p('../../packages/plotsim/src/index.ts'),
       '@hm/structure': p('../../packages/structure/src/index.ts'),
       '@hm/lattice': p('../../packages/lattice/src/index.ts'),
+      '@hm/kitspec/audit': p('../../packages/kitspec/src/audit.ts'),
+      '@hm/gamepreset': p('../../packages/gamepreset/src/index.ts'),
       '@hm/kitspec': p('../../packages/kitspec/src/index.ts'),
       '@hm/creature': p('../../packages/creature/src/index.ts'),
       '@hm/matstack': p('../../packages/matstack/src/index.ts'),

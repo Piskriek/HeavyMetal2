@@ -983,3 +983,6 @@ export function readPrint(x: unknown): Print | null {
   const p = loadPrint(x);
   return p === 'none' ? null : p;
 }
+
+// PNG Spore Cards share the same pure schemas and anatomy audit as Studio imports.
+export * from './spore-card';

@@ -13,7 +13,8 @@ import { GATE_DOME_RADIUS, eraForStage, kindsForEra, leakSites, clearOfGate, dro
 import { createLeakVisuals, type LeakVisuals } from '../monsters/leak-visual';
 import { gameAudio } from '../audio/game-audio';
 import { applyTurboBassSwarmerKnockback } from '@hm/tooljuice';
-import type { Era } from '../monsters/roster';
+import { SKINS, type Era, type SkinInfo } from '../monsters/roster';
+import type { CreatureGenomeSpec } from '@hm/creature';
 import type { WeaponStats } from '../base/weapons';
 
 export type { MonstersSetting } from '../monsters/policy';
@@ -429,6 +430,11 @@ export function createMonsters(options: {
   readonly initialStage?: number;
   readonly seed?: number;
   readonly events?: MonsterEvents;
+  /** Rung 5 replaces data in the existing renderer/brain, not either engine. */
+  readonly genomeRoster?: readonly CreatureGenomeSpec[];
+  readonly manualSpawnsOnly?: boolean;
+  readonly passive?: boolean;
+  readonly animationRateHz?: number;
 }): MonstersSystem {
   const { planetScene, camera, groundHeightAt } = options;
   let handlers: MonsterEvents = options.events ?? {};
@@ -469,7 +475,12 @@ export function createMonsters(options: {
   let firstSightingDone = false;
   let stats = { mobsSpawned: 0, mobsDefeated: 0, damageDealt: 0, shotsFired: 0, pelletsHit: 0, leaksSealed: 0, telegraphs: 0, hitsOnPlayer: 0 };
 
-  const renderer: MonsterRenderer = createMonsterRenderer(planetScene, { budget: { animated: 24, perSkin: 24 } });
+  const presetSkins: readonly SkinInfo[] = (options.genomeRoster ?? []).map((genome) => ({
+    id: genome.id, genome, era: 'modern3d', archetype: genome.archetype === 'avian-drone' ? 'flyer' : genome.archetype === 'hexapod' ? 'swarmer' : 'charger',
+    heightM: Math.max(0.5, genome.pelvis.restHeight * 2.2), core: false, source: 'preset', turn: 0, remapStrength: 0.2,
+  }));
+  const renderer: MonsterRenderer = createMonsterRenderer(planetScene, { budget: { animated: 24, perSkin: 24 }, roster: [...presetSkins, ...SKINS] });
+  let animationAt = 0;
   renderer.setStage(stage);
   planetScene.userData.monsterRemapStrength = overlayTuning.remapStrength;
   (renderer as unknown as { setRemapStrength?: (v: number) => void }).setRemapStrength?.(overlayTuning.remapStrength);
@@ -524,6 +535,7 @@ export function createMonsters(options: {
 
   /** The leaks the sites call for now: the dormant anomaly from its beat on, each live site from its stage on. */
   const ensureLeaks = (): void => {
+    if (options.manualSpawnsOnly) return;
     for (const site of sites) {
       if (siteLeak.has(site.index)) continue;
       if (site.dormant) {
@@ -685,7 +697,7 @@ export function createMonsters(options: {
 
   /** Proximity spawn step (TICKET-07 Item B): spawns defenders around open leaks within 40 m of the player. */
   const stepProximitySpawns = (dt: number, player: { readonly x: number; readonly z: number }): void => {
-    if (!unlocked || setting === 'off') return;
+    if (options.manualSpawnsOnly || !unlocked || setting === 'off') return;
     let totalLive = world.mobs.filter((m) => m.phase !== 'dead').length;
     if (totalLive >= cap) return;
 
@@ -860,7 +872,7 @@ export function createMonsters(options: {
         dt: h,
         stage,
         aggression: unlocked ? setting : 'off',
-        player: { x: player.x, z: player.z, alive: player.alive },
+        player: { x: player.x, z: player.z, alive: player.alive && !options.passive },
         machines: machines.map((m) => ({ id: m.id, x: m.x, z: m.z, hu: m.hu })),
         safe,
         solids,
@@ -872,9 +884,14 @@ export function createMonsters(options: {
       world = res.world;
       handle(res.events, player);
       gameAudio.setMobsEngaged(world.mobs.some((m) => m.phase === 'chase' || m.phase === 'windup' || m.phase === 'attack'));
-      const mobs: MonsterMob[] = world.mobs.map((m) => ({ id: m.id, kind: m.kind, x: m.x, z: m.z, y: groundHeightAt(m.x, m.z), phase: m.phase, phaseT: m.phaseT }));
-      renderer.sync(mobs, (m) => skinFor(m.kind, leakEra.get(mobRef(m.id)?.leak ?? -1) ?? eraForStage(stage), m.id));
-      renderer.update(h, cam);
+      const mobs: MonsterMob[] = world.mobs.map((m) => ({ id: m.id, kind: m.kind, x: m.x, z: m.z, y: groundHeightAt(m.x, m.z), phase: m.phase, phaseT: options.animationRateHz ? Math.floor(m.phaseT * options.animationRateHz) / options.animationRateHz : m.phaseT }));
+      renderer.sync(mobs, (m) => {
+        const matching = presetSkins.filter((s) => s.archetype === m.kind);
+        const choices = matching.length ? matching : presetSkins;
+        return choices.length ? choices[m.id % choices.length]!.id : skinFor(m.kind, leakEra.get(mobRef(m.id)?.leak ?? -1) ?? eraForStage(stage), m.id);
+      });
+      animationAt += h;
+      if (!options.animationRateHz || animationAt >= 1 / options.animationRateHz) { renderer.update(animationAt, cam); animationAt = 0; }
       const marks = [...siteLeak.values()].map((id) => markerOf(id)).filter((m): m is MonsterMarker => m !== null);
       visuals.update({ dt: h, markers: marks, sealing: sealingLeak, camera: cam, stage });
       if (burstLeft > 0 && weapon) {

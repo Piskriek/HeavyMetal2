@@ -6,6 +6,16 @@
 
 ---
 
+## 2026-10-25 — Arena JOB-26 / Plan 45 handoff
+
+Implemented on `arena/44905b50-heavymetal2` from `016864b6`; see [`JOB_26_MULTIVERSE_HANDOFF.md`](JOB_26_MULTIVERSE_HANDOFF.md) for source entry points, limits and reproducible validation.
+
+- Frozen Rung 5 presets and the URL/campaign/Spore gateways configure the existing play canvas, physics, kit targeting, matstack and audio. Four canonical games, five HUD blades, all fourteen sandbox kits; no second engine or genre bundle.
+- PNG beauty/export/Studio/drop integration is live. `@hm/cartlab` owns canonical JSON + fflate zTXt/CRC, bounded 256 KiB decompression and strict frozen schemas. The **existing audit algorithm** now lives in `@hm/kitspec/audit`, with a Studio re-export, so browser and portable decoder use one gate. Unsafe geometry-changing operators are refused because the audit currently measures pre-operator bounds; only topology-preserving UV projection operators are portable.
+- Final typecheck/build/direct Spore checks pass (**63/63**, bundle **5.68 MB**). All **10 preset + 3 audio** regressions pass. Full regular suite **3,568 pass / 2 unchanged missing-LFS-GLB failures / 4 skip** out of **3,574**; speed suite **23/23**. Do not turn those two existing failures into skips.
+- Chromium checks passed with zero page errors: four modes, controls/pause/waves/death, observer quota/custom rig/seed, actual framed PNG export/decode, transactional imports, campaign-save isolation and shared resource teardown. Entire ten-wave live victory, campaign credits/horizon handoff and hardware frame-budget/art acceptance remain manual review, not claimed completion evidence.
+- Ancillary missing-audio loading recursion is fixed (including late completion after leaving play). Generated dist/QA/cache files are not committed.
+
 ## 1. THE ARCHITECTURAL GAP ANALYSIS
 A web search and empirical analysis of the operational gap between **Gemini Flash (3.8 High)** and **Claude Opus (5.5 Max)** reveals complementary cognitive profiles:
 

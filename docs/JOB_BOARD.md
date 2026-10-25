@@ -261,14 +261,55 @@ Standing recurring Overwatch task executed whenever Antigravity / Overwatch is a
 2. Research and fold new breakthroughs in **AI Agent Skills (Vision+Coverage closed loops, procedural graph synthesis), WebGL2/WebGPU Visual Fidelity (OKLab quantization, screen-space normal-derivative micro-cavity), and Logical/Spatial Optimization (BVH/AABB raycasting, UBO material batching)** into `docs/OVERWATCH_TECH_AND_AI_RADAR.md` and active `JOB-*` cards.
 3. **Know your environment & adapt the roster:** Identify where you woke (Claude Code or Antigravity) and which models you can spawn. Run `node scripts/skill-inventory.mjs` (refreshes `docs/agents/SKILLS_INVENTORY.md` and flags **MISSING** skills), research new models, tools and skills (Claude Code plugins/skills such as `/frontend-design`, `/route`, `/code-review`; Antigravity skills and subagent tiers), then update `docs/agents/roster.json` (role ladders, skill tags) and re-tag job **Role**/**Skills** fields so cheaper rungs plus the right skills do the work. Finish with `node scripts/agent-worker.mjs --dispatch --env <env>`.
 
-## JOB-19 [OPEN] Plan 43: Modular Locomotion (`loc:`), Stage-Fidelity Animation (`anim:`) & Logic Graph Presets (`logic:`)
+## JOB-19 [REVIEW] Plan 43: Modular Locomotion (`loc:`), Stage-Fidelity Animation (`anim:`) & Logic Graph Presets (`logic:`)
 - **Role:** BUILDER
 - **Skills:** `frontend`
 - **Priority:** P1
 - **Milestone:** M3
 - **Paths:** `packages/kinematic, packages/anim, packages/triggers, packages/wiregraph, apps/web/src/play, docs/argo/plans/43-modular-motion-and-logic-presets.md`
 - **Verify:** `node --import tsx --test packages/kinematic/tests/modular-motion.test.ts && npm.cmd run typecheck`
-- **Updated:** 2026-10-22 14:09
+- **Updated:** 2026-10-25
+- **Commit:** see the JOB-19 commit on `arena/a2368b82-heavymetal2` (PR #68)
+
+### Landed (2026-10-25)
+
+1. **`loc:` is live.** `apps/web/src/play/locomotion.ts` owns the *choice* over `@hm/kinematic`'s `LOCOMOTION_PRESETS`:
+   `auto` (the lab deck keeps Earth standard, the Moon's surface keeps the suit's ballast) or any preset pinned everywhere,
+   kept per PC (`settings.locomotion`). The player loop reads it every frame — walk/sprint speed (`locomotionSpeed`, times
+   the preset's **air control** while the feet are off the ground), the jump (`stepVerticalJump` with the preset's impulse,
+   gravity, coyote time, buffer and landing spring) on both grounds, and the flying debug camera — so switching mid-jump
+   retunes the rest of the arc and keeps the state it had. Debug ▸ **Movement** has the row. `locomotion.test.ts` 5/5.
+2. **`anim:` is stage-quantised and declarative.** `stageAnimRateHz` is 8 / 12 / 18 / 30 / **60** at S4–S6 (60 is the frame
+   cadence: a machine that samples every frame is smooth), `@hm/anim` re-exports the surface (`STAGE_ANIM_HZ`, `stageAnimHz`,
+   `stageAnimStepSeconds`, `stageAnimTime`, `poseAtStage`), and `@hm/kitspec` now carries a `KitMotionSpec` on a **part**, a
+   **placement** (which wins) and a **socket**, with `presetMotions` listing them and `presetSockets` passing the socket's
+   motion through. Every `Math.sin` closure in `machine-props.ts` is gone: `kit-motion-specs.ts` names the press rams (twin,
+   half a cycle apart), the heavy ram, the projector sway, the drill spin and the idle LED blink, and the plume cadences and
+   the ram strokes read **one** angular constant (`RAM_CADENCE_RAD`), so the pour pulses when the ram strikes. `machine-motion.ts`
+   binds a spec to an object (rest pose + `evaluateKitMotion`) and poses it — pure in `(simTime, stage)`, so a scrub lands
+   where a step chain lands, and the prop's `animate(t, run, stage)` steps with the picture at S0. `PRESS_FRAME_KIT` puts the
+   stroke on its ram **sockets**; a builder only bolts the ram on. `kit-press-frame.test` coverage via `machine-motion.test` 7/7,
+   `machine-props.test` 12/12, kinematic 19/19, anim 8/8, kitspec 14/14.
+3. **`logic:` decides the Stargate.** New actuator kinds `lock-iris`, `turret-track`, `spawn-monster` and three new shelf
+   presets: **`stargate-iris-lock`** (privacy + code → iris shut / ramp door open; a `closed` plot admits nobody),
+   `perimeter-turret` (track, then fire through a 400 ms hold) and `nest-spawner` (stage gate + proximity, counted).
+   `apps/web/src/play/gate-logic.ts` evaluates the iris lock with `evaluateWireGraph`, the scene draws the access the graph
+   fired (`irisAccessFor`), and `stargateIrisClosed` — the world's, the kit's and the tests' single rule — is now that
+   graph's answer, memoised per mode. `gate-logic.test.ts` 4/4, wiregraph 7/7.
+4. **Guardrail 3 (AABB under motion).** `kit-target.ts` keeps a box per mesh with the world matrix it was measured at: on each
+   aim a pre-pass of sixteen-float compares finds a part a spec drove, re-boxes **only that mesh** from its cached geometry
+   bounding box, and re-takes the build's union from the boxes it keeps — no triangle is ever re-read on the aim path, and a
+   standing build costs the compares and nothing else. Counters `buildsRemeasured` / `meshesRemeasured` report it. The new
+   test drives a mesh with a `gantry-slide` spec and proves the ray follows it up and back (a stale box would still catch it).
+   `kit-target.test.ts` 9/9.
+
+### Outstanding on this ticket
+- The **slider and Studio curve UI** for the `loc:` and `anim:` params (the presets and the live switch exist; the sliders are
+  a Bench/Studio surface still to build), and the Beam Rifle's `logic:` cartridge UI for the three new shelf presets.
+- `perimeter-turret` and `nest-spawner` are shelf-ready and tested but not yet consumed by `turret-view.ts` / the monsters.
+- The iris graph's `open-door` output has no leaf to move on the plot's gate yet (the kit's ramp is static): the iris shield is
+  the gate's door until the kit carries a leaf.
+- Visual verification of all four (no GPU/Chrome in this session): the counts above are unit and numeric only.
 
 Extend Modular Preset Inception (`docs/argo/plans/43-modular-motion-and-logic-presets.md`) across all non-visual game systems and Fidelity Stages ($S_0 \to S_6$):
 1. **Locomotion & Jump Presets (`loc:` — Core Jump Shipped):** Expose `LOCOMOTION_PRESETS` (`earth-standard`, `lunar-ballast`, `lunar-low-g`, `arcade-quake`) with curated in-game sliders (Walk/Sprint Speed, Jump Impulse, Gravity, Air Control, Landing Spring) and Studio curve controls.

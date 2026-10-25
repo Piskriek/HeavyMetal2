@@ -6,7 +6,7 @@
  * (ARGO_NOTE_34 4d), and their parts take part cartridges like the lab's capacitor bank.
  */
 import * as THREE from 'three';
-import { flatten, maxRank, presetSockets, transformPoint, type Kit, type Overrides } from '@hm/kitspec';
+import { flatten, maxRank, presetSockets, transformPoint, type Kit, type KitMotionSpec, type Overrides } from '@hm/kitspec';
 import type { MachineKind } from '@hm/plotsim';
 import { type GenLevel, getGenSync } from '../assets/gen';
 import { buildKitPreset } from './kit-build';
@@ -22,6 +22,8 @@ import { vaultSkin } from './vault-skin';
 import { lightMaterial } from './light-material';
 import { kitLayering, layeredMaterial, type LayeredEnv } from './layered-material';
 import type { GateAccessMode } from '@hm/coopnet/gate-dialer';
+import { driveMotion, drivenAll } from './machine-motion';
+import { motionFor } from './kit-motion-specs';
 import { STARGATE_PRESET, stargateKit } from './kit-stargate';
 import type { KitBuild } from './kit-build';
 
@@ -200,19 +202,21 @@ export function heavyKitProp(kind: MachineKind, stage: number, genLevel: GenLeve
   const up = (v: THREE.Vector3 | null): THREE.Vector3 | null => (v ? v.clone().add(lift) : null);
   let animate = prop.animate;
   if (kind === 'heavy-press') {
+    // the ram sockets carry the stroke (plan 43): the frame says how the ram it holds moves, this builder only bolts it on
     const sockets = presetSockets(spec.kit, spec.preset);
-    const rams = [sockets.ramLeft, sockets.ramRight].map((s) => {
+    const fallback = motionFor('heavy-press', 'ram-a');
+    const bound: [THREE.Object3D | null, KitMotionSpec][] = [];
+    for (const [name, key] of [['ramLeft', 'ram-a'], ['ramRight', 'ram-b']] as const) {
+      const s = sockets[name];
       const ram = s ? getGenSync('press-ram', genLevel) : null;
       if (ram && s) {
         ram.position.set(s.at[0], s.at[1] + ringY, s.at[2]);
         prop.group.add(ram);
       }
-      return ram;
-    });
-    const restY = (sockets.ramLeft?.at[1] ?? 2.1) + ringY;
-    animate = (t, run) => {
-      rams.forEach((r, i) => { if (r) r.position.y = restY - Math.max(0, Math.sin(t * 3.1 + i * Math.PI)) * 0.35 * run; });
-    };
+      const motion = s?.motion ?? motionFor('heavy-press', key) ?? fallback;
+      if (motion) bound.push([ram, motion]);
+    }
+    animate = driveMotion(drivenAll(bound));
   }
   return {
     ...prop,

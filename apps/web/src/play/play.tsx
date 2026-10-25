@@ -158,6 +158,7 @@ import { stationById } from './lab-room';
 import { PlanetaryGridScreen } from '../shell/planetary-grid';
 import { loadRecentCodes, rememberRecentCode } from '../storage/recent-codes';
 import { GATE_ACCESS_MODES, isGateAccessMode } from '../base/world';
+import { irisAccessFor } from './gate-logic';
 import type { GateAccessMode } from '@hm/coopnet/gate-dialer';
 import { CHEVRON_LOCK_SECONDS, GATE_ARRIVAL_PAD_OFFSET_M, GATE_CHEVRON_COUNT, beginGateDial, stepGateDial } from '@hm/coopnet/gate-dialer';
 import { dialRandomPlot, dialSeed, gateDirectory, openGateCount, ownGateEntry } from './gate-directory';
@@ -1359,7 +1360,9 @@ useEffect(() => {
         scene?.setSpeciesSlots(ev.preset.species);
         say(ev.preset.label, `Six species slots set to ${biomeSlotSpecies(ev.preset).join(', ')}.`);
       } else if (ev.type === 'gateAccess') {
-        scene?.setGateAccess(ev.access);
+        // the shield on screen is the shield the gate's own rule fired (plan 43, logic:): the world stores the privacy, the
+        // `stargate-iris-lock` graph decides the iris and the ramp door from it
+        scene?.setGateAccess(irisAccessFor({ access: ev.access }));
         setGateAccess(ev.access);
         say(GATE_ACCESS_LABEL[ev.access], GATE_ACCESS_DOC[ev.access]);
       } else if (ev.type === 'filled') {
@@ -2218,7 +2221,7 @@ useEffect(() => {
         scene.setNodes(baseWorldRef.current.field);
         // plan 42: the plot's Gate stands where the save left it, with the iris in the state the save holds
         scene.setPlotGate(baseWorldRef.current.gatePose);
-        scene.setGateAccess(baseWorldRef.current.gateAccess);
+        scene.setGateAccess(irisAccessFor({ access: isGateAccessMode(baseWorldRef.current.gateAccess) ? baseWorldRef.current.gateAccess : 'open' }));
         scene.setSpeciesSlots(baseWorldRef.current.biome.species);
         if (isGateAccessMode(baseWorldRef.current.gateAccess)) setGateAccess(baseWorldRef.current.gateAccess);
         else setGateAccess('open');
@@ -4459,6 +4462,10 @@ useEffect(() => {
         devWeaponRef.current = w;
         sceneRef.current?.monsters.setWeaponStats(w);
       },
+      /** The locomotion preset in force: `auto` (the ground decides) or a named preset pinned everywhere (plan 43, loc:). */
+      locomotion: (): string => sceneRef.current?.debug.locomotion() ?? 'auto',
+      /** Pins a locomotion preset, live: the next frame's walk, jump, gravity, air control and landing spring read it. */
+      setLocomotion: (choice: string): string => sceneRef.current?.debug.setLocomotion(choice) ?? 'auto',
       /** The Monsters setting (the Settings page sets it through the play settings; the tests set it here). */
       setMonstersSetting: (level: MonstersSetting): void => { sceneRef.current?.monsters.setSetting(level); },
       /** Puts n of an item in the player's slots (stacks first). False when they do not fit or the item is unknown. */

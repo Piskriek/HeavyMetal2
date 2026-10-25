@@ -341,3 +341,5 @@ export * from './bone-retarget-map';
 
 // PLAN-43: gait clip presets
 export * from "./gait-presets";
+
+export * from "./stage-anim";

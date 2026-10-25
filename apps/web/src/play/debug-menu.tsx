@@ -8,6 +8,7 @@ import { CHAIN, CHAIN_STEPS, chainView, type Chain } from '../base/campaign-chai
 import { ITEMS, VEHICLE, VEHICLES, type VehicleKind } from '../base/catalog';
 import type { Archetype } from '../monsters/roster';
 import { kv } from '../storage/profile-storage';
+import { isLocomotionChoice, LOCOMOTION_CHOICES, presetFor, type LocomotionChoice } from './locomotion';
 import './debug-menu.css';
 
 /** The hooks the panel calls (play.tsx builds them from the same refs as window.__dev). */
@@ -36,6 +37,10 @@ export interface DebugApi {
   printVehicle(kind: VehicleKind): string;
   /** Plays the ending credits sequence immediately (Esc debug menu / tests). */
   playCredits?: () => void;
+  /** The locomotion preset in force (`auto`, or a preset id): plan 43's walk/jump/gravity/air-control/landing-spring tune. */
+  locomotion?(): string;
+  /** Pins a locomotion preset for the session (`auto` follows the ground). Live: the next frame reads it. */
+  setLocomotion?(choice: string): string;
 }
 
 export interface DebugMenuProps {
@@ -120,6 +125,14 @@ export function DebugMenu({ api, chain, stage, where, instantBuilds, onInstantBu
   const [amount, setAmount] = useState<string>('100');
   const [dest, setDest] = useState<'pack' | 'bridge'>('pack');
   const [, setTick] = useState(0);
+  // the locomotion preset in force (plan 43, loc:): the switch is live, so the row shows what the scene applied back
+  const [loco, setLoco] = useState<string>(() => api.locomotion?.() ?? 'auto');
+  const chooseLoco = (c: LocomotionChoice): void => {
+    const applied = api.setLocomotion?.(c) ?? c;
+    setLoco(applied);
+    const name = isLocomotionChoice(applied) ? presetFor('planet', applied).name : applied;
+    notify('Locomotion', applied === 'auto' ? 'Auto: the ground sets the pull' : name);
+  };
   const bump = (): void => setTick((t) => t + 1);
   // the confirmation: a small strip inside the panel (the game's own toast is a title card, and it would cover the panel)
   const [toast, setToast] = useState<{ readonly text: string; readonly sub: string; readonly id: number } | null>(null);
@@ -308,6 +321,31 @@ export function DebugMenu({ api, chain, stage, where, instantBuilds, onInstantBu
               </button>
             </div>
             <p className="dbg-note">While it is on, machine work finishes at once: fabricator prints (the scout, hauler and crawler), refinery and bench crafts. A tag shows in the top-right corner so screenshots say so. Off by default; the choice is kept on this PC.</p>
+          </section>
+
+          <section className="dbg-section" aria-labelledby="dbg-movement">
+            <h3 id="dbg-movement">Movement</h3>
+            <div className="dbg-row dbg-stages">
+              {LOCOMOTION_CHOICES.map((c) => (
+                <button
+                  type="button"
+                  key={c}
+                  aria-pressed={loco === c}
+                  className={loco === c ? 'on' : undefined}
+                  onClick={() => chooseLoco(c)}
+                  data-locomotion={c}
+                  title={c === 'auto' ? 'The lab floor is Earth, the Moon keeps its suit ballast' : presetFor('planet', c).name}
+                >
+                  {c === 'auto' ? 'Auto' : c}
+                </button>
+              ))}
+            </div>
+            <p className="dbg-note" data-testid="dbg-locomotion-state">
+              Now: <b>{loco === 'auto' ? 'Auto (the ground sets the pull)' : presetFor('planet', loco as LocomotionChoice).name}</b>.
+              The preset retunes walk and sprint speed, jump impulse, gravity, air control and the landing spring live: switching
+              mid-jump bends the rest of the arc, and the choice is kept on this PC. Auto keeps the lab at Earth standard and the
+              Moon's surface on its ballast, which is how the plot is meant to feel.
+            </p>
           </section>
 
           <section className="dbg-section" aria-labelledby="dbg-spawn">

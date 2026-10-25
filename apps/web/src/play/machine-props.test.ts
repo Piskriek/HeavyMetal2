@@ -198,3 +198,31 @@ test('nothing floats: every machine\'s status light sits on its housing, facing 
     }
   }
 });
+
+test("a machine's moving parts come from the motion table: running moves them, stopped leaves the builder's pose", () => {
+  const m = lab.createMaterials();
+  const snapshot = (p: ReturnType<typeof machineProp>): number[] => {
+    p.group.updateMatrixWorld(true);
+    const out: number[] = [];
+    p.group.traverse((o) => out.push(...o.matrixWorld.elements));
+    return out;
+  };
+  const MOVERS = new Set(['drill', 'press', 'heavy-press', 'projector', 'heavy-projector']);
+  for (const kind of ALL_KINDS) {
+    const p = machineProp(m, kind, 6);
+    // stopped: the clock runs, the prop does not (an idle machine holds the pose its builder gave it)
+    p.animate(0, 0, 6);
+    const stopped = snapshot(p);
+    p.animate(37.5, 0, 6);
+    assert.deepEqual(snapshot(p), stopped, `${kind}: an idle machine must not drift with the clock`);
+    // running: the parts named in the motion table move, and nothing else does
+    p.animate(0.4, 1, 6);
+    const running = snapshot(p);
+    const moved = running.some((v, i) => Math.abs(v - stopped[i]!) > 1e-9);
+    assert.equal(moved, MOVERS.has(kind), `${kind}: ${MOVERS.has(kind) ? 'has moving parts' : 'stands still'} while it runs`);
+    // and the pose follows the stage's animation rate: 0.13 s holds at 0.125 s on S0's 8 Hz grid, while S6 has moved on
+    const at = (t: number, stage: number): number[] => { p.animate(t, 1, stage); return snapshot(p); };
+    assert.deepEqual(at(0.13, 0), at(0.125, 0), `${kind}: S0 steps the motion at 8 Hz`);
+    if (MOVERS.has(kind)) assert.notDeepEqual(at(0.13, 6), at(0.13, 0), `${kind}: S6 runs between S0's steps`);
+  }
+});

@@ -25,6 +25,8 @@ import { createPlotHolo, type PlotHolo } from './plot-holo';
 import { COLOUR_MARK_FRAGMENT, localMachineWaveAt, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_OFF_FRAGMENT, OPENING_OFF_VERTEX, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX, scanRingFadeAt, waveBandColourFor } from './portal-shaders';
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
 import { disposeProp, FABRICATOR_PLUME, FABRICATOR_VENT, FEED_CUBES_FULL, feedCubeCount, feedCubeProgress, lineSpan, machinePlumeCount, machinePlumeCountOf, machinePlumeGravity, machinePlumeLook, machinePlumeLookOf, machinePlumeSpec, machinePlumeSteady, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
+import { RAM_CADENCE_RAD } from './kit-motion-specs';
+import { activeLocomotion, locomotionChoice, locomotionSpeed, setLocomotionChoice } from './locomotion';
 import { plotStargate, setPlotEnvironment } from './plot-kits';
 import { STARGATE_APERTURE_R, STARGATE_RING_CENTRE_Y } from './kit-stargate';
 import type { GateAccessMode } from '@hm/coopnet/gate-dialer';
@@ -105,7 +107,7 @@ import { createRemotePeersController, type RemotePeersController } from './remot
 import { currentOutpostSession } from '../net/outpost-session';
 import { PAINT_CELL, PAINT_CELLS } from '../base/plot-height';
 import { emptyField, encodeField } from '@hm/terrainbrush';
-import { createVerticalJumpState, LOCOMOTION_PRESETS, stepVerticalJump } from '@hm/kinematic';
+import { createVerticalJumpState, stepVerticalJump } from '@hm/kinematic';
 import { aimKit, type KitTargetable } from './kit-target';
 
 export type Where = 'lab' | 'planet';
@@ -176,7 +178,7 @@ export interface Detail {
   readonly suitCamTier: boolean;
 }
 
-const EYE = 1.68, RADIUS = 0.3, WALK = 3.0, RUN = 5.6;
+const EYE = 1.68, RADIUS = 0.3; // walk and sprint speed come from the locomotion preset in force (plan 43, loc:)
 /**
  * Astro's suit on the planet (TASK-21c): its metal is capped (the baked metal map is up to 1, and metal with no reflection is
  * black), and it reflects the lab's room light (`roomEnvMap`). Only the character takes it: the planet's own look does not change.
@@ -515,6 +517,9 @@ export interface PlayScene {
     testPieceAim(pieceId: number): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null;
     setAltCam(eye: { readonly x: number; readonly y: number; readonly z: number }, pitch: number, yaw: number, target?: { readonly x: number; readonly y: number; readonly z: number }): void;
     clearAltCam(): void;
+    /** The locomotion preset in force (`auto` follows the ground), and the switch that pins one (plan 43, loc:). */
+    locomotion(): string;
+    setLocomotion(choice: string): string;
     groundHeight(x: number, z: number): number;
     /** A third-person side view at `metres` from the character (null: back to the over-the-shoulder camera). For the shots. */
     sideShot(metres: number | null): void;
@@ -3163,7 +3168,10 @@ export function createPlayScene(o: {
       const sens = 0.0024;
       yaw -= c.look.dx * sens;
       pitch = Math.max(-1.45, Math.min(1.45, pitch - c.look.dy * sens));
-      const speed = (c.run ? RUN : WALK) * dt;
+      // the locomotion preset in force (plan 43, loc:): speed, jump, gravity, air control and the landing spring all read
+      // from it, so a switch mid-jump retunes the rest of the arc without resetting the state
+      const loco = activeLocomotion(where);
+      const speed = locomotionSpeed(loco, Boolean(c.run), !jumpState.onGround) * dt;
       const before = pos.clone();
 
       if (drivingVehicleId !== lastDrivingVehicleId) {
@@ -3262,7 +3270,7 @@ export function createPlayScene(o: {
         if (!altCamPos) {
           altCamPos = (cameraView === 'third' ? camera.position.clone() : pos.clone());
         }
-        const flySpeed = (c.run ? RUN * 1.5 : WALK * 1.5) * dt;
+        const flySpeed = locomotionSpeed(loco, Boolean(c.run), false) * 1.5 * dt;
         const camRot = new THREE.Euler(pitch, yaw, 0, 'YXZ');
         const fwd = new THREE.Vector3(0, 0, -1).applyEuler(camRot);
         const rgt = new THREE.Vector3(1, 0, 0).applyEuler(camRot);
@@ -3292,7 +3300,7 @@ export function createPlayScene(o: {
       if (where === 'lab') {
         collide(pos, before);
         const fh = room.floorHeight(pos.x, pos.z);
-        jumpState = stepVerticalJump(jumpState, { dt, jumpHeld: Boolean(c.jump), maxHeadroomM: 2.1 }, LOCOMOTION_PRESETS['earth-standard']);
+        jumpState = stepVerticalJump(jumpState, { dt, jumpHeld: Boolean(c.jump), maxHeadroomM: 2.1 }, loco);
         if (jumpState.justJumped) sfx('step-grit', { pitch: 1.75, volume: 0.35 });
         if (jumpState.justLanded) sfx('step-grit', { pitch: 1.25, volume: 0.45 });
         pos.y = fh + EYE + jumpState.heightAboveFloor + jumpState.landingDip;
@@ -3314,7 +3322,7 @@ export function createPlayScene(o: {
             pos.z = pushed.z;
             standY = activeWalkWorld.standAt(pos.x, pos.z, feetY, standY);
           }
-          jumpState = stepVerticalJump(jumpState, { dt, jumpHeld: Boolean(c.jump) }, LOCOMOTION_PRESETS['lunar-ballast']);
+          jumpState = stepVerticalJump(jumpState, { dt, jumpHeld: Boolean(c.jump) }, loco);
           if (jumpState.justJumped) sfx('step-grit', { pitch: 1.25, volume: 0.45 });
           if (jumpState.justLanded) sfx('step-grit', { pitch: 0.78, volume: 0.6 });
           if (!jumpState.onGround) {
@@ -3444,7 +3452,7 @@ export function createPlayScene(o: {
       }
       // ---- machines at work
       for (const v of views.values()) {
-        v.prop.animate(now, v.running);
+        v.prop.animate(now, v.running, propStage);
         if (v.running > 0.05) {
           const mPos = { x: v.m.x, y: groundAt(v.m.x, v.m.z), z: v.m.z };
           if (v.m.kind === 'mill' || v.m.kind === 'heavy-mill') {
@@ -3454,8 +3462,9 @@ export function createPlayScene(o: {
           } else if (v.m.kind === 'water' || v.m.kind === 'heavy-water') {
             gameAudio.startMachineLoop(v.m.id, 'watermaker', mPos);
           } else if (v.m.kind === 'press' || v.m.kind === 'heavy-press') {
-            const strokePhase = (now * 2.0) % (Math.PI * 2);
-            if (strokePhase < dt * 2.0) {
+            // the strike is heard when the ram lands, on the ram's own cadence (kit-motion-specs), not a second sine wave
+            const rate = v.m.kind === 'heavy-press' ? RAM_CADENCE_RAD.heavy : RAM_CADENCE_RAD.fast;
+            if ((now * rate) % (Math.PI * 2) < dt * rate) {
               gameAudio.playPressStroke(mPos);
             }
           }
@@ -4153,6 +4162,12 @@ export function createPlayScene(o: {
           camera.rotation.set(pitch, yaw, 0, 'YXZ');
         }
         camera.updateMatrixWorld(true);
+      },
+      locomotion: () => locomotionChoice(),
+      setLocomotion(name) {
+        const applied = setLocomotionChoice(name);
+        // the switch is live: the next frame's solve reads it, and the state it already had is kept
+        return applied;
       },
       clearAltCam() {
         debugAltCam = false;

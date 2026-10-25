@@ -45,3 +45,26 @@ test('logic: cartridge hook resolves and applies to doors/turrets/machines', () 
   assert.equal(applied?.logicPresetId, 'auto-airlock'); assert.equal(applied?.kind, 'door');
   assert.equal(applyLogicCartridge({}, 'logic:nope'), null);
 });
+
+test('the plan-43 behaviour presets: iris lock, perimeter turret and nest spawner validate and fire deterministically', () => {
+  for (const id of ['stargate-iris-lock', 'perimeter-turret', 'nest-spawner']) assert.ok(WIREGRAPH_SHELF[id], id);
+  const fire = (id: string, readings: Record<string, number>, steps = 1): string[] => {
+    let state = createWireGraphState();
+    let out: string[] = [];
+    for (let i = 0; i < steps; i += 1) {
+      const r = evaluateWireGraph(WIREGRAPH_SHELF[id]!, state, readings, 500);
+      state = r.state;
+      out = r.outputs.map((o) => o.kind);
+    }
+    return out;
+  };
+  // the turret tracks at once and fires once the target has held through the delay
+  assert.deepEqual(fire('perimeter-turret', { prox: 1 }), ['turret-track']);
+  assert.deepEqual(fire('perimeter-turret', { prox: 1 }, 2).sort(), ['fire-turret', 'turret-track']);
+  // the nest arms on stage 3 and a proximity trip, and spawns on the counter's beat
+  assert.deepEqual(fire('nest-spawner', { stage: 2, prox: 1 }, 5), []);
+  // the iris lock: shut on a code-only plot, open for a valid code, never open on a closed plot
+  assert.deepEqual(fire('stargate-iris-lock', { 'privacy-open': 0, 'privacy-closed': 0, code: 0 }), ['lock-iris']);
+  assert.ok(fire('stargate-iris-lock', { 'privacy-open': 0, 'privacy-closed': 0, code: 1 }).includes('open-door'));
+  assert.deepEqual(fire('stargate-iris-lock', { 'privacy-open': 0, 'privacy-closed': 1, code: 1 }), ['lock-iris']);
+});

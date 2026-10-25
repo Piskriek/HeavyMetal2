@@ -16,7 +16,7 @@ export const LOGIC_PRESET_SCHEMA = WIREGRAPH_PARAM_SCHEMA;
 
 export type TriggerSensorKind = 'proximity' | 'stage-reached' | 'cardinal-threshold' | 'power-brownout' | 'leak-active' | 'hopper-low';
 export type LogicNodeKind = 'and' | 'or' | 'not' | 'delay' | 'latch' | 'counter' | 'threshold';
-export type ActuatorKind = 'toggle-machine' | 'open-door' | 'fire-turret' | 'set-lamp-lx' | 'play-sound' | 'dial-gate';
+export type ActuatorKind = 'toggle-machine' | 'open-door' | 'fire-turret' | 'set-lamp-lx' | 'play-sound' | 'dial-gate' | 'lock-iris' | 'turret-track' | 'spawn-monster';
 export interface SensorSpec { readonly id: string; readonly kind: TriggerSensorKind; readonly threshold?: number; readonly target?: string }
 export interface LogicNodeSpec { readonly id: string; readonly kind: LogicNodeKind; readonly inputs: readonly string[]; readonly delayMs?: number; readonly counterTarget?: number; readonly threshold?: number; readonly resetInput?: string }
 export interface ActuatorSpec { readonly id: string; readonly kind: ActuatorKind; readonly input: string; readonly target: string; readonly value?: number }
@@ -25,7 +25,7 @@ export type WireGraphPreset = WireGraphSpec;
 
 export const SENSOR_KINDS: readonly TriggerSensorKind[] = ['proximity', 'stage-reached', 'cardinal-threshold', 'power-brownout', 'leak-active', 'hopper-low'];
 export const LOGIC_NODE_KINDS: readonly LogicNodeKind[] = ['and', 'or', 'not', 'delay', 'latch', 'counter', 'threshold'];
-export const ACTUATOR_KINDS: readonly ActuatorKind[] = ['toggle-machine', 'open-door', 'fire-turret', 'set-lamp-lx', 'play-sound', 'dial-gate'];
+export const ACTUATOR_KINDS: readonly ActuatorKind[] = ['toggle-machine', 'open-door', 'fire-turret', 'set-lamp-lx', 'play-sound', 'dial-gate', 'lock-iris', 'turret-track', 'spawn-monster'];
 
 /** Sensors are numeric: proximity/stage/cardinal pass the reading through; brownout/leak/hopper are 1 when active (reading >= threshold, default 1; brownout: reading <= threshold). */
 export function evaluateSensor(spec: SensorSpec, reading: number): number {
@@ -107,6 +107,22 @@ export const WIREGRAPH_SHELF: Readonly<Record<string, WireGraphSpec>> = Object.f
   'auto-airlock': g('auto-airlock', 'Auto Airlock', [{ id: 'prox', kind: 'proximity', threshold: 1 }], [{ id: 'open-delay', kind: 'delay', inputs: ['prox'], delayMs: 250 }], [{ id: 'door', kind: 'open-door', input: 'open-delay', target: 'airlock-door' }, { id: 'chime', kind: 'play-sound', input: 'open-delay', target: 'sfx-door' }]),
   'brownout-load-shedder': g('brownout-load-shedder', 'Brownout Load Shedder', [{ id: 'power', kind: 'power-brownout', threshold: 0.25 }], [{ id: 'shed', kind: 'latch', inputs: ['power'] }], [{ id: 'machine-off', kind: 'toggle-machine', input: 'shed', target: 'nonessential-machines', value: 0 }, { id: 'lamp', kind: 'set-lamp-lx', input: 'shed', target: 'warning-lamp', value: 40 }]),
   'leak-perimeter-alarm': g('leak-perimeter-alarm', 'Leak Perimeter Alarm', [{ id: 'leak', kind: 'leak-active', threshold: 1 }, { id: 'prox', kind: 'proximity', threshold: 1 }], [{ id: 'alarm', kind: 'latch', inputs: ['leak'] }, { id: 'near-and-leak', kind: 'and', inputs: ['leak', 'prox'] }], [{ id: 'lamp', kind: 'set-lamp-lx', input: 'alarm', target: 'perimeter-lamp', value: 120 }, { id: 'siren', kind: 'play-sound', input: 'near-and-leak', target: 'sfx-alarm' }, { id: 'turret', kind: 'fire-turret', input: 'near-and-leak', target: 'perimeter-turret' }]),
+  // plan 43's Stargate rule: the iris is shut unless the plot is listed open or the visitor's code is accepted, and the
+  // ramp door opens exactly when the iris does. No `if` in the game decides this; the gate evaluates this graph.
+  'stargate-iris-lock': g('stargate-iris-lock', 'Stargate Iris Lock',
+    [{ id: 'privacy-open', kind: 'cardinal-threshold', threshold: 1 }, { id: 'privacy-closed', kind: 'cardinal-threshold', threshold: 1 }, { id: 'code', kind: 'cardinal-threshold', threshold: 1 }],
+    [{ id: 'asked', kind: 'or', inputs: ['privacy-open', 'code'] }, { id: 'not-closed', kind: 'not', inputs: ['privacy-closed'] }, { id: 'admit', kind: 'and', inputs: ['asked', 'not-closed'] }, { id: 'shut', kind: 'not', inputs: ['admit'] }],
+    [{ id: 'iris', kind: 'lock-iris', input: 'shut', target: 'stargate-iris' }, { id: 'door', kind: 'open-door', input: 'admit', target: 'stargate-ramp-door' }]),
+  // plan 43's perimeter turret: it tracks what comes within reach and fires while the target holds, on one graph
+  'perimeter-turret': g('perimeter-turret', 'Perimeter Turret',
+    [{ id: 'prox', kind: 'proximity', threshold: 1 }],
+    [{ id: 'hold', kind: 'delay', inputs: ['prox'], delayMs: 400 }],
+    [{ id: 'track', kind: 'turret-track', input: 'prox', target: 'perimeter-turret' }, { id: 'fire', kind: 'fire-turret', input: 'hold', target: 'perimeter-turret' }]),
+  // plan 43's monster spawner: a stage gate and a proximity trip, counted, so a nest spawns on a beat rather than a stream
+  'nest-spawner': g('nest-spawner', 'Nest Spawner',
+    [{ id: 'stage', kind: 'stage-reached', threshold: 3 }, { id: 'prox', kind: 'proximity', threshold: 1 }],
+    [{ id: 'armed', kind: 'and', inputs: ['stage', 'prox'] }, { id: 'beat', kind: 'counter', inputs: ['armed'], counterTarget: 4 }],
+    [{ id: 'spawn', kind: 'spawn-monster', input: 'beat', target: 'nest', value: 1 }]),
   'stage6-earth-beacon': g('stage6-earth-beacon', 'Stage-6 Earth Beacon', [{ id: 'stage', kind: 'stage-reached', threshold: 6 }, { id: 'charge', kind: 'cardinal-threshold', threshold: 100 }], [{ id: 'both', kind: 'and', inputs: ['stage', 'charge'] }, { id: 'pulses', kind: 'counter', inputs: ['both'], counterTarget: 3 }], [{ id: 'gate', kind: 'dial-gate', input: 'pulses', target: 'earth-gate' }, { id: 'beacon', kind: 'set-lamp-lx', input: 'both', target: 'beacon-lamp', value: 200 }]),
 });
 export const serializeWireGraph = (graph: WireGraphSpec): string => JSON.stringify(graph);

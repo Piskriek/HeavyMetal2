@@ -13,7 +13,8 @@
  *  - the ramp — three grounded blocks climbing to the landing, which stands on the plinth at the aperture's sill;
  *  - the dialing `pedestal` — a `can` console with a `grille` face and a status lamp, the thing a player stands at to dial;
  *  - the `iris` — the shield that closes across the aperture. It is present only when the gate is not open
- *    (`stargateKit('code-only')` / `stargateKit('closed')`); `stargateIrisClosed(access)` is the single rule.
+ *    (`stargateKit('code-only')` / `stargateKit('closed')`); `stargateIrisClosed(access)` is the single rule, evaluated from the
+ * `stargate-iris-lock` wiregraph preset (plan 43, `logic:`: apps/web/src/play/gate-logic.ts).
  *
  * Sizing (measured off `flatten(stargateKit('open'))`): the annulus is 3.04 m across and rises 3.26 m, the chevrons reach
  * 3.44 m, and the aperture is 2.64 m across with its sill 0.42 m above the ground. With the dialing pedestal the whole kit
@@ -21,6 +22,7 @@
  */
 import type { Kit, Placement, SocketDef } from '@hm/kitspec';
 import type { GateAccessMode } from '@hm/coopnet/gate-dialer';
+import { irisClosedForAccess } from './gate-logic';
 
 /** The assembly name: what `buildKitPreset` and the beam's overrides key on. */
 export const STARGATE_PRESET = 'stargate';
@@ -55,9 +57,14 @@ export const stargateChevronMaterial = (index: number): string => `lx:${2400 + (
 /** The dialing pedestal's status lamp: a slow pulse, warmer than the chevrons. */
 export const STARGATE_DIAL_LAMP = 'lx:5200:1.4:pulse';
 
-/** The single rule the world, the kit and the scene share: the iris is shut for everything but an open gate. */
+/**
+ * The single rule the world, the kit and the scene share: the iris is shut for everything but an open gate — and the rule is
+ * the `stargate-iris-lock` wiregraph on the shelf (plan 43, `logic:`), not an `if` beside it. A plot listed `open` admits
+ * (the shield retracts); `code-only` and `closed` shut it, and a visitor whose code was accepted would open it through the
+ * same graph. Cached per mode: a rebuild asks, and not a frame.
+ */
 export function stargateIrisClosed(access: GateAccessMode): boolean {
-  return access !== 'open';
+  return irisClosedForAccess(access);
 }
 
 /**

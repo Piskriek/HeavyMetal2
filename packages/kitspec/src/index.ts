@@ -25,10 +25,15 @@ export interface Box3 {
   readonly max: Vec3;
 }
 
-/** A named attach point in its owner's frame: a position and an optional Euler rotation (degrees). */
+/**
+ * A named attach point in its owner's frame: a position and an optional Euler rotation (degrees). A socket may also say that
+ * what attaches to it moves (plan 43, `anim:`): the Shape Press's ram sockets carry the ram stroke, so the part a cartridge
+ * bolts on inherits the machine's motion instead of the builder hard-coding a sine wave for that one machine.
+ */
 export interface SocketDef {
   readonly at: Vec3;
   readonly rot?: Vec3;
+  readonly motion?: KitMotionSpec;
 }
 
 export type PartSource =
@@ -45,6 +50,24 @@ export interface OpRef {
   readonly params: Readonly<Record<string, number>>;
 }
 
+/**
+ * A declarative motion for a part or a placed copy (plan 43, `anim:`): the shape `@hm/kinematic`'s `evaluateKitMotion`
+ * evaluates. Pure data — the spec names a motion, its axis, its rate and its amplitude, and the evaluator is a function of
+ * `(spec, time, running, stage)`, never a frame-delta accumulator, so a scrubbed or replayed clock lands on the same pose.
+ *
+ * Kept structurally identical to `@hm/kinematic`'s `KitMotionSpec` (the same fields, the same kind names) rather than
+ * imported, so this package stays free of the evaluator's dependencies.
+ */
+export type KitMotionKind = 'reciprocate' | 'spin' | 'oscillate' | 'gantry-slide' | 'iris-aperture';
+
+export interface KitMotionSpec {
+  readonly kind: KitMotionKind;
+  readonly axis: 'x' | 'y' | 'z';
+  readonly rateHz: number;
+  readonly amplitude: number;
+  readonly phaseRad?: number;
+}
+
 export interface PartDef {
   readonly source: PartSource;
   /** The material slot (a trim-sheet region or a lab material name); merging groups by it. */
@@ -53,6 +76,8 @@ export interface PartDef {
   readonly slotMaterials?: Readonly<Record<string, string>>;
   readonly rank: DetailRank;
   readonly sockets?: Readonly<Record<string, SocketDef>>;
+  /** What this part does while the assembly runs (a ram's stroke, a ring's spin): the scene applies it, `kitspec` only names it. */
+  readonly motion?: KitMotionSpec;
 }
 
 /** What a placed copy changes about its part (the beam's Apply with a part cartridge, plan 38 section 8). */
@@ -85,6 +110,8 @@ export interface Placement {
   readonly rank?: DetailRank;
   /** A row of identical copies: copy k sits at `at + k * step`. */
   readonly repeat?: { readonly count: number; readonly step: Vec3 };
+  /** This placed copy's motion, which wins over its part's own (the machine's ram and the ram's part differ). */
+  readonly motion?: KitMotionSpec;
 }
 
 export interface AssemblyDef {
@@ -111,6 +138,8 @@ export interface PlacedPart {
   readonly matrix: Mat4;
   /** True when the matrix flips handedness (an odd number of mirrors): flip the triangle winding. */
   readonly mirrored: boolean;
+  /** The motion this copy runs while the assembly runs, if it or its part declares one. */
+  readonly motion?: KitMotionSpec;
 }
 
 export type IssueCode =
@@ -250,6 +279,16 @@ interface Frame {
 }
 
 /**
+ * The motions a preset declares, by part path, in flatten order: what the scene binds its moving handles to. Pure, so the
+ * same preset always lists the same handles in the same order, and a kit with no motion lists nothing.
+ */
+export function presetMotions(kit: Kit, preset: string, overrides?: Overrides): readonly { readonly path: string; readonly motion: KitMotionSpec }[] {
+  const out: { path: string; motion: KitMotionSpec }[] = [];
+  for (const p of flatten(kit, preset, overrides)) if (p.motion) out.push({ path: p.path, motion: p.motion });
+  return out;
+}
+
+/**
  * Every part a preset places, in a fixed order (children in order, repeats in order, depth first), with its matrix in
  * the preset's frame. Problems are skipped and reported by validate(); flatten never throws on a bad kit.
  */
@@ -344,6 +383,7 @@ function walk(
           rank: Math.max(rank, part.rank) as DetailRank,
           matrix,
           mirrored: determinant3(matrix) < 0,
+          ...(c.motion ?? part.motion ? { motion: c.motion ?? part.motion } : {}),
         });
       } else if (sub) {
         copies.push({ matrix, sockets: sub.sockets });
@@ -358,18 +398,25 @@ function walk(
  * sockets as `path.socket` (a machine's vent, feed and power points; plan 38 kit machines). Each is a position and the
  * socket's full frame.
  */
-export function presetSockets(kit: Kit, preset: string): Record<string, { readonly at: Vec3; readonly matrix: Mat4 }> {
-  const out: Record<string, { at: Vec3; matrix: Mat4 }> = {};
+export interface PresetSocket {
+  readonly at: Vec3;
+  readonly matrix: Mat4;
+  /** What attaches here does while the assembly runs, when the socket declares it. */
+  readonly motion?: KitMotionSpec;
+}
+
+export function presetSockets(kit: Kit, preset: string): Record<string, PresetSocket> {
+  const out: Record<string, PresetSocket> = {};
   const top = kit.assemblies[preset];
   for (const [name, s] of Object.entries(top?.sockets ?? {})) {
     const m = frameOf(s);
-    out[name] = { at: transformPoint(m, [0, 0, 0]), matrix: m };
+    out[name] = { at: transformPoint(m, [0, 0, 0]), matrix: m, ...(s.motion ? { motion: s.motion } : {}) };
   }
   for (const p of flatten(kit, preset)) {
     const def = kit.parts[p.part];
     for (const [name, s] of Object.entries(def?.sockets ?? {})) {
       const m = multiply(p.matrix, frameOf(s));
-      out[`${p.path}.${name}`] = { at: transformPoint(m, [0, 0, 0]), matrix: m };
+      out[`${p.path}.${name}`] = { at: transformPoint(m, [0, 0, 0]), matrix: m, ...(s.motion ? { motion: s.motion } : {}) };
     }
   }
   return out;

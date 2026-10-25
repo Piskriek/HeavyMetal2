@@ -13,6 +13,7 @@ import {
   transformPoint,
   validate,
   type Kit,
+  type KitMotionSpec,
 } from '../src/index';
 
 /** A capacitor bank like the plan 38 pilot: one generated can, three times on a skid, caps and bolts as code. */
@@ -204,4 +205,40 @@ test('presetSockets gives the top assembly sockets and every placed part socket 
   const top = s['cells[2]/can.top']!.at;
   assert.ok(Math.abs(top[0] - 0.55) < 1e-9 && Math.abs(top[1] - 1.55) < 1e-9, JSON.stringify(top));
   assert.ok(s['skid.deck'], 'the skid deck socket is listed');
+});
+
+test('a part, a placement or a socket can declare what moves (plan 43 anim:), and flatten reports it', async () => {
+  const { flatten: flat, presetMotions, presetSockets } = await import('../src/index');
+  const ram: KitMotionSpec = { kind: 'reciprocate', axis: 'y', rateHz: 2, amplitude: 0.3 };
+  const twin: KitMotionSpec = { ...ram, phaseRad: Math.PI };
+  const kit: Kit = {
+    parts: {
+      base: { source: { kind: 'box', size: [1, 0.1, 1] }, material: 'steel', rank: 0, sockets: { ramBed: { at: [0, 0.1, 0], motion: twin } } },
+      // a part-level motion: every copy of it runs the same stroke
+      piston: { source: { kind: 'box', size: [0.1, 0.4, 0.1] }, material: 'steel', rank: 1, motion: ram },
+      // a placement-level motion wins over the part's own
+      drum: { source: { kind: 'box', size: [0.3, 0.3, 0.3] }, material: 'steel', rank: 1, motion: { kind: 'spin', axis: 'y', rateHz: 1, amplitude: 1 } },
+    },
+    assemblies: {
+      p: {
+        children: [
+          { ref: 'base' },
+          { ref: 'piston', key: 'left', at: [0.2, 0.1, 0] },
+          { ref: 'piston', key: 'right', at: [-0.2, 0.1, 0] },
+          { ref: 'drum', key: 'drum', at: [0, 0.5, 0], motion: { kind: 'oscillate', axis: 'x', rateHz: 0.5, amplitude: 0.2 } },
+        ],
+      },
+    },
+  };
+  const motions = presetMotions(kit, 'p');
+  assert.deepEqual(motions.map((m) => m.path), ['left', 'right', 'drum']);
+  assert.equal(motions[0]!.motion.kind, 'reciprocate');
+  assert.equal(motions[2]!.motion.kind, 'oscillate', "the placement's own motion wins over its part's");
+  // a kit with nothing moving lists nothing, and the list is stable across calls (the same order every time)
+  assert.deepEqual(presetMotions({ parts: { base: kit.parts.base! }, assemblies: { q: { children: [{ ref: 'base' }] } } }, 'q'), []);
+  assert.deepEqual(presetMotions(kit, 'p'), motions);
+  // the socket's motion rides with the socket (a part's socket is listed under its placed path)
+  assert.deepEqual(presetSockets(kit, 'p')['base#0.ramBed']?.motion, twin);
+  assert.equal(presetSockets(kit, 'p')['base#0.ramBed']?.at[1], 0.1);
+  assert.equal(flat(kit, 'p').find((p) => p.path === 'left')!.motion, ram, 'flatten carries the resolved motion');
 });

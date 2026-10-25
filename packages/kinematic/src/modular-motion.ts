@@ -218,28 +218,35 @@ export function stepVerticalJump(
 // ============================================================================
 
 /**
- * Returns the animation sample rate (Hz) for a given Fidelity Stage (S0..S6).
+ * Returns the animation sample rate (Hz) for a given Fidelity Stage (S0..S6) — the cadence at which a procedural pose is
+ * held, so the stage's motion reads as its era's hardware:
  * - Stage 0 (Wireframe / 1-Bit): 8 Hz stepped pose cadence
  * - Stage 1 (16-colour EGA):     12 Hz shareware flipbook cadence
  * - Stage 2 (256-colour VGA):    18 Hz Quake vertex-keyframe cadence
  * - Stage 3 (Gouraud):           30 Hz console cadence
- * - Stage 4..6 (Full PBR):       0 (unquantized continuous 60-144 Hz interpolation)
+ * - Stage 4..6 (Full PBR):       60 Hz — the frame cadence itself, so the spring-damper and IK poses are continuous
+ *
+ * 60 at the top of the ladder is not a cap on quality: it is the fastest a 60 Hz frame can ask, and a machine that
+ * samples every frame is smooth. A caller that wants a rate above the frame cadence should not quantise at all.
  */
 export function stageAnimRateHz(stage: number): number {
   if (stage <= 0) return 8;
   if (stage === 1) return 12;
   if (stage === 2) return 18;
   if (stage === 3) return 30;
-  return 0;
+  return 60;
 }
 
 /**
  * Quantizes continuous time `tSec` to the stage's animation cadence so procedural kit animations
  * visually upgrade from stepped low-bit motion at Stage 0-2 to silky continuous motion at Stage 4-6.
+ *
+ * Pure in its arguments: the same time always gives the same pose, which is what lets the Studio's scrubbar seek to any
+ * timestamp — and what an animation must never do is accumulate a frame delta instead (`pos += vel * dt` drifts).
  */
 export function quantizeStageTime(tSec: number, stage: number): number {
   const rate = stageAnimRateHz(stage);
-  if (rate <= 0) return tSec;
+  if (!(rate > 0)) return tSec;
   return Math.floor(tSec * rate) / rate;
 }
 

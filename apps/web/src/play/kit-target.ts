@@ -12,8 +12,11 @@
  *     segment every later mesh is tested against.
  * Only the meshes that survive both go to `THREE.Raycaster` for triangles, and the winning hit's face index names its part.
  *
- * The boxes are cached per build and rebuilt only when the build's pose (its world matrix) or its visible mesh set (its detail rank)
- * changes, so a standing plot costs one matrix compare per kit per aim. The counters are there for the perf test and for the Bench:
+ * The boxes are cached per build and rebuilt only when something about the build actually moved — its own pose (its world matrix), its
+ * visible mesh set (its detail rank), or a mesh's world matrix (a part driven by a `KitMotionSpec`: a ram's stroke, an iris blade).
+ * A standing plot costs one matrix compare per kit per aim, and a moving kit costs one matrix compare per mesh plus a re-box of the
+ * one or two meshes that moved. Geometry bounding boxes are read, never triangles, so a moving machine is never re-triangulated on the
+ * aim path (guardrail 3): the dirtying is lazy, at the moment the ray asks, and only for what changed. The counters are there for the perf test and for the Bench:
  * a beam swept across forty machines should reject nearly all of them at stage 1.
  */
 import * as THREE from 'three';
@@ -52,6 +55,10 @@ export interface TargetCounters {
   meshesCulled: number;
   /** Meshes that went to the triangle test. */
   triangleTests: number;
+  /** Builds whose boxes had to be re-measured (a rebuild, or one of its parts moved under a motion spec). */
+  buildsRemeasured: number;
+  /** Meshes re-boxed because their own world matrix changed (a driven part); everything else reused its box. */
+  meshesRemeasured: number;
   /** Aims that ended on a part. */
   hits: number;
 }
@@ -62,6 +69,8 @@ const emptyCounters = (): TargetCounters => ({
   meshes: 0,
   meshesCulled: 0,
   triangleTests: 0,
+  buildsRemeasured: 0,
+  meshesRemeasured: 0,
   hits: 0,
 });
 
@@ -117,19 +126,26 @@ const boxToAabb = (box: THREE.Box3): Aabb => ({
   max: [box.max.x, box.max.y, box.max.z],
 });
 
+/** A box reused while a build's union is re-taken from its mesh slots (no allocation per aim). */
+const TMP_BOX = new THREE.Box3();
+
 const EXPAND = 1e-4; // a ray along a face must still count as a hit: a hair of padding costs nothing and saves a missed part
 const expand = (box: THREE.Box3, by = EXPAND): THREE.Box3 => box.expandByScalar(by);
 
 interface MeshSlot {
   readonly mesh: THREE.Mesh;
-  readonly box: Aabb;
+  /** The mesh's world pose (16 floats) when `box` was measured: a driven part moves, everything else keeps its box. */
+  pose: Float32Array;
+  /** The mesh's world AABB, expanded a hair: mutable, because a part under a motion spec moves between aims. */
+  box: Aabb;
   readonly visible: boolean;
 }
 
 interface CachedBuild {
   readonly pose: Float32Array;
   readonly mask: number;
-  readonly bounds: Aabb;
+  /** The union of the visible meshes' boxes: mutable, so a moved part grows or shrinks the build's own box. */
+  bounds: Aabb;
   readonly slots: readonly MeshSlot[];
 }
 
@@ -219,29 +235,59 @@ export class KitTargeter {
 
   private readonly scratchVec = new THREE.Vector3();
 
-  /** The cached boxes of one build, rebuilt when its pose or its visible mesh set changed (a rank change, a rebuilt machine). */
+  /**
+   * The cached boxes of one build. The build's own pose and its visible mask are compared first (a rebuilt machine, a rank
+   * change); then each mesh's own world matrix, so a part a `KitMotionSpec` drove is re-boxed and nothing else is. The build's
+   * union box is re-taken from the (mostly reused) mesh boxes, so a machine that moves one ram never re-measures the frame.
+   */
   private entry(build: KitBuild): CachedBuild {
     build.group.updateWorldMatrix(true, true);
     const children = build.group.children.filter((c): c is THREE.Mesh => (c as THREE.Mesh).isMesh);
-    const mask = visibleMask(children);
+    const mask = hashMask(visibleMask(children));
     // a pose the caller moves is a new pose: compare the sixteen floats rather than trusting a flag
     const pose = new Float32Array(build.group.matrixWorld.elements);
     const hit = this.cache.get(build);
-    if (hit && hit.mask === hashMask(mask) && samePose(hit.pose, pose)) return hit;
+    if (hit && hit.mask === mask && samePose(hit.pose, pose) && hit.slots.length === children.length) {
+      // the build is where it was: a pre-pass of sixteen-float compares says whether any part moved under it at all; a
+      // standing machine costs that and nothing else
+      let moved = false;
+      for (const slot of hit.slots) if (!samePose(slot.pose, slot.mesh.matrixWorld.elements)) { moved = true; break; }
+      if (!moved) return hit;
+      // a driven part moved: re-box exactly those meshes, then re-take the build's union from the mesh boxes it keeps
+      const union = this.box.makeEmpty();
+      for (const slot of hit.slots) {
+        if (!samePose(slot.pose, slot.mesh.matrixWorld.elements)) {
+          slot.pose = new Float32Array(slot.mesh.matrixWorld.elements);
+          const world = meshWorldBox(slot.mesh, this.scratch);
+          if (!world.isEmpty()) slot.box = boxToAabb(expand(world));
+          this.stats.meshesRemeasured += 1;
+        }
+        if (!slot.visible) continue;
+        const b = slot.box;
+        TMP_BOX.min.set(b.min[0], b.min[1], b.min[2]);
+        TMP_BOX.max.set(b.max[0], b.max[1], b.max[2]);
+        union.union(TMP_BOX);
+      }
+      if (!union.isEmpty()) hit.bounds = boxToAabb(expand(union));
+      this.stats.buildsRemeasured += 1;
+      return hit;
+    }
     const slots: MeshSlot[] = [];
     const union = this.box.makeEmpty();
     for (const mesh of children) {
       const world = meshWorldBox(mesh, this.scratch);
       if (world.isEmpty()) continue;
-      slots.push({ mesh, box: boxToAabb(expand(world)), visible: mesh.visible });
+      slots.push({ mesh, pose: new Float32Array(mesh.matrixWorld.elements), box: boxToAabb(expand(world)), visible: mesh.visible });
       if (mesh.visible) union.union(world);
     }
     const next: CachedBuild = {
       pose,
-      mask: hashMask(mask),
+      mask,
       bounds: union.isEmpty() ? { min: [0, 0, 0], max: [0, 0, 0] } : boxToAabb(expand(union)),
       slots,
     };
+    this.stats.buildsRemeasured += 1;
+    this.stats.meshesRemeasured += slots.length;
     this.cache.set(build, next);
     return next;
   }

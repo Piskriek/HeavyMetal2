@@ -12,8 +12,12 @@
  *  - `feed` / `chute` / `hopper`: `[0, 4.26, 0]`
  *  - `power`: `[0, 0.2, 0.8]`
  *  - `ramLeft`: `[-0.55, 2.1, 0]`, `ramRight`: `[0.55, 2.1, 0]`
+ *
+ * The two ram sockets carry the stroke itself (`motion`, plan 43): whatever a builder bolts on them — the generated press
+ * ram, a part cartridge's replacement — strikes the `ram-heavy` beat, and the frame has no sine wave of its own.
  */
 import type { Kit } from '@hm/kitspec';
+import { HEAVY_PRESS_RAM_STROKE, HEAVY_PRESS_RAM_STROKE_B } from './kit-motion-specs';
 
 export const PRESS_CORE_BOUNDS = {
   min: [-1.45, 0, -1.25],
@@ -196,8 +200,8 @@ export const PRESS_FRAME_KIT: Kit = {
         chute: { at: [0, 4.26, 0] },
         hopper: { at: [0, 4.26, 0] },
         power: { at: [0, 0.2, 0.8] },
-        ramLeft: { at: [-0.55, 2.1, 0] },
-        ramRight: { at: [0.55, 2.1, 0] },
+        ramLeft: { at: [-0.55, 2.1, 0], motion: HEAVY_PRESS_RAM_STROKE },
+        ramRight: { at: [0.55, 2.1, 0], motion: HEAVY_PRESS_RAM_STROKE_B },
       },
     },
   },

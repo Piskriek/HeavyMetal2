@@ -52,13 +52,16 @@ describe('Plan 43: Modular Locomotion, Jump & Stage-Fidelity Motion Presets', ()
     assert.equal(stageAnimRateHz(1), 12);
     assert.equal(stageAnimRateHz(2), 18);
     assert.equal(stageAnimRateHz(3), 30);
-    assert.equal(stageAnimRateHz(4), 0);
-    assert.equal(stageAnimRateHz(6), 0);
+    // S4..S6 sample at the frame cadence: 60 Hz is continuous for a screen that draws 60+ frames a second
+    assert.equal(stageAnimRateHz(4), 60);
+    assert.equal(stageAnimRateHz(6), 60);
 
     const q0 = quantizeStageTime(0.11, 0);
     assert.equal(q0, 0);
-    const q6 = quantizeStageTime(0.11, 6);
-    assert.equal(q6, 0.11);
+    // stage 6 holds a pose for one frame (1/60 s), so 0.11 s snaps to 6/60
+    assert.equal(quantizeStageTime(0.11, 6), 0.1);
+    assert.ok(Math.abs(quantizeStageTime(0.11, 6) - 0.11) <= 1 / 60, 'within one frame of the true time');
+    assert.equal(quantizeStageTime(0.11, 3), 0.1, '30 Hz holds a pose for a 1/30 s');
 
     const ramMotion = evaluateKitMotion(
       { kind: 'reciprocate', axis: 'y', rateHz: 0.5, amplitude: 0.35 },

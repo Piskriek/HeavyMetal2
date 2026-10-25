@@ -14,6 +14,12 @@ import { plumeShare } from './brownout-visual';
 import { PRINT_EDGE_HEX } from '@hm/tooljuice';
 import { heavyKitProp } from './plot-kits';
 import type { Overrides } from '@hm/kitspec';
+import { evaluateKitMotion } from '@hm/kinematic';
+import { driveMotion, drivenAll } from './machine-motion';
+import {
+  DRILL_BIT_SPIN, HEAVY_PRESS_RAM_STROKE, HOUSING_LED_BLINK, PRESS_CORE_RAM_STROKE, PRESS_RAM_STROKE, PRESS_RAM_STROKE_B,
+  PROJECTOR_HEAD_TILT, RAM_CADENCE_RAD,
+} from './kit-motion-specs';
 
 export type MachineLedStatus = 'running' | 'warn' | 'unpowered';
 
@@ -52,7 +58,8 @@ export function housingLedState(
     return { status: 'unpowered', colour: HOUSING_LED_COLOURS.unpowered, intensity: 0.85 };
   }
   if (running <= 0.05 || satisfaction < 0.99) {
-    const blinkOn = Math.sin(timeSec * Math.PI * 4) >= -0.1;
+    // the blink is the same declarative spec the scene poses parts with, sampled at the stage's rate: 2 Hz, mostly on
+    const blinkOn = evaluateKitMotion(HOUSING_LED_BLINK, timeSec, 1).rotOffset[1] >= -0.1;
     return {
       status: 'warn',
       colour: HOUSING_LED_COLOURS.warn,
@@ -79,8 +86,9 @@ export interface MachineProp {
   readonly statusLed?: THREE.Mesh;
   /** Housing LED anchor in the prop's frame (POL-39). */
   readonly ledAnchor?: THREE.Vector3;
-  /** Moves what moves while it runs (0..1 how hard it runs), t in seconds. */
-  animate(t: number, running: number): void;
+  /** Moves what moves while it runs (0..1 how hard it runs), t in seconds, on the Fidelity Stage's animation rate (plan 43:
+   *  the same declarative spec at every stage; the pose is quantised to the stage, so S0 steps at 8 Hz and S6 runs smooth). */
+  animate(t: number, running: number, stage?: number): void;
   /** Lights its lamps, 0..1. */
   light(glow: number): void;
   /** Updates the square housing status LED from live telemetry (POL-39). */
@@ -140,10 +148,11 @@ export function plumeCadenceMultiplier(cadence: PlumeCadence, t: number): number
   switch (cadence) {
     case 'continuous':
       return 1.0;
+    // ram-fast and ram-heavy are the rams' own strokes (kit-motion-specs): the pour pulses when the ram strikes
     case 'ram-fast':
-      return Math.max(0.15, Math.sin(t * 3.1));
+      return Math.max(0.15, Math.sin(t * RAM_CADENCE_RAD.fast));
     case 'ram-heavy':
-      return Math.max(0.15, Math.sin(t * 2.0));
+      return Math.max(0.15, Math.sin(t * RAM_CADENCE_RAD.heavy));
     case 'shimmer':
       return 0.85 + 0.15 * Math.sin(t * 6.0);
     case 'chatter':
@@ -420,8 +429,8 @@ function fitToTable(p: MachineProp, kind: MachineKind): MachineProp {
     lamps: [...p.lamps, statusLed],
     statusLed,
     ledAnchor,
-    animate(t, running) {
-      baseAnimate(t, running);
+    animate(t, running, stage) {
+      baseAnimate(t, running, stage);
       if (kind !== 'pylon') {
         setStatusLed(running, lastConnected, lastSatisfaction, t);
       }
@@ -562,10 +571,7 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
           feed,
           top: null,
           lamps: [],
-          animate: (t, run) => {
-            ram1.position.y = restY - Math.max(0, Math.sin(t * 3.1)) * 0.35 * run;
-            ram2.position.y = restY - Math.max(0, Math.sin(t * 3.1 + Math.PI)) * 0.35 * run;
-          },
+          animate: driveMotion(drivenAll([[ram1, PRESS_RAM_STROKE], [ram2, PRESS_RAM_STROKE_B]])),
           light: still,
         };
       }
@@ -576,7 +582,6 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
         const rawVent = at(p.sockets, 'vent') ?? new THREE.Vector3(0, 3.2, -0.56);
         const rawFeed = at(p.sockets, 'chute', 'hopper', 'feed') ?? new THREE.Vector3(0, 4.26, 0);
         const ram = p.parts?.ram;
-        const restY = ram?.position.y ?? 0;
         return {
           group: p.group,
           power: rawPower.clone().add(lift),
@@ -584,17 +589,15 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
           feed: rawFeed.clone().add(lift),
           top: null,
           lamps: p.lamps,
-          animate: (t, run) => {
-            if (ram) ram.position.y = restY - Math.max(0, Math.sin(t * 2.0)) * 0.6 * run;
-          },
+          animate: driveMotion(drivenAll([[ram, HEAVY_PRESS_RAM_STROKE]])),
           light: (g) => p.lamps.forEach((l) => heavygear.setLamp(l, g)),
         };
       }
       const p = field.shapePress(m, { stage: st });
-      const rest = p.rams.map((r) => r.position.y);
       return {
         group: p.group, power: at(p.sockets, 'power')!, vent: at(p.sockets, 'vent'), feed: at(p.sockets, 'feed'), top: null, lamps: p.lamps,
-        animate: (t, run) => p.rams.forEach((r, i) => { r.position.y = rest[i]! - Math.max(0, Math.sin(t * 3.1 + i * Math.PI)) * 0.18 * run; }),
+        // a generated core's rams tap rather than strike (kit-motion-specs), alternating as the twins do
+        animate: driveMotion(drivenAll(p.rams.map((r, i) => [r, i % 2 ? PRESS_RAM_STROKE_B : PRESS_CORE_RAM_STROKE] as const))),
         light: (g) => p.lamps.forEach((l) => field.setLamp(l, g)),
       };
     }
@@ -621,9 +624,7 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
           feed: null,
           top: null,
           lamps: [],
-          animate: (t, run) => {
-            head.rotation.x = Math.sin(t * 0.35) * 0.08 * run;
-          },
+          animate: driveMotion(drivenAll([[head, PROJECTOR_HEAD_TILT]])),
           light: still,
         };
       }
@@ -633,7 +634,6 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
         const rawPower = at(p.sockets, 'power') ?? new THREE.Vector3(0, 0, 0.6);
         const rawVent = at(p.sockets, 'vent') ?? new THREE.Vector3(0, 4.1, -0.66);
         const head = p.parts?.head;
-        const restRotX = head?.rotation.x ?? 0;
         return {
           group: p.group,
           power: rawPower.clone().add(lift),
@@ -641,15 +641,12 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
           feed: null,
           top: null,
           lamps: p.lamps,
-          animate: (t, run) => {
-            if (head) head.rotation.x = restRotX + Math.sin(t * 0.35) * 0.08 * run;
-          },
+          animate: driveMotion(drivenAll([[head, PROJECTOR_HEAD_TILT]])),
           light: (g) => p.lamps.forEach((l) => heavygear.setLamp(l, g)),
         };
       }
       const p = field.lightProjector(m, { stage: st });
-      const tilt = p.head.rotation.x;
-      return { group: p.group, power: at(p.sockets, 'power')!, vent: at(p.sockets, 'vent'), feed: null, top: null, lamps: p.lamps, animate: (t, run) => { p.head.rotation.x = tilt + Math.sin(t * 0.35) * 0.08 * run; }, light: (g) => p.lamps.forEach((l) => field.setLamp(l, g)) };
+      return { group: p.group, power: at(p.sockets, 'power')!, vent: at(p.sockets, 'vent'), feed: null, top: null, lamps: p.lamps, animate: driveMotion(drivenAll([[p.head, PROJECTOR_HEAD_TILT]])), light: (g) => p.lamps.forEach((l) => field.setLamp(l, g)) };
     }
     case 'heavy-water':
     case 'water': {
@@ -705,7 +702,7 @@ function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number,
       // the drill takes no ore in (its ore leaves at the tray, sheet 12): no feed hopper; its dim wisp comes from the rear stack
       const p = field.rockDrill(m, { stage: st });
       const vent = at(p.sockets, 'vent', 'exhaust') ?? findMachineVent(p.group, 0, 0, -0.25);
-      return { group: p.group, power: at(p.sockets, 'power')!, vent, feed: null, top: null, lamps: p.lamps, animate: (t, run) => { p.bit.rotation.y = t * 9 * run; }, light: (g) => p.lamps.forEach((l) => field.setLamp(l, g)) };
+      return { group: p.group, power: at(p.sockets, 'power')!, vent, feed: null, top: null, lamps: p.lamps, animate: driveMotion(drivenAll([[p.bit, DRILL_BIT_SPIN]])), light: (g) => p.lamps.forEach((l) => field.setLamp(l, g)) };
     }
     case 'power': {
       // the power unit takes no ore in (ARGO_NOTE_16 ruling 3): no feed hopper, and its violet steam comes off the steam socket

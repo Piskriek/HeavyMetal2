@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import type { Kit } from '@hm/kitspec';
 import { buildKitPreset, type KitBuild } from './kit-build';
 import { KitTargeter, aimKit, meshWorldBox, rayBoxEntry, type Aabb, type KitTargetable } from './kit-target';
+import { driven, poseDriven } from './machine-motion';
 
 const steel = new THREE.MeshBasicMaterial();
 
@@ -182,4 +183,51 @@ test('the shared targeter is one instance, and resetting it does not forget the 
   assert.ok(a);
   const sharedAgain = aimKit(targetables, new THREE.Vector3(0, 0.5, 5), new THREE.Vector3(0, 0, -1), 20);
   assert.deepEqual(sharedAgain, a);
+});
+
+test('a part a motion spec drives is re-boxed lazily: the aim finds it where it now is, and a standing build is never re-measured', () => {
+  // a rig whose ram sits away from its base, so a ray at the ram's height can only hit the ram
+  const rig: Kit = {
+    parts: {
+      base: {
+        source: { kind: 'box', size: [1, 0.2, 1] }, material: 'steel', rank: 0,
+        sockets: { side: { at: [3, 0.2, 0] } },
+      },
+      ram: { source: { kind: 'box', size: [0.2, 0.6, 0.2] }, material: 'trim', rank: 1 },
+    },
+    assemblies: { rig: { children: [{ ref: 'base', key: 'base' }, { ref: 'ram', key: 'ram', on: { child: 0, socket: 'side' } }] } },
+  };
+  const b = buildKitPreset(rig, 'rig', { materials: { steel, trim: steel }, gen: () => null, maxRank: 2 })!;
+  assert.ok(b, 'the rig builds');
+  const targetables: KitTargetable[] = [{ kit: 'rig', build: b }];
+  const aim = (t: KitTargeter, x: number, y: number) => t.aim(targetables, new THREE.Vector3(x, y, 5), new THREE.Vector3(0, 0, -1), 20);
+
+  const ramMesh = b.group.children.find((c) => (c as THREE.Mesh).isMesh && c.visible) as THREE.Mesh;
+  assert.ok(ramMesh, 'the build has a mesh to drive');
+
+  const targeter = new KitTargeter();
+  // at rest the ram stands at y 0.2..0.8 under x = 3, and the base is nowhere near that column
+  assert.equal(aim(targeter, 3, 0.5)?.path, 'ram');
+  // a second aim with nothing moved re-measures nothing: the boxes are the cached ones
+  targeter.reset();
+  assert.equal(aim(targeter, 3, 0.5)?.path, 'ram');
+  assert.equal(targeter.counters().buildsRemeasured, 0, 'a standing build costs no box work');
+  assert.equal(targeter.counters().meshesRemeasured, 0);
+
+  // drive every mesh of the build a gantry-slide 2 m up at a quarter hertz (as a KitMotionSpec would), and pose it at t = 1 s,
+  // where the sine is at its top: the ram is now at y 2.2..2.8
+  const spec = { kind: 'gantry-slide', axis: 'y', rateHz: 0.25, amplitude: 2 } as const;
+  const parts = b.group.children.filter((c) => (c as THREE.Mesh).isMesh).map((m) => driven(m, spec));
+  poseDriven(parts, 1, 1, 6);
+  targeter.reset();
+  assert.equal(aim(targeter, 3, 0.5), null, 'the old box of the moved ram must not still catch the ray');
+  assert.equal(aim(targeter, 3, 2.5)?.path, 'ram', 'the aim finds the ram where the motion put it');
+  assert.ok(targeter.counters().buildsRemeasured > 0, 'the moved build was re-measured');
+  assert.ok(targeter.counters().meshesRemeasured > 0 && targeter.counters().meshesRemeasured <= 4, 'only what moved was re-boxed');
+  // the geometry's own bounding box is read, never rebuilt: a driven part never re-triangulates on the aim path
+  assert.ok(ramMesh.geometry.boundingBox, 'the geometry box was computed once and reused');
+
+  // and back at rest the ray finds the ram again: the boxes follow the motion both ways
+  poseDriven(parts, 0, 1, 6);
+  assert.equal(aim(targeter, 3, 0.5)?.path, 'ram');
 });

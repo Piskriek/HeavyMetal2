@@ -584,19 +584,22 @@ Authored `docs/argo/plans/42-modular-stargate-earth-endgame.md`, synchronized `.
 
 **Completion Note (2026-10-25 14:48):** @hm/creature core package, 5-group genome builder, 3-tier IK LOD, and ASTRO_SUIT_CREATURE_KIT (astro-low.glb purged)
 
-## JOB-25 [OPEN] Plan 44 Part B: 37 Procedural Monster Roster Rebuild in apps/web/src/monsters/roster.ts
+## JOB-25 [DONE] Plan 44 Part B: 37 Procedural Monster Roster Rebuild in apps/web/src/monsters/roster.ts
 - **Role:** BUILDER
 - **Skills:** `visual-verify`
 - **Priority:** P1
 - **Milestone:** M6
 - **Paths:** `packages/creature, apps/web/src/monsters/roster.ts, apps/web/src/monsters/`
 - **Verify:** `npm.cmd run typecheck && node scripts/kit-compare-sheet.mjs`
-- **Updated:** 2026-10-25
+- **Commit:** `2beec047`
+- **Updated:** 2026-10-25 15:49
 
 1. Rebuild all 37 roster monsters across the 7 archetypes (`biped`, `theropod`, `quadruped`, `hexapod`, `arachnid`, `serpentine`, `avian-drone`) using declarative `CreatureGenomeSpec` presets.
 2. Purge all 37 static external GLB/sprite assets (~4.8 MiB) from `apps/web/src/monsters/`, locking in a net ~5.5 MiB single-file bundle reduction.
 3. Every creature must pass `studio.kit.audit(spec)` with 0 loose ends and 0 collision penetrations across 8 motion phases ($t \in [0, 1]$).
 4. Bind `@hm/skin` OKLab palettes and `@hm/soundlab` physical vocal tract formants (`vocal-tract.ts`) to each monster species.
+
+**Completion Note (2026-10-25 15:49):** Procedural monster roster rebuild: 38 species ported to @hm/creature, 5.55 MB static assets purged, 39/39 audit tests pass
 
 ## JOB-26 [OPEN] Plan 45: MultiverseGamePresetSpec, main.ts URL Query Gateway & Steganographic PNG Spore Cards
 - **Role:** ARCHITECT

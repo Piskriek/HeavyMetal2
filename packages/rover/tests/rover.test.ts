@@ -10,10 +10,10 @@ test('settles at rest, no jitter', () => {
     assert.ok(Math.abs(s.p[1] - y) < 1e-3 && Math.hypot(...s.v) < 1e-2 && y > 0.2 && y < 2, `${k} ${y}`);
   }
 });
-test('top speed, +steer turns right (toward -x), brakes', () => {
+test('top speed, +steer turns right (toward +x), brakes', () => {
   let s = run(run(spawn('scout', 0, 0, [0, 1], flat), idle, 120), { throttle: 1, steer: 0, brake: false }, 720);
   assert.ok(speed(s) > ROVERS.scout.topSpeed * 0.85 && speed(s) <= ROVERS.scout.topSpeed * 1.05, `${speed(s)}`);
-  const t = run(s, { throttle: 0.6, steer: 1, brake: false }, 60); assert.ok(fwd(t)[0] < fwd(s)[0] - 0.05, 'turned right');
+  const t = run(s, { throttle: 0.6, steer: 1, brake: false }, 60); assert.ok(fwd(t)[0] > fwd(s)[0] + 0.05, 'turned right');
   s = run(s, { throttle: 0, steer: 0, brake: true }, 900); assert.ok(Math.abs(speed(s)) < 0.3);
 });
 test('the crawler turns on the spot; a braked hauler holds a 20 degree slope', () => {
@@ -49,7 +49,7 @@ test('reverse drives backward and left steer turns left', () => {
   const s2 = run(spawn('scout', 0, 0, [0, 1], flat), idle, 60);
   const f0 = fwd(s2)[0];
   const tl = run(s2, { throttle: 0.6, steer: -1, brake: false }, 60);
-  assert.ok(fwd(tl)[0] > f0 + 0.05);
+  assert.ok(fwd(tl)[0] < f0 - 0.05);
 });
 test('never tunnels or explodes on bumps', () => {
   const bumps: Ground = { height: (x, z) => (x * x + z * z < 4 ? 0.6 : 0), g: 1.62 };

@@ -436,8 +436,8 @@ export function step(s: RoverState, input: Input, ground: Ground): RoverState {
     void R21;
     void R10;
     void R20;
-    const Rhx = -Fhz;
-    const Rhz = Fhx;
+    const Rhx = Fhz;
+    const Rhz = -Fhx;
     const WhxS = Fhx * cd + Rhx * sd;
     const WhzS = Fhz * cd + Rhz * sd;
     const WsxS = Rhx * cd - Fhx * sd;

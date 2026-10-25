@@ -35,8 +35,9 @@ import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest
 import { disposeProp, FABRICATOR_PLUME, FABRICATOR_VENT, FEED_CUBES_FULL, feedCubeCount, feedCubeProgress, lineSpan, machinePlumeCount, machinePlumeCountOf, machinePlumeGravity, machinePlumeLook, machinePlumeLookOf, machinePlumeSpec, machinePlumeSteady, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
 import { RAM_CADENCE_RAD } from './kit-motion-specs';
 import { activeLocomotion, locomotionChoice, locomotionSpeed, setLocomotionChoice } from './locomotion';
-import { plotStargate, plotVehicleKit, setPlotEnvironment, clearPlotEnvironment } from './plot-kits';
+import { plotStargate, plotVehicleKit, plotVehicleWheel, setPlotEnvironment, clearPlotEnvironment } from './plot-kits';
 import { STARGATE_APERTURE_R, STARGATE_RING_CENTRE_Y } from './kit-stargate';
+import { vehicleKitSpec, SCOUT_WHEEL, HAULER_WHEEL } from './kit-vehicles';
 import type { GateAccessMode } from '@hm/coopnet/gate-dialer';
 import { warmLayeredMaterials, releaseLayeredEnv } from './layered-material';
 import { beatPulse, evaluateBeatSyncedPlumeModulation } from '@hm/tooljuice';
@@ -97,11 +98,9 @@ import { spawn as spawnRover, step as stepRover, speed as roverSpeed, ROVERS, DT
 import {
   createMaterials as createRovergearMaterials,
   setLamp as setRoverLamp,
-  type Rover as RoverGearMesh,
   type Station as FabricatorStationMesh,
 } from '@hm/rovergear';
 import {
-  createGenRover,
   createGenFabricator,
   genLevelForStage,
 } from '../assets/gen-props';
@@ -683,6 +682,8 @@ export function createPlayScene(o: {
   let lookForFn: ((stage: Stage) => StageLook) | null = null;
   let twin = kit.gate(m, { twin: true, stage: 1 });
   let twinStage = 1;
+  let gateOn = false;
+  let powerT = -1;
   // JOB-08b: the event horizon. Its uniforms are evaluated from (clock, gate state, the last gate event) every frame and
   // written, never accumulated, so a scrub or a replay lands on exactly the frame the play-through showed.
   const horizonMat = keep(createEventHorizonMaterial({ innerRadius: 1, rimWidth: 0.12 }));
@@ -781,7 +782,11 @@ export function createPlayScene(o: {
   let planetSolids: { readonly m: readonly number[]; readonly boxes: readonly Box[] }[] = [];
   const rebuildPlanetStatic = (): void => {
     twin.group.updateMatrixWorld(true);
-    const solids: { m: number[]; boxes: readonly Box[] }[] = [{ m: [...twin.group.matrixWorld.elements], boxes: twin.colliders }];
+    const boxes = [...twin.colliders];
+    if (!gateOn || gateAccess !== 'open') {
+      boxes.push({ min: [-0.95, 0.4, -0.25], max: [0.95, 3.2, 0.25] });
+    }
+    const solids: { m: number[]; boxes: readonly Box[] }[] = [{ m: [...twin.group.matrixWorld.elements], boxes }];
     for (const v of views.values()) solids.push({ m: [...v.prop.group.matrixWorld.elements], boxes: [machineFootprint(v.m.kind)] });
     planetSolids = solids;
   };
@@ -841,7 +846,14 @@ export function createPlayScene(o: {
     id: number;
     kind: RoverKind;
     group: THREE.Group;
-    mesh: RoverGearMesh;
+    mesh: {
+      body: THREE.Group;
+      wheel: THREE.Group | null;
+      wheelRadius: number;
+      hubs: readonly (readonly [number, number, number])[];
+      lamps: THREE.Mesh[];
+      parts: Record<string, THREE.Object3D>;
+    };
     wheelPivots: THREE.Group[];
     wheelMeshes: THREE.Group[];
     lamps: THREE.Mesh[];
@@ -849,11 +861,6 @@ export function createPlayScene(o: {
     z: number;
     yaw: number;
     wheelAngle: number;
-    /**
-     * The vehicle's kit, hung at the same pose as the drawn rover (JOB-08v): the procedural mesh keeps the wheel and
-     * steering animation a merged kit cannot, and this build is what a Beam Rifle cartridge names (`base/wheel-3`,
-     * `mechanism/boom-arm`, the whole hull), because a part id needs a kit behind it.
-     */
     target: VehicleTargetable | null;
   }
 
@@ -880,58 +887,80 @@ export function createPlayScene(o: {
   let vehicleAcc = 0;
   let currentSpeed = 0;
 
-  /** The vehicle's kit build at a pose, as the beam's target. Null while the frames are off or a part will not build. */
-  function vehicleTargetFor(kind: RoverKind, x: number, y: number, z: number, yaw: number): VehicleTargetable | null {
-    const build = plotVehicleKit(kind, genLevelForStage(shown, currentQuality), Math.max(2, shown));
-    if (!build) return null;
-    const target = vehicleTargetable(kind, build);
-    target.setPose(x, y, z, yaw);
-    return target;
-  }
-
   function buildVehicleView(v: { id: number; kind: RoverKind; x: number; z: number; yaw: number }): VehicleView {
     const activeLevel = genLevelForStage(shown, currentQuality);
-    const mesh = createGenRover(v.kind, activeLevel, Math.max(2, shown), roverMaterials);
+    const spec = vehicleKitSpec(v.kind);
+    const wheelRadius = v.kind === 'scout' ? SCOUT_WHEEL.radius : v.kind === 'hauler' ? HAULER_WHEEL.radius : 0.4;
+
+    // Build the modular kit chassis and parts (with wheels separated for dynamic roll/steering)
+    const kitBuild = plotVehicleKit(v.kind, activeLevel, Math.max(2, shown), {
+      skip: (path) => path.includes('wheel'),
+    });
 
     const group = new THREE.Group();
     group.name = `vehicle-${v.id}-${v.kind}`;
-    group.add(mesh.body);
+
+    const body = kitBuild ? kitBuild.group : new THREE.Group();
+    body.position.set(0, -wheelRadius, 0);
+    group.add(body);
 
     const wheelPivots: THREE.Group[] = [];
     const wheelMeshes: THREE.Group[] = [];
-    if (mesh.wheel && mesh.hubs.length > 0) {
-      for (const hub of mesh.hubs) {
+    const wheelProto = plotVehicleWheel(v.kind, activeLevel, Math.max(2, shown));
+
+    if (wheelProto && spec.hubs.length > 0) {
+      for (const hub of spec.hubs) {
         const pivot = new THREE.Group();
-        pivot.position.set(hub[0], hub[1], hub[2]);
-        const wheelClone = mesh.wheel.clone();
+        pivot.position.set(hub[0], 0, hub[2]);
+        const wheelClone = wheelProto.clone();
         if (hub[0] < 0) {
           wheelClone.rotation.y = Math.PI;
         }
         pivot.add(wheelClone);
-        mesh.body.add(pivot);
+        group.add(pivot);
         wheelPivots.push(pivot);
         wheelMeshes.push(wheelClone);
       }
     }
 
-    const y = groundAt(v.x, v.z) + mesh.wheelRadius;
+    const y = groundAt(v.x, v.z) + wheelRadius;
     group.position.set(v.x, y, v.z);
     group.rotation.set(0, v.yaw, 0);
     vehiclesGroup.add(group);
+
+    const lamps: THREE.Mesh[] = [];
+    if (kitBuild) {
+      kitBuild.group.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
+        if (mesh.isMesh && (mesh.name.startsWith('kit:lx:') || mesh.name.startsWith('kit:lamp'))) lamps.push(mesh);
+      });
+    }
+
+    const target = kitBuild ? vehicleTargetable(v.kind, kitBuild) : null;
+    if (target) {
+      target.setPose(v.x, y, v.z, v.yaw);
+    }
 
     return {
       id: v.id,
       kind: v.kind,
       group,
-      mesh,
+      mesh: {
+        body,
+        wheel: wheelProto,
+        wheelRadius,
+        hubs: spec.hubs,
+        lamps,
+        parts: {},
+      },
       wheelPivots,
       wheelMeshes,
-      lamps: mesh.lamps,
+      lamps,
       x: v.x,
       z: v.z,
       yaw: v.yaw,
       wheelAngle: 0,
-      target: vehicleTargetFor(v.kind, v.x, y, v.z, v.yaw),
+      target,
     };
   }
 
@@ -1884,7 +1913,8 @@ export function createPlayScene(o: {
   let inDomeNow = false, inDomeLast: boolean | null = null, warnOn = false;
   /** Metres walked since the last footstep, and how many relay lamps the sequence has lit (one click each). */
   let stride = 0, relaysHeard = 0;
-  let powerT = -1, gateOn = false;
+  powerT = -1;
+  gateOn = false;
   /** GATE-03: the doorway is the dim static while the gate is off and the mark once it is on (called when gateOn changes). */
   const syncOpeningMaterial = (): void => {
     const want = gateOn ? horizonMat : openingOffMat;
@@ -2344,6 +2374,7 @@ export function createPlayScene(o: {
     console.warn('Failed to load scientist in Play:', err);
   });
 
+  const LAB_GATE_CLOSED_BOX: Box = { min: [-0.85, 0.4, -1.25], max: [0.85, 3.4, -0.75] };
   /** Pushes the walker's circle of RADIUS out of the lab's boxes (TICKET-01 B: the swept resolver, from where the walker stood). */
   const collide = (p: THREE.Vector3, from: { readonly x: number; readonly z: number }): void => {
     const safeFrom = {
@@ -2352,7 +2383,8 @@ export function createPlayScene(o: {
     };
     p.x = Math.max(ROOM.left + RADIUS, Math.min(ROOM.right - RADIUS, p.x));
     p.z = Math.max(ROOM.back + RADIUS, Math.min(ROOM.front - RADIUS, p.z));
-    const solid = pushCircle(safeFrom, p, room.floorHeight(safeFrom.x, safeFrom.z), RADIUS, room.colliders);
+    const colliders = gateOn ? room.colliders : [...room.colliders, LAB_GATE_CLOSED_BOX];
+    const solid = pushCircle(safeFrom, p, room.floorHeight(safeFrom.x, safeFrom.z), RADIUS, colliders);
     p.x = Math.max(ROOM.left + RADIUS, Math.min(ROOM.right - RADIUS, solid.x));
     p.z = Math.max(ROOM.back + RADIUS, Math.min(ROOM.front - RADIUS, solid.z));
   };
@@ -2759,6 +2791,7 @@ export function createPlayScene(o: {
     },
     restore(s) {
       gateOn = s.gateOn;
+      rebuildPlanetStatic();
       syncOpeningMaterial();
       room.setPower(gateOn ? POWER_ON : POWER_OFF);
       if (gateOn) {
@@ -2985,6 +3018,7 @@ export function createPlayScene(o: {
       // the iris moving is a gate event: the kawoosh's burst restarts from this frame (a pure timestamp, not a phase)
       lastGateEventT = clock;
       buildStargate();
+      rebuildPlanetStatic();
     },
     setSpeciesSlots(slots) {
       return biomeView ? biomeView.setSpeciesSlots(slots) : 0;
@@ -3327,6 +3361,7 @@ export function createPlayScene(o: {
         if (powerT >= POWER_SECONDS) {
           powerT = -1;
           gateOn = true;
+          rebuildPlanetStatic();
           lastGateEventT = clock;
           syncOpeningMaterial();
           pendingEvent = 'powered';
@@ -3399,7 +3434,7 @@ export function createPlayScene(o: {
           const wheelRadius = vView.mesh.wheelRadius;
           vView.wheelAngle += (currentSpeed * dt) / wheelRadius;
           const maxSteer = ROVERS[vView.kind].maxSteer;
-          const steerAngle = -steer * maxSteer;
+          const steerAngle = steer * maxSteer;
 
           const wheelWorldPos = new THREE.Vector3();
           for (let i = 0; i < vView.wheelPivots.length; i++) {

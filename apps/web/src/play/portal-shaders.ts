@@ -116,8 +116,8 @@ export const POST_FRAGMENT = /* glsl */ `
     vec3 rgb = texture2D(uColour, uv).rgb;
     float tone = ramp(luma(pow(rgb, vec3(1.0 / 2.2))), 0.14, 0.6);
     float facet = clamp(dot(N, normalize(uSunDir)) * 0.65 + 0.28, 0.05, 0.95);
-    float dampedFacet = clamp(facet, tone - 0.12, tone + 0.12);
-    float lum = mix(tone, dampedFacet, 0.22);
+    float dampedFacet = clamp(facet, tone - 0.05, tone + 0.05);
+    float lum = mix(tone, dampedFacet, 0.10);
     // POL-49: 0b contour uses second-order planarBrk so continuous rough slopes never flicker on a 5-degree yaw
     float bit = max(step(thr, lum), max(contour0b, 0.0));
     vec3 dither = bit > 0.5 ? ink : black;

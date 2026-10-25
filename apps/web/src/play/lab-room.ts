@@ -58,9 +58,9 @@ import { floorTextures, panelTextures } from '../lab/lab-scene';
 import * as kit from '@hm/labkit';
 import type { Box, Prop } from '@hm/labkit';
 import { operatorConsole as consoleMillOperatorConsole } from '@hm/consolemill';
-import { type GenLevel, genLevelFor, getGenSync, loadGen } from '../assets/gen';
+import { type GenLevel, genLevelFor, getGenSync } from '../assets/gen';
 import { createLabVista, VISTA_LEVEL, vistaHdModelsMissing, type LabVista, type WindowView } from './lab-vista';
-import { CLUTTER, CLUTTER_MODELS, type ClutterItem } from './lab-clutter';
+import { CLUTTER, type ClutterItem } from './lab-clutter';
 import { createMonitorEqualizer3D, isMonitorOverclockedPlaying, type MonitorEqualizer3D } from '../credits/monitor-jukebox';
 import { createPlanetTableHologram, type PlanetTableHologram3D, type FourFloats } from './planet-table-hologram';
 import { coilLevels, darkStrobe, POWER_OFF, strobeSweepZ, type Power } from './lab-power';
@@ -87,29 +87,9 @@ const WINDOW = { x0: -7.4, x1: 7.4, y0: 0.4, y1: 3.5 } as const;
 export const GATE_AT = { x: 0, z: -1.0 } as const;
 export const PLANET_TABLE_AT = { x: 5.0, z: -5.0 } as const;
 
-/** The labkit props on the west and east walls face the wall in the lab frame; their generated models turn half a turn to face the room. */
-const WEST_WALL_TURN = Math.PI;
 /** The operator console's throw lever: the bottom of its axle block, in the slot of the guide box on the deck (sheet 07, measured). */
 const LEVER_AT: readonly [number, number, number] = [0.336, 0.826, 0.203];
-/**
- * The lever's own tilt at rest, about X (radians): it leans slightly toward the operator, so a throw sweeps it back along the slot.
- * The play scene throws the pivot by LEVER_THROW (1.1 rad); the H-slot in the guide box is only 0.18 m long, so the lever travels
- * LEVER_TRAVEL (0.25 rad, about 0.08 m along the slot) for that throw. Without the scale the grip would leave the slot.
- */
-// POL-121: Rest tilt +0.42 rad and travel 0.95 rad so OFF -> ON sweeps ~54 deg inside its quadrant slot
-const LEVER_REST_TILT = 0.42;
-const LEVER_THROW = 1.1;
 export const LEVER_TRAVEL = 0.95;
-/** The breaker panel's isolator spindle, on the hazard plate's knob, in the panel's frame (sheet 07, measured on the packed model). */
-const ISOLATOR_AT: readonly [number, number, number] = [0.262, 1.12, 0.32];
-/** The handle's hub centre sits 0.072 m to the left of its origin: the handle is turned to stand on the spindle, with the hub centred on it. */
-const ISOLATOR_HUB_X = 0.072;
-/** The three sub-breaker sockets' floors, in the panel's frame (the middle left, sheet 07). Each toggle's collar stands on its floor. */
-const TOGGLE_SOCKETS: readonly (readonly [number, number, number])[] = [
-  [-0.355, 1.443, 0.234],
-  [-0.258, 1.443, 0.234],
-  [-0.161, 1.443, 0.234],
-];
 /** The keypad's pocket floor centre in the console's frame, and the hood's tilt about X (the hood leans back 20 degrees). */
 const KEYPAD_AT: readonly [number, number, number] = [0.405, 1.093, -0.109];
 const HOOD_TILT = -0.356;
@@ -140,30 +120,14 @@ export const WEAPON_BENCH_SET: readonly string[] = [
   'bench-jig', 'bench-printer', 'tool-wall', 'tool-drill', 'tool-wrench', 'tool-mallet', 'tool-scanner', 'tool-screwdriver',
 ];
 
-export const LAB_GEN_ASSETS: readonly string[] = [
-  'gate', 'capacitor-can', 'breaker-panel', 'breaker-handle', 'relay-cabinet', 'control-box', 'operator-console', 'console-lever',
-  'preset-rack', 'preset-bench', 'preset-combiner', 'planet-table', 'her-desk', 'cot', 'wall-radio', 'armory-rail', 'weapon-bench', 'weapon-frame',
-  ...WEAPON_BENCH_SET, ...CLUTTER_MODELS,
-];
+export const LAB_GEN_ASSETS: readonly string[] = [];
 
-/** The dissolve of a cleared salvage prop, seconds. */
-const DISSOLVE_SECONDS = 0.9;
-
-/** Loads the lab's generated models at a level, behind the caller's loading bar. A model that fails stays on its labkit fallback. */
-export async function preloadLabGenerated(level: GenLevel): Promise<void> {
-  await Promise.all(LAB_GEN_ASSETS.map((id) => loadGen(id, level).catch((err) => {
-    console.warn(`Lab piece ${id} stays on its fallback:`, err);
-    return null;
-  })));
+/** All lab assets are 100% procedural (@hm/partgen + @hm/kitspec + Sheet 07 rigs): zero legacy GLBs to preload. */
+export async function preloadLabGenerated(_level: GenLevel): Promise<void> {
+  return Promise.resolve();
 }
 
-/** A small emissive lamp on a generated model's face (the power sequence drives its emissive intensity, as on labkit lamps). */
-function lampOverlay(color: string, x: number, y: number, z: number, size: readonly [number, number, number] = [0.034, 0.034, 0.012]): THREE.Mesh {
-  const mat = new THREE.MeshStandardMaterial({ color: '#17110a', emissive: new THREE.Color(color), emissiveIntensity: 0, roughness: 0.35 });
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], size[2]), mat);
-  mesh.position.set(x, y, z);
-  return mesh;
-}
+
 
 /**
  * Builds a subdivided wall or floor PlaneGeometry whose origin is at `(x0, y0)` and whose UVs are
@@ -206,67 +170,7 @@ interface ClutterEntry {
   t: number;
 }
 
-/**
- * Rests a loaded model on a surface (TASK-23c): turns it to `yaw`, centres it on (x, z), and sets its lowest point on the surface.
- */
-function restOn(obj: THREE.Object3D, x: number, z: number, yaw: number, surfaceAt: (x: number, z: number) => number): void {
-  obj.rotation.set(0, yaw, 0);
-  obj.position.set(0, 0, 0);
-  obj.updateMatrixWorld(true);
-  const b = new THREE.Box3().setFromObject(obj);
-  const c = b.getCenter(new THREE.Vector3());
-  const ox = x - c.x, oz = z - c.z;
-  const surface = Math.max(...[b.min.x, b.max.x].flatMap((px) => [b.min.z, b.max.z].map((pz) => surfaceAt(px + ox, pz + oz))));
-  obj.position.set(ox, surface - b.min.y, oz);
-}
 
-/** Grounds a swapped generated model so its lowest bounding-box point sits at `baseY` (default 0, never floating). */
-function groundModelAt(obj: THREE.Object3D, baseY = 0): void {
-  obj.updateMatrixWorld(true);
-  const b = new THREE.Box3().setFromObject(obj);
-  if (!b.isEmpty() && Number.isFinite(b.min.y)) {
-    obj.position.y += baseY - b.min.y;
-  }
-}
-
-/** Hangs a model on a flat panel (TASK-23c): its back on the panel's front face, with a small gap, centred on (x, y). */
-function hangOn(obj: THREE.Object3D, panelFrontZ: number, x: number, y: number, tiltX = 0): void {
-  obj.rotation.set(tiltX, 0, 0);
-  obj.position.set(0, 0, 0);
-  obj.updateMatrixWorld(true);
-  const b = new THREE.Box3().setFromObject(obj);
-  const c = b.getCenter(new THREE.Vector3());
-  obj.position.set(x - c.x, y - c.y, panelFrontZ + 0.011 - b.min.z);
-}
-
-/** The weapon bench's set (TASK-23c). */
-function dressWeaponBench(bench: THREE.Group, parts: readonly THREE.Group[]): void {
-  const [jig, printer, wall, drill, wrench, mallet, scanner, screwdriver] = parts as unknown as [THREE.Group, THREE.Group, THREE.Group, THREE.Group, THREE.Group, THREE.Group, THREE.Group, THREE.Group];
-  const model = bench.children[0] ?? bench;
-  const topAt = (x: number, z: number): number => {
-    bench.updateMatrixWorld(true);
-    const from = bench.localToWorld(new THREE.Vector3(x, 5, z));
-    const hit = new THREE.Raycaster(from, new THREE.Vector3(0, -1, 0), 0, 10).intersectObject(model, true)[0];
-    return hit ? bench.worldToLocal(hit.point.clone()).y : 1.05;
-  };
-  restOn(jig, 0, 0, 0, topAt);
-  restOn(printer, -0.75, 0, 0, topAt);
-  restOn(mallet, 0.42, -0.12, 0.25, topAt);
-  restOn(wrench, 0.72, 0.15, -0.1, topAt);
-  bench.add(jig, printer, mallet, wrench);
-  const panelBox = new THREE.Box3().setFromObject(wall);
-  const wallGroup = new THREE.Group();
-  wallGroup.position.set(6.0, 1.35, 2.99 + panelBox.min.z);
-  wallGroup.rotation.y = Math.PI;
-  wallGroup.add(wall);
-  wall.position.set(0, 0, 0);
-  const front = panelBox.max.z;
-  hangOn(drill, front, -0.42, 0.62);
-  hangOn(scanner, front, 0.0, 0.66);
-  hangOn(screwdriver, front, 0.42, 0.6, Math.PI / 2);
-  wallGroup.add(drill, scanner, screwdriver);
-  bench.parent?.add(wallGroup);
-}
 
 const STORM_VERTEX = /* glsl */ `
   varying vec2 vUv;
@@ -503,15 +407,7 @@ export function createLabRoom(o: {
   let swaps: (() => boolean)[] = [];
   let lastPower: Power = POWER_OFF;
   const genFor = (id: string): THREE.Group | null => getGenSync(id, genLevel);
-  const genAll = (ids: readonly string[]): THREE.Group[] | null => {
-    const out: THREE.Group[] = [];
-    for (const id of ids) {
-      const g = genFor(id);
-      if (!g) return null;
-      out.push(g);
-    }
-    return out;
-  };
+
   /** Replaces a group's visual children with a generated model, keeping the children listed. */
   const replaceVisual = (targetGroup: THREE.Object3D, gen: THREE.Object3D, kept: readonly THREE.Object3D[] = []): void => {
     for (const child of [...targetGroup.children]) {
@@ -538,37 +434,7 @@ export function createLabRoom(o: {
     const visible = { minX: vis.min.x, minY: vis.min.y, minZ: vis.min.z, maxX: vis.max.x, maxY: vis.max.y, maxZ: vis.max.z };
     colliders.push(...overhangBoxes(visible, own, [...keepClear, SPAWN_CLEAR], 0.1));
   };
-  /** Swaps labkit props for their generated models, grounding each model at y = 0 and keeping any preserved children. */
-  const swapAll = (
-    items: readonly {
-      readonly p: { readonly group: THREE.Group; readonly colliders?: readonly Box[] };
-      readonly id: string;
-      readonly turn?: number;
-      readonly kept?: readonly THREE.Object3D[];
-      readonly ground?: boolean;
-    }[],
-  ): boolean => {
-    const gens = genAll(items.map((it) => it.id));
-    if (!gens) return false;
-    items.forEach((it, i) => {
-      const g = gens[i]!;
-      g.rotation.y = it.turn ?? 0;
-      if (it.ground !== false) {
-        groundModelAt(g, 0);
-      }
-      // POL-104 & POL-105: Merge static meshes inside swapped generated GLBs by material so Lab stays well under 185 draw calls
-      mergeStaticMeshes(g, it.kept ?? [], keep);
-      replaceVisual(it.p.group, g, it.kept ?? []);
-      fitOverhang(it.p);
-    });
-    return true;
-  };
-  const lamp = (color: string, x: number, y: number, z: number, size?: readonly [number, number, number]): THREE.Mesh => {
-    const mesh = lampOverlay(color, x, y, z, size);
-    keep(mesh.material as THREE.Material);
-    keep(mesh.geometry);
-    return mesh;
-  };
+
 
   // ---- The Shell (16 × 12 × 5 m)
   const panels = panelTextures(o.textureSize), floorTex = floorTextures(o.textureSize);
@@ -747,7 +613,8 @@ export function createLabRoom(o: {
   // ---- West Wall: The Power Wall (Sheet 07, south to north — grounded & cabled)
   void POWER_WALL_SHEET07_ORDER;
   const bank = place(kit.capacitorBank(m), -7.2, 1.0, -Math.PI / 2);
-  const breaker = place(kit.breakerPanel(m), -7.4, -1.0, -Math.PI / 2);
+  const breakerRaw = kit.breakerPanel(m);
+  const breaker = place(breakerRaw, -7.4, -1.0, -Math.PI / 2);
 
   // Grounded steel support plinth under the 4 Relay Cabinets (y = 0 to 0.72 m) so relay cabinets never float on the wall
   add(new THREE.BoxGeometry(0.56, 0.72, 3.65), m.darkSteel, (pl) => {
@@ -915,97 +782,26 @@ export function createLabRoom(o: {
     const c = spriteCards.get(id);
     return c ? { frames: c.frames, fps: c.fps } : null;
   };
-  // The breaker panel (sheet 07): the isolator turns about its spindle (the panel's normal) and the three sub-breakers flip in their sockets.
-  // The panel's own model carries the hazard plate, the knob and the sockets; the code adds only the moving parts and the socket collars.
-  const isolator = new THREE.Group();
+  // The breaker panel (sheet 07): rotary isolator handle and 3 sub-breaker toggles
+  const isolator = breakerRaw.handle ?? new THREE.Group();
   isolator.name = 'breaker-isolator';
-  const toggles = TOGGLE_SOCKETS.map((_, i) => {
+  const toggles = [-0.18, 0, 0.18].map((tx, i) => {
     const t = new THREE.Group();
     t.name = `breaker-toggle-${i}`;
+    t.position.set(tx, 1.25, 0.18);
+    const bat = new THREE.Mesh(keep(new THREE.BoxGeometry(0.024, 0.02, 0.05)), m.gunmetal);
+    bat.position.set(0, 0, 0.025);
+    t.add(bat);
+    breaker.group.add(t);
     return t;
   });
-  swaps.push(() => {
-    const panel = genFor('breaker-panel');
-    const handle = genFor('breaker-handle');
-    if (!panel || !handle) return false;
-    panel.rotation.y = WEST_WALL_TURN;
-    groundModelAt(panel, 0);
-    mergeStaticMeshes(panel, [], keep);
-    mergeStaticMeshes(handle, [], keep);
-    replaceVisual(breaker.group, panel);
-    fitOverhang(breaker);
-    // The isolator: the handle's column is turned to the panel's normal and its hub centred on the spindle
-    handle.rotation.x = Math.PI / 2;
-    handle.position.x = ISOLATOR_HUB_X;
-    isolator.clear();
-    isolator.add(handle);
-    isolator.position.set(ISOLATOR_AT[0], ISOLATOR_AT[1], ISOLATOR_AT[2]);
-    panel.add(isolator);
-    handleGlow(handle);
-    // The sub-breakers: a static collar seated in each socket (merged into one mesh), and a bat pivoting about the collar's top
-    const collars = new THREE.Group();
-    const batGeo = keep(new THREE.BoxGeometry(0.03, 0.02, 0.06));
-    const collarGeo = keep(new THREE.BoxGeometry(0.042, 0.042, 0.012));
-    TOGGLE_SOCKETS.forEach(([x, y, z], i) => {
-      const collar = new THREE.Mesh(collarGeo, m.darkSteel);
-      collar.position.set(x, y, z + 0.006);
-      collars.add(collar);
-      const pivot = toggles[i]!;
-      pivot.clear();
-      pivot.position.set(x, y, z + 0.012);
-      const bat = new THREE.Mesh(batGeo, m.gunmetal);
-      bat.position.set(0, 0, 0.03);
-      pivot.add(bat);
-      panel.add(pivot);
-    });
-    mergeStaticMeshes(collars, [], keep);
-    panel.add(collars);
-    return true;
-  });
   // POL-69: Caged amber (#ffc13d) beacon housings mounted on top of the 4 Relay Cabinets
-  const relayHousings = relays.map((r) => {
+  relays.forEach((r) => {
     const bh = buildRelayBeaconHousing(m, keep);
     r.group.add(bh.group);
     r.lamps.push(...bh.beacons);
-    return bh;
   });
-  swaps.push(() => {
-    const gens = genAll(relays.map(() => 'relay-cabinet'));
-    if (!gens) return false;
-    const relayLamps: THREE.Mesh[] = [];
-    relays.forEach((r, i) => {
-      const gen = gens[i]!;
-      gen.rotation.y = WEST_WALL_TURN;
-      groundModelAt(gen, 0);
-      mergeStaticMeshes(gen, [], keep);
-      const bh = relayHousings[i]!;
-      replaceVisual(r.group, gen, [bh.group]);
-      const pair = [lamp('#ffc13d', -0.12, 1.13, 0.262), lamp('#ffc13d', 0.12, 1.13, 0.262)];
-      gen.add(...pair);
-      relayLamps.push(...pair, ...bh.beacons);
-    });
-    lamps.relays = relayLamps;
-    return true;
-  });
-  swaps.push(() => {
-    const gens = genAll(boxes.map(() => 'control-box'));
-    if (!gens) return false;
-    const boxLamps: THREE.Mesh[] = [];
-    boxes.forEach((b, i) => {
-      const gen = gens[i]!;
-      mergeStaticMeshes(gen, [], keep);
-      replaceVisual(b.group, gen);
-      gen.rotation.y = WEST_WALL_TURN;
-      const pair = [lamp('#22cc44', -0.07, 0.36, 0.13), lamp('#ee2222', 0.07, 0.36, 0.13)];
-      gen.add(...pair);
-      boxLamps.push(...pair);
-    });
-    lamps.boxes = boxLamps;
-    return true;
-  });
-  // The lever's swing: the play scene turns the pivot (desk.lever); the swing inside it carries the lever's rest tilt and the throw's travel
-  const leverSwing = new THREE.Group();
-  leverSwing.name = 'console-lever-swing';
+
   // The keypad (sheet 07): a 4 x 4 grid of raised square keycaps with no numbers, one merged mesh, set into the hood's pocket.
   const buildKeypad = (): THREE.Group => {
     const pad = new THREE.Group();
@@ -1026,30 +822,8 @@ export function createLabRoom(o: {
     pad.rotation.x = HOOD_TILT;
     return pad;
   };
-  swaps.push(() => {
-    const body = genFor('operator-console');
-    const lever = genFor('console-lever');
-    if (!body || !lever) return false;
-    body.rotation.y = WEST_WALL_TURN;
-    groundModelAt(body, 0);
-    mergeStaticMeshes(body, [], keep);
-    mergeStaticMeshes(lever, [], keep);
-    replaceVisual(desk.group, body);
-    fitOverhang(desk);
-    // The throw lever (POL-121): widened 0.95 rad sweep through a raised quadrant slot guide
-    desk.lever.clear();
-    leverSwing.clear();
-    lever.rotation.x = LEVER_REST_TILT;
-    leverSwing.add(lever);
-    desk.lever.add(leverSwing);
-    desk.lever.position.set(LEVER_AT[0], LEVER_AT[1], LEVER_AT[2]);
-    body.add(desk.lever);
-    body.add(buildConsoleLeverQuadrant(m, keep, LEVER_AT));
-    body.add(buildKeypad());
-    // The hood's CRT is painted on the model, so the console carries no lamp of its own
-    lamps.desk = [];
-    return true;
-  });
+  desk.group.add(buildConsoleLeverQuadrant(m, keep, LEVER_AT));
+  desk.group.add(buildKeypad());
 
   // Overhead square cable trays along BOTH West wall (-7.6) and East wall (+7.55) at y = 4.2 m (in the shell: merged with it per material)
   shell.add(kit.cableTray(m, [-7.6, 1.2], [-7.6, -8.2], 4.2, ROOM.height).group);
@@ -1129,26 +903,7 @@ export function createLabRoom(o: {
   const tableDisc = pTable.lamps[0];
   if (tableDisc) tableDisc.material = tableDiscMat;
 
-  // Keep each machine's distinctive Sheet 07 dressGroup & pixel plume when swapping in generated GLBs!
-  swaps.push(() => swapAll([
-    { p: rack, id: 'preset-rack', turn: WEST_WALL_TURN, kept: [machineRigs[0]!.dressGroup] },
-    { p: bench, id: 'preset-bench', turn: WEST_WALL_TURN, kept: [machineRigs[1]!.dressGroup] },
-    { p: combiner, id: 'preset-combiner', turn: WEST_WALL_TURN, kept: [machineRigs[2]!.dressGroup] },
-  ]));
-  swaps.push(() => {
-    const plate = genFor('planet-table');
-    if (!plate) return false;
-    groundModelAt(plate, 0);
-    replaceVisual(pTable.group, plate, [planetTableHolo.group]);
-    pTable.lamps.length = 0;
-    const disc = new THREE.Mesh(keep(new THREE.CylinderGeometry(0.42, 0.42, 0.01, 32)), tableDiscMat);
-    disc.position.set(0, 1.1 + 0.005, 0);
-    mergeStaticMeshes(plate, [], keep);
-    plate.add(disc);
-    plate.add(planetTableHolo.group);
-    return true;
-  });
-
+  // East wall machines, planet table, armory and weapon bench retain their procedural rigs and geometry
   // ---- South-East: The Armory Nook
   const railGroup = new THREE.Group();
   const railBar = new THREE.Mesh(keep(new THREE.BoxGeometry(0.06, 0.06, 1.4)), m.gunmetal);
@@ -1165,18 +920,6 @@ export function createLabRoom(o: {
   mockTool.position.set(-0.08, 0.06, 0);
   railGroup.add(mockTool);
   place({ group: railGroup, colliders: [{ min: [-0.2, -0.2, -0.75], max: [0.1, 0.2, 0.75] }], sockets: [], lamps: [] }, 7.75, 0.6, 0, 1.3);
-  swaps.push(() => {
-    const rail = genFor('armory-rail');
-    const tool = genFor('weapon-frame');
-    if (!rail || !tool) return false;
-    railGroup.clear();
-    rail.rotation.y = -Math.PI / 2;
-    tool.position.set(0, 0.62, 0);
-    tool.rotation.y = Math.PI / 2;
-    railGroup.add(rail, tool);
-    mergeStaticMeshes(railGroup, [], keep);
-    return true;
-  });
 
   const armory = armoryRack(m);
   armory.group.getObjectByName('armory-beam-cradle')?.removeFromParent();
@@ -1186,14 +929,7 @@ export function createLabRoom(o: {
 
   const weaponBench = place(kit.presetBench(m), 6.0, 2.4, Math.PI);
   weaponBench.group.userData.stationId = 'weapon-bench';
-  swaps.push(() => {
-    const parts = genAll(WEAPON_BENCH_SET);
-    if (!parts) return false;
-    if (!swapAll([{ p: weaponBench, id: 'weapon-bench' }])) return false;
-    colliders.push({ min: [4.8, 0, 2.0], max: [7.2, 1.6, 2.8] });
-    dressWeaponBench(weaponBench.group, parts);
-    return true;
-  });
+  colliders.push({ min: [4.8, 0, 2.0], max: [7.2, 1.6, 2.8] });
 
   // ---- The lab clutter (TASK-23c)
   const clutterEntries = new Map<string, ClutterEntry>();
@@ -1251,15 +987,6 @@ export function createLabRoom(o: {
     disc.visible = false;
     group.add(disc);
     clutterEntries.set(item.id, { item, prop, disc, boxes: colliders.slice(before), state: 'standing', t: 0 });
-    swaps.push(() => {
-      const gen = genFor(item.model);
-      if (!gen) return false;
-      groundModelAt(gen, 0);
-      mergeStaticMeshes(gen, [], keep);
-      // the monitor's equaliser stays on the swapped model's screen
-      replaceVisual(prop.group, gen, item.id === 'old-monitor' && monitorEq ? [monitorEq.group] : []);
-      return true;
-    });
   }
   const takeAway = (e: ClutterEntry): void => {
     e.state = 'gone';
@@ -1269,6 +996,8 @@ export function createLabRoom(o: {
       if (i >= 0) colliders.splice(i, 1);
     }
   };
+  /** The dissolve of a cleared salvage prop, seconds. */
+  const DISSOLVE_SECONDS = 0.9;
   const tickClutter = (dt: number): void => {
     for (const e of clutterEntries.values()) {
       if (e.state !== 'dissolving') continue;
@@ -1284,7 +1013,7 @@ export function createLabRoom(o: {
     }
   };
 
-  // ---- South Wall: Her Corner
+  // ---- South Wall: Her Corner (all procedural furniture)
   const cotGroup = new THREE.Group();
   const cotFrame = new THREE.Mesh(keep(new THREE.BoxGeometry(1.9, 0.35, 0.8)), m.darkSteel);
   cotFrame.position.y = 0.18;
@@ -1298,8 +1027,7 @@ export function createLabRoom(o: {
   const cotBlanket = new THREE.Mesh(keep(new THREE.BoxGeometry(0.65, 0.08, 0.74)), m.gunmetal);
   cotBlanket.position.set(0.55, 0.46, 0);
   cotGroup.add(cotBlanket);
-  const cotProp = place({ group: cotGroup, colliders: [{ min: [-1.0, 0, -0.45], max: [1.0, 0.6, 0.45] }], sockets: [], lamps: [] }, -2.5, 2.2, 0);
-  swaps.push(() => swapAll([{ p: cotProp, id: 'cot', turn: Math.PI / 2 }]));
+  place({ group: cotGroup, colliders: [{ min: [-1.0, 0, -0.45], max: [1.0, 0.6, 0.45] }], sockets: [], lamps: [] }, -2.5, 2.2, 0);
 
   const deskGroup = new THREE.Group();
   const deskBody = new THREE.Mesh(keep(new THREE.BoxGeometry(1.4, 0.72, 0.68)), m.paint);
@@ -1328,16 +1056,7 @@ export function createLabRoom(o: {
   dScreen.position.set(0.42, 0.87, 0.215);
   dScreen.rotation.y = -0.25;
   deskGroup.add(dScreen);
-  const deskProp = place({ group: deskGroup, colliders: [{ min: [-0.75, 0, -0.4], max: [0.75, 1.0, 0.4] }], sockets: [], lamps: [] }, 1.0, 2.4, Math.PI);
-  swaps.push(() => {
-    const body = genFor('her-desk');
-    if (!body) return false;
-    groundModelAt(body, 0);
-    deskGroup.remove(deskBody, deskTop);
-    deskGroup.add(body);
-    fitOverhang(deskProp);
-    return true;
-  });
+  place({ group: deskGroup, colliders: [{ min: [-0.75, 0, -0.4], max: [0.75, 1.0, 0.4] }], sockets: [], lamps: [] }, 1.0, 2.4, Math.PI);
 
   // Inset wall radio in south wall beside desk
   const radioGroup = new THREE.Group();
@@ -1354,15 +1073,6 @@ export function createLabRoom(o: {
   radioGroup.position.set(2.2, 1.4, 2.92);
   radioGroup.rotation.y = Math.PI;
   group.add(radioGroup);
-  swaps.push(() => {
-    const gen = genFor('wall-radio');
-    if (!gen) return false;
-    replaceVisual(radioGroup, gen);
-    const lampMesh = lamp('#ff7700', 0.2, 0.08, 0.17, [0.04, 0.04, 0.02]);
-    (lampMesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.2;
-    gen.add(lampMesh);
-    return true;
-  });
 
   // Scientific charts taped on wall above desk
   const chartTex = keep(createChartTexture());
@@ -1452,6 +1162,7 @@ export function createLabRoom(o: {
       handleMats.push(mat);
     });
   };
+  handleGlow(isolator);
 
   const lamps = {
     relays: relays.flatMap((r) => r.lamps),
@@ -1630,8 +1341,7 @@ export function createLabRoom(o: {
         monitorEq.update(now);
       }
       planetTableHolo.update(now, currentFloats, consensusCommitted);
-      // desk.lever carries the play scene's full throw; the swing takes back all but the travel (the swing sits inside desk.lever)
-      leverSwing.rotation.x = desk.lever.rotation.x * (LEVER_TRAVEL / LEVER_THROW - 1);
+
       for (const rig of machineRigs) {
         rig.animate(now, lastPower.main);
       }

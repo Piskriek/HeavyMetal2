@@ -2274,7 +2274,8 @@ useEffect(() => {
           startCreditsRef.current?.('lab');
         },
       });
-    } catch {
+    } catch (err) {
+      console.error('Failed to createPlayScene:', err);
       setFailed(true);
       return undefined;
     }
@@ -4286,7 +4287,8 @@ useEffect(() => {
           freeMouse();
         } else if (liveWhereRef.current === 'planet' && hud.aimed !== null && panel === null) {
           sceneRef.current?.playAction('button');
-          setInspect({ src: 'plot', id: hud.aimed });
+          const isBaseMach = baseWorldRef.current.machines.some((m) => m.id === hud.aimed);
+          setInspect({ src: isBaseMach ? 'base' : 'plot', id: hud.aimed });
           setMenu(false);
           freeMouse();
         } else if (liveWhereRef.current === 'lab' && hud.aimedLab !== null && labPanel === null && fabricatorMachineId === null && !planetTableOpen && !weaponBenchOpen) {

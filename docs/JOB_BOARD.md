@@ -1,17 +1,17 @@
 <!-- ROADMAP_PROGRESS_START -->
-[![Release Progress](https://img.shields.io/badge/v1.0_Progress-100.0%25_LOCKED-00F0FF?style=for-the-badge&logo=target)](https://github.com/Piskriek/HeavyMetal2)
-[![Rule 8a Status](https://img.shields.io/badge/Rule_8a_Audit-PASS-success?style=for-the-badge&logo=checkmarx)](docs/argo/RULES.md)
+[![Release Progress](https://img.shields.io/badge/QA_Remediation-IN_PROGRESS-FF1E8E?style=for-the-badge&logo=target)](docs/argo/plans/ARGO_GRAND_MASTER_REPORT.md)
+[![Rule 8a Status](https://img.shields.io/badge/Rule_8a_Audit-ENFORCING-yellow?style=for-the-badge&logo=checkmarx)](docs/argo/RULES.md)
 [![Active Branch](https://img.shields.io/badge/Branch-feat%2Fmonster--mash--exploration-FF1E8E?style=for-the-badge&logo=git)](https://github.com/Piskriek/HeavyMetal2/tree/feat/monster-mash-exploration)
 
 ```text
-FIDELITY: The SetMix Multiverse — Milestone #1 (v1.0 Feature Complete Lock)
-[████████████████████] 100.0% Complete (20/20 Landed | 0 Open — RELEASE MILESTONE LOCKED!)
+FIDELITY: The SetMix Multiverse — QA Audit Remediation (ARGO_GRAND_MASTER_REPORT.md)
+[████████████░░░░░░░░] 60.0% Complete (3/5 Waves Done | 45 Findings)
 
-Phase 1: Foundation            [████████████████████] 100% (4/4)
-Phase 2: Materials             [████████████████████] 100% (3/3)
-Phase 3: Studio & Raycast      [████████████████████] 100% (4/4)
-Phase 4: Kits & Motion         [████████████████████] 100% (5/5)
-Phase 5: Endgame & 1.0         [████████████████████] 100% (4/4)
+Wave A1: Physics & Colliders (LAB-10, GATE-04, BB-02)         [DONE]
+Wave A2: Steering & Machine Inspector (VEH-02, BB-10, BB-11)   [DONE]
+Wave A3: Stage Visual Differentiation (STAGE-01, STAGE-02)     [DONE]
+Wave B:  Global Thumbnails & Texture Swatches (THUMB-01)       [OPEN]
+Wave C/D: Specs A-D (Planetary Grid, Studio Suite, Nexus)       [OPEN]
 ```
 <!-- ROADMAP_PROGRESS_END -->
 
@@ -86,6 +86,62 @@ Each job may list **Skills** (tags such as `frontend`, `route`, `visual-verify`)
 ---
 
 ## 3. JOB QUEUE
+
+## ═══════════════════════════════════════════════════════════════════════════
+## ACTIVE FOCUS: QA AUDIT REMEDIATION (ARGO_GRAND_MASTER_REPORT.md)
+## ═══════════════════════════════════════════════════════════════════════════
+
+## JOB-QA-01 [DONE] Wave A1: Physics & Colliders (LAB-10, GATE-04, BB-02)
+- **Role:** ENGINEER
+- **Skills:** `physics`, `collision`
+- **Priority:** P0 (BLOCKER)
+- **Milestone:** QA-W1
+- **Paths:** `apps/web/src/play/lab-room.ts, packages/labkit/src/index.ts, apps/web/src/base/walk.ts, apps/web/src/play/play-scene.ts`
+- **Verify:** `node --import tsx --test packages/labkit/tests/labkit.test.ts apps/web/src/play/lab-machines.test.ts packages/structure/tests/*.test.ts`
+- **Assigned:** `OVERSEER@antigravity`
+- **Updated:** 2026-10-25 20:05
+
+1. Added solid AABB boundary & prop colliders across Lab room and closed gate aperture blocker (`LAB-10`).
+2. Broadened Moon Twin Gate colliders to match full Stargate kit bounds (4.02m x 3.44m x 1.97m) with dialing pedestal and closed iris aperture blocker (`GATE-04`).
+3. Fixed base building foundation and floor step-up reach (`Math.max(maxStepUp, groundY + 1.35)`) and exempted walkable foundation top decks from horizontal barrier pushing (`BB-02`).
+
+## JOB-QA-02 [DONE] Wave A2: Vehicle Steering & Field Machine Interactions (VEH-02, BB-10, BB-11)
+- **Role:** ENGINEER
+- **Skills:** `controls`, `ui`
+- **Priority:** P0 (BLOCKER)
+- **Milestone:** QA-W1
+- **Paths:** `packages/rover/src/index.ts, packages/rover/tests/rover.test.ts, apps/web/src/play/play-scene.ts, apps/web/src/play/play.tsx`
+- **Verify:** `node --import tsx --test packages/rover/tests/rover.test.ts`
+
+1. Fixed inverted vehicle steering physics sign (`Rhx = Fhz; Rhz = -Fhx;`) so pressing `D` (+steer) turns right (+X) and `A` (-steer) turns left (-X), and aligned visual wheel steer angle (`steer * maxSteer`) (`VEH-02`).
+2. Wired `[E]` on placed field machines to open the `MachineInspector` modal directly for base hardpoint machines and plot machines (`BB-10`).
+3. Wired `[E]` on placed field benches and weapon benches to open drafting and weapon modding (`BB-11`).
+
+## JOB-QA-03 [DONE] Wave A3: Stage Visual Differentiation (STAGE-01, STAGE-02)
+- **Role:** ARCHITECT
+- **Skills:** `shaders`, `visual-verify`
+- **Priority:** P0 (BLOCKER)
+- **Milestone:** QA-W1
+- **Paths:** `apps/web/src/play/portal-shaders.ts, apps/web/src/play/play-scene.ts`
+- **Verify:** `node scripts/test-stage-looks.mjs`
+
+1. Fixed TDZ ReferenceError in `createPlayScene` (`gateOn` and `powerT` declaration order).
+2. Damped screen-space facet deviation in `portal-shaders.ts` (`dampedFacet` clamped to `+-0.05`, 10% mix), dropping the 5-degree yaw flip fraction from 12.3% to 7.3% (below the 10% target).
+3. Verified full visual pass with `node scripts/test-stage-looks.mjs`: 13/13 checks pass.
+
+## JOB-QA-04 [OPEN] Wave B: Global 3D Model & Procedural Texture Thumbnails (THUMB-01, BEAM-01, BEAM-02)
+- **Role:** BUILDER
+- **Skills:** `frontend`, `ui`
+- **Priority:** P1
+- **Milestone:** QA-W2
+- **Paths:** `packages/ui, apps/web/src/shell/hud.tsx, apps/web/src/play/beam-tool.ts`
+- **Verify:** `npm run typecheck`
+
+1. Replace generic SVG icons across Hotbar, Build Menu, and Inventory with real 3D offscreen renders (`THUMB-01`).
+2. Add live 64x64 `@hm/texgraph` procedural texture swatch thumbnails and cycle hotkeys to Beam Rifle Apply mode (`BEAM-01`).
+3. Decouple Sculpt mode sub-keys (1, 2, 3) from Hotbar slots (`BEAM-02`).
+
+## ═══════════════════════════════════════════════════════════════════════════
 
 ## JOB-01 [DONE] Uncapped GTX 950M performance gate & GPU timer hook (Plan 41 + POL-294)
 - **Role:** ENGINEER

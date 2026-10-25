@@ -176,11 +176,14 @@ export function kitFabricator(genLevel: GenLevel, stage: number, ringY: number):
 
 /**
  * A vehicle as a kit build (JOB-08v): the same five-group blueprint `kit-vehicles.ts` audited, dressed in the plot's
- * materials and built at the stage's detail rank. The plot hangs this at the vehicle's pose so a Beam Rifle cartridge
- * can name any part of it (`kit-target.ts`), while the procedural rover keeps the wheel and steering animation the
- * merged kit cannot (a kit's wheels are one mesh with the hull).
+ * materials and built at the stage's detail rank.
  */
-export function plotVehicleKit(kind: VehicleKind, genLevel: GenLevel, stage: number): KitBuild | null {
+export function plotVehicleKit(
+  kind: VehicleKind,
+  genLevel: GenLevel,
+  stage: number,
+  opts?: { readonly skip?: (path: string) => boolean; readonly overrides?: Overrides }
+): KitBuild | null {
   const rank = maxRank(stage, tierOfLevel(genLevel));
   return buildKitPreset(VEHICLE_KITS[kind], VEHICLE_PRESET, {
     materials: plotKitMaterials(),
@@ -189,5 +192,39 @@ export function plotVehicleKit(kind: VehicleKind, genLevel: GenLevel, stage: num
     resolveMaterial: plotResolve(genLevel, rank),
     layering: kitLayering,
     maxRank: rank,
+    skip: opts?.skip,
+    overrides: opts?.overrides,
   });
 }
+
+/**
+ * Builds a single modular wheel for a vehicle kind so the chassis and wheels can steer and roll independently.
+ */
+export function plotVehicleWheel(
+  kind: VehicleKind,
+  genLevel: GenLevel,
+  stage: number
+): THREE.Group | null {
+  const rank = maxRank(stage, tierOfLevel(genLevel));
+  const partDef = VEHICLE_KITS[kind].parts[`${kind}-wheel`] ?? VEHICLE_KITS[kind].parts[`${kind}-track-wheel`];
+  if (!partDef) return null;
+  const wheelKit: Kit = {
+    parts: { wheel: partDef },
+    assemblies: { wheel: { children: [{ ref: 'wheel', key: 'wheel' }] } },
+  };
+  const build = buildKitPreset(wheelKit, 'wheel', {
+    materials: plotKitMaterials(),
+    gen: () => null,
+    resolveMaterial: plotResolve(genLevel, rank),
+    layering: kitLayering,
+    maxRank: rank,
+  });
+  if (!build) return null;
+  const radius = kind === 'scout' ? 0.45 : kind === 'hauler' ? 0.55 : 0.25;
+  build.group.position.set(0, -radius, 0);
+  const container = new THREE.Group();
+  container.name = `vehicle-wheel-${kind}`;
+  container.add(build.group);
+  return container;
+}
+

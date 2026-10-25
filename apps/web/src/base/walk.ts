@@ -88,7 +88,8 @@ export class WalkWorld {
       } else if (p.kind === 'foundation' || p.kind === 'floor') {
         if (lx >= -2 && lx <= 2 && lz >= -2 && lz <= 2) {
           const candY = p.pos.y;
-          if (candY <= maxStepUp && candY > bestY) {
+          const foundationStepUp = Math.max(maxStepUp, groundY + 1.35);
+          if (candY <= foundationStepUp && candY > bestY) {
             bestY = candY;
           }
         }
@@ -159,7 +160,8 @@ export class WalkWorld {
             p.kind === 'lowRoof' ||
             p.kind === 'roofOuter' ||
             p.kind === 'roofInner' ||
-            p.kind === 'ridgeCap'
+            p.kind === 'ridgeCap' ||
+            ((p.kind === 'foundation' || p.kind === 'floor') && cMaxY <= feetY + 1.35 && cMaxY >= feetY - 0.5)
           ) continue;
 
           // Transform curX, curZ into piece local frame

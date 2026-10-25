@@ -43,8 +43,7 @@ export function modularScoutOn(): boolean {
   return typeof location !== 'undefined' && new URLSearchParams(location.search).get('scout') === 'modular';
 }
 
-/** The packed parts of the assembled scout. The steering wheel is not packed: its procedural yoke is used. */
-const SCOUT_PART_ASSETS: readonly string[] = ['scout-chassis', 'scout-shell', 'headlight', 'vehicle-seat'];
+export const SCOUT_PART_ASSETS: readonly string[] = ['scout-chassis', 'scout-shell', 'headlight', 'vehicle-seat'];
 
 /**
  * Every offset and scale of the assembled scout, in metres, in the rover frame: the origin at the hub height, +y up,
@@ -75,13 +74,6 @@ export const SCOUT_ASSEMBLY = {
 
 export const CORE_GEN_ASSETS: readonly string[] = [
   ...latticeGenAssets(),
-  ...(modularScoutOn() ? SCOUT_PART_ASSETS : []),
-  'scout-body',
-  'scout-wheel',
-  'hauler-body',
-  'hauler-wheel',
-  'crawler-body',
-  'crawler-arm',
   'fabricator-frame',
   'fabricator-head',
   'mill',

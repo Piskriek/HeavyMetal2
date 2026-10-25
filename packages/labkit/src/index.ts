@@ -527,12 +527,24 @@ export function gate(
 
   // the uprights (with their gussets and the plinth's edge) are solid; the opening between them is a doorway you walk through
   const frameTop = plinthH + uprightH + lintelH;
-  for (const side of [-1, 1]) {
-    const inner = openW / 2, outer = plinthW / 2;
-    colliders.push({
-      min: [side < 0 ? -outer : inner, 0, -plinthD / 2],
-      max: [side < 0 ? -inner : outer, frameTop, plinthD / 2],
-    });
+  if (isTwin) {
+    // GATE-04: Full Stargate kit frame and pedestal colliders (4.02m x 3.44m x 1.97m)
+    colliders.push(
+      // Left arch upright and gusset:
+      { min: [-2.05, 0, -0.65], max: [-0.95, 3.45, 0.65] },
+      // Right arch upright and gusset:
+      { min: [0.95, 0, -0.65], max: [2.05, 3.45, 0.65] },
+      // Dialing pedestal at [2.05, 0, 1.0]:
+      { min: [1.65, 0, 0.65], max: [2.45, 1.35, 1.35] },
+    );
+  } else {
+    for (const side of [-1, 1]) {
+      const inner = openW / 2, outer = plinthW / 2;
+      colliders.push({
+        min: [side < 0 ? -outer : inner, 0, -plinthD / 2],
+        max: [side < 0 ? -inner : outer, frameTop, plinthD / 2],
+      });
+    }
   }
 
   builder.build(group);

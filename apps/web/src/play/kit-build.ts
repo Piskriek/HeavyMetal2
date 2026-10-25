@@ -32,6 +32,12 @@ export interface KitBuildOptions {
   readonly maxRank: DetailRank;
   /** Per-path changes (the beam's Apply with a part cartridge). */
   readonly overrides?: Overrides;
+  /**
+   * Placed parts to leave out of the merged meshes, by path. A prop that has to move a part on its own (a ram, a
+   * drill bit, an iris blade) builds the rest of the preset here and builds the moving part as its own build, so the
+   * moving geometry is never welded into a static mesh. `placed` still lists every part.
+   */
+  readonly skip?: (path: string) => boolean;
   /** Registers what the build creates, for disposal with its owner. */
   readonly keep?: <T extends { dispose(): void }>(x: T) => T;
   /** A material the record does not hold, by name (a Texture Mill skin, `vault:<preset>`), or null. */
@@ -152,6 +158,7 @@ export function buildKitPreset(kit: Kit, preset: string, o: KitBuildOptions): Ki
 
   for (let pid = 0; pid < placed.length; pid++) {
     const p = placed[pid] as PlacedPart;
+    if (o.skip?.(p.path)) continue;
     const src = p.source;
     m4.fromArray(p.matrix as number[]);
     const finish = (g: THREE.BufferGeometry, material: THREE.Material, key: string): THREE.BufferGeometry => {

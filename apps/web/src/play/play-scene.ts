@@ -31,7 +31,7 @@ import { plotStargate, setPlotEnvironment } from './plot-kits';
 import { STARGATE_APERTURE_R, STARGATE_RING_CENTRE_Y } from './kit-stargate';
 import type { GateAccessMode } from '@hm/coopnet/gate-dialer';
 import { warmLayeredMaterials } from './layered-material';
-import { printFrame, beatPulse, evaluateBeatSyncedPlumeModulation } from '@hm/tooljuice';
+import { beatPulse, evaluateBeatSyncedPlumeModulation } from '@hm/tooljuice';
 import { evaluateHarmonicMachineChoir, type ActiveMachineEmitter, type MachineStemRole } from '@hm/musicbox';
 import { applyScientistWindowFGate, createWindowFCoopSyncController, type WindowFCoopSyncController } from './window-f-lab-and-coop-hooks';
 import { computeFightOverlayStrength, evaluateMoonAvatarLuminance, evaluateRoverCraterAndWallSafety, getTurretCornerCapParts, resolveTurretCornerMount } from './window-g-final-qa-hooks';
@@ -1157,15 +1157,9 @@ export function createPlayScene(o: {
     let sources = 0;
     let live = 0;
     for (const v of views.values()) {
-      if (v.printStartT !== undefined) {
-        const elapsed = t - v.printStartT;
-        const frame = printFrame(elapsed);
-        v.prop.applyPrintSweep?.(frame.clip, frame.offsetM);
-        if (frame.settled) {
-          v.prop.applyPrintSweep?.(1.0, 0.0);
-          delete v.printStartT;
-        }
-      }
+      // a machine is no longer printed from a generated model (JOB-08): kit machines stand whole from the first frame, so
+      // there is no print sweep left to clip. The gantry's own timeline still runs in the vehicle bay.
+      if (v.printStartT !== undefined) delete v.printStartT;
       if (v.emitter !== null) {
         v.pour = Math.round(machinePlumeCount(v.m.kind, v.share, t) * beatMult);
         plume.setCount(v.emitter, v.pour);

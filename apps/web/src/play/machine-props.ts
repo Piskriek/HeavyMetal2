@@ -1,25 +1,22 @@
-// Each machine of the plot (`@hm/plotsim`) as a prop: the texture mill from `@hm/labkit`, the six others from `@hm/fieldkit`
-// (both Arena Battles, built to sheet 12 of the concept art). Where its power comes in, where its pixels come out, and the parts
-// that move while it runs.
+// Each machine of the plot (`@hm/plotsim`) as a prop, built from its own `@hm/kitspec` kit (JOB-08): 100% `@hm/partgen`
+// geometry on declared sockets, five group assemblies, no generated model and no fallback. Where its power comes in, where
+// its pixels come out, and the parts that move while it runs are read off the kit, not measured.
 import * as THREE from 'three';
 import * as field from '@hm/fieldkit';
 import * as lab from '@hm/labkit';
-import * as basegear from '@hm/basegear';
-import * as heavygear from '@hm/heavygear';
-import { textureMill as consoleMillTextureMill, setLamp as setConsoleMillLamp } from '@hm/consolemill';
+import { flatten, maxRank, presetBounds, presetSockets, type Kit, type KitMotionSpec, type Overrides } from '@hm/kitspec';
 import type { MachineKind, Metric } from '@hm/plotsim';
-import { type GenLevel, getGenSync } from '../assets/gen';
+import type { GenLevel } from '../assets/gen';
 import { machineSize } from '../base/machine-inspect';
 import { plumeShare } from './brownout-visual';
-import { PRINT_EDGE_HEX } from '@hm/tooljuice';
-import { heavyKitProp } from './plot-kits';
-import type { Overrides } from '@hm/kitspec';
+import { buildKitPreset, type KitBuild } from './kit-build';
+import { MACHINE_BLUEPRINT, MACHINE_KITS, MACHINE_PRESET } from './kit-machines';
+import { kitLayering } from './layered-material';
+import { plotKitMaterials, plotResolve } from './plot-kits';
+import { tierOfLevel } from './kit-machine';
+import { driveMotion, driven, type DrivenPart } from './machine-motion';
 import { evaluateKitMotion } from '@hm/kinematic';
-import { driveMotion, drivenAll } from './machine-motion';
-import {
-  DRILL_BIT_SPIN, HEAVY_PRESS_RAM_STROKE, HOUSING_LED_BLINK, PRESS_CORE_RAM_STROKE, PRESS_RAM_STROKE, PRESS_RAM_STROKE_B,
-  PROJECTOR_HEAD_TILT, RAM_CADENCE_RAD,
-} from './kit-motion-specs';
+import { HOUSING_LED_BLINK, RAM_CADENCE_RAD } from './kit-motion-specs';
 
 export type MachineLedStatus = 'running' | 'warn' | 'unpowered';
 
@@ -27,24 +24,6 @@ export const HOUSING_LED_COLOURS: Readonly<Record<MachineLedStatus, string>> = {
   running: '#22c55e',   // Green: running with power & feed
   warn: '#f59e0b',      // Amber blink: no ore, idle, or brownout
   unpowered: '#ef4444', // Red: unpowered / disconnected
-};
-
-/**
- * Per-kind housing surface anchor [x, y, z] in metres (fitted prop frame) where the
- * square status LED sits on the front face of the housing (POL-39).
- */
-export const HOUSING_LED_ANCHOR: Readonly<Record<MachineKind, readonly [number, number, number]>> = {
-  drill: [0.38, 1.35, 0.92],
-  mill: [0.44, 1.32, 0.96],
-  pylon: [0.0, 1.25, 0.42],
-  press: [0.46, 1.38, 1.02],
-  power: [0.42, 1.30, 0.98],
-  projector: [0.34, 1.42, 0.82],
-  water: [0.52, 1.34, 1.08],
-  'heavy-mill': [0.95, 2.15, 2.28],
-  'heavy-press': [1.02, 2.25, 2.38],
-  'heavy-projector': [0.88, 2.35, 2.22],
-  'heavy-water': [1.08, 2.20, 2.46],
 };
 
 /** Pure evaluator for the square housing status LED colour & intensity (POL-39). */
@@ -76,15 +55,14 @@ export interface MachineProp {
   /** Where its pixels pour out (pixel machines), its steam (the power unit), or null. */
   readonly vent: THREE.Vector3 | null;
   /** Where its ore goes in (the feed hopper, dark grey cubes drop into it while it consumes), or null: a drill, a projector, the power
-   *  unit and a pylon take none (ARGO_NOTE_16 ruling 3). Optional only for the unused gen-asset builder in assets/gen-props.ts, which
-   *  predates the feed socket. */
+   *  unit and a pylon take none (ARGO_NOTE_16 ruling 3). */
   readonly feed?: THREE.Vector3 | null;
   /** A pylon's line attachment, for the spans between pylons. */
   readonly top: THREE.Vector3 | null;
   readonly lamps: readonly THREE.Mesh[];
   /** Square emissive status LED mesh mounted on the housing (POL-39). */
   readonly statusLed?: THREE.Mesh;
-  /** Housing LED anchor in the prop's frame (POL-39). */
+  /** Housing LED anchor in the prop's frame (POL-39): the kit socket the light is bolted to. */
   readonly ledAnchor?: THREE.Vector3;
   /** Moves what moves while it runs (0..1 how hard it runs), t in seconds, on the Fidelity Stage's animation rate (plan 43:
    *  the same declarative spec at every stage; the pose is quantised to the stage, so S0 steps at 8 Hz and S6 runs smooth). */
@@ -93,8 +71,6 @@ export interface MachineProp {
   light(glow: number): void;
   /** Updates the square housing status LED from live telemetry (POL-39). */
   setStatusLed?(running: number, connected: boolean, satisfaction?: number, t?: number): void;
-  /** Apply print sweep frame (T09b, P0-VFX-02): clip 0..1 with #7cff4d leading edge, and vertical offset. */
-  applyPrintSweep?(clip: number, offsetM: number): void;
 }
 
 /** The metric a machine's pixels raise (null: it pours none). */
@@ -221,28 +197,6 @@ export function machinePlumeGravity(kind: MachineKind): number {
   return FALLING_KINDS.has(kind) ? MACHINE_PLUME_SPECS[kind].gravity : 0;
 }
 
-/**
- * The feed hoppers of the generated meshes, in each asset's own frame: the sockets the asset registry (apps/web/src/assets/gen/
- * registry.json) measures on each model, checked against close shots (T03P follow-up). The old raycast from the side missed the
- * funnels: it landed on the tank top.
- */
-const GEN_FEED: Readonly<Record<'mill' | 'press' | 'water', readonly [number, number, number]>> = {
-  mill: [0, 4.16, 0],
-  press: [0, 4.26, 0],
-  water: [3.05, 1.6, 0],
-};
-/**
- * The exhaust vents of the mill and the press, in the same frame: their measured side stacks (registry.json). The pixels pour from
- * here, so the top opening takes only the falling ore cubes (ARGO_NOTE_16 ruling 5).
- */
-const GEN_VENT: Readonly<Record<'mill' | 'press', readonly [number, number, number]>> = {
-  mill: [1.715, 2.28, -0.48],
-  // POL-281 (ARGO_NOTE_17 ruling a): kept as measured; no side stack (0.77 m behind the chute is clearance enough)
-  press: [0, 3.44, -0.56],
-};
-/** A measured socket in a generated mesh's frame. Each mesh's origin is its base, so a hardpoint machine adds the ring height. */
-const genPoint = (p: readonly [number, number, number], base: number): THREE.Vector3 => new THREE.Vector3(p[0], p[1] + base, p[2]);
-
 /** Ore cubes falling into a feed hopper: at most this many at full run, one drop cycle takes FEED_DROP_SEC. */
 export const FEED_CUBES_FULL = 4;
 export const FEED_DROP_SEC = 1.2;
@@ -257,11 +211,6 @@ export function feedCubeProgress(t: number, slot: number, slots: number): number
   const x = t / FEED_DROP_SEC + slot / Math.max(1, slots);
   return x - Math.floor(x);
 }
-
-const at = (sockets: readonly { readonly name: string; readonly at: readonly [number, number, number] }[], ...names: string[]): THREE.Vector3 | null => {
-  for (const n of names) { const s = sockets.find((x) => x.name === n); if (s) return new THREE.Vector3(...s.at); }
-  return null;
-};
 
 /** Finds vent location by raycasting down onto the machine mesh, or highest vertex cluster + 0.05m. */
 export function findMachineVent(obj: THREE.Object3D, baseY: number, prefX = 0, prefZ = 0): THREE.Vector3 {
@@ -301,85 +250,151 @@ export function findMachineVent(obj: THREE.Object3D, baseY: number, prefX = 0, p
   return new THREE.Vector3(topX, maxY + 0.05, topZ);
 }
 
-/** Where a housing's status light mounts, by machine kind and shape: the rays run once per shape, not once per build. */
-const LED_MOUNTS = new Map<string, { readonly at: THREE.Vector3; readonly normal: THREE.Vector3 } | null>();
+/**
+ * The kit a kind is built from, its preset, and how the prop fits it to the table. Every machine is 100% `@hm/partgen`
+ * geometry placed by `@hm/kitspec` (JOB-08): no generated model, no fallback, no wrapper frame around a legacy mesh, so
+ * a machine's silhouette, its parts and its sockets are the same thing at every stage and every tier — only the detail
+ * rank changes which parts draw.
+ */
+const MACHINE_LAMP_PREFIX = 'kit:lx:';
+
+/** How far the status light stands off the housing it is bolted to (metres, prop frame). */
+const LED_STANDOFF = 0.02;
 
 /**
- * The surface a status light mounts on, in the prop's frame, and its outward normal. From in front of the anchor, a ray
- * back toward the machine at the anchor's height; if that passes through (an open press gap) or meets no front-facing
- * face, a little higher, lower and nearer the middle; failing those, the nearest surface in any direction from the anchor.
+ * The prop for a machine at a stage (0 or 1: chunky low poly; from 2: full detail), standing its real height. A kit-built
+ * machine takes the beam's part overrides (plan 38: a printed part fitted onto a bolt or a panel).
+ *
+ * `m` (the lab's material record) is no longer read: a machine draws in the plot's kit palette, which the trim sheet and
+ * the part swatches define. It stays in the signature because the plot's callers and the Studio bench pass it, and a
+ * cartridge can still put any `mat:`/`lx:` material on any part through the kit's own slots.
  */
-function ledMount(group: THREE.Group, inner: THREE.Object3D, kind: MachineKind, anchor: THREE.Vector3): { readonly at: THREE.Vector3; readonly normal: THREE.Vector3 } | null {
-  group.updateMatrixWorld(true);
-  const meshes: THREE.Mesh[] = [];
-  inner.traverse((o) => { if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh); });
-  const toGroup = new THREE.Matrix4().copy(group.matrixWorld).invert();
-  const box = new THREE.Box3().setFromObject(inner).applyMatrix4(toGroup);
-  const key = `${kind}|${box.min.toArray().map((v) => v.toFixed(3)).join(',')}|${box.max.toArray().map((v) => v.toFixed(3)).join(',')}|${meshes.length}`;
-  if (LED_MOUNTS.has(key)) {
-    const m = LED_MOUNTS.get(key)!;
-    return m && { at: m.at.clone(), normal: m.normal.clone() };
-  }
-  const rc = new THREE.Raycaster();
-  const cast = (origin: THREE.Vector3, dir: THREE.Vector3): { at: THREE.Vector3; normal: THREE.Vector3; distance: number } | null => {
-    rc.set(origin.clone().applyMatrix4(group.matrixWorld), dir.clone().transformDirection(group.matrixWorld));
-    const h = rc.intersectObjects(meshes, false)[0];
-    if (!h?.face) return null;
-    const normal = h.face.normal.clone().transformDirection(h.object.matrixWorld).transformDirection(toGroup);
-    if (normal.dot(dir) > 0) normal.negate(); // the side the ray came from
-    return { at: h.point.clone().applyMatrix4(toGroup), normal, distance: h.distance };
-  };
-  let found: { at: THREE.Vector3; normal: THREE.Vector3 } | null = null;
-  const back = new THREE.Vector3(0, 0, -1);
-  search: for (const dy of [0, 0.15, -0.15, 0.3, -0.3, 0.5, -0.5]) {
-    for (const sx of [1, 0.6, 0.3, 0]) {
-      const h = cast(new THREE.Vector3(anchor.x * sx, anchor.y + dy, box.max.z + 1), back);
-      if (h && h.normal.z > 0.5) { found = h; break search; }
-    }
-  }
-  if (!found) {
-    let best: { at: THREE.Vector3; normal: THREE.Vector3; distance: number } | null = null;
-    for (let i = 0; i < 16; i++) {
-      for (const y of [-0.5, 0, 0.5]) {
-        const t = (i / 16) * Math.PI * 2;
-        const h = cast(anchor, new THREE.Vector3(Math.cos(t), y, Math.sin(t)).normalize());
-        if (h && (!best || h.distance < best.distance)) best = h;
-      }
-    }
-    found = best;
-  }
-  LED_MOUNTS.set(key, found && { at: found.at.clone(), normal: found.normal.clone() });
-  return found;
+export function machineProp(_m: lab.LabMaterials, kind: MachineKind, stage: number, genLevel: GenLevel = 'low', overrides?: Overrides): MachineProp {
+  return kitProp(kind, stage, genLevel, overrides);
 }
 
-/**
- * Stands a built prop at its real height (machineSize, OPUS_NOTE_09 / BB-09): one uniform scale, its base kept where
- * it was (the ground, or the 0.78 m ring for the heavies). The parts scale with it, and so do the sockets (power,
- * vent, top), which are in the prop's own frame. The scale sits on an inner group, so the caller's group keeps its
- * position and yaw.
- */
-function fitToTable(p: MachineProp, kind: MachineKind): MachineProp {
-  const target = machineSize(kind).h;
-  const inner = new THREE.Group();
-  inner.name = 'fit-to-table';
-  for (const child of [...p.group.children]) inner.add(child);
-  p.group.add(inner);
-  p.group.updateMatrixWorld(true);
-  const toGroup = new THREE.Matrix4().copy(p.group.matrixWorld).invert();
-  const box = new THREE.Box3().setFromObject(inner).applyMatrix4(toGroup);
-  const native = box.max.y - box.min.y;
-  const s = native > 1e-6 ? target / native : 1;
-  const lift = native > 1e-6 ? box.min.y * (1 - s) : 0;
-  inner.scale.setScalar(s);
-  inner.position.set(0, lift, 0);
-  const scalePt = (v: THREE.Vector3): THREE.Vector3 => v.clone().multiplyScalar(s).add(new THREE.Vector3(0, lift, 0));
+/** The part a path hangs on (`mechanism/ram-piston` → `mechanism`), or null for a group assembly's own part. */
+const parentPathOf = (path: string): string | null => {
+  const i = path.lastIndexOf('/');
+  return i < 0 ? null : path.slice(0, i);
+};
 
-  // POL-39: Mount square emissive status LED on the housing surface anchor
-  const anchorTuple = HOUSING_LED_ANCHOR[kind] ?? HOUSING_LED_ANCHOR.mill;
-  const ledAnchor = new THREE.Vector3(anchorTuple[0], anchorTuple[1], anchorTuple[2]);
-  const isHeavy = kind.startsWith('heavy-');
-  const ledSize = isHeavy ? 0.18 : 0.13;
-  const ledGeo = new THREE.BoxGeometry(ledSize, ledSize, 0.045);
+/**
+ * One machine, built from its kit.
+ *
+ * The static parts are merged by material and rank (a machine is a handful of draw calls at any detail). The parts a
+ * `KitMotionSpec` moves are built as their own builds and hung on their rest matrices, so a ram's stroke, a bit's spin
+ * or a projector head's sway moves real geometry instead of a merged mesh. A moving part that hangs on another moving
+ * part (the work head on the ram's rod) is placed relative to it, so the stroke carries it and its own spin adds to it.
+ *
+ * The socket points and the fit are arithmetic on the kit's own bounds (`presetBounds`), not a measurement of the built
+ * scene: the same kit always gives the same prop, and the prop is targetable (`build`) and auditable at rest.
+ */
+function kitProp(kind: MachineKind, stage: number, genLevel: GenLevel, overrides?: Overrides): MachineProp {
+  const kit = MACHINE_KITS[kind];
+  const preset = MACHINE_PRESET;
+  const rank = maxRank(stage, tierOfLevel(genLevel));
+  const materials = plotKitMaterials();
+  const resolveMaterial = plotResolve(genLevel, rank);
+  const placed = flatten(kit, preset, overrides);
+  const moving = new Map<string, KitMotionSpec>();
+  for (const p of placed) {
+    const motion = kit.parts[p.part]?.motion;
+    if (motion) moving.set(p.path, motion);
+  }
+  const options = {
+    materials,
+    // every part of a machine is a @hm/partgen primitive: there is no generated model to wait for
+    gen: () => null,
+    resolveMaterial,
+    layering: kitLayering,
+    maxRank: rank,
+    ...(overrides ? { overrides } : {}),
+  };
+  const build = buildKitPreset(kit, preset, { ...options, skip: (path) => moving.has(path) });
+  // a machine kit holds no generated part, so a build can only fail on a malformed kit: stand the machine up empty rather
+  // than leave the plot without its machines
+  const staticBuild = build ?? buildKitPreset({ parts: {}, assemblies: { [preset]: { children: [] } } }, preset, options);
+  const inner = new THREE.Group();
+  inner.name = `fixture:${kind}`;
+  const group = new THREE.Group();
+  group.name = `machine:${kind}`;
+  if (staticBuild) inner.add(staticBuild.group);
+  group.add(inner);
+
+  // the fit: one uniform scale to the machine's real height, its base kept at the ground or on the hardpoint ring
+  const bounds = presetBounds(kit, placed);
+  const native = bounds ? bounds.max[1] - Math.min(0, bounds.min[1]) : 1;
+  const scale = native > 1e-6 ? machineSize(kind).h / native : 1;
+  const base = kind.startsWith('heavy-') ? RING_TOP_Y : 0;
+  inner.scale.setScalar(scale);
+  inner.position.y = base;
+  const place = (v: THREE.Vector3): THREE.Vector3 => new THREE.Vector3(v.x * scale, base + v.y * scale, v.z * scale);
+
+  // the moving parts: each as its own build, on its rest matrix (relative to the moving part it hangs on)
+  const rests = new Map<string, THREE.Matrix4>();
+  for (const p of placed) rests.set(p.path, new THREE.Matrix4().fromArray(p.matrix as number[]));
+  const holders = new Map<string, THREE.Object3D>();
+  const bound: DrivenPart[] = [];
+  for (const p of placed) {
+    const motion = moving.get(p.path);
+    if (!motion) continue;
+    const def = kit.parts[p.part];
+    if (!def) continue;
+    const single: Kit = {
+      parts: { [p.part]: { source: p.source, material: p.material, rank: p.rank } },
+      assemblies: { [preset]: { children: [{ ref: p.part, key: 'part' }] } },
+    };
+    const one = buildKitPreset(single, preset, options);
+    if (!one) continue;
+    const holder = new THREE.Group();
+    holder.name = `mover:${p.path}`;
+    holder.add(one.group);
+    const parent = parentPathOf(p.path);
+    const rest = rests.get(p.path);
+    const parentRest = parent ? rests.get(parent) : null;
+    const local = parentRest && rest ? new THREE.Matrix4().multiplyMatrices(parentRest.clone().invert(), rest) : rest;
+    if (local) {
+      const at = new THREE.Vector3();
+      const quat = new THREE.Quaternion();
+      const scl = new THREE.Vector3();
+      local.decompose(at, quat, scl);
+      holder.position.copy(at);
+      holder.quaternion.copy(quat);
+    }
+    (parent ? holders.get(parent) ?? inner : inner).add(holder);
+    holders.set(p.path, holder);
+    bound.push(driven(holder, motion));
+  }
+
+  const sockets = presetSockets(kit, preset);
+  const point = (name: string): THREE.Vector3 | null => {
+    const s = sockets[name];
+    return s ? place(new THREE.Vector3(s.at[0], s.at[1], s.at[2])) : null;
+  };
+
+  // its lamps are the meshes drawn with a light cartridge (`lx:`), each with its own material so a machine glows alone
+  const lamps: THREE.Mesh[] = [];
+  if (staticBuild) {
+    for (const c of staticBuild.group.children) {
+      if (!(c as THREE.Mesh).isMesh || !c.name.startsWith(MACHINE_LAMP_PREFIX)) continue;
+      const lamp = c as THREE.Mesh;
+      lamp.material = (lamp.material as THREE.Material).clone();
+      lamps.push(lamp);
+    }
+  }
+  for (const h of holders.values()) {
+    h.traverse((c) => {
+      if (!(c as THREE.Mesh).isMesh || !c.name.startsWith(MACHINE_LAMP_PREFIX)) return;
+      const lamp = c as THREE.Mesh;
+      lamp.material = (lamp.material as THREE.Material).clone();
+      lamps.push(lamp);
+    });
+  }
+
+  // POL-39: the status light on the housing's declared socket, facing out of it (the kit names the face; nothing floats)
+  const ledAnchor = point('statusLed') ?? place(new THREE.Vector3(0, MACHINE_BLUEPRINT.deck + 0.8, MACHINE_BLUEPRINT.mounts.controls[2] + 0.15));
+  const ledSize = kind.startsWith('heavy-') ? 0.18 : 0.13;
   const ledMat = new THREE.MeshStandardMaterial({
     color: HOUSING_LED_COLOURS.unpowered,
     emissive: HOUSING_LED_COLOURS.unpowered,
@@ -387,23 +402,13 @@ function fitToTable(p: MachineProp, kind: MachineKind): MachineProp {
     roughness: 0.2,
     metalness: 0.1,
   });
-  const statusLed = new THREE.Mesh(ledGeo, ledMat);
+  const statusLed = new THREE.Mesh(new THREE.BoxGeometry(ledSize, ledSize, 0.045), ledMat);
   statusLed.name = 'housing-status-led';
-  // nothing floats (the owner's rule): the anchor is only where to look; the light sits on the housing's real surface,
-  // facing out of it (measured 21 Oct: the fixed anchors left every light 0.13 to 1.95 m in the air)
-  const mount = ledMount(p.group, inner, kind, ledAnchor);
-  if (mount) {
-    ledAnchor.copy(mount.at);
-    statusLed.position.copy(mount.at).addScaledVector(mount.normal, 0.0245);
-    statusLed.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), mount.normal);
-  } else {
-    statusLed.position.copy(ledAnchor);
-  }
-  p.group.add(statusLed);
+  statusLed.position.copy(ledAnchor).add(new THREE.Vector3(0, 0, LED_STANDOFF));
+  group.add(statusLed);
 
   let lastConnected = true;
   let lastSatisfaction = 1;
-
   const setStatusLed = (running: number, connected: boolean, satisfaction = 1, t = 0): void => {
     lastConnected = connected;
     lastSatisfaction = satisfaction;
@@ -413,309 +418,38 @@ function fitToTable(p: MachineProp, kind: MachineKind): MachineProp {
     ledMat.emissiveIntensity = st.intensity;
     statusLed.userData.ledStatus = st.status;
   };
+  const motion = driveMotion(bound);
+  const setGlow = (glow: number): void => {
+    const g = Math.max(0, Math.min(1, glow)) * 1.6;
+    for (const l of lamps) {
+      const m = l.material as THREE.MeshStandardMaterial;
+      if ('emissiveIntensity' in m) m.emissiveIntensity = g;
+    }
+  };
 
-  const baseAnimate = p.animate;
-  const baseLight = p.light;
-
-  let edgeMesh: THREE.Mesh | null = null;
-  let baseY: number | null = null;
-
-  return {
-    ...p,
-    power: scalePt(p.power),
-    vent: p.vent ? scalePt(p.vent) : null,
-    feed: p.feed ? scalePt(p.feed) : null,
-    top: p.top ? scalePt(p.top) : null,
-    lamps: [...p.lamps, statusLed],
+  const prop: MachineProp & { readonly build: KitBuild } = {
+    build: staticBuild!,
+    group,
+    power: point('power') ?? place(new THREE.Vector3(0, MACHINE_BLUEPRINT.deck, 0)),
+    vent: point('vent'),
+    feed: point('feed'),
+    top: point('top'),
+    lamps: [...lamps, statusLed],
     statusLed,
     ledAnchor,
-    animate(t, running, stage) {
-      baseAnimate(t, running, stage);
-      if (kind !== 'pylon') {
-        setStatusLed(running, lastConnected, lastSatisfaction, t);
-      }
+    animate(t, running, stageAnim) {
+      motion(t, running, stageAnim);
+      if (kind !== 'pylon') setStatusLed(running, lastConnected, lastSatisfaction, t);
     },
     light(glow) {
-      baseLight(glow);
-      if (glow > 0.5) {
-        setStatusLed(1, true, 1, 0);
-      } else if (glow > 0.05) {
-        setStatusLed(0, true, 0.5, 0);
-      } else {
-        setStatusLed(0, false, 0, 0);
-      }
+      setGlow(glow);
+      if (glow > 0.5) setStatusLed(1, true, 1, 0);
+      else if (glow > 0.05) setStatusLed(0, true, 0.5, 0);
+      else setStatusLed(0, false, 0, 0);
     },
     setStatusLed,
-    applyPrintSweep(clip: number, offsetM: number): void {
-      if (baseY === null) baseY = p.group.position.y;
-      p.group.position.y = baseY + offsetM;
-      if (clip < 1.0) {
-        inner.scale.set(s, Math.max(0.02, s * clip), s);
-        if (!edgeMesh) {
-          const edgeW = Math.max(1.2, (box.max.x - box.min.x) * s * 1.08);
-          const edgeD = Math.max(1.2, (box.max.z - box.min.z) * s * 1.08);
-          const edgeGeo = new THREE.BoxGeometry(edgeW, 0.05, edgeD);
-          const edgeMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(PRINT_EDGE_HEX), transparent: true, opacity: 0.95 });
-          edgeMesh = new THREE.Mesh(edgeGeo, edgeMat);
-          edgeMesh.name = 'print-sweep-edge';
-          p.group.add(edgeMesh);
-        }
-        edgeMesh.position.set(0, target * clip, 0);
-      } else {
-        inner.scale.setScalar(s);
-        if (edgeMesh) {
-          p.group.remove(edgeMesh);
-          edgeMesh.geometry.dispose();
-          (edgeMesh.material as THREE.Material).dispose();
-          edgeMesh = null;
-        }
-        baseY = null;
-      }
-    },
   };
-}
-
-/**
- * The prop for a machine at a stage (0 or 1: chunky low poly; from 2: full detail), standing its real height (fitToTable).
- * A kit-built machine takes the beam's part overrides (plan 38: a printed part fitted onto a bolt or a panel).
- */
-export function machineProp(m: lab.LabMaterials, kind: MachineKind, stage: number, genLevel: GenLevel = 'low', overrides?: Overrides): MachineProp {
-  return fitToTable(buildMachineProp(m, kind, stage, genLevel, overrides), kind);
-}
-
-function buildMachineProp(m: lab.LabMaterials, kind: MachineKind, stage: number, genLevel: GenLevel, overrides?: Overrides): MachineProp {
-  const st = stage <= 1 ? 1 : 6;
-  const still = (): void => undefined;
-  const lift = new THREE.Vector3(0, RING_TOP_Y, 0);
-
-  switch (kind) {
-    case 'heavy-mill':
-    case 'mill': {
-      // a kit frame around the generated core (plan 38, TICKET-39), when the core has loaded
-      if (kind === 'heavy-mill') {
-        const kitted = heavyKitProp(kind, stage, genLevel, RING_TOP_Y, overrides);
-        if (kitted) return kitted;
-      }
-      const gen = getGenSync('mill', genLevel);
-      if (gen) {
-        const group = new THREE.Group();
-        group.name = `gen-${kind}`;
-        const isHeavy = kind === 'heavy-mill';
-        if (isHeavy) gen.position.copy(lift);
-        group.add(gen);
-        // the ore goes in at the top hopper; the pixels come out of the side stack (GEN_VENT, the measured socket: ARGO_NOTE_16 ruling 5)
-        const base = isHeavy ? RING_TOP_Y : 0;
-        const vent = genPoint(GEN_VENT.mill, base);
-        const feed = genPoint(GEN_FEED.mill, base);
-        const power = new THREE.Vector3(0, base + 0.2, -1.8);
-        return {
-          group,
-          power,
-          vent,
-          feed,
-          top: null,
-          lamps: [],
-          animate: still,
-          light: still,
-        };
-      }
-      if (kind === 'heavy-mill') {
-        const p = basegear.heavyMill(m as any, { stage: st });
-        p.group.position.y += RING_TOP_Y;
-        const rawPower = at(p.sockets, 'power') ?? new THREE.Vector3(0, 0.1, -1.58);
-        const rawVent = at(p.sockets, 'vent') ?? new THREE.Vector3(1.715, 2.28, -0.48);
-        const rawFeed = at(p.sockets, 'hopper', 'feed');
-        return {
-          group: p.group,
-          power: rawPower.clone().add(lift),
-          vent: rawVent.clone().add(lift),
-          feed: rawFeed ? rawFeed.clone().add(lift) : findMachineVent(p.group, RING_TOP_Y, 0, 0.6),
-          top: null,
-          lamps: p.lamps,
-          animate: still,
-          light: (g) => p.lamps.forEach((l) => basegear.setLamp(l, g)),
-        };
-      }
-      const p = consoleMillTextureMill(m, { stage: st });
-      return { group: p.group, power: at(p.sockets, 'power')!, vent: at(p.sockets, 'stack'), feed: at(p.sockets, 'hopper'), top: null, lamps: p.lamps, animate: still, light: (g) => p.lamps.forEach((l) => setConsoleMillLamp(l, g)) };
-    }
-    case 'heavy-press':
-    case 'press': {
-      // a kit frame around the generated core (plan 38, TICKET-39), when the core has loaded
-      if (kind === 'heavy-press') {
-        const kitted = heavyKitProp(kind, stage, genLevel, RING_TOP_Y, overrides);
-        if (kitted) return kitted;
-      }
-      const frame = getGenSync('press-frame', genLevel);
-      const ram1 = getGenSync('press-ram', genLevel);
-      const ram2 = getGenSync('press-ram', genLevel);
-      if (frame && ram1 && ram2) {
-        const group = new THREE.Group();
-        group.name = `gen-${kind}`;
-        const isHeavy = kind === 'heavy-press';
-        const baseY = isHeavy ? RING_TOP_Y : 0;
-        frame.position.set(0, baseY, 0);
-        group.add(frame);
-        const restY = baseY + 2.1;
-        ram1.position.set(-0.55, restY, 0);
-        ram2.position.set(0.55, restY, 0);
-        group.add(ram1, ram2);
-        // the rock goes in at the top chute; the pixels come out of the measured side stack (GEN_VENT, ARGO_NOTE_16 ruling 5)
-        const vent = genPoint(GEN_VENT.press, baseY);
-        const feed = genPoint(GEN_FEED.press, baseY);
-        const power = new THREE.Vector3(0, baseY + 0.2, 0.8);
-        return {
-          group,
-          power,
-          vent,
-          feed,
-          top: null,
-          lamps: [],
-          animate: driveMotion(drivenAll([[ram1, PRESS_RAM_STROKE], [ram2, PRESS_RAM_STROKE_B]])),
-          light: still,
-        };
-      }
-      if (kind === 'heavy-press') {
-        const p = heavygear.heavyPress(m as any, { stage: st });
-        p.group.position.y += RING_TOP_Y;
-        const rawPower = at(p.sockets, 'power') ?? new THREE.Vector3(0, 0, 0.76);
-        const rawVent = at(p.sockets, 'vent') ?? new THREE.Vector3(0, 3.2, -0.56);
-        const rawFeed = at(p.sockets, 'chute', 'hopper', 'feed') ?? new THREE.Vector3(0, 4.26, 0);
-        const ram = p.parts?.ram;
-        return {
-          group: p.group,
-          power: rawPower.clone().add(lift),
-          vent: rawVent.clone().add(lift),
-          feed: rawFeed.clone().add(lift),
-          top: null,
-          lamps: p.lamps,
-          animate: driveMotion(drivenAll([[ram, HEAVY_PRESS_RAM_STROKE]])),
-          light: (g) => p.lamps.forEach((l) => heavygear.setLamp(l, g)),
-        };
-      }
-      const p = field.shapePress(m, { stage: st });
-      return {
-        group: p.group, power: at(p.sockets, 'power')!, vent: at(p.sockets, 'vent'), feed: at(p.sockets, 'feed'), top: null, lamps: p.lamps,
-        // a generated core's rams tap rather than strike (kit-motion-specs), alternating as the twins do
-        animate: driveMotion(drivenAll(p.rams.map((r, i) => [r, i % 2 ? PRESS_RAM_STROKE_B : PRESS_CORE_RAM_STROKE] as const))),
-        light: (g) => p.lamps.forEach((l) => field.setLamp(l, g)),
-      };
-    }
-    case 'heavy-projector':
-    case 'projector': {
-      const mast = getGenSync('projector-mast', genLevel);
-      const head = getGenSync('projector-head', genLevel);
-      if (mast && head) {
-        const group = new THREE.Group();
-        group.name = `gen-${kind}`;
-        const isHeavy = kind === 'heavy-projector';
-        const baseY = isHeavy ? RING_TOP_Y : 0;
-        mast.position.set(0, baseY, 0);
-        group.add(mast);
-        const restY = baseY + 2.65;
-        head.position.set(0, restY, 0);
-        group.add(head);
-        const vent = findMachineVent(group, baseY, 0, 0);
-        const power = new THREE.Vector3(0, baseY + 0.2, 0.8);
-        return {
-          group,
-          power,
-          vent,
-          feed: null,
-          top: null,
-          lamps: [],
-          animate: driveMotion(drivenAll([[head, PROJECTOR_HEAD_TILT]])),
-          light: still,
-        };
-      }
-      if (kind === 'heavy-projector') {
-        const p = heavygear.heavyProjector(m as any, { stage: st });
-        p.group.position.y += RING_TOP_Y;
-        const rawPower = at(p.sockets, 'power') ?? new THREE.Vector3(0, 0, 0.6);
-        const rawVent = at(p.sockets, 'vent') ?? new THREE.Vector3(0, 4.1, -0.66);
-        const head = p.parts?.head;
-        return {
-          group: p.group,
-          power: rawPower.clone().add(lift),
-          vent: rawVent.clone().add(lift),
-          feed: null,
-          top: null,
-          lamps: p.lamps,
-          animate: driveMotion(drivenAll([[head, PROJECTOR_HEAD_TILT]])),
-          light: (g) => p.lamps.forEach((l) => heavygear.setLamp(l, g)),
-        };
-      }
-      const p = field.lightProjector(m, { stage: st });
-      return { group: p.group, power: at(p.sockets, 'power')!, vent: at(p.sockets, 'vent'), feed: null, top: null, lamps: p.lamps, animate: driveMotion(drivenAll([[p.head, PROJECTOR_HEAD_TILT]])), light: (g) => p.lamps.forEach((l) => field.setLamp(l, g)) };
-    }
-    case 'heavy-water':
-    case 'water': {
-      // a kit frame around the generated core (plan 38, TICKET-39), when the core has loaded
-      if (kind === 'heavy-water') {
-        const kitted = heavyKitProp(kind, stage, genLevel, RING_TOP_Y, overrides);
-        if (kitted) return kitted;
-      }
-      const gen = getGenSync('watermaker', genLevel);
-      if (gen) {
-        const group = new THREE.Group();
-        group.name = `gen-${kind}`;
-        const isHeavy = kind === 'heavy-water';
-        const baseY = isHeavy ? RING_TOP_Y : 0;
-        gen.position.set(0, baseY, 0);
-        group.add(gen);
-        // sheet 12: the ore comes in at the side screw, the cyan pixels out of the top-rear vent
-        const vent = findMachineVent(gen, baseY, 0, -0.6);
-        const feed = genPoint(GEN_FEED.water, baseY);
-        const power = new THREE.Vector3(0, baseY + 0.2, 0.8);
-        return {
-          group,
-          power,
-          vent,
-          feed,
-          top: null,
-          lamps: [],
-          animate: still,
-          light: still,
-        };
-      }
-      if (kind === 'heavy-water') {
-        const p = heavygear.heavyWater(m as any, { stage: st });
-        p.group.position.y += RING_TOP_Y;
-        const rawPower = at(p.sockets, 'power') ?? new THREE.Vector3(0, 0, 0.6);
-        const rawVent = at(p.sockets, 'vent') ?? new THREE.Vector3(0, 3.155, -0.58);
-        const rawFeed = at(p.sockets, 'hopper', 'feed') ?? new THREE.Vector3(1.4, 1.6, 0);
-        return {
-          group: p.group,
-          power: rawPower.clone().add(lift),
-          vent: rawVent.clone().add(lift),
-          feed: rawFeed.clone().add(lift),
-          top: null,
-          lamps: p.lamps,
-          animate: still,
-          light: (g) => p.lamps.forEach((l) => heavygear.setLamp(l, g)),
-        };
-      }
-      const p = field.waterMaker(m, { stage: st });
-      return { group: p.group, power: at(p.sockets, 'power')!, vent: at(p.sockets, 'vent'), feed: at(p.sockets, 'feed'), top: null, lamps: p.lamps, animate: still, light: (g) => p.lamps.forEach((l) => field.setLamp(l, g)) };
-    }
-    case 'drill': {
-      // the drill takes no ore in (its ore leaves at the tray, sheet 12): no feed hopper; its dim wisp comes from the rear stack
-      const p = field.rockDrill(m, { stage: st });
-      const vent = at(p.sockets, 'vent', 'exhaust') ?? findMachineVent(p.group, 0, 0, -0.25);
-      return { group: p.group, power: at(p.sockets, 'power')!, vent, feed: null, top: null, lamps: p.lamps, animate: driveMotion(drivenAll([[p.bit, DRILL_BIT_SPIN]])), light: (g) => p.lamps.forEach((l) => field.setLamp(l, g)) };
-    }
-    case 'power': {
-      // the power unit takes no ore in (ARGO_NOTE_16 ruling 3): no feed hopper, and its violet steam comes off the steam socket
-      const p = field.powerUnit(m, { stage: st });
-      return { group: p.group, power: at(p.sockets, 'out')!, vent: at(p.sockets, 'steam'), feed: null, top: null, lamps: p.lamps, animate: still, light: (g) => p.lamps.forEach((l) => field.setLamp(l, g)) };
-    }
-    case 'pylon': {
-      // a pylon takes no material in: its corona sparks come off the top insulator, under load
-      const p = field.relayPylon(m, { stage: st });
-      const top = new THREE.Vector3(...p.top);
-      return { group: p.group, power: at(p.sockets, 'box')!, vent: top.clone(), feed: null, top, lamps: p.lamps, animate: still, light: (g) => p.lamps.forEach((l) => field.setLamp(l, g)) };
-    }
-  }
+  return prop;
 }
 
 /** A sagging line between two pylons' tops (world points). */

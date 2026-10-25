@@ -1,43 +1,28 @@
 /**
- * The plot's kit-built machines (plan 38 section 9; Argo's TICKET-39 kit specs). The heavy Texture Mill, Shape Press
- * and Water Maker keep their generated cores and gain a modular outer frame (skid, columns, crown, doors, vents, bolts),
- * whose detail rank follows the stage and the Graphics tier: the frame's silhouette from the start, its doors and vents
- * from stage 2, its bolts and grilles from stage 3 on Medium or High. The frames draw in Argo's two trim materials
- * (ARGO_NOTE_34 4d), and their parts take part cartridges like the lab's capacitor bank.
+ * The plot's kit-built machines (plan 38 section 9; Argo's TICKET-39 kit specs). Every machine now comes from its own
+ * machine kit (`kit-machines.ts`, JOB-08), so this module holds what the plot builds *beside* the machines: the shared
+ * trim and swatch materials a kit draws with, the Quantum Archway Gate as a kit, and the vehicle fabricator's frame.
+ * What the module no longer holds is the legacy stopgap — a modular frame wrapped around a generated `.glb` core, and
+ * the ray-measured status-light mount that went with it (`machine-props.ts` reads a declared `statusLed` socket now).
  */
 import * as THREE from 'three';
-import { flatten, maxRank, presetSockets, transformPoint, type Kit, type KitMotionSpec, type Overrides } from '@hm/kitspec';
-import type { MachineKind } from '@hm/plotsim';
+import { flatten, maxRank, presetSockets, transformPoint, type Kit, type Overrides } from '@hm/kitspec';
 import { type GenLevel, getGenSync } from '../assets/gen';
 import { buildKitPreset } from './kit-build';
-import { kitMachineProp, tierOfLevel } from './kit-machine';
+import { tierOfLevel } from './kit-machine';
 import { FABRICATOR_FRAME_KIT } from './kit-fabricator-frame';
-import type { MachineProp } from './machine-props';
 import { KIT_TRIM_PALETTE } from './kit-trim-palette';
-import { MILL_FRAME_KIT } from './kit-mill-frame';
-import { PRESS_FRAME_KIT } from './kit-press-frame';
-import { WATERMAKER_FRAME_KIT } from './kit-watermaker-frame';
 import { PART_SWATCHES } from './part-swatches';
 import { vaultSkin } from './vault-skin';
 import { lightMaterial } from './light-material';
 import { kitLayering, layeredMaterial, type LayeredEnv } from './layered-material';
 import type { GateAccessMode } from '@hm/coopnet/gate-dialer';
-import { driveMotion, drivenAll } from './machine-motion';
-import { motionFor } from './kit-motion-specs';
 import { STARGATE_PRESET, stargateKit } from './kit-stargate';
 import type { KitBuild } from './kit-build';
 
-/** The heavy machines built from a kit, and the preset that is the whole machine. */
-export const HEAVY_KITS: Partial<Record<MachineKind, { readonly kit: Kit; readonly preset: string }>> = {
-  'heavy-mill': { kit: MILL_FRAME_KIT, preset: 'mill-frame' },
-  'heavy-press': { kit: PRESS_FRAME_KIT, preset: 'press-frame' },
-  'heavy-water': { kit: WATERMAKER_FRAME_KIT, preset: 'watermaker-frame' },
-};
-
 /**
- * The kit frames are off until Argo refits them to the real cores (TICKET-39b): the specs assumed a mill body of
- * +-1.72 m, but the generated mill is a +-1.1 m body on a +-2.0 m plinth, so the door, the status bar and the junction
- * box hang in the air in front of it. The debug switch (__dev.kitFrames) turns them on to test the beam's Apply.
+ * The kit frames are off until Argo refits them to the real cores (TICKET-39b): the gate and the vehicle fabricator keep
+ * their own visuals from the twin. The debug switch (`__dev.kitFrames`) turns them on to test the beam's Apply.
  */
 let kitFrames = false;
 export const setKitFrames = (on: boolean): void => { kitFrames = on; };
@@ -80,7 +65,7 @@ export function plotKitMaterials(): Readonly<Record<string, THREE.Material>> {
 }
 
 /** How a plot kit resolves a name the record does not hold: a Texture Mill skin, a lamp, a layered material at `rank`. */
-const plotResolve = (genLevel: GenLevel, rank: 0 | 1 | 2) => (name: string): THREE.Material | null =>
+export const plotResolve = (genLevel: GenLevel, rank: 0 | 1 | 2) => (name: string): THREE.Material | null =>
   vaultSkin(name, genLevel !== 'low') ?? lightMaterial(name) ?? layeredMaterial(name, rank, plotEnv ?? undefined);
 
 /** The kit with one child taken out of an assembly; the later children's `on.child` indices are renumbered. */
@@ -178,52 +163,4 @@ export function kitFabricator(genLevel: GenLevel, stage: number, ringY: number):
   const sockets: Record<string, { at: readonly number[] }> = {};
   for (const [name, s] of Object.entries(presetSockets(FABRICATOR_FRAME_KIT, FAB_PRESET))) sockets[name] = { at: [s.at[0], s.at[1] + ringY, s.at[2]] };
   return { group, head, sockets };
-}
-
-/**
- * A heavy machine as a kit-built prop, standing on the hardpoint ring (`ringY`), or null when it has no kit, the frames
- * are switched off, or its generated core has not loaded yet (the caller then builds it as before). The press keeps its
- * two working rams, hung at the kit's ram sockets.
- */
-export function heavyKitProp(kind: MachineKind, stage: number, genLevel: GenLevel, ringY: number, overrides?: Overrides): MachineProp | null {
-  const spec = HEAVY_KITS[kind];
-  if (!spec || !kitFrames) return null;
-  const prop = kitMachineProp(spec.kit, spec.preset, {
-    materials: plotKitMaterials(),
-    gen: (asset) => getGenSync(asset, genLevel),
-    resolveMaterial: plotResolve(genLevel, maxRank(stage, tierOfLevel(genLevel))),
-    stage,
-    genLevel,
-    ...(overrides ? { overrides } : {}),
-  });
-  if (!prop) return null;
-  const lift = new THREE.Vector3(0, ringY, 0);
-  prop.build.group.position.y = ringY;
-  const up = (v: THREE.Vector3 | null): THREE.Vector3 | null => (v ? v.clone().add(lift) : null);
-  let animate = prop.animate;
-  if (kind === 'heavy-press') {
-    // the ram sockets carry the stroke (plan 43): the frame says how the ram it holds moves, this builder only bolts it on
-    const sockets = presetSockets(spec.kit, spec.preset);
-    const fallback = motionFor('heavy-press', 'ram-a');
-    const bound: [THREE.Object3D | null, KitMotionSpec][] = [];
-    for (const [name, key] of [['ramLeft', 'ram-a'], ['ramRight', 'ram-b']] as const) {
-      const s = sockets[name];
-      const ram = s ? getGenSync('press-ram', genLevel) : null;
-      if (ram && s) {
-        ram.position.set(s.at[0], s.at[1] + ringY, s.at[2]);
-        prop.group.add(ram);
-      }
-      const motion = s?.motion ?? motionFor('heavy-press', key) ?? fallback;
-      if (motion) bound.push([ram, motion]);
-    }
-    animate = driveMotion(drivenAll(bound));
-  }
-  return {
-    ...prop,
-    power: up(prop.power)!,
-    vent: up(prop.vent),
-    feed: up(prop.feed ?? null),
-    top: up(prop.top),
-    animate,
-  };
 }

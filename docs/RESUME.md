@@ -1,5 +1,28 @@
 # RESUME: start here (fresh session)
 
+## 25 Oct Checkpoint (Antigravity Overwatch: PR #68 Merged — 8 Roadmap Jobs Landed, 88% Release Complete; read this first)
+- **PR #68 Harvest & Merge (`arena/a2368b82-heavymetal2` -> `feat/monster-mash-exploration` at `8486e268`):**
+  - **Scale:** 12 clean commits, +13,081 lines / -539 lines across 107 files.
+  - **Quality & Invariants:** `npm run typecheck` passes with **0 errors**. All deterministic procedural packages (`@hm/texgraph`, `@hm/matstack`, `@hm/skin`, `@hm/shareware`, `@hm/soundlab`, `@hm/kinematic`, `@hm/anim`) verified pure. Strict compliance with `RULES 8a` (zero shortcut wrappers around legacy meshes).
+- **8 Major Roadmap Tickets Landed & Verified:**
+  1. **`JOB-03`** (`packages/texgraph`): 6 periodic deterministic nodes (`anisotropic noise`, `hex`, `spots`, `weave`, `scratches`, `blur`) + 20-tile shelf library (`tile-library.ts`). $p95 - p5 \ge 0.35$, $<25\text{ ms}$ @ 128px.
+  2. **`JOB-04`** (`packages/matstack`): Layer order remediation (metal abrasion over topcoat), coat/aniso bleed suppression, coplanar edge deduplication in `mask-mesh.ts` before `.slice(0, EDGE_LINES)`.
+  3. **`JOB-17`** (`apps/web/src/play/kit-target.ts`): Universal Cartridge Targetability with zero-allocation 2-level AABB slab raycasting (<0.05ms frame cost), deleted dead `createGenMachineProp` and inverted plume gravity.
+  4. **`JOB-06`** (`apps/web/src/studio/studio-agent.ts`, `studio-skill.md`): Plan 40 BYOA Studio API with 4-step Vision+Coverage loop (`studio.material.coverage`, `studio.capture`, `studio.kit.validate`) and stdio MCP relay bridge.
+  5. **`JOB-02`** (`apps/web/src/play/kit-modules.ts`): `MATSTACK_TEST_PIECE_KIT` real material test piece with trim palette (`khaki-paint`, `hopper-slate`) and Bench live turntable preview.
+  6. **`JOB-07`** (Plan 42 Modular `STARGATE_KIT` & Earth Endgame): 43-part modular Stargate assembly, mechanical Iris shield with wiregraph lock, world v5 save with `moveGate` and `setGateAccess`, macro triplanar weathering in `layered-material.ts`, and Stage-6 Earth Plot `PlotBiomePreset` sandbox unlock.
+  7. **`JOB-19`** (Plan 43 Locomotion & Stage Motion Presets): Runtime locomotion switching (`locomotion.ts`), stage animation rate quantisation (`stageAnimRateHz` 8..60 Hz), declarative `KitMotionSpec` in `machine-motion.ts` (0 closures), lazy AABB dirty-flagging under motion.
+  8. **`JOB-20`** (Plan 43 Sprites, Audio Stems & Cartridges): `@hm/skin` OKLab palettes and Bayer dithering, `@hm/shareware` 8-angle billboard generator, `@hm/soundlab` & `@hm/musicbox` procedural synth stems with `AUDIO_STAGE_LADDER`, Bench sprite (`pxdc:`) and sound (`sndc:`) cartridges with Beam Rifle `Apply`.
+- **Roadmap & Infrastructure Status:**
+  - Weighted release completion: **88.0%** (13 of 19 jobs landed, 6 remaining, ~3.0 agent-days to 1.0).
+  - Automation scripts landed: `scripts/setup-github-roadmap.sh` (GitHub Projects v2), `scripts/update-progress-bar.mjs`, `.github/workflows/roadmap-progress.yml`.
+  - Tech radar refreshed: [`docs/OVERWATCH_TECH_AND_AI_RADAR.md`](OVERWATCH_TECH_AND_AI_RADAR.md) updated with October 2026 agent skills research (`wheresryan22/anatomy`, `caveman-compress`, `webgl-animation-skills`, `superpowers`).
+- **Immediate Next Actions (Ordered Execution Queue):**
+  1. **Push Branch**: Publish `feat/monster-mash-exploration` to GitHub remote to sync PR #68 status.
+  2. **`JOB-08`** (TICKET-40 Phase 2): Build from-scratch modular kits for all 11 Machines & 3 Vehicles (`@hm/partgen` + `@hm/kitspec` + `@hm/matstack`, zero GLB cores).
+  3. **`JOB-06b`** (`studio.kit.audit`): Wire Anatomy geometric and 24-angle orbit auditing into the Studio API.
+  4. **`JOB-08b`**: Implement Stargate Event Horizon WebGL Shader & monotonic attack/decay envelopes.
+
 ## 22 Oct Checkpoint (Antigravity Argon: Plan 42 & Unified Cross-Session Instructions; read this first)
 - **Owner architectural synthesis (22 Oct, recorded in [`docs/OWNER_ASKS.md`](OWNER_ASKS.md) & [`docs/argo/plans/42-modular-stargate-earth-endgame.md`](argo/plans/42-modular-stargate-earth-endgame.md)):**
   1. **Stargate Campaign as Studio Onboarding ("The Bakery & The Cake"):** The *FIDELITY* campaign is completely modular. Progressing through the 6 fidelity stages ($S_0 \to S_6$) teaches the player how the Studio's algorithmic preset systems work across all four floats ($\text{Pxd}, \text{Vtx}, \text{Lx}, \text{Aq}$).

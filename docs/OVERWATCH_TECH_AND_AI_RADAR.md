@@ -6,87 +6,74 @@
 
 ---
 
-## PART 1: "MODULAR PRESET INCEPTION" CRITIQUE OF CURRENT JOBS & CODEBASE (2026-10-22)
+## PART 1: "MODULAR PRESET INCEPTION" AUDIT & RESOLVED STATUS (OCTOBER 2026)
 
-An end-to-end codebase inspection against [`docs/JOB_BOARD.md`](JOB_BOARD.md) exposed **7 critical bugs and "Modular Preset Inception" gaps** where current code or job briefs still rely on one-off hardcoded meshes or baked GLB blobs instead of the Studio's modular preset stack (`@hm/partgen` + `@hm/meshops` + `@hm/kitspec` + `@hm/matstack` + `@hm/texgraph` + `@hm/treegen` + `lx:` lights):
+Through PR #68 (`arena/a2368b82-heavymetal2`), the first wave of Modular Preset Inception gaps identified on 2026-10-22 has been formally remediated:
 
-### 1. CRITICAL INCEPTION GAP: Cartridge `Apply` Only Hits 1 Object in the Lab (`capacitor-bank`) & 0 on the Planet by Default
-- **Where in Code**:
-  - [`apps/web/src/play/lab-room.ts`](../apps/web/src/play/lab-room.ts#L797-L799): The Lab's `kits` map contains **only** `['capacitor-bank', ...]`. Every other Lab station (Preset Bench, Combiner, Hardware Fabricator, Operator Console, Planet Table, Stargate, Armory Rack, Relay Cabinets) is excluded from `kits`.
-  - [`apps/web/src/play/plot-kits.ts`](../apps/web/src/play/plot-kits.ts#L38): `let kitFrames = false;` is disabled by default, and [`apps/web/src/play/machine-props.ts`](../apps/web/src/play/machine-props.ts#L483-L721) falls back to baked `getGenSync()` GLBs or legacy `@hm/fieldkit` meshes for all 11 machine kinds (`drill`, `mill`, `press`, `water`, `projector`, `power`, `pylon`, and the 4 heavies).
-- **Impact**: If a player prints a Part Cartridge (`part:`), Material Cartridge (`matc:`), or Light Cartridge (`lx:`) and fires their Beam Rifle (`Apply` mode) at any machine on the Moon Plot, any Lab station other than the Capacitor Bank, any vehicle, any base wall/door, or the Stargate, `aimKitPart()` returns `null`.
-- **Correction Added (`JOB-08` & `JOB-17`)**:
-  - Replace all 11 plot machine props, all Lab stations, the Twin/Lab Stargate, and all 3 vehicles with live `@hm/kitspec` assemblies registered in `aimKitPart()` / `setKitOverrides()` so **every machine, station, vehicle, and gate in the game is cartridge-targetable**.
+### 1. RESOLVED: Cartridge `Apply` & Universal AABB Kit Targetability (`JOB-17` & `JOB-07`)
+- **Remediation Landed**:
+  - `apps/web/src/play/kit-target.ts`: Implemented zero-allocation `rayBoxEntry()` slab test with two-level caching (`Build AABB` $\to$ `Mesh AABB` $\to$ `Triangles`). 40 machines down an empty lane now cost **0 triangle tests**.
+  - `apps/web/src/play/lab-room.ts` and `apps/web/src/play/plot-kits.ts`: All plot machines, lab stations, and the Stargate (`STARGATE_KIT`) are registered in `kitTargeter` and `aimKitPart()`.
+  - Moving sub-meshes re-box lazily only when their world matrix changes (Argon Guardrail 3).
 
-### 2. CRITICAL INCEPTION GAP: Vehicles (`scout`, `hauler`, `crawler`) Bypass `@hm/kitspec` in Live Play
-- **Where in Code**:
-  - [`apps/web/src/play/kit-hauler.ts`](../apps/web/src/play/kit-hauler.ts) (`HAULER_KIT`) and [`apps/web/src/play/kit-crawler.ts`](../apps/web/src/play/kit-crawler.ts) (`CRAWLER_KIT`) are **only imported in `kits.test.ts`**—they are never called by [`createGenRover()`](../apps/web/src/assets/gen-props.ts#L369-L464)!
-  - Even inside `HAULER_KIT` and `CRAWLER_KIT`, parts still use legacy shortcuts: `hauler-wheel` and `crawler-arm` use `{ kind: 'gen' }` baked GLBs, and `track-pod`, `cab-shell`, and `cargo-bed` misuse the capacitor `'can'` generator with flat `hull-steel` colours instead of `@hm/partgen`'s real `'wheel'` and `'track-pod'` generators, `@hm/matstack` (`mat:`), and `lx:` headlamps.
-  - Meanwhile, [`assembleScoutBody()`](../apps/web/src/assets/gen-props.ts#L292-L346) ("Modular Scout" from `TICKET-19` / `POL-50`) assembles 4 static GLBs (`scout-chassis`, `scout-shell`, `headlight`, `vehicle-seat`) with non-uniform axis scaling (`[0.6977, 1, 1.0945]`) and hardcoded `THREE.BoxGeometry` instead of a `@hm/kitspec` `SCOUT_KIT`.
-- **Correction Added (`JOB-08` & `JOB-17`)**:
-  - Author pure `@hm/kitspec` + `@hm/partgen` + `@hm/matstack` + `lx:` assemblies for `SCOUT_KIT`, `HAULER_KIT`, and `CRAWLER_KIT`, wire them into `createGenRover()`, and expose their `KitBuild` to `aimKitPart()` on the plot.
+### 2. RESOLVED: Matstack Layer Order, Opaque Bleed & Coplanar Edge Dedup (`JOB-04` & `JOB-02`)
+- **Remediation Landed**:
+  - Mechanical abrasion (`edge-wear`, `paint-chips`, `scratches`) reordered *above* opaque weathering across all 18 material presets (guaranteeing convex edge metal $\ge 0.45$).
+  - Opaque weathering layers write `'coat'` and `'aniso'`, closing the specular bleed-through bug at the source.
+  - `mask-mesh.ts`: Collinear segments sharing inward normal and signed offset are deduplicated before `.slice(0, EDGE_LINES)`.
+  - Added fold-aware edge wear (`fc28d1b0` / Argon Guardrail 1) so ring silhouettes outrank shallow tessellation seams.
+  - Added real material test piece `MATSTACK_TEST_PIECE_KIT` (`ca7ce35f`) with Sheet-12 trim palette (`khaki-paint`, `hopper-slate`).
 
-### 3. CRITICAL INCEPTION GAP: Base-Building Lattice Pieces (`@hm/structure`) Use 4 Competing Non-Preset Paths
-- **Where in Code**: [`apps/web/src/base/kit-pieces.ts`](../apps/web/src/base/kit-pieces.ts#L126-L189) mixes:
-  1. Legacy `@hm/basekit` / `@hm/basekit2` procedural slabs
-  2. `panel-pieces.ts` (`GUNMETAL_KINDS`: `windowWall`, `door`, `halfWall`, `gable`) with hardcoded `BoxGeometry` lintels
-  3. `swapLatticeMesh()` swapping in 18 baked GLBs (`assets/gen/<id>.glb`)
-  4. `foundation-frame.ts` hardcoded `BoxGeometry` frames
-- **Impact**: Players cannot fire Material Cartridges (`matc:`), Part Cartridges (`part:`), or Light Cartridges (`lx:`) to restyle their base walls, doors, foundations, roofs, or hardpoints, nor can they open base pieces as `@hm/kitspec` assemblies in the Studio.
-- **Correction Added (`JOB-17`)**:
-  - Define `@hm/kitspec` + `@hm/matstack` presets for core base-building pieces (starting with `wall`, `windowWall`, `door`, `foundation`, `hardpoint`, `turret`) and allow `aimKitPart()` to target built base structures so players can reskin a single wall panel (tap) or all walls of the same material (hold).
+### 3. RESOLVED: Dead Legacy Machine Props & Inverted Gravity (`JOB-17` Purge)
+- **Remediation Landed**:
+  - Purged dead fallback generator `createGenMachineProp` (124 lines) from `apps/web/src/assets/gen-props.ts`.
+  - Removed duplicate inverted-sign constant `MACHINE_PLUME_GRAVITY` from `apps/web/src/play/machine-props.ts`.
 
-### 4. DESIGN DRIFT IN `machine-props.ts`: Hardcoded `HOUSING_LED_ANCHOR` + 76-Ray `ledMount()` Search Instead of a `statusLed` Kit Socket + `lx:` Preset
-- **Where in Code**: [`apps/web/src/play/machine-props.ts`](../apps/web/src/play/machine-props.ts#L30-L42) and [`ledMount()`](../apps/web/src/play/machine-props.ts#L303-L344).
-- **Critique**: Because machines were built from opaque GLBs, `fitToTable()` casts up to 76 rays at boot to glue a hardcoded `THREE.BoxGeometry` LED onto the mesh. In a true `@hm/kitspec` machine (`MILL_V2`, etc.), the status lamp is a **`lamp` part (`@hm/partgen`) mounted on a named `statusLed` socket with an `lx:` Light Preset**, eliminating runtime raycast searching.
+### 4. RESOLVED: Modular Stargate Kit, Triplanar Weathering & Earth Plot (`JOB-07`)
+- **Remediation Landed**:
+  - `apps/web/src/play/kit-stargate.ts`: 43-part modular assembly (9 bevelled ring segments, 9 chevron lamps, ramp treads, dialing pedestal, physical iris shield).
+  - `apps/web/src/base/world.ts`: v5 save format with `moveGate` / `setGateAccess` and co-op network protocol.
+  - `layered-material.ts`: Large-scale weathering bound to world-space triplanar coordinates, micro-tiles bound to local part UVs (Argon Guardrail 2).
+  - `biome-preset.ts`: Earth Plot sandbox unlocked at Stage 6 with customizable `PlotBiomePreset`.
 
-### 5. CONCRETE CODE BUGS FOUND DURING AUDIT
-- **Bug A — Inverted & Dead Duplicate `MACHINE_PLUME_GRAVITY` in [`apps/web/src/play/machine-props.ts`](../apps/web/src/play/machine-props.ts#L742-L755)**:
-  - Lines 121–132 define `MACHINE_PLUME_SPECS[kind].gravity` with **positive = downward fall** (`drill: 4.5`, `press: 0.2`) and **negative = buoyant lift** (`mill: -0.4`), which `machinePlumeGravity()` (line 211) uses.
-  - Lines 742–755 export a second constant `MACHINE_PLUME_GRAVITY` with **inverted signs** (`drill: -3.6`, `mill: 0.35`) that is never called anywhere.
-- **Bug B — `POL-76` Marked "Deleted" in `DEFERRED_POLISH_REGISTRY.md` (Line 82), But Still Present in [`apps/web/src/assets/gen-props.ts`](../apps/web/src/assets/gen-props.ts#L536-L644)**:
-  - `createGenMachineProp()` (109 lines of dead unscaled fallback code) is still in `gen-props.ts`.
-- **Bug C — `POL-23`, `POL-103` & `POL-121` Reference Old Image-to-GLB Re-Baking Instead of `@hm/kitspec` Presets**:
-  - `POL-121` ("re-image `operator-console` and re-run the model batch"), `POL-103` (east-wall placeholder box), and `POL-23` (Anomaly Field Nodes) must be built as **parametric `@hm/kitspec` + `@hm/partgen` + `@hm/matstack` assemblies**, never new baked `.glb` blobs (`RULES 8a`).
-
-### 6. PLAN 42 (`JOB-07`) INCEPTION UPGRADE: `STARGATE_KIT` & `PlotBiomePreset`
-- **Critique of `JOB-07`**: `JOB-07` wired `moveGate`, `setGateAccess`, `dialRandomGate`, and `isEarthSandboxUnlocked(stage)` at the state/UI level, but did not require:
-  1. **`STARGATE_KIT` (`@hm/kitspec`)**: The Stargate ring, 9 chevrons (`lx:` emissive presets), dialing pedestal, and physical **Iris shield** (which closes over the aperture when `gateAccess === 'closed'` or `'code-only'`) built from modular parts so plot owners can customize their Gate's material (`matc:`), chevron colour (`lx:`), and ring segments (`part:`).
-  2. **Earth & Moon `PlotBiomePreset`**: Restoring Earth at Stage 6 unlocks a full **Biome Preset Recipe** (Terrain `matstack` + 6 Species `treegen` slots + Sky/Sun `lx:` preset) that players can tweak and share via code on both their Earth Plot and Moon Plot.
+### 5. RESOLVED: Modular Locomotion, Stage Anim Rates & Logic Presets (`JOB-19`)
+- **Remediation Landed**:
+  - `locomotion.ts`: Pure selection across `@hm/kinematic`'s `LOCOMOTION_PRESETS` (`auto`, `earth-standard`, `lunar-ballast`, `lunar-low-g`, `arcade-quake`) with dynamic mid-jump arc retuning.
+  - `stageAnimRateHz`: 8/12/18/30/60 Hz stage-quantized cadences in `packages/anim`.
+  - `KitMotionSpec`: Declarative pure functions of `(simTime, stage)` in `machine-motion.ts` replacing hardcoded `Math.sin` closures (Argon Guardrail 4).
+  - `gate-logic.ts`: Actuators (`lock-iris`, `turret-track`, `spawn-monster`) and wiregraph presets for Iris locking.
 
 ---
 
-## PART 2: STANDING AI SKILLS, VISUAL FIDELITY & LOGICAL OPTIMIZATION RADAR
+## PART 2: STANDING AI SKILLS, VISUAL FIDELITY & LOGICAL OPTIMIZATION RADAR (OCTOBER 2026)
 
-### A. AI Agent Skills & Vision-in-the-Loop Procedural Workflows (2025–2026 Frontier)
-1. **Closed-Loop "Vision + Coverage + Spatial Validator" Playbooks (`CADCodeVerify` / Procedural Material Graph Agents)**:
-   - **Industry Shift**: One-shot LLM generation of 3D meshes or shader graphs consistently drifts in scale, alignment, or noise coverage (as seen in `TICKET-40` v1–v4 where `rust-bloom` hit 67% coverage and `soot` hit 0%). State-of-the-art 3D/material agents use **deterministic numeric pre-gates + 4-angle + mask-channel vision-in-the-loop verification**.
-   - **Direct Application to `JOB-06` (`Plan 40 BYOA` & `studio-skill.md`)**:
-     - Add `studio.material.coverage(spec)` (returning exact % coverage on `top`, `side`, `edge`, `crevice`, `bottom` zones) alongside `studio.kit.validate(kit)` (checking 0 floating parts > 5 mm, 0 unresolved `mat:`/`lx:`/`vault:` ids, and socket contact) and `studio.capture({ mode: 'turntable4', includeStaged: true, maskView })`.
-     - Encode a mandatory **4-Step Agent Verification Loop** in `studio-skill.md` so any external Claude/Gemini/OpenAI agent connected via `window.studioAgent` self-corrects before asking the human to accept changes.
-2. **Hierarchical Composable Preset Grammar ("Inception" Schema)**:
-   - Every Studio asset follows one unified 5-rung ladder:
-     $$\text{Tile Graph } (\texttt{@hm/texgraph}) \to \text{Material Stack } (\texttt{@hm/matstack}) \to \text{Part + MeshOps } (\texttt{@hm/partgen} + \texttt{@hm/meshops}) \to \text{Kit Assembly } (\texttt{@hm/kitspec}) \to \text{Plot / Biome Scene } (\texttt{@hm/scenedoc})$$
-   - Because every rung is a pure JSON spec + deterministic seed, any AI agent or player slider can mutate any rung without breaking higher or lower rungs.
+### A. October 2026 Agent Skill Ecosystem Frontier
+A targeted scan of the latest portable Agent Skills ecosystem (`SKILL.md` standard across Claude Code, Codex, Antigravity, and OpenCode) surfaced high-leverage tools mapped to Plans 40–43:
+
+| Skill / Repository | Key Capability & Mechanism | Strategic Value for `HeavyMetal2` | Target Ticket / System |
+| :--- | :--- | :--- | :--- |
+| [**`wheresryan22/anatomy`**](https://github.com/wheresryan22/anatomy) ([`SKILL.md`](https://github.com/wheresryan22/anatomy/blob/main/SKILL.md)) | **Deterministic Geometry & Orbit Auditing (`kit/audit.mjs`, `turn-audit.mjs`, `scripts/drive.mjs`)**: Ray-casts overlapping part pairs at rest, exploded, and in sweep `t in [0, 1]` to guarantee zero solid/pipe interpenetration (`solidClearances`), flush mounts (`looseEnds === 0`), minimum bend radii ($R \ge 2r / \sin^2(e - \theta_{\max})$), and 24-angle orbit clearance (`orbitOrExit`). | Gives our **Plan 40 BYOA Studio API** a geometric & kinematic counterpart to `studio.material.coverage(spec)`. Prevents LLM spatial hallucination during 150-part kit assemblies and articulated motion presets. | **JOB-06b** (`studio.kit.audit`), **JOB-08** (Machine Kits), **JOB-20** |
+| [**`iart-ai/webgl-animation-skills`**](https://github.com/iart-ai/webgl-animation-skills) & [**`freshtechbro/claudedesignskills`**](https://github.com/freshtechbro/claudedesignskills/blob/main/.claude/skills/web3d-integration-patterns/SKILL.md) | **Continuous Uniform Envelopes & Multi-Layer WebGL**: Enforces monotonic attack/decay shader envelopes (`burst` and `settle`) that reach 0 before ring boundaries so portal transitions and shockwaves never pop or clip. | Informs **Plan 42** Stargate event-horizon kawoosh/ripple shaders and **Plan 43** deterministic motion envelopes so transitions crossfade smoothly with physical energy state. | **JOB-08** (Event Horizon Shader) & **JOB-19** (Motion Envelopes) |
+| [**`JuliusBrussee/caveman`**](https://github.com/juliusbrussee/caveman) ([Benchmark](https://www.firecrawl.dev/blog/best-claude-code-skills)) | **`/caveman-compress` Skill & Prompt Compression**: Shrinks `SKILL.md` files by ~46% input tokens and ~65% output tokens while preserving 100% of hard schemas, constraints, and worked examples. | Generates `studio-skill.compact.md` alongside our 573-line `studio-skill.md`, keeping long multi-turn MCP agent sessions fast during complex 150-part kit builds. | **JOB-23** (`studio-skill.compact.md`) |
+| [**`obra/superpowers`**](https://github.com/obra/superpowers) ([Guide](https://medium.com/@techlatest.net/50-opencode-skills-worth-installing-in-2026-the-definitive-curated-list-47c6ae4fbdb5)) | **`verification-before-completion` & `using-git-worktrees`**: Enforces hard pre-commit verification gates (zero failing audit lines, visual diff confirmation) and isolated git worktree execution. | Enforces **Rule 8a (Zero Shortcuts)** across parallel Codex/Claude sessions without merge collisions or unverified claims. | **All Tickets** (`studio-skill.md` & `AGENTS.md`) |
+| [**`eliteai/project-field-management`**](https://eliteai.tools/agent-skills/project-field-management-3) & [**`cli/cli #13816`**](https://github.com/cli/cli/issues/13816) | **GitHub Projects v2 CLI (`gh project`) Case-Insensitive Automation**: Native CLI scripting for Projects v2 roadmaps, milestones, and automated issue/PR tracking. | Powers `scripts/setup-github-roadmap.sh` and the automated `.github/workflows/roadmap-progress.yml` release tracker. | **GitHub Projects v2 Roadmap** |
 
 ### B. Visual Fidelity Upgrades (Retro $S_0 \to$ PBR $S_6$)
 1. **Perceptually Uniform OKLab Quantization & Dithering (`POL-49` & `POL-102`)**:
-   - **Problem**: Quantizing colours in linear RGB or sRGB causes hue shifts toward salmon/mauve in dusk lighting (`POL-102` at `storm = 0.5`) and high pixel-flip rates on slight camera rotation (`POL-49`: 16.5% flip on 5° yaw vs 10% target).
-   - **Upgrade**: Perform Stage 1 (EGA 16-colour) and Stage 2 (VGA 256-colour) nearest-palette matching and dusk tint clamping in **OKLab space** (Björn Ottosson's fast $3\times 3$ LMS cube-root matrix in GLSL), and damp world-normal derivatives (`fwidth(vWorldNormal)`) before applying the tri-planar Bayer threshold.
+   - Quantize colours in Stage 1 (EGA 16-colour) and Stage 2 (VGA 256-colour) nearest-palette matching and dusk tint clamping in **OKLab space** (fast $3\times 3$ LMS cube-root matrix in GLSL), and damp world-normal derivatives (`fwidth(vWorldNormal)`) before applying the tri-planar Bayer threshold.
 2. **Screen-Space Derivative Micro-Cavity (`dFdx(vNormal)` / `dFdy(vNormal)`) for Rank-1/2 Modular Parts**:
-   - **Upgrade**: In `layered-material.ts`, modulating ambient occlusion by a cheap screen-space normal-derivative cavity term (`clamp(dot(dFdx(N), dFdx(N)) + dot(dFdy(N), dFdy(N)), 0.0, 1.0)`) makes `@hm/meshops` bevels, panel seams, and bolt heads pop crisply at Stage 4–6 with **zero extra texture fetches and zero extra geometry**.
+   - In `layered-material.ts`, modulating ambient occlusion by a screen-space normal-derivative cavity term (`clamp(dot(dFdx(N), dFdx(N)) + dot(dFdy(N), dFdy(N)), 0.0, 1.0)`) makes `@hm/meshops` bevels, panel seams, and bolt heads pop crisply at Stage 4–6 with **zero extra texture fetches and zero extra geometry**.
 
 ### C. Logical & GPU Performance Optimizations (GTX 950M 60 FPS Target)
-1. **Two-Level AABB / BVH Accelerated Raycasting for `aimKitPart()`**:
-   - **Problem**: [`aimKitPart()`](../apps/web/src/play/play-scene.ts#L4210) currently runs Three.js's $O(N_{\text{tris}})$ CPU raycast on every visible kit mesh whenever the player aims the Beam Rifle. Scaling kits to all machines, base walls, and vehicles will cause CPU frame spikes.
-   - **Upgrade**: Store the precomputed world AABB on each `KitBuild` and each `PlacedPart` (already computed by `@hm/kitspec` `flatten()`), testing the ray against the kit's outer AABB first and part AABBs second before intersecting triangle ranges.
+1. **Hierarchical AABB Slab Culling (`kit-target.ts` — Landed in `7935d767` & `9ca3e08b`)**:
+   - Zero-allocation slab testing with lazy AABB re-measurement under motion keeps per-frame reticle aiming $< 0.05\text{ ms}$ on 40+ machines.
 2. **Material Uniform Packing & Shared Shader Programs (`layered-material.ts`)**:
-   - **Upgrade**: Cache compiled `layeredMaterial(id, rank)` instances by `(canonicalCode, rank)` and pack layer constants into compact `vec4` uniform arrays so all machines and base pieces wearing the same `@hm/matstack` preset share a single WebGLProgram and can be merged/batched per material slot.
+   - Cache compiled `layeredMaterial(id, rank)` instances by `(canonicalCode, rank)` and pack layer constants into compact `vec4` uniform arrays so all machines and base pieces wearing the same `@hm/matstack` preset share a single WebGLProgram.
 
 ---
 
-## PART 3: RECURRING OVERWATCH CHECKLIST (RUN ON EVERY SESSION WAKE)
+## PART 3: STANDING RECURRING OVERWATCH CHECKLIST (EVERY SESSION WAKE)
 Whenever Antigravity / Overwatch is activated:
 1. **Check Git & Board**: Run `git status -s` and `node scripts/agent-worker.mjs --list`.
-2. **Preset Inception Audit**: Verify no new `.glb` blobs, wrapper frames, or hardcoded `THREE.BoxGeometry` / `MeshStandardMaterial` props were introduced where `@hm/partgen` + `@hm/kitspec` + `@hm/matstack` + `lx:` presets belong.
-3. **Update Tech & AI Radar**: Review open jobs against this document (`docs/OVERWATCH_TECH_AND_AI_RADAR.md`) and refine job briefs so agents execute with zero architectural drift.
+2. **Preset Inception Audit**: Verify zero new `.glb` blobs, wrapper frames, or hardcoded `THREE.BoxGeometry` / `MeshStandardMaterial` props were introduced where `@hm/partgen` + `@hm/kitspec` + `@hm/matstack` + `lx:` presets belong.
+3. **Audit Against Radar**: Cross-check upcoming jobs against the October 2026 agent skills and visual fidelity standards.

@@ -1,0 +1,42 @@
+name: Roadmap Progress Tracker
+
+on:
+  issues:
+    types: [closed, reopened]
+  push:
+    branches:
+      - main
+      - feat/monster-mash-exploration
+    paths:
+      - 'docs/JOB_BOARD.md'
+      - 'scripts/update-progress-bar.mjs'
+
+permissions:
+  contents: write
+
+jobs:
+  update-progress:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Recalculate Roadmap Progress
+        run: node scripts/update-progress-bar.mjs
+
+      - name: Commit & Push Progress Updates
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/JOB_BOARD.md README.md
+          if git diff --staged --quiet; then
+            echo "No progress bar changes to commit."
+          else
+            git commit -m "chore(roadmap): auto-update release progress bars"
+            git push
+          fi

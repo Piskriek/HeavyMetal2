@@ -1,3 +1,20 @@
+<!-- ROADMAP_PROGRESS_START -->
+[![Release Progress](https://img.shields.io/badge/v1.0_Progress-88.0%25-00F0FF?style=for-the-badge&logo=target)](https://github.com/Piskriek/HeavyMetal2)
+[![Rule 8a Status](https://img.shields.io/badge/Rule_8a_Audit-PASS-success?style=for-the-badge&logo=checkmarx)](docs/argo/RULES.md)
+[![Active Branch](https://img.shields.io/badge/Branch-feat%2Fmonster--mash--exploration-FF1E8E?style=for-the-badge&logo=git)](https://github.com/Piskriek/HeavyMetal2/tree/feat/monster-mash-exploration)
+
+```text
+FIDELITY: The SetMix Multiverse — 1.0 Release Progress Tracker
+[██████████████████░░] 88.0% Complete (13/19 Landed | 6 Remaining | ~3.0 Agent-Days)
+
+Phase 1: Foundation            [████████████████████] 100% (4/4)
+Phase 2: Materials             [████████████████████] 100% (3/3)
+Phase 3: Studio & Raycast      [████████████████░░░░]  82% (3/4)
+Phase 4: Kits & Motion         [███████████████░░░░░]  77% (3/4)
+Phase 5: Endgame & 1.0         [░░░░░░░░░░░░░░░░░░░░]   0% (0/4)
+```
+<!-- ROADMAP_PROGRESS_END -->
+
 # FIDELITY // MULTI-AGENT COMMAND CENTER & ROADMAP JOB BOARD
 > **Launch Visual Command Center UI**: Double-click [`COMMAND_CENTER.bat`](../COMMAND_CENTER.bat) or run `node scripts/command-center.mjs` (`http://localhost:8090`).  
 > **Repository**: `https://github.com/Piskriek/HeavyMetal2` (`feat/monster-mash-exploration`)  

@@ -29,7 +29,7 @@ import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest
 import { disposeProp, FABRICATOR_PLUME, FABRICATOR_VENT, FEED_CUBES_FULL, feedCubeCount, feedCubeProgress, lineSpan, machinePlumeCount, machinePlumeCountOf, machinePlumeGravity, machinePlumeLook, machinePlumeLookOf, machinePlumeSpec, machinePlumeSteady, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
 import { RAM_CADENCE_RAD } from './kit-motion-specs';
 import { activeLocomotion, locomotionChoice, locomotionSpeed, setLocomotionChoice } from './locomotion';
-import { plotStargate, setPlotEnvironment } from './plot-kits';
+import { plotStargate, plotVehicleKit, setPlotEnvironment } from './plot-kits';
 import { STARGATE_APERTURE_R, STARGATE_RING_CENTRE_Y } from './kit-stargate';
 import type { GateAccessMode } from '@hm/coopnet/gate-dialer';
 import { warmLayeredMaterials } from './layered-material';
@@ -110,7 +110,7 @@ import { currentOutpostSession } from '../net/outpost-session';
 import { PAINT_CELL, PAINT_CELLS } from '../base/plot-height';
 import { emptyField, encodeField } from '@hm/terrainbrush';
 import { createVerticalJumpState, stepVerticalJump } from '@hm/kinematic';
-import { aimKit, type KitTargetable } from './kit-target';
+import { aimKit, vehicleTargetable, type KitTargetable, type VehicleTargetable } from './kit-target';
 
 export type Where = 'lab' | 'planet';
 /** What the screen gives the scene each frame. */
@@ -810,6 +810,12 @@ export function createPlayScene(o: {
     z: number;
     yaw: number;
     wheelAngle: number;
+    /**
+     * The vehicle's kit, hung at the same pose as the drawn rover (JOB-08v): the procedural mesh keeps the wheel and
+     * steering animation a merged kit cannot, and this build is what a Beam Rifle cartridge names (`base/wheel-3`,
+     * `mechanism/boom-arm`, the whole hull), because a part id needs a kit behind it.
+     */
+    target: VehicleTargetable | null;
   }
 
   /** emitter: the fabricator's plume while it prints; pour: its pixels now; vent: its exhaust, in the world; feedAt: where the ore
@@ -834,6 +840,15 @@ export function createPlayScene(o: {
   let drivingState: RoverState | null = null;
   let vehicleAcc = 0;
   let currentSpeed = 0;
+
+  /** The vehicle's kit build at a pose, as the beam's target. Null while the frames are off or a part will not build. */
+  function vehicleTargetFor(kind: RoverKind, x: number, y: number, z: number, yaw: number): VehicleTargetable | null {
+    const build = plotVehicleKit(kind, genLevelForStage(shown, currentQuality), Math.max(2, shown));
+    if (!build) return null;
+    const target = vehicleTargetable(kind, build);
+    target.setPose(x, y, z, yaw);
+    return target;
+  }
 
   function buildVehicleView(v: { id: number; kind: RoverKind; x: number; z: number; yaw: number }): VehicleView {
     const activeLevel = genLevelForStage(shown, currentQuality);
@@ -877,6 +892,7 @@ export function createPlayScene(o: {
       z: v.z,
       yaw: v.yaw,
       wheelAngle: 0,
+      target: vehicleTargetFor(v.kind, v.x, y, v.z, v.yaw),
     };
   }
 
@@ -909,6 +925,8 @@ export function createPlayScene(o: {
         const y = groundAt(v.x, v.z) + view.mesh.wheelRadius;
         view.group.position.set(v.x, y, v.z);
         view.group.rotation.set(0, v.yaw, 0);
+        // O(1): the kit's box is re-measured by the next aim that reaches it, not here
+        view.target?.setPose(v.x, y, v.z, v.yaw);
       }
     }
     isInitialVehiclesSync = false;
@@ -3241,6 +3259,7 @@ export function createPlayScene(o: {
           vView.yaw = Math.atan2(2 * (qy * qw + qx * qz), 1 - 2 * (qy * qy + qz * qz));
 
           vView.group.position.set(drivingState.p[0], drivingState.p[1], drivingState.p[2]);
+          vView.target?.setPose(drivingState.p[0], drivingState.p[1], drivingState.p[2], vView.yaw);
           vView.group.quaternion.set(qx, qy, qz, qw);
           vView.group.updateMatrixWorld(true);
 
@@ -4334,6 +4353,8 @@ export function createPlayScene(o: {
         const b = kitBuildOf(v);
         if (b) targetables.push({ kit: plotKitKey(v.m), build: b });
       }
+      // the plot's vehicles: their kits name every part a cartridge can dress (JOB-08v)
+      for (const view of vehicleViews.values()) if (view.target) targetables.push(view.target);
       const hit = aimKit(targetables, camera.position, dir, reach);
       return hit ? { kit: hit.kit, path: hit.path, gen: hit.gen } : null;
     },

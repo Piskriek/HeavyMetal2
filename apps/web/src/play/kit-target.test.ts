@@ -4,10 +4,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import type { Kit } from '@hm/kitspec';
+import { flatten, type Kit } from '@hm/kitspec';
 import { buildKitPreset, type KitBuild } from './kit-build';
-import { KitTargeter, aimKit, meshWorldBox, rayBoxEntry, type Aabb, type KitTargetable } from './kit-target';
+import { KitTargeter, aimKit, meshWorldBox, rayBoxEntry, vehicleTargetable, type Aabb, type KitTargetable } from './kit-target';
 import { driven, poseDriven } from './machine-motion';
+import { VEHICLE_KINDS, VEHICLE_KITS, VEHICLE_PRESET } from './kit-vehicles';
 
 const steel = new THREE.MeshBasicMaterial();
 
@@ -230,4 +231,68 @@ test('a part a motion spec drives is re-boxed lazily: the aim finds it where it 
   // and back at rest the ray finds the ram again: the boxes follow the motion both ways
   poseDriven(parts, 0, 1, 6);
   assert.equal(aim(targeter, 3, 0.5)?.path, 'ram');
+});
+
+// ---------------------------------------------------------------------------- the vehicles (JOB-08v)
+
+/** The plot's material record is name-keyed and open-ended; every kit name resolves to the same stand-in here. */
+const anyMaterial = new Proxy({} as Record<string, THREE.Material>, { get: () => steel });
+
+const vehicleBuild = (kind: 'hauler' | 'crawler' | 'scout'): KitBuild => {
+  const b = buildKitPreset(VEHICLE_KITS[kind], VEHICLE_PRESET, { materials: anyMaterial, gen: () => null, maxRank: 2 });
+  assert.ok(b, `${kind} should build`);
+  return b;
+};
+
+test('a vehicle is targetable part by part: a ray down the hull names the placed part, not the hull', () => {
+  for (const kind of VEHICLE_KINDS) {
+    const build = vehicleBuild(kind);
+    const target = vehicleTargetable(kind, build);
+    target.setPose(0, 0, 0, 0);
+    const targeter = new KitTargeter();
+    // straight down onto the vehicle's centre from 8 m up: the first thing the ray meets is a real part of the kit
+    const hit = targeter.aim([target], new THREE.Vector3(0, 8, 0), new THREE.Vector3(0, -1, 0), 20);
+    assert.ok(hit, `${kind}: the ray hits the vehicle`);
+    assert.equal(hit!.kit, `vehicle-${kind}`);
+    assert.ok(flatten(VEHICLE_KITS[kind], VEHICLE_PRESET).some((p) => p.path === hit!.path), `${kind}: ${hit!.path} is a placed part`);
+    targeter.reset();
+    assert.equal(targeter.aim([target], new THREE.Vector3(60, 8, 0), new THREE.Vector3(0, -1, 0), 20), null);
+    assert.equal(targeter.counters().triangleTests, 0, `${kind}: a miss costs the box and no triangles`);
+  }
+});
+
+test('a vehicle’s root box follows its pose lazily: setPose is O(1) and the next aim re-measures once', () => {
+  const build = vehicleBuild('hauler');
+  const target = vehicleTargetable('hauler', build);
+  const targeter = new KitTargeter();
+  target.setPose(0, 0, 0, 0);
+  const atOrigin = targeter.rootBox(build);
+  assert.ok(atOrigin.max[0] > 1 && atOrigin.max[1] > 2, 'the box is the assembled vehicle');
+  target.setPose(9, 0, 0, 0);
+  // the move itself touched nothing but the group's matrix: no geometry was read
+  targeter.reset();
+  const moved = targeter.rootBox(build);
+  assert.ok(moved.min[0] > 7 && moved.max[0] > 10, 'the box moved with the vehicle');
+  assert.equal(targeter.counters().meshes, 0, 'a box read never touches a triangle');
+  // and the old spot is empty now
+  assert.equal(targeter.aim([target], new THREE.Vector3(0, 8, 0), new THREE.Vector3(0, -1, 0), 20), null);
+});
+
+test('aiming at a vehicle stays inside the 0.05 ms budget per vehicle when the rays miss', () => {
+  const targets = VEHICLE_KINDS.map((kind) => vehicleTargetable(kind, vehicleBuild(kind)));
+  const targeter = new KitTargeter();
+  const origin = new THREE.Vector3(500, 30, 500);
+  const dir = new THREE.Vector3(0, -1, 0);
+  // warm the caches, then time 200 misses: three builds rejected at their root boxes each
+  for (let i = 0; i < 5; i += 1) targeter.aim(targets, origin, dir, 60);
+  targeter.reset();
+  const started = process.hrtime.bigint();
+  const runs = 200;
+  for (let i = 0; i < runs; i += 1) assert.equal(targeter.aim(targets, origin, dir, 60), null);
+  const perAimMs = Number(process.hrtime.bigint() - started) / 1e6 / runs;
+  const perVehicleMs = perAimMs / targets.length;
+  // the budget is per vehicle: one aim, three builds, each rejected at its root box without touching a triangle
+  assert.ok(perVehicleMs < 0.05, `an aim costs ${perAimMs.toFixed(4)} ms across three vehicles (${perVehicleMs.toFixed(4)} ms each)`);
+  assert.equal(targeter.counters().buildsCulled, runs * targets.length);
+  assert.equal(targeter.counters().triangleTests, 0);
 });

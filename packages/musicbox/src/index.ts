@@ -240,3 +240,4 @@ export function makeSong(seed: number, style: Style, key = 60): Song {
   };
 }
 export * from './harmonic-machine-choir';
+export * from './stems';

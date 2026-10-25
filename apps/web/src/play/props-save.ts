@@ -3,6 +3,7 @@
 // string with kv, and every change returns a new value, so a bad or old save reads as the empty one.
 
 import type { Overrides, PartOverride } from '@hm/kitspec';
+import { readPrint, type SoundPrintSpec, type SpritePrintSpec } from '@hm/cartlab';
 
 export const PROPS_SAVE_KEY = 'hm.setmix.props';
 
@@ -18,6 +19,10 @@ export interface PropsSave {
   readonly kits?: Readonly<Record<string, Overrides>>;
   /** Plan 39 (Aq): the trees the beam regrew, by place key (its spot to the centimetre), and the preset each grows as. */
   readonly trees?: Readonly<Record<string, TreePreset>>;
+  /** Plan 43: the sprite card hung over a machine, by kit id (a sprite cartridge's Apply). Omitted when none. */
+  readonly sprites?: Readonly<Record<string, SpritePrintSpec>>;
+  /** Plan 43: the hum a sound cartridge gave a machine, by kit id. Omitted when none. */
+  readonly sounds?: Readonly<Record<string, SoundPrintSpec>>;
 }
 
 /** A species preset a tree grows as: its species and its treegen slider values. */
@@ -33,6 +38,8 @@ const ints = (x: unknown): number[] => (Array.isArray(x) ? [...new Set(x.filter(
 
 const isObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 const shortId = (k: string): boolean => k.length > 0 && k.length <= 96;
+/** A kit id, the key a card or a hum is filed under: the same slug the bench writes. */
+const KIT_KEY = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const numbers = (x: unknown): Record<string, number> | null => {
   if (!isObj(x)) return null;
   const out: Record<string, number> = {};
@@ -93,15 +100,37 @@ function treesOf(x: unknown): Record<string, TreePreset> {
   return out;
 }
 
+/** The prints of one kind a save carries, checked with cartlab's own reader so a broken one is dropped rather than trusted. */
+const printsOf = (x: unknown, key: 'sprite' | 'sound'): Record<string, SpritePrintSpec | SoundPrintSpec> => {
+  const out: Record<string, SpritePrintSpec | SoundPrintSpec> = {};
+  if (!isObj(x)) return out;
+  for (const [kit, v] of Object.entries(x)) {
+    if (!shortId(kit) || !KIT_KEY.test(kit)) continue;
+    const print = readPrint({ [key]: v });
+    if (!print) continue;
+    if (key === 'sprite' && 'sprite' in print) out[kit] = print.sprite;
+    else if (key === 'sound' && 'sound' in print) out[kit] = print.sound;
+  }
+  return out;
+};
+
 /** The save from its stored text. Anything unreadable, or of another version, is the empty save. */
 export function parsePropsSave(raw: string | null): PropsSave {
   if (!raw) return EMPTY_PROPS_SAVE;
   try {
-    const o = JSON.parse(raw) as { v?: unknown; cleared?: unknown; logs?: unknown; sealed?: unknown; kits?: unknown; trees?: unknown } | null;
+    const o = JSON.parse(raw) as { v?: unknown; cleared?: unknown; logs?: unknown; sealed?: unknown; kits?: unknown; trees?: unknown; sprites?: unknown; sounds?: unknown } | null;
     if (!o || o.v !== 1) return EMPTY_PROPS_SAVE;
     const kits = kitsOf(o.kits), trees = treesOf(o.trees);
+    const sprites = printsOf(o.sprites, 'sprite') as Record<string, SpritePrintSpec>;
+    const sounds = printsOf(o.sounds, 'sound') as Record<string, SoundPrintSpec>;
     const base: PropsSave = { v: 1, cleared: strings(o.cleared), logs: strings(o.logs), sealed: ints(o.sealed) };
-    return { ...base, ...(Object.keys(kits).length > 0 ? { kits } : {}), ...(Object.keys(trees).length > 0 ? { trees } : {}) };
+    return {
+      ...base,
+      ...(Object.keys(kits).length > 0 ? { kits } : {}),
+      ...(Object.keys(trees).length > 0 ? { trees } : {}),
+      ...(Object.keys(sprites).length > 0 ? { sprites } : {}),
+      ...(Object.keys(sounds).length > 0 ? { sounds } : {}),
+    };
   } catch {
     return EMPTY_PROPS_SAVE;
   }
@@ -110,7 +139,25 @@ export function parsePropsSave(raw: string | null): PropsSave {
 export function serializePropsSave(s: PropsSave): string {
   const kits = s.kits && Object.keys(s.kits).length > 0 ? { kits: s.kits } : {};
   const trees = s.trees && Object.keys(s.trees).length > 0 ? { trees: s.trees } : {};
-  return JSON.stringify({ v: 1, cleared: [...s.cleared], logs: [...s.logs], sealed: [...s.sealed], ...kits, ...trees });
+  const sprites = s.sprites && Object.keys(s.sprites).length > 0 ? { sprites: s.sprites } : {};
+  const sounds = s.sounds && Object.keys(s.sounds).length > 0 ? { sounds: s.sounds } : {};
+  return JSON.stringify({ v: 1, cleared: [...s.cleared], logs: [...s.logs], sealed: [...s.sealed], ...kits, ...trees, ...sprites, ...sounds });
+}
+
+/** The save with a machine's sprite card set (a print) or taken down (null). */
+export function withSpriteCard(s: PropsSave, kit: string, print: SpritePrintSpec | null): PropsSave {
+  const next: Record<string, SpritePrintSpec> = { ...(s.sprites ?? {}) };
+  if (print === null) delete next[kit];
+  else next[kit] = print;
+  return { ...s, sprites: next };
+}
+
+/** The save with a machine's hum set (a print) or taken away (null). */
+export function withMachineHum(s: PropsSave, kit: string, print: SoundPrintSpec | null): PropsSave {
+  const next: Record<string, SoundPrintSpec> = { ...(s.sounds ?? {}) };
+  if (print === null) delete next[kit];
+  else next[kit] = print;
+  return { ...s, sounds: next };
 }
 
 /** The save with these trees regrown as `preset` (the beam's Apply with a species cartridge: one tree, or every match). */

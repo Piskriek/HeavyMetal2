@@ -103,13 +103,74 @@ export interface MaterialPrintSpec {
   readonly ref: string;
 }
 
-/** What the bench prints onto a blank for the beam rifle (plans 39 and 41): a part, a species, a light or a material. */
+export const SPRITE_DITHERS = ['none', 'bayer2', 'bayer4'] as const;
+export type SpriteDither = (typeof SPRITE_DITHERS)[number];
+
+/**
+ * A sprite sheet written onto a blank (plan 43, step 4): the turntable of one kit preset, baked at a Fidelity Stage into that
+ * stage's palette and dither. The Bench previews it as an eight-frame billboard; the beam's Apply puts it on a machine, which
+ * hangs it over the machine as a billboard card. Structural here: @hm/shareware reads it.
+ */
+export interface SpritePrintSpec {
+  readonly name: string;
+  /** The kit preset to turn: a `@hm/kitspec` preset id ('drill', 'press', 'gate'). */
+  readonly kit: string;
+  /** The Fidelity Stage whose palette and dither the sheet uses. */
+  readonly stage: number;
+  /** Pixels a frame. */
+  readonly size: number;
+  /** Frames around the turntable (1 to 16; 8 is the shareware card). */
+  readonly angles: number;
+  readonly dither: SpriteDither;
+  readonly elevationDeg: number;
+}
+
+/** One oscillator in a sound print: the atom of a synth patch. */
+export interface SoundAtomSpec {
+  readonly wave: string;
+  readonly freqHz: number;
+  readonly gain: number;
+  readonly attackMs: number;
+  readonly decayMs: number;
+  readonly delayMs?: number;
+  readonly detuneCents?: number;
+}
+
+/** A patch: atoms summed, with child patches summed under it (the recursion a stem is built from). */
+export interface SoundPatchSpec {
+  readonly name: string;
+  readonly gain?: number;
+  readonly atoms?: readonly SoundAtomSpec[];
+  readonly children?: readonly SoundPatchSpec[];
+}
+
+export const SOUND_ROLES = ['machine', 'rifle', 'gate', 'music'] as const;
+export type SoundRole = (typeof SOUND_ROLES)[number];
+
+/**
+ * A sound written onto a blank (plan 43, step 4): a recursive synth patch and the stage that plays it, so a `sndc:` cartridge
+ * sounds like its era's hardware. The Bench previews it; the beam's Apply gives its hum to the machine it is fired at.
+ * Structural here: @hm/soundlab reads it.
+ */
+export interface SoundPrintSpec {
+  readonly name: string;
+  readonly role: SoundRole;
+  readonly stage: number;
+  readonly gain: number;
+  readonly patch: SoundPatchSpec;
+  readonly pan?: number;
+  readonly loopSeconds?: number;
+}
+
+/** What the bench prints onto a blank for the beam rifle: a part, a species, a light, a material, a sprite or a sound. */
 export type Print =
   | { readonly part: PartSpec }
   | { readonly species: SpeciesSpec }
   | { readonly light: LightSpec }
-  | { readonly material: MaterialPrintSpec };
-export type PrintKind = 'part' | 'species' | 'light' | 'material';
+  | { readonly material: MaterialPrintSpec }
+  | { readonly sprite: SpritePrintSpec }
+  | { readonly sound: SoundPrintSpec };
+export type PrintKind = 'part' | 'species' | 'light' | 'material' | 'sprite' | 'sound';
 
 export interface Cartridge {
   readonly id: string;
@@ -128,6 +189,10 @@ export interface Cartridge {
   readonly light?: LightSpec;
   /** Kind 'material' only: the material it carries. */
   readonly material?: MaterialPrintSpec;
+  /** Kind 'sprite' only: the sprite sheet it carries. */
+  readonly sprite?: SpritePrintSpec;
+  /** Kind 'sound' only: the sound it carries. */
+  readonly sound?: SoundPrintSpec;
 }
 
 /**
@@ -144,10 +209,13 @@ export interface Job {
   readonly preset: string | null;
   readonly done: number;
   readonly needs: number;
-  /** A bench job printing a part, a species or a light instead of writing a preset (at most one of the three). */
+  /** A bench job printing a part, a species, a light, a material, a sprite or a sound instead of writing a preset. */
   readonly part?: PartSpec;
   readonly species?: SpeciesSpec;
   readonly light?: LightSpec;
+  readonly material?: MaterialPrintSpec;
+  readonly sprite?: SpritePrintSpec;
+  readonly sound?: SoundPrintSpec;
 }
 
 export interface LabState {
@@ -227,20 +295,35 @@ export function printOf(x: {
   readonly species?: SpeciesSpec;
   readonly light?: LightSpec;
   readonly material?: MaterialPrintSpec;
+  readonly sprite?: SpritePrintSpec;
+  readonly sound?: SoundPrintSpec;
 }): Print | null {
   if (x.part !== undefined) return { part: x.part };
   if (x.species !== undefined) return { species: x.species };
   if (x.light !== undefined) return { light: x.light };
   if (x.material !== undefined) return { material: x.material };
+  if (x.sprite !== undefined) return { sprite: x.sprite };
+  if (x.sound !== undefined) return { sound: x.sound };
   return null;
 }
-export const printKind = (p: Print): PrintKind => ('part' in p ? 'part' : 'species' in p ? 'species' : 'light' in p ? 'light' : 'material');
+export const printKind = (p: Print): PrintKind =>
+  'part' in p ? 'part' : 'species' in p ? 'species' : 'light' in p ? 'light' : 'material' in p ? 'material' : 'sprite' in p ? 'sprite' : 'sound';
 const printName = (p: Print): string =>
-  'part' in p ? p.part.name : 'species' in p ? p.species.name : 'light' in p ? p.light.name : p.material.name;
-/** Part, species, light and material cartridges go in the beam rifle only: never the combiner, never a plot machine. */
-const forTheRifle = (c: Cartridge): boolean => c.kind === 'part' || c.kind === 'species' || c.kind === 'light' || c.kind === 'material';
+  'part' in p ? p.part.name
+    : 'species' in p ? p.species.name
+      : 'light' in p ? p.light.name
+        : 'material' in p ? p.material.name
+          : 'sprite' in p ? p.sprite.name : p.sound.name;
+/** Every print cartridge goes in the beam rifle only: never the combiner, never a plot machine. */
+const PRINT_KINDS: readonly PrintKind[] = Object.freeze(['part', 'species', 'light', 'material', 'sprite', 'sound'] as const);
+const forTheRifle = (c: Cartridge): boolean => (PRINT_KINDS as readonly string[]).includes(c.kind);
 const RIFLE_ONLY: Readonly<Record<PrintKind, string>> = {
-  part: 'A part cartridge', species: 'A species cartridge', light: 'A light cartridge', material: 'A material cartridge',
+  part: 'A part cartridge',
+  species: 'A species cartridge',
+  light: 'A light cartridge',
+  material: 'A material cartridge',
+  sprite: 'A sprite cartridge',
+  sound: 'A sound cartridge',
 };
 
 const paused = (job: Job): Job => {
@@ -650,9 +733,85 @@ function loadMaterial(x: unknown): MaterialPrintSpec | null {
   return { name, ref };
 }
 
+const KIT_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
+
+/** A sprite print read back: a kit id, a stage off the ladder and a frame size a billboard can hold. */
+function loadSprite(x: unknown): SpritePrintSpec | null {
+  if (!isRecord(x)) return null;
+  const { name, kit, stage, size, angles, dither, elevationDeg } = x;
+  if (!isString(name) || name.length === 0 || name.length > 96 || !isString(kit) || !KIT_ID.test(kit)) return null;
+  if (!isNumber(stage) || stage < 0 || stage > 6) return null;
+  if (!isNumber(size) || size < 4 || size > 128) return null;
+  if (!isNumber(angles) || angles < 1 || angles > 16) return null;
+  if (!isString(dither) || !(SPRITE_DITHERS as readonly string[]).includes(dither)) return null;
+  if (!isNumber(elevationDeg) || elevationDeg < -80 || elevationDeg > 80) return null;
+  return {
+    name, kit, stage: Math.floor(stage), size: Math.round(size), angles: Math.round(angles),
+    dither: dither as SpriteDither, elevationDeg,
+  };
+}
+
+const isWaveName = (w: unknown): w is string => isString(w) && ['sine', 'square', 'sawtooth', 'triangle', 'noise'].includes(w);
+
+/** A patch read back, to a depth a hand-made patch can reach and no further. */
+function loadPatch(x: unknown, depth: number): SoundPatchSpec | null {
+  if (!isRecord(x) || depth > 6) return null;
+  const { name, gain, atoms, children } = x;
+  if (!isString(name) || (gain !== undefined && !isNumber(gain))) return null;
+  const atomList: SoundAtomSpec[] = [];
+  if (atoms !== undefined) {
+    if (!isList(atoms)) return null;
+    for (const a of atoms.slice(0, 32)) {
+      if (!isRecord(a) || !isWaveName(a.wave)) return null;
+      const { freqHz, gain: ag, attackMs, decayMs, delayMs, detuneCents } = a;
+      if (!isNumber(freqHz) || freqHz <= 0 || freqHz > 20000) return null;
+      if (!isNumber(ag) || ag < 0 || ag > 2) return null;
+      if (!isNumber(attackMs) || attackMs < 0 || attackMs > 5000) return null;
+      if (!isNumber(decayMs) || decayMs <= 0 || decayMs > 12000) return null;
+      if (delayMs !== undefined && (!isNumber(delayMs) || delayMs < 0 || delayMs > 8000)) return null;
+      if (detuneCents !== undefined && (!isNumber(detuneCents) || Math.abs(detuneCents) > 4800)) return null;
+      atomList.push({
+        wave: a.wave, freqHz, gain: ag, attackMs, decayMs,
+        ...(delayMs !== undefined ? { delayMs } : {}),
+        ...(detuneCents !== undefined ? { detuneCents } : {}),
+      });
+    }
+  }
+  const childList: SoundPatchSpec[] = [];
+  if (children !== undefined) {
+    if (!isList(children)) return null;
+    for (const c of children.slice(0, 32)) {
+      const kid = loadPatch(c, depth + 1);
+      if (!kid) return null;
+      childList.push(kid);
+    }
+  }
+  if (atomList.length === 0 && childList.length === 0) return null;
+  return { name, ...(gain !== undefined ? { gain } : {}), ...(atomList.length > 0 ? { atoms: atomList } : {}), ...(childList.length > 0 ? { children: childList } : {}) };
+}
+
+/** A sound print read back: a playable patch, a stage off the ladder and a role the mix knows. */
+function loadSound(x: unknown): SoundPrintSpec | null {
+  if (!isRecord(x)) return null;
+  const { name, role, stage, gain, pan, loopSeconds } = x;
+  if (!isString(name) || name.length === 0 || name.length > 96) return null;
+  if (!isString(role) || !(SOUND_ROLES as readonly string[]).includes(role)) return null;
+  if (!isNumber(stage) || stage < 0 || stage > 6) return null;
+  if (!isNumber(gain) || gain < 0 || gain > 2) return null;
+  if (pan !== undefined && (!isNumber(pan) || Math.abs(pan) > 1)) return null;
+  if (loopSeconds !== undefined && (!isNumber(loopSeconds) || loopSeconds <= 0 || loopSeconds > 60)) return null;
+  const patch = loadPatch(x.patch, 0);
+  if (!patch) return null;
+  return {
+    name, role: role as SoundRole, stage: Math.floor(stage), gain, patch,
+    ...(pan !== undefined ? { pan } : {}),
+    ...(loopSeconds !== undefined ? { loopSeconds } : {}),
+  };
+}
+
 /** The print as saved, checked: 'none' when there is none, null when one is malformed or more than one is set. */
 function loadPrint(x: Readonly<Record<string, unknown>>): Print | null | 'none' {
-  const set = (['part', 'species', 'light', 'material'] as const).filter((k) => x[k] !== undefined);
+  const set = (['part', 'species', 'light', 'material', 'sprite', 'sound'] as const).filter((k) => x[k] !== undefined);
   if (set.length === 0) return 'none';
   if (set.length > 1) return null;
   if (set[0] === 'part') {
@@ -667,8 +826,16 @@ function loadPrint(x: Readonly<Record<string, unknown>>): Print | null | 'none' 
     const p = loadLight(x.light);
     return p && { light: p };
   }
-  const p = loadMaterial(x.material);
-  return p && { material: p };
+  if (set[0] === 'material') {
+    const p = loadMaterial(x.material);
+    return p && { material: p };
+  }
+  if (set[0] === 'sprite') {
+    const p = loadSprite(x.sprite);
+    return p && { sprite: p };
+  }
+  const p = loadSound(x.sound);
+  return p && { sound: p };
 }
 
 function validPrint(print: Print): boolean {
@@ -682,11 +849,12 @@ function loadCartridge(x: unknown, nextId: number): Cartridge | null {
   if (!isString(id) || !isString(name)) return null;
   const n = CARTRIDGE_ID.exec(id)?.[1];
   if (n === undefined || !(Number(n) < nextId)) return null; // only ids already handed out
-  if (kind === 'part' || kind === 'species' || kind === 'light' || kind === 'material') {
+  if (isString(kind) && (PRINT_KINDS as readonly string[]).includes(kind)) {
+    const k = kind as PrintKind;
     const print = loadPrint(x);
     // a print names no preset, never sits in a machine, and carries exactly its own kind
-    if (print === null || print === 'none' || printKind(print) !== kind || preset !== null || slot !== null) return null;
-    return { id, name, kind, preset: null, from: [], affinity: { pxd: 1, vtx: 1, lx: 1, aq: 1 }, slot: null, ...print };
+    if (print === null || print === 'none' || printKind(print) !== k || preset !== null || slot !== null) return null;
+    return { id, name, kind: k, preset: null, from: [], affinity: { pxd: 1, vtx: 1, lx: 1, aq: 1 }, slot: null, ...print };
   }
   if (kind !== 'blank' && kind !== 'preset' && kind !== 'mix') return null;
   if (preset !== null && !isString(preset)) return null;

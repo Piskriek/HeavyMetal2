@@ -387,6 +387,13 @@ export interface PlayScene {
   aimKitPart(reach: number): { readonly kit: string; readonly path: string; readonly gen: string | null } | null;
   /** Rebuilds a lab kit with the beam's per-part overrides; false while its parts are not loaded yet. */
   setKitOverrides(kit: string, overrides: Overrides): boolean;
+  /** Hangs a sprite cartridge's baked turntable over a machine as a billboard card, or takes it down with null. */
+  setSpriteCard(
+    kit: string,
+    card: { readonly rgba: Uint8Array; readonly width: number; readonly height: number; readonly frames: number; readonly fps: number; readonly sizeM: number } | null,
+  ): boolean;
+  /** The card hanging over a machine: its frame count and cadence, or null. */
+  spriteCardOf(kit: string): { readonly frames: number; readonly fps: number } | null;
   /** A lab kit's placed parts as last built. */
   kitPlaced(kit: string): readonly PlacedPart[];
   /** Rebuilds every machine on the plot (the debug switch for the kit frames). */
@@ -3543,6 +3550,7 @@ export function createPlayScene(o: {
       const wc = postUniforms.uWaveCentre.value;
       plume.setWave([wc.x, wc.y, wc.z], waveTo >= 0 ? Math.min(r, RACER_REACH) : -1);
       tickMachinePlumes(now);
+      room.updateSpriteCards(now);
       plume.update(now);
       labPlume.update(now);
       beamFx.update(now);
@@ -4317,6 +4325,10 @@ export function createPlayScene(o: {
       const hit = aimKit(targetables, camera.position, dir, reach);
       return hit ? { kit: hit.kit, path: hit.path, gen: hit.gen } : null;
     },
+    setSpriteCard(kitId, card) {
+      return room.setSpriteCard(kitId, card);
+    },
+    spriteCardOf: (kitId) => room.spriteCardOf(kitId),
     setKitOverrides(kitId: string, overrides: Overrides) {
       // PLAN-42-GATE: the plot's own Gate kit rebuilds in place, keeping its iris state and its pose
       if (kitId === 'stargate') {

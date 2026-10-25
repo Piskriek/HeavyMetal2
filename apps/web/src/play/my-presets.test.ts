@@ -57,3 +57,31 @@ test('a share code carries one preset, kind and all, and refuses anything else',
   assert.equal(readShareCode('SMX-PLN-0001-MOON'), null, 'a planet code is not a preset');
   assert.equal(readShareCode(oakCode.slice(0, -6)), null, 'a cut code is junk');
 });
+
+test('sprite and sound presets save and travel under their own prefixes (plan 43)', () => {
+  const CARD: Print = { sprite: { name: 'Mill sprite, stage 3', kit: 'mill', stage: 3, size: 24, angles: 12, dither: 'none', elevationDeg: 10 } };
+  const HUM: Print = {
+    sound: {
+      name: 'Mill hum', role: 'machine', stage: 6, gain: 0.2,
+      patch: { name: 'hum', atoms: [{ wave: 'sine', freqHz: 74, gain: 0.4, attackMs: 20, decayMs: 400 }] },
+    },
+  };
+  let s = EMPTY_MY_PRESETS;
+  for (const p of [CARD, HUM]) s = savePreset(s, p).presets;
+  assert.deepEqual(s.list.map((q) => [q.kind, q.name]), [['sprite', 'Mill sprite, stage 3'], ['sound', 'Mill hum']]);
+  // they come back by kind, and the profile keeps them
+  assert.deepEqual(presetsOf(parseMyPresets(serializeMyPresets(s)), 'sprite').map((q) => q.name), ['Mill sprite, stage 3']);
+  assert.deepEqual(presetsOf(parseMyPresets(serializeMyPresets(s)), 'sound').map((q) => q.name), ['Mill hum']);
+  // and a share code carries each one, and refuses the other's payload
+  const cardCode = shareCode(CARD);
+  assert.ok(cardCode.startsWith('SMX-PXD-'));
+  assert.deepEqual(readShareCode(cardCode), CARD);
+  const humCode = shareCode(HUM);
+  assert.ok(humCode.startsWith('SMX-SND-'));
+  assert.deepEqual(readShareCode(humCode), HUM);
+  assert.equal(readShareCode(`SMX-PXD-${humCode.slice('SMX-SND-'.length)}`), null);
+  // renaming one renames the print it carries, not just the label
+  const renamed = renamePreset(s, 'my1', 'Turning mill');
+  assert.equal(renamed.list[0]!.name, 'Turning mill');
+  assert.ok('sprite' in renamed.list[0]!.print && renamed.list[0]!.print.sprite.name === 'Turning mill');
+});

@@ -8,3 +8,4 @@ export * from './random';
 export * from './describe';
 export * from './engine-spec';
 export * from './music-spec';
+export * from './stems';

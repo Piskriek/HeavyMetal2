@@ -49,3 +49,29 @@ test('the beam\'s regrown trees round-trip by place, and junk places, species or
   const junk = JSON.stringify({ v: 1, cleared: [], logs: [], sealed: [], trees: { 'x,1': oak, '1,2': { species: 'palm', params: {} }, '3,4': { species: 'pine', params: 'tall' }, '5,6': { species: 'birch', params: { height: 6 } } } });
   assert.deepEqual(parsePropsSave(junk).trees, { '5,6': { species: 'birch', params: { height: 6 } } });
 });
+
+test('a sprite card and a machine hum are part of the save, and a broken one is dropped, not trusted (plan 43)', async () => {
+  const { withSpriteCard, withMachineHum } = await import('./props-save');
+  const card = { name: 'Gate sprite, stage 2', kit: 'gate', stage: 2, size: 32, angles: 8, dither: 'bayer2' as const, elevationDeg: 12 };
+  const hum = {
+    name: 'Drill hum', role: 'machine' as const, stage: 4, gain: 0.22, loopSeconds: 0.5,
+    patch: { name: 'hum', atoms: [{ wave: 'sawtooth', freqHz: 58, gain: 0.5, attackMs: 40, decayMs: 200 }] },
+  };
+  const s = withMachineHum(withSpriteCard(EMPTY_PROPS_SAVE, 'gate', card), 'mill-frame', hum);
+  const back = parsePropsSave(serializePropsSave(s));
+  assert.deepEqual(back.sprites, { gate: card });
+  assert.deepEqual(back.sounds, { 'mill-frame': hum });
+  assert.equal(serializePropsSave(EMPTY_PROPS_SAVE).includes('sprites'), false, 'omitted when there are none');
+  // taking one down removes it
+  assert.deepEqual(withSpriteCard(s, 'gate', null).sprites, {});
+  assert.deepEqual(withMachineHum(s, 'mill-frame', null).sounds, {});
+  // junk is dropped: an impossible turntable, an unknown wave, a name that is not a kit
+  const junk = JSON.stringify({
+    v: 1, cleared: [], logs: [], sealed: [],
+    sprites: { gate: { ...card, angles: 99 }, 'not a kit': card },
+    sounds: { mill: { ...hum, patch: { name: 'bad', atoms: [{ wave: 'vocoder', freqHz: 100, gain: 0.4, attackMs: 1, decayMs: 60 }] } } },
+  });
+  const parsed = parsePropsSave(junk);
+  assert.equal(parsed.sprites, undefined);
+  assert.equal(parsed.sounds, undefined);
+});

@@ -48,13 +48,19 @@ import {
   printKind,
   type Print,
   type MaterialPrintSpec,
+  type SpritePrintSpec,
+  type SoundPrintSpec,
 } from '@hm/cartlab';
+import { renderStem } from '@hm/soundlab';
+import { bakeSpritePrint, spriteAtlas, spriteBill, spriteFps, stemAtStage } from './sprite-sound-cartridge';
 import type { PartOverride } from '@hm/kitspec';
 import { LAYER_SHELF, materialName, resolveMatPreset, specOfName } from '@hm/matstack';
 import { BenchParts } from './bench-parts';
 import { BenchSpecies } from './bench-species';
 import { BenchLights } from './bench-lights';
 import { BenchMaterials } from './bench-materials';
+import { BenchSprites } from './bench-sprites';
+import { BenchSounds } from './bench-sounds';
 import { MY_PRESETS_KEY, parseMyPresets, presetsOf, savePreset, serializeMyPresets, type MyPresets } from './my-presets';
 import { isLampPart, lightOverride } from './light-presets';
 import { rifleLook } from './rifle-look';
@@ -98,7 +104,7 @@ import { PieceMeshManager } from '../base/piece-meshes';
 import { globalKitPieceCache, integrityColorName } from '../base/kit-pieces';
 import { planFrameLegs } from '../base/foundation-legs';
 import { preloadAllGenAssets, genLevelForStage, createGenFixture } from '../assets/gen-props';
-import { PROPS_SAVE_KEY, parsePropsSave, serializePropsSave, clearedProp, readLog, sealedSite, withKitOverride, withTrees, type PropsSave, type TreePreset } from './props-save';
+import { PROPS_SAVE_KEY, parsePropsSave, serializePropsSave, clearedProp, readLog, sealedSite, withKitOverride, withTrees, withSpriteCard, withMachineHum, type PropsSave, type TreePreset } from './props-save';
 import { clutterById, salvageSplit } from './lab-clutter';
 import { loreFor } from './lore-logs';
 import { ARMORY_PICKUP_REACH, ARMORY_RAIL_POS, SIDEARM_ITEM_ID, shouldShowAmmoBadge } from './armory-rack';
@@ -624,7 +630,7 @@ export function PlayScreen(props: {
   const [labPanel, setLabPanel] = useState<LabMachineKind | null>(null);
   const [benchBlank, setBenchBlank] = useState<string | null>(null);
   /** The preset bench's page: authored terraforming presets, or Shape Press parts (TICKET-32). */
-  const [benchTab, setBenchTab] = useState<'presets' | 'parts' | 'species' | 'lights'>('presets');
+  const [benchTab, setBenchTab] = useState<'presets' | 'parts' | 'species' | 'lights' | 'sprites' | 'sounds'>('presets');
   /** The Materials page's shelf (plan 41): the ground's terraforming materials, or the machines' layered ones. */
   const [materialShelf, setMaterialShelf] = useState<'ground' | 'machines'>('ground');
   /** The player's own presets (plan 39 section 7): "Yours" on every bench page, kept in the profile. */
@@ -1001,7 +1007,7 @@ useEffect(() => {
   const beamOreFlushRef = useRef(0);
   /** The rifle's port (TASK-21): the written cartridge loaded from the lab rack, and its preset and colour. Not saved yet (TASK-21c). */
   /** The rifle's port: a material preset cartridge (preset set) or a part cartridge (part set, preset ''; TICKET-32). */
-  const beamPortRef = useRef<{ readonly cartridge: Cartridge; readonly preset: string; readonly name: string; readonly colour: string; readonly part?: PartSpec; readonly species?: SpeciesSpec; readonly light?: LightSpec; readonly material?: MaterialPrintSpec } | null>(null);
+  const beamPortRef = useRef<{ readonly cartridge: Cartridge; readonly preset: string; readonly name: string; readonly colour: string; readonly part?: PartSpec; readonly species?: SpeciesSpec; readonly light?: LightSpec; readonly material?: MaterialPrintSpec; readonly sprite?: SpritePrintSpec; readonly sound?: SoundPrintSpec } | null>(null);
   /** A part shot in progress: when the left button went down and whether Shift was held (tap = one part, hold or Shift = all of that kind). */
   const partShotRef = useRef<{ readonly t0: number; readonly shift: boolean } | null>(null);
   /** A light cartridge's shot at a lamp (plan 39, Lx), decided on release like a part shot. */
@@ -1731,6 +1737,77 @@ useEffect(() => {
   const applyLightShotRef = useRef<(broadcast: boolean) => number>(() => 0);
   applyLightShotRef.current = applyLightShot;
   /**
+   * The beam's Apply with a sprite cartridge (plan 43, step 4): bakes the print's turntable at its stage and hangs the card
+   * over the machine it is fired at, where it turns at that stage's cadence. Returns 1 when a card was hung.
+   */
+  const applySpriteShot = (broadcast: boolean): number => {
+    const scene = sceneRef.current;
+    const sprite = beamPortRef.current?.sprite;
+    if (!scene || !sprite) return 0;
+    const hit = scene.aimKitPart(BEAM_STROKE_RANGE);
+    if (!hit) {
+      say('Nothing to hang a card on', 'Aim at a machine: the Gate, a mill, a press.');
+      return 0;
+    }
+    const sheet = bakeSpritePrint(sprite);
+    const atlas = spriteAtlas(sheet);
+    const hung = scene.setSpriteCard(hit.kit, {
+      rgba: atlas.rgba,
+      width: atlas.width,
+      height: atlas.height,
+      frames: sheet.angles,
+      fps: spriteFps(sprite.stage),
+      sizeM: Math.max(0.5, sprite.size / 32),
+    });
+    if (!hung) {
+      say('That takes no card', 'A sprite card hangs over the lab machines and the Gate.');
+      return 0;
+    }
+    savePropsSave(withSpriteCard(propsRef.current, hit.kit, sprite));
+    gameAudio.playCartridgeSnap();
+    say(`Card hung: ${sprite.name}`,
+      broadcast
+        ? `${sheet.angles} frames, turned ${spriteFps(sprite.stage)} times a second: the whole machine shows them.`
+        : `${sheet.angles} frames at ${sprite.size} px, turned ${spriteFps(sprite.stage)} times a second.`);
+    return 1;
+  };
+  const applySpriteShotRef = useRef<(broadcast: boolean) => number>(() => 0);
+  applySpriteShotRef.current = applySpriteShot;
+  /**
+   * The beam's Apply with a sound cartridge (plan 43, step 4): the printed stem becomes the machine's hum, looped where the
+   * print is a loop and struck once where it is a verb. Firing the same print at the same machine again stops it. Returns 1
+   * when the hum changed.
+   */
+  const applySoundShot = (broadcast: boolean): number => {
+    const scene = sceneRef.current;
+    const sound = beamPortRef.current?.sound;
+    if (!scene || !sound) return 0;
+    const hit = scene.aimKitPart(BEAM_STROKE_RANGE);
+    if (!hit) {
+      say('Nothing to hum', 'Aim at a machine: a hum belongs to a machine.');
+      return 0;
+    }
+    const key = `hum:${hit.kit}`;
+    if (!broadcast && gameAudio.printVoicePlaying(key)) {
+      gameAudio.stopPrintSamples(key);
+      savePropsSave(withMachineHum(propsRef.current, hit.kit, null));
+      say(`Hum stopped: ${sound.name}`, 'Fire the same cartridge at the machine again to start it.');
+      gameAudio.playCartridgePing();
+      return 1;
+    }
+    const { stem } = stemAtStage(sound, sound.stage);
+    const rendered = renderStem(stem, sound.stage, 3);
+    const loop = sound.loopSeconds !== undefined;
+    gameAudio.playPrintSamples(rendered.channels, rendered.sampleRateHz, { key, loop, gain: 0.16 });
+    savePropsSave(withMachineHum(propsRef.current, hit.kit, sound));
+    gameAudio.playCartridgeSnap();
+    say(`${loop ? 'Hum set' : 'Struck'}: ${sound.name}`,
+      `Heard at stage ${sound.stage}, ${loop ? `a ${Math.round((sound.loopSeconds ?? 0) * 1000)} ms loop` : 'once'}.`);
+    return 1;
+  };
+  const applySoundShotRef = useRef<(broadcast: boolean) => number>(() => 0);
+  applySoundShotRef.current = applySoundShot;
+  /**
    * The beam's Apply with a layered material (plan 41): a tap puts the material on the part it is fired at (a panel keeps
    * its bolts); a hold or Shift on every part of the machine that wore the same material. Like for like: a generated
    * core keeps its own texture. Returns how many parts changed.
@@ -1765,10 +1842,14 @@ useEffect(() => {
   };
   const applyMaterialShotRef = useRef<(broadcast: boolean) => number>(() => 0);
   applyMaterialShotRef.current = applyMaterialShot;
-  /** Whether the base's stores (the pack and the linked bins) hold a part's cost: a dry run of the base's `pay` command. */
-  const partStockCheck = (spec: PartSpec): { readonly ok: boolean; readonly why: string } => {
+  /** Whether the base's stores (the pack and the linked bins) hold a bill: a dry run of the base's `pay` command. */
+  const stockCheck = (
+    bill: readonly { readonly item: string; readonly n: number }[],
+    reason: string,
+  ): { readonly ok: boolean; readonly why: string } => {
+    if (bill.length === 0) return { ok: true, why: '' };
     const at = sceneRef.current?.debug.position() ?? { x: 0, z: 0 };
-    const dry = apply(baseWorldRef.current, getBaseEnv(), { t: 'pay', at, bill: partBill(spec), reason: 'part' });
+    const dry = apply(baseWorldRef.current, getBaseEnv(), { t: 'pay', at, bill, reason });
     const refused = dry.events.find((ev) => ev.type === 'refused');
     if (refused && refused.type === 'refused') {
       const named = (refused.short ?? []).map((x) => `${x.n} ${x.item === 'vtx-rough' ? 'raw vertices' : x.item === 'pxd-mono' ? 'raw pixels' : x.item}`);
@@ -1776,10 +1857,14 @@ useEffect(() => {
     }
     return { ok: true, why: '' };
   };
-  const payForPart = (spec: PartSpec): void => {
+  /** Whether the stores hold a part's cost. */
+  const partStockCheck = (spec: PartSpec): { readonly ok: boolean; readonly why: string } => stockCheck(partBill(spec), 'part');
+  const payForStock = (bill: readonly { readonly item: string; readonly n: number }[], reason: string): void => {
+    if (bill.length === 0) return;
     const at = sceneRef.current?.debug.position() ?? { x: 0, z: 0 };
-    dispatchBase({ t: 'pay', at, bill: partBill(spec), reason: `part:${spec.gen}` });
+    dispatchBase({ t: 'pay', at, bill, reason });
   };
+  const payForPart = (spec: PartSpec): void => payForStock(partBill(spec), `part:${spec.gen}`);
   /**
    * The planet's Drafting Table prints a part (ARGO_NOTE_34 D.1): it draws a blank from the rack through the quantum
    * bridge, pays the part's raw vertices and raw pixels, prints at once, and puts the cartridge in the rifle's port.
@@ -2128,6 +2213,22 @@ useEffect(() => {
     // the beam's part overrides on the lab's kit-built props (TICKET-32): stored now, applied as each kit builds
     for (const [kit, ov] of Object.entries(propsRef.current.kits ?? {})) scene.setKitOverrides(kit, ov);
     scene.setTreeOverrides(propsRef.current.trees ?? {});
+    // plan 43: the cards hung over the machines and the hums they were given are part of this profile's world
+    for (const [kit, print] of Object.entries(propsRef.current.sprites ?? {})) {
+      const sheet = bakeSpritePrint(print);
+      const atlas = spriteAtlas(sheet);
+      scene.setSpriteCard(kit, {
+        rgba: atlas.rgba, width: atlas.width, height: atlas.height,
+        frames: sheet.angles, fps: spriteFps(print.stage), sizeM: Math.max(0.5, print.size / 32),
+      });
+    }
+    for (const [kit, print] of Object.entries(propsRef.current.sounds ?? {})) {
+      const { stem } = stemAtStage(print, print.stage);
+      const rendered = renderStem(stem, print.stage, 3);
+      gameAudio.playPrintSamples(rendered.channels, rendered.sampleRateHz, {
+        key: `hum:${kit}`, loop: print.loopSeconds !== undefined, gain: 0.16,
+      });
+    }
     if (typeof window !== 'undefined') {
       (window as any).__playScene = scene;
       (window as any).__createGenFixture = createGenFixture;
@@ -2323,6 +2424,16 @@ useEffect(() => {
           // A light cartridge in Apply sets the lamp it is fired at (decided on release: a tap one, a hold every lamp on the machine)
           if (beamHeldRef.current && beamModeRef.current === 'apply' && beamPortRef.current?.light) {
             lightShotRef.current = { t0: performance.now(), shift: e.shiftKey };
+            return;
+          }
+          // A sprite cartridge in Apply hangs its card over the machine it is fired at (at once: a card is per machine)
+          if (beamHeldRef.current && beamModeRef.current === 'apply' && beamPortRef.current?.sprite) {
+            applySpriteShotRef.current(e.shiftKey);
+            return;
+          }
+          // A sound cartridge in Apply gives the machine its hum (at once: the same cartridge again stops it)
+          if (beamHeldRef.current && beamModeRef.current === 'apply' && beamPortRef.current?.sound) {
+            applySoundShotRef.current(e.shiftKey);
             return;
           }
           // A layered material in Apply dresses the part it is fired at (decided on release: a tap one, a hold every part that wore the same)
@@ -4313,7 +4424,8 @@ useEffect(() => {
         return beamPortRef.current?.cartridge.id === id;
       },
       /** The rifle's port: its cartridge's name and, for a part cartridge, the part. */
-      port: () => (beamPortRef.current ? { name: beamPortRef.current.name, part: beamPortRef.current.part ?? null, species: beamPortRef.current.species ?? null, light: beamPortRef.current.light ?? null, material: beamPortRef.current.material ?? null } : null),
+      port: () => (beamPortRef.current ? { name: beamPortRef.current.name, part: beamPortRef.current.part ?? null, species: beamPortRef.current.species ?? null, light: beamPortRef.current.light ?? null, material: beamPortRef.current.material ?? null, sprite: beamPortRef.current.sprite ?? null, sound: beamPortRef.current.sound ?? null } : null),
+      spriteCard: (kit: string) => sceneRef.current?.spriteCardOf(kit) ?? null,
       seedCartridge: (preset: string): boolean => {
         const v = VAULT_BY_ID.get(preset);
         if (!v) return false;
@@ -5042,6 +5154,8 @@ useEffect(() => {
                     <button className={benchTab === 'parts' ? 'on' : ''} aria-pressed={benchTab === 'parts'} onClick={() => setBenchTab('parts')} data-testid="bench-tab-parts">Parts</button>
                     <button className={benchTab === 'species' ? 'on' : ''} aria-pressed={benchTab === 'species'} onClick={() => setBenchTab('species')} data-testid="bench-tab-species">Species</button>
                     <button className={benchTab === 'lights' ? 'on' : ''} aria-pressed={benchTab === 'lights'} onClick={() => setBenchTab('lights')} data-testid="bench-tab-lights">Lights</button>
+                    <button className={benchTab === 'sprites' ? 'on' : ''} aria-pressed={benchTab === 'sprites'} onClick={() => setBenchTab('sprites')} data-testid="bench-tab-sprites">Sprites</button>
+                    <button className={benchTab === 'sounds' ? 'on' : ''} aria-pressed={benchTab === 'sounds'} onClick={() => setBenchTab('sounds')} data-testid="bench-tab-sounds">Sounds</button>
                   </div>
                   <p>{benchTab === 'parts'
                     ? 'Prints a Shape Press part onto a blank cartridge. Load it in the beam rifle and fire Apply at a part: a tap changes that part, a hold or Shift changes every part of its kind.'
@@ -5049,6 +5163,10 @@ useEffect(() => {
                       ? 'Prints a Water Maker species onto a blank cartridge. Load it in the beam rifle and fire Apply at a tree on the plot: a tap regrows that tree, a hold or Shift every tree of its kind nearby.'
                       : benchTab === 'lights'
                         ? 'Prints a Light Projector light onto a blank cartridge. Load it in the beam rifle and fire Apply at a machine lamp: a tap sets that lamp, a hold or Shift every lamp on the machine.'
+                        : benchTab === 'sprites'
+                          ? 'Prints a machine\'s turntable onto a blank cartridge, baked in the Fidelity Stage\'s own palette and dither. Load it in the beam rifle and fire Apply at a machine: its card hangs above the machine and turns at that stage\'s cadence.'
+                          : benchTab === 'sounds'
+                            ? 'Prints a synth patch onto a blank cartridge, played on the Fidelity Stage\'s own hardware from a 1-bit speaker to a spatial mix. Load it in the beam rifle and fire Apply at a machine: the patch becomes that machine\'s hum.'
                       : materialShelf === 'machines'
                         ? 'Prints a machine material onto a blank cartridge: paint, then the wear on top (rust, dust, grime). Load it in the beam rifle and fire Apply at a machine part: a tap dresses that part, a hold or Shift every part that wore the same.'
                         : 'Writes an authored terraforming material onto a blank cartridge.'}</p>
@@ -5138,6 +5256,41 @@ useEffect(() => {
                         labRef.current = next;
                         commit(withLab(stateRef.current, next));
                         say('Printing started', `The bench prints ${spec.name} while powered.`);
+                      }}
+                    />
+                  ) : benchTab === 'sprites' ? (
+                    <BenchSprites
+                      mine={presetsOf(myPresets, 'sprite')}
+                      onSave={(spec: SpritePrintSpec) => saveMyPreset({ sprite: spec })}
+                      check={(spec) => {
+                        if (!activeBlank) return { ok: false, why: 'No blanks on the rack. Make a blank at the rack first.' };
+                        const c = canWritePrint(labRef.current, labEnv, activeBlank, { sprite: spec });
+                        return c.ok ? stockCheck(spriteBill(spec), 'sprite') : c;
+                      }}
+                      onPrint={(spec: SpritePrintSpec) => {
+                        if (!activeBlank) return;
+                        payForStock(spriteBill(spec), `sprite:${spec.kit}`);
+                        const next = startPrintWrite(labRef.current, labEnv, activeBlank, { sprite: spec });
+                        labRef.current = next;
+                        commit(withLab(stateRef.current, next));
+                        say('Printing started', `The bench turns ${spec.name} onto the cartridge while powered.`);
+                      }}
+                    />
+                  ) : benchTab === 'sounds' ? (
+                    <BenchSounds
+                      mine={presetsOf(myPresets, 'sound')}
+                      onSave={(spec: SoundPrintSpec) => saveMyPreset({ sound: spec })}
+                      check={(spec) => {
+                        if (!activeBlank) return { ok: false, why: 'No blanks on the rack. Make a blank at the rack first.' };
+                        return canWritePrint(labRef.current, labEnv, activeBlank, { sound: spec });
+                      }}
+                      onPrint={(spec: SoundPrintSpec) => {
+                        if (!activeBlank) return;
+                        // a patch is data, not matter: no stock, only the blank and the bench's time
+                        const next = startPrintWrite(labRef.current, labEnv, activeBlank, { sound: spec });
+                        labRef.current = next;
+                        commit(withLab(stateRef.current, next));
+                        say('Printing started', `The bench writes ${spec.name} onto the cartridge while powered.`);
                       }}
                     />
                   ) : (<>

@@ -210,6 +210,9 @@
       "@hm/musicbox": [
         "packages/musicbox/src/index.ts"
       ],
+      "@hm/skin": [
+        "packages/skin/src/index.ts"
+      ],
       "@hm/chunkworld": [
         "packages/chunkworld/src/index.ts"
       ],

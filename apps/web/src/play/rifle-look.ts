@@ -3,7 +3,8 @@
  * Texture Mill preset glows its palette; a part its first material; a species its canopy; a light its own colour; a
  * layered material its base colour.
  */
-import { printOf, type Cartridge, type Print } from '@hm/cartlab';
+import { printOf, type Cartridge, type Print, type SoundRole } from '@hm/cartlab';
+import { paletteForStage } from '@hm/skin';
 import { specOfName } from '@hm/matstack';
 import { presetLook } from './beam-port';
 import { lightHex } from './light-presets';
@@ -16,6 +17,11 @@ const materialHex = (ref: string): string => {
   if (!m) return '#808080';
   const c = m.base.colour;
   return c === 'paint1' ? m.paint[0] : c === 'paint2' ? m.paint[1] : c;
+};
+
+/** What a sound cartridge glows, by the role it was written for. */
+const SOUND_GLOW: Readonly<Record<SoundRole, string>> = {
+  machine: '#8ad0ff', rifle: '#ffd166', gate: '#c08aff', music: '#8affb0',
 };
 
 export interface RifleLook {
@@ -36,7 +42,12 @@ export function rifleLook(c: Cartridge): RifleLook | null {
         ? speciesHex({ species: print.species.species as 'pine' | 'oak' | 'birch', params: print.species.params })
         : 'light' in print
           ? lightHex(print.light)
-          : materialHex(print.material.ref);
+          : 'material' in print
+            ? materialHex(print.material.ref)
+            : 'sprite' in print
+              // a sprite glows the ink its own stage's palette leans on
+              ? (paletteForStage(print.sprite.stage).colours[Math.floor(paletteForStage(print.sprite.stage).colours.length * 0.6)] ?? '#9aa4ad')
+              : SOUND_GLOW[print.sound.role];
     return { colour, print, preset: '' };
   }
   if (c.kind === 'preset' && c.preset) return { colour: presetLook(c.preset)?.colour ?? '#808080', print: null, preset: c.preset };

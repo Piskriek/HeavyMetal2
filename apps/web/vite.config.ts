@@ -150,6 +150,7 @@ export default defineConfig(async ({ mode }) => ({
       '@hm/kart': p('../../packages/kart/src/index.ts'),
       '@hm/kinematic': p('../../packages/kinematic/src/index.ts'),
       '@hm/musicbox': p('../../packages/musicbox/src/index.ts'),
+      '@hm/skin': p('../../packages/skin/src/index.ts'),
       '@hm/chunkworld': p('../../packages/chunkworld/src/index.ts'),
       '@hm/pixels': p('../../packages/pixels/src/index.ts'),
       '@hm/questline': p('../../packages/questline/src/index.ts'),

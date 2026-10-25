@@ -282,6 +282,81 @@ export class GameAudioController {
     return this.ctx;
   }
 
+  // ---------------------------------------------------------------------------
+  // Printed stems (plan 43, step 4)
+  // ---------------------------------------------------------------------------
+
+  /** The printed stems playing right now: the Bench's preview, and a machine's hum after the beam applied one. */
+  private printVoices = new Map<string, { readonly src: AudioBufferSourceNode; readonly gain: GainNode }>();
+
+  /**
+   * Play samples a print rendered (`@hm/soundlab`'s `renderStem`): one channel or two, at the stage's own rate. A keyed voice
+   * replaces the one already playing under that key, so a machine carries one hum at a time. Printed stems are heard through
+   * the master bus, not the world bus: a preview has to be audible in the lab, where the world gate is shut.
+   * Returns the clip's length in seconds (0 when there is nothing to play).
+   */
+  public playPrintSamples(
+    channels: readonly Float32Array[],
+    sampleRateHz: number,
+    o: { readonly key?: string; readonly loop?: boolean; readonly gain?: number } = {},
+  ): number {
+    const first = channels[0];
+    if (!first || first.length === 0 || !Number.isFinite(sampleRateHz) || sampleRateHz <= 0) return 0;
+    let c: AudioContext;
+    try {
+      c = this.getContext();
+    } catch {
+      return 0; // no audio in this environment: the print still exists, it just makes no sound
+    }
+    const buffer = c.createBuffer(Math.max(1, Math.min(2, channels.length)), first.length, sampleRateHz);
+    for (let i = 0; i < buffer.numberOfChannels; i += 1) {
+      const ch = channels[i] ?? first;
+      buffer.copyToChannel(ch.subarray(0, first.length) as Float32Array<ArrayBuffer>, i);
+    }
+    const src = c.createBufferSource();
+    src.buffer = buffer;
+    src.loop = o.loop === true;
+    const gain = c.createGain();
+    gain.gain.value = Math.max(0, Math.min(2, o.gain ?? 0.4));
+    src.connect(gain);
+    gain.connect(this.masterGain ?? c.destination);
+    if (o.key) {
+      this.stopPrintSamples(o.key);
+      this.printVoices.set(o.key, { src, gain });
+      src.onended = (): void => {
+        if (this.printVoices.get(o.key as string)?.src === src) this.printVoices.delete(o.key as string);
+      };
+    }
+    src.start();
+    return buffer.duration;
+  }
+
+  /** Stop one printed stem by key, or every one of them. */
+  public stopPrintSamples(key?: string): void {
+    const keys = key === undefined ? [...this.printVoices.keys()] : [key];
+    for (const k of keys) {
+      const v = this.printVoices.get(k);
+      if (!v) continue;
+      this.printVoices.delete(k);
+      try {
+        v.src.stop();
+      } catch {
+        // already stopped
+      }
+      try {
+        v.src.disconnect();
+        v.gain.disconnect();
+      } catch {
+        // already disconnected
+      }
+    }
+  }
+
+  /** Whether a printed stem is playing under this key (the machine screen shows the hum). */
+  public printVoicePlaying(key: string): boolean {
+    return this.printVoices.has(key);
+  }
+
   private buildGraph(): void {
     if (!this.ctx) return;
     const c = this.ctx;

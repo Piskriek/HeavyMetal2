@@ -456,6 +456,15 @@ export interface LabRoom {
   aimKitPart(origin: THREE.Vector3, dir: THREE.Vector3, reach: number): { readonly kit: string; readonly path: string; readonly gen: string | null } | null;
   /** Rebuilds a kit with these per-part overrides (the beam's part cartridges); false while its parts are not loaded yet. */
   setKitOverrides(kit: string, overrides: Overrides): boolean;
+  /** Hangs a baked turntable over a machine as a billboard card (a sprite cartridge's Apply), or takes it down with null. */
+  setSpriteCard(
+    kit: string,
+    card: { readonly rgba: Uint8Array; readonly width: number; readonly height: number; readonly frames: number; readonly fps: number; readonly sizeM: number } | null,
+  ): boolean;
+  /** Turns every card to the frame its stage's cadence is on (called once a frame). */
+  updateSpriteCards(now: number): void;
+  /** The card hanging over a machine: its frame count and cadence, or null. */
+  spriteCardOf(kit: string): { readonly frames: number; readonly fps: number } | null;
   /** A kit's placed parts as last built (empty before its first build). */
   kitPlaced(kit: string): readonly PlacedPart[];
   /** Starts a salvage prop's dissolve (about a second; it then leaves the lab). False for a fixture or a prop that is not standing. */
@@ -836,6 +845,63 @@ export function createLabRoom(o: {
     return k.build === null ? false : rebuildKit(id);
   };
   const kitPlaced = (id: string): readonly PlacedPart[] => kits.get(id)?.build?.placed ?? [];
+
+  /**
+   * The billboard cards a sprite cartridge hung over a machine (plan 43, step 4), by kit id. One card per machine: applying a
+   * second sprite replaces the first, and a card is part of the machine's own group, so it moves with a rebuild.
+   */
+  const spriteCards = new Map<string, { readonly sprite: THREE.Sprite; readonly tex: THREE.DataTexture; readonly frames: number; readonly fps: number }>();
+
+  /** Hang a baked turntable over a machine, or take the one it has down (null). False when there is no such machine. */
+  const setSpriteCard = (
+    id: string,
+    card: { readonly rgba: Uint8Array; readonly width: number; readonly height: number; readonly frames: number; readonly fps: number; readonly sizeM: number } | null,
+  ): boolean => {
+    const k = kits.get(id);
+    if (!k) return false;
+    const had = spriteCards.get(id);
+    if (had) {
+      k.group.remove(had.sprite);
+      had.sprite.material.dispose();
+      had.tex.dispose();
+      spriteCards.delete(id);
+    }
+    if (card === null) return true;
+    const tex = new THREE.DataTexture(new Uint8Array(card.rgba), card.width, card.height, THREE.RGBAFormat);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    // the atlas is every frame side by side, so one step of u is one frame
+    tex.repeat.set(1 / Math.max(1, card.frames), 1);
+    tex.offset.set(0, 0);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+    const s = Math.max(0.1, card.sizeM);
+    sprite.scale.set(s, s, 1);
+    // the card sits clear of the machine's own top, so it is not swallowed by the frame it labels
+    let top = 1.6;
+    if (k.group.children.length > 0) {
+      const box = new THREE.Box3().setFromObject(k.group);
+      if (Number.isFinite(box.max.y) && box.max.y > 0) top = box.max.y - k.group.position.y;
+    }
+    sprite.position.set(0, Math.max(1.2, top) + s * 0.6, 0);
+    sprite.renderOrder = 4;
+    sprite.name = `sprite-card:${id}`;
+    k.group.add(sprite);
+    spriteCards.set(id, { sprite, tex, frames: Math.max(1, card.frames), fps: Math.max(1, card.fps) });
+    return true;
+  };
+
+  /** Turn every card to the frame its stage's cadence is on. Called once a frame. */
+  const updateSpriteCards = (now: number): void => {
+    for (const c of spriteCards.values()) c.tex.offset.x = (Math.floor(now * c.fps) % c.frames) / c.frames;
+  };
+
+  /** The card hanging over a machine, for the HUD and the tests: its frame count and cadence, or null. */
+  const spriteCardOf = (id: string): { readonly frames: number; readonly fps: number } | null => {
+    const c = spriteCards.get(id);
+    return c ? { frames: c.frames, fps: c.fps } : null;
+  };
   // The breaker panel (sheet 07): the isolator turns about its spindle (the panel's normal) and the three sub-breakers flip in their sockets.
   // The panel's own model carries the hazard plate, the knob and the sockets; the code adds only the moving parts and the socket collars.
   const isolator = new THREE.Group();
@@ -1491,6 +1557,9 @@ export function createLabRoom(o: {
     aimKitPart,
     setKitOverrides,
     kitPlaced,
+    setSpriteCard,
+    updateSpriteCards,
+    spriteCardOf,
     dissolveClutter,
     removeClutter,
     armory,

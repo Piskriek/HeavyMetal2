@@ -261,6 +261,51 @@ Standing recurring Overwatch task executed whenever Antigravity / Overwatch is a
 2. Research and fold new breakthroughs in **AI Agent Skills (Vision+Coverage closed loops, procedural graph synthesis), WebGL2/WebGPU Visual Fidelity (OKLab quantization, screen-space normal-derivative micro-cavity), and Logical/Spatial Optimization (BVH/AABB raycasting, UBO material batching)** into `docs/OVERWATCH_TECH_AND_AI_RADAR.md` and active `JOB-*` cards.
 3. **Know your environment & adapt the roster:** Identify where you woke (Claude Code or Antigravity) and which models you can spawn. Run `node scripts/skill-inventory.mjs` (refreshes `docs/agents/SKILLS_INVENTORY.md` and flags **MISSING** skills), research new models, tools and skills (Claude Code plugins/skills such as `/frontend-design`, `/route`, `/code-review`; Antigravity skills and subagent tiers), then update `docs/agents/roster.json` (role ladders, skill tags) and re-tag job **Role**/**Skills** fields so cheaper rungs plus the right skills do the work. Finish with `node scripts/agent-worker.mjs --dispatch --env <env>`.
 
+## JOB-20 [REVIEW] Plan 43 Step 4: Sprites, Audio Stems & Cartridge Parity (`pxdc:` / `sndc:`)
+- **Role:** BUILDER
+- **Skills:** `frontend`
+- **Priority:** P1
+- **Milestone:** M3
+- **Paths:** `packages/skin, packages/shareware, packages/soundlab, packages/musicbox, packages/cartlab, apps/web/src/play, apps/web/src/audio`
+- **Verify:** `node --import tsx --test apps/web/src/play/sprite-sound-cartridge.test.ts packages/soundlab/tests/stems.test.ts packages/musicbox/tests/stems.test.ts && npm.cmd run typecheck`
+- **Updated:** 2026-10-25
+- **Commit:** see the JOB-20 commit on `arena/a2368b82-heavymetal2` (PR #68)
+
+### Landed (2026-10-25)
+
+1. **`@hm/skin` — the stage's palette as data.** OKLab (`hexToOklab`/`oklabToHex`, `toOklch`, `deltaOk`), the four stage
+   palettes (`mono` 1-bit, `ega` 16, `vga` 32, `true`), `paletteForStage` (0–6, clamped), `nearestPaletteIndex` in OKLab,
+   Bayer 2/4 matrices with `ditherBias`, `quantiseRgba`/`indexedToRgba`, `shiftPalette` for skins and `asciiPreview`.
+2. **`@hm/shareware` sprite factory.** `bakeTurntable({kit, preset, stage, size, angles, dither, elevationDeg})` flattens a
+   `@hm/kitspec` preset, projects its solids into eight (or 1–16) yaw frames at a constant camera crane, flat-shades each face
+   from its real box axis normal (`0.42 + 0.58 · lambert`, lifted `0.04`), scan-converts the convex quads and quantises the
+   result into the stage's palette with that stage's dither. Plus `billboardFrameAt`/`frameForView` (front +z is frame 0),
+   `sheetToImage`/`sheetToRgba`, and `defaultMaterialColour` (a stable OKLCh ink per missing material).
+3. **`@hm/soundlab` stems, as a recursion.** `OscAtom → PatchNode → StemPreset` with `AUDIO_STAGE_LADDER` (1-bit 11 kHz mono
+   one voice at S0 → 16-bit 48 kHz stereo, filters and placement at S4–S6). `stageSoundsLike` performs the reduction the
+   hardware forces (a saw becomes a square on a speaker, a filter disappears, a pan has nowhere to go, voices are capped),
+   and `renderStem` renders it deterministically (seeded noise, RBJ biquads). The shelf: eleven machine hums, the rifle's three
+   verbs, the gate's chevron lock (nine ticks of one atom) and dial, four music stems.
+4. **`@hm/musicbox` song stems.** `songStem`/`songStems` turn a `Song` into the four stems the mix plays — one child patch per
+   note, each voice its own wave and filter, the loop the song's length — and `renderSongMix` sums them at a stage's hardware
+   (at S0 the whole arrangement is one voice, which is what the hardware did to eight bars of music).
+5. **Cartridge parity.** `@hm/cartlab` gains the `sprite` and `sound` print kinds (structural specs, readers and refusals:
+   a kit slug, a stage off the ladder, a bounded patch recursion), the rifle-only rule, and cartridge/job fields.
+   `sprite-sound-cartridge.ts` holds the `pxdc:`/`sndc:` codes (base64url JSON behind the prefix, read back through
+   `readPrint`), the six kit presets, `spriteBill`/`soundBill` (a patch is data, so a sound takes no stock), `spriteFps` and
+   the atlas. The Lab Bench has Sprites and Sounds tabs with a live animated card and an audible render, and the beam's Apply
+   hangs the card over the machine (`setSpriteCard`: a `DataTexture` atlas turned at the stage's cadence) or gives it the hum
+   (`playPrintSamples`: a loop, or one strike, played through the master bus). Both are saved per profile (`PropsSave.sprites`
+   / `.sounds`) and restored with the kit overrides.
+
+### Numbers
+
+`3386` tests, `3348` pass, `34` fail (the three known LFS lattice/monster failures), perf `23/23`. New suites: `@hm/skin`
+`7/7`, `@hm/shareware` sprite sheet `7/7`, `@hm/soundlab` stems `7/7`, `@hm/musicbox` stems `6/6`, cartlab sprite/sound
+`4/4`, `sprite-sound-cartridge` `6/6`, plus the props-save and my-presets plan-43 cases. `tsc --noEmit` clean.
+
+Unverified visually (no Chrome in this sandbox): how a baked sprite reads at each stage, and how a rendered stem sounds.
+
 ## JOB-19 [REVIEW] Plan 43: Modular Locomotion (`loc:`), Stage-Fidelity Animation (`anim:`) & Logic Graph Presets (`logic:`)
 - **Role:** BUILDER
 - **Skills:** `frontend`

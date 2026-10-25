@@ -21,7 +21,11 @@ surface; a light is a preset. You change the same data the person's panels chang
    `matstack.*` command per row. Nothing is applied: you get staged rows back, plus a refusal with the reason for anything that
    could not be staged. A refusal is information, not an error to retry blind.
 2. **Validate.** `studio.kit.validate` on the kit you touched: an unresolved `mat:`/`vault:` id, a part below the floor, a part that
-   floats, a machine socket that went missing. Fix every issue before you spend a person's attention on the change.
+   floats, a machine socket that went missing. Then `studio.kit.audit` for what legality cannot see: two parts in the same space, a
+   part hanging off nothing, a hose that ends in mid-air, a conduit that kinks across a moving joint, a control the beam can never
+   reach. The gates are `looseEnds === 0`, `terminals === 0`, no `solidClearances` pair, `hingeBendRadius.ok` and
+   `orbitClearance24.ok`; `summary` says which one failed in one line. Fix every issue before you spend a person's attention on
+   the change.
 3. **Measure.** `studio.material.coverage` for the material you touched. It returns percentages per zone — `top`, `side`, `edge`,
    `crease`, `bottom`, `splash` — for every layer, plus the material's edge metal and a set of plain readings. The numbers that
    matter: a patch is 2-15% of a face, a coat is over 60%; creases gather 2-3x what a face does; a worn edge shows bare metal at
@@ -90,6 +94,35 @@ undo history. If you are told a row is wrong, `studio.changes.reject` it and pro
         "type": {
           "kind": "json",
           "default": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "studio.kit.audit",
+    "summary": "The anatomy standard: colliding part pairs at rest, exploded and through 8 motion phases; loose ends; pipes that end in mid-air; bend radii at moving joints; and 24-ray orbit clearance for every control.",
+    "group": "inspect",
+    "params": [
+      {
+        "key": "kit",
+        "type": {
+          "kind": "json",
+          "default": null
+        }
+      },
+      {
+        "key": "preset",
+        "type": {
+          "kind": "string",
+          "maxLength": 80,
+          "default": "main"
+        }
+      },
+      {
+        "key": "options",
+        "type": {
+          "kind": "json",
+          "default": {}
         }
       }
     ]
@@ -452,6 +485,14 @@ Parameters:
   - `kit` (Kit) | json — a @hm/kitspec Kit
   - `preset` (Preset) | string — the assembly that is the whole machine
   - `sockets` (Required sockets) | json — e.g. ["power", "vent"] for a machine
+### `studio.kit.audit`
+The anatomy standard: colliding part pairs at rest, exploded and through 8 motion phases; loose ends; pipes that end in mid-air; bend radii at moving joints; and 24-ray orbit clearance for every control.
+Returns: the five reports (solidClearances, looseEnds, terminals, hingeBendRadius, orbitClearance24), a pass flag and a one-line summary
+
+Parameters:
+  - `kit` (Kit) | json — a @hm/kitspec Kit
+  - `preset` (Preset) | string — the assembly that is the whole machine (the kit's own main preset when it has none)
+  - `options` (Options) | json — collisionM, socketToleranceM, explode, phases, stage, ground, conduits, targets, minClearRays
 ### `studio.material.coverage`
 Percent of a 2.8 m machine each layer of a material paints, in six zones (top, side, edge, crease, bottom, splash), plus its edge metal.
 Returns: per-zone percentages, edge metal and a per-layer table
@@ -517,6 +558,31 @@ Parameters:
   - `scale` (Scale (m per repeat)) | 0.01..4 (default 0.3) — noise and streaks inputs only
   - `seed` (Seed) | 0..999 (default 1) — noise and streaks inputs only
   - `stretch` (Stretch) | 1..24 (default 4) — the streaks input only
+
+## The anatomy standard (`studio.kit.audit`)
+
+A machine is five groups of parts, and every group is a different promise:
+
+- `base` — the skid, mounting plates and levelers: it stands on the ground, level, nothing floating;
+- `structure` — frame rails, bulkheads, roll-cage: the silhouette, clear of itself;
+- `mechanism` — rams, motors, gears, axles: what moves, through a `KitMotionSpec` (never a frame delta);
+- `controls` — valves, breaker levers, status lights, cartridge ports: what the beam must be able to hit;
+- `subject` — the hopper bed, the fabricator nozzle, the turbine core: what the machine is *for*.
+
+The audit measures all five, and it never guesses: a collision is a pair of paths and a depth in metres, a loose end is the gap
+it actually left, an unreachable control is the number of its 24 orbit rays that landed on it. `explode: 1.0` re-runs the
+clearance sweep with every part pushed out from the centre, which is where two parts that merely touch at rest show up; `phases: 8`
+sweeps one cycle of the assembly's fastest motion, so a ram never passes through the die it is supposed to strike.
+
+```js
+const report = await studio.kit.audit({ kit: MILL_KIT, preset: 'machine' });
+if (!report.ok) {
+  console.log(report.summary);
+  console.log(report.solidClearances.slice(0, 5));   // [{ a: 'structure/rail', b: 'mechanism/ram', depth: 0.041 }]
+  console.log(report.loose);                         // [{ path: 'controls/lamp', gap: 0.0093 }]
+  console.log(report.orbitClearance24.failures);     // which control, and what stood in the way
+}
+```
 
 ## Worked example 1: tune a part, then print it
 

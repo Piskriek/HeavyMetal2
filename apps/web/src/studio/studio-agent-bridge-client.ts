@@ -60,6 +60,7 @@ const TOOL_ARITY: Readonly<Record<string, 'key' | 'key+args'>> = {
   'studio.changes.accept': 'key+args',
   'studio.changes.reject': 'key+args',
   'studio.kit.validate': 'key+args',
+  'studio.kit.audit': 'key+args',
   'studio.material.coverage': 'key+args',
   'studio.capture': 'key+args',
 };
@@ -85,6 +86,8 @@ function methodFor(tool: string): keyof StudioAgentApi | null {
       return 'reject';
     case 'studio.kit.validate':
       return 'validateKit';
+    case 'studio.kit.audit':
+      return 'auditKit';
     case 'studio.material.coverage':
       return 'materialCoverage';
     case 'studio.capture':
@@ -108,6 +111,9 @@ function argsFor(tool: string, args: unknown): unknown[] {
       return [a.id ?? '', a.why ?? ''];
     case 'studio.kit.validate':
       return [a.kit ?? null, typeof a.preset === 'string' ? a.preset : 'main', a.options ?? a];
+    case 'studio.kit.audit':
+      // the audit reads its preset out of the options (it also takes it as the second argument), so a flat call works too
+      return [a.kit ?? null, { ...(a.options ?? {}), ...(typeof a.preset === 'string' ? { preset: a.preset } : {}) }];
     case 'studio.material.coverage':
       return [a];
     case 'studio.capture':

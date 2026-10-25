@@ -50,6 +50,7 @@ import {
 import { flatten as flattenKit, presetSockets, validate as validateKitSpec, type Issue, type Kit, type Overrides } from '@hm/kitspec';
 import { atlasNoiseSource, atlasTileSource } from '@hm/texgraph';
 import { materialCoverageReport } from './studio-agent-coverage';
+import { auditSummary, kitAudit, type AuditOptions, type KitAuditReport } from './studio-agent-audit';
 
 // ------------------------------------------------------------------ what an agent can ask for
 
@@ -168,6 +169,23 @@ const DOCUMENT_COMMANDS: readonly CommandSpec[] = Object.freeze([
       { key: 'sockets', label: 'Required sockets', type: { kind: 'json', default: [] }, help: 'e.g. ["power", "vent"] for a machine' },
     ],
     returns: 'ok, or every issue with where it is and what is wrong',
+  },
+  {
+    name: 'studio.kit.audit',
+    summary:
+      'The anatomy standard: colliding part pairs at rest, exploded and through 8 motion phases; loose ends; pipes that end in mid-air; bend radii at moving joints; and 24-ray orbit clearance for every control.',
+    group: 'inspect',
+    params: [
+      { key: 'kit', label: 'Kit', type: { kind: 'json', default: null }, help: 'a @hm/kitspec Kit' },
+      { key: 'preset', label: 'Preset', type: { kind: 'string', maxLength: 80, default: 'main' }, help: "the assembly that is the whole machine (the kit's own main preset when it has none)" },
+      {
+        key: 'options',
+        label: 'Options',
+        type: { kind: 'json', default: {} },
+        help: 'collisionM, socketToleranceM, explode, phases, stage, ground, conduits, targets, minClearRays',
+      },
+    ],
+    returns: 'the five reports (solidClearances, looseEnds, terminals, hingeBendRadius, orbitClearance24), a pass flag and a one-line summary',
   },
   {
     name: 'studio.material.coverage',
@@ -686,6 +704,16 @@ export class StudioSession {
   /** `studio.kit.validate`. */
   validateKit(kit: Kit, preset: string, o: { readonly sockets?: readonly string[]; readonly overrides?: Overrides; readonly resolvesMaterial?: (name: string) => boolean } = {}): KitReport {
     return validateKit(kit, preset, o);
+  }
+
+  /**
+   * `studio.kit.audit`: the anatomy standard. Where `validateKit` says a kit is legal, this says whether it is buildable —
+   * colliding parts, parts that hang off nothing, pipes that end in mid-air, conduits that kink across a moving joint, and
+   * controls the beam can never reach. Pure: the report is the same for the same kit, and it never touches a renderer.
+   */
+  auditKit(kit: Kit, o: AuditOptions = {}): KitAuditReport & { readonly summary: string } {
+    const report = kitAudit(kit, o);
+    return { ...report, summary: auditSummary(report) };
   }
 
   /** `studio.material.coverage`: the six-zone report for a shelf preset or a spec, with percentages an agent can read. */

@@ -94,8 +94,8 @@ test('an MCP client handshakes, lists the tools, and gets the page\'s answer for
     assert.match(init.instructions, /propose -> validate -> measure -> look/);
 
     const list = replies[1]!.result as { tools: { name: string; inputSchema: { type: string } }[] };
-    assert.equal(list.tools.length, 11);
-    for (const name of ['studio.doc.propose', 'studio.material.coverage', 'studio.capture', 'studio.kit.validate']) {
+    assert.equal(list.tools.length, 12);
+    for (const name of ['studio.doc.propose', 'studio.material.coverage', 'studio.capture', 'studio.kit.validate', 'studio.kit.audit']) {
       assert.ok(list.tools.some((t) => t.name === name), `${name} is not in tools/list`);
     }
     for (const tool of list.tools) assert.equal(tool.inputSchema.type, 'object');

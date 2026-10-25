@@ -34,6 +34,8 @@ export interface StudioAgentApi {
   readonly undo: (key: string) => unknown;
   readonly redo: (key: string) => unknown;
   readonly validateKit: (key: string, kit: unknown, preset: string, o?: unknown) => unknown;
+  /** `studio.kit.audit`: the anatomy standard (collisions, loose ends, terminals, bend radii, orbit clearance). */
+  readonly auditKit: (key: string, kit: unknown, options?: unknown) => unknown;
   readonly materialCoverage: (key: string, o: unknown) => unknown;
   readonly capture: (key: string, o?: unknown) => Promise<unknown>;
   /** The session's own id and the key it is paired with (so a bridge can prove it is talking to the tab it thinks it is). */
@@ -119,6 +121,8 @@ export function installStudioAgent(o: {
     redo: (key) => guard(key) ?? session.redo(),
     validateKit: (key, kit, preset, options) =>
       guard(key) ?? session.validateKit(kit as Parameters<StudioSession['validateKit']>[0], preset, (options ?? {}) as Parameters<StudioSession['validateKit']>[2]),
+    auditKit: (key, kit, options) =>
+      guard(key) ?? session.auditKit(kit as Parameters<StudioSession['auditKit']>[0], (options ?? {}) as Parameters<StudioSession['auditKit']>[1]),
     materialCoverage: (key, request) => guard(key) ?? session.materialCoverage(request as Parameters<StudioSession['materialCoverage']>[0]),
     capture: async (key, request) => guard(key) ?? (await session.capture((request ?? {}) as Partial<CaptureRequest>)),
   };

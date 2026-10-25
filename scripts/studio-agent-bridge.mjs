@@ -77,6 +77,21 @@ const TOOLS = [
     },
   },
   {
+    name: 'studio.kit.audit',
+    description:
+      'The anatomy standard for a kit: colliding part pairs at rest, exploded and through 8 motion phases, loose ends, pipes that end in mid-air, bend radii at moving joints, and 24-ray orbit clearance for every control.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        kit: { type: 'object' },
+        preset: { type: 'string', description: 'the assembly that is the whole machine' },
+        options: { type: 'object', description: 'collisionM, socketToleranceM, explode, phases, stage, ground, conduits, targets, minClearRays' },
+      },
+      required: ['kit'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'studio.material.coverage',
     description: 'Percent of a 2.8 m machine each layer paints, in six zones, plus edge metal and plain readings. Measure before you ask for a review.',
     inputSchema: {

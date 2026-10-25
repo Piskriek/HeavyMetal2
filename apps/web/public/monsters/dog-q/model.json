@@ -1,1 +1,0 @@
-{"id":"dog-q","name":"dog-q","era":"modern3d","source":"quaternius","entry":"Blob/Dog.gltf","archetype":"charger","heightM":0.8,"model":{"file":"model.glb","scaleFromRaw":0.437668},"clips":{"attack":{"keys":2,"seconds":0.4},"death":{"keys":12,"seconds":0.367},"pain":{"keys":10,"seconds":0.3},"walk":{"keys":14,"seconds":0.433}}}

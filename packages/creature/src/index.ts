@@ -13,3 +13,4 @@ export * from './creature-skeleton';
 export * from './creature-assembly';
 export * from './creature-gait';
 export * from './creature-presets';
+export * from './roster-genomes';

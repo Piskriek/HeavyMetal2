@@ -1,10 +1,12 @@
-// Loads the monster skins: the sprite atlases (JSON views + WebP) and the 3D models (GLB with glTF clips). The core skins are inlined
-// by the single-file build; the rest are fetched from public/monsters/. Each load is cached; a failed one is remembered and never
-// retried, and the renderer draws its fallback in its place (adapter.ts fallbackFor). Nothing here blocks: callers preload behind a
-// loading bar.
+// Procedural monster skin builder (plan 44, part B, rule 8a): grows every monster skin directly from its declarative
+// @hm/creature genome into an articulated @hm/partgen 3D model and analytical gait clips (walk, attack, pain, death).
+// No static .glb models or .webp sprite sheets are bundled or fetched.
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { CREATURE_PRESET, creatureAssembly, evaluateCreatureGait, type CreatureGenomeSpec } from '@hm/creature';
+import { flatten, type PartDef, type PartSource } from '@hm/kitspec';
+import { buildPart, type Rank } from '@hm/partgen';
+import { hexToLinear, resolveMatPreset } from '@hm/matstack';
 import { fallbackFor } from './adapter';
 import { SKINS, type SkinInfo } from './roster';
 import type { SpriteGroup } from './timing';
@@ -29,16 +31,11 @@ export interface ModelAsset {
   readonly id: string;
   /** The model, scaled to its real height with its feet on y = 0 and centred on the origin. Instances are clones of it. */
   readonly prototype: THREE.Group;
-  /** The glTF clips by group (walk, attack, pain, death). A missing group is held in its first pose. */
+  /** The procedural animation clips by group (walk, attack, pain, death). */
   readonly clips: ReadonlyMap<SpriteGroup, THREE.AnimationClip>;
 }
 
 export type SkinAsset = SpriteAsset | ModelAsset;
-
-// the core files: the bundler inlines them (single-file build) and returns their URLs or values
-const coreSpriteUrl = import.meta.glob('../assets/monsters/*/sprite.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
-const coreSpriteJson = import.meta.glob('../assets/monsters/*/sprite.json', { eager: true, import: 'default' }) as Record<string, unknown>;
-const coreModelUrl = import.meta.glob('../assets/monsters/*/model.glb', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 
 const GROUPS: readonly SpriteGroup[] = ['walk', 'attack', 'pain', 'death'];
 
@@ -62,27 +59,6 @@ function infoOf(id: string, roster: readonly SkinInfo[]): SkinInfo {
   return s;
 }
 
-function urlOf(skin: SkinInfo, file: 'sprite.webp' | 'model.glb'): string {
-  if (skin.core) {
-    const map = file === 'sprite.webp' ? coreSpriteUrl : coreModelUrl;
-    const url = map[`../assets/monsters/${skin.id}/${file}`];
-    if (!url) throw new Error(`core file missing: ${skin.id}/${file}`);
-    return url;
-  }
-  return new URL(`monsters/${skin.id}/${file}`, document.baseURI).href;
-}
-
-async function readSpriteJson(skin: SkinInfo): Promise<Record<string, unknown>> {
-  if (skin.core) {
-    const raw = coreSpriteJson[`../assets/monsters/${skin.id}/sprite.json`];
-    if (!raw) throw new Error(`core sprite.json missing: ${skin.id}`);
-    return raw as Record<string, unknown>;
-  }
-  const res = await fetch(new URL(`monsters/${skin.id}/sprite.json`, document.baseURI).href);
-  if (!res.ok) throw new Error(`${skin.id}: sprite.json ${res.status}`);
-  return (await res.json()) as Record<string, unknown>;
-}
-
 /** Parses the packed sprite JSON: each view is [x, y, w, h, originX, originY, mirrored], or null. */
 export function parseSpriteJson(raw: Record<string, unknown>): { width: number; height: number; mpp: number; groups: Record<SpriteGroup, SpriteGroupData> } {
   const atlas = raw.atlas as { width: number; height: number };
@@ -102,23 +78,9 @@ export function parseSpriteJson(raw: Record<string, unknown>): { width: number; 
   return { width: atlas.width, height: atlas.height, mpp: Number(raw.metresPerPixel), groups: out };
 }
 
-async function loadSprite(skin: SkinInfo): Promise<SpriteAsset> {
-  const json = parseSpriteJson(await readSpriteJson(skin));
-  const texture = await new THREE.TextureLoader().loadAsync(urlOf(skin, 'sprite.webp'));
-  // the atlas rows run top-down, so the texture is not flipped; pixel art is sampled raw (no colour management, no mipmaps)
-  texture.flipY = false;
-  texture.colorSpace = THREE.NoColorSpace;
-  texture.generateMipmaps = false;
-  texture.minFilter = THREE.LinearFilter;
-  texture.magFilter = THREE.LinearFilter;
-  texture.needsUpdate = true;
-  return { kind: 'sprite', id: skin.id, texture, width: json.width, height: json.height, mpp: json.mpp, groups: json.groups };
-}
-
 /**
  * The box a model is fitted by. For morph-target models each frame (base plus one target's delta) gives a box; the fit uses the
- * median frame, so a single odd frame cannot shrink or grow the whole model (the LibreQuake frames vary, and the union of all of
- * them was three times the height of a walk frame). A model without morphs is fitted by its own box.
+ * median frame. A procedural creature without morphs is fitted by its own box.
  */
 export function animatedBox(root: THREE.Object3D): THREE.Box3 {
   root.updateMatrixWorld(true);
@@ -145,54 +107,300 @@ export function animatedBox(root: THREE.Object3D): THREE.Box3 {
   return frames[Math.floor(frames.length / 2)]!;
 }
 
-async function loadModel(skin: SkinInfo): Promise<ModelAsset> {
-  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  const gltf = await loader.loadAsync(urlOf(skin, 'model.glb'));
-  const scene = gltf.scene;
+interface PaintSpec {
+  readonly colour: string;
+  readonly metalness: number;
+  readonly roughness: number;
+  readonly emissive?: string;
+}
+
+const SEMANTIC_PAINT: Readonly<Record<string, PaintSpec>> = Object.freeze({
+  'eye-glow': { colour: '#ff5226', metalness: 0.35, roughness: 0.18, emissive: '#ff3b14' },
+  'suit-gold': { colour: '#d9a514', metalness: 0.92, roughness: 0.24, emissive: '#7a5204' },
+  'talon-horn': { colour: '#d8cfc0', metalness: 0.18, roughness: 0.52 },
+  'effector-boot': { colour: '#262b33', metalness: 0.3, roughness: 0.68 },
+  'effector-talon': { colour: '#cfc5b4', metalness: 0.2, roughness: 0.5 },
+  'effector-hoof': { colour: '#2d2823', metalness: 0.22, roughness: 0.64 },
+  'effector-pincer': { colour: '#b89e72', metalness: 0.32, roughness: 0.46 },
+  'effector-thruster': { colour: '#465260', metalness: 0.65, roughness: 0.34 },
+  'chitin-dark': { colour: '#2c332b', metalness: 0.28, roughness: 0.45 },
+  'chitin-plate': { colour: '#3e4a3c', metalness: 0.32, roughness: 0.42 },
+  'chitin': { colour: '#4a5744', metalness: 0.25, roughness: 0.48 },
+  'hide-scales': { colour: '#4f5d48', metalness: 0.16, roughness: 0.58 },
+  'hide-plate': { colour: '#3b4437', metalness: 0.22, roughness: 0.52 },
+  'hide-fur': { colour: '#5c4938', metalness: 0.1, roughness: 0.72 },
+  'drone-alloy': { colour: '#6e7885', metalness: 0.62, roughness: 0.36 },
+  'drone-plate': { colour: '#4d5663', metalness: 0.68, roughness: 0.32 },
+});
+
+function resolveCreatureMaterial(name: string, fallbackPresetId: string, cache: Map<string, THREE.MeshStandardMaterial>): THREE.MeshStandardMaterial {
+  const key = `${name}|${fallbackPresetId}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+
+  const semantic = SEMANTIC_PAINT[name];
+  if (semantic) {
+    const [r, g, b] = hexToLinear(semantic.colour);
+    const mat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(r, g, b),
+      metalness: semantic.metalness,
+      roughness: semantic.roughness,
+    });
+    if (semantic.emissive) {
+      const [er, eg, eb] = hexToLinear(semantic.emissive);
+      mat.emissive = new THREE.Color(er, eg, eb);
+      mat.emissiveIntensity = 1.1;
+    }
+    cache.set(key, mat);
+    return mat;
+  }
+
+  const preset = resolveMatPreset(name) ?? resolveMatPreset(fallbackPresetId);
+  const rawHex = preset?.base.colour ?? '#7a828c';
+  const hex = rawHex === '$paint1' ? (preset?.paint[0] ?? '#7a828c') : rawHex === '$paint2' ? (preset?.paint[1] ?? '#7a828c') : rawHex.startsWith('#') ? rawHex : (preset?.paint[0] ?? '#7a828c');
+  const [r, g, b] = hexToLinear(hex);
+  const mat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(r, g, b),
+    metalness: preset?.base.metal ?? 0.28,
+    roughness: preset?.base.rough ?? 0.56,
+  });
+  cache.set(key, mat);
+  return mat;
+}
+
+function slotGeometries(source: PartSource, _def: PartDef, rank: Rank): { slot: string; geometry: THREE.BufferGeometry }[] {
+  const out: { slot: string; geometry: THREE.BufferGeometry }[] = [];
+  if (source.kind === 'box') {
+    const [x, y, z] = source.size;
+    const geometry = new THREE.BoxGeometry(x, y, z);
+    geometry.translate(0, y / 2, 0);
+    out.push({ slot: 'box', geometry });
+    return out;
+  }
+  if (source.kind === 'param') {
+    const md = buildPart(source.gen, source.params, rank);
+    if (!md) return out;
+    for (const slot of md.slots) {
+      if (slot.count === 0) continue;
+      const remap = new Map<number, number>();
+      const index = new Uint32Array(slot.count);
+      const positions: number[] = [];
+      const normals: number[] = [];
+      const uvs: number[] = [];
+      for (let i = 0; i < slot.count; i += 1) {
+        const from = md.indices[slot.start + i] as number;
+        let to = remap.get(from);
+        if (to === undefined) {
+          to = remap.size;
+          remap.set(from, to);
+          positions.push(md.positions[from * 3] as number, md.positions[from * 3 + 1] as number, md.positions[from * 3 + 2] as number);
+          normals.push(md.normals[from * 3] as number, md.normals[from * 3 + 1] as number, md.normals[from * 3 + 2] as number);
+          uvs.push(md.uvs[from * 2] as number, md.uvs[from * 2 + 1] as number);
+        }
+        index[i] = to;
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+      geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geometry.setIndex(new THREE.BufferAttribute(index, 1));
+      out.push({ slot: slot.name, geometry });
+    }
+  }
+  return out;
+}
+
+function buildProceduralClips(genome: CreatureGenomeSpec): Map<SpriteGroup, THREE.AnimationClip> {
+  const clips = new Map<SpriteGroup, THREE.AnimationClip>();
+  const RAD = Math.PI / 180;
+
+  // 1. Walk clip driven by evaluateCreatureGait
+  const walkDuration = 1.0;
+  const walkSteps = 8;
+  const walkTimes: number[] = [];
+  const bodyPos: number[] = [];
+  const bodyQuat: number[] = [];
+  const limbQuats = new Map<string, number[]>();
+
+  for (let k = 0; k <= walkSteps; k += 1) {
+    const t = (k / walkSteps) * walkDuration;
+    walkTimes.push(t);
+    const gait = evaluateCreatureGait(genome, t, 1.4, { distanceM: 0 });
+    bodyPos.push(gait.pelvis.swayM, gait.pelvis.bobM, 0);
+    const qBody = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, gait.pelvis.rollDeg * RAD, 'XYZ'));
+    bodyQuat.push(qBody.x, qBody.y, qBody.z, qBody.w);
+    for (const limb of gait.limbs) {
+      let arr = limbQuats.get(limb.label);
+      if (!arr) {
+        arr = [];
+        limbQuats.set(limb.label, arr);
+      }
+      const qLimb = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(
+          limb.upperRotationDeg[0] * RAD * 0.35,
+          limb.upperRotationDeg[1] * RAD * 0.25,
+          limb.upperRotationDeg[2] * RAD * 0.25,
+          'XYZ',
+        ),
+      );
+      arr.push(qLimb.x, qLimb.y, qLimb.z, qLimb.w);
+    }
+  }
+
+  const walkTracks: THREE.KeyframeTrack[] = [
+    new THREE.VectorKeyframeTrack('creature_body.position', walkTimes, bodyPos),
+    new THREE.QuaternionKeyframeTrack('creature_body.quaternion', walkTimes, bodyQuat),
+  ];
+  for (const [label, values] of limbQuats) {
+    walkTracks.push(new THREE.QuaternionKeyframeTrack(`limb_${label}.quaternion`, walkTimes, values));
+  }
+  clips.set('walk', new THREE.AnimationClip('walk', walkDuration, walkTracks));
+
+  // 2. Attack clip (wind-up at t=0, lunge strike, recover)
+  const qWindup = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.18, 0, 0));
+  const qStrike = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.28, 0, 0));
+  const qIdentity = new THREE.Quaternion();
+  clips.set('attack', new THREE.AnimationClip('attack', 0.8, [
+    new THREE.VectorKeyframeTrack('creature_body.position', [0, 0.3, 0.8], [0, 0.04, -0.05, 0, -0.03, 0.12, 0, 0, 0]),
+    new THREE.QuaternionKeyframeTrack('creature_body.quaternion', [0, 0.3, 0.8], [
+      qWindup.x, qWindup.y, qWindup.z, qWindup.w,
+      qStrike.x, qStrike.y, qStrike.z, qStrike.w,
+      qIdentity.x, qIdentity.y, qIdentity.z, qIdentity.w,
+    ]),
+  ]));
+
+  // 3. Pain clip (recoil)
+  const qPain = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.24, 0, 0.12));
+  clips.set('pain', new THREE.AnimationClip('pain', 0.5, [
+    new THREE.VectorKeyframeTrack('creature_body.position', [0, 0.18, 0.5], [0, 0, 0, 0, 0.05, -0.08, 0, 0, 0]),
+    new THREE.QuaternionKeyframeTrack('creature_body.quaternion', [0, 0.18, 0.5], [
+      qIdentity.x, qIdentity.y, qIdentity.z, qIdentity.w,
+      qPain.x, qPain.y, qPain.z, qPain.w,
+      qIdentity.x, qIdentity.y, qIdentity.z, qIdentity.w,
+    ]),
+  ]));
+
+  // 4. Death clip (collapse to the floor)
+  const qFall = new THREE.Quaternion().setFromEuler(new THREE.Euler(1.35, 0, 0.25));
+  clips.set('death', new THREE.AnimationClip('death', 0.75, [
+    new THREE.VectorKeyframeTrack('creature_body.position', [0, 0.4, 0.75], [0, 0, 0, 0, -0.15, 0.08, 0, -0.35, 0.15]),
+    new THREE.QuaternionKeyframeTrack('creature_body.quaternion', [0, 0.75], [
+      qIdentity.x, qIdentity.y, qIdentity.z, qIdentity.w,
+      qFall.x, qFall.y, qFall.z, qFall.w,
+    ]),
+  ]));
+
+  return clips;
+}
+
+function buildCreatureModel(skin: SkinInfo): ModelAsset {
+  const genome = skin.genome;
+  const assembly = creatureAssembly(genome);
+  const placed = flatten(assembly.kit, CREATURE_PRESET);
+  const materials = new Map<string, THREE.MeshStandardMaterial>();
+  const rank: Rank = 1;
+
+  const scene = new THREE.Group();
+  scene.name = `creature:${skin.id}`;
+  const bodyGroup = new THREE.Group();
+  bodyGroup.name = 'creature_body';
+  scene.add(bodyGroup);
+
+  const limbGroups = new Map<string, { group: THREE.Group; invRoot: THREE.Matrix4 }>();
+  for (const limb of assembly.skeleton.limbs) {
+    const g = new THREE.Group();
+    g.name = `limb_${limb.label}`;
+    g.position.set(limb.root[0], limb.root[1], limb.root[2]);
+    g.updateMatrix();
+    const invRoot = g.matrix.clone().invert();
+    bodyGroup.add(g);
+    limbGroups.set(limb.label, { group: g, invRoot });
+  }
+
+  const partMatrix = new THREE.Matrix4();
+  for (const p of placed) {
+    const def = assembly.kit.parts[p.part];
+    if (!def) continue;
+    partMatrix.fromArray(p.matrix as unknown as number[]);
+
+    let targetGroup: THREE.Group = bodyGroup;
+    let localMatrix = partMatrix;
+    if (p.path.startsWith('mechanism/')) {
+      const sub = p.path.slice('mechanism/'.length);
+      for (const [label, entry] of limbGroups) {
+        if (sub.startsWith(`${label}-`)) {
+          targetGroup = entry.group;
+          localMatrix = entry.invRoot.clone().multiply(partMatrix);
+          break;
+        }
+      }
+    }
+
+    const byMaterial = new Map<string, THREE.BufferGeometry[]>();
+    for (const { slot, geometry } of slotGeometries(p.source, def, rank)) {
+      const matName = p.slotMaterials?.[slot] ?? p.material;
+      geometry.applyMatrix4(localMatrix);
+      const list = byMaterial.get(matName) ?? [];
+      list.push(geometry);
+      byMaterial.set(matName, list);
+    }
+
+    for (const [matName, list] of byMaterial) {
+      const geometry = list.length === 1 ? list[0]! : mergeGeometries(list, false);
+      if (!geometry) continue;
+      const mat = resolveCreatureMaterial(matName, genome.skinPaletteId, materials);
+      const mesh = new THREE.Mesh(geometry, mat);
+      mesh.name = `${p.path}:${matName}`;
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.frustumCulled = false;
+      targetGroup.add(mesh);
+    }
+  }
+
   scene.updateMatrixWorld(true);
-  // fit to the real height: the feet on y = 0, the body centred on the origin (the models come in their own units)
   const box = animatedBox(scene);
   const size = box.getSize(new THREE.Vector3());
   const centre = box.getCenter(new THREE.Vector3());
   const s = size.y > 0 ? skin.heightM / size.y : 1;
   scene.scale.setScalar(s);
   scene.position.set(-centre.x * s, -box.min.y * s, -centre.z * s);
-  scene.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) { m.castShadow = false; m.receiveShadow = false; m.frustumCulled = false; } });
+
+  // Counter-rotate by -skin.turn so renderer.ts's `yaw + turnOf(id)` faces +z for every era
+  const turnGroup = new THREE.Group();
+  turnGroup.rotation.y = -skin.turn;
+  turnGroup.add(scene);
+
   const prototype = new THREE.Group();
-  prototype.add(scene);
-  const clips = new Map<SpriteGroup, THREE.AnimationClip>();
-  for (const clip of gltf.animations) {
-    const g = GROUPS.find((x) => x === clip.name.toLowerCase());
-    if (g && !clips.has(g)) clips.set(g, clip);
-  }
+  prototype.add(turnGroup);
+  prototype.updateMatrixWorld(true);
+
+  const clips = buildProceduralClips(genome);
   return { kind: 'model', id: skin.id, prototype, clips };
 }
 
-/** Loads one skin (cached). Rejects when its files are missing or broken; a rejected skin is marked failed and never retried. */
+/** Builds and caches one procedural monster skin from its @hm/creature genome. */
 export function loadSkin(id: string, roster: readonly SkinInfo[] = SKINS): Promise<SkinAsset> {
   const have = loaded.get(id);
   if (have) return Promise.resolve(have);
   const busy = pending.get(id);
   if (busy) return busy;
-  const skin = infoOf(id, roster);
-  const p = (skin.era === 'sprite' ? loadSprite(skin) : loadModel(skin)).then((asset) => {
+  try {
+    const skin = infoOf(id, roster);
+    const asset = buildCreatureModel(skin);
     loaded.set(id, asset);
-    pending.delete(id);
-    return asset;
-  }, (err: unknown) => {
+    return Promise.resolve(asset);
+  } catch (err: unknown) {
     failed.add(id);
-    pending.delete(id);
     console.warn(`[monsters] ${id} stays on its fallback:`, err);
-    throw err;
-  });
-  pending.set(id, p);
-  return p;
+    return Promise.reject(err);
+  }
 }
 
 export interface PreloadResult { readonly loaded: readonly string[]; readonly failed: readonly string[] }
 
 /**
- * Loads the given skins and their fallbacks, behind the caller's loading bar. Never rejects: a skin that fails is listed in `failed`
+ * Builds the given skins and their fallbacks, behind the caller's loading bar. Never rejects: a skin that fails is listed in `failed`
  * and its fallback is drawn instead.
  */
 export async function preloadSkins(ids: readonly string[], onProgress?: (done: number, total: number) => void, roster: readonly SkinInfo[] = SKINS): Promise<PreloadResult> {

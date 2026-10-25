@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { fallbackFor, hash32, skinFor } from './adapter';
-import { FALLBACK_SKIN, SKINS, skinById, type Archetype, type Era } from './roster';
+import { FALLBACK_SKIN, SKINS, kitBySkinId, skinById, type Archetype, type Era } from './roster';
 
 const ARCHETYPES: readonly Archetype[] = ['charger', 'spitter', 'swarmer', 'flyer', 'brute', 'sapper'];
 const ERAS: readonly Era[] = ['sprite', 'early3d', 'modern3d'];
@@ -72,19 +72,20 @@ test('the hash is an integer mix: stable, and different seeds give different has
   assert.ok(Number.isInteger(hash32(123456)) && hash32(123456) >= 0);
 });
 
-test('the roster matches docs/monsters/packed.json, and every skin has its files', () => {
+test('the roster matches docs/monsters/packed.json, and every skin resolves its procedural @hm/creature genome', () => {
   const packed = JSON.parse(readFileSync(`${root}docs/monsters/packed.json`, 'utf8')) as {
     monsters: Record<string, { id: string; era: Era; archetype: Archetype; heightM: number; where: string; source: string }>;
   };
   const fromManifest = Object.values(packed.monsters).map((m) => ({ id: m.id, era: m.era, archetype: m.archetype, heightM: m.heightM, core: m.where === 'core', source: m.source })).sort((a, b) => a.id.localeCompare(b.id));
   assert.deepEqual(SKINS.map((s) => ({ id: s.id, era: s.era, archetype: s.archetype, heightM: s.heightM, core: s.core, source: s.source })), fromManifest, 'roster.ts is generated from the manifest: regenerate it if this fails');
   for (const s of SKINS) {
-    const dir = s.core ? `${root}apps/web/src/assets/monsters/${s.id}` : `${root}apps/web/public/monsters/${s.id}`;
-    const want = s.era === 'sprite' ? ['sprite.json', 'sprite.webp'] : ['model.glb'];
-    for (const f of want) assert.ok(existsSync(`${dir}/${f}`), `${s.id}: ${f} exists`);
+    assert.equal(s.genome.id, s.id, `${s.id}: genome id matches skin id`);
+    assert.ok(s.genome.skinPaletteId.length > 0, `${s.id}: skinPaletteId is bound`);
+    assert.ok(s.genome.voiceStemId.length > 0, `${s.id}: voiceStemId is bound`);
+    assert.ok(kitBySkinId(s.id), `${s.id}: builds a procedural kit`);
   }
-  // no stray skin folders beside the roster (the public folder also has credits.json, which is not a skin)
+  // Rule 8a: static binary .glb models and .webp sprite sheets are eradicated
+  assert.equal(existsSync(`${root}apps/web/src/assets/monsters`), false, 'core static monster assets are purged');
   const onDisk = readdirSync(`${root}apps/web/public/monsters`, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
-  const publicSkins = SKINS.filter((s) => !s.core).map((s) => s.id);
-  assert.deepEqual(onDisk.sort(), publicSkins.sort());
+  assert.deepEqual(onDisk, [], 'public static monster directories are purged');
 });

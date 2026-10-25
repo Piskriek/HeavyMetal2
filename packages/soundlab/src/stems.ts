@@ -342,6 +342,99 @@ export const STEM_SHELF: Readonly<Record<string, StemPreset>> = Object.freeze({
   'machine-hum-heavy-projector': hum('machine-hum-heavy-projector', 'Heavy projector hum', 84, 0.18),
   'machine-hum-heavy-water': hum('machine-hum-heavy-water', 'Heavy water maker hum', 58, 0.2),
 
+  // ---- creature vocal-tract resonant formants (plan 44: two-formant bandpass patches per archetype/role)
+  'vo-astro': stem('vo-astro', 'Suit comms formant', 'machine', 0.28, {
+    name: 'tract',
+    atoms: [
+      atom('sawtooth', 135, 0.45, 12, 220, { filter: { type: 'bandpass', freq: [520, 520], q: 3.2 } }),
+      atom('triangle', 270, 0.25, 18, 200, { detuneCents: 6, filter: { type: 'bandpass', freq: [1480, 1480], q: 2.8 } }),
+    ],
+  }),
+  'vo-theropod': stem('vo-theropod', 'Theropod guttural formant', 'machine', 0.36, {
+    name: 'tract',
+    atoms: [
+      atom('sawtooth', 82, 0.55, 8, 280, { filter: { type: 'bandpass', freq: [360, 360], q: 2.6 } }),
+      atom('sawtooth', 164, 0.32, 14, 240, { detuneCents: -11, filter: { type: 'bandpass', freq: [980, 980], q: 3.0 } }),
+    ],
+  }),
+  'vo-quadruped': stem('vo-quadruped', 'Quadruped snarl formant', 'machine', 0.34, {
+    name: 'tract',
+    atoms: [
+      atom('sawtooth', 110, 0.5, 6, 210, { filter: { type: 'bandpass', freq: [440, 440], q: 2.8 } }),
+      atom('square', 220, 0.26, 10, 180, { detuneCents: 8, filter: { type: 'bandpass', freq: [1220, 1220], q: 2.5 } }),
+    ],
+  }),
+  'vo-hexapod': stem('vo-hexapod', 'Hexapod stridulation formant', 'machine', 0.3, {
+    name: 'tract',
+    atoms: [
+      atom('square', 240, 0.42, 4, 150, { filter: { type: 'bandpass', freq: [880, 880], q: 4.0 } }),
+      atom('triangle', 480, 0.28, 6, 140, { detuneCents: 15, filter: { type: 'bandpass', freq: [2100, 2100], q: 3.5 } }),
+    ],
+  }),
+  'vo-arachnid': stem('vo-arachnid', 'Arachnid mandrel formant', 'machine', 0.32, {
+    name: 'tract',
+    atoms: [
+      atom('sawtooth', 190, 0.45, 5, 170, { filter: { type: 'bandpass', freq: [740, 740], q: 3.8 } }),
+      atom('noise', 1, 0.24, 3, 120, { filter: { type: 'bandpass', freq: [1850, 1850], q: 3.2 } }),
+    ],
+  }),
+  'vo-serpentine': stem('vo-serpentine', 'Serpentine sibilant formant', 'machine', 0.3, {
+    name: 'tract',
+    atoms: [
+      atom('noise', 1, 0.45, 10, 260, { filter: { type: 'bandpass', freq: [2400, 2400], q: 4.2 } }),
+      atom('triangle', 145, 0.3, 16, 240, { filter: { type: 'bandpass', freq: [580, 580], q: 2.6 } }),
+    ],
+  }),
+  'vo-avian-drone': stem('vo-avian-drone', 'Avian drone formant', 'machine', 0.32, {
+    name: 'tract',
+    atoms: [
+      atom('square', 340, 0.42, 4, 160, { filter: { type: 'bandpass', freq: [1120, 1120], q: 3.6 } }),
+      atom('sawtooth', 510, 0.26, 8, 150, { detuneCents: -9, filter: { type: 'bandpass', freq: [2480, 2480], q: 3.0 } }),
+    ],
+  }),
+  'vo-charger': stem('vo-charger', 'Charger bark formant', 'machine', 0.36, {
+    name: 'tract',
+    atoms: [
+      atom('sawtooth', 96, 0.52, 6, 220, { filter: { type: 'bandpass', freq: [410, 410], q: 2.8 } }),
+      atom('square', 192, 0.3, 10, 190, { detuneCents: 12, filter: { type: 'bandpass', freq: [1150, 1150], q: 3.1 } }),
+    ],
+  }),
+  'vo-spitter': stem('vo-spitter', 'Spitter rasp formant', 'machine', 0.34, {
+    name: 'tract',
+    atoms: [
+      atom('sawtooth', 155, 0.46, 8, 210, { filter: { type: 'bandpass', freq: [640, 640], q: 3.4 } }),
+      atom('noise', 1, 0.28, 4, 160, { filter: { type: 'bandpass', freq: [1920, 1920], q: 3.6 } }),
+    ],
+  }),
+  'vo-swarmer': stem('vo-swarmer', 'Swarmer chitter formant', 'machine', 0.28, {
+    name: 'tract',
+    atoms: [
+      atom('square', 420, 0.4, 3, 110, { filter: { type: 'bandpass', freq: [1350, 1350], q: 4.0 } }),
+      atom('triangle', 630, 0.25, 5, 100, { detuneCents: 18, filter: { type: 'bandpass', freq: [2750, 2750], q: 3.4 } }),
+    ],
+  }),
+  'vo-flyer': stem('vo-flyer', 'Flyer resonant drone formant', 'machine', 0.32, {
+    name: 'tract',
+    atoms: [
+      atom('triangle', 210, 0.44, 14, 260, { filter: { type: 'bandpass', freq: [720, 720], q: 3.2 } }),
+      atom('sawtooth', 315, 0.28, 18, 240, { detuneCents: -7, filter: { type: 'bandpass', freq: [1640, 1640], q: 2.9 } }),
+    ],
+  }),
+  'vo-brute': stem('vo-brute', 'Brute sub-bellow formant', 'machine', 0.4, {
+    name: 'tract',
+    atoms: [
+      atom('sawtooth', 64, 0.58, 12, 320, { filter: { type: 'bandpass', freq: [280, 280], q: 2.4 } }),
+      atom('sawtooth', 128, 0.34, 18, 290, { detuneCents: -14, filter: { type: 'bandpass', freq: [820, 820], q: 2.8 } }),
+    ],
+  }),
+  'vo-sapper': stem('vo-sapper', 'Sapper arc-pulse formant', 'machine', 0.32, {
+    name: 'tract',
+    atoms: [
+      atom('square', 280, 0.44, 5, 180, { filter: { type: 'bandpass', freq: [940, 940], q: 3.8 } }),
+      atom('sawtooth', 560, 0.26, 8, 160, { detuneCents: 11, filter: { type: 'bandpass', freq: [2240, 2240], q: 3.5 } }),
+    ],
+  }),
+
   // ---- the rifle's verbs (plan 43's `sfx:` voices, one patch each)
   'rifle-beam-fire': stem('rifle-beam-fire', 'Beam fire', 'rifle', 0.5, {
     name: 'verb',

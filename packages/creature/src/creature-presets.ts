@@ -528,15 +528,36 @@ export const HEXAPOD_GENOME: CreatureGenomeSpec = {
   ],
 };
 
-/** The four genomes the verification gate compiles: the suit and the three roster body plans. */
+import {
+  ARACHNID_GENOME,
+  AVIAN_DRONE_GENOME,
+  ROSTER_GENOMES_BY_ID,
+  ROSTER_MONSTER_GENOMES,
+  SERPENTINE_GENOME,
+  rosterGenomeById,
+} from './roster-genomes';
+
+export {
+  ARACHNID_GENOME,
+  AVIAN_DRONE_GENOME,
+  ROSTER_GENOMES_BY_ID,
+  ROSTER_MONSTER_GENOMES,
+  SERPENTINE_GENOME,
+  rosterGenomeById,
+};
+
+/** The seven canonical biological archetype genomes the verification gate compiles: the suit and the six roster body plans. */
 export const CREATURE_ARCHETYPE_GENOMES: readonly CreatureGenomeSpec[] = Object.freeze([
   ASTRO_SUIT_GENOME,
   THEROPOD_GENOME,
   QUADRUPED_GENOME,
   HEXAPOD_GENOME,
+  ARACHNID_GENOME,
+  SERPENTINE_GENOME,
+  AVIAN_DRONE_GENOME,
 ]);
 
-/** A genome by id, for a preset picker. */
+/** A genome by id (archetype preset or roster monster id), for a preset picker or skin loader. */
 export function creatureGenomeById(id: string): CreatureGenomeSpec | undefined {
-  return CREATURE_ARCHETYPE_GENOMES.find((g) => g.id === id);
+  return ROSTER_GENOMES_BY_ID[id] ?? CREATURE_ARCHETYPE_GENOMES.find((g) => g.id === id);
 }

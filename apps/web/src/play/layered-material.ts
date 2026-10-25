@@ -16,12 +16,22 @@
  * (never an invisible part).
  */
 import * as THREE from 'three';
-import { TILE_LIBRARY, evaluateGraph, type TexGraph } from '@hm/texgraph';
+import {
+  NOISE_ATLAS_INDEX,
+  NOISE_ATLAS_SIZE,
+  TILE_ATLAS_SIZE,
+  TILE_LIBRARY,
+  atlasNoiseSource,
+  atlasTileSource,
+  clearTileBytesCache,
+  noiseAtlasBytes,
+  tileBytesAt,
+  type TexGraph,
+} from '@hm/texgraph';
 import { VAULT_BY_ID } from '@hm/vault';
 import {
   CHANNEL_GROUPS,
   EDGE_BAND,
-  FLAT_TILE,
   MAX_LAYERS,
   MAX_MASK_INPUTS,
   features,
@@ -38,7 +48,6 @@ import {
   type MaskInput,
   type MaskMesh,
   type MaterialSpec,
-  type NoiseKind,
   type NoiseSource,
   type SurfaceSpec,
   type TileSource,
@@ -63,51 +72,11 @@ interface LayeredInfo {
 
 // ------------------------------------------------------------------ the noise atlas
 
-const NOISE_SIZE = 256;
-/** Channel order of the atlas: clouds, cells, speckle, scratches (matstack's NOISE_KINDS). */
-const NOISE_INDEX: Readonly<Record<NoiseKind, number>> = { clouds: 0, cells: 1, speckle: 2, scratches: 3 };
-
-/** The four noises as texgraph graphs (height output), all periodic on the tile. */
-const NOISE_GRAPHS: readonly TexGraph[] = [
-  { id: 'ms-clouds', name: 'Clouds', nodes: [{ id: 'n', type: 'noise', scale: 4, octaves: 5, gain: 0.5, seed: 11 }], out: { height: 'n' } },
-  {
-    id: 'ms-cells', name: 'Cells',
-    nodes: [{ id: 'c', type: 'cellular', scale: 7, jitter: 0.9, mode: 'f1', seed: 23 }, { id: 'i', type: 'invert', in: 'c' }],
-    out: { height: 'i' },
-  },
-  // fine blobs, not single texels: thresholded masks would glitter
-  { id: 'ms-speckle', name: 'Speckle', nodes: [{ id: 'g', type: 'noise', scale: 32, octaves: 2, gain: 0.45, seed: 37 }], out: { height: 'g' } },
-  {
-    id: 'ms-scratches', name: 'Scratches',
-    nodes: [
-      { id: 's', type: 'stripes', count: 23, softness: 0.08, vertical: false, tilt: 5 },
-      { id: 'f', type: 'noise', scale: 3, octaves: 2, gain: 0.5, seed: 43 },
-      { id: 'w', type: 'warp', in: 's', warp: 'f', amount: 0.04 },
-      { id: 'n', type: 'noise', scale: 6, octaves: 2, gain: 0.5, seed: 41 },
-      { id: 'm', type: 'blend', a: 'w', b: 'n', mode: 'multiply', amount: 1 },
-      { id: 'l', type: 'levels', in: 'm', inLow: 0.35, inHigh: 0.9, gamma: 1, outLow: 0, outHigh: 1 },
-    ],
-    out: { height: 'l' },
-  },
-];
-
-let noiseBytes: Uint8Array | null = null;
-/** The atlas as RGBA bytes, built once: the GPU texture and the CPU sampler read the same bytes. */
-function noiseAtlas(): Uint8Array {
-  if (noiseBytes) return noiseBytes;
-  const out = new Uint8Array(NOISE_SIZE * NOISE_SIZE * 4);
-  NOISE_GRAPHS.forEach((g, ch) => {
-    const h = evaluateGraph(g, { size: NOISE_SIZE }).height;
-    for (let i = 0; i < NOISE_SIZE * NOISE_SIZE; i++) out[i * 4 + ch] = Math.round(255 * Math.min(1, Math.max(0, h?.[i] ?? 0.5)));
-  });
-  noiseBytes = out;
-  return out;
-}
-
+/** The atlas lives in @hm/texgraph so the CPU report, the tests and the shader all read the same bytes (plan 41 §4.5). */
 let noiseTexture: THREE.DataTexture | null = null;
 function noiseTex(): THREE.DataTexture {
   if (noiseTexture) return noiseTexture;
-  const t = new THREE.DataTexture(noiseAtlas(), NOISE_SIZE, NOISE_SIZE, THREE.RGBAFormat);
+  const t = new THREE.DataTexture(noiseAtlasBytes(), NOISE_ATLAS_SIZE, NOISE_ATLAS_SIZE, THREE.RGBAFormat);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.colorSpace = THREE.NoColorSpace;
   t.generateMipmaps = true;
@@ -115,71 +84,32 @@ function noiseTex(): THREE.DataTexture {
   t.magFilter = THREE.LinearFilter;
   t.needsUpdate = true;
   noiseTexture = t;
-  return t;
-}
-
-/** Bilinear, wrapping, on bytes laid out RGBA: what a texture fetch at full resolution returns. */
-function bilinear(bytes: Uint8Array, size: number, channel: number, u: number, v: number): number {
-  const x = (u - Math.floor(u)) * size - 0.5, y = (v - Math.floor(v)) * size - 0.5;
-  const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0;
-  const at = (xi: number, yi: number): number => {
-    const xx = ((xi % size) + size) % size, yy = ((yi % size) + size) % size;
-    return bytes[(yy * size + xx) * 4 + channel]! / 255;
-  };
-  const a = at(x0, y0) + (at(x0 + 1, y0) - at(x0, y0)) * fx;
-  const b = at(x0, y0 + 1) + (at(x0 + 1, y0 + 1) - at(x0, y0 + 1)) * fx;
-  return a + (b - a) * fy;
+  return noiseTexture;
 }
 
 /** The atlas for the CPU (rank 0's flatten, the tests). */
-export const cpuNoise: NoiseSource = { sample: (kind, u, v) => bilinear(noiseAtlas(), NOISE_SIZE, NOISE_INDEX[kind], u, v) };
+export const cpuNoise: NoiseSource = atlasNoiseSource();
 
 // ------------------------------------------------------------------ tiles
 
 /** Tile graphs by id: the tile library first (TICKET-41: the 20 tiles the shelf names), then the vault's cartridges on top. */
-const TILE_GRAPHS = new Map<string, TexGraph>([
-  ...Object.entries(TILE_LIBRARY),
-  ...[...VAULT_BY_ID].map(([id, c]): [string, TexGraph] => [id, c.graph]),
-]);
-
-/** Adds tile graphs (the tile library); later registrations replace earlier ones of the same id. */
-export function registerTileGraphs(graphs: Readonly<Record<string, TexGraph>>): void {
-  for (const [id, g] of Object.entries(graphs)) TILE_GRAPHS.set(id, g);
-  tileCache.clear();
-}
-
-const tileCache = new Map<string, Uint8Array | null>();
-/** A tile as RGBA bytes (R grey, G height, B roughness), or null when no graph has this id. */
-function tileBytes(id: string, size: number): Uint8Array | null {
-  const key = `${id}|${size}`;
-  if (tileCache.has(key)) return tileCache.get(key)!;
-  const g = TILE_GRAPHS.get(id);
-  let out: Uint8Array | null = null;
-  if (g) {
-    const t = evaluateGraph(g, { size });
-    out = new Uint8Array(size * size * 4);
-    const b = (x: number): number => Math.round(255 * Math.min(1, Math.max(0, x)));
-    for (let i = 0; i < size * size; i++) {
-      const grey = t.albedo ? 0.2126 * t.albedo[i * 3]! + 0.7152 * t.albedo[i * 3 + 1]! + 0.0722 * t.albedo[i * 3 + 2]! : 0.5;
-      out[i * 4] = b(grey);
-      out[i * 4 + 1] = b(t.height?.[i] ?? 0.5);
-      out[i * 4 + 2] = b(t.roughness?.[i] ?? 0.5);
-      out[i * 4 + 3] = 255;
-    }
-  }
-  tileCache.set(key, out);
-  return out;
-}
-
-const CPU_TILE = 128;
-/** Tiles for the CPU, at the size rank 1 draws them. Unknown ids read flat, as the matstack contract says. */
-export const cpuTiles: TileSource = {
-  sample(tile, u, v) {
-    const bytes = tileBytes(tile, CPU_TILE);
-    if (!bytes) return FLAT_TILE;
-    return { grey: bilinear(bytes, CPU_TILE, 0, u, v), height: bilinear(bytes, CPU_TILE, 1, u, v), rough: bilinear(bytes, CPU_TILE, 2, u, v) };
-  },
+const TILE_GRAPHS: Record<string, TexGraph> = {
+  ...TILE_LIBRARY,
+  ...Object.fromEntries([...VAULT_BY_ID].map(([id, c]): [string, TexGraph] => [id, c.graph])),
 };
+
+/** Adds tile graphs (a cartridge's); later registrations replace earlier ones of the same id. */
+export function registerTileGraphs(graphs: Readonly<Record<string, TexGraph>>): void {
+  Object.assign(TILE_GRAPHS, graphs);
+  clearTileBytesCache();
+}
+
+/** A tile as RGBA bytes (R grey, G height, B roughness), or null when no graph has this id. */
+const tileBytes = (id: string, size: number): Uint8Array | null => tileBytesAt(TILE_GRAPHS, id, size);
+
+const CPU_TILE = TILE_ATLAS_SIZE;
+/** Tiles for the CPU, at the size rank 1 draws them. Unknown ids read flat, as the matstack contract says. */
+export const cpuTiles: TileSource = atlasTileSource(TILE_GRAPHS, CPU_TILE);
 
 /** The tiles a material uses, as one array texture, and each id's layer (ids with no graph are left out: flat). */
 function tileArray(ids: readonly string[], size: number): { readonly texture: THREE.DataArrayTexture | null; readonly layer: ReadonlyMap<string, number> } {
@@ -232,7 +162,7 @@ function inputParams(i: MaskInput): readonly [number, number, number, number] {
     case 'up':
     case 'down': return [i.angle, i.soft, 0, 0];
     case 'ground': return [i.height, i.soft, 0, 0];
-    case 'noise': { const o = seedOffset(i.seed); return [NOISE_INDEX[i.noise], i.scale, o[0], o[1]]; }
+    case 'noise': { const o = seedOffset(i.seed); return [NOISE_ATLAS_INDEX[i.noise], i.scale, o[0], o[1]]; }
     case 'streaks': { const o = seedOffset(i.seed); return [i.scale, i.stretch, o[0], o[1]]; }
   }
 }
@@ -634,7 +564,7 @@ export function releaseLayeredEnv(env: LayeredEnv): void {
 
 /** Builds the shared noise atlas now (about 0.2 s), so the first layered material never builds it mid-play. */
 export function warmLayeredMaterials(): void {
-  noiseAtlas();
+  noiseAtlasBytes();
   noiseTex();
 }
 

@@ -45,9 +45,10 @@ function maskProblems(m: MaskSpec): string[] {
   return out;
 }
 
-test('the first shelf: 29 surfaces, 11 masks, 16 layers, 16 materials (Argo, plan 41 section 4.9)', () => {
+test('the first shelf: 29 surfaces, 13 masks, 16 layers, 16 materials (Argo, plan 41 section 4.9)', () => {
   assert.equal(Object.keys(SURFACE_SHELF).length, 29);
-  assert.equal(Object.keys(MASK_SHELF).length, 11);
+  // 'seeps' (oil under edges and in creases) and 'soot-fall' (tops and undersides) joined the 11 in the 22 Oct review
+  assert.equal(Object.keys(MASK_SHELF).length, 13);
   assert.equal(Object.keys(LAYER_SHELF).length, 16);
   assert.equal(Object.keys(MATERIAL_SHELF).length, 16);
 });

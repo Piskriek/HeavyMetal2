@@ -1577,3 +1577,4 @@ export function litPreview(t: EvaluatedTexture): Uint8ClampedArray {
 }
 
 export * from "./tile-library";
+export * from "./noise-atlas";

@@ -210,3 +210,149 @@ test('rank 0 treats a quad as one face: both triangles flatten to the same value
   assert.equal(f.colour[first * 3], f.colour[second * 3]);
   assert.ok(f.metal[first]! > 0 && f.metal[first]! < 1, `a narrow face is part worn: ${f.metal[first]}`);
 });
+
+test('a face split along a straight side keeps every one of its sides: collinear pieces share a slot', () => {
+  // A 6 cm square cut into a 3 x 3 grid: each outer side is three 2 cm collinear pieces, and every side is inside the 5 cm band.
+  // Without deduplication a corner triangle spends two of its four slots on one side's pieces and drops a far side, so a
+  // fragment near that far side reads centimetres of slack where it should read a couple of millimetres.
+  const S = 0.06, N = 3;
+  const positions: number[] = [], indices: number[] = [];
+  const ids = new Map<string, number>();
+  const id = (x: number, z: number): number => {
+    const k = `${x.toFixed(5)},${z.toFixed(5)}`;
+    let at = ids.get(k);
+    if (at === undefined) { at = positions.length / 3; ids.set(k, at); positions.push(x, 0, z); }
+    return at;
+  };
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+    const x0 = (i * S) / N, x1 = ((i + 1) * S) / N, z0 = (j * S) / N, z1 = ((j + 1) * S) / N;
+    const a = id(x0, z0), b = id(x1, z0), c = id(x1, z1), d = id(x0, z1);
+    indices.push(a, b, c, a, c, d);
+  }
+  const band = 0.05;
+  const mesh = edgeLines({ positions: new Float32Array(positions), indices: new Uint32Array(indices) }, { band });
+
+  // the four outline lines, each with its inward side towards the middle
+  const corners = [[0, 0], [S, 0], [S, S], [0, S]];
+  const outlines = corners.map((a, k) => {
+    const b = corners[(k + 1) % 4]!;
+    const ex = b[0]! - a[0]!, ez = b[1]! - a[1]!, L = Math.hypot(ex, ez);
+    let nx = -ez / L, nz = ex / L;
+    if (nx * (S / 2 - a[0]!) + nz * (S / 2 - a[1]!) < 0) { nx = -nx; nz = -nz; }
+    return { a, n: [nx, nz] as const };
+  });
+  const expected = (x: number, z: number): number => {
+    let d = FAR;
+    for (const l of outlines) {
+      const v = (x - l.a[0]!) * l.n[0] + (z - l.a[1]!) * l.n[1];
+      if (v >= 0 && v < d) d = v;
+    }
+    return d;
+  };
+
+  let worst = 0;
+  for (let t = 0; t < mesh.indices.length / 3; t += 1) {
+    const v = [t * 3, t * 3 + 1, t * 3 + 2];
+    for (const barycentric of [[1 / 3, 1 / 3, 1 / 3], [0.8, 0.1, 0.1], [0.1, 0.8, 0.1], [0.1, 0.1, 0.8]]) {
+      let px = 0, pz = 0;
+      for (let k = 0; k < 3; k++) {
+        px += mesh.positions[v[k]! * 3]! * barycentric[k]!;
+        pz += mesh.positions[v[k]! * 3 + 2]! * barycentric[k]!;
+      }
+      let actual = FAR;
+      for (let slot = 0; slot < EDGE_LINES; slot += 1) {
+        let d = 0;
+        for (let k = 0; k < 3; k++) {
+          const value = mesh.edge[v[k]! * EDGE_LINES + slot]!;
+          d += (value >= 0 && value < FAR - 1 ? value : FAR) * barycentric[k]!;
+        }
+        actual = Math.min(actual, d);
+      }
+      worst = Math.max(worst, actual - expected(px, pz));
+    }
+  }
+  assert.ok(worst < 1e-6, `a fragment read ${(worst * 1000).toFixed(2)} mm of slack where a side should be`);
+});
+
+test('a subdivided quad keeps all four of its sides: half-segments of one side share a slot', () => {
+  // The 22 October review's case, in its smallest form: an 8 x 4 cm plate cut into two quads (four triangles). The bottom and the top
+  // sides are each two collinear 4 cm halves, and every side is inside the 5 cm band of the corner triangles. Without deduplication the
+  // first triangle spends two of its four EDGE_LINES on the two halves of the bottom side and drops the right side, so a fragment near
+  // that side reads centimetres of slack where it should read a couple of millimetres.
+  const W = 0.08, D = 0.04;
+  const positions = new Float32Array([
+    0, 0, 0, W / 2, 0, 0, W / 2, 0, D, 0, 0, D, // left quad: origin, mid-bottom, mid-top, top-left
+    W, 0, 0, W, 0, D, // right quad: bottom-right, top-right
+  ]);
+  const indices = new Uint32Array([
+    0, 1, 2, 0, 2, 3, // left quad, split on its diagonal
+    1, 4, 5, 1, 5, 2, // right quad
+  ]);
+  const band = 0.05;
+  const mesh = edgeLines({ positions, indices }, { band });
+
+  // the four outline lines, each with its inward side towards the plate's middle
+  const outline: { a: readonly [number, number]; n: readonly [number, number] }[] = [
+    { a: [0, 0], n: [0, 1] }, // bottom
+    { a: [W, 0], n: [-1, 0] }, // right
+    { a: [W, D], n: [0, -1] }, // top
+    { a: [0, D], n: [1, 0] }, // left
+  ];
+  const expected = (x: number, z: number): number => {
+    let d = FAR;
+    for (const l of outline) {
+      const v = (x - l.a[0]) * l.n[0] + (z - l.a[1]) * l.n[1];
+      if (v >= 0 && v < d) d = v;
+    }
+    return d;
+  };
+
+  // No triangle may spend two of its four slots on one line: the two halves of a split side must read as one slot, or the perpendicular
+  // side is the one that gets dropped. A line is identified by the distances it puts on a triangle's three vertices, so two slots that
+  // agree on all three are the same physical edge, counted twice.
+  for (let t = 0; t < mesh.indices.length / 3; t += 1) {
+    const v = [t * 3, t * 3 + 1, t * 3 + 2];
+    const lines: number[][] = [];
+    for (let slot = 0; slot < EDGE_LINES; slot += 1) {
+      const distances = v.map((vi) => mesh.edge[vi * EDGE_LINES + slot]!);
+      if (distances.every((d) => d >= FAR - 1)) continue; // empty slot
+      lines.push(distances);
+    }
+    for (let i = 0; i < lines.length; i += 1) {
+      for (let j = i + 1; j < lines.length; j += 1) {
+        const a = lines[i]!, b = lines[j]!;
+        const same = a.every((d, k) => Math.abs(d - b[k]!) < 1e-5);
+        assert.ok(!same, `triangle ${t} spent two slots on one line: [${a.map((d) => d.toFixed(4))}]`);
+      }
+    }
+  }
+
+  // every triangle must be able to read the distance to all four sides: its corner samples carry each side of the plate
+  let worst = 0;
+  let cornerSides = 0;
+  for (let t = 0; t < mesh.indices.length / 3; t += 1) {
+    const v = [t * 3, t * 3 + 1, t * 3 + 2];
+    for (let k = 0; k < 3; k += 1) {
+      const x = mesh.positions[v[k]! * 3]!, z = mesh.positions[v[k]! * 3 + 2]!;
+      let actual = FAR;
+      for (let slot = 0; slot < EDGE_LINES; slot += 1) {
+        const value = mesh.edge[v[k]! * EDGE_LINES + slot]!;
+        if (value >= 0 && value < FAR - 1) actual = Math.min(actual, value);
+      }
+      // the corner's own distance to the nearest side is what the shader reads; slack is what breaks an edge-wear mask
+      worst = Math.max(worst, actual - expected(x, z));
+      if (expected(x, z) < 0.005) cornerSides += 1;
+    }
+  }
+  assert.ok(cornerSides >= 6, `expected every plate corner to be on a side, found ${cornerSides}`);
+  assert.ok(worst < 1e-6, `a corner read ${(worst * 1000).toFixed(2)} mm of slack where a side should be`);
+
+  // and the mid-bottom vertex — the joint between the two halves of one side — reads the bottom side, not a lost slot
+  const mid = 1;
+  let midDistance = FAR;
+  for (let slot = 0; slot < EDGE_LINES; slot += 1) {
+    const value = mesh.edge[mid * EDGE_LINES + slot]!;
+    if (value >= 0 && value < FAR - 1) midDistance = Math.min(midDistance, value);
+  }
+  assert.ok(Math.abs(midDistance) < 1e-6, `the split side's joint reads ${midDistance}`);
+});

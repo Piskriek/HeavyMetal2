@@ -239,6 +239,14 @@ export function edgeLines(m: MaskMeshInput, o: MaskMeshOptions = {}): MaskMesh {
   };
   const signed = (px: number, py: number, pz: number, e: SharpEdge): number =>
     (px - e.a[0]) * e.inward[0] + (py - e.a[1]) * e.inward[1] + (pz - e.a[2]) * e.inward[2];
+  /**
+   * Whether two segments lie on one line with the same inward side: the same physical edge, split. `0.999` on the inward normals rather
+   * than 1: two triangles of a subdivided face can disagree in the last few bits, and a piece that is a hair off the line is still the
+   * same edge. A tenth of a millimetre of line offset is far below the 5 cm band, so a false positive costs nothing.
+   */
+  const sameLine = (p: SharpEdge, q: SharpEdge): boolean =>
+    dot(p.inward, q.inward) > 0.999 &&
+    Math.abs((p.a[0] - q.a[0]) * q.inward[0] + (p.a[1] - q.a[1]) * q.inward[1] + (p.a[2] - q.a[2]) * q.inward[2]) < 1e-4;
 
   const n = T * 3;
   const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2);
@@ -280,8 +288,11 @@ export function edgeLines(m: MaskMeshInput, o: MaskMeshOptions = {}): MaskMesh {
     near.sort((x, y) => x.d - y.d);
     const convex: Sharp[] = [], concave: Sharp[] = [];
     for (const e of [...own[t]!.map((i) => sharps[i]!), ...near.map((r) => r.e)]) {
-      if (e.concave) { if (concave.length < EDGE_LINES) concave.push(e); }
-      else if (convex.length < EDGE_LINES) convex.push(e);
+      const list = e.concave ? concave : convex;
+      // a face split along a straight side owns that side in pieces: the pieces are one line, and spending two slots on it
+      // would crowd out another side of a notched face (rule 8a, 22 Oct review). Keep the first piece, skip its twins.
+      if (list.some((kept) => sameLine(kept, e))) continue;
+      if (list.length < EDGE_LINES) list.push(e);
     }
     for (let c = 0; c < 3; c++) {
       const s = triSrc[t * 3 + c]!, vi = t * 3 + c;

@@ -20,6 +20,7 @@ import { EDGE_LINES, lineDistance, type MaskMesh } from './mask-mesh';
 export { BLEND_MODES, CHANNEL_GROUPS, EDGE_BAND, MAX_LAYERS, MAX_MASK_INPUTS, MAX_RAMP_STOPS, NOISE_KINDS, PAINT_REFS } from './constants';
 export * from './mask-mesh';
 export * from './shelf';
+export * from './coverage';
 export * from './codec';
 
 // ------------------------------------------------------------------ specs

@@ -456,6 +456,12 @@ export interface LabRoom {
   aimKitPart(origin: THREE.Vector3, dir: THREE.Vector3, reach: number): { readonly kit: string; readonly path: string; readonly gen: string | null } | null;
   /** Rebuilds a kit with these per-part overrides (the beam's part cartridges); false while its parts are not loaded yet. */
   setKitOverrides(kit: string, overrides: Overrides): boolean;
+  /**
+   * Registers a kit whose geometry belongs to someone else (the player's own suit, plan 44): the beam aims at it and its
+   * parts take cartridges, but rebuilding it is its owner's business, so `setKitOverrides` reports false and the build is
+   * left alone.
+   */
+  registerKit(id: string, build: KitBuild, kit: Kit, preset: string): void;
   /** Hangs a baked turntable over a machine as a billboard card (a sprite cartridge's Apply), or takes it down with null. */
   setSpriteCard(
     kit: string,
@@ -791,9 +797,16 @@ export function createLabRoom(o: {
     ['capacitor-bank', { group: bank.group, kit: CAPACITOR_BANK_KIT, preset: 'capacitor-bank', build: null, overrides: {} }],
     ['gate', { group: gate.group, kit: GATE_KIT, preset: 'gate', build: null, overrides: {} }],
   ]);
+  /** Kits another system owns (the player's suit): aimed at, never rebuilt here. */
+  const externalKits = new Set<string>();
+  /** Kits other systems hand the beam: their geometry is already in the scene, so there is nothing to build. */
+  const registerKit = (id: string, build: KitBuild, kit: Kit, preset: string): void => {
+    kits.set(id, { group: build.group, kit, preset, build, overrides: {} });
+    externalKits.add(id);
+  };
   const rebuildKit = (id: string): boolean => {
     const k = kits.get(id);
-    if (!k) return false;
+    if (!k || externalKits.has(id)) return false;
     const built = buildKitPreset(k.kit, k.preset, {
       materials: kitMaterials, gen: genFor, maxRank: maxRank(6, detailTier), overrides: k.overrides, keep,
       resolveMaterial: (name) => vaultSkin(name, detailTier !== 'low') ?? lightMaterial(name) ?? layeredMaterial(name, maxRank(6, detailTier)),
@@ -1556,6 +1569,7 @@ export function createLabRoom(o: {
     aimClutter,
     aimKitPart,
     setKitOverrides,
+    registerKit,
     kitPlaced,
     setSpriteCard,
     updateSpriteCards,

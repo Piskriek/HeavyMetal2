@@ -112,3 +112,35 @@ In strict accordance with Rule 8a and the `wheresryan22/anatomy` standard, every
 3. `terminals === 0`: All conduit and nerve endings terminate flush on valid hubs or sockets.
 4. `hingeBendRadius`: Joint rotations stay strictly within declared limits ($\theta \le \theta_{\max}$).
 5. `orbitClearance24 === true`: Clean visual silhouette from 24 sampled turntable angles.
+
+---
+
+## 6. PART A — IMPLEMENTED (JOB-24)
+
+`packages/creature` (`@hm/creature`) exists and every archetype passes the audit gate. What landed:
+
+| Piece | Where | Note |
+| :--- | :--- | :--- |
+| Genome schema | `packages/creature/src/creature-spec.ts` | `CreatureGenomeSpec`, `CreatureSpineSegmentSpec`, `CreatureLimbChainSpec` (+ `CreaturePelvisSpec`, `KitSocketPartSpec`, `CreatureLimbRole`); pure quat/vector math, no three.js. |
+| Skeleton | `packages/creature/src/creature-skeleton.ts` | Genome → resolved joint frames (`spine`, `limbs`, `sacrum`, `groundY`). Clamps `strideLength`/`stepHeight` to each chain's own reach, so no genome asks for a step it cannot take. |
+| Assembly | `packages/creature/src/creature-assembly.ts` | `buildCreatureKit()` / `creatureAssembly()` → a `@hm/kitspec` `Kit` of the five canonical groups, coaxial knuckle at every pivot, declared sockets, deterministic settle. No vertex weights, no CPU skinning. |
+| Gait | `packages/creature/src/creature-gait.ts` | `evaluateCreatureGait(genome, simTime, strideVelocity, options)` → `CreatureGait`, solved by `apps/web/src/avatar/two-bone-ik.ts`; 3-tier LOD (`<15 m` 60 Hz exact ground, `15–50 m` stage cadence 12–30 Hz on the pure heightfield with **0 raycasts**, `>=50 m` asleep). A pelvis crouch keeps every stance foot inside its reach. |
+| Presets | `packages/creature/src/creature-presets.ts` | `ASTRO_SUIT_GENOME` (45 parts), `THEROPOD_GENOME` (44), `QUADRUPED_GENOME` (44), `HEXAPOD_GENOME` (58); every foot planted on `y = 0`. |
+| Gate | `packages/creature/tests/creature-assembly.test.ts`, `creature-gait.test.ts` | `kitAudit(kit, { phases: 8 })` → `looseEnds === 0`, `solidClearances.length === 0`, `terminals === 0` for all four archetypes; knuckle centres equal the resolved joint; kits are pure functions of the genome. |
+
+The player's suit (`apps/web/src/avatar/astro/astro-model.ts`) is now `ASTRO_SUIT_CREATURE_KIT`:
+
+- `astro-low.glb` (and the HD pack) are **deleted**; `scripts/pack-character.mjs` is retired and
+  `scripts/retarget-astro.ts` now retargets the rifle set against `apps/web/src/avatar/astro/mixamo-rig.ts`, the Mixamo
+  rest skeleton kept as a 28-row data table (bones are a rig, not an asset).
+- `buildAstroSuit(level)` builds the genome's parts into the bone frame of the one Mixamo bone each part binds
+  (`creaturePartBones()`), one mesh per (part, material), each carrying `userData.astroPartPath`. The animator, the rifle
+  mount (`mixamorigRightHand`) and the lab's lean (`mixamorigSpine`) are unchanged, and nothing is skinned.
+- `astroSuitBuildFor(group)` wraps the live player instance as a `KitBuild`, registered in the lab as the `astro-suit` kit
+  (`room.registerKit`), so `aimKitPart()` reaches the player's own visor, thruster belt and gloves — on the plot too —
+  and part cartridges land on the suit exactly as on any machine.
+- `/suit.html` (`apps/web/src/dev/suit.ts`): the Studio turntable view of the suit, with the live audit readout and every
+  placed part listed by group and highlighted on hover.
+
+**Out of scope for Part A (Part B):** the 37 roster monsters in `apps/web/src/monsters/roster.ts` still use their packed
+assets; only the four genome presets above are compiled by the gate.

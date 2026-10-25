@@ -49,6 +49,7 @@ import { beadSpeed, spanPoint, spanSag } from './brownout-visual';
 import { castHeightfield, castSpheres, createRoverArmState, nearestHit, stepRoverArm, type CastSphere, type RoverArmState, type Vec3 as RoverVec3 } from './rover-camera';
 import { createExposureState, createScanWave, exposureTargetLuminance, gateOrLabFactor, markScanWaveDone, scanFrame, stepExposure, suitCamMix, suitCamProfile, suitCamStrength, triggerScanWave, type ExposureState, type ScanWave, type SuitCamSetting } from './stage-look';
 import { AVATAR_LIGHT_LAYER, createScientistInstance, scientistLevelFor, thirdPersonLightRig } from '../avatar/scientist/scientist-model';
+import { ASTRO_SUIT_CREATURE_KIT, astroSuitBuildFor } from '../avatar/astro/astro-model';
 import { socketMarkerGeometry, socketMarkerMaterial, socketMarkerOpacity } from './socket-markers';
 import { outcropGeometry, outcropMaterial } from './outcrops';
 import { loadScientistAnimations, type ClipName } from '../avatar/scientist/anims-loader';
@@ -2262,6 +2263,8 @@ export function createPlayScene(o: {
   // ---- scientist character model & animation (TASK-07, POL-18)
   let cameraView: 'first' | 'third' = o.cameraView ?? 'first';
   let scientistAnimator: ScientistAnimator | null = null;
+  /** The player's suit as a kit build (JOB-24): the beam's target on the suit's own meshes, once the avatar has loaded. */
+  let suitBuild: ReturnType<typeof astroSuitBuildFor> | null = null;
   const scientistHolder = new THREE.Group();
   scientistHolder.visible = cameraView === 'third';
   labScene.add(scientistHolder);
@@ -2304,6 +2307,10 @@ export function createPlayScene(o: {
       });
       syncSuitEnv(where === 'planet');
       scientistHolder.add(group);
+      // JOB-24: the player is a creature kit too. The suit's parts go at the beam's reach in the lab and on the plot, so a
+      // cartridge can be fired at your own visor, thruster belt or gloves.
+      suitBuild = astroSuitBuildFor(group);
+      room.registerKit('astro-suit', suitBuild, ASTRO_SUIT_CREATURE_KIT.kit, ASTRO_SUIT_CREATURE_KIT.preset);
       visorMaterials = vm;
       scientistAnimator = createScientistAnimator(group, new Map([...clips, ...rifleClips]));
       rifleHand = group.getObjectByName('mixamorigRightHand') ?? null;
@@ -4390,6 +4397,7 @@ export function createPlayScene(o: {
       const targetables: KitTargetable[] = [];
       // the Gate itself is a kit: its segments, pedestal and chevron lamps take cartridges like a machine
       if (stargate) targetables.push({ kit: 'stargate', build: stargate.build });
+      if (suitBuild) targetables.push({ kit: 'astro-suit', build: suitBuild });
       for (const v of views.values()) {
         const b = kitBuildOf(v);
         if (b) targetables.push({ kit: plotKitKey(v.m), build: b });

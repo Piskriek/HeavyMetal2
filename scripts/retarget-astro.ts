@@ -1,6 +1,8 @@
 // Retargets Mixamo animation sets (authored on the old scientist rig) onto Astro's rig.
-//   node --import tsx scripts/retarget-astro.ts <scientist.fbx> [astro dir]   the scientist clips, added to Astro's GLBs
 //   node --import tsx scripts/retarget-astro.ts <scientist.fbx> --rifle      the 11 rifle clips, into astro/rifle-anims.bin
+// The target rig is `apps/web/src/avatar/astro/mixamo-rig.ts`'s rest table: the suit itself is procedural
+// (`ASTRO_SUIT_CREATURE_KIT`), so there is no character GLB to patch. The scientist set is packed from the source FBX by
+// `scripts/pack-anims.mjs` into `scientist/anims.bin`; only the rifle set needs retargeting here.
 // Why not copy rotations by bone name: the two rigs share Mixamo names but not bind poses or bone axes, which bent
 // Astro into an alien crouch. For every bone and frame this takes the source bone's rotation relative to its own bind pose
 // (in world space) and applies it to Astro's bone in Astro's bind pose:
@@ -14,35 +16,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { MeshoptDecoder as ThreeMeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
-import { NodeIO, type Document } from '@gltf-transform/core';
-import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { prune, resample } from '@gltf-transform/functions';
-import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 import { decodeAnimationClips, RIFLE_CLIP_NAMES } from '../apps/web/src/avatar/scientist/anims-loader';
+import { buildMixamoRig } from '../apps/web/src/avatar/astro/mixamo-rig';
 
 const args = process.argv.slice(2);
 const rifleMode = args.includes('--rifle');
-const [fbxPath, dirArg] = args.filter((a) => a !== '--rifle');
-if (!fbxPath) { console.error('usage: node --import tsx scripts/retarget-astro.ts <scientist.fbx> [astro dir | --rifle]'); process.exit(2); }
-/** Where each level lives, as scripts/pack-character.mjs writes them: low inline in the single file, mid and high in the HD pack. */
-const ASTRO_FILES: Record<string, string> = { low: 'apps/web/src/avatar/astro/astro-low.glb', mid: 'apps/web/public/hd/astro/mid.glb', high: 'apps/web/public/hd/astro/high.glb' };
-/** An astro dir argument holds all three levels as astro-<level>.glb instead. */
-const astroFile = (level: string): string => (dirArg ? path.join(dirArg, `astro-${level}.glb`) : ASTRO_FILES[level]!);
+const [fbxPath] = args.filter((a) => a !== '--rifle');
+if (!fbxPath) { console.error('usage: node --import tsx scripts/retarget-astro.ts <scientist.fbx> --rifle'); process.exit(2); }
 const RIFLE_DIR = 'zips/Models/rigged/anims/rifle';
 const RIFLE_OUT = 'apps/web/src/avatar/astro/rifle-anims.bin';
 const FPS = 30;
-const OWN = new Set(['walking', 'running']);
 /** Keys within these of their straight-line guess are dropped (quaternion components; metres for the hips). */
 const QUAT_TOL = 0.008, POS_TOL_M = 0.001;
 
 const toArrayBuffer = (b: Buffer): ArrayBuffer => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
-const firstSkinned = (root: THREE.Object3D): THREE.SkinnedMesh => {
-  let found: THREE.SkinnedMesh | null = null;
-  root.traverse((o) => { if (!found && (o as THREE.SkinnedMesh).isSkinnedMesh) found = o as THREE.SkinnedMesh; });
-  if (!found) throw new Error('no skinned mesh'); return found;
-};
+
 
 /** Every bone under a root, posed to bind (all skeletons: a model may split its bones over several skinned meshes). */
 function bindPose(root: THREE.Object3D, usePose = true): { bones: Map<string, THREE.Bone>; bind: Map<string, { q: THREE.Quaternion; p: THREE.Vector3 }> } {
@@ -64,7 +52,7 @@ interface Source {
 
 /** The target: Astro's bones parents first, their bind pose after pose matching, and the hips' scale. */
 interface Target {
-  readonly skin: THREE.SkinnedMesh;
+  readonly root: THREE.Object3D;
   readonly order: THREE.Bone[];
   readonly tBind: Map<string, { q: THREE.Quaternion; p: THREE.Vector3 }>;
   readonly ratio: number;
@@ -92,15 +80,16 @@ function buildSource(fbx: string, clips: Map<string, THREE.AnimationClip>): Sour
   return { root, bones, bind, hipsRef };
 }
 
-function buildTarget(parsed: THREE.Group, src: Source): Target {
-  // rotations come from Astro's bind pose; the hips' standing height from its default node pose (0.916 m), which pose() misplaces
-  const skin = firstSkinned(parsed);
-  const tRest = bindPose(parsed, false).bind;
+function buildTarget(root: THREE.Object3D, src: Source): Target {
+  // rotations come from Astro's rest table; the hips' standing height (0.916 m) is that table's own first row
+  const tRest = bindPose(root, false).bind;
   const tStand = tRest.get('mixamorigHips')!.p.clone();
   const ratio = tStand.y / src.hipsRef.y;
   // target bones parents-first, so a parent's solved world rotation is ready for its children
   const order: THREE.Bone[] = []; const visit = (b: THREE.Object3D) => { if ((b as THREE.Bone).isBone) order.push(b as THREE.Bone); b.children.forEach(visit); };
-  visit(skin.skeleton.bones[0]!);
+  const first = root.getObjectByName('mixamorigHips') as THREE.Bone | null;
+  if (!first) throw new Error('the Mixamo rest table has no hips');
+  visit(first);
   // pose matching: turn each Astro bone (parents first) so it points where the source bone points in the source's T-pose; the
   // rest poses differ (an A-pose is not a T-pose), and retargeting against unmatched rests crosses the arms
   const tBind = new Map<string, { q: THREE.Quaternion; p: THREE.Vector3 }>();
@@ -117,7 +106,7 @@ function buildTarget(parsed: THREE.Group, src: Source): Target {
     adjust.set(b.name, adj);
     tBind.set(b.name, { q: adj.clone().multiply(rest.q), p: rest.p.clone() });
   }
-  return { skin, order, tBind, ratio, tStand };
+  return { root, order, tBind, ratio, tStand };
 }
 
 function retargetClip(clip: THREE.AnimationClip, src: Source, tgt: Target): Retargeted {
@@ -125,7 +114,7 @@ function retargetClip(clip: THREE.AnimationClip, src: Source, tgt: Target): Reta
   const frames = Math.max(2, Math.round(clip.duration * FPS) + 1), times = new Float32Array(frames);
   const rot = new Map(tgt.order.map((b) => [b.name, new Float32Array(frames * 4)] as const));
   const hips = new Float32Array(frames * 3);
-  const hipsBone = tgt.skin.skeleton.bones.find((b) => b.name === 'mixamorigHips')!;
+  const hipsBone = tgt.order.find((b) => b.name === 'mixamorigHips')!;
   const parentInv = hipsBone.parent ? hipsBone.parent.matrixWorld.clone().invert() : new THREE.Matrix4();
   for (let f = 0; f < frames; f++) {
     const t = Math.min(clip.duration, f / FPS); times[f] = t;
@@ -252,52 +241,15 @@ function rifleSet(src: Source, target: Target): void {
 }
 
 async function main(): Promise<void> {
-  // the scientist clips: the source's animation set (the idle is the hips' reference; the GLB pass retargets all of them)
+  if (!rifleMode) {
+    console.error('The suit is procedural now (ASTRO_SUIT_CREATURE_KIT), so there is no character GLB to patch.');
+    console.error('Pack the scientist set with: node scripts/pack-anims.mjs   (writes apps/web/src/avatar/scientist/anims.bin)');
+    process.exit(2);
+  }
+  // the idle is the hips' reference: the rifle set is retargeted against the same source rig
   const clips = decodeAnimationClips(fs.readFileSync('apps/web/src/avatar/scientist/anims.bin'));
-  await MeshoptEncoder.ready; await MeshoptDecoder.ready; await ThreeMeshoptDecoder.ready;
-  const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder, 'meshopt.decoder': MeshoptDecoder });
   const src = buildSource(fbxPath!, clips);
-
-  if (rifleMode) {
-    // Astro's rig is the same in every level: the mid GLB stands for it (its textures are not needed)
-    const bare = await io.read(astroFile('mid'));
-    for (const t of bare.getRoot().listTextures()) t.dispose();
-    const parsed = await new GLTFLoader().setMeshoptDecoder(ThreeMeshoptDecoder).parseAsync(toArrayBuffer(Buffer.from(await io.writeBinary(bare))), '');
-    rifleSet(src, buildTarget(parsed.scene, src));
-    return;
-  }
-
-  for (const level of ['low', 'mid', 'high']) {
-    const file = astroFile(level);
-    const doc: Document = await io.read(file);
-    // the target rig as three.js objects: parse a copy without textures (node has no image decoder)
-    const bare = await io.read(file);
-    for (const t of bare.getRoot().listTextures()) t.dispose();
-    const parsed = await new GLTFLoader().setMeshoptDecoder(ThreeMeshoptDecoder).parseAsync(toArrayBuffer(Buffer.from(await io.writeBinary(bare))), '');
-    const tgt = buildTarget(parsed.scene, src);
-    const docNodes = new Map(doc.getRoot().listNodes().map((n) => [THREE.PropertyBinding.sanitizeNodeName(n.getName()), n] as const));
-    const buffer = doc.getRoot().listBuffers()[0]!;
-    const existing = new Set(doc.getRoot().listAnimations().map((a) => a.getName().toLowerCase()));
-    let added = 0;
-    for (const [name, clip] of clips) {
-      if (OWN.has(name) || existing.has(name)) continue;
-      const r = retargetClip(clip, src, tgt);
-      const anim = doc.createAnimation(name), input = doc.createAccessor().setType('SCALAR').setArray(r.times).setBuffer(buffer);
-      for (const [bone, values] of r.rot) {
-        const node = docNodes.get(bone); if (!node) continue;
-        const s = doc.createAnimationSampler().setInput(input).setOutput(doc.createAccessor().setType('VEC4').setArray(values).setBuffer(buffer)).setInterpolation('LINEAR');
-        anim.addSampler(s).addChannel(doc.createAnimationChannel().setTargetNode(node).setTargetPath('rotation').setSampler(s));
-      }
-      const hipsNode = docNodes.get('mixamorigHips');
-      if (hipsNode) {
-        const s = doc.createAnimationSampler().setInput(input).setOutput(doc.createAccessor().setType('VEC3').setArray(r.hips).setBuffer(buffer)).setInterpolation('LINEAR');
-        anim.addSampler(s).addChannel(doc.createAnimationChannel().setTargetNode(hipsNode).setTargetPath('translation').setSampler(s));
-      }
-      added++;
-    }
-    await doc.transform(resample(), prune());
-    await io.write(file, doc);
-    console.log(`${file}: +${added} clips (${doc.getRoot().listAnimations().map((a) => a.getName()).join(', ')}), ${(fs.statSync(file).size / 1024).toFixed(0)} KB`);
-  }
+  const rig = buildMixamoRig();
+  rifleSet(src, buildTarget(rig.root, src));
 }
 main().catch((e: unknown) => { console.error(e); process.exit(1); });

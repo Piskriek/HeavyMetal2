@@ -202,6 +202,45 @@ export function addPrism(b: MeshBuilder, slot: string, sides: number, r: number,
   }
 }
 
+/** A vertical prism with an elliptic section: `rx` across x and `rz` across z, from y0 to y1 (a vertebra's body). */
+export function addEllipticPrism(b: MeshBuilder, slot: string, sides: number, rx: number, rz: number, y0: number, y1: number, cx = 0, cz = 0, turn = 0): void {
+  const ring = (y: number): V3[] => Array.from({ length: sides }, (_, i) => {
+    const a = turn + (i / sides) * Math.PI * 2;
+    return [cx + rx * Math.cos(a), y, cz - rz * Math.sin(a)] as V3;
+  });
+  const lo = ring(y0), hi = ring(y1);
+  b.poly(slot, hi);
+  b.poly(slot, [...lo].reverse());
+  for (let i = 0; i < sides; i++) {
+    const j = (i + 1) % sides;
+    b.poly(slot, [lo[i] as V3, lo[j] as V3, hi[j] as V3, hi[i] as V3]);
+  }
+}
+
+/**
+ * A faceted sphere centred on `(cx, cy, cz)`: `rings` latitude bands from pole to pole, `sides` sectors round the axis. A
+ * joint knuckle is one of these centred on the pivot, which is what lets a limb turn without pinching (plan 44).
+ */
+export function addSphere(b: MeshBuilder, slot: string, r: number, rings: number, sides: number, cx = 0, cy = 0, cz = 0): void {
+  const at = (lat: number, lon: number): V3 => {
+    const cl = Math.cos(lat);
+    return [cx + r * cl * Math.cos(lon), cy + r * Math.sin(lat), cz - r * cl * Math.sin(lon)] as V3;
+  };
+  const lo = Math.max(2, Math.round(rings)), n = Math.max(3, Math.round(sides));
+  for (let i = 0; i < lo; i++) {
+    const lat0 = -Math.PI / 2 + (i / lo) * Math.PI;
+    const lat1 = -Math.PI / 2 + ((i + 1) / lo) * Math.PI;
+    for (let j = 0; j < n; j++) {
+      const lon0 = (j / n) * Math.PI * 2;
+      const lon1 = ((j + 1) / n) * Math.PI * 2;
+      const a = at(lat0, lon0), b2 = at(lat0, lon1), c = at(lat1, lon1), d = at(lat1, lon0);
+      if (i === 0) b.poly(slot, [a, c, d]);
+      else if (i === lo - 1) b.poly(slot, [a, b2, c]);
+      else b.poly(slot, [a, b2, c, d]);
+    }
+  }
+}
+
 /**
  * A right-triangle prism along x (a gusset): from x0 to x1, its right angle at (y0, z0), one leg up to (y1, z0) and
  * one leg along to (y0, z1). z1 may be below z0 (the wedge then leans the other way).
@@ -1276,6 +1315,140 @@ export const track: Generator = {
   },
 };
 
+/**
+ * 21. A ball knuckle: a faceted sphere centred on its own origin, so the part's origin *is* the joint's rotation pivot.
+ *
+ * This is the primitive plan 44's coaxial articulation is built on. A limb link ends short of the joint by exactly the ball's
+ * radius, so the ball's box is flush with the link's end face: the two solids touch and never interpenetrate, and because the
+ * pivot is the ball's centre the joint turns across its whole biological range without pinching or leaving a gap. Ranks add
+ * the polar axle bosses (1) and the equatorial bolt circle (2); every addition stays inside the ball's own radius, so a
+ * knuckle's box is exactly `±radius` at every rank and a placement computed from it stays true as detail rises.
+ */
+export const knuckle: Generator = {
+  id: 'knuckle',
+  label: 'Ball knuckle',
+  slots: ['ball', 'boss', 'bolts'],
+  params: [
+    m('radius', 'Ball radius', 0.012, 0.25, 0.002, 0.06),
+    { key: 'sides', label: 'Sides', unit: 'count', min: 4, max: 16, step: 2, default: 8 },
+    { key: 'rings', label: 'Latitude rings', unit: 'count', min: 2, max: 8, step: 1, default: 4 },
+    { key: 'bossFactor', label: 'Axle boss', unit: 'factor', min: 0, max: 1, step: 0.05, default: 0.4 },
+  ],
+  build(given, rank) {
+    const p = resolveParams(this.params, given);
+    const b = new MeshBuilder(this.slots);
+    const r = p.radius as number;
+    const sides = Math.max(4, Math.round(p.sides as number));
+    const rings = Math.max(2, Math.round(p.rings as number));
+    addSphere(b, 'ball', r, rings, sides);
+    if (rank >= 1 && (p.bossFactor as number) > 0) {
+      // two flat axle caps at the poles of the coaxial y axis, inside the ball's radius
+      const br = r * Math.min(0.9, p.bossFactor as number);
+      addPrism(b, 'boss', sides, br, r * 0.62, r, 0, 0, Math.PI / sides);
+      addPrism(b, 'boss', sides, br, -r, -r * 0.62, 0, 0, Math.PI / sides);
+    }
+    if (rank >= 2) {
+      const head = Math.min(r * 0.16, 0.012);
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+        const cx = Math.cos(a) * r * 0.72, cz = Math.sin(a) * r * 0.72;
+        addPrism(b, 'bolts', 6, head, r * 0.9, r * 0.99, cx, cz, Math.PI / 6);
+      }
+    }
+    return b.build();
+  },
+};
+
+/**
+ * 22. A coaxial knuckle disc: a short cylinder centred on its own origin with its axis along y, the hinge knuckle a spinal
+ * vertebra, a wrist or a knee turns on. Its box is exactly `±radius` across and `±thickness/2` along the axis, so a link that
+ * ends on the disc's face is flush with it, and the disc's axis is the rotation the joint allows.
+ */
+export const disc: Generator = {
+  id: 'disc',
+  label: 'Coaxial knuckle disc',
+  slots: ['disc', 'rim', 'bolts'],
+  params: [
+    m('radius', 'Disc radius', 0.015, 0.3, 0.005, 0.08),
+    m('thickness', 'Thickness', 0.006, 0.2, 0.002, 0.03),
+    { key: 'sides', label: 'Sides', unit: 'count', min: 4, max: 16, step: 2, default: 12 },
+    { key: 'rimFactor', label: 'Rim step', unit: 'factor', min: 0, max: 0.8, step: 0.05, default: 0.3 },
+  ],
+  build(given, rank) {
+    const p = resolveParams(this.params, given);
+    const b = new MeshBuilder(this.slots);
+    const r = p.radius as number, t = p.thickness as number;
+    const sides = Math.max(4, Math.round(p.sides as number));
+    addPrism(b, 'disc', sides, r, -t / 2, t / 2, 0, 0, Math.PI / sides);
+    if (rank >= 1 && (p.rimFactor as number) > 0) {
+      // a stepped rim ring: a second, smaller prism that turns the cylinder into a spool without leaving its box
+      addPrism(b, 'rim', sides, r * (1 - Math.min(0.8, p.rimFactor as number) * 0.5), -t / 2, t / 2, 0, 0, Math.PI / sides);
+    }
+    if (rank >= 2) {
+      const head = Math.min(r * 0.14, 0.012);
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+        const cx = Math.cos(a) * r * 0.7, cz = Math.sin(a) * r * 0.7;
+        addPrism(b, 'bolts', 6, head, -t / 2, -t / 2 + Math.min(t * 0.4, 0.01), cx, cz, Math.PI / 6);
+      }
+    }
+    return b.build();
+  },
+};
+
+/**
+ * 23. A vertebral segment: an elliptic body along +y from its origin, the axial link of a creature's spine (plan 44's
+ * `CreatureSpineSegmentSpec`). `radiusX` is the lateral half-width and `radiusY` the dorsal-ventral half-height, so a
+ * carnivore's tall, narrow vertebra and a sauropod's broad one are the same generator at two slider values. Rank 0 is the
+ * elliptic prism that sets the box; 1 tapers the ends into their ball-and-socket collars and adds the dorsal keel; 2 adds the
+ * transverse processes and the socket bolts. Every rank stays inside the rank-0 box, so the audit's silhouette is honest.
+ */
+export const vertebra: Generator = {
+  id: 'vertebra',
+  label: 'Vertebral segment',
+  slots: ['body', 'keel', 'bolts'],
+  params: [
+    m('length', 'Length', 0.04, 1.2, 0.01, 0.16),
+    m('radiusX', 'Lateral half-width', 0.012, 0.4, 0.002, 0.085),
+    m('radiusY', 'Dorsal half-height', 0.012, 0.4, 0.002, 0.075),
+    { key: 'sides', label: 'Sides', unit: 'count', min: 4, max: 16, step: 2, default: 8 },
+    m('keel', 'Dorsal keel', 0, 0.6, 0.02, 0.32),
+    m('collar', 'Socket collar', 0, 0.9, 0.05, 0.55),
+  ],
+  build(given, rank) {
+    const p = resolveParams(this.params, given);
+    const b = new MeshBuilder(this.slots);
+    const l = p.length as number, rx = p.radiusX as number, ry = p.radiusY as number;
+    const sides = Math.max(4, Math.round(p.sides as number));
+    const inset = rank >= 1 ? Math.min(l * 0.18, Math.min(rx, ry) * 0.5) : 0;
+    if (inset > 0) {
+      // the body inboard of its two collars
+      addEllipticPrism(b, 'body', sides, rx, ry, inset, l - inset);
+      const cr = Math.min(0.9, p.collar as number);
+      addEllipticPrism(b, 'body', sides, rx * cr, ry * cr, 0, inset);
+      addEllipticPrism(b, 'body', sides, rx * cr, ry * cr, l - inset, l);
+      const kh = Math.min(ry, p.keel as number);
+      if (kh > 0) {
+        // the dorsal keel: a rib on the +z (back) face, inside the body's own half-height
+        addBox(b, 'keel', [-rx * 0.3, l * 0.28, ry - kh], [rx * 0.3, l * 0.72, ry]);
+      }
+    } else {
+      addEllipticPrism(b, 'body', sides, rx, ry, 0, l);
+    }
+    if (rank >= 2) {
+      // transverse processes: short lateral ribs at the body's waist
+      for (const sx of [-1, 1]) {
+        addBox(b, 'keel', [sx > 0 ? rx * 0.55 : -rx * 0.98, l * 0.36, -ry * 0.25], [sx > 0 ? rx * 0.98 : -rx * 0.55, l * 0.64, ry * 0.25]);
+      }
+      const head = Math.min(rx * 0.12, 0.012);
+      for (const y of [inset * 0.5, l - inset * 0.5]) {
+        addPrism(b, 'bolts', 6, head, y - head, y + head, 0, ry * 0.5, Math.PI / 6);
+      }
+    }
+    return b.build();
+  },
+};
+
 export const GENERATORS: Readonly<Record<string, Generator>> = Object.freeze({
   bolt,
   panel,
@@ -1297,6 +1470,9 @@ export const GENERATORS: Readonly<Record<string, Generator>> = Object.freeze({
   clamp,
   wheel,
   track,
+  knuckle,
+  disc,
+  vertebra,
 });
 
 /** Builds a part from the registry; unknown generators give null. */

@@ -1,0 +1,15 @@
+{
+  "name": "@hm/creature",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@hm/partgen": "0.0.1",
+    "@hm/kitspec": "0.0.1",
+    "@hm/matstack": "0.0.1",
+    "@hm/skin": "0.0.1",
+    "@hm/soundlab": "0.0.1",
+    "@hm/kinematic": "0.0.1"
+  }
+}

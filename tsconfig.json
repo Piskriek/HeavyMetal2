@@ -348,6 +348,9 @@
       "@hm/partgen": [
         "packages/partgen/src/index.ts"
       ],
+      "@hm/creature": [
+        "packages/creature/src/index.ts"
+      ],
       "@hm/meshops": [
         "packages/meshops/src/index.ts"
       ],

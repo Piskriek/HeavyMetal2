@@ -21,6 +21,9 @@ import { PART_SWATCHES } from './part-swatches';
 import { vaultSkin } from './vault-skin';
 import { lightMaterial } from './light-material';
 import { kitLayering, layeredMaterial, type LayeredEnv } from './layered-material';
+import type { GateAccessMode } from '@hm/coopnet/gate-dialer';
+import { STARGATE_PRESET, stargateKit } from './kit-stargate';
+import type { KitBuild } from './kit-build';
 
 /** The heavy machines built from a kit, and the preset that is the whole machine. */
 export const HEAVY_KITS: Partial<Record<MachineKind, { readonly kit: Kit; readonly preset: string }>> = {
@@ -96,6 +99,45 @@ const FAB_HEAD: Kit = {
   parts: { 'head-carriage': FABRICATOR_FRAME_KIT.parts['head-carriage']! },
   assemblies: { carriage: { children: [{ ref: 'head-carriage', key: 'carriage' }] } },
 };
+
+/**
+ * The plot's Quantum Archway Gate as a kit build (plan 42 section 4.3, JOB-07 item 1): the ring, its nine chevron lamps, the
+ * ramp, the dialing pedestal, and the iris when the gate is not open. The scene hangs this around the twin gate's opening
+ * and aims the beam at it like a machine, so the gate takes part, material and light cartridges with the same rules.
+ *
+ * Null while the kit frames are off (the twin keeps its own visual) or when a part cannot be built, so a failed build
+ * never leaves the plot gateless.
+ */
+export function plotStargate(o: {
+  readonly access: GateAccessMode;
+  readonly stage: number;
+  readonly genLevel: GenLevel;
+  readonly overrides?: Overrides;
+  readonly ringY?: number;
+}): { readonly group: THREE.Group; readonly build: KitBuild; readonly chevrons: readonly THREE.Mesh[] } | null {
+  if (!kitFrames) return null;
+  const rank = maxRank(o.stage, tierOfLevel(o.genLevel));
+  const kit = stargateKit(o.access);
+  const build = buildKitPreset(kit, STARGATE_PRESET, {
+    materials: plotKitMaterials(),
+    // every part of the gate is a @hm/partgen primitive: no generated assets to wait on
+    gen: () => null,
+    resolveMaterial: plotResolve(o.genLevel, rank),
+    layering: kitLayering,
+    maxRank: rank,
+    ...(o.overrides ? { overrides: o.overrides } : {}),
+  });
+  if (!build) return null;
+  const group = new THREE.Group();
+  group.name = 'plot-stargate';
+  group.add(build.group);
+  if (o.ringY) group.position.y = o.ringY;
+  // the chevrons are the meshes drawn with their own light cartridge (one unique Kelvin each, so nine stay nine)
+  const chevrons = build.group.children.filter(
+    (c): c is THREE.Mesh => (c as THREE.Mesh).isMesh && c.name.startsWith('kit:lx:'),
+  );
+  return { group, build, chevrons };
+}
 
 /**
  * The vehicle fabricator from Argo's frame kit (TICKET-39): the frame merged as one build, its print-head carriage built

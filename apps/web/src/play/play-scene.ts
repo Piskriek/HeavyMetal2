@@ -25,7 +25,9 @@ import { createPlotHolo, type PlotHolo } from './plot-holo';
 import { COLOUR_MARK_FRAGMENT, localMachineWaveAt, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_OFF_FRAGMENT, OPENING_OFF_VERTEX, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX, scanRingFadeAt, waveBandColourFor } from './portal-shaders';
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
 import { disposeProp, FABRICATOR_PLUME, FABRICATOR_VENT, FEED_CUBES_FULL, feedCubeCount, feedCubeProgress, lineSpan, machinePlumeCount, machinePlumeCountOf, machinePlumeGravity, machinePlumeLook, machinePlumeLookOf, machinePlumeSpec, machinePlumeSteady, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
-import { setPlotEnvironment } from './plot-kits';
+import { plotStargate, setPlotEnvironment } from './plot-kits';
+import { STARGATE_APERTURE_R, STARGATE_RING_CENTRE_Y } from './kit-stargate';
+import type { GateAccessMode } from '@hm/coopnet/gate-dialer';
 import { warmLayeredMaterials } from './layered-material';
 import { printFrame, beatPulse, evaluateBeatSyncedPlumeModulation } from '@hm/tooljuice';
 import { evaluateHarmonicMachineChoir, type ActiveMachineEmitter, type MachineStemRole } from '@hm/musicbox';
@@ -247,6 +249,13 @@ export interface PlayScene {
   setWalkWorld(walkWorld: WalkWorld | null): void;
   /** The moon arrival pose (GATE-05): `dist` metres out from the Twin Gate's back (default 3), facing away from the gate. */
   gateExit(dist?: number): { readonly x: number; readonly z: number; readonly yaw: number };
+  /**
+   * Stands the plot's Gate where the world says it is (plan 42 section 4.3's `moveGate`): the twin's frame, its footing,
+   * the arrival pad and the ground's keep-out all follow, so the pad a traveller lands on is the pad in front of the ring.
+   */
+  setPlotGate(pose: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }): void;
+  /** Sets the plot gate's iris (plan 42's `setGateAccess`): open shows the aperture, code-only and closed draw the shield. */
+  setGateAccess(access: GateAccessMode): void;
   setSocketRings(poses: readonly { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }[]): void;
   setPlanGhosts(ghosts: readonly { readonly kind: Kind; readonly at: { readonly x: number; readonly y: number; readonly z: number }; readonly yaw: number }[]): void;
   setSheltered(sheltered: boolean): void;
@@ -433,6 +442,8 @@ export interface PlayScene {
     roverBoostEnergy(): number;
     groundTriangles(): number; showGround(on: boolean): void; where(): Where; position(): THREE.Vector3; teleport(where: Where, x: number, z: number, yaw: number, pitch?: number): void; sync(): number;
     stats(): { readonly triangles: number; readonly calls: number }; wave(): number; gatePlanet(): { x: number; z: number };
+    /** The plot gate's iris state, and how many kit parts the ring drew (0 while the twin's own frame stands). */
+    gateAccess(): GateAccessMode; gateKitParts(): number;
     /** The way the player faces (the scene's yaw, radians). */
     facing(): number;
     /** Each placed machine's anchor above its housing, projected for the aim-gated labels (TASK-25). */
@@ -629,6 +640,41 @@ export function createPlayScene(o: {
   const footing = new THREE.Mesh(keep(new THREE.BoxGeometry(3.6, 2.4, 2.6)), m.concrete);
   footing.position.y = -1.2;
   twin.group.add(footing);
+  // ---- the plot's Gate as a modular kit (plan 42 section 4.3): the ring, nine chevron lamps, the ramp, the pedestal,
+  // and the iris when the gate is not open. The twin's own frame stays as the collision and exit data; its meshes step
+  // aside while the kit draws (and step back if a build fails, so the plot is never gateless).
+  let gateAccess: GateAccessMode = 'open';
+  let stargate: { readonly group: THREE.Group; readonly build: KitBuild } | null = null;
+  const gateKitOverrides: { value: Overrides | undefined } = { value: undefined };
+  const disposeStargate = (): void => {
+    if (!stargate) return;
+    twin.group.remove(stargate.group);
+    stargate.group.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (mesh.isMesh) mesh.geometry.dispose();
+    });
+    stargate = null;
+  };
+  const buildStargate = (): void => {
+    disposeStargate();
+    const built = plotStargate({
+      access: gateAccess,
+      stage: twinStage,
+      genLevel: genLevelForStage(shown, currentQuality),
+      ...(gateKitOverrides.value ? { overrides: gateKitOverrides.value } : {}),
+    });
+    if (!built) {
+      // no kit (the frames are off, or a part would not build): the twin draws itself
+      for (const c of twin.group.children) if (c !== twinOpening && c !== footing) c.visible = true;
+      return;
+    }
+    stargate = built;
+    for (const c of twin.group.children) if (c !== twinOpening && c !== footing) c.visible = false;
+    twin.group.add(built.group);
+    // the portal draws across the ring's own aperture, from its sill to its crown
+    twinOpening.position.set(0, STARGATE_RING_CENTRE_Y, 0.03);
+    twinOpening.scale.set((2 * STARGATE_APERTURE_R) / twin.opening.width, (2 * STARGATE_APERTURE_R) / twin.opening.height, 1);
+  };
   // you step out facing the goblin planet: the twin's back (-z) looks that way
   const view = new THREE.Vector2(PLANET_DIR.x, PLANET_DIR.z).normalize();
   twin.group.rotation.y = Math.atan2(-view.x, -view.y);
@@ -1284,6 +1330,7 @@ export function createPlayScene(o: {
     twin.group.position.copy(oldPos);
     twin.group.rotation.y = oldRotY;
     planetScene.add(twin.group);
+    buildStargate();
     syncPlanetMatrices();
   };
   /** Rebuilds one machine's prop (a new stage, or new kit parts), keeping how hard it runs and its pour. */
@@ -2532,6 +2579,7 @@ export function createPlayScene(o: {
       const gy = g.heightAt(0, 0);
       padTop = gy + 0.25;
       twin.group.position.set(0, gy, 0);
+      buildStargate();
       syncPlanetMatrices();
       g.update(0, 0, true);
       holo.build(g, { x: 0, z: 0 });
@@ -2763,6 +2811,21 @@ export function createPlayScene(o: {
       syncMonstersNavAndSolids(base);
       scheduleBiomeRebuild();
       scheduleCoverRebuild();
+    },
+    setPlotGate(pose) {
+      const gy = ground ? ground.heightAt(pose.x, pose.z) : pose.y;
+      padTop = gy + 0.25;
+      twin.group.position.set(pose.x, gy, pose.z);
+      twin.group.rotation.y = pose.yaw;
+      syncPlanetMatrices();
+      holo.build(ground ?? undefined as unknown as PlotGround, { x: pose.x, z: pose.z });
+      ground?.setKeepOut(keepOutZones({ gate: { x: pose.x, z: pose.z }, structures: [], pieces: [], machines: [] }));
+      monsters.setPlot(7, { x: pose.x, z: pose.z });
+    },
+    setGateAccess(access) {
+      if (access === gateAccess) return;
+      gateAccess = access;
+      buildStargate();
     },
     gateExit(dist) {
       twin.group.updateMatrixWorld(true);
@@ -3979,6 +4042,8 @@ export function createPlayScene(o: {
       stats: () => ({ triangles: renderer.info.render.triangles, calls: renderer.info.render.calls }),
       wave: () => waveRadius(),
       gatePlanet: () => ({ x: twin.group.position.x, z: twin.group.position.z }),
+      gateAccess: () => gateAccess,
+      gateKitParts: () => (stargate ? stargate.build.placed.length : 0),
       detail: () => ({ ...detail, planet: [postUniforms.uRes.value.x, postUniforms.uRes.value.y] as const, pixels: plume.stats().pixels }),
       machines: () => { let pouring = 0; for (const v of views.values()) if (v.emitter !== null) pouring++; return { standing: views.size, pouring }; },
       fabricators: () => [...fabricatorViews.values()].map((f) => {
@@ -4220,6 +4285,8 @@ export function createPlayScene(o: {
       // the plot's kit-built machines, through the two-stage AABB targeter (kit-target.ts): a machine the ray misses costs its box, not
       // its triangles, so every machine on the plot can be aimed at on the min-spec laptop
       const targetables: KitTargetable[] = [];
+      // the Gate itself is a kit: its segments, pedestal and chevron lamps take cartridges like a machine
+      if (stargate) targetables.push({ kit: 'stargate', build: stargate.build });
       for (const v of views.values()) {
         const b = kitBuildOf(v);
         if (b) targetables.push({ kit: plotKitKey(v.m), build: b });
@@ -4227,12 +4294,18 @@ export function createPlayScene(o: {
       const hit = aimKit(targetables, camera.position, dir, reach);
       return hit ? { kit: hit.kit, path: hit.path, gen: hit.gen } : null;
     },
-    setKitOverrides(kit: string, overrides: Overrides) {
-      // PLAN-42-GATE: 'gate' (and 'capacitor-bank') rebuild via the room's Gate kit.
-      if (!kit.startsWith('plot:')) return room.setKitOverrides(kit, overrides);
+    setKitOverrides(kitId: string, overrides: Overrides) {
+      // PLAN-42-GATE: the plot's own Gate kit rebuilds in place, keeping its iris state and its pose
+      if (kitId === 'stargate') {
+        gateKitOverrides.value = overrides;
+        buildStargate();
+        return stargate !== null;
+      }
+      // 'gate' (and 'capacitor-bank') rebuild via the room's Gate kit.
+      if (!kitId.startsWith('plot:')) return room.setKitOverrides(kitId, overrides);
       // kept for the machine's next build; a standing machine is rebuilt now, keeping its pour
-      plotKitOverrides.set(kit, overrides);
-      for (const [id, v] of views) if (plotKitKey(v.m) === kit) return kitBuildOf(rebuildView(id, v)) !== null;
+      plotKitOverrides.set(kitId, overrides);
+      for (const [id, v] of views) if (plotKitKey(v.m) === kitId) return kitBuildOf(rebuildView(id, v)) !== null;
       return true;
     },
     aimTree(reach: number) {

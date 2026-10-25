@@ -257,6 +257,11 @@
 .play-code-box, .play-code-input, .play-dial-code, .play-dial-input { flex: 1; padding: 8px 10px; background: rgba(0, 0, 0, .4); border: 1px solid rgba(241, 244, 245, .2); color: #f1f4f5; font-family: monospace; font-size: 12px; }
 .play-code-input:focus { border-color: var(--power); outline: none; }
 .play-dial-error { margin: 6px 0 0; font-size: 12px; color: #ff5a4a; }
+/* the random dial's six chevrons: dark until each one locks, then the gate's amber */
+.play-dial-row kbd { display: inline-block; min-width: 14px; margin-left: 3px; padding: 0 3px; border: 1px solid rgba(241, 244, 245, .22); border-radius: 2px; font-size: 11px; color: rgba(241, 244, 245, .35); }
+.play-dial-row kbd.on { border-color: #ffb03a; color: #ffd08a; background: rgba(255, 176, 58, .16); }
+/* a three-way switch (the gate's iris) reads as chosen, not as pressed */
+.play-dial-row button.on { border-color: #7cff4d; color: #d6ffc4; }
 .play-visiting-banner { margin-top: 4px; font-size: 13px; color: var(--amber); }
 .play-visiting-banner b { color: #fff; }
 

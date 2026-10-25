@@ -156,7 +156,11 @@ import { HaddyCrtPortrait } from '../shell/haddy-crt-portrait';
 import { evaluateContinentalConsensus, evaluateFinaleWindowHeal } from './planet-table-hologram';
 import { stationById } from './lab-room';
 import { PlanetaryGridScreen } from '../shell/planetary-grid';
-import { loadRecentCodes } from '../storage/recent-codes';
+import { loadRecentCodes, rememberRecentCode } from '../storage/recent-codes';
+import { GATE_ACCESS_MODES, isGateAccessMode } from '../base/world';
+import type { GateAccessMode } from '@hm/coopnet/gate-dialer';
+import { CHEVRON_LOCK_SECONDS, GATE_ARRIVAL_PAD_OFFSET_M, GATE_CHEVRON_COUNT, beginGateDial, stepGateDial } from '@hm/coopnet/gate-dialer';
+import { dialRandomPlot, dialSeed, gateDirectory, openGateCount, ownGateEntry } from './gate-directory';
 import { isBiosphereCoherent } from '@hm/questline';
 import { fidelityRules, FIDELITY_LINE_IDS } from '@hm/narrator';
 import { HudZone, CompassRibbon, FloatsPill, MachineLabel, SyncWord } from '../base/ui/hud-zones';
@@ -380,6 +384,18 @@ const CONTROLS: readonly [string, string][] = [
   ['Space', 'Jump (on foot); brake a vehicle'], ['Tab or I', 'Inventory'], ['K', 'Drafting table'],
   ['L', 'Lattice storage'], ['1 to 9', 'Hotbar slot, always (sculpt included)'], ['Esc', 'Close the open thing, then pause'],
 ];
+
+/** The iris states as the player reads them (plan 42 section 4.3: the world's three `GATE_ACCESS_MODES`). */
+const GATE_ACCESS_LABEL: Readonly<Record<GateAccessMode, string>> = {
+  open: 'Open',
+  'code-only': 'Code only',
+  closed: 'Closed (iris locked)',
+};
+const GATE_ACCESS_DOC: Readonly<Record<GateAccessMode, string>> = {
+  open: 'Your gate is listed: explorers dialing at random can land here.',
+  'code-only': 'Unlisted: only a traveller with your six-chevron code can dial in.',
+  closed: 'The iris is shut: nobody dials in, and your own outbound dialing still works.',
+};
 
 /** Where the shell sends the player in: a visit dials a plot code; a spawn puts the player in the lab or at the moon gate (TICKET-08a). */
 /** TICKET-14: a credits run on this screen, and where it started (the title's Ending Credits item, or the old monitor). */
@@ -630,6 +646,14 @@ export function PlayScreen(props: {
   const [dialOpen, setDialOpen] = useState(false);
   const [dialInput, setDialInput] = useState('');
   const [dialError, setDialError] = useState<string | null>(null);
+  /** The plot's iris state as the panel shows it (the world holds the truth; this mirrors it so the buttons re-paint). */
+  const [gateAccess, setGateAccess] = useState<GateAccessMode>('open');
+  /** The random dial's chevron lock: which chevrons are lit, and the pressed count the walk is on. */
+  const [gateDial, setGateDial] = useState<{ readonly code: string; readonly locked: number } | null>(null);
+  const [randomError, setRandomError] = useState<string | null>(null);
+  /** The plots this explorer has walked this session (the random dial prefers one it has not). */
+  const [walkedPlots, setWalkedPlots] = useState<readonly string[]>([]);
+  const gatePresses = useRef(0);
   const dialRef = useRef<((code: string) => { readonly ok: boolean; readonly why?: string }) | null>(null);
   const openDialRef = useRef<(() => void) | null>(null);
   /** Set while a menu takes the mouse: losing the pointer lock then does not pause. */
@@ -1326,6 +1350,14 @@ useEffect(() => {
         say('Queued refinement job');
       } else if (ev.type === 'collected') {
         say(`Collected ${ev.n} refined item(s)`);
+      } else if (ev.type === 'gateMoved') {
+        // plan 42: the ring, its footing, the arrival pad and the ground's keep-out all follow the world's pose
+        scene?.setPlotGate(ev.pose);
+        say('Gate moved', `The gate now stands at ${ev.pose.x.toFixed(1)}, ${ev.pose.z.toFixed(1)} with its pad ${GATE_ARRIVAL_PAD_OFFSET_M.toFixed(1)} m in front.`);
+      } else if (ev.type === 'gateAccess') {
+        scene?.setGateAccess(ev.access);
+        setGateAccess(ev.access);
+        say(GATE_ACCESS_LABEL[ev.access], GATE_ACCESS_DOC[ev.access]);
       } else if (ev.type === 'filled') {
         incrementPlacedCounter(ev.built.length);
         gameAudio.playWeld({ x: 0, y: 0, z: 0 });
@@ -1928,6 +1960,80 @@ useEffect(() => {
   }, [say]);
   dialRef.current = dial;
 
+  /** The plot's own gate id for the directory (one plot per profile). */
+  const ownPlotId = `plot:${(props.profile.name || 'player').trim().toLowerCase()}`;
+  const dialTimer = useRef<number | null>(null);
+  /** Stops the chevron lock (closing the console mid-dial leaves nothing running). */
+  const stopGateDial = useCallback(() => {
+    if (dialTimer.current !== null) {
+      window.clearInterval(dialTimer.current);
+      dialTimer.current = null;
+    }
+    setGateDial(null);
+  }, []);
+  useEffect(() => () => {
+    if (dialTimer.current !== null) window.clearInterval(dialTimer.current);
+  }, []);
+  /**
+   * Dial Random Gate (plan 42 section 4.3): `@hm/coopnet` picks an open plot that is not this one and not one just
+   * walked, the six chevrons lock at `CHEVRON_LOCK_SECONDS` each, and the gate then dials the plot code the entry stands
+   * for. All of the choosing is pure (`./gate-directory`), so a press count always gives the same plot.
+   */
+  const dialRandom = useCallback(() => {
+    const own = ownGateEntry({ plotId: ownPlotId, access: gateAccess, stage: plotRef.current.stage });
+    const pick = dialRandomPlot(gateDirectory(own), own.plotId, dialSeed(gatePresses.current, own.plotId), walkedPlots);
+    if (!pick.ok) {
+      setRandomError(pick.reason === 'no-open-gates'
+        ? 'No plot on the network is open to strangers just now.'
+        : 'That plot code would not write.');
+      return;
+    }
+    gatePresses.current += 1;
+    setRandomError(null);
+    setDialError(null);
+    let state = beginGateDial(pick.entry.addressCode);
+    setGateDial({ code: pick.entry.addressCode, locked: state.chevronsLocked });
+    if (dialTimer.current !== null) window.clearInterval(dialTimer.current);
+    let last = performance.now();
+    const arrive = (): void => {
+      if (dialTimer.current !== null) {
+        window.clearInterval(dialTimer.current);
+        dialTimer.current = null;
+      }
+      setGateDial(null);
+      const res = dial(pick.code);
+      if (!res.ok) {
+        setRandomError(res.why ?? 'That plot could not be dialed.');
+        return;
+      }
+      setWalkedPlots((prev) => (prev.includes(pick.entry.plotId) ? prev : [...prev, pick.entry.plotId]));
+      rememberRecentCode(pick.code);
+      say(`Dialed ${pick.entry.label ?? pick.entry.plotId}`, `Six chevrons locked on ${pick.entry.addressCode}.`);
+    };
+    dialTimer.current = window.setInterval(() => {
+      const now = performance.now();
+      state = stepGateDial(state, (now - last) / 1000);
+      last = now;
+      setGateDial({ code: pick.entry.addressCode, locked: state.chevronsLocked });
+      if (state.status === 'locked') arrive();
+    }, 50);
+  }, [dial, gateAccess, ownPlotId, say, walkedPlots]);
+
+  /**
+   * Moves the plot's Gate by one step (plan 42 section 4.3): `forward` walks along the gate's own facing (the way its
+   * arrival pad points), `turn` rotates it. The world's `moveGate` is the authority — it grounds the pose on the terrain
+   * and refuses anything outside the plot — so this only proposes the point.
+   */
+  const nudgeGate = useCallback((forward: number, turn: number) => {
+    const pose = baseWorldRef.current.gatePose;
+    const yaw = pose.yaw + turn;
+    const next = {
+      x: Number((pose.x + Math.sin(pose.yaw) * forward).toFixed(3)),
+      z: Number((pose.z + Math.cos(pose.yaw) * forward).toFixed(3)),
+    };
+    dispatchBase({ t: 'moveGate', at: next, yaw });
+  }, [dispatchBase]);
+
   const endVisit = useCallback(() => {
     if (!visitingRef.current) return;
     const owner = visitingRef.current.snapshot.owner;
@@ -2106,6 +2212,11 @@ useEffect(() => {
         scene.setPieces(pieceManagerRef.current.getMeshes());
         scene.setBase(baseWorldRef.current.base);
         scene.setNodes(baseWorldRef.current.field);
+        // plan 42: the plot's Gate stands where the save left it, with the iris in the state the save holds
+        scene.setPlotGate(baseWorldRef.current.gatePose);
+        scene.setGateAccess(baseWorldRef.current.gateAccess);
+        if (isGateAccessMode(baseWorldRef.current.gateAccess)) setGateAccess(baseWorldRef.current.gateAccess);
+        else setGateAccess('open');
         pieceManagerRef.current.sync(baseWorldRef.current, bEnv, false);
         scene.setWalkWorld(pieceManagerRef.current.walkWorld);
         scene.setVehicles(baseWorldRef.current.vehicles);
@@ -3646,6 +3757,10 @@ useEffect(() => {
   };
   const openDial = useCallback(() => {
     sceneRef.current?.playAction('button');
+    // the panel's iris state mirrors the world's (the world is the truth: the room, a save and a session all write it)
+    const access = baseWorldRef.current.gateAccess;
+    if (isGateAccessMode(access)) setGateAccess(access);
+    setRandomError(null);
     setDialOpen(true);
     freeMouse();
   }, [freeMouse]);
@@ -5169,7 +5284,9 @@ useEffect(() => {
             const gate = envRef.current?.gate ?? sceneRef.current?.debug.gatePlanet() ?? { x: 0, z: 0 };
             const codeRes = encodePlot(stateRef.current, gate);
             const myCode = codeRes.ok ? codeRes.code : '';
-            const close = (): void => { setDialOpen(false); lock(); };
+            // how many plots a stranger may dial at random right now (your own gate is never one of them)
+            const openNow = openGateCount(gateDirectory(ownGateEntry({ plotId: ownPlotId, access: gateAccess })));
+            const close = (): void => { stopGateDial(); setDialOpen(false); lock(); };
             return (
               <section className="play-machine play-dial-panel" aria-label="Gate Plot Dial">
                 <h3>Gate Plot Dial</h3>
@@ -5190,6 +5307,55 @@ useEffect(() => {
                       Copy
                     </button>
                   </div>
+                </div>
+
+                <div className="play-dial-section">
+                  <h4>Who can dial in</h4>
+                  <p>The iris is the lock: open lists your gate on the network, code-only answers only the code below, and closed turns visitors away (you can still dial out).</p>
+                  <div className="play-dial-row">
+                    {GATE_ACCESS_MODES.map((mode) => (
+                      <button
+                        key={mode}
+                        className={gateAccess === mode ? 'on' : ''}
+                        aria-pressed={gateAccess === mode}
+                        onClick={() => {
+                          if (mode === gateAccess) return;
+                          // the world decides (and refuses a state it already holds); its event paints the buttons
+                          dispatchBase({ t: 'setGateAccess', access: mode });
+                        }}
+                      >
+                        {GATE_ACCESS_LABEL[mode]}
+                      </button>
+                    ))}
+                  </div>
+                  {visiting ? <p className="play-why">You are standing on someone else&rsquo;s plot: this is your gate&rsquo;s lock, not theirs.</p> : null}
+                </div>
+
+                <div className="play-dial-section">
+                  <h4>Move the gate</h4>
+                  <p>Walk the ring along its own facing or turn it on the spot; the pad a traveller lands on stays in front of it.</p>
+                  <div className="play-dial-row">
+                    <button onClick={() => nudgeGate(4, 0)} aria-label="Move the gate forward 4 m">Forward 4 m</button>
+                    <button onClick={() => nudgeGate(-4, 0)} aria-label="Move the gate back 4 m">Back 4 m</button>
+                  </div>
+                  <div className="play-dial-row">
+                    <button onClick={() => nudgeGate(0, Math.PI / 4)} aria-label="Turn the gate a quarter turn left">&larr; Turn</button>
+                    <button onClick={() => nudgeGate(0, -Math.PI / 4)} aria-label="Turn the gate a quarter turn right">Turn &rarr;</button>
+                  </div>
+                </div>
+
+                <div className="play-dial-section">
+                  <h4>Dial random gate</h4>
+                  <p>
+                    Six chevrons lock, one every {CHEVRON_LOCK_SECONDS.toFixed(2)} s, onto an open plot you have not walked
+                    yet. {openNow} {openNow === 1 ? 'plot is' : 'plots are'} open to strangers from your address.
+                  </p>
+                  <div className="play-dial-row">
+                    <button className="go" disabled={gateDial !== null} onClick={dialRandom}>
+                      {gateDial ? <span>Locking <b>{gateDial.locked}/{GATE_CHEVRON_COUNT}</b> &middot; {gateDial.code.split('').map((c, i) => <kbd key={`${c}-${i}`} className={i < gateDial.locked ? 'on' : ''}>{c}</kbd>)}</span> : 'Dial Random Gate'}
+                    </button>
+                  </div>
+                  {randomError ? <p className="play-why">{randomError}</p> : null}
                 </div>
 
                 <div className="play-dial-section">

@@ -27,7 +27,7 @@ import { AudioTab, normalizeAudioLevels, type AudioLevelEntry, type AudioLevels,
 import { fileUrl, getAsset, type AssetInfo } from './studio-api';
 import { forgetLevels, loadGlbUrl } from './studio-levels';
 import { forgetThumb } from './studio-thumbs';
-import { forgetFourAngle } from './four-angle';
+import { forgetFourAngle, FourAnglePanel } from './four-angle';
 import { LookTab } from './look-tab';
 import { SceneTab } from './scene-tab';
 import { StudioErrorBoundary } from './studio-error-boundary';
@@ -138,6 +138,8 @@ export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
   const [rightTab, setRightTab] = useState<RightTab>('details');
   const [comparing, setComparing] = useState<string | null>(null);
   const [versions, setVersions] = useState<Record<string, number>>({});
+  const [stageScrub, setStageScrub] = useState<'neutral' | 's0' | 's1' | 's2' | 's3' | 's4'>('neutral');
+  const [showFourAngleView, setShowFourAngleView] = useState(false);
   /** The bench's record of the selected asset (its description, budgets): undefined while it loads, null off the dev server. */
   const [benchInfo, setBenchInfo] = useState<AssetInfo | null | undefined>(undefined);
   /** The Audio workspace: the levels as loaded, edited only in memory (no audio write route exists), and a note for Copy JSON. */
@@ -785,10 +787,19 @@ export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
                   </div>
                   <div className="sx-seg" role="group" aria-label="Detail level">
                     {(['low', 'mid', 'high', 'all'] as const).map((l) => (
-                      <button key={l} type="button" aria-pressed={level === l} onClick={() => setLevel(l)} disabled={comparing !== null}>
+                      <button key={l} type="button" aria-pressed={!showFourAngleView && level === l} onClick={() => { setShowFourAngleView(false); setLevel(l); }} disabled={comparing !== null}>
                         {l === 'all' ? 'All three' : LEVEL_LABEL[l]}
                       </button>
                     ))}
+                    <button
+                      type="button"
+                      aria-pressed={showFourAngleView}
+                      onClick={() => setShowFourAngleView((v) => !v)}
+                      disabled={!selected}
+                      title="4-Angle Review Grid (Rule 17: Front 0°, Right 90°, Back 180°, Left 270°)"
+                    >
+                      4-Angle Review
+                    </button>
                   </div>
                   <div className="sx-seg" role="group" aria-label="Surface">
                     {(['solid', 'wire', 'normals'] as const).map((o) => (
@@ -797,9 +808,53 @@ export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
                       </button>
                     ))}
                   </div>
+                  <div className="sx-seg" role="group" aria-label="Stage Shader Scrubber">
+                    {(['neutral', 's0', 's1', 's2', 's3', 's4'] as const).map((st) => (
+                      <button
+                        key={st}
+                        type="button"
+                        aria-pressed={stageScrub === st}
+                        onClick={() => setStageScrub(st)}
+                        title={`Stage Shader: ${st === 'neutral' ? 'Neutral PBR' : st.toUpperCase()}`}
+                      >
+                        {st === 'neutral' ? 'Neutral' : st.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
                   <button type="button" aria-pressed={inContext} onClick={() => setInContext((v) => !v)} disabled={!selected} title="Show the asset where the game uses it">In context</button>
                   <button type="button" onClick={() => vpRef.current?.focus()} disabled={!selected} title="Frame the selected asset (F)">Frame <kbd>F</kbd></button>
                 </div>
+
+                {showFourAngleView && selected ? (
+                  <div
+                    className="sx-four-angle-overlay"
+                    style={{
+                      position: 'absolute',
+                      inset: '48px 16px 16px 16px',
+                      zIndex: 12,
+                      background: 'rgba(8, 12, 20, 0.94)',
+                      borderRadius: '8px',
+                      padding: '16px',
+                      border: '1px solid rgba(61, 200, 255, 0.35)',
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.65)',
+                      overflowY: 'auto',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <h4 style={{ margin: 0, font: '700 13px Oxanium, monospace', color: '#3dc8ff', letterSpacing: '0.06em' }}>
+                        4-ANGLE REVIEW // {selected} (Front 0°, Right 90°, Back 180°, Left 270°)
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => setShowFourAngleView(false)}
+                        style={{ padding: '4px 10px', fontSize: '11px', cursor: 'pointer' }}
+                      >
+                        Close Grid
+                      </button>
+                    </div>
+                    <FourAnglePanel assetId={selected} version={versions[selected] ?? 0} size={300} />
+                  </div>
+                ) : null}
 
                 {loadingModels ? (
                   <div className="sx-loading" role="status">

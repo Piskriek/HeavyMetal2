@@ -216,7 +216,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime; readonly sta
   const stageOn = screen === 'goblin' || (screen === 'create' && createFor === 'race') || (screen === 'settings' && fromGoblin);
   const stageFull = stageOn && !(screen === 'settings' && !fromGoblin);
   const galaxyOn = screen === 'zoom' || screen === 'hub' || screen === 'activities' || screen === 'activity' || screen === 'islands'
-    || screen === 'avatars' || (screen === 'create' && createFor !== 'race') || (screen === 'settings' && !fromGoblin);
+    || screen === 'avatars' || (screen === 'create' && createFor !== 'race') || (screen === 'settings' && !fromGoblin) || screen === 'grid';
   const islandMounted = world !== null && (screen === 'island' || (screen === 'zoom' && session));
 
   /** Open an island as a fresh world: load its saved map, or build it from its template (a template instance has no saved map until it is edited). */
@@ -438,13 +438,13 @@ export function Shell(props: { readonly makeRuntime: () => Runtime; readonly sta
 
       {screen === 'hub' ? (
         <div className="shell-layer shell-ui" style={{ zIndex: 3 }}>
-          <DarkModal title="Community" subtitle="Presets, sounds and islands other players share." width={980} onClose={back}
+          <DarkModal title="Community Nexus" subtitle="Browse, download and share community enclave plots, terrain cartridges, blueprints and models." width={1020} onClose={back}
             headerRight={<>
               <span className="shell-credits" title="In-game credits. Never real money.">{profile.credits} cr</span>
               {session ? <button type="button" onClick={toIsland}>Back to Island</button> : null}
               <button type="button" onClick={toHome}>Home</button>
             </>}>
-            <Community profile={profile} onCredits={(d) => update((p) => ({ ...p, credits: Math.max(0, p.credits + d) }))} />
+            <Community profile={profile} onCredits={(d) => update((p) => ({ ...p, credits: Math.max(0, p.credits + d) }))} onDialCode={visitCode} />
           </DarkModal>
         </div>
       ) : null}

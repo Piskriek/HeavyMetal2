@@ -5,13 +5,13 @@
 
 ```text
 FIDELITY: The SetMix Multiverse — QA Audit Remediation (ARGO_GRAND_MASTER_REPORT.md)
-[████████████████░░░░] 80.0% Complete (4/5 Waves Done | 45 Findings)
+[████████████████████] 100.0% Complete (5/5 Waves Done | 45 Findings REMEDIATED)
 
 Wave A1: Physics & Colliders (LAB-10, GATE-04, BB-02)         [DONE]
 Wave A2: Steering & Machine Inspector (VEH-02, BB-10, BB-11)   [DONE]
 Wave A3: Stage Visual Differentiation (STAGE-01, STAGE-02)     [DONE]
 Wave B:  Global Thumbnails & Texture Swatches (THUMB-01)       [DONE]
-Wave C/D: Specs A-D (Planetary Grid, Studio Suite, Nexus)       [OPEN]
+Wave C/D: Specs A-D (Planetary Grid, Studio Suite, Nexus)       [DONE]
 ```
 <!-- ROADMAP_PROGRESS_END -->
 
@@ -144,6 +144,23 @@ Each job may list **Skills** (tags such as `frontend`, `route`, `visual-verify`)
 3. Added live 64x64 swatch thumbnail of active cartridge and 3D preview to the Beam Rifle HUD chip, with `[R]` and `[Alt+Wheel]` cycling (`BEAM-01`).
 4. Decoupled Sculpt mode sub-tool cycling (`KeyR`, `Alt+Wheel`) from hotbar numeric keys 1–9 (`BEAM-02`).
 5. All 14 unit tests pass with zero type errors.
+
+## JOB-QA-05 [DONE] Wave C/D: Specs A-D (MENU-01, MENU-02, STUDIO-01, DEC-09, UI-02)
+- **Role:** ARCHITECT
+- **Skills:** `frontend`, `ui`, `shaders`
+- **Priority:** P0
+- **Milestone:** QA-W3
+- **Paths:** `apps/web/src/shell/planetary-grid.tsx, apps/web/src/shell/community.tsx, apps/web/src/shell/controls-list.tsx, apps/web/src/shell/settings-body.tsx, apps/web/src/studio/studio-app.tsx`
+- **Verify:** `npm run typecheck && node --import tsx --test apps/web/src/shell/planetary-grid.test.ts packages/ui/tests/thumbnails.test.ts apps/web/src/play/beam-tool.test.ts`
+- **Assigned:** `ARCHITECT@antigravity`
+- **Updated:** 2026-10-25 21:05
+
+1. **Spec A / MENU-01**: Connected 3D galaxy backdrop behind Planetary Grid (`screen === 'grid'`), wired HUD sync pill to open the Planetary Grid modal directly in-game, and elevated `planetary-grid.tsx` into canonical 3-column architecture with 3-tab Enclave Navigator (`My Enclaves`, `Shared & Friends`, `Directory`), interactive 40,000 km Shared Planet Hologram with 11 neighbor domes, consensus gauge, and `[DEPLOY TO ENCLAVE ->]`.
+2. **Spec D / MENU-02**: Replaced legacy prototype screen in `community.tsx` and `community.css` with dark-glassmorphic **FIDELITY Community Nexus** featuring 4 canon tabs (`Enclave Branches`, `Cartridges (.smx)`, `Outpost Blueprints`, `Workshop & Monsters`).
+3. **Spec D / SETTINGS-01 & DEC-09**: Added Camera Shake Trauma setting (0–100%, default 35% Subtle) to `settings-body.tsx` and `types.ts`.
+4. **UI-02**: Restructured `controls-list.tsx` into categorized multi-column keycap cards with visual `<kbd>` badges.
+5. **Spec C / STUDIO-01**: Added live Stage 0–4 Shader Scrubber (`[Neutral] | [S0] | [S1] | [S2] | [S3] | [S4]`) and `[4-Angle Review]` toggle with overlay grid into `studio-app.tsx`.
+6. Verified 0 type errors across monorepo and 16/16 unit tests passing.
 
 ## ═══════════════════════════════════════════════════════════════════════════
 

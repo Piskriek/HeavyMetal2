@@ -151,6 +151,30 @@ export function SettingsBody(props: {
         <label className="row">Island style <select value={profile.style} onChange={(e) => update((p) => ({ ...p, style: e.target.value as 'voxel' | 'painted' }))}><option value="voxel">Voxel (blocks that match the avatars)</option><option value="painted">Painted (the full ground)</option></select></label>
         <label className="row">Detail <select value={profile.skin} onChange={(e) => update((p) => ({ ...p, skin: e.target.value as 'flat' | 'pbr' }))}><option value="flat">Flat (plain colours, lighter)</option><option value="pbr">PBR (bumps, shine and height detail)</option></select></label>
         <label className="row"><input type="checkbox" checked={play.reducedMotion} onChange={(e) => setPlaySettings({ reducedMotion: e.target.checked })} /> Less motion (no camera swoops or bouncing menus)</label>
+        <label className="row slider" data-ui="settings.cameraShake">
+          Camera shake trauma
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={Math.round((play.cameraShake ?? 0.35) * 100)}
+            aria-label="Camera shake trauma"
+            onChange={(e) => setPlaySettings({ cameraShake: Number(e.target.value) / 100 })}
+          />
+          <output>
+            {Math.round((play.cameraShake ?? 0.35) * 100)}% (
+            {(play.cameraShake ?? 0.35) < 0.2
+              ? 'Off'
+              : (play.cameraShake ?? 0.35) <= 0.45
+              ? 'Subtle'
+              : (play.cameraShake ?? 0.35) <= 0.75
+              ? 'Standard'
+              : 'Intense'}
+            )
+          </output>
+        </label>
+        <p className="hint">Trauma shake intensity applied during weapon firing, rover driving over rough regolith, and explosions (DEC-09 default: 35% Subtle).</p>
         {props.onManageProfiles ? (
           <div className="row">
             <span>Profiles</span>

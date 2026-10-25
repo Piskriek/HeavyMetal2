@@ -4896,22 +4896,21 @@ useEffect(() => {
             </span>
           ) : (
             <>
-              <span className={`sync-badge ${syncMode}`}>
+              <span
+                className={`sync-badge ${syncMode}`}
+                onClick={() => setPlanetTableOpen(true)}
+                title="Click to open Planetary Grid Enclave & Co-Op Management"
+                style={{ cursor: 'pointer' }}
+              >
                 <span className="sync-pulse" />
                 {syncMode === 'synced' ? 'GRID SYNCED' : 'SOLO DESYNCED'}
               </span>
               <button
                 className="sync-branch-toggle"
-                onClick={() => {
-                  const next = syncMode === 'synced' ? 'desynced' : 'synced';
-                  setSyncMode(next);
-                  say(
-                    next === 'synced' ? 'Synced with Planetary Grid' : 'Desynced to Solo Branch',
-                    next === 'synced' ? 'Majority consensus active on Sector 4.' : 'Playing solo offline.',
-                  );
-                }}
+                onClick={() => setPlanetTableOpen(true)}
+                title="Manage Planetary Grid and Enclave Co-Op"
               >
-                {syncMode === 'synced' ? 'Desync' : 'Sync'}
+                {syncMode === 'synced' ? 'Manage' : 'Sync'}
               </button>
             </>
           )}

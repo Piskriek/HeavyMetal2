@@ -1,9 +1,14 @@
+// ============================================================================
+// File: apps/web/src/shell/controls-list.tsx
+// UI-02 (DEC-10): Categorized multi-column visual keycap grid for Settings and Controls.
+// ============================================================================
+
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { defineSchema, type Params } from '@hm/contracts';
 import { Inspector } from '@hm/ui';
 import { DEFAULT_CONTROLS, normalizeControls, type Controls } from './profile';
 
-/** The mouse and view settings as a preset: the same sliders as everywhere (they grow when pushed, with a number box). */
+/** The mouse and view settings as a preset. */
 const CONTROLS_SCHEMA = defineSchema({
   kind: 'controls', version: 1, label: 'Controls', doc: 'How the mouse and the view feel.', slots: [],
   variables: [
@@ -23,31 +28,58 @@ export function ControlsSettings(props: { readonly value: Controls; readonly onC
   );
 }
 
-/**
- * Controls live here, in Settings, not on the screen: the screen only says what the tool in your hand does.
- * The mouse line is a live check of whether this browser lets the game capture the mouse (it never changes anything).
- */
-const ROWS: readonly (readonly [string, string])[] = [
-  ['Look around', 'Move the mouse (click the world first to capture it)'],
-  ['Walk', 'W A S D or the arrow keys'],
-  ['Run', 'Hold Shift'],
-  ['Jump', 'Space'],
-  ['First person or over the shoulder', 'V, or the 1st and 3rd buttons top right'],
-  ['The hotbar tabs', 'F1 to F12 (F11 and F12 also on Shift+F1 and Shift+F2: the browser keeps those keys)'],
-  ['Game, Simplified or Advanced', 'The backtick key, or the switch at the end of the hotbar'],
-  ['Pick a slot', '1 to 9, or the mouse wheel'],
-  ['Use what you hold', 'Left mouse button'],
-  ['The opposite (dig, wipe, take away)', 'Right mouse button'],
-  ['Free the mouse for sliders and presets while you walk', 'Tab (Tab again, or a click in the world, takes it back)'],
-  ['Find a tool', '/ (type a name, Enter takes you there)'],
-  ['Make the tool in hand bigger or smaller', '[ and ]'],
-  ['The gizmo (Simplified and Advanced)', '+ and - size it, Shift snaps moves, Ctrl snaps turns, Alt leaves a copy'],
-  ['Your avatar', 'The My avatar button top right, or My avatar in the Esc menu'],
-  ['Studio: fly without your goblin', 'B, or the Studio button; fly with W A S D, Space up, C down, hold the right button to look'],
-  ['Focus on a thing, hide the others', 'F and H (or the Focus and Hide others tools)'],
-  ['Flat or PBR ground', 'The Flat and PBR buttons top right'],
-  ['Undo, redo', 'Ctrl+Z, Ctrl+Y'],
-  ['Close one thing, then the menu', 'Esc'],
+interface KeycapControl {
+  readonly action: string;
+  readonly keys: readonly string[];
+  readonly note?: string;
+}
+
+interface ControlGroup {
+  readonly category: string;
+  readonly items: readonly KeycapControl[];
+}
+
+const CATEGORIZED_CONTROLS: readonly ControlGroup[] = [
+  {
+    category: 'Locomotion & Vehicle',
+    items: [
+      { action: 'Move / Steer', keys: ['W', 'A', 'S', 'D'] },
+      { action: 'Sprint / Boost', keys: ['Shift'] },
+      { action: 'Jump / Mantle', keys: ['Space'] },
+      { action: 'Camera 1P / 3P', keys: ['V'] },
+      { action: 'Interact / Enter Rover', keys: ['E'] },
+    ],
+  },
+  {
+    category: 'Beam Rifle & Tools',
+    items: [
+      { action: 'Fire Beam / Harvest', keys: ['LMB'] },
+      { action: 'Cycle Mode (Extract/Apply/Sculpt)', keys: ['Q'] },
+      { action: 'Cycle Cartridge / Tool', keys: ['R'], note: 'or Alt + Wheel' },
+      { action: 'Bandolier / Inventory', keys: ['Tab'] },
+      { action: 'Holster Sidearm', keys: ['G'] },
+    ],
+  },
+  {
+    category: 'Base Construction',
+    items: [
+      { action: 'Open Build Menu', keys: ['B'] },
+      { action: 'Radial Quick Picker', keys: ['X'] },
+      { action: 'Rotate Placed Piece', keys: ['R'] },
+      { action: 'Place Another Piece', keys: ['LMB'], note: 'Continuous build' },
+      { action: 'Exit Build Mode', keys: ['Esc'], note: 'or RMB' },
+    ],
+  },
+  {
+    category: 'Hotbar & System',
+    items: [
+      { action: 'Hotbar Selection', keys: ['1', '…', '9'] },
+      { action: 'Planetary Grid / Consensus', keys: ['P'], note: 'or HUD pill' },
+      { action: 'Close Window / Cancel', keys: ['Esc'] },
+      { action: 'Toggle HUD Telemetry', keys: ['F1'] },
+      { action: 'Undo / Redo', keys: ['Ctrl', 'Z'] },
+    ],
+  },
 ];
 
 type Capture = { readonly supported: boolean; readonly on: boolean };
@@ -64,14 +96,89 @@ export function ControlsList(): ReactElement {
     document.addEventListener('pointerlockchange', on);
     return () => document.removeEventListener('pointerlockchange', on);
   }, []);
+
   return (
-    <section className="controls-list" aria-label="Controls">
-      <h4>Controls</h4>
-      <dl>
-        {ROWS.map(([what, how]) => <div key={what}><dt>{what}</dt><dd>{how}</dd></div>)}
-      </dl>
-      <p className="hint" role="status">
-        Mouse capture: {cap.supported ? (cap.on ? 'on, the mouse is captured right now' : 'available, click the world to capture it') : 'not available in this browser, so the game aims at the middle of the screen and you look with the right mouse button held'}.
+    <section className="controls-list" aria-label="Controls Keymap">
+      <h4>Categorized Keybindings</h4>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: '16px',
+          marginTop: '10px',
+        }}
+      >
+        {CATEGORIZED_CONTROLS.map((grp) => (
+          <div
+            key={grp.category}
+            style={{
+              background: 'rgba(8, 14, 24, 0.65)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '8px',
+              padding: '12px 14px',
+            }}
+          >
+            <h5
+              style={{
+                margin: '0 0 10px 0',
+                font: '600 12px/1 Oxanium, monospace',
+                color: '#3dc8ff',
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {grp.category}
+            </h5>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {grp.items.map((it) => (
+                <div
+                  key={it.action}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '10px',
+                    fontSize: '12px',
+                    color: '#e2e8f0',
+                  }}
+                >
+                  <span>{it.action}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {it.keys.map((k) => (
+                      <kbd
+                        key={k}
+                        style={{
+                          background: 'rgba(15, 23, 42, 0.9)',
+                          border: '1px solid rgba(255, 255, 255, 0.25)',
+                          borderRadius: '4px',
+                          padding: '2px 6px',
+                          font: '600 11px/1 Oxanium, monospace',
+                          color: '#f8fafc',
+                          boxShadow: '0 2px 0 rgba(0, 0, 0, 0.5)',
+                        }}
+                      >
+                        {k}
+                      </kbd>
+                    ))}
+                    {it.note ? (
+                      <span style={{ fontSize: '10px', color: '#94a3b8', marginLeft: '2px' }}>
+                        {it.note}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="hint" role="status" style={{ marginTop: '12px' }}>
+        Mouse capture:{' '}
+        {cap.supported
+          ? cap.on
+            ? 'Active (click world to refocus).'
+            : 'Available (click world to capture pointer).'
+          : 'Not supported in this browser environment.'}
       </p>
     </section>
   );

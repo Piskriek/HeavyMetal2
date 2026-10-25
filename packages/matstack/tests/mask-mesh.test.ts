@@ -1,6 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { curvatureMasks, edgeLines, lineDistance, maskAttributes, segmentDistance, EDGE_BAND, EDGE_LINES, FAR, type MaskMesh, type MaskMeshInput } from '../src/index';
+import {
+  curvatureMasks,
+  edgeCandidateKey,
+  edgeLines,
+  edgeWearScale,
+  edgeWearTier,
+  lineDistance,
+  maskAttributes,
+  segmentDistance,
+  EDGE_BAND,
+  EDGE_LINES,
+  FAR,
+  type MaskMesh,
+  type MaskMeshInput,
+} from '../src/index';
 
 type V3 = [number, number, number];
 
@@ -355,4 +369,84 @@ test('a subdivided quad keeps all four of its sides: half-segments of one side s
     if (value >= 0 && value < FAR - 1) midDistance = Math.min(midDistance, value);
   }
   assert.ok(Math.abs(midDistance) < 1e-6, `the split side's joint reads ${midDistance}`);
+});
+
+// ---- Plan 42 / Argon directive 1: a shallow fold must not take the wear from a silhouette.
+// A ring is the case: nine segments around an aperture give every front-face triangle 40-degree radial seams of its own, and the
+// annulus must keep the convex edge wear its chamfers and rims carry (metal at the edge), not spend its band on the tessellation.
+
+/** Two coplanar halves folded against each other by `deg` about the line y = 0 (z = 0), with a probe vertex inside one half. */
+function foldedPair(deg: number): { mesh: MaskMeshInput; probe: readonly [number, number, number] } {
+  const t = (deg * Math.PI) / 180;
+  const pos: number[] = [], idx: number[] = [];
+  const vertex = (x: number, y: number, z: number): number => pos.push(x, y, z) / 3 - 1;
+  // upper half in the z = 0 plane, centre vertex 1.5 cm from the fold line and 2.5 cm from the far border
+  const c = vertex(0.05, 0.015, 0);
+  const a0 = vertex(0, 0, 0), a1 = vertex(0.1, 0, 0), a2 = vertex(0.1, 0.04, 0), a3 = vertex(0, 0.04, 0);
+  idx.push(a0, a1, c, a1, a2, c, a2, a3, c, a3, a0, c);
+  // lower half folded by `deg`
+  const b2 = vertex(0.1, -0.04 * Math.cos(t), -0.04 * Math.sin(t));
+  const b3 = vertex(0, -0.04 * Math.cos(t), -0.04 * Math.sin(t));
+  idx.push(a1, a0, b3, a1, b3, b2);
+  return { mesh: { positions: new Float32Array(pos), indices: new Uint32Array(idx) }, probe: [0.05, 0.015, 0] };
+}
+
+/** The distances a point reads in its four slots (metres), ignoring unused slots; the mask mesh gives every corner its own vertex. */
+function slots(mesh: MaskMesh, probe: readonly [number, number, number]): number[] {
+  const out: number[] = [];
+  for (let v = 0; v < mesh.positions.length / 3; v += 1) {
+    const at = v * 3;
+    if (Math.abs(mesh.positions[at]! - probe[0]) > 1e-9) continue;
+    if (Math.abs(mesh.positions[at + 1]! - probe[1]) > 1e-9) continue;
+    if (Math.abs(mesh.positions[at + 2]! - probe[2]) > 1e-9) continue;
+    for (let k = 0; k < EDGE_LINES; k += 1) {
+      const d = mesh.edge[v * EDGE_LINES + k]!;
+      if (d >= 0 && d < FAR - 1) out.push(d);
+    }
+  }
+  assert.ok(out.length > 0, 'the probe point is not a vertex of the mask mesh');
+  return out.sort((x, y) => x - y);
+}
+
+test('a 40-degree seam wears at 1.6x its distance, a right-angle chamfer at exactly its distance', () => {
+  // the probe vertex sits 1.5 cm from the fold in both meshes: the geometric distance is 0.015
+  const seam = edgeLines(foldedPair(40).mesh);
+  const chamfer = edgeLines(foldedPair(90).mesh);
+  const seamSlots = slots(seam, foldedPair(40).probe);
+  const chamferSlots = slots(chamfer, foldedPair(90).probe);
+  // 1 + 0.5 * (1 / (40/90) - 1) = 1.625: a tessellation seam's bead is 62% as wide as a right angle's
+  const scaled = 0.015 * edgeWearScale((40 * Math.PI) / 180);
+  assert.ok(
+    seamSlots.some((d) => Math.abs(d - scaled) < 1e-6),
+    `the seam reads ${seamSlots.map((d) => d.toFixed(4)).join(', ')} — expected a slot at ${scaled.toFixed(4)}`,
+  );
+  assert.ok(!seamSlots.some((d) => Math.abs(d - 0.015) < 1e-6), 'the shallow seam must not wear at its raw distance');
+  // a right angle and beyond keep the whole band: the annulus' silhouette wear is untouched
+  assert.ok(chamferSlots.some((d) => Math.abs(d - 0.015) < 1e-6), `the chamfer reads ${chamferSlots.map((d) => d.toFixed(4)).join(', ')}`);
+  // and the old order is one option away, so a caller can ask for raw distances
+  const raw = slots(edgeLines(foldedPair(40).mesh, { foldBias: 0 }), foldedPair(40).probe);
+  assert.ok(raw.some((d) => Math.abs(d - 0.015) < 1e-6), `foldBias 0 should read the raw 0.015, got ${raw.join(', ')}`);
+});
+
+test('the wear scale and the slot tier are monotone in the fold, and both go quiet at bias 0', () => {
+  const deg = (d: number): number => (d * Math.PI) / 180;
+  assert.equal(edgeWearScale(deg(90)), 1);
+  assert.equal(edgeWearScale(deg(120)), 1, 'a fold sharper than a right angle gains nothing more');
+  assert.ok(edgeWearScale(deg(60)) > edgeWearScale(deg(70)));
+  assert.ok(edgeWearScale(deg(40)) > edgeWearScale(deg(60)));
+  assert.ok(edgeWearScale(deg(20)) > edgeWearScale(deg(40)));
+  assert.ok(Math.abs(edgeWearScale(deg(45)) - 1.5) < 1e-12, '45 degrees wears at 1.5x its distance');
+  for (const d of [10, 20, 40, 60, 90]) {
+    assert.equal(edgeWearScale(deg(d), 0), 1, `bias 0 must keep raw distances at ${d} degrees`);
+    assert.equal(edgeWearTier(deg(d), 0), 0, 'bias 0 is one flat tier: plain nearest-first order');
+  }
+  // the tier puts a silhouette ahead of any seam, however near the seam is
+  assert.equal(edgeWearTier(deg(90)), 0);
+  assert.equal(edgeWearTier(deg(40)), 1);
+  assert.ok(
+    edgeCandidateKey(0.04, deg(90)) < edgeCandidateKey(0.005, deg(40)),
+    'a silhouette 4 cm away must outrank a seam 5 mm away',
+  );
+  // but two silhouettes still order by distance, so the nearest chamfer wins
+  assert.ok(edgeCandidateKey(0.01, deg(90)) < edgeCandidateKey(0.02, deg(90)));
 });

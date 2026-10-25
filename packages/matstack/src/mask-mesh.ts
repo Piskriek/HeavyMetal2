@@ -17,6 +17,11 @@
  *    vertex's sharpest bend becomes a distance-like value in the first slot, a rounded edge of radius `band` reading as
  *    on the edge.
  *
+ * The four slots are scarce on anything curved, so they are ranked by wear, not only by distance: a silhouette edge (a
+ * right-angle fold, a chamfer) outranks a shallow radial tessellation seam that happens to be a little closer. The rank
+ * is `distance / sharpness` in effect (see `edgeWearRank`), so a nine-sided ring keeps its convex edge wear instead of
+ * spending all four lines on its own facets. `foldBias: 0` restores plain nearest-first order.
+ *
  * Pure and deterministic. Any indexed triangle mesh works; normals and UVs are carried over.
  */
 import { EDGE_BAND } from './constants';
@@ -56,6 +61,11 @@ export interface MaskMeshOptions {
   readonly band?: number;
   /** Faces meeting at more than this many degrees make a sharp edge (default 30). */
   readonly sharpDeg?: number;
+  /**
+   * How hard a shallow fold is discounted against a silhouette when the four slots are scarce. 0 restores plain
+   * nearest-first order; the default (`EDGE_FOLD_BIAS`) keeps right-angle folds ahead of tessellation seams.
+   */
+  readonly foldBias?: number;
 }
 
 const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -111,12 +121,61 @@ export function maskAttributes(m: MaskMeshInput, o: MaskMeshOptions = {}): MaskM
 
 // ------------------------------------------------------------------ edge lines
 
+/** The default fold bias: at 40 degrees a seam competes at 1.6x its distance, at 20 degrees at 2.75x, at 90 degrees at 1x. */
+export const EDGE_FOLD_BIAS = 0.5;
+/** From this fold (degrees) on, an edge is a silhouette: a chamfer, a rim, the outside of a ring — never a tessellation seam. */
+export const SILHOUETTE_DEG = 60;
+const HALF_PI = Math.PI / 2;
+const SILHOUETTE_RAD = (SILHOUETTE_DEG * Math.PI) / 180;
+
+/**
+ * The tier an edge competes in: 0 for a silhouette (a chamfer, a rim, anything folded `SILHOUETTE_DEG` or sharper), 1 for
+ * a shallow fold (a radial tessellation seam, a panel joint on a curved surface). With `bias` 0 every edge is tier 0, which
+ * is the old nearest-first order.
+ *
+ * A ring is the case this exists for: nine segments around an aperture give every front-face triangle three 40-degree
+ * seams of its own, and with four line slots a distance-only order spends them all there — so the annulus loses the convex
+ * edge wear that makes metal read as metal. A silhouette is put ahead of any seam, however near the seam is.
+ */
+export function edgeWearTier(foldRad: number, bias: number = EDGE_FOLD_BIAS): 0 | 1 {
+  return bias > 0 && foldRad < SILHOUETTE_RAD ? 1 : 0;
+}
+
+/**
+ * How much wider the wear band of an edge is than a shallow fold's: 1 at a right angle and beyond, `1 + bias` at 45
+ * degrees, and unbounded as the fold flattens (a tessellation seam catches almost nothing).
+ *
+ * The bead of a chamfer is what wears, not the whole panel joint, so a shallow fold's distance is stored *grown* — the
+ * attribute is a distance in metres the mask compares against its band width, so growing it narrows the band. That is what
+ * keeps a curved ring's silhouette wearing as metal while its radial seams stay quiet.
+ */
+export function edgeWearScale(foldRad: number, bias: number = EDGE_FOLD_BIAS): number {
+  if (!(bias > 0) || !(foldRad > 0)) return 1;
+  const sharpness = Math.min(1, foldRad / HALF_PI);
+  return 1 + bias * (1 / sharpness - 1);
+}
+
+/**
+ * The wear rank of an edge: the distance it competes at, given how sharply the faces fold there (its distance grown by
+ * `edgeWearScale`). Monotonic in the distance for any fold, so the nearest edge still wins when the folds are alike.
+ */
+export function edgeWearRank(distance: number, foldRad: number, bias: number = EDGE_FOLD_BIAS): number {
+  return distance * edgeWearScale(foldRad, bias);
+}
+
+/** The sort key of a candidate edge: tier first, then wear rank, then the plain distance (a stable, total order). */
+export function edgeCandidateKey(distance: number, foldRad: number, bias: number = EDGE_FOLD_BIAS): number {
+  return edgeWearTier(foldRad, bias) * 1e6 + edgeWearRank(distance, foldRad, bias);
+}
+
 interface SharpEdge {
   readonly a: V3;
   readonly b: V3;
   /** The owning triangle's in-plane unit direction from the edge into the triangle. */
   readonly inward: V3;
   readonly concave: boolean;
+  /** How sharply the faces fold here, in radians: the smallest angle between the owners' normals (a border reads as 90). */
+  readonly fold: number;
 }
 
 /** A sharp edge with the triangle that owns it and its box grown by the band. */
@@ -134,6 +193,7 @@ interface Sharp extends SharpEdge {
 export function edgeLines(m: MaskMeshInput, o: MaskMeshOptions = {}): MaskMesh {
   const band = o.band ?? EDGE_BAND;
   const cosSharp = Math.cos(((o.sharpDeg ?? 30) * Math.PI) / 180);
+  const foldBias = o.foldBias ?? EDGE_FOLD_BIAS;
   const slots = slotsOf(m);
   const X = m.positions;
   // triangles: their corners, slot and unit face normal (zero-area ones draw nothing and are dropped)
@@ -196,12 +256,14 @@ export function edgeLines(m: MaskMeshInput, o: MaskMeshOptions = {}): MaskMesh {
       const a: V3 = [X[ia * 3]!, X[ia * 3 + 1]!, X[ia * 3 + 2]!], b: V3 = [X[ib * 3]!, X[ib * 3 + 1]!, X[ib * 3 + 2]!];
       const others = byEdge.get(edgeKey(ia, ib))!;
       let sharp = others.length === 1, concave = false; // an open border wears like an edge
+      let sharpest = 2; // the fold: the smallest normal dot among the faces meeting here (2 = a border, no sharp neighbour)
       for (const u of others) {
         if (u === t) continue;
         const d = ndot(t, u);
         if (d >= COPLANAR) parent[find(t)] = find(u);
         if (d >= cosSharp) continue;
         sharp = true;
+        if (d < sharpest) sharpest = d;
         // the neighbour's far corner in front of this face: the faces fold up into a valley
         let far = triSrc[u * 3]!;
         for (let k = 0; k < 3; k++) {
@@ -215,7 +277,7 @@ export function edgeLines(m: MaskMeshInput, o: MaskMeshOptions = {}): MaskMesh {
       if (dot(inward, [X[io * 3]! - a[0], X[io * 3 + 1]! - a[1], X[io * 3 + 2]! - a[2]]) < 0) inward = scale(inward, -1);
       own[t]!.push(sharps.length);
       sharps.push({
-        a, b, inward, concave, owner: t,
+        a, b, inward, concave, owner: t, fold: sharpest > 1.5 ? HALF_PI : Math.acos(Math.max(-1, Math.min(1, sharpest))),
         lo: [Math.min(a[0], b[0]) - band, Math.min(a[1], b[1]) - band, Math.min(a[2], b[2]) - band],
         hi: [Math.max(a[0], b[0]) + band, Math.max(a[1], b[1]) + band, Math.max(a[2], b[2]) + band],
       });
@@ -269,7 +331,7 @@ export function edgeLines(m: MaskMeshInput, o: MaskMeshOptions = {}): MaskMesh {
       for (let k = 0; k < 7; k++) d = Math.min(d, segDist(cx[k]!, cy[k]!, cz[k]!, e));
       return d;
     };
-    const near: { readonly e: Sharp; readonly d: number }[] = [];
+    const near: { readonly e: Sharp; readonly d: number; readonly key: number }[] = [];
     for (const i of groupEdges.get(find(t)) ?? []) {
       const e = sharps[i]!;
       if (e.owner === t) continue;
@@ -283,11 +345,17 @@ export function edgeLines(m: MaskMeshInput, o: MaskMeshOptions = {}): MaskMesh {
       const along = ((cx[6]! - e.a[0]) * dx + (cy[6]! - e.a[1]) * dy + (cz[6]! - e.a[2]) * dz) / L;
       if (along < -band || along > L + band) continue;
       const d = reach(e);
-      if (d < band) near.push({ e, d });
+      if (d < band) near.push({ e, d, key: edgeCandidateKey(d, e.fold, foldBias) });
     }
-    near.sort((x, y) => x.d - y.d);
+    // the triangle's own edges sit at distance 0, but a shallow seam of its own still ranks below a silhouette nearby
+    for (const i of own[t]!) {
+      const e = sharps[i]!;
+      near.push({ e, d: 0, key: edgeCandidateKey(0, e.fold, foldBias) });
+    }
+    // silhouette first, then distance: a shallow seam a little nearer must not take the slot from a chamfer (plan 42 ring)
+    near.sort((x, y) => x.key - y.key || x.d - y.d);
     const convex: Sharp[] = [], concave: Sharp[] = [];
-    for (const e of [...own[t]!.map((i) => sharps[i]!), ...near.map((r) => r.e)]) {
+    for (const { e } of near) {
       const list = e.concave ? concave : convex;
       // a face split along a straight side owns that side in pieces: the pieces are one line, and spending two slots on it
       // would crowd out another side of a notched face (rule 8a, 22 Oct review). Keep the first piece, skip its twins.
@@ -303,8 +371,16 @@ export function edgeLines(m: MaskMeshInput, o: MaskMeshOptions = {}): MaskMesh {
       nor[vi * 3 + 1] = N ? N[s * 3 + 1]! : triN[t * 3 + 1]!;
       nor[vi * 3 + 2] = N ? N[s * 3 + 2]! : triN[t * 3 + 2]!;
       if (m.uvs) { uv[vi * 2] = m.uvs[s * 2]!; uv[vi * 2 + 1] = m.uvs[s * 2 + 1]!; }
-      for (let k = 0; k < convex.length; k++) edge[vi * EDGE_LINES + k] = Math.max(0, signed(px, py, pz, convex[k]!));
-      for (let k = 0; k < concave.length; k++) cavity[vi * EDGE_LINES + k] = Math.max(0, signed(px, py, pz, concave[k]!));
+      // the stored value is the distance grown by the fold's wear scale, so a shallow seam reads as a narrow bead and a
+      // silhouette as a full band (plan 42: the ring keeps its convex edge wear, its tessellation does not)
+      for (let k = 0; k < convex.length; k++) {
+        const e = convex[k]!;
+        edge[vi * EDGE_LINES + k] = Math.max(0, signed(px, py, pz, e)) * edgeWearScale(e.fold, foldBias);
+      }
+      for (let k = 0; k < concave.length; k++) {
+        const e = concave[k]!;
+        cavity[vi * EDGE_LINES + k] = Math.max(0, signed(px, py, pz, e)) * edgeWearScale(e.fold, foldBias);
+      }
       idxBySlot[triSlot[t]!]!.push(vi);
     }
   }

@@ -735,21 +735,3 @@ export function disposeProp(p: MachineProp): void {
     if (p.lamps.includes(mesh)) (mesh.material as THREE.Material).dispose();
   });
 }
-
-/**
- * POL-282 (ARGO_NOTE_17 Ruling #2): Per-machine plume gravity (m/s^2).
- */
-export const MACHINE_PLUME_GRAVITY: Readonly<Record<MachineKind | 'fabricator', number>> = Object.freeze({
-  drill: -3.6,
-  pylon: -4.8,
-  press: -0.65,
-  'heavy-press': -0.75,
-  mill: 0.35,
-  'heavy-mill': 0.42,
-  water: 0.55,
-  'heavy-water': 0.65,
-  projector: 0.70,
-  'heavy-projector': 0.75,
-  power: 0.40,
-  fabricator: 0.30,
-});

@@ -4,7 +4,6 @@
  * generated models, respecting plot stage (1-2 low, 3-4 mid, 5-6 high) and Graphics tier.
  */
 import * as THREE from 'three';
-import * as lab from '@hm/labkit';
 import {
   type GenLevel,
   loadGen,
@@ -22,13 +21,8 @@ import {
   crawler as fallbackCrawler,
   fabricator as fallbackFabricator,
 } from '@hm/rovergear';
-import { MODULAR_SCOUT_SOCKETS, snapAerialToShellY, SCOUT_REAR_SOCKETS, HAULER_REAR_SOCKETS, type MachineKind } from '@hm/plotsim';
-import {
-  type MachineProp,
-  RING_TOP_Y,
-  findMachineVent,
-  machineProp as fallbackMachineProp,
-} from '../play/machine-props';
+import { MODULAR_SCOUT_SOCKETS, snapAerialToShellY, SCOUT_REAR_SOCKETS, HAULER_REAR_SOCKETS } from '@hm/plotsim';
+import { RING_TOP_Y } from '../play/machine-props';
 import type { Box, Socket, KitPieceResult } from '../base/kit-pieces';
 import { latticeGenAssets } from '../base/lattice-gen';
 import { kitFabricator } from '../play/plot-kits';
@@ -527,120 +521,6 @@ export function createGenFabricator(
     lamps,
     parts: { head: headGen },
   };
-}
-
-// ---------------------------------------------------------------------------
-// MACHINES ON HARDPOINTS
-// ---------------------------------------------------------------------------
-
-export function createGenMachineProp(
-  kind: MachineKind,
-  level: GenLevel = 'low',
-  stage: number = 6,
-  materials?: lab.LabMaterials
-): MachineProp {
-  const m = materials ?? lab.createMaterials();
-  const still = (): void => undefined;
-  const lift = new THREE.Vector3(0, RING_TOP_Y, 0);
-
-  switch (kind) {
-    case 'mill':
-    case 'heavy-mill': {
-      const gen = getGenSync('mill', level);
-      if (!gen) return fallbackMachineProp(m, kind, stage);
-      const group = new THREE.Group();
-      group.name = `gen-${kind}`;
-      gen.position.copy(lift);
-      group.add(gen);
-      const vent = findMachineVent(gen, RING_TOP_Y, 0, 0);
-      const power = new THREE.Vector3(0, RING_TOP_Y + 0.2, -1.8);
-      return {
-        group,
-        power,
-        vent,
-        top: null,
-        lamps: [],
-        animate: still,
-        light: still,
-      };
-    }
-    case 'press':
-    case 'heavy-press': {
-      const frame = getGenSync('press-frame', level);
-      const ram1 = getGenSync('press-ram', level);
-      const ram2 = getGenSync('press-ram', level);
-      if (!frame || !ram1 || !ram2) return fallbackMachineProp(m, kind, stage);
-      const group = new THREE.Group();
-      group.name = `gen-${kind}`;
-      frame.position.copy(lift);
-      group.add(frame);
-      const restY = RING_TOP_Y + 2.1;
-      ram1.position.set(-0.55, restY, 0);
-      ram2.position.set(0.55, restY, 0);
-      group.add(ram1, ram2);
-      const vent = findMachineVent(group, RING_TOP_Y, 0, 0);
-      const power = new THREE.Vector3(0, RING_TOP_Y + 0.2, 0.8);
-      return {
-        group,
-        power,
-        vent,
-        top: null,
-        lamps: [],
-        animate: (t, run) => {
-          ram1.position.y = restY - Math.max(0, Math.sin(t * 3.1)) * 0.35 * run;
-          ram2.position.y = restY - Math.max(0, Math.sin(t * 3.1 + Math.PI)) * 0.35 * run;
-        },
-        light: still,
-      };
-    }
-    case 'projector':
-    case 'heavy-projector': {
-      const mast = getGenSync('projector-mast', level);
-      const head = getGenSync('projector-head', level);
-      if (!mast || !head) return fallbackMachineProp(m, kind, stage);
-      const group = new THREE.Group();
-      group.name = `gen-${kind}`;
-      mast.position.copy(lift);
-      group.add(mast);
-      head.position.set(0, RING_TOP_Y + 2.65, 0);
-      group.add(head);
-      const vent = findMachineVent(group, RING_TOP_Y, 0, 0);
-      const power = new THREE.Vector3(0, RING_TOP_Y + 0.2, 0.8);
-      return {
-        group,
-        power,
-        vent,
-        top: null,
-        lamps: [],
-        animate: (t, run) => {
-          head.rotation.x = Math.sin(t * 0.35) * 0.08 * run;
-        },
-        light: still,
-      };
-    }
-    case 'water':
-    case 'heavy-water': {
-      const gen = getGenSync('watermaker', level);
-      if (!gen) return fallbackMachineProp(m, kind, stage);
-      const group = new THREE.Group();
-      group.name = `gen-${kind}`;
-      gen.position.copy(lift);
-      group.add(gen);
-      const vent = findMachineVent(gen, RING_TOP_Y, 0, 0);
-      const power = new THREE.Vector3(0, RING_TOP_Y + 0.2, 0.8);
-      return {
-        group,
-        power,
-        vent,
-        top: null,
-        lamps: [],
-        animate: still,
-        light: still,
-      };
-    }
-    default:
-      return fallbackMachineProp(m, kind, stage);
-  }
 }
 
 // ---------------------------------------------------------------------------

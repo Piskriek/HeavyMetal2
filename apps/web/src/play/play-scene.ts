@@ -104,6 +104,7 @@ import { currentOutpostSession } from '../net/outpost-session';
 import { PAINT_CELL, PAINT_CELLS } from '../base/plot-height';
 import { emptyField, encodeField } from '@hm/terrainbrush';
 import { createVerticalJumpState, LOCOMOTION_PRESETS, stepVerticalJump } from '@hm/kinematic';
+import { aimKit, type KitTargetable } from './kit-target';
 
 export type Where = 'lab' | 'planet';
 /** What the screen gives the scene each frame. */
@@ -4216,19 +4217,15 @@ export function createPlayScene(o: {
       // capacitor bank, so mat:/lx:/part: cartridges customize it; plot Twin gates move via
       // pure movePlotGate/setGateAccessMode (@hm/coopnet) and keep labkit visuals for now.
       if (where === 'lab') return room.aimKitPart(camera.position, dir, reach);
-      // the plot's kit-built machines: the nearest visible kit mesh along the view names its machine and part
-      const ray = new THREE.Raycaster(camera.position.clone(), dir, 0, reach);
-      let best: { kit: string; path: string; gen: string | null; d: number } | null = null;
+      // the plot's kit-built machines, through the two-stage AABB targeter (kit-target.ts): a machine the ray misses costs its box, not
+      // its triangles, so every machine on the plot can be aimed at on the min-spec laptop
+      const targetables: KitTargetable[] = [];
       for (const v of views.values()) {
         const b = kitBuildOf(v);
-        if (!b) continue;
-        v.prop.group.updateMatrixWorld(true);
-        const hit = ray.intersectObjects(b.group.children.filter((c) => c.visible), false)[0];
-        if (!hit || (best && hit.distance >= best.d) || hit.faceIndex === undefined || hit.faceIndex === null) continue;
-        const p = b.partAt(hit.object, hit.faceIndex);
-        if (p) best = { kit: plotKitKey(v.m), path: p.path, gen: p.source.kind === 'param' ? p.source.gen : null, d: hit.distance };
+        if (b) targetables.push({ kit: plotKitKey(v.m), build: b });
       }
-      return best ? { kit: best.kit, path: best.path, gen: best.gen } : null;
+      const hit = aimKit(targetables, camera.position, dir, reach);
+      return hit ? { kit: hit.kit, path: hit.path, gen: hit.gen } : null;
     },
     setKitOverrides(kit: string, overrides: Overrides) {
       // PLAN-42-GATE: 'gate' (and 'capacitor-bank') rebuild via the room's Gate kit.

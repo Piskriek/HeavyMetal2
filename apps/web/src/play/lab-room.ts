@@ -22,6 +22,7 @@ import {
 import { applyMonitorEqualizerNearShotFix } from './window-g-final-qa-hooks';
 import { maxRank, type Kit, type Overrides, type PlacedPart, type Tier } from '@hm/kitspec';
 import { buildKitPreset, type KitBuild } from './kit-build';
+import { aimKit, type KitTargetable } from './kit-target';
 import { PART_SWATCHES } from './part-swatches';
 import { vaultSkin } from './vault-skin';
 import { lightMaterial } from './light-material';
@@ -817,21 +818,16 @@ export function createLabRoom(o: {
     }]);
     return true;
   });
+  // The beam's aim over the room's kits, through the two-stage AABB targeter (kit-target.ts): the bank and the Gate take part, material and
+  // light cartridges like every other kit, and a room full of stations costs a box test each before any geometry is touched.
+  const kitTargetables = (): KitTargetable[] => {
+    const out: KitTargetable[] = [];
+    for (const [id, k] of kits) if (k.build) out.push({ kit: id, build: k.build });
+    return out;
+  };
   const aimKitPart = (origin: THREE.Vector3, dir: THREE.Vector3, reach: number): { kit: string; path: string; gen: string | null } | null => {
-    const ray = new THREE.Raycaster(origin, dir.clone().normalize(), 0, reach);
-    let best: { kit: string; path: string; gen: string | null; d: number } | null = null;
-    for (const [id, k] of kits) {
-      if (!k.build) continue;
-      k.group.updateMatrixWorld(true);
-      const meshes = k.build.group.children.filter((c) => c.visible);
-      for (const h of ray.intersectObjects(meshes, false)) {
-        if (best && h.distance >= best.d) break;
-        const p = h.faceIndex === undefined || h.faceIndex === null ? null : k.build.partAt(h.object, h.faceIndex);
-        if (p) best = { kit: id, path: p.path, gen: p.source.kind === 'param' ? p.source.gen : null, d: h.distance };
-        break;
-      }
-    }
-    return best ? { kit: best.kit, path: best.path, gen: best.gen } : null;
+    const hit = aimKit(kitTargetables(), origin, dir, reach);
+    return hit ? { kit: hit.kit, path: hit.path, gen: hit.gen } : null;
   };
   const setKitOverrides = (id: string, overrides: Overrides): boolean => {
     const k = kits.get(id);

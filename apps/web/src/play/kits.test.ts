@@ -12,6 +12,7 @@ import {
 import {
   KIT_TRIM_PALETTE,
   KIT_TRIM_MATERIAL_IDS,
+  KIT_PRESET_MATERIAL_IDS,
   isKitTrimMaterial,
   presetMaterials,
 } from './kit-trim-palette';
@@ -73,13 +74,29 @@ const CASES: readonly KitTestCase[] = [
 ];
 
 describe('TICKET-39 kit specs (4a, 4b, 4d)', () => {
-  it('defines the 4d two-material trim palette (hull-steel & accent-hardware)', () => {
-    assert.deepEqual(KIT_TRIM_MATERIAL_IDS, ['hull-steel', 'accent-hardware']);
-    assert.equal(KIT_TRIM_PALETTE['hull-steel'].bands.length, 3);
-    assert.equal(KIT_TRIM_PALETTE['accent-hardware'].bands.length, 3);
-    assert.equal(isKitTrimMaterial('hull-steel'), true);
-    assert.equal(isKitTrimMaterial('accent-hardware'), true);
+  it('defines the 4d two-material trim palette (hull-steel & accent-hardware, plus Sheet-12 khaki-paint & hopper-slate)', () => {
+    // the Sheet-12 pair Argo's review added: a painted housing and a cast-iron hopper, so a kit need not pretend paint is steel
+    assert.deepEqual(KIT_TRIM_MATERIAL_IDS, ['hull-steel', 'accent-hardware', 'khaki-paint', 'hopper-slate']);
+    assert.deepEqual(KIT_PRESET_MATERIAL_IDS, ['hull-steel', 'accent-hardware']);
+    for (const id of KIT_TRIM_MATERIAL_IDS) {
+      assert.equal(KIT_TRIM_PALETTE[id].id, id);
+      assert.equal(KIT_TRIM_PALETTE[id].bands.length, 3);
+      assert.equal(isKitTrimMaterial(id), true);
+      // the bands tile the sheet: 0..1, in order, with no gap and no overlap
+      let edge = 0;
+      for (const band of KIT_TRIM_PALETTE[id].bands) {
+        assert.equal(band.uvBand[0], edge, `${id}/${band.id} leaves a gap in the trim sheet`);
+        edge = band.uvBand[1];
+      }
+      assert.equal(edge, 1);
+    }
+    // khaki-paint is dielectric (metalness 0), hopper-slate is cast iron — the two are not the same material twice
+    assert.equal(KIT_TRIM_PALETTE['khaki-paint'].metalness, 0);
+    assert.equal(KIT_TRIM_PALETTE['khaki-paint'].baseHex, '#b8b2a2');
+    assert.equal(KIT_TRIM_PALETTE['hopper-slate'].baseHex, '#3e454d');
+    assert.ok(KIT_TRIM_PALETTE['hopper-slate'].metalness > 0.5);
     assert.equal(isKitTrimMaterial('unknown'), false);
+    assert.equal(isKitTrimMaterial('mat:field-worn-hazard'), false, 'a mat: preset is not a trim-sheet id');
   });
 
   for (const tc of CASES) {

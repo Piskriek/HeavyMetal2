@@ -1,11 +1,12 @@
 /**
- * The bench's material preview (plan 41 section 4.6): a small machine-like test piece wearing the material, on the
- * shared turntable with the lab's room reflection, so every layer has somewhere to land: sharp edges, the crease where
+ * The bench's material preview (plan 41 section 4.6): Argo's material test piece (TICKET-40, `MATSTACK_TEST_PIECE_KIT`) wearing the
+ * material, on the shared turntable with the lab's room reflection, so every layer has somewhere to land: sharp edges, the crease where
  * the body meets its plinth, tops, the splash zone. The mask view shows one layer's coverage in black and white.
  * Shelf thumbnails are the same piece, compiled without blocking (compileAsync) and drawn one a frame, once a session.
  *
- * The piece is an interim composition of partgen parts; Argo's test piece (TICKET-40, MATSTACK_TEST_PIECE_KIT) takes
- * its place when it lands.
+ * The piece is dressed in a single key (`withMaterial(kit, 'M')`): its five partgen parts keep their generators, sockets and ranks, and
+ * every part and slot material points at `M`, which the preview resolves to the material under the cursor. That is what makes the shelf
+ * thumbnails and the big view the same geometry for every material.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
@@ -13,44 +14,19 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { Kit } from '@hm/kitspec';
 import type { MaterialSpec } from '@hm/matstack';
 import { buildKitPreset, type KitBuild } from './kit-build';
+import { MATSTACK_TEST_PIECE_KIT, TEST_PIECE_PRESET, withMaterial } from './kit-modules';
 import { kitLayering, materialForSpec, releaseLayeredEnv, setMaskView, type LayeredEnv } from './layered-material';
 import { createTurntable, snapshot, type Turntable } from './turntable';
 
-/** A small machine, about 1.2 m across: a plinth, a bevelled body with a grille and a lamp, a hopper, a beam, a bracket, bolts. */
-const PIECE: Kit = {
-  parts: {
-    plinth: { source: { kind: 'box', size: [1.2, 0.1, 0.8] }, material: 'M', rank: 0 },
-    body: { source: { kind: 'param', gen: 'can', params: { width: 0.5, depth: 0.5, height: 0.9 } }, material: 'M', rank: 0 },
-    grille: { source: { kind: 'param', gen: 'grille', params: { width: 0.36, height: 0.32 } }, material: 'M', rank: 0 },
-    lamp: { source: { kind: 'param', gen: 'lamp', params: {} }, material: 'M', rank: 0 },
-    hopper: { source: { kind: 'param', gen: 'hopper', params: { topWidth: 0.5, topDepth: 0.5, bottomWidth: 0.3, bottomDepth: 0.3, height: 0.24 } }, material: 'M', rank: 0 },
-    beam: { source: { kind: 'param', gen: 'beam', params: { length: 0.5, section: 0.08 } }, material: 'M', rank: 0 },
-    bracket: { source: { kind: 'param', gen: 'bracket', params: {} }, material: 'M', rank: 0 },
-    bolt: { source: { kind: 'param', gen: 'bolt', params: {} }, material: 'M', rank: 0 },
-  },
-  assemblies: {
-    piece: {
-      children: [
-        { ref: 'plinth', key: 'plinth' },
-        { ref: 'body', key: 'body', at: [-0.25, 0.1, 0] },
-        { ref: 'grille', key: 'grille', at: [-0.25, 0.32, 0.25] },
-        { ref: 'lamp', key: 'lamp', at: [-0.25, 0.78, 0.25] },
-        { ref: 'hopper', key: 'hopper', at: [-0.25, 1.0, 0] },
-        { ref: 'beam', key: 'beam', at: [0.3, 0.1, 0.2] },
-        { ref: 'bracket', key: 'bracket', at: [0.35, 0.1, -0.2] },
-        { ref: 'bolt', key: 'bolts-front', at: [-0.52, 0.1, 0.32], repeat: { count: 2, step: [1.04, 0, 0] } },
-        { ref: 'bolt', key: 'bolts-back', at: [-0.52, 0.1, -0.32], repeat: { count: 2, step: [1.04, 0, 0] } },
-      ],
-    },
-  },
-};
+/** The test piece with every material keyed to `M`; the five parts, their sockets and ranks are unchanged. */
+const PIECE: Kit = withMaterial(MATSTACK_TEST_PIECE_KIT, 'M');
 
 /** The rank the preview draws at: per pixel, with the physical extras where the material has them. */
 const RANK = 2;
 
 /** The piece's geometry, built once (its edge lines do not depend on the material) and dressed per material. */
 function buildPiece(env: LayeredEnv, spec: MaterialSpec): KitBuild | null {
-  return buildKitPreset(PIECE, 'piece', {
+  return buildKitPreset(PIECE, TEST_PIECE_PRESET, {
     materials: {},
     gen: () => null,
     maxRank: 2,

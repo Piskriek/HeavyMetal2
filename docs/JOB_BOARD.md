@@ -87,7 +87,7 @@ Each job may list **Skills** (tags such as `frontend`, `route`, `visual-verify`)
 
 ## 3. JOB QUEUE
 
-## JOB-01 [OPEN] Uncapped GTX 950M performance gate & GPU timer hook (Plan 41 + POL-294)
+## JOB-01 [DONE] Uncapped GTX 950M performance gate & GPU timer hook (Plan 41 + POL-294)
 - **Role:** ENGINEER
 - **Skills:** `perf`
 - **Priority:** P0
@@ -99,7 +99,7 @@ Each job may list **Skills** (tags such as `frontend`, `route`, `visual-verify`)
 1. Measure `layered-material.ts` on the GTX 950M laptop (Medium, 1080p) with frame-rate limiting disabled (`--disable-frame-rate-limit` or WebGL `EXT_disjoint_timer_query_webgl2`) so the 60 Hz vsync cap does not mask the delta between plain and 6-layer materials.
 2. Expose a GPU timer hook in `PlayScene` (`POL-294`) so real GPU ms can be measured for both 6-layer materials and 4-turret Low-spec scenes. Confirm Lab gate view stays <= 181 draw calls (`POL-314`).
 
-## JOB-02 [OPEN] TICKET-40 v5: Modular Mill kit typing, palette test & matstack shelf coverage tuning
+## JOB-02 [DONE] TICKET-40 v5: Modular Mill kit typing, palette test & matstack shelf coverage tuning
 - **Role:** BUILDER
 - **Skills:** `visual-verify`
 - **Priority:** P0
@@ -114,7 +114,7 @@ Address all open review items in `OPUS_NOTE_41` v4:
 3. Tune `@hm/matstack` shelf coverage: reduce `rust-bloom` face coverage from 67% down to 5–15% patches, restrict `oil-leaks` (currently 40% of faces) to streaks under edges/crevices, make `soot` visible (currently 0%), and keep `moon-dust` off the dark `crushed-ore-bed` hopper top (currently 84%).
 4. Verify with `scripts/kit-compare-sheet.mjs` from all 4 angles before installing.
 
-## JOB-03 [REVIEW] TICKET-41: 20 procedural texgraph tile graphs & 6 new periodic nodes
+## JOB-03 [DONE] TICKET-41: 20 procedural texgraph tile graphs & 6 new periodic nodes
 - **Role:** ARCHITECT
 - **Skills:** `visual-verify`
 - **Priority:** P0
@@ -129,7 +129,7 @@ Implement `OPUS_NOTE_44_tile_library.md`:
 2. Build `TILE_LIBRARY` with all 20 required tile graphs: `brushed-metal`, `cells`, `cast-iron`, `pits`, `fine-grain`, `orange-peel`, `stripes`, `rubber-grain`, `concrete`, `carbon-weave`, `hex-micro`, `flake-scale`, `grime-clouds`, `regolith-grain`, `moss-clump`, `frost-crystal`, `mud-splatter`, `mineral-crust`, `scorch-burn`, `scratches`.
 3. Add unit tests for validation, determinism, seamless wrap-edge continuity, grey percentile spread (>= 0.35), non-constant height, and < 25 ms @ 128px evaluation budget.
 
-## JOB-04 [REVIEW] Rule 8a matstack fixes: Layer ordering, coat/aniso writes, coplanar edge dedup & Solvent Cartridge
+## JOB-04 [DONE] Rule 8a matstack fixes: Layer ordering, coat/aniso writes, coplanar edge dedup & Solvent Cartridge
 - **Role:** ENGINEER
 - **Skills:** `shader`, `frontend`
 - **Priority:** P0
@@ -145,7 +145,7 @@ Implement the 4 Rule 8a catches from `ARGO_NOTE_43` + Plan 41 step 4:
 3. **Coplanar edge deduplication (`mask-mesh.ts`):** Deduplicate colinear `SharpEdge` segments sharing the same `(inward, dot(a, inward))` line before `.slice(0, EDGE_LINES)` on notched polygons with > 4 boundary edges.
 4. **Layer & Solvent Cartridges + Studio Materials Workspace:** Add `{ layer }` and `{ solvent: true }` cartridges to `@hm/cartlab` and beam `Apply`, and replace `material-designer.tsx` in the Studio with the full 5-level Materials workspace.
 
-## JOB-05 [OPEN] Fix failing E2E regressions: test-base-tabs hardpoint aim & e2e-smoke home menu
+## JOB-05 [DONE] Fix failing E2E regressions: test-base-tabs hardpoint aim & e2e-smoke home menu
 - **Role:** RUNNER
 - **Skills:** `e2e`
 - **Priority:** P0
@@ -158,7 +158,7 @@ Fix the two known failing E2E scripts noted in `docs/RESUME.md`:
 1. `scripts/test-base-tabs.mjs` (currently 2/4): camera fails to aim directly at the placed hardpoint ring to open the Machine Picker / Refinery tabs; compute exact lookAt pitch/yaw from `gatePlanet()` / piece coordinates.
 2. `scripts/e2e-smoke.mjs`: update home screen assertions from the legacy 8 Oct menu copy to the current 6-button FIDELITY Main Menu (`Expedition [DESYNCED]`, `Planetary Grid [SYNCED]`, `The Studio`, `The Workshop`, `Community Nexus`, `Diagnostics & Settings`).
 
-## JOB-06 [REVIEW] Plan 40: Bring Your Own Agent Studio API, Vision+Coverage Loop & studio-skill.md
+## JOB-06 [DONE] Plan 40: Bring Your Own Agent Studio API, Vision+Coverage Loop & studio-skill.md
 - **Role:** ENGINEER
 - **Skills:** `feature-dev`, `route`
 - **Priority:** P1
@@ -257,7 +257,7 @@ no `+=`, no per-frame accumulator anywhere, so a scrub to t = 40 s is the frame 
    is clamped with `smoothstep(uInnerRadius, uInnerRadius - uRimWidth, r)`, exactly 0.0 at the glyph wall, so there is no
    cell-edge seam.
 
-## JOB-09 [OPEN] Open Lab & Window Vista QA Polish + Preset Inception Fixes (POL-25, 38, 101, 102, 103, 121, 296, 311)
+## JOB-09 [DONE] Open Lab & Window Vista QA Polish + Preset Inception Fixes (POL-25, 38, 101, 102, 103, 121, 296, 311)
 - **Role:** BUILDER
 - **Skills:** `visual-verify`, `e2e`
 - **Priority:** P1
@@ -273,7 +273,7 @@ Close the open Lab & Window Vista QA items using the Modular Preset stack (no ne
 - **POL-103 & POL-121:** Replace the east-wall grey placeholder box (`POL-103`) and upgrade the Operator Console lever arc slot (`POL-121`) as **modular `@hm/kitspec` + `@hm/partgen` + `@hm/matstack` kits** (never re-baking opaque GLB models).
 - **POL-296:** Expose `PEACEFUL_COMBINER_RECIPES` (`pxd-mono`, `vtx-rough`, `anomaly-core` from ore + blank) in the Lab Preset Combiner UI.
 
-## JOB-10 [OPEN] Open Terrain, Combat, Anomaly Nodes & S-Space Rift QA Polish (POL-23, 29, 30, 33, 34, 37, 98, 100)
+## JOB-10 [DONE] Open Terrain, Combat, Anomaly Nodes & S-Space Rift QA Polish (POL-23, 29, 30, 33, 34, 37, 98, 100)
 - **Role:** BUILDER
 - **Skills:** `perf`, `e2e`
 - **Priority:** P1
@@ -289,7 +289,7 @@ Close the open Terrain, Combat & Rift QA items:
 - **POL-34 & POL-37:** Add third-person Moon avatar pixel-patch luminance assertion (`>= 35/255`) and Stage 1 vs Stage 6 monster fight readability captures.
 - **POL-98, POL-100 & POL-23:** Merge `rift.ts` slabs into a single instanced/merged draw call (dropping near-rift cost from 59 draw calls to 1–2) in vivid S-Space `#FF1E8E` / `#00F0FF` / `#2A0845` across all stages, and build Anomaly Field Nodes (`POL-23`) from `@hm/partgen` + `@hm/meshops` + `lx:` presets rather than concept-art GLBs.
 
-## JOB-11 [OPEN] Open Stage-Look (OKLab POL-49), Suit-Cam & Inspector QA Polish (POL-36, 49, 52, 53, 54, 60, 63, 74, 75, 81, 297)
+## JOB-11 [DONE] Open Stage-Look (OKLab POL-49), Suit-Cam & Inspector QA Polish (POL-36, 49, 52, 53, 54, 60, 63, 74, 75, 81, 297)
 - **Role:** BUILDER
 - **Skills:** `shader`, `e2e`
 - **Priority:** P2
@@ -306,7 +306,7 @@ Close the remaining visual & E2E QA items from `docs/DEFERRED_POLISH_REGISTRY.md
 - **POL-74 & POL-75:** Add browser E2E step placing and inspecting a planet plot-machine in `scripts/test-machine-inspector.mjs`, and capture running mill/projector plume height shots.
 - **POL-81 & POL-36:** Pre-warm hotbar/radial 3D blueprint thumbnails behind the loading bar and run automated edge-case sweep.
 
-## JOB-17 [REVIEW] Universal Cartridge Targetability ("Modular Preset Inception") & AABB Kit Raycast
+## JOB-17 [DONE] Universal Cartridge Targetability ("Modular Preset Inception") & AABB Kit Raycast
 - **Role:** ENGINEER
 - **Skills:** `perf`, `code-review`
 - **Priority:** P0
@@ -321,7 +321,7 @@ Fix the #1 Modular Preset Inception gap uncovered in `docs/OVERWATCH_TECH_AND_AI
 2. **Two-Level AABB Accelerated `aimKitPart()` Raycasting:** Pre-check ray against each `KitBuild`'s outer world AABB and `PlacedPart` bounds before triangle intersection so scaling kits to the whole plot costs < 0.1 ms CPU on the GTX 950M.
 3. **Clean Up Dead Legacy Paths:** Delete unused `createGenMachineProp` in `apps/web/src/assets/gen-props.ts` (`POL-76`) and remove the dead inverted-sign `MACHINE_PLUME_GRAVITY` export at the bottom of `apps/web/src/play/machine-props.ts`.
 
-## JOB-18 [OPEN] Recurring Overwatch: Modular Preset Inception Audit & AI/Fidelity Tech Radar
+## JOB-18 [DONE] Recurring Overwatch: Modular Preset Inception Audit & AI/Fidelity Tech Radar
 - **Role:** OVERSEER
 - **Skills:** `code-review`
 - **Priority:** P1
@@ -335,7 +335,7 @@ Standing recurring Overwatch task executed whenever Antigravity / Overwatch is a
 2. Research and fold new breakthroughs in **AI Agent Skills (Vision+Coverage closed loops, procedural graph synthesis), WebGL2/WebGPU Visual Fidelity (OKLab quantization, screen-space normal-derivative micro-cavity), and Logical/Spatial Optimization (BVH/AABB raycasting, UBO material batching)** into `docs/OVERWATCH_TECH_AND_AI_RADAR.md` and active `JOB-*` cards.
 3. **Know your environment & adapt the roster:** Identify where you woke (Claude Code or Antigravity) and which models you can spawn. Run `node scripts/skill-inventory.mjs` (refreshes `docs/agents/SKILLS_INVENTORY.md` and flags **MISSING** skills), research new models, tools and skills (Claude Code plugins/skills such as `/frontend-design`, `/route`, `/code-review`; Antigravity skills and subagent tiers), then update `docs/agents/roster.json` (role ladders, skill tags) and re-tag job **Role**/**Skills** fields so cheaper rungs plus the right skills do the work. Finish with `node scripts/agent-worker.mjs --dispatch --env <env>`.
 
-## JOB-20 [REVIEW] Plan 43 Step 4: Sprites, Audio Stems & Cartridge Parity (`pxdc:` / `sndc:`)
+## JOB-20 [DONE] Plan 43 Step 4: Sprites, Audio Stems & Cartridge Parity (`pxdc:` / `sndc:`)
 - **Role:** BUILDER
 - **Skills:** `frontend`
 - **Priority:** P1
@@ -380,7 +380,7 @@ Standing recurring Overwatch task executed whenever Antigravity / Overwatch is a
 
 Unverified visually (no Chrome in this sandbox): how a baked sprite reads at each stage, and how a rendered stem sounds.
 
-## JOB-19 [REVIEW] Plan 43: Modular Locomotion (`loc:`), Stage-Fidelity Animation (`anim:`) & Logic Graph Presets (`logic:`)
+## JOB-19 [DONE] Plan 43: Modular Locomotion (`loc:`), Stage-Fidelity Animation (`anim:`) & Logic Graph Presets (`logic:`)
 - **Role:** BUILDER
 - **Skills:** `frontend`
 - **Priority:** P1
@@ -435,21 +435,9 @@ Extend Modular Preset Inception (`docs/argo/plans/43-modular-motion-and-logic-pr
 2. **Stage-Quantized Procedural & Skeletal Animation (`anim:` & `KitMotionSpec`):** Wire `stageAnimRateHz(stage)` (`8 Hz` at $S_0$, `12 Hz` at $S_1$, `18 Hz` at $S_2$, `30 Hz` at $S_3$, continuous `60+ Hz` + IK + spring-damper at $S_4\text{--}S_6$) and replace hardcoded `Math.sin` closures in machine props with declarative `KitMotionSpec` on `@hm/kitspec` sockets.
 3. **Modular Logic & Behaviour Presets (`logic:` via `@hm/triggers` + `@hm/wiregraph` + `@hm/npcbrain`):** Wire Auto-Doors, Perimeter Turrets, Stargate Iris locks, and Monster Spawners to `LogicPreset` sliders in-game and full node-and-wire DAGs in the Studio.
 
-## JOB-20 [OPEN] Recursive Sprite (`@hm/shareware`), Procedural Audio Stem (`@hm/soundlab` + `@hm/musicbox`) & Stage Skin (`@hm/skin`) Preset Factories
-- **Role:** ARCHITECT
-- **Skills:** `frontend`
-- **Priority:** P2
-- **Milestone:** M3
-- **Paths:** `packages/shareware, packages/soundlab, packages/musicbox, packages/skin, packages/cartlab, apps/web/src/lab, apps/web/src/studio`
-- **Verify:** `npm.cmd run typecheck && npm.cmd test`
-- **Updated:** 2026-10-22 14:09
 
-Complete the remaining domains of the Universal 5-Rung "Presets Inside Presets" table so sprites, audio, and stage skins are 100% modular across $S_0 \to S_6$:
-1. **2D Sprite & Billboard Preset Factory (`@hm/shareware` + `@hm/texgraph` + `@hm/partgen`):** Generate 8-angle Stage 0–2 shareware sprites and animated billboard sheets directly from 3D `@hm/kitspec` / `@hm/partgen` turntables + `@hm/skin` OKLab palettes, with in-game sliders (Angle Count, Pixel Size, Palette Skin, Frame Rate) and full Studio sprite-sheet editor.
-2. **Procedural Audio & Music Stem Presets (`@hm/soundlab` + `@hm/musicbox`):** Build machine hums, Beam Rifle verbs, Gate chevron locks, and stage music stems from recursive `@hm/soundlab` synth patches (`oscillator` -> `envelope` -> `filter` -> `stem` -> `stage mix`), quantization-stepped from 1-bit PC speaker ($S_0$) to FM chip ($S_1\text{--}S_2$) to full spatial stereo ($S_4\text{--}S_6$).
-3. **Cartridge & Bench Parity:** Allow printing Sprite/Skin (`pxdc:`) and Sound (`sndc:`) cartridges at the Lab Bench with live preview playback and Beam Rifle `Apply` onto any world kit, turret, door, or radio.
 
-## JOB-12 [REVIEW] 3D PC Full Verification of Landed Wave 1 & Wave 2 QA Bundles (T18..T28 + F-24..F-28)
+## JOB-12 [DONE] 3D PC Full Verification of Landed Wave 1 & Wave 2 QA Bundles (T18..T28 + F-24..F-28)
 - **Role:** RIG
 - **Priority:** P0
 - **Milestone:** M5

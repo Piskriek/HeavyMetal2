@@ -1,6 +1,21 @@
 # RESUME: start here (fresh session)
 
-## 25 Oct Checkpoint (Antigravity Overwatch: PR #68 Merged — 8 Roadmap Jobs Landed, 88% Release Complete; read this first)
+## 25 Oct Checkpoint (Antigravity Overwatch: Wave 3 Harvested — JOB-06b, JOB-08 Machines, JOB-08b Landed, 15/20 Jobs Complete; read this first)
+- **Wave 3 Harvest & Merge (`arena/1a30b2dd-heavymetal2` -> `feat/monster-mash-exploration` at `3e51a448`):**
+  - **Scale:** 3 clean commits (`e3bee29f`, `00c511a8`, `3e51a448`), +2,634 lines / -541 lines across 20 files.
+  - **Quality Gates:** `npm run typecheck` passes with **0 errors**. 32/32 new unit tests pass cleanly. `npm test` matches baseline (3,418 total tests, 3,380 pass, 34 Git-LFS pointer fails identical to origin).
+  - **Rule 8a Compliance:** PASS. HEAVY_KITS legacy core frames, ledMount shims, and all monolithic `.glb` machine fallbacks deleted.
+- **Wave 3 Architectural Deliverables:**
+  1. **`JOB-06b` (`apps/web/src/studio/studio-agent-audit.ts`)**: Full implementation of the `wheresryan22/anatomy` 5-check standard (`solidClearances` at rest/exploded/8 phases, `looseEnds: 0`, `terminals: 0`, `hingeBendRadius`, `orbitClearance24`). Wired through `studio-agent.ts`, MCP bridge client, and `studio-skill.md`. 11 unit tests pass.
+  2. **`JOB-08` Machines (`apps/web/src/play/kit-machines.ts`)**: All 11 machines rebuilt from `@hm/partgen` primitives on `@hm/kitspec` sockets across the 5 Anatomy groups (`base`, `structure`, `mechanism`, `controls`, `subject`), 25–45 parts each, 0 validation problems, 0 collisions/loose ends under audit gate. Movers driven by closure-free `KitMotionSpec` and targetable in `kit-target.ts`. (Vehicles remain open).
+  3. **`JOB-08b` (`apps/web/src/play/event-horizon.ts`)**: Pure stateless Stargate event horizon WebGL shader driven by `(simTime, gateState, lastEventTime)`. 4 monotonic envelopes (`uLockEnvelope`, `uKawooshBurst`, `uSteadyHorizon`, `uShutdownFade`), iris lock suppression to impact shimmer, and rim smoothstep zeroing. 9 unit tests pass.
+- **Immediate Next Focus (Final Remaining Items to 1.0 Release):**
+  1. **`JOB-08` Vehicles**: Rebuild `HAULER_KIT`, `CRAWLER_KIT`, and new `SCOUT_KIT` to 5-group Anatomy decomposition.
+  2. **`JOB-09`**: Plan 42 Part 3: Earth Endgame Biome, Portal Telemetry & Win Loop.
+  3. **`JOB-21`**: Monster Mash Exploration Loop & Multi-Cartridge Synergy.
+  4. **`JOB-22/23`**: 60 FPS Frame-Budget Stress Benchmark, `studio-skill.compact.md`, and 1.0 CI Lock.
+
+## 25 Oct Checkpoint (Antigravity Overwatch: PR #68 Merged — 8 Roadmap Jobs Landed, 88% Release Complete)
 - **PR #68 Harvest & Merge (`arena/a2368b82-heavymetal2` -> `feat/monster-mash-exploration` at `8486e268`):**
   - **Scale:** 12 clean commits, +13,081 lines / -539 lines across 107 files.
   - **Quality & Invariants:** `npm run typecheck` passes with **0 errors**. All deterministic procedural packages (`@hm/texgraph`, `@hm/matstack`, `@hm/skin`, `@hm/shareware`, `@hm/soundlab`, `@hm/kinematic`, `@hm/anim`) verified pure. Strict compliance with `RULES 8a` (zero shortcut wrappers around legacy meshes).

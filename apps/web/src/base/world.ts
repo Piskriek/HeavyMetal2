@@ -15,7 +15,8 @@ import * as L from '@hm/lattice';
 import * as S from '@hm/structure';
 import * as F from '@hm/substrate';
 import { TURRET_POWER_DRAW_KW } from '@hm/plotsim';
-import { DEFAULT_PLOT_RADIUS_M, resolveMovedGatePose, type GateAccessMode, type GatePose } from '@hm/coopnet/gate-dialer';
+import { DEFAULT_PLOT_RADIUS_M, EARTH_UNLOCK_FIDELITY_STAGE as EARTH_UNLOCK_STAGE, resolveMovedGatePose, type GateAccessMode, type GatePose } from '@hm/coopnet/gate-dialer';
+import { MOON_BIOME_PRESET, readBiomePreset, type PlotBiomePreset } from './biome-preset';
 import { DRAFT_ORE, EQUIP, FIELD_RADIUS, HEAVY, HEAVY_BILL, ITEMS, MAPS, MATERIALS, PIECE_EXTRA, PIECE_ORE, PIECE_STAGE, PRIMITIVES, QUEUE_MAX, RECIPE_BY_ID, STARTER, blueprint, blueprintId, pieceCost, FABRICATOR_BILL, FORGE_BY_ID, PART_SLOTS, VEHICLE, type Blueprint, type MapId, type PartSlot, type PrimitiveId, type StationKind, type VehicleKind } from './catalog';
 import { EQUIP_SLOTS, type EquipSlot, type SlotRef } from './view';
 
@@ -73,6 +74,12 @@ export interface BaseWorld {
    * visitor with the six-symbol code, `'closed'` not at all (the iris is shut). Outbound dialing works in every state.
    */
   readonly gateAccess: GateAccessMode;
+  /**
+   * The plot's biome (plan 42 §4.2-4.3): the ground material, the six species slots its trees grow as, and its sky. A Moon
+   * plot starts on the regolith preset; the Earth plot's restored preset is what Stage 6 unlocks, and its slots are the
+   * owner's to retune.
+   */
+  readonly biome: PlotBiomePreset;
 }
 
 /** The arrival pad a moved gate takes with it: where a visitor steps out (3.5 m in front of the gate, on its yaw). */
@@ -170,7 +177,9 @@ export type BaseCommand =
   /** Moves the plot's Stargate to `at` (a plot point), facing `yaw`; refused outside the plot or on invalid coordinates (plan 42). */
   | { readonly t: 'moveGate'; readonly at: Point; readonly yaw: number }
   /** Sets the gate's privacy: the iris shuts for `'code-only'` and `'closed'`, and random dialing lists only `'open'` (plan 42). */
-  | { readonly t: 'setGateAccess'; readonly access: GateAccessMode };
+  | { readonly t: 'setGateAccess'; readonly access: GateAccessMode }
+  /** Replaces the plot's biome preset (plan 42: the Earth plot's restored preset, or a retuned species slot). */
+  | { readonly t: 'setBiome'; readonly preset: PlotBiomePreset };
 
 export type BaseEvent =
   | { readonly type: 'refused'; readonly cmd: BaseCommand['t']; readonly why: string; readonly short?: readonly L.Stack[] }
@@ -202,7 +211,8 @@ export type BaseEvent =
   | { readonly type: 'salvaged'; readonly stock: readonly L.Stack[] }
   | { readonly type: 'switched'; readonly machine: number; readonly on: boolean }
   | { readonly type: 'gateMoved'; readonly pose: GatePose; readonly arrivalPad: GateArrivalPadDef }
-  | { readonly type: 'gateAccess'; readonly access: GateAccessMode };
+  | { readonly type: 'gateAccess'; readonly access: GateAccessMode }
+  | { readonly type: 'biome'; readonly preset: PlotBiomePreset };
 
 export interface Applied { readonly world: BaseWorld; readonly events: readonly BaseEvent[] }
 
@@ -214,7 +224,7 @@ export function createWorld(seed = 1): BaseWorld {
   slots[0] = { item: STARTER, n: 1 };
   return {
     v: 5, tick: 0, base: S.empty(), boxes: [], layouts: [], plans: [], shelter: false, vehicles: [], nextVehicle: 1, loadout: NO_LOADOUT,
-    gatePose: DEFAULT_GATE_POSE, gateAccess: 'open',
+    gatePose: DEFAULT_GATE_POSE, gateAccess: 'open', biome: MOON_BIOME_PRESET,
     player: { id: PLAYER, x: 0, z: 0, slots, maxKg: PLAYER_KG },
     equipment: { ...NO_EQUIPMENT, beam: { item: 'tool-beam', n: 1 }, visor: { item: 'eq-visor', n: 1 } },
     hotbar: 0,
@@ -374,6 +384,20 @@ function setGateAccess(w: BaseWorld, cmd: Extract<BaseCommand, { t: 'setGateAcce
   return next(w, { gateAccess: cmd.access }, [{ type: 'gateAccess', access: cmd.access }]);
 }
 
+/**
+ * Replaces the plot's biome preset (plan 42 §4.3). The preset is read back through `readBiomePreset`, so a hand-edited log
+ * cannot put six slots of nonsense on a plot; an unchanged preset is refused rather than logged.
+ */
+function setBiome(w: BaseWorld, cmd: Extract<BaseCommand, { t: 'setBiome' }>): Applied {
+  const preset = readBiomePreset(cmd.preset);
+  if (!preset) return refuse(w, cmd.t, 'bad-biome');
+  // Constitution 4: the Earth plot opens at Stage 6, so a world below it cannot wear Earth's biome (the panel hides the
+  // button too; a replayed log or a session peer does not get to skip the ladder)
+  if (preset.world === 'earth' && w.stage < EARTH_UNLOCK_STAGE) return refuse(w, cmd.t, 'earth-locked');
+  if (JSON.stringify(preset) === JSON.stringify(w.biome)) return refuse(w, cmd.t, 'same-biome');
+  return next(w, { biome: preset }, [{ type: 'biome', preset }]);
+}
+
 export function apply(w: BaseWorld, env: WorldEnv, cmd: BaseCommand): Applied {
   switch (cmd.t) {
     case 'hotbar': {
@@ -442,6 +466,8 @@ export function apply(w: BaseWorld, env: WorldEnv, cmd: BaseCommand): Applied {
       return moveGate(w, env, cmd);
     case 'setGateAccess':
       return setGateAccess(w, cmd);
+    case 'setBiome':
+      return setBiome(w, cmd);
     default: {
       const unknown: never = cmd;
       return refuse(w, (unknown as BaseCommand).t, 'unknown-cmd');

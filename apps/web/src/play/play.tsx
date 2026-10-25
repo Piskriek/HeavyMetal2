@@ -161,6 +161,7 @@ import { GATE_ACCESS_MODES, isGateAccessMode } from '../base/world';
 import type { GateAccessMode } from '@hm/coopnet/gate-dialer';
 import { CHEVRON_LOCK_SECONDS, GATE_ARRIVAL_PAD_OFFSET_M, GATE_CHEVRON_COUNT, beginGateDial, stepGateDial } from '@hm/coopnet/gate-dialer';
 import { dialRandomPlot, dialSeed, gateDirectory, openGateCount, ownGateEntry } from './gate-directory';
+import { EARTH_BIOME_PRESET, MOON_BIOME_PRESET, biomeSlotSpecies, earthPlotUnlock } from '../base/biome-preset';
 import { isBiosphereCoherent } from '@hm/questline';
 import { fidelityRules, FIDELITY_LINE_IDS } from '@hm/narrator';
 import { HudZone, CompassRibbon, FloatsPill, MachineLabel, SyncWord } from '../base/ui/hud-zones';
@@ -1354,6 +1355,9 @@ useEffect(() => {
         // plan 42: the ring, its footing, the arrival pad and the ground's keep-out all follow the world's pose
         scene?.setPlotGate(ev.pose);
         say('Gate moved', `The gate now stands at ${ev.pose.x.toFixed(1)}, ${ev.pose.z.toFixed(1)} with its pad ${GATE_ARRIVAL_PAD_OFFSET_M.toFixed(1)} m in front.`);
+      } else if (ev.type === 'biome') {
+        scene?.setSpeciesSlots(ev.preset.species);
+        say(ev.preset.label, `Six species slots set to ${biomeSlotSpecies(ev.preset).join(', ')}.`);
       } else if (ev.type === 'gateAccess') {
         scene?.setGateAccess(ev.access);
         setGateAccess(ev.access);
@@ -2215,6 +2219,7 @@ useEffect(() => {
         // plan 42: the plot's Gate stands where the save left it, with the iris in the state the save holds
         scene.setPlotGate(baseWorldRef.current.gatePose);
         scene.setGateAccess(baseWorldRef.current.gateAccess);
+        scene.setSpeciesSlots(baseWorldRef.current.biome.species);
         if (isGateAccessMode(baseWorldRef.current.gateAccess)) setGateAccess(baseWorldRef.current.gateAccess);
         else setGateAccess('open');
         pieceManagerRef.current.sync(baseWorldRef.current, bEnv, false);
@@ -5308,6 +5313,45 @@ useEffect(() => {
                     </button>
                   </div>
                 </div>
+
+                {(() => {
+                  const plot = plotRef.current;
+                  const biome = baseWorldRef.current.biome ?? MOON_BIOME_PRESET;
+                  const unlock = earthPlotUnlock(plot.stage, {
+                    pxd: level(plot, 'pxd'),
+                    vtx: level(plot, 'vtx'),
+                    lx: level(plot, 'lx'),
+                    aq: level(plot, 'aq'),
+                  });
+                  const onEarth = biome.world === 'earth';
+                  return (
+                    <div className="play-dial-section">
+                      <h4>Your plots</h4>
+                      <p>{unlock.reason}</p>
+                      <p className="play-why">
+                        {biome.label}: {biome.species.length} species slots on {biome.terrain.material}, sky {biome.sky.lamp}.
+                      </p>
+                      <div className="play-dial-row">
+                        <button
+                          className={onEarth ? 'on' : ''}
+                          aria-pressed={onEarth}
+                          disabled={!unlock.unlocked || onEarth}
+                          onClick={() => dispatchBase({ t: 'setBiome', preset: EARTH_BIOME_PRESET })}
+                        >
+                          Earth plot
+                        </button>
+                        <button
+                          className={!onEarth ? 'on' : ''}
+                          aria-pressed={!onEarth}
+                          disabled={!onEarth}
+                          onClick={() => dispatchBase({ t: 'setBiome', preset: MOON_BIOME_PRESET })}
+                        >
+                          Moon plot
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="play-dial-section">
                   <h4>Who can dial in</h4>

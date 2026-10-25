@@ -39,6 +39,12 @@ export interface PlotBiomeView {
    * preset does not fit are left as grown. Returns how many presets are in use.
    */
   setTreeOverrides(overrides: Readonly<Record<string, TreeVariantSpec>>): number;
+  /**
+   * The plot's own species palette (plan 42's `PlotBiomePreset`, 6 slots): every scattered tree grows as one of these
+   * presets, picked deterministically from its place, so a plot wears its species mix wherever the biome scatters trees.
+   * A tree the beam regrew still grows as its own cartridge's preset. Returns how many slots took.
+   */
+  setSpeciesSlots(slots: readonly TreeVariantSpec[]): number;
   /** The shown tree whose trunk is nearest the ray (within about a metre of it, and `reach` along it), or null. */
   treeAt(origin: readonly [number, number, number], dir: readonly [number, number, number], reach: number): TreeHit | null;
   /** The shown trees that grow as the same kind as the tree at `place` (its species, or its preset) within `radiusM` of it. */
@@ -653,6 +659,11 @@ export function createPlotBiomeView(
   const VARIANT_CAPACITY = 1024;
   const variants = new Map<string, Variant>();
   let treeOverrides: Readonly<Record<string, string>> = {};
+  /** The plot's species palette: the variant keys the scatter's trees take turns wearing (empty = the biome's own). */
+  let speciesSlotKeys: readonly string[] = [];
+  /** The palette's presets and the beam's per-tree presets, kept side by side so both can grow variant sets. */
+  let paletteSpecs: readonly TreeVariantSpec[] = [];
+  let overrideSpecs: Readonly<Record<string, TreeVariantSpec>> = {};
   const growVariant = (key: string, spec: TreeVariantSpec): Variant => {
     const nearModel = speciesModel(spec, 'near');
     const farModel = speciesModel(spec, 'far');
@@ -700,6 +711,35 @@ export function createPlotBiomeView(
       slot.mesh.count = c;
       slot.mesh.visible = c > 0;
     }
+  };
+
+  /**
+   * Grows the instanced sets both the palette and the beam's overrides need, and drops the ones nothing asks for. The cap
+   * is MAX_TREE_VARIANTS: past six species presets a plot costs more draw calls than its trees are worth.
+   */
+  const syncVariantSets = (overrides: Readonly<Record<string, TreeVariantSpec>>, palette: readonly TreeVariantSpec[]): void => {
+    const wanted = new Map<string, TreeVariantSpec>();
+    for (const spec of palette) {
+      const key = treeVariantKey(spec);
+      if (!wanted.has(key) && wanted.size < MAX_TREE_VARIANTS) wanted.set(key, spec);
+    }
+    for (const spec of Object.values(overrides)) {
+      const key = treeVariantKey(spec);
+      if (!wanted.has(key) && wanted.size < MAX_TREE_VARIANTS) wanted.set(key, spec);
+    }
+    for (const v of [...variants.values()]) if (!wanted.has(v.key)) dropVariant(v);
+    for (const [key, spec] of wanted) if (!variants.has(key)) variants.set(key, growVariant(key, spec));
+  };
+
+  /** Which of the plot's species slots a tree at `place` grows as (a stable hash of its spot). */
+  const speciesSlotFor = (place: string): string => {
+    if (speciesSlotKeys.length === 0) return '';
+    let h = 2166136261;
+    for (let i = 0; i < place.length; i++) {
+      h ^= place.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return speciesSlotKeys[(h >>> 0) % speciesSlotKeys.length] as string;
   };
 
   const dummy = new THREE.Object3D();
@@ -753,9 +793,10 @@ export function createPlotBiomeView(
       } else if (s.kind === 'bush') {
         slotById.get('bush')!.items.push({ ...s, worldX, worldZ });
       } else if (isTree(s.kind)) {
-        // a tree the beam regrew grows in its preset's set, everything else as scattered
+        // a tree the beam regrew grows in its preset's set; otherwise the plot's species palette picks one by place, and
+        // failing that it grows as its own scattered kind
         const place = treePlaceKey(worldX, worldZ);
-        const variant = variants.get(treeOverrides[place] ?? '');
+        const variant = variants.get(treeOverrides[place] ?? '') ?? variants.get(speciesSlotFor(place));
         const target = variant
           ? (dist < 60 ? variant.near : variant.far)
           : slotById.get(dist < 60 ? `${s.kind}_near` : `${s.kind}_far`);
@@ -801,21 +842,26 @@ export function createPlotBiomeView(
       foliageUniforms.uWindTime.value = timeSec;
     },
     setTreeOverrides(overrides: Readonly<Record<string, TreeVariantSpec>>): number {
-      const wanted = new Map<string, TreeVariantSpec>();
       const byPlace: Record<string, string> = {};
-      for (const [place, spec] of Object.entries(overrides)) {
-        const key = treeVariantKey(spec);
-        if (!wanted.has(key)) {
-          if (wanted.size >= MAX_TREE_VARIANTS) continue;
-          wanted.set(key, spec);
-        }
-        byPlace[place] = key;
-      }
-      for (const v of [...variants.values()]) if (!wanted.has(v.key)) dropVariant(v);
-      for (const [key, spec] of wanted) if (!variants.has(key)) variants.set(key, growVariant(key, spec));
+      for (const [place, spec] of Object.entries(overrides)) byPlace[place] = treeVariantKey(spec);
       treeOverrides = byPlace;
+      overrideSpecs = overrides;
+      syncVariantSets(overrideSpecs, paletteSpecs);
       if (lastInput) build(lastInput);
-      return wanted.size;
+      return Math.min(MAX_TREE_VARIANTS, new Set(Object.values(byPlace)).size);
+    },
+    setSpeciesSlots(slots: readonly TreeVariantSpec[]): number {
+      const taken: TreeVariantSpec[] = [];
+      for (const spec of slots) {
+        if (!isTree(spec.species)) continue;
+        if (taken.length >= MAX_TREE_VARIANTS) break;
+        taken.push(spec);
+      }
+      paletteSpecs = taken;
+      speciesSlotKeys = taken.map((spec) => treeVariantKey(spec));
+      syncVariantSets(overrideSpecs, taken);
+      if (lastInput) build(lastInput);
+      return taken.length;
     },
     treeAt(origin, dir, reach): TreeHit | null {
       const [ox, oy, oz] = origin;

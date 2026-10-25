@@ -256,6 +256,11 @@ export interface PlayScene {
   setPlotGate(pose: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }): void;
   /** Sets the plot gate's iris (plan 42's `setGateAccess`): open shows the aperture, code-only and closed draw the shield. */
   setGateAccess(access: GateAccessMode): void;
+  /**
+   * The plot's species palette (plan 42's `PlotBiomePreset`, six slots): the trees the biome scatters grow as these
+   * presets, picked by place. Returns how many slots took.
+   */
+  setSpeciesSlots(slots: readonly { readonly species: 'pine' | 'oak' | 'birch'; readonly params: Readonly<Record<string, number>> }[]): number;
   setSocketRings(poses: readonly { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }[]): void;
   setPlanGhosts(ghosts: readonly { readonly kind: Kind; readonly at: { readonly x: number; readonly y: number; readonly z: number }; readonly yaw: number }[]): void;
   setSheltered(sheltered: boolean): void;
@@ -2826,6 +2831,9 @@ export function createPlayScene(o: {
       if (access === gateAccess) return;
       gateAccess = access;
       buildStargate();
+    },
+    setSpeciesSlots(slots) {
+      return biomeView ? biomeView.setSpeciesSlots(slots) : 0;
     },
     gateExit(dist) {
       twin.group.updateMatrixWorld(true);

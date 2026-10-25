@@ -67,3 +67,25 @@ test('trees of the same kind nearby are found together; equal presets share a se
   assert.equal(v.setTreeOverrides(many), Math.min(MAX_TREE_VARIANTS, like.length), 'at most the cap; the rest stay as grown');
   assert.equal(v.setTreeOverrides({}), 0, 'clearing drops every preset set');
 });
+
+test('a plot wears its biome preset: the species slots decide what the scattered trees grow as', () => {
+  const v = view();
+  const before = someTree(v)!;
+  assert.ok(before.species !== 'pine' || before.kind === before.species, 'the biome grows its own species until a palette is set');
+  // every slot a pine: every tree the beam finds is now a pine, whatever the scatter called it
+  const pines: TreeVariantSpec[] = Array.from({ length: 6 }, (_, i) => ({ species: 'pine', params: { height: 6 + i, tint: i % 2 } }));
+  assert.equal(v.setSpeciesSlots(pines), 6);
+  const seen = new Set<string>();
+  for (let z = -45; z <= 45; z += 1) {
+    const hit = v.treeAt([-60, 11.5, z], [1, 0, 0], 200);
+    if (hit) seen.add(hit.kind);
+  }
+  assert.ok(seen.size > 0, 'trees are still standing');
+  assert.deepEqual([...seen], ['pine']);
+  // a palette that names no tree is refused rather than growing ferns, and the plot keeps its own species again
+  assert.equal(v.setSpeciesSlots([{ species: 'fern' as TreeVariantSpec['species'], params: {} }]), 0);
+  const after = someTree(v)!;
+  assert.equal(after.species, after.kind);
+  // the slot count is capped at the plot's six presets
+  assert.equal(v.setSpeciesSlots(Array.from({ length: 9 }, (_, i) => ({ species: 'oak' as const, params: { height: 4 + i } }))), MAX_TREE_VARIANTS);
+});

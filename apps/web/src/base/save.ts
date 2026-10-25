@@ -17,6 +17,7 @@ import {
   NO_LOADOUT, createWorld, isGateAccessMode, layoutPieces, pieceAt, vehicleBox, type BaseWorld, type Job, type Layout, type Machine, type Plan, type Vehicle,
 } from './world';
 import { DEFAULT_PLOT_RADIUS_M, type GatePose } from '@hm/coopnet/gate-dialer';
+import { MOON_BIOME_PRESET, readBiomePreset } from './biome-preset';
 
 /** The storage key for the base save (next to quest.ts's SAVE_KEY). */
 export const BASE_SAVE_KEY = 'hm-base-v1';
@@ -157,6 +158,7 @@ export function loadWorld(text: string | null, seed = 1): BaseWorld {
     loadout: loadout(raw['loadout']),
     gatePose: gatePose(raw['gatePose']),
     gateAccess: isGateAccessMode(raw['gateAccess']) ? raw['gateAccess'] : 'open',
+    biome: readBiomePreset(raw['biome']) ?? MOON_BIOME_PRESET,
   };
 }
 

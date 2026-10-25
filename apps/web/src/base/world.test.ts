@@ -8,6 +8,8 @@ import { weaponStats } from './weapons';
 import { BRIDGE_STORE, DEFAULT_GATE_POSE, GATE_ACCESS_MODES, INSTANT_TIME_SCALE, SHELTER, apply, createWorld, hashWorld, layoutPieces, networkAt, parkSpot, planGhosts, preview, replay, roomAt, withBridgeStore, type BaseCommand, type BaseWorld, type WorldEnv } from './world';
 import { DEFAULT_PLOT_RADIUS_M, resolveMovedGatePose } from '@hm/coopnet/gate-dialer';
 import { stargateIrisClosed } from '../play/kit-stargate';
+import { EARTH_BIOME_PRESET, MOON_BIOME_PRESET, withBiomeSlot } from './biome-preset';
+import { EARTH_UNLOCK_FIDELITY_STAGE as EARTH_UNLOCK_STAGE } from '@hm/coopnet/gate-dialer';
 
 const env: WorldEnv = { heightAt: () => 0, bridge: { x: 0, z: 0, range: 60 } };
 const at = { x: 2, z: 2 };
@@ -451,4 +453,41 @@ test('the gate pose and its privacy survive a save, and an older save gets an op
   hostile['gateAccess'] = 'everyone';
   assert.deepEqual(loadWorld(JSON.stringify(hostile), 1).gatePose, { x: 3, y: 0, z: 4, yaw: 0 });
   assert.equal(loadWorld(JSON.stringify(hostile), 1).gateAccess, 'open', 'an unknown state is not a locked gate');
+});
+
+test('the plot\'s biome is a preset the world owns: Earth at Stage 6, the Moon before it', () => {
+  const w0 = createWorld();
+  assert.equal(w0.biome.world, 'moon');
+  assert.equal(w0.biome.species.length, 6);
+  // the Earth plot is Stage 6 work: a Moon-stage world refuses its biome, and the reason names the rule
+  const early = apply(w0, env, { t: 'setBiome', preset: EARTH_BIOME_PRESET });
+  assert.deepEqual(early.events, [{ type: 'refused', cmd: 'setBiome', why: 'earth-locked' }]);
+  assert.equal(early.world, w0);
+  // at Stage 6 it is the owner's to take, and the event carries the preset the plot now wears
+  const staged = run(w0, { t: 'stage', stage: EARTH_UNLOCK_STAGE });
+  const opened = apply(staged, env, { t: 'setBiome', preset: EARTH_BIOME_PRESET });
+  assert.deepEqual(opened.events, [{ type: 'biome', preset: EARTH_BIOME_PRESET }]);
+  assert.deepEqual(opened.world.biome, EARTH_BIOME_PRESET);
+  // a retuned slot is a new preset; setting the same one again is refused rather than logged
+  const retuned = withBiomeSlot(EARTH_BIOME_PRESET, 0, { species: 'birch', share: 0.4 });
+  const tuned = run(opened.world, { t: 'setBiome', preset: retuned });
+  assert.deepEqual(tuned.biome.species[0], retuned.species[0]);
+  assert.deepEqual(apply(tuned, env, { t: 'setBiome', preset: retuned }).events, [{ type: 'refused', cmd: 'setBiome', why: 'same-biome' }]);
+  // a hostile preset never reaches a world
+  const junk = apply(tuned, env, { t: 'setBiome', preset: { ...EARTH_BIOME_PRESET, species: [] } });
+  assert.deepEqual(junk.events, [{ type: 'refused', cmd: 'setBiome', why: 'bad-biome' }]);
+  // and the preset is part of the save, so a plot keeps its biome across a reload
+  const back = loadWorld(saveWorld(tuned));
+  assert.deepEqual(back.biome, tuned.biome);
+});
+
+test('an old save with no biome keeps the Moon it was built on', () => {
+  const w = createWorld();
+  const text = saveWorld(w);
+  const raw = JSON.parse(text) as Record<string, unknown>;
+  delete raw['biome'];
+  assert.deepEqual(loadWorld(JSON.stringify(raw)).biome, MOON_BIOME_PRESET);
+  // a save whose biome is beyond repair reads as the Moon's too, never as a bare plot
+  const broken = { ...raw, biome: { v: 1, species: [{ species: 'fern' }] } };
+  assert.deepEqual(loadWorld(JSON.stringify(broken)).biome, MOON_BIOME_PRESET);
 });

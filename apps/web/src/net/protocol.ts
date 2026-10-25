@@ -15,6 +15,7 @@ import type * as L from '@hm/lattice';
 import type * as S from '@hm/structure';
 import type { PartSlot, StationKind, VehicleKind } from '../base/catalog';
 import type { GateAccessMode, GatePose as GateWorldPose } from '@hm/coopnet/gate-dialer';
+import type { PlotBiomePreset } from '../base/biome-preset';
 
 /** The arrival pad a moved gate takes with it (`GatePlacementResult.arrivalPad`), in its own shape so the wire type is plain data. */
 export interface GateArrivalPad { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }
@@ -115,7 +116,9 @@ export type WireBaseEvent =
   /** The plot's gate moved (plan 42): its new pose, and the arrival pad that moved with it. */
   | { readonly kind: 'gateMoved'; readonly pose: GateWorldPose; readonly arrivalPad: GateArrivalPad }
   /** The gate's iris/privacy state changed (plan 42). */
-  | { readonly kind: 'gateAccess'; readonly access: GateAccessMode };
+  | { readonly kind: 'gateAccess'; readonly access: GateAccessMode }
+  /** The plot's biome preset changed (plan 42: the Earth plot unlocked, or a species slot retuned). */
+  | { readonly kind: 'biome'; readonly preset: PlotBiomePreset };
 
 /** Converts a `BaseEvent` (which uses `type`) into a `WireBaseEvent` (which uses `kind`, never `type`). */
 export function toWireEvent(e: BaseEvent): WireBaseEvent {
@@ -178,6 +181,8 @@ export function toWireEvent(e: BaseEvent): WireBaseEvent {
       return { kind: 'gateMoved', pose: e.pose, arrivalPad: e.arrivalPad };
     case 'gateAccess':
       return { kind: 'gateAccess', access: e.access };
+    case 'biome':
+      return { kind: 'biome', preset: e.preset };
   }
 }
 
@@ -240,6 +245,8 @@ export function fromWireEvent(w: WireBaseEvent): BaseEvent {
       return { type: 'gateMoved', pose: w.pose, arrivalPad: w.arrivalPad };
     case 'gateAccess':
       return { type: 'gateAccess', access: w.access };
+    case 'biome':
+      return { type: 'biome', preset: w.preset };
     case 'paid':
       return { type: 'paid', reason: w.reason, bill: w.bill };
   }

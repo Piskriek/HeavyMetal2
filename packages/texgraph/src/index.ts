@@ -32,7 +32,16 @@ const NODE_TYPES = new Set([
   "invert",
   "ramp",
   "scaleBias",
+  // TICKET-41's six periodic nodes (the tile library, 2026-10-23)
+  "hex",
+  "spots",
+  "weave",
+  "scratches",
+  "blur",
 ]);
+
+/** The node types the tile library may use, for the Studio's node palette and the docs. */
+export const TILE_NODE_TYPES: readonly string[] = Object.freeze([...NODE_TYPES]);
 
 function isRecord(value: unknown): value is NodeRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -85,22 +94,27 @@ function hash2(x: number, y: number, seed: number): number {
   return (h >>> 0) / 4294967296;
 }
 
-function noiseImage(size: number, scale: number, octaves: number, gain: number, seed: number): Float32Array {
+/**
+ * Tileable value noise, quintic fade. `scaleY` (default: `scale`) stretches the lattice along v: with scaleX 32 and scaleY 2 the
+ * value changes quickly across the tile and slowly down it, which is what a brushed or rolled surface looks like (TICKET-41).
+ */
+function noiseImage(size: number, scale: number, octaves: number, gain: number, seed: number, scaleY = scale): Float32Array {
   const out = new Float32Array(size * size);
   const xa = new Int32Array(size), xb = new Int32Array(size), tx = new Float32Array(size);
-  let amplitude = 1, norm = 0, period = Math.max(1, Math.round(scale));
+  let amplitude = 1, norm = 0;
+  let periodX = Math.max(1, Math.round(scale)), periodY = Math.max(1, Math.round(scaleY));
   const count = Math.max(1, Math.min(6, Math.round(octaves || 1)));
   for (let octave = 0; octave < count; octave += 1) {
-    const lattice = new Float32Array(period * period);
+    const lattice = new Float32Array(periodX * periodY);
     const octaveSeed = (seed | 0) + octave * 101;
-    for (let j = 0; j < period; j += 1) for (let i = 0; i < period; i += 1) lattice[j * period + i] = hash2(i, j, octaveSeed);
+    for (let j = 0; j < periodY; j += 1) for (let i = 0; i < periodX; i += 1) lattice[j * periodX + i] = hash2(i, j, octaveSeed);
     for (let x = 0; x < size; x += 1) {
-      const f = ((x + 0.5) / size) * period, i0 = Math.floor(f);
-      xa[x] = i0 % period; xb[x] = (i0 + 1) % period; tx[x] = fade(f - i0);
+      const f = ((x + 0.5) / size) * periodX, i0 = Math.floor(f);
+      xa[x] = i0 % periodX; xb[x] = (i0 + 1) % periodX; tx[x] = fade(f - i0);
     }
     for (let y = 0; y < size; y += 1) {
-      const f = ((y + 0.5) / size) * period, j0 = Math.floor(f);
-      const ya = (j0 % period) * period, yb = ((j0 + 1) % period) * period, ty = fade(f - j0);
+      const f = ((y + 0.5) / size) * periodY, j0 = Math.floor(f);
+      const ya = (j0 % periodY) * periodX, yb = ((j0 + 1) % periodY) * periodX, ty = fade(f - j0);
       for (let x = 0; x < size; x += 1) {
         const a = lattice[ya + xa[x]!]!, b = lattice[ya + xb[x]!]!, c = lattice[yb + xa[x]!]!, d = lattice[yb + xb[x]!]!;
         const top = a + (b - a) * tx[x]!, bottom = c + (d - c) * tx[x]!;
@@ -109,7 +123,8 @@ function noiseImage(size: number, scale: number, octaves: number, gain: number, 
     }
     norm += amplitude;
     amplitude *= gain;
-    period *= 2;
+    periodX *= 2;
+    periodY *= 2;
   }
   for (let i = 0; i < out.length; i += 1) out[i] = norm > 0 ? out[i]! / norm : 0;
   return out;
@@ -165,6 +180,173 @@ function stripesImage(size: number, count: number, softness: number, vertical: b
   for (let i = 0; i < size; i += 1) line[i] = shape(0.5 + 0.5 * Math.sin(Math.PI * 2 * ((i + 0.5) / size) * bands));
   for (let y = 0; y < size; y += 1) for (let x = 0; x < size; x += 1) out[y * size + x] = vertical ? line[x]! : line[y]!;
   return out;
+}
+
+/** A wrapping scalar field's distance into [-0.5, 0.5): the shortest way round the tile. */
+function wrapDelta(value: number): number {
+  return value - Math.round(value);
+}
+
+/**
+ * A hexagonal grid that wraps on a square tile (TICKET-41). The hexagons are pointy-topped and nearly regular: `count` columns across
+ * and round(count * 2 / sqrt(3)) rows down keeps the aspect within 2% of a true honeycomb while both axes divide the tile exactly.
+ * Each pixel takes the smallest of its neighbouring cells' hex distance (0 at a centre, 1 on the wall), which is continuous across walls.
+ * - mode 'cell': a dome, 1 in the middle of a cell and 0 at its wall;
+ * - mode 'edge': thin bright walls, decaying over `band` of the distance.
+ */
+function hexImage(size: number, count: number, mode: string, jitter: number, band: number, seed: number): Float32Array {
+  const columns = Math.max(1, Math.min(32, Math.round(count)));
+  const rows = Math.max(1, Math.round((columns * 2) / Math.sqrt(3)));
+  const W = 1 / columns, H = 1 / rows;
+  const R = (W / Math.sqrt(3) + H / 1.5) / 2;
+  const jit = Math.max(0, Math.min(0.4, jitter));
+  const width = Math.max(0.01, Math.min(1, band));
+  const norm = Math.sqrt(3) * R;
+  const out = new Float32Array(size * size);
+  for (let y = 0; y < size; y += 1) {
+    const v = (y + 0.5) / size, baseJ = Math.floor(v * rows);
+    for (let x = 0; x < size; x += 1) {
+      const u = (x + 0.5) / size, baseI = Math.floor(u * columns);
+      let s = Infinity;
+      for (let dj = -1; dj <= 1; dj += 1) {
+        const j = baseJ + dj, jw = ((j % rows) + rows) % rows;
+        for (let di = -1; di <= 1; di += 1) {
+          const i = baseI + di, iw = ((i % columns) + columns) % columns;
+          const cx = (iw + 0.5 + (jw & 1) * 0.5) / columns + (hash2(iw, jw, seed) - 0.5) * jit * W;
+          const cy = (jw + 0.5) / rows + (hash2(iw, jw, (seed | 0) + 7919) - 0.5) * jit * H * 0.5;
+          const dx = Math.abs(wrapDelta(u - cx)), dy = Math.abs(wrapDelta(v - cy));
+          const distance = Math.max((2 * dx) / norm, (dx + Math.sqrt(3) * dy) / norm);
+          if (distance < s) s = distance;
+        }
+      }
+      out[y * size + x] = mode === "edge" ? clamp01(1 - (1 - Math.min(1, s)) / width) : 1 - clamp01(s);
+    }
+  }
+  return out;
+}
+
+/** Round spots at hashed, wrapping positions: 1 at a centre, 0 at its radius; `softness` 0 is a flat disc, 1 a soft bloom. */
+function spotsImage(size: number, count: number, radius: number, softness: number, seed: number): Float32Array {
+  const n = Math.max(1, Math.min(64, Math.round(count)));
+  const base = Math.max(0.004, Math.min(1, radius)), soft = clamp01(softness);
+  const sx = new Float32Array(n), sy = new Float32Array(n), sr = new Float32Array(n);
+  for (let k = 0; k < n; k += 1) {
+    sx[k] = hash2(k, 11, seed);
+    sy[k] = hash2(k, 23, seed);
+    sr[k] = base * (0.55 + 0.9 * hash2(k, 37, seed));
+  }
+  const out = new Float32Array(size * size);
+  for (let y = 0; y < size; y += 1) {
+    const v = (y + 0.5) / size;
+    for (let x = 0; x < size; x += 1) {
+      const u = (x + 0.5) / size;
+      let best = 0;
+      for (let k = 0; k < n; k += 1) {
+        const dx = wrapDelta(u - sx[k]!), dy = wrapDelta(v - sy[k]!);
+        const limit = sr[k]!, d2 = dx * dx + dy * dy;
+        if (d2 >= limit * limit) continue;
+        let f = 1 - Math.sqrt(d2) / limit;
+        f = f * (1 - soft) + f * f * (3 - 2 * f) * soft;
+        if (f > best) best = f;
+      }
+      out[y * size + x] = best;
+    }
+  }
+  return out;
+}
+
+/**
+ * A plain basket weave (TICKET-41): `threads` (rounded to an even number, so the alternation wraps) threads across and down, each a
+ * half-sine ridge, with the horizontal thread riding over the vertical one or under it on the parity of its cell.
+ */
+function weaveImage(size: number, threads: number, contrast: number): Float32Array {
+  const n = Math.max(2, Math.min(32, Math.round(threads / 2) * 2));
+  const lift = clamp01(contrast);
+  const gap = 0.12 * (1 - lift);
+  const out = new Float32Array(size * size);
+  for (let y = 0; y < size; y += 1) {
+    const v = (y + 0.5) / size, fv = v * n, j = Math.floor(fv) % n;
+    const ridgeV = Math.sin(Math.PI * (fv - Math.floor(fv)));
+    for (let x = 0; x < size; x += 1) {
+      const u = (x + 0.5) / size, fu = u * n, i = Math.floor(fu) % n;
+      const ridgeU = Math.sin(Math.PI * (fu - Math.floor(fu)));
+      const over = ((i + j) & 1) === 0;
+      const top = over ? ridgeV : ridgeU, cross = over ? ridgeU : ridgeV;
+      out[y * size + x] = clamp01(gap + (1 - gap) * top * (0.75 + 0.25 * cross));
+    }
+  }
+  return out;
+}
+
+/**
+ * Fine scratches (TICKET-41): `count` straight, tapered lines running across (`vertical` false) or down the tile (`vertical` true, like
+ * `stripes`), each with its own lane, start, length and strength; both axes wrap.
+ */
+function scratchesImage(size: number, count: number, length: number, width: number, vertical: boolean, seed: number): Float32Array {
+  const n = Math.max(1, Math.min(32, Math.round(count)));
+  const len = clamp01(length), w = Math.max(0.002, Math.min(0.2, width));
+  const lines = Array.from({ length: n }, (_, k) => ({
+    across: hash2(k, 3, seed),
+    along: hash2(k, 5, seed),
+    span: Math.max(0.02, len * (0.45 + 0.55 * hash2(k, 7, seed))),
+    strength: 0.55 + 0.45 * hash2(k, 11, seed),
+  }));
+  const out = new Float32Array(size * size);
+  for (let y = 0; y < size; y += 1) {
+    const v = (y + 0.5) / size;
+    for (let x = 0; x < size; x += 1) {
+      const u = (x + 0.5) / size;
+      const along = vertical ? v : u, across = vertical ? u : v;
+      let best = 0;
+      for (const line of lines) {
+        const halfW = w * (0.6 + 0.4 * line.strength);
+        const dp = wrapDelta(across - line.across);
+        if (Math.abs(dp) >= halfW) continue;
+        let da = along - line.along;
+        da -= Math.floor(da);
+        if (da > line.span) continue;
+        const taper = Math.min(1, Math.min(da, line.span - da) / (line.span * 0.12));
+        const value = clamp01((1 - Math.abs(dp) / halfW) * taper * line.strength);
+        if (value > best) best = value;
+      }
+      out[y * size + x] = best;
+    }
+  }
+  return out;
+}
+
+/** One wrapped box-blur pass along an axis, with a running sum: O(pixels), whatever the radius. */
+function boxBlurPass(src: Float32Array, dst: Float32Array, size: number, channels: number, radius: number, horizontal: boolean): void {
+  const span = radius * 2 + 1;
+  for (let outer = 0; outer < size; outer += 1) {
+    for (let c = 0; c < channels; c += 1) {
+      const at = (k: number): number => {
+        const kk = ((k % size) + size) % size;
+        return horizontal ? src[(outer * size + kk) * channels + c]! : src[(kk * size + outer) * channels + c]!;
+      };
+      let sum = 0;
+      for (let k = -radius; k <= radius; k += 1) sum += at(k);
+      for (let i = 0; i < size; i += 1) {
+        const index = horizontal ? (outer * size + i) * channels + c : (i * size + outer) * channels + c;
+        dst[index] = sum / span;
+        sum += at(i + radius + 1) - at(i - radius);
+      }
+    }
+  }
+}
+
+/** A wrapped blur: three box passes along each axis approximate a Gaussian, and the tile stays seamless. */
+function blurImage(data: Float32Array, size: number, channels: number, radius: number): Float32Array {
+  const r = Math.max(1, Math.min(Math.floor(size / 2), Math.round(radius)));
+  let source = data;
+  const horizontal = new Float32Array(data.length);
+  for (let pass = 0; pass < 3; pass += 1) {
+    boxBlurPass(source, horizontal, size, channels, r, true);
+    const vertical = new Float32Array(data.length);
+    boxBlurPass(horizontal, vertical, size, channels, r, false);
+    source = vertical;
+  }
+  return source;
 }
 
 /** The curl of a wrapping scalar field: its gradient turned a quarter, divided by the largest so the biggest offset is 1. */
@@ -243,7 +425,7 @@ function referencesFor(node: NodeRecord): string[] {
     return refs;
   }
 
-  if (type === "levels" || type === "invert" || type === "ramp" || type === "scaleBias") {
+  if (type === "levels" || type === "invert" || type === "ramp" || type === "scaleBias" || type === "blur") {
     return ["in"];
   }
 
@@ -297,9 +479,53 @@ function checkNodeParameters(node: NodeRecord, errors: string[]): void {
 
   if (type === "noise") {
     checkedNumber(node, "scale", errors, 1, 64, true);
+    if (node.scaleY !== undefined) checkedNumber(node, "scaleY", errors, 1, 64, true);
     checkedNumber(node, "octaves", errors, 1, 6, true);
     checkedNumber(node, "gain", errors, 0, 1);
     checkedNumber(node, "seed", errors);
+    return;
+  }
+
+  if (type === "hex") {
+    checkedNumber(node, "count", errors, 1, 32, true);
+    if (node.jitter !== undefined) checkedNumber(node, "jitter", errors, 0, 0.4);
+    if (node.band !== undefined) checkedNumber(node, "band", errors, 0.01, 1);
+    if (node.seed !== undefined) checkedNumber(node, "seed", errors);
+
+    if (node.mode !== "edge" && node.mode !== "cell") {
+      errors.push(`node '${id}': 'hex' parameter 'mode' must be 'edge' or 'cell'`);
+    }
+    return;
+  }
+
+  if (type === "spots") {
+    checkedNumber(node, "count", errors, 1, 64, true);
+    checkedNumber(node, "radius", errors, 0.004, 1);
+    if (node.softness !== undefined) checkedNumber(node, "softness", errors, 0, 1);
+    checkedNumber(node, "seed", errors);
+    return;
+  }
+
+  if (type === "weave") {
+    checkedNumber(node, "threads", errors, 2, 32, true);
+    if (node.contrast !== undefined) checkedNumber(node, "contrast", errors, 0, 1);
+    return;
+  }
+
+  if (type === "scratches") {
+    checkedNumber(node, "count", errors, 1, 32, true);
+    checkedNumber(node, "length", errors, 0, 1);
+    checkedNumber(node, "width", errors, 0.002, 0.2);
+
+    if (node.vertical !== undefined && typeof node.vertical !== "boolean") {
+      errors.push(`node '${id}': 'scratches' parameter 'vertical' must be boolean`);
+    }
+    if (node.seed !== undefined) checkedNumber(node, "seed", errors);
+    return;
+  }
+
+  if (type === "blur") {
+    checkedNumber(node, "radius", errors, 1, 32, true);
     return;
   }
 
@@ -579,6 +805,10 @@ export function validateGraph(g: unknown): { ok: boolean; errors: string[] } {
         result = "scalar";
       } else if (type === "stripes" || type === "checker") {
         result = "scalar";
+      } else if (type === "hex" || type === "spots" || type === "weave" || type === "scratches") {
+        result = "scalar";
+      } else if (type === "blur") {
+        result = typeof node.in === "string" ? inferType(node.in) : undefined;
       } else if (type === "constant") {
         result = isColorValue(node.value)
           ? "colour"
@@ -759,9 +989,45 @@ export function evaluateGraph(graph: TexGraph, opts?: EvaluateOptions): Evaluate
     let result: Image;
 
     switch (node.type) {
-      case "noise":
-        result = { colour: false, data: noiseImage(size, num(params, "scale", 1), num(params, "octaves", 1), num(params, "gain", 0.5), nodeSeed(node)) };
+      case "noise": {
+        const scale = num(params, "scale", 1);
+        result = {
+          colour: false,
+          data: noiseImage(size, scale, num(params, "octaves", 1), num(params, "gain", 0.5), nodeSeed(node), num(params, "scaleY", scale)),
+        };
         break;
+      }
+
+      case "hex":
+        result = {
+          colour: false,
+          data: hexImage(size, num(params, "count", 6), String(params.mode), num(params, "jitter", 0), num(params, "band", 0.18), nodeSeed(node)),
+        };
+        break;
+
+      case "spots":
+        result = {
+          colour: false,
+          data: spotsImage(size, num(params, "count", 12), num(params, "radius", 0.12), num(params, "softness", 0.5), nodeSeed(node)),
+        };
+        break;
+
+      case "weave":
+        result = { colour: false, data: weaveImage(size, num(params, "threads", 8), num(params, "contrast", 0.75)) };
+        break;
+
+      case "scratches":
+        result = {
+          colour: false,
+          data: scratchesImage(size, num(params, "count", 12), num(params, "length", 0.6), num(params, "width", 0.02), params.vertical === true, nodeSeed(node)),
+        };
+        break;
+
+      case "blur": {
+        const input = get(String(params.in));
+        result = { colour: input.colour, data: blurImage(input.data, size, input.colour ? 3 : 1, num(params, "radius", 2)) };
+        break;
+      }
 
       case "cellular":
         result = { colour: false, data: cellularImage(size, num(params, "scale", 1), num(params, "jitter", 0.8), String(params.mode), nodeSeed(node)) };
@@ -1309,3 +1575,5 @@ export function litPreview(t: EvaluatedTexture): Uint8ClampedArray {
   }
   return out;
 }
+
+export * from "./tile-library";

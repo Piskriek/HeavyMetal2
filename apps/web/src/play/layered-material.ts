@@ -16,7 +16,7 @@
  * (never an invisible part).
  */
 import * as THREE from 'three';
-import { evaluateGraph, type TexGraph } from '@hm/texgraph';
+import { TILE_LIBRARY, evaluateGraph, type TexGraph } from '@hm/texgraph';
 import { VAULT_BY_ID } from '@hm/vault';
 import {
   CHANNEL_GROUPS,
@@ -136,8 +136,11 @@ export const cpuNoise: NoiseSource = { sample: (kind, u, v) => bilinear(noiseAtl
 
 // ------------------------------------------------------------------ tiles
 
-/** Tile graphs by id: the vault's cartridges today, the tile library (TICKET-41) when it lands. */
-const TILE_GRAPHS = new Map<string, TexGraph>([...VAULT_BY_ID].map(([id, c]) => [id, c.graph]));
+/** Tile graphs by id: the tile library first (TICKET-41: the 20 tiles the shelf names), then the vault's cartridges on top. */
+const TILE_GRAPHS = new Map<string, TexGraph>([
+  ...Object.entries(TILE_LIBRARY),
+  ...[...VAULT_BY_ID].map(([id, c]): [string, TexGraph] => [id, c.graph]),
+]);
 
 /** Adds tile graphs (the tile library); later registrations replace earlier ones of the same id. */
 export function registerTileGraphs(graphs: Readonly<Record<string, TexGraph>>): void {

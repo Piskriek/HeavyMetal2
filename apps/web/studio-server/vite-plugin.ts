@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
 import { BENCH_ROUTE, JobRunner, benchPathsFor, handleBenchRequest } from './bench';
 import { BodyTooLarge, ROUTE, handleStudioRequest, type Reply, type Request } from './write-back';
+import { AGENT_ROUTE, AgentRelay } from './agent-relay';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '../../..');
@@ -25,6 +26,50 @@ const benchDir = process.env.STUDIO_BENCH_DIR || undefined;
 if (mock && !benchDir) throw new Error('STUDIO_BENCH_MOCK=1 needs STUDIO_BENCH_DIR (a temporary folder): the fixtures never run on the real assets');
 const benchPaths = benchPathsFor(root, process.env.STUDIO_SECRETS_FILE || path.join(root, '.studio-secrets.json'), benchDir);
 const jobs = new JobRunner(root);
+// The agent relay (plan 40 §4): the bridge posts tool calls here, the Studio page long-polls for them and answers. One per dev server;
+// a call nobody answers fails with a reason after half a minute.
+const agentRelay = new AgentRelay();
+
+/** The relay's routes. JSON in, JSON out; a page polls with its pairing key. */
+async function handleAgentRequest(request: Request): Promise<Reply> {
+  const path = request.path;
+  const keyOf = (): string => request.query?.key ?? '';
+  const body = async (): Promise<Record<string, unknown>> => {
+    const text = request.method === 'GET' ? '' : await request.readBody(1 << 20);
+    try {
+      const parsed = text ? (JSON.parse(text) as unknown) : {};
+      return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {};
+    } catch {
+      return {};
+    }
+  };
+  const json = (status: number, value: unknown): Reply => ({ status, body: JSON.stringify(value) });
+  if (path === `${AGENT_ROUTE}/poll`) {
+    const key = keyOf();
+    return json(200, { ok: true, calls: agentRelay.poll(key) });
+  }
+  if (path === `${AGENT_ROUTE}/status`) {
+    const key = keyOf();
+    return json(200, { ok: true, status: agentRelay.status(key) });
+  }
+  const payload = await body();
+  const key = typeof payload.key === 'string' ? payload.key : '';
+  if (path === `${AGENT_ROUTE}/call`) {
+    const tool = typeof payload.tool === 'string' ? payload.tool : '';
+    if (!tool) return json(400, { ok: false, why: 'a tool name is required' });
+    return json(200, await agentRelay.call(key, tool, payload.args ?? {}));
+  }
+  if (path === `${AGENT_ROUTE}/answer`) {
+    const id = typeof payload.id === 'string' ? payload.id : '';
+    const answer = (payload.answer ?? {}) as { ok?: boolean; value?: unknown; why?: string };
+    const settled = agentRelay.answer(key, id, { ok: answer.ok !== false, ...(answer.value === undefined ? {} : { value: answer.value }), ...(answer.why ? { why: answer.why } : {}) });
+    return json(settled ? 200 : 404, { ok: settled, ...(settled ? {} : { why: `no call '${id}' is in flight for this key` }) });
+  }
+  if (path === `${AGENT_ROUTE}/drop`) {
+    return json(200, { ok: true, dropped: agentRelay.drop(key, typeof payload.why === 'string' ? payload.why : undefined) });
+  }
+  return json(404, { ok: false, why: `unknown agent route ${path}` });
+}
 
 export function studioWriteBack(): Plugin {
   return {
@@ -35,10 +80,12 @@ export function studioWriteBack(): Plugin {
         const url = req.url ?? '';
         const isData = url.startsWith(ROUTE);
         const isBench = url.startsWith(BENCH_ROUTE);
-        if (!isData && !isBench) { next(); return; }
+        const isAgent = url.startsWith(AGENT_ROUTE);
+        if (!isData && !isBench && !isAgent) { next(); return; }
         const request: Request = {
           method: req.method ?? 'GET',
           path: url.split('?')[0] ?? url,
+          query: Object.fromEntries(new URL(url, 'http://studio.local').searchParams),
           host: req.headers.host,
           origin: req.headers.origin,
           contentType: req.headers['content-type'],
@@ -54,9 +101,11 @@ export function studioWriteBack(): Plugin {
             req.on('error', reject);
           }),
         };
-        const answer = isBench
-          ? handleBenchRequest(request, benchPaths, jobs, { mock })
-          : handleStudioRequest(request, paths);
+        const answer = isAgent
+          ? handleAgentRequest(request)
+          : isBench
+            ? handleBenchRequest(request, benchPaths, jobs, { mock })
+            : handleStudioRequest(request, paths);
         answer.then((reply: Reply | null) => {
           if (!reply) { next(); return; }
           res.statusCode = reply.status;

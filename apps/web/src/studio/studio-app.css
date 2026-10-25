@@ -500,3 +500,39 @@
   background: rgba(16, 24, 34, 0.7);
 }
 
+
+/* The agent readout (plan 40): the pairing key a person reads to their bridge, and what the bridge has done so far. */
+.sx-agent { position: relative; }
+.sx-agent-toggle {
+  border: 1px solid rgba(124, 255, 77, 0.35);
+  background: rgba(9, 14, 12, 0.7);
+  color: #bfe8b0;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+.sx-agent-toggle[aria-expanded='true'] { background: rgba(124, 255, 77, 0.14); }
+.sx-agent-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  width: 340px;
+  z-index: 40;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(124, 255, 77, 0.25);
+  background: rgba(6, 10, 9, 0.96);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  font-size: 12px;
+  line-height: 1.45;
+  color: #b9c6bd;
+}
+.sx-agent-key { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.sx-agent-key code { font-size: 11px; color: #d9ffe0; overflow-wrap: anywhere; }
+.sx-agent-key button { border: 1px solid rgba(255, 255, 255, 0.16); background: transparent; color: inherit; border-radius: 4px; cursor: pointer; }
+.sx-agent-panel p { margin: 0; }
+.sx-agent-panel a { color: #8fe3ff; }
+.sx-agent-why { margin-top: 6px !important; color: #ffb4a1; }

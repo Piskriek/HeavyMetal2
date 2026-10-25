@@ -22,7 +22,9 @@
     "ui-editor": "node scripts/ui-editor.mjs",
     "e2e:legacy": "node scripts/e2e-smoke.mjs",
     "command-center": "node scripts/command-center.mjs",
-    "board": "node scripts/agent-worker.mjs --list"
+    "board": "node scripts/agent-worker.mjs --list",
+    "studio-skill": "node --import tsx scripts/studio-skill.mjs",
+    "studio-agent": "node scripts/studio-agent-bridge.mjs"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.5.1",

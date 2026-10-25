@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import type { Group } from 'three';
 import { createHistory, redo, undo, type History, type Op } from '@hm/scenedoc';
 import { SPECS } from '@hm/vault';
+import { MATERIAL_SHELF } from '@hm/matstack';
 import { ASSET_TWEAKS, GEN, loadGenRaw, type GenLevel } from '../assets/gen';
 import { kv } from '../storage/profile-storage';
 import { fieldError, FIELDS, type AssetTweak, type Vec3 } from '../../studio-server/tweak-schema';
@@ -29,6 +30,8 @@ import { StudioErrorBoundary } from './studio-error-boundary';
 import { MaterialDesigner } from './material-designer';
 import { MonsterTab } from './monster-tab';
 import { PartDesigner } from './part-designer';
+import { installStudioAgent, newPairingKey, type StudioAgentApi } from './studio-agent-page';
+import { startBridgeClient, type BridgeState } from './studio-agent-bridge-client';
 import './studio-app.css';
 
 const ENDPOINT = '/__studio/data/asset-tweaks';
@@ -154,6 +157,35 @@ export function StudioApp({ onBack, renderPrototype }: {
   toolRef.current = tool;
   const savedRef = useRef(saved);
   savedRef.current = saved;
+
+  // ---- the agent API (plan 40): installed once per Studio mount, paired by a key the person reads out to their bridge ----
+  const [agentKey, setAgentKey] = useState<string | null>(null);
+  const [agentState, setAgentState] = useState<BridgeState | null>(null);
+  const [agentOpen, setAgentOpen] = useState(false);
+  useEffect(() => {
+    const key = newPairingKey();
+    const installed = installStudioAgent({
+      key,
+      // the session edits the document the person is looking at, through the same history their own undo walks
+      doc: histRef.current.doc,
+      history: { get: () => histRef.current, set: (h: History) => setHist(h) },
+      materials: { ...MATERIAL_SHELF },
+      // eyes: the review renderer's four angles of the selected asset (the live viewport can attach later, when it exposes one)
+      eyes: { asset: () => selRef.current },
+    });
+    const client = startBridgeClient({
+      key,
+      api: () => (globalThis as { studioAgent?: StudioAgentApi }).studioAgent,
+      onState: setAgentState,
+    });
+    setAgentKey(key);
+    return () => {
+      void client.stop();
+      installed.disconnect();
+    };
+    // the key is per Studio mount: a reload pairs again, and a new key cancels the old one
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const doc = hist.doc;
   const changes = useMemo(() => pendingChanges(doc, saved), [doc, saved]);
@@ -545,6 +577,28 @@ export function StudioApp({ onBack, renderPrototype }: {
           <button type="button" aria-pressed={workspace === 'moon'} onClick={() => setWorkspace('moon')}>Moon (prototype)</button>
         </nav>
         <span className="sx-grow" />
+        {agentKey ? (
+          <div className="sx-agent" title="Any agent that reads studio-skill.md can pair with this Studio using this key">
+            <button type="button" className="sx-agent-toggle" aria-expanded={agentOpen} onClick={() => setAgentOpen((v) => !v)}>
+              Agent {agentState?.connecting ? (agentState.polls > 0 ? 'listening' : 'idle') : 'offline'}
+            </button>
+            {agentOpen ? (
+              <div className="sx-agent-panel">
+                <div className="sx-agent-key">
+                  <span>Pairing key</span>
+                  <code>{agentKey}</code>
+                  <button type="button" onClick={() => { void navigator.clipboard?.writeText(agentKey); }}>Copy</button>
+                </div>
+                <p>
+                  Run <code>node scripts/studio-agent-bridge.mjs --key {agentKey.slice(0, 8)}…</code> and point your agent at it. Read{' '}
+                  <a href="/studio-skill.md" target="_blank" rel="noreferrer">studio-skill.md</a> first: propose, validate, measure, look,
+                  then ask. {agentState ? `${agentState.answered} answered, ${agentState.refused} refused.` : ''}
+                </p>
+                {agentState?.lastWhy ? <p className="sx-agent-why">{agentState.lastWhy}</p> : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         {workspace === 'assets' || workspace === 'scene' ? <>
         <div className="sx-cluster">
           <button

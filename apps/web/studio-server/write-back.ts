@@ -48,6 +48,8 @@ export interface Request {
   readonly method: string;
   /** The path with its query string removed. */
   readonly path: string;
+  /** The query string's parameters (an agent's poll carries its pairing key this way). */
+  readonly query?: Readonly<Record<string, string>>;
   readonly host: string | undefined;
   readonly origin: string | undefined;
   readonly contentType: string | undefined;

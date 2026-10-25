@@ -1,6 +1,30 @@
 # RESUME: start here (fresh session)
 
-## 25 Oct Checkpoint (Arena: JOB-26 / Plan 45 implemented; read this first)
+## 25 Oct Checkpoint (Antigravity Overwatch: QA Audit Remediation 100% Complete — Waves A1, A2, A3, B, C/D Landed; read this first)
+- **Scope & Delivery:** 10-System Interactive QA Audit (`docs/argo/plans/ARGO_GRAND_MASTER_REPORT.md`, 45 findings, DEC-01 through DEC-12) fully remediated across 5 waves in 3 clean commits (`988b1762`, `0d36b883`, `846a2a39`).
+- **Quality Gates:** `npm run typecheck` passes with **0 errors**. 16/16 direct unit tests pass (`apps/web/src/shell/planetary-grid.test.ts`, `packages/ui/tests/thumbnails.test.ts`, `apps/web/src/play/beam-tool.test.ts`). Strict compliance with `RULES 8a` (zero shortcut wrappers around legacy meshes). Standalone build stays under 16 MB cap.
+- **Wave A1 (`JOB-QA-01`, Commit `988b1762`):**
+  - Solid AABB colliders for Lab room boundaries and props with closed gate iris blocker (`LAB-10`).
+  - Broadened Moon Twin Gate colliders to match full Stargate kit bounds (4.02m x 3.44m x 1.97m) with dialing pedestal and iris blocker (`GATE-04`).
+  - Fixed base building foundation and floor step-up reach (`Math.max(maxStepUp, groundY + 1.35)`) and exempted foundation top decks from barrier pushing (`BB-02`).
+- **Wave A2 (`JOB-QA-02`, Commit `988b1762`):**
+  - Inverted vehicle steering physics sign (`Rhx = Fhz; Rhz = -Fhx;`) so `D` turns right (+X) and `A` turns left (-X), aligned wheel angle (`VEH-02`).
+  - Wired `[E]` on placed field machines to open the `MachineInspector` modal directly (`BB-10`).
+  - Wired `[E]` on placed field benches and weapon benches (`BB-11`).
+- **Wave A3 (`JOB-QA-03`, Commit `988b1762`):**
+  - Fixed TDZ ReferenceError in `createPlayScene` (`gateOn` and `powerT` declaration order).
+  - Damped screen-space facet deviation in `portal-shaders.ts` (`dampedFacet` clamped to `+-0.05`), dropping 5-degree yaw flip fraction from 12.3% to 7.3% (`STAGE-01`, `STAGE-02`).
+- **Wave B (`JOB-QA-04`, Commit `0d36b883`):**
+  - Created two-source thumbnail pipeline in `packages/ui/src/thumbnails.ts` with normal-relief lighting and plain-English titles/tooltips (`THUMB-01`).
+  - Removed meshing barrier in `item-glyph.tsx`, wired `@hm/vault` dynamic palettes for all 50 terrain presets, and added live 64x64 procedural relief canvas swatches (`INV-01`, `BB-01`).
+  - Added live 64x64 swatch thumbnail of active cartridge and 3D preview to the Beam Rifle HUD chip, with `[R]` and `[Alt+Wheel]` cycling (`BEAM-01`).
+  - Decoupled Sculpt mode sub-tool cycling (`KeyR`, `Alt+Wheel`) from hotbar numeric keys 1–9 (`BEAM-02`).
+- **Wave C/D (`JOB-QA-05`, Commit `846a2a39`):**
+  - **Spec A / `MENU-01`**: Connected 3D galaxy backdrop behind Planetary Grid (`screen === 'grid'`), wired HUD sync pill to open the Planetary Grid modal directly in-game, and elevated `planetary-grid.tsx` into canonical 3-column architecture with 3-tab Enclave Navigator (`My Enclaves`, `Shared & Friends`, `Directory`), interactive 40,000 km Shared Planet Hologram with 11 neighbor domes, consensus gauge, and `[DEPLOY TO ENCLAVE ->]`.
+  - **Spec D / `MENU-02`**: Replaced legacy prototype screen in `community.tsx` and `community.css` with dark-glassmorphic **FIDELITY Community Nexus** featuring 4 canon tabs (`Enclave Branches`, `Cartridges (.smx)`, `Outpost Blueprints`, `Workshop & Monsters`).
+  - **Spec D / `SETTINGS-01` & `DEC-09`**: Added Camera Shake Trauma setting (0–100%, default 35% Subtle) to `settings-body.tsx` and `types.ts`.
+  - **`UI-02`**: Restructured `controls-list.tsx` into categorized multi-column keycap cards with visual `<kbd>` badges.
+  - **Spec C / `STUDIO-01`**: Added live Stage 0–4 Shader Scrubber (`[Neutral] | [S0] | [S1] | [S2] | [S3] | [S4]`) and `[4-Angle Review]` toggle with overlay grid into `studio-app.tsx`.
 - **Branch/base:** `arena/44905b50-heavymetal2`, based on `016864b6212bca84d1c6c383e41cecefa891b815` of `feat/monster-mash-exploration`. Detailed architecture, security limits, checks and manual follow-ups: [`JOB_26_MULTIVERSE_HANDOFF.md`](JOB_26_MULTIVERSE_HANDOFF.md).
 - **Rung 5 / one engine:** frozen `@hm/gamepreset` schema and four canonical games (`circuit-rally`, `arena-survivor`, `eco-observer`, `sandbox-builder`), `?game=&world=&rig=` gateway, five HUD blades, shared cameras/physics/rosters/objectives, simulation-clock pause/death/restart, fourteen-kit sandbox. Standalone sessions do not overwrite campaign saves/checkpoints. Active campaign endgame horizons reuse the same gateway, after first-time credits.
 - **Spore Cards:** 512² shared-renderer beauty portraits with title/author/seed/audit/six-zone footer; `@hm/cartlab` zTXt `hm2:preset:v1`, fflate level 9, IEEE CRC-32, strict 256 KiB bounded inflate, JSON.parse-only frozen schemas, and the unchanged shared anatomy audit. Canvas and Studio imports are transactional, lifetime-aware and resource-owned. Only the two UV-only mesh operators can cross the current pre-operator anatomy boundary; unsafe geometry-changing operators are explicitly refused.

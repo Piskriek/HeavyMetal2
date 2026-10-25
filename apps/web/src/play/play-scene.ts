@@ -111,6 +111,7 @@ import { PAINT_CELL, PAINT_CELLS } from '../base/plot-height';
 import { emptyField, encodeField } from '@hm/terrainbrush';
 import { createVerticalJumpState, stepVerticalJump } from '@hm/kinematic';
 import { aimKit, vehicleTargetable, type KitTargetable, type VehicleTargetable } from './kit-target';
+import { earthEndgameState, type EndgameInput, type EndgameState } from './earth-endgame';
 
 export type Where = 'lab' | 'planet';
 /** What the screen gives the scene each frame. */
@@ -155,8 +156,8 @@ export interface FrameOut {
   readonly aimedProp: { readonly id: string; readonly salvage: boolean } | null;
   /** The stage the picture shows (a wave brings the next one across the plot). */
   readonly stage: number;
-  /** Something happened this frame ('stage-up': a wave has finished bringing `stage`). */
-  readonly event: 'to-planet' | 'to-lab' | 'sync-lost' | 'powered' | 'stage-up' | null;
+  /** Something happened this frame ('stage-up': a wave has finished bringing `stage`; 'to-earth'/'to-moon': the gate crossed worlds). */
+  readonly event: 'to-planet' | 'to-lab' | 'to-earth' | 'to-moon' | 'sync-lost' | 'powered' | 'stage-up' | null;
   /** You stand inside a safe dome (the gate's, a powered pylon's or the shelter's): sync holds and refills (TASK-26). */
   readonly inDome: boolean;
   /** Sync is at or below 30% outside a dome: the return arrow shows in the compass (TASK-26). */
@@ -253,6 +254,11 @@ export interface PlayScene {
   setWalkWorld(walkWorld: WalkWorld | null): void;
   /** The moon arrival pose (GATE-05): `dist` metres out from the Twin Gate's back (default 3), facing away from the gate. */
   gateExit(dist?: number): { readonly x: number; readonly z: number; readonly yaw: number };
+  /**
+   * JOB-09: stand the traveller in an arrival sector (the Earth plot's pad, or home). The sector comes from
+   * `earth-endgame.ts`'s `arrivalSector`, so the pose the player lands on is the one the gate dialer resolved.
+   */
+  gateArrival(sector: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }): void;
   /**
    * Stands the plot's Gate where the world says it is (plan 42 section 4.3's `moveGate`): the twin's frame, its footing,
    * the arrival pad and the ground's keep-out all follow, so the pad a traveller lands on is the pad in front of the ring.
@@ -428,6 +434,11 @@ export interface PlayScene {
   isNearWater(): boolean;
   /** For the tests and the e2e: where you are, and a way to stand somewhere. */
   readonly debug: {
+    /**
+     * JOB-09: the Earth endgame evaluated for the inputs the caller owns (stage, cardinals, plot, gate, stats, clock).
+     * Pure — `earth-endgame.ts` has no state of its own, so this is a read and never a step.
+     */
+    earthEndgame(input: EndgameInput): EndgameState;
     biomeCounts(): BiomeInstanceCount | null;
     biomeTriangles(): number;
     biomeDrawCalls(): number;
@@ -554,6 +565,14 @@ export function createPlayScene(o: {
   readonly beamField?: string | null;
   readonly vegetation?: 'auto' | 'off' | 'low' | 'high';
   readonly hasSidearm?: boolean;
+  /**
+   * JOB-09: where a step through the plot's horizon takes the traveller (`earth-endgame.ts`'s transit rule, evaluated by
+   * the caller that owns the stage, the cardinals and the biome). Null: nowhere, and the doorway keeps its lab/planet
+   * crossing. The scene owns the geometry of the crossing; the caller owns what it means.
+   */
+  readonly earthTransit?: () => 'earth' | 'moon' | null;
+  /** The step through the horizon changed worlds: the caller applies the biome and the arrival sector. */
+  readonly onEarthTransit?: (to: 'earth' | 'moon') => void;
 }): PlayScene {
   const renderer = new THREE.WebGLRenderer({ canvas: o.canvas, antialias: o.antialias, powerPreference: o.powerPreference });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -2867,6 +2886,16 @@ export function createPlayScene(o: {
     setSpeciesSlots(slots) {
       return biomeView ? biomeView.setSpeciesSlots(slots) : 0;
     },
+    gateArrival(sector) {
+      // the pad the gate's own placement resolved: a point on the plot, facing away from the ring
+      pos.set(sector.x, groundAt(sector.x, sector.z) + EYE, sector.z);
+      yaw = sector.yaw;
+      pitch = 0;
+      building = false;
+      if (ghost) ghost.group.visible = false;
+      // stepping out of a horizon is a gate event: the kawoosh's burst restarts from this frame
+      lastGateEventT = clock;
+    },
     gateExit(dist) {
       twin.group.updateMatrixWorld(true);
       return computeGateExitPose(twin.group.matrixWorld.elements, gateYawDelta, dist);
@@ -3376,7 +3405,17 @@ export function createPlayScene(o: {
         const gateM = where === 'lab' ? labGateM : planetGateM;
         const a = local(gateM, before), b = local(gateM, pos);
         const op = where === 'lab' ? room.gate.opening : twin.opening;
-        if (Math.sign(a.z - op.z) !== Math.sign(b.z - op.z) && Math.abs(b.x) < op.width / 2 - 0.15) crossTo(where === 'lab' ? 'planet' : 'lab');
+        if (Math.sign(a.z - op.z) !== Math.sign(b.z - op.z) && Math.abs(b.x) < op.width / 2 - 0.15) {
+          // JOB-09: on the planet, a live horizon may be a world and not a room. The caller's transit rule says which,
+          // and it is evaluated here rather than kept in a cutscene object: the same step gives the same answer.
+          const transit = where === 'planet' ? (o.earthTransit?.() ?? null) : null;
+          if (transit) {
+            pendingEvent = transit === 'earth' ? 'to-earth' : 'to-moon';
+            o.onEarthTransit?.(transit);
+          } else {
+            crossTo(where === 'lab' ? 'planet' : 'lab');
+          }
+        }
       }
       // ---- sync (TASK-26: the safe domes). Inside the gate's 25 m dome, a powered pylon's or the shelter's 15 m dome, sync holds and
       // refills at 20% a second; outside it drains over 90 s. The running-machine field (stage 1 and up) is unchanged.
@@ -3974,6 +4013,8 @@ export function createPlayScene(o: {
     isConsensusCommitted: () => consensusCommitted,
     getHorizonDomes: () => horizonDomes,
     debug: {
+      // JOB-09: the Earth endgame is a pure read (no state, no step): the transit rule, the monument, the telemetry, the roll
+      earthEndgame: (input: EndgameInput) => earthEndgameState(input),
       setSync: (v: number) => { sync = Math.max(0, Math.min(1, v)); },
       plumePixels: () => plume.stats().pixels,
       machineRuns: () => [...views.values()].map((v) => ({ kind: v.m.kind, run: v.running })),

@@ -34,11 +34,11 @@ const JOBS = [
   { id: 'JOB-07', title: 'Modular STARGATE_KIT, Iris Shield & Earth Endgame', phase: 'Phase 4: Kits & Motion', weight: 8, status: 'DONE' },
   { id: 'JOB-19', title: 'Plan 43: Deterministic Motion & Logic Presets', phase: 'Phase 4: Kits & Motion', weight: 8, status: 'DONE' },
   { id: 'JOB-20', title: 'Recursive Sprite, Audio Stem & Stage Skin Presets', phase: 'Phase 4: Kits & Motion', weight: 4, status: 'DONE' },
-  { id: 'JOB-08', title: 'TICKET-40 Phase 2: Modular Kits for the 11 Machines & 3 Vehicles', phase: 'Phase 4: Kits & Motion', weight: 6, status: 'IN_PROGRESS' },
+  { id: 'JOB-08', title: 'TICKET-40 Phase 2: Modular Kits for the 11 Machines & 3 Vehicles', phase: 'Phase 4: Kits & Motion', weight: 6, status: 'DONE' },
   { id: 'JOB-08b', title: 'Stargate Event Horizon WebGL Shader & Envelopes', phase: 'Phase 4: Kits & Motion', weight: 6, status: 'DONE' },
 
   // Phase 5: Endgame & 1.0 (13%)
-  { id: 'JOB-09', title: 'Plan 42 Earth Endgame Biome & Power Routing Puzzle', phase: 'Phase 5: Endgame & 1.0', weight: 5, status: 'TODO' },
+  { id: 'JOB-09', title: 'Plan 42 Earth Endgame Biome & Power Routing Puzzle', phase: 'Phase 5: Endgame & 1.0', weight: 5, status: 'DONE' },
   { id: 'JOB-21', title: 'Monster Mash Exploration Loop & Multi-Cartridge Synergy', phase: 'Phase 5: Endgame & 1.0', weight: 4, status: 'TODO' },
   { id: 'JOB-22', title: '60 FPS Frame-Budget Audit & 380-Part Stress Benchmark', phase: 'Phase 5: Endgame & 1.0', weight: 2, status: 'TODO' },
   { id: 'JOB-23', title: '1.0 Release Packaging, studio-skill.compact.md & CI Gate', phase: 'Phase 5: Endgame & 1.0', weight: 2, status: 'TODO' },

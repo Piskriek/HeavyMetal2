@@ -121,8 +121,8 @@ Address all open review items in `OPUS_NOTE_41` v4:
 - **Milestone:** M1
 - **Paths:** `packages/texgraph/src/index.ts, packages/texgraph/tests`
 - **Verify:** `npm.cmd run typecheck && npm.cmd test`
+- **Commit:** `2800ff3 (tile library 97c9678)`
 - **Updated:** 2026-10-22 13:08
-- **Commit:** `2800ff3` (tile library `97c9678`)
 
 Implement `OPUS_NOTE_44_tile_library.md`:
 1. Add 6 periodic, deterministic nodes to `@hm/texgraph`: anisotropic `noise` (`scaleY`), `scratches`, `spots`, `hex` (`'edge'` | `'cell'`), `weave`, and wrapped `blur`.
@@ -136,8 +136,8 @@ Implement `OPUS_NOTE_44_tile_library.md`:
 - **Milestone:** M1
 - **Paths:** `packages/matstack/src/index.ts, packages/matstack/src/mask-mesh.ts, packages/matstack/src/shelf.ts, packages/cartlab, apps/web/src/studio`
 - **Verify:** `node scripts/test-layered-material.mjs && node scripts/test-material-cartridge.mjs`
-- **Updated:** 2026-10-22 13:08
 - **Commit:** `959a74c`
+- **Updated:** 2026-10-22 13:08
 
 Implement the 4 Rule 8a catches from `ARGO_NOTE_43` + Plan 41 step 4:
 1. **Mechanical abrasion on top:** Ensure `edge-wear`, `paint-chips`, and `scratches` evaluate above `dirt`/`rust-bloom` so sharp convex edges expose bright metal (`maxMetal > 0.45`).
@@ -165,8 +165,8 @@ Fix the two known failing E2E scripts noted in `docs/RESUME.md`:
 - **Milestone:** M3
 - **Paths:** `apps/web/src/studio, scripts/studio-agent-bridge.mjs, packages/studiomesh`
 - **Verify:** `npm.cmd run typecheck && npm.cmd test`
-- **Updated:** 2026-10-22 13:32
 - **Commit:** `00c3bea`
+- **Updated:** 2026-10-22 13:32
 
 Implement Plan 40 (`docs/argo/plans/40-bring-your-own-agent.md` + `ARGO_NOTE_32` + `ARGO_NOTE_43` §3 + `docs/OVERWATCH_TECH_AND_AI_RADAR.md`):
 1. `studio-agent.ts` exposing `studio.doc.read`, `studio.commands.list` (`matstack.setPaint`, `matstack.setAge`, `matstack.addLayer`, `matstack.updateLayer`, `matstack.setMaskInput`), `studio.doc.propose`, `studio.changes.list/accept/reject`, `studio.capture({ mode: 'view' | 'turntable4', includeStaged: true, rank, maskView })`, `studio.kit.validate`, and **`studio.material.coverage(spec)`** (returning numeric % coverage on top/side/edge/crevice/bottom zones so AI agents self-correct before rendering).
@@ -206,8 +206,8 @@ the credits the first time Earth is reached; the monument reads in the dial pane
 - **Milestone:** M2
 - **Paths:** `packages/partgen, packages/kitspec, apps/web/src/play/plot-kits.ts, apps/web/src/play/kit-vehicles.ts, apps/web/src/play/kit-target.ts`
 - **Verify:** `npm.cmd run typecheck && node scripts/kit-compare-sheet.mjs`
+- **Commit:** `3a4b5ad (vehicles), 00c511a (machines)`
 - **Updated:** 2026-10-25
-- **Commit:** `3a4b5ad` (vehicles), `00c511a` (machines)
 
 Per `RULES 8a`, Owner directive (21 Oct), and `docs/OVERWATCH_TECH_AND_AI_RADAR.md` critique:
 1. Delete the legacy `HEAVY_KITS` frames-around-GLB-cores stopgap in `plot-kits.ts` and replace `HOUSING_LED_ANCHOR` + 76-ray `ledMount()` in `machine-props.ts` with a first-class `statusLed` socket + `lamp` part + `lx:` preset on every machine kit.
@@ -241,8 +241,8 @@ allocation-free, so an aim over three vehicles costs ~0.02 ms each. `kit-hauler.
 - **Milestone:** M4
 - **Paths:** `apps/web/src/play/event-horizon.ts, apps/web/src/play/play-scene.ts`
 - **Verify:** `npm.cmd run typecheck && node --import tsx --test apps/web/src/play/event-horizon.test.ts`
+- **Commit:** `feat(shader) (see git log -1 --grep='feat(shader)')`
 - **Updated:** 2026-10-25
-- **Commit:** `feat(shader)` (see `git log -1 --grep='feat(shader)'`)
 
 `event-horizon.ts` holds the horizon as four pure envelopes of `(simTime, gateState, lastEventTime)` — no damped spring,
 no `+=`, no per-frame accumulator anywhere, so a scrub to t = 40 s is the frame the play-through showed at 40 s:
@@ -313,8 +313,8 @@ Close the remaining visual & E2E QA items from `docs/DEFERRED_POLISH_REGISTRY.md
 - **Milestone:** M2
 - **Paths:** `apps/web/src/play/play-scene.ts, apps/web/src/play/lab-room.ts, apps/web/src/play/plot-kits.ts, apps/web/src/assets/gen-props.ts, apps/web/src/base/kit-pieces.ts`
 - **Verify:** `npm.cmd run typecheck && node scripts/test-material-cartridge.mjs && node scripts/test-part-cartridge.mjs`
+- **Commit:** `7935d76 (raycast + dead paths; vehicles and base pieces still to wire)`
 - **Updated:** 2026-10-22 13:33
-- **Commit:** `7935d76` (raycast + dead paths; vehicles and base pieces still to wire)
 
 Fix the #1 Modular Preset Inception gap uncovered in `docs/OVERWATCH_TECH_AND_AI_RADAR.md`:
 1. **Enable Kit Targetability Across the Whole World:** Currently `lab-room.ts` only registers `capacitor-bank` in `kits`, and `plot-kits.ts` has `kitFrames = false` (so `aimKitPart()` returns `null` for 100% of planet machines, vehicles, base structures, and Lab stations). Wire `aimKitPart()` and `setKitOverrides()` to cover all plot machines (`plot:<id>`), all Lab stations (`lab-room.ts`), all 3 vehicles (`createGenRover` wired to `SCOUT_KIT`, `HAULER_KIT`, `CRAWLER_KIT`), the Stargate (`STARGATE_KIT`), and built base pieces (`kit-pieces.ts`).
@@ -342,8 +342,8 @@ Standing recurring Overwatch task executed whenever Antigravity / Overwatch is a
 - **Milestone:** M3
 - **Paths:** `packages/skin, packages/shareware, packages/soundlab, packages/musicbox, packages/cartlab, apps/web/src/play, apps/web/src/audio`
 - **Verify:** `node --import tsx --test apps/web/src/play/sprite-sound-cartridge.test.ts packages/soundlab/tests/stems.test.ts packages/musicbox/tests/stems.test.ts && npm.cmd run typecheck`
+- **Commit:** `see the JOB-20 commit on arena/a2368b82-heavymetal2 (PR #68)`
 - **Updated:** 2026-10-25
-- **Commit:** see the JOB-20 commit on `arena/a2368b82-heavymetal2` (PR #68)
 
 ### Landed (2026-10-25)
 
@@ -387,8 +387,8 @@ Unverified visually (no Chrome in this sandbox): how a baked sprite reads at eac
 - **Milestone:** M3
 - **Paths:** `packages/kinematic, packages/anim, packages/triggers, packages/wiregraph, apps/web/src/play, docs/argo/plans/43-modular-motion-and-logic-presets.md`
 - **Verify:** `node --import tsx --test packages/kinematic/tests/modular-motion.test.ts && npm.cmd run typecheck`
+- **Commit:** `see the JOB-19 commit on arena/a2368b82-heavymetal2 (PR #68)`
 - **Updated:** 2026-10-25
-- **Commit:** see the JOB-19 commit on `arena/a2368b82-heavymetal2` (PR #68)
 
 ### Landed (2026-10-25)
 
@@ -565,21 +565,24 @@ Authored `docs/argo/plans/42-modular-stargate-earth-endgame.md`, synchronized `.
 
 ## 4. PHASE 6: POST-1.0 EXPANSION (PLANS 44 & 45 — ZERO-IDLE FLEET QUEUE)
 > **Status**: Approved by Argon (Creative Architect) on `30ddd8a6`  
-> **Mandate**: Staged immediately behind Milestone #1 (Wave 4 `JOB-08v` Vehicles & `JOB-09` Earth Endgame) to ensure zero fleet idle time.  
+> **Mandate**: Staged immediately behind Milestone #1 (Wave 4 `JOB-08v` Vehicles & `JOB-09` Earth Endgame) to ensure zero fleet idle time.
 
-## JOB-24 [OPEN] Plan 44 Part A: @hm/creature Core Package, 5-Group Genome Builder, 3-Tier IK LOD & ASTRO_SUIT_CREATURE_KIT
+## JOB-24 [DONE] Plan 44 Part A: @hm/creature Core Package, 5-Group Genome Builder, 3-Tier IK LOD & ASTRO_SUIT_CREATURE_KIT
 - **Role:** ENGINEER
 - **Skills:** `feature-dev`, `visual-verify`
 - **Priority:** P1
 - **Milestone:** M6
 - **Paths:** `packages/creature, packages/partgen, packages/kitspec, apps/web/src/avatar/astro/astro-model.ts, apps/web/src/avatar/two-bone-ik.ts`
 - **Verify:** `npm.cmd run typecheck && npm.cmd test && node --import tsx packages/creature/tests/creature-assembly.test.ts`
-- **Updated:** 2026-10-25
+- **Commit:** `dd468c65`
+- **Updated:** 2026-10-25 14:48
 
 1. Author the `@hm/creature` package exporting `CreatureGenomeSpec`, `bindCreatureSkeleton()`, and `evaluateCreatureGait()`.
 2. Map morphology 1:1 onto the 5 `kit-groups.ts` groups (`base`: pelvis/sacral root, `structure`: Sushumna spine/ribs/cranium, `mechanism`: limb chains with coaxial knuckles, `controls`: sensory organs, `subject`: hands/claws/effectors).
 3. Integrate zero-allocation `solveTwoBoneIk()` with 3-tier distance LOD (<15m 60 Hz foot IK; 15–50m `stageAnimRateHz` against analytical heightfield; >50m sleep).
 4. Rebuild the player avatar as `ASTRO_SUIT_CREATURE_KIT` (38-part articulated suit kit), purging `astro-low.glb` (1.2 MiB). Must pass `studio.kit.audit` with 0 loose ends and 0 collision violations across 8 motion phases.
+
+**Completion Note (2026-10-25 14:48):** @hm/creature core package, 5-group genome builder, 3-tier IK LOD, and ASTRO_SUIT_CREATURE_KIT (astro-low.glb purged)
 
 ## JOB-25 [OPEN] Plan 44 Part B: 37 Procedural Monster Roster Rebuild in apps/web/src/monsters/roster.ts
 - **Role:** BUILDER

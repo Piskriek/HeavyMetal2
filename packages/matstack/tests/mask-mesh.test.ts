@@ -414,7 +414,8 @@ test('a 40-degree seam wears at 1.6x its distance, a right-angle chamfer at exac
   const chamfer = edgeLines(foldedPair(90).mesh);
   const seamSlots = slots(seam, foldedPair(40).probe);
   const chamferSlots = slots(chamfer, foldedPair(90).probe);
-  // 1 + 0.5 * (1 / (40/90) - 1) = 1.625: a tessellation seam's bead is 62% as wide as a right angle's
+  // 1 + 0.5 * (45 - 40) / 45 = 1.056: a shallow seam's bead is a little narrower than a chamfer's, and the tier above keeps
+  // the slots for the chamfers even when the seam is nearer
   const scaled = 0.015 * edgeWearScale((40 * Math.PI) / 180);
   assert.ok(
     seamSlots.some((d) => Math.abs(d - scaled) < 1e-6),
@@ -432,10 +433,12 @@ test('the wear scale and the slot tier are monotone in the fold, and both go qui
   const deg = (d: number): number => (d * Math.PI) / 180;
   assert.equal(edgeWearScale(deg(90)), 1);
   assert.equal(edgeWearScale(deg(120)), 1, 'a fold sharper than a right angle gains nothing more');
-  assert.ok(edgeWearScale(deg(60)) > edgeWearScale(deg(70)));
-  assert.ok(edgeWearScale(deg(40)) > edgeWearScale(deg(60)));
-  assert.ok(edgeWearScale(deg(20)) > edgeWearScale(deg(40)));
-  assert.ok(Math.abs(edgeWearScale(deg(45)) - 1.5) < 1e-12, '45 degrees wears at 1.5x its distance');
+  // a machined chamfer (45 degrees) and everything sharper keeps the whole band: the ring's edge wear is untouched
+  for (const d of [45, 60, 70, 90, 120]) assert.equal(edgeWearScale(deg(d)), 1, `${d} degrees must keep the full band`);
+  assert.ok(edgeWearScale(deg(30)) > edgeWearScale(deg(40)));
+  assert.ok(edgeWearScale(deg(20)) > edgeWearScale(deg(30)));
+  assert.ok(Math.abs(edgeWearScale(deg(0.0001)) - 1.5) < 1e-4, 'a fold flattened to nothing wears at 1.5x its distance');
+  assert.ok(edgeWearScale(deg(20)) < 1.3, 'a shallow seam is a little narrower, not a different material');
   for (const d of [10, 20, 40, 60, 90]) {
     assert.equal(edgeWearScale(deg(d), 0), 1, `bias 0 must keep raw distances at ${d} degrees`);
     assert.equal(edgeWearTier(deg(d), 0), 0, 'bias 0 is one flat tier: plain nearest-first order');

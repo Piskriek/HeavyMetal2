@@ -5,7 +5,9 @@ import { ITEMS, STARTER } from './catalog';
 import * as S from '@hm/structure';
 import { loadWorld, saveWorld } from './save';
 import { weaponStats } from './weapons';
-import { BRIDGE_STORE, INSTANT_TIME_SCALE, SHELTER, apply, createWorld, hashWorld, layoutPieces, networkAt, parkSpot, planGhosts, preview, replay, roomAt, withBridgeStore, type BaseCommand, type BaseWorld, type WorldEnv } from './world';
+import { BRIDGE_STORE, DEFAULT_GATE_POSE, GATE_ACCESS_MODES, INSTANT_TIME_SCALE, SHELTER, apply, createWorld, hashWorld, layoutPieces, networkAt, parkSpot, planGhosts, preview, replay, roomAt, withBridgeStore, type BaseCommand, type BaseWorld, type WorldEnv } from './world';
+import { DEFAULT_PLOT_RADIUS_M, resolveMovedGatePose } from '@hm/coopnet/gate-dialer';
+import { stargateIrisClosed } from '../play/kit-stargate';
 
 const env: WorldEnv = { heightAt: () => 0, bridge: { x: 0, z: 0, range: 60 } };
 const at = { x: 2, z: 2 };
@@ -370,4 +372,83 @@ test('Instant builds (debug): the time scale runs the machines\' queues at once;
   assert.ok(instant.events.some((e) => e.type === 'printed' && e.kind === 'scout'), 'instant builds: the scout is out in one tick');
   assert.equal(instant.world.machines[0]!.jobs.length, 0);
   assert.equal(instant.world.vehicles.length, 1);
+});
+
+// ---- Plan 42 §4.3: the plot gate is movable and its iris has three states.
+
+test('a new world puts its gate at the origin, open, and says so', () => {
+  const w = createWorld();
+  assert.deepEqual(w.gatePose, { x: 0, y: 0, z: 0, yaw: 0 });
+  assert.equal(w.gateAccess, 'open');
+  assert.equal(w.v, 5);
+});
+
+test('moveGate stands the gate where the owner wants it, on the ground, with an arrival pad in front', () => {
+  const w = run(createWorld(), { t: 'moveGate', at: { x: 40, z: -30 }, yaw: Math.PI / 2 });
+  assert.equal(w.gatePose.x, 40);
+  assert.equal(w.gatePose.z, -30);
+  assert.equal(w.gatePose.y, 0, 'the gate sits on the ground at its new place');
+  // the network owns the pose, so yaw is normalised and rounded to a tenth of a degree; a micron of rounding is not a move
+  assert.ok(Math.abs(w.gatePose.yaw - Math.PI / 2) < 1e-3);
+  // the pose is @hm/coopnet's, so the pad is the same one the network's visitors land on
+  const { arrivalPad } = resolveMovedGatePose({ x: 40, y: 0, z: -30, yaw: Math.PI / 2 }, DEFAULT_PLOT_RADIUS_M) as { arrivalPad: { x: number; y: number; z: number } };
+  assert.ok(Math.abs(arrivalPad.x - 43.5) < 1e-6 && Math.abs(arrivalPad.z + 30) < 1e-6, `pad at ${arrivalPad.x}, ${arrivalPad.z}`);
+  // moving it is a logged command: the same log replays to the same pose
+  const again = replay(createWorld(), env, [{ t: 'moveGate', at: { x: 40, z: -30 }, yaw: Math.PI / 2 }]).world;
+  assert.equal(hashWorld(again), hashWorld(w));
+});
+
+test('moveGate refuses what the plot cannot hold, and refuses a move that changes nothing', () => {
+  const w0 = createWorld();
+  const far = apply(w0, env, { t: 'moveGate', at: { x: DEFAULT_PLOT_RADIUS_M + 5, z: 0 }, yaw: 0 });
+  assert.deepEqual(far.events, [{ type: 'refused', cmd: 'moveGate', why: 'out-of-plot-bounds' }]);
+  assert.equal(far.world, w0);
+  const nasty = apply(w0, env, { t: 'moveGate', at: { x: Number.NaN, z: 0 }, yaw: 0 });
+  assert.equal(nasty.events[0]?.type, 'refused');
+  const same = apply(w0, env, { t: 'moveGate', at: { x: 0, z: 0 }, yaw: 0 });
+  assert.deepEqual(same.events, [{ type: 'refused', cmd: 'moveGate', why: 'same-pose' }]);
+  assert.equal(same.world, w0, 'a refused move leaves the world alone');
+});
+
+test('setGateAccess takes exactly the three privacy states, and the iris follows them', () => {
+  // from a closed gate, each of the three states is one command away (a fresh world is already open, so setting open again is a no-op)
+  let w = apply(createWorld(), env, { t: 'setGateAccess', access: 'closed' }).world;
+  assert.equal(w.gateAccess, 'closed');
+  for (const access of GATE_ACCESS_MODES) {
+    const r = apply(w, env, { t: 'setGateAccess', access });
+    assert.equal(r.world.gateAccess, access);
+    assert.deepEqual(r.events, [{ type: 'gateAccess', access }]);
+    // the kit's iris is the same rule as the plot's: shut for everything but open
+    assert.equal(stargateIrisClosed(access), access !== 'open');
+    w = { ...w, gateAccess: access === 'open' ? 'closed' : 'open' };
+  }
+  const junk = apply(createWorld(), env, { t: 'setGateAccess', access: 'friends' as never });
+  assert.deepEqual(junk.events, [{ type: 'refused', cmd: 'setGateAccess', why: 'bad-access' }]);
+  const same = apply(createWorld(), env, { t: 'setGateAccess', access: 'open' });
+  assert.deepEqual(same.events, [{ type: 'refused', cmd: 'setGateAccess', why: 'same-access' }]);
+});
+
+test('the gate pose and its privacy survive a save, and an older save gets an open gate at the origin', () => {
+  const w = run(createWorld(), { t: 'moveGate', at: { x: 12, z: 8 }, yaw: 1.2 }, { t: 'setGateAccess', access: 'code-only' });
+  const back = loadWorld(saveWorld(w), 1);
+  assert.deepEqual(back.gatePose, w.gatePose);
+  assert.equal(back.gateAccess, 'code-only');
+  // a v4 save (before the gate could move) loads its gate at the origin, open
+  const old = JSON.parse(saveWorld(createWorld())) as Record<string, unknown>;
+  delete old['gatePose'];
+  delete old['gateAccess'];
+  old['v'] = 4;
+  const migrated = loadWorld(JSON.stringify(old), 1);
+  assert.deepEqual(migrated.gatePose, DEFAULT_GATE_POSE);
+  assert.equal(migrated.gateAccess, 'open');
+  // and a hostile pose is not trusted: outside the plot, or not a pose at all
+  const hostile = JSON.parse(saveWorld(createWorld())) as Record<string, unknown>;
+  hostile['gatePose'] = { x: 1e9, y: 0, z: 0, yaw: 0 };
+  assert.deepEqual(loadWorld(JSON.stringify(hostile), 1).gatePose, DEFAULT_GATE_POSE);
+  hostile['gatePose'] = { x: 'north', z: 0 };
+  assert.deepEqual(loadWorld(JSON.stringify(hostile), 1).gatePose, DEFAULT_GATE_POSE);
+  hostile['gatePose'] = { x: 3, y: 0, z: 4, yaw: 0 };
+  hostile['gateAccess'] = 'everyone';
+  assert.deepEqual(loadWorld(JSON.stringify(hostile), 1).gatePose, { x: 3, y: 0, z: 4, yaw: 0 });
+  assert.equal(loadWorld(JSON.stringify(hostile), 1).gateAccess, 'open', 'an unknown state is not a locked gate');
 });

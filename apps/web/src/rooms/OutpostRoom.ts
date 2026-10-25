@@ -375,7 +375,8 @@ export default class OutpostRoom extends GameRoom<OutpostMessage> {
           this.notice(sender.id, 'already-seeded');
           return;
         }
-        if (!msg.world || msg.world.v !== 4) {
+        const worldVersion = msg.world ? (msg.world as { readonly v?: unknown }).v : undefined;
+        if (!msg.world || (worldVersion !== 4 && worldVersion !== 5)) {
           this.notice(sender.id, 'bad-world');
           return;
         }

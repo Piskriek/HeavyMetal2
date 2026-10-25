@@ -141,18 +141,23 @@ export function edgeWearTier(foldRad: number, bias: number = EDGE_FOLD_BIAS): 0 
   return bias > 0 && foldRad < SILHOUETTE_RAD ? 1 : 0;
 }
 
+/** From this fold (degrees) on an edge keeps the whole wear band: a machined chamfer or a rim, all of it metal. */
+export const FULL_BAND_DEG = 45;
+
 /**
- * How much wider the wear band of an edge is than a shallow fold's: 1 at a right angle and beyond, `1 + bias` at 45
- * degrees, and unbounded as the fold flattens (a tessellation seam catches almost nothing).
+ * How much a fold's wear band is narrowed, as a factor on the stored distance: 1 (full width) at `FULL_BAND_DEG` and beyond,
+ * rising to `1 + bias` as the fold flattens to nothing.
  *
- * The bead of a chamfer is what wears, not the whole panel joint, so a shallow fold's distance is stored *grown* — the
- * attribute is a distance in metres the mask compares against its band width, so growing it narrows the band. That is what
- * keeps a curved ring's silhouette wearing as metal while its radial seams stay quiet.
+ * A chamfer's bead is what wears, so a 45-degree machined edge keeps its whole band and a ring of them reads as metal. A
+ * shallow radial seam catches proportionally less, so its distance is stored *grown* — the attribute is a distance in metres
+ * that the mask compares against its band width, so growing it narrows the band. That is what keeps a curved surface's
+ * tessellation quiet while its silhouettes stay crisp.
  */
 export function edgeWearScale(foldRad: number, bias: number = EDGE_FOLD_BIAS): number {
   if (!(bias > 0) || !(foldRad > 0)) return 1;
-  const sharpness = Math.min(1, foldRad / HALF_PI);
-  return 1 + bias * (1 / sharpness - 1);
+  const full = (FULL_BAND_DEG * Math.PI) / 180;
+  const shallow = Math.max(0, Math.min(1, 1 - foldRad / full));
+  return 1 + bias * shallow;
 }
 
 /**

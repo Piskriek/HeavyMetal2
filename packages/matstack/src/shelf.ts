@@ -194,7 +194,7 @@ export const WEATHERING_SURFACE_SHELF: Readonly<Record<string, SurfaceSpec>> = O
     metal: 0.0,
     rough: 0.86,
     specular: 0.3,
-    tile: { tile: 'grime-clouds', scale: 0.55, bump: 0.12, roughVar: 0.16, colourVar: 0.14 },
+    tile: { tile: 'grime-clouds', scale: 0.55, bump: 0.12, roughVar: 0.16, colourVar: 0.14, space: 'world' },
   },
   'dust': {
     name: 'Dust',
@@ -249,7 +249,7 @@ export const WEATHERING_SURFACE_SHELF: Readonly<Record<string, SurfaceSpec>> = O
     metal: 0.0,
     rough: 0.92,
     specular: 0.25,
-    tile: { tile: 'moss-clump', scale: 0.25, bump: 0.48, roughVar: 0.14, colourVar: 0.18 },
+    tile: { tile: 'moss-clump', scale: 0.25, bump: 0.48, roughVar: 0.14, colourVar: 0.18, space: 'world' },
     fuzz: { amount: 0.85, colour: '#6e964c' },
   },
   'frost': {
@@ -284,7 +284,7 @@ export const WEATHERING_SURFACE_SHELF: Readonly<Record<string, SurfaceSpec>> = O
     metal: 0.05,
     rough: 0.88,
     specular: 0.25,
-    tile: { tile: 'scorch-burn', scale: 0.5, bump: 0.24, roughVar: 0.18, colourVar: 0.16 },
+    tile: { tile: 'scorch-burn', scale: 0.5, bump: 0.24, roughVar: 0.18, colourVar: 0.16, space: 'world' },
   },
   'bright-metal': {
     name: 'Bright metal',
@@ -296,6 +296,12 @@ export const WEATHERING_SURFACE_SHELF: Readonly<Record<string, SurfaceSpec>> = O
   },
 });
 
+/**
+ * Every surface, base and weathering alike. Two of them project their tile in **world** space (`space: 'world'`): the large-scale
+ * weathering layers — grime clouds, moss clumps, scorch burns — which are features of a place and must run across the seams of a
+ * kit, and the macro mask noise that gates them. Everything else keeps local part UVs, because brushed metal, hex micro-texture
+ * and carbon weave are surface detail that has to travel with the part (plan 42, Argon directive 2).
+ */
 export const SURFACE_SHELF: Readonly<Record<string, SurfaceSpec>> = Object.freeze({
   ...BASE_SURFACE_SHELF,
   ...WEATHERING_SURFACE_SHELF,
@@ -325,7 +331,7 @@ export const MASK_SHELF: Readonly<Record<string, MaskSpec>> = Object.freeze({
     name: 'Worn edges',
     inputs: [
       { kind: 'edge', width: 0.042, blend: 'normal', opacity: 1.0, invert: false },
-      { kind: 'noise', noise: 'clouds', scale: 0.35, seed: 23, blend: 'multiply', opacity: 0.38, invert: false },
+      { kind: 'noise', noise: 'clouds', scale: 0.35, seed: 23, blend: 'multiply', opacity: 0.38, invert: false, space: 'world' },
     ],
     balance: 0.22,
     contrast: 0.52,
@@ -335,7 +341,7 @@ export const MASK_SHELF: Readonly<Record<string, MaskSpec>> = Object.freeze({
     name: 'Crevices',
     inputs: [
       { kind: 'cavity', width: 0.048, blend: 'normal', opacity: 1.0, invert: false },
-      { kind: 'noise', noise: 'clouds', scale: 0.4, seed: 37, blend: 'multiply', opacity: 0.35, invert: false },
+      { kind: 'noise', noise: 'clouds', scale: 0.4, seed: 37, blend: 'multiply', opacity: 0.35, invert: false, space: 'world' },
     ],
     balance: 0.24,
     contrast: 0.56,
@@ -345,7 +351,7 @@ export const MASK_SHELF: Readonly<Record<string, MaskSpec>> = Object.freeze({
     name: 'Tops',
     inputs: [
       { kind: 'up', angle: 52, soft: 24, blend: 'normal', opacity: 1.0, invert: false },
-      { kind: 'noise', noise: 'clouds', scale: 0.6, seed: 41, blend: 'multiply', opacity: 0.32, invert: false },
+      { kind: 'noise', noise: 'clouds', scale: 0.6, seed: 41, blend: 'multiply', opacity: 0.32, invert: false, space: 'world' },
     ],
     balance: 0.2,
     contrast: 0.42,
@@ -355,7 +361,7 @@ export const MASK_SHELF: Readonly<Record<string, MaskSpec>> = Object.freeze({
     name: 'Undersides',
     inputs: [
       { kind: 'down', angle: 55, soft: 25, blend: 'normal', opacity: 1.0, invert: false },
-      { kind: 'noise', noise: 'clouds', scale: 0.5, seed: 53, blend: 'multiply', opacity: 0.35, invert: false },
+      { kind: 'noise', noise: 'clouds', scale: 0.5, seed: 53, blend: 'multiply', opacity: 0.35, invert: false, space: 'world' },
     ],
     balance: 0.2,
     contrast: 0.48,
@@ -384,7 +390,7 @@ export const MASK_SHELF: Readonly<Record<string, MaskSpec>> = Object.freeze({
   'patches': {
     name: 'Patches',
     inputs: [
-      { kind: 'noise', noise: 'clouds', scale: 0.65, seed: 83, blend: 'normal', opacity: 1.0, invert: false },
+      { kind: 'noise', noise: 'clouds', scale: 0.65, seed: 83, blend: 'normal', opacity: 1.0, invert: false, space: 'world' },
       { kind: 'noise', noise: 'cells', scale: 0.28, seed: 89, blend: 'multiply', opacity: 0.45, invert: false },
     ],
     balance: 0.24,
@@ -396,7 +402,7 @@ export const MASK_SHELF: Readonly<Record<string, MaskSpec>> = Object.freeze({
     // above the noise's mean on purpose, so only the peaks pass (plan 41 §7: 5-15% of a face, not 67%).
     name: 'Pitting',
     inputs: [
-      { kind: 'noise', noise: 'clouds', scale: 0.9, seed: 97, blend: 'normal', opacity: 1.0, invert: false },
+      { kind: 'noise', noise: 'clouds', scale: 0.9, seed: 97, blend: 'normal', opacity: 1.0, invert: false, space: 'world' },
       { kind: 'noise', noise: 'cells', scale: 0.45, seed: 89, blend: 'multiply', opacity: 0.5, invert: false },
       { kind: 'cavity', width: 0.045, blend: 'add', opacity: 0.3, invert: false },
     ],
@@ -422,7 +428,7 @@ export const MASK_SHELF: Readonly<Record<string, MaskSpec>> = Object.freeze({
     inputs: [
       { kind: 'up', angle: 58, soft: 28, blend: 'normal', opacity: 1.0, invert: false },
       { kind: 'down', angle: 55, soft: 25, blend: 'max', opacity: 1.0, invert: false },
-      { kind: 'noise', noise: 'clouds', scale: 0.55, seed: 53, blend: 'multiply', opacity: 1.0, invert: false },
+      { kind: 'noise', noise: 'clouds', scale: 0.55, seed: 53, blend: 'multiply', opacity: 1.0, invert: false, space: 'world' },
     ],
     balance: 0.1,
     contrast: 0.45,

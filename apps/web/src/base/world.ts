@@ -15,6 +15,7 @@ import * as L from '@hm/lattice';
 import * as S from '@hm/structure';
 import * as F from '@hm/substrate';
 import { TURRET_POWER_DRAW_KW } from '@hm/plotsim';
+import { DEFAULT_PLOT_RADIUS_M, resolveMovedGatePose, type GateAccessMode, type GatePose } from '@hm/coopnet/gate-dialer';
 import { DRAFT_ORE, EQUIP, FIELD_RADIUS, HEAVY, HEAVY_BILL, ITEMS, MAPS, MATERIALS, PIECE_EXTRA, PIECE_ORE, PIECE_STAGE, PRIMITIVES, QUEUE_MAX, RECIPE_BY_ID, STARTER, blueprint, blueprintId, pieceCost, FABRICATOR_BILL, FORGE_BY_ID, PART_SLOTS, VEHICLE, type Blueprint, type MapId, type PartSlot, type PrimitiveId, type StationKind, type VehicleKind } from './catalog';
 import { EQUIP_SLOTS, type EquipSlot, type SlotRef } from './view';
 
@@ -35,7 +36,7 @@ export const BEAM_RANGE = 12;
 export interface Point { readonly x: number; readonly z: number }
 
 export interface BaseWorld {
-  readonly v: 4;
+  readonly v: 5;
   /** Commands applied so far: the position in the command log. */
   readonly tick: number;
   readonly base: S.Base;
@@ -62,7 +63,28 @@ export interface BaseWorld {
   readonly nextVehicle: number;
   /** The parts fitted to the weapon frame (the frame itself sits in the sidearm slot), by slot; null = empty. */
   readonly loadout: Readonly<Record<PartSlot, string | null>>;
+  /**
+   * Where the plot's Stargate stands (plan 42 §4.3): the movable gate's pose on the plot, `yaw` clockwise from +z. The arrival pad,
+   * the safe sync dome and the quantum bridge root all read it, so moving the gate moves the plot's front door with it.
+   */
+  readonly gatePose: GatePose;
+  /**
+   * The gate's privacy (plan 42 §4.3): `'open'` is listed for random dialing and dialable by anyone, `'code-only'` only by a
+   * visitor with the six-symbol code, `'closed'` not at all (the iris is shut). Outbound dialing works in every state.
+   */
+  readonly gateAccess: GateAccessMode;
 }
+
+/** The arrival pad a moved gate takes with it: where a visitor steps out (3.5 m in front of the gate, on its yaw). */
+export interface GateArrivalPadDef { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }
+
+/** The gate's default pose: bolted at the plot's origin, facing +z. */
+export const DEFAULT_GATE_POSE: GatePose = Object.freeze({ x: 0, y: 0, z: 0, yaw: 0 });
+/** The three privacy states a gate can be in, in the order the console's toggle offers them. */
+export const GATE_ACCESS_MODES: readonly GateAccessMode[] = Object.freeze(['open', 'code-only', 'closed']);
+/** Whether `access` is one of the three states (a command from a hand-edited log is not trusted). */
+export const isGateAccessMode = (access: unknown): access is GateAccessMode =>
+  typeof access === 'string' && (GATE_ACCESS_MODES as readonly string[]).includes(access);
 
 /** A printed vehicle: its pose, and for a hauler the id of its storage box on the linked network. */
 export interface Vehicle { readonly id: number; readonly kind: VehicleKind; readonly x: number; readonly z: number; readonly yaw: number; readonly box: number | null }
@@ -144,7 +166,11 @@ export type BaseCommand =
   /** Switches a base hardpoint machine on or off (POL-73). */
   | { readonly t: 'switch'; readonly machine: number; readonly on: boolean }
   /** Pays a bill from the player, then the linked network in reach (TICKET-32: printing a part cartridge). */
-  | { readonly t: 'pay'; readonly at: Point; readonly bill: readonly L.Stack[]; readonly reason: string };
+  | { readonly t: 'pay'; readonly at: Point; readonly bill: readonly L.Stack[]; readonly reason: string }
+  /** Moves the plot's Stargate to `at` (a plot point), facing `yaw`; refused outside the plot or on invalid coordinates (plan 42). */
+  | { readonly t: 'moveGate'; readonly at: Point; readonly yaw: number }
+  /** Sets the gate's privacy: the iris shuts for `'code-only'` and `'closed'`, and random dialing lists only `'open'` (plan 42). */
+  | { readonly t: 'setGateAccess'; readonly access: GateAccessMode };
 
 export type BaseEvent =
   | { readonly type: 'refused'; readonly cmd: BaseCommand['t']; readonly why: string; readonly short?: readonly L.Stack[] }
@@ -174,7 +200,9 @@ export type BaseEvent =
   | { readonly type: 'fitted'; readonly slot: PartSlot; readonly item: string | null }
   | { readonly type: 'granted'; readonly stock: readonly L.Stack[]; readonly lost: readonly L.Stack[] }
   | { readonly type: 'salvaged'; readonly stock: readonly L.Stack[] }
-  | { readonly type: 'switched'; readonly machine: number; readonly on: boolean };
+  | { readonly type: 'switched'; readonly machine: number; readonly on: boolean }
+  | { readonly type: 'gateMoved'; readonly pose: GatePose; readonly arrivalPad: GateArrivalPadDef }
+  | { readonly type: 'gateAccess'; readonly access: GateAccessMode };
 
 export interface Applied { readonly world: BaseWorld; readonly events: readonly BaseEvent[] }
 
@@ -185,7 +213,8 @@ export function createWorld(seed = 1): BaseWorld {
   const slots: (L.Stack | null)[] = Array.from({ length: PLAYER_SLOTS }, () => null);
   slots[0] = { item: STARTER, n: 1 };
   return {
-    v: 4, tick: 0, base: S.empty(), boxes: [], layouts: [], plans: [], shelter: false, vehicles: [], nextVehicle: 1, loadout: NO_LOADOUT,
+    v: 5, tick: 0, base: S.empty(), boxes: [], layouts: [], plans: [], shelter: false, vehicles: [], nextVehicle: 1, loadout: NO_LOADOUT,
+    gatePose: DEFAULT_GATE_POSE, gateAccess: 'open',
     player: { id: PLAYER, x: 0, z: 0, slots, maxKg: PLAYER_KG },
     equipment: { ...NO_EQUIPMENT, beam: { item: 'tool-beam', n: 1 }, visor: { item: 'eq-visor', n: 1 } },
     hotbar: 0,
@@ -324,6 +353,27 @@ function pay(w: BaseWorld, env: WorldEnv, at: Point, bill: readonly L.Stack[]): 
   return r.ok ? { ok: true, patch: split(w, r.boxes) } : { ok: false, short: r.short };
 }
 
+/**
+ * Moves the plot's gate (plan 42 §4.3). The pose is validated by `@hm/coopnet`'s pure `resolveMovedGatePose`, which owns the plot
+ * bounds and rounds the pose and its arrival pad, so the game and the network agree on where a gate stands to the millimetre.
+ */
+function moveGate(w: BaseWorld, env: WorldEnv, cmd: Extract<BaseCommand, { t: 'moveGate' }>): Applied {
+  const result = resolveMovedGatePose({ x: cmd.at.x, y: env.heightAt(cmd.at.x, cmd.at.z), z: cmd.at.z, yaw: cmd.yaw }, DEFAULT_PLOT_RADIUS_M);
+  if (!result.ok) return refuse(w, cmd.t, result.reason ?? 'invalid-pose');
+  const pose = result.gatePose;
+  if (pose.x === w.gatePose.x && pose.y === w.gatePose.y && pose.z === w.gatePose.z && pose.yaw === w.gatePose.yaw) {
+    return refuse(w, cmd.t, 'same-pose');
+  }
+  return next(w, { gatePose: pose }, [{ type: 'gateMoved', pose, arrivalPad: result.arrivalPad }]);
+}
+
+/** Sets the gate's privacy (plan 42 §4.3): the iris follows from the state, so this is the only command that shuts a gate. */
+function setGateAccess(w: BaseWorld, cmd: Extract<BaseCommand, { t: 'setGateAccess' }>): Applied {
+  if (!isGateAccessMode(cmd.access)) return refuse(w, cmd.t, 'bad-access');
+  if (cmd.access === w.gateAccess) return refuse(w, cmd.t, 'same-access');
+  return next(w, { gateAccess: cmd.access }, [{ type: 'gateAccess', access: cmd.access }]);
+}
+
 export function apply(w: BaseWorld, env: WorldEnv, cmd: BaseCommand): Applied {
   switch (cmd.t) {
     case 'hotbar': {
@@ -388,6 +438,10 @@ export function apply(w: BaseWorld, env: WorldEnv, cmd: BaseCommand): Applied {
       const r = pay(w, env, cmd.at, cmd.bill);
       return r.ok ? next(w, r.patch, [{ type: 'paid', reason: cmd.reason, bill: cmd.bill }]) : refuse(w, cmd.t, 'short', r.short);
     }
+    case 'moveGate':
+      return moveGate(w, env, cmd);
+    case 'setGateAccess':
+      return setGateAccess(w, cmd);
     default: {
       const unknown: never = cmd;
       return refuse(w, (unknown as BaseCommand).t, 'unknown-cmd');

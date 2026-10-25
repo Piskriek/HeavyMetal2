@@ -130,10 +130,10 @@ function tileArray(ids: readonly string[], size: number): { readonly texture: TH
 
 // ------------------------------------------------------------------ packing a spec into uniforms
 
-/** Vec4s per surface: colour+metal, rough/spec/tile/scale, bump/roughVar/colourVar/ramp, detail, coat/fuzz/aniso, fuzz colour+film, emit+thickness. */
-const SURF_VEC = 7;
-/** Vec4s per mask input: (kind, blend, opacity, invert), (params). */
-const INPUT_VEC = 2;
+/** Vec4s per surface: colour+metal, rough/spec/tile/scale, bump/roughVar/colourVar/ramp, detail, coat/fuzz/aniso, fuzz colour+film, emit+thickness, spaces. */
+const SURF_VEC = 8;
+/** Vec4s per mask input: (kind, blend, opacity, invert), (params), (space, 0, 0, 0). */
+const INPUT_VEC = 3;
 const RAMP_W = 256;
 const INPUT_KIND: Readonly<Record<MaskInput['kind'], number>> = { all: 0, edge: 1, cavity: 2, up: 3, down: 4, ground: 5, noise: 6, streaks: 7 };
 const BLEND_INDEX = { normal: 0, add: 1, subtract: 2, multiply: 3, max: 4, min: 5 } as const;
@@ -167,9 +167,40 @@ function inputParams(i: MaskInput): readonly [number, number, number, number] {
   }
 }
 
+/** One surface's projection: 1 = world (triplanar, large-scale weathering), 0 = the part's own UVs (micro detail). */
+export interface SurfaceSpaces {
+  readonly tile: number;
+  readonly detail: number;
+}
+
+/**
+ * The projection each surface and mask input of a material is packed with (plan 42, Argon directive 2). Pure, and the one place the
+ * rule lives: a large-scale weathering layer reads in world space so it runs across the seams of a kit, a micro tile keeps the
+ * part's UVs so it travels with the part. `pack` reads it, so what a test checks is what the shader gets.
+ */
+export function materialSpaces(
+  spec: MaterialSpec,
+): { readonly surfaces: readonly SurfaceSpaces[]; readonly inputs: readonly number[] } {
+  const layers = spec.layers.slice(0, MAX_LAYERS).filter((l) => l.visible);
+  const surfaces = [spec.base, ...layers.map((l) => l.surface)].map((surface) => ({
+    tile: surface.tile?.space === 'world' ? 1 : 0,
+    detail: surface.detail?.space === 'world' ? 1 : 0,
+  }));
+  const inputs: number[] = [];
+  for (const layer of layers) {
+    const ins = layer.mask.inputs.slice(0, MAX_MASK_INPUTS);
+    for (let i = 0; i < MAX_MASK_INPUTS; i += 1) {
+      const inp = ins[i];
+      inputs.push(inp && inp.kind === 'noise' && inp.space === 'world' ? 1 : 0);
+    }
+  }
+  return { surfaces, inputs };
+}
+
 function pack(spec: MaterialSpec, rank: MatRank): Packed {
   const layers: readonly LayerSpec[] = spec.layers.slice(0, MAX_LAYERS).filter((l) => l.visible);
   const surfaces: readonly SurfaceSpec[] = [spec.base, ...layers.map((l) => l.surface)];
+  const spaces = materialSpaces(spec);
   const tileIds = [...new Set(surfaces.flatMap((s) => [s.tile?.tile, s.detail?.tile].filter((x): x is string => !!x)))];
   const tiles = tileArray(tileIds, rank === 2 ? 256 : 128);
   const surf = new Float32Array(surfaces.length * SURF_VEC * 4);
@@ -190,6 +221,8 @@ function pack(spec: MaterialSpec, rank: MatRank): Packed {
       s.coat?.amount ?? 0, s.coat?.rough ?? 0.1, s.fuzz?.amount ?? 0, s.aniso?.amount ?? 0,
       fz[0]!, fz[1]!, fz[2]!, s.film?.amount ?? 0,
       em[0]! * ei, em[1]! * ei, em[2]! * ei, s.film?.thickness ?? 400,
+      // world space (triplanar, large-scale weathering) or local part UVs (micro detail that travels with the part)
+      spaces.surfaces[si]?.tile ?? 0, spaces.surfaces[si]?.detail ?? 0, 0, 0,
     ];
     surf.set(v, si * SURF_VEC * 4);
     if (hasRamp) {
@@ -208,7 +241,10 @@ function pack(spec: MaterialSpec, rank: MatRank): Packed {
     const ins = l.mask.inputs.slice(0, MAX_MASK_INPUTS);
     ins.forEach((inp, ii) => {
       const at = (li * MAX_MASK_INPUTS + ii) * INPUT_VEC * 4;
-      inputs.set([INPUT_KIND[inp.kind], BLEND_INDEX[inp.blend], inp.opacity, inp.invert ? 1 : 0, ...inputParams(inp)], at);
+      inputs.set(
+        [INPUT_KIND[inp.kind], BLEND_INDEX[inp.blend], inp.opacity, inp.invert ? 1 : 0, ...inputParams(inp), spaces.inputs[li * MAX_MASK_INPUTS + ii] ?? 0, 0, 0, 0],
+        at,
+      );
     });
     masks.set([l.mask.balance, l.mask.contrast, l.mask.invert ? 1 : 0, ins.length], li * 4);
     lay.set([l.opacity, l.heightBlend, l.weathering ? 1 : 0, l.writes.reduce((bits, w) => bits | WRITE_BIT[w], 0)], li * 4);
@@ -230,6 +266,7 @@ attribute vec4 aCavity;
 varying vec4 vMsEdge;
 varying vec4 vMsCav;
 varying vec3 vMsPos;
+varying vec3 vMsWorld;
 varying vec3 vMsNormal;
 varying vec2 vMsUv;
 `;
@@ -237,6 +274,7 @@ const VERT_MAIN = /* glsl */ `
 vMsEdge = aEdge;
 vMsCav = aCavity;
 vMsPos = position;
+vMsWorld = (modelMatrix * vec4(position, 1.0)).xyz;
 vMsNormal = normal;
 vMsUv = uv;
 `;
@@ -260,6 +298,7 @@ uniform int msMaskView;
 varying vec4 vMsEdge;
 varying vec4 vMsCav;
 varying vec3 vMsPos;
+varying vec3 vMsWorld;
 varying vec3 vMsNormal;
 varying vec2 vMsUv;
 float msViewValue = 0.0;
@@ -270,7 +309,38 @@ float msSmooth(float e0, float e1, float x) { float t = clamp((x - e0) / (e1 - e
 float msLine(vec4 d) { vec4 f = mix(vec4(MS_FAR), d, step(0.0, d)); return min(min(f.x, f.y), min(f.z, f.w)); }
 float msNoiseAt(int kind, vec2 uv) { vec4 n = texture2D(msNoise, uv); return kind == 0 ? n.r : kind == 1 ? n.g : kind == 2 ? n.b : n.a; }
 
-float msInput(int kind, vec4 p) {
+/** The three axis weights of a triplanar projection: the normal, sharpened so one axis dominates on flat faces. */
+vec3 msTriWeights(vec3 n) {
+  vec3 w = pow(abs(normalize(n)), vec3(4.0));
+  return w / max(1e-4, w.x + w.y + w.z);
+}
+
+#if MS_TILES
+/**
+ * A world-space tile read (plan 42, Argon directive 2): the three planes of the tile blended by the surface normal, so a large-scale
+ * weathering pattern runs continuously across the parts of a kit - the seam between two ring segments does not restart it.
+ */
+vec3 msTriTile(int layer, float scale, vec3 n) {
+  float sc = max(scale, 0.001);
+  vec3 w = msTriWeights(n);
+  vec3 x = texture(msTiles, vec3(vMsWorld.zy / sc, float(layer))).rgb;
+  vec3 y = texture(msTiles, vec3(vMsWorld.xz / sc, float(layer))).rgb;
+  vec3 z = texture(msTiles, vec3(vMsWorld.xy / sc, float(layer))).rgb;
+  return x * w.x + y * w.y + z * w.z;
+}
+#endif
+
+/** The same idea for the mask noise atlas: grounds clouds and patches in the place, not in the part's UV island. */
+float msTriNoise(int kind, float scale, vec4 seed) {
+  float sc = max(scale, 0.001);
+  vec3 w = msTriWeights(vMsNormal);
+  float x = msNoiseAt(kind, vMsWorld.zy / sc + seed.zw);
+  float y = msNoiseAt(kind, vMsWorld.xz / sc + seed.zw);
+  float z = msNoiseAt(kind, vMsWorld.xy / sc + seed.zw);
+  return x * w.x + y * w.y + z * w.z;
+}
+
+float msInput(int kind, vec4 p, bool world) {
   if (kind == 0) return 1.0;
   if (kind == 1 || kind == 2) {
     float w = clamp(p.x, 0.0005, ${EDGE_BAND.toFixed(4)});
@@ -283,7 +353,7 @@ float msInput(int kind, vec4 p) {
     return 1.0 - msSmooth(p.x - s, p.x + s, th);
   }
   if (kind == 5) { float s = max(0.005, p.y); return 1.0 - msSmooth(p.x - s, p.x + s, vMsPos.y); }
-  if (kind == 6) return clamp(msNoiseAt(int(p.x + 0.5), vMsUv / max(0.001, p.y) + p.zw), 0.0, 1.0);
+  if (kind == 6) return clamp(world ? msTriNoise(int(p.x + 0.5), p.y, p) : msNoiseAt(int(p.x + 0.5), vMsUv / max(0.001, p.y) + p.zw), 0.0, 1.0);
   float L = length(n.xz);
   if (L < 0.001) return 0.0;
   vec2 t = vec2(n.z, -n.x) / L;
@@ -311,7 +381,8 @@ float msMaskOf(int l) {
     if (i >= count) break;
     vec4 a = msIn[(l * ${MAX_MASK_INPUTS} + i) * ${INPUT_VEC}];
     vec4 p = msIn[(l * ${MAX_MASK_INPUTS} + i) * ${INPUT_VEC} + 1];
-    float raw = msInput(int(a.x + 0.5), p);
+    vec4 f = msIn[(l * ${MAX_MASK_INPUTS} + i) * ${INPUT_VEC} + 2];
+    float raw = msInput(int(a.x + 0.5), p, f.x > 0.5);
     acc = msBlend(int(a.y + 0.5), acc, a.w > 0.5 ? 1.0 - raw : raw, clamp(a.z, 0.0, 1.0));
   }
   float c = 0.5 - m.x * 0.5;
@@ -331,10 +402,11 @@ MsCh msSurface(int s) {
   vec4 e = msSurf[s * ${SURF_VEC} + 4];
   vec4 f = msSurf[s * ${SURF_VEC} + 5];
   vec4 g = msSurf[s * ${SURF_VEC} + 6];
+  vec4 h = msSurf[s * ${SURF_VEC} + 7];
   vec3 t = vec3(0.5);
   bool tiled = b.z >= 0.0;
 #if MS_TILES
-  if (tiled) t = texture(msTiles, vec3(vMsUv / max(b.w, 0.001), b.z)).rgb;
+  if (tiled) t = h.x > 0.5 ? msTriTile(int(b.z + 0.5), b.w, vMsNormal) : texture(msTiles, vec3(vMsUv / max(b.w, 0.001), b.z)).rgb;
 #endif
   MsCh o;
   if (c.w > 0.5) o.colour = texture2D(msRamps, vec2(t.r, (float(s) + 0.5) / float(MS_SURF))).rgb;
@@ -343,7 +415,7 @@ MsCh msSurface(int s) {
   float height = 0.5 + (tiled ? (t.g - 0.5) * c.x : 0.0);
 #if MS_TILES
   if (d.x >= 0.0) {
-    vec3 dt = texture(msTiles, vec3(vMsUv / max(d.y, 0.001), d.x)).rgb;
+    vec3 dt = h.y > 0.5 ? msTriTile(int(d.x + 0.5), d.y, vMsNormal) : texture(msTiles, vec3(vMsUv / max(d.y, 0.001), d.x)).rgb;
     rough += d.w * (dt.b - 0.5) * 2.0;
     height += (dt.g - 0.5) * d.z;
   }

@@ -38,6 +38,16 @@ export interface RampStop {
   readonly colour: string;
 }
 
+/**
+ * Where a tile is projected (plan 42, Argon directive 2). `'uv'` (the default) uses the part's own UVs, which is what a *micro*
+ * tile wants: brushed metal, hex micro-texture and carbon weave are surface detail that must follow the part as it moves.
+ * `'world'` projects in world space (triplanar), which is what a *large-scale* weathering layer wants: grime clouds, scorch
+ * burns and moss clumps are features of the place, not of the panel, so they must run continuously across the seams between
+ * the parts of a kit instead of restarting on every part's UV island.
+ */
+export type TileSpace = 'uv' | 'world';
+export const TILE_SPACES: readonly TileSpace[] = Object.freeze(['uv', 'world']);
+
 export interface TileUse {
   /** A tile the TileSource knows (a texgraph preset or vault cartridge id). Unknown tiles read as flat. */
   readonly tile: string;
@@ -47,6 +57,8 @@ export interface TileUse {
   readonly bump: number;
   /** Roughness += roughVar * (tile roughness - 0.5) * 2. */
   readonly roughVar: number;
+  /** UV (default, micro detail follows the part) or world space (large-scale weathering flows across seams). */
+  readonly space?: TileSpace;
 }
 
 /** One look's channels (plan 41 section 4.2). Optional sections are off when absent. */
@@ -104,7 +116,14 @@ export type MaskInput =
   /** Below `height` metres above the machine's foot, fading over `soft` metres. */
   | (InputBase & { readonly kind: 'ground'; readonly height: number; readonly soft: number })
   /** A noise sampled on the box UV, one repeat per `scale` metres, shifted by `seed`. */
-  | (InputBase & { readonly kind: 'noise'; readonly noise: NoiseKind; readonly scale: number; readonly seed: number })
+  | (InputBase & {
+      readonly kind: 'noise';
+      readonly noise: NoiseKind;
+      readonly scale: number;
+      readonly seed: number;
+      /** UV (default) or world space: a large-scale weathering mask should not restart on every part's UV island. */
+      readonly space?: TileSpace;
+    })
   /** Clouds stretched `stretch` times along gravity on side faces: runs and leaks. Zero on flat tops and bottoms. */
   | (InputBase & { readonly kind: 'streaks'; readonly scale: number; readonly stretch: number; readonly seed: number });
 

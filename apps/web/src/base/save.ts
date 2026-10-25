@@ -13,9 +13,10 @@ import * as F from '@hm/substrate';
 import { FIELD_RADIUS, FORGE_BY_ID, HEAVY, ITEMS, PART_SLOTS, QUEUE_MAX, RECIPE_BY_ID, VEHICLE, VEHICLES, type PartSlot, type StationKind, type VehicleKind } from './catalog';
 import { EQUIP_SLOTS, type EquipSlot } from './view';
 import {
-  BIN_KG, BIN_SLOTS, BRIDGE_STORE, MAX_LAYOUTS, MAX_PLANS, PLAYER, PLAYER_KG, PLAYER_SLOTS,
-  NO_LOADOUT, createWorld, layoutPieces, pieceAt, vehicleBox, type BaseWorld, type Job, type Layout, type Machine, type Plan, type Vehicle,
+  BIN_KG, BIN_SLOTS, BRIDGE_STORE, DEFAULT_GATE_POSE, MAX_LAYOUTS, MAX_PLANS, PLAYER, PLAYER_KG, PLAYER_SLOTS,
+  NO_LOADOUT, createWorld, isGateAccessMode, layoutPieces, pieceAt, vehicleBox, type BaseWorld, type Job, type Layout, type Machine, type Plan, type Vehicle,
 } from './world';
+import { DEFAULT_PLOT_RADIUS_M, type GatePose } from '@hm/coopnet/gate-dialer';
 
 /** The storage key for the base save (next to quest.ts's SAVE_KEY). */
 export const BASE_SAVE_KEY = 'hm-base-v1';
@@ -74,8 +75,8 @@ export function loadWorld(text: string | null, seed = 1): BaseWorld {
   const fresh = createWorld(seed);
   let raw: unknown;
   try { raw = text ? JSON.parse(text) : null; } catch { return fresh; }
-  // v3 saves (before vehicles and the weapon loadout) load with none of either
-  if (!isRec(raw) || (raw['v'] !== 3 && raw['v'] !== 4)) return fresh;
+  // v3 saves (before vehicles and the weapon loadout) load with none of either; v5 added the plot gate's pose and privacy
+  if (!isRec(raw) || (raw['v'] !== 3 && raw['v'] !== 4 && raw['v'] !== 5)) return fresh;
   const base = typeof raw['base'] === 'string' ? S.decode(raw['base']) : null;
   if (!base) return fresh;
 
@@ -138,7 +139,7 @@ export function loadWorld(text: string | null, seed = 1): BaseWorld {
   }
 
   return {
-    v: 4,
+    v: 5,
     tick: int(raw['tick'], 0, Number.MAX_SAFE_INTEGER) ?? 0,
     base,
     boxes,
@@ -154,7 +155,21 @@ export function loadWorld(text: string | null, seed = 1): BaseWorld {
     vehicles,
     nextVehicle: Math.max(int(raw['nextVehicle'], 1, 1_000_000) ?? 1, ...vehicles.map((v) => v.id + 1)),
     loadout: loadout(raw['loadout']),
+    gatePose: gatePose(raw['gatePose']),
+    gateAccess: isGateAccessMode(raw['gateAccess']) ? raw['gateAccess'] : 'open',
   };
+}
+
+/**
+ * The plot gate's pose from a save: a pose the plot can hold, or the default at the origin. An old save has none, and its gate stood
+ * at the origin, so that is what it gets — 'open', as every gate was before plan 42.
+ */
+function gatePose(raw: unknown): GatePose {
+  if (!isRec(raw)) return DEFAULT_GATE_POSE;
+  const x = num(raw['x']), y = num(raw['y']), z = num(raw['z']), yaw = num(raw['yaw']);
+  if (x === null || y === null || z === null || yaw === null) return DEFAULT_GATE_POSE;
+  if (Math.hypot(x, z) > DEFAULT_PLOT_RADIUS_M || y < -1 || y > 500) return DEFAULT_GATE_POSE;
+  return { x, y, z, yaw };
 }
 
 /** The weapon's fitted parts: each slot empty or a part made for that slot. */

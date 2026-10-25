@@ -14,6 +14,10 @@ import { hashWorld, type BaseCommand, type BaseEvent, type BaseWorld } from '../
 import type * as L from '@hm/lattice';
 import type * as S from '@hm/structure';
 import type { PartSlot, StationKind, VehicleKind } from '../base/catalog';
+import type { GateAccessMode, GatePose as GateWorldPose } from '@hm/coopnet/gate-dialer';
+
+/** The arrival pad a moved gate takes with it (`GatePlacementResult.arrivalPad`), in its own shape so the wire type is plain data. */
+export interface GateArrivalPad { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }
 
 export const PROTOCOL_VERSION = 1;
 
@@ -107,7 +111,11 @@ export type WireBaseEvent =
   | { readonly kind: 'granted'; readonly stock: readonly L.Stack[]; readonly lost: readonly L.Stack[] }
   | { readonly kind: 'salvaged'; readonly stock: readonly L.Stack[] }
   | { readonly kind: 'switched'; readonly machine: number; readonly on: boolean }
-  | { readonly kind: 'paid'; readonly reason: string; readonly bill: readonly L.Stack[] };
+  | { readonly kind: 'paid'; readonly reason: string; readonly bill: readonly L.Stack[] }
+  /** The plot's gate moved (plan 42): its new pose, and the arrival pad that moved with it. */
+  | { readonly kind: 'gateMoved'; readonly pose: GateWorldPose; readonly arrivalPad: GateArrivalPad }
+  /** The gate's iris/privacy state changed (plan 42). */
+  | { readonly kind: 'gateAccess'; readonly access: GateAccessMode };
 
 /** Converts a `BaseEvent` (which uses `type`) into a `WireBaseEvent` (which uses `kind`, never `type`). */
 export function toWireEvent(e: BaseEvent): WireBaseEvent {
@@ -166,6 +174,10 @@ export function toWireEvent(e: BaseEvent): WireBaseEvent {
       return { kind: 'salvaged', stock: e.stock };
     case 'switched':
       return { kind: 'switched', machine: e.machine, on: e.on };
+    case 'gateMoved':
+      return { kind: 'gateMoved', pose: e.pose, arrivalPad: e.arrivalPad };
+    case 'gateAccess':
+      return { kind: 'gateAccess', access: e.access };
   }
 }
 
@@ -224,6 +236,10 @@ export function fromWireEvent(w: WireBaseEvent): BaseEvent {
       return { type: 'salvaged', stock: w.stock };
     case 'switched':
       return { type: 'switched', machine: w.machine, on: w.on };
+    case 'gateMoved':
+      return { type: 'gateMoved', pose: w.pose, arrivalPad: w.arrivalPad };
+    case 'gateAccess':
+      return { type: 'gateAccess', access: w.access };
     case 'paid':
       return { type: 'paid', reason: w.reason, bill: w.bill };
   }

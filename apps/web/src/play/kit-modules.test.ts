@@ -111,9 +111,10 @@ test('every material it wears is a real mat: preset in the shelf', () => {
     assert.ok(MATERIAL_SHELF[key] ?? resolveMatPreset(key), `${key} is not in the shelf`);
   }
   // and the skins are the palette's own ids, not free strings
-  for (const id of Object.values(MAT_PRESET_SKINS)) assert.ok(resolveMatPreset(id), `${id} does not resolve`);
+  for (const id of Object.values(MAT_PRESET_SKINS)) assert.ok(resolveMatPreset(id as string), `${id} does not resolve`);
   // the piece shows a dielectric paint, a brushed steel and a rusted hopper: three different bases
-  const bases = new Set(kitMaterialKeys(MATSTACK_TEST_PIECE_KIT).map((id) => resolveMatPreset(id)!.base.name));
+  const bases = new Set(kitMaterialKeys(MATSTACK_TEST_PIECE_KIT).map((id: string) => resolveMatPreset(id)!.base.name));
+
   assert.ok(bases.size >= 3, `the piece only shows ${bases.size} base surfaces`);
 });
 

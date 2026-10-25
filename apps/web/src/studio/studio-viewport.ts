@@ -50,11 +50,20 @@ export interface ShowOptions {
 
 export interface CopyStats { readonly key: string; readonly meshes: number; readonly triangles: number }
 
+export interface FaceHit {
+  readonly point: Vec3;
+  readonly normal: Vec3;
+  readonly triangleIndex?: number;
+  readonly object?: THREE.Object3D;
+  readonly altKey?: boolean;
+  readonly shiftKey?: boolean;
+}
+
 export interface ViewportHooks {
   readonly onDragStart: () => void;
   readonly onDrag: (next: Partial<Transform>) => void;
   readonly onDragEnd: () => void;
-  readonly onFaceClick?: (hit: { point: Vec3; normal: Vec3 }) => void;
+  readonly onFaceClick?: (hit: FaceHit) => void;
 }
 
 /** Keymaps: which keys pick a tool, and how the mouse moves the camera. Maya is also the default for W/E/R. */
@@ -217,9 +226,46 @@ export class StudioViewport {
 
   /** Frames the copies (or the gizmo pivot) from the current angle. */
   focus(): void {
-    const p = this.pivot() ?? [0, 0.8, 0];
-    this.target.set(p[0], p[1], p[2]);
-    this.dist = 6;
+    const p = this.pivot();
+    if (p) {
+      this.target.set(p[0], p[1], p[2]);
+      this.dist = 6;
+      return;
+    }
+    const box = new THREE.Box3().setFromObject(this.copyRoot);
+    if (!box.isEmpty()) {
+      const center = box.getCenter(new THREE.Vector3());
+      this.target.copy(center);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      this.dist = Math.max(2.5, maxDim * 2.2);
+    } else {
+      this.target.set(0, 0.8, 0);
+      this.dist = 6;
+    }
+  }
+
+  /**
+   * Shows a custom THREE.Group (such as a built Kit assembly or machine model).
+   */
+  showCustomGroup(group: THREE.Group, opts?: { reframe?: boolean }): void {
+    this.clearCopies();
+    this.copyRoot.add(group);
+    if (opts?.reframe) {
+      const box = new THREE.Box3().setFromObject(group);
+      if (!box.isEmpty()) {
+        const center = box.getCenter(new THREE.Vector3());
+        this.target.copy(center);
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        this.dist = Math.max(2.5, maxDim * 2.2);
+      }
+    }
+    this.drawGizmo();
+  }
+
+  getRenderer(): THREE.WebGLRenderer {
+    return this.renderer;
   }
 
   getGizmoScreenPoint(handle: 'x' | 'y' | 'z' | 'pivot' = 'x'): { x: number; y: number } | null {
@@ -239,7 +285,7 @@ export class StudioViewport {
     };
   }
 
-  raycastFace(e: PointerEvent): { point: Vec3; normal: Vec3 } | null {
+  raycastFace(e: PointerEvent): FaceHit | null {
     const r = this.renderer.domElement.getBoundingClientRect();
     const ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     this.raycaster.setFromCamera(ndc, this.camera);
@@ -252,7 +298,14 @@ export class StudioViewport {
         const normMatrix = new THREE.Matrix3().getNormalMatrix(h.object.matrixWorld);
         norm.applyMatrix3(normMatrix).normalize();
       }
-      return { point: pt, normal: [norm.x, norm.y, norm.z] };
+      return {
+        point: pt,
+        normal: [norm.x, norm.y, norm.z],
+        triangleIndex: h.faceIndex ?? undefined,
+        object: h.object,
+        altKey: e.altKey,
+        shiftKey: e.shiftKey,
+      };
     }
     return null;
   }

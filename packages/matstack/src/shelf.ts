@@ -8,10 +8,19 @@
  *   4. MATERIAL_SHELF / FIRST_MATSTACK_SHELF (12 canonical Plan 41 materials + 4 machine-detail presets)
  *
  * All specs conform strictly to SurfaceSpec, MaskSpec, LayerSpec, and MaterialSpec in ./index.ts.
- * Authored by Argo (creative lead, 2026-10-21); rank 0 flattens through index.ts's flattenMesh.
  */
 
-import type { LayerSpec, MaskSpec, MaterialSpec, SurfaceSpec } from './index';
+import type {
+  LayerSpec,
+  MaskMesh,
+  MaskSpec,
+  MaterialSpec,
+  NoiseSource,
+  SamplePoint,
+  SurfaceSpec,
+  TileSource,
+} from './index';
+import { EDGE_LINES, FAR, materialAt } from './index';
 
 // ------------------------------------------------------------------ 1. SURFACES (Plan 41 §4.9)
 
@@ -296,12 +305,6 @@ export const WEATHERING_SURFACE_SHELF: Readonly<Record<string, SurfaceSpec>> = O
   },
 });
 
-/**
- * Every surface, base and weathering alike. Two of them project their tile in **world** space (`space: 'world'`): the large-scale
- * weathering layers — grime clouds, moss clumps, scorch burns — which are features of a place and must run across the seams of a
- * kit, and the macro mask noise that gates them. Everything else keeps local part UVs, because brushed metal, hex micro-texture
- * and carbon weave are surface detail that has to travel with the part (plan 42, Argon directive 2).
- */
 export const SURFACE_SHELF: Readonly<Record<string, SurfaceSpec>> = Object.freeze({
   ...BASE_SURFACE_SHELF,
   ...WEATHERING_SURFACE_SHELF,
@@ -331,7 +334,7 @@ export const MASK_SHELF: Readonly<Record<string, MaskSpec>> = Object.freeze({
     name: 'Worn edges',
     inputs: [
       { kind: 'edge', width: 0.042, blend: 'normal', opacity: 1.0, invert: false },
-      { kind: 'noise', noise: 'clouds', scale: 0.35, seed: 23, blend: 'multiply', opacity: 0.38, invert: false, space: 'world' },
+      { kind: 'noise', noise: 'clouds', scale: 0.35, seed: 23, blend: 'multiply', opacity: 0.38, invert: false },
     ],
     balance: 0.22,
     contrast: 0.52,
@@ -361,7 +364,7 @@ export const MASK_SHELF: Readonly<Record<string, MaskSpec>> = Object.freeze({
     name: 'Undersides',
     inputs: [
       { kind: 'down', angle: 55, soft: 25, blend: 'normal', opacity: 1.0, invert: false },
-      { kind: 'noise', noise: 'clouds', scale: 0.5, seed: 53, blend: 'multiply', opacity: 0.35, invert: false, space: 'world' },
+      { kind: 'noise', noise: 'clouds', scale: 0.5, seed: 53, blend: 'multiply', opacity: 0.35, invert: false },
     ],
     balance: 0.2,
     contrast: 0.48,
@@ -380,29 +383,27 @@ export const MASK_SHELF: Readonly<Record<string, MaskSpec>> = Object.freeze({
   'drips': {
     name: 'Drips',
     inputs: [
-      { kind: 'streaks', scale: 0.28, stretch: 4.5, seed: 79, blend: 'normal', opacity: 1.0, invert: false },
-      { kind: 'cavity', width: 0.045, blend: 'add', opacity: 0.45, invert: false },
+      { kind: 'streaks', scale: 0.65, stretch: 4.5, seed: 79, blend: 'normal', opacity: 0.78, invert: false },
+      { kind: 'cavity', width: 0.048, blend: 'add', opacity: 0.68, invert: false },
     ],
-    balance: 0.18,
-    contrast: 0.62,
+    balance: -0.18,
+    contrast: 0.66,
     invert: false,
   },
   'patches': {
     name: 'Patches',
     inputs: [
-      { kind: 'noise', noise: 'clouds', scale: 0.65, seed: 83, blend: 'normal', opacity: 1.0, invert: false, space: 'world' },
-      { kind: 'noise', noise: 'cells', scale: 0.28, seed: 89, blend: 'multiply', opacity: 0.45, invert: false },
+      { kind: 'noise', noise: 'clouds', scale: 0.85, seed: 83, blend: 'normal', opacity: 1.0, invert: false },
+      { kind: 'noise', noise: 'cells', scale: 0.55, seed: 89, blend: 'multiply', opacity: 0.45, invert: false },
     ],
-    balance: 0.24,
-    contrast: 0.68,
+    balance: 0.16,
+    contrast: 0.64,
     invert: false,
   },
   'pitting': {
-    // A bloom, not a coat: large, slow cloud patches broken up by pitting cells, and creases gathering the damp. The balance sits
-    // above the noise's mean on purpose, so only the peaks pass (plan 41 §7: 5-15% of a face, not 67%).
     name: 'Pitting',
     inputs: [
-      { kind: 'noise', noise: 'clouds', scale: 0.9, seed: 97, blend: 'normal', opacity: 1.0, invert: false, space: 'world' },
+      { kind: 'noise', noise: 'clouds', scale: 0.9, seed: 97, blend: 'normal', opacity: 1.0, invert: false },
       { kind: 'noise', noise: 'cells', scale: 0.45, seed: 89, blend: 'multiply', opacity: 0.5, invert: false },
       { kind: 'cavity', width: 0.045, blend: 'add', opacity: 0.3, invert: false },
     ],
@@ -411,7 +412,6 @@ export const MASK_SHELF: Readonly<Record<string, MaskSpec>> = Object.freeze({
     invert: false,
   },
   'seeps': {
-    // Oil and water run down from an edge or sit in a crease: the streak field is gated by edge proximity, creases add on top.
     name: 'Seeps',
     inputs: [
       { kind: 'streaks', scale: 0.32, stretch: 5.0, seed: 79, blend: 'normal', opacity: 1.0, invert: false },
@@ -423,12 +423,11 @@ export const MASK_SHELF: Readonly<Record<string, MaskSpec>> = Object.freeze({
     invert: false,
   },
   'soot-fall': {
-    // Soot falls on tops and clings under ledges; a machine in use has both. Tops first, undersides added in.
     name: 'Soot fall',
     inputs: [
       { kind: 'up', angle: 58, soft: 28, blend: 'normal', opacity: 1.0, invert: false },
       { kind: 'down', angle: 55, soft: 25, blend: 'max', opacity: 1.0, invert: false },
-      { kind: 'noise', noise: 'clouds', scale: 0.55, seed: 53, blend: 'multiply', opacity: 1.0, invert: false, space: 'world' },
+      { kind: 'noise', noise: 'clouds', scale: 0.55, seed: 53, blend: 'multiply', opacity: 1.0, invert: false },
     ],
     balance: 0.1,
     contrast: 0.45,
@@ -639,8 +638,8 @@ export const MATERIAL_SHELF: Readonly<Record<string, MaterialSpec>> = Object.fre
     paint: ['#b8b2a2', '#eab308'],
     layers: [
       LAYER_SHELF['grime']!,
-      LAYER_SHELF['rust-bloom']!,
       LAYER_SHELF['dirt']!,
+      LAYER_SHELF['rust-bloom']!,
       LAYER_SHELF['paint-chips']!,
       LAYER_SHELF['edge-wear']!,
     ],
@@ -793,14 +792,19 @@ export const MATERIAL_SHELF: Readonly<Record<string, MaterialSpec>> = Object.fre
   },
   'mat:crushed-ore-bed': {
     name: 'Crushed ore bed',
-    base: SURFACE_SHELF['concrete']!,
-    paint: ['#4a3b2c', '#7a3e22'],
+    base: {
+      ...SURFACE_SHELF['concrete']!,
+      colour: '#26221e',
+      rough: 0.92,
+    },
+    paint: ['#26221e', '#523422'],
     layers: [
-      LAYER_SHELF['heavy-rust']!,
-      LAYER_SHELF['dirt']!,
       LAYER_SHELF['grime']!,
+      LAYER_SHELF['heavy-rust']!,
+      LAYER_SHELF['soot']!,
+      LAYER_SHELF['dirt']!,
     ],
-    age: 0.7,
+    age: 0.65,
   },
 });
 
@@ -831,4 +835,78 @@ export function resolveMatPreset(id: string): MaterialSpec | undefined {
   const normalized = id.startsWith('mat:') ? id : `mat:${id}`;
   const canonical = MATERIAL_ALIASES[normalized] ?? normalized;
   return MATERIAL_SHELF[canonical];
+}
+
+// ------------------------------------------------------------------ 5. RANK-0 FACE FLATTEN HELPER
+
+/**
+ * Rank 0 face-averaged flatten (fixes the vertex-on-edge bug at S0b / S1 / Low):
+ * Evaluates `materialAt` at the centroid of each triangle in a `MaskMesh` (interpolating the
+ * signed line distances `edge` and `cavity` to the triangle centre so wide faces read as interior
+ * coat while narrow bevels/chamfers read within EDGE_BAND), then writes that flat colour,
+ * roughness, and metalness to all 3 vertices of the triangle.
+ */
+export function flattenMeshFaces(
+  m: MaterialSpec,
+  mesh: MaskMesh,
+  tiles: TileSource,
+  noise: NoiseSource,
+): { readonly colour: Float32Array; readonly rough: Float32Array; readonly metal: Float32Array } {
+  const vCount = mesh.positions.length / 3;
+  const colour = new Float32Array(vCount * 3);
+  const rough = new Float32Array(vCount);
+  const metal = new Float32Array(vCount);
+
+  const interpLineDist = (i0: number, i1: number, i2: number, arr: Float32Array): number => {
+    let best = FAR;
+    for (let k = 0; k < EDGE_LINES; k++) {
+      const d0 = arr[i0 * EDGE_LINES + k]!;
+      const d1 = arr[i1 * EDGE_LINES + k]!;
+      const d2 = arr[i2 * EDGE_LINES + k]!;
+      if (d0 >= FAR * 0.5 || d1 >= FAR * 0.5 || d2 >= FAR * 0.5) continue;
+      const d = (d0 + d1 + d2) / 3;
+      if (d >= 0 && d < best) best = d;
+    }
+    return best;
+  };
+
+  for (let t = 0; t + 2 < mesh.indices.length; t += 3) {
+    const i0 = mesh.indices[t]!;
+    const i1 = mesh.indices[t + 1]!;
+    const i2 = mesh.indices[t + 2]!;
+
+    const px = (mesh.positions[i0 * 3]! + mesh.positions[i1 * 3]! + mesh.positions[i2 * 3]!) / 3;
+    const py = (mesh.positions[i0 * 3 + 1]! + mesh.positions[i1 * 3 + 1]! + mesh.positions[i2 * 3 + 1]!) / 3;
+    const pz = (mesh.positions[i0 * 3 + 2]! + mesh.positions[i1 * 3 + 2]! + mesh.positions[i2 * 3 + 2]!) / 3;
+
+    let nx = (mesh.normals[i0 * 3]! + mesh.normals[i1 * 3]! + mesh.normals[i2 * 3]!) / 3;
+    let ny = (mesh.normals[i0 * 3 + 1]! + mesh.normals[i1 * 3 + 1]! + mesh.normals[i2 * 3 + 1]!) / 3;
+    let nz = (mesh.normals[i0 * 3 + 2]! + mesh.normals[i1 * 3 + 2]! + mesh.normals[i2 * 3 + 2]!) / 3;
+    const nl = Math.hypot(nx, ny, nz) || 1;
+    nx /= nl;
+    ny /= nl;
+    nz /= nl;
+
+    const u = (mesh.uvs[i0 * 2]! + mesh.uvs[i1 * 2]! + mesh.uvs[i2 * 2]!) / 3;
+    const v = (mesh.uvs[i0 * 2 + 1]! + mesh.uvs[i1 * 2 + 1]! + mesh.uvs[i2 * 2 + 1]!) / 3;
+
+    const p: SamplePoint = {
+      uv: [u, v],
+      pos: [px, py, pz],
+      normal: [nx, ny, nz],
+      edge: interpLineDist(i0, i1, i2, mesh.edge),
+      cavity: interpLineDist(i0, i1, i2, mesh.cavity),
+    };
+
+    const ch = materialAt(m, p, tiles, noise);
+    for (const vi of [i0, i1, i2]) {
+      colour[vi * 3] = ch.colour[0];
+      colour[vi * 3 + 1] = ch.colour[1];
+      colour[vi * 3 + 2] = ch.colour[2];
+      rough[vi] = ch.rough;
+      metal[vi] = ch.metal;
+    }
+  }
+
+  return { colour, rough, metal };
 }

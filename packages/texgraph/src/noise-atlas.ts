@@ -13,8 +13,7 @@
  * Everything here is deterministic and cached; no DOM, clock or randomness.
  */
 
-import { evaluateGraph, type TexGraph } from './index';
-import { TILE_LIBRARY } from './tile-library';
+import { evaluateGraph, type TexGraph, TILE_LIBRARY } from './index';
 
 /** The four mask noises, in the atlas's channel order. */
 export type MaterialNoiseKind = 'clouds' | 'cells' | 'speckle' | 'scratches';

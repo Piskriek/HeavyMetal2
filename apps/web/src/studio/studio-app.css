@@ -185,7 +185,7 @@
 .sx-empty { padding: 8px 0; }
 
 /* the centre: viewport over the changes panel */
-.sx-center { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 6px var(--b); }
+.sx-center { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) 6px var(--b); }
 .sx-view { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: var(--sx-bg); }
 .sx-view .sx-canvas { position: absolute; inset: 0; display: block; }
 .sx-tools { position: absolute; left: 12px; top: 12px; display: flex; gap: 8px; align-items: center; z-index: 3; flex-wrap: wrap; max-width: calc(100% - 24px); }
@@ -331,10 +331,37 @@
 }
 .sx-help { font-size: 11px; margin-top: 6px; }
 
-/* the right panel's two tabs */
-.sx-right-tabs { display: flex; gap: 2px; margin: -14px -14px 14px; padding: 9px 14px; border-bottom: 1px solid var(--sx-line); background: var(--sx-panel); }
-.sx-right-tabs button { background: transparent; border: 1px solid transparent; color: var(--sx-dim); font: 600 12px/1 var(--sx-display); padding: 7px 10px; border-radius: 6px; }
+/* the right panel's inspector tabs */
+.sx-right-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: -14px -14px 14px; padding: 9px 14px; border-bottom: 1px solid var(--sx-line); background: var(--sx-panel); }
+.sx-right-tabs button { background: transparent; border: 1px solid transparent; color: var(--sx-dim); font: 600 11px/1 var(--sx-display); padding: 6px 9px; border-radius: 6px; }
+.sx-right-tabs button:hover:not(:disabled) { color: var(--sx-text); background: rgba(255, 255, 255, 0.04); }
 .sx-right-tabs button[aria-selected='true'] { color: var(--sx-amber); background: var(--sx-amber-soft); border-color: rgba(255, 197, 61, 0.4); }
+
+/* Modular Machine Kits Selector in Left Panel */
+.sx-kit-selector { flex: 0 0 auto; max-height: 280px; overflow-y: auto; }
+.sx-kit-list { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.sx-kit-item {
+  display: flex; flex-direction: column; gap: 2px; padding: 7px 9px;
+  background: rgba(10, 16, 23, 0.7); border: 1px solid var(--sx-line);
+  border-radius: 6px; cursor: pointer; text-align: left; transition: all 0.12s ease;
+}
+.sx-kit-item:hover { background: rgba(20, 30, 42, 0.9); border-color: var(--sx-line-hi); }
+.sx-kit-item.selected {
+  background: var(--sx-amber-soft); border-color: rgba(255, 197, 61, 0.6);
+  box-shadow: 0 0 10px rgba(255, 197, 61, 0.15);
+}
+.sx-kit-item-title { font: 600 12px/1.2 var(--sx-display); color: var(--sx-text); }
+.sx-kit-item.selected .sx-kit-item-title { color: var(--sx-amber); }
+.sx-kit-item-sub { display: flex; justify-content: space-between; font-size: 11px; color: var(--sx-dim); }
+.sx-badge { font: 600 10px/1 var(--sx-display); padding: 2px 6px; border-radius: 4px; }
+.sx-badge.sx-ok { color: var(--sx-ok); background: rgba(111, 227, 160, 0.12); border: 1px solid rgba(111, 227, 160, 0.35); }
+.sx-badge.sx-warn { color: var(--sx-amber); background: var(--sx-amber-soft); border: 1px solid rgba(255, 197, 61, 0.4); }
+.sx-btn-snap {
+  margin-top: 8px; width: 100%; background: rgba(255, 197, 61, 0.15);
+  border: 1px solid rgba(255, 197, 61, 0.5); color: var(--sx-amber);
+  font-weight: 600; padding: 6px; border-radius: 5px; cursor: pointer; font-size: 11px;
+}
+.sx-btn-snap:hover { background: rgba(255, 197, 61, 0.25); }
 
 /* the Redo panel */
 .sx-redo { display: flex; flex-direction: column; gap: 14px; }

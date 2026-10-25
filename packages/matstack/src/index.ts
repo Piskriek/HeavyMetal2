@@ -15,19 +15,18 @@
  *  - `layers` run bottom to top (the UI lists them top first).
  */
 
-import { BLEND_MODES, CHANNEL_GROUPS, EDGE_BAND, MAX_LAYERS, MAX_MASK_INPUTS, NOISE_KINDS, PAINT_REFS } from './constants';
+import { EDGE_BAND, MAX_LAYERS, MAX_MASK_INPUTS } from './constants';
+export { EDGE_BAND, MAX_LAYERS, MAX_MASK_INPUTS, MAX_RAMP_STOPS } from './constants';
 import { EDGE_LINES, lineDistance, type MaskMesh } from './mask-mesh';
-export { BLEND_MODES, CHANNEL_GROUPS, EDGE_BAND, MAX_LAYERS, MAX_MASK_INPUTS, MAX_RAMP_STOPS, NOISE_KINDS, PAINT_REFS } from './constants';
 export * from './mask-mesh';
-export * from './shelf';
-export * from './coverage';
-export * from './codec';
 
 // ------------------------------------------------------------------ specs
 
 export type V3 = readonly [number, number, number];
 export type RGB = readonly [number, number, number];
 
+/** Paint references a surface can use as its colour: the material's first and second paint. */
+export const PAINT_REFS = ['paint1', 'paint2'] as const;
 export type PaintRef = (typeof PAINT_REFS)[number];
 /** '#rrggbb' (sRGB), or a paint reference. */
 export type ColourRef = string;
@@ -38,13 +37,6 @@ export interface RampStop {
   readonly colour: string;
 }
 
-/**
- * Where a tile is projected (plan 42, Argon directive 2). `'uv'` (the default) uses the part's own UVs, which is what a *micro*
- * tile wants: brushed metal, hex micro-texture and carbon weave are surface detail that must follow the part as it moves.
- * `'world'` projects in world space (triplanar), which is what a *large-scale* weathering layer wants: grime clouds, scorch
- * burns and moss clumps are features of the place, not of the panel, so they must run continuously across the seams between
- * the parts of a kit instead of restarting on every part's UV island.
- */
 export type TileSpace = 'uv' | 'world';
 export const TILE_SPACES: readonly TileSpace[] = Object.freeze(['uv', 'world']);
 
@@ -87,16 +79,10 @@ export interface SurfaceSpec {
   readonly emit?: { readonly colour: string; readonly intensity: number };
 }
 
+export const NOISE_KINDS = ['clouds', 'cells', 'speckle', 'scratches'] as const;
 export type NoiseKind = (typeof NOISE_KINDS)[number];
 
-/**
- * How many features each noise has across one repeat, so a mask's `scale` (metres per repeat) sets a feature size of
- * scale / count: clouds are soft blotches (4 across), cells are blobs bright in the middle with dark borders (7 across),
- * speckle is fine soft grain (32 across), scratches are thin broken lines (23 across). The renderer's noise atlas is
- * built to match.
- */
-export const NOISE_FEATURES: Readonly<Record<NoiseKind, number>> = { clouds: 4, cells: 7, speckle: 32, scratches: 23 };
-
+export const BLEND_MODES = ['normal', 'add', 'subtract', 'multiply', 'max', 'min'] as const;
 export type BlendMode = (typeof BLEND_MODES)[number];
 
 interface InputBase {
@@ -104,7 +90,10 @@ interface InputBase {
   readonly opacity: number;
   /** Inverts this input's value before it is blended. */
   readonly invert: boolean;
+  /** UV (default) or world space: a large-scale weathering mask should not restart on every part's UV island. */
+  readonly space?: TileSpace;
 }
+
 
 /** One input of a mask (plan 41 section 4.3). */
 export type MaskInput =
@@ -116,14 +105,7 @@ export type MaskInput =
   /** Below `height` metres above the machine's foot, fading over `soft` metres. */
   | (InputBase & { readonly kind: 'ground'; readonly height: number; readonly soft: number })
   /** A noise sampled on the box UV, one repeat per `scale` metres, shifted by `seed`. */
-  | (InputBase & {
-      readonly kind: 'noise';
-      readonly noise: NoiseKind;
-      readonly scale: number;
-      readonly seed: number;
-      /** UV (default) or world space: a large-scale weathering mask should not restart on every part's UV island. */
-      readonly space?: TileSpace;
-    })
+  | (InputBase & { readonly kind: 'noise'; readonly noise: NoiseKind; readonly scale: number; readonly seed: number })
   /** Clouds stretched `stretch` times along gravity on side faces: runs and leaks. Zero on flat tops and bottoms. */
   | (InputBase & { readonly kind: 'streaks'; readonly scale: number; readonly stretch: number; readonly seed: number });
 
@@ -140,6 +122,7 @@ export interface MaskSpec {
   readonly invert: boolean;
 }
 
+export const CHANNEL_GROUPS = ['colour', 'metal', 'rough', 'specular', 'height', 'coat', 'fuzz', 'aniso', 'film', 'emit'] as const;
 export type ChannelGroup = (typeof CHANNEL_GROUPS)[number];
 
 export interface LayerSpec {
@@ -244,19 +227,10 @@ export const isHex = (s: string): boolean => HEX_RE.test(s);
 
 /** '#rrggbb' to linear RGB; anything else reads as mid grey (#808080). */
 export function hexToLinear(hex: string): RGB {
-  const hit = linearCache.get(hex);
-  if (hit) return hit;
   const h = isHex(hex) ? hex : '#808080';
   const n = parseInt(h.slice(1), 16);
-  const out: RGB = Object.freeze([srgbToLinear(((n >> 16) & 255) / 255), srgbToLinear(((n >> 8) & 255) / 255), srgbToLinear((n & 255) / 255)] as const);
-  if (linearCache.size < 4096) linearCache.set(hex, out);
-  return out;
+  return [srgbToLinear(((n >> 16) & 255) / 255), srgbToLinear(((n >> 8) & 255) / 255), srgbToLinear((n & 255) / 255)];
 }
-/** Colours already converted (evaluation runs per sample, so each is parsed once). */
-const linearCache = new Map<string, RGB>();
-
-/** Each ramp's stops in order, sorted once per ramp. */
-const sortedStops = new WeakMap<readonly RampStop[], readonly RampStop[]>();
 
 /** A colour reference resolved against the material's paint. */
 export function resolveColour(ref: ColourRef, paint: readonly [string, string]): RGB {
@@ -272,8 +246,7 @@ export function seedOffset(seed: number): readonly [number, number] {
 
 /** The ramp's colour at x, interpolated in linear RGB between the stops either side (stops sorted by `at`). */
 export function rampAt(stops: readonly RampStop[], x: number): RGB {
-  let s = sortedStops.get(stops);
-  if (!s) sortedStops.set(stops, (s = [...stops].sort((a, b) => a.at - b.at)));
+  const s = [...stops].sort((a, b) => a.at - b.at);
   const first = s[0];
   if (!first) return hexToLinear('#808080');
   if (x <= first.at) return hexToLinear(first.colour);
@@ -374,9 +347,7 @@ export function levels(acc: number, balance: number, contrast: number): number {
 /** The mask at a point: the inputs folded from 0 in order, then levels, then the mask's invert. */
 export function maskAt(mask: MaskSpec, p: SamplePoint, noise: NoiseSource): number {
   let acc = 0;
-  const count = Math.min(mask.inputs.length, MAX_MASK_INPUTS);
-  for (let i = 0; i < count; i++) {
-    const input = mask.inputs[i]!;
+  for (const input of mask.inputs.slice(0, MAX_MASK_INPUTS)) {
     const raw = inputValue(input, p, noise);
     acc = blendInput(input.blend, acc, input.invert ? 1 - raw : raw, clamp01(input.opacity));
   }
@@ -464,30 +435,28 @@ const mix3 = (a: RGB, b: RGB, t: number): RGB => [mix(a[0], b[0], t), mix(a[1], 
 /** `below` with a layer's surface mixed over it by weight w, in the channel groups the layer writes. */
 export function blendChannels(below: Channels, over: Channels, w: number, writes: readonly ChannelGroup[]): Channels {
   if (w <= 0) return below;
-  const coat = writes.includes('coat'), fuzz = writes.includes('fuzz'), film = writes.includes('film');
+  const has = (g: ChannelGroup): boolean => writes.includes(g);
   return {
-    colour: writes.includes('colour') ? mix3(below.colour, over.colour, w) : below.colour,
-    metal: writes.includes('metal') ? mix(below.metal, over.metal, w) : below.metal,
-    rough: writes.includes('rough') ? mix(below.rough, over.rough, w) : below.rough,
-    specular: writes.includes('specular') ? mix(below.specular, over.specular, w) : below.specular,
-    height: writes.includes('height') ? mix(below.height, over.height, w) : below.height,
-    coat: coat ? mix(below.coat, over.coat, w) : below.coat,
-    coatRough: coat ? mix(below.coatRough, over.coatRough, w) : below.coatRough,
-    fuzz: fuzz ? mix(below.fuzz, over.fuzz, w) : below.fuzz,
-    fuzzColour: fuzz ? mix3(below.fuzzColour, over.fuzzColour, w) : below.fuzzColour,
-    aniso: writes.includes('aniso') ? mix(below.aniso, over.aniso, w) : below.aniso,
-    film: film ? mix(below.film, over.film, w) : below.film,
-    filmThickness: film ? mix(below.filmThickness, over.filmThickness, w) : below.filmThickness,
-    emit: writes.includes('emit') ? mix3(below.emit, over.emit, w) : below.emit,
+    colour: has('colour') ? mix3(below.colour, over.colour, w) : below.colour,
+    metal: has('metal') ? mix(below.metal, over.metal, w) : below.metal,
+    rough: has('rough') ? mix(below.rough, over.rough, w) : below.rough,
+    specular: has('specular') ? mix(below.specular, over.specular, w) : below.specular,
+    height: has('height') ? mix(below.height, over.height, w) : below.height,
+    coat: has('coat') ? mix(below.coat, over.coat, w) : below.coat,
+    coatRough: has('coat') ? mix(below.coatRough, over.coatRough, w) : below.coatRough,
+    fuzz: has('fuzz') ? mix(below.fuzz, over.fuzz, w) : below.fuzz,
+    fuzzColour: has('fuzz') ? mix3(below.fuzzColour, over.fuzzColour, w) : below.fuzzColour,
+    aniso: has('aniso') ? mix(below.aniso, over.aniso, w) : below.aniso,
+    film: has('film') ? mix(below.film, over.film, w) : below.film,
+    filmThickness: has('film') ? mix(below.filmThickness, over.filmThickness, w) : below.filmThickness,
+    emit: has('emit') ? mix3(below.emit, over.emit, w) : below.emit,
   };
 }
 
 /** The material at a point: the base surface, then each layer bottom to top. */
 export function materialAt(m: MaterialSpec, p: SamplePoint, tiles: TileSource, noise: NoiseSource): Channels {
   let out = surfaceAt(m.base, p, m.paint, tiles);
-  const count = Math.min(m.layers.length, MAX_LAYERS);
-  for (let i = 0; i < count; i++) {
-    const layer = m.layers[i]!;
+  for (const layer of m.layers.slice(0, MAX_LAYERS)) {
     if (!layer.visible) continue;
     const s = surfaceAt(layer.surface, p, m.paint, tiles);
     out = blendChannels(out, s, layerWeight(layer, s.height, p, m.age, noise), layer.writes);
@@ -496,8 +465,8 @@ export function materialAt(m: MaterialSpec, p: SamplePoint, tiles: TileSource, n
 }
 
 /**
- * The material evaluated at each of the given points. Colour is linear RGB, 3 per point. Rank 0 uses it through
- * `flattenMesh`; dense meshes flatten per vertex, faceted ones per face.
+ * Rank 0 (plan 41 section 4.5): the material evaluated at each vertex, for a plain vertex-coloured material.
+ * Colour is linear RGB, 3 per point.
  */
 export function flatten(
   m: MaterialSpec,
@@ -683,3 +652,10 @@ export function featureKey(f: MaterialFeatures): string {
   const flags: [boolean, string][] = [[f.tiles, 't'], [f.detail, 'd'], [f.ramp, 'r'], [f.coat, 'c'], [f.fuzz, 'f'], [f.aniso, 'a'], [f.film, 'i'], [f.emit, 'e']];
   return [`L${f.layers}`, ...flags.filter(([on]) => on).map(([, k]) => k)].join(' ');
 }
+
+export * from './constants';
+export * from './mask-mesh';
+export * from './coverage';
+export * from './codec';
+export * from './shelf';
+

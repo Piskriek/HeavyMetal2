@@ -1,0 +1,253 @@
+/**
+ * apps/web/src/studio/inspectors/partgen-meshops-panel.css
+ * Studio Creative Suite — Partgen & MeshOps Panel Styling
+ */
+
+.sx-partgen-meshops-panel {
+  display: flex;
+  flex-direction: column;
+  background: rgba(18, 22, 28, 0.95);
+  backdrop-filter: blur(16px);
+  color: #e6edf3;
+  padding: 12px;
+  gap: 12px;
+  height: 100%;
+  overflow-y: auto;
+  user-select: none;
+}
+
+.sx-partgen-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sx-partgen-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sx-partgen-title {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #f0f6fc;
+}
+
+.sx-part-id-badge {
+  font-size: 10px;
+  font-family: monospace;
+  padding: 2px 6px;
+  background: rgba(124, 255, 77, 0.12);
+  border: 1px solid rgba(124, 255, 77, 0.3);
+  color: #7cff4d;
+  border-radius: 4px;
+}
+
+.sx-gen-tag-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sx-source-kind-pill {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #c9d1d9;
+}
+
+.sx-gen-id-pill {
+  font-size: 9.5px;
+  font-family: monospace;
+  color: #3dc8ff;
+  background: rgba(61, 200, 255, 0.12);
+  border: 1px solid rgba(61, 200, 255, 0.3);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.sx-part-rank-pill {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #facc15;
+  margin-left: auto;
+}
+
+/* Quick Presets Grid */
+.sx-quick-presets-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sx-section-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #8b949e;
+}
+
+.sx-quick-pills-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.sx-quick-pill-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 4px;
+  background: rgba(28, 36, 48, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: #e6edf3;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sx-quick-pill-btn:hover {
+  background: rgba(61, 200, 255, 0.18);
+  border-color: #3dc8ff;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.sx-qp-icon {
+  font-size: 11px;
+}
+
+/* Parametric Controls */
+.sx-params-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sx-params-sliders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(22, 28, 38, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+}
+
+.sx-gen-param-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sx-param-label-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+}
+
+.sx-param-name {
+  color: #8b949e;
+  font-family: monospace;
+}
+
+.sx-param-val {
+  color: #3dc8ff;
+  font-family: monospace;
+  font-weight: 700;
+}
+
+/* MeshOps Stack */
+.sx-meshops-stack-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sx-meshops-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sx-meshops-badge {
+  font-size: 9px;
+  font-family: monospace;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(255, 61, 138, 0.12);
+  border: 1px solid rgba(255, 61, 138, 0.3);
+  color: #ff3d8a;
+}
+
+.sx-ops-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sx-op-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: rgba(26, 32, 44, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+}
+
+.sx-op-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sx-op-idx {
+  font-size: 9px;
+  font-family: monospace;
+  color: #8b949e;
+}
+
+.sx-op-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #f0f6fc;
+}
+
+.sx-op-del-btn {
+  background: transparent;
+  border: none;
+  color: #8b949e;
+  font-size: 10px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: all 0.1s ease;
+}
+
+.sx-op-del-btn:hover {
+  background: rgba(248, 81, 73, 0.2);
+  color: #f85149;
+}
+
+.sx-ops-empty,
+.sx-partgen-empty {
+  padding: 12px;
+  text-align: center;
+  font-size: 11px;
+  color: #8b949e;
+  font-style: italic;
+  background: rgba(22, 28, 38, 0.5);
+  border-radius: 6px;
+}

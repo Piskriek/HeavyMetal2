@@ -1,6 +1,21 @@
 # RESUME: start here (fresh session)
 
-## 25 Oct Checkpoint (Antigravity Overwatch: QA Audit Remediation 100% Complete — Waves A1, A2, A3, B, C/D Landed; read this first)
+## 26 Oct Checkpoint (Antigravity Overwatch: Plan 44 Studio Creative Suite Realization Landed — Phase 7 STUDIO-44A through 44E; read this first)
+- **Scope & Delivery:** Implemented Plan 44 ([`44-studio-creative-suite-realization.md`](argo/plans/44-studio-creative-suite-realization.md)) and Phase 7 tickets (`STUDIO-44A` through `STUDIO-44E`) connecting the headless TypeScript packages (`@hm/matstack`, `@hm/texgraph`, `@hm/kitspec`, `@hm/partgen`, `@hm/meshops`) into a live, interactive, user-friendly creative suite at `http://localhost:5173/?studio`.
+- **Quality Gates & Invariants:**
+  - `npm run typecheck`: **0 errors**.
+  - `npm test`: **3,618 tests passed, 0 failures** across all 59 suites, with 22/22 speed benchmarks passing.
+  - `npm run build`: Standalone single-file bundle builds in 45.62s at **12.71 MB / 16.00 MB cap** (`apps/web/dist/index.html` untracked & never committed).
+  - Strict compliance with `RULES 8a`: zero shortcuts, no legacy static GLB wrappers around machines, full recursive preset architecture.
+- **Key Architectural Deliverables:**
+  1. **`STUDIO-44A`**: Completed 20-tile `@hm/texgraph` library with 6 periodic wrapping node types (`noise` with `scaleY`, `scratches`, `spots`, `hex`, `weave`, `blur`), canonical `TILE_LIBRARY` in `tile-library.ts` (< 25ms eval), and `@hm/matstack/src/shelf.ts` shelf coverage.
+  2. **`STUDIO-44B`**: Reactive `StudioStore` state machine with `@hm/scenedoc` undo/redo, 3D face raycast picking (`raycast-picker.ts`), and `LayeredMaterialBridge` driving WebGL2 layered shader arrays and Mask B&W mode.
+  3. **`STUDIO-44C`**: `MaterialSlotStrip` above 3D viewport canvas with live slot toggles and `[Part | Whole]` scope; two-tier `MatstackInspector` (Tier 1 16 smart swatches, live try-on, Paint 1/Paint 2 pickers, Age slider; Tier 2 5-layer stack with Mask B&W `[M]` button); `TexGraphNodeEditor` with procedural node params and live preview.
+  4. **`STUDIO-44D`**: `KitAssemblerPanel` with live grounding validation (`0 Issues — Grounded & PBR Valid`) and auto-snap grounding; `SocketGizmos` 3D triad socket pins and surface-normal snapping; `PartGenMeshOpsPanel` with generator sliders, 6 one-click preset pills, and 27-operator mesh modifier stack.
+  5. **`STUDIO-44E`**: Rebuilt Texture Mill V2 (`apps/web/src/play/kit-mill-v2.ts`) as a 53-part pure `@hm/kitspec` assembly with 29/29 passing unit tests (`kit-mill-v2.test.ts`), wired into Studio as the default active machine model alongside Stargate Gate, Capacitor Bank, and Test Piece.
+- **Interactive Browser Verification (`browser_subagent`):** Verified live at `http://localhost:5173/?studio`: Texture Mill V2 rendered with layered materials, slot switching, all 6 inspector tabs verified, 'Rust bucket' preset applied with real-time shader response, and dynamic kit switching to Stargate Gate verified with clean console logs (0 errors).
+
+## 25 Oct Checkpoint (Antigravity Overwatch: QA Audit Remediation 100% Complete — Waves A1, A2, A3, B, C/D Landed)
 - **Scope & Delivery:** 10-System Interactive QA Audit (`docs/argo/plans/ARGO_GRAND_MASTER_REPORT.md`, 45 findings, DEC-01 through DEC-12) fully remediated across 5 waves in 3 clean commits (`988b1762`, `0d36b883`, `846a2a39`).
 - **Quality Gates:** `npm run typecheck` passes with **0 errors**. 16/16 direct unit tests pass (`apps/web/src/shell/planetary-grid.test.ts`, `packages/ui/tests/thumbnails.test.ts`, `apps/web/src/play/beam-tool.test.ts`). Strict compliance with `RULES 8a` (zero shortcut wrappers around legacy meshes). Standalone build stays under 16 MB cap.
 - **Wave A1 (`JOB-QA-01`, Commit `988b1762`):**

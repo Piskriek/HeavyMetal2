@@ -1,0 +1,301 @@
+/**
+ * apps/web/src/studio/inspectors/texgraph-node-editor.css
+ * Studio Creative Suite — TexGraph Node Editor Styling
+ */
+
+.sx-texgraph-editor {
+  display: flex;
+  flex-direction: column;
+  background: rgba(18, 22, 28, 0.95);
+  backdrop-filter: blur(16px);
+  color: #e6edf3;
+  padding: 12px;
+  gap: 12px;
+  height: 100%;
+  overflow-y: auto;
+  user-select: none;
+}
+
+.sx-texgraph-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sx-texgraph-title-area {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sx-texgraph-title {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #f0f6fc;
+}
+
+.sx-texgraph-badge {
+  font-size: 10px;
+  font-family: monospace;
+  padding: 2px 6px;
+  background: rgba(124, 255, 77, 0.12);
+  border: 1px solid rgba(124, 255, 77, 0.3);
+  color: #7cff4d;
+  border-radius: 4px;
+}
+
+.sx-tile-select-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sx-select-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #8b949e;
+}
+
+.sx-tile-select {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #f0f6fc;
+  font-size: 11.5px;
+  padding: 6px 8px;
+  outline: none;
+  cursor: pointer;
+}
+
+.sx-tile-select:focus {
+  border-color: #3dc8ff;
+  box-shadow: 0 0 6px rgba(61, 200, 255, 0.3);
+}
+
+/* 2x2 Seamless Wrap Preview */
+.sx-preview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sx-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sx-preview-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #8b949e;
+}
+
+.sx-channel-btns {
+  display: flex;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 5px;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sx-channel-btn {
+  padding: 2px 7px;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #8b949e;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.sx-channel-btn:hover {
+  color: #ffffff;
+}
+
+.sx-channel-btn.active {
+  background: rgba(61, 200, 255, 0.2);
+  color: #3dc8ff;
+}
+
+.sx-canvas-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  background: rgba(14, 18, 24, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.sx-wrap-canvas {
+  width: 256px;
+  height: 256px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  image-rendering: pixelated;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.sx-canvas-overlay-ctrls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 256px;
+  font-size: 9.5px;
+  color: #8b949e;
+}
+
+.sx-seam-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.sx-dim-pill {
+  font-family: monospace;
+  font-size: 9px;
+  color: #6e7681;
+}
+
+/* Nodes Section */
+.sx-nodes-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sx-nodes-header {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #8b949e;
+}
+
+.sx-nodes-chip-row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.sx-node-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  background: rgba(30, 36, 48, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.12s ease;
+}
+
+.sx-node-chip:hover {
+  background: rgba(42, 50, 64, 0.9);
+  border-color: rgba(61, 200, 255, 0.4);
+}
+
+.sx-node-chip.active {
+  background: rgba(61, 200, 255, 0.2);
+  border-color: #3dc8ff;
+  box-shadow: 0 0 8px rgba(61, 200, 255, 0.3);
+}
+
+.sx-node-type-tag {
+  font-size: 8.5px;
+  font-weight: 800;
+  font-family: monospace;
+  padding: 1px 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  color: #7cff4d;
+}
+
+.sx-node-id-text {
+  font-size: 11px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+/* Node Params Card */
+.sx-node-params-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(24, 30, 40, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+}
+
+.sx-node-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sx-node-id-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #f0f6fc;
+}
+
+.sx-node-type-badge {
+  font-size: 9.5px;
+  font-family: monospace;
+  color: #7cff4d;
+  background: rgba(124, 255, 77, 0.15);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.sx-params-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sx-param-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sx-param-label-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+}
+
+.sx-param-key {
+  font-family: monospace;
+  color: #8b949e;
+}
+
+.sx-param-val {
+  font-family: monospace;
+  font-weight: 700;
+  color: #3dc8ff;
+}
+
+.sx-no-params {
+  font-size: 11px;
+  color: #8b949e;
+  font-style: italic;
+  padding: 6px 0;
+}

@@ -20,7 +20,7 @@ import { kv } from '../storage/profile-storage';
 import { fieldError, FIELDS, type AssetTweak, type Vec3 } from '../../studio-server/tweak-schema';
 import { ChangesPanel, ContentBrowser, Details, Outliner, fmtValue } from './studio-panels';
 import { acceptInto, ASSET, clampField, discardOps, EMPTY_HISTORY, fileText, pendingChanges, placeOp, propsOf, REGISTRY, step, tweakOf, type Change, type Props, type Saved } from './studio-data';
-import { KEYMAPS, StudioViewport, type Context, type Copy, type Keymap, type Overlay, type Tool, type Transform } from './studio-viewport';
+import { KEYMAPS, StudioViewport, type Context, type Copy, type Keymap, type Overlay, type Tool, type Transform, type FaceHit } from './studio-viewport';
 import { presetsFrom, type MaterialPreset } from './studio-presets';
 import { RedoPanel } from './studio-redo';
 import { AudioTab, normalizeAudioLevels, type AudioLevelEntry, type AudioLevels, type AudioPatch } from './audio-tab';
@@ -36,6 +36,13 @@ import { MonsterTab } from './monster-tab';
 import { PartDesigner } from './part-designer';
 import { installStudioAgent, newPairingKey, type StudioAgentApi } from './studio-agent-page';
 import { startBridgeClient, type BridgeState } from './studio-agent-bridge-client';
+import { MaterialSlotStrip } from './inspectors/material-slot-strip';
+import { MatStackInspector } from './inspectors/matstack-inspector';
+import { TexGraphNodeEditor } from './inspectors/texgraph-node-editor';
+import { KitAssemblerPanel } from './inspectors/kit-assembler-panel';
+import { PartgenMeshopsPanel } from './inspectors/partgen-meshops-panel';
+import { globalStudioStore, useStudioState } from './state/studio-hook';
+import { buildStudioMachineModel, type StudioMachineBuildResult } from './viewport/studio-machine-model';
 import './studio-app.css';
 
 const ENDPOINT = '/__studio/data/asset-tweaks';
@@ -52,10 +59,19 @@ type AudioDoc = { readonly about?: string; readonly levels: Readonly<Record<stri
 type Status = { readonly tone: 'ok' | 'warn' | 'err'; readonly text: string };
 /** The levels the viewport shows: one, or all three side by side. */
 type LevelChoice = GenLevel | 'all';
-type RightTab = 'details' | 'redo';
+type RightTab = 'material' | 'assembly' | 'texgraph' | 'partgen' | 'details' | 'redo';
 
 const LEVEL_LABEL: Record<GenLevel, string> = { low: 'Low', mid: 'Mid', high: 'High' };
 const LEVELS: readonly GenLevel[] = ['low', 'mid', 'high'];
+const KIT_TITLES: Record<string, string> = {
+  'kit:texture-mill': 'Texture Mill V2',
+  'kit:stargate': 'Stargate Gate',
+  'kit:fabricator-frame': 'Fabricator Frame',
+  'kit:capacitor-bank': 'Capacitor Bank',
+  'kit:test-piece': 'MatStack Test Piece',
+};
+const kitTitle = (id: string, preset = ''): string =>
+  KIT_TITLES[id] ?? (preset ? preset.replace(/-/g, ' ').toUpperCase() : id);
 /** The vault's material presets, once: the one-click looks of the Material section. */
 const PRESETS: readonly MaterialPreset[] = presetsFrom(SPECS);
 
@@ -135,7 +151,14 @@ export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
   const [status, setStatus] = useState<Status | null>(null);
   const [vpTick, setVpTick] = useState(0);
   const [rawTick, setRawTick] = useState(0);
-  const [rightTab, setRightTab] = useState<RightTab>('details');
+  const studioState = useStudioState();
+  const [activeKitMode, setActiveKitMode] = useState<boolean>(true);
+  const [materialScope, setMaterialScope] = useState<'part-override' | 'kit-slot'>('kit-slot');
+  const machineBuildRef = useRef<StudioMachineBuildResult | null>(null);
+  const isFirstKitLoad = useRef<boolean>(true);
+  const activeKitModeRef = useRef<boolean>(activeKitMode);
+  activeKitModeRef.current = activeKitMode;
+  const [rightTab, setRightTab] = useState<RightTab>('material');
   const [comparing, setComparing] = useState<string | null>(null);
   const [versions, setVersions] = useState<Record<string, number>>({});
   const [stageScrub, setStageScrub] = useState<'neutral' | 's0' | 's1' | 's2' | 's3' | 's4'>('neutral');
@@ -236,6 +259,7 @@ export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
   }, [commit]);
 
   const place = useCallback((id: string) => {
+    setActiveKitMode(false);
     if (!doc.nodes[id]) commit(`Place ${id}`, [placeOp(id, savedRef.current)]);
     setSelected(id);
     setWorkspace('assets');
@@ -379,10 +403,32 @@ export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
         commit(`${label}: ${id}`, [{ op: 'set', id, props }], `gizmo:${id}`);
       },
       onDragEnd: () => { /* nothing: the next step starts a new undo entry */ },
+      onFaceClick: (hit: FaceHit) => {
+        if (!activeKitModeRef.current || !machineBuildRef.current) return;
+        if (!hit.object || hit.triangleIndex === undefined) return;
+        const part = machineBuildRef.current.build.partAt(hit.object, hit.triangleIndex);
+        if (!part) return;
+        const slotName = Object.keys(part.slotMaterials ?? {})[0] ?? 'body';
+        const slotKey = `${part.part}:${slotName}`;
+        if (hit.altKey) {
+          globalStudioStore.selectPartAndSlot(part.path, part.part, slotKey);
+        } else if (hit.shiftKey) {
+          globalStudioStore.assignSlotMaterial(slotKey, globalStudioStore.getSnapshot().activeMaterialId, 'kit-slot');
+        } else {
+          globalStudioStore.selectPartAndSlot(part.path, part.part, slotKey);
+        }
+      },
     });
     vpRef.current = vp;
     setVpTick((n) => n + 1);
-    return () => { vp.dispose(); vpRef.current = null; };
+    return () => {
+      if (machineBuildRef.current) {
+        machineBuildRef.current.dispose();
+        machineBuildRef.current = null;
+      }
+      vp.dispose();
+      vpRef.current = null;
+    };
   }, [workspace, commit]);
 
   useEffect(() => { vpRef.current?.setKeymap(keymap); }, [keymap, vpTick]);
@@ -401,10 +447,52 @@ export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
   }, [workspace]);
   useEffect(() => { sceneVp?.setKeymap(keymap); }, [keymap, sceneVp]);
 
-  // ---- what the viewport shows: the selected asset at one level or all three, or the old against the new ----
+  // ---- what the viewport shows: active machine kit or selected legacy asset ----
   useEffect(() => {
     const vp = vpRef.current;
     if (!vp) return;
+
+    if (activeKitMode) {
+      const renderer = vp.getRenderer();
+      const kitEntry = studioState.kits[studioState.activeKitId];
+      if (!kitEntry || !renderer) {
+        vp.show([], EMPTY_SHOW);
+        setCopyStats([]);
+        return;
+      }
+
+      if (machineBuildRef.current) {
+        machineBuildRef.current.dispose();
+        machineBuildRef.current = null;
+      }
+
+      const overrides = studioState.overridesByKit[studioState.activeKitId];
+      const maskLayerIdx = studioState.viewportMode === 'mask-bw' ? studioState.maskViewLayerIndex : null;
+      const maxRank = studioState.previewRank === 'auto' ? 2 : (studioState.previewRank as 0 | 1 | 2);
+
+      const res = buildStudioMachineModel(
+        renderer,
+        kitEntry.kit,
+        kitEntry.rootPreset,
+        overrides,
+        maskLayerIdx,
+        maxRank,
+      );
+
+      if (res) {
+        machineBuildRef.current = res;
+        vp.showCustomGroup(res.group, { reframe: isFirstKitLoad.current });
+        isFirstKitLoad.current = false;
+        setCopyStats([
+          {
+            label: `${kitTitle(studioState.activeKitId, kitEntry.rootPreset)} (${kitEntry.rootPreset})`,
+            triangles: res.pickTable.totalTriangles,
+          },
+        ]);
+      }
+      return;
+    }
+
     if (!selected || !selProps) {
       vp.show([], EMPTY_SHOW);
       setCopyStats([]);
@@ -476,7 +564,26 @@ export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
     });
     lastFrame.current = frame;
     setCopyStats(stats.map((s, i): { label: string; triangles: number } => ({ label: labels[i] ?? s.key, triangles: s.triangles })));
-  }, [workspace, vpTick, selected, selProps, level, overlay, inContext, comparing, selVersion, rawTick]);
+  }, [
+    workspace,
+    activeKitMode,
+    studioState.activeKitId,
+    studioState.overridesByKit,
+    studioState.materials,
+    studioState.tiles,
+    studioState.viewportMode,
+    studioState.maskViewLayerIndex,
+    studioState.previewRank,
+    vpTick,
+    selected,
+    selProps,
+    level,
+    overlay,
+    inContext,
+    comparing,
+    selVersion,
+    rawTick,
+  ]);
 
   // a draft of the scene survives a reload (per browser): what is placed and its values
   useEffect(() => {
@@ -497,6 +604,9 @@ export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
         if (workspace === 'scene') {
           if (e.shiftKey) sceneUndoRef.current?.redo();
           else sceneUndoRef.current?.undo();
+        } else if (activeKitModeRef.current) {
+          if (e.shiftKey) globalStudioStore.redo();
+          else globalStudioStore.undo();
         } else {
           setHist((h) => (e.shiftKey ? redo(REGISTRY, h) : undo(REGISTRY, h)).history);
         }
@@ -506,6 +616,8 @@ export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
         e.preventDefault();
         if (workspace === 'scene') {
           sceneUndoRef.current?.redo();
+        } else if (activeKitModeRef.current) {
+          globalStudioStore.redo();
         } else {
           setHist((h) => redo(REGISTRY, h).history);
         }
@@ -633,10 +745,17 @@ export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
             type="button"
             onClick={() => {
               if (workspace === 'scene') sceneUndoRef.current?.undo();
+              else if (activeKitMode) globalStudioStore.undo();
               else setHist((h) => undo(REGISTRY, h).history);
             }}
-            disabled={workspace === 'scene' ? !sceneUndoRef.current?.canUndo : !undoLabel}
-            title={workspace === 'scene' ? 'Undo transform (Ctrl+Z)' : (undoLabel ? `Undo: ${undoLabel} (Ctrl+Z)` : 'Nothing to undo')}
+            disabled={
+              workspace === 'scene'
+                ? !sceneUndoRef.current?.canUndo
+                : activeKitMode
+                  ? !globalStudioStore.canUndo()
+                  : !undoLabel
+            }
+            title={workspace === 'scene' ? 'Undo transform (Ctrl+Z)' : (activeKitMode ? 'Undo studio edit (Ctrl+Z)' : undoLabel ? `Undo: ${undoLabel} (Ctrl+Z)` : 'Nothing to undo')}
             aria-label="Undo"
           >
             Undo
@@ -645,10 +764,17 @@ export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
             type="button"
             onClick={() => {
               if (workspace === 'scene') sceneUndoRef.current?.redo();
+              else if (activeKitMode) globalStudioStore.redo();
               else setHist((h) => redo(REGISTRY, h).history);
             }}
-            disabled={workspace === 'scene' ? !sceneUndoRef.current?.canRedo : !redoLabel}
-            title={workspace === 'scene' ? 'Redo transform (Ctrl+Shift+Z)' : (redoLabel ? `Redo: ${redoLabel} (Ctrl+Shift+Z)` : 'Nothing to redo')}
+            disabled={
+              workspace === 'scene'
+                ? !sceneUndoRef.current?.canRedo
+                : activeKitMode
+                  ? !globalStudioStore.canRedo()
+                  : !redoLabel
+            }
+            title={workspace === 'scene' ? 'Redo transform (Ctrl+Shift+Z)' : (activeKitMode ? 'Redo studio edit (Ctrl+Shift+Z)' : redoLabel ? `Redo: ${redoLabel} (Ctrl+Shift+Z)` : 'Nothing to redo')}
             aria-label="Redo"
           >
             Redo
@@ -761,14 +887,54 @@ export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
         <StudioErrorBoundary key="assets" tabName="Assets">
           <div className="sx-body">
             <aside className="sx-left sx-panel" aria-label="Content and outliner">
+              <section className="sx-block sx-kit-selector">
+                <div className="sx-block-head">
+                  <h2>Modular Machine Kits</h2>
+                  <span className={`sx-badge ${studioState.validationIssues.length === 0 ? 'sx-ok' : 'sx-warn'}`}>
+                    {studioState.validationIssues.length === 0 ? '0 Issues' : `${studioState.validationIssues.length} Issues`}
+                  </span>
+                </div>
+                <div className="sx-kit-list">
+                  {Object.entries(studioState.kits).map(([kId, entry]) => {
+                    const isSelected = activeKitMode && studioState.activeKitId === kId;
+                    return (
+                      <button
+                        key={kId}
+                        type="button"
+                        className={`sx-kit-item ${isSelected ? 'selected' : ''}`}
+                        onClick={() => {
+                          globalStudioStore.selectKit(kId);
+                          setActiveKitMode(true);
+                          setSelected(null);
+                        }}
+                      >
+                        <div className="sx-kit-item-title">{kitTitle(kId, entry.rootPreset)}</div>
+                        <div className="sx-kit-item-sub">
+                          <span>{entry.rootPreset}</span>
+                          <span>{entry.kit.assemblies[entry.rootPreset]?.children.length ?? 0} parts</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                {studioState.validationIssues.length > 0 && (
+                  <button
+                    type="button"
+                    className="sx-btn-snap"
+                    onClick={() => globalStudioStore.autoFixGroundingIssues()}
+                  >
+                    ⚡ Auto-Snap Grounding ({studioState.validationIssues.length})
+                  </button>
+                )}
+              </section>
               <section className="sx-block">
                 <h2>Content</h2>
-                <ContentBrowser query={query} onQuery={setQuery} placed={placed} onPlace={place} selected={selected}
+                <ContentBrowser query={query} onQuery={setQuery} placed={placed} onPlace={place} selected={activeKitMode ? null : selected}
                   cls={cls} onClass={setCls} versions={versions} />
               </section>
               <section className="sx-block sx-outline">
                 <h2>Scene <span className="sx-count">{doc.roots.length}</span></h2>
-                <Outliner rows={outlineRows} selected={selected} onSelect={setSelected} onRemove={removeId} />
+                <Outliner rows={outlineRows} selected={activeKitMode ? null : selected} onSelect={(id) => { setActiveKitMode(false); setSelected(id); }} onRemove={removeId} />
               </section>
             </aside>
 
@@ -776,11 +942,12 @@ export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
               onPointerDown={startResize('left')} />
 
             <div className="sx-center">
+              {activeKitMode && <MaterialSlotStrip onScopeChange={(s) => setMaterialScope(s)} />}
               <div className="sx-view" ref={hostRef}>
                 <div className="sx-tools" role="toolbar" aria-label="Tools">
                   <div className="sx-seg" role="group" aria-label="Transform tool">
                     {(['move', 'rotate', 'scale'] as const).map((t) => (
-                      <button key={t} type="button" aria-pressed={tool === t} onClick={() => setTool(t)} disabled={!selected || comparing !== null}>
+                      <button key={t} type="button" aria-pressed={tool === t} onClick={() => setTool(t)} disabled={(!selected && !activeKitMode) || comparing !== null}>
                         {t === 'move' ? 'Move' : t === 'rotate' ? 'Turn' : 'Scale'} <kbd>{shortcut(t)}</kbd>
                       </button>
                     ))}
@@ -795,7 +962,7 @@ export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
                       type="button"
                       aria-pressed={showFourAngleView}
                       onClick={() => setShowFourAngleView((v) => !v)}
-                      disabled={!selected}
+                      disabled={!selected && !activeKitMode}
                       title="4-Angle Review Grid (Rule 17: Front 0°, Right 90°, Back 180°, Left 270°)"
                     >
                       4-Angle Review
@@ -822,7 +989,7 @@ export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
                     ))}
                   </div>
                   <button type="button" aria-pressed={inContext} onClick={() => setInContext((v) => !v)} disabled={!selected} title="Show the asset where the game uses it">In context</button>
-                  <button type="button" onClick={() => vpRef.current?.focus()} disabled={!selected} title="Frame the selected asset (F)">Frame <kbd>F</kbd></button>
+                  <button type="button" onClick={() => vpRef.current?.focus()} disabled={!selected && !activeKitMode} title="Frame the asset or machine (F)">Frame <kbd>F</kbd></button>
                 </div>
 
                 {showFourAngleView && selected ? (
@@ -863,14 +1030,31 @@ export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
                   </div>
                 ) : null}
 
-                {!selected ? (
+                {!selected && !activeKitMode ? (
                   <div className="sx-empty-view">
                     <h2>Nothing selected</h2>
-                    <p>Double-click an asset in Content to place it here. Then drag its arrows to move it, the ring to turn it, the cube to scale it.</p>
+                    <p>Select a Modular Machine Kit on the left, or double-click an asset in Content to place it here.</p>
                   </div>
                 ) : null}
 
-                {selected && selProps ? (
+                {activeKitMode ? (
+                  <div className="sx-telemetry" aria-label="Active kit readout">
+                    <div className="sx-tm-head">
+                      <span>{kitTitle(studioState.activeKitId, studioState.kits[studioState.activeKitId]?.rootPreset)}</span>
+                      <span className="sx-dim">{studioState.kits[studioState.activeKitId]?.rootPreset}</span>
+                    </div>
+                    <dl>
+                      <div><dt>Active Slot</dt><dd>{studioState.activeSlotKey ?? '(none)'}</dd></div>
+                      <div><dt>Material</dt><dd>{studioState.activeMaterialId.replace(/^mat:/, '')}</dd></div>
+                      {studioState.activePartPath ? <div><dt>Part Path</dt><dd>{studioState.activePartPath}</dd></div> : null}
+                      {copyStats.map((s) => (
+                        <div key={s.label}><dt>Triangles</dt><dd>{s.triangles.toLocaleString('en-GB')}</dd></div>
+                      ))}
+                      <div><dt>Grounding</dt><dd>{studioState.validationIssues.length === 0 ? '✓ Grounded' : `⚠️ ${studioState.validationIssues.length} issues`}</dd></div>
+                    </dl>
+                    <p className="sx-dim">Click a face to select part & slot. Alt+Click to eyedrop. Shift+Click to apply.</p>
+                  </div>
+                ) : selected && selProps ? (
                   <div className="sx-telemetry" aria-label="Selected asset readout">
                     <div className="sx-tm-head"><span>{comparing ? `${selected}, old against new` : selected}</span><span className="sx-dim">{GEN[selected]?.class}</span></div>
                     <dl>
@@ -901,10 +1085,22 @@ export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
 
             <aside className="sx-right sx-panel" aria-label="Details">
               <div className="sx-right-tabs" role="tablist" aria-label="Right panel">
+                <button type="button" role="tab" aria-selected={rightTab === 'material'} onClick={() => setRightTab('material')}>Material & Layers</button>
+                <button type="button" role="tab" aria-selected={rightTab === 'assembly'} onClick={() => setRightTab('assembly')}>Assembly & Sockets</button>
+                <button type="button" role="tab" aria-selected={rightTab === 'texgraph'} onClick={() => setRightTab('texgraph')}>TexGraph & UV</button>
+                <button type="button" role="tab" aria-selected={rightTab === 'partgen'} onClick={() => setRightTab('partgen')}>PartGen & MeshOps</button>
                 <button type="button" role="tab" aria-selected={rightTab === 'details'} onClick={() => setRightTab('details')}>Details</button>
                 <button type="button" role="tab" aria-selected={rightTab === 'redo'} onClick={() => setRightTab('redo')}>Redo model</button>
               </div>
-              {rightTab === 'details' ? (<>
+              {rightTab === 'material' ? (
+                <MatStackInspector scope={materialScope} />
+              ) : rightTab === 'assembly' ? (
+                <KitAssemblerPanel />
+              ) : rightTab === 'texgraph' ? (
+                <TexGraphNodeEditor />
+              ) : rightTab === 'partgen' ? (
+                <PartgenMeshopsPanel />
+              ) : rightTab === 'details' ? (<>
                 <div className="sx-block-head">
                   <h2>Details</h2>
                   <span className="sx-dim">{mode === 'simple' ? 'Simple' : 'Advanced'}</span>

@@ -1,0 +1,180 @@
+/**
+ * apps/web/src/studio/inspectors/material-slot-strip.css
+ * Studio Creative Suite — Material Slot Strip Styling
+ */
+
+.sx-slot-strip-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(18, 22, 28, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  user-select: none;
+}
+
+.sx-slot-strip-empty {
+  padding: 8px 14px;
+  font-size: 11px;
+  color: #8b949e;
+  font-style: italic;
+  background: rgba(18, 22, 28, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sx-slot-strip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sx-slot-strip-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #c9d1d9;
+}
+
+.sx-slot-count-pill {
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(61, 200, 255, 0.15);
+  color: #3dc8ff;
+  border-radius: 10px;
+  border: 1px solid rgba(61, 200, 255, 0.3);
+}
+
+.sx-slot-scope-toggle {
+  display: flex;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 6px;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sx-scope-btn {
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #8b949e;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sx-scope-btn:hover {
+  color: #f0f6fc;
+}
+
+.sx-scope-btn.active {
+  background: rgba(61, 200, 255, 0.2);
+  color: #3dc8ff;
+  box-shadow: 0 0 6px rgba(61, 200, 255, 0.25);
+}
+
+.sx-slot-strip-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.sx-slot-strip-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.sx-slot-strip-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+}
+
+.sx-slot-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: rgba(30, 36, 46, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: left;
+}
+
+.sx-slot-chip:hover {
+  background: rgba(42, 50, 64, 0.9);
+  border-color: rgba(61, 200, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.sx-slot-chip.selected {
+  background: rgba(61, 200, 255, 0.16);
+  border-color: #3dc8ff;
+  box-shadow: 0 0 10px rgba(61, 200, 255, 0.35);
+}
+
+.sx-slot-swatch-box {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.sx-slot-swatch-half {
+  flex: 1;
+  height: 100%;
+}
+
+.sx-slot-lamp-indicator {
+  width: 100%;
+  height: 100%;
+  box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.6);
+}
+
+.sx-slot-chip.is-lamp .sx-slot-swatch-box {
+  border-radius: 50%;
+}
+
+.sx-slot-chip-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.sx-slot-chip-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: #e6edf3;
+  text-transform: capitalize;
+}
+
+.sx-slot-chip-material {
+  font-size: 9.5px;
+  color: #8b949e;
+}
+
+.sx-slot-chip.selected .sx-slot-chip-material {
+  color: #a5d6ff;
+}
+
+.sx-slot-part-count {
+  font-size: 10px;
+  font-weight: 600;
+  color: #6e7681;
+  margin-left: 2px;
+}

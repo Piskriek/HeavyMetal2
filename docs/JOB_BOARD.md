@@ -681,3 +681,94 @@ Authored `docs/argo/plans/42-modular-stargate-earth-endgame.md`, synchronized `.
 4. Implement secure drag-and-drop decoder: 256 KiB decompression bomb cap, frozen Zod schema validation, `studio.kit.audit` gate, and zero `eval`.
 
 **Completion Note (2026-10-25, Arena):** Implemented on `arena/44905b50-heavymetal2` from `016864b6`: strict frozen `@hm/gamepreset` schema/four games, dual gateway/five HUD blades/shared-engine objectives, 512² Spore beauty + portable `@hm/cartlab` codec/audit and transactional canvas/Studio drop. Typecheck/build PASS (5.68 MB); direct Spore tests 63/63, preset/audio tests 10/10 + 3/3; full suite 3,568 pass/2 unchanged LFS failures/4 skip (3,574 total), speed 23/23. Browser boot/import/save-isolation/actual-export checks passed. Live full assault, campaign-credit handoff and hardware review remain explicit manual checks. Details: [`JOB_26_MULTIVERSE_HANDOFF.md`](JOB_26_MULTIVERSE_HANDOFF.md).
+
+
+---
+
+## 5. PHASE 7: THE STUDIO CREATIVE SUITE OVERHAUL (PLAN 44)
+> **Mandate**: Execute [Plan 44 (`docs/argo/plans/44-studio-creative-suite-realization.md`)](argo/plans/44-studio-creative-suite-realization.md) to transform `http://localhost:5173/?studio` from a disconnected prototype shell into the Owner's gold-standard in-engine creative suite.  
+> **Rule 8a Enforcement ("Shortcuts are unacceptable; check each other")**: Every ticket below has strict file locks, deterministic unit tests, and mandatory 4-angle visual verification criteria. No mock sliders, no disconnected demo spheres, and no un-grounded parts.
+
+## STUDIO-44A [DONE] Complete the 20-Tile @hm/texgraph Library & Fix @hm/matstack Shelf Coverage
+- **Role:** RUNNER
+- **Skills:** `feature-dev`, `math`
+- **Priority:** P0 (Wave 1)
+- **Milestone:** M1
+- **Paths:** `packages/texgraph/src/index.ts, packages/texgraph/src/tile-library.ts, packages/texgraph/tests/tile-library.test.ts, packages/matstack/src/shelf.ts, apps/web/src/play/kit-modules.ts, apps/web/src/play/kits.test.ts`
+- **Verify:** `npm run typecheck && npm test && node --import tsx packages/texgraph/tests/tile-library.test.ts`
+- **Assigned:** `Arena / Haiku`
+
+1. Add the 6 periodic, seeded, wrapping node types to `packages/texgraph/src/index.ts` (`noise` with `scaleY`, `scratches`, `spots`, `hex`, `weave`, `blur`).
+2. Export canonical `TILE_LIBRARY: Readonly<Record<string, TexGraph>>` with all 20 tiles validating, wrapping seamlessly, and evaluating in `< 25 ms`.
+3. Fix `@hm/matstack/src/shelf.ts` coverage (`rust-bloom` 5–15%, `soot` 15–35%, `crushed-ore-bed` dark ore).
+4. Update `kit-modules.ts` strict typing (`kind: 'param' as const`) and `kits.test.ts` 4-material palette check.
+
+## STUDIO-44B [DONE] Shared StudioSessionState, Live 3D Asset Raycast Slot Picker & Viewport Shader Integration
+- **Role:** ENGINEER
+- **Skills:** `shader`, `viewport`, `state`
+- **Priority:** P0 (Wave 1)
+- **Milestone:** M3
+- **Paths:** `apps/web/src/studio/state/studio-store.ts, apps/web/src/studio/state/studio-persistence.ts, apps/web/src/studio/viewport/studio-viewport.tsx, apps/web/src/studio/viewport/raycast-picker.ts, apps/web/src/play/layered-material.ts, apps/web/src/play/kit-build.ts`
+- **Verify:** `npm run typecheck && npm test`
+- **Assigned:** `Claude Opus`
+
+1. Create `studio-store.ts` implementing reactive `StudioSelection`, `@hm/scenedoc` undo/redo, and `studio-persistence.ts` write-back to `studio-data/`.
+2. Connect `layered-material.ts` and `studio-viewport.tsx` to `DataArrayTexture` slices with `< 25 ms` `updateTileInArray()` live updates on the active 3D asset.
+3. Implement `Mask B&W` shader mode outputting `vec3(layerWeight)` directly on the 3D model when `[M]` is toggled.
+4. Implement `raycast-picker.ts`: clicking any face in the viewport resolves `{ path, partId, slotName }` via `kitBuild.partAt(hit)` and focuses it in the Right Dock inspector.
+
+## STUDIO-44C [DONE] Asset Material Slot Strip, Two-Tier @hm/matstack Layer Stack Inspector & @hm/texgraph Editor Binding
+- **Role:** BUILDER
+- **Skills:** `frontend`, `ui`
+- **Priority:** P0 (Wave 1)
+- **Milestone:** M3
+- **Paths:** `apps/web/src/studio/inspectors/material-slot-strip.tsx, apps/web/src/studio/inspectors/matstack-inspector.tsx, apps/web/src/studio/inspectors/texgraph-node-editor.tsx, apps/web/src/studio/outliner/unified-shelf.tsx`
+- **Verify:** `npm run typecheck && npm run build`
+- **Assigned:** `Gemini Flash`
+
+1. Build `material-slot-strip.tsx` listing all material slots on the active 3D asset with 48x48 live swatches and `[This Part | Whole Machine]` scope toggle.
+2. Build `matstack-inspector.tsx` with Tier 1 (16 smart material shelf with live hover try-on, `paint1`/`paint2`, master `Age` slider) and Tier 2 (reorderable 6-layer stack, channel writes pills, `SurfaceSpec` and `MaskSpec` editors).
+3. Build `texgraph-node-editor.tsx` embedding `@hm/wiregraph` canvas with 2x2 seam preview and live `updateTileInArray()` on slider change.
+4. Wire `unified-shelf.tsx` with drag-and-drop and one-click try-on directly onto the active 3D model.
+
+## STUDIO-44D [DONE] Pillar 2 UI: Interactive @hm/kitspec Machine & Kit Assembler, 3D Socket Triad Gizmos & @hm/meshops Panel
+- **Role:** ENGINEER
+- **Skills:** `frontend`, `gizmo`, `kitspec`
+- **Priority:** P0 (Wave 2)
+- **Milestone:** M2
+- **Paths:** `apps/web/src/studio/outliner/studio-outliner.tsx, apps/web/src/studio/viewport/socket-gizmos.ts, apps/web/src/studio/inspectors/kit-assembler-panel.tsx, apps/web/src/studio/inspectors/partgen-meshops-panel.tsx, apps/web/src/studio/viewport/quad-angle-view.tsx`
+- **Verify:** `npm run typecheck && npm test`
+- **Assigned:** `Claude Opus + Gemini Flash`
+
+1. Build `studio-outliner.tsx` displaying the complete `AssemblyDef` hierarchy with child placements, sockets, and material slots.
+2. Build `socket-gizmos.ts` rendering interactive 3D triad pins for `SocketDef` points and `[+ Add Socket on Face]` surface-normal raycast snapping.
+3. Build `kit-assembler-panel.tsx` with live `validate()` grounding status (`0 issues` vs auto-snap button) and placement transform controls.
+4. Build `partgen-meshops-panel.tsx` with schema sliders, 6 one-click preset pills, and full 27-operator `@hm/meshops` modifier stack.
+5. Wire `quad-angle-view.tsx` for 4-angle Rule 17 review (`Front`, `Right`, `Back`, `Iso`) and side-by-side legacy compare.
+
+## STUDIO-44E [OPEN] Wave 1 & 2 Legacy GLB Replacement: Rebuild Lab & Field Machines as Pure @hm/kitspec Assemblies
+- **Role:** BUILDER
+- **Skills:** `feature-dev`, `visual-verify`
+- **Priority:** P0 (Wave 2)
+- **Milestone:** M2
+- **Paths:** `apps/web/src/play/kit-mill-v2.ts, apps/web/src/play/kit-press-v2.ts, apps/web/src/play/kit-water-maker.ts, apps/web/src/play/kit-rock-drill.ts, apps/web/src/play/kit-lab-machines.ts, apps/web/src/play/machine-props.ts`
+- **Verify:** `npm run typecheck && node scripts/kit-compare-sheet.mjs`
+- **Assigned:** `Arena / Haiku + Flash`
+
+1. Land `MILL_V2` (`apps/web/src/play/kit-mill-v2.ts`) with open-throat hopper, dark ore bed, base hazard stripes, and status lamps.
+2. Author matching pure `@hm/kitspec` assemblies for Shape Press, Water Maker, Rock Drill, Light Projector, Power Unit, Relay Pylon, Breaker Panel, Relay Cabinets, Gate Frame, and Lab Benches.
+3. Wire `machine-props.ts` and `lab-scene.ts` to instantiate assemblies with Beam Rifle `Apply` slot picking.
+4. Verify with `kit-compare-sheet.mjs` against legacy models and ensure draw calls stay `<= 181`.
+
+## STUDIO-44F [OPEN] End-to-End Studio Playwright Verification Suite & Legacy GLB Purge
+- **Role:** RUNNER
+- **Skills:** `e2e`, `qa`
+- **Priority:** P1 (Wave 3)
+- **Milestone:** M5
+- **Paths:** `scripts/test-studio-suite.mjs, scripts/retire-legacy-glbs.mjs, apps/web/src/assets/gen/registry.json`
+- **Verify:** `node scripts/test-studio-suite.mjs && npm run build`
+- **Assigned:** `Claude Haiku / Opus`
+
+1. Build Playwright e2e test testing raycast slot picking, `@hm/matstack` live application, Mask B&W mode, socket attachment, `@hm/meshops` stack, and `studio-data/` disk round-trip.
+2. Build `scripts/retire-legacy-glbs.mjs` systematically removing retired legacy `.glb` models from `registry.json` and bundle, keeping `dist/index.html <= 15.0 MB`.
+

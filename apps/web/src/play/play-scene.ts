@@ -22,7 +22,9 @@ import { createLabRoom, GATE_AT, PLANET_TABLE_AT, POWER_OFF, POWER_ON, POWER_SEC
 import { WAKE_SECONDS, wakeLift, type Power } from './lab-power';
 import { preloadVista, VISTA_LEVEL, type WindowView } from './lab-vista';
 import { createPlotHolo, type PlotHolo } from './plot-holo';
-import { COLOUR_MARK_FRAGMENT, localMachineWaveAt, MARK_VERTEX, OPENING_FRAGMENT, OPENING_MARK_FRAGMENT, OPENING_OFF_FRAGMENT, OPENING_OFF_VERTEX, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX, scanRingFadeAt, waveBandColourFor } from './portal-shaders';
+import { COLOUR_MARK_FRAGMENT, localMachineWaveAt, MARK_VERTEX, OPENING_FRAGMENT, OPENING_OFF_FRAGMENT, OPENING_OFF_VERTEX, OPENING_VERTEX, PIECE_HOLO_FRAGMENT, PIECE_HOLO_VERTEX, PLUME_GLOW_FRAGMENT, PLUME_GLOW_VERTEX, POST_FRAGMENT, QUAD_VERTEX, scanRingFadeAt, waveBandColourFor } from './portal-shaders';
+import { CHEVRON_COUNT, applyEventHorizon, createEventHorizonMaterial, eventHorizonUniforms } from './event-horizon';
+import { irisClosedForAccess } from './gate-logic';
 import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest';
 import { disposeProp, FABRICATOR_PLUME, FABRICATOR_VENT, FEED_CUBES_FULL, feedCubeCount, feedCubeProgress, lineSpan, machinePlumeCount, machinePlumeCountOf, machinePlumeGravity, machinePlumeLook, machinePlumeLookOf, machinePlumeSpec, machinePlumeSteady, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
 import { RAM_CADENCE_RAD } from './kit-motion-specs';
@@ -646,8 +648,12 @@ export function createPlayScene(o: {
   let lookForFn: ((stage: Stage) => StageLook) | null = null;
   let twin = kit.gate(m, { twin: true, stage: 1 });
   let twinStage = 1;
-  const openingMark = keep(new THREE.ShaderMaterial({ vertexShader: MARK_VERTEX, fragmentShader: OPENING_MARK_FRAGMENT, side: THREE.DoubleSide, blending: THREE.NoBlending }));
-  // GATE-03: the unpowered doorway shows the dim static (OPENING_OFF_FRAGMENT) until the gate is on, then the mark (openingMark)
+  // JOB-08b: the event horizon. Its uniforms are evaluated from (clock, gate state, the last gate event) every frame and
+  // written, never accumulated, so a scrub or a replay lands on exactly the frame the play-through showed.
+  const horizonMat = keep(createEventHorizonMaterial({ innerRadius: 1, rimWidth: 0.12 }));
+  /** When the gate last connected or its iris moved: the kawoosh's `tau = 0`. -Infinity: nothing has happened yet. */
+  let lastGateEventT = Number.NEGATIVE_INFINITY;
+  // GATE-03: the unpowered doorway shows the dim static (OPENING_OFF_FRAGMENT) until the gate is on, then the horizon
   const openingOffUniforms = { uTime: { value: 0 } };
   const openingOffMat = keep(new THREE.ShaderMaterial({ vertexShader: OPENING_OFF_VERTEX, fragmentShader: OPENING_OFF_FRAGMENT, uniforms: openingOffUniforms, side: THREE.DoubleSide }));
   const twinOpening = new THREE.Mesh(keep(new THREE.PlaneGeometry(twin.opening.width, twin.opening.height)), openingOffMat);
@@ -1824,7 +1830,7 @@ export function createPlayScene(o: {
   let powerT = -1, gateOn = false;
   /** GATE-03: the doorway is the dim static while the gate is off and the mark once it is on (called when gateOn changes). */
   const syncOpeningMaterial = (): void => {
-    const want = gateOn ? openingMark : openingOffMat;
+    const want = gateOn ? horizonMat : openingOffMat;
     if (twinOpening.material !== want) twinOpening.material = want;
   };
   // the wake (TASK-28): the first time the player is in the lab before the lever, the camera starts 65 degrees up and sits up over 2.2 s
@@ -2836,6 +2842,8 @@ export function createPlayScene(o: {
     setGateAccess(access) {
       if (access === gateAccess) return;
       gateAccess = access;
+      // the iris moving is a gate event: the kawoosh's burst restarts from this frame (a pure timestamp, not a phase)
+      lastGateEventT = clock;
       buildStargate();
     },
     setSpeciesSlots(slots) {
@@ -3121,6 +3129,15 @@ export function createPlayScene(o: {
       beamFx.update(clock);
       holoUniforms.uTime.value = now;
       openingOffUniforms.uTime.value = now;
+      // the horizon's four envelopes, straight from the clock and the gate's state (JOB-08b)
+      applyEventHorizon(
+        horizonMat,
+        eventHorizonUniforms(
+          now,
+          { open: gateOn, irisClosed: irisClosedForAccess(gateAccess), chevrons: gateOn ? CHEVRON_COUNT : 0 },
+          lastGateEventT,
+        ),
+      );
       socketActiveMat.opacity = socketMarkerOpacity(true, now);
       // ---- the wake: the camera's lift above level, from its start to the 2.2 s the player takes to sit up
       if (wakeT >= 0) {
@@ -3160,6 +3177,7 @@ export function createPlayScene(o: {
         if (powerT >= POWER_SECONDS) {
           powerT = -1;
           gateOn = true;
+          lastGateEventT = clock;
           syncOpeningMaterial();
           pendingEvent = 'powered';
           gameAudio.startGateHum({ x: 0, y: 1.0, z: -1.0 });

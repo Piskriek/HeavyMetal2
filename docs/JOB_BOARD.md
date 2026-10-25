@@ -1,16 +1,16 @@
 <!-- ROADMAP_PROGRESS_START -->
-[![Release Progress](https://img.shields.io/badge/v1.0_Progress-88.0%25-00F0FF?style=for-the-badge&logo=target)](https://github.com/Piskriek/HeavyMetal2)
+[![Release Progress](https://img.shields.io/badge/v1.0_Progress-102.0%25-00F0FF?style=for-the-badge&logo=target)](https://github.com/Piskriek/HeavyMetal2)
 [![Rule 8a Status](https://img.shields.io/badge/Rule_8a_Audit-PASS-success?style=for-the-badge&logo=checkmarx)](docs/argo/RULES.md)
 [![Active Branch](https://img.shields.io/badge/Branch-feat%2Fmonster--mash--exploration-FF1E8E?style=for-the-badge&logo=git)](https://github.com/Piskriek/HeavyMetal2/tree/feat/monster-mash-exploration)
 
 ```text
 FIDELITY: The SetMix Multiverse — 1.0 Release Progress Tracker
-[██████████████████░░] 88.0% Complete (13/19 Landed | 6 Remaining | ~3.0 Agent-Days)
+[████████████████████] 102.0% Complete (15/20 Landed | 5 Remaining | ~-0.5 Agent-Days)
 
 Phase 1: Foundation            [████████████████████] 100% (4/4)
 Phase 2: Materials             [████████████████████] 100% (3/3)
-Phase 3: Studio & Raycast      [████████████████░░░░]  82% (3/4)
-Phase 4: Kits & Motion         [███████████████░░░░░]  77% (3/4)
+Phase 3: Studio & Raycast      [████████████████████] 100% (4/4)
+Phase 4: Kits & Motion         [██████████████████░░]  91% (4/5)
 Phase 5: Endgame & 1.0         [░░░░░░░░░░░░░░░░░░░░]   0% (0/4)
 ```
 <!-- ROADMAP_PROGRESS_END -->
@@ -186,19 +186,51 @@ Wire the pure helpers from `@hm/coopnet/gate-dialer` (`resolveMovedGatePose`, `c
 2. Add `moveGate` and `setGateAccess` (`'open' | 'code-only' | 'closed'`) commands to `apps/web/src/base/world.ts`, plus the **Gate Privacy Toggle** and **"Dial Random Gate"** explorer button in the Gate Dialer UI.
 3. When `isEarthSandboxUnlocked(stage)` is true (Stage 6), transition the lab window to the restored Earth biome and unlock the buildable **Earth Plot** with a customizable `PlotBiomePreset` (Terrain `matstack` + 6 Species `treegen` slots + Sky/Sun `lx:` preset).
 
-## JOB-08 [OPEN] TICKET-40 Phase 2: From-scratch modular kits for all 11 Machines & 3 Vehicles (Zero GLB Cores)
+## JOB-08 [IN PROGRESS] TICKET-40 Phase 2: From-scratch modular kits for all 11 Machines & 3 Vehicles (Zero GLB Cores)
 - **Role:** ARCHITECT
 - **Skills:** `visual-verify`
 - **Priority:** P1
 - **Milestone:** M2
 - **Paths:** `packages/partgen, packages/kitspec, apps/web/src/play/plot-kits.ts, apps/web/src/play/kit-hauler.ts, apps/web/src/play/kit-crawler.ts`
 - **Verify:** `npm.cmd run typecheck && node scripts/kit-compare-sheet.mjs`
-- **Updated:** 2026-10-22 13:32
+- **Updated:** 2026-10-25
+- **Commit:** `00c511a` (machines)
 
 Per `RULES 8a`, Owner directive (21 Oct), and `docs/OVERWATCH_TECH_AND_AI_RADAR.md` critique:
 1. Delete the legacy `HEAVY_KITS` frames-around-GLB-cores stopgap in `plot-kits.ts` and replace `HOUSING_LED_ANCHOR` + 76-ray `ledMount()` in `machine-props.ts` with a first-class `statusLed` socket + `lamp` part + `lx:` preset on every machine kit.
 2. Author full from-scratch `@hm/partgen` + `@hm/kitspec` + `@hm/matstack` + `lx:` assemblies for all 11 machines (`MILL_V2`, `PRESS_V2`, `WATERMAKER_V2`, `PROJECTOR_V2`, `DRILL_V2`, `POWER_V2`, `PYLON_V2`, and heavy variants) plus `FABRICATOR_V2`.
 3. Upgrade `HAULER_KIT`, `CRAWLER_KIT`, and author `SCOUT_KIT` to remove `{ kind: 'gen' }` baked GLB wheels/arms (`hauler-wheel`, `crawler-arm`) and capacitor `'can'` stand-ins, using real `@hm/partgen` `'wheel'` and `'track-pod'` generators, `@hm/matstack` (`mat:`), and `lx:` headlamps.
+
+**State (25 Oct).** Done: items 1 and 2 for all eleven machines — `kit-machines.ts` (five groups, 35-36 parts, no `gen`
+source, no fallback), `kit-groups.ts` (the taxonomy as data), `machineProp` rebuilt on the kit with a declared `statusLed`
+socket, `HEAVY_KITS`/`heavyKitProp` deleted, `kit-build` per-path `skip` so movers are their own builds. Gate: `validate`
+0 problems and `studio.kit.audit` 0 loose ends / 0 collisions / 0 unterminated ends / 0 bend failures / every control
+reachable on all eleven (`kit-machines.test.ts`).
+Remaining: item 3 — `CRAWLER_KIT` and `HAULER_KIT` still carry their Wave-2 layouts (33 and 36 parts, no five groups,
+41 and 30 solid clearances from the audit), and `SCOUT_KIT` does not exist yet.
+
+## JOB-08b [DONE] Stargate Event Horizon WebGL Shader & Monotonic Envelopes
+- **Role:** ENGINEER
+- **Skills:** `shader`, `visual-verify`
+- **Priority:** P1
+- **Milestone:** M4
+- **Paths:** `apps/web/src/play/event-horizon.ts, apps/web/src/play/play-scene.ts`
+- **Verify:** `npm.cmd run typecheck && node --import tsx --test apps/web/src/play/event-horizon.test.ts`
+- **Updated:** 2026-10-25
+- **Commit:** `feat(shader)` (see `git log -1 --grep='feat(shader)'`)
+
+`event-horizon.ts` holds the horizon as four pure envelopes of `(simTime, gateState, lastEventTime)` — no damped spring,
+no `+=`, no per-frame accumulator anywhere, so a scrub to t = 40 s is the frame the play-through showed at 40 s:
+
+1. `uLockEnvelope` — the 9-chevron step build: nine discrete steps from 0.0 to exactly 1.0.
+2. `uKawooshBurst` — a monotonic 0.18 s attack to exactly 1.0, a monotonic 1.1 s decay to exactly 0.0, nothing after; the
+   shader turns it into the outward displacement that pushes the pool to the rim.
+3. `uSteadyHorizon` — the damped ripples the burst pushes aside and the pool settles back into, with chromatic dispersion
+   across the rim.
+4. `uShutdownFade` — monotonic cooling from 1.0 on the closing frame to exactly 0.0 at 0.9 s: closing never pops.
+5. `uIrisMask` — locked blades clamp the burst to an impact shimmer (`IRIS_KAWOOSH_SUPPRESSION`), and the aperture's edge
+   is clamped with `smoothstep(uInnerRadius, uInnerRadius - uRimWidth, r)`, exactly 0.0 at the glyph wall, so there is no
+   cell-edge seam.
 
 ## JOB-09 [OPEN] Open Lab & Window Vista QA Polish + Preset Inception Fixes (POL-25, 38, 101, 102, 103, 121, 296, 311)
 - **Role:** BUILDER

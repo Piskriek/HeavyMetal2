@@ -521,6 +521,48 @@ Authored `docs/argo/plans/42-modular-stargate-earth-endgame.md`, synchronized `.
 
 ---
 
+## JOB-21 [OPEN] Cross-Game Multiverse Exploration Loop & Multi-Cartridge Synergy (formerly Monster Mash)
+- **Role:** ARCHITECT
+- **Skills:** `frontend`, `multiplayer`, `visual-verify`
+- **Priority:** P1
+- **Milestone:** M5
+- **Paths:** `packages/crossgame, apps/web/src/play/cross-game.ts, apps/web/src/play/play-scene.ts, packages/cartlab`
+- **Verify:** `npm.cmd run typecheck && npm.cmd test`
+- **Updated:** 2026-10-25
+
+1. Reframe the feature formerly known as "Monster Mash" as the **Cross-Game Multiverse Feature**:
+   - Entities and mechanics are 100% procedural (`@hm/creature`, `@hm/kitspec`, `@hm/wiregraph`).
+   - The system does NOT import static third-party meshes; it streams procedural assets, vehicles, creatures, physics, and rules across completely different games in the multiverse.
+2. Build the Cross-Game streaming bridge: allow an entity from one GameMode (e.g. survival, mining) to traverse Stargates or be beamed via cartridges into another GameMode (e.g. rally racing, factory automation) with its procedural gait, material wear stack, and interaction rules intact.
+3. Multi-Cartridge Synergy: Firing the Beam Rifle (`Apply` mode) allows sampling an entity in Game A and manifesting it inside Game B.
+
+## JOB-22 [OPEN] 60 FPS Frame-Budget Audit, 380-Part Stress Benchmark & Zero-Alloc Raycast Audit
+- **Role:** RIG
+- **Skills:** `perf`, `visual-verify`
+- **Priority:** P0
+- **Milestone:** M5
+- **Paths:** `scripts/perf-layered-material.mjs, apps/web/src/play/kit-target.ts, apps/web/src/play/play-scene.ts`
+- **Verify:** `node scripts/perf-layered-material.mjs && npm.cmd test`
+- **Updated:** 2026-10-25
+
+1. Run the 380-part scene stress test on the GTX 950M Low profile (11 machines + 3 vehicles + Stargate in view simultaneously).
+2. Verify kit-target zero-allocation steady state: aiming over 14 kits costs < 0.05 ms with zero heap garbage generated per tick.
+3. Confirm draw calls remain <= 181 and frame times hold 60 FPS (16.6 ms budget).
+
+## JOB-23 [OPEN] 1.0 Release Packaging, studio-skill.compact.md & CI Gate Lock
+- **Role:** BUILDER
+- **Skills:** `feature-dev`, `code-review`
+- **Priority:** P0
+- **Milestone:** M5
+- **Paths:** `public/studio-skill.compact.md, scripts/compress-skill.mjs, apps/web/dist/index.html`
+- **Verify:** `npm.cmd run build && node scripts/test-bundle-size.mjs`
+- **Updated:** 2026-10-25
+
+1. Generate `public/studio-skill.compact.md` via Caveman prompt compression (saving ~46% input tokens and ~65% output tokens while preserving 100% of hard schemas and constraints).
+2. Lock in standalone single-file distribution (`apps/web/dist/index.html`, staying well under the 16.00 MiB cap).
+3. Validate CI release gate: zero typecheck errors, 100% passing test suites, and tag `v1.0.0-feature-complete`.
+
+
 ## 4. PHASE 6: POST-1.0 EXPANSION (PLANS 44 & 45 — ZERO-IDLE FLEET QUEUE)
 > **Status**: Approved by Argon (Creative Architect) on `30ddd8a6`  
 > **Mandate**: Staged immediately behind Milestone #1 (Wave 4 `JOB-08v` Vehicles & `JOB-09` Earth Endgame) to ensure zero fleet idle time.  

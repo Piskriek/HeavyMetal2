@@ -8,6 +8,7 @@
  * 100% deterministic, pure functions with zero binary GLB dependencies and zero closures.
  */
 import type { Kit, KitMotionSpec } from '@hm/kitspec';
+import { kv } from '../storage/profile-storage';
 
 export type EntityDomainKind = 'creature' | 'vehicle' | 'machine' | 'prop-assembly';
 
@@ -348,9 +349,8 @@ export class CrossGameBuffer {
   }
 
   private loadFromStorage(): void {
-    if (typeof window === 'undefined' || !window.localStorage) return;
     try {
-      const raw = window.localStorage.getItem(CrossGameBuffer.STORAGE_KEY);
+      const raw = kv.get(CrossGameBuffer.STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
@@ -366,9 +366,8 @@ export class CrossGameBuffer {
   }
 
   private saveToStorage(): void {
-    if (typeof window === 'undefined' || !window.localStorage) return;
     try {
-      window.localStorage.setItem(CrossGameBuffer.STORAGE_KEY, JSON.stringify(this.slots));
+      kv.set(CrossGameBuffer.STORAGE_KEY, JSON.stringify(this.slots));
     } catch {
       // Storage quota or sandboxed frame fallback
     }

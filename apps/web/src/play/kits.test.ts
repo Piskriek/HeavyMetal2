@@ -24,8 +24,6 @@ import {
 import { MILL_FRAME_KIT } from './kit-mill-frame';
 import { PRESS_FRAME_KIT } from './kit-press-frame';
 import { WATERMAKER_FRAME_KIT } from './kit-watermaker-frame';
-import { HAULER_KIT } from './kit-hauler';
-import { CRAWLER_KIT } from './kit-crawler';
 
 interface KitTestCase {
   readonly id: string;
@@ -59,21 +57,9 @@ const CASES: readonly KitTestCase[] = [
     maxSpan: [7.737, 3.998, 6.301],
     requiredSockets: ['vent', 'feed', 'hopper', 'power'],
   },
-  {
-    id: 'hauler',
-    kit: HAULER_KIT,
-    maxSpan: [2.579, 2.931, 5.998],
-    requiredSockets: ['seatLeft', 'seatRight', 'dish', 'lampLeft', 'lampRight'],
-  },
-  {
-    id: 'crawler',
-    kit: CRAWLER_KIT,
-    maxSpan: [2.4, 2.2, 6.2],
-    requiredSockets: ['seat', 'drill', 'mast', 'lampLeft', 'lampRight'],
-  },
 ];
 
-describe('TICKET-39 kit specs (4a, 4b, 4d)', () => {
+describe('TICKET-39 kit specs (4a, 4b, 4d): the four frames that are still frame kits', () => {
   it('defines the 4d two-material trim palette (hull-steel & accent-hardware, plus Sheet-12 khaki-paint & hopper-slate)', () => {
     // the Sheet-12 pair Argo's review added: a painted housing and a cast-iron hopper, so a kit need not pretend paint is steel
     assert.deepEqual(KIT_TRIM_MATERIAL_IDS, ['hull-steel', 'accent-hardware', 'khaki-paint', 'hopper-slate']);

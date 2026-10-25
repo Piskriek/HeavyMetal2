@@ -18,6 +18,7 @@ import { lightMaterial } from './light-material';
 import { kitLayering, layeredMaterial, type LayeredEnv } from './layered-material';
 import type { GateAccessMode } from '@hm/coopnet/gate-dialer';
 import { STARGATE_PRESET, stargateKit } from './kit-stargate';
+import { VEHICLE_KITS, VEHICLE_PRESET, type VehicleKind } from './kit-vehicles';
 import type { KitBuild } from './kit-build';
 
 /**
@@ -163,4 +164,22 @@ export function kitFabricator(genLevel: GenLevel, stage: number, ringY: number):
   const sockets: Record<string, { at: readonly number[] }> = {};
   for (const [name, s] of Object.entries(presetSockets(FABRICATOR_FRAME_KIT, FAB_PRESET))) sockets[name] = { at: [s.at[0], s.at[1] + ringY, s.at[2]] };
   return { group, head, sockets };
+}
+
+/**
+ * A vehicle as a kit build (JOB-08v): the same five-group blueprint `kit-vehicles.ts` audited, dressed in the plot's
+ * materials and built at the stage's detail rank. The plot hangs this at the vehicle's pose so a Beam Rifle cartridge
+ * can name any part of it (`kit-target.ts`), while the procedural rover keeps the wheel and steering animation the
+ * merged kit cannot (a kit's wheels are one mesh with the hull).
+ */
+export function plotVehicleKit(kind: VehicleKind, genLevel: GenLevel, stage: number): KitBuild | null {
+  const rank = maxRank(stage, tierOfLevel(genLevel));
+  return buildKitPreset(VEHICLE_KITS[kind], VEHICLE_PRESET, {
+    materials: plotKitMaterials(),
+    // every part of a vehicle is a @hm/partgen primitive or a box: no generated asset to wait on
+    gen: () => null,
+    resolveMaterial: plotResolve(genLevel, rank),
+    layering: kitLayering,
+    maxRank: rank,
+  });
 }

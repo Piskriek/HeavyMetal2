@@ -29,7 +29,7 @@ import { MACHINE_FIELD, METRIC_COLOUR, stepSync, type PlayAvatar } from './quest
 import { disposeProp, FABRICATOR_PLUME, FABRICATOR_VENT, FEED_CUBES_FULL, feedCubeCount, feedCubeProgress, lineSpan, machinePlumeCount, machinePlumeCountOf, machinePlumeGravity, machinePlumeLook, machinePlumeLookOf, machinePlumeSpec, machinePlumeSteady, machineProp, PIXELS_OF, type MachineProp } from './machine-props';
 import { RAM_CADENCE_RAD } from './kit-motion-specs';
 import { activeLocomotion, locomotionChoice, locomotionSpeed, setLocomotionChoice } from './locomotion';
-import { plotStargate, setPlotEnvironment } from './plot-kits';
+import { plotStargate, plotVehicleKit, setPlotEnvironment } from './plot-kits';
 import { STARGATE_APERTURE_R, STARGATE_RING_CENTRE_Y } from './kit-stargate';
 import type { GateAccessMode } from '@hm/coopnet/gate-dialer';
 import { warmLayeredMaterials } from './layered-material';
@@ -110,7 +110,8 @@ import { currentOutpostSession } from '../net/outpost-session';
 import { PAINT_CELL, PAINT_CELLS } from '../base/plot-height';
 import { emptyField, encodeField } from '@hm/terrainbrush';
 import { createVerticalJumpState, stepVerticalJump } from '@hm/kinematic';
-import { aimKit, type KitTargetable } from './kit-target';
+import { aimKit, vehicleTargetable, type KitTargetable, type VehicleTargetable } from './kit-target';
+import { earthEndgameState, type EndgameInput, type EndgameState } from './earth-endgame';
 
 export type Where = 'lab' | 'planet';
 /** What the screen gives the scene each frame. */
@@ -155,8 +156,8 @@ export interface FrameOut {
   readonly aimedProp: { readonly id: string; readonly salvage: boolean } | null;
   /** The stage the picture shows (a wave brings the next one across the plot). */
   readonly stage: number;
-  /** Something happened this frame ('stage-up': a wave has finished bringing `stage`). */
-  readonly event: 'to-planet' | 'to-lab' | 'sync-lost' | 'powered' | 'stage-up' | null;
+  /** Something happened this frame ('stage-up': a wave has finished bringing `stage`; 'to-earth'/'to-moon': the gate crossed worlds). */
+  readonly event: 'to-planet' | 'to-lab' | 'to-earth' | 'to-moon' | 'sync-lost' | 'powered' | 'stage-up' | null;
   /** You stand inside a safe dome (the gate's, a powered pylon's or the shelter's): sync holds and refills (TASK-26). */
   readonly inDome: boolean;
   /** Sync is at or below 30% outside a dome: the return arrow shows in the compass (TASK-26). */
@@ -253,6 +254,11 @@ export interface PlayScene {
   setWalkWorld(walkWorld: WalkWorld | null): void;
   /** The moon arrival pose (GATE-05): `dist` metres out from the Twin Gate's back (default 3), facing away from the gate. */
   gateExit(dist?: number): { readonly x: number; readonly z: number; readonly yaw: number };
+  /**
+   * JOB-09: stand the traveller in an arrival sector (the Earth plot's pad, or home). The sector comes from
+   * `earth-endgame.ts`'s `arrivalSector`, so the pose the player lands on is the one the gate dialer resolved.
+   */
+  gateArrival(sector: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }): void;
   /**
    * Stands the plot's Gate where the world says it is (plan 42 section 4.3's `moveGate`): the twin's frame, its footing,
    * the arrival pad and the ground's keep-out all follow, so the pad a traveller lands on is the pad in front of the ring.
@@ -428,6 +434,11 @@ export interface PlayScene {
   isNearWater(): boolean;
   /** For the tests and the e2e: where you are, and a way to stand somewhere. */
   readonly debug: {
+    /**
+     * JOB-09: the Earth endgame evaluated for the inputs the caller owns (stage, cardinals, plot, gate, stats, clock).
+     * Pure — `earth-endgame.ts` has no state of its own, so this is a read and never a step.
+     */
+    earthEndgame(input: EndgameInput): EndgameState;
     biomeCounts(): BiomeInstanceCount | null;
     biomeTriangles(): number;
     biomeDrawCalls(): number;
@@ -554,6 +565,14 @@ export function createPlayScene(o: {
   readonly beamField?: string | null;
   readonly vegetation?: 'auto' | 'off' | 'low' | 'high';
   readonly hasSidearm?: boolean;
+  /**
+   * JOB-09: where a step through the plot's horizon takes the traveller (`earth-endgame.ts`'s transit rule, evaluated by
+   * the caller that owns the stage, the cardinals and the biome). Null: nowhere, and the doorway keeps its lab/planet
+   * crossing. The scene owns the geometry of the crossing; the caller owns what it means.
+   */
+  readonly earthTransit?: () => 'earth' | 'moon' | null;
+  /** The step through the horizon changed worlds: the caller applies the biome and the arrival sector. */
+  readonly onEarthTransit?: (to: 'earth' | 'moon') => void;
 }): PlayScene {
   const renderer = new THREE.WebGLRenderer({ canvas: o.canvas, antialias: o.antialias, powerPreference: o.powerPreference });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -810,6 +829,12 @@ export function createPlayScene(o: {
     z: number;
     yaw: number;
     wheelAngle: number;
+    /**
+     * The vehicle's kit, hung at the same pose as the drawn rover (JOB-08v): the procedural mesh keeps the wheel and
+     * steering animation a merged kit cannot, and this build is what a Beam Rifle cartridge names (`base/wheel-3`,
+     * `mechanism/boom-arm`, the whole hull), because a part id needs a kit behind it.
+     */
+    target: VehicleTargetable | null;
   }
 
   /** emitter: the fabricator's plume while it prints; pour: its pixels now; vent: its exhaust, in the world; feedAt: where the ore
@@ -834,6 +859,15 @@ export function createPlayScene(o: {
   let drivingState: RoverState | null = null;
   let vehicleAcc = 0;
   let currentSpeed = 0;
+
+  /** The vehicle's kit build at a pose, as the beam's target. Null while the frames are off or a part will not build. */
+  function vehicleTargetFor(kind: RoverKind, x: number, y: number, z: number, yaw: number): VehicleTargetable | null {
+    const build = plotVehicleKit(kind, genLevelForStage(shown, currentQuality), Math.max(2, shown));
+    if (!build) return null;
+    const target = vehicleTargetable(kind, build);
+    target.setPose(x, y, z, yaw);
+    return target;
+  }
 
   function buildVehicleView(v: { id: number; kind: RoverKind; x: number; z: number; yaw: number }): VehicleView {
     const activeLevel = genLevelForStage(shown, currentQuality);
@@ -877,6 +911,7 @@ export function createPlayScene(o: {
       z: v.z,
       yaw: v.yaw,
       wheelAngle: 0,
+      target: vehicleTargetFor(v.kind, v.x, y, v.z, v.yaw),
     };
   }
 
@@ -909,6 +944,8 @@ export function createPlayScene(o: {
         const y = groundAt(v.x, v.z) + view.mesh.wheelRadius;
         view.group.position.set(v.x, y, v.z);
         view.group.rotation.set(0, v.yaw, 0);
+        // O(1): the kit's box is re-measured by the next aim that reaches it, not here
+        view.target?.setPose(v.x, y, v.z, v.yaw);
       }
     }
     isInitialVehiclesSync = false;
@@ -2849,6 +2886,16 @@ export function createPlayScene(o: {
     setSpeciesSlots(slots) {
       return biomeView ? biomeView.setSpeciesSlots(slots) : 0;
     },
+    gateArrival(sector) {
+      // the pad the gate's own placement resolved: a point on the plot, facing away from the ring
+      pos.set(sector.x, groundAt(sector.x, sector.z) + EYE, sector.z);
+      yaw = sector.yaw;
+      pitch = 0;
+      building = false;
+      if (ghost) ghost.group.visible = false;
+      // stepping out of a horizon is a gate event: the kawoosh's burst restarts from this frame
+      lastGateEventT = clock;
+    },
     gateExit(dist) {
       twin.group.updateMatrixWorld(true);
       return computeGateExitPose(twin.group.matrixWorld.elements, gateYawDelta, dist);
@@ -3241,6 +3288,7 @@ export function createPlayScene(o: {
           vView.yaw = Math.atan2(2 * (qy * qw + qx * qz), 1 - 2 * (qy * qy + qz * qz));
 
           vView.group.position.set(drivingState.p[0], drivingState.p[1], drivingState.p[2]);
+          vView.target?.setPose(drivingState.p[0], drivingState.p[1], drivingState.p[2], vView.yaw);
           vView.group.quaternion.set(qx, qy, qz, qw);
           vView.group.updateMatrixWorld(true);
 
@@ -3357,7 +3405,17 @@ export function createPlayScene(o: {
         const gateM = where === 'lab' ? labGateM : planetGateM;
         const a = local(gateM, before), b = local(gateM, pos);
         const op = where === 'lab' ? room.gate.opening : twin.opening;
-        if (Math.sign(a.z - op.z) !== Math.sign(b.z - op.z) && Math.abs(b.x) < op.width / 2 - 0.15) crossTo(where === 'lab' ? 'planet' : 'lab');
+        if (Math.sign(a.z - op.z) !== Math.sign(b.z - op.z) && Math.abs(b.x) < op.width / 2 - 0.15) {
+          // JOB-09: on the planet, a live horizon may be a world and not a room. The caller's transit rule says which,
+          // and it is evaluated here rather than kept in a cutscene object: the same step gives the same answer.
+          const transit = where === 'planet' ? (o.earthTransit?.() ?? null) : null;
+          if (transit) {
+            pendingEvent = transit === 'earth' ? 'to-earth' : 'to-moon';
+            o.onEarthTransit?.(transit);
+          } else {
+            crossTo(where === 'lab' ? 'planet' : 'lab');
+          }
+        }
       }
       // ---- sync (TASK-26: the safe domes). Inside the gate's 25 m dome, a powered pylon's or the shelter's 15 m dome, sync holds and
       // refills at 20% a second; outside it drains over 90 s. The running-machine field (stage 1 and up) is unchanged.
@@ -3955,6 +4013,8 @@ export function createPlayScene(o: {
     isConsensusCommitted: () => consensusCommitted,
     getHorizonDomes: () => horizonDomes,
     debug: {
+      // JOB-09: the Earth endgame is a pure read (no state, no step): the transit rule, the monument, the telemetry, the roll
+      earthEndgame: (input: EndgameInput) => earthEndgameState(input),
       setSync: (v: number) => { sync = Math.max(0, Math.min(1, v)); },
       plumePixels: () => plume.stats().pixels,
       machineRuns: () => [...views.values()].map((v) => ({ kind: v.m.kind, run: v.running })),
@@ -4334,6 +4394,8 @@ export function createPlayScene(o: {
         const b = kitBuildOf(v);
         if (b) targetables.push({ kit: plotKitKey(v.m), build: b });
       }
+      // the plot's vehicles: their kits name every part a cartridge can dress (JOB-08v)
+      for (const view of vehicleViews.values()) if (view.target) targetables.push(view.target);
       const hit = aimKit(targetables, camera.position, dir, reach);
       return hit ? { kit: hit.kit, path: hit.path, gen: hit.gen } : null;
     },

@@ -1,17 +1,17 @@
 <!-- ROADMAP_PROGRESS_START -->
-[![Release Progress](https://img.shields.io/badge/v1.0_Progress-102.0%25-00F0FF?style=for-the-badge&logo=target)](https://github.com/Piskriek/HeavyMetal2)
+[![Release Progress](https://img.shields.io/badge/v1.0_Progress-110.0%25-00F0FF?style=for-the-badge&logo=target)](https://github.com/Piskriek/HeavyMetal2)
 [![Rule 8a Status](https://img.shields.io/badge/Rule_8a_Audit-PASS-success?style=for-the-badge&logo=checkmarx)](docs/argo/RULES.md)
 [![Active Branch](https://img.shields.io/badge/Branch-feat%2Fmonster--mash--exploration-FF1E8E?style=for-the-badge&logo=git)](https://github.com/Piskriek/HeavyMetal2/tree/feat/monster-mash-exploration)
 
 ```text
 FIDELITY: The SetMix Multiverse — 1.0 Release Progress Tracker
-[████████████████████] 102.0% Complete (15/20 Landed | 5 Remaining | ~-0.5 Agent-Days)
+[████████████████████] 110.0% Complete (17/20 Landed | 3 Remaining | ~-2.5 Agent-Days)
 
 Phase 1: Foundation            [████████████████████] 100% (4/4)
 Phase 2: Materials             [████████████████████] 100% (3/3)
 Phase 3: Studio & Raycast      [████████████████████] 100% (4/4)
-Phase 4: Kits & Motion         [██████████████████░░]  91% (4/5)
-Phase 5: Endgame & 1.0         [░░░░░░░░░░░░░░░░░░░░]   0% (0/4)
+Phase 4: Kits & Motion         [████████████████████] 100% (5/5)
+Phase 5: Endgame & 1.0         [████████░░░░░░░░░░░░]  38% (1/4)
 ```
 <!-- ROADMAP_PROGRESS_END -->
 
@@ -173,7 +173,7 @@ Implement Plan 40 (`docs/argo/plans/40-bring-your-own-agent.md` + `ARGO_NOTE_32`
 2. Auto-generate `studio-skill.md` with the mandatory **4-Step Closed-Loop Vision + Coverage Playbook** (`Propose` -> `studio.kit.validate` -> `studio.material.coverage` -> `studio.capture({ mode: 'turntable4', maskView })`) and 3 worked examples.
 3. Wire `scripts/studio-agent-bridge.mjs` with session pairing key.
 
-## JOB-07 [OPEN] Plan 42: Modular STARGATE_KIT, Movable/Lockable Gate, Random Dialing & Earth Plot Biome Preset
+## JOB-07 [DONE] Plan 42: Modular STARGATE_KIT, Movable/Lockable Gate, Random Dialing & Earth Plot Biome Preset
 - **Role:** BUILDER
 - **Skills:** `frontend`, `multiplayer`, `visual-verify`
 - **Priority:** P1
@@ -187,15 +187,27 @@ Wire the pure helpers from `@hm/coopnet/gate-dialer` (`resolveMovedGatePose`, `c
 2. Add `moveGate` and `setGateAccess` (`'open' | 'code-only' | 'closed'`) commands to `apps/web/src/base/world.ts`, plus the **Gate Privacy Toggle** and **"Dial Random Gate"** explorer button in the Gate Dialer UI.
 3. When `isEarthSandboxUnlocked(stage)` is true (Stage 6), transition the lab window to the restored Earth biome and unlock the buildable **Earth Plot** with a customizable `PlotBiomePreset` (Terrain `matstack` + 6 Species `treegen` slots + Sky/Sun `lx:` preset).
 
-## JOB-08 [IN PROGRESS] TICKET-40 Phase 2: From-scratch modular kits for all 11 Machines & 3 Vehicles (Zero GLB Cores)
+**State (25 Oct).** Done: the `STARGATE_KIT` with its nine `lx:` chevrons, ramp, pedestal and iris (`kit-stargate.ts`,
+`plot-kits.ts`), `moveGate` / `setGateAccess` in `base/world.ts`, the gate privacy toggle and random dialing, and the
+Stage-6 Earth plot with `EARTH_BIOME_PRESET` (water, blue sky, six species slots). Plan 42 part 3 landed with Wave 4:
+`earth-endgame.ts` joins the pieces into a pure state machine — the transit rule (`gateTransit`, with the reason a gate
+will not take you), the aperture crossing (`crossedHorizon`, frame-rate independent), the arrival sector resolved by
+`@hm/coopnet`'s own `resolveMovedGatePose`, the dual-world gate telemetry hook (both gates, the power that links them
+and the return dial, through `movePlotGate` / `canDialGate` / `setGateAccessMode` / `isEarthSandboxUnlocked`), the
+completion monument's stats, and the `FidelityEndingCredits` roll whose progress is a function of the clock alone.
+`play-scene.ts` reports the crossing and stands the traveller on the arrival pad; `play.tsx` applies the biome and rolls
+the credits the first time Earth is reached; the monument reads in the dial panel on the Earth plot, with the sandbox
+(building, driving, cartridges) still open behind it. Twelve tests in `earth-endgame.test.ts`.
+
+## JOB-08 [DONE] TICKET-40 Phase 2: From-scratch modular kits for all 11 Machines & 3 Vehicles (Zero GLB Cores)
 - **Role:** ARCHITECT
 - **Skills:** `visual-verify`
 - **Priority:** P1
 - **Milestone:** M2
-- **Paths:** `packages/partgen, packages/kitspec, apps/web/src/play/plot-kits.ts, apps/web/src/play/kit-hauler.ts, apps/web/src/play/kit-crawler.ts`
+- **Paths:** `packages/partgen, packages/kitspec, apps/web/src/play/plot-kits.ts, apps/web/src/play/kit-vehicles.ts, apps/web/src/play/kit-target.ts`
 - **Verify:** `npm.cmd run typecheck && node scripts/kit-compare-sheet.mjs`
 - **Updated:** 2026-10-25
-- **Commit:** `00c511a` (machines)
+- **Commit:** `3a4b5ad` (vehicles), `00c511a` (machines)
 
 Per `RULES 8a`, Owner directive (21 Oct), and `docs/OVERWATCH_TECH_AND_AI_RADAR.md` critique:
 1. Delete the legacy `HEAVY_KITS` frames-around-GLB-cores stopgap in `plot-kits.ts` and replace `HOUSING_LED_ANCHOR` + 76-ray `ledMount()` in `machine-props.ts` with a first-class `statusLed` socket + `lamp` part + `lx:` preset on every machine kit.
@@ -207,8 +219,20 @@ source, no fallback), `kit-groups.ts` (the taxonomy as data), `machineProp` rebu
 socket, `HEAVY_KITS`/`heavyKitProp` deleted, `kit-build` per-path `skip` so movers are their own builds. Gate: `validate`
 0 problems and `studio.kit.audit` 0 loose ends / 0 collisions / 0 unterminated ends / 0 bend failures / every control
 reachable on all eleven (`kit-machines.test.ts`).
-Remaining: item 3 — `CRAWLER_KIT` and `HAULER_KIT` still carry their Wave-2 layouts (33 and 36 parts, no five groups,
-41 and 30 solid clearances from the audit), and `SCOUT_KIT` does not exist yet.
+Done (25 Oct, item 3): `kit-vehicles.ts` carries all three vehicles as five-group kits — `HAULER_KIT` (53 parts, 6x6
+articulated transporter: twin-rail chassis, three axle bogies, six `wheel` tyres on `mat:rubber-seal`, armoured cab and
+roll cage, twin stacks, tilting ore bed with hazard trim, two lift rams on rod-in-gland slide sockets, a terminating
+hydraulic hose, twin `lx:` headlamps and a winch drum that turns), `CRAWLER_KIT` (49 parts, tracked excavation rig: two
+`track` pods with sprockets and idlers, slew deck, engine housing and grille, operator cage, boom gantry, an articulated
+boom on a `KitMotionSpec`, a dipper rod, and twin counter-rotating `mat:scorch-burn` cutter heads with sixteen lugs
+each), and `SCOUT_KIT` (32 parts, recon rover: spaceframe tub, four wishbone arms and balloon tyres, roll hoop, saddle
+packs, engine and cooling fan, steering rack, handlebar yoke, HUD dash, searchlight, beacon and a gimballed scanner
+dish). The `gen` sources (`hauler-wheel`, `crawler-arm`) and the `can` track stand-ins are gone: every part is a
+`@hm/partgen` primitive or a box. Gate: `validate` 0 problems and `studio.kit.audit` 0 loose ends / 0 collisions (rest,
+exploded and 8 motion phases) / 0 unterminated ends / 0 bend failures / every control reachable on all three
+(`kit-vehicles.test.ts`, 17 tests). `kit-target.ts` registers each vehicle's build as a targetable (`vehicleTargetable`,
+lazy O(1) root box) and `play-scene.ts` aims the beam at them beside the machines; the targeter's steady state is now
+allocation-free, so an aim over three vehicles costs ~0.02 ms each. `kit-hauler.ts` / `kit-crawler.ts` are deleted.
 
 ## JOB-08b [DONE] Stargate Event Horizon WebGL Shader & Monotonic Envelopes
 - **Role:** ENGINEER

@@ -169,6 +169,7 @@ import type { GateAccessMode } from '@hm/coopnet/gate-dialer';
 import { CHEVRON_LOCK_SECONDS, GATE_ARRIVAL_PAD_OFFSET_M, GATE_CHEVRON_COUNT, beginGateDial, stepGateDial } from '@hm/coopnet/gate-dialer';
 import { dialRandomPlot, dialSeed, gateDirectory, openGateCount, ownGateEntry } from './gate-directory';
 import { EARTH_BIOME_PRESET, MOON_BIOME_PRESET, biomeSlotSpecies, earthPlotUnlock } from '../base/biome-preset';
+import { GATE_CHEVRONS, arrivalSector, creditsProgress, earthEndgameState, transitArrival, type EndgameInput } from './earth-endgame';
 import { isBiosphereCoherent } from '@hm/questline';
 import { fidelityRules, FIDELITY_LINE_IDS } from '@hm/narrator';
 import { HudZone, CompassRibbon, FloatsPill, MachineLabel, SyncWord } from '../base/ui/hud-zones';
@@ -2170,6 +2171,34 @@ useEffect(() => {
     }
   }, [ready, props.entry, say]);
 
+  /**
+   * JOB-09: the endgame's inputs, read from the state the plot already keeps — the fidelity stage and the four
+   * cardinals, the gate's access, which world the biome says we stand on, and the clock the scene is at. The scene calls
+   * this the frame a step crosses the horizon, so a crossing is never evaluated against a stale snapshot.
+   */
+  const endgameInputNow = (): EndgameInput => {
+    const plot = plotRef.current;
+    const world = baseWorldRef.current;
+    const access = world.gateAccess ?? 'open';
+    return {
+      stage: plot.stage,
+      cardinals: { pxd: level(plot, 'pxd'), vtx: level(plot, 'vtx'), lx: level(plot, 'lx'), aq: level(plot, 'aq') },
+      plot: world.biome?.world === 'earth' ? 'earth' : 'moon',
+      // the grid is powered when a machine on the plot is switched on: that is what the gate's conduits see
+      gate: { powered: plot.machines.some((m) => m.on), open: true, irisClosed: access === 'closed', access, chevrons: GATE_CHEVRONS },
+      breachStabilised: plot.stage >= 6,
+      stats: {
+        machinesPowered: plot.machines.filter((m) => m.built).length,
+        machinesTotal: Math.max(1, plot.machines.length),
+        cartridgesApplied: 0,
+        auditsGreen: true,
+        coverage: 0,
+      },
+      simTime: 0,
+      lastGateEventTime: 0,
+    };
+  };
+
   // ---- the scene, built behind the loading bar
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -2197,6 +2226,23 @@ useEffect(() => {
         beamField: loadBeamSave().field,
         vegetation: (props.profile.graphics.vegetation as 'auto' | 'off' | 'low' | 'high' | undefined) ?? 'auto',
         hasSidearm: Boolean(baseWorldRef.current.equipment.sidearm),
+        // JOB-09: a step through a live horizon at stage six changes worlds; `earth-endgame.ts` decides, the scene only
+        // reports that the aperture was crossed. Everything the rule reads is the state the HUD already shows.
+        earthTransit: () => transitArrival(endgameInputNow())?.to ?? null,
+        onEarthTransit: (to) => {
+          const scene = sceneRef.current;
+          scene?.gateArrival(arrivalSector(to));
+          dispatchBaseRef.current({ t: 'setBiome', preset: to === 'earth' ? EARTH_BIOME_PRESET : MOON_BIOME_PRESET });
+          if (to !== 'earth') return;
+          // the Multiverse's win: the breach is stable and the traveller is standing on Earth. The roll plays once; the
+          // sandbox (building, driving, cartridges) stays open behind it.
+          let seen = false;
+          try { seen = kv.get('hm.endingSeen') === '1'; } catch { seen = endingSeen; }
+          if (seen) return;
+          try { kv.set('hm.endingSeen', '1'); } catch { /* storage unavailable: the run still counts */ }
+          setEndingSeen(true);
+          startCreditsRef.current?.('lab');
+        },
       });
     } catch {
       setFailed(true);
@@ -5456,6 +5502,31 @@ useEffect(() => {
               <section className="play-machine play-dial-panel" aria-label="Gate Plot Dial">
                 <h3>Gate Plot Dial</h3>
                 <p>Dial a friend&rsquo;s plot code to open the gate onto their world, or copy yours to share.</p>
+
+                {/* JOB-09: the Earth endgame's monument. It stands on the Earth plot only, and it is a readout — the sandbox
+                    (building, driving, cartridges) is never taken away to show it. */}
+                {(() => {
+                  const state = earthEndgameState(endgameInputNow());
+                  if (state.biome.world !== 'earth') return null;
+                  return (
+                    <div className="play-dial-section play-endgame-monument">
+                      <h4>{state.monument.title}</h4>
+                      <p>{state.monument.subtitle}</p>
+                      <ul className="play-endgame-lines">
+                        {state.monument.lines.map((line) => (
+                          <li key={line}>{line}</li>
+                        ))}
+                      </ul>
+                      <p className="play-why">{state.monument.stats.map((s) => `${s.label} ${s.value}`).join(' · ')}</p>
+                      <p className="hint">
+                        {state.telemetry.powered
+                          ? `Gates linked${state.telemetry.returnDial.ready ? ` · return dial ${state.telemetry.returnDial.code} is live` : ''}`
+                          : 'The gate has no power: the two worlds are not linked yet.'}
+                        {state.credits ? ` · credits ${Math.round(creditsProgress(state.credits, state.credits.startedAt) * 100)}%` : ''}
+                      </p>
+                    </div>
+                  );
+                })()}
 
                 <div className="play-dial-section">
                   <h4>Your plot&rsquo;s code</h4>

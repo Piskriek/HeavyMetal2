@@ -135,7 +135,7 @@ const expand = (box: THREE.Box3, by = EXPAND): THREE.Box3 => box.expandByScalar(
 interface MeshSlot {
   readonly mesh: THREE.Mesh;
   /** The mesh's world pose (16 floats) when `box` was measured: a driven part moves, everything else keeps its box. */
-  pose: Float32Array;
+  readonly pose: Float32Array;
   /** The mesh's world AABB, expanded a hair: mutable, because a part under a motion spec moves between aims. */
   box: Aabb;
   readonly visible: boolean;
@@ -143,18 +143,11 @@ interface MeshSlot {
 
 interface CachedBuild {
   readonly pose: Float32Array;
-  readonly mask: number;
+  mask: number;
   /** The union of the visible meshes' boxes: mutable, so a moved part grows or shrinks the build's own box. */
   bounds: Aabb;
   readonly slots: readonly MeshSlot[];
 }
-
-/** Which visible meshes a build has, as a 32-bit mask over its children (a kit build is a handful of meshes; a longer one gets a second key). */
-const visibleMask = (meshes: readonly THREE.Object3D[]): string => {
-  let out = '';
-  for (let i = 0; i < meshes.length; i += 1) out += (meshes[i] as THREE.Object3D).visible ? '1' : '0';
-  return out;
-};
 
 const samePose = (a: Float32Array, b: ArrayLike<number>): boolean => {
   for (let i = 0; i < 16; i += 1) if (a[i] !== b[i]) return false;
@@ -179,6 +172,14 @@ export class KitTargeter {
 
   reset(): void {
     this.stats = emptyCounters();
+  }
+
+  /**
+   * A build's root box in world space, measured lazily: one matrix compare when nothing that matters moved. This is
+   * what a caller reads to know where a vehicle is without tracing a ray through its geometry.
+   */
+  rootBox(build: KitBuild): Aabb {
+    return this.entry(build).bounds;
   }
 
   /**
@@ -242,36 +243,41 @@ export class KitTargeter {
    */
   private entry(build: KitBuild): CachedBuild {
     build.group.updateWorldMatrix(true, true);
-    const children = build.group.children.filter((c): c is THREE.Mesh => (c as THREE.Mesh).isMesh);
-    const mask = hashMask(visibleMask(children));
-    // a pose the caller moves is a new pose: compare the sixteen floats rather than trusting a flag
-    const pose = new Float32Array(build.group.matrixWorld.elements);
     const hit = this.cache.get(build);
-    if (hit && hit.mask === mask && samePose(hit.pose, pose) && hit.slots.length === children.length) {
-      // the build is where it was: a pre-pass of sixteen-float compares says whether any part moved under it at all; a
-      // standing machine costs that and nothing else
-      let moved = false;
-      for (const slot of hit.slots) if (!samePose(slot.pose, slot.mesh.matrixWorld.elements)) { moved = true; break; }
-      if (!moved) return hit;
-      // a driven part moved: re-box exactly those meshes, then re-take the build's union from the mesh boxes it keeps
-      const union = this.box.makeEmpty();
-      for (const slot of hit.slots) {
-        if (!samePose(slot.pose, slot.mesh.matrixWorld.elements)) {
-          slot.pose = new Float32Array(slot.mesh.matrixWorld.elements);
-          const world = meshWorldBox(slot.mesh, this.scratch);
-          if (!world.isEmpty()) slot.box = boxToAabb(expand(world));
-          this.stats.meshesRemeasured += 1;
+    // the steady state is allocation-free: the build's own pose, then its visibility bits, then one matrix compare per
+    // mesh. A standing vehicle on a plot costs three floats-per-mesh compares an aim, and nothing is created.
+    if (hit) {
+      const mask = visibilityBits(hit.slots);
+      if (mask === hit.mask && samePose(hit.pose, build.group.matrixWorld.elements)) {
+        let moved = false;
+        for (const slot of hit.slots) {
+          if (!samePose(slot.pose, slot.mesh.matrixWorld.elements)) {
+            moved = true;
+            break;
+          }
         }
-        if (!slot.visible) continue;
-        const b = slot.box;
-        TMP_BOX.min.set(b.min[0], b.min[1], b.min[2]);
-        TMP_BOX.max.set(b.max[0], b.max[1], b.max[2]);
-        union.union(TMP_BOX);
+        if (!moved) return hit;
+        // a driven part moved: re-box exactly those meshes, then re-take the build's union from the mesh boxes it keeps
+        const union = this.box.makeEmpty();
+        for (const slot of hit.slots) {
+          if (!samePose(slot.pose, slot.mesh.matrixWorld.elements)) {
+            slot.pose.set(slot.mesh.matrixWorld.elements);
+            const world = meshWorldBox(slot.mesh, this.scratch);
+            if (!world.isEmpty()) slot.box = boxToAabb(expand(world));
+            this.stats.meshesRemeasured += 1;
+          }
+          if (!slot.visible) continue;
+          const b = slot.box;
+          TMP_BOX.min.set(b.min[0], b.min[1], b.min[2]);
+          TMP_BOX.max.set(b.max[0], b.max[1], b.max[2]);
+          union.union(TMP_BOX);
+        }
+        if (!union.isEmpty()) hit.bounds = boxToAabb(expand(union));
+        this.stats.buildsRemeasured += 1;
+        return hit;
       }
-      if (!union.isEmpty()) hit.bounds = boxToAabb(expand(union));
-      this.stats.buildsRemeasured += 1;
-      return hit;
     }
+    const children = build.group.children.filter((c): c is THREE.Mesh => (c as THREE.Mesh).isMesh);
     const slots: MeshSlot[] = [];
     const union = this.box.makeEmpty();
     for (const mesh of children) {
@@ -281,8 +287,8 @@ export class KitTargeter {
       if (mesh.visible) union.union(world);
     }
     const next: CachedBuild = {
-      pose,
-      mask,
+      pose: new Float32Array(build.group.matrixWorld.elements),
+      mask: visibilityBits(slots),
       bounds: union.isEmpty() ? { min: [0, 0, 0], max: [0, 0, 0] } : boxToAabb(expand(union)),
       slots,
     };
@@ -293,17 +299,41 @@ export class KitTargeter {
   }
 }
 
-/** A 32-bit string hash of the visibility mask (collisions only cost a stale box for one aim; the slots carry `visible` anyway). */
-function hashMask(mask: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < mask.length; i += 1) {
-    h ^= mask.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
+/** The visible-mesh bits of a build's slots, as a number: a rank change flips bits, a mesh that moved does not. */
+const visibilityBits = (slots: readonly MeshSlot[]): number => {
+  let bits = 0;
+  for (let i = 0; i < slots.length && i < 31; i += 1) if ((slots[i] as MeshSlot).mesh.visible) bits |= 1 << i;
+  return bits;
+};
 
 let shared: KitTargeter | null = null;
+
+/** A vehicle in the world as the beam sees it: its kit's build, and the pose the drive code moves it to. */
+export interface VehicleTargetable extends KitTargetable {
+  readonly kind: string;
+  /**
+   * Move the vehicle to a pose. O(1): one matrix write and no geometry read — the boxes are re-measured lazily, by the
+   * next aim that reaches this build, and only for the meshes whose own matrix changed (a wheel on a `KitMotionSpec`).
+   */
+  setPose(x: number, y: number, z: number, yaw: number): void;
+}
+
+/**
+ * A kit build hung in the world at a pose a vehicle drives to. The vehicle's cosmetic mesh (the plot still draws its
+ * procedural rover) has no part ids; this build does, so a Beam Rifle cartridge can name `base/wheel-3` or the whole
+ * hull, and `studio.kit.audit` already proved every one of those parts is seated on a socket.
+ */
+export function vehicleTargetable(kind: string, build: KitBuild): VehicleTargetable {
+  return {
+    kind,
+    kit: `vehicle-${kind}`,
+    build,
+    setPose(x: number, y: number, z: number, yaw: number): void {
+      build.group.position.set(x, y, z);
+      build.group.rotation.set(0, yaw, 0);
+    },
+  };
+}
 
 /**
  * The scene-wide targeter. One per page is enough (its cache is keyed by build), and it is what every call site uses so the culling

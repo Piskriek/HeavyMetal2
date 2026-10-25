@@ -81,6 +81,7 @@ Each job may list **Skills** (tags such as `frontend`, `route`, `visual-verify`)
 - **M3 — Bring Your Own Agent & Full Studio Workspaces ([Plan 40](argo/plans/40-bring-your-own-agent.md))**: `window.studioAgent`, `studio-skill.md`, `studio.capture` (4-angle + mask views), `studio.kit.validate`, T29 part-split retopo button, and full Studio Materials/Parts/Species/Lights workspaces.
 - **M4 — Stargate Network, Co-Op & Stage-6 Earth Endgame ([Plan 42](argo/plans/42-modular-stargate-earth-endgame.md))**: Movable gates (`moveGate`), gate privacy (`open` | `code-only` | `closed`), random explorer gate dialing (`dialRandomGate`), and Stage-6 Earth Plot restoration sandbox.
 - **M5 — Previous QA Rounds & E2E Regression Fixes (`POL-01..314` / `F-01..28` / `T01..T28`)**: Verification of Wave 1 & Wave 2 bundles (`T18..T28`), failing E2E smoke/base-tab fixes, Lab & Window vista QA fixes, combat/rover E2E checks, and GPU timer hooks.
+- **M6 — Modular Spore Creatures & Multiverse Game Presets ([Plan 44](argo/plans/PLAN_44_MODULAR_SPORE_CREATURE_KITS.md) & [Plan 45](argo/plans/PLAN_45_MULTIVERSE_GAME_PRESETS_AND_SPORE_CARDS.md))**: Rebuild avatar and 37 roster monsters as pure 5-Rung `@hm/creature` kits (-5.5 MiB bundle reduction), `MultiverseGamePresetSpec`, URL gateway (`/?world=&game=&rig=`), and Steganographic PNG Spore Cards.
 
 ---
 
@@ -493,3 +494,51 @@ Completed and verified previous QA rounds across `docs/sidecar/FLASH_INBOX.md` (
 - **Updated:** 2026-10-22 13:08
 
 Authored `docs/argo/plans/42-modular-stargate-earth-endgame.md`, synchronized `.agents/GEMINI.md`, `CLAUDE.md`, `docs/RESUME.md`, `docs/OWNER_ASKS.md`, and `docs/argo/RULES.md`, built the visual Command Center & GitHub Job Board (`COMMAND_CENTER.bat`, `scripts/command-center.mjs`, `scripts/agent-worker.mjs`), and implemented pure deterministic helpers (`resolveMovedGatePose`, `canDialPlotGate`, `selectRandomOpenGate`, `isEarthSandboxUnlocked`) with 6/6 passing unit tests in `packages/coopnet/tests/gate-dialer.test.ts`.
+
+---
+
+## 4. PHASE 6: POST-1.0 EXPANSION (PLANS 44 & 45 — ZERO-IDLE FLEET QUEUE)
+> **Status**: Approved by Argon (Creative Architect) on `30ddd8a6`  
+> **Mandate**: Staged immediately behind Milestone #1 (Wave 4 `JOB-08v` Vehicles & `JOB-09` Earth Endgame) to ensure zero fleet idle time.  
+
+## JOB-24 [OPEN] Plan 44 Part A: @hm/creature Core Package, 5-Group Genome Builder, 3-Tier IK LOD & ASTRO_SUIT_CREATURE_KIT
+- **Role:** ENGINEER
+- **Skills:** `feature-dev`, `visual-verify`
+- **Priority:** P1
+- **Milestone:** M6
+- **Paths:** `packages/creature, packages/partgen, packages/kitspec, apps/web/src/avatar/astro/astro-model.ts, apps/web/src/avatar/two-bone-ik.ts`
+- **Verify:** `npm.cmd run typecheck && npm.cmd test && node --import tsx packages/creature/tests/creature-assembly.test.ts`
+- **Updated:** 2026-10-25
+
+1. Author the `@hm/creature` package exporting `CreatureGenomeSpec`, `bindCreatureSkeleton()`, and `evaluateCreatureGait()`.
+2. Map morphology 1:1 onto the 5 `kit-groups.ts` groups (`base`: pelvis/sacral root, `structure`: Sushumna spine/ribs/cranium, `mechanism`: limb chains with coaxial knuckles, `controls`: sensory organs, `subject`: hands/claws/effectors).
+3. Integrate zero-allocation `solveTwoBoneIk()` with 3-tier distance LOD (<15m 60 Hz foot IK; 15–50m `stageAnimRateHz` against analytical heightfield; >50m sleep).
+4. Rebuild the player avatar as `ASTRO_SUIT_CREATURE_KIT` (38-part articulated suit kit), purging `astro-low.glb` (1.2 MiB). Must pass `studio.kit.audit` with 0 loose ends and 0 collision violations across 8 motion phases.
+
+## JOB-25 [OPEN] Plan 44 Part B: 37 Procedural Monster Roster Rebuild in apps/web/src/monsters/roster.ts
+- **Role:** BUILDER
+- **Skills:** `visual-verify`
+- **Priority:** P1
+- **Milestone:** M6
+- **Paths:** `packages/creature, apps/web/src/monsters/roster.ts, apps/web/src/monsters/`
+- **Verify:** `npm.cmd run typecheck && node scripts/kit-compare-sheet.mjs`
+- **Updated:** 2026-10-25
+
+1. Rebuild all 37 roster monsters across the 7 archetypes (`biped`, `theropod`, `quadruped`, `hexapod`, `arachnid`, `serpentine`, `avian-drone`) using declarative `CreatureGenomeSpec` presets.
+2. Purge all 37 static external GLB/sprite assets (~4.8 MiB) from `apps/web/src/monsters/`, locking in a net ~5.5 MiB single-file bundle reduction.
+3. Every creature must pass `studio.kit.audit(spec)` with 0 loose ends and 0 collision penetrations across 8 motion phases ($t \in [0, 1]$).
+4. Bind `@hm/skin` OKLab palettes and `@hm/soundlab` physical vocal tract formants (`vocal-tract.ts`) to each monster species.
+
+## JOB-26 [OPEN] Plan 45: MultiverseGamePresetSpec, main.ts URL Query Gateway & Steganographic PNG Spore Cards
+- **Role:** ARCHITECT
+- **Skills:** `frontend`, `route`
+- **Priority:** P1
+- **Milestone:** M6
+- **Paths:** `packages/gamepreset, apps/web/src/main.ts, apps/web/src/play/game-presets.ts, apps/web/src/studio/spore-card.ts`
+- **Verify:** `npm.cmd run typecheck && node --import tsx packages/cartlab/tests/spore-card.test.ts`
+- **Updated:** 2026-10-25
+
+1. Implement `MultiverseGamePresetSpec` declaring `cameraMode`, `hudBlade`, `playerRigId`, and `activeRules` (circuit racing, wave survivor, ecosystem observer, Stargate escape).
+2. Wire the 6-line dual-gateway router in `apps/web/src/main.ts` parsing `/?world=<seed>&game=<preset>&rig=<kit>`, reusing the existing canvas, shaders, physics, and raycaster while swapping HUD blade and camera controller.
+3. Build `spore-card.ts` in `apps/web/src/studio/`: encode 512x512 turntable snapshots with compressed `fflate` `zTXt` ancillary PNG chunks (`"hm2:preset:v1"`).
+4. Implement secure drag-and-drop decoder: 256 KiB decompression bomb cap, frozen Zod schema validation, `studio.kit.audit` gate, and zero `eval`.

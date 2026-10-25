@@ -1,17 +1,17 @@
 <!-- ROADMAP_PROGRESS_START -->
-[![Release Progress](https://img.shields.io/badge/v1.0_Progress-110.0%25-00F0FF?style=for-the-badge&logo=target)](https://github.com/Piskriek/HeavyMetal2)
+[![Release Progress](https://img.shields.io/badge/v1.0_Progress-100.0%25_LOCKED-00F0FF?style=for-the-badge&logo=target)](https://github.com/Piskriek/HeavyMetal2)
 [![Rule 8a Status](https://img.shields.io/badge/Rule_8a_Audit-PASS-success?style=for-the-badge&logo=checkmarx)](docs/argo/RULES.md)
 [![Active Branch](https://img.shields.io/badge/Branch-feat%2Fmonster--mash--exploration-FF1E8E?style=for-the-badge&logo=git)](https://github.com/Piskriek/HeavyMetal2/tree/feat/monster-mash-exploration)
 
 ```text
-FIDELITY: The SetMix Multiverse — 1.0 Release Progress Tracker
-[████████████████████] 110.0% Complete (17/20 Landed | 3 Remaining | ~-2.5 Agent-Days)
+FIDELITY: The SetMix Multiverse — Milestone #1 (v1.0 Feature Complete Lock)
+[████████████████████] 100.0% Complete (20/20 Landed | 0 Open — RELEASE MILESTONE LOCKED!)
 
 Phase 1: Foundation            [████████████████████] 100% (4/4)
 Phase 2: Materials             [████████████████████] 100% (3/3)
 Phase 3: Studio & Raycast      [████████████████████] 100% (4/4)
 Phase 4: Kits & Motion         [████████████████████] 100% (5/5)
-Phase 5: Endgame & 1.0         [████████░░░░░░░░░░░░]  38% (1/4)
+Phase 5: Endgame & 1.0         [████████████████████] 100% (4/4)
 ```
 <!-- ROADMAP_PROGRESS_END -->
 
@@ -521,7 +521,7 @@ Authored `docs/argo/plans/42-modular-stargate-earth-endgame.md`, synchronized `.
 
 ---
 
-## JOB-21 [OPEN] Cross-Game Multiverse Exploration Loop & Multi-Cartridge Synergy (formerly Monster Mash)
+## JOB-21 [DONE] Cross-Game Multiverse Exploration Loop & Multi-Cartridge Synergy (formerly Monster Mash)
 - **Role:** ARCHITECT
 - **Skills:** `frontend`, `multiplayer`, `visual-verify`
 - **Priority:** P1
@@ -536,7 +536,7 @@ Authored `docs/argo/plans/42-modular-stargate-earth-endgame.md`, synchronized `.
 2. Build the Cross-Game streaming bridge: allow an entity from one GameMode (e.g. survival, mining) to traverse Stargates or be beamed via cartridges into another GameMode (e.g. rally racing, factory automation) with its procedural gait, material wear stack, and interaction rules intact.
 3. Multi-Cartridge Synergy: Firing the Beam Rifle (`Apply` mode) allows sampling an entity in Game A and manifesting it inside Game B.
 
-## JOB-22 [OPEN] 60 FPS Frame-Budget Audit, 380-Part Stress Benchmark & Zero-Alloc Raycast Audit
+## JOB-22 [DONE] 60 FPS Frame-Budget Audit, 380-Part Stress Benchmark & Zero-Alloc Raycast Audit
 - **Role:** RIG
 - **Skills:** `perf`, `visual-verify`
 - **Priority:** P0
@@ -549,7 +549,7 @@ Authored `docs/argo/plans/42-modular-stargate-earth-endgame.md`, synchronized `.
 2. Verify kit-target zero-allocation steady state: aiming over 14 kits costs < 0.05 ms with zero heap garbage generated per tick.
 3. Confirm draw calls remain <= 181 and frame times hold 60 FPS (16.6 ms budget).
 
-## JOB-23 [OPEN] 1.0 Release Packaging, studio-skill.compact.md & CI Gate Lock
+## JOB-23 [DONE] 1.0 Release Packaging, studio-skill.compact.md & CI Gate Lock
 - **Role:** BUILDER
 - **Skills:** `feature-dev`, `code-review`
 - **Priority:** P0

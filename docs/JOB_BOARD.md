@@ -96,7 +96,7 @@ Address all open review items in `OPUS_NOTE_41` v4:
 3. Tune `@hm/matstack` shelf coverage: reduce `rust-bloom` face coverage from 67% down to 5–15% patches, restrict `oil-leaks` (currently 40% of faces) to streaks under edges/crevices, make `soot` visible (currently 0%), and keep `moon-dust` off the dark `crushed-ore-bed` hopper top (currently 84%).
 4. Verify with `scripts/kit-compare-sheet.mjs` from all 4 angles before installing.
 
-## JOB-03 [OPEN] TICKET-41: 20 procedural texgraph tile graphs & 6 new periodic nodes
+## JOB-03 [REVIEW] TICKET-41: 20 procedural texgraph tile graphs & 6 new periodic nodes
 - **Role:** ARCHITECT
 - **Skills:** `visual-verify`
 - **Priority:** P0
@@ -104,13 +104,14 @@ Address all open review items in `OPUS_NOTE_41` v4:
 - **Paths:** `packages/texgraph/src/index.ts, packages/texgraph/tests`
 - **Verify:** `npm.cmd run typecheck && npm.cmd test`
 - **Updated:** 2026-10-22 13:08
+- **Commit:** `2800ff3` (tile library `97c9678`)
 
 Implement `OPUS_NOTE_44_tile_library.md`:
 1. Add 6 periodic, deterministic nodes to `@hm/texgraph`: anisotropic `noise` (`scaleY`), `scratches`, `spots`, `hex` (`'edge'` | `'cell'`), `weave`, and wrapped `blur`.
 2. Build `TILE_LIBRARY` with all 20 required tile graphs: `brushed-metal`, `cells`, `cast-iron`, `pits`, `fine-grain`, `orange-peel`, `stripes`, `rubber-grain`, `concrete`, `carbon-weave`, `hex-micro`, `flake-scale`, `grime-clouds`, `regolith-grain`, `moss-clump`, `frost-crystal`, `mud-splatter`, `mineral-crust`, `scorch-burn`, `scratches`.
 3. Add unit tests for validation, determinism, seamless wrap-edge continuity, grey percentile spread (>= 0.35), non-constant height, and < 25 ms @ 128px evaluation budget.
 
-## JOB-04 [OPEN] Rule 8a matstack fixes: Layer ordering, coat/aniso writes, coplanar edge dedup & Solvent Cartridge
+## JOB-04 [REVIEW] Rule 8a matstack fixes: Layer ordering, coat/aniso writes, coplanar edge dedup & Solvent Cartridge
 - **Role:** ENGINEER
 - **Skills:** `shader`, `frontend`
 - **Priority:** P0
@@ -118,6 +119,7 @@ Implement `OPUS_NOTE_44_tile_library.md`:
 - **Paths:** `packages/matstack/src/index.ts, packages/matstack/src/mask-mesh.ts, packages/matstack/src/shelf.ts, packages/cartlab, apps/web/src/studio`
 - **Verify:** `node scripts/test-layered-material.mjs && node scripts/test-material-cartridge.mjs`
 - **Updated:** 2026-10-22 13:08
+- **Commit:** `959a74c`
 
 Implement the 4 Rule 8a catches from `ARGO_NOTE_43` + Plan 41 step 4:
 1. **Mechanical abrasion on top:** Ensure `edge-wear`, `paint-chips`, and `scratches` evaluate above `dirt`/`rust-bloom` so sharp convex edges expose bright metal (`maxMetal > 0.45`).
@@ -138,7 +140,7 @@ Fix the two known failing E2E scripts noted in `docs/RESUME.md`:
 1. `scripts/test-base-tabs.mjs` (currently 2/4): camera fails to aim directly at the placed hardpoint ring to open the Machine Picker / Refinery tabs; compute exact lookAt pitch/yaw from `gatePlanet()` / piece coordinates.
 2. `scripts/e2e-smoke.mjs`: update home screen assertions from the legacy 8 Oct menu copy to the current 6-button FIDELITY Main Menu (`Expedition [DESYNCED]`, `Planetary Grid [SYNCED]`, `The Studio`, `The Workshop`, `Community Nexus`, `Diagnostics & Settings`).
 
-## JOB-06 [OPEN] Plan 40: Bring Your Own Agent Studio API, Vision+Coverage Loop & studio-skill.md
+## JOB-06 [REVIEW] Plan 40: Bring Your Own Agent Studio API, Vision+Coverage Loop & studio-skill.md
 - **Role:** ENGINEER
 - **Skills:** `feature-dev`, `route`
 - **Priority:** P1
@@ -146,6 +148,7 @@ Fix the two known failing E2E scripts noted in `docs/RESUME.md`:
 - **Paths:** `apps/web/src/studio, scripts/studio-agent-bridge.mjs, packages/studiomesh`
 - **Verify:** `npm.cmd run typecheck && npm.cmd test`
 - **Updated:** 2026-10-22 13:32
+- **Commit:** `00c3bea`
 
 Implement Plan 40 (`docs/argo/plans/40-bring-your-own-agent.md` + `ARGO_NOTE_32` + `ARGO_NOTE_43` §3 + `docs/OVERWATCH_TECH_AND_AI_RADAR.md`):
 1. `studio-agent.ts` exposing `studio.doc.read`, `studio.commands.list` (`matstack.setPaint`, `matstack.setAge`, `matstack.addLayer`, `matstack.updateLayer`, `matstack.setMaskInput`), `studio.doc.propose`, `studio.changes.list/accept/reject`, `studio.capture({ mode: 'view' | 'turntable4', includeStaged: true, rank, maskView })`, `studio.kit.validate`, and **`studio.material.coverage(spec)`** (returning numeric % coverage on top/side/edge/crevice/bottom zones so AI agents self-correct before rendering).
@@ -229,7 +232,7 @@ Close the remaining visual & E2E QA items from `docs/DEFERRED_POLISH_REGISTRY.md
 - **POL-74 & POL-75:** Add browser E2E step placing and inspecting a planet plot-machine in `scripts/test-machine-inspector.mjs`, and capture running mill/projector plume height shots.
 - **POL-81 & POL-36:** Pre-warm hotbar/radial 3D blueprint thumbnails behind the loading bar and run automated edge-case sweep.
 
-## JOB-17 [OPEN] Universal Cartridge Targetability ("Modular Preset Inception") & AABB Kit Raycast
+## JOB-17 [REVIEW] Universal Cartridge Targetability ("Modular Preset Inception") & AABB Kit Raycast
 - **Role:** ENGINEER
 - **Skills:** `perf`, `code-review`
 - **Priority:** P0
@@ -237,6 +240,7 @@ Close the remaining visual & E2E QA items from `docs/DEFERRED_POLISH_REGISTRY.md
 - **Paths:** `apps/web/src/play/play-scene.ts, apps/web/src/play/lab-room.ts, apps/web/src/play/plot-kits.ts, apps/web/src/assets/gen-props.ts, apps/web/src/base/kit-pieces.ts`
 - **Verify:** `npm.cmd run typecheck && node scripts/test-material-cartridge.mjs && node scripts/test-part-cartridge.mjs`
 - **Updated:** 2026-10-22 13:33
+- **Commit:** `7935d76` (raycast + dead paths; vehicles and base pieces still to wire)
 
 Fix the #1 Modular Preset Inception gap uncovered in `docs/OVERWATCH_TECH_AND_AI_RADAR.md`:
 1. **Enable Kit Targetability Across the Whole World:** Currently `lab-room.ts` only registers `capacitor-bank` in `kits`, and `plot-kits.ts` has `kitFrames = false` (so `aimKitPart()` returns `null` for 100% of planet machines, vehicles, base structures, and Lab stations). Wire `aimKitPart()` and `setKitOverrides()` to cover all plot machines (`plot:<id>`), all Lab stations (`lab-room.ts`), all 3 vehicles (`createGenRover` wired to `SCOUT_KIT`, `HAULER_KIT`, `CRAWLER_KIT`), the Stargate (`STARGATE_KIT`), and built base pieces (`kit-pieces.ts`).

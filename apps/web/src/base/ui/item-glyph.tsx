@@ -10,7 +10,6 @@ import {
   Wrench,
   Zap,
 } from 'lucide-react';
-import { thumbAssetFor } from './thumb-map';
 import { useItemThumb } from './use-item-thumb';
 
 interface ItemGlyphProps {
@@ -21,17 +20,15 @@ interface ItemGlyphProps {
 
 export const ItemGlyph: React.FC<ItemGlyphProps> = ({ item, size = 24, className = '' }) => {
   const tint = item.tint || '#00f0ff';
-  // TICKET-04: an item with a 3D mesh (vehicles, weapon parts, primitives, blueprints) shows its thumbnail. Raw pixels, raw
-  // vertices, texture maps and ore have no mesh, so they keep their line glyphs below.
-  const meshed = thumbAssetFor({ item: item.id }) !== null;
-  const thumb = useItemThumb(meshed ? { item: item.id, tint: item.tint } : null);
+  // THUMB-01 / DEC-11: Every item displays its 3D model thumbnail if meshed, or its live 64x64 procedural relief swatch if unmeshed.
+  const thumb = useItemThumb({ item: item.id, tint: item.tint, kind: item.kind, id: item.id });
   if (thumb) {
     return (
       <img
         src={thumb}
         width={size}
         height={size}
-        alt=""
+        alt={item.name}
         draggable={false}
         className={`hm-thumb-img${className ? ` ${className}` : ''}`}
       />

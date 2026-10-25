@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { emptyField } from '@hm/terrainbrush';
 import { handPose, viewPose } from './rifle-hold';
-import { BEAM_START, boulderBeamRate, cycleBeamMode, runStroke, SCULPT_RULES, sculptToolForKey, strokeOf, STROKE_RADIUS, type BeamState } from './beam-tool';
+import { BEAM_START, boulderBeamRate, cycleBeamMode, cycleSculptTool, runStroke, SCULPT_RULES, sculptToolForKey, strokeOf, STROKE_RADIUS, type BeamState } from './beam-tool';
 
 const RULES = { maxDepth: 2, maxHeight: 2, orePerCubicMetre: 1, ratePerSecond: 1 };
 const flat = (): number => 0;
@@ -26,6 +26,13 @@ test('in Sculpt, keys 1 to 3 pick carve, raise and smooth; other keys pick nothi
   assert.equal(sculptToolForKey('Digit3'), 'smooth');
   assert.equal(sculptToolForKey('Digit4'), null);
   assert.equal(sculptToolForKey('KeyE'), null);
+});
+
+test('cycleSculptTool cycles carve -> raise -> smooth and wraps both ways (BEAM-02)', () => {
+  assert.equal(cycleSculptTool('carve', 1), 'raise');
+  assert.equal(cycleSculptTool('raise', 1), 'smooth');
+  assert.equal(cycleSculptTool('smooth', 1), 'carve');
+  assert.equal(cycleSculptTool('carve', -1), 'smooth');
 });
 
 test('a stroke: Extract makes none, Apply needs a cartridge, Sculpt makes the chosen tool', () => {

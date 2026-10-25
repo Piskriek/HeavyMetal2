@@ -13,12 +13,20 @@ const TABS: readonly { readonly id: BuildTab; readonly label: string; readonly c
   { id: 'plans', label: 'Plans', colour: '#a78bfa' },
 ];
 
-/** The player's name for each structure kind (the blueprint pieces and the fixtures). */
+/** The player's name for each structure kind (the blueprint pieces, fixtures, and machines). */
 export const KIND_LABEL: Readonly<Record<string, string>> = {
-  foundation: 'Foundation', floor: 'Floor', wall: 'Wall', lowRoof: 'Low roof', bench: 'Bench', weaponBench: 'Weapon bench', bin: 'Bin',
-  halfWall: 'Half wall', windowWall: 'Window wall', doorframe: 'Doorframe', door: 'Door', gable: 'Gable', pillar: 'Pillar', repeater: 'Repeater',
-  ramp: 'Ramp', stairs: 'Stairs', roof: 'Roof', roofOuter: 'Outer roof', roofInner: 'Inner roof', ridgeCap: 'Ridge cap', airlock: 'Airlock',
-  hardpoint: 'Hardpoint', lifeSupport: 'Life support',
+  foundation: 'Foundation', floor: 'Floor', wall: 'Wall', lowRoof: 'Low Roof', bench: 'Drafting Table', weaponBench: 'Weapon Modding Bench', bin: 'Lattice Bin',
+  halfWall: 'Half Wall', windowWall: 'Window Wall', doorframe: 'Doorframe', door: 'Reinforced Door', gable: 'Gable Wall', pillar: 'Support Pillar', repeater: 'Relay Pylon',
+  ramp: 'Ramp', stairs: 'Stairs', roof: 'Pitched Roof', roofOuter: 'Outer Corner Roof', roofInner: 'Inner Corner Roof', ridgeCap: 'Ridge Cap', airlock: 'Airlock',
+  hardpoint: 'Hardpoint Socket', lifeSupport: 'Life Support', turret: 'Defense Turret',
+  drill: 'Rock Drill', rockDrill: 'Rock Drill',
+  mill: 'Texture Mill', textureMill: 'Texture Mill',
+  pylon: 'Relay Pylon', relayPylon: 'Relay Pylon',
+  press: 'Shape Press', shapePress: 'Shape Press',
+  power: 'Power Unit', powerCell: 'Power Unit',
+  projector: 'Light Projector', lightTower: 'Light Projector',
+  water: 'Water Maker', waterGen: 'Water Maker',
+  fabricator: 'Vehicle Fabricator', vehicleFabricator: 'Vehicle Fabricator',
 };
 
 export interface MenuMachine { readonly key: string; readonly name: string; readonly blurb: string; readonly cost: string; readonly shut: boolean; readonly short: boolean; readonly highlighted: boolean; readonly unlock: number }

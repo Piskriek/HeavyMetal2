@@ -129,11 +129,11 @@ import * as S from '@hm/structure';
 import type { Kind } from '@hm/structure';
 import * as L from '@hm/lattice';
 import { BEAM_COLOURS, type BeamMode } from '@hm/beamkit';
-import { BEAM_STROKE_RANGE, cycleBeamMode, SCULPT_TOOLS, type SculptTool } from './beam-tool';
-import { reloadedLab, writtenOnRack } from './beam-port';
+import { BEAM_STROKE_RANGE, cycleBeamMode, SCULPT_TOOLS, cycleSculptTool, type SculptTool } from './beam-tool';
+import { allWrittenOnRack, reloadedLab, writtenOnRack } from './beam-port';
 import { keepOutZones } from './beam-keepout';
 import { RadialMenu } from '../base/ui/radial-menu';
-import { HoldRing, thumbFor } from '../base/ui/hud-bits';
+import { HoldRing, thumbFor, ThumbImg } from '../base/ui/hud-bits';
 import type { ThumbRef } from '../base/ui/thumb-map';
 import { ControlsGrid } from './controls-grid';
 
@@ -1037,8 +1037,13 @@ useEffect(() => {
   const speciesShotRef = useRef<{ readonly t0: number; readonly shift: boolean } | null>(null);
   /** A material cartridge's shot at a machine part (plan 39 step 2), decided on release like a part shot. */
   const skinShotRef = useRef<{ readonly t0: number; readonly shift: boolean } | null>(null);
-  const [beamPort, setBeamPort] = useState<{ readonly name: string } | null>(null);
-  /** The extraction counter: adds to the running count and fades two seconds after the last add (field nodes and boulders). */
+  const [beamPort, setBeamPort] = useState<{
+    readonly name: string;
+    readonly preset?: string;
+    readonly colour?: string;
+    readonly id?: string;
+    readonly kind?: string;
+  } | null>(null);
   const flashBeamHarvest = (count: number, name: string): void => {
     setBeamHarvest((prev) => ({ count: (prev ? prev.count : 0) + count, name, fading: false }));
     if (beamHarvestTimerRef.current !== null) window.clearTimeout(beamHarvestTimerRef.current);
@@ -1132,7 +1137,13 @@ useEffect(() => {
     const kind = look.print ? printKind(look.print) : null;
     labRef.current = next;
     commit(withLab(withPlot(stateRef.current, plotRef.current), next));
-    setBeamPort({ name: written.name });
+    setBeamPort({
+      name: written.name,
+      preset: look.preset,
+      colour: look.colour,
+      id: written.id,
+      kind: kind ?? undefined,
+    });
     sceneRef.current?.setBeamCartridge(beamPortRef.current.colour);
     sceneRef.current?.playAction('reload');
     beamDirtyRef.current = true;
@@ -1142,6 +1153,22 @@ useEffect(() => {
           : kind === 'light' ? 'Fire Apply at a machine lamp: a tap sets it, a hold or Shift every lamp on the machine.'
             : kind === 'material' ? 'Fire Apply at a machine part: a tap dresses it, a hold or Shift every part that wears the same.'
             : 'Hold the left button in Apply to paint the ground, or fire it at a machine part to paint the part.');
+  };
+  const cycleBeamCartridge = (step: 1 | -1 = 1): void => {
+    const list = allWrittenOnRack(labRef.current).filter((c) => rifleLook(c) !== null);
+    if (list.length === 0 && !beamPortRef.current) {
+      say('The port stays empty', 'No written cartridge is on the lab rack. Write one at the bench.');
+      return;
+    }
+    if (list.length === 0) {
+      say(`Holding: ${beamPortRef.current?.name ?? 'Cartridge'}`, 'No other written cartridge on the rack to swap.');
+      return;
+    }
+    const currentId = beamPortRef.current?.cartridge.id;
+    const curIdx = currentId ? list.findIndex((c) => c.id === currentId) : -1;
+    const nextIdx = (curIdx + step + list.length) % list.length;
+    const nextCart = list[nextIdx]!;
+    loadBeamCartridge(nextCart);
   };
   const reloadBeam = (): void => {
     const written = writtenOnRack(labRef.current);
@@ -2356,7 +2383,12 @@ useEffect(() => {
         if (savedPort && savedLook) {
           beamPortRef.current = { cartridge: savedPort, preset: savedLook.preset, name: savedPort.name, colour: savedLook.colour, ...(savedLook.print ?? {}) };
           scene.setBeamCartridge(savedLook.colour);
-          setBeamPort({ name: savedPort.name });
+          setBeamPort({
+            name: savedPort.name,
+            preset: savedLook.preset,
+            colour: savedLook.colour,
+            id: savedPort.id,
+          });
         }
         env = {
           gate: scene.debug.gatePlanet(),
@@ -4099,7 +4131,20 @@ useEffect(() => {
         return;
       }
       if (e.code === 'KeyR') {
-        if (beamHeldRef.current) { reloadBeam(); return; }
+        if (beamHeldRef.current) {
+          if (beamModeRef.current === 'sculpt') {
+            const nextTool = cycleSculptTool(sculptToolRef.current, 1);
+            chooseSculptTool(nextTool);
+            say(`Sculpt: ${SCULPT_LABEL[nextTool]}`);
+            return;
+          }
+          if (beamModeRef.current === 'apply') {
+            cycleBeamCartridge(1);
+            return;
+          }
+          reloadBeam();
+          return;
+        }
         // the gun in hand reloads its magazine (a full magazine is the loadout's; a reload is a player's action, not a tick)
         const gunScene = sceneRef.current;
         if (gunScene?.monsters.isEquipped()) {
@@ -4385,6 +4430,16 @@ useEffect(() => {
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
       if (beamHeldRef.current) {
+        if (e.altKey && beamModeRef.current === 'apply') {
+          cycleBeamCartridge(e.deltaY > 0 ? 1 : -1);
+          return;
+        }
+        if (e.altKey && beamModeRef.current === 'sculpt') {
+          const nextTool = cycleSculptTool(sculptToolRef.current, e.deltaY > 0 ? 1 : -1);
+          chooseSculptTool(nextTool);
+          say(`Sculpt: ${SCULPT_LABEL[nextTool]}`);
+          return;
+        }
         const mode = cycleBeamMode(beamModeRef.current, e.deltaY > 0 ? 1 : -1);
         setBeamHeld(true, mode);
         say(`Beam: ${BEAM_LABEL[mode]}`);
@@ -6070,13 +6125,50 @@ useEffect(() => {
               </div>
           ) : null}
           {beamHud.held && hud.where === 'planet' && !hideOverlays ? (
-            <div className="hm-beam-chip" data-hud-zone="bottom-right" data-testid="beam-mode" data-mode={beamHud.mode} data-port={beamPort?.name ?? ''} data-tool={beamHud.mode === 'sculpt' ? sculptTool : ''}>
-              <b>{beamHud.mode === 'sculpt' ? `${BEAM_LABEL[beamHud.mode]}: ${SCULPT_LABEL[sculptTool]}` : BEAM_LABEL[beamHud.mode]}</b>
-              <span>
-                {beamHud.mode === 'apply'
-                  ? beamPort ? `Port: ${beamPort.name}` : 'Port empty: R loads a cartridge'
-                  : beamHud.mode === 'sculpt' ? 'X: carve, raise, smooth; Q: next mode' : 'Q or wheel: next mode'}
-              </span>
+            <div
+              className="hm-beam-chip"
+              data-hud-zone="bottom-right"
+              data-testid="beam-mode"
+              data-mode={beamHud.mode}
+              data-port={beamPort?.name ?? ''}
+              data-tool={beamHud.mode === 'sculpt' ? sculptTool : ''}
+            >
+              <div className="hm-beam-swatch-box">
+                {beamHud.mode === 'apply' && beamPort ? (
+                  <ThumbImg
+                    thumb={{
+                      item: beamPort.preset || beamPort.name,
+                      tint: beamPort.colour,
+                      id: beamPort.preset || beamPort.name,
+                    }}
+                    size={48}
+                  />
+                ) : beamHud.mode === 'sculpt' ? (
+                  <ThumbImg thumb={{ kind: 'ramp' }} size={38} />
+                ) : (
+                  <ThumbImg thumb={{ item: 'tool-beam' }} size={38} />
+                )}
+              </div>
+              <div className="hm-beam-info">
+                <b>
+                  {beamHud.mode === 'apply'
+                    ? beamPort
+                      ? `Apply: ${beamPort.name}`
+                      : 'Apply: Empty Port'
+                    : beamHud.mode === 'sculpt'
+                      ? `Sculpt: ${SCULPT_LABEL[sculptTool]}`
+                      : 'Extract: Anomaly Nodes'}
+                </b>
+                <span>
+                  {beamHud.mode === 'apply'
+                    ? beamPort
+                      ? 'R / Alt+Wheel: cycle cartridge · Q: next mode'
+                      : 'R: load cartridge · Q: next mode'
+                    : beamHud.mode === 'sculpt'
+                      ? 'R / Alt+Wheel: cycle tool · X: radial · Q: next mode'
+                      : 'Hold LMB to extract · Q or wheel: next mode'}
+                </span>
+              </div>
             </div>
           ) : null}
           {hud.where === 'planet' && !hideOverlays && (!props.gamePreset || props.gamePreset.hudBlade === 'sandbox-freeplay' || props.gamePreset.hudBlade === 'exploration-o2') ? (

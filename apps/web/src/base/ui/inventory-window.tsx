@@ -6,6 +6,7 @@ import { weaponStats } from '../weapons';
 import { Backpack, Crosshair, Eye, Flame, Shield, Sparkles, Wind, X, Zap } from 'lucide-react';
 import { ItemGlyph } from './item-glyph';
 import { CloseHint } from './hud-bits';
+import { resolveItemDescription } from '@hm/ui';
 
 interface InventoryWindowProps {
   inventory: InventoryView;
@@ -158,12 +159,14 @@ export const InventoryWindow: React.FC<InventoryWindowProps> = ({
                 const eqSlot = inventory.equipment[eqKey];
                 const isSelected = selectedSlot?.at === 'equipment' && selectedSlot.slot === eqKey;
 
+                const eqDesc = eqSlot.item ? resolveItemDescription(eqSlot.item.id, eqSlot.item.name) : null;
+
                 return (
                   <div
                     key={eqKey}
                     className={`hm-equip-slot ${isSelected ? 'selected' : ''}`}
                     onClick={() => handleSlotClick({ at: 'equipment', slot: eqKey })}
-                    title={eqSlot.item ? `${eqSlot.item.name} (${eqSlot.item.kg}kg)` : `Empty ${eqKey}`}
+                    title={eqDesc && eqSlot.item ? `${eqDesc.title} (${eqSlot.item.kg} kg)\n${eqDesc.hint}` : `Empty ${eqKey}`}
                     data-testid={`equip-slot-${eqKey}`}
                   >
                     <div className={`hm-slot-icon-box ${!eqSlot.item ? 'empty-equip' : ''}`}>
@@ -196,13 +199,14 @@ export const InventoryWindow: React.FC<InventoryWindowProps> = ({
                 {PART_SLOTS.map((slotKey) => {
                   const partId = loadout[slotKey];
                   const forgeSpec = partId ? FORGE_BY_ID[partId] : null;
+                  const forgeDesc = forgeSpec ? resolveItemDescription(forgeSpec.id, forgeSpec.name) : null;
 
                   return (
                     <div
                       key={slotKey}
                       className="hm-equip-slot"
                       onClick={() => handleLoadoutSlotClick(slotKey)}
-                      title={forgeSpec ? `${forgeSpec.name} (Click to remove, or click part in backpack to fit)` : `Empty ${slotKey} (Click carried component to fit)`}
+                      title={forgeDesc && forgeSpec ? `${forgeDesc.title}\n${forgeDesc.hint}\n(Click to remove, or click part in backpack to fit)` : `Empty ${slotKey} (Click carried component to fit)`}
                       data-testid={`loadout-slot-${slotKey}`}
                       style={{ cursor: 'pointer' }}
                     >
@@ -244,6 +248,7 @@ export const InventoryWindow: React.FC<InventoryWindowProps> = ({
                 const isSelected = selectedSlot?.at === 'inventory' && selectedSlot.index === idx;
                 const isHotbarRow = idx < 9;
                 const item = slot.item;
+                const desc = item ? resolveItemDescription(item.id, item.name) : null;
 
                 return (
                   <div
@@ -252,8 +257,8 @@ export const InventoryWindow: React.FC<InventoryWindowProps> = ({
                     onClick={() => handleSlotClick({ at: 'inventory', index: idx })}
                     data-testid={`inv-slot-${idx}`}
                     title={
-                      item
-                        ? `${item.name} (${item.kind})\nStack: ${slot.n} / ${item.stack}\nUnit: ${item.kg} kg`
+                      desc && item
+                        ? `${desc.title} (${item.kind})\n${desc.hint}\nStack: ${slot.n} / ${item.stack} · Unit: ${item.kg} kg`
                         : isHotbarRow
                           ? `Hotbar Slot ${idx + 1}`
                           : `Slot ${idx + 1}`

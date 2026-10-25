@@ -6,6 +6,7 @@
 // ============================================================================
 
 import { ITEMS, blueprint, type MapId } from '../catalog';
+import { VAULT_BY_ID } from '@hm/vault';
 
 export interface ThumbRef {
   readonly item?: string;
@@ -196,18 +197,45 @@ export const KIND_THUMB_ASSETS: Readonly<Record<string, string>> = {
  */
 export const MACHINE_THUMB_ASSETS: Readonly<Record<string, string>> = {
   drill: 'tool-drill',
+  rockDrill: 'tool-drill',
+  'rock-drill': 'tool-drill',
   mill: 'mill',
+  textureMill: 'mill',
+  'texture-mill': 'mill',
   pylon: 'repeater',
+  relayPylon: 'repeater',
+  'relay-pylon': 'repeater',
   press: 'press-frame',
+  shapePress: 'press-frame',
+  'shape-press': 'press-frame',
   power: 'generator-small-a',
+  powerCell: 'generator-small-a',
+  'power-cell': 'generator-small-a',
+  powerUnit: 'generator-small-a',
+  'power-unit': 'generator-small-a',
+  generator: 'generator-small-a',
   projector: 'projector-mast',
+  lightTower: 'projector-mast',
+  'light-tower': 'projector-mast',
+  lightProjector: 'projector-mast',
+  'light-projector': 'projector-mast',
   water: 'watermaker',
+  waterGen: 'watermaker',
+  'water-gen': 'watermaker',
+  waterMaker: 'watermaker',
+  'water-maker': 'watermaker',
   watermaker: 'watermaker',
   'heavy-mill': 'mill',
   'heavy-press': 'press-frame',
   'heavy-projector': 'projector-mast',
   'heavy-water': 'watermaker',
   fabricator: 'fabricator-frame',
+  vehicleFabricator: 'fabricator-frame',
+  'vehicle-fabricator': 'fabricator-frame',
+  weaponBench: 'weapon-bench',
+  'weapon-bench': 'weapon-bench',
+  bench: 'drafting',
+  workbench: 'drafting',
 };
 
 /**
@@ -351,7 +379,7 @@ export interface SwatchPalette {
   readonly hi: string;
   readonly lo: string;
   readonly accent: string;
-  readonly pattern: 'grain' | 'facets' | 'strata' | 'moss' | 'pxd' | 'vtx' | 'ore';
+  readonly pattern: 'grain' | 'facets' | 'strata' | 'moss' | 'pxd' | 'vtx' | 'ore' | 'data';
 }
 
 export const CARTRIDGE_PALETTES: Readonly<Record<string, SwatchPalette>> = {
@@ -370,10 +398,18 @@ export const CARTRIDGE_PALETTES: Readonly<Record<string, SwatchPalette>> = {
   volcanic_slag: { base: '#3d2622', hi: '#783528', lo: '#1f110f', accent: '#ff7b3d', pattern: 'grain' },
   'pxd-mono': { base: '#525866', hi: '#d9d9d9', lo: '#232730', accent: '#ffffff', pattern: 'pxd' },
   'pxd-chroma': { base: '#701a4a', hi: '#ff3d8a', lo: '#360922', accent: '#ffc13d', pattern: 'pxd' },
+  pixelRaw: { base: '#525866', hi: '#d9d9d9', lo: '#232730', accent: '#ffffff', pattern: 'pxd' },
+  rawPixels: { base: '#525866', hi: '#d9d9d9', lo: '#232730', accent: '#ffffff', pattern: 'pxd' },
   'vtx-rough': { base: '#1e4e68', hi: '#7dd3fc', lo: '#0f2938', accent: '#3dc8ff', pattern: 'vtx' },
   'vtx-fine': { base: '#0f525e', hi: '#22d3ee', lo: '#072a30', accent: '#7cff4d', pattern: 'vtx' },
   ore: { base: '#7a654b', hi: '#a08a6a', lo: '#473929', accent: '#c9b28f', pattern: 'ore' },
   'anomaly-core': { base: '#1a4f66', hi: '#7cf3ff', lo: '#0b2530', accent: '#b46bff', pattern: 'facets' },
+  blank: { base: '#1e293b', hi: '#475569', lo: '#0f172a', accent: '#00f0ff', pattern: 'data' },
+  'blank-cart': { base: '#1e293b', hi: '#475569', lo: '#0f172a', accent: '#00f0ff', pattern: 'data' },
+  blankCart: { base: '#1e293b', hi: '#475569', lo: '#0f172a', accent: '#00f0ff', pattern: 'data' },
+  blankCartridge: { base: '#1e293b', hi: '#475569', lo: '#0f172a', accent: '#00f0ff', pattern: 'data' },
+  texCart: { base: '#8c7a64', hi: '#b5a188', lo: '#574a3b', accent: '#d6c4ab', pattern: 'grain' },
+  textureCartridge: { base: '#8c7a64', hi: '#b5a188', lo: '#574a3b', accent: '#d6c4ab', pattern: 'grain' },
 };
 
 export function resolveSwatchPalette(ref: ThumbRef): SwatchPalette | null {
@@ -390,6 +426,25 @@ export function resolveSwatchPalette(ref: ThumbRef): SwatchPalette | null {
   const mapKey = `map-${cleanKey}` as MapId;
   if (CARTRIDGE_PALETTES[mapKey]) {
     return CARTRIDGE_PALETTES[mapKey]!;
+  }
+
+  // Vault preset dynamic lookup
+  const vHit = VAULT_BY_ID.get(cleanKey) ?? VAULT_BY_ID.get(key);
+  if (vHit && vHit.palette && vHit.palette.length > 0) {
+    const pal = vHit.palette;
+    const base = pal[0] ?? '#8c7a64';
+    const hi = pal[1] ?? '#b5a188';
+    const lo = pal[pal.length - 1] ?? '#574a3b';
+    const accent = pal[2] ?? hi;
+    const pattern =
+      vHit.category === 'FLORA'
+        ? 'moss'
+        : vHit.category === 'CRYSTAL'
+          ? 'facets'
+          : vHit.category === 'ROAD' || vHit.category === 'STRUCTURE'
+            ? 'strata'
+            : 'grain';
+    return { base, hi, lo, accent, pattern };
   }
 
   const itemSpec = ITEMS[key];

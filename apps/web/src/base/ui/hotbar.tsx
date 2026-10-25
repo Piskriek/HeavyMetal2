@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import type { BaseActions, InventoryView } from '../view';
 import { ItemGlyph } from './item-glyph';
+import { resolveItemDescription } from '@hm/ui';
 
 interface HotbarProps {
   inventory: InventoryView;
@@ -32,6 +33,7 @@ export const Hotbar: React.FC<HotbarProps> = ({ inventory, actions }) => {
       {hotbarSlots.map((slot, idx) => {
         const isSelected = inventory.hotbar === idx;
         const item = slot.item;
+        const desc = item ? resolveItemDescription(item.id, item.name) : null;
 
         return (
           <div
@@ -39,7 +41,7 @@ export const Hotbar: React.FC<HotbarProps> = ({ inventory, actions }) => {
             className={`hm-hotbar-slot ${isSelected ? 'selected' : ''}`}
             onClick={() => actions.selectHotbar(idx)}
             data-testid={`hotbar-slot-${idx + 1}`}
-            title={item ? `${item.name} (${item.kind})\nStack: ${slot.n} / ${item.stack}` : 'Empty Slot'}
+            title={desc && item ? `${desc.title} (${item.kind})\n${desc.hint}\nStack: ${slot.n} / ${item.stack}` : `Hotbar Slot ${idx + 1}`}
           >
             <span className="hm-slot-keybind">{idx + 1}</span>
 

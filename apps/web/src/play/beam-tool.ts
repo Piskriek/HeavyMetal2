@@ -77,6 +77,13 @@ export function sculptToolForKey(code: string): SculptTool | null {
   return null;
 }
 
+/** Cycles the sculpt tool to the next (1) or previous (-1) tool (BEAM-02). */
+export function cycleSculptTool(tool: SculptTool, step: 1 | -1 = 1): SculptTool {
+  const i = SCULPT_TOOLS.indexOf(tool);
+  const n = SCULPT_TOOLS.length;
+  return SCULPT_TOOLS[(((i + step) % n) + n) % n]!;
+}
+
 /** The mode's sculpt tool as a brush kind. */
 function brushOf(tool: SculptTool): BrushKind {
   return tool;

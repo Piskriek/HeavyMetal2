@@ -5,3 +5,4 @@ export type { InputChoice, InputSource } from './controls';
 export { numberToEmit, parseNumber } from './controls';
 export * from './range';
 export * from './kit';
+export * from './thumbnails';

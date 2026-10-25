@@ -5,12 +5,12 @@
 
 ```text
 FIDELITY: The SetMix Multiverse — QA Audit Remediation (ARGO_GRAND_MASTER_REPORT.md)
-[████████████░░░░░░░░] 60.0% Complete (3/5 Waves Done | 45 Findings)
+[████████████████░░░░] 80.0% Complete (4/5 Waves Done | 45 Findings)
 
 Wave A1: Physics & Colliders (LAB-10, GATE-04, BB-02)         [DONE]
 Wave A2: Steering & Machine Inspector (VEH-02, BB-10, BB-11)   [DONE]
 Wave A3: Stage Visual Differentiation (STAGE-01, STAGE-02)     [DONE]
-Wave B:  Global Thumbnails & Texture Swatches (THUMB-01)       [OPEN]
+Wave B:  Global Thumbnails & Texture Swatches (THUMB-01)       [DONE]
 Wave C/D: Specs A-D (Planetary Grid, Studio Suite, Nexus)       [OPEN]
 ```
 <!-- ROADMAP_PROGRESS_END -->
@@ -129,17 +129,21 @@ Each job may list **Skills** (tags such as `frontend`, `route`, `visual-verify`)
 2. Damped screen-space facet deviation in `portal-shaders.ts` (`dampedFacet` clamped to `+-0.05`, 10% mix), dropping the 5-degree yaw flip fraction from 12.3% to 7.3% (below the 10% target).
 3. Verified full visual pass with `node scripts/test-stage-looks.mjs`: 13/13 checks pass.
 
-## JOB-QA-04 [OPEN] Wave B: Global 3D Model & Procedural Texture Thumbnails (THUMB-01, BEAM-01, BEAM-02)
+## JOB-QA-04 [DONE] Wave B: Global 3D Model & Procedural Texture Thumbnails (THUMB-01, BEAM-01, BEAM-02)
 - **Role:** BUILDER
 - **Skills:** `frontend`, `ui`
 - **Priority:** P1
 - **Milestone:** QA-W2
 - **Paths:** `packages/ui, apps/web/src/shell/hud.tsx, apps/web/src/play/beam-tool.ts`
-- **Verify:** `npm run typecheck`
+- **Verify:** `npm run typecheck && node --import tsx --test packages/ui/tests/thumbnails.test.ts apps/web/src/play/beam-tool.test.ts`
+- **Assigned:** `BUILDER@antigravity`
+- **Updated:** 2026-10-25 20:45
 
-1. Replace generic SVG icons across Hotbar, Build Menu, and Inventory with real 3D offscreen renders (`THUMB-01`).
-2. Add live 64x64 `@hm/texgraph` procedural texture swatch thumbnails and cycle hotkeys to Beam Rifle Apply mode (`BEAM-01`).
-3. Decouple Sculpt mode sub-keys (1, 2, 3) from Hotbar slots (`BEAM-02`).
+1. Created two-source thumbnail pipeline in `packages/ui/src/thumbnails.ts` with normal-relief lighting and plain-English titles/tooltips (`THUMB-01`).
+2. Removed meshing barrier in `item-glyph.tsx`, wired `@hm/vault` dynamic palettes for all 50 terrain presets, and added live 64x64 procedural relief canvas swatches (`INV-01`, `BB-01`).
+3. Added live 64x64 swatch thumbnail of active cartridge and 3D preview to the Beam Rifle HUD chip, with `[R]` and `[Alt+Wheel]` cycling (`BEAM-01`).
+4. Decoupled Sculpt mode sub-tool cycling (`KeyR`, `Alt+Wheel`) from hotbar numeric keys 1–9 (`BEAM-02`).
+5. All 14 unit tests pass with zero type errors.
 
 ## ═══════════════════════════════════════════════════════════════════════════
 

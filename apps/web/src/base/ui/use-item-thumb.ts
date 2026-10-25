@@ -99,6 +99,11 @@ function drawCanvasSwatch(palette: SwatchPalette, keySeed: number): string | nul
         const c = mixRgb(loRgb, baseRgb, h * 0.8);
         ctx.fillStyle = rgbCss(c);
         ctx.fillRect(x, y, step, step);
+      } else if (palette.pattern === 'data') {
+        const lineY = (y >> 3) % 2 === 0;
+        const c = lineY ? (h > 0.45 ? accRgb : hiRgb) : loRgb;
+        ctx.fillStyle = rgbCss(c, lineY ? 0.9 : 0.35);
+        ctx.fillRect(x, y, step, step);
       } else {
         const c = mixRgb(loRgb, hiRgb, h * 0.85);
         ctx.fillStyle = rgbCss(c);
@@ -129,9 +134,17 @@ function drawCanvasSwatch(palette: SwatchPalette, keySeed: number): string | nul
     }
   }
 
+  // Subtle directional relief shading
+  const reliefGrad = ctx.createLinearGradient(0, 0, SWATCH_SIZE, SWATCH_SIZE);
+  reliefGrad.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
+  reliefGrad.addColorStop(0.45, 'rgba(255, 255, 255, 0)');
+  reliefGrad.addColorStop(1, 'rgba(0, 0, 0, 0.45)');
+  ctx.fillStyle = reliefGrad;
+  ctx.fillRect(0, 0, SWATCH_SIZE, SWATCH_SIZE);
+
   // Subtle inner telemetry bevel frame
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.36)';
+  ctx.lineWidth = 1.5;
   ctx.strokeRect(1, 1, SWATCH_SIZE - 2, SWATCH_SIZE - 2);
 
   return canvas.toDataURL('image/png');

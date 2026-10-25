@@ -44,9 +44,16 @@ export function averagePalette(palette: readonly string[]): string | null {
  * (a job's inputs stay where they are). Null when there is none.
  */
 export function writtenOnRack(lab: LabState): Cartridge | null {
+  const all = allWrittenOnRack(lab);
+  return all[0] ?? null;
+}
+
+/**
+ * All written cartridges available on the lab rack that can be loaded into the Beam Rifle (BEAM-01).
+ */
+export function allWrittenOnRack(lab: LabState): Cartridge[] {
   const inJob = new Set<string>([...(lab.bench?.inputs ?? []), ...(lab.combiner?.inputs ?? [])]);
-  // a written preset or a print for the rifle (a part, a species, a light), first in rack order
-  return lab.cartridges.find((c) => c.slot === null && !inJob.has(c.id) && ((c.kind === 'preset' && c.preset !== null) || printOf(c) !== null)) ?? null;
+  return lab.cartridges.filter((c) => c.slot === null && !inJob.has(c.id) && ((c.kind === 'preset' && c.preset !== null) || printOf(c) !== null));
 }
 
 /**

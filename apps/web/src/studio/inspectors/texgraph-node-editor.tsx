@@ -1,322 +1,388 @@
 /**
  * @file apps/web/src/studio/inspectors/texgraph-node-editor.tsx
- * STUDIO-44C: Tier 3 @hm/texgraph DAG & Seamless Wrap Preview Canvas
- *
- * Exposes the 20 canonical procedural surface tiles, interactive node parameter sliders,
- * a real-time 2x2 seamless wrap preview canvas, and immediate live texture upload.
+ * ARGO_STUDIO_REALITY_AUDIT_AND_BLUEPRINT.md (Screen 3 & Aspect 3):
+ * 20 Canonical Seamless Tiles (`@hm/texgraph`) + 2x2 Wrap & 3D UV Sphere Preview +
+ * Interactive Node Parameter Sliders & `[+ Add Node]` Graph Builder.
  */
 
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   evaluateGraph,
   TILE_LIBRARY,
   type TexGraph,
   type TexNode,
 } from '@hm/texgraph';
-import { globalStudioStore, useStudioState } from '../state/studio-hook';
-import './texgraph-node-editor.css';
+import type { StudioState, StudioStore } from '../state/studio-store';
 
 export interface TexGraphNodeEditorProps {
-  readonly onTileUpdated?: (tileId: string) => void;
-  readonly state?: any;
-  readonly store?: any;
+  state: StudioState;
+  store: StudioStore;
 }
 
-export const TexGraphNodeEditor: React.FC<TexGraphNodeEditorProps> = ({ onTileUpdated }) => {
-  const state = useStudioState();
+export type TexPreviewChannel = 'grey' | 'height' | 'roughness' | 'sphere-3d';
+
+export const TexGraphNodeEditor: React.FC<TexGraphNodeEditorProps> = ({ state, store }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [channel, setChannel] = useState<TexPreviewChannel>('grey');
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [newNodeType, setNewNodeType] = useState<'noise' | 'scratches' | 'spots' | 'hex' | 'weave' | 'blur'>('noise');
 
-  const [activeTileId, setActiveTileId] = useState<string>(state.activeTileId ?? 'brushed-metal');
-  const [channelView, setChannelView] = useState<'albedo' | 'height' | 'roughness'>('albedo');
-  const [showSeams, setShowSeams] = useState<boolean>(true);
+  const tileIds = Object.keys(TILE_LIBRARY);
+  const activeTileId = state.activeTileId in state.tiles ? state.activeTileId : tileIds[0]!;
+  const activeGraph: TexGraph = state.tiles[activeTileId] ?? TILE_LIBRARY[activeTileId]!;
 
-  // Active graph from store or fallback to canonical library
-  const currentGraph: TexGraph = useMemo(() => {
-    return state.tiles[activeTileId] ?? TILE_LIBRARY[activeTileId] ?? TILE_LIBRARY['brushed-metal']!;
-  }, [state.tiles, activeTileId]);
-
-  // Selected node within the graph for editing
-  const [selectedNodeId, setSelectedNodeId] = useState<string>(
-    currentGraph.nodes[0]?.id ?? 'streaks',
-  );
-
-  useEffect(() => {
-    if (!currentGraph.nodes.some((n) => n.id === selectedNodeId)) {
-      setSelectedNodeId(currentGraph.nodes[0]?.id ?? '');
-    }
-  }, [currentGraph, selectedNodeId]);
-
-  // Render 2x2 seamless wrap preview whenever graph or channelView changes
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !activeGraph) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    try {
-      const tileDim = 128;
-      const ev = evaluateGraph(currentGraph, { size: tileDim });
-      const imgData = ctx.createImageData(tileDim, tileDim);
-      const pixelCount = tileDim * tileDim;
+    const tileRes = 64;
+    const evaluated = evaluateGraph(activeGraph, { size: tileRes });
 
-      for (let i = 0; i < pixelCount; i += 1) {
-        let r = 128;
-        let g = 128;
-        let b = 128;
+    if (channel === 'sphere-3d') {
+      // Render a 3D UV-wrapped shaded preview sphere directly on the 256x256 canvas
+      const w = canvas.width;
+      const h = canvas.height;
+      const imgData = ctx.createImageData(w, h);
+      const cx = w / 2;
+      const cy = h / 2;
+      const rad = w * 0.42;
 
-        if (channelView === 'albedo' && ev.albedo) {
-          r = Math.round(ev.albedo[i * 3]! * 255);
-          g = Math.round(ev.albedo[i * 3 + 1]! * 255);
-          b = Math.round(ev.albedo[i * 3 + 2]! * 255);
-        } else if (channelView === 'height' && ev.height) {
-          const v = Math.round(ev.height[i]! * 255);
-          r = v;
-          g = v;
-          b = v;
-        } else if (channelView === 'roughness' && ev.roughness) {
-          const v = Math.round(ev.roughness[i]! * 255);
-          r = v;
-          g = v;
-          b = v;
-        }
+      for (let py = 0; py < h; py++) {
+        for (let px = 0; px < w; px++) {
+          const dx = (px - cx) / rad;
+          const dy = (cy - py) / rad;
+          const r2 = dx * dx + dy * dy;
+          const pOff = (py * w + px) * 4;
+          if (r2 > 1.0) {
+            imgData.data[pOff] = 9;
+            imgData.data[pOff + 1] = 13;
+            imgData.data[pOff + 2] = 22;
+            imgData.data[pOff + 3] = 255;
+            continue;
+          }
+          const dz = Math.sqrt(1.0 - r2);
+          const u = ((Math.atan2(dx, dz) / (Math.PI * 2)) + 0.5) * 2.0;
+          const v = (Math.asin(Math.max(-1, Math.min(1, dy))) / Math.PI + 0.5) * 2.0;
+          const tx = ((Math.floor(u * tileRes) % tileRes) + tileRes) % tileRes;
+          const ty = ((Math.floor(v * tileRes) % tileRes) + tileRes) % tileRes;
+          const sampleIdx = ty * tileRes + tx;
+          const gVal = evaluated.albedo
+            ? (evaluated.albedo[sampleIdx * 3]! * 0.299 + evaluated.albedo[sampleIdx * 3 + 1]! * 0.587 + evaluated.albedo[sampleIdx * 3 + 2]! * 0.114)
+            : (evaluated.height?.[sampleIdx] ?? 0.5);
+          const hVal = evaluated.height?.[sampleIdx] ?? 0.5;
 
-        const dst = i * 4;
-        imgData.data[dst] = r;
-        imgData.data[dst + 1] = g;
-        imgData.data[dst + 2] = b;
-        imgData.data[dst + 3] = 255;
-      }
-
-      // Create an offscreen canvas to stamp 2x2
-      const offscreen = document.createElement('canvas');
-      offscreen.width = tileDim;
-      offscreen.height = tileDim;
-      const offCtx = offscreen.getContext('2d');
-      if (offCtx) {
-        offCtx.putImageData(imgData, 0, 0);
-
-        // Draw 4 tiles (top-left, top-right, bottom-left, bottom-right)
-        ctx.clearRect(0, 0, 256, 256);
-        ctx.drawImage(offscreen, 0, 0);
-        ctx.drawImage(offscreen, 128, 0);
-        ctx.drawImage(offscreen, 0, 128);
-        ctx.drawImage(offscreen, 128, 128);
-
-        // Subtle seam crosshair
-        if (showSeams) {
-          ctx.strokeStyle = 'rgba(61, 200, 255, 0.45)';
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(128, 0);
-          ctx.lineTo(128, 256);
-          ctx.moveTo(0, 128);
-          ctx.lineTo(256, 128);
-          ctx.stroke();
+          // Directional lighting + bump relief
+          const ndotl = Math.max(0.15, dx * 0.45 + dy * 0.55 + dz * 0.7);
+          const lit = Math.max(0, Math.min(1, (0.35 + gVal * 0.65) * ndotl + (hVal - 0.5) * 0.25));
+          const byte = Math.round(lit * 255);
+          imgData.data[pOff] = byte;
+          imgData.data[pOff + 1] = Math.min(255, Math.round(byte * 1.04));
+          imgData.data[pOff + 2] = Math.min(255, Math.round(byte * 1.1));
+          imgData.data[pOff + 3] = 255;
         }
       }
-    } catch (err) {
-      // Draw error message on canvas
-      ctx.fillStyle = '#220808';
-      ctx.fillRect(0, 0, 256, 256);
-      ctx.fillStyle = '#ff6b6b';
-      ctx.font = '11px sans-serif';
-      ctx.fillText('Graph evaluation error', 10, 30);
+      ctx.putImageData(imgData, 0, 0);
+      return;
     }
-  }, [currentGraph, channelView, showSeams]);
 
-  const handleTileChange = (newTileId: string) => {
-    setActiveTileId(newTileId);
-    globalStudioStore.setActiveTileId(newTileId);
-  };
+    // 2x2 Toroidal Seamless Wrap Preview (256x256)
+    const imgData = ctx.createImageData(tileRes, tileRes);
+    for (let i = 0; i < tileRes * tileRes; i++) {
+      if (channel === 'grey' && evaluated.albedo) {
+        imgData.data[i * 4 + 0] = Math.max(0, Math.min(255, Math.round(evaluated.albedo[i * 3]! * 255)));
+        imgData.data[i * 4 + 1] = Math.max(0, Math.min(255, Math.round(evaluated.albedo[i * 3 + 1]! * 255)));
+        imgData.data[i * 4 + 2] = Math.max(0, Math.min(255, Math.round(evaluated.albedo[i * 3 + 2]! * 255)));
+      } else {
+        const buf = channel === 'height' ? evaluated.height : evaluated.roughness;
+        const v = Math.max(0, Math.min(255, Math.round((buf?.[i] ?? 0.5) * 255)));
+        imgData.data[i * 4 + 0] = v;
+        imgData.data[i * 4 + 1] = v;
+        imgData.data[i * 4 + 2] = v;
+      }
+      imgData.data[i * 4 + 3] = 255;
+    }
 
-  const handleUpdateNodeParam = (nodeId: string, paramKey: string, val: number) => {
-    const updatedNodes: TexNode[] = currentGraph.nodes.map((node) => {
-      if (node.id !== nodeId) return node;
-      return {
-        ...node,
-        [paramKey]: val,
-      };
+    const offscreen = document.createElement('canvas');
+    offscreen.width = tileRes;
+    offscreen.height = tileRes;
+    const offCtx = offscreen.getContext('2d');
+    if (offCtx) {
+      offCtx.putImageData(imgData, 0, 0);
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, 256, 256);
+      ctx.drawImage(offscreen, 0, 0, 128, 128);
+      ctx.drawImage(offscreen, 128, 0, 128, 128);
+      ctx.drawImage(offscreen, 0, 128, 128, 128);
+      ctx.drawImage(offscreen, 128, 128, 128, 128);
+
+      // Seam Crosshair Guides
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(128, 0);
+      ctx.lineTo(128, 256);
+      ctx.moveTo(0, 128);
+      ctx.lineTo(256, 128);
+      ctx.stroke();
+    }
+  }, [activeTileId, activeGraph, channel]);
+
+  const activeNode: TexNode | undefined =
+    activeGraph.nodes.find((n) => n.id === selectedNodeId) ?? activeGraph.nodes[0];
+
+  const handleUpdateNodeParam = (nodeId: string, key: string, value: number) => {
+    const nextNodes = activeGraph.nodes.map((n) =>
+      n.id === nodeId ? ({ ...n, [key]: value } as TexNode) : n,
+    );
+    store.updateTexGraph(activeTileId, {
+      ...activeGraph,
+      nodes: nextNodes,
     });
-
-    const updatedGraph: TexGraph = {
-      ...currentGraph,
-      nodes: updatedNodes,
-    };
-
-    globalStudioStore.updateTexGraph(activeTileId, updatedGraph);
-    onTileUpdated?.(activeTileId);
   };
 
-  const selectedNode = currentGraph.nodes.find((n) => n.id === selectedNodeId);
-
-  // Helper to extract editable numeric parameters from a node
-  const editableParams = useMemo(() => {
-    if (!selectedNode) return [];
-    const ignored = new Set(['id', 'type', 'in', 'a', 'b', 'warp', 'mode']);
-    return Object.entries(selectedNode)
-      .filter(([k, v]) => !ignored.has(k) && typeof v === 'number')
-      .map(([k, v]) => ({ key: k, value: v as number }));
-  }, [selectedNode]);
+  const handleAddNode = () => {
+    const newId = `${newNodeType}_${activeGraph.nodes.length + 1}`;
+    const lastId = activeGraph.nodes[activeGraph.nodes.length - 1]?.id ?? 'n0';
+    let created: TexNode;
+    switch (newNodeType) {
+      case 'scratches':
+        created = { id: newId, type: 'scratches', count: 18, length: 0.35, width: 0.012, angleSpread: 0.8, seed: 7 };
+        break;
+      case 'spots':
+        created = { id: newId, type: 'spots', count: 24, radiusMin: 0.02, radiusMax: 0.07, softness: 0.4, seed: 11 };
+        break;
+      case 'hex':
+        created = { id: newId, type: 'hex', count: 8, lineWidth: 0.08, mode: 'edge', seed: 3 };
+        break;
+      case 'weave':
+        created = { id: newId, type: 'weave', countX: 6, countY: 6, gap: 0.12 };
+        break;
+      case 'blur':
+        created = { id: newId, type: 'blur', in: lastId, radius: 0.03 };
+        break;
+      default:
+        created = { id: newId, type: 'noise', scale: 6, scaleY: 6, octaves: 3, gain: 0.5, seed: 19 };
+        break;
+    }
+    store.updateTexGraph(activeTileId, {
+      ...activeGraph,
+      nodes: [...activeGraph.nodes, created],
+    });
+    setSelectedNodeId(newId);
+  };
 
   return (
-    <div className="sx-texgraph-editor" data-testid="texgraph-node-editor">
-      {/* Header and Tile Selector */}
-      <div className="sx-texgraph-header">
-        <div className="sx-texgraph-title-area">
-          <span className="sx-texgraph-title">TexGraph Designer</span>
-          <span className="sx-texgraph-badge">Tier 3 (Procedural)</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 14, color: '#e2e8f0' }}>
+      {/* Active Tile Selector */}
+      <div
+        style={{
+          background: '#111827',
+          border: '1px solid #1e293b',
+          borderRadius: 8,
+          padding: 12,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
+        <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase' }}>
+          Active Procedural Surface Tile (@hm/texgraph — {tileIds.length} Tiles)
+        </div>
+        <select
+          value={activeTileId}
+          onChange={(e) => {
+            store.setActiveTileId(e.target.value);
+            setSelectedNodeId(null);
+          }}
+          style={{
+            padding: '6px 8px',
+            borderRadius: 6,
+            background: '#0f172a',
+            color: '#38bdf8',
+            border: '1px solid #334155',
+            fontSize: 12,
+            fontWeight: 700,
+          }}
+        >
+          {tileIds.map((tId) => (
+            <option key={tId} value={tId}>
+              {tId} ({state.tiles[tId]?.nodes.length ?? 0} nodes)
+            </option>
+          ))}
+        </select>
+
+        {/* Channel & 3D Sphere Toggle */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
+          {(
+            [
+              { id: 'grey', label: 'Albedo' },
+              { id: 'height', label: 'Height' },
+              { id: 'roughness', label: 'Rough' },
+              { id: 'sphere-3d', label: '3D Sphere' },
+            ] as Array<{ id: TexPreviewChannel; label: string }>
+          ).map((ch) => (
+            <button
+              key={ch.id}
+              onClick={() => setChannel(ch.id)}
+              style={{
+                padding: '4px 6px',
+                borderRadius: 4,
+                fontSize: 10,
+                fontWeight: channel === ch.id ? 700 : 500,
+                border: channel === ch.id ? '1px solid #38bdf8' : '1px solid #334155',
+                background: channel === ch.id ? '#0284c7' : '#0f172a',
+                color: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              {ch.label}
+            </button>
+          ))}
         </div>
 
-        <div className="sx-tile-select-row">
-          <label htmlFor="texgraph-tile-select" className="sx-select-label">Active Surface Tile:</label>
-          <select
-            id="texgraph-tile-select"
-            className="sx-tile-select"
-            value={activeTileId}
-            onChange={(e) => handleTileChange(e.target.value)}
-            data-testid="tile-select-dropdown"
-          >
-            {Object.keys(TILE_LIBRARY).sort().map((id) => (
-              <option key={id} value={id}>
-                {TILE_LIBRARY[id]?.name ?? id} ({id})
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* 2x2 Seamless Wrap Preview Section */}
-      <div className="sx-preview-section">
-        <div className="sx-preview-header">
-          <span className="sx-preview-label">2×2 Seamless Wrap Preview</span>
-          <div className="sx-channel-btns" role="radiogroup" aria-label="Channel preview">
-            <button
-              type="button"
-              className={`sx-channel-btn ${channelView === 'albedo' ? 'active' : ''}`}
-              onClick={() => setChannelView('albedo')}
-              role="radio"
-              aria-checked={channelView === 'albedo'}
-            >
-              Albedo
-            </button>
-            <button
-              type="button"
-              className={`sx-channel-btn ${channelView === 'height' ? 'active' : ''}`}
-              onClick={() => setChannelView('height')}
-              role="radio"
-              aria-checked={channelView === 'height'}
-            >
-              Height
-            </button>
-            <button
-              type="button"
-              className={`sx-channel-btn ${channelView === 'roughness' ? 'active' : ''}`}
-              onClick={() => setChannelView('roughness')}
-              role="radio"
-              aria-checked={channelView === 'roughness'}
-            >
-              Rough
-            </button>
-          </div>
-        </div>
-
-        <div className="sx-canvas-container">
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 4 }}>
           <canvas
             ref={canvasRef}
+            data-testid="texgraph-preview-canvas"
             width={256}
             height={256}
-            className="sx-wrap-canvas"
-            data-testid="seamless-wrap-canvas"
+            style={{
+              width: 220,
+              height: 220,
+              borderRadius: 8,
+              border: '1px solid #38bdf8',
+              background: '#090d16',
+            }}
           />
-          <div className="sx-canvas-overlay-ctrls">
-            <label className="sx-seam-toggle-label">
-              <input
-                type="checkbox"
-                checked={showSeams}
-                onChange={(e) => setShowSeams(e.target.checked)}
-              />
-              <span>Seam Guides</span>
-            </label>
-            <span className="sx-dim-pill">256×256 (2×2 repeats)</span>
-          </div>
         </div>
       </div>
 
-      {/* Node DAG List & Inspector */}
-      <div className="sx-nodes-section">
-        <div className="sx-nodes-header">
-          <span className="sx-nodes-title">Graph Nodes ({currentGraph.nodes.length})</span>
+      {/* Node Graph Chain & [+ Add Node] */}
+      <div
+        style={{
+          background: '#111827',
+          border: '1px solid #1e293b',
+          borderRadius: 8,
+          padding: 12,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#cbd5e1' }}>
+            DAG Nodes ({activeGraph.nodes.length})
+          </span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <select
+              value={newNodeType}
+              onChange={(e) => setNewNodeType(e.target.value as typeof newNodeType)}
+              style={{
+                padding: '3px 6px',
+                borderRadius: 4,
+                background: '#0f172a',
+                color: '#e2e8f0',
+                border: '1px solid #334155',
+                fontSize: 10,
+              }}
+            >
+              <option value="noise">noise (aniso)</option>
+              <option value="scratches">scratches</option>
+              <option value="spots">spots</option>
+              <option value="hex">hex</option>
+              <option value="weave">weave</option>
+              <option value="blur">blur</option>
+            </select>
+            <button
+              onClick={handleAddNode}
+              style={{
+                padding: '3px 8px',
+                borderRadius: 4,
+                border: 'none',
+                background: '#10b981',
+                color: '#052e16',
+                fontWeight: 700,
+                fontSize: 10,
+                cursor: 'pointer',
+              }}
+            >
+              + Add Node
+            </button>
+          </div>
         </div>
 
-        {/* Node Chips */}
-        <div className="sx-nodes-chip-row" role="listbox" aria-label="Tile graph nodes">
-          {currentGraph.nodes.map((node) => {
-            const isSelected = node.id === selectedNodeId;
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+          {activeGraph.nodes.map((node) => {
+            const isSel = node.id === activeNode?.id;
             return (
               <button
                 key={node.id}
-                type="button"
-                className={`sx-node-chip ${isSelected ? 'active' : ''}`}
                 onClick={() => setSelectedNodeId(node.id)}
-                data-testid={`node-chip-${node.id}`}
-                role="option"
-                aria-selected={isSelected}
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: 5,
+                  fontSize: 10,
+                  fontWeight: isSel ? 700 : 500,
+                  border: isSel ? '1.5px solid #38bdf8' : '1px solid #243046',
+                  background: isSel ? 'rgba(56, 189, 248, 0.18)' : '#162032',
+                  color: '#f8fafc',
+                  cursor: 'pointer',
+                }}
               >
-                <span className="sx-node-type-tag">{node.type}</span>
-                <span className="sx-node-id-text">{node.id}</span>
+                {node.id} ({node.type})
               </button>
             );
           })}
         </div>
 
-        {/* Selected Node Parameter Controls */}
-        {selectedNode && (
-          <div className="sx-node-params-card" data-testid="node-params-card">
-            <div className="sx-node-card-header">
-              <span className="sx-node-id-title">{selectedNode.id}</span>
-              <span className="sx-node-type-badge">{selectedNode.type}</span>
+        {/* Selected Node Parameter Sliders */}
+        {activeNode && (
+          <div
+            style={{
+              marginTop: 6,
+              padding: 10,
+              borderRadius: 6,
+              background: '#162032',
+              border: '1px solid #243046',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+            }}
+          >
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#38bdf8' }}>
+              Node Parameters: {activeNode.id} ({activeNode.type})
             </div>
-
-            {editableParams.length === 0 ? (
-              <div className="sx-no-params">No direct numeric parameters on this node.</div>
-            ) : (
-              <div className="sx-params-list">
-                {editableParams.map(({ key, value }) => {
-                  const isInteger = key === 'octaves' || key === 'seed' || key === 'count';
-                  const step = isInteger ? 1 : value < 1 ? 0.02 : 0.1;
-                  const min = key === 'octaves' ? 1 : key.includes('radius') ? 0.005 : 0;
-                  const max = key === 'octaves' ? 8 : key.includes('radius') ? 0.5 : Math.max(100, value * 2);
-
-                  return (
-                    <div key={key} className="sx-param-row">
-                      <div className="sx-param-label-row">
-                        <label htmlFor={`param-slider-${key}`} className="sx-param-key">{key}</label>
-                        <span className="sx-param-val">
-                          {isInteger ? value.toFixed(0) : value.toFixed(3)}
-                        </span>
-                      </div>
-                      <input
-                        id={`param-slider-${key}`}
-                        type="range"
-                        min={min}
-                        max={max}
-                        step={step}
-                        className="sx-slider"
-                        value={value}
-                        onChange={(e) =>
-                          handleUpdateNodeParam(
-                            selectedNode.id,
-                            key,
-                            isInteger ? parseInt(e.target.value, 10) : parseFloat(e.target.value),
-                          )
-                        }
-                        data-testid={`param-slider-${key}`}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            {Object.entries(activeNode).map(([k, v]) => {
+              if (k === 'id' || k === 'type' || typeof v !== 'number') return null;
+              const isInt = k === 'scale' || k === 'scaleY' || k === 'octaves' || k === 'seed' || k === 'count' || k === 'countX' || k === 'countY';
+              return (
+                <label
+                  key={k}
+                  style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 10 }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#94a3b8' }}>{k}</span>
+                    <span style={{ color: '#38bdf8' }}>{isInt ? Math.round(v) : v.toFixed(3)}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={isInt ? 1 : 0.0}
+                    max={k === 'seed' ? 200 : isInt ? 32 : 2.0}
+                    step={isInt ? 1 : 0.01}
+                    value={v}
+                    onChange={(e) =>
+                      handleUpdateNodeParam(
+                        activeNode.id,
+                        k,
+                        isInt ? parseInt(e.target.value, 10) : parseFloat(e.target.value),
+                      )
+                    }
+                  />
+                </label>
+              );
+            })}
           </div>
         )}
       </div>

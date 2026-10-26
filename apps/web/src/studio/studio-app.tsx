@@ -3,10 +3,12 @@ import {
   createStudioStore,
   RUNG_METADATA,
   type CreativeInspectorTabId,
+  type PresetRung,
   type StudioStore,
   type StudioWorkspaceId,
 } from './state/studio-store';
 import { persistStagedStudioChanges } from './state/studio-persistence';
+import { StudioViewportCanvas } from './viewport/studio-viewport';
 import { MaterialSlotStrip } from './inspectors/material-slot-strip';
 import { MatstackInspector } from './inspectors/matstack-inspector';
 import { KitAssemblerPanel } from './inspectors/kit-assembler-panel';
@@ -28,19 +30,19 @@ export interface StudioAppProps {
 
 const defaultStore = createStudioStore();
 
-const WORKSPACES: Array<{ id: StudioWorkspaceId; label: string }> = [
-  { id: 'creative-suite', label: 'Creative Suite' },
-  { id: 'look-lighting', label: 'Look & Lighting' },
-  { id: 'scene-layout', label: 'Scene Layout' },
-  { id: 'audio-lab', label: 'Audio Lab' },
+const WORKSPACES: Array<{ id: StudioWorkspaceId; label: string; rung: PresetRung }> = [
+  { id: 'creative-suite', label: 'Creative Suite', rung: 4 },
+  { id: 'look-lighting', label: 'Look & Lighting', rung: 5 },
+  { id: 'scene-layout', label: 'Scene Layout', rung: 5 },
+  { id: 'audio-lab', label: 'Audio Lab', rung: 3 },
 ];
 
-const INSPECTOR_TABS: Array<{ id: CreativeInspectorTabId; label: string }> = [
-  { id: 'material-layers', label: 'Material & Layers' },
-  { id: 'parts-assemblies', label: 'Parts & Assemblies' },
-  { id: 'texgraph-uv', label: 'TexGraph (UV)' },
-  { id: 'partgen-meshops', label: 'PartGen & MeshOps' },
-  { id: 'logic-triggers', label: 'Logic & Triggers' },
+const INSPECTOR_TABS: Array<{ id: CreativeInspectorTabId; label: string; rung: PresetRung }> = [
+  { id: 'material-layers', label: 'Material & Layers', rung: 2 },
+  { id: 'parts-assemblies', label: 'Parts & Assemblies', rung: 4 },
+  { id: 'texgraph-uv', label: 'TexGraph (UV)', rung: 1 },
+  { id: 'partgen-meshops', label: 'PartGen & MeshOps', rung: 3 },
+  { id: 'logic-triggers', label: 'Logic & Triggers', rung: 3 },
 ];
 
 export const StudioApp: React.FC<StudioAppProps> = ({
@@ -50,7 +52,7 @@ export const StudioApp: React.FC<StudioAppProps> = ({
 }) => {
   const state = useSyncExternalStore(
     (listener) => store.subscribe(listener),
-    () => store.getSnapshot()
+    () => store.getSnapshot(),
   );
 
   const [saveBanner, setSaveBanner] = useState<string | null>(null);
@@ -88,9 +90,29 @@ export const StudioApp: React.FC<StudioAppProps> = ({
     setSaveBanner(
       res.ok
         ? `Applied & saved ${res.writtenPaths.length} file(s) to campaign`
-        : `Save warning: ${res.error ?? 'offline mode'}`
+        : `Save warning: ${res.error ?? 'offline mode'}`,
     );
     setTimeout(() => setSaveBanner(null), 3000);
+  };
+
+  // Interactive 5-Rung Inception Navigation (Part 3 of Audit)
+  const navigateToRung = (rung: PresetRung) => {
+    store.setActiveRung(rung);
+    if (rung === 5) {
+      store.setActiveWorkspace('scene-layout');
+    } else if (rung === 4) {
+      store.setActiveWorkspace('creative-suite');
+      store.setActiveInspectorTab('parts-assemblies');
+    } else if (rung === 3) {
+      store.setActiveWorkspace('creative-suite');
+      store.setActiveInspectorTab('partgen-meshops');
+    } else if (rung === 2) {
+      store.setActiveWorkspace('creative-suite');
+      store.setActiveInspectorTab('material-layers');
+    } else if (rung === 1) {
+      store.setActiveWorkspace('creative-suite');
+      store.setActiveInspectorTab('texgraph-uv');
+    }
   };
 
   return (
@@ -115,6 +137,7 @@ export const StudioApp: React.FC<StudioAppProps> = ({
           padding: '8px 16px',
           background: '#0d131f',
           borderBottom: '1px solid #1e293b',
+          flexShrink: 0,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -137,7 +160,14 @@ export const StudioApp: React.FC<StudioAppProps> = ({
               ← Back
             </button>
           )}
-          <span style={{ fontSize: 14, fontWeight: 800, letterSpacing: '0.06em', color: '#38bdf8' }}>
+          <span
+            style={{
+              fontSize: 14,
+              fontWeight: 800,
+              letterSpacing: '0.06em',
+              color: '#38bdf8',
+            }}
+          >
             FIDELITY STUDIO
           </span>
 
@@ -176,7 +206,10 @@ export const StudioApp: React.FC<StudioAppProps> = ({
               return (
                 <button
                   key={ws.id}
-                  onClick={() => store.setActiveWorkspace(ws.id)}
+                  onClick={() => {
+                    store.setActiveWorkspace(ws.id);
+                    store.setActiveRung(ws.rung);
+                  }}
                   style={{
                     padding: '6px 12px',
                     borderRadius: 6,
@@ -280,7 +313,7 @@ export const StudioApp: React.FC<StudioAppProps> = ({
         </div>
       </header>
 
-      {/* Q1 & Q3: Permanent Context Breadcrumb Bar + 5-Rung Hierarchy Indicator */}
+      {/* Q1 & Q3: Interactive 5-Rung Inception Context Breadcrumb Bar */}
       <div
         style={{
           display: 'flex',
@@ -291,15 +324,134 @@ export const StudioApp: React.FC<StudioAppProps> = ({
           borderBottom: '1px solid #182234',
           fontSize: 11,
           color: '#94a3b8',
+          flexShrink: 0,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ color: '#38bdf8', fontWeight: 700 }}>Context:</span>
-          <span style={{ color: '#f8fafc' }}>{breadcrumb.formatted}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+          <span style={{ color: '#38bdf8', fontWeight: 700, marginRight: 2 }}>
+            5-Rung Inception:
+          </span>
+          <button
+            onClick={() => navigateToRung(5)}
+            title="Zoom Out to Rung 5: Planetary World & Scene Layout"
+            style={{
+              padding: '2px 8px',
+              borderRadius: 4,
+              border: state.activeRung === 5 ? '1px solid #38bdf8' : '1px solid #1e293b',
+              background: state.activeRung === 5 ? 'rgba(56, 189, 248, 0.18)' : '#111827',
+              color: state.activeRung === 5 ? '#f8fafc' : '#cbd5e1',
+              fontSize: 11,
+              cursor: 'pointer',
+            }}
+          >
+            🪐 R5 World: {breadcrumb.worldLabel}
+          </button>
+          <span>▸</span>
+          <button
+            onClick={() => navigateToRung(4)}
+            title="Jump to Rung 4: Modular Machine Kit & Sockets (@hm/kitspec)"
+            style={{
+              padding: '2px 8px',
+              borderRadius: 4,
+              border: state.activeRung === 4 ? '1px solid #38bdf8' : '1px solid #1e293b',
+              background: state.activeRung === 4 ? 'rgba(56, 189, 248, 0.18)' : '#111827',
+              color: state.activeRung === 4 ? '#f8fafc' : '#cbd5e1',
+              fontSize: 11,
+              cursor: 'pointer',
+            }}
+          >
+            ⚙️ R4 Kit: {breadcrumb.machineLabel}
+          </button>
+          <span>▸</span>
+          <button
+            onClick={() => navigateToRung(3)}
+            title="Dive to Rung 3: Parametric Part & MeshOps Stack (@hm/partgen)"
+            style={{
+              padding: '2px 8px',
+              borderRadius: 4,
+              border: state.activeRung === 3 ? '1px solid #38bdf8' : '1px solid #1e293b',
+              background: state.activeRung === 3 ? 'rgba(56, 189, 248, 0.18)' : '#111827',
+              color: state.activeRung === 3 ? '#f8fafc' : '#cbd5e1',
+              fontSize: 11,
+              cursor: 'pointer',
+            }}
+          >
+            📦 R3 Part: {state.activePartId ?? 'plinth'}
+          </button>
+          <span>▸</span>
+          <button
+            onClick={() => navigateToRung(2)}
+            title="Dive to Rung 2: Layered PBR Material Stack (@hm/matstack)"
+            style={{
+              padding: '2px 8px',
+              borderRadius: 4,
+              border: state.activeRung === 2 ? '1px solid #38bdf8' : '1px solid #1e293b',
+              background: state.activeRung === 2 ? 'rgba(56, 189, 248, 0.18)' : '#111827',
+              color: state.activeRung === 2 ? '#f8fafc' : '#cbd5e1',
+              fontSize: 11,
+              cursor: 'pointer',
+            }}
+          >
+            🎨 R2 Slot: {breadcrumb.slotLabel}
+          </button>
+          <span>▸</span>
+          <button
+            onClick={() => navigateToRung(1)}
+            title="Dive to Rung 1: Seamless Procedural Tile Atom (@hm/texgraph)"
+            style={{
+              padding: '2px 8px',
+              borderRadius: 4,
+              border: state.activeRung === 1 ? '1px solid #38bdf8' : '1px solid #1e293b',
+              background: state.activeRung === 1 ? 'rgba(56, 189, 248, 0.18)' : '#111827',
+              color: state.activeRung === 1 ? '#f8fafc' : '#cbd5e1',
+              fontSize: 11,
+              cursor: 'pointer',
+            }}
+          >
+            🧬 R1 Atom: {state.activeTileId}
+          </button>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {saveBanner && <span style={{ color: '#34d399', fontWeight: 700 }}>{saveBanner}</span>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {saveBanner && (
+            <span style={{ color: '#34d399', fontWeight: 700 }}>{saveBanner}</span>
+          )}
+          <button
+            onClick={() =>
+              navigateToRung(Math.min(5, state.activeRung + 1) as PresetRung)
+            }
+            disabled={state.activeRung >= 5}
+            title="Zoom Out One Rung in the Preset Hierarchy"
+            style={{
+              padding: '2px 7px',
+              borderRadius: 4,
+              border: '1px solid #334155',
+              background: '#162032',
+              color: state.activeRung < 5 ? '#7dd3fc' : '#475569',
+              fontSize: 10,
+              cursor: state.activeRung < 5 ? 'pointer' : 'default',
+            }}
+          >
+            ↑ Zoom Out Rung
+          </button>
+          <button
+            onClick={() =>
+              navigateToRung(Math.max(1, state.activeRung - 1) as PresetRung)
+            }
+            disabled={state.activeRung <= 1}
+            title="Dive In One Rung in the Preset Hierarchy"
+            style={{
+              padding: '2px 7px',
+              borderRadius: 4,
+              border: '1px solid #334155',
+              background: '#162032',
+              color: state.activeRung > 1 ? '#7dd3fc' : '#475569',
+              fontSize: 10,
+              cursor: state.activeRung > 1 ? 'pointer' : 'default',
+            }}
+          >
+            ↓ Dive In Rung
+          </button>
           <span
             style={{
               padding: '2px 8px',
@@ -309,6 +461,7 @@ export const StudioApp: React.FC<StudioAppProps> = ({
               color: '#7dd3fc',
               fontSize: 10,
               fontWeight: 600,
+              whiteSpace: 'nowrap',
             }}
           >
             {rungMeta.label} ({rungMeta.engine})
@@ -316,43 +469,43 @@ export const StudioApp: React.FC<StudioAppProps> = ({
         </div>
       </div>
 
-      {/* Workspace Body */}
-      <div style={{ flex: 1, overflow: 'hidden' }}>
+      {/* Workspace Body (Strict minWidth: 0 & minmax(0, 1fr) prevents CSS Grid Blow-Out!) */}
+      <div style={{ flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden' }}>
         {state.activeWorkspace === 'creative-suite' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 410px', height: '100%' }}>
-            {/* Left/Center: MaterialSlotStrip + 3D Viewport */}
-            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0, overflow: 'hidden' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'minmax(0, 1fr) 420px',
+              width: '100%',
+              height: '100%',
+              minWidth: 0,
+              minHeight: 0,
+              overflow: 'hidden',
+            }}
+          >
+            {/* Left/Center: MaterialSlotStrip + Live Three.js WebGL Viewport */}
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                width: '100%',
+                height: '100%',
+                minWidth: 0,
+                minHeight: 0,
+                overflow: 'hidden',
+              }}
+            >
               <MaterialSlotStrip state={state} store={store} />
-              <div
-                style={{
-                  flex: 1,
-                  position: 'relative',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'radial-gradient(circle at 50% 40%, #162236, #090d16 75%)',
-                }}
-              >
-                <div style={{ textAlign: 'center', pointerEvents: 'none' }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#38bdf8' }}>
-                    Live 3D Modular Machine Viewport — {state.kits[state.activeKitId]?.label}
-                  </div>
-                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
-                    Mode: {state.viewportMode.toUpperCase()} | Validation Issues:{' '}
-                    {state.validationIssues.length}
-                  </div>
-                  {state.hoveredMaterialId && (
-                    <div style={{ fontSize: 11, color: '#fbbf24', marginTop: 6 }}>
-                      Hover Preview Active → {state.hoveredMaterialId}
-                    </div>
-                  )}
-                </div>
+              <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative' }}>
+                <StudioViewportCanvas state={state} store={store} />
               </div>
             </div>
 
             {/* Right: 5 Purpose-Built Inspector Tabs */}
             <div
               style={{
+                width: 420,
+                minWidth: 0,
                 borderLeft: '1px solid #1e293b',
                 background: '#0f172a',
                 display: 'flex',
@@ -367,6 +520,7 @@ export const StudioApp: React.FC<StudioAppProps> = ({
                   borderBottom: '1px solid #1e293b',
                   background: '#0b111e',
                   overflowX: 'auto',
+                  flexShrink: 0,
                 }}
               >
                 {INSPECTOR_TABS.map((t) => {
@@ -374,7 +528,10 @@ export const StudioApp: React.FC<StudioAppProps> = ({
                   return (
                     <button
                       key={t.id}
-                      onClick={() => store.setActiveInspectorTab(t.id)}
+                      onClick={() => {
+                        store.setActiveInspectorTab(t.id);
+                        store.setActiveRung(t.rung);
+                      }}
                       style={{
                         padding: '9px 10px',
                         fontSize: 11,
@@ -393,7 +550,7 @@ export const StudioApp: React.FC<StudioAppProps> = ({
                 })}
               </div>
 
-              <div style={{ flex: 1, overflowY: 'auto' }}>
+              <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
                 {state.activeInspectorTab === 'material-layers' && (
                   <MatstackInspector state={state} store={store} />
                 )}
@@ -432,7 +589,11 @@ export const StudioApp: React.FC<StudioAppProps> = ({
         <NewPlanetModal store={store} onClose={() => store.setNewPlanetModalOpen(false)} />
       )}
       {state.sporeCardModalOpen && (
-        <SporeCardModal state={state} store={store} onClose={() => store.setSporeCardModalOpen(false)} />
+        <SporeCardModal
+          state={state}
+          store={store}
+          onClose={() => store.setSporeCardModalOpen(false)}
+        />
       )}
       <TestPlayOverlay state={state} store={store} />
     </div>

@@ -1,260 +1,511 @@
 /**
  * @file apps/web/src/studio/inspectors/kit-assembler-panel.tsx
- * STUDIO-44D: Interactive @hm/kitspec Kit & Assembly Inspector
- *
- * Grounding status badge (0 issues vs floating/below-ground auto-snap),
- * child placement list, transform sliders, and socket pin connections.
+ * ARGO_STUDIO_REALITY_AUDIT_AND_BLUEPRINT.md (Screen 2 & Aspects 4–5, 8):
+ * Modular Machine & Kit Assembler (`@hm/kitspec`), 3D Triad Socket Snapping,
+ * Live Transform Sliders (`X/Y/Z`, Rotation, Mirror, Rank), and `[+ Add Socket]` Authoring.
  */
 
-import React, { useMemo } from 'react';
-import { globalStudioStore, useStudioState } from '../state/studio-hook';
-import './kit-assembler-panel.css';
+import React, { useState } from 'react';
+import type { DetailRank } from '@hm/kitspec';
+import { GENERATORS } from '@hm/partgen';
+import { STUDIO_KIT_LIST } from '../kits/studio-kit-registry';
+import { enumerateAssemblySockets, type TriadSocketRole } from '../viewport/socket-gizmos';
+import type { StudioState, StudioStore } from '../state/studio-store';
 
 export interface KitAssemblerPanelProps {
-  readonly state?: any;
-  readonly store?: any;
+  state: StudioState;
+  store: StudioStore;
 }
 
-export const KitAssemblerPanel: React.FC<KitAssemblerPanelProps> = () => {
-  const state = useStudioState();
+const ROLE_BADGE: Record<TriadSocketRole, { label: string; hex: string }> = {
+  input: { label: 'INPUT (Red)', hex: '#ff3d8a' },
+  output: { label: 'OUTPUT (Blue)', hex: '#3dc8ff' },
+  power: { label: 'POWER (Gold)', hex: '#ffc13d' },
+  mount: { label: 'MOUNT (Green)', hex: '#7cff4d' },
+};
 
-  const entry = state.kits[state.activeKitId];
-  const kit = entry?.kit;
-  const rootPreset = entry?.rootPreset;
+export const KitAssemblerPanel: React.FC<KitAssemblerPanelProps> = ({ state, store }) => {
+  const activeEntry = state.kits[state.activeKitId]!;
+  const sockets = React.useMemo(
+    () => enumerateAssemblySockets(activeEntry.kit, activeEntry.rootPreset),
+    [activeEntry],
+  );
 
-  const asm = kit && rootPreset ? kit.assemblies[rootPreset] : undefined;
-  const issues = state.validationIssues;
+  const [selectedPinId, setSelectedPinId] = useState<string>(sockets[0]?.pinId ?? '');
+  const [selectedPartOrGen, setSelectedPartOrGen] = useState<string>(
+    Object.keys(activeEntry.kit.parts)[0] ?? Object.keys(GENERATORS)[0] ?? 'can',
+  );
+  const [selectedChildIdx, setSelectedChildIdx] = useState<number>(0);
+  const [newSocketName, setNewSocketName] = useState<string>('mountAux');
+  const [newSocketY, setNewSocketY] = useState<number>(0.5);
 
-  // Selected child placement index based on activePartPath or activePartId
-  const selectedChildIndex = useMemo(() => {
-    if (!asm) return -1;
-    if (state.activePartPath) {
-      // If path is e.g. "mill-frame", find matching child
-      const idx = asm.children.findIndex(
-        (c) => c.key === state.activePartPath || c.ref === state.activePartPath,
-      );
-      if (idx >= 0) return idx;
-    }
-    if (state.activePartId) {
-      const idx = asm.children.findIndex((c) => c.ref === state.activePartId);
-      if (idx >= 0) return idx;
-    }
-    return 0; // default to first child if available
-  }, [asm, state.activePartPath, state.activePartId]);
+  const rootAssembly = activeEntry.kit.assemblies[activeEntry.rootPreset];
+  const children = rootAssembly?.children ?? [];
+  const safeChildIdx =
+    selectedChildIdx >= 0 && selectedChildIdx < children.length ? selectedChildIdx : 0;
+  const activePlacement = children[safeChildIdx];
+  const issueCount = state.validationIssues.length;
 
-  const selectedChild = asm && selectedChildIndex >= 0 ? asm.children[selectedChildIndex] : undefined;
-  const selectedPartDef = kit && selectedChild ? kit.parts[selectedChild.ref] : undefined;
-
-  const handleTransformChange = (axisIdx: number, val: number) => {
-    if (selectedChildIndex < 0 || !selectedChild) return;
-    const currentAt = selectedChild.at ?? [0, 0, 0];
-    const nextAt: [number, number, number] = [
-      axisIdx === 0 ? val : currentAt[0] ?? 0,
-      axisIdx === 1 ? val : currentAt[1] ?? 0,
-      axisIdx === 2 ? val : currentAt[2] ?? 0,
-    ];
-    globalStudioStore.updatePlacement(selectedChildIndex, { at: nextAt });
+  const handleAddCustomSocket = () => {
+    const targetPartId =
+      state.activePartId ??
+      activePlacement?.ref ??
+      Object.keys(activeEntry.kit.parts)[0];
+    if (!targetPartId || !newSocketName.trim()) return;
+    store.addSocketToPart(targetPartId, newSocketName.trim(), {
+      at: [0, newSocketY, 0],
+    });
   };
-
-  const handleSelectChild = (childIdx: number) => {
-    if (!asm) return;
-    const child = asm.children[childIdx];
-    if (child) {
-      globalStudioStore.selectPartAndSlot(child.key ?? child.ref, child.ref, null);
-    }
-  };
-
-  if (!kit || !asm) {
-    return (
-      <div className="sx-assembler-empty">
-        <span>No active assembly in current kit</span>
-      </div>
-    );
-  }
 
   return (
-    <div className="sx-kit-assembler-panel" data-testid="kit-assembler-panel">
-      {/* Header and Validation Status Badge */}
-      <div className="sx-assembler-header">
-        <div className="sx-assembler-title-row">
-          <span className="sx-assembler-title">Assembly & Sockets</span>
-          <span className="sx-kit-id-badge">{state.activeKitId}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 14, color: '#e2e8f0' }}>
+      {/* Active Campaign Machine / Kit Switcher */}
+      <div
+        style={{
+          background: '#111827',
+          border: '1px solid #1e293b',
+          borderRadius: 8,
+          padding: 12,
+        }}
+      >
+        <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          Active Modular Machine Kit (Rule 8a — Zero Legacy GLBs)
         </div>
+        <select
+          value={state.activeKitId}
+          onChange={(e) => {
+            store.selectKit(e.target.value);
+            setSelectedChildIdx(0);
+          }}
+          style={{
+            width: '100%',
+            marginTop: 6,
+            padding: '7px 10px',
+            borderRadius: 6,
+            background: '#0f172a',
+            color: '#f8fafc',
+            border: '1px solid #334155',
+            fontSize: 12,
+            fontWeight: 600,
+          }}
+        >
+          {STUDIO_KIT_LIST.map((entry) => (
+            <option key={entry.id} value={entry.id}>
+              {entry.label} ({entry.id}) — {entry.category}
+            </option>
+          ))}
+        </select>
 
-        {/* Live Grounding & PBR Validation Status */}
-        <div className="sx-validation-status-box" data-testid="grounding-status-box">
-          {issues.length === 0 ? (
-            <div className="sx-valid-badge" data-testid="validation-pass-badge">
-              <span className="sx-badge-icon">✓</span>
-              <span>0 Issues — Grounded & PBR Valid</span>
-            </div>
-          ) : (
-            <div className="sx-issues-summary">
-              <div className="sx-issues-pill-row">
-                <span className="sx-issue-badge" data-testid="validation-issues-badge">
-                  ⚠️ {issues.length} Issue{issues.length === 1 ? '' : 's'} Detected
-                </span>
-                <button
-                  type="button"
-                  className="sx-auto-snap-btn"
-                  onClick={() => globalStudioStore.autoFixGroundingIssues()}
-                  title="Auto-snap floating or subterranean parts to valid grounding sockets"
-                  data-testid="auto-snap-grounding-btn"
-                >
-                  ⚡ Auto-Snap Grounding
-                </button>
-              </div>
-              <ul className="sx-issues-list">
-                {issues.slice(0, 3).map((iss, i) => (
-                  <li key={i} className="sx-issue-item">
-                    {iss.detail} ({iss.at})
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+        {/* Grounding Audit & [⚡ Auto-Snap Grounding] */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginTop: 10,
+            padding: '6px 10px',
+            borderRadius: 6,
+            background: issueCount === 0 ? 'rgba(16, 185, 129, 0.14)' : 'rgba(239, 68, 68, 0.16)',
+            border: issueCount === 0 ? '1px solid #10b981' : '1px solid #ef4444',
+          }}
+        >
+          <span style={{ fontSize: 11, fontWeight: 700, color: issueCount === 0 ? '#34d399' : '#f87171' }}>
+            {issueCount === 0
+              ? '✓ 0 Issues — Grounded & PBR Valid'
+              : `⚠ ${issueCount} Grounding / Socket Issue(s)`}
+          </span>
+          <button
+            onClick={() => store.autoFixGroundingIssues()}
+            style={{
+              padding: '4px 10px',
+              borderRadius: 5,
+              border: 'none',
+              background: '#f59e0b',
+              color: '#0f172a',
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            ⚡ Auto-Snap Grounding
+          </button>
         </div>
       </div>
 
-      {/* Assembly Placements Shelf */}
-      <div className="sx-placements-section">
-        <div className="sx-section-title-row">
-          <span className="sx-section-heading">Placed Parts ({asm.children.length})</span>
-          <span className="sx-section-sub">Root: {rootPreset}</span>
+      {/* Color-Coded 3D Triad Sockets & Snap Part */}
+      <div
+        style={{
+          background: '#111827',
+          border: '1px solid #1e293b',
+          borderRadius: 8,
+          padding: 12,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#cbd5e1' }}>
+          Color-Coded 3D Triad Sockets ({sockets.length})
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+          {(['input', 'output', 'power', 'mount'] as TriadSocketRole[]).map((role) => (
+            <div
+              key={role}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                fontSize: 10,
+                color: '#cbd5e1',
+              }}
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: ROLE_BADGE[role].hex,
+                  display: 'inline-block',
+                }}
+              />
+              <span>{ROLE_BADGE[role].label}</span>
+            </div>
+          ))}
         </div>
 
-        <div className="sx-placements-list" role="listbox" aria-label="Assembly placements">
-          {asm.children.map((child, idx) => {
-            const isSelected = selectedChildIndex === idx;
-            const pDef = kit.parts[child.ref];
-            const isSocketMounted = Boolean(child.on);
+        <select
+          value={state.activeSocketPinId ?? selectedPinId}
+          onChange={(e) => {
+            setSelectedPinId(e.target.value);
+            store.selectSocketPin(e.target.value || null);
+          }}
+          style={{
+            padding: '5px 8px',
+            borderRadius: 4,
+            background: '#0f172a',
+            color: '#e2e8f0',
+            border: '1px solid #334155',
+            fontSize: 11,
+          }}
+        >
+          <option value="">-- Pick Target 3D Triad Socket --</option>
+          {sockets.map((sock) => (
+            <option key={sock.pinId} value={sock.pinId}>
+              [{sock.triadRole.toUpperCase()}] {sock.ownerPath || 'root'}.{sock.socketName} (
+              {sock.occupiedBy.length > 0 ? 'occupied' : 'free'})
+            </option>
+          ))}
+        </select>
 
+        <div style={{ display: 'flex', gap: 6 }}>
+          <select
+            value={selectedPartOrGen}
+            onChange={(e) => setSelectedPartOrGen(e.target.value)}
+            style={{
+              flex: 1,
+              padding: '5px 8px',
+              borderRadius: 4,
+              background: '#0f172a',
+              color: '#e2e8f0',
+              border: '1px solid #334155',
+              fontSize: 11,
+            }}
+          >
+            {Object.keys(activeEntry.kit.parts).map((p) => (
+              <option key={p} value={p}>
+                Kit Part: {p} (
+                {activeEntry.kit.parts[p]?.source.kind === 'param'
+                  ? activeEntry.kit.parts[p]?.source.gen
+                  : activeEntry.kit.parts[p]?.source.kind}
+                )
+              </option>
+            ))}
+            {Object.keys(GENERATORS).map((g) => (
+              <option key={`gen:${g}`} value={g}>
+                @hm/partgen: {g}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => {
+              const targetPinId = state.activeSocketPinId ?? selectedPinId;
+              const sock = sockets.find((s) => s.pinId === targetPinId) ?? sockets[0];
+              if (sock && selectedPartOrGen) {
+                store.attachPartToSocket(
+                  Math.max(0, sock.childIndex),
+                  sock.socketName,
+                  selectedPartOrGen,
+                );
+              }
+            }}
+            style={{
+              padding: '5px 12px',
+              borderRadius: 4,
+              border: 'none',
+              background: '#0284c7',
+              color: '#fff',
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            + Snap Part
+          </button>
+        </div>
+
+        {/* [+ Add Socket] Authoring Bar */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 6,
+            marginTop: 4,
+            paddingTop: 6,
+            borderTop: '1px solid #1e293b',
+            alignItems: 'center',
+          }}
+        >
+          <input
+            type="text"
+            value={newSocketName}
+            onChange={(e) => setNewSocketName(e.target.value)}
+            placeholder="Socket name (e.g. feedIn)"
+            style={{
+              flex: 1,
+              padding: '4px 6px',
+              borderRadius: 4,
+              background: '#0f172a',
+              color: '#fff',
+              border: '1px solid #334155',
+              fontSize: 10,
+            }}
+          />
+          <input
+            type="number"
+            step={0.1}
+            value={newSocketY}
+            onChange={(e) => setNewSocketY(parseFloat(e.target.value) || 0)}
+            title="Socket Y height (m)"
+            style={{
+              width: 54,
+              padding: '4px 6px',
+              borderRadius: 4,
+              background: '#0f172a',
+              color: '#fff',
+              border: '1px solid #334155',
+              fontSize: 10,
+            }}
+          />
+          <button
+            onClick={handleAddCustomSocket}
+            style={{
+              padding: '4px 8px',
+              borderRadius: 4,
+              border: '1px solid #10b981',
+              background: 'rgba(16, 185, 129, 0.16)',
+              color: '#6ee7b7',
+              fontSize: 10,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            + Add Socket
+          </button>
+        </div>
+      </div>
+
+      {/* Selected Placement 3D Transform Sliders (Updates 3D Viewport Live!) */}
+      {activePlacement && (
+        <div
+          style={{
+            background: '#111827',
+            border: '1px solid #38bdf8',
+            borderRadius: 8,
+            padding: 12,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#38bdf8' }}>
+              Transform: #{safeChildIdx + 1} {activePlacement.key ?? activePlacement.ref}
+            </span>
+            <select
+              value={activePlacement.mirror ?? 'none'}
+              onChange={(e) => {
+                const v = e.target.value;
+                store.updatePlacement(safeChildIdx, {
+                  mirror: v === 'none' ? undefined : (v as 'x' | 'z'),
+                });
+              }}
+              style={{
+                padding: '2px 6px',
+                borderRadius: 4,
+                background: '#0f172a',
+                color: '#e2e8f0',
+                border: '1px solid #334155',
+                fontSize: 10,
+              }}
+            >
+              <option value="none">Mirror: None</option>
+              <option value="x">Mirror X (Left/Right)</option>
+              <option value="z">Mirror Z (Front/Back)</option>
+            </select>
+          </div>
+
+          {(['X (Right)', 'Y (Height)', 'Z (Forward)'] as const).map((label, axisIdx) => {
+            const curAt: [number, number, number] = [
+              activePlacement.at?.[0] ?? 0,
+              activePlacement.at?.[1] ?? 0,
+              activePlacement.at?.[2] ?? 0,
+            ];
             return (
-              <button
-                key={`${child.ref}-${idx}`}
-                type="button"
-                className={`sx-placement-item ${isSelected ? 'selected' : ''}`}
-                onClick={() => handleSelectChild(idx)}
-                data-testid={`placement-item-${idx}`}
-                role="option"
-                aria-selected={isSelected}
+              <label
+                key={label}
+                style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 10 }}
               >
-                <div className="sx-placement-item-left">
-                  <span className="sx-child-idx">#{idx + 1}</span>
-                  <div className="sx-placement-names">
-                    <span className="sx-placement-key">{child.key ?? child.ref}</span>
-                    <span className="sx-placement-ref">{child.ref}</span>
-                  </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{label}</span>
+                  <span style={{ color: '#38bdf8' }}>{curAt[axisIdx]!.toFixed(3)} m</span>
                 </div>
-
-                <div className="sx-placement-item-right">
-                  {isSocketMounted ? (
-                    <span className="sx-mount-tag sx-tag-socket" title={`Mounted on socket '${child.on?.socket}'`}>
-                      🔗 {child.on?.socket}
-                    </span>
-                  ) : (
-                    <span className="sx-mount-tag sx-tag-root">⚓ Free at [{child.at?.join(', ') ?? '0,0,0'}]</span>
-                  )}
-                  {pDef?.material && (
-                    <span className="sx-part-mat-pill">{pDef.material.replace('mat:', '')}</span>
-                  )}
-                </div>
-              </button>
+                <input
+                  type="range"
+                  min={-2.5}
+                  max={2.5}
+                  step={0.01}
+                  value={curAt[axisIdx]!}
+                  onChange={(e) => {
+                    const nextAt: [number, number, number] = [...curAt];
+                    nextAt[axisIdx] = parseFloat(e.target.value);
+                    store.updatePlacement(safeChildIdx, { at: nextAt });
+                  }}
+                />
+              </label>
             );
           })}
-        </div>
-      </div>
 
-      {/* Selected Placement Inspector & Transforms */}
-      {selectedChild && (
-        <div className="sx-selected-placement-card" data-testid="selected-placement-card">
-          <div className="sx-card-title-row">
-            <span className="sx-card-title">Transform: {selectedChild.key ?? selectedChild.ref}</span>
-            <span className="sx-rank-pill">Rank {selectedChild.rank ?? selectedPartDef?.rank ?? 1}</span>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 10 }}>
+            <span style={{ color: '#94a3b8' }}>Quick Rotate Y:</span>
+            {[-90, 0, 90, 180].map((deg) => (
+              <button
+                key={deg}
+                onClick={() => {
+                  const curRot = activePlacement.rot ?? [0, 0, 0];
+                  store.updatePlacement(safeChildIdx, {
+                    rot: [curRot[0], deg, curRot[2]],
+                  });
+                }}
+                style={{
+                  padding: '2px 6px',
+                  borderRadius: 4,
+                  background: '#162032',
+                  color: '#cbd5e1',
+                  border: '1px solid #334155',
+                  fontSize: 10,
+                  cursor: 'pointer',
+                }}
+              >
+                {deg}°
+              </button>
+            ))}
+            <select
+              value={activePlacement.rank ?? 0}
+              onChange={(e) =>
+                store.updatePlacement(safeChildIdx, {
+                  rank: parseInt(e.target.value, 10) as DetailRank,
+                })
+              }
+              style={{
+                marginLeft: 'auto',
+                padding: '2px 6px',
+                borderRadius: 4,
+                background: '#0f172a',
+                color: '#38bdf8',
+                border: '1px solid #334155',
+                fontSize: 10,
+              }}
+            >
+              <option value={0}>Rank 0</option>
+              <option value={1}>Rank 1</option>
+              <option value={2}>Rank 2</option>
+            </select>
           </div>
-
-          {/* Position XYZ Sliders */}
-          <div className="sx-transform-grid">
-            <div className="sx-coord-slider">
-              <div className="sx-coord-label-row">
-                <span className="sx-coord-name sx-x">X (Right)</span>
-                <span className="sx-coord-val">{(selectedChild.at?.[0] ?? 0).toFixed(2)} m</span>
-              </div>
-              <input
-                type="range"
-                min="-4"
-                max="4"
-                step="0.05"
-                className="sx-slider"
-                value={selectedChild.at?.[0] ?? 0}
-                onChange={(e) => handleTransformChange(0, parseFloat(e.target.value))}
-                data-testid="pos-x-slider"
-              />
-            </div>
-
-            <div className="sx-coord-slider">
-              <div className="sx-coord-label-row">
-                <span className="sx-coord-name sx-y">Y (Height)</span>
-                <span className="sx-coord-val">{(selectedChild.at?.[1] ?? 0).toFixed(2)} m</span>
-              </div>
-              <input
-                type="range"
-                min="-1"
-                max="6"
-                step="0.05"
-                className="sx-slider"
-                value={selectedChild.at?.[1] ?? 0}
-                onChange={(e) => handleTransformChange(1, parseFloat(e.target.value))}
-                data-testid="pos-y-slider"
-              />
-            </div>
-
-            <div className="sx-coord-slider">
-              <div className="sx-coord-label-row">
-                <span className="sx-coord-name sx-z">Z (Forward)</span>
-                <span className="sx-coord-val">{(selectedChild.at?.[2] ?? 0).toFixed(2)} m</span>
-              </div>
-              <input
-                type="range"
-                min="-4"
-                max="4"
-                step="0.05"
-                className="sx-slider"
-                value={selectedChild.at?.[2] ?? 0}
-                onChange={(e) => handleTransformChange(2, parseFloat(e.target.value))}
-                data-testid="pos-z-slider"
-              />
-            </div>
-          </div>
-
-          {/* Sockets on Selected Part */}
-          {selectedPartDef?.sockets && Object.keys(selectedPartDef.sockets).length > 0 && (
-            <div className="sx-part-sockets-area">
-              <div className="sx-sockets-title">Defined Sockets on this Part</div>
-              <div className="sx-sockets-chip-row">
-                {Object.entries(selectedPartDef.sockets).map(([sockName]) => {
-                  const isOccupied = asm.children.some(
-                    (c) => c.on?.child === selectedChildIndex && c.on?.socket === sockName,
-                  );
-                  return (
-                    <div
-                      key={sockName}
-                      className={`sx-socket-chip ${isOccupied ? 'occupied' : 'open'}`}
-                      data-testid={`part-socket-${sockName}`}
-                    >
-                      <span className="sx-socket-dot" />
-                      <span className="sx-socket-name">{sockName}</span>
-                      <span className="sx-socket-status">
-                        {isOccupied ? 'Occupied' : 'Open'}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       )}
+
+      {/* Placed Parts Hierarchy */}
+      <div
+        style={{
+          background: '#111827',
+          border: '1px solid #1e293b',
+          borderRadius: 8,
+          padding: 12,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          maxHeight: 240,
+          overflowY: 'auto',
+        }}
+      >
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#cbd5e1' }}>
+          Assembly Placements ({children.length} children)
+        </div>
+        {children.map((pl, idx) => {
+          const key = pl.key ?? `${pl.ref}#${idx}`;
+          const isSelected = idx === safeChildIdx || state.activePartPath === key;
+          return (
+            <div
+              key={`${key}-${idx}`}
+              onClick={() => {
+                setSelectedChildIdx(idx);
+                store.selectPartAndSlot(key, pl.ref, state.activeSlotKey);
+              }}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '5px 8px',
+                borderRadius: 4,
+                background: isSelected ? 'rgba(56, 189, 248, 0.18)' : '#161f2e',
+                border: isSelected ? '1px solid #38bdf8' : '1px solid #243046',
+                cursor: 'pointer',
+                fontSize: 11,
+              }}
+            >
+              <div>
+                <strong style={{ color: isSelected ? '#38bdf8' : '#f1f5f9' }}>
+                  #{idx + 1} {key}
+                </strong>
+                <span style={{ color: '#94a3b8', marginLeft: 6 }}>({pl.ref})</span>
+                {pl.on && (
+                  <div style={{ fontSize: 9, color: '#64748b' }}>
+                    ↳ attached to child #{pl.on.child + 1} socket &quot;{pl.on.socket}&quot;
+                  </div>
+                )}
+              </div>
+              {idx > 0 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    store.removePlacement(idx);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid #475569',
+                    color: '#f87171',
+                    borderRadius: 4,
+                    fontSize: 10,
+                    padding: '1px 6px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };

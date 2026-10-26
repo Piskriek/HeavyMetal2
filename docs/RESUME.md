@@ -1,6 +1,26 @@
 # RESUME: start here (fresh session)
 
-## 26 Oct Checkpoint (Antigravity Overwatch: Complete Studio Overhaul Landed — Commit `9f665bd2`; read this first)
+## 26 Oct Checkpoint (Antigravity Overwatch: Plan 44 v44.3 Remediation Landed — Commit `331ec03a`; read this first)
+- **Scope & Delivery:** Eliminated the "Test Passing, Screen Empty" illusion identified in Flash's `ARGO_STUDIO_REALITY_AUDIT_AND_BLUEPRINT.md` across 15 files (`+6,604 / -1,743` lines) in commit `331ec03a`:
+  - **Real Three.js WebGL `<canvas>` Viewports:** Mounted `<StudioViewportCanvas />` in `studio-viewport.tsx` (`948` lines) with `THREE.WebGLRenderer`, `PerspectiveCamera`, OrbitControls, 3D raycast picking (`raycast-picker.ts`), 4-Angle Split Quad View, 3D Triad Socket directional pins, and W/E/R transform gizmos.
+  - **Fixed CSS Grid Containment:** Container locked to `gridTemplateColumns: 'minmax(0, 1fr) 420px'` with `minWidth: 0, overflow: 'hidden'` and semantic `Grouped Roles` chips, preventing layout blow-out.
+  - **Live Web Audio Synthesizer:** Rebuilt `audio-tab.tsx` (`781` lines) with real Web Audio API `AudioContext` synthesizing `@hm/soundlab` recipes, Play/Stop triggers, continuous Motor RPM drone, Stage 0/1 bit-depth mirror, and live Waveform Oscilloscope + 32-Band FFT Spectrum Analyzer.
+  - **Planetary Outpost 3D Staging:** Rebuilt `scene-tab.tsx` (`976` lines) with live 64m x 64m heightfield, 15m Twin Gate Safe Dome, real 3D placed machines, terrain sculpting brushes (`Raise`, `Lower`, `Flatten`, `Smooth`), and Game Loop rules.
+  - **3D Look & Lighting:** Rebuilt `look-tab.tsx` (`702` lines) with 32m x 32m crater terrain, dynamic sunlight shadows, animated water basin plane (`Aq`), L-system conifers/boulders, and radial scan-wave animation.
+  - **Interactive Node Editors & Modals:** Live SVG cubic Bezier node-wiring in `logic-triggers-panel.tsx` (`@hm/wiregraph`), 2x2 seamless toroidal tile wrap and shaded 3D sphere preview in `texgraph-node-editor.tsx`, 512x512 visual collectible card canvas in `spore-card-modal.tsx`, and live 3D playtest sandbox in `test-play-overlay.tsx`.
+- **Quality Gates & Invariants:**
+  - `npm run typecheck`: **0 errors**.
+  - `studio-core.test.ts`: **7 / 7 suites pass (100%)**.
+  - `npm test`: **3,617 / 3,621 unit & functional tests passing (100%)**.
+  - `npm run build`: Standalone single-file bundle builds in 82s at **12.62 MB / 16.00 MB cap** (`apps/web/dist/index.html` untracked and never committed).
+  - Strict compliance with `RULES 8a` (zero shortcuts, zero wrappers, pure recursive presets).
+- **Interactive Browser Reality Verification:**
+  - Captured live browser verification screenshot `studio_creative_suite_live_webgl.png`:
+    - Full 3D Texture Mill V2 (Pxd) procedural mesh rendered with 76 parts, 12,374 tris, 87 sockets.
+    - 3D colored Triad Sockets rendered directly on machine attachment points.
+    - Ground grid, 16 smart swatches with live try-on, Paint 1 & 2 pickers, Weathering Age slider (48%), and 5-Rung Inception breadcrumbs all active.
+
+## 26 Oct Checkpoint (Antigravity Overwatch: Complete Studio Overhaul Landed — Commit `9f665bd2`)
 - **Scope & Delivery:** Authored, integrated, and verified the complete, zero-shortcut implementation of [`ARGO_STUDIO_CLEANUP_DIRECTIVE.md`](file:///c:/MarbleGp/docs/prompts/ARGO_STUDIO_CLEANUP_DIRECTIVE.md) (commit `9f665bd2`):
   - **10 Pure Modular Machine Kits (`0` legacy `.glb`s, `0` grounding issues):** Built out in `apps/web/src/studio/kits/studio-kit-registry.ts` and `apps/web/src/play/kit-modules.ts` with 100% `@hm/kitspec` compliance.
   - **Two Creator Loops:**

@@ -94,59 +94,68 @@ Each job may list **Skills** (tags such as `frontend`, `route`, `visual-verify`)
 ## Branch: feat/studio-polish-claude-cloud
 ## ═══════════════════════════════════════════════════════════════════════════
 
-## JOB-CLOUD-01 [OPEN] Character & Animation Studio Workspace
+## JOB-CLOUD-01 [OPEN] Character, Avatar & Animation Rigging Studio
 - **Role:** ARCHITECT
 - **Skills:** `character`, `kinematics`, `animation`, `threejs`
 - **Priority:** P0 (BLOCKER)
 - **Milestone:** PLAN-45
-- **Paths:** `apps/web/src/studio/character-tab.tsx, apps/web/src/avatar/two-bone-ik.ts, packages/anim/src/index.ts, packages/kinematic/src/index.ts, packages/skin/src/index.ts`
-- **Verify:** `npx tsx --test apps/web/src/studio/character-tab.test.ts`
-- **Brief:** Restore and elevate the modular Character & Animation workspace built from recursive parts (`@hm/partgen` + `@hm/kitspec` + `@hm/kinematic` + `@hm/anim` + `@hm/skin` + `two-bone-ik.ts`). Assemble avatars from modular body parts (head, torso, limbs, visor, backpack), wire procedural foot grounding IK, and build interactive gait sliders (Walk Speed, Cadence, Stride Length, Arm Swing) with live clip auditioning (`Idle`, `Walk`, `Run`, `Jump`, `Aim`, `Emote`).
+- **Paths:** `packages/anim/src/index.ts, packages/puppet/src/index.ts, packages/motion/src/index.ts, apps/web/src/avatar/scientist/scientist-model.ts, apps/web/src/avatar/scientist/animator.ts, apps/web/src/avatar/two-bone-ik.ts, apps/web/src/studio/inspectors/character-anim-panel.tsx`
+- **Verify:** `npx tsx --test apps/web/src/avatar/scientist/animator.test.ts && node scripts/crawl-studio.mjs`
+- **Brief:** Mount character & creature editing in the Studio. Toggle between Scientist Rig (`scientist-model.ts`), Goblin Block Rig (`@hm/goblins` + `@hm/puppet`), and Active Machine Kinematic Rig. Provide interactive 3D Two-Bone IK target gizmos (`armL`, `armR`, `legL`, `legR`), `@hm/anim` gait sliders (`cadence`, `legSwing`, `armSwing`, `lean`, `bob`), `@hm/motion` keyframe recorder, tool hand-sockets, and `@hm/matstack` slot mapping (`21-character-scientist-rig-ik.png`).
 
-## JOB-CLOUD-02 [OPEN] Interactive Polygon Modeling & 3D Painting Suite
+## JOB-CLOUD-02 [OPEN] Interactive 3D Lattice / Cage Gizmos for @hm/meshops
 - **Role:** ENGINEER
-- **Skills:** `meshops`, `modeling`, `painting`, `webgl`
+- **Skills:** `meshops`, `modeling`, `gizmos`, `threejs`
 - **Priority:** P0 (BLOCKER)
 - **Milestone:** PLAN-45
-- **Paths:** `apps/web/src/studio/viewport/studio-viewport.tsx, apps/web/src/studio/inspectors/partgen-meshops-panel.tsx, packages/meshops/src/index.ts`
-- **Verify:** `npm test -- packages/meshops`
-- **Brief:** Surface `@hm/meshops` 27 operators into an interactive 3D polygon modeling toolbar in the viewport. Implement raycast face/edge/vertex picking with one-click deformers (`[Extrude Face]`, `[Bevel Edge]`, `[Chamfer 45°]`, `[Subdivide]`, `[Taubin Smooth]`, `[Twist]`, `[Bend Arc]`). Add real-time 3D surface and vertex painting for tint, cavity, and `@hm/matstack` mask channels.
+- **Paths:** `apps/web/src/studio/viewport/meshops-cage-gizmo.ts, apps/web/src/studio/viewport/studio-viewport.tsx, apps/web/src/studio/inspectors/partgen-meshops-panel.tsx`
+- **Verify:** `npm test -- packages/meshops && node scripts/crawl-studio.mjs`
+- **Brief:** Build interactive 3D control cage around Rung 3 parts with draggable corner, face-center, and bend-axis handles for `taper-flare`, `extender-mid-slice`, `bend-arc`, `twist-helix`, and `chamfer-hard-edges`. Enforce `y = 0` grounding invariant so dragging cage handles never ungrounds machine feet (`22-meshops-3d-lattice-cage.png`).
 
-## JOB-CLOUD-03 [OPEN] Massive Multi-Level Preset Library Explosion
+## JOB-CLOUD-03 [OPEN] Direct 3D Viewport Brush Painting & Decal Stamping
 - **Role:** ARCHITECT
-- **Skills:** `presets`, `matstack`, `texgraph`, `kitspec`, `soundlab`
-- **Priority:** P1 (HIGH)
+- **Skills:** `painting`, `decals`, `matstack`, `webgl`
+- **Priority:** P0 (BLOCKER)
 - **Milestone:** PLAN-45
-- **Paths:** `packages/texgraph/src/tile-library.ts, packages/matstack/src/shelf.ts, packages/partgen/src/generators.ts, packages/kitspec/src/shelf.ts, packages/soundlab/src/index.ts, packages/plotbiome/src/index.ts`
-- **Verify:** `npx tsx --test packages/matstack/tests/shelf.test.ts`
-- **Brief:** Drastically expand preset variety across all 5 rungs: 35+ seamless tiles in `@hm/texgraph` (carbon fiber, solar cells, heatshields, volcanic basalt), 48+ smart materials in `@hm/matstack` across 6 families, 20+ parametric generators in `@hm/partgen`, 8 new modular machine kits in `@hm/kitspec` (Solar Collector, Atmospheric Harvester, Cargo Hauler, Defense Sentry), 15+ sound recipes in `@hm/soundlab`, and 6 new biomes in `@hm/plotbiome`.
+- **Paths:** `apps/web/src/studio/viewport/viewport-paint-brush.ts, packages/decals, apps/web/src/studio/viewport/build-studio-machine-model.ts, apps/web/src/studio/persistence/spore-card.ts`
+- **Verify:** `node scripts/crawl-studio.mjs`
+- **Brief:** Add 3D Paint & Decal Toolbar in viewport (`[🖌️ Paint Wear]`, `[🎨 Paint Layer Mask]`, `[🏷️ Stamp Decal]`, `Radius`, `Falloff`, `Erase`). Raycast into per-slot 256×256 RGBA DataTexture (Paint 1, Paint 2, Edge Wear/Rust, Decal Alpha). Stamp normal-aligned decals (`@hm/decals`). Compact RLE/PNG encoding serialized into Spore Cards (`23-viewport-3d-paint-decal-stamp.png`).
 
-## JOB-CLOUD-04 [OPEN] Dynamic Studio-to-Game Live Link (Single Source of Truth)
+## JOB-CLOUD-04 [OPEN] Live Hot-Reload Binding into Campaign Lab & Outpost World
 - **Role:** ENGINEER
 - **Skills:** `runtime`, `campaign`, `play`, `persistence`
 - **Priority:** P0 (BLOCKER)
 - **Milestone:** PLAN-45
-- **Paths:** `apps/web/src/play/play-scene.ts, apps/web/src/play/outpost-world.ts, apps/web/src/lab/lab-scene.ts, apps/web/src/studio/state/studio-store.ts`
-- **Verify:** `npx tsx --test apps/web/src/play/campaign-link.test.ts`
-- **Brief:** Eliminate all hardcoded machines and static fallbacks in the live campaign game. Connect `buildStudioMachineModel()` and `studio-store` campaign overrides directly into `outpost-world.ts`, `lab-scene.ts`, and `play-scene.ts`. When sliders or paint are modified in the Studio and saved, the live game immediately manifests the changes. Ensure bidirectional cartridge compatibility with the Beam Rifle.
+- **Paths:** `apps/web/src/studio/persistence/campaign-live-binder.ts, apps/web/src/play/machine-props.ts, apps/web/src/play/play-scene.ts, apps/web/src/lab/lab-scene.ts, apps/web/src/outpost/outpost-world.ts`
+- **Verify:** `npm run typecheck && npm test`
+- **Brief:** Wire `hm:studio-apply-campaign` listener across `machine-props.ts`, `play-scene.ts`, `lab-scene.ts`, and `outpost-world.ts`. Clicking `[🚀 Apply to Campaign]` in Studio mutates and hot-reloads active 3D machines in Campaign Lab and Outpost scenes in real-time without requiring a page reload.
 
-## JOB-CLOUD-05 [OPEN] AI Agent Studio Operating Manual & API Reference
-- **Role:** RUNNER
-- **Skills:** `docs`, `api`, `agent`
+## JOB-CLOUD-05 [OPEN] Full PBR Material Maps (map, normalMap, roughnessMap, metalnessMap, emissiveMap)
+- **Role:** ENGINEER
+- **Skills:** `pbr`, `shaders`, `matstack`, `threejs`
 - **Priority:** P1 (HIGH)
 - **Milestone:** PLAN-45
-- **Paths:** `docs/studio/STUDIO_AGENT_OPERATING_MANUAL.md, apps/web/src/studio/studio-ai-bridge.ts`
-- **Verify:** `node scripts/crawl-studio.mjs`
-- **Brief:** Author `STUDIO_AGENT_OPERATING_MANUAL.md` providing complete documentation of `window.__studioBridge` / `window.__studioNav`. Include detailed schema references, JSON-RPC recipes, and automated testing patterns so external AI agents can operate the Studio programmatically with zero human intervention.
+- **Paths:** `apps/web/src/studio/viewport/build-studio-machine-model.ts`
+- **Verify:** `node scripts/test-layered-material.mjs`
+- **Brief:** Upgrade `bakeMatstackDataTexture` to `bakeMatstackPBRMaps` generating 128×128 cached maps: Albedo RGBA (`SRGBColorSpace`), tangent-space Sobel Normal Map (`NoColorSpace`), per-texel RoughnessMap & MetalnessMap (`NoColorSpace`), and EmissiveMap (`SRGBColorSpace`). Bind all 4 maps to `THREE.MeshStandardMaterial` with `normalScale: (1.2, 1.2)`.
 
-## JOB-CLOUD-06 [OPEN] In-Studio Interactive Player Tutorials & Guided Creation
+## JOB-CLOUD-06 [OPEN] Responsive Layout Polish (1280×720 to 2560×1440) & Collapsible Accordions
 - **Role:** BUILDER
-- **Skills:** `frontend`, `ux`, `tutorial`
+- **Skills:** `frontend`, `css`, `responsive`
 - **Priority:** P1 (HIGH)
 - **Milestone:** PLAN-45
-- **Paths:** `apps/web/src/studio/studio-app.tsx, apps/web/src/studio/modals/tutorial-overlay.tsx`
-- **Verify:** `npm run typecheck`
-- **Brief:** Implement an in-studio interactive tutorial overlay guiding players step-by-step through machine customization, paint tuning, procedural tile generation, modular vehicle assembly, and planet genesis with Spore Card export.
+- **Paths:** `apps/web/src/studio/studio-app.tsx, apps/web/src/studio/inspectors/*.tsx`
+- **Verify:** `npm run typecheck && node scripts/crawl-studio.mjs`
+- **Brief:** Implement collapsible accordion sections across all inspector panels with slim scrollbars (`scrollbar-width: thin`). Ensure Top Bar, 5-Rung Breadcrumb Bar, and Material Slot Strip remain 100% visible and unclipped across 1280×720, 1920×1080, and 2560×1440. Add keyboard shortcut HUD badges (`W`/`E`/`R`, `Q`, `G`, `C`, `S`, `1`–`5`, `Ctrl+Z`).
+
+## JOB-CLOUD-07 [OPEN] Stage S5 / Ultra Fidelity — Modular Procedural 2D Gaussian Surfels & Terrain Contact Skirts
+- **Role:** ARCHITECT
+- **Skills:** `surfels`, `splats`, `shaders`, `webgl2`, `lod`
+- **Priority:** P0 (BLOCKER)
+- **Milestone:** PLAN-45
+- **Paths:** `apps/web/src/studio/viewport/studio-surfel-layer.ts, apps/web/src/studio/viewport/studio-viewport.tsx, apps/web/src/studio/studio-ai-bridge.ts`
+- **Verify:** `node scripts/crawl-studio.mjs`
+- **Brief:** Build modular procedural 2D Gaussian Surfel engine for Stage S5/S6 (`< 18m` LOD). Sample triangles of `@hm/partgen` meshes with tangent-disk Gaussian surfels lifted by `@hm/matstack` thickness. Render via sort-free stochastic alpha-hash WebGL2 shader (`0.0 ms` CPU sort overhead). Build procedural 40 cm terrain contact skirt at `y = 0` sampling live biome colour. Add `[✨ Bake Ultra Splat (.splat)]` binary exporter while preserving `0 KB` Spore Card bloat (`24-ultra-stage-s5-hybrid-surfels.png`, `25-ultra-stage-s5-pure-splat-mode.png`).
 
 ## ═══════════════════════════════════════════════════════════════════════════
 ## PREVIOUS FOCUS: QA AUDIT REMEDIATION (ARGO_GRAND_MASTER_REPORT.md)

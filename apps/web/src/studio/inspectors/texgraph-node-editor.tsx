@@ -18,6 +18,8 @@ import './texgraph-node-editor.css';
 
 export interface TexGraphNodeEditorProps {
   readonly onTileUpdated?: (tileId: string) => void;
+  readonly state?: any;
+  readonly store?: any;
 }
 
 export const TexGraphNodeEditor: React.FC<TexGraphNodeEditorProps> = ({ onTileUpdated }) => {

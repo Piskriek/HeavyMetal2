@@ -10,7 +10,12 @@ import React, { useMemo } from 'react';
 import { globalStudioStore, useStudioState } from '../state/studio-hook';
 import './kit-assembler-panel.css';
 
-export const KitAssemblerPanel: React.FC = () => {
+export interface KitAssemblerPanelProps {
+  readonly state?: any;
+  readonly store?: any;
+}
+
+export const KitAssemblerPanel: React.FC<KitAssemblerPanelProps> = () => {
   const state = useStudioState();
 
   const entry = state.kits[state.activeKitId];

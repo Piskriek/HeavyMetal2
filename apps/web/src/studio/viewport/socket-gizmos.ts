@@ -1,7 +1,8 @@
 /**
  * @file apps/web/src/studio/viewport/socket-gizmos.ts
- * STUDIO-44D (Opus Core): 3D Socket Pin Enumeration, Surface-Normal Raycast Socket Authoring,
- * and Auto-Snap Grounding Solver for `@hm/kitspec`.
+ * STUDIO-44D & ARGO_STUDIO_CLEANUP_DIRECTIVE.md (Q5):
+ * 3D Triad Socket Pin Enumeration (Red = Input, Blue = Output, Gold = Power, Green = Mount),
+ * Surface-Normal Raycast Socket Authoring, and Auto-Snap Grounding Solver for `@hm/kitspec`.
  *
  * Pure TypeScript, zero DOM globals, deterministic.
  */
@@ -20,6 +21,8 @@ import {
 } from '@hm/kitspec';
 
 export type SocketPinCategory = 'structural-open' | 'structural-occupied' | 'gameplay';
+/** Q5 Triad Socket Semantic Role: Red = Input, Blue = Output, Gold = Power, Green = Mount */
+export type TriadSocketRole = 'input' | 'output' | 'power' | 'mount';
 
 export interface SocketPin {
   /** Unique identifier in the viewport: `${ownerPath}::${socketName}` */
@@ -40,13 +43,28 @@ export interface SocketPin {
   readonly localSocket: SocketDef;
   /** Paths of child placements currently snapped to this socket. */
   readonly occupiedBy: readonly string[];
-  /** Visual category for color-coding (#3dc8ff open, #7cff4d occupied, #ffc13d/#ff3d8a gameplay). */
+  /** Visual category for occupancy/gameplay filtering. */
   readonly category: SocketPinCategory;
-  /** Canonical hex color for the 3D triad pin. */
+  /** Q5 Semantic Triad Role: 'input' (Red), 'output' (Blue), 'power' (Gold), 'mount' (Green). */
+  readonly triadRole: TriadSocketRole;
+  /** Canonical hex color for the 3D triad pin (#ff3d8a Red, #3dc8ff Blue, #ffc13d Gold, #7cff4d Green). */
   readonly colorHex: string;
 }
 
-const GAMEPLAY_SOCKET_RE = /(hopper|feed|vent|exhaust|plume|power|cable|cartridge|slot|wheel|lamp|door)/i;
+const INPUT_SOCKET_RE = /(hopper|feed|inlet|intake|input|cartridge|slot)/i;
+const OUTPUT_SOCKET_RE = /(vent|exhaust|plume|stack|out|output|chute|discharge|portal)/i;
+const POWER_SOCKET_RE = /(power|cable|bus|terminal|hv|coil|beacon|led|lamp|console|line)/i;
+const GAMEPLAY_SOCKET_RE = /(hopper|feed|vent|exhaust|plume|power|cable|cartridge|slot|wheel|lamp|door|portal|bus)/i;
+
+export function classifyTriadSocketRole(socketName: string): {
+  readonly role: TriadSocketRole;
+  readonly colorHex: string;
+} {
+  if (POWER_SOCKET_RE.test(socketName)) return { role: 'power', colorHex: '#ffc13d' };
+  if (OUTPUT_SOCKET_RE.test(socketName)) return { role: 'output', colorHex: '#3dc8ff' };
+  if (INPUT_SOCKET_RE.test(socketName)) return { role: 'input', colorHex: '#ff3d8a' };
+  return { role: 'mount', colorHex: '#7cff4d' };
+}
 
 const frameOfSocket = (s: SocketDef): Mat4 =>
   multiply(translation(s.at), rotation(s.rot ?? [0, 0, 0]));
@@ -61,7 +79,7 @@ const transformDir = (m: Mat4, d: Vec3): Vec3 => {
 
 /**
  * Enumerates all 3D socket pins on a `Kit` preset (`AssemblyDef` exposed sockets + every child `PartDef`'s sockets),
- * computing their exact preset-space coordinates, orientations, occupancy, and color codes.
+ * computing their exact preset-space coordinates, orientations, occupancy, and Q5 Triad Role color codes.
  */
 export function enumerateAssemblySockets(
   kit: Kit,
@@ -74,7 +92,6 @@ export function enumerateAssemblySockets(
   const placed = flatten(kit, presetId, overrides);
   const pins: SocketPin[] = [];
 
-  // Map occupied sockets: key = `${childIndex}:${copyIndex}:${socketName}` -> child keys
   const occupiedMap = new Map<string, string[]>();
   asm.children.forEach((c, idx) => {
     if (c.on) {
@@ -86,11 +103,12 @@ export function enumerateAssemblySockets(
     }
   });
 
-  // 1. Root assembly exposed sockets (e.g. 'vent', 'feed', 'power', 'cartridge')
+  // 1. Root assembly exposed sockets
   if (asm.sockets) {
     for (const [sName, sDef] of Object.entries(asm.sockets)) {
       const m = frameOfSocket(sDef);
       const isGameplay = GAMEPLAY_SOCKET_RE.test(sName);
+      const triad = classifyTriadSocketRole(sName);
       pins.push({
         pinId: `<root>::${sName}`,
         ownerPath: '',
@@ -102,7 +120,8 @@ export function enumerateAssemblySockets(
         localSocket: sDef,
         occupiedBy: [],
         category: isGameplay ? 'gameplay' : 'structural-open',
-        colorHex: isGameplay ? '#ffc13d' : '#3dc8ff',
+        triadRole: triad.role,
+        colorHex: triad.colorHex,
       });
     }
   }
@@ -125,8 +144,7 @@ export function enumerateAssemblySockets(
       const isGameplay = GAMEPLAY_SOCKET_RE.test(sName);
       const category: SocketPinCategory =
         occ.length > 0 ? 'structural-occupied' : isGameplay ? 'gameplay' : 'structural-open';
-      const colorHex =
-        category === 'structural-occupied' ? '#7cff4d' : category === 'gameplay' ? '#ff3d8a' : '#3dc8ff';
+      const triad = classifyTriadSocketRole(sName);
 
       pins.push({
         pinId: `${p.path}::${sName}`,
@@ -139,7 +157,8 @@ export function enumerateAssemblySockets(
         localSocket: sDef,
         occupiedBy: occ,
         category,
-        colorHex,
+        triadRole: triad.role,
+        colorHex: triad.colorHex,
       });
     }
   });
@@ -147,10 +166,8 @@ export function enumerateAssemblySockets(
   return pins;
 }
 
-/** Inverts a rigid (rotation + translation, or uniform/mirror scale) 4x4 column-major matrix. */
 export function invertMat4(m: Mat4): Mat4 {
   const g = (i: number): number => m[i] as number;
-  // Upper-left 3x3 inverse via cofactors
   const m00 = g(0), m10 = g(1), m20 = g(2);
   const m01 = g(4), m11 = g(5), m21 = g(6);
   const m02 = g(8), m12 = g(9), m22 = g(10);
@@ -193,13 +210,6 @@ const snapScalar = (v: number, step: number): number => {
 
 const RAD_TO_DEG = 180 / Math.PI;
 
-/**
- * Converts a 3D surface raycast hit (`hitPointWorld`, `hitNormalWorld`) on a part with transform `parentWorldMatrix`
- * into a clean `SocketDef { at, rot }` in the parent part's local coordinate space:
- * - `at` is snapped to `snapStepM` (default 5 mm = 0.005 m);
- * - `rot` (Euler 'XYZ' degrees) aligns the socket's local +Y axis with the local surface normal so any part
- *   placed on the socket stands flush against that face!
- */
 export function surfaceHitToSocketDef(
   hitPointWorld: Vec3,
   hitNormalWorld: Vec3,
@@ -216,7 +226,6 @@ export function surfaceHitToSocketDef(
     snapScalar(localPt[2], snapStepM),
   ];
 
-  // Fast exact cardinal-axis snap for square-section industrial faces (+Y, -Y, +Z, -Z, +X, -X)
   const [nx, ny, nz] = localN;
   if (ny > 0.98) return { at };
   if (ny < -0.98) return { at, rot: [180, 0, 0] };
@@ -225,21 +234,16 @@ export function surfaceHitToSocketDef(
   if (nx > 0.98) return { at, rot: [0, 0, -90] };
   if (nx < -0.98) return { at, rot: [0, 0, 90] };
 
-  // General orthonormal basis with +Y = localN, decomposed into three.js 'XYZ' Euler angles (Rx * Ry * Rz)
   const upRef: Vec3 = Math.abs(ny) < 0.9 ? [0, 1, 0] : [0, 0, 1];
-  // xAxis = normalize(cross(upRef, localN))
   let xx = upRef[1] * nz - upRef[2] * ny;
   let xy = upRef[2] * nx - upRef[0] * nz;
   let xz = upRef[0] * ny - upRef[1] * nx;
   const xLen = Math.hypot(xx, xy, xz) || 1;
   xx /= xLen; xy /= xLen; xz /= xLen;
-  // zAxis = cross(xAxis, localN)
   const zx = xy * nz - xz * ny;
   const zy = xz * nx - xx * nz;
   const zz = xx * ny - xy * nx;
 
-  // In three.js 'XYZ' Euler order, R = Rx(rx) * Ry(ry) * Rz(rz):
-  // R[0][2] = zx = sin(ry)
   const sinRy = Math.max(-1, Math.min(1, zx));
   const ry = Math.asin(sinRy) * RAD_TO_DEG;
   let rx = 0;
@@ -248,7 +252,7 @@ export function surfaceHitToSocketDef(
     rx = Math.atan2(-zy, zz) * RAD_TO_DEG;
     rz = Math.atan2(-ny, xx) * RAD_TO_DEG;
   } else {
-    rx = Math.atan2(xy, yySafe(nx, ny, nz)) * RAD_TO_DEG;
+    rx = Math.atan2(xy, ny || 1) * RAD_TO_DEG;
   }
 
   return {
@@ -257,15 +261,6 @@ export function surfaceHitToSocketDef(
   };
 }
 
-function yySafe(_nx: number, ny: number, _nz: number): number {
-  return ny || 1;
-}
-
-/**
- * 1-Click Auto-Snap Grounding Solver (`STUDIO-44D`):
- * Inspects `validate(kit, presetId)` for any `below-ground` or `floating` root children and adjusts their `at`
- * offset so every part rests cleanly on `y = 0` or on the nearest underlying sibling's AABB face.
- */
 export function autoSnapFloatingPlacements(kit: Kit, presetId: string): Kit {
   const asm = kit.assemblies[presetId];
   if (!asm) return kit;
@@ -296,7 +291,6 @@ export function autoSnapFloatingPlacements(kit: Kit, presetId: string): Kit {
 
     const curAt: Vec3 = c.at ?? [0, 0, 0];
     if (hasBelow && minY < 0) {
-      // Lift child so its bottom sits flush at y = 0
       const dy = -minY;
       return {
         ...c,
@@ -305,7 +299,6 @@ export function autoSnapFloatingPlacements(kit: Kit, presetId: string): Kit {
     }
 
     if (hasFloat && !c.on) {
-      // Drop root-attached floating child onto y = 0 (or highest underlying sibling AABB top below minY)
       let targetY = 0;
       const myBox = childBoxes[0]!.box;
       for (const other of boxes) {

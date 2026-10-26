@@ -22,6 +22,8 @@ import './matstack-inspector.css';
 
 export interface MatStackInspectorProps {
   readonly scope?: 'part-override' | 'kit-slot';
+  readonly state?: any;
+  readonly store?: any;
 }
 
 export const MatStackInspector: React.FC<MatStackInspectorProps> = ({ scope = 'kit-slot' }) => {
@@ -462,3 +464,5 @@ export const MatStackInspector: React.FC<MatStackInspectorProps> = ({ scope = 'k
     </div>
   );
 };
+
+export { MatStackInspector as MatstackInspector };

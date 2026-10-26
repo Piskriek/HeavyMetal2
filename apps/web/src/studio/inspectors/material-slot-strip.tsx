@@ -12,6 +12,8 @@ import './material-slot-strip.css';
 
 export interface MaterialSlotStripProps {
   readonly onScopeChange?: (scope: 'part-override' | 'kit-slot') => void;
+  readonly state?: any;
+  readonly store?: any;
 }
 
 export const MaterialSlotStrip: React.FC<MaterialSlotStripProps> = ({ onScopeChange }) => {

@@ -441,7 +441,7 @@ export const SHARED_MODULE_ASSEMBLIES: Readonly<Record<string, AssemblyDef>> = O
  *  - `tp-bracket`: gusseted `bracket`;
  *  - `tp-short-can`: short `can` housing.
  */
-export const MATSTACK_TEST_PIECE_KIT: Kit = Object.freeze({
+export const MATSTACK_TEST_PIECE_KIT: Kit = Object.freeze<any>({
   parts: {
     'tp-skid': {
       source: {
@@ -451,7 +451,7 @@ export const MATSTACK_TEST_PIECE_KIT: Kit = Object.freeze({
       },
       material: MAT_PRESET_SKINS.darkHopper,
       slotMaterials: { body: MAT_PRESET_SKINS.darkHopper, trim: MAT_PRESET_SKINS.brushedTrim },
-      rank: 0,
+      rank: 0 as const,
       sockets: {
         panelMount: { at: [-0.08, 0.28, -0.14], rot: [90, 0, 0] },
         beamMount: { at: [0.22, 0.34, -0.12], rot: [0, 0, 90] },
@@ -467,7 +467,7 @@ export const MATSTACK_TEST_PIECE_KIT: Kit = Object.freeze({
       },
       material: MAT_PRESET_SKINS.khakiBody,
       slotMaterials: { plate: MAT_PRESET_SKINS.khakiBody, bolts: MAT_PRESET_SKINS.brushedTrim },
-      rank: 0,
+      rank: 0 as const,
     },
     'tp-square-beam': {
       source: {
@@ -477,7 +477,7 @@ export const MATSTACK_TEST_PIECE_KIT: Kit = Object.freeze({
       },
       material: MAT_PRESET_SKINS.khakiBody,
       slotMaterials: { steel: MAT_PRESET_SKINS.khakiBody },
-      rank: 0,
+      rank: 0 as const,
     },
     'tp-bracket': {
       source: {
@@ -487,7 +487,7 @@ export const MATSTACK_TEST_PIECE_KIT: Kit = Object.freeze({
       },
       material: MAT_PRESET_SKINS.khakiBody,
       slotMaterials: { steel: MAT_PRESET_SKINS.khakiBody, bolts: MAT_PRESET_SKINS.brushedTrim },
-      rank: 1,
+      rank: 1 as const,
     },
     'tp-short-can': {
       source: {
@@ -497,7 +497,7 @@ export const MATSTACK_TEST_PIECE_KIT: Kit = Object.freeze({
       },
       material: MAT_PRESET_SKINS.khakiBody,
       slotMaterials: { body: MAT_PRESET_SKINS.khakiBody, trim: MAT_PRESET_SKINS.hazardStripe },
-      rank: 1,
+      rank: 1 as const,
     },
   },
   assemblies: {
@@ -511,7 +511,7 @@ export const MATSTACK_TEST_PIECE_KIT: Kit = Object.freeze({
       ],
     },
   },
-} as Kit);
+});
 
 export { MAT_PRESET_SKINS } from './kit-trim-palette';
 export const TEST_PIECE_HEIGHT = 0.60;

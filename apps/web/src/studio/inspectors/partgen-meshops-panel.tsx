@@ -20,7 +20,12 @@ const QUICK_PRESETS = [
   { key: 'edge-wear', label: 'Edge Wear', icon: '🛡️' },
 ] as const;
 
-export const PartgenMeshopsPanel: React.FC = () => {
+export interface PartGenMeshOpsPanelProps {
+  readonly state?: any;
+  readonly store?: any;
+}
+
+export const PartgenMeshopsPanel: React.FC<PartGenMeshOpsPanelProps> = () => {
   const state = useStudioState();
 
   const entry = state.kits[state.activeKitId];
@@ -198,3 +203,6 @@ export const PartgenMeshopsPanel: React.FC = () => {
     </div>
   );
 };
+
+export { PartgenMeshopsPanel as PartGenMeshOpsPanel };
+

@@ -321,7 +321,7 @@ export const StudioApp: React.FC<StudioAppProps> = ({
         {state.activeWorkspace === 'creative-suite' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 410px', height: '100%' }}>
             {/* Left/Center: MaterialSlotStrip + 3D Viewport */}
-            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0, overflow: 'hidden' }}>
               <MaterialSlotStrip state={state} store={store} />
               <div
                 style={{

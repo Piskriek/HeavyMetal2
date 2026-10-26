@@ -28,6 +28,8 @@ export interface StudioAppProps {
   renderPrototype?: () => React.ReactElement;
 }
 
+import { installStudioAiBridge } from './studio-ai-bridge';
+
 const defaultStore = createStudioStore();
 
 const WORKSPACES: Array<{ id: StudioWorkspaceId; label: string; rung: PresetRung }> = [
@@ -58,6 +60,11 @@ export const StudioApp: React.FC<StudioAppProps> = ({
   const [saveBanner, setSaveBanner] = useState<string | null>(null);
   const breadcrumb = store.getBreadcrumb();
   const rungMeta = RUNG_METADATA[state.activeRung];
+
+  // Install Programmatic AI Navigation & Inspection Bridge on window
+  useEffect(() => {
+    return installStudioAiBridge(store);
+  }, [store]);
 
   // Global keyboard shortcuts: Ctrl+Z / Ctrl+Shift+Z undo/redo & [M] Mask B&W toggle
   useEffect(() => {

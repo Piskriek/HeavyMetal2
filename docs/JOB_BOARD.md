@@ -88,7 +88,68 @@ Each job may list **Skills** (tags such as `frontend`, `route`, `visual-verify`)
 ## 3. JOB QUEUE
 
 ## ═══════════════════════════════════════════════════════════════════════════
-## ACTIVE FOCUS: QA AUDIT REMEDIATION (ARGO_GRAND_MASTER_REPORT.md)
+## ACTIVE FOCUS: PLAN 45 — CLAUDE CLOUD STUDIO REALIZATION & POLISH
+## Directive: docs/argo/plans/45-studio-claude-cloud-directive.md
+## Briefing: docs/prompts/CLAUDE_CLOUD_STUDIO_BRIEFING.md
+## Branch: feat/studio-polish-claude-cloud
+## ═══════════════════════════════════════════════════════════════════════════
+
+## JOB-CLOUD-01 [OPEN] Character & Animation Studio Workspace
+- **Role:** ARCHITECT
+- **Skills:** `character`, `kinematics`, `animation`, `threejs`
+- **Priority:** P0 (BLOCKER)
+- **Milestone:** PLAN-45
+- **Paths:** `apps/web/src/studio/character-tab.tsx, apps/web/src/avatar/two-bone-ik.ts, packages/anim/src/index.ts, packages/kinematic/src/index.ts, packages/skin/src/index.ts`
+- **Verify:** `npx tsx --test apps/web/src/studio/character-tab.test.ts`
+- **Brief:** Restore and elevate the modular Character & Animation workspace built from recursive parts (`@hm/partgen` + `@hm/kitspec` + `@hm/kinematic` + `@hm/anim` + `@hm/skin` + `two-bone-ik.ts`). Assemble avatars from modular body parts (head, torso, limbs, visor, backpack), wire procedural foot grounding IK, and build interactive gait sliders (Walk Speed, Cadence, Stride Length, Arm Swing) with live clip auditioning (`Idle`, `Walk`, `Run`, `Jump`, `Aim`, `Emote`).
+
+## JOB-CLOUD-02 [OPEN] Interactive Polygon Modeling & 3D Painting Suite
+- **Role:** ENGINEER
+- **Skills:** `meshops`, `modeling`, `painting`, `webgl`
+- **Priority:** P0 (BLOCKER)
+- **Milestone:** PLAN-45
+- **Paths:** `apps/web/src/studio/viewport/studio-viewport.tsx, apps/web/src/studio/inspectors/partgen-meshops-panel.tsx, packages/meshops/src/index.ts`
+- **Verify:** `npm test -- packages/meshops`
+- **Brief:** Surface `@hm/meshops` 27 operators into an interactive 3D polygon modeling toolbar in the viewport. Implement raycast face/edge/vertex picking with one-click deformers (`[Extrude Face]`, `[Bevel Edge]`, `[Chamfer 45°]`, `[Subdivide]`, `[Taubin Smooth]`, `[Twist]`, `[Bend Arc]`). Add real-time 3D surface and vertex painting for tint, cavity, and `@hm/matstack` mask channels.
+
+## JOB-CLOUD-03 [OPEN] Massive Multi-Level Preset Library Explosion
+- **Role:** ARCHITECT
+- **Skills:** `presets`, `matstack`, `texgraph`, `kitspec`, `soundlab`
+- **Priority:** P1 (HIGH)
+- **Milestone:** PLAN-45
+- **Paths:** `packages/texgraph/src/tile-library.ts, packages/matstack/src/shelf.ts, packages/partgen/src/generators.ts, packages/kitspec/src/shelf.ts, packages/soundlab/src/index.ts, packages/plotbiome/src/index.ts`
+- **Verify:** `npx tsx --test packages/matstack/tests/shelf.test.ts`
+- **Brief:** Drastically expand preset variety across all 5 rungs: 35+ seamless tiles in `@hm/texgraph` (carbon fiber, solar cells, heatshields, volcanic basalt), 48+ smart materials in `@hm/matstack` across 6 families, 20+ parametric generators in `@hm/partgen`, 8 new modular machine kits in `@hm/kitspec` (Solar Collector, Atmospheric Harvester, Cargo Hauler, Defense Sentry), 15+ sound recipes in `@hm/soundlab`, and 6 new biomes in `@hm/plotbiome`.
+
+## JOB-CLOUD-04 [OPEN] Dynamic Studio-to-Game Live Link (Single Source of Truth)
+- **Role:** ENGINEER
+- **Skills:** `runtime`, `campaign`, `play`, `persistence`
+- **Priority:** P0 (BLOCKER)
+- **Milestone:** PLAN-45
+- **Paths:** `apps/web/src/play/play-scene.ts, apps/web/src/play/outpost-world.ts, apps/web/src/lab/lab-scene.ts, apps/web/src/studio/state/studio-store.ts`
+- **Verify:** `npx tsx --test apps/web/src/play/campaign-link.test.ts`
+- **Brief:** Eliminate all hardcoded machines and static fallbacks in the live campaign game. Connect `buildStudioMachineModel()` and `studio-store` campaign overrides directly into `outpost-world.ts`, `lab-scene.ts`, and `play-scene.ts`. When sliders or paint are modified in the Studio and saved, the live game immediately manifests the changes. Ensure bidirectional cartridge compatibility with the Beam Rifle.
+
+## JOB-CLOUD-05 [OPEN] AI Agent Studio Operating Manual & API Reference
+- **Role:** RUNNER
+- **Skills:** `docs`, `api`, `agent`
+- **Priority:** P1 (HIGH)
+- **Milestone:** PLAN-45
+- **Paths:** `docs/studio/STUDIO_AGENT_OPERATING_MANUAL.md, apps/web/src/studio/studio-ai-bridge.ts`
+- **Verify:** `node scripts/crawl-studio.mjs`
+- **Brief:** Author `STUDIO_AGENT_OPERATING_MANUAL.md` providing complete documentation of `window.__studioBridge` / `window.__studioNav`. Include detailed schema references, JSON-RPC recipes, and automated testing patterns so external AI agents can operate the Studio programmatically with zero human intervention.
+
+## JOB-CLOUD-06 [OPEN] In-Studio Interactive Player Tutorials & Guided Creation
+- **Role:** BUILDER
+- **Skills:** `frontend`, `ux`, `tutorial`
+- **Priority:** P1 (HIGH)
+- **Milestone:** PLAN-45
+- **Paths:** `apps/web/src/studio/studio-app.tsx, apps/web/src/studio/modals/tutorial-overlay.tsx`
+- **Verify:** `npm run typecheck`
+- **Brief:** Implement an in-studio interactive tutorial overlay guiding players step-by-step through machine customization, paint tuning, procedural tile generation, modular vehicle assembly, and planet genesis with Spore Card export.
+
+## ═══════════════════════════════════════════════════════════════════════════
+## PREVIOUS FOCUS: QA AUDIT REMEDIATION (ARGO_GRAND_MASTER_REPORT.md)
 ## ═══════════════════════════════════════════════════════════════════════════
 
 ## JOB-QA-01 [DONE] Wave A1: Physics & Colliders (LAB-10, GATE-04, BB-02)

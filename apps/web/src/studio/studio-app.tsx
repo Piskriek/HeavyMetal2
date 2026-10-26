@@ -31,9 +31,7 @@ import { forgetFourAngle, FourAnglePanel } from './four-angle';
 import { LookTab } from './look-tab';
 import { SceneTab } from './scene-tab';
 import { StudioErrorBoundary } from './studio-error-boundary';
-import { MaterialDesigner } from './material-designer';
 import { MonsterTab } from './monster-tab';
-import { PartDesigner } from './part-designer';
 import { installStudioAgent, newPairingKey, type StudioAgentApi } from './studio-agent-page';
 import { startBridgeClient, type BridgeState } from './studio-agent-bridge-client';
 import { MaterialSlotStrip } from './inspectors/material-slot-strip';
@@ -706,12 +704,53 @@ export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
           <div><b>FIDELITY</b><span>Studio</span></div>
         </div>
         <nav className="sx-tabs" aria-label="Workspaces">
-          <button type="button" aria-pressed={workspace === 'assets'} onClick={() => setWorkspace('assets')}>Assets</button>
+          <button
+            type="button"
+            aria-pressed={workspace === 'assets' && rightTab === 'material'}
+            onClick={() => {
+              setWorkspace('assets');
+              setActiveKitMode(true);
+              setRightTab('material');
+            }}
+          >
+            Materials
+          </button>
+          <button
+            type="button"
+            aria-pressed={workspace === 'assets' && (rightTab === 'assembly' || rightTab === 'partgen')}
+            onClick={() => {
+              setWorkspace('assets');
+              setActiveKitMode(true);
+              setRightTab('assembly');
+            }}
+          >
+            Parts & Assemblies
+          </button>
+          <button
+            type="button"
+            aria-pressed={workspace === 'assets' && rightTab === 'texgraph'}
+            onClick={() => {
+              setWorkspace('assets');
+              setActiveKitMode(true);
+              setRightTab('texgraph');
+            }}
+          >
+            TexGraph (UV)
+          </button>
+          <button
+            type="button"
+            aria-pressed={workspace === 'assets' && rightTab === 'details'}
+            onClick={() => {
+              setWorkspace('assets');
+              setActiveKitMode(true);
+              setRightTab('details');
+            }}
+          >
+            Assets
+          </button>
           <button type="button" aria-pressed={workspace === 'scene'} onClick={() => setWorkspace('scene')}>Scene</button>
           <button type="button" aria-pressed={workspace === 'look'} onClick={() => setWorkspace('look')}>Look</button>
           <button type="button" aria-pressed={workspace === 'audio'} onClick={() => setWorkspace('audio')}>Audio</button>
-          <button type="button" aria-pressed={workspace === 'material'} onClick={() => setWorkspace('material')}>Materials</button>
-          <button type="button" aria-pressed={workspace === 'parts'} onClick={() => setWorkspace('parts')}>Parts</button>
           <button type="button" aria-pressed={workspace === 'monsters'} onClick={() => setWorkspace('monsters')}>Monsters</button>
           <button type="button" aria-pressed={workspace === 'spores'} onClick={() => setWorkspace('spores')}>Spore Cards</button>
           <button type="button" aria-pressed={workspace === 'moon'} onClick={() => setWorkspace('moon')}>Moon (prototype)</button>
@@ -871,14 +910,7 @@ export function StudioApp({ onBack, renderPrototype, onGamePreset }: {
             {audioDoc ? <AudioTab levels={audioDoc.levels} writable={writable === true} onChange={changeAudio} /> : null}
           </div>
         </StudioErrorBoundary>
-      ) : workspace === 'material' ? (
-        <StudioErrorBoundary key="material" tabName="Materials">
-          <MaterialDesigner />
-        </StudioErrorBoundary>
-      ) : workspace === 'parts' ? (
-        <StudioErrorBoundary key="parts" tabName="Parts">
-          <PartDesigner />
-        </StudioErrorBoundary>
+
       ) : workspace === 'monsters' ? (
         <StudioErrorBoundary key="monsters" tabName="Monsters">
           <MonsterTab writable={writable === true} />

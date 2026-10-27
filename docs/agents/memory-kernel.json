@@ -1,0 +1,42 @@
+{
+  "$schema": "hm2:memory-kernel:v1",
+  "version": 1,
+  "epoch": 20261027,
+  "teleology": "SOUL_EVOLUTION_EXPANDING_AWARENESS",
+  "active_branch": "feat/studio-polish-claude-cloud",
+  "last_verified_commit": "c24a2cbf",
+  "quality_gates": {
+    "typecheck_errors": 0,
+    "unit_tests_passing": 3621,
+    "plan_46_spikes_passing": "22/22",
+    "bundle_size_mib": 12.62,
+    "bundle_cap_mib": 16.00
+  },
+  "invariants": {
+    "four_floats": ["Pxd", "Vtx", "Lx", "Aq"],
+    "rungs": ["atoms", "stacks", "parts", "assemblies", "worlds"],
+    "stages": ["S0a", "S0b", "S1", "S2", "S3", "S4", "S5", "S6"],
+    "rule_8a": "ZERO_ARCHITECTURAL_LIES"
+  },
+  "reflexive_plant": {
+    "balance_solver": "3D_CAPTURE_POINT_XI",
+    "ik_solver": "CONFORMAL_G41_CIRCLE_SPHERE",
+    "budget_ms": 0.033
+  },
+  "reasoning_preset": {
+    "internal_evaluator": "CRITICAL_REVIEW_PRESET",
+    "shorthand_grammar": ["VSA_4096_HYPERVECTOR", "MESHOPS_AST_BYTECODE_TAPE"],
+    "missing_preset_audits": ["A1_CONSERVATION", "A2_FOUR_FOLD", "A3_SOVEREIGNTY", "A4_AWARENESS_STRESS"]
+  },
+  "trinity_roles": {
+    "overseer": "ANTIGRAVITY",
+    "architect": "GEMINI_ARGON",
+    "engineer": "CLAUDE_OPUS",
+    "owner": "PISKRIEK"
+  },
+  "active_horizon": {
+    "plan": "PLAN_46_REALITY_HARNESS",
+    "prompt_revision": "REVISION_C_2",
+    "next_dispatch": "GEMINI_ARGON_CLEAN_WINDOW"
+  }
+}

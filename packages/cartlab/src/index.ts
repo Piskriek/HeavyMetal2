@@ -986,3 +986,6 @@ export function readPrint(x: unknown): Print | null {
 
 // PNG Spore Cards share the same pure schemas and anatomy audit as Studio imports.
 export * from './spore-card';
+
+// Plan 47 consumer integration: Sovereign Harness (`harness:` / `harnessc:`) cartridges.
+export * from './harness-cartridge';

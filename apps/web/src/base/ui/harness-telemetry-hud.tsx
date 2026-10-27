@@ -11,7 +11,7 @@
  * Pure deterministic view-model projection + React HUD blade (RULES 8a).
  */
 
-import { StateIdx } from '../../../../../packages/harness/src/types';
+import { StateIdx } from '@hm/harness';
 
 export interface IHarnessHudViewModel {
   /** Attractor Trench Widget */
@@ -53,12 +53,12 @@ export function computeHarnessHudViewModel(
   relativeAwarenessCap: number,
   targetTrueX = 0.0,
 ): IHarnessHudViewModel {
-  const qx = stateVec[StateIdx.Q_X];
-  const muPrior = stateVec[StateIdx.MU_PXD];
-  const piPrior = stateVec[StateIdx.PI_PRIOR];
-  const awareness = stateVec[StateIdx.A_AWARE];
-  const ftle = stateVec[StateIdx.LAMBDA_FTLE];
-  const coherenceH = stateVec[StateIdx.H_COHERENCE];
+  const qx = stateVec[StateIdx.QX]!;
+  const muPrior = stateVec[StateIdx.MU_PXD]!;
+  const piPrior = stateVec[StateIdx.PI_PRIOR]!;
+  const awareness = stateVec[StateIdx.A_AWARE]!;
+  const ftle = stateVec[StateIdx.LAMBDA_FTLE]!;
+  const coherenceH = stateVec[StateIdx.H_COHERENCE]!;
 
   // 1. Attractor Trench Depth & SVG Potential Curve (120x44 px)
   const rawTrenchJ = 0.5 * piPrior * (qx - muPrior) * (qx - muPrior) + 0.15 * Math.max(0, piPrior - 1.5);
@@ -82,8 +82,8 @@ export function computeHarnessHudViewModel(
   const scanlineGlitchOpacity = Number((mirrorErrorNorm * 0.85).toFixed(3));
 
   // 3. Syntropic Buffer Escrow & Exploration Reserve
-  const escrowBalanceJ = syntropicBuffer[0];
-  const explorationReserveJ = stateVec[StateIdx.E_RESERVE];
+  const escrowBalanceJ = syntropicBuffer[0]!;
+  const explorationReserveJ = stateVec[StateIdx.E_RESERVE]!;
   const escrowGateOpenRatio = Math.min(1.0, Math.exp(-piPrior / 1.5));
 
   // 4. Graduation G_ascent Ray-7 Violet Aura

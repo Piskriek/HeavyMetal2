@@ -484,3 +484,6 @@ export function hashSim(sim: Sim): string {
   }
   return parts.join('|');
 }
+
+// Plan 47 consumer integration: the Sovereign Harness rover escort binding.
+export * from './rover-harness-binding';

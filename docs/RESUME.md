@@ -1,5 +1,21 @@
 # RESUME: start here (fresh session)
 
+## 27 Oct Checkpoint (Claude Engineer, Claude Cloud: Plan 47 Consumer Integration Aligned with `@hm/harness` — Commit `230e3081`; read this first)
+- **Scope & Delivery:** Gemini Argon's Plan 47 Consumer Integration Pass (commit `83618f70`: blueprint, standalone 10/10 JS suite, three prototype consumer modules) aligned with the canonical `@hm/harness` types and wired into the monorepo. The prototypes carried ~97 typecheck errors of canonical drift (`StateIdx.Q_X` vs `QX`, `relativeAwarenessBound` vs `relativeAwarenessCeiling`, invented `IDynamicsSpec` scalars, missing strict-index assertions); all resolved:
+  - **`packages/mobsim/src/rover-harness-binding.ts`**: canonical names throughout; tuning constants come from an explicit `IHarnessTuning` parameter instead of invented vessel fields; the inlined Cayley-Padé math replaced with the canonical `stepCayleyPadeMidpoint` + caller-owned scratch (one source of integrator truth, zero tick-path allocations preserved). Exported from the `@hm/mobsim` index.
+  - **`packages/cartlab/src/harness-cartridge.ts`**: canonical `tier: 1|2|3` and `relativeAwarenessCeiling` on `IHarnessCartridgeSpec` (all 8 shelf presets updated); `VesselArchetypeId` / `ContextModeCode` / `EthicalConstraintCode` wire types declared and exported here (codes 0/2 and bit 0 map onto the canonical downward channel; the rest are declared shelf flavors); **Node `Buffer` removed** — pure base64url codec, since cartlab bundles into the single-file browser client where `Buffer` does not exist; `toVesselPreset` now derives from `createEscortRoverPreset()` and the new `toHarnessTuning` maps the 6 Bench sliders onto `IHarnessTuning` (Π₀, α_anneal, r_syntropic). Exported from the `@hm/cartlab` index.
+  - **`apps/web/src/base/ui/harness-telemetry-hud.tsx`**: `@hm/harness` alias import, canonical `StateIdx` spellings, strict-index assertions; the pure view-model export is unchanged in shape.
+  - **New TS tests execute the aligned code** (the JS consumer suite is standalone and never imports the TS): `packages/mobsim/tests/rover-harness-binding.test.ts` (panic swerve → Higher-Self bridge → escort line < 0.01 m, slip < 0.15, graduation, tanh steering envelope), `packages/cartlab/tests/harness-cartridge.test.ts` (shelf passthrough, `harnessc:` round-trip, CRC tamper gate, base64url cross-checked against Node's reference codec, CRC-32 IEEE vector, canonical projections), `apps/web/src/base/ui/harness-telemetry-hud.test.ts` (magenta trench-lock, Ray-7 violet graduation, emerald band).
+- **Quality Gates (verified at `230e3081`, exit codes captured directly, no pipes):**
+  - `npm run typecheck`: **0 errors** across the monorepo.
+  - `npm test`: **exit 0 — 3,638 / 3,642 pass, 0 fail, 4 skip; speed pass 23/23** (includes the 11 new consumer tests).
+  - `node scripts/test-harness-consumer-integration.js`: **10/10**; `scripts/test-plan-46-spikes.mjs`: **22/22**; `scripts/spike_sovereign_harness.js`: **16/16**.
+  - `npm run build`: **12.62 MiB / 16 MiB cap** (the `@hm/harness` graph enters the client bundle at no material cost). `apps/web/dist/index.html` restored after the build, per the never-commit rule.
+- **Next Actions:**
+  1. Wire the binding into the live game loop: call `stepRoverEscortHarness` from the rover vehicle tick (`apps/web/src/play/`), mount the HUD blade in Zone 8, and hook the Bench `harness:` tab + Beam Rifle `Apply` per Plan 47 §3.2 (UI work — load `/frontend-design` first).
+  2. Multi-DOF generalization of the Cayley-Padé resolvent (the 1-DOF escort axis is the verified seed).
+  3. Multi-archetype physical envelopes for `toVesselPreset` (crawler/turret/creature substrates differ from the rover's).
+
 ## 27 Oct Checkpoint (Claude Engineer, Claude Cloud: Plan 46 Waves 1–3 `@hm/harness` Landed — Commits `5bfd8c9f` + `d6611acc`; read this first)
 - **Wave 2 — Benchmark Hardening (`scripts/test-plan-46-spikes.mjs`, commit `d6611acc`):**
   - Spike 3: 64-pass JIT warmup (plus exact delta-impulse reset) so the timed region measures the CSR kernel's steady state, not the TurboFan compilation spike: **1.616 ms → 0.055 ms** (plan target 0.169 ms).

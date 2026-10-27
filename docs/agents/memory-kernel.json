@@ -4,11 +4,12 @@
   "epoch": 20261027,
   "teleology": "SOUL_EVOLUTION_EXPANDING_AWARENESS",
   "active_branch": "feat/studio-polish-claude-cloud",
-  "last_verified_commit": "d6611acc",
+  "last_verified_commit": "230e3081",
   "quality_gates": {
     "typecheck_errors": 0,
-    "unit_tests_passing": 3627,
+    "unit_tests_passing": 3638,
     "plan_46_spikes_passing": "38/38",
+    "plan_47_consumer_suite_passing": "10/10",
     "bundle_size_mib": 12.62,
     "bundle_cap_mib": 16.00
   },
@@ -55,10 +56,11 @@
     "owner": "PISKRIEK"
   },
   "active_horizon": {
-    "plan": "PLAN_46_REALITY_HARNESS",
+    "plan": "PLAN_47_CONSUMER_INTEGRATION",
     "prompt_revision": "REVISION_D_2",
     "wave_1_landed_commit": "5bfd8c9f",
     "waves_2_3_landed_commit": "d6611acc",
-    "next_dispatch": "HARNESS_CONSUMER_INTEGRATION_ARGON_CREATIVE_PASS"
+    "plan_47_aligned_commit": "230e3081",
+    "next_dispatch": "LIVE_GAME_LOOP_WIRING_HUD_ZONE8_BENCH_TAB"
   }
 }

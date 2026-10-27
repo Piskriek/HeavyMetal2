@@ -68,6 +68,7 @@ import { BenchMaterials } from './bench-materials';
 import { BenchSprites } from './bench-sprites';
 import { BenchSounds } from './bench-sounds';
 import { BenchHarness } from './bench-harness';
+import { CompanionChat } from './companion-chat';
 import { HarnessTelemetryHud, type IHarnessHudViewModel } from '../base/ui/harness-telemetry-hud';
 import { computeDrivingDriftBadge, type DrivingDriftBadgeState } from '@hm/hudmath/toast-queue-and-compass';
 import { MY_PRESETS_KEY, parseMyPresets, presetsOf, savePreset, serializeMyPresets, type MyPresets } from './my-presets';
@@ -5019,6 +5020,13 @@ useEffect(() => {
               <DrivingHudBadge telemetry={drivingDrift} />
             </HudZone>
           ) : null}
+          {/* Plan 48: In-game AI Companion Comms */}
+          <CompanionChat
+            companion={sceneRef.current?.getCompanion?.() ?? null}
+            onBroadcastRadio={(text) => {
+              say('Overwatch · Co-Builder', text);
+            }}
+          />
           {(state.step === 'build' || state.step === 'drill' || state.step === 'done' || visiting) && drivingSpeed === null ? (
             <HudZone zone="bottom-right">
             <section className="play-plot" data-hud-zone="bottom-right" aria-label={visiting ? `Visiting ${visiting.snapshot.owner}'s plot` : 'Your plot'}>

@@ -1,5 +1,22 @@
 # RESUME: start here (fresh session)
 
+## 27 Oct Checkpoint (Antigravity Overseer: Plan 48 Wave 1 Landed — The In-Game AI Companion & Comms HUD; read this first)
+- **Scope & Delivery (Plan 48 Wave 1: The In-Game AI Companion):**
+  - **In-Game Companion Avatar (`apps/web/src/play/companion.ts`)**: Spawns a second Hazmat Scientist companion ("Overwatch · Co-Builder") with a Ray-7 Violet Visor (`#b84dff`), floating 3D billboard nameplate, dynamic speech bubble, autonomous formation locomotion (shadowing player at 3.0m on right shoulder), smooth yaw slew, and animation crossfades (walk, run, idle, wave, cheer).
+  - **Scene Integration (`apps/web/src/play/play-scene.ts`)**: Companion seamlessly steps within the fixed-step physics accumulator, clamped to the ground heightfield (`groundAt`), transitions between Lab and Planet across portal crossovers, and exposes `getCompanion()` on `PlayScene` and `window.__companion`.
+  - **Comms HUD & Push-to-Talk (`companion-chat.tsx` + `.css`, `play.tsx`)**: Bottom-left tactical comms button (`[COMMS · OVERWATCH]`, toggleable via `Enter`), glassmorphism chat panel, quick action chips (Follow, Wave, Status, Cheer), Web Speech API microphone push-to-talk, broadcast toast notifications via `say()`, and live companion speech triggers.
+  - **Neural Bridge Endpoint (`scripts/companion-bridge.mjs`)**: Lightweight local HTTP & WebSocket server on port 8220 exposing `/status`, `/command`, and `/companion/say`.
+  - **Research & Spec**: [`docs/COMPANION_AI_COOP_RESEARCH.md`](COMPANION_AI_COOP_RESEARCH.md) and [`docs/argo/plans/48-in-game-ai-companion-bridge.md`](argo/plans/48-in-game-ai-companion-bridge.md).
+- **Quality Gates (verified live on local machine):**
+  - `npm run typecheck`: **0 errors**.
+  - `npm test`: **exit 0 — 3,643 / 3,647 pass, 0 fail, 4 skip; speed pass 23/23**.
+  - `node scripts/test-companion-e2e.mjs`: **7 / 7 checks PASSED (100%)** in headless Chromium against the built single-file bundle (toggle visible, panel open, chat reply, 3D entity active, speech bubble rendered, gesture chip triggered, 0 page errors). Screenshots in `shots-run/companion/`.
+  - `npm run build`: **12.66 MiB / 16.00 MiB cap** (standalone single-file bundle).
+- **Next Actions (Wave 2 & 3):**
+  1. Live interactive play session with Piskriek testing the companion in the browser.
+  2. Multi-vehicle escort: have the companion board a secondary rover and drive alongside the player using `@hm/harness`.
+  3. Hook up streaming helmet radio TTS for speech synthesis.
+
 ## 27 Oct Checkpoint (Claude Engineer, Claude Cloud: Plan 47 CLOSED — Persistence & Playwright E2E Landed — Commit `d56414ae`; read this first)
 - **Scope & Delivery (dispatch `E2E_SOULS_TAB_ZONE8_PLAYWRIGHT_AND_HARNESS_PERSISTENCE`, the final Plan 47 item):**
   - **Plot-save persistence:** `Vehicle.harness?` ref on the base world; `bindHarness` command (decode-validated, `null` strips) + `harnessBound` event, mirrored both ways through the net protocol wire mapping so bound souls sync across the shared world; `loadWorld` re-validates the ref through the CRC gate (tampered saves drop it). Boarding is one `boardVehicle()` path (E key + `hmPlay.base.boardVehicle` hook): a rifle harness binds and persists via dispatch, a saved soul wakes by name, else the steadfast default. Unit coverage in `world.test.ts` (bind/refuse/park/save-load/strip/tamper).

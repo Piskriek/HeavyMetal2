@@ -57,13 +57,14 @@
     "owner": "PISKRIEK"
   },
   "active_horizon": {
-    "plan": "PLAN_47_CONSUMER_INTEGRATION",
+    "plan": "PLAN_48_IN_GAME_AI_COMPANION",
     "prompt_revision": "REVISION_D_2",
     "wave_1_landed_commit": "5bfd8c9f",
     "waves_2_3_landed_commit": "d6611acc",
     "plan_47_aligned_commit": "230e3081",
     "plan_47_live_wiring_commit": "36d21c03",
     "plan_47_closed_commit": "d56414ae",
-    "next_dispatch": "OWNER_REVIEW_PLAN_47_COMPLETE"
+    "plan_48_wave_1_landed": true,
+    "next_dispatch": "PLAN_48_LIVE_COMPANION_TESTING"
   }
 }

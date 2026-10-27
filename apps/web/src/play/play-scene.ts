@@ -67,6 +67,7 @@ import { outcropGeometry, outcropMaterial } from './outcrops';
 import { loadScientistAnimations, type ClipName } from '../avatar/scientist/anims-loader';
 import { createScientistAnimator, type OneShotKind, type ScientistAnimator } from '../avatar/scientist/animator';
 import { loadRifleAnimations } from '../avatar/astro/rifle-clips';
+import { createCompanionEntity, type CompanionEntity } from './companion';
 import { handPose, viewPose } from './rifle-hold';
 import { footprintSolids, navFor } from '../base/navgrid';
 import { solveLeftArmForegripIk } from '../avatar/two-bone-ik';
@@ -445,6 +446,8 @@ export interface PlayScene {
   setVehicleHarness(ref: string | null): boolean;
   getDrivingVehicle(): { readonly id: number; readonly kind: RoverKind; readonly speed: number; readonly boostEnergy?: number; readonly boosting?: boolean } | null;
   getNearVehicle(reach?: number): { readonly id: number; readonly kind: RoverKind } | null;
+  /** Returns the active in-game AI companion entity, if loaded. */
+  getCompanion(): CompanionEntity | null;
   /** POL-96: marks the sidearm on the armory rail taken or standing. */
   setSidearmTaken(taken: boolean): void;
   /** POL-97: salvages the targeted wreck truck, returning its stock. */
@@ -2445,6 +2448,20 @@ export function createPlayScene(o: {
     console.warn('Failed to load scientist in Play:', err);
   });
 
+  let companionEntity: CompanionEntity | null = null;
+  void createCompanionEntity({ x: pos.x + 2.0, y: pos.y, z: pos.z + 1.2, yaw: yaw }).then((comp) => {
+    if (!sceneAlive) { comp.dispose(); return; }
+    companionEntity = comp;
+    if (where === 'planet') {
+      planetScene.add(comp.group);
+    } else {
+      labScene.add(comp.group);
+    }
+    (window as any).__companion = comp;
+  }).catch((err) => {
+    console.warn('Failed to load companion in Play:', err);
+  });
+
   const LAB_GATE_CLOSED_BOX: Box = { min: [-0.85, 0.4, -1.25], max: [0.85, 3.4, -0.75] };
   /** Pushes the walker's circle of RADIUS out of the lab's boxes (TICKET-01 B: the swept resolver, from where the walker stood). */
   const collide = (p: THREE.Vector3, from: { readonly x: number; readonly z: number }): void => {
@@ -2471,9 +2488,17 @@ export function createPlayScene(o: {
       if (next === 'planet') {
         labScene.remove(scientistHolder);
         planetScene.add(scientistHolder);
+        if (companionEntity && companionEntity.group.parent !== planetScene) {
+          labScene.remove(companionEntity.group);
+          planetScene.add(companionEntity.group);
+        }
       } else {
         planetScene.remove(scientistHolder);
         labScene.add(scientistHolder);
+        if (companionEntity && companionEntity.group.parent !== labScene) {
+          planetScene.remove(companionEntity.group);
+          labScene.add(companionEntity.group);
+        }
       }
     }
     where = next;
@@ -2901,10 +2926,18 @@ export function createPlayScene(o: {
           planetScene.remove(scientistHolder);
           labScene.add(scientistHolder);
         }
+        if (companionEntity && companionEntity.group.parent !== labScene) {
+          planetScene.remove(companionEntity.group);
+          labScene.add(companionEntity.group);
+        }
       } else {
         if (scientistHolder.parent !== planetScene) {
           labScene.remove(scientistHolder);
           planetScene.add(scientistHolder);
+        }
+        if (companionEntity && companionEntity.group.parent !== planetScene) {
+          labScene.remove(companionEntity.group);
+          planetScene.add(companionEntity.group);
         }
       }
       api.setPlot(s.plot, s.running, s.connected);
@@ -3709,6 +3742,11 @@ export function createPlayScene(o: {
         applyThirdPersonForegripIk();
       }
 
+      if (companionEntity) {
+        const floorFn = where === 'planet' ? groundAt : room.floorHeight;
+        companionEntity.step(dt, { x: pos.x, y: pos.y - EYE, z: pos.z, yaw }, floorFn);
+      }
+
       if (drivingVehicleId === null) roverArmOn = false;
       if (altCamPos) {
         camera.position.copy(altCamPos);
@@ -4336,9 +4374,17 @@ export function createPlayScene(o: {
           if (w === 'planet') {
             labScene.remove(scientistHolder);
             planetScene.add(scientistHolder);
+            if (companionEntity && companionEntity.group.parent !== planetScene) {
+              labScene.remove(companionEntity.group);
+              planetScene.add(companionEntity.group);
+            }
           } else {
             planetScene.remove(scientistHolder);
             labScene.add(scientistHolder);
+            if (companionEntity && companionEntity.group.parent !== labScene) {
+              planetScene.remove(companionEntity.group);
+              labScene.add(companionEntity.group);
+            }
           }
           pendingEvent = w === 'planet' ? 'to-planet' : 'to-lab';
         }
@@ -4547,6 +4593,7 @@ export function createPlayScene(o: {
       for (const model of sporeModels) { model.build.group.removeFromParent(); for (const resource of model.resources) resource.dispose(); }
       sporeModels.length = 0;
       scientistAnimator?.dispose();
+      companionEntity?.dispose();
       avatarRig.dispose();
       labScene.remove(scientistHolder);
       planetScene.remove(scientistHolder);
@@ -4729,6 +4776,7 @@ export function createPlayScene(o: {
     exitVehicle,
     getDrivingVehicle,
     getNearVehicle,
+    getCompanion: () => companionEntity,
   };
   (api as any).planetScene = planetScene;
   (api as any).labScene = labScene;

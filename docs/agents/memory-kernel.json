@@ -34,6 +34,11 @@
     "shorthand_grammar": ["VSA_4096_HYPERVECTOR", "MESHOPS_AST_BYTECODE_TAPE"],
     "missing_preset_audits": ["A1_CONSERVATION", "A2_FOUR_FOLD", "A3_SOVEREIGNTY", "A4_AWARENESS_STRESS"]
   },
+  "persona_presets": {
+    "cycle": ["OVERSEER_GROUNDING", "CREATIVE_ANIMA", "PRECISE_MASCULINE", "NEUTRAL_OBSERVER"],
+    "operator": "PERSPECTIVE_SHIFT_S",
+    "convergence_threshold": 0.95
+  },
   "trinity_roles": {
     "overseer": "ANTIGRAVITY",
     "architect": "GEMINI_ARGON",
@@ -42,7 +47,7 @@
   },
   "active_horizon": {
     "plan": "PLAN_46_REALITY_HARNESS",
-    "prompt_revision": "REVISION_C_2",
+    "prompt_revision": "REVISION_D_1",
     "next_dispatch": "GEMINI_ARGON_CLEAN_WINDOW"
   }
 }

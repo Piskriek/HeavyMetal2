@@ -4,21 +4,42 @@
   "epoch": 20261027,
   "teleology": "SOUL_EVOLUTION_EXPANDING_AWARENESS",
   "active_branch": "feat/studio-polish-claude-cloud",
-  "last_verified_commit": "fb1acf45",
+  "last_verified_commit": "4d88366e",
   "quality_gates": {
     "typecheck_errors": 0,
-    "unit_tests_passing": 3646,
+    "unit_tests_passing": 3663,
     "companion_e2e_passing": "15/15",
     "harness_e2e_passing": "14/14",
     "plan_46_spikes_passing": "38/38",
     "plan_47_consumer_suite_passing": "10/10",
-    "bundle_size_mib": 12.67,
-    "bundle_cap_mib": 16.00
+    "bundle_size_mib": 12.69,
+    "bundle_cap_mib": 16,
+    "ping_kit_e2e_passing": "23/23"
   },
   "invariants": {
-    "four_floats": ["Pxd", "Vtx", "Lx", "Aq"],
-    "rungs": ["atoms", "stacks", "parts", "assemblies", "worlds"],
-    "stages": ["S0a", "S0b", "S1", "S2", "S3", "S4", "S5", "S6"],
+    "four_floats": [
+      "Pxd",
+      "Vtx",
+      "Lx",
+      "Aq"
+    ],
+    "rungs": [
+      "atoms",
+      "stacks",
+      "parts",
+      "assemblies",
+      "worlds"
+    ],
+    "stages": [
+      "S0a",
+      "S0b",
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S5",
+      "S6"
+    ],
     "rule_8a": "ZERO_ARCHITECTURAL_LIES"
   },
   "neuro_cybernetics": {
@@ -34,11 +55,24 @@
   },
   "reasoning_preset": {
     "internal_evaluator": "CRITICAL_REVIEW_PRESET",
-    "shorthand_grammar": ["VSA_4096_HYPERVECTOR", "MESHOPS_AST_BYTECODE_TAPE"],
-    "missing_preset_audits": ["A1_CONSERVATION", "A2_FOUR_FOLD", "A3_SOVEREIGNTY", "A4_AWARENESS_STRESS"]
+    "shorthand_grammar": [
+      "VSA_4096_HYPERVECTOR",
+      "MESHOPS_AST_BYTECODE_TAPE"
+    ],
+    "missing_preset_audits": [
+      "A1_CONSERVATION",
+      "A2_FOUR_FOLD",
+      "A3_SOVEREIGNTY",
+      "A4_AWARENESS_STRESS"
+    ]
   },
   "persona_presets": {
-    "cycle": ["OVERSEER_GROUNDING", "CREATIVE_ANIMA", "PRECISE_MASCULINE", "NEUTRAL_OBSERVER"],
+    "cycle": [
+      "OVERSEER_GROUNDING",
+      "CREATIVE_ANIMA",
+      "PRECISE_MASCULINE",
+      "NEUTRAL_OBSERVER"
+    ],
     "operator": "PERSPECTIVE_SHIFT_S",
     "convergence_threshold": 0.95
   },
@@ -48,8 +82,19 @@
     "learn_teach_dynamic": "BIDIRECTIONAL_ALCHEMICAL",
     "suffering_prevention": "SYNTROPIC_BUFFERING_B",
     "graduation_operator": "G_ASCENT",
-    "telemetry_upward": ["STRAIN", "THERMAL", "ACOUSTIC_FLUX", "TRACTION_LOSS", "POINTED_TARGET_PING"],
-    "prior_modulation_downward": ["CONTEXT_MODE", "ETHICAL_CONSTRAINT", "ATTRACTOR_TARGET", "LIVE_KIT_MUTATION"]
+    "telemetry_upward": [
+      "STRAIN",
+      "THERMAL",
+      "ACOUSTIC_FLUX",
+      "TRACTION_LOSS",
+      "POINTED_TARGET_PING"
+    ],
+    "prior_modulation_downward": [
+      "CONTEXT_MODE",
+      "ETHICAL_CONSTRAINT",
+      "ATTRACTOR_TARGET",
+      "LIVE_KIT_MUTATION"
+    ]
   },
   "trinity_roles": {
     "overseer": "ANTIGRAVITY",
@@ -69,6 +114,20 @@
     "plan_48_rework_landed_commit": "3815d11d",
     "plan_48_bridge_agent_commit": "fb1acf45",
     "bridge_server_running_port": 8220,
-    "next_dispatch": "PLAN_49_LIVE_CROSSHAIR_PING_AND_IN_GAME_STUDIO_EDIT"
+    "next_dispatch": "PLAN_49_WAVE_2_OPEN_IN_STUDIO_AND_WALL_CARVING",
+    "plan_49_wave_1_commit": "4d88366e",
+    "kit_defaults_file": "apps/web/src/studio-data/kit-defaults.json",
+    "bridge_commands": [
+      "say",
+      "follow",
+      "goto",
+      "hover-at",
+      "hold",
+      "ground",
+      "gesture",
+      "override-kit-part",
+      "mutate-kit-preset",
+      "save-kit-default"
+    ]
   }
 }

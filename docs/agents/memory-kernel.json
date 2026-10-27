@@ -4,11 +4,11 @@
   "epoch": 20261027,
   "teleology": "SOUL_EVOLUTION_EXPANDING_AWARENESS",
   "active_branch": "feat/studio-polish-claude-cloud",
-  "last_verified_commit": "4c2fd604",
+  "last_verified_commit": "5bfd8c9f",
   "quality_gates": {
     "typecheck_errors": 0,
-    "unit_tests_passing": 3621,
-    "plan_46_spikes_passing": "22/22",
+    "unit_tests_passing": 3627,
+    "plan_46_spikes_passing": "38/38",
     "bundle_size_mib": 12.62,
     "bundle_cap_mib": 16.00
   },
@@ -57,6 +57,7 @@
   "active_horizon": {
     "plan": "PLAN_46_REALITY_HARNESS",
     "prompt_revision": "REVISION_D_2",
-    "next_dispatch": "GEMINI_ARGON_CLEAN_WINDOW"
+    "wave_1_landed_commit": "5bfd8c9f",
+    "next_dispatch": "WAVE_2_BENCHMARK_HARDENING"
   }
 }

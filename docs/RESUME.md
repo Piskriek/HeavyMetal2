@@ -1,5 +1,21 @@
 # RESUME: start here (fresh session)
 
+## 27 Oct Checkpoint (Claude Engineer, Claude Cloud: Plan 46 Wave 1 `@hm/harness` Landed — Commit `5bfd8c9f`; read this first)
+- **Scope & Delivery:** Wave 1 core implementation of the Sovereign Reality Harness (`packages/harness/src/`), productionizing the verified Spike 8 math (`scripts/spike_sovereign_harness.js`) into pure, typed, documented modules under `RULES 8a`:
+  - **`sieve-mdl.ts`**: Pure Rissanen MDL Spectral Sieve. Per-mode DFT projection with coding gain $\Delta L(k) = (N/2)\ln(1 + E_k/E_{\text{res}}) - (3/2)\ln N$; structural modes reconstruct the kinematic pattern (`@hm/meshops` routing), residual variance/std reported for `@hm/matstack`. Degenerate-input guards (empty, DC-only, mismatched buffers) and Nyquist-bounded mode range.
+  - **`port-hamiltonian.ts`**: Unconditionally passive Cayley-Padé Midpoint Resolvent with Tikhonov-renormalized precision $\tilde{\Pi} = \Pi/(1 + \tfrac{1}{4}\Delta t^2 \Pi/m)$, zero-allocation `Float64Array` scratch API (`CayleyPadeOut` slots), exact per-step energy accounting identity (external work $\equiv \Delta H +$ dissipated), plus `stepReflexivePlant` (3D Capture Point $\xi$ + Conformal $\mathcal{G}_{4,1}$ knee altitude).
+  - **`inception-loop.ts`**: `SovereignInceptionLoop implements IBidirectionalInceptionLoop` — $y_\uparrow$ somatic telemetry / $\mu_\downarrow$ prior modulation channels (one step of causal latency on $\kappa_{\text{calm}}$, as verified), continuous differential precision annealing with zero governor clamps, Int8 Bayesian trench latch with sub-LSB accumulator, Phase-Locked Syntropic Escrow Gate, Graduation Operator $\mathcal{G}_{\text{ascent}}$, per-step Audit A1 conservation check, and all Spike 8 constants lifted into documented `IHarnessTuning` (`ESCORT_ROVER_TUNING`) with `createEscortRoverPreset()` / `createSquadOverseerPreset()` four-fold vessel presets (Audit A2).
+  - **`tests/harness.test.ts`** (6/6): replays Spike 8 Steps A–D through the production modules (trench $\Pi > 12$, latch $\ge 60$; awareness-magnified distortion; min annealed $\Pi < 1$, strain $< 0.01$ J, reserve transmutation, conservation residual $< 10^{-5}$ J, coherence $\ge 0.95$, graduation), a genuine CFL-trap passivity proof ($\Pi = 10^6$ at 8 Hz: bounded, settles, $H$ non-increasing without input), and a bit-exact two-run determinism check.
+- **Infrastructure fixes:** registered the `@hm/harness` path alias in `tsconfig.json`; synced `package-lock.json` with the `@hm/harness` workspace (fresh-clone `npm ci` was failing against commit `1d895aa`).
+- **Quality Gates:**
+  - `npm run typecheck`: **0 errors**.
+  - `node scripts/test-plan-46-spikes.mjs`: **22/22** and `node scripts/spike_sovereign_harness.js`: **16/16** (38/38 empirical assertions, re-run post-change as regression).
+  - `npm test`: full suite green (exit 0; speed pass 23/23; +6 new harness tests).
+- **Next Actions (Plan 46 §2.4):**
+  1. **Wave 2 Benchmark Hardening:** 64-pass JIT warmup in Spike 3 and pre-allocated `Float32Array` buffers in Spike 4 of `scripts/test-plan-46-spikes.mjs`.
+  2. **Wave 3 Epistemic Compression:** implement `IRecursiveMemoryKernel` ($\mathcal{C}_{\text{compress}}$ / $\mathcal{I}_{\text{wake}}$, bit-exact round-trip) in `@hm/harness` and wire kernel updates.
+  3. Integrate `@hm/harness` into a consumer (vessel escort behavior in `@hm/mobsim` / rover escort HUD telemetry) once Gemini Argon's creative pass approves the binding points.
+
 ## 27 Oct Checkpoint (Antigravity Overwatch: Learn/Teach Inception Chain & Soul Graduation — Commit `109ddaf6`; read this first)
 - **Scope & Ontology:** Established the formal metaphysical, cybernetic, and mathematical architecture unifying the Reality Harness (Plan 46), the Law of One, and the SetMix Multiverse:
   - **The Recursive Higher-Self Ladder & Learn/Teach Dynamic:** Every entity at Depth $N$ is both an embodied learner and the **Higher Self to Depth $N-1$**. Growth unfolds through a non-coercive **learn/teach and teach/learn** relationship: Depth $N+1$ learns from Depth $N$'s raw somatic telemetry ($\mathbf{y}_{\uparrow}$) what physical friction feels like, while Depth $N$ learns higher ethical context and harmonic serenity from Depth $N+1$'s prior modulation ($\mathbf{\mu}_{\downarrow}$).

@@ -39,6 +39,12 @@
     "operator": "PERSPECTIVE_SHIFT_S",
     "convergence_threshold": 0.95
   },
+  "inception_chain": {
+    "relative_awareness_scaling": "VESSEL_BOUNDED",
+    "anti_delusion_invariant": "AWARENESS_MATCHES_VESSEL_ENVELOPE",
+    "telemetry_upward": ["STRAIN", "THERMAL", "ACOUSTIC_FLUX", "TRACTION_LOSS"],
+    "prior_modulation_downward": ["CONTEXT_MODE", "ETHICAL_CONSTRAINT", "ATTRACTOR_TARGET"]
+  },
   "trinity_roles": {
     "overseer": "ANTIGRAVITY",
     "architect": "GEMINI_ARGON",

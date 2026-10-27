@@ -32,7 +32,14 @@ const FILES_TO_PACK = [
   'docs/agents/ROSTER.md',
   'docs/agents/roster.json',
   'docs/argo/plans/ARGO_STUDIO_REALITY_AUDIT_AND_BLUEPRINT.md',
-  'scripts/test-plan-46-spikes.mjs'
+  'docs/argo/plans/46-reality-harness-spectral-ai-ego.md',
+  'scripts/test-plan-46-spikes.mjs',
+  'scripts/spike_sovereign_harness.js',
+  'packages/harness/src/types.ts',
+  'packages/harness/src/inception-loop.ts',
+  'packages/harness/src/port-hamiltonian.ts',
+  'packages/harness/src/sieve-mdl.ts',
+  'packages/harness/src/memory-kernel.ts'
 ];
 
 const syncPayload = {

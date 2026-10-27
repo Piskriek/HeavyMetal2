@@ -4,14 +4,15 @@
   "epoch": 20261027,
   "teleology": "SOUL_EVOLUTION_EXPANDING_AWARENESS",
   "active_branch": "feat/studio-polish-claude-cloud",
-  "last_verified_commit": "d56414ae",
+  "last_verified_commit": "fb1acf45",
   "quality_gates": {
     "typecheck_errors": 0,
-    "unit_tests_passing": 3642,
+    "unit_tests_passing": 3646,
+    "companion_e2e_passing": "15/15",
     "harness_e2e_passing": "14/14",
     "plan_46_spikes_passing": "38/38",
     "plan_47_consumer_suite_passing": "10/10",
-    "bundle_size_mib": 12.62,
+    "bundle_size_mib": 12.67,
     "bundle_cap_mib": 16.00
   },
   "invariants": {
@@ -47,8 +48,8 @@
     "learn_teach_dynamic": "BIDIRECTIONAL_ALCHEMICAL",
     "suffering_prevention": "SYNTROPIC_BUFFERING_B",
     "graduation_operator": "G_ASCENT",
-    "telemetry_upward": ["STRAIN", "THERMAL", "ACOUSTIC_FLUX", "TRACTION_LOSS"],
-    "prior_modulation_downward": ["CONTEXT_MODE", "ETHICAL_CONSTRAINT", "ATTRACTOR_TARGET"]
+    "telemetry_upward": ["STRAIN", "THERMAL", "ACOUSTIC_FLUX", "TRACTION_LOSS", "POINTED_TARGET_PING"],
+    "prior_modulation_downward": ["CONTEXT_MODE", "ETHICAL_CONSTRAINT", "ATTRACTOR_TARGET", "LIVE_KIT_MUTATION"]
   },
   "trinity_roles": {
     "overseer": "ANTIGRAVITY",
@@ -57,7 +58,7 @@
     "owner": "PISKRIEK"
   },
   "active_horizon": {
-    "plan": "PLAN_48_IN_GAME_AI_COMPANION",
+    "plan": "PLAN_49_LIVE_PING_TELEMETRY_AND_STUDIO_INSPECTION",
     "prompt_revision": "REVISION_D_2",
     "wave_1_landed_commit": "5bfd8c9f",
     "waves_2_3_landed_commit": "d6611acc",
@@ -66,6 +67,8 @@
     "plan_47_closed_commit": "d56414ae",
     "plan_48_wave_1_landed": true,
     "plan_48_rework_landed_commit": "3815d11d",
-    "next_dispatch": "PLAN_48_ATTACH_LIVE_AGENT_TO_BRIDGE"
+    "plan_48_bridge_agent_commit": "fb1acf45",
+    "bridge_server_running_port": 8220,
+    "next_dispatch": "PLAN_49_LIVE_CROSSHAIR_PING_AND_IN_GAME_STUDIO_EDIT"
   }
 }

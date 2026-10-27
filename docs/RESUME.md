@@ -1,6 +1,17 @@
 # RESUME: start here (fresh session)
 
-## 27 Oct Checkpoint (Claude Engineer, Claude Cloud: Plan 48 Companion REWORKED on Owner Live-Test Feedback — Commit `3815d11d`; read this first)
+## 27 Oct Checkpoint (Antigravity Overseer: Plan 48 Bridge Agent Landed & Plan 49 Live Ping / Studio Edit Handoff — Commit `fb1acf45`; read this first)
+- **Scope & Delivery (Plan 48 Completed & Running):**
+  - **Live Neural Bridge & Agent Daemon:** `scripts/companion-bridge.mjs` listening on port `8220`; `scripts/companion-agent.mjs` running as daemon attached to `/events` and `/command` with local kinematic intent filtering.
+  - **Single-File Bundle Freshly Built:** `apps/web/dist/index.html` at 12.67 MiB (under 16.00 MiB cap).
+  - **Verified Quality Gates:** `npm run typecheck` **0 errors**; `npm test` **exit 0 — 3,646 / 3,650 pass**; `scripts/test-companion-e2e.mjs` **15/15 checks passed** (headless Playwright: PTT pill without panel on `T`, `Enter`/`Esc` panel lifecycle, 0.16 m hover accuracy at eye level, guard/follow states).
+- **Owner's Live Co-Building Directive (Plan 49: Live Gaze/Ping Targeting & In-Game-to-Studio Editing Loop):**
+  - **1. Target Ping & Crosshair Telemetry:** The AI engineer in Claude Code must be able to "see" what Piskriek points at. Wire a Middle-Click / `Q` / Beam Rifle crosshair raycast that emits `{ type: 'ping', target: { x, y, z, normal, entityType, kitId, partId } }` through `POST /event` to the bridge, rendering a pulsing violet target reticle in-game for 3s.
+  - **2. In-Game Kit Inspection & Studio Preset Mutation:** When pointing at a kit (e.g. Stargate `SMX-KIT-GATE-01`), voice commands like *"open gate in studio"* load the kit document; *"remove black and yellow chevrons on base piece"* mutates the `@hm/matstack` hazard layer on the base part via live kit overrides (`setKitOverrides`); *"save as default"* writes the modified preset to the shelf catalog.
+  - **3. Modular Wall Carving (Honest Status):** Pointing at a lab wall and saying *"put a door here and a corridor on the other side"* requires runtime lattice cell carving in `@hm/structure` and instantiating modular doorway/corridor kit pieces — roadmapped as Plan 49 Wave 2.
+- **Claude Code Handoff:** Claude Opus 5.5 can resume from this clean tree on `feat/studio-polish-claude-cloud` at `fb1acf45`.
+
+## 27 Oct Checkpoint (Claude Engineer, Claude Cloud: Plan 48 Companion REWORKED on Owner Live-Test Feedback — Commit `3815d11d`)
 - **Owner feedback (Piskriek, live test), all four points landed:**
   1. **True hold-to-talk:** `T` keydown = mic-open chirp + speech recognition + the minimal violet `[TX · TRANSMITTING]` pill ONLY (the panel never opens); keyup = squelch click + send transcript. `Enter` is the ONLY key opening the typed panel; `Esc` closes. **The structural-integrity overlay moved from `T` to `I`.**
   2. **Spatial intelligence:** `companion-intent.ts` — a pure, unit-tested synonym-scored parser + resolver against the player's LIVE pose (`fwd = (-sin yaw, -cos yaw)`): hover-front 2.2 m at eye level facing the player, come-here 2.0 m, flanks ±2.5 m out / 1.5 m back, hold/guard, follow, land, landmarks (lab `GATE_AT`, new `PRESET_BENCH_AT`, planet gate, nearest plot vehicle). The companion gained hover flight (+1.4 m altitude glide, straight-line airborne translation — the yaw-coupled walker step orbited its mark, caught by e2e), a guard stance, and spatial confirmations.

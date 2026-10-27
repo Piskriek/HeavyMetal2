@@ -242,8 +242,15 @@ const xVec = new Float32Array(NUM_VERTS);
 const yOut = new Float32Array(NUM_VERTS);
 xVec[0] = 1.0; // delta impulse
 
-// JIT warmup step
-applyScaledLaplacianCSR(NUM_VERTS, rowPtr, colIdx, cotW, invLumpedMass, 6.0, xVec, yOut);
+// 64-pass JIT warmup: a single pass leaves the CSR kernel in V8's interpreter/baseline tier
+// and the first timed run eats the TurboFan compilation spike (~5.97 ms observed at commit
+// 51004904). 64 passes exercise both the kernel and the xVec.set copy the timed loop uses.
+for (let warm = 0; warm < 64; warm++) {
+  applyScaledLaplacianCSR(NUM_VERTS, rowPtr, colIdx, cotW, invLumpedMass, 6.0, xVec, yOut);
+  xVec.set(yOut);
+}
+// Reset to the exact delta-impulse initial condition before the timed measurement.
+xVec.fill(0.0);
 xVec[0] = 1.0;
 
 const t4 = performance.now();
@@ -333,11 +340,32 @@ const nominalFoot = new Float32Array([0.2, 0.0, 0.0]);
 const pole = new Float32Array([0.0, 0.0, 1.0]);
 const L1 = 0.7, L2 = 0.7; // 1.4m total reach for 1.0m standing hip height
 
+// Hoisted pre-allocated Float32Array(3) vectors: the previous in-loop literal arrays
+// ([0,1,0], [0,0,1.5], [0,0,0], and the ankle target) allocated 4 arrays per biped per
+// frame inside the timed region (~1.27 ms observed at commit 51004904).
+const comPos = new Float32Array([0.0, 1.0, 0.0]);
+const comVel = new Float32Array([0.0, 0.0, 1.5]); // Push perturbation: 1.5 m/s forward
+const supportCenter = new Float32Array(3);
+const ankleTarget = new Float32Array(3);
+
+// 64-pass JIT warmup (same rationale as Spike 3): with only 16 timed iterations the
+// measurement is otherwise dominated by first-call compilation, not the per-frame cost
+// the reactive-balance budget assertion is about.
+for (let warm = 0; warm < 64; warm++) {
+  computeCapturePointStepTarget(comPos, comVel, supportCenter, 0.20, nominalFoot, 9.81, 1.0, 0.25, footTarget);
+  ankleTarget[0] = footTarget[0];
+  ankleTarget[1] = 0.0;
+  ankleTarget[2] = footTarget[2];
+  solveConformalTwoBoneIK(hip, ankleTarget, pole, L1, L2, kneePos);
+}
+
 const t6 = performance.now();
 for (let biped = 0; biped < 16; biped++) {
-  // Push perturbation: comVel = 1.5 m/s forward
-  computeCapturePointStepTarget([0, 1, 0], [0, 0, 1.5], [0, 0, 0], 0.20, nominalFoot, 9.81, 1.0, 0.25, footTarget);
-  solveConformalTwoBoneIK(hip, [footTarget[0], 0.0, footTarget[2]], pole, L1, L2, kneePos);
+  computeCapturePointStepTarget(comPos, comVel, supportCenter, 0.20, nominalFoot, 9.81, 1.0, 0.25, footTarget);
+  ankleTarget[0] = footTarget[0];
+  ankleTarget[1] = 0.0;
+  ankleTarget[2] = footTarget[2];
+  solveConformalTwoBoneIK(hip, ankleTarget, pole, L1, L2, kneePos);
 }
 const t7 = performance.now();
 const bipedTimeMs = t7 - t6;

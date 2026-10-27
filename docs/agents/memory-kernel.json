@@ -18,6 +18,12 @@
     "stages": ["S0a", "S0b", "S1", "S2", "S3", "S4", "S5", "S6"],
     "rule_8a": "ZERO_ARCHITECTURAL_LIES"
   },
+  "neuro_cybernetics": {
+    "memory_representation": "PRESET_POINT_CLOUD_TRAJECTORY",
+    "emotion_transducer": "ENERGY_INFLOW_PRECISION_MODULATION",
+    "blockage_mechanism": "ATTRACTOR_TRENCH_HARDENING",
+    "healing_operator": "ATTENTIONAL_CIRCUIT_BREAKER_PRECISION_ANNEALING"
+  },
   "reflexive_plant": {
     "balance_solver": "3D_CAPTURE_POINT_XI",
     "ik_solver": "CONFORMAL_G41_CIRCLE_SPHERE",

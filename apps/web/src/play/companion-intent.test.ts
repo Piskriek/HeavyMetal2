@@ -73,7 +73,7 @@ test('plan 49: kit orders about the pinged thing parse before any movement word'
   assert.equal(parseCompanionIntent('restore the chevrons').kind, 'kit-restore-hazard');
   assert.equal(parseCompanionIntent('save as default').kind, 'kit-save-default');
   assert.equal(parseCompanionIntent('make that the new default').kind, 'kit-save-default');
-  assert.equal(parseCompanionIntent('undo that').kind, 'kit-reset');
+  assert.equal(parseCompanionIntent('undo that').kind, 'undo');
   assert.equal(parseCompanionIntent('reset the gate').kind, 'kit-reset');
   assert.equal(parseCompanionIntent('what is this').kind, 'ping-what');
   assert.equal(parseCompanionIntent("what's that thing").kind, 'ping-what');
@@ -84,4 +84,34 @@ test('plan 49: kit orders about the pinged thing parse before any movement word'
   const o = resolveCompanionOrder({ kind: 'kit-strip-hazard' }, { x: 0, z: 0, yaw: 0 });
   assert.equal(o.target, null);
   assert.equal(o.hover || o.hold || o.follow, false);
+});
+
+test('plan 50: the drone\'s orders, finds and edit control parse ahead of the movement words', () => {
+  assert.deepEqual(parseCompanionIntent('hold fire'), { kind: 'combat-mode', mode: 'hold-fire' });
+  assert.deepEqual(parseCompanionIntent('weapons free'), { kind: 'combat-mode', mode: 'weapons-free' });
+  assert.deepEqual(parseCompanionIntent('open fire'), { kind: 'combat-mode', mode: 'weapons-free' });
+  assert.deepEqual(parseCompanionIntent('defend me'), { kind: 'combat-mode', mode: 'defend' });
+  assert.deepEqual(parseCompanionIntent('cover my left'), { kind: 'cover', side: 'left' });
+  assert.deepEqual(parseCompanionIntent('cover my six'), { kind: 'cover', side: 'rear' });
+  assert.deepEqual(parseCompanionIntent('kill that'), { kind: 'focus', target: 'ping' });
+  assert.deepEqual(parseCompanionIntent('focus the big one'), { kind: 'focus', target: 'biggest' });
+  assert.deepEqual(parseCompanionIntent('shoot the nearest'), { kind: 'focus', target: 'nearest' });
+  assert.deepEqual(parseCompanionIntent('find me guns'), { kind: 'scout', category: 'weapons' });
+  assert.deepEqual(parseCompanionIntent('look for ore'), { kind: 'scout', category: 'resources' });
+  assert.deepEqual(parseCompanionIntent('where is the exit'), { kind: 'scout', category: 'exits' });
+  assert.equal(parseCompanionIntent('come back').kind, 'recall');
+  assert.equal(parseCompanionIntent('keep it').kind, 'keep');
+  assert.equal(parseCompanionIntent('undo').kind, 'undo');
+  // the movement orders still win their own phrases
+  assert.equal(parseCompanionIntent('hold position').kind, 'hold');
+  assert.equal(parseCompanionIntent('come here').kind, 'come-front');
+  assert.equal(parseCompanionIntent('take my left side').kind, 'flank-left');
+  assert.equal(parseCompanionIntent('float in front of me').kind, 'hover-front');
+});
+
+test('review fixes: hold and follow words beat find words; only an explicit "keep it" commits', () => {
+  assert.equal(parseCompanionIntent('I need you to guard the gate').kind, 'hold');
+  assert.equal(parseCompanionIntent('hold here, any monsters coming?').kind, 'hold');
+  assert.equal(parseCompanionIntent('looks good').kind === 'keep', false);
+  assert.deepEqual(parseCompanionIntent('find me guns'), { kind: 'scout', category: 'weapons' });
 });

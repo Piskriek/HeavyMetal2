@@ -75,6 +75,10 @@ import { loadScientistAnimations, type ClipName } from '../avatar/scientist/anim
 import { createScientistAnimator, type OneShotKind, type ScientistAnimator } from '../avatar/scientist/animator';
 import { loadRifleAnimations } from '../avatar/astro/rifle-clips';
 import { createCompanionEntity, type CompanionEntity } from './companion';
+import { barkLine, COMBAT_TUNING, FOCUS_ORDER_S, newCombatBrain, standDown, stepCombat, type CombatMob, type CombatMode, type CoverSide } from './companion-combat';
+import type { PointOfInterest, ScoutCategory } from './companion-scout';
+import { ARMORY_RAIL_POS } from './armory-rack';
+import { GAME_SCREEN_KIT, GAME_SCREEN_SURFACE } from './kit-game-screen';
 import { handPose, viewPose } from './rifle-hold';
 import { footprintSolids, navFor } from '../base/navgrid';
 import { solveLeftArmForegripIk } from '../avatar/two-bone-ik';
@@ -432,6 +436,24 @@ export interface PlayScene {
   pingTarget(reach: number): { readonly hit: PingHit; readonly where: Where } | null;
   /** Plan 49: drops the violet ping reticle on a hit (one at a time: a new ping replaces the old). */
   showPing(hit: PingHit): void;
+  /**
+   * Plan 50: the drone's standing combat orders. `focus` takes a monster id, the nearest or the biggest (for 60 s), or
+   * null to drop it. Returns what the drone says about it ('' when there is nothing to say).
+   */
+  companionOrders(patch: { readonly mode?: CombatMode; readonly cover?: CoverSide; readonly focus?: number | 'nearest' | 'biggest' | null }): string;
+  /** Plan 50 test seam: the fast brain's orders, target, clock and the monsters it sees. */
+  companionCombat(): { readonly orders: import('./companion-combat').CombatOrders | null; readonly targetId: number | null; readonly t: number; readonly mobs: readonly CombatMob[] };
+  /** Plan 50: a monster hit the player (it counts double in the drone's threat score for a few seconds). */
+  noteCompanionHurtBy(mobId: number): void;
+  /** Plan 50: the drone's barks since the last call (contact, target down, area clear), for the radio. */
+  drainCompanionBarks(): string[];
+  /** Plan 50: everything of one category the drone can find in the current world. */
+  pointsOfInterest(category: ScoutCategory): PointOfInterest[];
+  /** Plan 50 §6: stands a screen 4.5 m ahead mirroring a linked window (another game), or takes it down with null. */
+  showGameScreen(video: HTMLVideoElement | null): boolean;
+  gameScreenShown(): boolean;
+  /** The canvas the world is drawn on (the AI's eyes sample it, plan 50). */
+  viewCanvas(): HTMLCanvasElement;
   /** Plan 49: the ping marker's state for tests: its age in seconds, or null when none shows. */
   pingMarkerAge(): number | null;
   /** Plan 49: the key a kit's shipped defaults are stored under ('machine:<kind>' for a plot machine), or null when it has none. */
@@ -2847,6 +2869,18 @@ export function createPlayScene(o: {
       if (s) hits.push({ point: tuple3(s.point), normal: tuple3(s.normal), distance: s.distance, source: s.source, ...(s.objectId ? { objectId: s.objectId } : {}) });
       return nearestPingHit(hits);
     }
+    // plan 50: the monsters, as spheres about their middle, so "kill that" can name one
+    for (const m of combatMobs()) {
+      const ox = origin.x - m.x, oy = origin.y - m.y, oz = origin.z - m.z;
+      const b = ox * dir.x + oy * dir.y + oz * dir.z;
+      const c = ox * ox + oy * oy + oz * oz - 0.7 * 0.7;
+      const disc = b * b - c;
+      if (disc < 0) continue;
+      const dist = -b - Math.sqrt(disc);
+      if (dist <= 0 || dist > reach) continue;
+      const p = origin.clone().addScaledVector(dir, dist);
+      hits.push({ point: p, normal: new THREE.Vector3(p.x - m.x, p.y - m.y, p.z - m.z).normalize(), distance: dist, source: 'enemy', objectId: `mob:${m.id}`, part: m.kind });
+    }
     // the base pieces
     if (piecesGroup && piecesGroup.children.length > 0) {
       pieceRaycaster.set(origin, dir);
@@ -2981,6 +3015,143 @@ export function createPlayScene(o: {
     pingMarker.mats.stalk.opacity = 0.55 * pulse.alpha;
     pingMarker.mats.core.opacity = pulse.alpha;
     pingMarker.core.rotation.y = (clock - pingMarker.born) * 2.4;
+  };
+
+  // ---- Plan 50: Overwatch's fast brain. The drone fights at the frame rate; the slow brain only sets its orders.
+  let combatBrain = newCombatBrain();
+  let companionHurtBy: { id: number; at: number } | null = null;
+  const companionBarks: string[] = [];
+  /** The living monsters as the brain sees them (aimed at their middle, winding up when they telegraph). */
+  const combatMobs = (): CombatMob[] =>
+    where !== 'planet' || !playerAlive
+      ? []
+      : monsters.getMobList().filter((m) => m.phase !== 'dead').map((m) => ({
+          id: m.id, kind: m.kind, hp: m.hp, x: m.pos.x, y: m.pos.y + 0.8, z: m.pos.z, telegraph: m.phase === 'windup',
+        }));
+  /** The player's shot: the held weapon's mean damage per trigger pull (the drone deals a share of it). */
+  const playerShotDamage = (): number => {
+    const w = monsters.getWeaponStats();
+    return w ? w.pellets * (w.damage[0] + w.damage[1]) / 2 : 10;
+  };
+  /** The player's sustained damage per second with the held weapon (the drone deals a share of it). */
+  const playerDps = (): number => {
+    const w = monsters.getWeaponStats();
+    if (!w) return 20;
+    return (w.pellets * ((w.damage[0] + w.damage[1]) / 2) * Math.max(1, w.burst)) / Math.max(0.05, w.cooldown + (Math.max(1, w.burst) - 1) * w.burstGap);
+  };
+  const companionFight = (dt: number): void => {
+    const comp = companionEntity;
+    if (!comp) return;
+    comp.setEnvironment(where === 'planet' ? 'vacuum' : 'air');
+    const s = comp.getState();
+    // no fight in another world, with the player down, or on the ground: stand down without calling anything "down"
+    if (where !== 'planet' || !playerAlive || s.landed) {
+      if (combatBrain.targetId !== null || combatBrain.fought) combatBrain = standDown(combatBrain);
+      comp.setCombat(null, null);
+      return;
+    }
+    const tick = stepCombat(combatBrain, {
+      dt,
+      drone: { x: s.x, y: s.y, z: s.z },
+      player: { x: pos.x, z: pos.z, yaw, shotDamage: playerShotDamage(), dps: playerDps() },
+      mobs: combatMobs(),
+      orders: comp.getCombatOrders(),
+      hurtBy: companionHurtBy,
+    });
+    combatBrain = tick.brain;
+    comp.setCombat(s.landed ? null : tick.station, tick.aimYaw);
+    if (tick.shot) {
+      // a hit goes through the monsters' own path, so its death, drop and the HUD are the same as the player's shot
+      if (tick.shot.hit) monsters.hurtMob(tick.shot.mobId, tick.shot.damage);
+      comp.showShot(tick.shot.at, tick.shot.hit);
+    }
+    if (tick.bark) companionBarks.push(barkLine(tick.bark));
+  };
+  /** Everything of one category the drone can find in the world the player is in (plan 50 §3). */
+  const pointsOfInterest = (category: ScoutCategory): PointOfInterest[] => {
+    const out: PointOfInterest[] = [];
+    const add = (x: number, y: number, z: number, label: string): void => { out.push({ category, x, y, z, label }); };
+    const planet = where === 'planet';
+    switch (category) {
+      case 'enemies':
+        for (const m of combatMobs()) add(m.x, m.y, m.z, `a ${m.kind}`);
+        break;
+      case 'hazards':
+        if (planet) {
+          for (const k of monsters.markers()) if (k.state === 'open' || k.state === 'warned') add(k.x, groundAt(k.x, k.z), k.z, k.state === 'warned' ? `a leak about to open (${Math.round(k.inSeconds ?? 0)} s)` : 'an open leak');
+          for (const v of views.values()) if (monsters.isLatched(v.m.id)) add(v.m.x, groundAt(v.m.x, v.m.z), v.m.z, `a sapper on the ${v.m.kind}`);
+        }
+        break;
+      case 'objectives':
+        if (planet) for (const k of monsters.markers()) if (k.state !== 'sealed' && !k.dormant) add(k.x, groundAt(k.x, k.z), k.z, 'a leak to seal');
+        if (!planet && !gateOn) add(GATE_AT.x, 1.2, GATE_AT.z, 'the gate (pull the lever on the console to power it)');
+        break;
+      case 'exits':
+        if (planet) add(twin.group.position.x, twin.group.position.y + 1.5, twin.group.position.z, 'the Stargate home');
+        else add(GATE_AT.x, 1.6, GATE_AT.z, gateOn ? 'the open gate' : 'the gate (not powered yet)');
+        break;
+      case 'weapons':
+        if (!planet && !room.armory.isTaken()) add(ARMORY_RAIL_POS.x, ARMORY_RAIL_POS.y, ARMORY_RAIL_POS.z, 'the sidearm on the armory rack');
+        if (planet) for (const f of lastFabricatorsList) add(f.x, groundAt(f.x, f.z) + 1, f.z, f.printing ? 'a fabricator, printing' : 'a fabricator (prints weapons and vehicles)');
+        break;
+      case 'resources':
+        if (planet) for (const b of ground?.getBoulders() ?? []) if (b.ore > 0) add(b.x, b.y, b.z, 'an ore boulder');
+        break;
+      case 'salvage':
+        if (planet) for (const w of wrecks.debugBuilt?.() ?? []) if (!w.salvaged && w.salvage) add(w.x, groundAt(w.x, w.z) + 0.5, w.z, 'a salvageable wreck');
+        break;
+      case 'secrets':
+        if (planet) for (const w of wrecks.debugBuilt?.() ?? []) if (w.log) add(w.x, groundAt(w.x, w.z) + 0.5, w.z, 'a transponder with a log');
+        break;
+      case 'vehicles':
+        if (planet) for (const v of lastVehiclesList) add(v.x, groundAt(v.x, v.z) + 0.8, v.z, `the ${v.kind}`);
+        break;
+      default:
+        break; // ammo, health, armour, keys and currency: this world has none yet
+    }
+    return out;
+  };
+
+  // ---- Plan 50 §6: the game screen (a linked window, mirrored live on a free-standing display in the world)
+  let gameScreen: { readonly group: THREE.Group; readonly tex: THREE.VideoTexture; readonly owned: { dispose(): void }[] } | null = null;
+  const hideGameScreen = (): void => {
+    if (!gameScreen) return;
+    gameScreen.group.removeFromParent();
+    for (const o of gameScreen.owned) o.dispose();
+    gameScreen = null;
+  };
+  const showGameScreen = (video: HTMLVideoElement | null): boolean => {
+    hideGameScreen();
+    if (!video) return false;
+    const owned: { dispose(): void }[] = [];
+    const keepIt = <T extends { dispose(): void }>(x: T): T => { owned.push(x); return x; };
+    const mats = {
+      gunmetal: keepIt(new THREE.MeshStandardMaterial({ color: '#4b525b', metalness: 0.7, roughness: 0.38 })),
+      darkSteel: keepIt(new THREE.MeshStandardMaterial({ color: '#2b3038', metalness: 0.6, roughness: 0.5 })),
+      violet: keepIt(new THREE.MeshStandardMaterial({ color: '#2a0f3d', emissive: '#b84dff', emissiveIntensity: 2 })),
+    };
+    const built = buildKitPreset(GAME_SCREEN_KIT, 'game-screen', { materials: mats, gen: () => null, maxRank: 2, keep: keepIt });
+    if (!built) return false;
+    const tex = keepIt(new THREE.VideoTexture(video));
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const picture = new THREE.Mesh(
+      keepIt(new THREE.PlaneGeometry(GAME_SCREEN_SURFACE.width, GAME_SCREEN_SURFACE.height)),
+      keepIt(new THREE.MeshBasicMaterial({ map: tex, toneMapped: false })),
+    );
+    picture.position.set(...GAME_SCREEN_SURFACE.centre);
+    picture.name = 'game-screen-picture';
+    built.group.add(picture);
+    const group = new THREE.Group();
+    group.name = 'game-screen';
+    group.add(built.group);
+    // stand it 4.5 m ahead on the ground, facing the player
+    const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+    const x = pos.x + fx * 4.5, z = pos.z + fz * 4.5;
+    group.position.set(x, where === 'planet' ? groundAt(x, z) : room.floorHeight(x, z), z);
+    group.rotation.y = Math.atan2(pos.x - x, pos.z - z);
+    (where === 'planet' ? planetScene : labScene).add(group);
+    gameScreen = { group, tex, owned };
+    return true;
   };
 
   const api: PlayScene = {
@@ -3950,6 +4121,7 @@ export function createPlayScene(o: {
       if (companionEntity) {
         const floorFn = where === 'planet' ? groundAt : room.floorHeight;
         companionEntity.step(dt, { x: pos.x, y: pos.y - EYE, z: pos.z, yaw }, floorFn);
+        companionFight(dt);
       }
 
       if (drivingVehicleId === null) roverArmOn = false;
@@ -4865,6 +5037,7 @@ export function createPlayScene(o: {
       }
       tracks.dispose();
       hidePing();
+      hideGameScreen();
       for (const mesh of [pingMarker.brackets, pingMarker.ripple, pingMarker.stalk, pingMarker.core]) mesh.geometry.dispose();
       for (const mat of Object.values(pingMarker.mats)) mat.dispose();
       roost.dispose();
@@ -4894,6 +5067,43 @@ export function createPlayScene(o: {
       return hit ? { hit, where } : null;
     },
     showPing: showPingAt,
+    companionOrders(patch) {
+      const comp = companionEntity;
+      if (!comp) return 'The drone is not up yet.';
+      if (patch.mode) comp.setCombatOrders({ mode: patch.mode });
+      if (patch.cover) comp.setCombatOrders({ cover: patch.cover });
+      if (patch.focus !== undefined) {
+        if (patch.focus === null) {
+          comp.setCombatOrders({ focusId: null, focusUntil: 0 });
+        } else {
+          // only what is within the drone's leash of the player: no orders to snipe across the map
+          const mobs = combatMobs().filter((m) => Math.hypot(m.x - pos.x, m.z - pos.z) <= COMBAT_TUNING.leashM);
+          const s = comp.getState();
+          const pick = typeof patch.focus === 'number'
+            ? mobs.find((m) => m.id === patch.focus)
+            : patch.focus === 'biggest'
+              ? [...mobs].sort((a, b) => b.hp - a.hp)[0]
+              : [...mobs].sort((a, b) => Math.hypot(a.x - s.x, a.z - s.z) - Math.hypot(b.x - s.x, b.z - s.z))[0];
+          if (!pick) return 'No target to focus on.';
+          comp.setCombatOrders({ focusId: pick.id, focusUntil: combatBrain.t + FOCUS_ORDER_S, ...(comp.getCombatOrders().mode === 'hold-fire' ? { mode: 'weapons-free' } : {}) });
+          return `Focusing the ${pick.kind}.`;
+        }
+      }
+      return '';
+    },
+    companionCombat() {
+      return { orders: companionEntity?.getCombatOrders() ?? null, targetId: combatBrain.targetId, t: combatBrain.t, mobs: combatMobs() };
+    },
+    noteCompanionHurtBy(mobId: number) {
+      companionHurtBy = { id: mobId, at: combatBrain.t };
+    },
+    drainCompanionBarks() {
+      return companionBarks.splice(0, companionBarks.length);
+    },
+    pointsOfInterest,
+    showGameScreen,
+    gameScreenShown: () => gameScreen !== null,
+    viewCanvas: () => renderer.domElement,
     pingMarkerAge: () => (pingMarker.where === null ? null : clock - pingMarker.born),
     kitDefaultKey(kit: string) {
       if (kit === 'gate' || kit === 'gate-dais' || kit === 'capacitor-bank' || kit === 'stargate') return kit;

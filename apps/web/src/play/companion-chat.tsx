@@ -20,6 +20,7 @@ import {
   type CompanionLandmarks,
   type CompanionPlayerPose,
 } from './companion-intent';
+import type { ScoutCategory } from './companion-scout';
 import './companion-chat.css';
 
 /** What the screen can do through the comms (plan 49): the ping's callout and its bridge event. */
@@ -39,14 +40,43 @@ export type CompanionKitOrder =
 
 /** The screen's kit edits, which the comms run on voice orders and bridge commands. */
 export interface CompanionKitOps {
-  /** Runs an order on the live scene and the player's save; returns what the companion says. */
-  run(order: CompanionKitOrder): string;
+  /** Runs an order on the live scene; returns what the companion says. Staged (an AI's edit): shown, saved only on 'keep it'. */
+  run(order: CompanionKitOrder, staged?: boolean): string;
   /** The companion's answer to "what is this?": the last ping, named. */
   describePing(): string;
   /** A kit's effective overrides to write as its shipped default, or why there is nothing to save. */
   defaultsFor(kitId?: string): { readonly key: string; readonly name: string; readonly overrides: Readonly<Record<string, unknown>> } | { readonly error: string };
   /** The bridge wrote the defaults: the page reads them from now on. */
   defaultsSaved(all: unknown): void;
+}
+
+/** The screen's drone controls (plan 50): standing orders, finds, and the edit history the comms drive. */
+export interface CompanionDroneOps {
+  /** Sets standing combat orders; `focus: 'ping'` means the monster last pinged. Returns what the drone says. */
+  orders(patch: { readonly mode?: 'defend' | 'weapons-free' | 'hold-fire'; readonly cover?: 'left' | 'right' | 'rear'; readonly focus?: number | 'ping' | 'nearest' | 'biggest' | null }): string;
+  /** Finds and marks the nearest thing of a category, and sends the drone to it. */
+  scout(category: ScoutCategory): string;
+  /** Cancels everything: back to formation, defend mode, no focus. */
+  recall(): string;
+  /** Undoes the last kit edit (one step), or rejects a staged proposal. */
+  undo(): string;
+  /** Commits a staged proposal from the bridge. */
+  keep(): string;
+  /** The fight as the bridge's telemetry carries it, or null. */
+  snapshot(): Readonly<Record<string, unknown>> | null;
+}
+
+/**
+ * The AI's eyes and the linked game window (plan 50 §6, docs/GAME_IN_GAME_STREAMING_RESEARCH.md Stage 0): another game's
+ * window mirrored on a screen in the world, and frames of what the player sees sent to the bridge for the AI to look at.
+ */
+export interface CompanionScreenOps {
+  /** Asks the browser for a window to mirror (needs the player's click: the picker is the browser's). */
+  link(): Promise<string>;
+  unlink(): string;
+  linked(): boolean;
+  /** JPEG frames of the player's view and of the linked window, if any. */
+  frames(): Promise<readonly { readonly source: 'game' | 'external'; readonly blob: Blob }[]>;
 }
 
 export interface CompanionChatProps {
@@ -58,7 +88,14 @@ export interface CompanionChatProps {
   readonly handleRef?: React.MutableRefObject<CompanionChatHandle | null>;
   /** The screen's kit edits (plan 49); without them kit orders are answered, not run. */
   readonly kitOps?: CompanionKitOps;
+  /** The screen's drone controls (plan 50). */
+  readonly droneOps?: CompanionDroneOps;
+  /** The AI's eyes and the linked game window (plan 50 §6). */
+  readonly screenOps?: CompanionScreenOps;
 }
+
+/** How often the eyes send a frame while the bridge is linked. */
+const EYES_EVERY_MS = 3000;
 
 interface Message {
   readonly id: string;
@@ -151,7 +188,21 @@ function localChatReply(text: string): string {
   return 'Copy that, Piskriek. Say "follow me", "float in front of me", "hold position", or send me to the gate, the rover or the bench.';
 }
 
-export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroadcastRadio, getContext, handleRef, kitOps }) => {
+export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroadcastRadio, getContext, handleRef, kitOps, droneOps, screenOps }) => {
+  const screenOpsRef = useRef(screenOps);
+  screenOpsRef.current = screenOps;
+  /** The AI's eyes: on by default while a bridge is linked (the owner wants the AI to see what he points at). */
+  const [eyesOn, setEyesOn] = useState(true);
+  const eyesOnRef = useRef(true);
+  eyesOnRef.current = eyesOn;
+  const [screenLinked, setScreenLinked] = useState(false);
+  useEffect(() => {
+    const t = window.setInterval(() => setScreenLinked(screenOpsRef.current?.linked() ?? false), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+  const lastFrameAtRef = useRef(0);
+  const droneOpsRef = useRef(droneOps);
+  droneOpsRef.current = droneOps;
   const bridgeUrl = useRef<string | null>(null);
   if (bridgeUrl.current === null && typeof window !== 'undefined') bridgeUrl.current = companionBridgeUrl(window.location) ?? '';
   const kitOpsRef = useRef(kitOps);
@@ -215,9 +266,12 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
     return () => { handleRef.current = null; };
   }, [handleRef]);
 
-  /** Runs a kit order through the screen, or says why it cannot (plan 49). */
-  const runKitOrder = (order: CompanionKitOrder): string =>
-    kitOpsRef.current ? kitOpsRef.current.run(order) : 'Kit edits need the play screen; I cannot reach the machine from here.';
+  /** Runs a kit order through the screen, or says why it cannot (plan 49). An order from the bridge is staged (plan 50 §5). */
+  const runKitOrder = (order: CompanionKitOrder, staged = false): string =>
+    kitOpsRef.current ? kitOpsRef.current.run(order, staged) : 'Kit edits need the play screen; I cannot reach the machine from here.';
+  /** Runs a drone order through the screen, or says why it cannot (plan 50). */
+  const drone = (f: (ops: CompanionDroneOps) => string): string =>
+    droneOpsRef.current ? f(droneOpsRef.current) : 'The drone controls need the play screen.';
 
   /** "Save as default": the bridge writes the kit's overrides into the shipped defaults file (plan 49). */
   const saveKitDefault = async (kitId?: string): Promise<void> => {
@@ -271,6 +325,13 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
         case 'kit-reset': companionSays(runKitOrder({ kind: 'reset' })); return;
         case 'kit-save-default': void saveKitDefault(); return;
         case 'ping-what': companionSays(kitOpsRef.current?.describePing() ?? 'Ping something first: middle mouse, or Q.'); return;
+        case 'combat-mode': companionSays(drone((o) => o.orders({ mode: intent.mode }))); return;
+        case 'focus': companionSays(drone((o) => o.orders({ focus: intent.target }))); return;
+        case 'cover': companionSays(drone((o) => o.orders({ cover: intent.side }))); return;
+        case 'scout': companionSays(drone((o) => o.scout(intent.category))); return;
+        case 'recall': companionSays(drone((o) => o.recall())); return;
+        case 'undo': companionSays(drone((o) => o.undo())); return;
+        case 'keep': companionSays(drone((o) => o.keep())); return;
         default: break;
       }
       if (intent.kind === 'status') {
@@ -403,6 +464,8 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
       action?: string; text?: string; target?: { x: number; z: number }; gesture?: string;
       // plan 49 kit commands
       kitId?: string; partId?: string; paths?: string[]; material?: string; mutation?: string;
+      /** plan 50: ignored: an AI's kit edit is always staged for the player's 'keep it' */
+      stage?: boolean;
     };
     const str = (v: unknown): string | undefined => (typeof v === 'string' && v.length > 0 ? v : undefined);
     /** A bridge kit command as a kit order, or null when it is not one (or is malformed). */
@@ -428,13 +491,30 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
         return;
       }
       // plan 49: kit edits on what Piskriek pinged (or the kit named), and "save as default"
+      // plan 50 review: shipping a default changes the game for everyone, so only the player's own words do it; the AI asks
       if (cmd.action === 'save-kit-default') {
-        void saveKitDefault(str(cmd.kitId));
+        companionSays(`${cmd.text ? `${cmd.text} ` : ''}The AI on the bridge suggests saving this kit as the shipped default. Say "save as default" if you want that.`);
+        return;
+      }
+      // plan 50: the drone's orders from an AI on the bridge
+      const o = droneOpsRef.current;
+      // ("keep" is the player's word alone: the bridge cannot approve its own proposal)
+      if (o && (cmd.action === 'engage' || cmd.action === 'focus' || cmd.action === 'cover' || cmd.action === 'scout' || cmd.action === 'find' || cmd.action === 'recall' || cmd.action === 'undo')) {
+        const c = cmd as unknown as { mode?: string; target?: unknown; side?: string; category?: string };
+        const said =
+          cmd.action === 'engage' ? o.orders({ mode: c.mode === 'hold-fire' || c.mode === 'defend' ? c.mode : 'weapons-free' })
+          : cmd.action === 'focus' ? o.orders({ focus: typeof c.target === 'number' || c.target === 'nearest' || c.target === 'biggest' || c.target === null ? (c.target as number | 'nearest' | 'biggest' | null) : 'ping' })
+          : cmd.action === 'cover' ? o.orders({ cover: c.side === 'left' || c.side === 'rear' ? c.side : 'right' })
+          : cmd.action === 'scout' || cmd.action === 'find' ? o.scout((c.category ?? 'enemies') as ScoutCategory)
+          : cmd.action === 'recall' ? o.recall()
+          : o.undo();
+        if (said) companionSays(cmd.text ? `${cmd.text} ${said}` : said);
         return;
       }
       if (cmd.action === 'override-kit-part' || cmd.action === 'mutate-kit-preset') {
         const order = kitOrderOf(cmd);
-        const said = order ? runKitOrder(order) : `I could not read that kit command (${cmd.action}): it needs a kit part and a material, or a mutation.`;
+        // an edit from the bridge is always staged for the player's yes
+        const said = order ? runKitOrder(order, true) : `I could not read that kit command (${cmd.action}): it needs a kit part and a material, or a mutation.`;
         companionSays(cmd.text ? `${cmd.text} ${said}` : said);
         postBridgeEvent({ type: 'kit-result', action: cmd.action, result: said });
         return;
@@ -455,7 +535,17 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
         for (const cmd of data.commands ?? []) applyCommand(cmd as Parameters<typeof applyCommand>[0]);
         const ctx = getContext?.();
         const s = companionRef.current?.getState();
-        if (ctx && s) postBridgeEvent({ type: 'telemetry', player: ctx.player, companion: { x: s.x, y: s.y, z: s.z, state: s.state, hover: s.hover } });
+        if (ctx && s) postBridgeEvent({ type: 'telemetry', player: ctx.player, companion: { x: s.x, y: s.y, z: s.z, state: s.state, hover: s.hover }, combat: droneOpsRef.current?.snapshot() ?? null });
+        // the eyes: a frame of the view (and of a linked window) every few seconds, for the AI to look at
+        const so = screenOpsRef.current;
+        if (so && eyesOnRef.current && Date.now() - lastFrameAtRef.current >= EYES_EVERY_MS) {
+          lastFrameAtRef.current = Date.now();
+          void so.frames().then((frames) => {
+            for (const f of frames) {
+              void fetch(`${base}/frame?source=${f.source}`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: f.blob }).catch(() => {});
+            }
+          });
+        }
       } catch {
         failures++;
         if (failures >= 3 && !bridgeLinkedRef.current) setBridgeLinked(false);
@@ -525,6 +615,29 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
             <button className="companion-chip" onClick={() => sendRef.current('Status report')}>
               📊 Status
             </button>
+            {screenOps && (
+              <button
+                className={`companion-chip${screenLinked ? ' on' : ''}`}
+                data-testid="companion-link-screen"
+                title="Mirror another window (a game running on this PC) on a screen in the world"
+                onClick={() => {
+                  if (screenLinked) companionSays(screenOps.unlink());
+                  else void screenOps.link().then((said) => companionSays(said));
+                }}
+              >
+                📺 {screenLinked ? 'Unlink window' : 'Link window'}
+              </button>
+            )}
+            {screenOps && (
+              <button
+                className={`companion-chip${eyesOn ? ' on' : ''}`}
+                data-testid="companion-eyes"
+                title="Send what you see to the AI on the bridge every few seconds"
+                onClick={() => setEyesOn((on) => !on)}
+              >
+                👁 Eyes {eyesOn ? 'on' : 'off'}
+              </button>
+            )}
           </div>
 
           <div className="companion-chat-input-row">

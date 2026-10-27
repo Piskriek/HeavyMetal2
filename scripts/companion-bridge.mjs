@@ -26,7 +26,13 @@
  *   GET  /poll          -> drains queued commands for the companion
  *   POST /event         -> appends an event
  *   POST /kit-defaults  -> {key, overrides}: writes the kit's shipped defaults (apps/web/src/studio-data/kit-defaults.json)
- *   GET  /status        -> link state and the latest telemetry and ping
+ *   POST /frame?source= -> a JPEG of what the player sees (plan 50: the AI's eyes), saved to shots-run/bridge/frame-<source>.jpg
+ *   GET  /status        -> link state, the latest telemetry, ping and frames
+ *
+ * Plan 50, the drone's orders (the fast brain follows them; kit edits from here are staged for the player's "keep it"):
+ *   { "action": "engage", "mode": "weapons-free"|"defend"|"hold-fire" }   { "action": "cover", "side": "left"|"right"|"rear" }
+ *   { "action": "focus", "target": <mob id>|"ping"|"nearest"|"biggest"|null }   { "action": "recall" }
+ *   { "action": "scout", "category": "weapons"|"enemies"|"resources"|"salvage"|"exits"|... }   { "action": "undo" }   { "action": "keep" }
  *
  * Safety (it writes a file): it listens on 127.0.0.1 only, answers CORS for localhost pages only, refuses writes from any
  * other page's Origin, caps bodies at 64 KB, and writes only shape-checked overrides to the one defaults file, atomically.
@@ -52,6 +58,11 @@ const PORT = parseInt(arg('--port') ?? '8220', 10);
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const DEFAULTS_FILE = path.resolve(arg('--defaults-file') ?? path.join(ROOT, 'apps/web/src/studio-data/kit-defaults.json'));
 const BODY_CAP = 64 * 1024;
+/** A 640x360 JPEG is 20 to 60 KB; anything past this is not a frame. */
+const FRAME_CAP = 400 * 1024;
+const FRAME_DIR = path.resolve(arg('--frame-dir') ?? path.join(ROOT, 'shots-run/bridge'));
+/** The latest frame per source (game, external), for /status. */
+const lastFrames = {};
 
 /** Commands queued for the game to drain on its next /poll. */
 const pendingCommands = [];
@@ -182,7 +193,9 @@ const handle = async (req, res) => {
     return;
   }
   // a page on another site must not drive the game or write files, even with a request the browser sends without asking
-  if (req.method === 'POST' && origin && !LOCAL_ORIGIN_RE.test(origin)) {
+  // (an <img> GET carries no Origin, but the browser marks it cross-site: refuse those too)
+  const crossSite = req.headers['sec-fetch-site'] === 'cross-site' && !(origin && LOCAL_ORIGIN_RE.test(origin));
+  if (crossSite || (req.method === 'POST' && origin && !LOCAL_ORIGIN_RE.test(origin))) {
     json(res, 403, { ok: false, error: 'origin not allowed' });
     return;
   }
@@ -195,6 +208,7 @@ const handle = async (req, res) => {
       pendingCommands: pendingCommands.length,
       eventCount: events.length,
       defaultsFile: DEFAULTS_FILE,
+      frames: lastFrames,
       lastTelemetry,
       lastPing,
     });
@@ -225,6 +239,33 @@ const handle = async (req, res) => {
     } catch (err) {
       json(res, 400, { ok: false, error: String(err instanceof Error ? err.message : err) });
     }
+    return;
+  }
+
+  // Plan 50: the AI's eyes — the game posts a JPEG of what the player sees (FIDELITY's view, or a linked game's screen)
+  // every few seconds; the latest lands at shots-run/bridge/frame-<source>.jpg for the AI to look at. Loopback only.
+  if (pathname === '/frame' && req.method === 'POST') {
+    const source = (url.searchParams.get('source') ?? 'game').replace(/[^a-z0-9-]/gi, '').slice(0, 24) || 'game';
+    const chunks = [];
+    let size = 0;
+    let refused = false;
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > FRAME_CAP) { refused = true; req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on('end', () => {
+      if (refused) return;
+      const buf = Buffer.concat(chunks);
+      if (buf.length < 4 || buf[0] !== 0xff || buf[1] !== 0xd8) { json(res, 400, { ok: false, error: 'a frame is a JPEG' }); return; }
+      fs.mkdirSync(FRAME_DIR, { recursive: true });
+      const file = path.join(FRAME_DIR, `frame-${source}.jpg`);
+      const tmp = `${file}.${process.pid}.tmp`;
+      fs.writeFileSync(tmp, buf);
+      fs.renameSync(tmp, file);
+      lastFrames[source] = { file: path.relative(ROOT, file).replaceAll('\\', '/'), at: Date.now(), bytes: buf.length };
+      json(res, 200, { ok: true, ...lastFrames[source] });
+    });
     return;
   }
 

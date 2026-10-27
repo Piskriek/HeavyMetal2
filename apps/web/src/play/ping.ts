@@ -7,7 +7,7 @@
  */
 
 /** What a ping hit, coarse. The owner named the first four; the last three keep a base piece or a Spore model from being called a wall. */
-export type PingEntityType = 'machine' | 'rover' | 'wall' | 'terrain' | 'structure' | 'prop' | 'creation';
+export type PingEntityType = 'machine' | 'rover' | 'wall' | 'terrain' | 'structure' | 'prop' | 'creation' | 'enemy';
 
 export interface PingVec3 {
   readonly x: number;
@@ -22,7 +22,7 @@ export interface PingHit {
   readonly normal: PingVec3;
   readonly distance: number;
   /** The kind of thing the ray met. */
-  readonly source: 'kit' | 'piece' | 'shell' | 'ground' | 'clutter';
+  readonly source: 'kit' | 'piece' | 'shell' | 'ground' | 'clutter' | 'enemy';
   /** The kit the part belongs to ('gate', 'plot:<id>@<built>', 'vehicle-<kind>', 'stargate', ...). */
   readonly kitId?: string;
   /** The placed part's path in its kit (what an override is keyed by). */
@@ -91,6 +91,8 @@ export function classifyPing(hit: PingHit): PingEntityType {
       return 'structure';
     case 'clutter':
       return 'prop';
+    case 'enemy':
+      return 'enemy';
     case 'ground':
       return 'terrain';
     case 'shell':
@@ -183,6 +185,7 @@ const TYPE_NAMES: Readonly<Record<PingEntityType, string>> = {
   structure: 'base piece',
   prop: 'prop',
   creation: 'creation',
+  enemy: 'enemy',
 };
 
 /** The short name the HUD shows: 'Quantum archway gate · rim front', 'Lab wall, west side', 'Ground'. The placed part names which one. */
@@ -191,6 +194,8 @@ export function pingLabel(t: PingTarget): string {
     const part = t.partId ? readablePart(t.partId) : t.part ? readablePart(t.part) : '';
     return part ? `${kitName(t.kitId)} · ${part}` : kitName(t.kitId);
   }
+  // plan 50: a pinged monster is named by its kind (carried in `part`), so 'kill that' knows what it means
+  if (t.entityType === 'enemy') return t.part ? `Enemy · ${t.part}` : 'Enemy';
   if (t.entityType === 'terrain') return t.entityId === 'lab-floor' ? 'Lab floor' : t.entityId === 'lab-ceiling' ? 'Lab ceiling' : 'Ground';
   if (t.entityType === 'wall') return t.entityId.startsWith('lab-wall-') ? `Lab wall, ${t.entityId.slice('lab-wall-'.length)} side` : 'Wall';
   return capitalise(TYPE_NAMES[t.entityType]);

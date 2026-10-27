@@ -68,7 +68,8 @@ import { BenchMaterials } from './bench-materials';
 import { BenchSprites } from './bench-sprites';
 import { BenchSounds } from './bench-sounds';
 import { BenchHarness } from './bench-harness';
-import { CompanionChat, playPingBlip, type CompanionChatHandle, type CompanionKitOps, type CompanionKitOrder } from './companion-chat';
+import { CompanionChat, playPingBlip, type CompanionChatHandle, type CompanionDroneOps, type CompanionKitOps, type CompanionKitOrder, type CompanionScreenOps } from './companion-chat';
+import { nearestPoi, scoutLine, type ScoutCategory } from './companion-scout';
 import { kitName, pingCallout, pingEvent, pingLabel, pingTargetOf, PING_DEBOUNCE_S, PING_REACH_M, type PingTarget } from './ping';
 import { applyKitPlan, planKitMutation, type KitMutation } from './kit-mutation';
 import { MATERIAL_RE, setKitDefaults, withKitDefaults } from './kit-defaults';
@@ -1792,10 +1793,31 @@ useEffect(() => {
   pingNowRef.current = pingNow;
   /** 'darkSteel' -> 'dark steel', 'mat:workshop-steel' -> 'workshop steel'. */
   const readableMaterial = (m: string): string => m.replace(/^(mat|matc|lx):/, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]+/g, ' ').toLowerCase();
+  /** Plan 50 §5: every committed kit edit is one undo step; an AI's edit is staged (shown, not saved) until 'keep it'. */
+  const kitUndoRef = useRef<{ readonly kitId: string; readonly before: Overrides | undefined }[]>([]);
+  const stagedEditRef = useRef<{ readonly kitId: string; readonly before: Overrides | undefined; readonly after: Overrides; readonly timer: number } | null>(null);
+  /** Writes a kit's overrides into the save (an empty record takes the kit's entry off). */
+  const saveKitOverrides = (kitId: string, ov: Overrides | undefined): void => {
+    const kits: Record<string, Overrides> = { ...(propsRef.current.kits ?? {}) };
+    if (ov && Object.keys(ov).length > 0) kits[kitId] = ov;
+    else delete kits[kitId];
+    savePropsSave({ ...propsRef.current, kits });
+  };
+  /** Puts a staged proposal back (the live kit returns to its saved look). */
+  const dropStagedEdit = (): boolean => {
+    const st = stagedEditRef.current;
+    if (!st) return false;
+    window.clearTimeout(st.timer);
+    stagedEditRef.current = null;
+    sceneRef.current?.setKitOverrides(st.kitId, st.before ?? {});
+    return true;
+  };
   const kitOps = useMemo<CompanionKitOps>(() => ({
-    run(order: CompanionKitOrder): string {
+    run(order: CompanionKitOrder, staged = false): string {
       const scene = sceneRef.current;
       if (!scene) return 'The world is still loading.';
+      // a new edit replaces a proposal still waiting for its yes
+      dropStagedEdit();
       const ping = lastPingRef.current?.target ?? null;
       const kitId = order.kitId ?? ping?.kitId;
       if (!kitId) {
@@ -1829,22 +1851,31 @@ useEffect(() => {
         scene.setKitOverrides(kitId, before ?? {});
         return `The ${name} would not rebuild with that change, so I left it as it was.`;
       }
-      const kits: Record<string, Overrides> = { ...(propsRef.current.kits ?? {}) };
-      if (Object.keys(next).length > 0) kits[kitId] = next;
-      else delete kits[kitId];
-      savePropsSave({ ...propsRef.current, kits });
+      if (staged) {
+        // an AI's proposal: shown live, put back in 30 s unless the player keeps it
+        const timer = window.setTimeout(() => {
+          if (dropStagedEdit()) companionHandleRef.current?.say(`No answer, so I put the ${name} back as it was.`);
+        }, 30000);
+        stagedEditRef.current = { kitId, before, after: next, timer };
+      } else {
+        saveKitOverrides(kitId, next);
+        kitUndoRef.current = [...kitUndoRef.current.slice(-19), { kitId, before }];
+      }
+      const ask = staged ? ' Say "keep it" to keep it, or "undo".' : '';
       const n = plan.changes.length;
       const parts = `${n} ${n === 1 ? 'part' : 'parts'}`;
       const tos = [...new Set(plan.changes.map((c) => readableMaterial(c.to)))].join(' and ');
       switch (mutation.kind) {
         case 'strip-hazard':
-          return `Black-and-yellow off the ${name}: ${parts} repainted in ${tos}. Say "save as default" to keep it for everyone, or "put the stripes back".`;
+          return staged
+            ? `Black-and-yellow off the ${name}: ${parts} repainted in ${tos}.${ask}`
+            : `Black-and-yellow off the ${name}: ${parts} repainted in ${tos}. Say "save as default" to keep it for everyone, "undo", or "put the stripes back".`;
         case 'restore-hazard':
-          return `Hazard striping back on the ${name}: ${parts}.`;
+          return `Hazard striping back on the ${name}: ${parts}.${ask}`;
         case 'reset':
-          return `The ${name} is back to its default look: ${parts}.`;
+          return `The ${name} is back to its default look: ${parts}.${ask}`;
         case 'set-material':
-          return `${parts} of the ${name} now ${n === 1 ? 'wears' : 'wear'} ${tos}.`;
+          return `${parts} of the ${name} now ${n === 1 ? 'wears' : 'wear'} ${tos}.${ask}`;
       }
     },
     describePing(): string {
@@ -1866,6 +1897,163 @@ useEffect(() => {
       setKitDefaults(all);
     },
   }), [savePropsSave, say]);
+  /** Plan 50: the drone's orders, finds and the edit history, as the comms (voice, typed, or an AI on the bridge) drive them. */
+  const droneOps = useMemo<CompanionDroneOps>(() => ({
+    orders(patch): string {
+      const scene = sceneRef.current;
+      if (!scene) return 'The world is still loading.';
+      const lines: string[] = [];
+      if (patch.mode) {
+        scene.companionOrders({ mode: patch.mode });
+        lines.push(patch.mode === 'hold-fire' ? 'Holding fire. I will still call out contacts.'
+          : patch.mode === 'weapons-free' ? 'Weapons free: engaging anything within 25 m of us.'
+          : 'Defending you: I take whatever comes within 15 m or winds up at you.');
+      }
+      if (patch.cover) {
+        scene.companionOrders({ cover: patch.cover });
+        lines.push(patch.cover === 'rear' ? 'Covering your six.' : `Covering your ${patch.cover}.`);
+      }
+      if (patch.focus !== undefined) {
+        let focus = patch.focus;
+        if (focus === 'ping') {
+          const t = lastPingRef.current?.target;
+          const id = t?.entityType === 'enemy' ? Number(t.entityId.split(':')[1]) : Number.NaN;
+          if (!Number.isFinite(id)) return 'Ping the enemy first (middle mouse on it), then say "kill that".';
+          focus = id;
+        }
+        lines.push(scene.companionOrders({ focus }) || 'Focus dropped.');
+      }
+      return lines.join(' ');
+    },
+    scout(category: ScoutCategory): string {
+      const scene = sceneRef.current;
+      if (!scene) return 'The world is still loading.';
+      const p = scene.debug.position();
+      const pois = scene.pointsOfInterest(category);
+      const near = nearestPoi(pois, p.x, p.z);
+      if (near) {
+        const d = Math.hypot(near.x - p.x, near.z - p.z) || 1;
+        scene.showPing({ point: { x: near.x, y: near.y, z: near.z }, normal: { x: 0, y: 1, z: 0 }, distance: d, source: 'ground' });
+        // the drone flies over and holds 1.5 m short of it at eye level, so the player can follow its lamp
+        scene.getCompanion()?.hoverAt(near.x - ((near.x - p.x) / d) * 1.5, near.z - ((near.z - p.z) / d) * 1.5);
+      }
+      return scoutLine(category, near, p, pois.length);
+    },
+    recall(): string {
+      const scene = sceneRef.current;
+      scene?.companionOrders({ mode: 'defend', cover: 'right', focus: null });
+      scene?.getCompanion()?.followPlayer();
+      return 'Back on your shoulder, defending you. Orders cleared.';
+    },
+    undo(): string {
+      if (dropStagedEdit()) return 'Put it back as it was.';
+      const last = kitUndoRef.current[kitUndoRef.current.length - 1];
+      if (!last) return 'Nothing to undo.';
+      kitUndoRef.current = kitUndoRef.current.slice(0, -1);
+      sceneRef.current?.setKitOverrides(last.kitId, last.before ?? {});
+      saveKitOverrides(last.kitId, last.before);
+      return `Undone: the ${kitName(last.kitId)} is back as it was.`;
+    },
+    keep(): string {
+      const st = stagedEditRef.current;
+      if (!st) return 'Nothing is waiting for a yes.';
+      window.clearTimeout(st.timer);
+      stagedEditRef.current = null;
+      saveKitOverrides(st.kitId, st.after);
+      kitUndoRef.current = [...kitUndoRef.current.slice(-19), { kitId: st.kitId, before: st.before }];
+      return `Kept on the ${kitName(st.kitId)}. "Undo" takes it back.`;
+    },
+    snapshot(): Readonly<Record<string, unknown>> | null {
+      const scene = sceneRef.current;
+      if (!scene) return null;
+      const c = scene.companionCombat();
+      const p = scene.debug.position();
+      return {
+        mode: c.orders?.mode ?? null, cover: c.orders?.cover ?? null, focus: c.orders?.focusId ?? null, target: c.targetId,
+        threats: c.mobs.slice(0, 6).map((m) => ({ id: m.id, kind: m.kind, hp: Math.round(m.hp), x: Math.round(m.x * 10) / 10, z: Math.round(m.z * 10) / 10, d: Math.round(Math.hypot(m.x - p.x, m.z - p.z)) })),
+      };
+    },
+  }), [savePropsSave]);
+  // ---- Plan 50 §6: the AI's eyes, and another window (a game on this PC) mirrored on a screen in the world
+  /** Set while the eyes wait for the next drawn frame: the frame loop hands it the canvas right after drawing (no preserved buffer). */
+  const eyesRequestRef = useRef<((canvas: HTMLCanvasElement) => void) | null>(null);
+  const linkedStreamRef = useRef<MediaStream | null>(null);
+  const linkedVideoRef = useRef<HTMLVideoElement | null>(null);
+  /** A 640x360 JPEG of any picture, letterboxed. */
+  const jpegCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const toJpeg = (src: CanvasImageSource, sw: number, sh: number): Promise<Blob | null> => {
+    // one small canvas, reused: the eyes run every few seconds on the min-spec laptop
+    const c = (jpegCanvasRef.current ??= document.createElement('canvas'));
+    c.width = 640;
+    c.height = 360;
+    const g = c.getContext('2d');
+    if (!g || !sw || !sh) return Promise.resolve(null);
+    const k = Math.min(640 / sw, 360 / sh);
+    g.fillStyle = '#000';
+    g.fillRect(0, 0, 640, 360);
+    g.drawImage(src, (640 - sw * k) / 2, (360 - sh * k) / 2, sw * k, sh * k);
+    return new Promise((resolve) => c.toBlob((b) => resolve(b), 'image/jpeg', 0.72));
+  };
+  const unlinkWindow = (): void => {
+    for (const t of linkedStreamRef.current?.getTracks() ?? []) t.stop();
+    linkedStreamRef.current = null;
+    if (linkedVideoRef.current) linkedVideoRef.current.srcObject = null;
+    linkedVideoRef.current = null;
+    sceneRef.current?.showGameScreen(null);
+  };
+  const linkStream = (stream: MediaStream): boolean => {
+    unlinkWindow();
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.srcObject = stream;
+    void video.play().catch(() => {});
+    linkedStreamRef.current = stream;
+    linkedVideoRef.current = video;
+    // the player closing the window or pressing the browser's "Stop sharing" ends the link
+    for (const t of stream.getVideoTracks()) t.addEventListener('ended', () => { if (linkedStreamRef.current === stream) unlinkWindow(); });
+    return sceneRef.current?.showGameScreen(video) ?? false;
+  };
+  const screenOps = useMemo<CompanionScreenOps>(() => ({
+    async link(): Promise<string> {
+      if (!navigator.mediaDevices?.getDisplayMedia) return 'This browser cannot share a window.';
+      try {
+        // a window first (not the whole desktop), at most 720p and 15 fps: the screen's texture uploads every frame on the GTX 950M
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: { displaySurface: 'window', width: { max: 1280 }, height: { max: 720 }, frameRate: { max: 15 } },
+          audio: false,
+          monitorTypeSurfaces: 'exclude',
+        } as DisplayMediaStreamOptions);
+        return linkStream(stream)
+          ? 'Window linked: it is on the screen ahead of you, and my eyes see it too.'
+          : 'The window is shared, but the screen would not stand here.';
+      } catch {
+        return 'No window shared.';
+      }
+    },
+    unlink(): string {
+      unlinkWindow();
+      return 'Window unlinked.';
+    },
+    linked: () => linkedStreamRef.current !== null,
+    async frames() {
+      const out: { source: 'game' | 'external'; blob: Blob }[] = [];
+      const view = await new Promise<Blob | null>((resolve) => {
+        const mine = (canvas: HTMLCanvasElement): void => { void toJpeg(canvas, canvas.width, canvas.height).then(resolve); };
+        eyesRequestRef.current = mine;
+        // no frame drawn within a second (paused, hidden tab): give up on this one only
+        window.setTimeout(() => { if (eyesRequestRef.current === mine) { eyesRequestRef.current = null; resolve(null); } }, 1000);
+      });
+      if (view) out.push({ source: 'game', blob: view });
+      const v = linkedVideoRef.current;
+      if (v && v.videoWidth > 0) {
+        const b = await toJpeg(v, v.videoWidth, v.videoHeight);
+        if (b) out.push({ source: 'external', blob: b });
+      }
+      return out;
+    },
+  }), []);
+  useEffect(() => () => unlinkWindow(), []);
   /**
    * The beam's Apply with a species cartridge (plan 39, Aq): a tap regrows the tree it is fired at as the cartridge's
    * species; a hold or Shift every tree of that tree's kind within 12 m. Like for like: it fits trees only. A plot holds
@@ -2177,7 +2365,11 @@ useEffect(() => {
         // Haddy's surge warning (A6-LEAK-SURGE, Argo's line); the narrator's cooldown keeps it from repeating
         narratorRef.current?.trigger('leak:surge');
       },
-      onHitPlayer: (damage, bearing) => takeHit(damage, bearing),
+      onHitPlayer: (damage, bearing, mob) => {
+        takeHit(damage, bearing);
+        // plan 50: the one that hurt the player counts double in the drone's threat score for a few seconds
+        if (mob) sceneRef.current?.noteCompanionHurtBy(mob.id);
+      },
       onDeath: (_mob, drop) => {
         narratorRef.current?.trigger('mob:kill');
         updateChain(monsterKilled);
@@ -3296,6 +3488,14 @@ useEffect(() => {
             vehicleInput,
           }
         : { move: { x: 0, z: 0 }, look: { dx: 0, dy: 0 }, run: false });
+      // plan 50: the drone's barks (contact, target down, area clear) go out on the radio, one per 8 s at most
+      for (const line of scene.drainCompanionBarks()) companionHandleRef.current?.say(line);
+      // plan 50: the eyes read the frame just drawn (the drawing buffer is not preserved past this task)
+      if (eyesRequestRef.current) {
+        const take = eyesRequestRef.current;
+        eyesRequestRef.current = null;
+        take(scene.viewCanvas());
+      }
       if (props.gamePreset && live) {
         const preset = props.gamePreset;
         const at = scene.debug.position();
@@ -4711,6 +4911,26 @@ useEffect(() => {
       lastPing: () => lastPingRef.current,
       pingMarkerAge: () => sceneRef.current?.pingMarkerAge() ?? null,
       kitOrder: (order: CompanionKitOrder): string => kitOps.run(order),
+      /** Plan 50 test seams: a fake "game window" (an animated canvas stream) linked as the browser's picker would, and unlinked. */
+      linkTestWindow: (): boolean => {
+        const c = document.createElement('canvas');
+        c.width = 320;
+        c.height = 180;
+        const g = c.getContext('2d');
+        let n = 0;
+        const paint = (): void => {
+          if (!g) return;
+          g.fillStyle = `hsl(${(n += 7) % 360} 70% 40%)`;
+          g.fillRect(0, 0, 320, 180);
+          g.fillStyle = '#fff';
+          g.fillRect(140 + 40 * Math.sin(n / 20), 80, 40, 20);
+          if (linkedStreamRef.current) requestAnimationFrame(paint);
+        };
+        const ok = linkStream(c.captureStream(15));
+        paint();
+        return ok;
+      },
+      unlinkWindow: (): void => unlinkWindow(),
       /** Turns the heavy machines' kit frames on or off (off until TICKET-39b refits them) and rebuilds the plot's machines. */
       kitFrames: (on: boolean): void => {
         setKitFrames(on);
@@ -5158,6 +5378,8 @@ useEffect(() => {
             companion={sceneRef.current?.getCompanion?.() ?? null}
             handleRef={companionHandleRef}
             kitOps={kitOps}
+            droneOps={droneOps}
+            screenOps={screenOps}
             onBroadcastRadio={(text) => {
               say('Overwatch · Co-Builder', text);
             }}

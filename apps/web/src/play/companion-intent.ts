@@ -6,6 +6,7 @@
  * Player facing convention (the walker's, from play-scene teleport math):
  *   forward = (-sin yaw, -cos yaw), right = (cos yaw, -sin yaw).
  */
+import { parseScoutOrder, type ScoutCategory } from './companion-scout';
 
 export interface CompanionPlayerPose {
   readonly x: number;
@@ -38,6 +39,14 @@ export type CompanionIntent =
   | { readonly kind: 'kit-save-default' }
   | { readonly kind: 'kit-reset' }
   | { readonly kind: 'ping-what' }
+  // plan 50: the drone's standing orders, finds, and edit control
+  | { readonly kind: 'combat-mode'; readonly mode: 'defend' | 'weapons-free' | 'hold-fire' }
+  | { readonly kind: 'focus'; readonly target: 'ping' | 'nearest' | 'biggest' }
+  | { readonly kind: 'cover'; readonly side: 'left' | 'right' | 'rear' }
+  | { readonly kind: 'scout'; readonly category: ScoutCategory }
+  | { readonly kind: 'recall' }
+  | { readonly kind: 'undo' }
+  | { readonly kind: 'keep' }
   | { readonly kind: 'chat' };
 
 /** A resolved order: where to go, whether to float there, and the spoken confirmation. */
@@ -103,7 +112,25 @@ export function parseCompanionIntent(raw: string): CompanionIntent {
   const takeOff = tokens.includes('take') && (tokens.includes('off') || tokens.includes('away'));
   if (hazard && (hits(text, tokens, REMOVE) || takeOff)) return { kind: 'kit-strip-hazard' };
   if (tokens.includes('default') && hits(text, tokens, DEFAULT_VERB)) return { kind: 'kit-save-default' };
+  // plan 50: edit control, then the drone's orders, before any movement word reads them as a move
+  if (hits(text, tokens, ['undo', 'undo that', 'take that back', 'revert that', 'no not that'])) return { kind: 'undo' };
+  if (hits(text, tokens, ['keep it', 'keep that', 'keep this', 'yes keep', 'apply it', 'commit it'])) return { kind: 'keep' };
   if (hits(text, tokens, RESET)) return { kind: 'kit-reset' };
+  if (hits(text, tokens, ['hold fire', 'cease fire', 'stop shooting', "don't shoot", 'dont shoot', 'stand down'])) return { kind: 'combat-mode', mode: 'hold-fire' };
+  if (hits(text, tokens, ['weapons free', 'open fire', 'fire at will', 'go loud', 'engage', 'attack everything', 'kill everything'])) return { kind: 'combat-mode', mode: 'weapons-free' };
+  if (hits(text, tokens, ['defend me', 'protect me', 'guard me', 'keep me alive', 'watch my back'])) return { kind: 'combat-mode', mode: 'defend' };
+  if (hits(text, tokens, ['cover'])) {
+    if (hits(text, tokens, ['left'])) return { kind: 'cover', side: 'left' };
+    if (hits(text, tokens, ['rear', 'back', 'six', 'behind'])) return { kind: 'cover', side: 'rear' };
+    if (hits(text, tokens, ['right'])) return { kind: 'cover', side: 'right' };
+  }
+  const attackWord = hits(text, tokens, ['focus', 'kill', 'shoot', 'attack', 'take out', 'take down', 'target', 'hit']);
+  if (attackWord) {
+    if (hits(text, tokens, ['big one', 'biggest', 'brute', 'big guy', 'boss', 'tank'])) return { kind: 'focus', target: 'biggest' };
+    if (hits(text, tokens, ['nearest', 'closest', 'nearby'])) return { kind: 'focus', target: 'nearest' };
+    if (hits(text, tokens, ['that', 'this', 'it', 'him', 'them', 'there', 'pinged', 'marked'])) return { kind: 'focus', target: 'ping' };
+  }
+  if (hits(text, tokens, ['recall', 'come back', 'return to me', 'cancel that', 'cancel everything', 'regroup', 'fall back'])) return { kind: 'recall' };
   if (hits(text, tokens, WHAT)) return { kind: 'ping-what' };
 
   // "land" / "walk" cancels hover before anything else reads as a float order
@@ -123,6 +150,9 @@ export function parseCompanionIntent(raw: string): CompanionIntent {
   if (hits(text, tokens, GATE) && wantsGo) return { kind: 'landmark', name: 'gate' };
   if (hits(text, tokens, ROVER) && wantsGo) return { kind: 'landmark', name: 'rover' };
   if (hits(text, tokens, BENCH) && wantsGo) return { kind: 'landmark', name: 'bench' };
+  // plan 50: a find order, after the hold, follow and landmark words ("I need you to guard the gate" is a hold)
+  const find = parseScoutOrder(raw);
+  if (find) return { kind: 'scout', category: find };
 
   if (wantsFront || wantsHere) return { kind: 'come-front' };
 
@@ -202,7 +232,14 @@ export function resolveCompanionOrder(
     case 'kit-save-default':
     case 'kit-reset':
     case 'ping-what':
-      return { intent, ...none, reply: '' }; // the caller runs the kit edit on the last ping and reports it
+    case 'combat-mode':
+    case 'focus':
+    case 'cover':
+    case 'scout':
+    case 'recall':
+    case 'undo':
+    case 'keep':
+      return { intent, ...none, reply: '' }; // the caller runs it (the kit edit, the order or the find) and reports it
     case 'chat':
       return { intent, ...none, reply: '' }; // the caller routes to the bridge or small talk
   }

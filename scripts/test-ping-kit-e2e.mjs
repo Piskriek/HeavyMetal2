@@ -180,7 +180,14 @@ try {
   check('a bridge override-kit-part lands on the live kit', overridden);
   const kitResult = await until(async () => (await events('kit-result')).at(-1), 4000);
   check('the game reports the kit result back to the bridge', /now wears? dark steel/.test(kitResult?.result ?? ''), kitResult?.result);
+  // plan 50: an AI's edit over the bridge is staged; the player keeps it before it can become a default
+  await order('keep it');
+  // plan 50 review: the bridge can only suggest a shipped default; the player's own words save it
   await postCommand({ action: 'save-kit-default', kitId: 'gate-dais' });
+  const suggested = await until(async () => (await events('companion-say')).find((e) => /suggests saving this kit as the shipped default/.test(e.text)), 4000);
+  check('a bridge save-kit-default only suggests it', Boolean(suggested) && fs.readFileSync(defaultsFile, 'utf8').trim() === '{}');
+  await order('save as default');
+  await page.locator('.companion-chat-close').click();
   const written = await until(async () => {
     const d = JSON.parse(fs.readFileSync(defaultsFile, 'utf8'));
     return d['gate-dais']?.['step-upper']?.material === 'darkSteel' && d['gate-dais']?.['band-lower-north']?.material === 'paint' ? d : null;
@@ -193,6 +200,9 @@ try {
   await postCommand({ action: 'mutate-kit-preset', kitId: 'gate-dais', mutation: 'restore-hazard' });
   const restored = await until(async () => Object.values(await materials()).filter((m) => m === 'hazard').length === 8, 6000);
   check('mutate-kit-preset restore-hazard puts the stripes back', restored);
+  // plan 50: an AI's edit is staged until the player keeps it
+  await order('keep it');
+  await page.locator('.companion-chat-close').click();
   const saved = await page.evaluate(() => window.__dev.kitOverrides()['gate-dais'] ?? null);
   check('the player save holds the dais overrides', saved?.['step-upper']?.material === 'darkSteel' && saved?.['band-lower-north']?.material === 'hazard', JSON.stringify(saved));
 

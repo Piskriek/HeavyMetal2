@@ -23,6 +23,12 @@
   min-height: 22px;
 }
 
+/* the trench row wraps its latch pill under the well when tight, so the readout never truncates */
+.hud-harness-row[data-testid='harness-trench'] {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
 .hud-harness-well {
   filter: drop-shadow(0 0 4px currentColor);
   flex: 0 0 auto;
@@ -30,7 +36,10 @@
 
 .hud-harness-pill {
   font-family: var(--hud-font-display, 'Oxanium', monospace);
-  font-size: 11px;
+  font-size: 10px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   letter-spacing: 0.04em;
   border: 1px solid;
   border-radius: 999px;

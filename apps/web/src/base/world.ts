@@ -16,6 +16,7 @@ import * as S from '@hm/structure';
 import * as F from '@hm/substrate';
 import { TURRET_POWER_DRAW_KW } from '@hm/plotsim';
 import { DEFAULT_PLOT_RADIUS_M, EARTH_UNLOCK_FIDELITY_STAGE as EARTH_UNLOCK_STAGE, resolveMovedGatePose, type GateAccessMode, type GatePose } from '@hm/coopnet/gate-dialer';
+import { decodeHarnessCartridgeCode } from '@hm/cartlab';
 import { MOON_BIOME_PRESET, readBiomePreset, type PlotBiomePreset } from './biome-preset';
 import { DRAFT_ORE, EQUIP, FIELD_RADIUS, HEAVY, HEAVY_BILL, ITEMS, MAPS, MATERIALS, PIECE_EXTRA, PIECE_ORE, PIECE_STAGE, PRIMITIVES, QUEUE_MAX, RECIPE_BY_ID, STARTER, blueprint, blueprintId, pieceCost, FABRICATOR_BILL, FORGE_BY_ID, PART_SLOTS, VEHICLE, type Blueprint, type MapId, type PartSlot, type PrimitiveId, type StationKind, type VehicleKind } from './catalog';
 import { EQUIP_SLOTS, type EquipSlot, type SlotRef } from './view';
@@ -94,7 +95,11 @@ export const isGateAccessMode = (access: unknown): access is GateAccessMode =>
   typeof access === 'string' && (GATE_ACCESS_MODES as readonly string[]).includes(access);
 
 /** A printed vehicle: its pose, and for a hauler the id of its storage box on the linked network. */
-export interface Vehicle { readonly id: number; readonly kind: VehicleKind; readonly x: number; readonly z: number; readonly yaw: number; readonly box: number | null }
+export interface Vehicle {
+  readonly id: number; readonly kind: VehicleKind; readonly x: number; readonly z: number; readonly yaw: number; readonly box: number | null;
+  /** The Sovereign Harness soul bound to this vehicle (plan 47): a `harness:`/`harnessc:` ref, or absent for the default soul. */
+  readonly harness?: string;
+}
 /** A vehicle's storage box id: below every piece, bin and the bridge store's. */
 export const vehicleBox = (vehicleId: number): number => -100 - vehicleId;
 export const NO_LOADOUT: Readonly<Record<PartSlot, string | null>> = { core: null, barrel: null, sight: null, cell: null };
@@ -162,6 +167,7 @@ export type BaseCommand =
   | { readonly t: 'shelter'; readonly cx: number; readonly cz: number; readonly yaw: number }
   /** Leaves a vehicle where the player parked it (logged, so a replay parks it there too). */
   | { readonly t: 'park'; readonly vehicle: number; readonly x: number; readonly z: number; readonly yaw: number }
+  | { readonly t: 'bindHarness'; readonly vehicle: number; readonly ref: string | null }
   /** Crafts a weapon frame or part at a Weapon Bench within reach. */
   | { readonly t: 'forge'; readonly at: Point; readonly item: string }
   /** Fits a part from the pack into its slot (the part there goes back to the pack), or empties a slot (item null). */
@@ -205,6 +211,7 @@ export type BaseEvent =
   | { readonly type: 'shelter'; readonly structure: number }
   | { readonly type: 'printed'; readonly machine: number; readonly vehicle: number; readonly kind: VehicleKind }
   | { readonly type: 'parked'; readonly vehicle: number }
+  | { readonly type: 'harnessBound'; readonly vehicle: number; readonly ref: string | null }
   | { readonly type: 'forged'; readonly item: string }
   | { readonly type: 'fitted'; readonly slot: PartSlot; readonly item: string | null }
   | { readonly type: 'granted'; readonly stock: readonly L.Stack[]; readonly lost: readonly L.Stack[] }
@@ -448,6 +455,8 @@ export function apply(w: BaseWorld, env: WorldEnv, cmd: BaseCommand): Applied {
       return shelter(w, env, cmd);
     case 'park':
       return park(w, cmd);
+    case 'bindHarness':
+      return bindHarness(w, cmd);
     case 'forge':
       return forge(w, env, cmd);
     case 'fit':
@@ -973,6 +982,19 @@ function park(w: BaseWorld, cmd: Extract<BaseCommand, { t: 'park' }>): Applied {
   // a hauler's bin goes where the hauler goes, so the network finds it there
   const boxes = v.box === null ? w.boxes : w.boxes.map((b) => (b.id === v.box ? { ...b, x: cmd.x, z: cmd.z } : b));
   return next(w, { vehicles, boxes }, [{ type: 'parked', vehicle: v.id }]);
+}
+
+/** Binds a Sovereign Harness soul ref to a vehicle, or strips it (plan 47). The ref must decode. */
+function bindHarness(w: BaseWorld, cmd: Extract<BaseCommand, { t: 'bindHarness' }>): Applied {
+  const v = w.vehicles.find((x) => x.id === cmd.vehicle);
+  if (!v) return refuse(w, cmd.t, 'no-vehicle');
+  if (cmd.ref !== null && decodeHarnessCartridgeCode(cmd.ref) === null) return refuse(w, cmd.t, 'bad-harness');
+  const vehicles = w.vehicles.map((x) => {
+    if (x.id !== v.id) return x;
+    if (cmd.ref === null) { const { harness: _h, ...rest } = x; return rest; }
+    return { ...x, harness: cmd.ref };
+  });
+  return next(w, { vehicles }, [{ type: 'harnessBound', vehicle: v.id, ref: cmd.ref }]);
 }
 
 function forge(w: BaseWorld, env: WorldEnv, cmd: Extract<BaseCommand, { t: 'forge' }>): Applied {

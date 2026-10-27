@@ -51,6 +51,7 @@ import {
   readPrint,
   printKind,
   type Print,
+  decodeHarnessCartridgeCode,
   type HarnessPrintSpec,
   type MaterialPrintSpec,
   type SpritePrintSpec,
@@ -1133,6 +1134,29 @@ useEffect(() => {
     lostSupportRef.current = lost;
     (baseViewSource as WorldViewSource).notify?.();
   };
+  /**
+   * Boards a vehicle and wakes its Sovereign Harness soul (plan 47): a harness cartridge in the
+   * rifle's port binds (and persists on the vehicle in the plot save); otherwise a saved soul
+   * wakes; otherwise the steadfast default rides along. Used by the E key and the e2e hook.
+   */
+  const boardVehicle = (id: number, kind: string): boolean => {
+    const entered = sceneRef.current?.enterVehicle(id);
+    if (!entered) return false;
+    const heldHarness = beamPortRef.current?.harness;
+    const savedRef = baseWorldRef.current.vehicles.find((v) => v.id === id)?.harness ?? null;
+    if (heldHarness && sceneRef.current?.setVehicleHarness(heldHarness.ref)) {
+      dispatchBase({ t: 'bindHarness', vehicle: id, ref: heldHarness.ref });
+      say(`Driving ${kind.toUpperCase()} · ${heldHarness.name} bound`, 'WASD to drive, Space to brake, E to exit.');
+    } else if (savedRef !== null && sceneRef.current?.setVehicleHarness(savedRef)) {
+      const soulName = decodeHarnessCartridgeCode(savedRef)?.name ?? 'Bound soul';
+      say(`Driving ${kind.toUpperCase()} · ${soulName} woken`, 'WASD to drive, Space to brake, E to exit.');
+    } else {
+      sceneRef.current?.setVehicleHarness(null);
+      say(`Driving ${kind.toUpperCase()}`, 'WASD to drive, Space to brake, E to exit.');
+    }
+    return true;
+  };
+
   /** Puts a written cartridge from the lab rack into the rifle's port: R takes the first one, the X radial in Apply the one picked. */
   const loadBeamCartridge = (written: Cartridge): void => {
     // a written material, or a print (plans 39 and 41): a part, a species, a light or a machine material, each glowing its own colour in the port
@@ -3763,6 +3787,11 @@ useEffect(() => {
           scene.monsters.setWeaponStats(devWeaponRef.current ?? weaponStats(baseWorldRef.current.loadout));
         },
         enterVehicle: (id: number) => scene.enterVehicle(id),
+        /** Boards through the real bind path (plan 47): rifle harness binds, a saved soul wakes, else the default. */
+        boardVehicle: (id: number) => {
+          const v = baseWorldRef.current.vehicles.find((x) => x.id === id);
+          return v ? boardVehicle(v.id, v.kind) : false;
+        },
         exitVehicle: () => {
           const parked = scene.exitVehicle();
           if (parked) {
@@ -4285,16 +4314,7 @@ useEffect(() => {
         }
         const nearV = sceneRef.current?.getNearVehicle(3.5);
         if (nearV) {
-          const entered = sceneRef.current?.enterVehicle(nearV.id);
-          if (entered) {
-            // Plan 47: a harness cartridge in the rifle's port binds the vessel soul on boarding.
-            const heldHarness = beamPortRef.current?.harness;
-            if (heldHarness && sceneRef.current?.setVehicleHarness(heldHarness.ref)) {
-              say(`Driving ${nearV.kind.toUpperCase()} · ${heldHarness.name} bound`, 'WASD to drive, Space to brake, E to exit.');
-            } else {
-              say(`Driving ${nearV.kind.toUpperCase()}`, 'WASD to drive, Space to brake, E to exit.');
-            }
-          }
+          boardVehicle(nearV.id, nearV.kind);
           return;
         }
         // Build mode (a blueprint in the active hotbar slot): E places the piece, so nothing aimed is used or toggled.
@@ -4623,7 +4643,7 @@ useEffect(() => {
         return beamPortRef.current?.cartridge.id === id;
       },
       /** The rifle's port: its cartridge's name and, for a part cartridge, the part. */
-      port: () => (beamPortRef.current ? { name: beamPortRef.current.name, part: beamPortRef.current.part ?? null, species: beamPortRef.current.species ?? null, light: beamPortRef.current.light ?? null, material: beamPortRef.current.material ?? null, sprite: beamPortRef.current.sprite ?? null, sound: beamPortRef.current.sound ?? null } : null),
+      port: () => (beamPortRef.current ? { name: beamPortRef.current.name, part: beamPortRef.current.part ?? null, species: beamPortRef.current.species ?? null, light: beamPortRef.current.light ?? null, material: beamPortRef.current.material ?? null, sprite: beamPortRef.current.sprite ?? null, sound: beamPortRef.current.sound ?? null, harness: beamPortRef.current.harness ?? null } : null),
       spriteCard: (kit: string) => sceneRef.current?.spriteCardOf(kit) ?? null,
       seedCartridge: (preset: string): boolean => {
         const v = VAULT_BY_ID.get(preset);

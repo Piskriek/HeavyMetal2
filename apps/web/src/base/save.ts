@@ -17,6 +17,7 @@ import {
   NO_LOADOUT, createWorld, isGateAccessMode, layoutPieces, pieceAt, vehicleBox, type BaseWorld, type Job, type Layout, type Machine, type Plan, type Vehicle,
 } from './world';
 import { DEFAULT_PLOT_RADIUS_M, type GatePose } from '@hm/coopnet/gate-dialer';
+import { decodeHarnessCartridgeCode } from '@hm/cartlab';
 import { MOON_BIOME_PRESET, readBiomePreset } from './biome-preset';
 
 /** The storage key for the base save (next to quest.ts's SAVE_KEY). */
@@ -91,7 +92,9 @@ export function loadWorld(text: string | null, seed = 1): BaseWorld {
     if (!isRec(v)) continue;
     const id = int(v['id'], 1, 1_000_000), kind = v['kind'] as VehicleKind, x = num(v['x']), z = num(v['z']), yaw = num(v['yaw']);
     if (id === null || !(VEHICLES as readonly string[]).includes(kind) || x === null || z === null || yaw === null || vehicles.some((o) => o.id === id)) continue;
-    vehicles.push({ id, kind, x, z, yaw, box: VEHICLE[kind].cargo ? vehicleBox(id) : null });
+    // a bound Sovereign Harness soul rides the save (plan 47); a ref that no longer decodes is dropped, never trusted
+    const harness = typeof v['harness'] === 'string' && decodeHarnessCartridgeCode(v['harness']) !== null ? v['harness'] : undefined;
+    vehicles.push({ id, kind, x, z, yaw, box: VEHICLE[kind].cargo ? vehicleBox(id) : null, ...(harness !== undefined ? { harness } : {}) });
   }
   const vehicleBoxes = new Set(vehicles.flatMap((v) => (v.box === null ? [] : [v.box])));
   // boxes: the bridge store, one per bin piece and one per hauler, each kept once; a missing one comes back empty

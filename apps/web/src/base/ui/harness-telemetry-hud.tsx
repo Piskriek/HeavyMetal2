@@ -137,7 +137,7 @@ export function HarnessTelemetryHud(props: { readonly vm: IHarnessHudViewModel |
   return (
     <div className="hud-harness-blade" data-hud-zone="bottom-right" role="status" aria-label="Soul harness telemetry">
       <div className="hud-harness-row" data-testid="harness-trench">
-        <svg className="hud-harness-well" viewBox="0 0 120 44" width="120" height="44" aria-hidden="true">
+        <svg className="hud-harness-well" viewBox="0 0 120 44" width="92" height="34" aria-hidden="true">
           <path d={vm.svgWellPathD} fill="none" stroke={vm.trenchColorHex} strokeWidth="2" strokeLinecap="round" />
         </svg>
         <span className="hud-harness-pill" style={{ color: vm.trenchColorHex, borderColor: vm.trenchColorHex }}>

@@ -107,6 +107,8 @@ export type WireBaseEvent =
   | { readonly kind: 'shelter'; readonly structure: number }
   | { readonly kind: 'printed'; readonly machine: number; readonly vehicle: number; readonly vehicleKind: VehicleKind }
   | { readonly kind: 'parked'; readonly vehicle: number }
+  /** A Sovereign Harness soul bound to (or stripped from) a vehicle (plan 47). */
+  | { readonly kind: 'harnessBound'; readonly vehicle: number; readonly ref: string | null }
   | { readonly kind: 'forged'; readonly item: string }
   | { readonly kind: 'fitted'; readonly slot: PartSlot; readonly item: string | null }
   | { readonly kind: 'granted'; readonly stock: readonly L.Stack[]; readonly lost: readonly L.Stack[] }
@@ -167,6 +169,8 @@ export function toWireEvent(e: BaseEvent): WireBaseEvent {
       return { kind: 'printed', machine: e.machine, vehicle: e.vehicle, vehicleKind: e.kind };
     case 'parked':
       return { kind: 'parked', vehicle: e.vehicle };
+    case 'harnessBound':
+      return { kind: 'harnessBound', vehicle: e.vehicle, ref: e.ref };
     case 'forged':
       return { kind: 'forged', item: e.item };
     case 'fitted':
@@ -231,6 +235,8 @@ export function fromWireEvent(w: WireBaseEvent): BaseEvent {
       return { type: 'printed', machine: w.machine, vehicle: w.vehicle, kind: w.vehicleKind };
     case 'parked':
       return { type: 'parked', vehicle: w.vehicle };
+    case 'harnessBound':
+      return { type: 'harnessBound', vehicle: w.vehicle, ref: w.ref };
     case 'forged':
       return { type: 'forged', item: w.item };
     case 'fitted':

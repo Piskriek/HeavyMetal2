@@ -491,3 +491,22 @@ test('an old save with no biome keeps the Moon it was built on', () => {
   const broken = { ...raw, biome: { v: 1, species: [{ species: 'fern' }] } };
   assert.deepEqual(loadWorld(JSON.stringify(broken)).biome, MOON_BIOME_PRESET);
 });
+
+test('a vehicle keeps its bound harness soul across park and the save/load round trip (plan 47)', () => {
+  let w: BaseWorld = { ...createWorld(), vehicles: [{ id: 1, kind: 'scout', x: 4, z: 4, yaw: 0, box: null }], nextVehicle: 2 };
+  assert.equal(apply(w, env, { t: 'bindHarness', vehicle: 9, ref: 'harness:escort-steadfast' }).events[0]!.type, 'refused', 'no such vehicle');
+  assert.equal(apply(w, env, { t: 'bindHarness', vehicle: 1, ref: 'harness:not-a-soul' }).events[0]!.type, 'refused', 'a ref that does not decode is refused');
+  w = run(w, { t: 'bindHarness', vehicle: 1, ref: 'harness:hauler-heavy-syntropic' });
+  assert.equal(w.vehicles[0]!.harness, 'harness:hauler-heavy-syntropic');
+  w = run(w, { t: 'park', vehicle: 1, x: 30, z: -12, yaw: 1.2 });
+  assert.equal(w.vehicles[0]!.harness, 'harness:hauler-heavy-syntropic', 'parking keeps the soul');
+  const back = loadWorld(saveWorld(w), 1);
+  assert.equal(back.vehicles[0]!.harness, 'harness:hauler-heavy-syntropic', 'the soul rides the save');
+  // stripping the soul removes the field entirely
+  const stripped = run(w, { t: 'bindHarness', vehicle: 1, ref: null });
+  assert.equal('harness' in stripped.vehicles[0]!, false);
+  // a tampered save ref never loads (the CRC gate drops it)
+  const raw = JSON.parse(saveWorld(back)) as { vehicles: { harness?: string }[] };
+  raw.vehicles[0]!.harness = 'harnessc:FFFFFF:corrupt';
+  assert.equal(loadWorld(JSON.stringify(raw), 1).vehicles[0]!.harness, undefined);
+});

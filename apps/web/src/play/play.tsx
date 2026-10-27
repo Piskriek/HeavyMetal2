@@ -51,6 +51,7 @@ import {
   readPrint,
   printKind,
   type Print,
+  type HarnessPrintSpec,
   type MaterialPrintSpec,
   type SpritePrintSpec,
   type SoundPrintSpec,
@@ -65,6 +66,9 @@ import { BenchLights } from './bench-lights';
 import { BenchMaterials } from './bench-materials';
 import { BenchSprites } from './bench-sprites';
 import { BenchSounds } from './bench-sounds';
+import { BenchHarness } from './bench-harness';
+import { HarnessTelemetryHud, type IHarnessHudViewModel } from '../base/ui/harness-telemetry-hud';
+import { computeDrivingDriftBadge, type DrivingDriftBadgeState } from '@hm/hudmath/toast-queue-and-compass';
 import { MY_PRESETS_KEY, parseMyPresets, presetsOf, savePreset, serializeMyPresets, type MyPresets } from './my-presets';
 import { isLampPart, lightOverride } from './light-presets';
 import { rifleLook } from './rifle-look';
@@ -176,7 +180,7 @@ import { EARTH_BIOME_PRESET, MOON_BIOME_PRESET, biomeSlotSpecies, earthPlotUnloc
 import { GATE_CHEVRONS, arrivalSector, creditsProgress, earthEndgameState, transitArrival, type EndgameInput } from './earth-endgame';
 import { isBiosphereCoherent } from '@hm/questline';
 import { fidelityRules, FIDELITY_LINE_IDS } from '@hm/narrator';
-import { HudZone, CompassRibbon, FloatsPill, MachineLabel, SyncWord } from '../base/ui/hud-zones';
+import { HudZone, CompassRibbon, DrivingHudBadge, FloatsPill, MachineLabel, SyncWord } from '../base/ui/hud-zones';
 import { DiegeticRadioTunerWidget } from '../shell/diegetic-radio-tuner-widget';
 import { COLLECTIBLE_MUSIC_TAPES, resolveRadioArrangementStyle } from '@hm/content';
 import {
@@ -647,7 +651,7 @@ export function PlayScreen(props: {
   const [labPanel, setLabPanel] = useState<LabMachineKind | null>(null);
   const [benchBlank, setBenchBlank] = useState<string | null>(null);
   /** The preset bench's page: authored terraforming presets, or Shape Press parts (TICKET-32). */
-  const [benchTab, setBenchTab] = useState<'presets' | 'parts' | 'species' | 'lights' | 'sprites' | 'sounds'>('presets');
+  const [benchTab, setBenchTab] = useState<'presets' | 'parts' | 'species' | 'lights' | 'sprites' | 'sounds' | 'harness'>('presets');
   /** The Materials page's shelf (plan 41): the ground's terraforming materials, or the machines' layered ones. */
   const [materialShelf, setMaterialShelf] = useState<'ground' | 'machines'>('ground');
   /** The player's own presets (plan 39 section 7): "Yours" on every bench page, kept in the profile. */
@@ -1013,6 +1017,9 @@ useEffect(() => {
   const [drivingSpeed, setDrivingSpeed] = useState<number | null>(null);
   const [drivingBoostEnergy, setDrivingBoostEnergy] = useState<number | undefined>(undefined);
   const [drivingBoosting, setDrivingBoosting] = useState(false);
+  /** Plan 47: the driven vehicle's Sovereign Harness telemetry blade (Zone 8) and the drift badge beside it. */
+  const [drivingHarness, setDrivingHarness] = useState<IHarnessHudViewModel | null>(null);
+  const [drivingDrift, setDrivingDrift] = useState<DrivingDriftBadgeState | null>(null);
   const [baseWorldVersion, setBaseWorldVersion] = useState(0);
   const [baseWindowOpen, setBaseWindowOpen] = useState(false);
   const [beamHarvest, setBeamHarvest] = useState<{ count: number; name: string; fading?: boolean } | null>(null);
@@ -1026,7 +1033,7 @@ useEffect(() => {
   const beamOreFlushRef = useRef(0);
   /** The rifle's port (TASK-21): the written cartridge loaded from the lab rack, and its preset and colour. Not saved yet (TASK-21c). */
   /** The rifle's port: a material preset cartridge (preset set) or a part cartridge (part set, preset ''; TICKET-32). */
-  const beamPortRef = useRef<{ readonly cartridge: Cartridge; readonly preset: string; readonly name: string; readonly colour: string; readonly part?: PartSpec; readonly species?: SpeciesSpec; readonly light?: LightSpec; readonly material?: MaterialPrintSpec; readonly sprite?: SpritePrintSpec; readonly sound?: SoundPrintSpec } | null>(null);
+  const beamPortRef = useRef<{ readonly cartridge: Cartridge; readonly preset: string; readonly name: string; readonly colour: string; readonly part?: PartSpec; readonly species?: SpeciesSpec; readonly light?: LightSpec; readonly material?: MaterialPrintSpec; readonly sprite?: SpritePrintSpec; readonly sound?: SoundPrintSpec; readonly harness?: HarnessPrintSpec } | null>(null);
   /** A part shot in progress: when the left button went down and whether Shift was held (tap = one part, hold or Shift = all of that kind). */
   const partShotRef = useRef<{ readonly t0: number; readonly shift: boolean } | null>(null);
   /** A light cartridge's shot at a lamp (plan 39, Lx), decided on release like a part shot. */
@@ -1152,7 +1159,8 @@ useEffect(() => {
         : kind === 'species' ? 'Fire Apply at a tree on the plot: a tap regrows it, a hold or Shift every tree of its kind nearby.'
           : kind === 'light' ? 'Fire Apply at a machine lamp: a tap sets it, a hold or Shift every lamp on the machine.'
             : kind === 'material' ? 'Fire Apply at a machine part: a tap dresses it, a hold or Shift every part that wears the same.'
-            : 'Hold the left button in Apply to paint the ground, or fire it at a machine part to paint the part.');
+            : kind === 'harness' ? 'Enter a vehicle (E) with this loaded to bind its vessel soul; the Zone 8 blade shows it living.'
+              : 'Hold the left button in Apply to paint the ground, or fire it at a machine part to paint the part.');
   };
   const cycleBeamCartridge = (step: 1 | -1 = 1): void => {
     const list = allWrittenOnRack(labRef.current).filter((c) => rifleLook(c) !== null);
@@ -3178,6 +3186,10 @@ useEffect(() => {
         setDrivingSpeed(out.drivingVehicle.speed);
         setDrivingBoostEnergy(out.drivingVehicle.boostEnergy);
         setDrivingBoosting(Boolean(out.drivingVehicle.boosting));
+        setDrivingHarness(out.drivingVehicle.harness ?? null);
+        setDrivingDrift(out.drivingVehicle.vx !== undefined && out.drivingVehicle.vz !== undefined && out.drivingVehicle.yaw !== undefined
+          ? computeDrivingDriftBadge(out.drivingVehicle.vx, out.drivingVehicle.vz, out.drivingVehicle.yaw)
+          : null);
         driveAccRef.current += out.drivingVehicle.speed * dt;
         if (driveAccRef.current >= 1) {
           const whole = Math.floor(driveAccRef.current);
@@ -3189,6 +3201,8 @@ useEffect(() => {
         setDrivingSpeed(null);
         setDrivingBoostEnergy(undefined);
         setDrivingBoosting(false);
+        setDrivingHarness(null);
+        setDrivingDrift(null);
       }
       dx = 0; dy = 0;
 
@@ -4273,7 +4287,13 @@ useEffect(() => {
         if (nearV) {
           const entered = sceneRef.current?.enterVehicle(nearV.id);
           if (entered) {
-            say(`Driving ${nearV.kind.toUpperCase()}`, 'WASD to drive, Space to brake, E to exit.');
+            // Plan 47: a harness cartridge in the rifle's port binds the vessel soul on boarding.
+            const heldHarness = beamPortRef.current?.harness;
+            if (heldHarness && sceneRef.current?.setVehicleHarness(heldHarness.ref)) {
+              say(`Driving ${nearV.kind.toUpperCase()} · ${heldHarness.name} bound`, 'WASD to drive, Space to brake, E to exit.');
+            } else {
+              say(`Driving ${nearV.kind.toUpperCase()}`, 'WASD to drive, Space to brake, E to exit.');
+            }
           }
           return;
         }
@@ -4972,6 +4992,13 @@ useEffect(() => {
           {prompt && drivingSpeed === null && building === null ? <p className={`play-prompt${building && !hud.ghost?.ok ? ' bad' : ''}`} data-hud-zone="centre">{prompt}</p> : null}
           {hud.aimedProp && !hud.aimedProp.salvage && databank === null ? <LoreHover prop={hud.aimedProp.id} /> : null}
           {databank !== null ? <DataBank log={databank} onClose={closeDatabank} /> : null}
+          {drivingSpeed !== null ? (
+            // Plan 47 (Pillar 2): while driving, zone 8 carries the Sovereign Harness telemetry blade and the drift badge.
+            <HudZone zone="bottom-right">
+              <HarnessTelemetryHud vm={drivingHarness} />
+              <DrivingHudBadge telemetry={drivingDrift} />
+            </HudZone>
+          ) : null}
           {(state.step === 'build' || state.step === 'drill' || state.step === 'done' || visiting) && drivingSpeed === null ? (
             <HudZone zone="bottom-right">
             <section className="play-plot" data-hud-zone="bottom-right" aria-label={visiting ? `Visiting ${visiting.snapshot.owner}'s plot` : 'Your plot'}>
@@ -5337,6 +5364,7 @@ useEffect(() => {
                     <button className={benchTab === 'lights' ? 'on' : ''} aria-pressed={benchTab === 'lights'} onClick={() => setBenchTab('lights')} data-testid="bench-tab-lights">Lights</button>
                     <button className={benchTab === 'sprites' ? 'on' : ''} aria-pressed={benchTab === 'sprites'} onClick={() => setBenchTab('sprites')} data-testid="bench-tab-sprites">Sprites</button>
                     <button className={benchTab === 'sounds' ? 'on' : ''} aria-pressed={benchTab === 'sounds'} onClick={() => setBenchTab('sounds')} data-testid="bench-tab-sounds">Sounds</button>
+                    <button className={benchTab === 'harness' ? 'on' : ''} aria-pressed={benchTab === 'harness'} onClick={() => setBenchTab('harness')} data-testid="bench-tab-harness">Souls</button>
                   </div>
                   <p>{benchTab === 'parts'
                     ? 'Prints a Shape Press part onto a blank cartridge. Load it in the beam rifle and fire Apply at a part: a tap changes that part, a hold or Shift changes every part of its kind.'
@@ -5348,6 +5376,8 @@ useEffect(() => {
                           ? 'Prints a machine\'s turntable onto a blank cartridge, baked in the Fidelity Stage\'s own palette and dither. Load it in the beam rifle and fire Apply at a machine: its card hangs above the machine and turns at that stage\'s cadence.'
                           : benchTab === 'sounds'
                             ? 'Prints a synth patch onto a blank cartridge, played on the Fidelity Stage\'s own hardware from a 1-bit speaker to a spatial mix. Load it in the beam rifle and fire Apply at a machine: the patch becomes that machine\'s hum.'
+                            : benchTab === 'harness'
+                              ? 'Prints a Sovereign Harness vessel soul onto a blank cartridge. Load it in the beam rifle and enter a vehicle: the soul binds, feels its own chassis, and the Zone 8 blade shows it living.'
                       : materialShelf === 'machines'
                         ? 'Prints a machine material onto a blank cartridge: paint, then the wear on top (rust, dust, grime). Load it in the beam rifle and fire Apply at a machine part: a tap dresses that part, a hold or Shift every part that wore the same.'
                         : 'Writes an authored terraforming material onto a blank cartridge.'}</p>
@@ -5469,6 +5499,21 @@ useEffect(() => {
                         if (!activeBlank) return;
                         // a patch is data, not matter: no stock, only the blank and the bench's time
                         const next = startPrintWrite(labRef.current, labEnv, activeBlank, { sound: spec });
+                        labRef.current = next;
+                        commit(withLab(stateRef.current, next));
+                        say('Printing started', `The bench writes ${spec.name} onto the cartridge while powered.`);
+                      }}
+                    />
+                  ) : benchTab === 'harness' ? (
+                    <BenchHarness
+                      check={(spec) => {
+                        if (!activeBlank) return { ok: false, why: 'No blanks on the rack. Make a blank at the rack first.' };
+                        return canWritePrint(labRef.current, labEnv, activeBlank, { harness: spec });
+                      }}
+                      onPrint={(spec) => {
+                        if (!activeBlank) return;
+                        // a soul is data, not matter: no stock, only the blank and the bench's time
+                        const next = startPrintWrite(labRef.current, labEnv, activeBlank, { harness: spec });
                         labRef.current = next;
                         commit(withLab(stateRef.current, next));
                         say('Printing started', `The bench writes ${spec.name} onto the cartridge while powered.`);

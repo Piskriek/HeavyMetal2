@@ -58,6 +58,32 @@ export interface IRoverActuatorOutput {
 }
 
 /**
+ * Derives the harness's physical input vector from the REAL driven-rover somatics (plan 47
+ * live wiring): the lateral jolt is the measured change in sideways velocity (skids, landings,
+ * collisions), the concussion channel carries the scene's actual impact-audio level, and the
+ * surface grip follows the world's gravity (Lunar regolith 0.45 under ~1.62 m/s², Earth
+ * asphalt 0.85 under ~9.81 m/s²). Pure; no invented inputs.
+ */
+export function deriveRoverHarnessInput(
+  lateralVelMps: number,
+  prevLateralVelMps: number,
+  dtSec: number,
+  vesselMassKg: number,
+  gravityMps2: number,
+  concussionDb: number,
+  escortSpeedMps: number,
+): IRoverPhysicalInput {
+  return {
+    escortLineTargetX: 0.0,
+    escortSpeedTargetMps: escortSpeedMps,
+    flatbedGunfireDb: concussionDb,
+    gunfireIsFriendlyAllies: true,
+    surfaceGripMu: gravityMps2 > 5.0 ? 0.85 : 0.45,
+    lateralImpulseN: (vesselMassKg * (lateralVelMps - prevLateralVelMps)) / Math.max(1e-6, dtSec),
+  };
+}
+
+/**
  * Pure, zero-allocation tick binding the SovereignInceptionLoop state (Float32Array(24))
  * to the Rover Escort's physical steering, traction, and formation actuators.
  *

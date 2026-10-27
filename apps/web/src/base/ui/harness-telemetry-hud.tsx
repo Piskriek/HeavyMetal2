@@ -11,6 +11,7 @@
  * Pure deterministic view-model projection + React HUD blade (RULES 8a).
  */
 
+import type { ReactElement } from 'react';
 import { StateIdx } from '@hm/harness';
 
 export interface IHarnessHudViewModel {
@@ -114,4 +115,66 @@ export function computeHarnessHudViewModel(
     graduatedRay7AuraActive,
     auraHex,
   };
+}
+
+/** A joule reading squeezed into a [0..1] bar width: saturating, so small reserves still show. */
+const barFill = (joules: number): number => joules / (joules + 8.0);
+
+const RING_R = 15;
+const RING_C = 2 * Math.PI * RING_R;
+
+/**
+ * The Sovereign Harness Telemetry Blade (plan 47, Pillar 2): the four diegetic instruments —
+ * Attractor Trench potential well, Cybernetic Mirror phase reticle, Syntropic Buffer chambers,
+ * and the Graduation mastery ring — rendered from the pure view-model. Docks in HUD zone 8
+ * (bottom-right) while the player pilots a harnessed vehicle.
+ */
+export function HarnessTelemetryHud(props: { readonly vm: IHarnessHudViewModel | null }): ReactElement | null {
+  const vm = props.vm;
+  if (!vm) return null;
+  const latchSign = vm.latchLogOdds > 0 ? '+' : '';
+  const escrowPct = Math.round(vm.escrowGateOpenRatio * 100);
+  return (
+    <div className="hud-harness-blade" data-hud-zone="bottom-right" role="status" aria-label="Soul harness telemetry">
+      <div className="hud-harness-row" data-testid="harness-trench">
+        <svg className="hud-harness-well" viewBox="0 0 120 44" width="120" height="44" aria-hidden="true">
+          <path d={vm.svgWellPathD} fill="none" stroke={vm.trenchColorHex} strokeWidth="2" strokeLinecap="round" />
+        </svg>
+        <span className="hud-harness-pill" style={{ color: vm.trenchColorHex, borderColor: vm.trenchColorHex }}>
+          Π {vm.piPrior >= 100 ? vm.piPrior.toFixed(0) : vm.piPrior.toFixed(2)} · L {latchSign}{vm.latchLogOdds}
+        </span>
+      </div>
+      <div className="hud-harness-row" data-testid="harness-mirror">
+        <svg className="hud-harness-reticle" viewBox="0 0 48 48" width="34" height="34" aria-hidden="true">
+          <circle cx="24" cy="24" r="10" fill="none" stroke="#9fe8ff" strokeWidth="2" opacity="0.9" />
+          <g transform={`rotate(${vm.phaseLockDeg} 24 24)`}>
+            <circle cx="24" cy="24" r="17" fill="none" stroke={vm.mirrorErrorNorm < 0.05 ? '#3eff8b' : '#3dc8ff'}
+              strokeWidth="2" strokeDasharray={`${17 * Math.PI * (0.55 + 0.45 * vm.awarenessRatio)} ${17 * Math.PI * 2}`} />
+          </g>
+          <line x1="4" y1="24" x2="44" y2="24" stroke="#ff3d8a" strokeWidth="1.5" opacity={vm.scanlineGlitchOpacity} />
+        </svg>
+        <span className="hud-harness-read">MIRROR Δ{vm.phaseLockDeg}° · A {(vm.awarenessRatio * 100).toFixed(0)}%</span>
+      </div>
+      <div className="hud-harness-row hud-harness-buffer" data-testid="harness-buffer">
+        <i className="hud-harness-chamber" aria-hidden="true">
+          <b className="is-escrow" style={{ width: `${barFill(vm.escrowBalanceJ) * 100}%` }} />
+        </i>
+        <span className="hud-harness-gate">⇥{escrowPct}%</span>
+        <i className="hud-harness-chamber" aria-hidden="true">
+          <b className="is-reserve" style={{ width: `${barFill(vm.explorationReserveJ) * 100}%` }} />
+        </i>
+        <span className="hud-harness-read">{vm.escrowBalanceJ.toFixed(1)}J → {vm.explorationReserveJ.toFixed(1)}J</span>
+      </div>
+      <div className={`hud-harness-row hud-harness-aura${vm.graduatedRay7AuraActive ? ' is-graduated' : ''}`} data-testid="harness-aura">
+        <svg viewBox="0 0 36 36" width="26" height="26" aria-hidden="true">
+          <circle cx="18" cy="18" r={RING_R} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="3" />
+          <circle cx="18" cy="18" r={RING_R} fill="none" stroke={vm.auraHex} strokeWidth="3" strokeLinecap="round"
+            strokeDasharray={RING_C} strokeDashoffset={RING_C * (1 - vm.masteryProgressRatio)} transform="rotate(-90 18 18)" />
+        </svg>
+        <span className="hud-harness-read" style={{ color: vm.auraHex }}>
+          H {(vm.coherenceH * 100).toFixed(1)}%{vm.graduatedRay7AuraActive ? ' ★ N+1' : ''}
+        </span>
+      </div>
+    </div>
+  );
 }

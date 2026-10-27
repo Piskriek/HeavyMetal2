@@ -12,6 +12,11 @@ import { creatureGenomeById } from '@hm/creature';
 import { buildSporeModel, preloadSporeCreation, sporeModelBinding } from '../studio/spore-model';
 import { kitAudit } from '@hm/kitspec/audit';
 import { gameVehicleKind, type MultiverseGamePresetSpec } from './game-presets';
+// Plan 47 (Pillar 1): the driven rover's Sovereign Harness — vessel soul, Higher-Self bridge, somatic telemetry.
+import { CAYLEY_PADE_OUT_LENGTH, StateIdx, type IHarnessTuning, type IVesselPreset } from '@hm/harness';
+import { deriveRoverHarnessInput, stepRoverEscortHarness, type IRoverActuatorOutput } from '@hm/mobsim';
+import { HARNESS_SHELF_PRESETS, decodeHarnessCartridgeCode, toHarnessTuning, toVesselPreset, type IHarnessCartridgeSpec } from '@hm/cartlab';
+import { computeHarnessHudViewModel, type IHarnessHudViewModel } from '../base/ui/harness-telemetry-hud';
 import { CIRCUIT_CHECKPOINTS, gameCreatureIds, gameSpawn, gameStage } from './game-mode';
 import { tickLights } from './light-material';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
@@ -168,7 +173,14 @@ export interface FrameOut {
   readonly inDome: boolean;
   /** Sync is at or below 30% outside a dome: the return arrow shows in the compass (TASK-26). */
   readonly warn: boolean;
-  readonly drivingVehicle?: { readonly id: number; readonly kind: RoverKind; readonly speed: number; readonly boostEnergy?: number; readonly boosting?: boolean } | null;
+  readonly drivingVehicle?: {
+    readonly id: number; readonly kind: RoverKind; readonly speed: number;
+    readonly boostEnergy?: number; readonly boosting?: boolean;
+    /** World-frame velocity and heading, for the drift badge (plan 47). */
+    readonly vx?: number; readonly vz?: number; readonly yaw?: number;
+    /** The Sovereign Harness telemetry blade's view-model (plan 47, Pillar 2). */
+    readonly harness?: IHarnessHudViewModel | null;
+  } | null;
 }
 
 /** What the display governor and Settings change while you play: how the machines' pixels are drawn, and the ground's triangles. */
@@ -429,6 +441,8 @@ export interface PlayScene {
   setFabricators(fabricators: readonly { readonly id: number; readonly x: number; readonly z: number; readonly yaw: number; readonly printing: boolean }[]): void;
   enterVehicle(id: number): boolean;
   exitVehicle(): { readonly id: number; readonly x: number; readonly z: number; readonly yaw: number } | null;
+  /** Binds a `harness:`/`harnessc:` cartridge ref to the vehicle soul (null restores the default). False: the ref does not decode. */
+  setVehicleHarness(ref: string | null): boolean;
   getDrivingVehicle(): { readonly id: number; readonly kind: RoverKind; readonly speed: number; readonly boostEnergy?: number; readonly boosting?: boolean } | null;
   getNearVehicle(reach?: number): { readonly id: number; readonly kind: RoverKind } | null;
   /** POL-96: marks the sidearm on the armory rail taken or standing. */
@@ -887,6 +901,61 @@ export function createPlayScene(o: {
   let vehicleAcc = 0;
   let currentSpeed = 0;
 
+  // Plan 47 (Pillar 1): the driven vehicle's Sovereign Harness runtime. The vessel soul runs on the
+  // same fixed step as @hm/rover, fed only by measured somatics (lateral jolts, real impact
+  // concussions, the world's gravity). Its traction output feathers the drive input; the rest is
+  // telemetry for the Zone 8 HUD blade. Rebindable from a `harness:`/`harnessc:` rifle cartridge.
+  let harnessSpec: IHarnessCartridgeSpec = HARNESS_SHELF_PRESETS['harness:escort-steadfast']!;
+  let harnessVessel: IVesselPreset = toVesselPreset(harnessSpec);
+  let harnessTuning: IHarnessTuning = toHarnessTuning(harnessSpec);
+  const harnessState = new Float32Array(24);
+  const harnessTel = new Float32Array(4);
+  const harnessLedger = new Float64Array(4);
+  const harnessLatch = new Int8Array(1);
+  const harnessLatchAccum = new Float32Array(1);
+  const harnessMastery = new Float32Array(1);
+  const harnessScratch = new Float64Array(CAYLEY_PADE_OUT_LENGTH);
+  const harnessActuator: IRoverActuatorOutput = {
+    steerAngleRad: 0, driveTorqueNm: 0, activeSuspensionDampingNspm: 0,
+    lateralErrorM: 0, tractionSlipRatio: 0, graduatedToSquadLeader: false,
+  };
+  let harnessPrevLatVel = 0;
+  let harnessConcussionDb = 0;
+  let harnessVm: IHarnessHudViewModel | null = null;
+
+  /** A fresh soul on the centerline: reserve 5 J, calm priors, awareness at the newborn 0.12. */
+  function resetHarnessRuntime(): void {
+    harnessState.fill(0);
+    harnessState[StateIdx.E_RESERVE] = 5.0;
+    harnessState[StateIdx.PI_KIN] = harnessTuning.piBase;
+    harnessState[StateIdx.PI_THERM] = 1.0;
+    harnessState[StateIdx.PI_ACOUST] = 1.0;
+    harnessState[StateIdx.PI_PRIOR] = harnessTuning.piBase;
+    harnessState[StateIdx.A_AWARE] = 0.12;
+    harnessState[StateIdx.H_COHERENCE] = 0.5;
+    harnessTel.fill(0);
+    harnessLedger.fill(0);
+    harnessLatch[0] = 0;
+    harnessLatchAccum[0] = 0;
+    harnessMastery[0] = 0;
+    harnessActuator.tractionSlipRatio = 0;
+    harnessActuator.graduatedToSquadLeader = false;
+    harnessPrevLatVel = 0;
+    harnessConcussionDb = 0;
+    harnessVm = null;
+  }
+
+  /** Binds a harness cartridge ref to the vehicle soul (null restores the steadfast default). */
+  function setVehicleHarness(ref: string | null): boolean {
+    const spec = ref === null ? HARNESS_SHELF_PRESETS['harness:escort-steadfast']! : decodeHarnessCartridgeCode(ref);
+    if (!spec) return false;
+    harnessSpec = spec;
+    harnessVessel = toVesselPreset(spec);
+    harnessTuning = toHarnessTuning(spec);
+    resetHarnessRuntime();
+    return true;
+  }
+
   function buildVehicleView(v: { id: number; kind: RoverKind; x: number; z: number; yaw: number }): VehicleView {
     const activeLevel = genLevelForStage(shown, currentQuality);
     const spec = vehicleKitSpec(v.kind);
@@ -1080,6 +1149,7 @@ export function createPlayScene(o: {
     for (const lamp of view.lamps) setRoverLamp(lamp, 1);
     currentSpeed = 0;
     vehicleAcc = 0;
+    resetHarnessRuntime();
     const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(view.group.quaternion);
     const camDist = view.kind === 'scout' ? 4.6 : view.kind === 'hauler' ? 6.2 : 7.8;
     const camHeight = view.kind === 'scout' ? 1.8 : view.kind === 'hauler' ? 2.4 : 3.0;
@@ -1097,6 +1167,7 @@ export function createPlayScene(o: {
     drivingVehicleId = null;
     drivingState = null;
     currentSpeed = 0;
+    harnessVm = null;
     if (view) {
       for (const lamp of view.lamps) setRoverLamp(lamp, 0);
       const exitDist = 2.4;
@@ -3403,14 +3474,33 @@ export function createPlayScene(o: {
           const boosted = boostedInput(rawInput, boost, roverBoostEnergy, dt);
           roverBoostEnergy = boosted.energy;
           isRoverBoosting = boosted.boosting;
-          const input = { throttle: boosted.throttle, steer: boosted.steer, brake: boosted.brake };
+          // Plan 47: the harness's traction output feathers the drive — τ ∝ (1 − 0.55·slip) — so a
+          // skidding soul eases its own wheels. Smooth and causal (last step's slip); never a clamp.
+          const tractionFeather = 1.0 - 0.55 * harnessActuator.tractionSlipRatio;
+          const input = { throttle: boosted.throttle * tractionFeather, steer: boosted.steer, brake: boosted.brake };
+          const gWorld = o.gamePreset ? 9.81 * o.gamePreset.activeRules.gravityScale : 1.62;
 
           vehicleAcc += Math.min(dt, 0.1);
           while (vehicleAcc >= ROVER_DT) {
             drivingState = stepRover(drivingState, input, {
               height: (gx, gz) => groundAt(gx, gz),
-              g: o.gamePreset ? 9.81 * o.gamePreset.activeRules.gravityScale : 1.62,
+              g: gWorld,
             });
+            // Plan 47 (Pillar 1): the vessel soul feels the same fixed step. Lateral velocity is
+            // measured against the body's right axis; its change is the real chassis jolt.
+            const hqx = drivingState.q[0], hqy = drivingState.q[1], hqz = drivingState.q[2], hqw = drivingState.q[3];
+            const yawNow = Math.atan2(2 * (hqy * hqw + hqx * hqz), 1 - 2 * (hqy * hqy + hqz * hqz));
+            const latVel = drivingState.v[0] * Math.cos(yawNow) - drivingState.v[2] * Math.sin(yawNow);
+            harnessConcussionDb = Math.max(0, harnessConcussionDb - 240 * ROVER_DT);
+            const harnessInput = deriveRoverHarnessInput(
+              latVel, harnessPrevLatVel, ROVER_DT, harnessVessel.substrate.massKg, gWorld,
+              harnessConcussionDb, Math.abs(roverSpeed(drivingState)),
+            );
+            stepRoverEscortHarness(
+              harnessState, harnessTel, harnessLedger, harnessLatch, harnessLatchAccum, harnessMastery,
+              harnessScratch, harnessVessel, harnessTuning, harnessInput, ROVER_DT, true, harnessActuator,
+            );
+            harnessPrevLatVel = latVel;
             vehicleAcc -= ROVER_DT;
           }
 
@@ -3418,8 +3508,14 @@ export function createPlayScene(o: {
           gameAudio.updateRoverMotor(drivingVehicleId, vView.group.position, currentSpeed, ROVERS[vView.kind].topSpeed);
           if (lastRoverSpeed - currentSpeed > 6.0) {
             gameAudio.playRoverImpact(vView.group.position);
+            // The impact the player hears is the concussion the vessel soul feels (decays 240 dB/s).
+            harnessConcussionDb = 120;
           }
           lastRoverSpeed = currentSpeed;
+          harnessVm = computeHarnessHudViewModel(
+            harnessState, harnessLedger, harnessLatch[0]!, harnessMastery[0]!,
+            harnessVessel.evaluator.masteryWindowSec, harnessVessel.relativeAwarenessCeiling,
+          );
           vView.x = drivingState.p[0];
           vView.z = drivingState.p[2];
 
@@ -3965,6 +4061,10 @@ export function createPlayScene(o: {
           speed: currentSpeed,
           boostEnergy: roverBoostEnergy,
           boosting: isRoverBoosting,
+          vx: drivingState.v[0],
+          vz: drivingState.v[2],
+          yaw: vehicleViews.get(drivingVehicleId)!.yaw,
+          harness: harnessVm,
         } : null,
       };
     },
@@ -4625,6 +4725,7 @@ export function createPlayScene(o: {
     setVehicles,
     setFabricators,
     enterVehicle,
+    setVehicleHarness,
     exitVehicle,
     getDrivingVehicle,
     getNearVehicle,

@@ -103,6 +103,16 @@ export interface MaterialPrintSpec {
   readonly ref: string;
 }
 
+/**
+ * A Soul Harness written onto a blank (plan 47): a shelf preset's `harness:<id>` or a player's
+ * own tuned `harnessc:<crc>:<code>` (./harness-cartridge reads it). The rifle's port glows
+ * Ray-7 violet; entering a vehicle with it loaded binds the vessel soul. `name` is what people read.
+ */
+export interface HarnessPrintSpec {
+  readonly name: string;
+  readonly ref: string;
+}
+
 export const SPRITE_DITHERS = ['none', 'bayer2', 'bayer4'] as const;
 export type SpriteDither = (typeof SPRITE_DITHERS)[number];
 
@@ -162,15 +172,16 @@ export interface SoundPrintSpec {
   readonly loopSeconds?: number;
 }
 
-/** What the bench prints onto a blank for the beam rifle: a part, a species, a light, a material, a sprite or a sound. */
+/** What the bench prints onto a blank for the beam rifle: a part, a species, a light, a material, a sprite, a sound or a harness. */
 export type Print =
   | { readonly part: PartSpec }
   | { readonly species: SpeciesSpec }
   | { readonly light: LightSpec }
   | { readonly material: MaterialPrintSpec }
   | { readonly sprite: SpritePrintSpec }
-  | { readonly sound: SoundPrintSpec };
-export type PrintKind = 'part' | 'species' | 'light' | 'material' | 'sprite' | 'sound';
+  | { readonly sound: SoundPrintSpec }
+  | { readonly harness: HarnessPrintSpec };
+export type PrintKind = 'part' | 'species' | 'light' | 'material' | 'sprite' | 'sound' | 'harness';
 
 export interface Cartridge {
   readonly id: string;
@@ -193,6 +204,8 @@ export interface Cartridge {
   readonly sprite?: SpritePrintSpec;
   /** Kind 'sound' only: the sound it carries. */
   readonly sound?: SoundPrintSpec;
+  /** Kind 'harness' only: the vessel soul harness it carries (plan 47). */
+  readonly harness?: HarnessPrintSpec;
 }
 
 /**
@@ -209,13 +222,14 @@ export interface Job {
   readonly preset: string | null;
   readonly done: number;
   readonly needs: number;
-  /** A bench job printing a part, a species, a light, a material, a sprite or a sound instead of writing a preset. */
+  /** A bench job printing a part, a species, a light, a material, a sprite, a sound or a harness instead of writing a preset. */
   readonly part?: PartSpec;
   readonly species?: SpeciesSpec;
   readonly light?: LightSpec;
   readonly material?: MaterialPrintSpec;
   readonly sprite?: SpritePrintSpec;
   readonly sound?: SoundPrintSpec;
+  readonly harness?: HarnessPrintSpec;
 }
 
 export interface LabState {
@@ -297,6 +311,7 @@ export function printOf(x: {
   readonly material?: MaterialPrintSpec;
   readonly sprite?: SpritePrintSpec;
   readonly sound?: SoundPrintSpec;
+  readonly harness?: HarnessPrintSpec;
 }): Print | null {
   if (x.part !== undefined) return { part: x.part };
   if (x.species !== undefined) return { species: x.species };
@@ -304,18 +319,19 @@ export function printOf(x: {
   if (x.material !== undefined) return { material: x.material };
   if (x.sprite !== undefined) return { sprite: x.sprite };
   if (x.sound !== undefined) return { sound: x.sound };
+  if (x.harness !== undefined) return { harness: x.harness };
   return null;
 }
 export const printKind = (p: Print): PrintKind =>
-  'part' in p ? 'part' : 'species' in p ? 'species' : 'light' in p ? 'light' : 'material' in p ? 'material' : 'sprite' in p ? 'sprite' : 'sound';
+  'part' in p ? 'part' : 'species' in p ? 'species' : 'light' in p ? 'light' : 'material' in p ? 'material' : 'sprite' in p ? 'sprite' : 'sound' in p ? 'sound' : 'harness';
 const printName = (p: Print): string =>
   'part' in p ? p.part.name
     : 'species' in p ? p.species.name
       : 'light' in p ? p.light.name
         : 'material' in p ? p.material.name
-          : 'sprite' in p ? p.sprite.name : p.sound.name;
+          : 'sprite' in p ? p.sprite.name : 'sound' in p ? p.sound.name : p.harness.name;
 /** Every print cartridge goes in the beam rifle only: never the combiner, never a plot machine. */
-const PRINT_KINDS: readonly PrintKind[] = Object.freeze(['part', 'species', 'light', 'material', 'sprite', 'sound'] as const);
+const PRINT_KINDS: readonly PrintKind[] = Object.freeze(['part', 'species', 'light', 'material', 'sprite', 'sound', 'harness'] as const);
 const forTheRifle = (c: Cartridge): boolean => (PRINT_KINDS as readonly string[]).includes(c.kind);
 const RIFLE_ONLY: Readonly<Record<PrintKind, string>> = {
   part: 'A part cartridge',
@@ -324,6 +340,7 @@ const RIFLE_ONLY: Readonly<Record<PrintKind, string>> = {
   material: 'A material cartridge',
   sprite: 'A sprite cartridge',
   sound: 'A sound cartridge',
+  harness: 'A harness cartridge',
 };
 
 const paused = (job: Job): Job => {
@@ -733,6 +750,18 @@ function loadMaterial(x: unknown): MaterialPrintSpec | null {
   return { name, ref };
 }
 
+/** A harness ref's shape: a shelf id or a CRC-checked compact code (./harness-cartridge decodes it fully at bind time). */
+const HARNESS_REF = /^harness:[a-z0-9][a-z0-9-]{0,63}$|^harnessc:[0-9A-F]{6}:[A-Za-z0-9_-]{1,4000}$/;
+
+/** A harness print read back: a name people read and a ref the harness codec can decode. */
+function loadHarness(x: unknown): HarnessPrintSpec | null {
+  if (!isRecord(x)) return null;
+  const { name, ref } = x;
+  if (!isString(name) || name.length === 0 || name.length > 96) return null;
+  if (!isString(ref) || ref.length > 4200 || !HARNESS_REF.test(ref)) return null;
+  return { name, ref };
+}
+
 const KIT_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
 
 /** A sprite print read back: a kit id, a stage off the ladder and a frame size a billboard can hold. */
@@ -811,7 +840,7 @@ function loadSound(x: unknown): SoundPrintSpec | null {
 
 /** The print as saved, checked: 'none' when there is none, null when one is malformed or more than one is set. */
 function loadPrint(x: Readonly<Record<string, unknown>>): Print | null | 'none' {
-  const set = (['part', 'species', 'light', 'material', 'sprite', 'sound'] as const).filter((k) => x[k] !== undefined);
+  const set = (['part', 'species', 'light', 'material', 'sprite', 'sound', 'harness'] as const).filter((k) => x[k] !== undefined);
   if (set.length === 0) return 'none';
   if (set.length > 1) return null;
   if (set[0] === 'part') {
@@ -834,8 +863,12 @@ function loadPrint(x: Readonly<Record<string, unknown>>): Print | null | 'none' 
     const p = loadSprite(x.sprite);
     return p && { sprite: p };
   }
-  const p = loadSound(x.sound);
-  return p && { sound: p };
+  if (set[0] === 'sound') {
+    const p = loadSound(x.sound);
+    return p && { sound: p };
+  }
+  const p = loadHarness(x.harness);
+  return p && { harness: p };
 }
 
 function validPrint(print: Print): boolean {

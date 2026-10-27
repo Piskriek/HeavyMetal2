@@ -47,7 +47,10 @@ export function rifleLook(c: Cartridge): RifleLook | null {
             : 'sprite' in print
               // a sprite glows the ink its own stage's palette leans on
               ? (paletteForStage(print.sprite.stage).colours[Math.floor(paletteForStage(print.sprite.stage).colours.length * 0.6)] ?? '#9aa4ad')
-              : SOUND_GLOW[print.sound.role];
+              : 'sound' in print
+                ? SOUND_GLOW[print.sound.role]
+                // a harness glows Ray-7 violet-indigo (plan 47)
+                : '#b84dff';
     return { colour, print, preset: '' };
   }
   if (c.kind === 'preset' && c.preset) return { colour: presetLook(c.preset)?.colour ?? '#808080', print: null, preset: c.preset };

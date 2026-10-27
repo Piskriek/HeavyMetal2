@@ -362,3 +362,24 @@
   padding: 6px 2px 2px;
   background: rgba(12, 14, 17, 0.98);
 }
+
+/* Plan 47: the Soul Harness page. The pinned stage holds the live scout turntable with the four
+   telemetry instruments overlaid at its foot; the stress/bridge test strip sits under it. */
+.bench-harness-stage .part-preview {
+  position: relative;
+}
+.bench-harness-hud {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  transform: scale(0.82);
+  transform-origin: bottom left;
+  pointer-events: none;
+}
+.bench-harness-tests {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 2px 2px;
+  background: rgba(12, 14, 17, 0.98);
+}

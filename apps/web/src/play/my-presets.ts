@@ -32,7 +32,7 @@ const innerOf = (p: Print) =>
     : 'species' in p ? p.species
       : 'light' in p ? p.light
         : 'material' in p ? p.material
-          : 'sprite' in p ? p.sprite : p.sound;
+          : 'sprite' in p ? p.sprite : 'sound' in p ? p.sound : p.harness;
 const nameOf = (p: Print): string => innerOf(p).name;
 /** JSON with every object's keys sorted, at every depth, so equal data always reads the same. */
 const stable = (x: unknown): string => {
@@ -54,7 +54,8 @@ const named = (p: Print, name: string): Print =>
       : 'light' in p ? { light: { ...p.light, name } }
         : 'material' in p ? { material: { ...p.material, name } }
           : 'sprite' in p ? { sprite: { ...p.sprite, name } }
-            : { sound: { ...p.sound, name } };
+            : 'sound' in p ? { sound: { ...p.sound, name } }
+              : { harness: { ...p.harness, name } };
 
 /** The library from its stored text; anything unreadable is the empty library, and each broken preset is dropped. */
 export function parseMyPresets(raw: string | null): MyPresets {
@@ -100,7 +101,7 @@ export function renamePreset(s: MyPresets, id: string, name: string): MyPresets 
 
 export const presetsOf = (s: MyPresets, kind: PrintKind): readonly MyPreset[] => s.list.filter((q) => q.kind === kind);
 
-const PREFIX: Readonly<Record<PrintKind, string>> = { part: 'SMX-PRT-', species: 'SMX-SPC-', light: 'SMX-LGT-', material: 'SMX-MAT-', sprite: 'SMX-PXD-', sound: 'SMX-SND-' };
+const PREFIX: Readonly<Record<PrintKind, string>> = { part: 'SMX-PRT-', species: 'SMX-SPC-', light: 'SMX-LGT-', material: 'SMX-MAT-', sprite: 'SMX-PXD-', sound: 'SMX-SND-', harness: 'SMX-HRN-' };
 
 const toBase64Url = (text: string): string => {
   const bytes = new TextEncoder().encode(text);

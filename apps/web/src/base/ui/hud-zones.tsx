@@ -4,6 +4,8 @@
 import type { CSSProperties, ReactElement, ReactNode } from 'react';
 import './hud-zones.css';
 import './pixel-font.css';
+// The harness blade's styles load with the zones so its own module stays importable from node tests (plan 47).
+import './harness-telemetry-hud.css';
 import type { HudZone as Zone } from './hud-zones-logic';
 import {
   BUILD_DRAWER_BOTTOM_PX,

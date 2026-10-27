@@ -4,17 +4,18 @@
   "epoch": 20261027,
   "teleology": "SOUL_EVOLUTION_EXPANDING_AWARENESS",
   "active_branch": "feat/studio-polish-claude-cloud",
-  "last_verified_commit": "4d88366e",
+  "last_verified_commit": "1f14f1ae",
   "quality_gates": {
     "typecheck_errors": 0,
-    "unit_tests_passing": 3663,
+    "unit_tests_passing": 3688,
     "companion_e2e_passing": "15/15",
     "harness_e2e_passing": "14/14",
     "plan_46_spikes_passing": "38/38",
     "plan_47_consumer_suite_passing": "10/10",
-    "bundle_size_mib": 12.69,
+    "bundle_size_mib": 12.72,
     "bundle_cap_mib": 16,
-    "ping_kit_e2e_passing": "23/23"
+    "ping_kit_e2e_passing": "24/24",
+    "drone_e2e_passing": "25/25"
   },
   "invariants": {
     "four_floats": [
@@ -103,7 +104,7 @@
     "owner": "PISKRIEK"
   },
   "active_horizon": {
-    "plan": "PLAN_49_LIVE_PING_TELEMETRY_AND_STUDIO_INSPECTION",
+    "plan": "PLAN_51_HARNESS_OBSERVER_SHORTHAND_EGO",
     "prompt_revision": "REVISION_D_2",
     "wave_1_landed_commit": "5bfd8c9f",
     "waves_2_3_landed_commit": "d6611acc",
@@ -114,7 +115,7 @@
     "plan_48_rework_landed_commit": "3815d11d",
     "plan_48_bridge_agent_commit": "fb1acf45",
     "bridge_server_running_port": 8220,
-    "next_dispatch": "PLAN_49_WAVE_2_OPEN_IN_STUDIO_AND_WALL_CARVING",
+    "next_dispatch": "PLAN_51_OBSERVER_LADDER_SHORTHAND_TRANSLATOR",
     "plan_49_wave_1_commit": "4d88366e",
     "kit_defaults_file": "apps/web/src/studio-data/kit-defaults.json",
     "bridge_commands": [
@@ -128,6 +129,13 @@
       "override-kit-part",
       "mutate-kit-preset",
       "save-kit-default"
+    ],
+    "plan_50_drone_commit": "1f14f1ae",
+    "avatar_hips_fix_commit": "fa494b38",
+    "standing_rules": [
+      "examples-mean-categories (CLAUDE.md drift guard 6)",
+      "screenshots are the last-resort observer channel",
+      "stream only what each game permits"
     ]
   }
 }

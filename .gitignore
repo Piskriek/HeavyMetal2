@@ -12,6 +12,7 @@ baseline/
 NewPatches/
 art-src/
 *.zip
+overwatch-sync.json
 
 # Local environment & IDE configs
 .env*.local

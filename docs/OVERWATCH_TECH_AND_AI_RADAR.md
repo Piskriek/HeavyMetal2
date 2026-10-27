@@ -68,7 +68,21 @@ A targeted scan of the latest portable Agent Skills ecosystem (`SKILL.md` standa
 1. **Hierarchical AABB Slab Culling (`kit-target.ts` — Landed in `7935d767` & `9ca3e08b`)**:
    - Zero-allocation slab testing with lazy AABB re-measurement under motion keeps per-frame reticle aiming $< 0.05\text{ ms}$ on 40+ machines.
 2. **Material Uniform Packing & Shared Shader Programs (`layered-material.ts`)**:
-   - Cache compiled `layeredMaterial(id, rank)` instances by `(canonicalCode, rank)` and pack layer constants into compact `vec4` uniform arrays so all machines and base pieces wearing the same `@hm/matstack` preset share a single WebGLProgram.
+### D. Frontier AI & Geometric Mechanics Radar: The Reality Harness & Artificial Ego
+1. **NVIDIA MotionBricks (`NVlabs/motionbricks`, SIGGRAPH 2026)**:
+   - Replaces fragmented animation graphs and thousands of hand-authored transitions with a continuous latent neural network backbone compressing 350,000+ motion clips.
+   - Runs at **15,000 FPS with ~2ms latency**, composing navigation, locomotion styles, and keyframe targets via modular **"Smart Primitives"**.
+   - Directly informs Plan 46: converting `@hm/anim` and `@hm/puppet` into continuous phase-manifold generators rather than brittle discrete state machines.
+2. **LeCun Joint Embedding Predictive Architecture (JEPA / V-JEPA) for System-1 Perception**:
+   - Replaces slow (500–2000 ms) autoregressive token generation with energy-based latent predictive models.
+   - Operates in sub-millisecond loops to evaluate physical and topological compatibility between external entities and our 5-group anatomy (`base`, `structure`, `mechanism`, `controls`, `subject`).
+3. **Spectral Manifold Geometry, Laplace-Beltrami Operators & Functional Maps**:
+   - Invariant shape descriptors derived from discrete cotangent Laplacian eigenfunctions ($\Delta_{\mathcal{M}} \psi_i = \lambda_i \psi_i$).
+   - Heat Kernel Signatures (HKS) and Wave Kernel Signatures (WKS) enable zero-shot segmentation of incoming 3D meshes and automated socket identification.
+4. **Vector Symbolic Architectures (VSA) / Hyperdimensional Computing**:
+   - Encodes recursive presets as high-dimensional hypervectors ($D \approx 1024$), enabling instant style/genre transfer via pure vector algebra ($\mathbf{V}_{\text{Out}} = \mathbf{V}_{\text{In}} \otimes \mathbf{V}_{\text{Ego}}$) with zero floating-point drift.
+5. **Conformal Geometric Algebra ($\mathcal{G}_{4,1}$ CGA)**:
+   - Replaces Euler angles, quaternions, and $4\times 4$ matrices with multivector motors/rotors for singularity-free kinematics, two-bone IK, and cross-world spatial transforms.
 
 ---
 

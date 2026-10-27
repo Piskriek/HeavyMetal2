@@ -3,3 +3,5 @@ export * from './sieve-mdl.js';
 export * from './port-hamiltonian.js';
 export * from './inception-loop.js';
 export * from './memory-kernel.js';
+export * from './vsa-item-memory.js';
+export * from './mechanic-mimicry.js';

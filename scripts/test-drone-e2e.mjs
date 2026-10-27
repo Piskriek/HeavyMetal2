@@ -145,6 +145,36 @@ try {
   await page.evaluate(() => window.__dev.unlinkWindow());
   check('unlinking takes the screen down', !(await page.evaluate(() => window.__playScene.gameScreenShown())));
 
+  // --- 4b. Plan 51: a mechanic observed in another game becomes presets; the player's word puts it on the body ---
+  const observation = (() => {
+    // the CLI's demo run (scripts/observe-mechanic.mjs): a 3.6 m/s² body, jumping at 4.6 m/s, walking 3.2 then running 6.0
+    const dt = 1 / 60, t = [], x = [], y = [], z = [];
+    let h = 0, vy = 0, px = 0;
+    for (let f = 0; f < 600; f++) {
+      if (h <= 0 && f % 180 === 20) vy = 4.6;
+      vy -= 3.6 * dt;
+      h = Math.max(0, h + vy * dt);
+      if (h === 0) vy = 0;
+      px += (f < 300 ? 3.2 : 6.0) * dt;
+      t.push(f * dt); x.push(px); y.push(h); z.push(0);
+    }
+    return { game: 'Demo (synthetic)', channel: 'synthetic', trajectory: { t, x, y, z } };
+  })();
+  const observed = await fetch(`${bridge}/observe-mechanic`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(observation) });
+  check('the bridge takes an observed mechanic', observed.ok, String(observed.status));
+  const mimicEvt = await until(async () => (await getJson('/events?after=0')).events.find((e) => e.type === 'mimic-result'), 9000);
+  check('the harness decompiles it into loc: and harnessc: codes', mimicEvt?.codes?.loc?.startsWith('loc:v1:') && mimicEvt?.codes?.harness?.startsWith('harnessc:'), JSON.stringify(mimicEvt?.codes ?? null).slice(0, 160));
+  check('...and its VSA match names the preset it was made with', mimicEvt?.nearest?.locomotion?.id === 'lunar-low-g', mimicEvt?.nearest?.locomotion?.id);
+  const gBefore = await page.evaluate(() => window.__dev.activeLocomotion().gravityMps2);
+  check('an observation alone changes nothing (it is a proposal)', Math.abs(gBefore - 3.6) > 1, `g ${gBefore}`);
+  await order('apply the mimic');
+  const gMimic = await page.evaluate(() => window.__dev.activeLocomotion().gravityMps2);
+  check('"apply the mimic" puts the observed gravity on the body', Math.abs(gMimic - 3.6) / 3.6 < 0.05, `g ${gMimic}`);
+  await order('undo');
+  const gUndone = await page.evaluate(() => window.__dev.activeLocomotion().gravityMps2);
+  check('"undo" takes the mimic off', Math.abs(gUndone - gBefore) < 1e-6, `g ${gUndone}`);
+  await closePanel();
+
   // --- 5. the Moon: thrusters, and the fast brain fights ---
   const gate = await page.evaluate(() => window.__dev.gate());
   await page.evaluate((g) => window.__playScene.debug.teleport('planet', g.x + 6, g.z + 14, 0, 0), gate);

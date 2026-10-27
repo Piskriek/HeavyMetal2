@@ -1,10 +1,11 @@
 /**
  * Kit mutations on what the player pinged (plan 49, Mission 2): pure planning over a kit's placed parts.
  *
- * "Remove the black and yellow chevrons on the base piece" is a `strip-hazard`: the hazard trim is re-dressed in the
- * material of the part it sits on, so the stripes go and the surface reads as one piece (a part override can change a
- * part's material, not delete the part, and a 12 mm band in the step's own paint is the step). The screen applies the
- * plan through the same override path the Beam Rifle's Apply uses (props save + setKitOverrides).
+ * "Remove the black and yellow chevrons on the base piece" is a `strip-hazard`: the hazard trim is taken out of the build
+ * (`PartOverride.hidden`: the builder assembles no mesh for it and no ray can hit it). The first version painted the trim
+ * over in the body's material, which left dead triangles and hit boxes in the mesh; RULES 8a (owner and Argon, 27 Oct)
+ * rejected that. The screen applies the plan through the same override path the Beam Rifle's Apply uses (props save +
+ * setKitOverrides).
  *
  * Scope of a strip, from the pinged part:
  *  - the pinged part is hazard trim: the hazard trim on the body it sits on (the four bands of one dais step, the gate's
@@ -123,20 +124,20 @@ export function hazardScope(placed: readonly PlacedPart[], path: string | undefi
 export function planKitMutation(placed: readonly PlacedPart[], m: KitMutation, kit?: Kit): KitMutationPlan {
   switch (m.kind) {
     case 'strip-hazard': {
+      // RULES 8a: the trim is taken out of the build (no mesh, nothing to hit), not painted over to look gone
       const { parts, scope } = hazardScope(placed, m.path, kit);
-      const changes: KitPartChange[] = [];
-      for (const p of parts) {
-        const to = bodyMaterialUnder(p, placed, kit);
-        if (to && to !== p.material) changes.push({ path: p.path, override: { material: to }, from: p.material, to });
-      }
+      const changes: KitPartChange[] = parts
+        .filter((p) => !p.hidden)
+        .map((p) => ({ path: p.path, override: { hidden: true }, from: p.material, to: 'hidden' }));
       return { changes, scope: changes.length > 0 ? scope : 'none' };
     }
     case 'restore-hazard': {
+      // back in the build, in its kit's own hazard paint (also undoes an older save that painted it over)
       const changes: KitPartChange[] = [];
       for (const p of placed) {
         const def = kit?.parts[p.part];
         if (!def || !(HAZARD_MATERIAL_RE.test(def.material) || HAZARD_PART_RE.test(p.part))) continue;
-        if (p.material !== def.material) changes.push({ path: p.path, override: { material: def.material }, from: p.material, to: def.material });
+        if (p.hidden || p.material !== def.material) changes.push({ path: p.path, override: { hidden: false, material: def.material }, from: p.hidden ? 'hidden' : p.material, to: def.material });
       }
       return { changes, scope: changes.length > 0 ? 'whole-kit' : 'none' };
     }

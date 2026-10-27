@@ -10,7 +10,7 @@
  * The switch is live: the scene reads the preset every frame and the solver keeps the state it already had, so changing
  * mid-jump retunes the arc from that moment (the rules change, the state does not). The choice is kept on this PC.
  */
-import { LOCOMOTION_PRESETS, type LocomotionPreset, type LocomotionPresetId } from '@hm/kinematic';
+import { decodeLocomotionCode, encodeLocomotionCode, LOCOMOTION_PRESETS, type LocomotionPreset, type LocomotionPresetId } from '@hm/kinematic';
 import { kv } from '../storage/profile-storage';
 
 /** `auto` follows the ground (the lab is Earth, the Moon keeps its ballast); a named preset pins one feel everywhere. */
@@ -61,7 +61,30 @@ export function presetFor(where: 'lab' | 'planet', which: LocomotionChoice = cho
 
 /** The preset in force where the player stands. */
 export function activeLocomotion(where: 'lab' | 'planet'): LocomotionPreset {
-  return presetFor(where, choice);
+  return custom ?? presetFor(where, choice);
+}
+
+/**
+ * Plan 51: a custom preset (a mechanic the harness mimicked from another game, as a `loc:v1:` code) in force over the
+ * named choice, everywhere, until cleared. Kept on this PC as its code, so it survives a reload.
+ */
+export const LOCOMOTION_CUSTOM_KEY = 'settings.locomotion.custom';
+let custom: LocomotionPreset | null = (() => {
+  const code = kv.get(LOCOMOTION_CUSTOM_KEY);
+  return typeof code === 'string' ? decodeLocomotionCode(code, 'Mimicked locomotion') : null;
+})();
+
+/** The custom preset in force, or null. */
+export function customLocomotion(): LocomotionPreset | null {
+  return custom;
+}
+
+/** Puts a custom preset in force (null clears it, and the named choice rules again). Returns what is in force. */
+export function setCustomLocomotion(preset: LocomotionPreset | null): LocomotionPreset | null {
+  custom = preset;
+  if (preset) kv.set(LOCOMOTION_CUSTOM_KEY, encodeLocomotionCode(preset));
+  else kv.remove(LOCOMOTION_CUSTOM_KEY);
+  return custom;
 }
 
 /**

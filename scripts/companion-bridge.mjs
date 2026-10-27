@@ -27,6 +27,8 @@
  *   POST /event         -> appends an event
  *   POST /kit-defaults  -> {key, overrides}: writes the kit's shipped defaults (apps/web/src/studio-data/kit-defaults.json)
  *   POST /frame?source= -> a JPEG of what the player sees (plan 50: the AI's eyes), saved to shots-run/bridge/frame-<source>.jpg
+ *   POST /observe-mechanic -> Plan 51: {game, channel, trajectory? {t,x,y,z}, shots? {t, kick?}, events? [{t,name}]} from any
+ *                     permitted observer; relayed to the game as a mimic proposal ("apply the mimic" is the player's word)
  *   GET  /status        -> link state, the latest telemetry, ping and frames
  *
  * Plan 50, the drone's orders (the fast brain follows them; kit edits from here are staged for the player's "keep it"):
@@ -60,6 +62,8 @@ const DEFAULTS_FILE = path.resolve(arg('--defaults-file') ?? path.join(ROOT, 'ap
 const BODY_CAP = 64 * 1024;
 /** A 640x360 JPEG is 20 to 60 KB; anything past this is not a frame. */
 const FRAME_CAP = 400 * 1024;
+/** An observation can carry minutes of samples (a trajectory at 60 Hz): up to 1 MB. */
+const OBSERVATION_CAP = 1024 * 1024;
 const FRAME_DIR = path.resolve(arg('--frame-dir') ?? path.join(ROOT, 'shots-run/bridge'));
 /** The latest frame per source (game, external), for /status. */
 const lastFrames = {};
@@ -94,6 +98,7 @@ function checkPartOverride(v) {
   const out = {};
   for (const [k, f] of Object.entries(v)) {
     if (k === 'material') { if (typeof f !== 'string' || !MATERIAL_RE.test(f)) return null; out.material = f; }
+    else if (k === 'hidden') { if (typeof f !== 'boolean') return null; out.hidden = f; }
     else if (k === 'gen') { if (typeof f !== 'string' || !NAME_RE.test(f)) return null; out.gen = f; }
     else if (k === 'params') { const p = numbers(f); if (!p) return null; out.params = p; }
     else if (k === 'slotMaterials') { const s = materials(f); if (!s) return null; out.slotMaterials = s; }
@@ -150,13 +155,13 @@ function writeDefaults(all) {
 const LOCAL_ORIGIN_RE = /^http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?$/;
 
 /** Reads a JSON body up to the cap; resolves the parsed value, or rejects. */
-function readJson(req) {
+function readJson(req, cap = BODY_CAP) {
   return new Promise((resolve, reject) => {
     let body = '';
     let size = 0;
     req.on('data', (chunk) => {
       size += chunk.length;
-      if (size > BODY_CAP) {
+      if (size > cap) {
         reject(new Error('body too large'));
         req.destroy();
         return;
@@ -236,6 +241,25 @@ const handle = async (req, res) => {
       }
       if (e.type === 'kit-result') console.log(`\x1b[33m[KIT]\x1b[0m ${e.result}`);
       json(res, 200, { ok: true });
+    } catch (err) {
+      json(res, 400, { ok: false, error: String(err instanceof Error ? err.message : err) });
+    }
+    return;
+  }
+
+  // Plan 51: a mechanic observed in a game running on the PC (from the best channel that game permits: telemetry, a mod
+  // SDK, a permitted loader, its files, the screen last), relayed to the game, whose harness decompiles it into presets
+  if (pathname === '/observe-mechanic' && req.method === 'POST') {
+    try {
+      const obs = await readJson(req, OBSERVATION_CAP);
+      const ladder = ['telemetry', 'mod-sdk', 'mod-loader', 'game-files', 'screen', 'synthetic'];
+      if (!isRecord(obs) || typeof obs.game !== 'string' || obs.game.length > 64 || !ladder.includes(obs.channel)) throw new Error('an observation has a game (string) and a channel: ' + ladder.join(' | '));
+      if (!isRecord(obs.trajectory) && !isRecord(obs.shots) && !Array.isArray(obs.events)) throw new Error('an observation carries a trajectory, shots or events');
+      dispatchCommand({ action: 'mimic', observation: obs });
+      const counts = { trajectory: isRecord(obs.trajectory) && Array.isArray(obs.trajectory.t) ? obs.trajectory.t.length : 0, shots: isRecord(obs.shots) && Array.isArray(obs.shots.t) ? obs.shots.t.length : 0, events: Array.isArray(obs.events) ? obs.events.length : 0 };
+      pushEvent({ type: 'mechanic-observed', game: obs.game, channel: obs.channel, ...counts });
+      console.log(`\x1b[36m[OBSERVED]\x1b[0m ${obs.game} via ${obs.channel}: ${JSON.stringify(counts)}`);
+      json(res, 200, { ok: true, queued: true, ...counts });
     } catch (err) {
       json(res, 400, { ok: false, error: String(err instanceof Error ? err.message : err) });
     }

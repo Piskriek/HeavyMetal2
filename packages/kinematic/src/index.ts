@@ -325,3 +325,4 @@ export * from './modular-motion';
 
 // PLAN-43: 5-rung motion presets (MOTION_SHELF, stepKinematicMotion, mot: cartridges)
 export * from "./motion-presets";
+export * from './preset-codes';

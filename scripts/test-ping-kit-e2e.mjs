@@ -71,7 +71,7 @@ const until = async (fn, timeoutMs, stepMs = 200) => {
     await new Promise((r) => setTimeout(r, stepMs));
   }
 };
-const materials = () => page.evaluate(() => Object.fromEntries(window.__dev.kitPlaced('gate-dais').map((p) => [p.path, p.material])));
+const materials = () => page.evaluate(() => Object.fromEntries(window.__dev.kitPlaced('gate-dais').map((p) => [p.path, p.hidden ? 'hidden' : p.material])));
 const panelOpen = () => page.locator('[data-testid="companion-comms-panel"]').count();
 /** Sends an order through the typed comms panel. */
 const order = async (text) => {
@@ -163,9 +163,9 @@ try {
   await order('remove the black and yellow chevrons on the base piece');
   const stripped = await until(async () => {
     const m = await materials();
-    return ['band-lower-north', 'band-lower-south', 'band-lower-east', 'band-lower-west'].every((p) => m[p] === 'paint') ? m : null;
+    return ['band-lower-north', 'band-lower-south', 'band-lower-east', 'band-lower-west'].every((p) => m[p] === 'hidden') ? m : null;
   }, 5000);
-  check('the voice order repaints the four bands of that step in its paint', Boolean(stripped), JSON.stringify(stripped ?? (await materials())));
+  check('the voice order takes the four bands of that step out of the build (RULES 8a)', Boolean(stripped), JSON.stringify(stripped ?? (await materials())));
   const m1 = await materials();
   check('the other step keeps its chevrons', ['band-upper-north', 'band-upper-south', 'band-upper-east', 'band-upper-west'].every((p) => m1[p] === 'hazard'));
   // the panel's own close button (Esc would also pause the game), then a wider look at the dais
@@ -190,7 +190,7 @@ try {
   await page.locator('.companion-chat-close').click();
   const written = await until(async () => {
     const d = JSON.parse(fs.readFileSync(defaultsFile, 'utf8'));
-    return d['gate-dais']?.['step-upper']?.material === 'darkSteel' && d['gate-dais']?.['band-lower-north']?.material === 'paint' ? d : null;
+    return d['gate-dais']?.['step-upper']?.material === 'darkSteel' && d['gate-dais']?.['band-lower-north']?.hidden === true ? d : null;
   }, 6000);
   check('save-kit-default writes the kit into the defaults file', Boolean(written), JSON.stringify(written ?? fs.readFileSync(defaultsFile, 'utf8')));
   const saidSaved = await until(async () => (await events('companion-say')).find((e) => /Saved as the default for the Gate dais/.test(e.text)), 4000);

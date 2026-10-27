@@ -38,6 +38,11 @@ export interface KitBuildOptions {
    * moving geometry is never welded into a static mesh. `placed` still lists every part.
    */
   readonly skip?: (path: string) => boolean;
+  /**
+   * Plan 49 / RULES 8a: placed parts taken out of this build by path, as well as any an override marks `hidden`. They get no
+   * mesh, so nothing of them is drawn or hit; `placed` still lists them, so they can be shown again.
+   */
+  readonly hiddenParts?: readonly string[];
   /** Registers what the build creates, for disposal with its owner. */
   readonly keep?: <T extends { dispose(): void }>(x: T) => T;
   /** A material the record does not hold, by name (a Texture Mill skin, `vault:<preset>`), or null. */
@@ -156,9 +161,12 @@ export function buildKitPreset(kit: Kit, preset: string, o: KitBuildOptions): Ki
   };
   const m4 = new THREE.Matrix4();
 
+  const hiddenParts = new Set(o.hiddenParts ?? []);
   for (let pid = 0; pid < placed.length; pid++) {
     const p = placed[pid] as PlacedPart;
     if (o.skip?.(p.path)) continue;
+    // a hidden part is not assembled at all: no triangles, no boxes, so the beam and the ping cannot hit it
+    if (p.hidden || hiddenParts.has(p.path)) continue;
     const src = p.source;
     m4.fromArray(p.matrix as number[]);
     const finish = (g: THREE.BufferGeometry, material: THREE.Material, key: string): THREE.BufferGeometry => {

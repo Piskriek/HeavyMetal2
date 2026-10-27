@@ -47,6 +47,7 @@ export type CompanionIntent =
   | { readonly kind: 'recall' }
   | { readonly kind: 'undo' }
   | { readonly kind: 'keep' }
+  | { readonly kind: 'mimic-apply' }
   | { readonly kind: 'chat' };
 
 /** A resolved order: where to go, whether to float there, and the spoken confirmation. */
@@ -114,6 +115,10 @@ export function parseCompanionIntent(raw: string): CompanionIntent {
   if (tokens.includes('default') && hits(text, tokens, DEFAULT_VERB)) return { kind: 'kit-save-default' };
   // plan 50: edit control, then the drone's orders, before any movement word reads them as a move
   if (hits(text, tokens, ['undo', 'undo that', 'take that back', 'revert that', 'no not that'])) return { kind: 'undo' };
+  // plan 51: the player puts a mimicked mechanic in force (before "keep", whose "apply it" would catch it)
+  if (hits(text, tokens, ['mimic', 'mimicked', 'that mechanic', 'copy that movement', 'copied movement'])) {
+    if (hits(text, tokens, ['apply', 'try', 'use', 'put', 'give me', 'switch to', 'load'])) return { kind: 'mimic-apply' };
+  }
   if (hits(text, tokens, ['keep it', 'keep that', 'keep this', 'yes keep', 'apply it', 'commit it'])) return { kind: 'keep' };
   if (hits(text, tokens, RESET)) return { kind: 'kit-reset' };
   if (hits(text, tokens, ['hold fire', 'cease fire', 'stop shooting', "don't shoot", 'dont shoot', 'stand down'])) return { kind: 'combat-mode', mode: 'hold-fire' };
@@ -239,6 +244,7 @@ export function resolveCompanionOrder(
     case 'recall':
     case 'undo':
     case 'keep':
+    case 'mimic-apply':
       return { intent, ...none, reply: '' }; // the caller runs it (the kit edit, the order or the find) and reports it
     case 'chat':
       return { intent, ...none, reply: '' }; // the caller routes to the bridge or small talk

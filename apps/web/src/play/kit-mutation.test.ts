@@ -18,13 +18,13 @@ test('the dais is two paint steps and eight hazard bands, the bands resting on t
   assert.deepEqual(paths(placed.filter((p) => p.material === 'paint')), ['step-lower', 'step-upper']);
 });
 
-test('pinging a step strips the bands on that step and repaints them in its paint', () => {
+test('pinging a step takes the bands on that step out of the build (RULES 8a: hidden, not painted over)', () => {
   const placed = dais();
   const plan = planKitMutation(placed, { kind: 'strip-hazard', path: 'step-lower' }, GATE_DAIS_KIT);
   assert.equal(plan.scope, 'touching');
   assert.deepEqual(paths(plan.changes), ['band-lower-east', 'band-lower-north', 'band-lower-south', 'band-lower-west']);
-  for (const c of plan.changes) assert.deepEqual(c.override, { material: 'paint' });
-  assert.ok(plan.changes.every((c) => c.from === 'hazard' && c.to === 'paint'));
+  for (const c of plan.changes) assert.deepEqual(c.override, { hidden: true });
+  assert.ok(plan.changes.every((c) => c.from === 'hazard' && c.to === 'hidden'));
 });
 
 test('pinging a band strips every band on its step; nothing pinged strips the whole kit', () => {
@@ -41,12 +41,12 @@ test('pinging a band strips every band on its step; nothing pinged strips the wh
   assert.equal(all.changes.length, 8);
 });
 
-test('the gate\'s plinth rims take the plinth\'s dark steel, never a lamp\'s', () => {
+test('the gate\'s plinth rims are hidden, the plinth and its lamps untouched', () => {
   const placed = gate();
   const plan = planKitMutation(placed, { kind: 'strip-hazard', path: 'plinth' }, GATE_KIT);
   assert.equal(plan.scope, 'touching');
   assert.deepEqual(paths(plan.changes), ['rim-back', 'rim-front']);
-  assert.ok(plan.changes.every((c) => c.to === 'darkSteel'));
+  assert.ok(plan.changes.every((c) => c.to === 'hidden'));
 });
 
 test('a stripped kit applies, reads as stripped, and restores to its own hazard paint', () => {
@@ -55,13 +55,14 @@ test('a stripped kit applies, reads as stripped, and restores to its own hazard 
   const stripped = applyKitPlan({ 'step-upper': { material: 'green' } }, strip);
   assert.equal(stripped['step-upper']?.material, 'green', 'an unrelated override is kept');
   const after = flatten(GATE_DAIS_KIT, 'gate-dais', stripped);
-  // the upper bands now take the green the player gave their step; the lower bands the lower step's paint
-  assert.equal(after.filter((p) => isHazardPart(p, GATE_DAIS_KIT)).length, 0);
+  // all eight bands are hidden (still listed, so they can come back); nothing was repainted
+  assert.equal(after.filter((p) => p.hidden).length, 8);
+  assert.equal(after.filter((p) => p.material === 'hazard').length, 8);
   assert.equal(planKitMutation(after, { kind: 'strip-hazard' }, GATE_DAIS_KIT).scope, 'none', 'nothing left to strip');
   const restore = planKitMutation(after, { kind: 'restore-hazard' }, GATE_DAIS_KIT);
   assert.equal(restore.changes.length, 8);
   const back = flatten(GATE_DAIS_KIT, 'gate-dais', applyKitPlan(stripped, restore));
-  assert.equal(back.filter((p) => p.material === 'hazard').length, 8);
+  assert.equal(back.filter((p) => p.material === 'hazard' && !p.hidden).length, 8);
 });
 
 test('set-material and reset touch only the named parts', () => {
@@ -99,4 +100,31 @@ test('shipped defaults are shape-checked and sit under the player\'s overrides f
   assert.deepEqual(checked, { 'gate-dais': { 'band-lower-north': { material: 'paint' } } });
   // no defaults for a key: the overrides come back as given, undefined included
   assert.equal(withKitDefaults('no-such-kit', undefined), undefined);
+});
+
+test('RULES 8a: a hidden part is genuinely out of the build: no triangles, so no ray can hit it', async () => {
+  const THREE = await import('three');
+  const { buildKitPreset } = await import('./kit-build');
+  const mat = new THREE.MeshBasicMaterial();
+  const materials = { paint: mat, hazard: mat };
+  const full = buildKitPreset(GATE_DAIS_KIT, 'gate-dais', { materials, gen: () => null, maxRank: 2 })!;
+  const strip = planKitMutation(dais(), { kind: 'strip-hazard' }, GATE_DAIS_KIT);
+  const hiddenBuild = buildKitPreset(GATE_DAIS_KIT, 'gate-dais', { materials, gen: () => null, maxRank: 2, overrides: applyKitPlan({}, strip) })!;
+  const tris = (b: { group: import('three').Group }) => {
+    let n = 0;
+    b.group.traverse((o) => { const m = o as import('three').Mesh; if (m.isMesh) n += (m.geometry.index?.count ?? m.geometry.attributes.position!.count) / 3; });
+    return n;
+  };
+  assert.ok(tris(hiddenBuild) < tris(full), `${tris(hiddenBuild)} vs ${tris(full)} triangles`);
+  assert.equal(tris(full) - tris(hiddenBuild), 8 * 12, 'eight 12-triangle boxes removed');
+  // a ray straight down onto a lower band now meets the step under it, not the band
+  hiddenBuild.group.updateMatrixWorld(true);
+  const ray = new THREE.Raycaster(new THREE.Vector3(0, 2, 2.39), new THREE.Vector3(0, -1, 0));
+  const hit = ray.intersectObject(hiddenBuild.group, true)[0]!;
+  assert.equal(hiddenBuild.partAt(hit.object, hit.faceIndex!)?.path, 'step-lower');
+  // the explicit option takes parts out too
+  const byOption = buildKitPreset(GATE_DAIS_KIT, 'gate-dais', { materials, gen: () => null, maxRank: 2, hiddenParts: ['band-lower-south'] })!;
+  assert.equal(tris(full) - tris(byOption), 12);
+  assert.deepEqual(checkPartOverride({ hidden: true }), { hidden: true });
+  assert.equal(checkPartOverride({ hidden: 'yes' }), null);
 });

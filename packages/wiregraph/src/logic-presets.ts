@@ -133,3 +133,15 @@ export function resolveLogicCartridge(cartridgeId: string): WireGraphSpec | null
 export const parseLogicCartridgeId = resolveLogicCartridge;
 export function applyLogicCartridge<T extends object>(target: T, cartridgeId: string): (T & { readonly logic: WireGraphSpec; readonly logicPresetId: string }) | null { const logic = resolveLogicCartridge(cartridgeId); if (!logic) return null; return { ...target, logic, logicPresetId: logic.id }; }
 export const applyLogicPreset = applyLogicCartridge;
+
+/**
+ * Plan 51: a custom logic graph as a share code (`logicc:` + the graph's JSON, URI-encoded), for graphs the harness
+ * induces from an observed game. `logic:<id>` still names a shelf graph. Decoding validates the graph, so a malformed or
+ * hostile code yields null.
+ */
+export const encodeLogicCode = (graph: WireGraphSpec): string => `logicc:${encodeURIComponent(serializeWireGraph(graph))}`;
+export function decodeLogicCode(code: string): WireGraphSpec | null {
+  if (code.startsWith('logic:')) return resolveLogicCartridge(code);
+  if (!code.startsWith('logicc:') || code.length > 16384) return null;
+  try { return parseWireGraph(decodeURIComponent(code.slice('logicc:'.length))); } catch { return null; }
+}

@@ -52,6 +52,9 @@ import {
   printKind,
   type Print,
   decodeHarnessCartridgeCode,
+  encodeHarnessCartridgeCode,
+  HARNESS_SHELF_PRESETS,
+  type IHarnessCartridgeSpec,
   type HarnessPrintSpec,
   type MaterialPrintSpec,
   type SpritePrintSpec,
@@ -100,6 +103,12 @@ import { LOW_BARK_COOLDOWN, PLAYER_MAX_HP, hitBearing, hurt as hurtHp, isLow, pa
 import { usePlaySettings } from '../shell/play-settings';
 import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { kv } from '../storage/profile-storage';
+import { isMechanicObservation, transduceMechanic, type MimicryResult } from '@hm/harness';
+import { encodeKitMotionCode, encodeLocomotionCode } from '@hm/kinematic';
+import { encodeLogicCode } from '@hm/wiregraph';
+import { activeLocomotion, customLocomotion, setCustomLocomotion } from './locomotion';
+/** Plan 51: where every mimic's share codes are kept for the bench and the Studio. */
+const MIMIC_SHELF_KEY = 'hm.setmix.mimics';
 import { BASE_SAVE_KEY, saveWorld } from '../base/save';
 import { OUTPOST_PLOT_SEED } from '../base/plot-height';
 import { ROLE_LABELS } from '../net/protocol';
@@ -1794,7 +1803,17 @@ useEffect(() => {
   /** 'darkSteel' -> 'dark steel', 'mat:workshop-steel' -> 'workshop steel'. */
   const readableMaterial = (m: string): string => m.replace(/^(mat|matc|lx):/, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]+/g, ' ').toLowerCase();
   /** Plan 50 §5: every committed kit edit is one undo step; an AI's edit is staged (shown, not saved) until 'keep it'. */
-  const kitUndoRef = useRef<{ readonly kitId: string; readonly before: Overrides | undefined }[]>([]);
+  /** One undo history for every change the comms make (a kit edit, an applied mimic): each entry is one step. */
+  const undoStackRef = useRef<{ readonly label: string; readonly undo: () => void }[]>([]);
+  const pushUndo = (label: string, undo: () => void): void => {
+    undoStackRef.current = [...undoStackRef.current.slice(-19), { label, undo }];
+  };
+  /** The undo step of a kit edit: the kit's overrides as they were, live and saved. */
+  const pushKitUndo = (kitId: string, before: Overrides | undefined): void =>
+    pushUndo(`the ${kitName(kitId)} is back as it was`, () => {
+      sceneRef.current?.setKitOverrides(kitId, before ?? {});
+      saveKitOverrides(kitId, before);
+    });
   const stagedEditRef = useRef<{ readonly kitId: string; readonly before: Overrides | undefined; readonly after: Overrides; readonly timer: number } | null>(null);
   /** Writes a kit's overrides into the save (an empty record takes the kit's entry off). */
   const saveKitOverrides = (kitId: string, ov: Overrides | undefined): void => {
@@ -1859,7 +1878,7 @@ useEffect(() => {
         stagedEditRef.current = { kitId, before, after: next, timer };
       } else {
         saveKitOverrides(kitId, next);
-        kitUndoRef.current = [...kitUndoRef.current.slice(-19), { kitId, before }];
+        pushKitUndo(kitId, before);
       }
       const ask = staged ? ' Say "keep it" to keep it, or "undo".' : '';
       const n = plan.changes.length;
@@ -1868,8 +1887,8 @@ useEffect(() => {
       switch (mutation.kind) {
         case 'strip-hazard':
           return staged
-            ? `Black-and-yellow off the ${name}: ${parts} repainted in ${tos}.${ask}`
-            : `Black-and-yellow off the ${name}: ${parts} repainted in ${tos}. Say "save as default" to keep it for everyone, "undo", or "put the stripes back".`;
+            ? `Black-and-yellow off the ${name}: ${parts} taken out of the build.${ask}`
+            : `Black-and-yellow off the ${name}: ${parts} taken out of the build. Say "save as default" to keep it for everyone, "undo", or "put the stripes back".`;
         case 'restore-hazard':
           return `Hazard striping back on the ${name}: ${parts}.${ask}`;
         case 'reset':
@@ -1898,6 +1917,8 @@ useEffect(() => {
     },
   }), [savePropsSave, say]);
   /** Plan 50: the drone's orders, finds and the edit history, as the comms (voice, typed, or an AI on the bridge) drive them. */
+  /** Plan 51: the last mechanic the harness mimicked (a proposal until "apply the mimic"), with its share codes. */
+  const lastMimicRef = useRef<{ readonly result: MimicryResult; readonly codes: { readonly loc?: string; readonly logic?: string; readonly anim?: string; readonly harness: string } } | null>(null);
   const droneOps = useMemo<CompanionDroneOps>(() => ({
     orders(patch): string {
       const scene = sceneRef.current;
@@ -1945,14 +1966,72 @@ useEffect(() => {
       scene?.getCompanion()?.followPlayer();
       return 'Back on your shoulder, defending you. Orders cleared.';
     },
+    mimic(observation: unknown) {
+      // plan 51: a mechanic observed in another game, decompiled by the harness into FIDELITY presets (a proposal: the
+      // player's own "apply the mimic" puts it in force)
+      if (!isMechanicObservation(observation)) return { said: 'That observation is not one I can read: it needs a game, a channel and a trajectory, shots or events.', event: null };
+      const r = transduceMechanic(observation);
+      const harnessSpec: IHarnessCartridgeSpec = {
+        ...HARNESS_SHELF_PRESETS['harness:escort-steadfast']!,
+        id: `harness:mimic-${r.game.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 24)}`,
+        name: `${r.game} (mimic)`,
+        ...r.harness,
+      };
+      const codes = {
+        ...(r.locomotion ? { loc: encodeLocomotionCode(r.locomotion) } : {}),
+        ...(r.logic ? { logic: encodeLogicCode(r.logic) } : {}),
+        ...(r.motion ? { anim: encodeKitMotionCode(r.motion) } : {}),
+        harness: encodeHarnessCartridgeCode(harnessSpec),
+      };
+      lastMimicRef.current = { result: r, codes };
+      // the shelf keeps every mimic's codes for the bench and the Studio (logic and anim have no slot in play yet)
+      const shelf = (() => { try { return JSON.parse(kv.get(MIMIC_SHELF_KEY) ?? '[]') as unknown[]; } catch { return []; } })();
+      kv.set(MIMIC_SHELF_KEY, JSON.stringify([...shelf.slice(-19), { game: r.game, channel: r.channel, codes, confidence: r.confidence }]));
+      const parts: string[] = [];
+      if (r.locomotion) parts.push(`movement: gravity ${r.locomotion.gravityMps2} m/s², jump ${r.locomotion.jumpImpulseMps} m/s, walk ${r.locomotion.walkSpeedMps}, run ${r.locomotion.runSpeedMps} (nearest ${r.nearest.locomotion?.id})`);
+      if (r.fire) parts.push(r.fire.burst > 1 ? `fire: ${r.fire.burst}-round bursts at ${Math.round(1 / r.fire.roundGapS)} rounds/s` : `fire: full auto at ${Math.round(r.fire.roundsPerSecond * 60)} rounds/min`);
+      if (r.logic && !r.fire) parts.push(`${r.logic.actuators.length} trigger rules`);
+      const said = `Read ${r.game} through ${r.channel}: ${parts.join('; ') || 'nothing I could identify'}. Confidence ${Math.round(r.confidence * 100)}%. Say "apply the mimic" to try it, "undo" after to drop it.`;
+      return { said, event: { type: 'mimic-result', game: r.game, channel: r.channel, codes, nearest: r.nearest, fire: r.fire, sieve: r.sieve, confidence: r.confidence, notes: r.notes } };
+    },
+    applyMimic(): string {
+      const m = lastMimicRef.current;
+      const scene = sceneRef.current;
+      if (!m || !scene) return 'No mimic to apply: an observation has to come in over the bridge first.';
+      const r = m.result;
+      const done: string[] = [];
+      const prevLoco = customLocomotion();
+      const prevWeapon = scene.monsters.getWeaponStats();
+      let tuned = false;
+      if (r.locomotion) {
+        setCustomLocomotion(r.locomotion);
+        done.push('your movement');
+      }
+      if (r.fire) {
+        if (prevWeapon) {
+          scene.monsters.setWeaponStats({ ...prevWeapon, burst: r.fire.burst, burstGap: r.fire.roundGapS, cooldown: Math.max(0.05, r.fire.burstGapS || r.fire.roundGapS) });
+          done.push('your weapon\'s fire pattern');
+        }
+        scene.setCompanionTuning({ burstRounds: Math.max(1, r.fire.burst), roundGapS: r.fire.roundGapS, burstGapS: Math.max(0.05, r.fire.burstGapS || r.fire.roundGapS) });
+        tuned = true;
+        done.push('my own fire rhythm');
+      }
+      if (scene.getDrivingVehicle() && scene.setVehicleHarness(m.codes.harness)) done.push('this rover\'s harness');
+      pushUndo(`the ${r.game} mimic is off`, () => {
+        setCustomLocomotion(prevLoco);
+        if (prevWeapon) sceneRef.current?.monsters.setWeaponStats(prevWeapon);
+        if (tuned) sceneRef.current?.setCompanionTuning(null);
+      });
+      const shelf = [m.codes.logic ? 'its logic graph' : null, m.codes.anim ? 'its motion' : null].filter(Boolean).join(' and ');
+      return `${r.game} mimic applied to ${done.join(', ') || 'nothing in reach'}.${shelf ? ` ${shelf[0]!.toUpperCase()}${shelf.slice(1)} wait on the mimic shelf (no slot in play yet).` : ''} "Undo" takes it off.`;
+    },
     undo(): string {
       if (dropStagedEdit()) return 'Put it back as it was.';
-      const last = kitUndoRef.current[kitUndoRef.current.length - 1];
+      const last = undoStackRef.current[undoStackRef.current.length - 1];
       if (!last) return 'Nothing to undo.';
-      kitUndoRef.current = kitUndoRef.current.slice(0, -1);
-      sceneRef.current?.setKitOverrides(last.kitId, last.before ?? {});
-      saveKitOverrides(last.kitId, last.before);
-      return `Undone: the ${kitName(last.kitId)} is back as it was.`;
+      undoStackRef.current = undoStackRef.current.slice(0, -1);
+      last.undo();
+      return `Undone: ${last.label}.`;
     },
     keep(): string {
       const st = stagedEditRef.current;
@@ -1960,7 +2039,7 @@ useEffect(() => {
       window.clearTimeout(st.timer);
       stagedEditRef.current = null;
       saveKitOverrides(st.kitId, st.after);
-      kitUndoRef.current = [...kitUndoRef.current.slice(-19), { kitId: st.kitId, before: st.before }];
+      pushKitUndo(st.kitId, st.before);
       return `Kept on the ${kitName(st.kitId)}. "Undo" takes it back.`;
     },
     snapshot(): Readonly<Record<string, unknown>> | null {
@@ -4901,6 +4980,7 @@ useEffect(() => {
         params: p.source.kind === 'param' ? p.source.params : null,
         ops: p.source.kind === 'param' ? (p.source.ops ?? []).map((o) => o.op) : [],
         material: p.material,
+        hidden: p.hidden === true,
       })),
       kitOverrides: () => propsRef.current.kits ?? {},
       /** Plan 49 test seams: ping as the middle button does, the last ping, the reticle's age, and a kit order as the comms run it. */
@@ -4931,6 +5011,8 @@ useEffect(() => {
         return ok;
       },
       unlinkWindow: (): void => unlinkWindow(),
+      /** Plan 51 test seam: the locomotion preset the body moves by now (a custom mimic, or the named choice). */
+      activeLocomotion: () => activeLocomotion(liveWhereRef.current === 'planet' ? 'planet' : 'lab'),
       /** Turns the heavy machines' kit frames on or off (off until TICKET-39b refits them) and rebuilds the plot's machines. */
       kitFrames: (on: boolean): void => {
         setKitFrames(on);

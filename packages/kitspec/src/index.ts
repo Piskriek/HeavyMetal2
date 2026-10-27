@@ -90,6 +90,11 @@ export interface PartOverride {
   readonly ops?: readonly OpRef[];
   readonly material?: string;
   readonly slotMaterials?: Readonly<Record<string, string>>;
+  /**
+   * Plan 49 / RULES 8a: the placed copy is taken out of the build. A builder assembles no mesh for it and a ray cannot hit
+   * it (no dead triangles or boxes left behind), while `flatten` still lists it so it can be shown again.
+   */
+  readonly hidden?: boolean;
 }
 
 export type Overrides = Readonly<Record<string, PartOverride>>;
@@ -140,6 +145,8 @@ export interface PlacedPart {
   readonly mirrored: boolean;
   /** The motion this copy runs while the assembly runs, if it or its part declares one. */
   readonly motion?: KitMotionSpec;
+  /** Taken out of the build by an override (`PartOverride.hidden`): no mesh, nothing to hit. */
+  readonly hidden?: true;
 }
 
 export type IssueCode =
@@ -305,9 +312,14 @@ function withOverrides(kit: Kit, placed: PlacedPart[], overrides: Overrides): Pl
     const def = kit.parts[p.part];
     if (!o || !def) return p;
     const r = applyOverride(def, o);
-    const { slotMaterials: _drop, ...rest } = p;
+    const { slotMaterials: _drop, hidden: _wasHidden, ...rest } = p;
     void _drop;
-    return { ...rest, source: r.source, material: r.material, ...(r.slotMaterials ? { slotMaterials: r.slotMaterials } : {}) };
+    void _wasHidden;
+    return {
+      ...rest, source: r.source, material: r.material,
+      ...(r.slotMaterials ? { slotMaterials: r.slotMaterials } : {}),
+      ...(o.hidden ? { hidden: true } : {}),
+    };
   });
 }
 

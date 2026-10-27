@@ -64,6 +64,10 @@ export interface CompanionDroneOps {
   keep(): string;
   /** The fight as the bridge's telemetry carries it, or null. */
   snapshot(): Readonly<Record<string, unknown>> | null;
+  /** Plan 51: decompiles an observed mechanic into presets (a proposal): what to say, and the result for the bridge. */
+  mimic(observation: unknown): { readonly said: string; readonly event: Readonly<Record<string, unknown>> | null };
+  /** Plan 51: puts the last mimic in force (the player's words only). */
+  applyMimic(): string;
 }
 
 /**
@@ -332,6 +336,7 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
         case 'recall': companionSays(drone((o) => o.recall())); return;
         case 'undo': companionSays(drone((o) => o.undo())); return;
         case 'keep': companionSays(drone((o) => o.keep())); return;
+        case 'mimic-apply': companionSays(drone((o) => o.applyMimic())); return;
         default: break;
       }
       if (intent.kind === 'status') {
@@ -491,6 +496,15 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
         return;
       }
       // plan 49: kit edits on what Piskriek pinged (or the kit named), and "save as default"
+      // plan 51: a mechanic observed in another game on the PC, decompiled by the harness; applying it is the player's word
+      if (cmd.action === 'mimic') {
+        const o = droneOpsRef.current;
+        if (!o) return;
+        const r = o.mimic((cmd as unknown as { observation?: unknown }).observation);
+        companionSays(r.said);
+        if (r.event) postBridgeEvent(r.event);
+        return;
+      }
       // plan 50 review: shipping a default changes the game for everyone, so only the player's own words do it; the AI asks
       if (cmd.action === 'save-kit-default') {
         companionSays(`${cmd.text ? `${cmd.text} ` : ''}The AI on the bridge suggests saving this kit as the shipped default. Say "save as default" if you want that.`);

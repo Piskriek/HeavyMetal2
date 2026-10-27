@@ -115,3 +115,10 @@ test('review fixes: hold and follow words beat find words; only an explicit "kee
   assert.equal(parseCompanionIntent('looks good').kind === 'keep', false);
   assert.deepEqual(parseCompanionIntent('find me guns'), { kind: 'scout', category: 'weapons' });
 });
+
+test('plan 51: the player puts a mimicked mechanic in force by name', () => {
+  assert.equal(parseCompanionIntent('apply the mimic').kind, 'mimic-apply');
+  assert.equal(parseCompanionIntent('try the mimicked movement').kind, 'mimic-apply');
+  assert.equal(parseCompanionIntent('use that mechanic').kind, 'mimic-apply');
+  assert.equal(parseCompanionIntent('keep it').kind, 'keep');
+});

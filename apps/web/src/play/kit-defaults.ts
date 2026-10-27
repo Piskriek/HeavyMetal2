@@ -53,6 +53,9 @@ export function checkPartOverride(v: unknown): PartOverride | null {
     if (k === 'material') {
       if (typeof field !== 'string' || !MATERIAL_RE.test(field)) return null;
       out.material = field;
+    } else if (k === 'hidden') {
+      if (typeof field !== 'boolean') return null;
+      out.hidden = field;
     } else if (k === 'gen') {
       if (typeof field !== 'string' || !NAME_RE.test(field)) return null;
       out.gen = field;

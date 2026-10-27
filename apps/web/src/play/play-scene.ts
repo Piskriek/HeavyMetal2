@@ -75,7 +75,7 @@ import { loadScientistAnimations, type ClipName } from '../avatar/scientist/anim
 import { createScientistAnimator, type OneShotKind, type ScientistAnimator } from '../avatar/scientist/animator';
 import { loadRifleAnimations } from '../avatar/astro/rifle-clips';
 import { createCompanionEntity, type CompanionEntity } from './companion';
-import { barkLine, COMBAT_TUNING, FOCUS_ORDER_S, newCombatBrain, standDown, stepCombat, type CombatMob, type CombatMode, type CoverSide } from './companion-combat';
+import { barkLine, COMBAT_TUNING, FOCUS_ORDER_S, newCombatBrain, standDown, stepCombat, type CombatMob, type CombatMode, type CombatTuning, type CoverSide } from './companion-combat';
 import type { PointOfInterest, ScoutCategory } from './companion-scout';
 import { ARMORY_RAIL_POS } from './armory-rack';
 import { GAME_SCREEN_KIT, GAME_SCREEN_SURFACE } from './kit-game-screen';
@@ -447,6 +447,8 @@ export interface PlayScene {
   noteCompanionHurtBy(mobId: number): void;
   /** Plan 50: the drone's barks since the last call (contact, target down, area clear), for the radio. */
   drainCompanionBarks(): string[];
+  /** Plan 51: retunes the drone's combat brain (a mimicked fire pattern's bursts); null restores the research's numbers. */
+  setCompanionTuning(patch: Partial<CombatTuning> | null): void;
   /** Plan 50: everything of one category the drone can find in the current world. */
   pointsOfInterest(category: ScoutCategory): PointOfInterest[];
   /** Plan 50 §6: stands a screen 4.5 m ahead mirroring a linked window (another game), or takes it down with null. */
@@ -3019,6 +3021,8 @@ export function createPlayScene(o: {
 
   // ---- Plan 50: Overwatch's fast brain. The drone fights at the frame rate; the slow brain only sets its orders.
   let combatBrain = newCombatBrain();
+  /** Plan 51: the drone's combat tuning (a mimicked fire pattern can retune its bursts); the research's numbers by default. */
+  let companionTuning: CombatTuning = COMBAT_TUNING;
   let companionHurtBy: { id: number; at: number } | null = null;
   const companionBarks: string[] = [];
   /** The living monsters as the brain sees them (aimed at their middle, winding up when they telegraph). */
@@ -3057,6 +3061,7 @@ export function createPlayScene(o: {
       mobs: combatMobs(),
       orders: comp.getCombatOrders(),
       hurtBy: companionHurtBy,
+      tuning: companionTuning,
     });
     combatBrain = tick.brain;
     comp.setCombat(s.landed ? null : tick.station, tick.aimYaw);
@@ -5096,6 +5101,9 @@ export function createPlayScene(o: {
     },
     noteCompanionHurtBy(mobId: number) {
       companionHurtBy = { id: mobId, at: combatBrain.t };
+    },
+    setCompanionTuning(patch) {
+      companionTuning = patch ? { ...COMBAT_TUNING, ...patch } : COMBAT_TUNING;
     },
     drainCompanionBarks() {
       return companionBarks.splice(0, companionBarks.length);

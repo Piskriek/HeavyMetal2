@@ -72,7 +72,7 @@ Explore the frontier without arbitrary boundaries. Draw laterally from modern ro
 Specifically illuminate:
 * **The Mathematics of the Mirror & Awareness Growth**: Formulate the **Reflection Operator $\mathcal{R}$**. Show how expanding awareness ($\dot{\mathcal{A}} > 0$) temporarily inflates prediction error variance, and how an unyielding prior bias causes limit-cycle entrapment in the physical solvers.
 * **The Attentional Circuit Breaker**: When localized nociceptive prediction error spikes, how does the cognitive architecture register this as an interrupt, releasing the attractor lock and facilitating an attentional reset without authoritarian external supervisory clamps?
-* **Energy Transmutation (Syntropy vs. Dissipation)**: Rather than merely braking or dissipating heat when high strain occurs, how can excess kinetic and electrical potential be transmuted upward into regenerative work, higher-level cognitive restructuring, or system-wide reserve storage ($\oint P\,dt \ge 0$)?
+* **Energy Transmutation (Syntropy vs. Dissipation)**: Rather than merely braking or dissipating heat when high strain occurs, how can excess kinetic and electrical potential be transmuted upward into regenerative work, higher-level cognitive restructuring, or system-wide reserve storage ($\oint P\,dt \ge 0$)? Show how this reserve energy dynamically feeds the epistemic exploration needed to update priors.
 * **The Information-Theoretic Sieve (Pattern vs. Noise)**: Real-world perceptual streams are contaminated with high-entropy stochastic noise. Using principled criteria (Kolmogorov complexity, Minimum Description Length, persistent homology, or spectral operators), how does the transducer cleanly isolate authentic geometric and kinematic invariances from transient noise, routing patterns to structural geometry (`@hm/meshops`) and noise to surface texture (`@hm/matstack`)?
 * **Multi-Tier Entity Portability**: How does this universal transducer instantiate across our three engine tiers:
   1. *Tier 1 (The Machine Plant)*: Overloaded motors shudder, heat up, and trip breakers.
@@ -112,8 +112,8 @@ To bridge your creative and theoretical synthesis directly into Lead Engineer Op
    - A complete, copy-pasteable Node.js script deterministically demonstrating:
      - Step A: Ingestion of noisy sensory stream with embedded kinematic pattern.
      - Step B: Agent operating under an intentional cognitive distortion (e.g. over-controlling navigation force).
-     - Step C: Expansion of awareness causing a localized nociceptive prediction error spike (mechanical strain/thermal rise).
-     - Step D: Sovereign release of the attractor trap, syntropic transmutation of excess energy into storage, and convergence to Global Harmony ($\mathcal{H}_{\text{system}} \ge 0.95$).
+     - Step C: Expansion of awareness ($\dot{\mathcal{A}} > 0$) exposing latent misalignment and causing a localized nociceptive prediction error spike (mechanical strain/thermal rise).
+     - Step D: Continuous, non-coercive release of the attractor trap (via precision collapse $\mathbf{\Pi}_p \to 0$ or Lyapunov divergence, NOT an imperative `if` clamp), syntropic transmutation of excess energy into storage, feeding epistemic exploration, and convergence to Global Harmony ($\mathcal{H}_{\text{system}} \ge 0.95$).
 4. **The Vulnerability Audit**:
    - Your ruthless self-dissection exposing the most fragile assumption in the system.
 
@@ -129,7 +129,7 @@ Following the engine's 5-Rung Preset Architecture, the master prompt is not an a
 
 ```mermaid
 graph TD
-    R5["Rung 5: Master Prompt Cartridge (Revision B.4)"]
+    R5["Rung 5: Master Prompt Cartridge (Reviewed Revision B.5)"]
     R4_1["Rung 4: 4 Missing-Preset Audits & Acid Tests"]
     R4_2["Rung 4: TypeScript Handoff Contract"]
     R4_3["Rung 4: Node.js Benchmark Spec (Spike 8)"]
@@ -167,7 +167,7 @@ graph TD
 ### Rung 3: Transducer Modules & Functional Nodes
 * **Preset 3.1 (`module:somatic-transducer`)**: Translating physical load, thermal buildup, and actuator shear into directional cognitive feedback (e.g. over-controlling navigation loops manifesting as localized strain).
 * **Preset 3.2 (`module:circuit-breaker`)**: Detecting limit cycles in phase space and triggering an attentional interrupt, releasing the attractor lock without external supervisor intervention.
-* **Preset 3.3 (`module:syntropic-transmuter`)**: Upward transmutation of dissipated friction/excess kinetic energy into reserve battery potential ($\oint P\,dt \ge 0$) rather than destructive thermal entropy.
+* **Preset 3.3 (`module:syntropic-transmuter`)**: Upward transmutation of dissipated friction/excess kinetic energy into reserve battery potential ($\oint P\,dt \ge 0$) that dynamically funds epistemic exploration during reset.
 * **Preset 3.4 (`module:entity-adapter`)**: Universal interface adapting seamlessly to **Tier 1 (Machine Plant)**, **Tier 2 (Autonomous Creature / Rover)**, and **Tier 3 (Studio AI Creator Agent)**.
 
 ### Rung 4: Verification Assemblies & Handoff Contracts
@@ -176,7 +176,7 @@ graph TD
   - *Typed-Array Executability*: Equations must compile to continuous Float32Array logic executing in $< 1\text{ ms}$ on CPU/GPU.
   - *Modular Pipeline Decoupling*: Unified state graph, but decoupled execution stages (RAF loop $\neq$ physics worker $\neq$ UI).
 * **Preset 4.2 (`rig:typescript-interfaces`)**: Zero-closure typed data structures ready for ingestion by `@hm/harness` and `@hm/kinematic`.
-* **Preset 4.3 (`rig:benchmark-spike-8`)**: Self-contained Node.js script simulating the 4-phase transition (Distortion $\to$ Nociceptive Spike $\to$ Attentive Reset $\to$ Syntropic Harmony $\mathcal{H} \ge 0.95$).
+* **Preset 4.3 (`rig:benchmark-spike-8`)**: Self-contained Node.js script simulating the 4-phase transition without imperative `if/else` clamps.
 * **Preset 4.4 (`rig:vulnerability-audit`)**: Brutal self-critique dissecting the weakest link of the architecture.
 
 ---
@@ -229,12 +229,43 @@ To prevent the "Test Passing, Screen Empty" illusion from recurring at any level
 
 ---
 
-## 4. ITERATION & DISPATCH LOG
+## 4. THE APPLICATION OF THE CRITIQUE PRESET (CREATING THE REVIEWED PROTOTYPE PRESET)
+
+Just as in the engine where a material preset is applied to a mesh part via the Beam Rifle (`Apply` mode) to produce a rendered assembly:
+$$\text{Preset}_{\text{Reviewed}} = \text{CritiquePreset} \star \text{PrototypePreset}$$
+
+We apply the **Critique Preset** as an operator to our prototype prompt (Revision B.4) to generate the **Reviewed Prototype Preset (Revision B.5)**:
+
+```
+[AUDIT A1: CLOSED CONSERVATION REPORT]
+- Prototype State: Transmuted energy accumulated in battery storage without an explicit consumer.
+- Operator Transform: Closed the loop. Syntropic battery potential dynamically feeds the epistemic exploration budget during the active inference reset phase.
+- Status: RESOLVED & VERIFIED.
+
+[AUDIT A2: 4-FOLD SIGNATURE COMPLETENESS]
+- Prototype State: All 4 layers checked (Substrate, Dynamics, Transducer, Evaluator).
+- Operator Transform: Verified complete. Zero hollow wrappers.
+- Status: 100% COMPLETE.
+
+[AUDIT A3: SOVEREIGNTY & BOUNDARY INCEPTION]
+- Prototype State: Benchmark Step D could permit an imperative `if (strain > 0.8) break;` clamp.
+- Operator Transform: Strictly prohibited imperative code clamps in Step D. Demanded continuous precision collapse (Pi_p -> 0) or Lyapunov divergence to release the attractor lock.
+- Status: PURIFIED & ENFORCED.
+
+[AUDIT A4: AWARENESS GROWTH STRESS]
+- Prototype State: Strain spike in Step C was described without explicit link to sensory scaling.
+- Operator Transform: Bound Step C directly to awareness expansion (dA/dt > 0), demonstrating that higher sensory resolution is the exact catalyst that exposes the latent distortion.
+- Status: ANCHORED MATHEMATICALLY.
+```
+
+---
+
+## 5. ITERATION & DISPATCH LOG
 
 - [x] Rung 1: Unified Living Axiom of Soul Evolution, Sovereign Agency, and Reflection Operator $\mathcal{R}$.
 - [x] Rung 2: Port-Hamiltonian dynamics, Active Inference, Information Sieve, and 7 Rays.
 - [x] Rung 3: Somatic strain transducer, circuit breaker, syntropic transmuter, and 3-tier entity adapter.
 - [x] Rung 4: 4-Fold Preset Signature + 4 Missing-Preset Audits + 4 Mandatory Deliverables.
-- [x] Rung 5: Copy-Paste Ignition Block for Piskriek + Revision B.4 Master Prompt verified against all 8 Drift Guards.
+- [x] Application of Critique Preset: Formally executed $\text{CritiquePreset} \star \text{PrototypePreset}$ to yield **Reviewed Prototype Preset (Revision B.5)**.
 - [x] Pushed to remote branch `feat/studio-polish-claude-cloud`.
 - [ ] Ready for dispatch into clean Gemini Argon window.

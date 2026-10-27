@@ -87,6 +87,9 @@
    - Write the findings with sources as a research doc (pattern: [`docs/BASE_BUILDING_RESEARCH.md`](docs/BASE_BUILDING_RESEARCH.md)), then brief Arena, the art agent or the sidecar. Anything beyond the owner's words is a proposal for the owner.
 5. **SAVE REASONING FOR ARCHITECTURE & INTEGRATION**:
    - Delegate heavy self-contained modules to Arena AI battles; save Claude reasoning tokens for high-level architecture, glue, and review.
+6. **EXAMPLES MEAN CATEGORIES (owner, 2026-10-27, standing rule)**:
+   - Every example in the owner's messages stands for a whole category. "Find me guns" means everything a companion finds or fetches; "select the lab and add rooms" means everything modular the drone can edit; "Gunfire Reborn" means any moddable external game.
+   - Before the first tool call of every turn: list the examples, name each one's category, and put the category (not the example) in the research brief, the plan and the task list. The example is the first test case. If you are about to grep or build only the example, stop and widen.
 
 ---
 

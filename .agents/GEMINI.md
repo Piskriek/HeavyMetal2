@@ -71,6 +71,8 @@ Development alternates between **Google Antigravity (Gemini Argon / Flash, or Cl
    - Research comparable games, community feedback, and modern techniques before designing any new system, and record findings in `docs/*_RESEARCH.md`.
 5. **SHARED GIT TREE SAFETY**:
    - Never run `git reset --hard`, `git stash`, `git clean`, `git checkout`, or `git add -A`. Stage and commit only the specific paths you modified (`git commit -- <paths>`). Never commit `apps/web/dist/index.html`.
+6. **EXAMPLES MEAN CATEGORIES (owner, 2026-10-27, standing rule)**:
+   - Every example in the owner's messages stands for a whole category ("find me guns" = everything a companion finds or fetches; "select the lab and add rooms" = everything modular the drone can edit). Name the category, research and plan all of it; the example is only the first test case.
 
 ---
 

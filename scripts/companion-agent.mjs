@@ -22,6 +22,8 @@ const PORT = parseInt(process.argv.find((a, i) => process.argv[i - 1] === '--por
 const BRIDGE_URL = `http://localhost:${PORT}`;
 
 let lastSeq = 0;
+/** Plan 49: the last thing Piskriek pinged (middle mouse / Q): what 'this' and 'that' mean in his next sentence. */
+let lastPing = null;
 let lastTelemetry = {
   player: { x: 0, z: 0, yaw: 0 },
   companion: { x: 0, y: 0, z: 0, state: 'idle', hover: false },
@@ -84,6 +86,8 @@ function isLocalIntent(text) {
     'go to the gate', 'to the gate', 'go to the rover', 'to the rover', 'go to the bench', 'to the bench',
     'wave', 'cheer',
     'status report', 'status', 'telemetry',
+    // plan 49 kit orders the game runs on the last ping (newer games tag player-say with its intent instead)
+    'chevron', 'hazard', 'stripe', 'default', 'what is this', 'what is that', 'reset', 'undo',
   ];
   return localPatterns.some((p) => q.includes(p));
 }
@@ -98,6 +102,15 @@ function generateOverwatchReply(text, telemetry) {
   const q = text.toLowerCase().trim();
   const p = telemetry.player;
   const c = telemetry.companion;
+
+  // 0. Plan 49: 'this' / 'that' / 'here' refer to the last ping
+  if (lastPing && /\b(this|that|it|here)\b/.test(q)) {
+    const t = lastPing.target ?? {};
+    return {
+      action: 'say',
+      text: `You're on the ${lastPing.label ?? t.entityType} at (${t.x}, ${t.z}), ${t.distance} m out.${t.kitId ? ' Tell me what to change on it, or say "remove the chevrons" or "save as default".' : ''}`,
+    };
+  }
 
   // 1. Diagnostics & Location
   if (q.includes('where are') || q.includes('coordinates') || q.includes('position') || q.includes('telemetry')) {
@@ -194,6 +207,12 @@ async function loop() {
       if (e.type === 'telemetry') {
         if (e.player) lastTelemetry.player = e.player;
         if (e.companion) lastTelemetry.companion = e.companion;
+      } else if (e.type === 'ping') {
+        lastPing = e;
+        const t = e.target ?? {};
+        console.log(`\x1b[35m[PING]\x1b[0m ${e.label ?? t.entityType} @ (${t.x}, ${t.z}) ${t.distance} m${t.kitId ? ` kit=${t.kitId} part=${t.partId}` : ''}`);
+      } else if (e.type === 'player-say' && e.intent && e.intent !== 'chat') {
+        console.log(`\x1b[33m[LOCAL INTENT]\x1b[0m "${e.text}" (${e.intent}) handled in game.`);
       } else if (e.type === 'player-say') {
         const timestamp = new Date(e.at || Date.now()).toLocaleTimeString();
         console.log(`\x1b[36m[${timestamp}] [PISKRIEK RADIO]\x1b[0m ${e.text}`);

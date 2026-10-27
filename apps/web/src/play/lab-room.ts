@@ -22,13 +22,15 @@ import {
 import { applyMonitorEqualizerNearShotFix } from './window-g-final-qa-hooks';
 import { maxRank, type Kit, type Overrides, type PlacedPart, type Tier } from '@hm/kitspec';
 import { buildKitPreset, type KitBuild } from './kit-build';
-import { aimKit, type KitTargetable } from './kit-target';
+import { aimKit, type KitTarget, type KitTargetable } from './kit-target';
 import { PART_SWATCHES } from './part-swatches';
 import { vaultSkin } from './vault-skin';
 import { lightMaterial } from './light-material';
 import { kitLayering, layeredMaterial } from './layered-material';
 import { CAPACITOR_BANK_KIT } from './kit-capacitor-bank';
 import { GATE_KIT } from './kit-gate';
+import { GATE_DAIS_KIT } from './kit-gate-dais';
+import { withKitDefaults } from './kit-defaults';
 export {
   aimLabStation,
   LAB_STATIONS,
@@ -358,8 +360,19 @@ export interface LabRoom {
   setStationOperating(id: RightWallMachineId | LabStationId | 'rack' | 'bench' | 'combiner', on: boolean): void;
   /** The lab clutter (TASK-23c): the prop the ray meets within `reach` metres (a fixture or a salvage prop), or null. Lab metres. */
   aimClutter(origin: THREE.Vector3, dir: THREE.Vector3, reach: number): string | null;
-  /** Kit-built props (plan 38): the part the ray meets within `reach` lab metres (its kit, path and generator), or null. */
-  aimKitPart(origin: THREE.Vector3, dir: THREE.Vector3, reach: number): { readonly kit: string; readonly path: string; readonly gen: string | null } | null;
+  /** Kit-built props (plan 38): the part the ray meets within `reach` lab metres (its kit, path, generator and where), or null. */
+  aimKitPart(origin: THREE.Vector3, dir: THREE.Vector3, reach: number): KitTarget | null;
+  /**
+   * The ping's room cast (plan 49): the shell surface (floor, walls, ceiling, beams) or the prop the ray meets within `reach`,
+   * kits left to `aimKitPart`. The normal faces the ray. Null when the ray meets nothing of the room.
+   */
+  pingSurface(origin: THREE.Vector3, dir: THREE.Vector3, reach: number): {
+    readonly point: readonly [number, number, number];
+    readonly normal: readonly [number, number, number];
+    readonly distance: number;
+    readonly source: 'shell' | 'clutter';
+    readonly objectId?: string;
+  } | null;
   /** Rebuilds a kit with these per-part overrides (the beam's part cartridges); false while its parts are not loaded yet. */
   setKitOverrides(kit: string, overrides: Overrides): boolean;
   /**
@@ -576,19 +589,12 @@ export function createLabRoom(o: {
   };
 
   // ---- The Gate & Square Two-Step Plinth (walkable, 0.2m per step)
-  const edgeBands = (size: number, topY: number): void => {
-    const bnd = 0.22;
-    const hz = 0.012;
-    const half = size / 2;
-    for (const s of [-1, 1]) {
-      add(new THREE.BoxGeometry(size, hz, bnd), m.hazard, (b) => { b.position.set(GATE_AT.x, topY + hz / 2, GATE_AT.z + s * (half - bnd / 2)); });
-      add(new THREE.BoxGeometry(bnd, hz, size - 2 * bnd), m.hazard, (b) => { b.position.set(GATE_AT.x + s * (half - bnd / 2), topY + hz / 2, GATE_AT.z); });
-    }
-  };
-  add(new THREE.BoxGeometry(5.0, 0.2, 5.0), m.paint, (p1) => { p1.position.set(GATE_AT.x, 0.1, GATE_AT.z); });
-  edgeBands(5.0, 0.2);
-  add(new THREE.BoxGeometry(4.0, 0.2, 4.0), m.paint, (p2) => { p2.position.set(GATE_AT.x, 0.3, GATE_AT.z); });
-  edgeBands(4.0, 0.4);
+  // Plan 49: the dais is a kit (kit-gate-dais.ts), not shell boxes, so a ping names its steps and bands and a mutation
+  // ("remove the chevrons on the base") rebuilds it. Its kit build fills this group below; the walkable height stays analytic.
+  const daisGroup = new THREE.Group();
+  daisGroup.name = 'gate-dais';
+  daisGroup.position.set(GATE_AT.x, 0, GATE_AT.z);
+  group.add(daisGroup);
 
   // TICKET-06 LAB-09 fix: no top-lintel orange rectangle; only the 6 upright ribbed copper coils (bottom to top)
   const gate = kit.gate(m);
@@ -654,7 +660,7 @@ export function createLabRoom(o: {
   const detailTier: Tier = o.quality === 'low' || o.quality === 'medium' ? o.quality : 'high';
   // Every swatch a printed part can carry (TICKET-32: a fat green bolt needs green), beside the lab's own materials
   const kitMaterials: Record<string, THREE.Material> = {
-    darkSteel: m.darkSteel, gunmetal: m.gunmetal, copper: m.copper, hazard: m.hazard,
+    darkSteel: m.darkSteel, gunmetal: m.gunmetal, copper: m.copper, hazard: m.hazard, paint: m.paint,
     // the capacitor bank's charge lamps, until a light cartridge sets one
     lamp: keep(new THREE.MeshStandardMaterial({ color: '#14181f', emissive: '#3eff8b', emissiveIntensity: 1.2, roughness: 0.3 })),
   };
@@ -665,6 +671,7 @@ export function createLabRoom(o: {
   const kits = new Map<string, { group: THREE.Group; kit: Kit; preset: string; build: KitBuild | null; overrides: Overrides }>([
     ['capacitor-bank', { group: bank.group, kit: CAPACITOR_BANK_KIT, preset: 'capacitor-bank', build: null, overrides: {} }],
     ['gate', { group: gate.group, kit: GATE_KIT, preset: 'gate', build: null, overrides: {} }],
+    ['gate-dais', { group: daisGroup, kit: GATE_DAIS_KIT, preset: 'gate-dais', build: null, overrides: {} }],
   ]);
   /** Kits another system owns (the player's suit): aimed at, never rebuilt here. */
   const externalKits = new Set<string>();
@@ -676,8 +683,9 @@ export function createLabRoom(o: {
   const rebuildKit = (id: string): boolean => {
     const k = kits.get(id);
     if (!k || externalKits.has(id)) return false;
+    // the shipped defaults (plan 49, "save as default") under the player's own overrides
     const built = buildKitPreset(k.kit, k.preset, {
-      materials: kitMaterials, gen: genFor, maxRank: maxRank(6, detailTier), overrides: k.overrides, keep,
+      materials: kitMaterials, gen: genFor, maxRank: maxRank(6, detailTier), overrides: withKitDefaults(id, k.overrides) ?? {}, keep,
       resolveMaterial: (name) => vaultSkin(name, detailTier !== 'low') ?? lightMaterial(name) ?? layeredMaterial(name, maxRank(6, detailTier)),
       layering: kitLayering,
     });
@@ -701,6 +709,7 @@ export function createLabRoom(o: {
     fitOverhang(bank);
     return true;
   });
+  swaps.push(() => rebuildKit('gate-dais'));
   swaps.push(() => {
     if (!rebuildKit('gate')) return false;
     fitOverhang(gate, [{
@@ -716,9 +725,52 @@ export function createLabRoom(o: {
     for (const [id, k] of kits) if (k.build) out.push({ kit: id, build: k.build });
     return out;
   };
-  const aimKitPart = (origin: THREE.Vector3, dir: THREE.Vector3, reach: number): { kit: string; path: string; gen: string | null } | null => {
-    const hit = aimKit(kitTargetables(), origin, dir, reach);
-    return hit ? { kit: hit.kit, path: hit.path, gen: hit.gen } : null;
+  const aimKitPart = (origin: THREE.Vector3, dir: THREE.Vector3, reach: number): KitTarget | null => aimKit(kitTargetables(), origin, dir, reach);
+  /** True when the object and every parent up to the room are visible (three's ray does not look at `visible`). */
+  const shown = (o: THREE.Object3D): boolean => {
+    for (let c: THREE.Object3D | null = o; c && c !== group; c = c.parent) if (!c.visible) return false;
+    return true;
+  };
+  const pingRay = new THREE.Raycaster();
+  const pingNormal = new THREE.Vector3();
+  const pingSurface: LabRoom['pingSurface'] = (origin, dir, reach) => {
+    const kitGroups = new Set<THREE.Object3D>([...kits.values()].map((k) => k.group));
+    // meshes only: a sprite card needs a camera to be cast against, and lines and points are not surfaces
+    const meshes: THREE.Mesh[] = [];
+    for (const child of group.children) {
+      if (kitGroups.has(child) || !child.visible) continue;
+      child.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (mesh.isMesh && !(o as THREE.Object3D & { isSprite?: boolean }).isSprite) meshes.push(mesh);
+      });
+    }
+    pingRay.set(origin, dir);
+    pingRay.near = 0;
+    pingRay.far = reach;
+    for (const hit of pingRay.intersectObjects(meshes, false)) {
+      if (!shown(hit.object)) continue;
+      // the window's glass and other near-clear sheets let the ping through
+      const mat = (hit.object as THREE.Mesh).material;
+      const first = Array.isArray(mat) ? mat[0] : mat;
+      if (first && first.transparent && first.opacity < 0.3) continue;
+      pingNormal.set(0, 1, 0);
+      if (hit.face) pingNormal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld);
+      if (pingNormal.dot(dir) > 0) pingNormal.negate();
+      let inShell = false;
+      let named: string | null = null;
+      for (let c: THREE.Object3D | null = hit.object; c && c !== group; c = c.parent) {
+        if (c === shell) inShell = true;
+        if (!named && c.name) named = c.name;
+      }
+      const base = {
+        point: [hit.point.x, hit.point.y, hit.point.z] as const,
+        normal: [pingNormal.x, pingNormal.y, pingNormal.z] as const,
+        distance: hit.distance,
+      };
+      if (inShell) return { ...base, source: 'shell' };
+      return { ...base, source: 'clutter', objectId: aimClutter(origin, dir, reach) ?? named ?? 'lab-prop' };
+    }
+    return null;
   };
   const setKitOverrides = (id: string, overrides: Overrides): boolean => {
     const k = kits.get(id);
@@ -1281,6 +1333,7 @@ export function createLabRoom(o: {
     envLevel: () => 0.03 + lastPower.main * 0.2,
     aimClutter,
     aimKitPart,
+    pingSurface,
     setKitOverrides,
     registerKit,
     kitPlaced,

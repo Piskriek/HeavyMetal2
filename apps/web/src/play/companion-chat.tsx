@@ -22,11 +22,42 @@ import {
 } from './companion-intent';
 import './companion-chat.css';
 
+/** What the screen can do through the comms (plan 49): the ping's callout and its bridge event. */
+export interface CompanionChatHandle {
+  /** The companion says `text` on the radio (log, bubble, the bridge); `spoken` is what the voice reads, when shorter. */
+  say(text: string, spoken?: string): void;
+  /** Sends an event to the bridge when it is linked (a ping). */
+  post(event: Readonly<Record<string, unknown>>): void;
+}
+
+/** A kit order from a voice order or from an AI on the bridge (plan 49 Mission 2). No kit id: the last ping's. */
+export type CompanionKitOrder =
+  | { readonly kind: 'strip-hazard'; readonly kitId?: string; readonly partId?: string }
+  | { readonly kind: 'restore-hazard'; readonly kitId?: string }
+  | { readonly kind: 'reset'; readonly kitId?: string; readonly paths?: readonly string[] }
+  | { readonly kind: 'set-material'; readonly kitId?: string; readonly paths: readonly string[]; readonly material: string };
+
+/** The screen's kit edits, which the comms run on voice orders and bridge commands. */
+export interface CompanionKitOps {
+  /** Runs an order on the live scene and the player's save; returns what the companion says. */
+  run(order: CompanionKitOrder): string;
+  /** The companion's answer to "what is this?": the last ping, named. */
+  describePing(): string;
+  /** A kit's effective overrides to write as its shipped default, or why there is nothing to save. */
+  defaultsFor(kitId?: string): { readonly key: string; readonly name: string; readonly overrides: Readonly<Record<string, unknown>> } | { readonly error: string };
+  /** The bridge wrote the defaults: the page reads them from now on. */
+  defaultsSaved(all: unknown): void;
+}
+
 export interface CompanionChatProps {
   readonly companion: CompanionEntity | null;
   readonly onBroadcastRadio?: (text: string) => void;
   /** The player's live pose and the landmarks the game can currently locate. */
   readonly getContext?: () => { readonly player: CompanionPlayerPose; readonly landmarks: CompanionLandmarks };
+  /** Filled with the comms' handle once mounted (the screen's ping speaks and posts through it). */
+  readonly handleRef?: React.MutableRefObject<CompanionChatHandle | null>;
+  /** The screen's kit edits (plan 49); without them kit orders are answered, not run. */
+  readonly kitOps?: CompanionKitOps;
 }
 
 interface Message {
@@ -35,7 +66,19 @@ interface Message {
   readonly text: string;
 }
 
-const BRIDGE_URL = 'http://localhost:8220';
+/** How long the comms count the bridge as linked after its last answer to a poll. */
+const BRIDGE_GRACE_MS = 15000;
+
+/**
+ * The Neural Bridge's address: localhost:8220, or `?bridge=<port>` (the e2e runs its own bridge beside a live one). Only
+ * while the game itself is on localhost, so a link to the hosted game can never send the player's words anywhere.
+ */
+export function companionBridgeUrl(location: { readonly hostname: string; readonly search: string }): string | null {
+  if (!['localhost', '127.0.0.1'].includes(location.hostname)) return null;
+  const port = new URLSearchParams(location.search).get('bridge');
+  if (port !== null) return /^\d{2,5}$/.test(port) ? `http://localhost:${port}` : null;
+  return 'http://localhost:8220';
+}
 
 // ---- Radio audio: one shared context, a rising mic-open chirp and a falling squelch click ----
 let sharedAudioCtx: AudioContext | null = null;
@@ -71,6 +114,8 @@ function tone(freqA: number, freqB: number, seconds: number, gainPeak: number): 
 export const playMicOpenChirp = (): void => tone(820, 1240, 0.09, 0.09);
 /** Transmission closed: the falling squelch click. */
 export const playSquelchClick = (): void => tone(1150, 480, 0.07, 0.07);
+/** A ping went down (plan 49): a short high blip, above the radio's chirps so the two never read as one. */
+export const playPingBlip = (): void => tone(1480, 1980, 0.12, 0.08);
 
 /** Synthesizes the companion's voice; stale utterances are cancelled so speech never piles up. */
 export function speakCompanionVoice(text: string): void {
@@ -106,7 +151,11 @@ function localChatReply(text: string): string {
   return 'Copy that, Piskriek. Say "follow me", "float in front of me", "hold position", or send me to the gate, the rover or the bench.';
 }
 
-export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroadcastRadio, getContext }) => {
+export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroadcastRadio, getContext, handleRef, kitOps }) => {
+  const bridgeUrl = useRef<string | null>(null);
+  if (bridgeUrl.current === null && typeof window !== 'undefined') bridgeUrl.current = companionBridgeUrl(window.location) ?? '';
+  const kitOpsRef = useRef(kitOps);
+  kitOpsRef.current = kitOps;
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [txHold, setTxHold] = useState(false);
@@ -123,29 +172,83 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
   isOpenRef.current = isOpen;
   const companionRef = useRef(companion);
   companionRef.current = companion;
-  const bridgeLinkedRef = useRef(false);
-  bridgeLinkedRef.current = bridgeLinked;
+  /**
+   * Linked = the bridge answered a poll in the last 15 s, read from the poll itself (not React state), so a few slow frames
+   * on the min-spec laptop never drop a ping or a spoken order on the floor.
+   */
+  const lastPollOkRef = useRef(0);
+  const bridgeLinkedRef = useRef({ get current(): boolean { return Date.now() - lastPollOkRef.current < BRIDGE_GRACE_MS; } }).current;
 
   // Auto-scroll chat log
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [messages, isOpen]);
 
-  const postBridgeEvent = (event: Record<string, unknown>): void => {
-    if (!bridgeLinkedRef.current) return;
-    void fetch(`${BRIDGE_URL}/event`, {
+  const postBridgeEvent = (event: Readonly<Record<string, unknown>>): void => {
+    if (!bridgeLinkedRef.current || !bridgeUrl.current) return;
+    void fetch(`${bridgeUrl.current}/event`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...event, at: Date.now() }),
     }).catch(() => {});
   };
 
-  const companionSays = (reply: string): void => {
+  const companionSays = (reply: string, spoken: string = reply): void => {
     setMessages((prev) => [...prev, { id: `msg-${Date.now()}-c-${prev.length}`, sender: 'companion', text: reply }]);
     companionRef.current?.say(reply, 5.0);
     onBroadcastRadio?.(reply);
-    speakCompanionVoice(reply);
+    speakCompanionVoice(spoken);
     postBridgeEvent({ type: 'companion-say', text: reply });
+  };
+
+  // the screen's ping speaks and posts through the comms (plan 49)
+  const companionSaysRef = useRef(companionSays);
+  companionSaysRef.current = companionSays;
+  const postBridgeEventRef = useRef(postBridgeEvent);
+  postBridgeEventRef.current = postBridgeEvent;
+  useEffect(() => {
+    if (!handleRef) return;
+    handleRef.current = {
+      say: (text, spoken) => companionSaysRef.current(text, spoken),
+      post: (event) => postBridgeEventRef.current(event),
+    };
+    return () => { handleRef.current = null; };
+  }, [handleRef]);
+
+  /** Runs a kit order through the screen, or says why it cannot (plan 49). */
+  const runKitOrder = (order: CompanionKitOrder): string =>
+    kitOpsRef.current ? kitOpsRef.current.run(order) : 'Kit edits need the play screen; I cannot reach the machine from here.';
+
+  /** "Save as default": the bridge writes the kit's overrides into the shipped defaults file (plan 49). */
+  const saveKitDefault = async (kitId?: string): Promise<void> => {
+    const ops = kitOpsRef.current;
+    if (!ops) {
+      companionSays('Kit edits need the play screen; nothing to save from here.');
+      return;
+    }
+    const d = ops.defaultsFor(kitId);
+    if ('error' in d) {
+      companionSays(d.error);
+      return;
+    }
+    if (!bridgeLinkedRef.current || !bridgeUrl.current) {
+      companionSays(`The ${d.name} keeps the change on your save. Start the Neural Bridge to write it as the shipped default.`);
+      return;
+    }
+    try {
+      const res = await fetch(`${bridgeUrl.current}/kit-defaults`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: d.key, overrides: d.overrides }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string; defaults?: unknown; file?: string };
+      if (!res.ok || !data.ok) throw new Error(data.error ?? `bridge answered ${res.status}`);
+      ops.defaultsSaved(data.defaults);
+      companionSays(`Saved as the default for the ${d.name}. It ships with the next build once kit-defaults.json is committed.`, `Saved as the default for the ${d.name}.`);
+      postBridgeEvent({ type: 'kit-default-saved', key: d.key, file: data.file ?? null });
+    } catch (err) {
+      companionSays(`The bridge did not take the default: ${err instanceof Error ? err.message : String(err)}.`);
+    }
   };
 
   const sendRef = useRef<(text: string) => void>(() => {});
@@ -154,13 +257,22 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
     if (!trimmed) return;
     setMessages((prev) => [...prev, { id: `msg-${Date.now()}-u-${prev.length}`, sender: 'player', text: trimmed }]);
     setInput('');
-    postBridgeEvent({ type: 'player-say', text: trimmed });
+    const intent = parseCompanionIntent(trimmed);
+    // the intent rides along, so an agent on the bridge leaves the orders the game ran itself alone
+    postBridgeEvent({ type: 'player-say', text: trimmed, intent: intent.kind });
 
     const comp = companionRef.current;
     const ctx = getContext?.() ?? { player: { x: 0, z: 0, yaw: 0 }, landmarks: {} };
-    const intent = parseCompanionIntent(trimmed);
 
     window.setTimeout(() => {
+      switch (intent.kind) {
+        case 'kit-strip-hazard': companionSays(runKitOrder({ kind: 'strip-hazard' })); return;
+        case 'kit-restore-hazard': companionSays(runKitOrder({ kind: 'restore-hazard' })); return;
+        case 'kit-reset': companionSays(runKitOrder({ kind: 'reset' })); return;
+        case 'kit-save-default': void saveKitDefault(); return;
+        case 'ping-what': companionSays(kitOpsRef.current?.describePing() ?? 'Ping something first: middle mouse, or Q.'); return;
+        default: break;
+      }
       if (intent.kind === 'status') {
         const s = comp?.getState();
         companionSays(
@@ -282,34 +394,71 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
 
   // ---- Neural Bridge link: lets any outside AI read the conversation and drive the companion ----
   useEffect(() => {
-    if (!['localhost', '127.0.0.1'].includes(window.location.hostname)) return;
+    const base = bridgeUrl.current;
+    if (!base) return;
     let alive = true;
     let failures = 0;
     let timer = 0;
-    const applyCommand = (cmd: { action?: string; text?: string; target?: { x: number; z: number }; gesture?: string }): void => {
-      const comp = companionRef.current;
-      if (!comp || !cmd.action) return;
+    type BridgeCommand = {
+      action?: string; text?: string; target?: { x: number; z: number }; gesture?: string;
+      // plan 49 kit commands
+      kitId?: string; partId?: string; paths?: string[]; material?: string; mutation?: string;
+    };
+    const str = (v: unknown): string | undefined => (typeof v === 'string' && v.length > 0 ? v : undefined);
+    /** A bridge kit command as a kit order, or null when it is not one (or is malformed). */
+    const kitOrderOf = (cmd: BridgeCommand): CompanionKitOrder | null => {
+      const kitId = str(cmd.kitId);
+      const paths = Array.isArray(cmd.paths) ? cmd.paths.filter((p): p is string => typeof p === 'string') : str(cmd.partId) ? [cmd.partId as string] : undefined;
+      if (cmd.action === 'override-kit-part') {
+        const material = str(cmd.material);
+        if (!material || !paths || paths.length === 0) return null;
+        return { kind: 'set-material', paths, material, ...(kitId ? { kitId } : {}) };
+      }
+      if (cmd.action === 'mutate-kit-preset') {
+        if (cmd.mutation === 'strip-hazard') return { kind: 'strip-hazard', ...(kitId ? { kitId } : {}), ...(str(cmd.partId) ? { partId: cmd.partId as string } : {}) };
+        if (cmd.mutation === 'restore-hazard') return { kind: 'restore-hazard', ...(kitId ? { kitId } : {}) };
+        if (cmd.mutation === 'reset') return { kind: 'reset', ...(kitId ? { kitId } : {}), ...(paths ? { paths } : {}) };
+      }
+      return null;
+    };
+    const applyCommand = (cmd: BridgeCommand): void => {
+      if (!cmd.action) return;
       if (cmd.action === 'say' && cmd.text) {
         companionSays(cmd.text);
         return;
       }
+      // plan 49: kit edits on what Piskriek pinged (or the kit named), and "save as default"
+      if (cmd.action === 'save-kit-default') {
+        void saveKitDefault(str(cmd.kitId));
+        return;
+      }
+      if (cmd.action === 'override-kit-part' || cmd.action === 'mutate-kit-preset') {
+        const order = kitOrderOf(cmd);
+        const said = order ? runKitOrder(order) : `I could not read that kit command (${cmd.action}): it needs a kit part and a material, or a mutation.`;
+        companionSays(cmd.text ? `${cmd.text} ${said}` : said);
+        postBridgeEvent({ type: 'kit-result', action: cmd.action, result: said });
+        return;
+      }
+      const comp = companionRef.current;
+      if (!comp) return;
       comp.executeCommand(cmd as Parameters<CompanionEntity['executeCommand']>[0]);
       if (cmd.text) companionSays(cmd.text);
     };
     const poll = async (): Promise<void> => {
       try {
-        const res = await fetch(`${BRIDGE_URL}/poll`, { signal: AbortSignal.timeout(1200) });
+        const res = await fetch(`${base}/poll`, { signal: AbortSignal.timeout(4000) });
         if (!res.ok) throw new Error(String(res.status));
         const data = (await res.json()) as { commands?: unknown[] };
         failures = 0;
-        if (!bridgeLinkedRef.current) setBridgeLinked(true);
+        lastPollOkRef.current = Date.now();
+        setBridgeLinked(true);
         for (const cmd of data.commands ?? []) applyCommand(cmd as Parameters<typeof applyCommand>[0]);
         const ctx = getContext?.();
         const s = companionRef.current?.getState();
         if (ctx && s) postBridgeEvent({ type: 'telemetry', player: ctx.player, companion: { x: s.x, y: s.y, z: s.z, state: s.state, hover: s.hover } });
       } catch {
         failures++;
-        if (failures >= 3 && bridgeLinkedRef.current) setBridgeLinked(false);
+        if (failures >= 3 && !bridgeLinkedRef.current) setBridgeLinked(false);
       }
       if (alive) timer = window.setTimeout(() => void poll(), bridgeLinkedRef.current ? 1500 : 10000);
     };

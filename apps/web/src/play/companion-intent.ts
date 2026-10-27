@@ -32,6 +32,12 @@ export type CompanionIntent =
   | { readonly kind: 'landmark'; readonly name: 'gate' | 'rover' | 'bench' }
   | { readonly kind: 'gesture'; readonly gesture: 'wave' | 'cheer' | 'point' }
   | { readonly kind: 'status' }
+  // plan 49: orders about what the player pinged (the ping is the referent: "remove the chevrons" means on that)
+  | { readonly kind: 'kit-strip-hazard' }
+  | { readonly kind: 'kit-restore-hazard' }
+  | { readonly kind: 'kit-save-default' }
+  | { readonly kind: 'kit-reset' }
+  | { readonly kind: 'ping-what' }
   | { readonly kind: 'chat' };
 
 /** A resolved order: where to go, whether to float there, and the spoken confirmation. */
@@ -67,6 +73,13 @@ const WAVE = ['wave', 'hello', 'hi', 'hey', 'greet', 'greetings'];
 const CHEER = ['cheer', 'celebrate', 'great', 'good job', 'awesome', 'well done', 'nice work'];
 const POINT = ['point'];
 const STATUS = ['status', 'report', 'telemetry', 'diagnostics', 'sitrep', 'how are you'];
+// plan 49: kit edits on the pinged thing
+const HAZARD = ['chevron', 'chevrons', 'hazard', 'hazards', 'stripe', 'stripes', 'striping', 'black and yellow', 'yellow and black', 'caution', 'band', 'bands', 'tiger stripes'];
+const REMOVE = ['remove', 'strip', 'delete', 'get rid of', 'take off', 'take away', 'lose', 'clear', 'no more', 'without', 'paint over', 'hide', 'drop'];
+const RESTORE_VERB = ['put', 'bring', 'add', 'give'];
+const DEFAULT_VERB = ['save', 'make', 'set', 'keep', 'store', 'write'];
+const RESET = ['reset', 'revert', 'undo'];
+const WHAT = ['what is this', 'what is that', "what's this", "what's that", 'what am i looking at', 'what am i pointing at', 'what did i ping', 'identify', 'what is it'];
 
 /**
  * Parses a spoken or typed command into an intent. Scored, not first-match: a float/hover word
@@ -82,6 +95,16 @@ export function parseCompanionIntent(raw: string): CompanionIntent {
   const wantsFront = hits(text, tokens, FRONT);
   const wantsHere = hits(text, tokens, HERE);
   const wantsGo = hits(text, tokens, GO);
+
+  // plan 49: kit edits first, so "the stripes on the ground" is an edit, not a landing order
+  const hazard = hits(text, tokens, HAZARD);
+  if (hazard && (tokens.includes('restore') || (tokens.includes('back') && hits(text, tokens, RESTORE_VERB)))) return { kind: 'kit-restore-hazard' };
+  // "take the stripes off" splits its verb around the object, so take...off/away counts as a removal too
+  const takeOff = tokens.includes('take') && (tokens.includes('off') || tokens.includes('away'));
+  if (hazard && (hits(text, tokens, REMOVE) || takeOff)) return { kind: 'kit-strip-hazard' };
+  if (tokens.includes('default') && hits(text, tokens, DEFAULT_VERB)) return { kind: 'kit-save-default' };
+  if (hits(text, tokens, RESET)) return { kind: 'kit-reset' };
+  if (hits(text, tokens, WHAT)) return { kind: 'ping-what' };
 
   // "land" / "walk" cancels hover before anything else reads as a float order
   if (hits(text, tokens, GROUND) && !wantsFloat) return { kind: 'ground' };
@@ -174,6 +197,12 @@ export function resolveCompanionOrder(
       return { intent, ...none, reply: intent.gesture === 'wave' ? 'Greetings, Lead Architect.' : intent.gesture === 'cheer' ? 'Ascent resonance confirmed!' : 'There.' };
     case 'status':
       return { intent, ...none, reply: '' }; // the caller fills live telemetry
+    case 'kit-strip-hazard':
+    case 'kit-restore-hazard':
+    case 'kit-save-default':
+    case 'kit-reset':
+    case 'ping-what':
+      return { intent, ...none, reply: '' }; // the caller runs the kit edit on the last ping and reports it
     case 'chat':
       return { intent, ...none, reply: '' }; // the caller routes to the bridge or small talk
   }

@@ -62,3 +62,26 @@ test('hold stops, follow resumes, landmarks use real coordinates and refuse unkn
   assert.equal(noRover.target, null);
   assert.match(noRover.reply, /don't have coordinates/);
 });
+
+test('plan 49: kit orders about the pinged thing parse before any movement word', () => {
+  // the owner's own words from the live walk-through
+  assert.equal(parseCompanionIntent('remove the black and yellow chevrons on the base piece').kind, 'kit-strip-hazard');
+  assert.equal(parseCompanionIntent('get rid of those hazard stripes').kind, 'kit-strip-hazard');
+  // "on the ground" must not read as a landing order
+  assert.equal(parseCompanionIntent('take the stripes off the ground there').kind, 'kit-strip-hazard');
+  assert.equal(parseCompanionIntent('put the stripes back').kind, 'kit-restore-hazard');
+  assert.equal(parseCompanionIntent('restore the chevrons').kind, 'kit-restore-hazard');
+  assert.equal(parseCompanionIntent('save as default').kind, 'kit-save-default');
+  assert.equal(parseCompanionIntent('make that the new default').kind, 'kit-save-default');
+  assert.equal(parseCompanionIntent('undo that').kind, 'kit-reset');
+  assert.equal(parseCompanionIntent('reset the gate').kind, 'kit-reset');
+  assert.equal(parseCompanionIntent('what is this').kind, 'ping-what');
+  assert.equal(parseCompanionIntent("what's that thing").kind, 'ping-what');
+  // the movement orders are unchanged
+  assert.equal(parseCompanionIntent('land now').kind, 'ground');
+  assert.deepEqual(parseCompanionIntent('go to the gate'), { kind: 'landmark', name: 'gate' });
+  // a kit order resolves to no movement: the screen runs it on the last ping
+  const o = resolveCompanionOrder({ kind: 'kit-strip-hazard' }, { x: 0, z: 0, yaw: 0 });
+  assert.equal(o.target, null);
+  assert.equal(o.hover || o.hold || o.follow, false);
+});

@@ -5,7 +5,14 @@
 // Two scenes, one walker. Crossing the gate's opening carries you (and the camera) from one gate's frame to the other's.
 // Each frame the far side is drawn from a virtual camera into a texture, and the near side shows it in the opening.
 import * as THREE from 'three';
-import type { Overrides, PlacedPart } from '@hm/kitspec';
+import type { Kit, Overrides, PlacedPart } from '@hm/kitspec';
+import { MACHINE_KITS } from './kit-machines';
+import { CAPACITOR_BANK_KIT } from './kit-capacitor-bank';
+import { GATE_KIT } from './kit-gate';
+import { GATE_DAIS_KIT } from './kit-gate-dais';
+import { STARGATE_KIT } from './kit-stargate';
+import { withKitDefaults } from './kit-defaults';
+import { nearestPingHit, pingPulse, pingSizeM, PING_VIOLET, type PingHit } from './ping';
 import { buildKitPreset, type KitBuild } from './kit-build';
 import type { SporeCreation } from '@hm/cartlab';
 import { creatureGenomeById } from '@hm/creature';
@@ -122,7 +129,8 @@ import { currentOutpostSession } from '../net/outpost-session';
 import { PAINT_CELL, PAINT_CELLS } from '../base/plot-height';
 import { emptyField, encodeField } from '@hm/terrainbrush';
 import { createVerticalJumpState, stepVerticalJump } from '@hm/kinematic';
-import { aimKit, vehicleTargetable, type KitTargetable, type VehicleTargetable } from './kit-target';
+import { aimKit, vehicleTargetable, type KitTarget, type KitTargetable, type VehicleTargetable } from './kit-target';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { earthEndgameState, type EndgameInput, type EndgameState } from './earth-endgame';
 
 export type Where = 'lab' | 'planet';
@@ -417,6 +425,19 @@ export interface PlayScene {
    * or on the plot a kit-built machine (its kit id is `plot:<machine id>@<built>`).
    */
   aimKitPart(reach: number): { readonly kit: string; readonly path: string; readonly gen: string | null } | null;
+  /**
+   * Plan 49: what the crosshair is on within `reach` m — a kit part (with its part and material), a base piece, the lab's
+   * shell or a prop, a boulder or the ground — the nearest of them, or null when the ray meets nothing.
+   */
+  pingTarget(reach: number): { readonly hit: PingHit; readonly where: Where } | null;
+  /** Plan 49: drops the violet ping reticle on a hit (one at a time: a new ping replaces the old). */
+  showPing(hit: PingHit): void;
+  /** Plan 49: the ping marker's state for tests: its age in seconds, or null when none shows. */
+  pingMarkerAge(): number | null;
+  /** Plan 49: the key a kit's shipped defaults are stored under ('machine:<kind>' for a plot machine), or null when it has none. */
+  kitDefaultKey(kit: string): string | null;
+  /** Plan 49: the kit definition behind a kit id (for planning a mutation), or null. */
+  kitOf(kit: string): Kit | null;
   /** Rebuilds a lab kit with the beam's per-part overrides; false while its parts are not loaded yet. */
   setKitOverrides(kit: string, overrides: Overrides): boolean;
   /** Hangs a sprite cartridge's baked turntable over a machine as a billboard card, or takes it down with null. */
@@ -737,7 +758,11 @@ export function createPlayScene(o: {
       access: gateAccess,
       stage: twinStage,
       genLevel: genLevelForStage(shown, currentQuality),
-      ...(gateKitOverrides.value ? { overrides: gateKitOverrides.value } : {}),
+      ...((): { overrides?: Overrides } => {
+        // the shipped defaults (plan 49) under the beam's overrides
+        const ov = withKitDefaults('stargate', gateKitOverrides.value);
+        return ov ? { overrides: ov } : {};
+      })(),
     });
     if (!built) {
       // no kit (the frames are off, or a part would not build): the twin draws itself
@@ -1387,7 +1412,7 @@ export function createPlayScene(o: {
     if (u['uTime']) u['uTime'].value = time;
   };
   const build = (mm: Machine): MachineView => {
-    const prop = machineProp(m, mm.kind, propStage, genLevelForStage(shown, currentQuality), plotKitOverrides.get(plotKitKey(mm)));
+    const prop = machineProp(m, mm.kind, propStage, genLevelForStage(shown, currentQuality), withKitDefaults(`machine:${mm.kind}`, plotKitOverrides.get(plotKitKey(mm))));
     prop.group.position.set(mm.x, groundAt(mm.x, mm.z) - 0.05, mm.z);
     prop.group.rotation.y = mm.yaw;
     planetScene.add(prop.group);
@@ -2704,6 +2729,17 @@ export function createPlayScene(o: {
     return hit;
   };
   const aimRayDir = new THREE.Vector3();
+  /** The base piece a ray hit belongs to: the piece manager's instanced lookup, else a `pieceId` up the hit's parents. */
+  const pieceIdOfHit = (hit: THREE.Intersection): number | null => {
+    if (!piecesGroup) return null;
+    const mgr = (piecesGroup.userData as { manager?: { pieceIdFromHit: (o: THREE.Object3D, inst?: number) => number | null } }).manager;
+    const fromManager = mgr ? mgr.pieceIdFromHit(hit.object, hit.instanceId) : null;
+    if (fromManager !== null) return fromManager;
+    for (let curr: THREE.Object3D | null = hit.object; curr && curr !== piecesGroup; curr = curr.parent) {
+      if (curr.userData?.pieceId !== undefined) return curr.userData.pieceId as number;
+    }
+    return null;
+  };
 
   const aimPointFn = (): { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly normal: { readonly x: number; readonly y: number; readonly z: number }; readonly piece: number | null } | null => {
     // 1. Raycast ground
@@ -2723,21 +2759,7 @@ export function createPlayScene(o: {
       if (hits.length > 0 && hits[0]) {
         const first = hits[0];
         pieceDist = first.distance;
-        let pieceId: number | null = null;
-        const mgr = (piecesGroup.userData as { manager?: { pieceIdFromHit: (o: THREE.Object3D, inst?: number) => number | null } }).manager;
-        if (mgr) {
-          pieceId = mgr.pieceIdFromHit(first.object, first.instanceId);
-        }
-        if (pieceId === null) {
-          let curr: THREE.Object3D | null = first.object;
-          while (curr && curr !== piecesGroup) {
-            if (curr.userData?.pieceId !== undefined) {
-              pieceId = curr.userData.pieceId;
-              break;
-            }
-            curr = curr.parent;
-          }
-        }
+        const pieceId = pieceIdOfHit(first);
         const norm = first.face ? first.face.normal.clone().transformDirection(first.object.matrixWorld) : new THREE.Vector3(0, 1, 0);
         pieceHit = {
           x: first.point.x,
@@ -2779,6 +2801,188 @@ export function createPlayScene(o: {
   const checkpointMaterials: THREE.MeshStandardMaterial[] = [];
   let playerRigBuild: KitBuild | null = null;
   let presetStarted = false;
+  // ---- Plan 49: the ping. One cast over everything the crosshair can be on, and one violet reticle at a time.
+  /** The kit part under the crosshair, with where it was hit: the lab's kits and creations, or the plot's machines, Gate, suit and vehicles. */
+  const aimKitTarget = (reach: number): KitTarget | null => {
+    camera.updateMatrixWorld(true);
+    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    // PLAN-42-GATE: the lab Gate kit ('gate', kit-gate.ts) aims via the room like the
+    // capacitor bank, so mat:/lx:/part: cartridges customize it; plot Twin gates move via
+    // pure movePlotGate/setGateAccessMode (@hm/coopnet) and keep labkit visuals for now.
+    if (where === 'lab') {
+      const hit = aimKit(sporeModels.filter((m) => m.where === 'lab'), camera.position, dir, reach);
+      return hit ?? room.aimKitPart(camera.position, dir, reach);
+    }
+    // the plot's kit-built machines, through the two-stage AABB targeter (kit-target.ts): a machine the ray misses costs its box, not
+    // its triangles, so every machine on the plot can be aimed at on the min-spec laptop
+    const targetables: KitTargetable[] = sporeModels.filter((m) => m.where === 'planet');
+    // the Gate itself is a kit: its segments, pedestal and chevron lamps take cartridges like a machine
+    if (stargate) targetables.push({ kit: 'stargate', build: stargate.build });
+    if (suitBuild) targetables.push({ kit: 'astro-suit', build: suitBuild });
+    for (const v of views.values()) {
+      const b = kitBuildOf(v);
+      if (b) targetables.push({ kit: plotKitKey(v.m), build: b });
+    }
+    // the plot's vehicles: their kits name every part a cartridge can dress (JOB-08v)
+    for (const view of vehicleViews.values()) if (view.target) targetables.push(view.target);
+    return aimKit(targetables, camera.position, dir, reach);
+  };
+  const tuple3 = (t: readonly [number, number, number]): { x: number; y: number; z: number } => ({ x: t[0], y: t[1], z: t[2] });
+  const pingDir = new THREE.Vector3();
+  const pingCast = (reach: number): PingHit | null => {
+    camera.updateMatrixWorld(true);
+    const origin = camera.position;
+    const dir = pingDir.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
+    const hits: (PingHit | null)[] = [];
+    const kitHit = aimKitTarget(reach);
+    if (kitHit) {
+      const part = api.kitPlaced(kitHit.kit).find((p) => p.path === kitHit.path);
+      hits.push({
+        point: tuple3(kitHit.point), normal: tuple3(kitHit.normal), distance: kitHit.distance, source: 'kit',
+        kitId: kitHit.kit, partId: kitHit.path, ...(part ? { part: part.part, material: part.material } : {}),
+      });
+    }
+    if (where === 'lab') {
+      const s = room.pingSurface(origin, dir, reach);
+      if (s) hits.push({ point: tuple3(s.point), normal: tuple3(s.normal), distance: s.distance, source: s.source, ...(s.objectId ? { objectId: s.objectId } : {}) });
+      return nearestPingHit(hits);
+    }
+    // the base pieces
+    if (piecesGroup && piecesGroup.children.length > 0) {
+      pieceRaycaster.set(origin, dir);
+      pieceRaycaster.far = reach;
+      const first = pieceRaycaster.intersectObjects(piecesGroup.children, true)[0];
+      pieceRaycaster.far = Infinity;
+      if (first) {
+        const id = pieceIdOfHit(first);
+        const n = first.face ? first.face.normal.clone().transformDirection(first.object.matrixWorld) : new THREE.Vector3(0, 1, 0);
+        if (n.dot(dir) > 0) n.negate();
+        hits.push({ point: first.point.clone(), normal: n, distance: first.distance, source: 'piece', objectId: id === null ? 'piece' : `piece:${id}` });
+      }
+    }
+    const o = { x: origin.x, y: origin.y, z: origin.z };
+    const d = { x: dir.x, y: dir.y, z: dir.z };
+    // the boulders, as the rover camera sees them (spheres of half their size)
+    const boulders = ground?.getBoulders() ?? [];
+    const rock = castSpheres(o, d, reach, boulders.map((b) => ({ x: b.x, y: b.y, z: b.z, r: 0.5 * b.size })));
+    if (rock !== null) {
+      const p = origin.clone().addScaledVector(dir, rock);
+      let near = boulders[0];
+      for (const b of boulders) if (near && Math.hypot(p.x - b.x, p.y - b.y, p.z - b.z) - 0.5 * b.size < Math.hypot(p.x - near.x, p.y - near.y, p.z - near.z) - 0.5 * near.size) near = b;
+      const n = near ? new THREE.Vector3(p.x - near.x, p.y - near.y, p.z - near.z).normalize() : new THREE.Vector3(0, 1, 0);
+      hits.push({ point: p, normal: n, distance: rock, source: 'ground', ...(near ? { objectId: `boulder:${near.id}` } : {}) });
+    }
+    // the ground: its normal from the heightfield's slope
+    const at = castHeightfield(o, d, reach, groundAt);
+    if (at !== null) {
+      const p = origin.clone().addScaledVector(dir, at);
+      const h = 0.25;
+      const n = new THREE.Vector3(groundAt(p.x - h, p.z) - groundAt(p.x + h, p.z), 2 * h, groundAt(p.x, p.z - h) - groundAt(p.x, p.z + h)).normalize();
+      hits.push({ point: { x: p.x, y: groundAt(p.x, p.z), z: p.z }, normal: n, distance: at, source: 'ground' });
+    }
+    return nearestPingHit(hits);
+  };
+
+  /**
+   * The reticle (plan 49 §2): Ray-7 violet corner brackets lying on the surface, a square ripple, a square-section stalk along
+   * the normal and a core diamond that shows through whatever stands between (no lettering in the world: the name is the
+   * HUD's and the companion's). Built once, re-parented into whichever world the ping is in.
+   */
+  const pingMarker = ((): {
+    readonly group: THREE.Group;
+    readonly brackets: THREE.Mesh;
+    readonly ripple: THREE.Mesh;
+    readonly stalk: THREE.Mesh;
+    readonly core: THREE.Mesh;
+    readonly mats: { readonly bracket: THREE.MeshBasicMaterial; readonly ripple: THREE.MeshBasicMaterial; readonly stalk: THREE.MeshBasicMaterial; readonly core: THREE.MeshBasicMaterial };
+    born: number;
+    where: Where | null;
+  } => {
+    const flat = (w: number, d: number, x: number, z: number): THREE.BufferGeometry => new THREE.BoxGeometry(w, 0.012, d).translate(x, 0.006, z);
+    // the reticle is 1 m across in its own frame (the group scales it by distance): four L corners, arms 0.28, bars 0.05
+    const arm = 0.28, bar = 0.05, half = 0.5;
+    const corners: THREE.BufferGeometry[] = [];
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        corners.push(flat(arm, bar, sx * (half - arm / 2), sz * (half - bar / 2)));
+        corners.push(flat(bar, arm - bar, sx * (half - bar / 2), sz * (half - bar - (arm - bar) / 2)));
+      }
+    }
+    const rippleBar = 0.022;
+    const ripples = [
+      flat(1, rippleBar, 0, -half + rippleBar / 2), flat(1, rippleBar, 0, half - rippleBar / 2),
+      flat(rippleBar, 1 - 2 * rippleBar, -half + rippleBar / 2, 0), flat(rippleBar, 1 - 2 * rippleBar, half - rippleBar / 2, 0),
+    ];
+    const merge = (parts: THREE.BufferGeometry[]): THREE.BufferGeometry => {
+      const merged = mergeGeometries(parts.map((g) => g.toNonIndexed()), false) ?? new THREE.BufferGeometry();
+      for (const g of parts) g.dispose();
+      return merged;
+    };
+    const mat = (colour: string, opacity: number, through: boolean): THREE.MeshBasicMaterial => new THREE.MeshBasicMaterial({
+      color: colour, transparent: true, opacity, depthWrite: false, depthTest: !through, toneMapped: false,
+      polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
+    });
+    const mats = {
+      bracket: mat(PING_VIOLET, 0.95, false),
+      ripple: mat('#e2b8ff', 0.8, false),
+      stalk: mat(PING_VIOLET, 0.55, false),
+      core: mat('#f3dcff', 1, true),
+    };
+    const group = new THREE.Group();
+    group.name = 'ping-marker';
+    group.visible = false;
+    group.renderOrder = 998;
+    const brackets = new THREE.Mesh(merge(corners), mats.bracket);
+    const ripple = new THREE.Mesh(merge(ripples), mats.ripple);
+    const stalk = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.6, 0.035).translate(0, 0.3, 0), mats.stalk);
+    const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.07, 0), mats.core);
+    core.position.y = 0.09;
+    core.renderOrder = 999;
+    for (const mesh of [brackets, ripple, stalk, core]) {
+      mesh.frustumCulled = false;
+      group.add(mesh);
+    }
+    return { group, brackets, ripple, stalk, core, mats, born: -1, where: null };
+  })();
+  const pingUp = new THREE.Vector3(0, 1, 0);
+  const pingNormalV = new THREE.Vector3();
+  const hidePing = (): void => {
+    pingMarker.group.removeFromParent();
+    pingMarker.group.visible = false;
+    pingMarker.where = null;
+    pingMarker.born = -1;
+  };
+  const showPingAt = (hit: PingHit): void => {
+    hidePing();
+    const n = pingNormalV.set(hit.normal.x, hit.normal.y, hit.normal.z);
+    if (n.lengthSq() < 1e-8) n.set(0, 1, 0);
+    n.normalize();
+    pingMarker.group.position.set(hit.point.x, hit.point.y, hit.point.z).addScaledVector(n, 0.004);
+    pingMarker.group.quaternion.setFromUnitVectors(pingUp, n);
+    pingMarker.group.scale.setScalar(pingSizeM(hit.distance));
+    pingMarker.group.visible = true;
+    pingMarker.born = clock;
+    pingMarker.where = where;
+    (where === 'planet' ? planetScene : labScene).add(pingMarker.group);
+    updatePing();
+  };
+  /** Turns the reticle to its pulse at the scene clock, and takes it down at the end of its life or when the player changes worlds. */
+  const updatePing = (): void => {
+    if (pingMarker.where === null) return;
+    const pulse = pingPulse(clock - pingMarker.born);
+    if (!pulse.alive || pingMarker.where !== where) {
+      hidePing();
+      return;
+    }
+    pingMarker.brackets.scale.set(pulse.scale, 1, pulse.scale);
+    pingMarker.ripple.scale.set(pulse.ripple, 1, pulse.ripple);
+    pingMarker.mats.bracket.opacity = 0.95 * pulse.alpha;
+    pingMarker.mats.ripple.opacity = pulse.rippleAlpha;
+    pingMarker.mats.stalk.opacity = 0.55 * pulse.alpha;
+    pingMarker.mats.core.opacity = pulse.alpha;
+    pingMarker.core.rotation.y = (clock - pingMarker.born) * 2.4;
+  };
+
   const api: PlayScene = {
     async loadSporeCreation(creation, isCurrent = () => true) {
       await preloadSporeCreation(creation);
@@ -3415,6 +3619,7 @@ export function createPlayScene(o: {
     frame(now, dt, c) {
       clock = now;
       beamFx.update(clock);
+      updatePing();
       holoUniforms.uTime.value = now;
       openingOffUniforms.uTime.value = now;
       // the horizon's four envelopes, straight from the clock and the gate's state (JOB-08b)
@@ -4659,6 +4864,9 @@ export function createPlayScene(o: {
         }
       }
       tracks.dispose();
+      hidePing();
+      for (const mesh of [pingMarker.brackets, pingMarker.ripple, pingMarker.stalk, pingMarker.core]) mesh.geometry.dispose();
+      for (const mat of Object.values(pingMarker.mats)) mat.dispose();
       roost.dispose();
       for (const g of activeGantries) g.dispose();
       activeGantries.length = 0;
@@ -4678,29 +4886,31 @@ export function createPlayScene(o: {
       for (let i = 0; i < n; i++) monsters.update(1 / 30, { x: p.x, z: p.z, yaw, alive: playerAlive }, camera);
     },
     aimKitPart(reach: number) {
-      camera.updateMatrixWorld(true);
-      const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-      // PLAN-42-GATE: the lab Gate kit ('gate', kit-gate.ts) aims via the room like the
-      // capacitor bank, so mat:/lx:/part: cartridges customize it; plot Twin gates move via
-      // pure movePlotGate/setGateAccessMode (@hm/coopnet) and keep labkit visuals for now.
-      if (where === 'lab') {
-        const hit = aimKit(sporeModels.filter((m) => m.where === 'lab'), camera.position, dir, reach);
-        return hit ?? room.aimKitPart(camera.position, dir, reach);
-      }
-      // the plot's kit-built machines, through the two-stage AABB targeter (kit-target.ts): a machine the ray misses costs its box, not
-      // its triangles, so every machine on the plot can be aimed at on the min-spec laptop
-      const targetables: KitTargetable[] = sporeModels.filter((m) => m.where === 'planet');
-      // the Gate itself is a kit: its segments, pedestal and chevron lamps take cartridges like a machine
-      if (stargate) targetables.push({ kit: 'stargate', build: stargate.build });
-      if (suitBuild) targetables.push({ kit: 'astro-suit', build: suitBuild });
-      for (const v of views.values()) {
-        const b = kitBuildOf(v);
-        if (b) targetables.push({ kit: plotKitKey(v.m), build: b });
-      }
-      // the plot's vehicles: their kits name every part a cartridge can dress (JOB-08v)
-      for (const view of vehicleViews.values()) if (view.target) targetables.push(view.target);
-      const hit = aimKit(targetables, camera.position, dir, reach);
+      const hit = aimKitTarget(reach);
       return hit ? { kit: hit.kit, path: hit.path, gen: hit.gen } : null;
+    },
+    pingTarget(reach: number) {
+      const hit = pingCast(reach);
+      return hit ? { hit, where } : null;
+    },
+    showPing: showPingAt,
+    pingMarkerAge: () => (pingMarker.where === null ? null : clock - pingMarker.born),
+    kitDefaultKey(kit: string) {
+      if (kit === 'gate' || kit === 'gate-dais' || kit === 'capacitor-bank' || kit === 'stargate') return kit;
+      if (kit.startsWith('plot:')) {
+        for (const v of views.values()) if (plotKitKey(v.m) === kit) return `machine:${v.m.kind}`;
+      }
+      return null;
+    },
+    kitOf(kit: string) {
+      if (kit === 'gate') return GATE_KIT;
+      if (kit === 'gate-dais') return GATE_DAIS_KIT;
+      if (kit === 'capacitor-bank') return CAPACITOR_BANK_KIT;
+      if (kit === 'stargate') return STARGATE_KIT;
+      if (kit.startsWith('plot:')) {
+        for (const v of views.values()) if (plotKitKey(v.m) === kit) return MACHINE_KITS[v.m.kind] ?? null;
+      }
+      return null;
     },
     setSpriteCard(kitId, card) {
       return room.setSpriteCard(kitId, card);

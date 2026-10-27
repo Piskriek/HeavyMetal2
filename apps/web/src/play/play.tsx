@@ -59,7 +59,7 @@ import {
 } from '@hm/cartlab';
 import { renderStem } from '@hm/soundlab';
 import { bakeSpritePrint, spriteAtlas, spriteBill, spriteFps, stemAtStage } from './sprite-sound-cartridge';
-import type { PartOverride } from '@hm/kitspec';
+import type { Overrides, PartOverride } from '@hm/kitspec';
 import { LAYER_SHELF, materialName, resolveMatPreset, specOfName } from '@hm/matstack';
 import { BenchParts } from './bench-parts';
 import { BenchSpecies } from './bench-species';
@@ -68,7 +68,10 @@ import { BenchMaterials } from './bench-materials';
 import { BenchSprites } from './bench-sprites';
 import { BenchSounds } from './bench-sounds';
 import { BenchHarness } from './bench-harness';
-import { CompanionChat } from './companion-chat';
+import { CompanionChat, playPingBlip, type CompanionChatHandle, type CompanionKitOps, type CompanionKitOrder } from './companion-chat';
+import { kitName, pingCallout, pingEvent, pingLabel, pingTargetOf, PING_DEBOUNCE_S, PING_REACH_M, type PingTarget } from './ping';
+import { applyKitPlan, planKitMutation, type KitMutation } from './kit-mutation';
+import { MATERIAL_RE, setKitDefaults, withKitDefaults } from './kit-defaults';
 import { HarnessTelemetryHud, type IHarnessHudViewModel } from '../base/ui/harness-telemetry-hud';
 import { computeDrivingDriftBadge, type DrivingDriftBadgeState } from '@hm/hudmath/toast-queue-and-compass';
 import { MY_PRESETS_KEY, parseMyPresets, presetsOf, savePreset, serializeMyPresets, type MyPresets } from './my-presets';
@@ -1755,6 +1758,114 @@ useEffect(() => {
   };
   const applySkinShotRef = useRef<(broadcast: boolean) => number>(() => 0);
   applySkinShotRef.current = applySkinShot;
+  // ---- Plan 49: the ping (middle mouse, or Q when Q has no other job) and the kit edits the comms run on what was pinged
+  const companionHandleRef = useRef<CompanionChatHandle | null>(null);
+  /** The last ping: the referent of the next spoken order ("remove the chevrons" means on that). */
+  const lastPingRef = useRef<{ readonly target: PingTarget; readonly where: 'lab' | 'planet' } | null>(null);
+  const lastPingAtRef = useRef(-Infinity);
+  const pingNow = (): PingTarget | null => {
+    const scene = sceneRef.current;
+    if (!scene) return null;
+    const now = performance.now() / 1000;
+    if (now - lastPingAtRef.current < PING_DEBOUNCE_S) return null;
+    lastPingAtRef.current = now;
+    const cast = scene.pingTarget(PING_REACH_M);
+    if (!cast) {
+      say('Nothing to ping', `Nothing within ${PING_REACH_M} m under the crosshair.`);
+      return null;
+    }
+    scene.showPing(cast.hit);
+    playPingBlip();
+    const target = pingTargetOf(cast.hit, cast.where);
+    lastPingRef.current = { target, where: cast.where };
+    const handle = companionHandleRef.current;
+    if (handle) {
+      handle.post(pingEvent(target, cast.where));
+      // the log and the bridge get the coordinates; the voice keeps to the name
+      handle.say(pingCallout(target), `Target locked: ${pingLabel(target).replace(' · ', ', ')}.`);
+    } else {
+      say('Ping', pingLabel(target));
+    }
+    return target;
+  };
+  const pingNowRef = useRef<() => PingTarget | null>(() => null);
+  pingNowRef.current = pingNow;
+  /** 'darkSteel' -> 'dark steel', 'mat:workshop-steel' -> 'workshop steel'. */
+  const readableMaterial = (m: string): string => m.replace(/^(mat|matc|lx):/, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]+/g, ' ').toLowerCase();
+  const kitOps = useMemo<CompanionKitOps>(() => ({
+    run(order: CompanionKitOrder): string {
+      const scene = sceneRef.current;
+      if (!scene) return 'The world is still loading.';
+      const ping = lastPingRef.current?.target ?? null;
+      const kitId = order.kitId ?? ping?.kitId;
+      if (!kitId) {
+        return ping
+          ? `That ping is on the ${pingLabel(ping).toLowerCase()}, not a machine. Ping the machine part first: middle mouse, or Q.`
+          : 'Ping the machine first: middle mouse, or Q.';
+      }
+      const name = kitName(kitId);
+      const placed = scene.kitPlaced(kitId);
+      if (placed.length === 0) return `I cannot reach the ${name} from here.`;
+      if (order.kind === 'set-material' && !MATERIAL_RE.test(order.material)) return `"${order.material}" is not a material name I can put on a part.`;
+      const mutation: KitMutation =
+        order.kind === 'strip-hazard'
+          ? { kind: 'strip-hazard', ...((order.partId ?? (ping?.kitId === kitId ? ping.partId : undefined)) ? { path: (order.partId ?? ping?.partId) as string } : {}) }
+          : order.kind === 'restore-hazard'
+            ? { kind: 'restore-hazard' }
+            : order.kind === 'reset'
+              ? { kind: 'reset', ...(order.paths ? { paths: order.paths } : {}) }
+              : { kind: 'set-material', paths: order.paths, material: order.material };
+      const plan = planKitMutation(placed, mutation, scene.kitOf(kitId) ?? undefined);
+      if (plan.changes.length === 0) {
+        if (mutation.kind === 'strip-hazard') return `The ${name} has no black-and-yellow left to remove.`;
+        if (mutation.kind === 'restore-hazard') return `The ${name}'s hazard striping is already on.`;
+        if (mutation.kind === 'reset') return `The ${name} already wears its default look.`;
+        return `None of those parts are on the ${name}, or they already wear ${readableMaterial(mutation.material)}.`;
+      }
+      const before = propsRef.current.kits?.[kitId];
+      const next = applyKitPlan(before, plan);
+      // the live scene first: a kit that will not rebuild with the change is put back, and nothing is saved
+      if (!scene.setKitOverrides(kitId, next)) {
+        scene.setKitOverrides(kitId, before ?? {});
+        return `The ${name} would not rebuild with that change, so I left it as it was.`;
+      }
+      const kits: Record<string, Overrides> = { ...(propsRef.current.kits ?? {}) };
+      if (Object.keys(next).length > 0) kits[kitId] = next;
+      else delete kits[kitId];
+      savePropsSave({ ...propsRef.current, kits });
+      const n = plan.changes.length;
+      const parts = `${n} ${n === 1 ? 'part' : 'parts'}`;
+      const tos = [...new Set(plan.changes.map((c) => readableMaterial(c.to)))].join(' and ');
+      switch (mutation.kind) {
+        case 'strip-hazard':
+          return `Black-and-yellow off the ${name}: ${parts} repainted in ${tos}. Say "save as default" to keep it for everyone, or "put the stripes back".`;
+        case 'restore-hazard':
+          return `Hazard striping back on the ${name}: ${parts}.`;
+        case 'reset':
+          return `The ${name} is back to its default look: ${parts}.`;
+        case 'set-material':
+          return `${parts} of the ${name} now ${n === 1 ? 'wears' : 'wear'} ${tos}.`;
+      }
+    },
+    describePing(): string {
+      const last = lastPingRef.current?.target;
+      if (!last) return 'Ping something first: middle mouse, or Q.';
+      const wearing = last.material ? `, in ${readableMaterial(last.material)}` : '';
+      const hint = last.kitId ? ' Say "remove the chevrons", "put the stripes back" or "save as default".' : '';
+      return `That is the ${pingLabel(last).replace(' · ', ', ').toLowerCase()}${wearing}, ${last.distance.toFixed(1)} m out.${hint}`;
+    },
+    defaultsFor(kitId?: string) {
+      const scene = sceneRef.current;
+      const id = kitId ?? lastPingRef.current?.target.kitId;
+      if (!scene || !id) return { error: 'Ping the machine you want to keep as it is first.' };
+      const key = scene.kitDefaultKey(id);
+      if (!key) return { error: `The ${kitName(id)} has no shipped default to write: the lab kits, the Stargate and plot machines do.` };
+      return { key, name: kitName(id), overrides: withKitDefaults(key, propsRef.current.kits?.[id]) ?? {} };
+    },
+    defaultsSaved(all: unknown): void {
+      setKitDefaults(all);
+    },
+  }), [savePropsSave, say]);
   /**
    * The beam's Apply with a species cartridge (plan 39, Aq): a tap regrows the tree it is fired at as the cartridge's
    * species; a hold or Shift every tree of that tree's kind within 12 m. Like for like: it fits trees only. A plot holds
@@ -4228,6 +4339,9 @@ useEffect(() => {
             return;
           }
         }
+        // plan 49: Q with no other job pings what the crosshair is on (middle mouse always does)
+        if (!e.repeat) pingNowRef.current();
+        return;
       }
       // X opens the radial wheel for what you hold; releasing X or clicking picks (RadialMenu). Z is the remove (below).
       if (e.code === 'KeyX') {
@@ -4448,6 +4562,15 @@ useEffect(() => {
   }, [say]);
   useEffect(() => {
     const onClick = (e: MouseEvent): void => {
+      // plan 49: the middle button pings what the crosshair is on (and never starts the browser's autoscroll)
+      if (e.button === 1) {
+        const onUi = (e.target as HTMLElement | null)?.closest?.('input, textarea, select, button, [role="dialog"]');
+        if (!onUi) {
+          e.preventDefault();
+          pingNowRef.current();
+        }
+        return;
+      }
       // the right button cancels a placement (the key strip says so); the left button places (TASK-25)
       if (e.button === 2) {
         if (sceneRef.current?.ghostLocked()) sceneRef.current.releaseGhost();
@@ -4580,6 +4703,14 @@ useEffect(() => {
         material: p.material,
       })),
       kitOverrides: () => propsRef.current.kits ?? {},
+      /** Plan 49 test seams: ping as the middle button does, the last ping, the reticle's age, and a kit order as the comms run it. */
+      ping: (): PingTarget | null => {
+        lastPingAtRef.current = -Infinity;
+        return pingNowRef.current();
+      },
+      lastPing: () => lastPingRef.current,
+      pingMarkerAge: () => sceneRef.current?.pingMarkerAge() ?? null,
+      kitOrder: (order: CompanionKitOrder): string => kitOps.run(order),
       /** Turns the heavy machines' kit frames on or off (off until TICKET-39b refits them) and rebuilds the plot's machines. */
       kitFrames: (on: boolean): void => {
         setKitFrames(on);
@@ -5025,6 +5156,8 @@ useEffect(() => {
           {/* Plan 48: In-game AI Companion Comms (hold T to talk, Enter to type) */}
           <CompanionChat
             companion={sceneRef.current?.getCompanion?.() ?? null}
+            handleRef={companionHandleRef}
+            kitOps={kitOps}
             onBroadcastRadio={(text) => {
               say('Overwatch · Co-Builder', text);
             }}

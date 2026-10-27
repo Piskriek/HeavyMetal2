@@ -35,6 +35,8 @@ export interface KitTarget {
   readonly gen: string | null;
   readonly distance: number;
   readonly point: readonly [number, number, number];
+  /** The hit face's normal in world space, turned to face the ray (plan 49: the ping's reticle lies on the surface). */
+  readonly normal: readonly [number, number, number];
 }
 
 /** A kit in the world, by the id the beam and the overrides use. */
@@ -221,12 +223,16 @@ export class KitTargeter {
         if (best && hit.distance >= best.distance) continue;
         const part = t.build.partAt(slot.mesh, hit.faceIndex);
         if (!part) continue;
+        const n = this.scratchNormal.set(0, 1, 0);
+        if (hit.face) n.copy(hit.face.normal).transformDirection(slot.mesh.matrixWorld);
+        if (n.dot(dir) > 0) n.negate();
         best = {
           kit: t.kit,
           path: part.path,
           gen: part.source.kind === 'param' ? part.source.gen : null,
           distance: hit.distance,
           point: [hit.point.x, hit.point.y, hit.point.z],
+          normal: [n.x, n.y, n.z],
         };
       }
     }
@@ -235,6 +241,7 @@ export class KitTargeter {
   }
 
   private readonly scratchVec = new THREE.Vector3();
+  private readonly scratchNormal = new THREE.Vector3();
 
   /**
    * The cached boxes of one build. The build's own pose and its visible mask are compared first (a rebuilt machine, a rank

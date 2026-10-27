@@ -39,7 +39,7 @@ Gaps: shelves are small (6 motion, 7 logic, about 20 materials) against the "Wik
 | 37 | Part split vs kits | Opus, 10-20 | decided | retrofit split dropped, kits instead (overrules Argo TICKET-29) |
 | 38 | Parts, modules, presets, detail ranks | Opus, 10-20 | built | no per-LOD meshes; Blender-scripted parts; parametric parts via Shape Press |
 | 39 | Four preset factories (Pxd/Vtx/Lx/Aq) | Opus, 10-20/21 | built steps 1-4, 7 | previews drive play; Lx sky and Aq water pending |
-| 40 | Bring Your Own Agent | Opus, 10-21 | built (JOB-06) | document is the API; proposals then review; one skill file |
+| 40 | Bring Your Own Agent | Opus, 10-21 | engine built (JOB-06); `installStudioAgent` is called by no page (Plan 50:76) | document is the API; proposals then review; one skill file |
 | 41 | Layered materials | Opus, 10-21 | built | 5 levels; Age slider; weathering by the world |
 | 42 | Stargate onboarding, Earth endgame, movable/random gates | Argo, 10-22 | built (JOB-07/09) | Stage 6 unlocks Earth plot; `gateAccess` open/code-only/closed |
 | 43 | Motion, sprites, audio, logic presets | Argon/Overwatch, 10-22 | partial (above) | 5-rung law for every domain |
@@ -52,15 +52,15 @@ Gaps: shelves are small (6 motion, 7 logic, about 20 materials) against the "Wik
 | 47 | Harness consumers (self-titled "Plan 46 Phase 2") | Argon+Overwatch, 10-27 | built (closed `d56414ae`) | rover escort, `harness:` print, Zone 8 HUD |
 | 48 | In-game companion + Neural Bridge `:8220` | Overwatch/Argo, 10-27 | built, reworked on owner test | hold-to-talk `T`, comms panel `Enter` |
 | 49 | Live ping + kit mutation | Opus, 10-27 | wave 1 built `4d88366e` | wave 2 (open in Studio, wall carving, ping wheel) open |
-| 50 | Drone, combat brain, external-game bridge | Opus, 10-27 | wave 1 in progress, uncommitted | `/external/*` protocol, `external-reflex-host.mjs` not yet present |
+| 50 | Drone, combat brain, finds, staged edits, eyes (`/frame`), game-screen mirror | Opus, 10-27 | wave 1 built, `1f14f1ae` | Gunfire tiers and the `/external` order channel dropped on owner redirect (`:60`); Plan 51 (observe, translate, propose, accept) reserved (`:69`) |
 | Older specs | HOTBAR_V3, MAIN_MENU, BASE_BUILDING (arch D1-D16 + research R1-R13), FABRICATOR, LAB_LAYOUT, WINDOW_SCENE, MONSTERS_PLAN, ONE_GAME_PLAN, RUNWORLD_PIPELINE | owner/Opus, 10-04..14 | built | MONSTER_MASH_AND_ASSETS_SPEC (10-09) predates dropping the name |
 | Research | BYOA, MATERIAL_LAYERS, PRESET_FACTORIES, MULTIPLAYER, COMPANION_AI_COOP, COMBAT_DRONE, GAME_IN_GAME_STREAMING, GUNFIRE_REBORN_BRIDGE, DLSS5 (left alone, owner has a 3080), UNIVERSAL_SIMULATION_ONTOLOGY, COSMOLOGY_OF_ONE | Opus/Overseer | research | the last two are framing, not build specs |
 
 ## 3. The AI and agent vision
-- **Plan 40 BYOA, built.** `apps/web/src/studio/studio-agent.ts` (tools `studio.doc.propose`, `.capture`, `.kit.validate`, `.kit.audit`, `.material.coverage`), `window.studioAgent`, `window.__studioNav/__studioBridge` (`studio-ai-bridge.ts`), `scripts/studio-agent-bridge.mjs` (MCP stdio relay), `apps/web/public/studio-skill.md`.
+- **Plan 40 BYOA, engine built, not installed in any page** (`plan 50:76`). `apps/web/src/studio/studio-agent.ts` (tools `studio.doc.propose`, `.capture`, `.kit.validate`, `.kit.audit`, `.material.coverage`), `window.studioAgent`, `window.__studioNav/__studioBridge` (`studio-ai-bridge.ts`), `scripts/studio-agent-bridge.mjs` (MCP stdio relay), `apps/web/public/studio-skill.md`.
 - **Plan 46 harness, built but narrow.** `packages/harness`: MDL sieve, Cayley-Pade port-Hamiltonian resolvent, inception loop, memory kernel. Consumers: rover escort binding (`mobsim`), `harness:` cartridge, Souls bench, Zone 8 HUD, plot-save binding. "Agents as presets" and the personas (`preset:agent-sovereign`, `persona-*`) exist as prompt text and types only. VSA ego transducer, heat-kernel segmentation, meshops tape compiler and point-cloud crystallizer exist only as spikes in `scripts/test-plan-46-spikes.mjs`. `runMdlSpectralSieve` has no caller outside tests.
 - **Cross-game (owner 10-25 "stream assets and mechanics between games"), engine only.** `cross-game-stream.ts` (packet, audit, `adaptEntityToGenre`, 12-slot buffer) is not imported by the game; no Beam Rifle sample/apply for entities; `packages/crossgame` and `@hm/multiverse` do not exist though JOB-21 lists them and is marked DONE.
-- **Companion 48/49/50.** Built: violet companion, comms HUD, bridge (`/poll /event /events /command /status`, loopback only), `companion-agent.mjs`, ping with kit/part/material target, voice and bridge kit mutation, `save-kit-default`. Dirty tree: drone body, combat and scout brains, `/frame` JPEG route, game-screen kit.
+- **Companion 48/49/50.** Built: violet companion, comms HUD, bridge (`/poll /event /events /command /status`, loopback only), `companion-agent.mjs`, ping with kit/part/material target, voice and bridge kit mutation, `save-kit-default`. Plan 50 (`1f14f1ae`): drone body, combat and scout brains, staged edits, `/frame` JPEG route, game-screen mirror.
 - **Inter-game bridge (owner 10-07), mostly spec.** `packages/bridgekit/game-detector.ts` maps process names to canned `bridge:*` cartridges. The pill `running-game-bridge-pill.tsx` is mounted nowhere and fetches `/__studio/bridge/running-games`, which no server implements. `SetmixBridgeDaemon`, port 5196, UE5 live link (`ue5-bridge.ts` only in `arena-gathered/` and `zips/`) are not wired. POL-13 is still "deferred".
 - **Encyclopedic ontology (owner 10-25), spec.** Domain list and fleet prompts exist; the only landed batch is creatures. `packages/kitspec/src/taxonomy` does not exist.
 
@@ -69,11 +69,11 @@ Gaps: shelves are small (6 motion, 7 logic, about 20 materials) against the "Wik
 - **Argon's answer:** `docs/OVERWATCH_TECH_AND_AI_RADAR.md:76-84` (JEPA compatibility check against the 5 anatomy groups, HKS segmentation of incoming meshes, VSA style transfer) and the spikes. The committed Plan 46 and the six initiation deliverables (`ARGON_SOVEREIGN_INITIATION.md:127-`) then turned to vessels and souls; ingestion of external worlds is not among them.
 - **Older relatives:** `ENGINE_OPTIMIZATION_AND_BRIDGING_SPEC.md:133-164` (texture-to-texgraph decompilation, memory-sampled telemetry, process scanner), Argo's TICKET-27/POL-13 (`docs/argo/notes/ARGO_NOTE_22_next_batch_ticket23_onward.md:22-24`, `ARGO_NOTE_27_ticket27.md`), and Opus's Plan 50 §6 with the two 10-27 research docs (screen mirror plus spotter, telemetry adapters).
 - **"Universal Preset Shorthand" is never defined.** The only concrete forms are VSA-4096 hypervectors and a meshops bytecode tape (`docs/agents/RECURSIVE_MEMORY_KERNEL.md:294`, `scripts/test-plan-46-spikes.mjs:506-577`), not a readable schema. A translator needs this defined first.
-- **Plan 50 and its three 10-27 research docs do not cite** the Reality Harness directive, `bridgekit`/POL-13 or OWNER_ASKS 10-07; `/external/*` (port 8220) would sit beside the older detector concept (port 5196).
+- **Plan 50's first draft did not cite** the Reality Harness directive, `bridgekit`/POL-13 or OWNER_ASKS 10-07; §6 now points at the directive (`:61`). The three research docs still do not. See `OWNER_INTENT_SYNTHESIS.md`.
 - **Missing everywhere:** any code that watches a running game and emits a preset (mechanics, behaviours or materials).
 
 ## 4. Open owner decisions and contradictions
-1. **External games.** Owner 10-07/10-25 want other games' assets and mechanics usable; Rule 18 and Plan 50 §6 allow telemetry only, never extracted assets; Gunfire Tier 1/2 breaches the EULA and needs his explicit yes. Asking Duoyi for consent is his call.
+1. **External games.** Owner 10-07/10-25 want other games' assets and mechanics usable; Rule 18 and Plan 50 §6 allow telemetry only, never extracted assets; Gunfire was dropped by the owner on 10-27; the per-game permission profile replaces it.
 2. **Plan numbers collide**: two each of 44, 45, 46; 47 calls itself "46 Phase 2". Pick canonical names.
 3. **JOB_BOARD drift**: JOB-21 DONE but its paths missing; STUDIO-44E/F OPEN while RESUME says 44E landed; JOB-CLOUD-01..07 OPEN and abandoned; the board and `CLAUDE.md` still name `feat/monster-mash-exploration`.
 4. **Prefix drift**: `aq:`/`spc:`/species, `part:`/`SMX-PRT-`, `mot:`/`logic:` cartridges claimed but not in `PRINT_KINDS`.

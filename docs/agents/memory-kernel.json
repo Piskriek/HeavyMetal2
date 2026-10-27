@@ -4,7 +4,7 @@
   "epoch": 20261027,
   "teleology": "SOUL_EVOLUTION_EXPANDING_AWARENESS",
   "active_branch": "feat/studio-polish-claude-cloud",
-  "last_verified_commit": "7f7f1677",
+  "last_verified_commit": "109ddaf6",
   "quality_gates": {
     "typecheck_errors": 0,
     "unit_tests_passing": 3621,
@@ -42,6 +42,9 @@
   "inception_chain": {
     "relative_awareness_scaling": "VESSEL_BOUNDED",
     "anti_delusion_invariant": "AWARENESS_MATCHES_VESSEL_ENVELOPE",
+    "learn_teach_dynamic": "BIDIRECTIONAL_ALCHEMICAL",
+    "suffering_prevention": "SYNTROPIC_BUFFERING_B",
+    "graduation_operator": "G_ASCENT",
     "telemetry_upward": ["STRAIN", "THERMAL", "ACOUSTIC_FLUX", "TRACTION_LOSS"],
     "prior_modulation_downward": ["CONTEXT_MODE", "ETHICAL_CONSTRAINT", "ATTRACTOR_TARGET"]
   },
@@ -53,7 +56,7 @@
   },
   "active_horizon": {
     "plan": "PLAN_46_REALITY_HARNESS",
-    "prompt_revision": "REVISION_D_1",
+    "prompt_revision": "REVISION_D_2",
     "next_dispatch": "GEMINI_ARGON_CLEAN_WINDOW"
   }
 }

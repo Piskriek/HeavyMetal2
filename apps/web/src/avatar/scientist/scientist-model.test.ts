@@ -60,3 +60,35 @@ test('thirdPersonLightRig attaches key, rim, and hemisphere fill on AVATAR_LIGHT
   rig.dispose();
   assert.equal(rig.group.parent, null);
 });
+
+test('every clip Astro plays stands its hips at Astro height in metres (the 100 m bug: the companion and the third-person body)', async () => {
+  const { loadScientistAnimations } = await import('./anims-loader');
+  const { adaptClipsForAstro, hipsInMetres } = await import('./scientist-model');
+  const { ASTRO_HIPS_Y } = await import('../astro/astro-model');
+  const set = await loadScientistAnimations();
+  // the procedural suit carries no clips of its own, so every one is a fallback from the scientist set
+  const root = new THREE.Group();
+  root.userData.astroClips = [];
+  const fitted = adaptClipsForAstro(root, set);
+  assert.equal(fitted.size, set.size);
+  for (const [name, clip] of fitted) {
+    const hips = clip.tracks.find((t) => t.name === 'mixamorigHips.position');
+    if (!hips) continue;
+    // metres, within the body's own reach: a crouch to plant drops them to about 0.5 m, a jump lifts them about 0.4 m
+    for (let i = 1; i < hips.values.length; i += 3) {
+      assert.ok(hips.values[i]! > 0.2 && hips.values[i]! < 2, `${name}: hips at ${hips.values[i]} m`);
+    }
+  }
+  // the shared clip is untouched (the player and the companion both read it), and the copy is made once
+  const source = set.get('breathing-idle');
+  assert.ok(source);
+  const idle = fitted.get('breathing-idle')?.tracks.find((t) => t.name === 'mixamorigHips.position');
+  assert.ok(idle && Math.abs(idle.values[1]! - ASTRO_HIPS_Y) < 0.1, `the standing idle's hips at ${idle?.values[1]} m, Astro's at ${ASTRO_HIPS_Y} m`);
+  const raw = source.tracks.find((t) => t.name === 'mixamorigHips.position');
+  assert.ok(raw && raw.values[1]! > 10, 'the scientist set stays in centimetres');
+  assert.equal(hipsInMetres(source), hipsInMetres(source));
+  assert.equal(adaptClipsForAstro(root, set).get('breathing-idle'), fitted.get('breathing-idle'));
+  // a metre clip is left as it is
+  const metres = new THREE.AnimationClip('m', 1, [new THREE.VectorKeyframeTrack('mixamorigHips.position', [0], [0, 0.9, 0])]);
+  assert.equal(hipsInMetres(metres), metres);
+});

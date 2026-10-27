@@ -1,6 +1,6 @@
 /**
  * The player character's instances. The model is Astro (`../astro/astro-model.ts`); the scientist names stay because
- * the lab, the creator and the animator use them. Astro's GLBs carry their own full clip set (see `adaptClipsForAstro`).
+ * the lab, the creator and the animator use them. Astro is the procedural suit and plays the scientist set (`adaptClipsForAstro`).
  *
  * TICKET-05 (OPUS_NOTE_12 Item D, STAGE-04): the default level is 'high' (`scientistLevelFor` drops it to 'mid' only on
  * Low graphics with fps under 30), and `thirdPersonLightRig` lights the avatar on AVATAR_LIGHT_LAYER only. The rig's lights
@@ -8,7 +8,7 @@
  */
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { loadAstro, type AstroLevel } from '../astro/astro-model';
+import { ASTRO_HIPS_Y, loadAstro, type AstroLevel } from '../astro/astro-model';
 
 export const animsBinUrl = new URL('./anims.bin', import.meta.url);
 
@@ -92,9 +92,9 @@ export async function createScientistInstance(
 }
 
 /**
- * The clips an Astro instance plays: its own GLB carries the whole set. Walking and Running are Meshy's; the other twelve
- * are the Mixamo set retargeted onto Astro's rig by `scripts/retarget-astro.ts`. The scientist set (`clips`) is only the
- * fallback for a name Astro lacks.
+ * The clips an Astro instance plays: its own set first (the procedural suit, JOB-24, carries none), then the scientist set
+ * (`clips`), with its centimetre hips brought to Astro's metres (`hipsInMetres`). Before JOB-24 the GLB carried all fourteen;
+ * now every clip is a fallback.
  */
 export function adaptClipsForAstro(
   root: THREE.Object3D,
@@ -103,8 +103,41 @@ export function adaptClipsForAstro(
   const own = (root.userData.astroClips as readonly THREE.AnimationClip[] | undefined) ?? [];
   const out = new Map<string, THREE.AnimationClip>();
   for (const c of own) out.set(c.name.toLowerCase(), c);
-  for (const [name, clip] of clips) if (!out.has(name)) out.set(name, clip);
+  for (const [name, clip] of clips) if (!out.has(name)) out.set(name, hipsInMetres(clip));
   return out;
+}
+
+/**
+ * The scientist set (HMAN v1) carries the Mixamo hips in centimetres, about 100 standing, for a rig the old scientist GLB
+ * scaled by 0.01. Astro's procedural rig (JOB-24) is in metres with its hips at ASTRO_HIPS_Y, and since the suit became
+ * code it carries no clips of its own, so every idle, gesture and walk is a fallback from that set: played as they are,
+ * they stood the player's body and the companion's 100 m above their feet (only the companion's name tag, which hangs
+ * off its holder, stayed in view). A hips track in centimetres is scaled by ASTRO_HIPS_Y over the source's 100 cm (the
+ * old rifle scaler's rule, TASK-21). Metre tracks (the rifle set, HMAN v2) are left as they are. The shared clip is never
+ * changed: the scaled copy is made once per clip and shared by every instance.
+ */
+const SOURCE_HIPS_CM = 100;
+/** A hips height above this many units is centimetres (a metre rig's hips stand near 1). */
+const CENTIMETRE_HIPS_ABOVE = 10;
+const metreCopies = new WeakMap<THREE.AnimationClip, THREE.AnimationClip>();
+export function hipsInMetres(clip: THREE.AnimationClip): THREE.AnimationClip {
+  const done = metreCopies.get(clip);
+  if (done) return done;
+  const hips = clip.tracks.find((t) => t.name === 'mixamorigHips.position');
+  let tall = 0;
+  if (hips) for (let i = 1; i < hips.values.length; i += 3) tall = Math.max(tall, Math.abs(hips.values[i]!));
+  if (!hips || tall <= CENTIMETRE_HIPS_ABOVE) {
+    metreCopies.set(clip, clip);
+    return clip;
+  }
+  const copy = clip.clone();
+  const k = ASTRO_HIPS_Y / SOURCE_HIPS_CM;
+  for (const track of copy.tracks) {
+    if (track.name !== 'mixamorigHips.position') continue;
+    for (let i = 0; i < track.values.length; i++) track.values[i] = track.values[i]! * k;
+  }
+  metreCopies.set(clip, copy);
+  return copy;
 }
 
 export interface ThirdPersonLightRig {

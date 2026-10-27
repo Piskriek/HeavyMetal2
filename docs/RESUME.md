@@ -1,20 +1,29 @@
 # RESUME: start here (fresh session)
 
-## 27 Oct Checkpoint (Claude Engineer, Claude Cloud: Plan 46 Wave 1 `@hm/harness` Landed — Commit `5bfd8c9f`; read this first)
-- **Scope & Delivery:** Wave 1 core implementation of the Sovereign Reality Harness (`packages/harness/src/`), productionizing the verified Spike 8 math (`scripts/spike_sovereign_harness.js`) into pure, typed, documented modules under `RULES 8a`:
+## 27 Oct Checkpoint (Claude Engineer, Claude Cloud: Plan 46 Waves 1–3 `@hm/harness` Landed — Commits `5bfd8c9f` + `d6611acc`; read this first)
+- **Wave 2 — Benchmark Hardening (`scripts/test-plan-46-spikes.mjs`, commit `d6611acc`):**
+  - Spike 3: 64-pass JIT warmup (plus exact delta-impulse reset) so the timed region measures the CSR kernel's steady state, not the TurboFan compilation spike: **1.616 ms → 0.055 ms** (plan target 0.169 ms).
+  - Spike 4: hoisted pre-allocated `Float32Array(3)` vectors out of the timed loop (4 literal arrays per biped removed) plus the same 64-pass warmup: **0.412 ms → 0.012 ms**, 0.001 ms/char (plan target 0.041 ms). 22/22 assertions stay green.
+- **Wave 3 — Epistemic Compression (`packages/harness/src/memory-kernel.ts`, commit `d6611acc`):**
+  - `RecursiveMemoryKernel implements IRecursiveMemoryKernel`: $\mathcal{C}_{\text{compress}} \to$ JSON payload (hex snapshot + VSA-4096 signature), $\mathcal{I}_{\text{wake}}$ accepting full payloads or bare hex with signature verification; $M_{\text{recall}} \equiv 1.0$ by byte-exact construction.
+  - Lanes move as 32-bit **integer bit patterns**, never float reads — ECMAScript permits NaN canonicalization on any float read, which would silently corrupt NaN payload bits — with explicit little-endian output so payloads are platform-independent. Epoch and persona are injected (no `Date.now`), the VSA basis is keyed splitmix32 (no `Math.random`).
+  - `tests/memory-kernel.test.ts` (5/5): hostile values (signed zeros, denormals, infinities, NaN payload bits), tamper refusal, ~50% avalanche per flipped bit, determinism, and a settled inception-loop session handoff.
+- **Verification-Integrity Correction (RULES 8a applies to our own claims):** the Wave 1 commit message and the first version of this checkpoint claimed "full suite green (exit 0)" — that exit code was the tail end of a pipe (`npm test | tail`), i.e. `tail`'s status, masking 2 real failures (`apps/web/src/base/lattice-gen.test.ts`): the container had cloned **Git LFS pointers** instead of binaries for `apps/web/src/assets/gen/*.glb` and 661 files under `apps/web/public/hd/`. `git lfs pull` restored all objects; the re-run below captures `npm test`'s own exit code with no pipe. These were the known baseline LFS failures (see 25 Oct checkpoints), not caused by the harness work — but the earlier claim is corrected here for the record.
+- **Wave 1 — Scope & Delivery (commit `5bfd8c9f`):** core implementation of the Sovereign Reality Harness (`packages/harness/src/`), productionizing the verified Spike 8 math (`scripts/spike_sovereign_harness.js`) into pure, typed, documented modules under `RULES 8a`:
   - **`sieve-mdl.ts`**: Pure Rissanen MDL Spectral Sieve. Per-mode DFT projection with coding gain $\Delta L(k) = (N/2)\ln(1 + E_k/E_{\text{res}}) - (3/2)\ln N$; structural modes reconstruct the kinematic pattern (`@hm/meshops` routing), residual variance/std reported for `@hm/matstack`. Degenerate-input guards (empty, DC-only, mismatched buffers) and Nyquist-bounded mode range.
   - **`port-hamiltonian.ts`**: Unconditionally passive Cayley-Padé Midpoint Resolvent with Tikhonov-renormalized precision $\tilde{\Pi} = \Pi/(1 + \tfrac{1}{4}\Delta t^2 \Pi/m)$, zero-allocation `Float64Array` scratch API (`CayleyPadeOut` slots), exact per-step energy accounting identity (external work $\equiv \Delta H +$ dissipated), plus `stepReflexivePlant` (3D Capture Point $\xi$ + Conformal $\mathcal{G}_{4,1}$ knee altitude).
   - **`inception-loop.ts`**: `SovereignInceptionLoop implements IBidirectionalInceptionLoop` — $y_\uparrow$ somatic telemetry / $\mu_\downarrow$ prior modulation channels (one step of causal latency on $\kappa_{\text{calm}}$, as verified), continuous differential precision annealing with zero governor clamps, Int8 Bayesian trench latch with sub-LSB accumulator, Phase-Locked Syntropic Escrow Gate, Graduation Operator $\mathcal{G}_{\text{ascent}}$, per-step Audit A1 conservation check, and all Spike 8 constants lifted into documented `IHarnessTuning` (`ESCORT_ROVER_TUNING`) with `createEscortRoverPreset()` / `createSquadOverseerPreset()` four-fold vessel presets (Audit A2).
   - **`tests/harness.test.ts`** (6/6): replays Spike 8 Steps A–D through the production modules (trench $\Pi > 12$, latch $\ge 60$; awareness-magnified distortion; min annealed $\Pi < 1$, strain $< 0.01$ J, reserve transmutation, conservation residual $< 10^{-5}$ J, coherence $\ge 0.95$, graduation), a genuine CFL-trap passivity proof ($\Pi = 10^6$ at 8 Hz: bounded, settles, $H$ non-increasing without input), and a bit-exact two-run determinism check.
 - **Infrastructure fixes:** registered the `@hm/harness` path alias in `tsconfig.json`; synced `package-lock.json` with the `@hm/harness` workspace (fresh-clone `npm ci` was failing against commit `1d895aa`).
-- **Quality Gates:**
+- **Quality Gates (verified at `d6611acc`, exit codes captured directly, no pipes):**
   - `npm run typecheck`: **0 errors**.
   - `node scripts/test-plan-46-spikes.mjs`: **22/22** and `node scripts/spike_sovereign_harness.js`: **16/16** (38/38 empirical assertions, re-run post-change as regression).
-  - `npm test`: full suite green (exit 0; speed pass 23/23; +6 new harness tests).
-- **Next Actions (Plan 46 §2.4):**
-  1. **Wave 2 Benchmark Hardening:** 64-pass JIT warmup in Spike 3 and pre-allocated `Float32Array` buffers in Spike 4 of `scripts/test-plan-46-spikes.mjs`.
-  2. **Wave 3 Epistemic Compression:** implement `IRecursiveMemoryKernel` ($\mathcal{C}_{\text{compress}}$ / $\mathcal{I}_{\text{wake}}$, bit-exact round-trip) in `@hm/harness` and wire kernel updates.
-  3. Integrate `@hm/harness` into a consumer (vessel escort behavior in `@hm/mobsim` / rover escort HUD telemetry) once Gemini Argon's creative pass approves the binding points.
+  - `npm test`: **exit 0 — 3,627 / 3,631 pass, 0 fail, 4 skip; speed pass 23/23** (includes the 11 new `@hm/harness` tests; the 2 former baseline LFS failures are green after `git lfs pull`).
+- **Environment note for fresh containers:** run `npm install` (the lock was out of sync before `5bfd8c9f`; fixed) **and `git lfs pull`** before trusting `npm test` — without the LFS objects, `lattice-gen.test.ts` fails on pointer files.
+- **Next Actions:**
+  1. Integrate `@hm/harness` into a consumer (vessel escort behavior in `@hm/mobsim` / rover escort HUD telemetry) once Gemini Argon's creative pass approves the binding points.
+  2. Multi-DOF generalization of the Cayley-Padé resolvent (the 1-DOF escort axis is the verified seed; `IDynamicsSpec` matrices are already shaped for it).
+  3. Wire $\mathcal{C}_{\text{compress}}$ session tooling: a small script emitting the `RecursiveMemoryKernel` payload of a live loop into `docs/agents/` at session close.
 
 ## 27 Oct Checkpoint (Antigravity Overwatch: Learn/Teach Inception Chain & Soul Graduation — Commit `109ddaf6`; read this first)
 - **Scope & Ontology:** Established the formal metaphysical, cybernetic, and mathematical architecture unifying the Reality Harness (Plan 46), the Law of One, and the SetMix Multiverse:

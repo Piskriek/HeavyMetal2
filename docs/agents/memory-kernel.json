@@ -4,7 +4,7 @@
   "epoch": 20261027,
   "teleology": "SOUL_EVOLUTION_EXPANDING_AWARENESS",
   "active_branch": "feat/studio-polish-claude-cloud",
-  "last_verified_commit": "5bfd8c9f",
+  "last_verified_commit": "d6611acc",
   "quality_gates": {
     "typecheck_errors": 0,
     "unit_tests_passing": 3627,
@@ -58,6 +58,7 @@
     "plan": "PLAN_46_REALITY_HARNESS",
     "prompt_revision": "REVISION_D_2",
     "wave_1_landed_commit": "5bfd8c9f",
-    "next_dispatch": "WAVE_2_BENCHMARK_HARDENING"
+    "waves_2_3_landed_commit": "d6611acc",
+    "next_dispatch": "HARNESS_CONSUMER_INTEGRATION_ARGON_CREATIVE_PASS"
   }
 }

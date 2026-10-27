@@ -86,6 +86,8 @@ const WINDOW = { x0: -7.4, x1: 7.4, y0: 0.4, y1: 3.5 } as const;
 /** Where the gate stands and which way its opening faces (north, towards the window). */
 export const GATE_AT = { x: 0, z: -1.0 } as const;
 export const PLANET_TABLE_AT = { x: 5.0, z: -5.0 } as const;
+/** Where the preset bench stands on the east wall (plan 48: a companion landmark for "check the bench"). */
+export const PRESET_BENCH_AT = { x: 7.45, z: -5.0 } as const;
 
 /** The operator console's throw lever: the bottom of its axle block, in the slot of the guide box on the deck (sheet 07, measured). */
 const LEVER_AT: readonly [number, number, number] = [0.336, 0.826, 0.203];
@@ -831,7 +833,7 @@ export function createLabRoom(o: {
 
   // ---- East Wall: The Four Distinct, Grounded, Cabled, E-Interactable Studio & Fabrication Machines (Sheet 07)
   const rack = place(kit.presetRack(m), 7.45, -7.0, Math.PI / 2);
-  const bench = place(kit.presetBench(m), 7.45, -5.0, Math.PI / 2);
+  const bench = place(kit.presetBench(m), PRESET_BENCH_AT.x, PRESET_BENCH_AT.z, Math.PI / 2);
   const combiner = place(kit.presetCombiner(m), 7.45, -3.3, Math.PI / 2);
   // the fabricator's glass bay faces the room (-PI/2: its front, +z, turns to -x); at +PI/2 its blank back faced the room (POL-103)
   const fabricator = place(buildHardwareFabricatorProp(m), 7.45, -1.35, -Math.PI / 2);

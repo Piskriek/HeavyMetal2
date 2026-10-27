@@ -4,10 +4,10 @@ import { loadScientistAnimations } from '../avatar/scientist/anims-loader';
 import { loadRifleAnimations } from '../avatar/astro/rifle-clips';
 import { createScientistAnimator, type ScientistAnimator, type OneShotKind } from '../avatar/scientist/animator';
 
-export type CompanionBehaviorState = 'idle' | 'follow' | 'goto' | 'gesture';
+export type CompanionBehaviorState = 'idle' | 'follow' | 'goto' | 'gesture' | 'hover' | 'guard';
 
 export interface CompanionCommand {
-  readonly action: 'follow' | 'goto' | 'say' | 'gesture';
+  readonly action: 'follow' | 'goto' | 'say' | 'gesture' | 'hover-at' | 'hold' | 'ground';
   readonly target?: { readonly x: number; readonly z: number };
   readonly text?: string;
   readonly gesture?: 'wave' | 'cheer' | 'point';
@@ -19,6 +19,8 @@ export interface CompanionState {
   readonly z: number;
   readonly yaw: number;
   readonly state: CompanionBehaviorState;
+  /** True while the companion floats at eye level instead of walking the ground. */
+  readonly hover: boolean;
   readonly speech: string | null;
 }
 
@@ -28,6 +30,14 @@ export interface CompanionEntity {
   say: (text: string, durationSec?: number) => void;
   followPlayer: () => void;
   goto: (x: number, z: number) => void;
+  /** Floats to (x, z) at eye level and faces the player on arrival (owner feedback: "float in front of me"). */
+  hoverAt: (x: number, z: number) => void;
+  /** Floats in place at eye level, facing the player. */
+  hoverHold: () => void;
+  /** Guard stance: stops on the ground where it stands and watches the player. */
+  holdPosition: () => void;
+  /** Cancels hover and settles back onto the ground. */
+  ground: () => void;
   playGesture: (gesture: 'wave' | 'cheer' | 'point') => void;
   executeCommand: (cmd: CompanionCommand) => void;
   step: (
@@ -169,10 +179,13 @@ export async function createCompanionEntity(
 
   // Companion State
   let state: CompanionBehaviorState = 'follow';
+  let hoverMode = false;
   let speechText: string | null = null;
   let speechTimerSec = 0;
   let targetCoord: { x: number; z: number } | null = null;
   let currentYaw = initialPos.yaw;
+  /** Smoothed altitude above the ground: 0 walking, HOVER_ALT_M floating at eye level. */
+  let altitude = 0;
 
   const say = (text: string, durationSec = 5.0): void => {
     speechText = text;
@@ -187,13 +200,38 @@ export async function createCompanionEntity(
 
   const goto = (x: number, z: number): void => {
     state = 'goto';
+    hoverMode = false;
     targetCoord = { x, z };
   };
 
+  const hoverAt = (x: number, z: number): void => {
+    state = 'goto';
+    hoverMode = true;
+    targetCoord = { x, z };
+  };
+
+  const hoverHold = (): void => {
+    state = 'hover';
+    hoverMode = true;
+    targetCoord = null;
+  };
+
+  const holdPosition = (): void => {
+    state = 'guard';
+    hoverMode = false;
+    targetCoord = null;
+  };
+
+  const ground = (): void => {
+    hoverMode = false;
+    if (state === 'hover') state = 'guard';
+  };
+
   const playGesture = (gesture: 'wave' | 'cheer' | 'point'): void => {
+    const resume = state;
     state = 'gesture';
     animator.playOneShot(gesture as OneShotKind, () => {
-      state = 'follow';
+      state = resume === 'gesture' ? 'follow' : resume;
     });
   };
 
@@ -201,6 +239,10 @@ export async function createCompanionEntity(
     if (cmd.text) say(cmd.text);
     if (cmd.action === 'follow') followPlayer();
     else if (cmd.action === 'goto' && cmd.target) goto(cmd.target.x, cmd.target.z);
+    else if (cmd.action === 'hover-at' && cmd.target) hoverAt(cmd.target.x, cmd.target.z);
+    else if (cmd.action === 'hover-at') hoverHold();
+    else if (cmd.action === 'hold') holdPosition();
+    else if (cmd.action === 'ground') ground();
     else if (cmd.action === 'gesture' && cmd.gesture) playGesture(cmd.gesture);
   };
 
@@ -224,7 +266,7 @@ export async function createCompanionEntity(
     let stopDistance = 1.6;
 
     if (state === 'follow') {
-      // Formation: shadow player at 3.0m on right shoulder
+      // Formation: shadow player at the right shoulder (player forward = (-sin yaw, -cos yaw))
       const rightX = Math.cos(player.yaw);
       const rightZ = -Math.sin(player.yaw);
       const forwardX = -Math.sin(player.yaw);
@@ -237,7 +279,7 @@ export async function createCompanionEntity(
     } else if (state === 'goto' && targetCoord) {
       destX = targetCoord.x;
       destZ = targetCoord.z;
-      stopDistance = 0.5;
+      stopDistance = hoverMode ? 0.25 : 0.5;
     }
 
     const dx = destX - holder.position.x;
@@ -246,8 +288,14 @@ export async function createCompanionEntity(
 
     let forwardInput = 0;
     let run = false;
+    const facePlayer = (rate: number): void => {
+      const toPlayerYaw = Math.atan2(player.x - holder.position.x, player.z - holder.position.z);
+      const yawDiff = Math.atan2(Math.sin(toPlayerYaw - currentYaw), Math.cos(toPlayerYaw - currentYaw));
+      currentYaw += yawDiff * Math.min(1.0, dt * rate);
+      holder.rotation.y = currentYaw;
+    };
 
-    if (dist > stopDistance) {
+    if ((state === 'follow' || state === 'goto') && dist > stopDistance) {
       // Move towards destination
       const targetYaw = Math.atan2(dx, dz);
       // Smooth yaw slew
@@ -255,8 +303,13 @@ export async function createCompanionEntity(
       currentYaw += yawDiff * Math.min(1.0, dt * 7.0);
       holder.rotation.y = currentYaw;
 
-      // Speed selection
-      if (dist > 5.5) {
+      if (hoverMode) {
+        // A smooth airborne glide straight at the mark (the walker's yaw-coupled step would
+        // orbit the target at the speed/slew equilibrium); the yaw slew above is looks only.
+        const step = Math.min(Math.min(4.2, 1.2 + dist * 1.6) * dt, dist);
+        holder.position.x += (dx / dist) * step;
+        holder.position.z += (dz / dist) * step;
+      } else if (dist > 5.5) {
         run = true;
         forwardInput = 1.0;
         const speed = 5.2 * dt;
@@ -270,20 +323,27 @@ export async function createCompanionEntity(
         holder.position.z += Math.cos(currentYaw) * speed;
       }
     } else {
-      // Stopped: face the player if following
+      // Stopped
       if (state === 'follow') {
-        const toPlayerYaw = Math.atan2(player.x - holder.position.x, player.z - holder.position.z);
-        const yawDiff = Math.atan2(Math.sin(toPlayerYaw - currentYaw), Math.cos(toPlayerYaw - currentYaw));
-        currentYaw += yawDiff * Math.min(1.0, dt * 4.0);
-        holder.rotation.y = currentYaw;
+        facePlayer(4.0);
       } else if (state === 'goto') {
-        state = 'idle';
+        // Arrived: a hover order ends floating in place facing the player; a walk order stands down
+        state = hoverMode ? 'hover' : 'idle';
+      } else if (state === 'hover') {
+        facePlayer(5.0);
+      } else if (state === 'guard') {
+        // Guard stance: watch the player while they stay within earshot
+        if (Math.hypot(player.x - holder.position.x, player.z - holder.position.z) < 9.0) facePlayer(3.0);
       }
     }
 
-    // 3. Ground height clamp
+    // 3. Altitude: glide between the ground and eye level (owner feedback: float at ~+1.4 m)
+    const HOVER_ALT_M = 1.4;
+    const altTarget = hoverMode ? HOVER_ALT_M : 0;
+    altitude += (altTarget - altitude) * Math.min(1.0, dt * 4.5);
+    if (Math.abs(altitude - altTarget) < 0.01) altitude = altTarget;
     const groundY = floorHeight(holder.position.x, holder.position.z);
-    holder.position.y = groundY;
+    holder.position.y = groundY + altitude;
 
     // 4. Step animation mixer
     animator.update(dt, {
@@ -299,6 +359,7 @@ export async function createCompanionEntity(
     z: holder.position.z,
     yaw: currentYaw,
     state,
+    hover: hoverMode,
     speech: speechText,
   });
 
@@ -314,6 +375,10 @@ export async function createCompanionEntity(
     say,
     followPlayer,
     goto,
+    hoverAt,
+    hoverHold,
+    holdPosition,
+    ground,
     playGesture,
     executeCommand,
     step,

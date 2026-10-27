@@ -170,7 +170,7 @@ import { CreditsDirector, OldMonitorJukeboxModal, isMonitorOverclockedPlaying, p
 import { CreditsPlayer } from '../credits/credits-player';
 import { HaddyCrtPortrait } from '../shell/haddy-crt-portrait';
 import { evaluateContinentalConsensus, evaluateFinaleWindowHeal } from './planet-table-hologram';
-import { stationById } from './lab-room';
+import { GATE_AT, PRESET_BENCH_AT, stationById } from './lab-room';
 import { PlanetaryGridScreen } from '../shell/planetary-grid';
 import { loadRecentCodes, rememberRecentCode } from '../storage/recent-codes';
 import { GATE_ACCESS_MODES, isGateAccessMode } from '../base/world';
@@ -4238,7 +4238,9 @@ useEffect(() => {
         if (!e.repeat) startRemoveHold();
         return;
       }
-      if (e.code === 'KeyT') {
+      // Plan 48 (owner feedback): T is the companion's hold-to-talk radio now, so the
+      // structural-integrity overlay moved to I. CompanionChat owns the T listener.
+      if (e.code === 'KeyI') {
         const vs = baseViewSource as WorldViewSource;
         const cur = vs.get?.()?.build?.integrity ?? false;
         const next = !cur;
@@ -5020,11 +5022,33 @@ useEffect(() => {
               <DrivingHudBadge telemetry={drivingDrift} />
             </HudZone>
           ) : null}
-          {/* Plan 48: In-game AI Companion Comms */}
+          {/* Plan 48: In-game AI Companion Comms (hold T to talk, Enter to type) */}
           <CompanionChat
             companion={sceneRef.current?.getCompanion?.() ?? null}
             onBroadcastRadio={(text) => {
               say('Overwatch · Co-Builder', text);
+            }}
+            getContext={() => {
+              const scene = sceneRef.current;
+              const p = scene?.debug.position();
+              const player = { x: p?.x ?? 0, z: p?.z ?? 0, yaw: scene?.debug.facing() ?? 0 };
+              const inLab = liveWhereRef.current === 'lab';
+              const gatePlanet = !inLab ? scene?.debug.gatePlanet() : null;
+              // the nearest vehicle on the plot is "the rover"
+              let rover: { x: number; z: number } | undefined;
+              let best = Infinity;
+              for (const v of baseWorldRef.current.vehicles) {
+                const d = Math.hypot(v.x - player.x, v.z - player.z);
+                if (d < best) { best = d; rover = { x: v.x, z: v.z }; }
+              }
+              return {
+                player,
+                landmarks: {
+                  gate: inLab ? { x: GATE_AT.x, z: GATE_AT.z } : gatePlanet ? { x: gatePlanet.x, z: gatePlanet.z } : undefined,
+                  ...(rover && !inLab ? { rover } : {}),
+                  ...(inLab ? { bench: { x: PRESET_BENCH_AT.x, z: PRESET_BENCH_AT.z } } : {}),
+                },
+              };
             }}
           />
           {(state.step === 'build' || state.step === 'drill' || state.step === 'done' || visiting) && drivingSpeed === null ? (

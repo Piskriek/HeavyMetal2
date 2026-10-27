@@ -221,3 +221,56 @@
 .companion-send-btn:hover {
   background: #cd70ff;
 }
+
+/* Plan 48 rework: the push-to-talk TX pill — the ONLY thing on screen while T is held. */
+.companion-tx-pill {
+  position: fixed;
+  right: 24px;
+  bottom: 178px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(10, 14, 22, 0.88);
+  border: 1px solid rgba(184, 77, 255, 0.65);
+  color: #e0aaff;
+  font-family: var(--hud-font-display, 'Oxanium', monospace);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+  box-shadow: 0 0 14px rgba(184, 77, 255, 0.35);
+  animation: companion-tx-pulse 1.1s ease-in-out infinite;
+}
+.companion-tx-mic {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ff3d8a;
+  box-shadow: 0 0 8px #ff3d8a;
+}
+@keyframes companion-tx-pulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(184, 77, 255, 0.25); }
+  50% { box-shadow: 0 0 20px rgba(184, 77, 255, 0.65); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .companion-tx-pill { animation: none; }
+}
+
+/* The Neural Bridge badge in the panel header: violet when an outside AI is linked. */
+.companion-bridge-badge {
+  margin-left: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-style: normal;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: #9aa7b8;
+  border: 1px solid rgba(154, 167, 184, 0.4);
+}
+.companion-bridge-badge.linked {
+  color: #e0aaff;
+  border-color: rgba(184, 77, 255, 0.7);
+  box-shadow: 0 0 8px rgba(184, 77, 255, 0.35);
+}

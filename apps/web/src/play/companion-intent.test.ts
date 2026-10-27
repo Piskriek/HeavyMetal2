@@ -1,0 +1,64 @@
+// Plan 48 owner feedback: the companion's spatial understanding is parsed and resolved by pure
+// functions, so the exact phrases Piskriek used in the live game are pinned here.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { parseCompanionIntent, resolveCompanionOrder, type CompanionPlayerPose } from './companion-intent';
+
+const close = (a: number, b: number, eps = 1e-9): boolean => Math.abs(a - b) < eps;
+
+test('the owner\'s live phrases parse to the right intents', () => {
+  assert.equal(parseCompanionIntent('float in front of me').kind, 'hover-front');
+  assert.equal(parseCompanionIntent('Hover here').kind, 'hover-here');
+  assert.equal(parseCompanionIntent('could you levitate ahead of me please').kind, 'hover-front');
+  assert.equal(parseCompanionIntent('come here').kind, 'come-front');
+  assert.equal(parseCompanionIntent('in front of me').kind, 'come-front');
+  assert.equal(parseCompanionIntent('on my right flank').kind, 'flank-right');
+  assert.equal(parseCompanionIntent('take my left side').kind, 'flank-left');
+  assert.equal(parseCompanionIntent('stay here').kind, 'hold');
+  assert.equal(parseCompanionIntent('hold position').kind, 'hold');
+  assert.equal(parseCompanionIntent("don't move").kind, 'hold');
+  assert.equal(parseCompanionIntent('follow me').kind, 'follow');
+  assert.equal(parseCompanionIntent('back in formation').kind, 'follow');
+  assert.equal(parseCompanionIntent('land now').kind, 'ground');
+  assert.deepEqual(parseCompanionIntent('go to the gate'), { kind: 'landmark', name: 'gate' });
+  assert.deepEqual(parseCompanionIntent('head over to the stargate'), { kind: 'landmark', name: 'gate' });
+  assert.deepEqual(parseCompanionIntent('go to the rover'), { kind: 'landmark', name: 'rover' });
+  assert.deepEqual(parseCompanionIntent('check the bench'), { kind: 'landmark', name: 'bench' });
+  assert.equal(parseCompanionIntent('status report').kind, 'status');
+  assert.deepEqual(parseCompanionIntent('hello there'), { kind: 'gesture', gesture: 'wave' });
+  assert.deepEqual(parseCompanionIntent('great work out here'), { kind: 'gesture', gesture: 'cheer' });
+  assert.equal(parseCompanionIntent('what do you think of the sunset').kind, 'chat');
+  assert.equal(parseCompanionIntent('').kind, 'chat');
+});
+
+test('hover-front resolves 2.2 m along the player facing, hover on, with spatial confirmation', () => {
+  // facing convention: forward = (-sin yaw, -cos yaw); yaw 0 faces -z
+  const p: CompanionPlayerPose = { x: 10, z: -4, yaw: 0 };
+  const o = resolveCompanionOrder(parseCompanionIntent('float in front of me'), p);
+  assert.ok(o.hover);
+  assert.ok(o.target && close(o.target.x, 10) && close(o.target.z, -6.2), JSON.stringify(o.target));
+  assert.match(o.reply, /Hovering 2\.2 meters ahead at eye level/);
+
+  const turned: CompanionPlayerPose = { x: 0, z: 0, yaw: Math.PI / 2 }; // forward = (-1, 0)
+  const o2 = resolveCompanionOrder({ kind: 'hover-front' }, turned);
+  assert.ok(o2.target && close(o2.target.x, -2.2) && close(o2.target.z, 0, 1e-9), JSON.stringify(o2.target));
+});
+
+test('flanks resolve 2.5 m out and 1.5 m back of the live pose', () => {
+  const p: CompanionPlayerPose = { x: 0, z: 0, yaw: 0 }; // fwd (0,-1), right (1,0)
+  const r = resolveCompanionOrder({ kind: 'flank-right' }, p);
+  assert.ok(r.target && close(r.target.x, 2.5) && close(r.target.z, 1.5), JSON.stringify(r.target));
+  const l = resolveCompanionOrder({ kind: 'flank-left' }, p);
+  assert.ok(l.target && close(l.target.x, -2.5) && close(l.target.z, 1.5), JSON.stringify(l.target));
+});
+
+test('hold stops, follow resumes, landmarks use real coordinates and refuse unknown ones', () => {
+  const p: CompanionPlayerPose = { x: 0, z: 0, yaw: 1.3 };
+  assert.ok(resolveCompanionOrder({ kind: 'hold' }, p).hold);
+  assert.ok(resolveCompanionOrder({ kind: 'follow' }, p).follow);
+  const withGate = resolveCompanionOrder({ kind: 'landmark', name: 'gate' }, p, { gate: { x: 40, z: -7 } });
+  assert.deepEqual(withGate.target, { x: 40, z: -7 });
+  const noRover = resolveCompanionOrder({ kind: 'landmark', name: 'rover' }, p, {});
+  assert.equal(noRover.target, null);
+  assert.match(noRover.reply, /don't have coordinates/);
+});

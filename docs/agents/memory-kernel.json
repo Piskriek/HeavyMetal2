@@ -65,6 +65,7 @@
     "plan_47_live_wiring_commit": "36d21c03",
     "plan_47_closed_commit": "d56414ae",
     "plan_48_wave_1_landed": true,
-    "next_dispatch": "PLAN_48_LIVE_COMPANION_TESTING"
+    "plan_48_rework_landed_commit": "3815d11d",
+    "next_dispatch": "PLAN_48_ATTACH_LIVE_AGENT_TO_BRIDGE"
   }
 }

@@ -263,6 +263,23 @@ try {
   check('it calls out the contact', contact, contact ? '' : JSON.stringify((await getJson('/events?after=0')).events.filter((e) => e.type === 'companion-say').slice(-6).map((e) => e.text.slice(0, 80))));
   await shot('03-drone-fights-on-the-moon');
 
+  // --- 6. Plan 56 W6a: the fight became the drone's memory; leaving the Moon is its dream, told on waking ---
+  // the kill comes after the contact callout: wait for the brute to go down
+  const fireCats = await until(async () => {
+    const cats = await page.evaluate(() => window.__dev.droneMemory().presets.fire.ep.map((e) => e.cat));
+    return cats.includes('CONTACT') && cats.includes('TARGET_DOWN') ? cats : null;
+  }, 15000);
+  check('the fight became the drone\'s experience: the contact and the kill are in its fire preset', Boolean(fireCats), JSON.stringify(fireCats ?? await page.evaluate(() => window.__dev.droneMemory().presets.fire.ep.map((e) => e.cat))));
+  const dreamsBefore = (await getJson('/events?after=0')).events.filter((e) => e.type === 'ego-dream').length;
+  await page.evaluate(() => window.__playScene.debug.teleport('lab', 0, 2.4, 0, 0));
+  await frames(10);
+  const dreamt = await until(async () => (await getJson('/events?after=0')).events.filter((e) => e.type === 'ego-dream').slice(dreamsBefore)[0], 6000);
+  check('back in the lab the drone dreams: the bridge gets the digest, and it tells the dream on the radio', Boolean(dreamt) && Array.isArray(dreamt.digest?.replayed) && dreamt.digest.replayed.length > 0
+    && Boolean(await until(() => said(/^I dreamed the (contact|target down|area clear|hits on you|reflex) again/), 4000)), JSON.stringify(dreamt ?? null).slice(0, 200));
+  // the game's storage keys are per profile (hm.p.<id>.<key>)
+  const saved = await page.evaluate(() => { try { const k = Object.keys(localStorage).find((x) => x.endsWith('hm.drone.memory.v1')); return k ? JSON.parse(localStorage.getItem(k) ?? 'null')?.v ?? null : null; } catch { return 'unreadable'; } });
+  check('...and its memory is saved as share codes', saved === 1, String(saved));
+
   check('no page errors during the run', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 } catch (e) {
   check('script completed', false, e.message);

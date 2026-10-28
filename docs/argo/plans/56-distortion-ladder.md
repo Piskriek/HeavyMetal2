@@ -423,3 +423,83 @@ What each step does:
     - adopted and ready presets graduate; ready ones wait;
     - balanced but still-learning presets are not counted against;
     - unbalanced for 4 weeks means repeat (`repeatCurriculum`: every memory kept).
+
+## 16. W6, the wiring into play (planned 28 Oct; owner: "Commit, then W6")
+| Part | What | Done when |
+|---|---|---|
+| W6a | **Built 28 Oct.** **The drone's memory host** (`apps/web/src/play/drone-memory.ts`, pure, plus thin hooks in `play.tsx` and `play-scene.ts`). Detailed below. | A drone e2e check: after a Moon fight the fire preset holds episodes; back in the lab the drone tells its dream and the bridge gets `ego-dream`. |
+| W6b | **The Higher Self seat on the bridge.** Detailed below. | A bridge e2e check: a cue from the seat opens a hardened preset in the next dream. |
+| W6c | **Symptoms you can see:** `symptomOffset` jitters the drone's fire rhythm by its fire preset's unbalanced charge. | A stuttering rhythm while distorted, steady once balanced. |
+| W6d | **The Studio's memory view** (the frontend-design skill first). Detailed below. | A screenshot, and the agent API (Plan 40) can read the same view. |
+| W6e | **The player as wanderer:** the player's character as an anchor (`wan.from = 'player'`), its balance read from steady play. Its calm reaches the drone's presets at each catalyst. | Steady play calms the drone's hardening; panic-spraying does not. |
+| W6f | **The weekly round on a server:** `weeklyAdoption` and `harvestWeek` run in a server-authoritative room; plots as rooms are the gates. Candidate host: RUN.world multiplayer (§17). It needs the owner's yes and research. | One slot's week closes on the server with a real tally. |
+
+**W6a in detail:**
+- **The drone's ego and its three presets:** fire rhythm (`mot`), reflexes (`logic`), flight (`loc`).
+- **They record real catalysts:**
+  - a contact (excitement by distance);
+  - a target down (a good outcome);
+  - the area clear;
+  - hits on the player, where flight failed to cover: felt as root-reactivity when hard;
+  - each reflex the bridge fires.
+  - `by` is always the ego's own dominant thinking.
+- **A dream runs when the player leaves the Moon** (the `to-lab` event, an offline checkpoint) with the built-in cue. The wake line goes on the radio, and the bridge gets an `ego-dream` event with the digest.
+- **The memory is saved as share codes** (`hm.drone.memory.v1`).
+
+**W6b in detail:**
+- `ego-perspective` events carry the digest lines.
+- A `higher-self-cue` command (episode cues) and a `higher-self-say` command reach the drone.
+- The drone voices the Higher Self's reading. The seat never writes memory.
+
+**W6d in detail:**
+- a preset's memory beside its live preview: its rays and their charge, its kundalini level, its pole, its episodes and cause links;
+- the dream digest;
+- the pack's triads and alignment.
+
+**W6a as built:**
+- `apps/web/src/play/drone-memory.ts`: `createDroneMemory`, `noteCatalyst`, `dreamNow`, and `saveDroneMemory` / `loadDroneMemory` (share codes). 3/3 tests.
+- `play-scene.ts` hands over the drone's combat events (`drainCombatEvents`).
+- `play.tsx`:
+  - hits on the player go to flight; the scene's events go to fire and flight; fired reflexes go to the reflex preset;
+  - ticks are seconds, so memories keep their order across sessions;
+  - leaving the Moon (the gate or sync lost) dreams, saves (`hm.drone.memory.v1`), says the wake line and posts `ego-dream` to the bridge;
+  - `__dev.droneMemory()` is the test seam.
+- The drone e2e checks it: 46/46, including the fight in the fire preset, the dream on the bridge and the radio, and the save.
+- **Found on the way:** with two tabs open, a profile posted with no addressee went to whichever tab polled first, and the tab without that game dropped it. The gamebridge e2e had been passing by luck. The bridge now routes a `bridge-profile` to the tab that bridged its game (`sessionClients`). Gamebridge e2e 33/33.
+
+## 17. Hosting the weekly round and the gates on RUN.world (owner, 28 Oct: "wire putting it on run.world, will that work?")
+**What RUN's multiplayer offers** (the `rundot-multiplayer` skill; the feature is in beta):
+- **Server-authoritative rooms** (`GameRoom`): the server owns the state and validates every client message.
+- **Persistence:** `getPersistState` / `onRestore`, `autoPersist`.
+- **Singleton rooms:** one shared room, no matchmaking.
+- **Timers:** `this.clock` timers survive a crash. `getServerTime()` is available.
+- **Identity:** stable player ids (usernames are display only).
+- **Room codes:** 6-character codes to join by.
+- **Server services:** notifications, leaderboard, UGC, game config, simulation.
+
+**How the plan maps onto it:**
+- **The weekly round:** a singleton `harvest` room runs `weeklyAdoption` and `harvestWeek` unchanged.
+  - They are pure and deterministic, so any client can check the server's result.
+  - The week boundary comes from server time. The room closes a week lazily, on the first message after the boundary, so no scheduled job is needed.
+- **One count per player:** by player id. The room keeps each player's slot use for the week, the last report counting, and broadcasts no tally until the week closes (the TF2 lesson).
+- **The defaults and the submissions:** the game-config service could hold each week's defaults, and the UGC service the submitted presets as share codes. To verify in the SDK.
+- **The gates and astral travel:**
+  - each plot is a persisted room joined by its code (the gate);
+  - `gateAccess` maps onto lock, unlock and reject;
+  - the host room accepts no writes from visitors, so travel is read only by the server's authority.
+  - Visiting a plot whose owner is offline needs persisted rooms that restore on join. To verify.
+
+**What fits the rules:**
+- The client stays a single-file bundle; the room code runs on RUN's servers.
+- The simulation stays pure: the rooms import `@hm/harness`.
+- AIs never vote; only player ids count.
+- The Neural Bridge stays loopback-only: this is the players' network, not a gateway for outside AIs (Plan 55's question stays separate).
+
+**Open:**
+- The feature is in beta.
+- The skill documents no scheduled jobs, hence the lazy close.
+- Cross-room shared persistence, and how well RUN accounts resist fake identities, are not documented. Verify both before building.
+- **The empty lobby:** a quorum of 10 may stall the defaults while players are few. Start with a smaller quorum, or a curated seed default.
+- **Use is reported by clients,** and a modified client could lie. Count first what rooms see during the sessions they host.
+
+**Verdict:** it should work for the weekly round and the gates. The smallest slice comes first: one singleton harvest room for one slot, tested with a short "week". It needs the owner's yes, as a server piece that spends credits.

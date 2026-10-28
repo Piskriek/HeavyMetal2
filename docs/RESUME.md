@@ -60,7 +60,10 @@
     - wanderers: they descend veiled and limited, calm others while balanced, lend their cue, and find it easier the second time;
     - astral travel: read only, open gates only, to hosts that resonate;
     - the weekly majority adoption, and harvest day.
-    - W6 (the wiring into play, the bridge's Higher Self seat, the Studio's memory view) is next. The real weekly round needs a server (the Plan 55 gateway question). Owner question: "repeat" instead of "perish".
+    - W5 was pushed as 37246cfe.
+    - **W6a is built** (Plan 56 §16): the drone's memory host. Its fights, hits on the player and reflexes become the memory of its ego and three presets; leaving the Moon dreams, says the wake line, posts ego-dream and saves. Drone e2e 46/46.
+    - Next: W6b to W6e (the Higher Self seat, symptoms, the Studio memory view, the player as anchor).
+    - W6f, the weekly round, has a feasibility note: Plan 56 §17, RUN.world multiplayer. Yes, as the smallest slice: one singleton harvest room. It needs the owner's yes. Owner question: "repeat" instead of "perish".
 - **Skill:** the owner's SQ distortion check is installed locally at `.claude/skills/sq-distortion-check`.
 
 ## 28 Oct Checkpoint 2 (Claude Opus: Plan 51 Wave 3 + Plan 52, Commit `8600a81b`; read this first)

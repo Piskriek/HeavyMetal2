@@ -255,7 +255,9 @@ try {
   await until(() => said(/^SomeIndie: limited/), 8000);
   await order('relay my input');
   const consent = a.locator('[data-testid="relay-consent"]');
-  check('a game guarded by an anti-cheat gets no relay: the drone says why and offers playing it beside FIDELITY', Boolean(await until(() => said(/^SomeIndie runs TestGuard, so nothing is sent into it, whatever is ticked\. Play SomeIndie with your own hands/), 5000)) && (await consent.count()) === 0);
+  const refusedSaid = Boolean(await until(() => said(/^SomeIndie runs TestGuard, so nothing is sent into it, whatever is ticked\. Play SomeIndie with your own hands/), 5000));
+  check('a game guarded by an anti-cheat gets no relay: the drone says why and offers playing it beside FIDELITY', refusedSaid && (await consent.count()) === 0,
+    JSON.stringify({ refusedSaid, consent: await consent.count(), last: (await events('companion-say')).slice(-4).map((e) => e.text.slice(0, 90)) }));
   const guarded = await fetch(`${bridge}/input-relay/arm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gameId: 'cs2', ticked: true, typed: 'RELAY', transport: 'synthetic-keys', process: 'cs2.exe' }) });
   check('...and the bridge itself refuses CS2 even with the box and the word', guarded.status === 400 && /guarded by an anti-cheat/.test((await guarded.json()).error ?? ''));
   // then the same game with no anti-cheat, whose profile allows input: the player's choice

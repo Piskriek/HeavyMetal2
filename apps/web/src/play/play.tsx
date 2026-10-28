@@ -104,6 +104,7 @@ import { LOW_BARK_COOLDOWN, PLAYER_MAX_HP, hitBearing, hurt as hurtHp, isLow, pa
 import { usePlaySettings } from '../shell/play-settings';
 import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { kv } from '../storage/profile-storage';
+import { createDroneMemory, dreamNow, loadDroneMemory, noteCatalyst, saveDroneMemory, type DroneCatalyst, type DroneMemory } from './drone-memory';
 import { isMechanicObservation, transduceMechanic, type MimicryResult } from '@hm/harness';
 import { gateObservation, mirrorKeyEdges, weaponStandIn, type BridgePermissionProfile } from '@hm/gamebridge';
 import { createReflexSlot, type ReflexAction, type ReflexSlot } from './mimic-reflex';
@@ -114,6 +115,8 @@ import { activeLocomotion, customLocomotion, setCustomLocomotion } from './locom
 const MIMIC_SHELF_KEY = 'hm.setmix.mimics';
 /** Plan 51 wave 3: the share of a hit that gets through the reflex shield. */
 const SHIELD_PASS = 0.2;
+/** Plan 56 W6a: where the drone's memory (its ego and presets, as share codes) is saved. */
+const DRONE_MEMORY_KEY = 'hm.drone.memory.v1';
 /** Plan 53 §2.6: the `key` of each mirrored key event (by its code), for handlers that read `key` rather than `code`. */
 const MIRROR_KEY_NAMES: Readonly<Record<string, string>> = {
   KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd', Space: ' ', ControlLeft: 'Control', ShiftLeft: 'Shift', KeyR: 'r', KeyE: 'e',
@@ -1793,6 +1796,29 @@ useEffect(() => {
   // bridged game's window does not pause, since the player is playing here through that game's keys
   const mirrorMaskRef = useRef(0);
   const mirrorOnRef = useRef(false);
+  // Plan 56 W6a: the drone's memory (its ego and the presets it lives by). Play becomes its experience, leaving the Moon is
+  // its dream, and it is saved as share codes. Ticks are seconds, so its memories keep their order across sessions.
+  const droneMemoryRef = useRef<DroneMemory | null>(null);
+  const droneStageRef = useRef(0);
+  const droneMemory = (): DroneMemory => {
+    if (!droneMemoryRef.current) {
+      let saved: string | null = null;
+      try { saved = kv.get(DRONE_MEMORY_KEY); } catch { /* storage unavailable: a fresh memory */ }
+      droneMemoryRef.current = loadDroneMemory(saved) ?? createDroneMemory();
+    }
+    return droneMemoryRef.current;
+  };
+  const noteDrone = (c: DroneCatalyst): void => {
+    droneMemoryRef.current = noteCatalyst(droneMemory(), c, Math.floor(Date.now() / 1000), droneStageRef.current);
+  };
+  /** Leaving the Moon (the gate, or sync lost): the drone dreams, saves, and tells its dream on waking; the bridge gets it too. */
+  const droneDreams = (): void => {
+    const d = dreamNow(droneMemory(), Math.floor(Date.now() / 1000));
+    droneMemoryRef.current = d.memory;
+    try { kv.set(DRONE_MEMORY_KEY, saveDroneMemory(d.memory)); } catch { /* storage unavailable: kept for this session */ }
+    companionHandleRef.current?.say(d.line);
+    companionHandleRef.current?.post({ type: 'ego-dream', line: d.line, digest: d.memory.lastDream });
+  };
   // Plan 53: the player's own presses for the input relay (fire, use, jump, reload). The comms send them on only while the
   // relay the player chose (a box ticked, RELAY typed) is on; nothing here originates a press.
   useEffect(() => {
@@ -2039,6 +2065,8 @@ useEffect(() => {
     // plan 53: on the stage, the bridged game's own outcome and threat edges (a new round, a wave) bring a new set of
     // FIDELITY stand-ins for its opponents
     if (stageRef.current && actions.some((a) => a.kind === 'arc-chain' || a.kind === 'pulse-shield') && topUpStandIns()) done.push('stand-ins');
+    // plan 56 W6a: a reflex that fired is the reflex preset's experience
+    if (done.length) noteDrone({ kind: 'reflex' });
     return done;
   };
   // ---- Plan 53: the bridge stage (a bare "bridge" order): the pad on an empty stretch of the Moon, the bridged game's
@@ -2790,6 +2818,8 @@ useEffect(() => {
       },
       onHitPlayer: (damage, bearing, mob) => {
         takeHit(damage, bearing);
+        // plan 56 W6a: a hit on the player is the drone's flight failing to cover
+        noteDrone({ kind: 'hurt', damage });
         // plan 50: the one that hurt the player counts double in the drone's threat score for a few seconds
         if (mob) sceneRef.current?.noteCompanionHurtBy(mob.id);
       },
@@ -3913,6 +3943,9 @@ useEffect(() => {
         : { move: { x: 0, z: 0 }, look: { dx: 0, dy: 0 }, run: false });
       // plan 50: the drone's barks (contact, target down, area clear) go out on the radio, one per 8 s at most
       for (const line of scene.drainCompanionBarks()) companionHandleRef.current?.say(line);
+      // plan 56 W6a: the drone's fights become its memory
+      droneStageRef.current = out.stage;
+      for (const e of scene.drainCombatEvents()) noteDrone(e.kind === 'contact' ? { kind: 'contact', distance: e.distance } : { kind: e.kind });
       // plan 50: the eyes read the frame just drawn (the drawing buffer is not preserved past this task)
       if (eyesRequestRef.current) {
         const take = eyesRequestRef.current;
@@ -4028,9 +4061,11 @@ useEffect(() => {
       if (out.event === 'to-lab') {
         s = returned(s);
         if (visitingRef.current) endVisit();
+        droneDreams();
       }
       if (out.event === 'sync-lost') {
         s = returned(s);
+        droneDreams();
         say('Sync lost', 'The gate pulled you back. Your sync refills in the lab.');
         // the zero-loss recall (TASK-26 / POL-57): Argo's line as a subtitle only, plus trigger for narrator
         narratorRef.current?.trigger('sync:recall');
@@ -5313,6 +5348,8 @@ useEffect(() => {
       return true;
     };
     const dev = {
+      /** Plan 56 W6a test seam: the drone's memory (its ego, presets, preferences and last dream). */
+      droneMemory: (): DroneMemory => droneMemory(),
       /**
        * A test seam (debug switch only): a written preset cartridge goes on the lab rack, so the X radial in Apply has one to
        * offer. Players never reach it (window.__dev exists only in dev builds and under ?e2e).

@@ -659,6 +659,10 @@ function dispatchCommand(cmd) {
       fs.writeFileSync(PROFILES_FILE, `${JSON.stringify(profiles, null, 2)}\n`);
     } catch { /* the in-memory copy still serves */ }
   }
+  // a game's profile goes to the tab that bridged that game: with two tabs open, the other one would drop it
+  if (cmd.action === 'bridge-profile' && !cmd.to && isRecord(cmd.profile) && typeof cmd.profile.gameId === 'string' && sessionClients[cmd.profile.gameId]) {
+    cmd = { ...cmd, to: sessionClients[cmd.profile.gameId] };
+  }
   pendingCommands.push(cmd);
   pushEvent({ type: 'command', cmd });
   console.log(`\x1b[35m[COMPANION BRIDGE]\x1b[0m Queued command:`, cmd);

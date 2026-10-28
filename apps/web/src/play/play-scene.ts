@@ -448,6 +448,8 @@ export interface PlayScene {
   noteCompanionHurtBy(mobId: number): void;
   /** Plan 50: the drone's barks since the last call (contact, target down, area clear), for the radio. */
   drainCompanionBarks(): string[];
+  /** Plan 56 W6a: the drone's combat events since the last call (contact, target down, area clear), for its memory. */
+  drainCombatEvents(): import('./companion-combat').CombatEvent[];
   /** Plan 51: retunes the drone's combat brain (a mimicked fire pattern's bursts); null restores the research's numbers. */
   setCompanionTuning(patch: Partial<CombatTuning> | null): void;
   /** The drone's fire rhythm now (a live mimic changes it). */
@@ -3070,6 +3072,8 @@ export function createPlayScene(o: {
   };
   let companionHurtBy: { id: number; at: number } | null = null;
   const companionBarks: string[] = [];
+  /** Plan 56 W6a: the drone's combat events waiting for its memory (the newest 32). */
+  const combatEvents: import('./companion-combat').CombatEvent[] = [];
   /** The living monsters as the brain sees them (aimed at their middle, winding up when they telegraph). */
   const combatMobs = (): CombatMob[] =>
     where !== 'planet' || !playerAlive
@@ -3117,6 +3121,7 @@ export function createPlayScene(o: {
       comp.showShot(tick.shot.at, tick.shot.hit);
     }
     if (tick.bark) companionBarks.push(barkLine(tick.bark));
+    for (const e of tick.events) { combatEvents.push(e); if (combatEvents.length > 32) combatEvents.shift(); }
   };
   /** Everything of one category the drone can find in the world the player is in (plan 50 §3). */
   const pointsOfInterest = (category: ScoutCategory): PointOfInterest[] => {
@@ -5211,6 +5216,9 @@ export function createPlayScene(o: {
     companionOverclock(seconds) { overclockS = seconds <= 0 ? 0 : Math.max(overclockS, Math.min(15, seconds)); },
     companionOverclockLeft: () => overclockS,
     companionArc,
+    drainCombatEvents() {
+      return combatEvents.splice(0, combatEvents.length);
+    },
     drainCompanionBarks() {
       return companionBarks.splice(0, companionBarks.length);
     },

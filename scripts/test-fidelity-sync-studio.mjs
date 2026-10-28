@@ -4,208 +4,93 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Automated Playwright validation for FIDELITY Main Menu, Dedicated Studio, and Synced/Desynced Campaign:
- * - Serves apps/web/dist on port 8198
- * - Checks main menu branding and buttons
- * - Clicks 'The Studio', verifies StudioScreen with Moon Base Game Editor (3D canvas, stage scrub, diff export)
- * - Tests Planet Forge tab (planet presets, atmospheric hue/rings, activity game rules, multiverse publishing)
- * - Returns to main menu
- * - Tests Synced Planetary Grid campaign launch and live Desync toggle
+ * The FIDELITY home, the Studio, and the Planetary Grid's synced and desynced play (rewritten 28 Oct, Plan 57 §14.2):
+ * - the home: the FIDELITY brand and its menu, the grid room ready behind it;
+ * - the Studio: the menu opens the Studio app, the rung-based editor (the old Moon editor and Planet Forge are no longer
+ *   mounted: the Studio route renders StudioApp, which does not use its renderPrototype). It is driven through its AI bridge
+ *   (window.__studioBridge): its manifest lists workspaces and kits, a rung and a kit can be chosen, and Back returns home;
+ * - the Planetary Grid: synced, spawned in the lab (the parked story's start, so ?story), the sync badge shows; the desync
+ *   toggle switches it to the solo branch.
+ * It asserts what it sees (the version before only printed it). Boots the built game: run `npm run build` first.
  */
 
-const chromePaths = [
-  'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
-  '/usr/bin/google-chrome',
-];
-const chromePath = chromePaths.find(fs.existsSync);
-
-if (!chromePath) {
-  console.log('Chrome not found, skipping browser test');
-  process.exit(0);
-}
+const chromePath = [process.env.CHROME_PATH, 'C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe', '/usr/bin/google-chrome', '/usr/bin/chromium']
+  .filter(Boolean).find(fs.existsSync);
+if (!chromePath) { console.error('Chrome/Chromium not found; set CHROME_PATH.'); process.exit(1); }
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const port = 8198;
 const targetUrl = `http://localhost:${port}/?story`;
-
-console.log(`Starting static server on port ${port}...`);
-const server = spawn(process.execPath, ['scripts/serve.mjs'], {
-  cwd: root,
-  env: { ...process.env, PORT: String(port) },
-  stdio: 'ignore',
-});
+const server = spawn(process.execPath, ['scripts/serve.mjs'], { cwd: root, env: { ...process.env, PORT: String(port) }, stdio: 'ignore' });
 await new Promise((r) => setTimeout(r, 1500));
-
-console.log('Launching Chrome browser...');
-const browser = await chromium.launch({
-  executablePath: chromePath,
-  headless: true,
-  args: [
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--disable-dev-shm-usage',
-    '--use-gl=angle',
-    '--use-angle=swiftshader',
-    '--enable-webgl',
-    '--ignore-gpu-blocklist',
-  ],
+const browser = await chromium.launch({ executablePath: chromePath, headless: true, args: ['--ignore-gpu-blocklist', '--enable-gpu'] });
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+await page.addInitScript(() => {
+  Element.prototype.requestPointerLock = function () { return Promise.reject(new Error('pointer lock stubbed in test')); };
+  try { localStorage.clear(); } catch {}
 });
-
-const page = await browser.newPage();
 const pageErrors = [];
-page.on('pageerror', (err) => {
-  console.log('PAGE ERROR:', err.message);
-  pageErrors.push(err.message);
-});
+page.on('pageerror', (err) => pageErrors.push(err.message));
+const results = [];
+const check = (name, ok, detail = '') => {
+  results.push({ name, ok: !!ok });
+  console.log(`${ok ? 'OK  ' : 'FAIL'} ${name}${detail ? ` (${detail})` : ''}`);
+};
+fs.mkdirSync('shots-run', { recursive: true });
 
 try {
-  console.log('Navigating to', targetUrl);
   await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await page.waitForTimeout(2000);
+  await page.waitForSelector('.sm-home', { timeout: 30000 });
 
-  // 1. Verify Main Menu Brand & Badges
-  const brand = await page.locator('.fidelity-brand').textContent();
-  console.log('OK: Brand header found:', brand?.trim());
-
-  const expeditionBtn = page.locator('.sm-menu button', { hasText: 'Expedition' });
-  const gridBtn = page.locator('.sm-menu button', { hasText: 'Planetary Grid' });
-  const studioBtn = page.locator('.sm-menu button', { hasText: 'The Studio' });
-
-  console.log('OK: Expedition button visible:', await expeditionBtn.isVisible());
-  console.log('OK: Planetary Grid button visible:', await gridBtn.isVisible());
-  console.log('OK: The Studio button visible:', await studioBtn.isVisible());
-
-  fs.mkdirSync('shots-run', { recursive: true });
+  // 1. the home
+  check('the brand is FIDELITY', (await page.locator('.fidelity-brand b').innerText()).trim() === 'FIDELITY');
+  const items = await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent));
+  check('the menu holds Expedition, Planetary Grid and The Studio', ['Expedition', 'Planetary Grid', 'The Studio'].every((t) => items.includes(t)), items.join(', '));
+  check('the grid room is ready behind it', await page.waitForFunction(() => window.hmRoom?.ready === true, null, { timeout: 90000 }).then(() => true, () => false));
   await page.screenshot({ path: 'shots-run/fidelity-menu-synced-desynced.png' });
-  console.log('Captured shots-run/fidelity-menu-synced-desynced.png');
 
-  // 2. Click The Studio
-  console.log('Testing The Studio (Creative Suite)...');
-  await studioBtn.click();
-  await page.waitForTimeout(2000);
+  // 2. the Studio, through its AI bridge
+  await page.locator('.sm-menu button', { hasText: 'The Studio' }).click();
+  const opened = await page.waitForFunction(() => Boolean(window.__studioBridge), null, { timeout: 30000 }).then(() => true, () => false);
+  check('The Studio opens the Studio app (its AI bridge is up)', opened);
+  const manifest = await page.evaluate(() => window.__studioBridge?.getManifest() ?? null);
+  check('its manifest lists workspaces and kits', (manifest?.workspaces?.length ?? 0) > 0 && (manifest?.kits?.length ?? 0) > 0, `${manifest?.workspaces?.length ?? 0} workspaces, ${manifest?.kits?.length ?? 0} kits`);
+  await page.evaluate(() => window.__studioBridge.setActiveRung(4));
+  check('a rung can be chosen (Kits & Assemblies)', await page.evaluate(() => window.__studioBridge.getSnapshot().activeRung === 4));
+  const kit = manifest?.kits?.find((k) => k.id !== manifest.activeKitId)?.id ?? null;
+  if (kit) await page.evaluate((id) => window.__studioBridge.selectKit(id), kit);
+  check('a kit can be chosen', kit !== null && await page.evaluate((id) => window.__studioBridge.getSnapshot().activeKitId === id, kit), String(kit));
+  await page.screenshot({ path: 'shots-run/fidelity-studio.png' });
+  await page.locator('[data-testid="studio-back-btn"]').click();
+  check('Back returns to the home', await page.waitForSelector('.sm-home', { timeout: 15000 }).then(() => true, () => false));
 
-  // Verify Studio Root & Topbar
-  // TASK-17/18: The Studio opens the asset bench (.sx); the old Moon editor is its "Moon (prototype)" workspace
-  await page.locator('.sx').waitFor({ state: 'visible', timeout: 5000 });
-  await page.locator('button', { hasText: 'Moon (prototype)' }).click();
-  await page.waitForTimeout(500);
-  const studioRoot = page.locator('.studio-root');
-  await studioRoot.waitFor({ state: 'visible', timeout: 5000 });
-  console.log('OK: Studio root mounted!');
-
-  const backToFidelity = page.locator('button', { hasText: 'Back to FIDELITY' });
-  console.log('OK: Back to FIDELITY button visible:', await backToFidelity.isVisible());
-
-  // Test Moon Base Game Editor controls
-  const stagePills = page.locator('.stage-pill');
-  const stageCount = await stagePills.count();
-  console.log('OK: Simulation stage scrubber pills count:', stageCount);
-
-  // Click Stage 5
-  console.log('Scrubbing Moon Base Game to Stage 5...');
-  await page.locator('.stage-pill', { hasText: 'S5' }).click();
-  await page.waitForTimeout(500);
-
-  await page.screenshot({ path: 'shots-run/fidelity-studio-moon.png' });
-  console.log('Captured shots-run/fidelity-studio-moon.png');
-
-  // Test Weekly Patch Modal
-  console.log('Testing Weekly Patch Diff Modal...');
-  await page.locator('button', { hasText: 'Submit Weekly Patch' }).click();
-  await page.waitForTimeout(500);
-
-  const diffModal = page.locator('.studio-modal-card');
-  console.log('OK: Weekly patch modal visible:', await diffModal.isVisible());
-  const diffPre = page.locator('.code-diff-viewer pre');
-  console.log('OK: Diff viewer has patch JSON:', (await diffPre.textContent())?.includes('PATCH-MOON'));
-
-  await page.screenshot({ path: 'shots-run/fidelity-studio-patch-diff.png' });
-  console.log('Captured shots-run/fidelity-studio-patch-diff.png');
-
-  // Close modal via Escape
-  console.log('Dismissing patch modal with Escape...');
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(400);
-
-  // Test Planet Forge Tab
-  console.log('Switching to Planet Forge tab...');
-  await page.locator('.studio-tab-btn', { hasText: 'Planet Forge' }).click();
-  await page.waitForTimeout(1000);
-
-  const presetCards = page.locator('.preset-card');
-  const presetCount = await presetCards.count();
-  console.log('OK: Preset planet templates count:', presetCount);
-
-  // Pick Volcanic Crucible
-  console.log('Selecting Ignis-IV Caldera preset...');
-  await page.locator('.preset-card', { hasText: 'Ignis-IV' }).click();
-  await page.waitForTimeout(500);
-
-  // Verify visualizer
-  const planetOrb = page.locator('.planet-orb-sphere');
-  console.log('OK: Planet orb visualizer visible:', await planetOrb.isVisible());
-
-  await page.screenshot({ path: 'shots-run/fidelity-studio-planet-forge.png' });
-  console.log('Captured shots-run/fidelity-studio-planet-forge.png');
-
-  // Test Publish to Multiverse
-  console.log('Testing Publish to SetMix Multiverse...');
-  await page.locator('button', { hasText: 'Package & Publish Planet' }).click();
-  await page.waitForTimeout(500);
-
-  const publishModal = page.locator('.studio-modal-card');
-  console.log('OK: Multiverse publish modal visible:', await publishModal.isVisible());
-  const regCodeEl = page.locator('.celebration-text .reg-code b');
-  console.log('OK: Multiverse ID generated:', await regCodeEl.textContent());
-
-  await page.screenshot({ path: 'shots-run/fidelity-studio-planet-published.png' });
-  console.log('Captured shots-run/fidelity-studio-planet-published.png');
-
-  // Close publish modal
-  await page.locator('button', { hasText: 'Continue Editing' }).click();
-  await page.waitForTimeout(400);
-
-  // Return to main menu
-  console.log('Returning to main menu from Studio...');
-  await page.locator('button', { hasText: 'Back to FIDELITY' }).click();
-  await page.waitForTimeout(1500);
-
-  // 3. Click Planetary Grid (Shared Synced World)
-  console.log('Launching Planetary Grid (Synced)...');
+  // 3. the Planetary Grid: synced, then the desync toggle
   await page.locator('.sm-menu button', { hasText: 'Planetary Grid' }).click();
-  // TICKET-08a: the Grid is a screen now (it used to start the campaign directly): choose SYNCED, then enter at the Earth lab
   await page.locator('[data-testid="pg-sync-synced"]').click({ timeout: 15000 });
-  await page.locator('[data-testid="pg-spawn-lab"]').click({ timeout: 15000 });
-  await page.waitForTimeout(3000);
-  // a fresh grid profile opens the character creator first (as the campaign test dismisses it)
-  await page.locator('button', { hasText: 'Done: into the lab' }).click({ timeout: 8000 }).catch(() => {});
-  await page.waitForTimeout(2500);
-
+  // the spawn panel (cards and a deploy button since 846a2a39): the Earth lab, then deploy
+  await page.locator('.pg-spawn-card', { hasText: 'Earth Observation Lab' }).click({ timeout: 15000 });
+  await page.locator('.pg-deploy-cta').click({ timeout: 15000 });
+  // a fresh grid profile opens the character creator first (the parked story's start: ?story)
+  await page.locator('button', { hasText: 'Done: into the lab' }).click({ timeout: 30000 }).catch(() => {});
   const syncBadge = page.locator('.sync-badge');
-  await syncBadge.waitFor({ state: 'visible', timeout: 30000 });
-  const syncText = await syncBadge.textContent();
-  console.log('OK: Sync Badge visible on campaign HUD:', syncText?.trim());
-
+  const badge = await syncBadge.waitFor({ state: 'visible', timeout: 60000 }).then(() => true, () => false);
+  const synced = badge ? (await syncBadge.textContent())?.trim() ?? '' : '';
+  check('the synced grid shows its sync badge', badge && /sync/i.test(synced), synced);
   await page.screenshot({ path: 'shots-run/fidelity-grid-synced.png' });
-  console.log('Captured shots-run/fidelity-grid-synced.png');
-
-  // 4. Test Desync Toggle
-  console.log('Toggling Desync into Solo Branch...');
-  const desyncBtn = page.locator('.sync-branch-toggle');
-  await desyncBtn.click();
+  // the HUD's Manage button opens the grid's panel over play; its DESYNCED button switches to the solo branch
+  await page.locator('.sync-branch-toggle').click();
+  await page.locator('[data-testid="pg-sync-desynced"]').click({ timeout: 15000 });
   await page.waitForTimeout(500);
-  const desyncedText = await syncBadge.textContent();
-  console.log('OK: Sync Badge after desyncing:', desyncedText?.trim());
+  const desynced = (await syncBadge.textContent())?.trim() ?? '';
+  check('the grid panel in play switches it to the solo branch', desynced !== synced && /desync|solo/i.test(desynced), desynced);
 
-  console.log('\nALL FIDELITY STUDIO & SYNCED/DESYNCED CAMPAIGN CHECKS PASSED!');
+  check('no page errors', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 } catch (err) {
-  console.error('Test failed with error:', err);
-  process.exitCode = 1;
+  check('script completed', false, err.message);
 } finally {
-  await browser.close();
+  await browser.close().catch(() => {});
   server.kill();
-  if (pageErrors.length > 0) {
-    console.log('Encountered page errors:', pageErrors);
-  }
 }
+const failed = results.filter((r) => !r.ok);
+console.log(`\n${results.length - failed.length}/${results.length} home, Studio and grid checks passed`);
+process.exit(failed.length ? 1 : 0);

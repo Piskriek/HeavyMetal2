@@ -30,6 +30,7 @@
  *   POST /observe-mechanic -> Plan 51: {game, channel, trajectory? {t,x,y,z}, shots? {t, kick?}, events? [{t,name}]} from any
  *                     permitted observer; relayed to the game as a mimic proposal ("apply the mimic" is the player's word)
  *   GET  /status        -> link state, the latest telemetry, ping and frames
+ *   POST /telemetry/<game> -> a game's official telemetry (Valve GSI and the like); GET it for the count and the last payload
  *
  * Plan 50, the drone's orders (the fast brain follows them; kit edits from here are staged for the player's "keep it"):
  *   { "action": "engage", "mode": "weapons-free"|"defend"|"hold-fire" }   { "action": "cover", "side": "left"|"right"|"rear" }
@@ -77,6 +78,8 @@ const FAKE_PROCESSES = arg('--fake-processes') ? arg('--fake-processes').split('
 const PROFILES_FILE = path.join(path.dirname(FRAME_DIR), 'bridge', 'profiles.json');
 const profiles = (() => { try { const p = JSON.parse(fs.readFileSync(PROFILES_FILE, 'utf8')); return isRecordLoose(p) ? p : {}; } catch { return {}; } })();
 const telemetryCount = {};
+/** The last payload each game posted, so an AI writing a mapping (or a person checking one) can see a real one. */
+const lastTelemetryPayload = {};
 function isRecordLoose(v) { return typeof v === 'object' && v !== null && !Array.isArray(v); }
 
 /** Commands queued for the game to drain on its next /poll. */
@@ -362,10 +365,15 @@ const handle = async (req, res) => {
       if (queued.length >= TELEMETRY_QUEUE) pendingCommands.splice(pendingCommands.indexOf(queued[0]), 1);
       pendingCommands.push({ action: 'telemetry', gameId: tel[1], payload, at: Date.now() / 1000, ...(sessionClients[tel[1]] ? { to: sessionClients[tel[1]] } : {}) });
       telemetryCount[tel[1]] = (telemetryCount[tel[1]] ?? 0) + 1;
+      lastTelemetryPayload[tel[1]] = { at: Date.now(), payload };
       json(res, 200, { ok: true });
     } catch (err) {
       json(res, 400, { ok: false, error: String(err instanceof Error ? err.message : err) });
     }
+    return;
+  }
+  if (tel && req.method === 'GET') {
+    json(res, 200, { gameId: tel[1], count: telemetryCount[tel[1]] ?? 0, last: lastTelemetryPayload[tel[1]] ?? null });
     return;
   }
   if (pathname === '/bridge-profiles' && req.method === 'GET') {

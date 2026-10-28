@@ -10,7 +10,7 @@ import { pixelRatioFor, resolveGraphics, type GraphicsSettings } from '@hm/rende
 import { noteTier, powerPreferenceOf, saveProfile, type Profile } from '../shell/profile';
 import { tierFor } from '../crafter/crafter';
 import { bakeLookCached } from '../crafter/looks';
-import type { Plot } from '../crafter/planet';
+import { PLAY_NEIGHBOURS, PLAY_PLOT } from './play-worlds';
 import { SMOOTH_IDS, smoothModel } from '../crafter/smooth-models';
 import { CreateScientist } from '../avatar/create-scientist';
 import type { ClipName } from '../avatar/scientist/anims-loader';
@@ -224,18 +224,12 @@ import {
 import '../base/base.css';
 import './play.css';
 
-/** Your plot's cartridge until the ground shader battle lands: sandy desert tones, the nearest in the vault to the concept art's stage 1. */
-const PLOT = 'crater_calcite';
+// the plot and its neighbours live in play-worlds.ts, so the grid room warms the looks play bakes (Plan 57 §10)
+const PLOT = PLAY_PLOT;
 const SYNC_BLOCKS = 20;
 /** How long Dr. Haddy's portrait stays in the top-left zone after the quest step changes (POL-40, plan 16), in ms. */
 const PORTRAIT_QUEST_PING_MS = 4000;
-/** Other players' plots, 1 km across like yours (owner, 2026-10-07): seen from your plot as greener, wetter patches 1.1 to 3 km away.
- *  Samples until the shared planet is wired (SETMIX_PLAN Phase 5). */
-const NEIGHBOURS: readonly Plot[] = ([
-  ['Mossfold', 35, 1150, 170, 'emerald_canopy', 6], ['Kettle Rise', 112, 1480, 150, 'spore_meadow', 5], ['Fernreach', 168, 1900, 190, 'solar_fern_glade', 6],
-  ['Low Atoll', 214, 2350, 210, 'coral_atoll', 6], ['Prism Flats', 262, 1320, 120, 'prismata_grass', 4], ['Greywater', 305, 2700, 230, 'emerald_canopy', 5],
-  ['Stillgrove', 340, 3000, 240, 'spore_meadow', 6],
-] as const).map(([name, deg, dist, r, cartridge, stage]) => ({ name, r, cartridge, stage, x: Math.cos((deg * Math.PI) / 180) * dist, z: Math.sin((deg * Math.PI) / 180) * dist }));
+const NEIGHBOURS = PLAY_NEIGHBOURS;
 
 /** The ground's triangles by tier (the display governor changes it as you play). */
 const GROUND_BUDGET: Readonly<Record<Quality, number>> = { potato: 60000, low: 75000, medium: 200000, high: 200000, ultra: 280000 };

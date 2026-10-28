@@ -23,7 +23,7 @@ import { duplicateActivity, loadProfile, makeActivity, removeActivity, saveProfi
 import { SettingsBody } from './settings-body';
 import { ManageProfilesModal } from './manage-profiles-modal';
 import { GoblinFront, SetMixHome } from './goblin-front';
-import { LabHome } from '../lab/lab';
+import { GridRoom } from './grid-room';
 import { astroLevelFor } from '../avatar/astro/astro-model';
 import { setScientistLevel } from '../avatar/scientist/scientist-model';
 import { captureMouse } from './capture-mouse';
@@ -398,7 +398,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime; readonly sta
         </div>
       ) : null}
 
-      {screen === 'home' ? <div className="shell-layer" style={{ zIndex: 2 }}><LabHome profile={profile} /></div> : null}
+      {/* plan 57 §10: the grid room, not the lab (it warms the presets and draws only on change) */}
+      {screen === 'home' ? <div className="shell-layer" style={{ zIndex: 2 }}><GridRoom profile={profile} /></div> : null}
       {screen === 'home' ? (
         <div className="shell-layer shell-ui sm-layer" style={{ zIndex: 4 }}>
           <SetMixHome

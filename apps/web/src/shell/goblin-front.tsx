@@ -88,7 +88,6 @@ const RACING_ITEM: MenuItem = { id: 'racing', label: 'Goblin Racing', says: 'Rac
 
 import { ProfileChip } from './profile-chip';
 import { FidelityLogo } from './fidelity-logo';
-import { HaddyCrtPortrait } from './haddy-crt-portrait';
 
 /** The menu for a version of the game: Goblin Racing remains accessible if specifically requested. */
 export function homeMenu(edition: Edition, endingSeen = false): readonly MenuItem[] {
@@ -145,59 +144,17 @@ export function SetMixHome(props: {
         <svg className="sm-leader" aria-hidden="true"><circle ref={props.leader.ring} r="0" /><line ref={props.leader.line} /></svg>
       ) : null}
 
-      {/* POL-01 & POL-64: Main Menu Hero Diptych (Wasteland Glitch Window + Stage 4/6 Twin Gate Portal) */}
-      <div
-        className="fidelity-menu-hero"
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          inset: 0,
-          pointerEvents: 'none',
-          overflow: 'hidden',
-          background:
-            'radial-gradient(circle at 68% 46%, rgba(61, 200, 255, 0.18) 0%, rgba(180, 107, 255, 0.12) 28%, rgba(5, 8, 15, 0.92) 74%)',
-        }}
-      >
-        {/* Observation Window Wasteland Glitch Pockets (Left/Upper Backdrop) */}
-        <div
-          className="fidelity-hero-wasteland-window"
-          style={{
-            position: 'absolute',
-            top: '8%',
-            right: '6%',
-            width: '56%',
-            height: '34%',
-            border: '1px solid rgba(56, 189, 248, 0.28)',
-            background:
-              'linear-gradient(135deg, rgba(16, 23, 38, 0.78) 0%, rgba(14, 116, 144, 0.22) 52%, rgba(245, 158, 11, 0.18) 100%)',
-            boxShadow: 'inset 0 0 36px rgba(56, 189, 248, 0.16)',
-          }}
-        />
-        {/* Stage 4/6 Twin Gate Portal Arch & Lush Pine Canopy Silhouette (Center-Right Hero) */}
-        <div
-          className="fidelity-hero-gate-arch"
-          style={{
-            position: 'absolute',
-            bottom: '10%',
-            right: '18%',
-            width: 240,
-            height: 320,
-            border: '3px solid rgba(255, 193, 61, 0.72)',
-            borderBottom: '6px solid rgba(124, 255, 77, 0.65)',
-            borderRadius: '12px 12px 2px 2px',
-            boxShadow:
-              '0 0 48px rgba(255, 193, 61, 0.28), inset 0 0 64px rgba(61, 200, 255, 0.32)',
-            background:
-              'linear-gradient(180deg, rgba(56, 189, 248, 0.28) 0%, rgba(16, 185, 129, 0.26) 65%, rgba(124, 255, 77, 0.32) 100%)',
-          }}
-        />
-      </div>
-
+      {/* plan 57 §10: the grid room behind this menu has the real gate; the DOM window and arch that stood in for the lab are gone */}
       {/* POL-64: Frosted Glass Blade housing Brand Header & Primary Navigation Suite */}
       <div
         className="fidelity-glass-blade"
         style={{
-          position: 'relative',
+          // the full height of the left side: its brand and menu are placed inside it, so in the flow it had only its padding
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          left: 0,
+          width: 'min(440px, 86vw)',
           zIndex: 2,
           backdropFilter: 'blur(14px)',
           WebkitBackdropFilter: 'blur(14px)',
@@ -207,7 +164,6 @@ export function SetMixHome(props: {
           display: 'flex',
           flexDirection: 'column',
           gap: 18,
-          maxWidth: 440,
         }}
       >
         {/* Brand Header */}
@@ -243,52 +199,8 @@ export function SetMixHome(props: {
       </div>
 
 
-      {/* Live Substrate Telemetry HUD (Right Observation Panel) */}
-      <aside className="fidelity-telemetry-hud" aria-label="Substrate Telemetry">
-        <div className="hud-panel-header">
-          <span className="hud-indicator-dot pulsing" />
-          <span>SUBSTRATE TELEMETRY</span>
-        </div>
-
-        <div className="hud-tile">
-          <div className="hud-tile-title">CONTAINMENT INTEGRITY</div>
-          <div className="hud-tile-value cyan">98.4%</div>
-          <div className="hud-meter-track">
-            <div className="hud-meter-bar" style={{ width: '98.4%' }} />
-          </div>
-          <div className="hud-tile-sub">SUBSTRATE DRIFT: NOMINAL</div>
-        </div>
-
-        <div className="hud-tile">
-          <div className="hud-tile-title">ACTIVE RESOLUTION VECTOR</div>
-          <div className="hud-vector-grid">
-            <span title="Pixel Density">Pxd: <b>1.00</b></span>
-            <span title="Vertex Tessellation">Vtx: <b>1.00</b></span>
-            <span title="Lux / Shading">Lx: <b>1.00</b></span>
-            <span title="Acoustics">Aq: <b>1.00</b></span>
-          </div>
-          <div className="hud-tile-sub">S = (Pxd, Vtx, Lx, Aq)</div>
-        </div>
-
-        <div className="hud-tile">
-          <div className="hud-tile-title">WEEKLY PROTOCOL</div>
-          <div className="hud-tile-value amber">CYCLE 42</div>
-          <div className="hud-tile-sub">COMMUNITY CONSENSUS ACTIVE</div>
-        </div>
-
-        <div className="hud-tile">
-          <div className="hud-tile-title">LUNAR PORTAL</div>
-          <div className="hud-badge-online">GATE SHIELDED // READY</div>
-        </div>
-
-        {/* POL-40: Dr. Gwen Haddy CRT Portrait Slot */}
-        <div className="fidelity-telemetry-portrait" style={{ marginTop: 2 }}>
-          <HaddyCrtPortrait
-            subtitleText="Portal link stable at 12 kW. Eleven neighbor domes on the horizon."
-            stage={6}
-          />
-        </div>
-      </aside>
+      {/* plan 57 §4, §10: the right side is left clear for the room's bridge screen. The old telemetry column showed fixed
+          numbers and story copy; it comes back as the System HUD, reading real state (a lens, never a lie) */}
 
       {/* Top Controls */}
       <div className="sm-top-controls">

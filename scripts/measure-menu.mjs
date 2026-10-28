@@ -4,7 +4,8 @@
  * per second of wall time, frames drawn, and the live WebGL canvases. Run it before and after a menu change, on the
  * min-spec laptop for the real numbers (headless rendering here is software, so read GPU-bound costs as relative only).
  *
- *   node scripts/measure-menu.mjs [--seconds 10]
+ *   node scripts/measure-menu.mjs [--seconds 10] [--profile] [--shot <file.png>]
+ * With the grid room (Plan 57 §10) it waits for the warm-up to finish first and reports it: mount and warm-up time, frames drawn.
  */
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright-core';
@@ -27,8 +28,13 @@ try {
   await page.addInitScript(() => { try { localStorage.clear(); } catch {} });
   await page.goto(`http://localhost:${port}/`, { waitUntil: 'domcontentloaded', timeout: 45000 });
   await page.waitForSelector('.sm-menu button', { timeout: 45000 });
-  // let the menu settle (fonts, first frames, any intro) before sampling
-  await page.waitForTimeout(3000);
+  // the grid room warms the presets first; sample once it is done (a menu without the room just settles for 3 s)
+  const hasRoom = await page.waitForFunction(() => window.hmRoom?.ready === true, null, { timeout: 90000 }).then(() => true, () => false);
+  const warm = hasRoom ? await page.evaluate(() => ({ mountMs: Math.round(window.hmRoom.mountMs), warmMs: Math.round(window.hmRoom.warmMs), rendersDuringWarm: window.hmRoom.renders, stage: window.hmRoom.stage, calls: window.hmRoom.calls, triangles: window.hmRoom.triangles })) : null;
+  await page.waitForTimeout(hasRoom ? 1000 : 3000);
+  const shotAt = process.argv.indexOf('--shot');
+  if (shotAt > 0 && process.argv[shotAt + 1]) await page.screenshot({ path: process.argv[shotAt + 1] });
+  const rendersBefore = hasRoom ? await page.evaluate(() => window.hmRoom.renders) : 0;
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Performance.enable');
   const metrics = async () => Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map((m) => [m.name, m.value]));
@@ -67,6 +73,7 @@ try {
     rafPerSec: +(live.frames / wall).toFixed(1),
     visibleCanvases: live.canvases,
     jsHeapMb: +((b.JSHeapUsedSize ?? 0) / 1048576).toFixed(1),
+    ...(warm ? { room: { ...warm, rendersWhileIdle: (await page.evaluate(() => window.hmRoom?.renders ?? 0)) - rendersBefore } } : {}),
   };
   console.log(JSON.stringify(out, null, 2));
 } finally {

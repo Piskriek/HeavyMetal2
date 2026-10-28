@@ -48,13 +48,14 @@ try {
   check('boots to the SetMix home with no page error', errors.length === 0, errors.join(' | '));
   console.log(`     renderer: ${await page.evaluate(() => { const g = document.createElement('canvas').getContext('webgl2'); const x = g?.getExtension('WEBGL_debug_renderer_info'); return g && x ? g.getParameter(x.UNMASKED_RENDERER_WEBGL) : 'unknown'; })}`);
   check('the home is SetMix Multiverse with its menu', (await page.locator('.sm-brand b').innerText()) === 'SetMix' && (await page.locator('.sm-brand i').innerText()) === 'Multiverse' && JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Play', 'Studio', 'My planet', 'Avatars', 'Community', 'Settings']));
-  // the home is the lab (STATUS SM11): the finished planet shows through its arch once its trees and looks are built
-  await page.waitForFunction(() => window.hmLab && window.hmLab.ready && window.hmLab.frames > 5, null, { timeout: T(60000) });
-  check('the home is the lab, with the finished planet through its arch', await page.locator('.lab-home.ready').count() === 1);
-  check('the menu lab has the free-standing gate and no arch', await dom(() => window.hmLab.gate && !window.hmLab.arch));
-  await page.waitForFunction(() => window.hmLab && typeof window.hmLab.scientistArmAngle === 'function' && window.hmLab.scientistArmAngle() !== null, null, { timeout: T(30000) });
-  const armAngle = await dom(() => window.hmLab.scientistArmAngle());
-  check('in the menu, the figure upper arms hang down (no T-pose)', typeof armAngle === 'number' && Math.abs(armAngle) > 0.5, `arm angle: ${armAngle}`);
+  // the home is the grid room (Plan 57 §10; the lab behind the menu is stripped): it warms the presets rung by rung, climbs to
+  // stage 3, then draws nothing while nothing changes
+  await page.waitForFunction(() => window.hmRoom && window.hmRoom.ready, null, { timeout: T(90000) });
+  check('the home is the grid room, warmed to stage 3 with every rung filled', await page.locator('.grid-room.ready').count() === 1
+    && await dom(() => window.hmRoom.stage === '3' && window.hmRoom.warm.length === 5));
+  const idleFrom = await dom(() => window.hmRoom.renders);
+  await page.waitForTimeout(T(1500));
+  check('the room draws nothing while nothing changes', (await dom(() => window.hmRoom.renders)) === idleFrom);
   await shot('menu-setmix');
 
   // Profile menu (TASK-09): chip in top right shows active profile; menu allows switching and opening manager
@@ -84,7 +85,7 @@ try {
   // the Goblin Racing version of the same build (owner, 2026-10-06 20:30): Goblin Racing tops its menu, and only there
   await page.goto(`http://127.0.0.1:${port}/?edition=goblin-racing`);
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
-  await page.waitForFunction(() => window.hmLab && window.hmLab.ready && window.hmLab.frames > 5, null, { timeout: T(60000) });
+  await page.waitForFunction(() => window.hmRoom && window.hmRoom.ready, null, { timeout: T(90000) });
   await shot('menu-goblin-racing');
   check('the Goblin Racing version lists Goblin Racing first', JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Goblin Racing', 'Play', 'Studio', 'My planet', 'Avatars', 'Community', 'Settings']));
   // Goblin Racing: its menu entry opens its own menu; Race modes holds its sections; Esc steps back out to SetMix
@@ -105,7 +106,7 @@ try {
   // back to the SetMix version for the rest
   await page.goto(`http://127.0.0.1:${port}/`);
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
-  await page.waitForFunction(() => window.hmLab && window.hmLab.ready && window.hmLab.frames > 5, null, { timeout: T(60000) });
+  await page.waitForFunction(() => window.hmRoom && window.hmRoom.ready, null, { timeout: T(60000) });
 
   // the Resolution Crafter preview (?crafter, a test view): the moon builds behind a loading bar; a stage jump sends a wave out from your plot's centre; Esc returns home
   const crafterErrors = errors.length;
@@ -127,7 +128,7 @@ try {
   check('the Resolution Crafter raised no page error', errors.length === crafterErrors, errors.slice(crafterErrors).join(' | '));
   await page.goto(`http://127.0.0.1:${port}/`);
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
-  await page.waitForFunction(() => window.hmLab && window.hmLab.ready && window.hmLab.frames > 5, null, { timeout: T(60000) });
+  await page.waitForFunction(() => window.hmRoom && window.hmRoom.ready, null, { timeout: T(60000) });
 
 
   // My planet shows your islands drawn from above; going into one the first time makes your first avatar (look and name), then dives
@@ -204,7 +205,7 @@ try {
   await text('.shell-top button', 'Home').click();
   await page.waitForSelector('.sm-home');
   check('community returns home', true);
-  await page.waitForFunction(() => window.hmLab && window.hmLab.ready && window.hmLab.frames > 5, null, { timeout: T(60000) });
+  await page.waitForFunction(() => window.hmRoom && window.hmRoom.ready, null, { timeout: T(60000) });
   check('coming home opens the lab again', await page.locator('.lab-home.ready').count() === 1);
 
   await page.locator('.sm-menu .sm-sub').click();
@@ -704,7 +705,7 @@ try {
   // the first Play runs last: your human made in the lab is your first avatar, and the island tour above needs a new player
   await page.goto(`http://127.0.0.1:${port}/`);
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
-  await page.waitForFunction(() => window.hmLab && window.hmLab.ready && window.hmLab.frames > 5, null, { timeout: T(60000) });
+  await page.waitForFunction(() => window.hmRoom && window.hmRoom.ready, null, { timeout: T(60000) });
 
   // Play: the first Play (STATUS SM22). Your human is made in the lab; the main lever turns the gate on; you walk through onto
   // the stage-0 planet, where sync runs down; you walk back; the first texture mill lifts the plot to stage 1; Esc pauses
@@ -1013,7 +1014,7 @@ try {
   await page.fill('.sm-profile-new-input', 'E2E fresh');
   await page.evaluate(() => { window.__beforeReload = true; });
   await dom(() => { [...document.querySelectorAll('.sm-profile-create-btns button')].find((b) => b.textContent.includes('Create'))?.click(); });
-  await page.waitForFunction(() => !window.__beforeReload && document.querySelector('.sm-profile-label')?.textContent?.trim() === 'E2E fresh' && window.hmLab && window.hmLab.ready, null, { timeout: T(30000) });
+  await page.waitForFunction(() => !window.__beforeReload && document.querySelector('.sm-profile-label')?.textContent?.trim() === 'E2E fresh' && window.hmRoom && window.hmRoom.ready, null, { timeout: T(30000) });
   check('switched to fresh profile E2E fresh', (await page.locator('.sm-profile-label').innerText()).trim() === 'E2E fresh');
 
   // Verify Play starts fresh at scientist creator
@@ -1037,7 +1038,7 @@ try {
   await page.waitForSelector('.sm-profile-menu', { timeout: T(5000) });
   await page.evaluate(() => { window.__beforeReload = true; });
   await dom(() => { [...document.querySelectorAll('.sm-profile-item')].find((b) => b.querySelector('.sm-profile-item-name')?.textContent?.trim() === 'Main')?.click(); });
-  await page.waitForFunction(() => !window.__beforeReload && document.querySelector('.sm-profile-label')?.textContent?.trim() === 'Main' && window.hmLab && window.hmLab.ready, null, { timeout: T(30000) });
+  await page.waitForFunction(() => !window.__beforeReload && document.querySelector('.sm-profile-label')?.textContent?.trim() === 'Main' && window.hmRoom && window.hmRoom.ready, null, { timeout: T(30000) });
   check('switched back to Main profile', (await page.locator('.sm-profile-label').innerText()).trim() === 'Main');
 
   // Verify Main's Play save is intact

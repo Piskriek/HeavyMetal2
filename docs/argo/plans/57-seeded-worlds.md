@@ -154,6 +154,23 @@ The owner: a planet is "a very dense soul and it moves through the densities jus
   - the bar tracks the weight done. Play unlocks when the required set is ready, and optional jobs carry on behind it (the loading-bars rule).
 - **The room is also the start of the new game:** the presets visibly assemble in it as they warm (frames, then materials, then light). That is the preset foundation made visible before the player is dropped in.
 
+**§10 as built (28 Oct):** `shell/grid-room.tsx`, `grid-room-scene.ts`, `grid-room-warm.ts` (pure, tests 4/4). It replaces the lab backdrop behind the home.
+- **One stage shader for every surface:** the room climbs 0a wireframe → 0b 1-bit Bayer → 1 the 16 EGA colours → 2 VGA → 3 Gouraud as the warm-up's share rises. Each step is one draw, not an animation. Stage 3 is the stage a player spawns at (§14).
+- **The warm-up is the preset ladder** (Argon): a plinth per rung, filled when every job of that rung is done.
+  - atoms: the room's program and the sound samples;
+  - stacks: the six stage looks of play's plot;
+  - parts: the smooth models;
+  - assemblies: the generated props;
+  - worlds: the neighbouring worlds' looks.
+  - Each job is a cached pass play reuses, with the same cartridge, stage, device and grid spacing (`play/play-worlds.ts` now holds the plot and neighbours both use).
+- **In the room:** a square gate frame on its base whose panel lights warm when play is ready; the bridge screen on two legs, each on its own foot (dark until a game is bridged); nothing floats and there is no lettering.
+- **Drawing:** only on change (a job, a resize, a pointer lean), under a frame cap (30 on the light tiers, else 60), and never while hidden. The warm-up pauses while the tab is hidden.
+- **The home menu's stand-ins are gone:**
+  - the DOM "wasteland window" and CSS gate arch, which also laid a 92%-dark gradient over everything;
+  - the right-hand telemetry column, all fixed numbers and story copy (it also called Aq "Acoustics"; the constitution's Aq is the aquatic level). The right side stays clear for the bridge screen until the System HUD shows real state (§4).
+  - The menu's glass blade now spans the left side: in the flow it had been only its 42 px of padding.
+- **Seams:** `window.hmRoom` (ready, stage, share, warm rungs, renders, mount, scene, first-draw and warm-up times, `showStage(s)` for a stage check). e2e-smoke's lab checks now read the room.
+
 ## 11. Gaussian splats, a far fidelity tier (research: [SPLAT_WORLDS_RESEARCH](../../SPLAT_WORLDS_RESEARCH.md))
 
 - **What Google launched** (checked at the source): **Genie 4**, announced 27 Oct 2026.
@@ -200,9 +217,23 @@ The owner: a planet is "a very dense soul and it moves through the densities jus
 - §10's fix targets exactly that: render on change, a frame cap, and a stop when the tab is hidden.
 - **The target after the change:** under 50 ms a second at idle once warm-up ends, and no frames drawn at all while nothing moves. Re-measure with the same script, and on the min-spec laptop for the real numbers.
 
+**After the change** (28 Oct, the grid room):
+
+| Measure | The lab | The grid room |
+|---|---|---|
+| main thread, idle (headless) | 881 ms a second | **56 ms** a second (script 1.7 ms; the rest is the DOM menu's styles and the probe's own frame counter) |
+| draws while idle | about 40 a second | **0** |
+| JS heap | 54 MB | 27 MB |
+| draw calls / triangles a frame | (the whole lab) | 21 / 1,808 |
+| warm-up, real GPU (Intel HD 530) | — | 2.4–3.8 s, 8–20 draws in all |
+| mount, real GPU | — | 63 ms: the scene 33 ms (the WebGL context is 10–17 ms of it), the rest the menu's first layout, which the room forces early by reading its canvas size; first frame at 95 ms |
+
+- Argon's target was a mount under 16 ms. The next small step, if wanted: build the scene one frame after the menu first paints, so the menu shows at once and the room's 33 ms comes after.
+
 ## 13. Build order (Opus sets it; Argon audits)
 
-1. **The menu room and warm-up** (§10): it is concrete, it fixes a cost the owner feels now, and it shows the preset foundation. Load the frontend-design skill first.
+1. **The menu room and warm-up** (§10): **built 28 Oct.** Next on it: the bridge screen shows the mirror (Plan 53), and the scene is built one frame after the menu's first paint.
+1b. **Strip the lab and the story for parts** (§14, [LAB_SALVAGE](../notes/LAB_SALVAGE.md)): the reusable pieces become presets, and the story frame goes. Argon's rule: no gate regresses. The new start keeps the seam the e2e scripts use to get into play (a start button and the same ready hook), so ~35 scripts change a line, not their flow.
 2. **Body persistence and planet bodies:**
    - Argon's B: the body saved as an `mb` shorthand line;
    - a third body kind, `planetary` (§2), in `BODY_ZONES`.
@@ -213,6 +244,56 @@ The owner: a planet is "a very dense soul and it moves through the densities jus
 7. **Lineage** (§6) and the language tier, then the sandbox's sharing (§9).
 8. **Splats** (§11), after the research's first prototype passes on the min-spec laptop.
 
-**Owner decisions needed:**
-- should a world's look (S0a–S6) follow its planet's density (§2)?
-- does the new start replace the lab, or does the lab become the grid room?
+**Argon's audit of step 1 (28 Oct): green.** His notes for the next wave:
+- build the room's scene one `requestAnimationFrame` after the menu first paints (approved; do it the next time the shell is touched);
+- in step 1b, fix the two stale e2e scripts (e2e-smoke's old brand and Goblin Racing item, and the Studio test's `.sx` selector), so the whole e2e suite runs green;
+- mimic the free, min-spec games first, Cataclysm: DDA and Pokémon Showdown. They exercise `stat`, `curve`, `skillgrow`, `loot`, `recipe` and the type and status formulas before KSP 1, RimWorld and Factorio.
+
+**Owner decisions, answered 28 Oct** (§14):
+- the lab and the story are stripped for parts, and the new start replaces them;
+- each world has its own fidelity; the player spawns at stage 3 and reaches the others by gate or by a ship they build.
+
+## 14. The owner's answers (28 Oct): strip the lab, spawn at stage 3, gate or fly
+
+> "strip the lab and the story for parts to build the simulation, we will need more presets tho, a player would spawn in at the 3rd stage of fidelity unless they want to experience what its like in other densities/fidelities they can gate to those planets or build a ship". Full words in OWNER_ASKS.
+
+- **The lab and the story are stripped for parts.**
+  - Every reusable piece becomes a preset on the shelf: the lab's machines and props become kits, its rooms room modules, its lights and sounds presets. The inventory is `docs/argo/notes/LAB_SALVAGE.md`.
+  - The story frame goes: the quests, the narrator's act lines, and the lab-to-Moon routing. Nothing reusable is deleted.
+- **Each world has its own fidelity, and fidelity is density.**
+  - A world's stage is its planet preset's density (§2). That settles the open question: a world's look follows its planet.
+  - The owner's "3rd stage" matches Ra's third density, the density of self-awareness and choice, where people are. The player spawns at **stage 3** (Gouraud) on the arrival world.
+  - The other worlds spread across the ladder, so the player can visit what other densities look and feel like:
+    - a world of raw elements at 0a/0b (wireframe, then 1-bit), first density;
+    - growing, living worlds at 1–2 (EGA, VGA), second density;
+    - the arrival world at 3;
+    - an advanced world at 4–6 (PBR), whose natives are further along.
+  - The seed validator (§5) makes sure each system spans the ladder.
+  - A world's stage still rises with its people, on the planet's slow clock (§2), and the constitution's stage ladder is unchanged: its looks now key on the planet.
+- **Two ways to travel:**
+  - **The gate:** the Stargate the player helps build (§7) dials the other worlds, and later other systems.
+  - **A ship they build:** a ship is a Rung 4 kit built from parts. The foundations exist:
+    - `@hm/rocket` (part kinds with mass, fuel and thrust);
+    - `@hm/orbital` (ground-to-orbit crossfade, then approach and landing transfer to another world: an early prototype to bring up to production quality);
+    - the drone's own thruster and nozzle parts, and `kit-vehicles`.
+  - A ship's flight reads its parts' mass, thrust and fuel, so a badly built ship cannot reach orbit. Ship-building mechanics come from the mimic research.
+- **More presets, from other games' mechanics.** The owner will download and run the games we need. The holo deck (§10) is Plan 53's bridge stage as well:
+  - the game's picture streams onto the room's screen, read-only;
+  - the drone observes its mechanics into presets, by Plan 51's ladder (telemetry, mod SDK, game files, published constants; the screen last);
+  - anti-cheat risk is told first, and no assets, names or code cross.
+  - Which games, and the new preset kinds the LitRPG frame needs (stats, XP curves, skills, quests, loot, crafting, ships): `docs/MIMIC_GAMES_RESEARCH.md`.
+- **The games to load** (MIMIC_GAMES_RESEARCH's shopping list, single player, no anti-cheat named on their store pages):
+  1. RimWorld: Defs XML for needs, skills, social, recipes, taming and the storyteller;
+  2. Cataclysm: DDA (free): JSON for survival, crafting, mutation and loot;
+  3. Skyrim SE: the UESP formulas, SKSE, for use-based skills and combat;
+  4. Stardew Valley: SMAPI, for friendship, farming and crafting;
+  5. Factorio: `--dump-data` JSON, for recipes, the tech tree and throughput;
+  6. Kerbal Space Program 1: kRPC, for ships from parts, thrust, mass, fuel and orbits;
+  7. Minecraft Java: its documented loot-table and dimension JSON;
+  8. Pokémon Showdown (free, MIT): the damage, type and status formulas.
+  - Next: Valheim, Space Engineers, Outer Wilds and Evoland, the last for a world per art style. The first three are borderline on the 950M.
+- **The new preset kinds are universal operators, never game templates** (Argon, 28 Oct; Plan 52's example-fixation distortion):
+  - the 17 kinds are `stat`, `curve`, `skillgrow`, `tree`, `class`, `notice`, `quest`, `dmg`, `effect`, `matrix`, `recipe`, `loot`, `bond`, `tame`, `ship`, `body`, `rules`;
+  - each is a Rung 1–5 operator. One `curve` is a KSP thrust curve, Factorio throughput and a LitRPG XP curve alike; `stat` + `curve` + `ship` compose into delta-v as easily as into a skill level;
+  - a game is only the first test case, so no kind names a game;
+  - four have packages already but no share code: `@hm/questline`, `@hm/itemdefs`, `@hm/rocket`, `@hm/orbital`.

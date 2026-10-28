@@ -21,9 +21,25 @@
   6. the Stargate phases;
   7. lineage and language;
   8. splats.
-- **Owner decisions open:**
-  - does a world's look follow its planet's density?
-  - does the new start replace the lab?
+- **Owner answers (28 Oct, Plan 57 §14):**
+  - strip the lab and the story for parts (the inventory is docs/argo/notes/LAB_SALVAGE.md);
+  - the player spawns at stage 3; other worlds sit at their own stages, reached by gate or by a ship they build (`@hm/rocket`, `@hm/orbital` exist);
+  - he will download the games we name for mechanic mimicry (docs/MIMIC_GAMES_RESEARCH.md: RimWorld, Cataclysm DDA, Skyrim SE, Stardew, Factorio, KSP 1, Minecraft Java, Pokémon Showdown). The 17 new preset kinds are universal operators (Argon).
+- **The grid room is built** (Plan 57 §10): it replaces the lab behind the home.
+  - It climbs wireframe, 1-bit, EGA, VGA and Gouraud as the presets warm rung by rung (atoms, stacks, parts, assemblies, worlds: cached passes play reuses).
+  - It draws only on change.
+  - The idle menu went from 881 to 56 ms of main thread a second, 0 idle draws, and a halved heap. Mount is 63 ms on the HD 530.
+  - The DOM lab stand-ins and the fixed-number telemetry column are gone from the home menu.
+- **Stale e2e found** (failing before today):
+  - e2e-smoke expects the old "SetMix / Multiverse" brand and a Goblin Racing menu item;
+  - test-fidelity-sync-studio waits for `.sx`, which became `.studio-root` in `9f665bd2`.
+  - Both go into the strip step's script rewrite.
+- **Argon's audit: green.**
+- **Next:**
+  1. 1b, the strip: keep the e2e seam into play, and fix the two stale e2e scripts so the suite is fully green;
+  2. the room's scene one frame after first paint (approved);
+  3. the bridge screen's mirror;
+  4. mimic Cataclysm: DDA and Pokémon Showdown first.
 - **Plan 56's drone body visuals are built** (§20.10): overlays on its own parts, a new radio mast each side, the starved glow. Drone e2e 57/57; full suite green apart from the known texgraph speed flake (passes alone).
 
 ## 28 Oct Checkpoint 3 (Claude Opus: Plans 53–55, the CS2 live run, the anti-cheat warning and the input relay; uncommitted on top of `ed83534e`; read this first)

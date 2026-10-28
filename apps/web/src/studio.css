@@ -589,6 +589,15 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
 .sm-menu button:disabled { cursor: default; }
 .sm-menu button:disabled b { opacity: .6; }
 .sm-foot { position: absolute; left: clamp(20px, 5vw, 72px); bottom: 18px; margin: 0; font-size: 12px; color: var(--dim); animation: sm-in .6s var(--ease-out) .35s both; }
+/* the grid room behind the home (shell/grid-room.tsx, Plan 57 §10): it draws only on change, and it is the warm-up's bar
+   itself (it climbs wireframe, 1-bit, EGA, VGA, Gouraud); the line here says what is warming and how far along it is */
+.grid-room { position: absolute; inset: 0; background: #000; }
+.grid-room-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.grid-room-status { position: absolute; right: clamp(20px, 5vw, 72px); bottom: 22px; width: min(320px, 60vw); display: grid; gap: 7px; justify-items: end;
+  font-size: 12px; color: rgba(232, 238, 241, .8); text-shadow: 0 1px 2px rgba(0, 0, 0, .7); pointer-events: none; }
+.grid-room-status i { width: 100%; height: 2px; background: rgba(255, 255, 255, .16); position: relative; overflow: hidden; }
+.grid-room-status i::after { content: ''; position: absolute; inset: 0; background: #f1f4f5; transform-origin: left center; transform: scaleX(var(--warm, 0)); transition: transform .25s var(--ease-out); }
+@media (prefers-reduced-motion: reduce) { .grid-room-status i::after { transition: none; } }
 /* the lab behind the SetMix home (lab/lab.tsx): revealed once, when the planet outside the arch is ready */
 .lab-home { position: absolute; inset: 0; background: #0c1014; }
 .lab-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity .9s ease; }

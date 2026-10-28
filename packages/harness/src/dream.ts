@@ -97,10 +97,18 @@ const clamp01 = (x: number): number => Math.min(1, Math.max(0, x));
 const clampI8 = (x: number): number => Math.max(-127, Math.min(127, Math.round(x)));
 const keyOf = (of: string, t: number): string => `${of}@${t}`;
 
-/** How open a preset is to a repair: soft memories and invested ones take it; a hardened, uninvested one, uncued, refuses. */
+/** Plan 56 §15: how much easier each earlier rising makes a wanderer's repair, counted up to WANDERER_EASE_MAX risings. */
+export const WANDERER_EASE = 0.25;
+export const WANDERER_EASE_MAX = 4;
+
+/**
+ * How open a preset is to a repair: soft memories and invested ones take it; a hardened, uninvested one, uncued, refuses.
+ * A wanderer who has risen before finds it easier, but not automatic: it still needs the dream and the cue (Law of One 75.24).
+ */
 export function dreamOpenness(mem: Mem, cued: boolean): number {
   const hard = cued ? mem.hard / 2 : mem.hard;
-  return clamp01((1 - hard) * (0.5 + mem.inv / 2));
+  const ease = mem.wan ? 1 + WANDERER_EASE * Math.min(mem.wan.done, WANDERER_EASE_MAX) : 1;
+  return clamp01((1 - hard) * (0.5 + mem.inv / 2) * ease);
 }
 
 /** An episode this dream may replay: preset `p`, its episode `i`. */

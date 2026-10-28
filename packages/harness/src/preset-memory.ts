@@ -41,6 +41,11 @@ export interface Experience {
   readonly felt?: SqOrAligned;
   /** The higher rung's rule or preset that acted (e.g. 'logic:mimic-reflex'). */
   readonly src?: string;
+  /**
+   * Plan 56 §15: how much balanced wanderers present calmed this moment (`anchorCalm`, 0..0.6). The excitement is still felt
+   * (the episode keeps it), but it hardens and charges only by excitement · (1 − calm).
+   */
+  readonly calm?: number;
 }
 
 const RAYS = 7;
@@ -128,20 +133,22 @@ function linkCause(cause: Mem['cause'], by: SqOrAligned, d: SqId): Mem['cause'] 
 export function recordExperience(mem: Mem, x: Experience): Mem {
   if (!Number.isSafeInteger(x.t) || x.t < 0) throw new Error('t must be a whole tick');
   const ex = clamp01(x.excitement, 'excitement');
+  // what an anchor's calm leaves of the moment: it sets and distorts by this, while the episode keeps what was felt
+  const set = ex * (1 - clamp01(x.calm ?? 0, 'calm'));
   const err = clamp01(x.error, 'error');
   const d = x.felt ?? predictDistortion(mem, x.by);
-  const episode: Episode = { t: x.t, stage: x.stage, cat: x.cat, ex, err, h: ex, d, by: x.by, ...(x.src !== undefined ? { src: x.src } : {}) };
+  const episode: Episode = { t: x.t, stage: x.stage, cat: x.cat, ex, err, h: Math.round(set * 1000) / 1000, d, by: x.by, ...(x.src !== undefined ? { src: x.src } : {}) };
 
   const charge = [...mem.charge];
   let cause = mem.cause;
   if (d !== ALIGNED) {
     const ray = rayOf(d);
-    charge[ray] = Math.max(-127, Math.min(127, (charge[ray] ?? 0) + Math.round(ex * CHARGE_GAIN)));
+    charge[ray] = Math.max(-127, Math.min(127, (charge[ray] ?? 0) + Math.round(set * CHARGE_GAIN)));
     cause = linkCause(cause, x.by, d);
   }
   return checkMem({
     ...mem,
-    hard: mem.hard + (1 - mem.hard) * ex * HARDEN_RATE,
+    hard: mem.hard + (1 - mem.hard) * set * HARDEN_RATE,
     bal: memoryBalance(charge),
     charge,
     ep: [...makeRoom(mem.ep), episode],

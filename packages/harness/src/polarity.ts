@@ -76,24 +76,29 @@ export function findDyads(presets: readonly Mem[], window = DYAD_WINDOW): Dyad[]
       const pa = polarityOf(a), pb = polarityOf(b);
       const poles = [poleOf(pa), poleOf(pb)];
       if (!(poles.includes('intent') && poles.includes('context'))) continue;
-      // each good episode of b is matched once, to the nearest good episode of a with the same catalyst
-      const used = new Set<number>();
-      let strength = 0;
-      for (const ea of a.ep) {
-        if (ea.err >= 0.5) continue;
-        let best = -1, gap = Infinity;
-        b.ep.forEach((eb, k) => {
-          if (used.has(k) || eb.err >= 0.5 || eb.cat !== ea.cat) return;
-          const g = Math.abs(eb.t - ea.t);
-          if (g <= window && g < gap) { best = k; gap = g; }
-        });
-        if (best >= 0) { used.add(best); strength++; }
-      }
+      const strength = coActs(a, b, window);
       if (strength === 0) continue;
       out.push({ a: a.of, b: b.of, strength, whole: Math.abs(pa + pb) <= WHOLE_AT && a.bal >= BALANCED_AT && b.bal >= BALANCED_AT });
     }
   }
   return out;
+}
+
+/** How often two presets acted on the same catalyst within `window` ticks, both with good outcomes: each episode matched once, to its nearest. */
+export function coActs(a: Mem, b: Mem, window = DYAD_WINDOW): number {
+  const used = new Set<number>();
+  let n = 0;
+  for (const ea of a.ep) {
+    if (ea.err >= 0.5) continue;
+    let best = -1, gap = Infinity;
+    b.ep.forEach((eb, k) => {
+      if (used.has(k) || eb.err >= 0.5 || eb.cat !== ea.cat) return;
+      const g = Math.abs(eb.t - ea.t);
+      if (g <= window && g < gap) { best = k; gap = g; }
+    });
+    if (best >= 0) { used.add(best); n++; }
+  }
+  return n;
 }
 
 /**

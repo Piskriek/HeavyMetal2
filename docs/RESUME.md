@@ -54,7 +54,13 @@
       - the Higher Self's complementary framing;
     - the pack's `alignment`, the 9: nano, micro and macro;
     - `LOOP_STEPS`, the 6 steps mapped onto the loop;
-    - 8/8 tests. W5 (the lifecycle: graduate or repeat, investment, responsibility) is next. Owner question: "repeat" instead of "perish".
+    - 8/8 tests (`eec52c45`). **W5 is built:** `lifecycle.ts`, 9/9 tests:
+    - kundalini, mastery and readiness;
+    - the next rung's awareness for a risen preset;
+    - wanderers: they descend veiled and limited, calm others while balanced, lend their cue, and find it easier the second time;
+    - astral travel: read only, open gates only, to hosts that resonate;
+    - the weekly majority adoption, and harvest day.
+    - W6 (the wiring into play, the bridge's Higher Self seat, the Studio's memory view) is next. The real weekly round needs a server (the Plan 55 gateway question). Owner question: "repeat" instead of "perish".
 - **Skill:** the owner's SQ distortion check is installed locally at `.claude/skills/sq-distortion-check`.
 
 ## 28 Oct Checkpoint 2 (Claude Opus: Plan 51 Wave 3 + Plan 52, Commit `8600a81b`; read this first)

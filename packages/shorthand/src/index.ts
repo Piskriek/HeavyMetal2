@@ -132,6 +132,12 @@ export interface Mem {
    * (Masculine, reaching, mechanical), 0 balanced. A lean, not a label: both principles are in every preset. Absent: derived from its kind.
    */
   readonly pol?: number;
+  /**
+   * Plan 56 §15: a wanderer, a higher entity in this lower role. `from` is where it came from (a rung's `of`, 'player',
+   * 'overwatch'); `done` is how many times it has risen before; `lim` is the share of the role's normal parameter range
+   * it may use (its extra physical limitation). Its higher memory does not come along: the veil.
+   */
+  readonly wan?: { readonly from: string; readonly done: number; readonly lim: number };
   readonly vocab?: readonly string[];
 }
 export interface Frame {
@@ -228,6 +234,7 @@ const memRule: JsonRule = shape({
   of: ofRule, hard: n01, bal: n01, charge: list(number(-127, 127, true), 7, 7),
   ep: list(episodeRule, MAX_EPISODES), cause: list(causeRule, MAX_CAUSE_LINKS), inv: n01, cyc: number(0, 65535, true),
   pol: optional(number(-127, 127, true)),
+  wan: optional(shape({ from: shid, done: number(0, 255, true), lim: n01 })),
   vocab: optional(list(shid, MAX_VOCAB)),
 });
 const frameRule: JsonRule = shape({
@@ -293,7 +300,7 @@ export function quantizeMem(m: Mem): Mem {
     of: m.of, hard: q3(m.hard), bal: q3(m.bal), charge: [...m.charge],
     ep: m.ep.map((e) => ({ t: e.t, stage: e.stage, cat: e.cat, ex: q3(e.ex), err: q3(e.err), h: q3(e.h), d: e.d, by: e.by, ...(e.src !== undefined ? { src: e.src } : {}) })),
     cause: m.cause.map((c) => ({ by: c.by, d: c.d, n: c.n, open: c.open })),
-    inv: q3(m.inv), cyc: m.cyc, ...(m.pol !== undefined ? { pol: m.pol } : {}), ...(m.vocab !== undefined && m.vocab.length > 0 ? { vocab: [...m.vocab] } : {}),
+    inv: q3(m.inv), cyc: m.cyc, ...(m.pol !== undefined ? { pol: m.pol } : {}), ...(m.wan !== undefined ? { wan: { from: m.wan.from, done: m.wan.done, lim: q3(m.wan.lim) } } : {}), ...(m.vocab !== undefined && m.vocab.length > 0 ? { vocab: [...m.vocab] } : {}),
   };
 }
 /** The canonical frame: numbers on their grids, perm deduplicated in PERM_KINDS order, empty look and vocab dropped, param keys in canonical order. */
@@ -359,7 +366,7 @@ export function formatFrame(frame: Frame): string {
     out.push(p.join(' '));
   }
   for (const m of f.mems) {
-    out.push(`m of=${m.of} hard=${num(m.hard)} bal=${num(m.bal)} ch=${m.charge.join(',')} inv=${num(m.inv)} cyc=${m.cyc}${m.pol !== undefined ? ` pol=${m.pol}` : ''}${m.vocab !== undefined ? ` vocab=${m.vocab.join(',')}` : ''}`);
+    out.push(`m of=${m.of} hard=${num(m.hard)} bal=${num(m.bal)} ch=${m.charge.join(',')} inv=${num(m.inv)} cyc=${m.cyc}${m.pol !== undefined ? ` pol=${m.pol}` : ''}${m.wan !== undefined ? ` wan=${m.wan.from},${m.wan.done},${num(m.wan.lim)}` : ''}${m.vocab !== undefined ? ` vocab=${m.vocab.join(',')}` : ''}`);
     for (const e of m.ep) out.push(`me t=${e.t} st=${e.stage} cat=${e.cat} ex=${num(e.ex)} err=${num(e.err)} h=${num(e.h)} d=${e.d} by=${e.by}${e.src !== undefined ? ` src=${e.src}` : ''}`);
     for (const c of m.cause) out.push(`mc by=${c.by} d=${c.d} n=${c.n} open=${c.open ? 1 : 0}`);
   }
@@ -538,10 +545,10 @@ function parseInner(textIn: string): Frame {
         ...opt(m, 'focus', (x) => x), ...opt(m, 'verb', (x) => x), ttl: pn(need(m, 'ttl')),
       });
     } else if (head === 'm') {
-      const m = kv(tk, 1, ['of', 'hard', 'bal', 'ch', 'inv', 'cyc', 'pol', 'vocab']);
+      const m = kv(tk, 1, ['of', 'hard', 'bal', 'ch', 'inv', 'cyc', 'pol', 'wan', 'vocab']);
       mems.push({
         of: need(m, 'of'), hard: pn(need(m, 'hard')), bal: pn(need(m, 'bal')), charge: pvec(need(m, 'ch'), 7), ep: [], cause: [],
-        inv: pn(need(m, 'inv')), cyc: pn(need(m, 'cyc')), ...opt(m, 'pol', pn), ...opt(m, 'vocab', (x) => (x === '' ? [] : x.split(','))),
+        inv: pn(need(m, 'inv')), cyc: pn(need(m, 'cyc')), ...opt(m, 'pol', pn), ...opt(m, 'wan', (x) => { const [from, done, lim] = x.split(','); if (from === undefined || done === undefined || lim === undefined || x.split(',').length !== 3) throw BAD; return { from, done: pn(done), lim: pn(lim) }; }), ...opt(m, 'vocab', (x) => (x === '' ? [] : x.split(','))),
       });
     } else if (head === 'me' || head === 'mc') {
       const cur = mems[mems.length - 1];
@@ -649,6 +656,8 @@ export const MEM_CODEC_SCHEMA: Schema = {
       inv: fl(), cyc: { kind: 'int', min: 0, max: 65535 },
       // the codec has no optional fields: −128 stands for "no declared polarity" and is mapped back on decode
       pol: { kind: 'int', min: -128, max: 127 },
+      // no wanderer: from '' (mapped back on decode)
+      wan: { kind: 'object', fields: { from: str(MAX_ID), done: { kind: 'int', min: 0, max: 255 }, lim: fl() } },
       vocab: { kind: 'array', of: str(MAX_ID), maxLength: MAX_VOCAB },
     },
   },
@@ -657,7 +666,7 @@ export const MEM_CODEC_SCHEMA: Schema = {
 /** A mem as a share code (checked and quantized first). Throws Error(why) on an invalid mem. */
 export function encodeMem(mem: Mem): string {
   const m = checkMem(mem);
-  return encode(MEM_CODEC_SCHEMA, { ...m, ep: m.ep.map((e) => ({ ...e, src: e.src ?? '' })), pol: m.pol ?? -128, vocab: m.vocab ?? [] });
+  return encode(MEM_CODEC_SCHEMA, { ...m, ep: m.ep.map((e) => ({ ...e, src: e.src ?? '' })), pol: m.pol ?? -128, wan: m.wan ?? { from: '', done: 0, lim: 0 }, vocab: m.vocab ?? [] });
 }
 
 /** Reads a mem code. Returns null for anything that is not a valid mem. Never throws. */
@@ -667,8 +676,8 @@ export function decodeMem(code: string): Mem | null {
     if (v === null) return null;
     const raw = v as Mem;
     const ep = raw.ep.map(({ src, ...e }) => (src === '' || src === undefined ? e : { ...e, src }));
-    const { pol, ...rest } = raw;
-    return checkMem(quantizeMem({ ...rest, ep, ...(pol === -128 || pol === undefined ? {} : { pol }) }));
+    const { pol, wan, ...rest } = raw;
+    return checkMem(quantizeMem({ ...rest, ep, ...(pol === -128 || pol === undefined ? {} : { pol }), ...(wan === undefined || wan.from === '' ? {} : { wan }) }));
   } catch {
     return null;
   }

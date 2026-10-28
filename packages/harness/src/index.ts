@@ -11,3 +11,4 @@ export * from './preset-memory.js';
 export * from './dream.js';
 export * from './polarity.js';
 export * from './system-memory.js';
+export * from './lifecycle.js';

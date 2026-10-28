@@ -25,7 +25,7 @@ const episode = (i: number): Episode => ({
   ex: 0.1234 + (i % 5) / 10, err: (i % 7) / 10, h: 0.5, d: SQ_IDS[i % SQ_IDS.length]!, by: i % 3 === 0 ? ALIGNED : SQ_IDS[(i + 4) % SQ_IDS.length]!, ...(i % 4 === 0 ? { src: 'logic:reflex' } : {}),
 });
 const bigMem: Mem = {
-  of: 'loc:ab12cd34', hard: 0.6204, bal: 0.41, charge: [0, 3, -2, 0, -127, 127, 1], inv: 0.3, cyc: 2, pol: -40,
+  of: 'loc:ab12cd34', hard: 0.6204, bal: 0.41, charge: [0, 3, -2, 0, -127, 127, 1], inv: 0.3, cyc: 2, pol: -40, wan: { from: 'brain:0e01', done: 2, lim: 0.8 },
   ep: Array.from({ length: 32 }, (_, i) => episode(i)),
   cause: [
     { by: 'solar-control', d: 'root-reactivity', n: 5, open: true },

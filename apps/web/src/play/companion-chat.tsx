@@ -21,6 +21,14 @@ import {
   type CompanionPlayerPose,
 } from './companion-intent';
 import type { ScoutCategory } from './companion-scout';
+import { KNOWN_BRIDGE_GAMES } from '@hm/bridgekit';
+import {
+  checkBridgeProfile, createTelemetryAccumulator, gameIdOf, profileLine, rankRunningGames, uncheckedProfile,
+  type BridgePermissionProfile, type TelemetryAccumulator,
+} from '@hm/gamebridge';
+
+/** Plan 51 wave 2: this many telemetry samples (about 10 s of a 30 Hz feed) make one observation for the harness. */
+const TELEMETRY_BATCH = 300;
 import './companion-chat.css';
 
 /** What the screen can do through the comms (plan 49): the ping's callout and its bridge event. */
@@ -65,7 +73,13 @@ export interface CompanionDroneOps {
   /** The fight as the bridge's telemetry carries it, or null. */
   snapshot(): Readonly<Record<string, unknown>> | null;
   /** Plan 51: decompiles an observed mechanic into presets (a proposal): what to say, and the result for the bridge. */
-  mimic(observation: unknown): { readonly said: string; readonly event: Readonly<Record<string, unknown>> | null };
+  /**
+   * Plan 51: decompiles an observation of another game into presets, cut to what its profile lets cross. `live` (the player's
+   * "bridge this game" order) puts it in force at once; otherwise it waits for "apply the mimic".
+   */
+  mimic(observation: unknown, profile?: BridgePermissionProfile | null, live?: boolean): { readonly said: string; readonly event: Readonly<Record<string, unknown>> | null };
+  /** Plan 51 wave 2: the bridge closed: puts back everything its live mimics changed. */
+  endLiveMimic(): string;
   /** Plan 51: puts the last mimic in force (the player's words only). */
   applyMimic(): string;
 }
@@ -277,6 +291,76 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
   const drone = (f: (ops: CompanionDroneOps) => string): string =>
     droneOpsRef.current ? f(droneOpsRef.current) : 'The drone controls need the play screen.';
 
+  // ---- Plan 51 wave 2: "bridge this game": find it, check its terms, stream what may cross, mimic it live ----
+  /** The game being bridged: its profile (what may cross), and the telemetry mapping's accumulator when it has one. */
+  const bridgeSessionRef = useRef<{
+    gameId: string; title: string; process: string | null; profile: BridgePermissionProfile;
+    acc: TelemetryAccumulator | null; unmappedSaid: boolean;
+  } | null>(null);
+  /** Puts a profile in force for the session (a checked one replaces the unchecked one) and says what may cross. */
+  const applyBridgeProfile = (p: BridgePermissionProfile, process: string | null): void => {
+    // the game's own telemetry is a floor rung: it streams whenever there is a mapping that says which fields are which
+    const acc = p.telemetry ? createTelemetryAccumulator(p.telemetry) : null;
+    bridgeSessionRef.current = { gameId: p.gameId, title: p.title, process, profile: p, acc, unmappedSaid: false };
+    companionSays(`${profileLine(p)} Whatever I read of it goes straight onto you; "stop the bridge" puts everything back.`, `${p.title} is bridged. Its mechanics come across, never its art.`);
+    postBridgeEvent({ type: 'bridge-active', gameId: p.gameId, title: p.title, verdict: p.verdict, channels: p.channels, streams: p.streams, mapped: acc !== null });
+  };
+  /** The player's order: finds the game on this PC (the name said, or the likeliest running game) and asks for a verdict. */
+  const bridgeGame = async (name: string | null): Promise<void> => {
+    const base = bridgeUrl.current;
+    if (!bridgeLinkedRef.current || !base) {
+      companionSays('Bridging another game needs the Neural Bridge running on this PC (node scripts/companion-bridge.mjs).');
+      return;
+    }
+    let processes: string[] = [];
+    try {
+      const res = await fetch(`${base}/running-games`);
+      const data = (await res.json()) as { processes?: unknown };
+      processes = Array.isArray(data.processes) ? data.processes.filter((p): p is string => typeof p === 'string') : [];
+    } catch {
+      companionSays('The bridge could not list what is running on this PC.');
+      return;
+    }
+    const known = KNOWN_BRIDGE_GAMES.map((g) => ({ tokens: g.processTokens, title: g.displayName }));
+    const ranked = rankRunningGames(processes, name, known);
+    // with no name said, only a known engine or the one candidate is a safe guess; otherwise the drone asks which
+    if (!name && ranked.length > 1 && ranked[0]!.score < 6) {
+      companionSays(`I see ${ranked.slice(0, 4).map((c) => c.title).join(', ')} running. Which one? Say "bridge <name>".`);
+      return;
+    }
+    // a name the player said that no running process matches is still bridged by that name (its telemetry may come in)
+    const pick = ranked[0] && (!name || ranked[0].score >= 20) ? ranked[0] : null;
+    const title = pick?.title ?? name;
+    if (!title) {
+      companionSays('I do not see a game running. Start it, or tell me its name: "bridge <name>".');
+      return;
+    }
+    const gameId = pick?.gameId ?? gameIdOf(title);
+    const process = pick?.process ?? null;
+    // the session starts at once on the unchecked profile (mechanics through the floor), so the bridge works out of the box;
+    // an AI's checked verdict, when it comes, widens or narrows the rest
+    endBridgeSession(false);
+    applyBridgeProfile(uncheckedProfile(title, gameId), process);
+    let checked = false;
+    try {
+      const res = await fetch(`${base}/bridge-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId, title, process }),
+      });
+      checked = ((await res.json()) as { known?: boolean }).known === true;
+    } catch { /* the session already runs on the unchecked profile */ }
+    if (!checked && bridgeSessionRef.current?.gameId === gameId) companionSays(`Asking the AI on the bridge to check ${title}'s terms for anything beyond mechanics.`);
+  };
+  /** Ends the session; `say` false when a new bridge replaces it. Whatever its mimics changed goes back. */
+  const endBridgeSession = (say = true): void => {
+    const s = bridgeSessionRef.current;
+    bridgeSessionRef.current = null;
+    const undone = droneOpsRef.current?.endLiveMimic() ?? '';
+    if (s) postBridgeEvent({ type: 'bridge-closed', gameId: s.gameId });
+    if (say) companionSays(s ? `Unbridged from ${s.title}. ${undone}` : 'No game is bridged.');
+  };
+
   /** "Save as default": the bridge writes the kit's overrides into the shipped defaults file (plan 49). */
   const saveKitDefault = async (kitId?: string): Promise<void> => {
     const ops = kitOpsRef.current;
@@ -337,6 +421,8 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
         case 'undo': companionSays(drone((o) => o.undo())); return;
         case 'keep': companionSays(drone((o) => o.keep())); return;
         case 'mimic-apply': companionSays(drone((o) => o.applyMimic())); return;
+        case 'bridge-game': void bridgeGame(intent.name); return;
+        case 'bridge-stop': endBridgeSession(); return;
         default: break;
       }
       if (intent.kind === 'status') {
@@ -496,13 +582,59 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
         return;
       }
       // plan 49: kit edits on what Piskriek pinged (or the kit named), and "save as default"
-      // plan 51: a mechanic observed in another game on the PC, decompiled by the harness; applying it is the player's word
+      // plan 51: a mechanic observed in another game on the PC, decompiled by the harness. Applying it is the player's word:
+      // "apply the mimic", or the "bridge this game" order, which makes every observation of that game go straight in
       if (cmd.action === 'mimic') {
         const o = droneOpsRef.current;
         if (!o) return;
-        const r = o.mimic((cmd as unknown as { observation?: unknown }).observation);
+        const observation = (cmd as unknown as { observation?: unknown }).observation;
+        // the bridged game's profile gates it (another game's observation is gated by the unchecked profile)
+        const s = bridgeSessionRef.current;
+        const game = typeof (observation as { game?: unknown })?.game === 'string' ? (observation as { game: string }).game : '';
+        const ours = s !== null && (gameIdOf(game) === s.gameId || game === s.title);
+        const r = o.mimic(observation, ours ? s.profile : null, ours);
         companionSays(r.said);
         if (r.event) postBridgeEvent(r.event);
+        return;
+      }
+      // plan 51 wave 2: an AI's verdict on a game's terms (or the scripted agent's honest "not checked")
+      if (cmd.action === 'bridge-profile') {
+        const p = checkBridgeProfile((cmd as unknown as { profile?: unknown }).profile);
+        if (!p) {
+          companionSays('A bridge profile came in that I could not read, so nothing crosses.');
+          return;
+        }
+        // only for the game the player ordered bridged: an AI cannot open a bridge (and its live mimic) by itself
+        const s = bridgeSessionRef.current;
+        if (!s || s.gameId !== p.gameId) return;
+        // a second "not checked" adds nothing unless it brings a telemetry mapping (it would only reset the samples)
+        if (p.verdict === 'unchecked' && s.profile.verdict === 'unchecked' && !p.telemetry) return;
+        applyBridgeProfile(p, s.process);
+        return;
+      }
+      // plan 51 wave 2: the bridged game's own telemetry (a floor rung: every game allows it), mapped through its preset
+      // into samples; each full batch becomes an observation the harness mimics live
+      if (cmd.action === 'telemetry') {
+        const t = cmd as unknown as { gameId?: string; payload?: unknown; at?: number };
+        const s = bridgeSessionRef.current;
+        if (!s || s.gameId !== t.gameId) return;
+        if (!s.acc) {
+          if (!s.unmappedSaid) {
+            s.unmappedSaid = true;
+            companionSays(`Telemetry is arriving from ${s.title}, but nobody has told me which of its fields are position, shots or events yet. An AI on the bridge can send a mapping with its profile.`);
+          }
+          return;
+        }
+        s.acc.push(t.payload, typeof t.at === 'number' ? t.at : 0);
+        if (s.acc.size() >= TELEMETRY_BATCH) {
+          const obs = s.acc.take(s.title, 'telemetry');
+          const o = droneOpsRef.current;
+          if (obs && o) {
+            const r = o.mimic(obs, s.profile, true);
+            companionSays(r.said);
+            if (r.event) postBridgeEvent(r.event);
+          }
+        }
         return;
       }
       // plan 50 review: shipping a default changes the game for everyone, so only the player's own words do it; the AI asks

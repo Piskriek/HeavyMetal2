@@ -22,7 +22,7 @@ import { gameVehicleKind, type MultiverseGamePresetSpec } from './game-presets';
 // Plan 47 (Pillar 1): the driven rover's Sovereign Harness — vessel soul, Higher-Self bridge, somatic telemetry.
 import { CAYLEY_PADE_OUT_LENGTH, StateIdx, type IHarnessTuning, type IVesselPreset } from '@hm/harness';
 import { deriveRoverHarnessInput, stepRoverEscortHarness, type IRoverActuatorOutput } from '@hm/mobsim';
-import { HARNESS_SHELF_PRESETS, decodeHarnessCartridgeCode, toHarnessTuning, toVesselPreset, type IHarnessCartridgeSpec } from '@hm/cartlab';
+import { HARNESS_SHELF_PRESETS, decodeHarnessCartridgeCode, encodeHarnessCartridgeCode, toHarnessTuning, toVesselPreset, type IHarnessCartridgeSpec } from '@hm/cartlab';
 import { computeHarnessHudViewModel, type IHarnessHudViewModel } from '../base/ui/harness-telemetry-hud';
 import { CIRCUIT_CHECKPOINTS, gameCreatureIds, gameSpawn, gameStage } from './game-mode';
 import { tickLights } from './light-material';
@@ -449,6 +449,8 @@ export interface PlayScene {
   drainCompanionBarks(): string[];
   /** Plan 51: retunes the drone's combat brain (a mimicked fire pattern's bursts); null restores the research's numbers. */
   setCompanionTuning(patch: Partial<CombatTuning> | null): void;
+  /** The drone's fire rhythm now (a live mimic changes it). */
+  companionTuning(): CombatTuning;
   /** Plan 50: everything of one category the drone can find in the current world. */
   pointsOfInterest(category: ScoutCategory): PointOfInterest[];
   /** Plan 50 §6: stands a screen 4.5 m ahead mirroring a linked window (another game), or takes it down with null. */
@@ -489,6 +491,8 @@ export interface PlayScene {
   exitVehicle(): { readonly id: number; readonly x: number; readonly z: number; readonly yaw: number } | null;
   /** Binds a `harness:`/`harnessc:` cartridge ref to the vehicle soul (null restores the default). False: the ref does not decode. */
   setVehicleHarness(ref: string | null): boolean;
+  /** The vehicle soul's harness as a `harnessc:` code (what an undo puts back). */
+  vehicleHarnessCode(): string;
   getDrivingVehicle(): { readonly id: number; readonly kind: RoverKind; readonly speed: number; readonly boostEnergy?: number; readonly boosting?: boolean } | null;
   getNearVehicle(reach?: number): { readonly id: number; readonly kind: RoverKind } | null;
   /** Returns the active in-game AI companion entity, if loaded. */
@@ -5105,6 +5109,7 @@ export function createPlayScene(o: {
     setCompanionTuning(patch) {
       companionTuning = patch ? { ...COMBAT_TUNING, ...patch } : COMBAT_TUNING;
     },
+    companionTuning: () => companionTuning,
     drainCompanionBarks() {
       return companionBarks.splice(0, companionBarks.length);
     },
@@ -5201,6 +5206,7 @@ export function createPlayScene(o: {
     setFabricators,
     enterVehicle,
     setVehicleHarness,
+    vehicleHarnessCode: () => encodeHarnessCartridgeCode(harnessSpec),
     exitVehicle,
     getDrivingVehicle,
     getNearVehicle,

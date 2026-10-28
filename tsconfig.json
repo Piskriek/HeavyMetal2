@@ -348,6 +348,9 @@
       "@hm/gamepreset": [
         "packages/gamepreset/src/index.ts"
       ],
+      "@hm/gamebridge": [
+        "packages/gamebridge/src/index.ts"
+      ],
       "@hm/harness": [
         "packages/harness/src/index.ts"
       ],

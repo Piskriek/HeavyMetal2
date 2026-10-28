@@ -67,6 +67,16 @@ const OBSERVATION_CAP = 1024 * 1024;
 const FRAME_DIR = path.resolve(arg('--frame-dir') ?? path.join(ROOT, 'shots-run/bridge'));
 /** The latest frame per source (game, external), for /status. */
 const lastFrames = {};
+/** Plan 51 Wave 2: official telemetry payloads are small JSON documents; the queue keeps the newest few hundred. */
+const TELEMETRY_CAP = 256 * 1024;
+const TELEMETRY_QUEUE = 600;
+/** Tests pass the running processes instead of scanning the machine. */
+const FAKE_PROCESSES = arg('--fake-processes') ? arg('--fake-processes').split(',').map((s) => s.trim()).filter(Boolean) : null;
+/** The permission profiles AIs have written, by game id (kept beside the frames, outside the repo's tracked files). */
+const PROFILES_FILE = path.join(path.dirname(FRAME_DIR), 'bridge', 'profiles.json');
+const profiles = (() => { try { const p = JSON.parse(fs.readFileSync(PROFILES_FILE, 'utf8')); return isRecordLoose(p) ? p : {}; } catch { return {}; } })();
+const telemetryCount = {};
+function isRecordLoose(v) { return typeof v === 'object' && v !== null && !Array.isArray(v); }
 
 /** Commands queued for the game to drain on its next /poll. */
 const pendingCommands = [];
@@ -247,6 +257,47 @@ const handle = async (req, res) => {
     return;
   }
 
+  // Plan 51 Wave 2: which processes are running (the drone ranks them as the game the player means). Names only.
+  if (pathname === '/running-games' && req.method === 'GET') {
+    json(res, 200, { processes: await runningProcesses() });
+    return;
+  }
+  // the drone asks the AI on the bridge to check a game's terms live; the answer is a `bridge-profile` command
+  if (pathname === '/bridge-request' && req.method === 'POST') {
+    try {
+      const r = await readJson(req);
+      if (!isRecord(r) || typeof r.gameId !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,47}$/.test(r.gameId)) throw new Error('a bridge request names a gameId');
+      const title = typeof r.title === 'string' ? r.title.slice(0, 96) : r.gameId;
+      pushEvent({ type: 'bridge-request', gameId: r.gameId, title, process: typeof r.process === 'string' ? r.process.slice(0, 96) : null, known: profiles[r.gameId] ?? null });
+      console.log(`\x1b[35m[BRIDGE REQUEST]\x1b[0m ${title} (${r.gameId}): an AI should check its terms and answer {action:'bridge-profile', profile}`);
+      json(res, 200, { ok: true, known: profiles[r.gameId] ?? null });
+    } catch (err) {
+      json(res, 400, { ok: false, error: String(err instanceof Error ? err.message : err) });
+    }
+    return;
+  }
+  // an official integration (a game's state integration, a telemetry adapter) posts here; relayed to the game, which maps
+  // it through the bridged game's mapping preset into samples and gates them (its mechanics always cross, never its assets;
+  // its names cross as labels unless its checked profile allows them)
+  const tel = /^\/telemetry\/([a-z0-9][a-z0-9._-]{0,47})$/.exec(pathname);
+  if (tel && req.method === 'POST') {
+    try {
+      const payload = await readJson(req, TELEMETRY_CAP);
+      const queued = pendingCommands.filter((c) => c.action === 'telemetry');
+      if (queued.length >= TELEMETRY_QUEUE) pendingCommands.splice(pendingCommands.indexOf(queued[0]), 1);
+      pendingCommands.push({ action: 'telemetry', gameId: tel[1], payload, at: Date.now() / 1000 });
+      telemetryCount[tel[1]] = (telemetryCount[tel[1]] ?? 0) + 1;
+      json(res, 200, { ok: true });
+    } catch (err) {
+      json(res, 400, { ok: false, error: String(err instanceof Error ? err.message : err) });
+    }
+    return;
+  }
+  if (pathname === '/bridge-profiles' && req.method === 'GET') {
+    json(res, 200, { profiles, telemetry: telemetryCount });
+    return;
+  }
+
   // Plan 51: a mechanic observed in a game running on the PC (from the best channel that game permits: telemetry, a mod
   // SDK, a permitted loader, its files, the screen last), relayed to the game, whose harness decompiles it into presets
   if (pathname === '/observe-mechanic' && req.method === 'POST') {
@@ -348,7 +399,28 @@ const handle = async (req, res) => {
 };
 const server = http.createServer(handle);
 
+/** The names of the running processes (Windows: tasklist; elsewhere: ps), or the --fake-processes list in tests. */
+async function runningProcesses() {
+  if (FAKE_PROCESSES) return FAKE_PROCESSES;
+  const { execFile } = await import('node:child_process');
+  const run = (cmd, args) => new Promise((resolve) => execFile(cmd, args, { timeout: 4000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 }, (err, out) => resolve(err ? '' : String(out))));
+  if (process.platform === 'win32') {
+    const out = await run('tasklist', ['/fo', 'csv', '/nh']);
+    return [...new Set(out.split(/\r?\n/).map((l) => /^"([^"]+)"/.exec(l)?.[1]).filter(Boolean))];
+  }
+  const out = await run('ps', ['-eo', 'comm=']);
+  return [...new Set(out.split(/\n/).map((l) => l.trim().split('/').pop()).filter(Boolean))];
+}
+
 function dispatchCommand(cmd) {
+  // Plan 51 Wave 2: a game's permission profile is kept, so the verdict survives a bridge restart
+  if (cmd.action === 'bridge-profile' && isRecord(cmd.profile) && typeof cmd.profile.gameId === 'string' && /^[a-z0-9][a-z0-9._-]{0,47}$/.test(cmd.profile.gameId)) {
+    profiles[cmd.profile.gameId] = cmd.profile;
+    try {
+      fs.mkdirSync(path.dirname(PROFILES_FILE), { recursive: true });
+      fs.writeFileSync(PROFILES_FILE, `${JSON.stringify(profiles, null, 2)}\n`);
+    } catch { /* the in-memory copy still serves */ }
+  }
   pendingCommands.push(cmd);
   pushEvent({ type: 'command', cmd });
   console.log(`\x1b[35m[COMPANION BRIDGE]\x1b[0m Queued command:`, cmd);

@@ -228,6 +228,7 @@ export default defineConfig(async ({ mode }) => ({
       '@hm/sky': p('../../packages/sky/src/index.ts'),
       '@hm/plotbiome': p('../../packages/plotbiome/src/index.ts'),
       '@hm/harness': p('../../packages/harness/src/index.ts'),
+      '@hm/gamebridge': p('../../packages/gamebridge/src/index.ts'),
     },
   },
   assetsInclude: ['**/*.fbx', '**/*.bin'],

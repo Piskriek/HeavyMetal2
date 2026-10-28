@@ -104,6 +104,7 @@ import { usePlaySettings } from '../shell/play-settings';
 import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { kv } from '../storage/profile-storage';
 import { isMechanicObservation, transduceMechanic, type MimicryResult } from '@hm/harness';
+import { gateObservation, type BridgePermissionProfile } from '@hm/gamebridge';
 import { encodeKitMotionCode, encodeLocomotionCode } from '@hm/kinematic';
 import { encodeLogicCode } from '@hm/wiregraph';
 import { activeLocomotion, customLocomotion, setCustomLocomotion } from './locomotion';
@@ -1919,6 +1920,65 @@ useEffect(() => {
   /** Plan 50: the drone's orders, finds and the edit history, as the comms (voice, typed, or an AI on the bridge) drive them. */
   /** Plan 51: the last mechanic the harness mimicked (a proposal until "apply the mimic"), with its share codes. */
   const lastMimicRef = useRef<{ readonly result: MimicryResult; readonly codes: { readonly loc?: string; readonly logic?: string; readonly anim?: string; readonly harness: string } } | null>(null);
+  /** Plan 51 wave 2: the one undo step of a live bridge (each refinement replaces the last; this puts back what was before). */
+  const liveMimicUndoRef = useRef<{ readonly label: string; readonly undo: () => void } | null>(null);
+  /** What the live bridge's undo step puts back, widened as refinements touch more (a weapon picked up mid-bridge). */
+  const liveBaseRef = useRef<{ loco: ReturnType<typeof customLocomotion>; weapon: ReturnType<NonNullable<typeof sceneRef.current>['monsters']['getWeaponStats']>; harness: string; tuned: boolean; harnessed: boolean } | null>(null);
+  /**
+   * Puts the last mimic in force: movement, the weapon's and the drone's fire pattern, and the rover's harness when driving.
+   * `live` is a bridge the player ordered ("bridge this game"): every refinement goes straight in and they all share one undo
+   * step back to how things were before the bridge.
+   */
+  const applyLastMimic = (live: boolean): string => {
+    const m = lastMimicRef.current;
+    const scene = sceneRef.current;
+    if (!m || !scene) return 'No mimic to apply: an observation has to come in over the bridge first.';
+    const r = m.result;
+    const done: string[] = [];
+    const prevLoco = customLocomotion();
+    const prevWeapon = scene.monsters.getWeaponStats();
+    const prevHarness = scene.vehicleHarnessCode();
+    let tuned = false;
+    let harnessed = false;
+    if (r.locomotion) {
+      setCustomLocomotion(r.locomotion);
+      done.push(`your movement (gravity ${r.locomotion.gravityMps2} m/s²)`);
+    }
+    if (r.fire) {
+      if (prevWeapon) {
+        scene.monsters.setWeaponStats({ ...prevWeapon, burst: r.fire.burst, burstGap: r.fire.roundGapS, cooldown: Math.max(0.05, r.fire.burstGapS || r.fire.roundGapS) });
+        done.push('your weapon\'s fire pattern');
+      }
+      scene.setCompanionTuning({ burstRounds: Math.max(1, r.fire.burst), roundGapS: r.fire.roundGapS, burstGapS: Math.max(0.05, r.fire.burstGapS || r.fire.roundGapS) });
+      tuned = true;
+      done.push('my own fire rhythm');
+    }
+    if (scene.getDrivingVehicle() && scene.setVehicleHarness(m.codes.harness)) {
+      harnessed = true;
+      done.push('this rover\'s harness');
+    }
+    const step = liveMimicUndoRef.current;
+    const base = liveBaseRef.current;
+    if (live && step && base && undoStackRef.current.includes(step)) {
+      // a refinement: the bridge's one undo step still puts back what was there before the bridge touched each thing
+      if (!base.weapon && prevWeapon && r.fire) base.weapon = prevWeapon;
+      base.tuned ||= tuned;
+      base.harnessed ||= harnessed;
+    } else {
+      const was = { loco: prevLoco, weapon: r.fire ? prevWeapon : null, harness: prevHarness, tuned, harnessed };
+      pushUndo(`the ${r.game} mimic is off`, () => {
+        setCustomLocomotion(was.loco);
+        const s = sceneRef.current;
+        if (was.weapon) s?.monsters.setWeaponStats(was.weapon);
+        if (was.tuned) s?.setCompanionTuning(null);
+        if (was.harnessed) s?.setVehicleHarness(was.harness);
+      });
+      liveMimicUndoRef.current = live ? undoStackRef.current[undoStackRef.current.length - 1]! : null;
+      liveBaseRef.current = live ? was : null;
+    }
+    const shelf = [m.codes.logic && !r.fire ? 'its trigger rules' : null, m.codes.anim ? 'its motion' : null].filter(Boolean).join(' and ');
+    return `${live ? 'Live: ' : ''}${r.game} mimic on ${done.join(', ') || 'nothing in reach'}.${shelf ? ` ${shelf[0]!.toUpperCase()}${shelf.slice(1)} wait on the mimic shelf: nothing here is wired to that game's events yet.` : ''} ${live ? '"Stop the bridge" puts everything back.' : '"Undo" takes it off.'}`;
+  };
   const droneOps = useMemo<CompanionDroneOps>(() => ({
     orders(patch): string {
       const scene = sceneRef.current;
@@ -1966,11 +2026,14 @@ useEffect(() => {
       scene?.getCompanion()?.followPlayer();
       return 'Back on your shoulder, defending you. Orders cleared.';
     },
-    mimic(observation: unknown) {
-      // plan 51: a mechanic observed in another game, decompiled by the harness into FIDELITY presets (a proposal: the
-      // player's own "apply the mimic" puts it in force)
+    mimic(observation: unknown, profile?: BridgePermissionProfile | null, live?: boolean) {
+      // plan 51: a mechanic observed in another game, decompiled by the harness into FIDELITY presets. It is a proposal
+      // until the player's own word puts it in force: "apply the mimic", or the "bridge this game" order (live)
       if (!isMechanicObservation(observation)) return { said: 'That observation is not one I can read: it needs a game, a channel and a trajectory, shots or events.', event: null };
-      const r = transduceMechanic(observation);
+      // wave 2: the game's profile cuts it to what may cross (mechanics always do; names become labels; deeper rungs need a check)
+      const gate = gateObservation(profile ?? null, observation);
+      if (!gate.observation) return { said: `Nothing from ${observation.game} crossed: ${gate.dropped.join('; ')}.`, event: { type: 'mimic-refused', game: observation.game, channel: observation.channel, dropped: gate.dropped } };
+      const r = transduceMechanic(gate.observation);
       const harnessSpec: IHarnessCartridgeSpec = {
         ...HARNESS_SHELF_PRESETS['harness:escort-steadfast']!,
         id: `harness:mimic-${r.game.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 24)}`,
@@ -1991,39 +2054,21 @@ useEffect(() => {
       if (r.locomotion) parts.push(`movement: gravity ${r.locomotion.gravityMps2} m/s², jump ${r.locomotion.jumpImpulseMps} m/s, walk ${r.locomotion.walkSpeedMps}, run ${r.locomotion.runSpeedMps} (nearest ${r.nearest.locomotion?.id})`);
       if (r.fire) parts.push(r.fire.burst > 1 ? `fire: ${r.fire.burst}-round bursts at ${Math.round(1 / r.fire.roundGapS)} rounds/s` : `fire: full auto at ${Math.round(r.fire.roundsPerSecond * 60)} rounds/min`);
       if (r.logic && !r.fire) parts.push(`${r.logic.actuators.length} trigger rules`);
-      const said = `Read ${r.game} through ${r.channel}: ${parts.join('; ') || 'nothing I could identify'}. Confidence ${Math.round(r.confidence * 100)}%. Say "apply the mimic" to try it, "undo" after to drop it.`;
-      return { said, event: { type: 'mimic-result', game: r.game, channel: r.channel, codes, nearest: r.nearest, fire: r.fire, sieve: r.sieve, confidence: r.confidence, notes: r.notes } };
+      const read = `Read ${r.game} through ${r.channel}: ${parts.join('; ') || 'nothing I could identify'}. Confidence ${Math.round(r.confidence * 100)}%.${gate.dropped.length ? ` Kept back: ${gate.dropped.join('; ')}.` : ''}`;
+      const said = live ? `${read} ${applyLastMimic(true)}` : `${read} Say "apply the mimic" to try it, "undo" after to drop it.`;
+      return { said, event: { type: 'mimic-result', game: r.game, channel: r.channel, codes, nearest: r.nearest, fire: r.fire, sieve: r.sieve, confidence: r.confidence, notes: r.notes, live: live === true, dropped: gate.dropped } };
     },
     applyMimic(): string {
-      const m = lastMimicRef.current;
-      const scene = sceneRef.current;
-      if (!m || !scene) return 'No mimic to apply: an observation has to come in over the bridge first.';
-      const r = m.result;
-      const done: string[] = [];
-      const prevLoco = customLocomotion();
-      const prevWeapon = scene.monsters.getWeaponStats();
-      let tuned = false;
-      if (r.locomotion) {
-        setCustomLocomotion(r.locomotion);
-        done.push('your movement');
-      }
-      if (r.fire) {
-        if (prevWeapon) {
-          scene.monsters.setWeaponStats({ ...prevWeapon, burst: r.fire.burst, burstGap: r.fire.roundGapS, cooldown: Math.max(0.05, r.fire.burstGapS || r.fire.roundGapS) });
-          done.push('your weapon\'s fire pattern');
-        }
-        scene.setCompanionTuning({ burstRounds: Math.max(1, r.fire.burst), roundGapS: r.fire.roundGapS, burstGapS: Math.max(0.05, r.fire.burstGapS || r.fire.roundGapS) });
-        tuned = true;
-        done.push('my own fire rhythm');
-      }
-      if (scene.getDrivingVehicle() && scene.setVehicleHarness(m.codes.harness)) done.push('this rover\'s harness');
-      pushUndo(`the ${r.game} mimic is off`, () => {
-        setCustomLocomotion(prevLoco);
-        if (prevWeapon) sceneRef.current?.monsters.setWeaponStats(prevWeapon);
-        if (tuned) sceneRef.current?.setCompanionTuning(null);
-      });
-      const shelf = [m.codes.logic ? 'its logic graph' : null, m.codes.anim ? 'its motion' : null].filter(Boolean).join(' and ');
-      return `${r.game} mimic applied to ${done.join(', ') || 'nothing in reach'}.${shelf ? ` ${shelf[0]!.toUpperCase()}${shelf.slice(1)} wait on the mimic shelf (no slot in play yet).` : ''} "Undo" takes it off.`;
+      return applyLastMimic(false);
+    },
+    endLiveMimic(): string {
+      const step = liveMimicUndoRef.current;
+      liveMimicUndoRef.current = null;
+      if (!step || !undoStackRef.current.includes(step)) return 'Bridge closed. Nothing of its mimic was still on.';
+      undoStackRef.current = undoStackRef.current.filter((s) => s !== step);
+      liveBaseRef.current = null;
+      step.undo();
+      return `Bridge closed: ${step.label}, everything is back as it was before.`;
     },
     undo(): string {
       if (dropStagedEdit()) return 'Put it back as it was.';

@@ -48,6 +48,8 @@ export type CompanionIntent =
   | { readonly kind: 'undo' }
   | { readonly kind: 'keep' }
   | { readonly kind: 'mimic-apply' }
+  | { readonly kind: 'bridge-game'; readonly name: string | null }
+  | { readonly kind: 'bridge-stop' }
   | { readonly kind: 'chat' };
 
 /** A resolved order: where to go, whether to float there, and the spoken confirmation. */
@@ -90,6 +92,8 @@ const RESTORE_VERB = ['put', 'bring', 'add', 'give'];
 const DEFAULT_VERB = ['save', 'make', 'set', 'keep', 'store', 'write'];
 const RESET = ['reset', 'revert', 'undo'];
 const WHAT = ['what is this', 'what is that', "what's this", "what's that", 'what am i looking at', 'what am i pointing at', 'what did i ping', 'identify', 'what is it'];
+// plan 51 wave 2: words around a game's name in "bridge the game I'm playing" that are not the name
+const BRIDGE_FILLER = ['the', 'this', 'that', 'game', 'games', "i'm", 'im', 'i', 'am', 'playing', 'running', 'open', 'please', 'now', 'for', 'me', 'my', 'to', 'into', 'with', 'one', 'current', 'here'];
 
 /**
  * Parses a spoken or typed command into an intent. Scored, not first-match: a float/hover word
@@ -120,6 +124,14 @@ export function parseCompanionIntent(raw: string): CompanionIntent {
     if (hits(text, tokens, ['apply', 'try', 'use', 'put', 'give me', 'switch to', 'load'])) return { kind: 'mimic-apply' };
   }
   if (hits(text, tokens, ['keep it', 'keep that', 'keep this', 'yes keep', 'apply it', 'commit it'])) return { kind: 'keep' };
+  // plan 51 wave 2: ending the bridge puts back everything its live mimic changed
+  if (/^(?:please )?(?:unbridge|unlink the game|(?:stop|end|close|drop|cut|kill) (?:the )?(?:bridge|bridging|game bridge|mimic|mimicking)|disconnect(?: from)?(?: the)? (?:game|bridge))\b/.test(text)) return { kind: 'bridge-stop' };
+  // plan 51 wave 2: "bridge this game", "bridge counter strike", "hook into the game I'm playing": the name, if said
+  const bridge = /^(?:please )?(?:bridge(?: to| into| with)?|hook into|connect to|link up with)\b(.*)$/.exec(text);
+  if (bridge) {
+    const name = (bridge[1] ?? '').split(' ').filter((w) => w && !BRIDGE_FILLER.includes(w)).join(' ');
+    return { kind: 'bridge-game', name: name || null };
+  }
   if (hits(text, tokens, RESET)) return { kind: 'kit-reset' };
   if (hits(text, tokens, ['hold fire', 'cease fire', 'stop shooting', "don't shoot", 'dont shoot', 'stand down'])) return { kind: 'combat-mode', mode: 'hold-fire' };
   if (hits(text, tokens, ['weapons free', 'open fire', 'fire at will', 'go loud', 'engage', 'attack everything', 'kill everything'])) return { kind: 'combat-mode', mode: 'weapons-free' };
@@ -245,6 +257,8 @@ export function resolveCompanionOrder(
     case 'undo':
     case 'keep':
     case 'mimic-apply':
+    case 'bridge-game':
+    case 'bridge-stop':
       return { intent, ...none, reply: '' }; // the caller runs it (the kit edit, the order or the find) and reports it
     case 'chat':
       return { intent, ...none, reply: '' }; // the caller routes to the bridge or small talk

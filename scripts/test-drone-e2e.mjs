@@ -6,7 +6,10 @@
  *  - an AI's kit edit over the bridge is staged: shown, not saved; "keep it" saves it; "undo" puts it back;
  *  - on the Moon the fast brain engages a placed monster and hurts it; barks reach the bridge;
  *  - orders by voice (hold fire, weapons free, cover my left) set the brain's orders; "find ..." marks a point of interest;
- *  - the eyes post JPEG frames of the view, and of a linked window, to the bridge; no page errors.
+ *  - the eyes post JPEG frames of the view, and of a linked window, to the bridge;
+ *  - plan 51: an observed mechanic waits for "apply the mimic"; "bridge <game>" finds the game on a fake process list,
+ *    bridges its mechanics even under a refused verdict, mimics its telemetry live, and "stop the bridge" puts all back;
+ *  - no page errors.
  * Boots the built game (run `npm run build` first); shots to shots-run/drone/.
  *   node scripts/test-drone-e2e.mjs
  */
@@ -30,7 +33,11 @@ const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'drone-e2e-'));
 const defaultsFile = path.join(tmpDir, 'kit-defaults.json');
 fs.writeFileSync(defaultsFile, '{}\n');
 const server = spawn(process.execPath, ['scripts/serve.mjs'], { cwd: root, env: { ...process.env, PORT: String(port) }, stdio: 'ignore' });
-const bridgeProc = spawn(process.execPath, ['scripts/companion-bridge.mjs', '--port', String(bridgePort), '--defaults-file', defaultsFile, '--frame-dir', path.join(tmpDir, 'frames')], { cwd: root, stdio: 'ignore' });
+// a made-up PC for "bridge <game>": the OS, a browser, an indie game and a tool (never the real process list)
+const bridgeProc = spawn(process.execPath, ['scripts/companion-bridge.mjs', '--port', String(bridgePort), '--defaults-file', defaultsFile, '--frame-dir', path.join(tmpDir, 'frames'), '--fake-processes', 'svchost.exe,chrome.exe,SomeIndie.exe,OtherTool.exe'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
+// the bridge's log, printed if the run fails (a crashed bridge otherwise shows only as 'fetch failed')
+let bridgeLog = '';
+for (const s of [bridgeProc.stdout, bridgeProc.stderr]) s.on('data', (d) => { bridgeLog = (bridgeLog + d).slice(-6000); });
 await new Promise((r) => setTimeout(r, 1500));
 
 const browser = await chromium.launch({ executablePath: chromePath, headless: true, args: ['--ignore-gpu-blocklist', '--enable-gpu'] });
@@ -173,6 +180,70 @@ try {
   await order('undo');
   const gUndone = await page.evaluate(() => window.__dev.activeLocomotion().gravityMps2);
   check('"undo" takes the mimic off', Math.abs(gUndone - gBefore) < 1e-6, `g ${gUndone}`);
+
+  // --- 4c. Plan 51 wave 2: "bridge <game>" finds it on the PC, bridges its mechanics out of the box and mimics them LIVE ---
+  await order('bridge this game');
+  check('with no name and no known engine, the drone asks which game', Boolean(await until(() => said(/running\. Which one\?/), 4000)));
+  await order('bridge some indie');
+  check('"bridge some indie" finds SomeIndie.exe and bridges it unchecked: mechanics by its telemetry or the screen',
+    Boolean(await until(() => said(/^SomeIndie: unchecked\. Nobody checked its terms yet\. Mechanics cross by telemetry > screen/), 5000)));
+  const request = await until(async () => (await getJson('/events?after=0')).events.find((e) => e.type === 'bridge-request'), 4000);
+  check('...and asks the AI on the bridge to check its terms', request?.gameId === 'someindie' && request?.process === 'SomeIndie.exe', JSON.stringify(request ?? null));
+  // a GSI-style feed: position "x, z, y" in centimetres, a shots counter, a phase field; g = 8 m/s², 5 rounds/s
+  const telemetryFeed = (n) => {
+    const dt = 1 / 30, out = [];
+    let h = 0, vy = 0, px = 0, fired = 0;
+    for (let f = 0; f < n; f++) {
+      if (h <= 0 && f % 75 === 10) vy = 5;
+      vy -= 8 * dt;
+      h = Math.max(0, h + vy * dt);
+      if (h === 0) vy = 0;
+      px += (f < 150 ? 3 : 6) * dt;
+      if (f % 6 === 0) fired += 1;
+      out.push({ provider: { timestamp: f * dt }, player: { position: `${(px * 100).toFixed(2)}, 0, ${(h * 100).toFixed(3)}`, shots: fired }, boss: { state: f < 200 ? 'Calm' : 'Enraged' } });
+    }
+    return out;
+  };
+  const postTelemetry = async (payloads) => { for (const p of payloads) await fetch(`${bridge}/telemetry/someindie`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }); };
+  await postTelemetry(telemetryFeed(1));
+  check('telemetry with no mapping yet is held back with a plain reason', Boolean(await until(() => said(/nobody has told me which of its fields/), 5000)));
+  // the test plays the checking AI, and its verdict is the harshest: the terms refuse. Mechanics must still cross.
+  await postCommand({
+    action: 'bridge-profile',
+    profile: {
+      schema: 'hm2:bridge-profile:v1', gameId: 'someindie', title: 'SomeIndie', verdict: 'refused',
+      channels: ['mod-loader'], streams: ['mechanics', 'entity-kinds'], soloOnly: false,
+      sources: [{ url: 'https://example.com/someindie-eula', quote: 'No third-party tool may modify or inject into the game.' }],
+      checkedBy: 'e2e (playing the checking AI)', setup: ['Turn on its telemetry output.'], notes: [],
+      telemetry: {
+        t: { path: 'provider.timestamp' },
+        x: { path: 'player.position', split: ',', index: 0, scale: 0.01 },
+        y: { path: 'player.position', split: ',', index: 2, scale: 0.01 },
+        z: { path: 'player.position', split: ',', index: 1, scale: 0.01 },
+        shotCounter: { path: 'player.shots' },
+        events: ['boss.state'],
+      },
+    },
+  });
+  check('a refused verdict still bridges its mechanics (no mods, loaders or file reads)', Boolean(await until(() => said(/mechanics still cross by telemetry > screen, solo/), 5000)));
+  const tuningBefore = await page.evaluate(() => window.__playScene.companionTuning().roundGapS);
+  const gPre = await page.evaluate(() => window.__dev.activeLocomotion().gravityMps2);
+  await postTelemetry(telemetryFeed(330));
+  const live = await until(async () => (await getJson('/events?after=0')).events.find((e) => e.type === 'mimic-result' && e.live === true), 12000);
+  check('a full telemetry batch becomes a live mimic, with no "apply the mimic"', Boolean(live), JSON.stringify(live?.codes ?? null).slice(0, 120));
+  check('...the game\'s names crossed only as labels (the refused profile never allowed them)', live?.dropped?.some((d) => /anonymous labels/.test(d)), JSON.stringify(live?.dropped ?? null));
+  const gLive = await page.evaluate(() => window.__dev.activeLocomotion().gravityMps2);
+  check('the observed gravity is on the body at once', Math.abs(gLive - 8) / 8 < 0.05, `g ${gLive} (was ${gPre})`);
+  const gapLive = await page.evaluate(() => window.__playScene.companionTuning().roundGapS);
+  check('...and the observed fire rate is on the drone\'s guns', Math.abs(gapLive - 0.2) < 0.02, `round gap ${gapLive} s (was ${tuningBefore})`);
+  await order('stop the bridge');
+  check('"stop the bridge" says so', Boolean(await until(() => said(/^Unbridged from SomeIndie/), 4000)));
+  const gAfter = await page.evaluate(() => window.__dev.activeLocomotion().gravityMps2);
+  const gapAfter = await page.evaluate(() => window.__playScene.companionTuning().roundGapS);
+  check('...and puts movement and fire back as they were before the bridge', Math.abs(gAfter - gPre) < 1e-6 && Math.abs(gapAfter - tuningBefore) < 1e-9, `g ${gAfter}, gap ${gapAfter}`);
+  await postTelemetry(telemetryFeed(330));
+  await page.waitForTimeout(2500);
+  check('after the bridge closes, its telemetry changes nothing', Math.abs((await page.evaluate(() => window.__dev.activeLocomotion().gravityMps2)) - gPre) < 1e-6);
   await closePanel();
 
   // --- 5. the Moon: thrusters, and the fast brain fights ---
@@ -201,5 +272,6 @@ try {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 }
 const failed = results.filter((r) => !r.ok);
+if (failed.length) console.log(`\n--- the bridge's log (tail) ---\n${bridgeLog.slice(-3000)}`);
 console.log(`\n${results.length - failed.length}/${results.length} drone checks passed`);
 process.exit(failed.length === 0 ? 0 : 1);

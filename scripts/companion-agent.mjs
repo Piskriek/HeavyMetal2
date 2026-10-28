@@ -207,6 +207,12 @@ async function loop() {
       if (e.type === 'telemetry') {
         if (e.player) lastTelemetry.player = e.player;
         if (e.companion) lastTelemetry.companion = e.companion;
+      } else if (e.type === 'bridge-request') {
+        // Plan 51 Wave 2: the game already runs the bridge on the unchecked profile (mechanics through the game's own
+        // telemetry or the screen, never its assets). This scripted agent cannot read terms, so it adds nothing; a checking
+        // AI on the bridge answers with {action:'bridge-profile', profile} (sources quoted, a telemetry mapping if the game
+        // publishes one), which widens or narrows everything beyond mechanics.
+        if (!e.known) console.log(`\x1b[33m[BRIDGE]\x1b[0m ${e.title}: bridged on the unchecked profile (mechanics only); no AI here to check its terms`);
       } else if (e.type === 'ping') {
         lastPing = e;
         const t = e.target ?? {};

@@ -39,7 +39,64 @@ resort**. No other game's assets are copied: its feel is re-expressed in FIDELIT
 - **RULES 8a fix of Plan 49**: "remove the chevrons" no longer paints trim over. `PartOverride.hidden` (kitspec) and
   `hiddenParts` (kit-build) take parts out of the build: no mesh, nothing to hit, still listed so they can come back.
 
-## 2. Next (in order; ask the owner where marked)
+## 2. Wave 2: the drone bridges any game, live (owner, 28 Oct)
+
+"Write modular code: when I ask you to bridge a game from within the game, as the drone you check the game's copyright
+live and start streaming the things that aren't copyrighted." Research: [`docs/GAME_BRIDGE_PERMISSIONS_RESEARCH.md`](../../GAME_BRIDGE_PERMISSIONS_RESEARCH.md).
+
+- **One module for every game, `@hm/gamebridge` (pure).** It holds:
+  - the **permission profile** (`hm2:bridge-profile:v1`: verdict, allowed observer rungs, allowed stream classes
+    `mechanics` / `telemetry` / `entity-kinds`, solo only, sources with quotes, who checked it, setup steps). `assets` is
+    never allowed; the validator strips it;
+  - the **mechanics floor** (owner and Argon review, 28 Oct). Mechanics are ideas and systems, which copyright does not
+    protect, so **no verdict blocks them**: unchecked, limited and refused games all bridge mechanics out of the box.
+    - The floor rungs (`FLOOR_CHANNELS`) are the game's own official telemetry, which it sends out to be read, and the
+      screen, which the player sees. Every game allows both.
+    - A checked profile adds only the deeper rungs (mod SDK, loader, game files): they touch the game's code or data,
+      where terms and anti-cheat bind. A refused verdict keeps the floor, solo.
+    - Samples are consumed to measure the mechanics and never kept.
+    - The game's names for its events cross as anonymous labels (`boss.state:#2`) unless the profile allows
+      `entity-kinds`. A rule keeps its shape and timing; the game's words stay behind;
+  - the **unchecked profile** (the floor rungs, mechanics, solo);
+  - **gating** (assets never; mechanics always; names anonymized; a deeper rung needs a checked profile);
+  - **rung choice** (the best allowed rung that is available);
+  - **telemetry mapping presets** (data, not code: dotted paths from an official telemetry payload to the observation's
+    numbers, so a new game is a new preset);
+  - a **share code** (`bridgec:`).
+- **The live flow, in play:**
+  1. You say "bridge this game", or "bridge <name>".
+  2. The drone asks the bridge which processes are running and ranks them (known engine signatures from `bridgekit`
+     first).
+  3. With no name said, the drone bridges a known engine or the only candidate; otherwise it names what is running and
+     asks which game.
+  4. The session starts at once on the unchecked profile, so the bridge works with no AI attached. The drone reads out
+     what crosses.
+  5. It posts a `bridge-request`. A checking AI on the bridge reads that game's terms live and answers with a
+     `bridge-profile`: sources quoted, deeper rungs, names, and the game's telemetry mapping when it publishes one. Its
+     verdict replaces the unchecked one for everything beyond mechanics. An AI cannot open a bridge by itself: profiles
+     only apply to the game the player ordered bridged.
+  6. Observations flow through gating:
+     - official telemetry posted to `POST :8220/telemetry/<game>`, through the mapping, in batches of 300 samples (about
+       10 s of a 30 Hz feed);
+     - an AI's `/observe-mechanic` for that game;
+     - the screen, last.
+     Telemetry that arrives before a mapping is held back with a plain reason.
+  7. **The live effect.** "Bridge this game" is the player's word, so every mimic of the bridged game goes straight
+     onto play:
+     - movement (gravity, jump, walk and run);
+     - the weapon's and the drone's fire pattern;
+     - the rover's harness while driving.
+     Each refinement replaces the last, and all of them share one undo step. "Stop the bridge" (or "unbridge") puts back
+     everything as it was before the bridge. A mimic of a game nobody bridged still waits for "apply the mimic".
+  8. Trigger rules from events have nothing in FIDELITY to bind to yet. They go on the mimic shelf as `logic:` codes
+     (the play slot is §3.3). The fire graph does apply, as the fire pattern.
+  9. Proven by `scripts/test-drone-e2e.mjs` §4c:
+     - a fake process list;
+     - a refused verdict that still bridges;
+     - a GSI-style feed whose g = 8 and 5 rounds/s land on the body and the drone's guns within one batch;
+     - "stop the bridge" restoring both.
+
+## 3. Next (in order; ask the owner where marked)
 
 1. **The shorthand**, defined (`OWNER_INTENT_SYNTHESIS.md` §4: typed JSON `hm2:shorthand:v1` + a one-line text form);
    the mimic result becomes one of its frame kinds.

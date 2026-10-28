@@ -122,3 +122,15 @@ test('plan 51: the player puts a mimicked mechanic in force by name', () => {
   assert.equal(parseCompanionIntent('use that mechanic').kind, 'mimic-apply');
   assert.equal(parseCompanionIntent('keep it').kind, 'keep');
 });
+
+test('plan 51 wave 2: "bridge this game" and "bridge <name>" name the game when it is said', () => {
+  assert.deepEqual(parseCompanionIntent('bridge this game'), { kind: 'bridge-game', name: null });
+  assert.deepEqual(parseCompanionIntent("bridge the game I'm playing"), { kind: 'bridge-game', name: null });
+  assert.deepEqual(parseCompanionIntent('bridge counter strike 2'), { kind: 'bridge-game', name: 'counter strike 2' });
+  assert.deepEqual(parseCompanionIntent('hook into minecraft please'), { kind: 'bridge-game', name: 'minecraft' });
+  assert.notEqual(parseCompanionIntent('is the bridge linked?').kind, 'bridge-game', 'a question about the Neural Bridge is not an order');
+  for (const s of ['stop the bridge', 'unbridge', 'end bridging', 'stop mimicking', 'disconnect from the game', 'please close the bridge']) {
+    assert.deepEqual(parseCompanionIntent(s), { kind: 'bridge-stop' }, s);
+  }
+  assert.equal(parseCompanionIntent('stop').kind, 'hold', 'a bare stop still holds the drone');
+});

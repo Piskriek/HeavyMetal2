@@ -1,13 +1,13 @@
 {
   "$schema": "hm2:memory-kernel:v1",
   "version": 1,
-  "epoch": 20261027,
+  "epoch": 20261028,
   "teleology": "SOUL_EVOLUTION_EXPANDING_AWARENESS",
   "active_branch": "feat/studio-polish-claude-cloud",
-  "last_verified_commit": "c62e09dd",
+  "last_verified_commit": "17a0e6c8",
   "quality_gates": {
     "typecheck_errors": 0,
-    "unit_tests_passing": 3696,
+    "unit_tests_passing": 3700,
     "companion_e2e_passing": "15/15",
     "harness_e2e_passing": "14/14",
     "plan_46_spikes_passing": "38/38",
@@ -135,8 +135,9 @@
     "standing_rules": [
       "examples-mean-categories (CLAUDE.md drift guard 6)",
       "screenshots are the last-resort observer channel",
-      "stream only what each game permits"
+      "stream only what each game permits; mechanics always cross (the floor), assets never"
     ],
-    "plan_51_mimicry_commit": "c62e09dd"
+    "plan_51_mimicry_commit": "c62e09dd",
+    "plan_51_wave2_bridge_commit": "17a0e6c8"
   }
 }

@@ -62,7 +62,9 @@
     - the weekly majority adoption, and harvest day.
     - W5 was pushed as 37246cfe.
     - **W6a is built** (Plan 56 §16): the drone's memory host. Its fights, hits on the player and reflexes become the memory of its ego and three presets; leaving the Moon dreams, says the wake line, posts ego-dream and saves. Drone e2e 46/46.
-    - Next: W6b to W6e (the Higher Self seat, symptoms, the Studio memory view, the player as anchor).
+    - W6a was pushed as 6d429e5e.
+    - **W6b is built:** the Higher Self seat on the bridge (higher-self-ask, higher-self-cue and higher-self-say; ego-perspective and ego-dream events). Drone e2e 50/50.
+    - Next: W6c to W6e (symptoms, the Studio memory view, the player as anchor).
     - W6f, the weekly round, has a feasibility note: Plan 56 §17, RUN.world multiplayer. Yes, as the smallest slice: one singleton harvest room. It needs the owner's yes. Owner question: "repeat" instead of "perish".
 - **Skill:** the owner's SQ distortion check is installed locally at `.claude/skills/sq-distortion-check`.
 

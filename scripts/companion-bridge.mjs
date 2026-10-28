@@ -17,10 +17,16 @@
  *   { "action": "mutate-kit-preset", "kitId"?, "partId"?, "mutation": "strip-hazard"|"restore-hazard"|"reset" }
  *   { "action": "override-kit-part", "kitId"?, "partId" | "paths": [...], "material": "darkSteel" }
  *   { "action": "save-kit-default", "kitId"? }    the game sends the kit's overrides to POST /kit-defaults
+ *   Plan 56 W6b, the Higher Self seat (it reads, cues and speaks; it never writes the drone's memory):
+ *   { "action": "higher-self-ask" }                               -> an ego-perspective event
+ *   { "action": "higher-self-cue", "cues": [{ "of", "t" }, ...] }  1..12 episodes from ego-perspective's cueable, for the next dream
+ *   { "action": "higher-self-say", "words": "..." }               the drone says "From my Higher Self: ..." (one line, 300 chars)
  *
  * Events an AI reads (GET /events): player-say {text, intent}, companion-say {text}, telemetry {player, companion},
  *   ping {where, label, target: {x,y,z, normal, entityType, entityId, kitId?, partId?, part?, material?, distance}},
- *   kit-result {action, result}, kit-default-saved {key, file}, command {cmd}.
+ *   kit-result {action, result}, kit-default-saved {key, file}, command {cmd},
+ *   Plan 56: ego-perspective {lines, kundalini, cueable}, ego-dream {line, digest, cuedBy}, higher-self-cue-taken {count},
+ *   higher-self-cue-refused {why}.
  *
  * The game's side (companion-chat.tsx polls while the game runs on localhost):
  *   GET  /poll          -> drains queued commands for the companion

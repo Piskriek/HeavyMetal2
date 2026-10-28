@@ -270,12 +270,27 @@ try {
     return cats.includes('CONTACT') && cats.includes('TARGET_DOWN') ? cats : null;
   }, 15000);
   check('the fight became the drone\'s experience: the contact and the kill are in its fire preset', Boolean(fireCats), JSON.stringify(fireCats ?? await page.evaluate(() => window.__dev.droneMemory().presets.fire.ep.map((e) => e.cat))));
-  const dreamsBefore = (await getJson('/events?after=0')).events.filter((e) => e.type === 'ego-dream').length;
+  // Plan 56 W6b: the Higher Self seat. Hits on the player charge the flight preset; the seat reads that and cues it
+  const typed = async (type) => (await getJson('/events?after=0')).events.filter((e) => e.type === type);
+  await page.evaluate(() => { for (let i = 0; i < 3; i++) window.__dev.droneNote({ kind: 'hurt', damage: 25 }); });
+  const askedBefore = (await typed('ego-perspective')).length;
+  await postCommand({ action: 'higher-self-ask' });
+  const persp = await until(async () => (await typed('ego-perspective')).slice(askedBefore)[0], 6000);
+  const cue = persp?.cueable?.find((c) => c.of === 'loc:f17e');
+  check('the Higher Self seat reads the drone\'s perspective: its digest and the episodes worth a cue', Boolean(persp?.lines?.length) && Boolean(cue), JSON.stringify(persp ?? null).slice(0, 200));
+  const takenBefore = (await typed('higher-self-cue-taken')).length;
+  if (cue) await postCommand({ action: 'higher-self-cue', cues: [{ of: cue.of, t: cue.t }] });
+  check('...its cue is held for the next dream', (await until(async () => (await typed('higher-self-cue-taken')).slice(takenBefore)[0], 5000))?.count === 1);
+  const dreamsBefore = (await typed('ego-dream')).length;
   await page.evaluate(() => window.__playScene.debug.teleport('lab', 0, 2.4, 0, 0));
   await frames(10);
-  const dreamt = await until(async () => (await getJson('/events?after=0')).events.filter((e) => e.type === 'ego-dream').slice(dreamsBefore)[0], 6000);
+  const dreamt = await until(async () => (await typed('ego-dream')).slice(dreamsBefore)[0], 6000);
   check('back in the lab the drone dreams: the bridge gets the digest, and it tells the dream on the radio', Boolean(dreamt) && Array.isArray(dreamt.digest?.replayed) && dreamt.digest.replayed.length > 0
     && Boolean(await until(() => said(/^I dreamed the (contact|target down|area clear|hits on you|reflex) again/), 4000)), JSON.stringify(dreamt ?? null).slice(0, 200));
+  check('...and the Higher Self\'s cue steered it: the cued hits were replayed', dreamt?.cuedBy === 'higher-self' && Boolean(cue) && dreamt.digest.replayed.some((r) => r.cued && r.of === cue.of && r.t === cue.t),
+    JSON.stringify(dreamt?.digest?.replayed?.slice(0, 3) ?? null));
+  await postCommand({ action: 'higher-self-say', words: 'Rest in Presence. The ally beside you is the anchor you were looking for.' });
+  check('the drone voices its Higher Self\'s reading, marked as such', Boolean(await until(() => said(/^From my Higher Self: Rest in Presence\. The ally beside you/), 5000)));
   // the game's storage keys are per profile (hm.p.<id>.<key>)
   const saved = await page.evaluate(() => { try { const k = Object.keys(localStorage).find((x) => x.endsWith('hm.drone.memory.v1')); return k ? JSON.parse(localStorage.getItem(k) ?? 'null')?.v ?? null : null; } catch { return 'unreadable'; } });
   check('...and its memory is saved as share codes', saved === 1, String(saved));

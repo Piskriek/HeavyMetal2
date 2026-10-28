@@ -104,7 +104,8 @@ import { LOW_BARK_COOLDOWN, PLAYER_MAX_HP, hitBearing, hurt as hurtHp, isLow, pa
 import { usePlaySettings } from '../shell/play-settings';
 import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { kv } from '../storage/profile-storage';
-import { createDroneMemory, dreamNow, loadDroneMemory, noteCatalyst, saveDroneMemory, type DroneCatalyst, type DroneMemory } from './drone-memory';
+import { createDroneMemory, dreamNow, dronePerspective, loadDroneMemory, noteCatalyst, saveDroneMemory, type DroneCatalyst, type DroneMemory } from './drone-memory';
+import type { DreamCue } from '@hm/harness';
 import { isMechanicObservation, transduceMechanic, type MimicryResult } from '@hm/harness';
 import { gateObservation, mirrorKeyEdges, weaponStandIn, type BridgePermissionProfile } from '@hm/gamebridge';
 import { createReflexSlot, type ReflexAction, type ReflexSlot } from './mimic-reflex';
@@ -1800,6 +1801,8 @@ useEffect(() => {
   // its dream, and it is saved as share codes. Ticks are seconds, so its memories keep their order across sessions.
   const droneMemoryRef = useRef<DroneMemory | null>(null);
   const droneStageRef = useRef(0);
+  /** Plan 56 W6b: the Higher Self's cues, held for the next dream (then cleared). */
+  const higherSelfCuesRef = useRef<readonly DreamCue[] | null>(null);
   const droneMemory = (): DroneMemory => {
     if (!droneMemoryRef.current) {
       let saved: string | null = null;
@@ -1813,11 +1816,16 @@ useEffect(() => {
   };
   /** Leaving the Moon (the gate, or sync lost): the drone dreams, saves, and tells its dream on waking; the bridge gets it too. */
   const droneDreams = (): void => {
-    const d = dreamNow(droneMemory(), Math.floor(Date.now() / 1000));
+    const cues = higherSelfCuesRef.current;
+    higherSelfCuesRef.current = null;
+    // the Higher Self's cues when it gave some; otherwise the built-in cue (lowest ray first)
+    const d = dreamNow(droneMemory(), Math.floor(Date.now() / 1000), cues ?? undefined);
     droneMemoryRef.current = d.memory;
     try { kv.set(DRONE_MEMORY_KEY, saveDroneMemory(d.memory)); } catch { /* storage unavailable: kept for this session */ }
     companionHandleRef.current?.say(d.line);
-    companionHandleRef.current?.post({ type: 'ego-dream', line: d.line, digest: d.memory.lastDream });
+    companionHandleRef.current?.post({ type: 'ego-dream', line: d.line, digest: d.memory.lastDream, cuedBy: cues ? 'higher-self' : 'built-in' });
+    // and what it sees of itself now, for the Higher Self
+    companionHandleRef.current?.post({ type: 'ego-perspective', ...dronePerspective(d.memory) });
   };
   // Plan 53: the player's own presses for the input relay (fire, use, jump, reload). The comms send them on only while the
   // relay the player chose (a box ticked, RELAY typed) is on; nothing here originates a press.
@@ -2252,6 +2260,13 @@ useEffect(() => {
     },
     applyMimic(): string {
       return applyLastMimic(false);
+    },
+    perspective() {
+      return dronePerspective(droneMemory());
+    },
+    higherSelfCue(cues) {
+      higherSelfCuesRef.current = cues;
+      return `${cues.length} cue${cues.length === 1 ? '' : 's'} held for the next dream.`;
     },
     mirror(mask) {
       mirrorOnRef.current = mask !== null;
@@ -5350,6 +5365,8 @@ useEffect(() => {
     const dev = {
       /** Plan 56 W6a test seam: the drone's memory (its ego, presets, preferences and last dream). */
       droneMemory: (): DroneMemory => droneMemory(),
+      /** Plan 56 W6 test seam: a catalyst straight into the drone's memory (a fight the test cannot stage). */
+      droneNote: (c: DroneCatalyst): void => noteDrone(c),
       /**
        * A test seam (debug switch only): a written preset cartridge goes on the lab rack, so the X radial in Apply has one to
        * offer. Players never reach it (window.__dev exists only in dev builds and under ?e2e).

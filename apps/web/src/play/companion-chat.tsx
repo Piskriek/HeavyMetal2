@@ -22,6 +22,8 @@ import {
 } from './companion-intent';
 import type { ScoutCategory } from './companion-scout';
 import { KNOWN_BRIDGE_GAMES } from '@hm/bridgekit';
+import type { DreamCue } from '@hm/harness';
+import { checkCues, higherSelfWords, type DronePerspective } from './drone-memory';
 import {
   antiCheatAdvice, bridgeManifest, bridgePresetFor, checkBridgeProfile, createCadenceAnalyzer, RELAY_CONFIRM_WORD, relayAllowed, relayCommand, relayConsentOk, manifestLine, PRESET_SIGNATURES, readRaw, createEventAnonymizer, createTelemetryAccumulator, parseCadenceLine, gameIdOf, profileLine, rankRunningGames, uncheckedProfile,
   type BridgePermissionProfile, type CadenceAnalyzer, type DocumentedMechanics, type InputRelaySpec, type RelayAction, type EventClass, type TelemetryAccumulator,
@@ -114,6 +116,10 @@ export interface CompanionDroneOps {
    * here presses too; 0 keeps the mirror on with nothing held; null turns it off and lets every mirrored key go.
    */
   mirror(mask: number | null): void;
+  /** Plan 56 W6b: what the drone shows a Higher Self (its digest, its kundalini levels, the episodes worth a cue). */
+  perspective(): DronePerspective;
+  /** Plan 56 W6b: a Higher Self's cues, held for the next dream (they only bias what it replays); what to report. */
+  higherSelfCue(cues: readonly DreamCue[]): string;
 }
 
 /**
@@ -871,6 +877,26 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
         if (!s || s.gameId !== g.gameId || !Array.isArray(g.names)) return;
         const names = g.names.filter((n): n is string => typeof n === 'string' && n.length <= 64).slice(0, 16);
         feedReflexes(s.gameId, s.rename ? names.map(s.rename) : names);
+        return;
+      }
+      // plan 56 W6b: the Higher Self seat. An AI on the bridge reads the drone's perspective, cues its next dream and speaks
+      // through it; it never writes the drone's memory (a cue only biases what the dream replays)
+      if (cmd.action === 'higher-self-ask') {
+        const o = droneOpsRef.current;
+        if (o) postBridgeEvent({ type: 'ego-perspective', ...o.perspective() });
+        return;
+      }
+      if (cmd.action === 'higher-self-cue') {
+        const o = droneOpsRef.current;
+        const cues = checkCues((cmd as unknown as { cues?: unknown }).cues);
+        if (!o || !cues) { postBridgeEvent({ type: 'higher-self-cue-refused', why: o ? 'cues are 1 to 12 of the drone\'s own episodes: { of, t }' : 'the drone is not here' }); return; }
+        postBridgeEvent({ type: 'higher-self-cue-taken', count: cues.length, said: o.higherSelfCue(cues) });
+        return;
+      }
+      if (cmd.action === 'higher-self-say') {
+        const words = higherSelfWords((cmd as unknown as { words?: unknown }).words);
+        // the ego is the one voice: it says its Higher Self's reading, marked as such
+        if (words) companionSays(`From my Higher Self: ${words}`, words);
         return;
       }
       // plan 51 wave 3: the cadence sampler's lines (the input-audio rung): edges go live to the reflex slot, and every

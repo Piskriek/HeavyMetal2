@@ -428,7 +428,7 @@ What each step does:
 | Part | What | Done when |
 |---|---|---|
 | W6a | **Built 28 Oct.** **The drone's memory host** (`apps/web/src/play/drone-memory.ts`, pure, plus thin hooks in `play.tsx` and `play-scene.ts`). Detailed below. | A drone e2e check: after a Moon fight the fire preset holds episodes; back in the lab the drone tells its dream and the bridge gets `ego-dream`. |
-| W6b | **The Higher Self seat on the bridge.** Detailed below. | A bridge e2e check: a cue from the seat opens a hardened preset in the next dream. |
+| W6b | **Built 28 Oct.** **The Higher Self seat on the bridge.** Detailed below. | A bridge e2e check: a cue from the seat opens a hardened preset in the next dream. |
 | W6c | **Symptoms you can see:** `symptomOffset` jitters the drone's fire rhythm by its fire preset's unbalanced charge. | A stuttering rhythm while distorted, steady once balanced. |
 | W6d | **The Studio's memory view** (the frontend-design skill first). Detailed below. | A screenshot, and the agent API (Plan 40) can read the same view. |
 | W6e | **The player as wanderer:** the player's character as an anchor (`wan.from = 'player'`), its balance read from steady play. Its calm reaches the drone's presets at each catalyst. | Steady play calms the drone's hardening; panic-spraying does not. |
@@ -503,3 +503,84 @@ What each step does:
 - **Use is reported by clients,** and a modified client could lie. Count first what rooms see during the sessions they host.
 
 **Verdict:** it should work for the weekly round and the gates. The smallest slice comes first: one singleton harvest room for one slot, tested with a short "week". It needs the owner's yes, as a server piece that spends credits.
+
+**W6b as built:**
+- `drone-memory.ts`: `dronePerspective` (W4's digest lines, kundalini per preset, the charged episodes worth a cue, newest first, up to 12), `checkCues` (only the drone's own presets, whole ticks, 1 to 12) and `higherSelfWords` (one plain line, 300 characters).
+- **Bridge commands:**
+  - `higher-self-ask` returns an `ego-perspective` event;
+  - `higher-self-cue` is held for the next dream (`higher-self-cue-taken` or `-refused`);
+  - `higher-self-say`: the drone says "From my Higher Self: ...".
+- After each dream the bridge gets `ego-dream` (with `cuedBy`) and a fresh `ego-perspective`.
+- The seat never writes memory. It is documented at the top of `scripts/companion-bridge.mjs`.
+- Drone e2e 50/50: the seat reads the perspective, cues a hit, the dream replays the cued episode, and the drone voices the reading.
+
+## 18. Reasoning and language from parts (owner, 28 Oct; a proposal, after W6)
+- **His words:** "a basic part doesnt have much agency but can sense changes and change states, if you assemble enough parts that work as one and change states acording to incomming information and they have weighted systems taht learn then they should be able to start reasoning at some level. basic logic reasoning but if those combine with actions and preset names you would have a language not long after, the drone identity would shape how the language is translated to the player, using filler words and synonyms etc that come from the drone personality and the role its playing. the framework for reason, does it exist, will the drones be able to reason eventually?"
+- **The ladder of agency, and what exists of it:**
+  1. **Sense, and change state.** Every preset records its catalysts (W2). `logic:` presets are state machines (sensor, then and/or, then actuator), and the reflex slot runs them live.
+  2. **Learn with weights:**
+     - the ego's preferences, moved by replay (W3);
+     - Plan 52's veiled Bayesian learner;
+     - cause links that count and then predict (W2);
+     - hardness as importance.
+  3. **Basic logic reasoning.**
+     - If-then rules exist as logic graphs, and the harness induces them from what it observes (mechanic mimicry's `logic:`).
+     - The cause graph is a learned causal model ("control above leaves reactivity here").
+     - The dream's imagined rerun predicts before it keeps a repair.
+     - **Missing:** chaining, meaning steps of inference over learned rules (A leads to B, B leads to C, so do A to reach C), and planning over presets.
+  4. **Language.** The shorthand is a grounded symbol system: every token names a preset, an entity, a fact or an order that exists in the world.
+     - Harnad's symbol grounding problem asks that a symbol's meaning come from sensed states, not from a dictionary of other symbols. Here it does, by construction.
+     - Mordatch and Abbeel (2017): agents with a shared goal and symbols with no preset meanings built a vocabulary and syntax, and pointed and guided when they could not talk.
+     - Foerster et al. (2016): agents learned protocols to share what their task needed.
+     - **The hook is `Mem.vocab`** (a preset's own codes, W1), which is not used yet.
+  5. **A voice.** Today the drone's words are fixed templates (`barkLine`, `wakeLine`, `digestLines`). The owner's idea is that the drone's identity and role translate its language for the player.
+- **Will the drones reason?** Yes, at the level the parts allow: association, prediction, simple inference and planning over a small set of grounded actions, which is classic symbolic AI with learned weights.
+  - Open-ended, abstract reasoning from these parts alone, on the min-spec laptop, is not near. That is why the ladder keeps a slow mind above the drone: the Higher Self seat, an LLM. The shorthand is the language between the two.
+  - The drone's own reasoning grows from the bottom: each induced rule and each closed link is a step. What the Higher Self teaches (cues, readings) can be distilled into the drone's own rules (§7's distillation), so over time it needs the seat less.
+- **The build, after W6, in order:**
+  1. **R1, the drone's sentences:** it composes lines from its own shorthand state (a small grammar over presets, actions and episodes) instead of fixed templates.
+  2. **R2, a `voice:` preset per identity and role:**
+     - vocabulary, synonyms, filler words and register;
+     - the pole's framing (§12);
+     - written as data, so the player can tune it. Argo writes the first ones.
+  3. **R3, chaining:** a bounded, pure planner over the logic graphs and cause links.
+  4. **R4, coined words:** when the drone keeps meeting a pattern no token names (a cluster of episodes), it coins a code in `vocab` and uses it. Between agents, the words travel over the seat channel (Plan 55).
+- **Constraints:**
+  - pure, small and Int8, for the min-spec laptop;
+  - the Higher Self stays the slow mind;
+  - the ego stays the one voice to the player;
+  - no fifth global metric.
+- **Sources** (the research doc gets them when R1 starts):
+  - [Mordatch and Abbeel, Emergence of Grounded Compositional Language in Multi-Agent Populations (arXiv 1703.04908)](https://arxiv.org/abs/1703.04908)
+  - [Foerster et al., Learning to Communicate with Deep Multi-Agent Reinforcement Learning (arXiv 1605.06676)](https://arxiv.org/abs/1605.06676)
+  - [The symbol grounding problem (Wikipedia, on Harnad 1990)](https://en.wikipedia.org/wiki/Symbol_grounding_problem)
+
+## 19. The middle rungs: characters, organic and mechanical (owner, 28 Oct; planned as W6g)
+- **His words:** "there can be stuff between drone/guide and vehicles and guns. like characters, organic and mechanical".
+- **The category:** every entity with agency between the guide and the tools:
+  - organic characters: creatures, monsters, animals, people;
+  - mechanical characters: robots, mechs, walkers, turrets;
+  - and everything between, such as a cyborg.
+- **The ladder:** parts, then tools (vehicles, guns, machines), then characters, then guides (the drone), then the Overwatch, then the Higher Self.
+  - Each rung harmonizes the pair below it (§13): a character harmonizes the vehicle it rides and the gun it wields; the guide harmonizes the characters it travels with. The same triad nests at every rung.
+- **Polarity fits as it stands (§12):**
+  - organic characters lean context, as species do (Aq);
+  - mechanical characters lean intent, as kits do (Vtx);
+  - a declared `pol` places anyone between, a cyborg near balance.
+  - `KIND_POLARITY` gains the character kinds: `creature` around −80, `mech` around +80.
+- **What exists to build on:**
+  - the monsters (`apps/web/src/play/monsters.ts`, with their phases and attacks);
+  - `@hm/npcbrain` utility brains, and `@hm/creature` genome specs;
+  - the rovers;
+  - the Weapon Bench's guns.
+- **W6g, after W6c to W6e:**
+  1. **Generalize the drone's memory host into a rung host:** an ego plus role presets, for any entity.
+     - the drone: fire, reflex, flight;
+     - a character: move, attack, sense;
+     - a vehicle: drive, harness;
+     - a gun: rhythm, recoil.
+  2. **Characters get memories from their own catalysts:** hit, hurt, flee, kill, rest.
+     - Short-lived monsters share one memory per species (a social memory complex for their kind), so the species learns across encounters. Named and persistent characters (companions, the player's crew) get their own.
+  3. **Tools gain memories while a character or the drone uses them.** Their pair is a triad the user harmonizes.
+  4. **The Overwatch pack nests the four levels:** tools under characters under the guide, and the egos under the Overwatch seat.
+- **Bounds for the min-spec:** a memory per species, not per spawned monster; a rung host per persistent entity; the same 32-episode records.

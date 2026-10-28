@@ -49,3 +49,31 @@ test('the drone\'s memory saves as share codes and comes back exactly; anything 
   for (const bad of [null, '', 'nope', '{"v":2}', JSON.stringify({ v: 1, ego: 'x', presets: [] })]) assert.equal(loadDroneMemory(bad), null);
   assert.equal(back.ego.of, DRONE_MEMORY_OF.ego);
 });
+
+test('the Higher Self seat: the drone shows its digest and what is worth a cue; cues and words from the bridge are checked', async () => {
+  const { checkCues, dronePerspective, higherSelfWords, MAX_CUES } = await import('./drone-memory');
+  let m = createDroneMemory();
+  m = noteCatalyst(m, { kind: 'contact', distance: 9 }, 100, 1);
+  for (let i = 0; i < 3; i++) m = noteCatalyst(m, { kind: 'hurt', damage: 25 }, 110 + i, 1);
+  const p = dronePerspective(m);
+  assert.ok(p.lines[0]?.startsWith('System coherence'));
+  assert.ok(p.lines.some((l) => l.includes('loc:f17e') && l.includes('root-reactivity')), 'the flight preset still carries the hits');
+  assert.deepEqual(p.cueable.map((c) => [c.of, c.t, c.d]), [['loc:f17e', 112, 'root-reactivity'], ['loc:f17e', 111, 'root-reactivity'], ['loc:f17e', 110, 'root-reactivity']], 'the charged episodes, newest first');
+  assert.equal(p.kundalini.flight, 0, 'the root ray is charged: it has not begun to rise');
+  assert.equal(p.kundalini.fire, 7);
+  // a cue from the seat steers the next dream to the cued episode
+  const cues = checkCues([{ of: 'loc:f17e', t: 110 }])!;
+  const { memory } = dreamNow(m, 400, cues);
+  assert.deepEqual(memory.lastDream?.replayed.filter((r) => r.cued).map((r) => [r.of, r.t]), [['loc:f17e', 110]]);
+  // checked: only the drone's own presets, whole ticks, 1 to 12 of them
+  assert.equal(checkCues([{ of: 'kit:00aa', t: 1 }]), null);
+  assert.equal(checkCues([{ of: 'loc:f17e', t: 1.5 }]), null);
+  assert.equal(checkCues([]), null);
+  assert.equal(checkCues(Array.from({ length: MAX_CUES + 1 }, (_, i) => ({ of: 'loc:f17e', t: i }))), null);
+  assert.equal(checkCues('nope'), null);
+  // the Higher Self's words: one plain line, capped
+  assert.equal(higherSelfWords('  Rest in\nPresence.\u0007 '), 'Rest in Presence.');
+  assert.equal(higherSelfWords('x'.repeat(400))?.length, 300);
+  assert.equal(higherSelfWords('   '), null);
+  assert.equal(higherSelfWords(42), null);
+});

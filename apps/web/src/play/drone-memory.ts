@@ -13,9 +13,9 @@
  *
  * Pure: the game passes the tick and the stage; nothing here reads a clock or storage.
  */
-import { decodeMem, encodeMem, type Mem, type StageId } from '@hm/shorthand';
+import { ALIGNED, decodeMem, encodeMem, type Mem, type StageId } from '@hm/shorthand';
 import {
-  createPresetMemory, dominantDistortion, dream, recordExperience, wakeLine,
+  REST_AT, SQ_DISTORTION_CATALOG, compileSystemMemory, createPresetMemory, digestLines, dominantDistortion, dream, kundalini, recordExperience, wakeLine,
   type DreamCue, type DreamDigest, type EgoWeights, type Experience,
 } from '@hm/harness';
 
@@ -106,4 +106,53 @@ export function loadDroneMemory(text: string | null): DroneMemory | null {
   } catch {
     return null;
   }
+}
+
+// ---- Plan 56 W6b: the Higher Self seat. An AI on the bridge reads the drone's perspective, cues its next dream and
+// speaks through it. The seat never writes memory: a cue only biases what the dream replays.
+
+/** What the drone shows a Higher Self: its system digest (W4) as lines, each preset's kundalini level, and what it may cue. */
+export interface DronePerspective {
+  readonly lines: readonly string[];
+  readonly kundalini: Readonly<Record<DroneRole, number>>;
+  /** Episodes still charging a ray, the ones worth a cue: newest first, at most MAX_CUES. */
+  readonly cueable: readonly { readonly of: string; readonly t: number; readonly cat: string; readonly d: string; readonly h: number }[];
+}
+
+/** The most cues a Higher Self may give for one dream (the dream's own budget). */
+export const MAX_CUES = 12;
+
+export function dronePerspective(m: DroneMemory): DronePerspective {
+  const presets = DRONE_ROLES.map((r) => m.presets[r]);
+  const pack = compileSystemMemory(presets, [{ ego: m.ego, presets: presets.map((p) => p.of), weights: m.weights }]);
+  const cueable = presets.flatMap((p) => p.ep
+    .filter((e) => e.d !== ALIGNED && (p.charge[SQ_DISTORTION_CATALOG[e.d].rayIndex - 1] ?? 0) > REST_AT)
+    .map((e) => ({ of: p.of, t: e.t, cat: e.cat, d: e.d, h: e.h })))
+    .sort((a, b) => b.t - a.t || (a.of < b.of ? -1 : 1)).slice(0, MAX_CUES);
+  return {
+    lines: digestLines(pack),
+    kundalini: { fire: kundalini(m.presets.fire), reflex: kundalini(m.presets.reflex), flight: kundalini(m.presets.flight) },
+    cueable,
+  };
+}
+
+/** A Higher Self's cues from the bridge, checked: only the drone's own presets, whole ticks, at most MAX_CUES; null for anything else. */
+export function checkCues(raw: unknown): DreamCue[] | null {
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_CUES) return null;
+  const mine = new Set<string>(DRONE_ROLES.map((r) => DRONE_MEMORY_OF[r]));
+  const out: DreamCue[] = [];
+  for (const c of raw) {
+    if (!c || typeof c !== 'object') return null;
+    const { of, t } = c as { of?: unknown; t?: unknown };
+    if (typeof of !== 'string' || !mine.has(of) || !Number.isSafeInteger(t) || (t as number) < 0) return null;
+    out.push({ of, t: t as number });
+  }
+  return out;
+}
+
+/** A Higher Self's words, made safe to say: plain text, one line, at most 300 characters; null when nothing is left. */
+export function higherSelfWords(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const s = raw.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+  return s.length ? s : null;
 }

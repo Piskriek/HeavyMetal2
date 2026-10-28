@@ -47,6 +47,7 @@
  *   curl -s -X POST localhost:8220/command -H 'Content-Type: application/json' \
  *     -d '{"action":"mutate-kit-preset","mutation":"strip-hazard","text":"On it."}'
  */
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
@@ -80,6 +81,66 @@ function isRecordLoose(v) { return typeof v === 'object' && v !== null && !Array
 
 /** Commands queued for the game to drain on its next /poll. */
 const pendingCommands = [];
+/** Plan 51 wave 3: the comms client (a game tab) that opened each game's bridge session; its stream is routed there. */
+const sessionClients = {};
+
+// ---- Plan 51 wave 3: the cadence sampler (the input-audio floor rung) for games that publish no telemetry ----
+/** On by default on Windows while a bridge is live; `--no-sampler` turns it off; `--sampler-replay <file>` plays a recording. */
+const NO_SAMPLER = process.argv.includes('--no-sampler');
+const SAMPLER_REPLAY = arg('--sampler-replay');
+/** Sampler lines go to the game in batches of this many (about 100 ms at 200 Hz); the queue keeps the newest few seconds. */
+const CADENCE_BATCH = 20;
+const CADENCE_QUEUE = 120;
+let sampler = null;
+function queueCadence(gameId, lines) {
+  const queued = pendingCommands.filter((c) => c.action === 'cadence');
+  if (queued.length >= CADENCE_QUEUE) pendingCommands.splice(pendingCommands.indexOf(queued[0]), 1);
+  pendingCommands.push({ action: 'cadence', gameId, lines, ...(sessionClients[gameId] ? { to: sessionClients[gameId] } : {}) });
+}
+function stopSampler() {
+  if (!sampler) return;
+  sampler.stop();
+  console.log(`\x1b[35m[SAMPLER]\x1b[0m stopped (${sampler.gameId}, ${sampler.count} samples)`);
+  sampler = null;
+}
+/** Starts sampling the bridged game (its process name), or replays a recorded stream in tests. */
+function startSampler(gameId, processName) {
+  stopSampler();
+  if (NO_SAMPLER) return;
+  let buf = [];
+  const s = { gameId, count: 0, stop: () => {} };
+  const take = (line) => {
+    if (!/^\d/.test(line)) return;
+    s.count += 1;
+    buf.push(line.trim());
+    if (buf.length >= CADENCE_BATCH) { queueCadence(gameId, buf); buf = []; }
+  };
+  if (SAMPLER_REPLAY && processName) {
+    // a recording plays at its own pace (by its t column), so the game sees the timing a live run would give
+    const lines = fs.readFileSync(path.resolve(SAMPLER_REPLAY), 'utf8').split(/\r?\n/).filter((l) => /^\d/.test(l));
+    const t0 = Date.now();
+    let i = 0;
+    const timer = setInterval(() => {
+      const now = (Date.now() - t0) / 1000;
+      while (i < lines.length && Number(lines[i].split(' ')[0]) <= now) take(lines[i++]);
+      if (i >= lines.length) clearInterval(timer);
+    }, 25);
+    s.stop = () => clearInterval(timer);
+  } else if (process.platform === 'win32' && processName) {
+    // no -ExecutionPolicy change: the machine's own policy (RemoteSigned) runs a local script
+    const child = spawn('powershell.exe', ['-NoProfile', '-File', path.join(ROOT, 'scripts/cadence-sampler.ps1'), '-Process', processName], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let rest = '';
+    child.stdout.on('data', (d) => { const parts = (rest + d).split(/\r?\n/); rest = parts.pop() ?? ''; for (const l of parts) take(l); });
+    child.stderr.on('data', (d) => console.log(`\x1b[31m[SAMPLER]\x1b[0m ${String(d).trim().slice(0, 300)}`));
+    child.on('exit', () => { if (sampler === s) sampler = null; });
+    s.stop = () => { try { child.kill(); } catch {} };
+  } else {
+    return;
+  }
+  sampler = s;
+  console.log(`\x1b[35m[SAMPLER]\x1b[0m sampling ${processName ?? gameId}${SAMPLER_REPLAY ? ' (replay)' : ''}: its own audio, and fire/jump/dash only while its window has focus`);
+}
+process.on('exit', () => stopSampler());
 /** The conversation + telemetry log, newest last; seq is monotonic. */
 const events = [];
 let nextSeq = 1;
@@ -233,7 +294,14 @@ const handle = async (req, res) => {
   // The game drains its command queue here (companion-chat.tsx polls every 1.5 s)
   if (pathname === '/poll' && req.method === 'GET') {
     lastGamePoll = Date.now();
-    json(res, 200, { commands: pendingCommands.splice(0, pendingCommands.length) });
+    // a bridged game's stream goes to the tab that opened that bridge (two FIDELITY tabs share one bridge in the
+    // self-bridge); everything else goes to whichever tab polls first, as before
+    const client = url.searchParams.get('client');
+    const out = [], keep = [];
+    for (const c of pendingCommands) (!c.to || c.to === client ? out : keep).push(c);
+    pendingCommands.length = 0;
+    pendingCommands.push(...keep);
+    json(res, 200, { commands: out });
     return;
   }
 
@@ -243,6 +311,13 @@ const handle = async (req, res) => {
       const e = await readJson(req);
       if (!isRecord(e) || typeof e.type !== 'string') throw new Error('an event is an object with a type');
       pushEvent(e);
+      // the bridge session drives the sampler: it runs only while the player has a game bridged
+      if (e.type === 'bridge-active' && typeof e.gameId === 'string' && typeof e.client === 'string') sessionClients[e.gameId] = e.client.slice(0, 64);
+      if (e.type === 'bridge-closed' && typeof e.gameId === 'string') delete sessionClients[e.gameId];
+      if (e.type === 'bridge-active' && typeof e.gameId === 'string') {
+        if (sampler?.gameId !== e.gameId) startSampler(e.gameId, typeof e.process === 'string' ? e.process : null);
+      }
+      if (e.type === 'bridge-closed') stopSampler();
       if (e.type === 'player-say') console.log(`\x1b[36m[PISKRIEK]\x1b[0m ${e.text}${e.intent && e.intent !== 'chat' ? `  \x1b[90m(${e.intent}, run in game)\x1b[0m` : ''}`);
       if (e.type === 'ping' && isRecord(e.target)) {
         const t = e.target;
@@ -285,7 +360,7 @@ const handle = async (req, res) => {
       const payload = await readJson(req, TELEMETRY_CAP);
       const queued = pendingCommands.filter((c) => c.action === 'telemetry');
       if (queued.length >= TELEMETRY_QUEUE) pendingCommands.splice(pendingCommands.indexOf(queued[0]), 1);
-      pendingCommands.push({ action: 'telemetry', gameId: tel[1], payload, at: Date.now() / 1000 });
+      pendingCommands.push({ action: 'telemetry', gameId: tel[1], payload, at: Date.now() / 1000, ...(sessionClients[tel[1]] ? { to: sessionClients[tel[1]] } : {}) });
       telemetryCount[tel[1]] = (telemetryCount[tel[1]] ?? 0) + 1;
       json(res, 200, { ok: true });
     } catch (err) {
@@ -303,7 +378,7 @@ const handle = async (req, res) => {
   if (pathname === '/observe-mechanic' && req.method === 'POST') {
     try {
       const obs = await readJson(req, OBSERVATION_CAP);
-      const ladder = ['telemetry', 'mod-sdk', 'mod-loader', 'game-files', 'screen', 'synthetic'];
+      const ladder = ['telemetry', 'mod-sdk', 'mod-loader', 'game-files', 'screen', 'input-audio', 'synthetic'];
       if (!isRecord(obs) || typeof obs.game !== 'string' || obs.game.length > 64 || !ladder.includes(obs.channel)) throw new Error('an observation has a game (string) and a channel: ' + ladder.join(' | '));
       if (!isRecord(obs.trajectory) && !isRecord(obs.shots) && !Array.isArray(obs.events)) throw new Error('an observation carries a trajectory, shots or events');
       dispatchCommand({ action: 'mimic', observation: obs });

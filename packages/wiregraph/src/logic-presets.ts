@@ -16,7 +16,8 @@ export const LOGIC_PRESET_SCHEMA = WIREGRAPH_PARAM_SCHEMA;
 
 export type TriggerSensorKind = 'proximity' | 'stage-reached' | 'cardinal-threshold' | 'power-brownout' | 'leak-active' | 'hopper-low';
 export type LogicNodeKind = 'and' | 'or' | 'not' | 'delay' | 'latch' | 'counter' | 'threshold';
-export type ActuatorKind = 'toggle-machine' | 'open-door' | 'fire-turret' | 'set-lamp-lx' | 'play-sound' | 'dial-gate' | 'lock-iris' | 'turret-track' | 'spawn-monster';
+/** plan 51 wave 3 adds the reflex slot's four: the suit's shield pulsed, the drone's fire overclocked, an instant reload, a chained arc zap. */
+export type ActuatorKind = 'toggle-machine' | 'open-door' | 'fire-turret' | 'set-lamp-lx' | 'play-sound' | 'dial-gate' | 'lock-iris' | 'turret-track' | 'spawn-monster' | 'pulse-shield' | 'overclock-fire' | 'reload-weapon' | 'arc-chain';
 export interface SensorSpec { readonly id: string; readonly kind: TriggerSensorKind; readonly threshold?: number; readonly target?: string }
 export interface LogicNodeSpec { readonly id: string; readonly kind: LogicNodeKind; readonly inputs: readonly string[]; readonly delayMs?: number; readonly counterTarget?: number; readonly threshold?: number; readonly resetInput?: string }
 export interface ActuatorSpec { readonly id: string; readonly kind: ActuatorKind; readonly input: string; readonly target: string; readonly value?: number }
@@ -25,7 +26,7 @@ export type WireGraphPreset = WireGraphSpec;
 
 export const SENSOR_KINDS: readonly TriggerSensorKind[] = ['proximity', 'stage-reached', 'cardinal-threshold', 'power-brownout', 'leak-active', 'hopper-low'];
 export const LOGIC_NODE_KINDS: readonly LogicNodeKind[] = ['and', 'or', 'not', 'delay', 'latch', 'counter', 'threshold'];
-export const ACTUATOR_KINDS: readonly ActuatorKind[] = ['toggle-machine', 'open-door', 'fire-turret', 'set-lamp-lx', 'play-sound', 'dial-gate', 'lock-iris', 'turret-track', 'spawn-monster'];
+export const ACTUATOR_KINDS: readonly ActuatorKind[] = ['toggle-machine', 'open-door', 'fire-turret', 'set-lamp-lx', 'play-sound', 'dial-gate', 'lock-iris', 'turret-track', 'spawn-monster', 'pulse-shield', 'overclock-fire', 'reload-weapon', 'arc-chain'];
 
 /** Sensors are numeric: proximity/stage/cardinal pass the reading through; brownout/leak/hopper are 1 when active (reading >= threshold, default 1; brownout: reading <= threshold). */
 export function evaluateSensor(spec: SensorSpec, reading: number): number {
@@ -123,6 +124,17 @@ export const WIREGRAPH_SHELF: Readonly<Record<string, WireGraphSpec>> = Object.f
     [{ id: 'stage', kind: 'stage-reached', threshold: 3 }, { id: 'prox', kind: 'proximity', threshold: 1 }],
     [{ id: 'armed', kind: 'and', inputs: ['stage', 'prox'] }, { id: 'beat', kind: 'counter', inputs: ['armed'], counterTarget: 4 }],
     [{ id: 'spawn', kind: 'spawn-monster', input: 'beat', target: 'nest', value: 1 }]),
+  // plan 51 wave 3's Mimic Reflex Slot: a bridged game's events, by class (the sensor's target is `class:<name>`), drive
+  // live reflexes on the suit and the drone while the bridge is live. Values are durations in ms or a chain length.
+  'mimic-reflex': g('mimic-reflex', 'Mimic Reflex Slot',
+    [{ id: 'threat', kind: 'cardinal-threshold', threshold: 1, target: 'class:threat' }, { id: 'mobility', kind: 'cardinal-threshold', threshold: 1, target: 'class:mobility' },
+      { id: 'outcome', kind: 'cardinal-threshold', threshold: 1, target: 'class:outcome' }, { id: 'objective', kind: 'cardinal-threshold', threshold: 1, target: 'class:objective' },
+      { id: 'harm', kind: 'cardinal-threshold', threshold: 1, target: 'class:harm' }],
+    [{ id: 'pressure', kind: 'or', inputs: ['threat', 'objective', 'harm'] }],
+    [{ id: 'shield', kind: 'pulse-shield', input: 'pressure', target: 'player-suit', value: 4000 },
+      { id: 'overclock', kind: 'overclock-fire', input: 'pressure', target: 'drone', value: 4000 },
+      { id: 'reload', kind: 'reload-weapon', input: 'mobility', target: 'player-weapon' },
+      { id: 'arc', kind: 'arc-chain', input: 'outcome', target: 'drone', value: 3 }]),
   'stage6-earth-beacon': g('stage6-earth-beacon', 'Stage-6 Earth Beacon', [{ id: 'stage', kind: 'stage-reached', threshold: 6 }, { id: 'charge', kind: 'cardinal-threshold', threshold: 100 }], [{ id: 'both', kind: 'and', inputs: ['stage', 'charge'] }, { id: 'pulses', kind: 'counter', inputs: ['both'], counterTarget: 3 }], [{ id: 'gate', kind: 'dial-gate', input: 'pulses', target: 'earth-gate' }, { id: 'beacon', kind: 'set-lamp-lx', input: 'both', target: 'beacon-lamp', value: 200 }]),
 });
 export const serializeWireGraph = (graph: WireGraphSpec): string => JSON.stringify(graph);

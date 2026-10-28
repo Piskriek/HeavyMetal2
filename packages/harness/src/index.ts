@@ -5,3 +5,4 @@ export * from './inception-loop.js';
 export * from './memory-kernel.js';
 export * from './vsa-item-memory.js';
 export * from './mechanic-mimicry.js';
+export * from './veil-learning-harvest.js';

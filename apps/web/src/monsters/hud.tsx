@@ -28,6 +28,8 @@ export interface MonsterHudProps {
   readonly radar: readonly RadarLeak[];
   /** The leak under the beam's Seal hold, and whether the player is close enough to seal it; null when none. */
   readonly seal: { readonly pct: number; readonly inReach: boolean } | null;
+  /** Plan 51 wave 3: the reflex shield is up (a bridged game's threat edge raised it); hits soak most of their damage. */
+  readonly shielded?: boolean;
 }
 
 /** The radar's edge, in metres: a leak beyond it sits on the rim. */
@@ -104,7 +106,7 @@ export function MonsterHud(props: MonsterHudProps) {
         </div>
       </aside>
 
-      <section className={`mhud-plate mhud-vitals${low ? ' low' : ''}`} data-hud-zone="bottom-right" aria-label="Health">
+      <section className={`mhud-plate mhud-vitals${low ? ' low' : ''}${props.shielded ? ' shielded' : ''}`} data-hud-zone="bottom-right" aria-label="Health">
         <p className="mhud-title">Health</p>
         <div className="mhud-figure">
           <b>{shown}</b>
@@ -115,7 +117,7 @@ export function MonsterHud(props: MonsterHudProps) {
             <i key={i} className={i < lit ? 'on' : ''} />
           ))}
         </div>
-        {low ? <p className="mhud-note">Low. Back off to the gate and patch up.</p> : null}
+        {props.shielded ? <p className="mhud-shield-note">Shield up: hits do a fifth of their damage.</p> : low ? <p className="mhud-note">Low. Back off to the gate and patch up.</p> : null}
       </section>
 
       {seal ? (

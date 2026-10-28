@@ -28,9 +28,12 @@ import { WIREGRAPH_SHELF, validateWireGraph, type ActuatorKind, type ActuatorSpe
 import { runMdlSpectralSieve, type IMdlSieveResult } from './sieve-mdl.js';
 import { createItemMemory, nearestRecord, type FeatureRange } from './vsa-item-memory.js';
 
-/** The rung of the observer ladder an observation came from, best first; `screen` is the last resort. */
-export type ObserverChannel = 'telemetry' | 'mod-sdk' | 'mod-loader' | 'game-files' | 'screen' | 'synthetic';
-export const OBSERVER_LADDER: readonly ObserverChannel[] = ['telemetry', 'mod-sdk', 'mod-loader', 'game-files', 'screen'];
+/**
+ * The rung of the observer ladder an observation came from, best first. The last resorts are perception: `screen` (what the
+ * player sees) and `input-audio` (the game's own audio and the player's own input edges, plan 51 wave 3).
+ */
+export type ObserverChannel = 'telemetry' | 'mod-sdk' | 'mod-loader' | 'game-files' | 'screen' | 'input-audio' | 'synthetic';
+export const OBSERVER_LADDER: readonly ObserverChannel[] = ['telemetry', 'mod-sdk', 'mod-loader', 'game-files', 'screen', 'input-audio'];
 
 /** One observed mechanic signature. Times in seconds, positions in metres (the observer converts its game's units). */
 export interface MechanicObservation {
@@ -361,7 +364,7 @@ function readRules(game: string, events: NonNullable<MechanicObservation['events
 
 // ------------------------------------------------------------------ the transducer
 
-const CHANNEL_WEIGHT: Readonly<Record<ObserverChannel, number>> = { telemetry: 1, 'mod-sdk': 0.95, 'mod-loader': 0.9, 'game-files': 0.85, screen: 0.6, synthetic: 1 };
+const CHANNEL_WEIGHT: Readonly<Record<ObserverChannel, number>> = { telemetry: 1, 'mod-sdk': 0.95, 'mod-loader': 0.9, 'game-files': 0.85, screen: 0.6, 'input-audio': 0.55, synthetic: 1 };
 
 /** Decompiles one observed mechanic into FIDELITY presets. */
 export function transduceMechanic(obs: MechanicObservation): MimicryResult {

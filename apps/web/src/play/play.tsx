@@ -71,7 +71,7 @@ import { BenchMaterials } from './bench-materials';
 import { BenchSprites } from './bench-sprites';
 import { BenchSounds } from './bench-sounds';
 import { BenchHarness } from './bench-harness';
-import { CompanionChat, playPingBlip, type CompanionChatHandle, type CompanionDroneOps, type CompanionKitOps, type CompanionKitOrder, type CompanionScreenOps } from './companion-chat';
+import { CompanionChat, companionBridgeUrl, playPingBlip, type CompanionChatHandle, type CompanionDroneOps, type CompanionKitOps, type CompanionKitOrder, type CompanionScreenOps } from './companion-chat';
 import { nearestPoi, scoutLine, type ScoutCategory } from './companion-scout';
 import { kitName, pingCallout, pingEvent, pingLabel, pingTargetOf, PING_DEBOUNCE_S, PING_REACH_M, type PingTarget } from './ping';
 import { applyKitPlan, planKitMutation, type KitMutation } from './kit-mutation';
@@ -105,11 +105,14 @@ import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { kv } from '../storage/profile-storage';
 import { isMechanicObservation, transduceMechanic, type MimicryResult } from '@hm/harness';
 import { gateObservation, type BridgePermissionProfile } from '@hm/gamebridge';
+import { createReflexSlot, type ReflexAction, type ReflexSlot } from './mimic-reflex';
 import { encodeKitMotionCode, encodeLocomotionCode } from '@hm/kinematic';
 import { encodeLogicCode } from '@hm/wiregraph';
 import { activeLocomotion, customLocomotion, setCustomLocomotion } from './locomotion';
 /** Plan 51: where every mimic's share codes are kept for the bench and the Studio. */
 const MIMIC_SHELF_KEY = 'hm.setmix.mimics';
+/** Plan 51 wave 3: the share of a hit that gets through the reflex shield. */
+const SHIELD_PASS = 0.2;
 import { BASE_SAVE_KEY, saveWorld } from '../base/save';
 import { OUTPOST_PLOT_SEED } from '../base/plot-height';
 import { ROLE_LABELS } from '../net/protocol';
@@ -1629,6 +1632,10 @@ useEffect(() => {
   const sealAimRef = useRef<number | null>(null);
   // a loadout the tests set: the real loadout re-applies whenever the base changes, so the fire re-applies this one
   const devWeaponRef = useRef<WeaponStats | null>(null);
+  /** Plan 51 wave 3: the reflex shield is up until this (performance.now ms); the HUD shows it while it holds. */
+  const shieldUntilRef = useRef(0);
+  const [shieldOn, setShieldOn] = useState(false);
+  const shieldTimerRef = useRef(0);
   const [vitals, setVitals] = useState<{ readonly hp: number; readonly hitAt: number; readonly bearing: number }>({ hp: PLAYER_MAX_HP, hitAt: -1e9, bearing: 0 });
   const [radar, setRadar] = useState<readonly RadarLeak[]>([]);
   const [sealView, setSealView] = useState<{ readonly pct: number; readonly inReach: boolean } | null>(null);
@@ -1673,7 +1680,8 @@ useEffect(() => {
 
   const takeHit = useCallback((damage: number, bearing: number) => {
     const now = performance.now();
-    const next = hurtHp(hpRef.current, damage);
+    // plan 51 wave 3: the reflex shield (a bridged game's threat edge) soaks four fifths of each hit while it is up
+    const next = hurtHp(hpRef.current, now < shieldUntilRef.current ? damage * SHIELD_PASS : damage);
     hpRef.current = next;
     lastHitRef.current = props.gamePreset ? gameTimeRef.current : now;
     setVitals({ hp: next, hitAt: now, bearing });
@@ -1929,6 +1937,69 @@ useEffect(() => {
    * `live` is a bridge the player ordered ("bridge this game"): every refinement goes straight in and they all share one undo
    * step back to how things were before the bridge.
    */
+  // ---- Plan 51 wave 3: the FIDELITY self-bridge. A tab opened with ?telemetry-out streams its own telemetry to the
+  // Neural Bridge as `fidelity-<game>` (FIDELITY_TELEMETRY_MAPPING in @hm/gamebridge reads it), so a second FIDELITY tab
+  // can bridge this one: the whole pipe, with no install. 30 Hz while the world is up.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !new URLSearchParams(window.location.search).has('telemetry-out')) return;
+    const base = companionBridgeUrl(window.location);
+    if (!base) return;
+    const gameId = `fidelity-${props.gamePreset?.id ?? 'campaign'}`;
+    let kills = 0;
+    let living: number | null = null;
+    let busy = false;
+    const timer = window.setInterval(() => {
+      const scene = sceneRef.current;
+      if (!scene || busy) return;
+      const pos = scene.debug.position();
+      const w = scene.monsters.getWeaponStats();
+      const mobs = scene.monsters.getMobList().length;
+      // a living count that falls is mobs killed (or gone): the outcome edge; a wave or a leak opening is the threat edge
+      if (living !== null && mobs < living) kills += living - mobs;
+      living = mobs;
+      const payload = {
+        t: performance.now() / 1000,
+        player: { x: pos.x, y: pos.y, z: pos.z, airborne: scene.debug.airborne() },
+        weapon: { name: w ? `${w.mode}-${w.magazine}` : 'none', ammo: scene.monsters.getAmmo().current },
+        world: { wave: gameProgressRef.current.wave, leaksOpen: scene.monsters.markers().filter((k) => k.state === 'open').length, kills },
+      };
+      busy = true;
+      void fetch(`${base}/telemetry/${gameId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        .catch(() => {}).finally(() => { busy = false; });
+    }, 33);
+    return () => window.clearInterval(timer);
+  }, [props.gamePreset]);
+  /** Plan 51 wave 3: the Mimic Reflex Slot while a bridge is live (null otherwise), and its clock for delayed rules. */
+  const reflexSlotRef = useRef<ReflexSlot | null>(null);
+  const reflexTimerRef = useRef(0);
+  /** Runs the slot's reflexes on the suit and the drone; returns what actually happened, for the bridge. */
+  const runReflexes = (actions: readonly ReflexAction[]): string[] => {
+    const scene = sceneRef.current;
+    const done: string[] = [];
+    for (const a of actions) {
+      if (a.kind === 'pulse-shield') {
+        shieldUntilRef.current = Math.max(shieldUntilRef.current, performance.now() + a.ms);
+        setShieldOn(true);
+        window.clearTimeout(shieldTimerRef.current);
+        shieldTimerRef.current = window.setTimeout(() => setShieldOn(false), Math.max(0, shieldUntilRef.current - performance.now()));
+        done.push('shield');
+      } else if (a.kind === 'overclock-fire' && scene) {
+        scene.companionOverclock(a.ms / 1000);
+        done.push('overclock');
+      } else if (a.kind === 'reload-weapon' && scene?.monsters.isEquipped()) {
+        scene.monsters.reload();
+        done.push('reload');
+      } else if (a.kind === 'arc-chain' && scene) {
+        const n = scene.companionArc(a.links);
+        if (n > 0) done.push(`arc x${n}`);
+      }
+    }
+    return done;
+  };
+  const stopReflexSlot = (): void => {
+    window.clearInterval(reflexTimerRef.current);
+    reflexSlotRef.current = null;
+  };
   const applyLastMimic = (live: boolean): string => {
     const m = lastMimicRef.current;
     const scene = sceneRef.current;
@@ -1957,6 +2028,8 @@ useEffect(() => {
       harnessed = true;
       done.push('this rover\'s harness');
     }
+    // the bridged game's own trigger -> effect rules run live in the reflex slot (the fire graph is the fire pattern above)
+    if (live && r.logic && !r.fire) reflexSlotRef.current?.addGraph(r.logic);
     const step = liveMimicUndoRef.current;
     const base = liveBaseRef.current;
     if (live && step && base && undoStackRef.current.includes(step)) {
@@ -2061,7 +2134,24 @@ useEffect(() => {
     applyMimic(): string {
       return applyLastMimic(false);
     },
+    reflexStart(classes) {
+      stopReflexSlot();
+      const slot = createReflexSlot(classes ? { classes } : {});
+      reflexSlotRef.current = slot;
+      // delayed and counted rules need the clock to run between events
+      reflexTimerRef.current = window.setInterval(() => { if (reflexSlotRef.current === slot) runReflexes(slot.step([], 100)); }, 100);
+    },
+    reflex(events) {
+      const slot = reflexSlotRef.current;
+      if (!slot || events.length === 0) return [];
+      return runReflexes(slot.step(events, 0));
+    },
     endLiveMimic(): string {
+      stopReflexSlot();
+      window.clearTimeout(shieldTimerRef.current);
+      shieldUntilRef.current = 0;
+      setShieldOn(false);
+      sceneRef.current?.companionOverclock(0);
       const step = liveMimicUndoRef.current;
       liveMimicUndoRef.current = null;
       if (!step || !undoStackRef.current.includes(step)) return 'Bridge closed. Nothing of its mimic was still on.';
@@ -6656,7 +6746,7 @@ useEffect(() => {
             </div>
           )}
 
-          {(!props.gamePreset || props.gamePreset.hudBlade === 'arena-wave-survivor' || props.gamePreset.hudBlade === 'exploration-o2') && !hideOverlays ? <MonsterHud hp={vitals.hp} maxHp={PLAYER_MAX_HP} hitAt={vitals.hitAt} hitBearing={vitals.bearing} radar={radar} seal={sealView} /> : null}
+          {(!props.gamePreset || props.gamePreset.hudBlade === 'arena-wave-survivor' || props.gamePreset.hudBlade === 'exploration-o2') && !hideOverlays ? <MonsterHud hp={vitals.hp} maxHp={PLAYER_MAX_HP} hitAt={vitals.hitAt} hitBearing={vitals.bearing} radar={radar} seal={sealView} shielded={shieldOn} /> : null}
           {gunEquipped && (
             <div className={`play-crosshair${hitMarker ? ' hit' : ''}`}>
               <div className="ch-top" />

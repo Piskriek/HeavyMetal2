@@ -96,6 +96,78 @@ live and start streaming the things that aren't copyrighted." Research: [`docs/G
      - a GSI-style feed whose g = 8 and 5 rounds/s land on the body and the drone's guns within one batch;
      - "stop the bridge" restoring both.
 
+## 2b. Wave 3: every game gives mechanics, and bridged rules drive play (owner and Argon, 28 Oct)
+
+The ask: validate every channel at once (movement, fire rate, state-change rules) on:
+- an FPS with official telemetry (CS2's Valve GSI);
+- an FPS with none (Quake / LibreQuake);
+- a second local FIDELITY instance (`?game=arena-survivor`, `circuit-rally`), so the whole pipe runs with zero installs.
+
+It also closes the two Wave 2 gaps: bridged `logic:` rules sit unused, and a game with no telemetry gives nothing.
+
+**Categories (standing rule 6).**
+- CS2 stands for *games that publish official telemetry*.
+- Quake stands for *games that publish nothing*: perception only (the screen, the game's own audio, the player's own input).
+- FIDELITY stands for *any FIDELITY instance as a bridged game*.
+- The event pairs stand for *event classes*:
+  - threat: boss, wave, spawn, alarm, horde;
+  - mobility: dash, jump, sprint, slide, movement;
+  - outcome: round, kill, score, death, match;
+  - objective: bomb, flag, capture, checkpoint, lap;
+  - harm: health, damage, flashed, burning.
+
+**Decisions.**
+1. **Mapping language v2 (`@hm/gamebridge`, data not code).**
+   - Selector segments: `player.weapons[state=active].ammo_clip` picks the child whose field matches.
+   - Falling counters: `counts: 'down'` makes an ammo clip falling a shot, and a reload rising is not a shot.
+   - A counter scope: when the active weapon's name changes, the counter re-bases instead of counting a switch as shots.
+   - `eventClasses` overrides beside the keyword classifier `classifyEventField`.
+   - **Bridge presets** (`BRIDGE_PRESETS`): checked profiles that ship. `cs2` (Valve GSI: official telemetry, limited: no mods or injection, VAC) and every FIDELITY standalone game, so those bridge with no AI attached. A session keeps one event anonymizer, so labels stay consistent across batches and live events.
+2. **The Mimic Reflex Slot**, a live and temporary `logic:` slot on the suit and the drone. No lab blank: it is not a print.
+   - While the bridge is live, each external event (a telemetry field change, or an input or audio edge from the sampler) is classified (`bindAnonymousEventToFidelitySlot`) and fed, as it happens, to the reflex preset `mimic-reflex`. That preset is a wiregraph the Studio can edit, with three new actuator kinds:
+     - threat → `pulse-shield` and `overclock-fire` (`onLeakSurgeOrWaveEdge`). For 4 s the suit's shield lets only a fifth of each hit through: play does damage the player, through `takeHit`. The health plate takes the bridge's Ray-7 violet. The drone's fire rhythm doubles for the same 4 s;
+     - mobility → `reload-weapon`: an instant reload (`onPlayerJumpOrSprintEdge`);
+     - outcome → `arc-chain`: the drone chains a zap through up to three monsters near it, through the monsters' own hurt path (`onWeaponFireBurst`);
+     - objective and harm → the same overclock (a pressure edge).
+   - The bridged game's own rule graphs run in the same slot, with their delays and counters; their `fire-turret` actuators fire the arc.
+   - **Not built: the "phase impulse".** Play has no dash yet, so an impulse would be decoration. It waits for a `dash` preset field (§3.4). The mobility edge's instant reload is built.
+   - "Stop the bridge" clears the slot and ends any overclock.
+3. **The cadence sampler (`scripts/cadence-sampler.ps1`, run by the bridge, Windows).** It starts with the bridge session and stops with it (`--no-sampler` turns it off). At about 200 Hz it reads:
+   - which window has focus. It samples only while the bridged game's own window is in front;
+   - three input edges as booleans: fire (left mouse), jump (space), dash/sprint (shift). Never any other key, never text;
+   - the game's own audio peak from its Windows audio session (`IAudioSessionManager2` → the session whose process is the game → `IAudioMeterInformation`). Music and voice chat in other apps are ignored.
+   The bridge turns that into observations on a new floor rung, `input-audio` (the player's own senses, like the screen):
+   - fire cadence comes from audio onsets while fire is held, or from input edges for semi-auto;
+   - jump and dash edges become events;
+   - samples live in memory only and are posted as `mimic` commands for the bridged game, while edges go live to the reflex slot.
+   It does not touch the game's process or memory. Gravity still needs telemetry or the screen tracker (§3.5).
+4. **The FIDELITY self-bridge.** `?telemetry-out` on any FIDELITY tab posts its own telemetry to `POST :8220/telemetry/fidelity-<game>`: position, shots and ammo, leaks, kills, waves. A second tab says "bridge fidelity arena survivor", and the shipped FIDELITY preset maps it. The e2e runs two tabs: tab A must recover tab B's real gravity and fire rate, and react to B's waves and kills through the reflex slot.
+5. **CS2 live** (installing on this PC, 28 Oct). `node scripts/bridge-setup.mjs cs2` writes Valve's `gamestate_integration_fidelity.cfg` into the game's `cfg` folder, pointing at `/telemetry/cs2`. That folder is where Valve documents it.
+   - CS2 sends only the local player's data while playing. Position may be spectator-only, so fire cadence and round, bomb and kill events are certain, and gravity is only possible.
+   - Verified on a live payload once installed. **Quake/LibreQuake** is not installed here: the sampler covers it, and a demo-file reader (`.dem`, the game-files rung) is §3.6.
+
+**Built and measured (28 Oct).** `scripts/test-gamebridge-e2e.mjs` passes 14/14 on the min-spec laptop.
+- **Self-bridge:** tab A recovered tab B's real body gravity, 1.587 against 1.619 m/s².
+  - That is B's Moon gravity, because a game preset sets gravity to 9.81 × its `gravityScale`, over the locomotion preset's 9.8. The harness measured what B's body really did.
+  - A also recovered B's real fire pace (a round every 0.65 s), live.
+  - B's jumps reloaded A's weapon, and B's waves pulsed A's shield and overclocked A's drone.
+  - "Stop the bridge" restored everything.
+- **Input-audio:** a recorded sampler stream gave the drone 6.06 rounds/s from the audio alone, and its jump presses reloaded the weapon live.
+- **Sampler on this PC:** it read a test process's own audio session (peak 0.30, the clip's amplitude) and recovered an 8 Hz click rhythm (gaps of 0.12–0.13 s against 0.125).
+- Unit tests:
+  - a CS2-shaped GSI stream: the clip falling counts as shots, a reload or a weapon switch does not;
+  - classes, the session anonymizer, the cadence analyzer;
+  - the reflex slot, with a bridged rule's 1.5 s delay playing out.
+
+**Found and fixed on the way.**
+1. **Two FIDELITY tabs on one bridge both drained its command queue.** Each comms instance now has a client id; the bridge routes a bridged game's telemetry, cadence and edges to the tab that opened that bridge.
+2. **A background tab's timers run about once a second.** A source tab streams well only in front, and the receiving tab's 1.5 s poll is unaffected.
+3. **A batch now also closes after 10 s of game time with a dozen samples in it.** This is for sparse feeds like CS2's GSI, which posts on change.
+4. **A failed live mimic now posts a `mimic-error` event.** It used to vanish in the poll loop. `telemetry-batch` and `cadence-window` events show an AI that the pipe is working.
+5. **No `-ExecutionPolicy Bypass`.** The sampler runs under the machine's own RemoteSigned policy; the auto-mode classifier rightly refused the flag.
+
+**Cross-check with Argon's Plan 52 doc.** His `bindAnonymousEventToFidelitySlot` keyed on literal prefixes (`boss.state`, `wave.surge`, ...) and bound unknown events to the arc. This one binds classes, so any game's names work, and unknown events bind to nothing. His sampler code guessed gravity from how long Space was held (`-3.71` past 200 ms) and counted clicks per second as the fire rate. Both are untrue for most games, so this sampler measures the game's own audio onsets and reports no gravity.
+
 ## 3. Next (in order; ask the owner where marked)
 
 1. **The shorthand**, defined (`OWNER_INTENT_SYNTHESIS.md` §4: typed JSON `hm2:shorthand:v1` + a one-line text form);

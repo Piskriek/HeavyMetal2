@@ -23,12 +23,18 @@ import {
 import type { ScoutCategory } from './companion-scout';
 import { KNOWN_BRIDGE_GAMES } from '@hm/bridgekit';
 import {
-  checkBridgeProfile, createTelemetryAccumulator, gameIdOf, profileLine, rankRunningGames, uncheckedProfile,
-  type BridgePermissionProfile, type TelemetryAccumulator,
+  bridgePresetFor, checkBridgeProfile, createCadenceAnalyzer, PRESET_SIGNATURES, createEventAnonymizer, createTelemetryAccumulator, parseCadenceLine, gameIdOf, profileLine, rankRunningGames, uncheckedProfile,
+  type BridgePermissionProfile, type CadenceAnalyzer, type EventClass, type TelemetryAccumulator,
 } from '@hm/gamebridge';
 
-/** Plan 51 wave 2: this many telemetry samples (about 10 s of a 30 Hz feed) make one observation for the harness. */
+/** Plan 51 wave 2: this many telemetry samples (about 10 s of a 30 Hz feed) make one observation for the harness... */
 const TELEMETRY_BATCH = 300;
+/** ...or this many seconds of the game's time with a few samples in it, for a slow or sparse feed (a game that posts on change). */
+const TELEMETRY_SPAN_S = 10;
+/** Plan 51 wave 3: this many cadence-sampler samples (about 8 s at 200 Hz) make one input-audio observation. */
+const CADENCE_WINDOW = 1600;
+/** A live bridge's refinements speak at most this often (the bridge still gets every result). */
+const LIVE_SAY_GAP_MS = 20000;
 import './companion-chat.css';
 
 /** What the screen can do through the comms (plan 49): the ping's callout and its bridge event. */
@@ -80,6 +86,10 @@ export interface CompanionDroneOps {
   mimic(observation: unknown, profile?: BridgePermissionProfile | null, live?: boolean): { readonly said: string; readonly event: Readonly<Record<string, unknown>> | null };
   /** Plan 51 wave 2: the bridge closed: puts back everything its live mimics changed. */
   endLiveMimic(): string;
+  /** Plan 51 wave 3: opens the Mimic Reflex Slot for a live bridge (event classes from the game's mapping). */
+  reflexStart(classes?: Readonly<Record<string, EventClass>>): void;
+  /** Feeds the bridged game's events to the slot as they happen; returns the reflexes that ran. */
+  reflex(events: readonly string[]): readonly string[];
   /** Plan 51: puts the last mimic in force (the player's words only). */
   applyMimic(): string;
 }
@@ -253,12 +263,14 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [messages, isOpen]);
 
+  /** Plan 51 wave 3: this comms instance on the bridge (two FIDELITY tabs can share one bridge: the self-bridge). */
+  const clientIdRef = useRef(`c${Math.floor(performance.now() * 1000).toString(36)}${Math.floor(performance.timeOrigin % 1e9).toString(36)}`);
   const postBridgeEvent = (event: Readonly<Record<string, unknown>>): void => {
     if (!bridgeLinkedRef.current || !bridgeUrl.current) return;
     void fetch(`${bridgeUrl.current}/event`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...event, at: Date.now() }),
+      body: JSON.stringify({ ...event, client: clientIdRef.current, at: Date.now() }),
     }).catch(() => {});
   };
 
@@ -296,14 +308,23 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
   const bridgeSessionRef = useRef<{
     gameId: string; title: string; process: string | null; profile: BridgePermissionProfile;
     acc: TelemetryAccumulator | null; unmappedSaid: boolean;
+    /** The session's event anonymizer when the game's names may not cross (labels stay stable across batches and live). */
+    rename: ((name: string) => string) | null;
+    /** The input-audio rung (the cadence sampler), a floor rung every bridged game gets. */
+    cadence: CadenceAnalyzer;
+    lastSaidAt: number;
   } | null>(null);
   /** Puts a profile in force for the session (a checked one replaces the unchecked one) and says what may cross. */
   const applyBridgeProfile = (p: BridgePermissionProfile, process: string | null): void => {
     // the game's own telemetry is a floor rung: it streams whenever there is a mapping that says which fields are which
-    const acc = p.telemetry ? createTelemetryAccumulator(p.telemetry) : null;
-    bridgeSessionRef.current = { gameId: p.gameId, title: p.title, process, profile: p, acc, unmappedSaid: false };
+    const prev = bridgeSessionRef.current?.gameId === p.gameId ? bridgeSessionRef.current : null;
+    const rename = p.streams.includes('entity-kinds') ? null : prev?.rename ?? createEventAnonymizer();
+    const acc = p.telemetry ? createTelemetryAccumulator(p.telemetry, rename ? { rename } : {}) : null;
+    bridgeSessionRef.current = { gameId: p.gameId, title: p.title, process, profile: p, acc, unmappedSaid: false, rename, cadence: prev?.cadence ?? createCadenceAnalyzer(), lastSaidAt: 0 };
+    // the reflex slot opens with the bridge: the game's events drive the suit and the drone as they happen
+    droneOpsRef.current?.reflexStart(p.telemetry?.eventClasses);
     companionSays(`${profileLine(p)} Whatever I read of it goes straight onto you; "stop the bridge" puts everything back.`, `${p.title} is bridged. Its mechanics come across, never its art.`);
-    postBridgeEvent({ type: 'bridge-active', gameId: p.gameId, title: p.title, verdict: p.verdict, channels: p.channels, streams: p.streams, mapped: acc !== null });
+    postBridgeEvent({ type: 'bridge-active', gameId: p.gameId, title: p.title, process, verdict: p.verdict, channels: p.channels, streams: p.streams, mapped: acc !== null });
   };
   /** The player's order: finds the game on this PC (the name said, or the likeliest running game) and asks for a verdict. */
   const bridgeGame = async (name: string | null): Promise<void> => {
@@ -321,7 +342,7 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
       companionSays('The bridge could not list what is running on this PC.');
       return;
     }
-    const known = KNOWN_BRIDGE_GAMES.map((g) => ({ tokens: g.processTokens, title: g.displayName }));
+    const known = [...PRESET_SIGNATURES, ...KNOWN_BRIDGE_GAMES.map((g) => ({ tokens: g.processTokens, title: g.displayName }))];
     const ranked = rankRunningGames(processes, name, known);
     // with no name said, only a known engine or the one candidate is a safe guess; otherwise the drone asks which
     if (!name && ranked.length > 1 && ranked[0]!.score < 6) {
@@ -340,7 +361,10 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
     // the session starts at once on the unchecked profile (mechanics through the floor), so the bridge works out of the box;
     // an AI's checked verdict, when it comes, widens or narrows the rest
     endBridgeSession(false);
-    applyBridgeProfile(uncheckedProfile(title, gameId), process);
+    // a shipped preset (CS2, any FIDELITY game) is a checked profile with its telemetry mapping: no AI needed for it
+    const preset = bridgePresetFor(gameId);
+    applyBridgeProfile(preset ?? uncheckedProfile(title, gameId), process);
+    if (preset) return;
     let checked = false;
     try {
       const res = await fetch(`${base}/bridge-request`, {
@@ -351,6 +375,32 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
       checked = ((await res.json()) as { known?: boolean }).known === true;
     } catch { /* the session already runs on the unchecked profile */ }
     if (!checked && bridgeSessionRef.current?.gameId === gameId) companionSays(`Asking the AI on the bridge to check ${title}'s terms for anything beyond mechanics.`);
+  };
+  /** A live bridge's mimic result: always to the bridge, aloud at most every LIVE_SAY_GAP_MS (the first one always). */
+  const liveMimic = (s: { lastSaidAt: number }, r: { readonly said: string; readonly event: Readonly<Record<string, unknown>> | null }): void => {
+    if (r.event) postBridgeEvent(r.event);
+    const now = Date.now();
+    if (now - s.lastSaidAt >= LIVE_SAY_GAP_MS || r.event?.type !== 'mimic-result') {
+      s.lastSaidAt = now;
+      companionSays(r.said);
+    }
+  };
+  /** A live mimic that fails says why on the bridge instead of vanishing in the poll loop. */
+  const liveMimicSafe = (s: { lastSaidAt: number }, run: () => { readonly said: string; readonly event: Readonly<Record<string, unknown>> | null }): void => {
+    try { liveMimic(s, run()); }
+    catch (err) { postBridgeEvent({ type: 'mimic-error', message: err instanceof Error ? `${err.message} @ ${(err.stack ?? '').split(/\r?\n/)[1]?.trim() ?? ''}` : String(err) }); }
+  };
+  /** Plan 51 wave 3: the bridged game's events into the reflex slot; what ran is reported to the bridge (and said once). */
+  const reflexSaidRef = useRef(new Set<string>());
+  const feedReflexes = (gameId: string, names: readonly string[]): void => {
+    const done = droneOpsRef.current?.reflex(names) ?? [];
+    if (done.length === 0) return;
+    postBridgeEvent({ type: 'reflex', gameId, events: names, done });
+    const first = done.filter((d) => !reflexSaidRef.current.has(d.split(' ')[0]!));
+    if (first.length) {
+      for (const d of first) reflexSaidRef.current.add(d.split(' ')[0]!);
+      companionSays(`Reflex from the bridge: ${first.join(', ')} (on ${names[0]}).`, 'Reflex.');
+    }
   };
   /** Ends the session; `say` false when a new bridge replaces it. Whatever its mimics changed goes back. */
   const endBridgeSession = (say = true): void => {
@@ -614,6 +664,37 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
       }
       // plan 51 wave 2: the bridged game's own telemetry (a floor rung: every game allows it), mapped through its preset
       // into samples; each full batch becomes an observation the harness mimics live
+      // plan 51 wave 3: an edge from the cadence sampler (input or audio) or another observer, live, for the reflex slot
+      if (cmd.action === 'game-event') {
+        const g = cmd as unknown as { gameId?: string; names?: unknown };
+        const s = bridgeSessionRef.current;
+        if (!s || s.gameId !== g.gameId || !Array.isArray(g.names)) return;
+        const names = g.names.filter((n): n is string => typeof n === 'string' && n.length <= 64).slice(0, 16);
+        feedReflexes(s.gameId, s.rename ? names.map(s.rename) : names);
+        return;
+      }
+      // plan 51 wave 3: the cadence sampler's lines (the input-audio rung): edges go live to the reflex slot, and every
+      // CADENCE_WINDOW samples with shots in them become a live mimic of the game's fire cadence
+      if (cmd.action === 'cadence') {
+        const c = cmd as unknown as { gameId?: string; lines?: unknown };
+        const s = bridgeSessionRef.current;
+        if (!s || s.gameId !== c.gameId || !Array.isArray(c.lines)) return;
+        const edges: string[] = [];
+        for (const line of c.lines.slice(0, 200)) {
+          const smp = typeof line === 'string' ? parseCadenceLine(line) : null;
+          if (smp) edges.push(...s.cadence.push(smp));
+        }
+        if (edges.length) feedReflexes(s.gameId, s.rename ? edges.map(s.rename) : edges);
+        if (s.cadence.size() >= CADENCE_WINDOW) {
+          const samples = s.cadence.size();
+          const obs = s.cadence.take(s.title);
+          // the window's counts, so an AI on the bridge can see the sampler working even when no shots were heard
+          postBridgeEvent({ type: 'cadence-window', gameId: s.gameId, samples, shots: obs?.shots?.t.length ?? 0, edges: obs?.events?.length ?? 0 });
+          const o = droneOpsRef.current;
+          if (obs?.shots && o) liveMimicSafe(s, () => o.mimic(obs, s.profile, true));
+        }
+        return;
+      }
       if (cmd.action === 'telemetry') {
         const t = cmd as unknown as { gameId?: string; payload?: unknown; at?: number };
         const s = bridgeSessionRef.current;
@@ -625,15 +706,13 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
           }
           return;
         }
-        s.acc.push(t.payload, typeof t.at === 'number' ? t.at : 0);
-        if (s.acc.size() >= TELEMETRY_BATCH) {
+        const made = s.acc.push(t.payload, typeof t.at === 'number' ? t.at : 0);
+        if (made.length) feedReflexes(s.gameId, made.map((e) => e.name));
+        if (s.acc.size() >= TELEMETRY_BATCH || (s.acc.span() >= TELEMETRY_SPAN_S && s.acc.size() >= 12)) {
           const obs = s.acc.take(s.title, 'telemetry');
+          postBridgeEvent({ type: 'telemetry-batch', gameId: s.gameId, trajectory: obs?.trajectory?.t.length ?? 0, shots: obs?.shots?.t.length ?? 0, events: obs?.events?.length ?? 0 });
           const o = droneOpsRef.current;
-          if (obs && o) {
-            const r = o.mimic(obs, s.profile, true);
-            companionSays(r.said);
-            if (r.event) postBridgeEvent(r.event);
-          }
+          if (obs && o) liveMimicSafe(s, () => o.mimic(obs, s.profile, true));
         }
         return;
       }
@@ -672,7 +751,7 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
     };
     const poll = async (): Promise<void> => {
       try {
-        const res = await fetch(`${base}/poll`, { signal: AbortSignal.timeout(4000) });
+        const res = await fetch(`${base}/poll?client=${clientIdRef.current}`, { signal: AbortSignal.timeout(4000) });
         if (!res.ok) throw new Error(String(res.status));
         const data = (await res.json()) as { commands?: unknown[] };
         failures = 0;

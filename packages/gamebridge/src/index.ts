@@ -24,10 +24,12 @@ export type StreamClass = 'mechanics' | 'telemetry' | 'entity-kinds' | 'assets';
 export const SAFE_STREAM_CLASSES: readonly StreamClass[] = ['mechanics', 'telemetry', 'entity-kinds'];
 
 /**
- * The rungs every game allows, checked or not: its own official telemetry (the game sends it out to be read) and the screen
- * (what the player sees). Mechanics read through them cross whatever a profile says.
+ * The rungs every game allows, checked or not: its own official telemetry (the game sends it out to be read), the screen
+ * (what the player sees) and input-audio (the game's own audio session and the player's own fire, jump and dash keys, read
+ * only while the game's window is in front). None of them touches the game's code, memory or files. Mechanics read
+ * through them cross whatever a profile says.
  */
-export const FLOOR_CHANNELS: readonly ObserverChannel[] = ['telemetry', 'screen'];
+export const FLOOR_CHANNELS: readonly ObserverChannel[] = ['telemetry', 'screen', 'input-audio'];
 
 /** The rungs a profile allows: the floor, plus the deeper rungs a checked profile names (best first). */
 export function allowedChannels(profile: BridgePermissionProfile): readonly ObserverChannel[] {
@@ -36,7 +38,11 @@ export function allowedChannels(profile: BridgePermissionProfile): readonly Obse
 
 export type BridgeVerdict = 'permitted' | 'limited' | 'refused' | 'unchecked';
 
-/** A dotted path into a telemetry payload ("player.position"), with an optional split of a "x, y, z" string and a scale. */
+/**
+ * A path into a telemetry payload: dotted fields ("player.position"), indices ("allplayers[0]") and selectors
+ * ("player.weapons[state=active].ammo_clip": the first child whose field has that value), with an optional split of a
+ * "x, y, z" string and a scale.
+ */
 export interface TelemetryPath {
   readonly path: string;
   /** Split the string at this separator and take `index` (a GSI-style "x, y, z" position). */
@@ -46,6 +52,18 @@ export interface TelemetryPath {
   readonly scale?: number;
 }
 
+/** A counter whose steps are shots: rounds fired rising, or an ammo clip falling. */
+export interface ShotCounterPath extends TelemetryPath {
+  /** 'up' (default): each rise is a shot. 'down': each fall is a shot, and a rise (a reload) is not. */
+  readonly counts?: 'up' | 'down';
+  /** A path whose change re-bases the counter instead of counting (the active weapon's name: a switch is not a shot). */
+  readonly scope?: string;
+}
+
+/** What an event means for play, whatever the game calls it (plan 51 wave 3: the reflex slot binds classes, not names). */
+export type EventClass = 'threat' | 'mobility' | 'outcome' | 'objective' | 'harm';
+export const EVENT_CLASSES: readonly EventClass[] = ['threat', 'mobility', 'outcome', 'objective', 'harm'];
+
 /** How one game's official telemetry payload becomes observation samples: data, not code (a new game is a new preset). */
 export interface TelemetryMapping {
   /** The sample's time in seconds; absent: the time the bridge received it. */
@@ -53,10 +71,32 @@ export interface TelemetryMapping {
   readonly x?: TelemetryPath;
   readonly y?: TelemetryPath;
   readonly z?: TelemetryPath;
-  /** A counter that rises by one per shot (ammo spent, rounds fired): each rise is a shot. */
-  readonly shotCounter?: TelemetryPath;
+  readonly shotCounter?: ShotCounterPath;
   /** Fields whose change is an event, named by the field ("round.phase" changing to "over" is "round.phase:over"). */
   readonly events?: readonly string[];
+  /** The class of an event field, where the keyword classifier would guess wrong. */
+  readonly eventClasses?: Readonly<Record<string, EventClass>>;
+}
+
+/** Keywords in an event's field path, per class: the default classification (a mapping can override it). */
+const CLASS_WORDS: readonly (readonly [RegExp, EventClass])[] = [
+  [/boss|wave|spawn|horde|alarm|alert|enemy|enemies|leak|surge|siege|invasion/, 'threat'],
+  [/dash|jump|sprint|slide|movement|airborne|grounded|crouch|mantle|vault|roll/, 'mobility'],
+  [/bomb|flag|objective|capture|checkpoint|lap|goal|point|zone/, 'objective'],
+  [/health|damage|hurt|armor|armour|flashed|burning|bleed|stun|shield/, 'harm'],
+  [/round|kill|score|death|frag|match|win|streak|mvp|assist/, 'outcome'],
+];
+
+/** The field part of an event name ("round.phase:#2" -> "round.phase"). */
+export const eventField = (name: string): string => { const cut = name.indexOf(':'); return cut < 0 ? name : name.slice(0, cut); };
+
+/** The class of an event by its field path (the overrides first), or null when no keyword says. */
+export function classifyEventField(name: string, overrides?: Readonly<Record<string, EventClass>>): EventClass | null {
+  const field = eventField(name);
+  const set = overrides?.[field];
+  if (set) return set;
+  const low = field.toLowerCase();
+  return CLASS_WORDS.find(([re]) => re.test(low))?.[1] ?? null;
 }
 
 export interface BridgePermissionProfile {
@@ -108,14 +148,109 @@ export function uncheckedProfile(title: string, gameId = gameIdOf(title)): Bridg
   };
 }
 
-function checkPath(v: unknown): TelemetryPath | null {
+type PathToken = { readonly field: string } | { readonly index: number } | { readonly key: string; readonly value: string };
+const TOKEN_RE = /\.?([A-Za-z0-9_-]+)|\[(\d+)\]|\[([A-Za-z0-9_]+)=([A-Za-z0-9_ .-]*)\]/y;
+
+/** A path's tokens, or null when any character of it is not a field, an index or a selector. */
+export function pathTokens(path: string): PathToken[] | null {
+  if (path.length === 0 || path.length > 128) return null;
+  const out: PathToken[] = [];
+  TOKEN_RE.lastIndex = 0;
+  while (TOKEN_RE.lastIndex < path.length) {
+    const at = TOKEN_RE.lastIndex;
+    const m = TOKEN_RE.exec(path);
+    if (!m || m.index !== at) return null;
+    if (m[1] !== undefined) out.push({ field: m[1] });
+    else if (m[2] !== undefined) out.push({ index: Number(m[2]) });
+    else out.push({ key: m[3]!, value: m[4] ?? '' });
+  }
+  return out;
+}
+
+// ------------------------------------------------------------------ shipped presets (checked profiles that need no AI)
+
+/**
+ * FIDELITY's own telemetry payload (any FIDELITY tab with `?telemetry-out`): seconds on the tab's clock, the player in
+ * metres (y up), the weapon in hand and its ammo, and the world's waves, open leaks and kills. Our own game: everything
+ * may cross, names included.
+ */
+export const FIDELITY_TELEMETRY_MAPPING: TelemetryMapping = {
+  t: { path: 't' },
+  x: { path: 'player.x' }, y: { path: 'player.y' }, z: { path: 'player.z' },
+  shotCounter: { path: 'weapon.ammo', counts: 'down', scope: 'weapon.name' },
+  events: ['player.airborne', 'world.wave', 'world.leaksOpen', 'world.kills'],
+  eventClasses: { 'player.airborne': 'mobility', 'world.wave': 'threat', 'world.leaksOpen': 'threat', 'world.kills': 'outcome' },
+};
+
+/**
+ * Counter-Strike 2 through Valve's Game State Integration (research 28 Oct, docs/GAME_BRIDGE_PERMISSIONS_RESEARCH.md):
+ * the game POSTs JSON to a local URI named in a cfg file in its own cfg folder. While playing it sends only the local
+ * player's data. Shots are the active weapon's clip falling (a reload or a switch is not a shot); the time is when the
+ * bridge received the post (GSI's own timestamp is whole seconds). Position is Source units (an inch), z up; it may be
+ * sent only while spectating, so gravity is "if present" and fire and round, bomb and kill rules are the sure part.
+ */
+export const CS2_TELEMETRY_MAPPING: TelemetryMapping = {
+  x: { path: 'player.position', split: ',', index: 0, scale: 0.0254 },
+  y: { path: 'player.position', split: ',', index: 2, scale: 0.0254 },
+  z: { path: 'player.position', split: ',', index: 1, scale: 0.0254 },
+  shotCounter: { path: 'player.weapons[state=active].ammo_clip', counts: 'down', scope: 'player.weapons[state=active].name' },
+  events: ['round.phase', 'round.bomb', 'map.phase', 'player.state.round_kills', 'player.match_stats.kills', 'player.state.health', 'player.state.flashed'],
+  eventClasses: {
+    'round.phase': 'outcome', 'map.phase': 'outcome', 'round.bomb': 'objective',
+    'player.state.round_kills': 'outcome', 'player.match_stats.kills': 'outcome', 'player.state.health': 'harm', 'player.state.flashed': 'harm',
+  },
+};
+
+const CS2_PROFILE: BridgePermissionProfile = {
+  schema: 'hm2:bridge-profile:v1', gameId: 'cs2', title: 'Counter-Strike 2', engine: 'Source 2', verdict: 'limited',
+  channels: ['telemetry', 'screen', 'input-audio'], streams: ['mechanics', 'telemetry', 'entity-kinds'], soloOnly: false,
+  sources: [
+    { url: 'https://developer.valvesoftware.com/wiki/Counter-Strike:_Global_Offensive_Game_State_Integration', quote: '' },
+    { url: 'https://github.com/antonpup/CounterStrike2GSI', quote: 'will only expose local player\'s information when playing a game' },
+  ],
+  checkedBy: 'claude-opus (research)', checkedOn: '2026-10-28',
+  setup: ['Run "node scripts/bridge-setup.mjs cs2" once (it writes Valve\'s gamestate_integration_fidelity.cfg into the game\'s cfg folder), then restart CS2.'],
+  telemetry: CS2_TELEMETRY_MAPPING,
+  notes: [
+    'Game State Integration is Valve\'s own feature for overlays and tools: the official telemetry rung, online included.',
+    'No mods, loaders or memory reads: VAC guards the game, so the deeper rungs stay closed.',
+  ],
+};
+
+/** The FIDELITY profile for one of its games ("fidelity-arena-survivor"): permitted, everything but assets, names included. */
+export function fidelityProfile(gameId: string): BridgePermissionProfile {
+  const rest = gameId.replace(/^fidelity-?/, '').replace(/-/g, ' ');
+  return {
+    schema: 'hm2:bridge-profile:v1', gameId, title: `FIDELITY${rest ? ` ${rest}` : ''}`, engine: 'FIDELITY', verdict: 'permitted',
+    channels: [...OBSERVER_LADDER], streams: ['mechanics', 'telemetry', 'entity-kinds'], soloOnly: false, sources: [],
+    checkedBy: 'FIDELITY (our own game)', setup: ['Open the other FIDELITY tab with ?telemetry-out added to its address.'],
+    telemetry: FIDELITY_TELEMETRY_MAPPING,
+    notes: ['A FIDELITY instance bridged into another: the whole pipe, with no install.'],
+  };
+}
+
+/** Process signatures of the games with a shipped profile, for the running-game ranker ("bridge counter strike" -> cs2.exe). */
+export const PRESET_SIGNATURES: readonly { readonly tokens: readonly string[]; readonly title: string }[] = [
+  { tokens: ['cs2'], title: 'Counter-Strike 2' },
+];
+
+/** The shipped profile for a game, when there is one (CS2, any FIDELITY game); null sends the game to the unchecked one. */
+export function bridgePresetFor(gameId: string): BridgePermissionProfile | null {
+  if (gameId === 'cs2' || gameId === 'counter-strike-2' || gameId === 'counter-strike') return CS2_PROFILE;
+  if (/^fidelity(-[a-z0-9-]+)?$/.test(gameId)) return fidelityProfile(gameId);
+  return null;
+}
+
+function checkPath(v: unknown): (TelemetryPath & { counts?: 'up' | 'down'; scope?: string }) | null {
   if (!isRecord(v)) return null;
   const path = str(v.path, 128);
-  if (!path || !/^[A-Za-z0-9_.[\]-]+$/.test(path)) return null;
-  const out: { path: string; split?: string; index?: number; scale?: number } = { path };
+  if (!path || !pathTokens(path)) return null;
+  const out: { path: string; split?: string; index?: number; scale?: number; counts?: 'up' | 'down'; scope?: string } = { path };
   if (v.split !== undefined) { const s = str(v.split, 4); if (!s) return null; out.split = s; }
   if (v.index !== undefined) { if (!Number.isInteger(v.index) || (v.index as number) < 0 || (v.index as number) > 16) return null; out.index = v.index as number; }
   if (v.scale !== undefined) { if (typeof v.scale !== 'number' || !Number.isFinite(v.scale) || v.scale === 0) return null; out.scale = v.scale; }
+  if (v.counts !== undefined) { if (v.counts !== 'up' && v.counts !== 'down') return null; out.counts = v.counts; }
+  if (v.scope !== undefined) { const s = str(v.scope, 128); if (!s || !pathTokens(s)) return null; out.scope = s; }
   return out;
 }
 
@@ -139,11 +274,18 @@ export function checkBridgeProfile(v: unknown): BridgePermissionProfile | null {
   let telemetry: TelemetryMapping | undefined;
   if (isRecord(v.telemetry)) {
     const t = v.telemetry;
-    const m: { t?: TelemetryPath; x?: TelemetryPath; y?: TelemetryPath; z?: TelemetryPath; shotCounter?: TelemetryPath; events?: string[] } = {};
+    const m: { t?: TelemetryPath; x?: TelemetryPath; y?: TelemetryPath; z?: TelemetryPath; shotCounter?: ShotCounterPath; events?: string[]; eventClasses?: Record<string, EventClass> } = {};
     for (const k of ['t', 'x', 'y', 'z', 'shotCounter'] as const) {
       if (t[k] !== undefined) { const p = checkPath(t[k]); if (!p) return null; m[k] = p; }
     }
-    if (t.events !== undefined) m.events = lines(t.events, 16).filter((e) => /^[A-Za-z0-9_.[\]-]+$/.test(e));
+    if (t.events !== undefined) m.events = lines(t.events, 16).filter((e) => pathTokens(e) !== null);
+    if (isRecord(t.eventClasses)) {
+      const classes: Record<string, EventClass> = {};
+      for (const [field, cls] of Object.entries(t.eventClasses).slice(0, 32)) {
+        if (pathTokens(field) && (EVENT_CLASSES as readonly string[]).includes(cls as string)) classes[field] = cls as EventClass;
+      }
+      m.eventClasses = classes;
+    }
     telemetry = m;
   }
   const refused = verdict === 'refused';
@@ -173,17 +315,26 @@ export function bestChannel(profile: BridgePermissionProfile, available: readonl
  * took). The field path stays (it is the telemetry API's structure, written by the mapping), so the trigger -> action rule the
  * harness reads keeps its shape and timing and loses only the game's names. Deterministic: labels number in order of arrival.
  */
-export function anonymizeEvents(events: readonly { readonly t: number; readonly name: string }[]): { t: number; name: string }[] {
+export function anonymizeEvents(events: readonly { readonly t: number; readonly name: string }[], anonymize: (name: string) => string = createEventAnonymizer()): { t: number; name: string }[] {
+  return events.map((e) => ({ t: e.t, name: anonymize(e.name) }));
+}
+
+/**
+ * One session's anonymizer: the same value always gets the same label, across batches and live events, so a bridged rule
+ * learnt from one batch still matches the events that arrive after it. A name already a label ("field:#3") passes as it is.
+ */
+export function createEventAnonymizer(): (name: string) => string {
   const labels = new Map<string, Map<string, number>>();
-  return events.map((e) => {
-    const cut = e.name.indexOf(':');
-    const field = cut < 0 ? 'event' : e.name.slice(0, cut);
-    const value = cut < 0 ? e.name : e.name.slice(cut + 1);
+  return (name) => {
+    const cut = name.indexOf(':');
+    const field = cut < 0 ? 'event' : name.slice(0, cut);
+    const value = cut < 0 ? name : name.slice(cut + 1);
+    if (/^#\d+$/.test(value)) return name;
     const seen = labels.get(field) ?? new Map<string, number>();
     labels.set(field, seen);
     if (!seen.has(value)) seen.set(value, seen.size + 1);
-    return { t: e.t, name: `${field}:#${seen.get(value)}` };
-  });
+    return `${field}:#${seen.get(value)}`;
+  };
 }
 
 /**
@@ -214,73 +365,95 @@ export function gateObservation(profile: BridgePermissionProfile | null, obs: Me
 
 // ------------------------------------------------------------------ telemetry mapping (an official payload -> samples)
 
-/** Reads a dotted path ("player.state.health", "allplayers[0].position") from a payload, as a number. */
-export function readPath(payload: unknown, p: TelemetryPath): number | null {
+/** The value at a path: fields, indices, and selectors that pick the first child whose field has the value. */
+export function readRaw(payload: unknown, path: string): unknown {
+  const tokens = pathTokens(path);
+  if (!tokens) return undefined;
   let cur: unknown = payload;
-  for (const seg of p.path.replace(/\[(\d+)\]/g, '.$1').split('.')) {
-    if (seg === '') continue;
-    if (cur === null || typeof cur !== 'object') return null;
-    cur = (cur as Record<string, unknown>)[seg];
+  for (const tok of tokens) {
+    if (cur === null || typeof cur !== 'object') return undefined;
+    if ('field' in tok) cur = (cur as Record<string, unknown>)[tok.field];
+    else if ('index' in tok) cur = (cur as Record<string, unknown>)[String(tok.index)];
+    else cur = Object.values(cur as Record<string, unknown>).find((c) => isRecord(c) && String(c[tok.key]) === tok.value);
   }
+  return cur;
+}
+
+/** Reads a path ("player.state.health", "allplayers[0].position", "player.weapons[state=active].ammo_clip") as a number. */
+export function readPath(payload: unknown, p: TelemetryPath): number | null {
+  let cur = readRaw(payload, p.path);
   if (typeof cur === 'string' && p.split !== undefined) cur = cur.split(p.split)[p.index ?? 0]?.trim();
   const n = typeof cur === 'number' ? cur : typeof cur === 'string' && cur.trim() !== '' ? Number(cur) : NaN;
   return Number.isFinite(n) ? n * (p.scale ?? 1) : null;
 }
 
-const readRaw = (payload: unknown, path: string): unknown => {
-  let cur: unknown = payload;
-  for (const seg of path.replace(/\[(\d+)\]/g, '.$1').split('.')) {
-    if (seg === '') continue;
-    if (cur === null || typeof cur !== 'object') return undefined;
-    cur = (cur as Record<string, unknown>)[seg];
-  }
-  return cur;
-};
-
 export interface TelemetryAccumulator {
-  /** Takes one payload, received at `receivedAt` seconds (used when the mapping has no time path). */
-  push(payload: unknown, receivedAt: number): void;
+  /**
+   * Takes one payload, received at `receivedAt` seconds (used when the mapping has no time path). Returns the events this
+   * payload made (already renamed), so a live consumer (the reflex slot) reacts as they happen, not a batch later.
+   */
+  push(payload: unknown, receivedAt: number): readonly { readonly t: number; readonly name: string }[];
   /** Samples held. */
   size(): number;
+  /** Seconds of game time the held samples span (a sparse feed, like a game that posts only on change, fills by time). */
+  span(): number;
   /** The observation the held samples make (and clears them), or null when there is too little. */
   take(game: string, channel: ObserverChannel): MechanicObservation | null;
 }
 
-/** Turns a stream of official telemetry payloads into observation samples through a mapping preset. */
-export function createTelemetryAccumulator(mapping: TelemetryMapping, cap = 20000): TelemetryAccumulator {
+/**
+ * Turns a stream of official telemetry payloads into observation samples through a mapping preset. `rename` is applied to
+ * every event name as it is made (a session's anonymizer when the game's names may not cross).
+ */
+export function createTelemetryAccumulator(mapping: TelemetryMapping, opts: { readonly cap?: number; readonly rename?: (name: string) => string } = {}): TelemetryAccumulator {
+  const cap = opts.cap ?? 20000;
+  const rename = opts.rename ?? ((n: string) => n);
   let t: number[] = [], x: number[] = [], y: number[] = [], z: number[] = [];
   let shots: number[] = [];
   let events: { t: number; name: string }[] = [];
   let lastCounter: number | null = null;
+  let lastScope: string | null = null;
+  let first: number | null = null, last: number | null = null;
   const lastEventValue = new Map<string, string>();
   return {
     push(payload, receivedAt) {
       const time = mapping.t ? readPath(payload, mapping.t) ?? receivedAt : receivedAt;
+      first ??= time;
+      last = time;
       if (mapping.x && mapping.y && mapping.z) {
         const px = readPath(payload, mapping.x), py = readPath(payload, mapping.y), pz = readPath(payload, mapping.z);
         if (px !== null && py !== null && pz !== null && (t.length === 0 || time > t[t.length - 1]!)) {
           t.push(time); x.push(px); y.push(py); z.push(pz);
         }
       }
-      if (mapping.shotCounter) {
-        const c = readPath(payload, mapping.shotCounter);
+      const sc = mapping.shotCounter;
+      if (sc) {
+        // a change of scope (another weapon in hand) re-bases the counter: its new value is a start, not shots
+        const scope = sc.scope !== undefined ? String(readRaw(payload, sc.scope) ?? '') : '';
+        if (scope !== lastScope) { lastScope = scope; lastCounter = null; }
+        const c = readPath(payload, sc);
         if (c !== null) {
-          if (lastCounter !== null && c > lastCounter) for (let k = 0; k < Math.min(20, c - lastCounter); k++) shots.push(time);
+          const step = lastCounter === null ? 0 : sc.counts === 'down' ? lastCounter - c : c - lastCounter;
+          for (let k = 0; k < Math.min(20, step); k++) shots.push(time);
           lastCounter = c;
         }
       }
+      const made: { t: number; name: string }[] = [];
       for (const path of mapping.events ?? []) {
         const v = readRaw(payload, path);
         if (v === undefined || (typeof v !== 'string' && typeof v !== 'number' && typeof v !== 'boolean')) continue;
         const s = String(v);
-        if (lastEventValue.has(path) && lastEventValue.get(path) !== s) events.push({ t: time, name: `${path}:${s}`.slice(0, 64) });
+        if (lastEventValue.has(path) && lastEventValue.get(path) !== s) made.push({ t: time, name: rename(`${path}:${s}`.slice(0, 64)) });
         lastEventValue.set(path, s);
       }
+      events.push(...made);
       if (t.length > cap) { t = t.slice(-cap); x = x.slice(-cap); y = y.slice(-cap); z = z.slice(-cap); }
       if (shots.length > cap) shots = shots.slice(-cap);
       if (events.length > cap) events = events.slice(-cap);
+      return made;
     },
     size: () => t.length + shots.length + events.length,
+    span: () => (first === null || last === null ? 0 : last - first),
     take(game, channel) {
       const hasTrajectory = t.length >= 8, hasShots = shots.length >= 3, hasEvents = events.length >= 1;
       if (!hasTrajectory && !hasShots && !hasEvents) return null;
@@ -290,7 +463,85 @@ export function createTelemetryAccumulator(mapping: TelemetryMapping, cap = 2000
         ...(hasShots ? { shots: { t: shots } } : {}),
         ...(hasEvents ? { events } : {}),
       };
-      t = []; x = []; y = []; z = []; shots = []; events = [];
+      t = []; x = []; y = []; z = []; shots = []; events = []; first = null; last = null;
+      return obs;
+    },
+  };
+}
+
+// ------------------------------------------------------------------ the input-audio rung (the cadence sampler's stream)
+
+/** One sample of scripts/cadence-sampler.ps1: focus, three input keys (read only while the game has focus), its audio peak. */
+export interface CadenceSample {
+  readonly t: number;
+  readonly fg: boolean;
+  readonly fire: boolean;
+  readonly jump: boolean;
+  readonly dash: boolean;
+  readonly peak: number;
+}
+
+/** A sampler line ("t fg fire jump dash peak") as a sample, or null for anything else. */
+export function parseCadenceLine(line: string): CadenceSample | null {
+  const f = line.trim().split(/\s+/);
+  if (f.length !== 6) return null;
+  const [t, fg, fire, jump, dash, peak] = f.map(Number) as [number, number, number, number, number, number];
+  if (![t, fg, fire, jump, dash, peak].every(Number.isFinite) || peak < 0 || peak > 1) return null;
+  // the keys only count while the game has focus (the sampler already zeroes them; this holds even for a hand-made stream)
+  return { t, fg: fg === 1, fire: fg === 1 && fire === 1, jump: fg === 1 && jump === 1, dash: fg === 1 && dash === 1, peak };
+}
+
+export interface CadenceAnalyzer {
+  /** Takes one sample; returns the live edges it made ("input.jump:down"), for the reflex slot. */
+  push(s: CadenceSample): readonly string[];
+  /** Samples held since the last take. */
+  size(): number;
+  /** The observation the held samples make (fire cadence, input edges), and clears them; null when there is too little. */
+  take(game: string): MechanicObservation | null;
+}
+
+/**
+ * The input-audio rung: shots are the game's own audio onsets (a rise through an adaptive threshold, 40 ms apart at least)
+ * while fire is held or just pressed; a game whose shots make no sound in its session falls back to the fire presses.
+ * Jump, dash and fire presses are events. Gravity is not here: it needs positions (telemetry or the screen).
+ */
+export function createCadenceAnalyzer(): CadenceAnalyzer {
+  let shots: number[] = [], presses: number[] = [], events: { t: number; name: string }[] = [];
+  let n = 0, recentMax = 0, prevPeak = 0, lastOnset = -Infinity, lastFireDown = -Infinity;
+  let prev: CadenceSample | null = null;
+  return {
+    push(s) {
+      n += 1;
+      const made: string[] = [];
+      for (const key of ['fire', 'jump', 'dash'] as const) {
+        if (s[key] && !(prev?.[key] ?? false)) {
+          const name = `input.${key}:down`;
+          made.push(name);
+          events.push({ t: s.t, name });
+          if (key === 'fire') { lastFireDown = s.t; presses.push(s.t); }
+        }
+      }
+      // onsets: the peak rises through a threshold that follows the session's own loudness (decays over about a second)
+      recentMax = Math.max(s.peak, recentMax * 0.995);
+      const thr = Math.max(0.02, recentMax * 0.35);
+      if (s.peak >= thr && prevPeak < thr && s.t - lastOnset >= 0.04) {
+        lastOnset = s.t;
+        if (s.fire || s.t - lastFireDown <= 0.2) shots.push(s.t);
+      }
+      prevPeak = s.peak;
+      prev = s;
+      if (shots.length > 4000) shots = shots.slice(-4000);
+      if (presses.length > 4000) presses = presses.slice(-4000);
+      if (events.length > 4000) events = events.slice(-4000);
+      return made;
+    },
+    size: () => n,
+    take(game) {
+      const fire = shots.length >= 3 ? shots : presses.length >= 3 ? presses : [];
+      const obs: MechanicObservation | null = fire.length >= 3 || events.length >= 1
+        ? { game, channel: 'input-audio', ...(fire.length >= 3 ? { shots: { t: [...fire] } } : {}), ...(events.length ? { events: [...events] } : {}) }
+        : null;
+      shots = []; presses = []; events = []; n = 0;
       return obs;
     },
   };

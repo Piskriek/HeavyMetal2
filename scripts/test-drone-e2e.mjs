@@ -34,7 +34,7 @@ const defaultsFile = path.join(tmpDir, 'kit-defaults.json');
 fs.writeFileSync(defaultsFile, '{}\n');
 const server = spawn(process.execPath, ['scripts/serve.mjs'], { cwd: root, env: { ...process.env, PORT: String(port) }, stdio: 'ignore' });
 // a made-up PC for "bridge <game>": the OS, a browser, an indie game and a tool (never the real process list)
-const bridgeProc = spawn(process.execPath, ['scripts/companion-bridge.mjs', '--port', String(bridgePort), '--defaults-file', defaultsFile, '--frame-dir', path.join(tmpDir, 'frames'), '--fake-processes', 'svchost.exe,chrome.exe,SomeIndie.exe,OtherTool.exe'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
+const bridgeProc = spawn(process.execPath, ['scripts/companion-bridge.mjs', '--port', String(bridgePort), '--defaults-file', defaultsFile, '--frame-dir', path.join(tmpDir, 'frames'), '--fake-processes', 'svchost.exe,chrome.exe,SomeIndie.exe,OtherTool.exe', '--no-sampler'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
 // the bridge's log, printed if the run fails (a crashed bridge otherwise shows only as 'fetch failed')
 let bridgeLog = '';
 for (const s of [bridgeProc.stdout, bridgeProc.stderr]) s.on('data', (d) => { bridgeLog = (bridgeLog + d).slice(-6000); });
@@ -225,7 +225,7 @@ try {
       },
     },
   });
-  check('a refused verdict still bridges its mechanics (no mods, loaders or file reads)', Boolean(await until(() => said(/mechanics still cross by telemetry > screen, solo/), 5000)));
+  check('a refused verdict still bridges its mechanics (no mods, loaders or file reads)', Boolean(await until(() => said(/mechanics still cross by telemetry > screen > input-audio, solo/), 5000)));
   const tuningBefore = await page.evaluate(() => window.__playScene.companionTuning().roundGapS);
   const gPre = await page.evaluate(() => window.__dev.activeLocomotion().gravityMps2);
   await postTelemetry(telemetryFeed(330));

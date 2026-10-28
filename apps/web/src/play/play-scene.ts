@@ -451,6 +451,11 @@ export interface PlayScene {
   setCompanionTuning(patch: Partial<CombatTuning> | null): void;
   /** The drone's fire rhythm now (a live mimic changes it). */
   companionTuning(): CombatTuning;
+  /** Plan 51 wave 3 reflex: the drone fires at double rate for this long (a longer hold wins over a shorter one; 0 ends it). */
+  companionOverclock(seconds: number): void;
+  companionOverclockLeft(): number;
+  /** Plan 51 wave 3 reflex: a zap chained through up to `links` monsters near the drone; how many it hit. */
+  companionArc(links: number): number;
   /** Plan 50: everything of one category the drone can find in the current world. */
   pointsOfInterest(category: ScoutCategory): PointOfInterest[];
   /** Plan 50 §6: stands a screen 4.5 m ahead mirroring a linked window (another game), or takes it down with null. */
@@ -544,7 +549,7 @@ export interface PlayScene {
     roost(): WheelRoost;
     gantries(): readonly PrintGantry[];
     roverBoostEnergy(): number;
-    groundTriangles(): number; showGround(on: boolean): void; where(): Where; position(): THREE.Vector3; teleport(where: Where, x: number, z: number, yaw: number, pitch?: number): void; sync(): number;
+    groundTriangles(): number; showGround(on: boolean): void; where(): Where; position(): THREE.Vector3; airborne(): boolean; teleport(where: Where, x: number, z: number, yaw: number, pitch?: number): void; sync(): number;
     stats(): { readonly triangles: number; readonly calls: number }; wave(): number; gatePlanet(): { x: number; z: number };
     /** The plot gate's iris state, and how many kit parts the ring drew (0 while the twin's own frame stands). */
     gateAccess(): GateAccessMode; gateKitParts(): number;
@@ -3027,6 +3032,38 @@ export function createPlayScene(o: {
   let combatBrain = newCombatBrain();
   /** Plan 51: the drone's combat tuning (a mimicked fire pattern can retune its bursts); the research's numbers by default. */
   let companionTuning: CombatTuning = COMBAT_TUNING;
+  /** Plan 51 wave 3: seconds left of a reflex overclock (the drone's fire rhythm at double rate). */
+  let overclockS = 0;
+  /**
+   * Plan 51 wave 3's arc reflex: a zap from the drone chained through up to `links` monsters (the nearest within 14 m of the
+   * drone, then each next within 6 m of the last), each through the monsters' own hurt path. Holds to the drone's orders:
+   * nothing on hold fire, off the planet, with the player down, or with the drone landed. Returns how many it hit.
+   */
+  const companionArc = (links: number): number => {
+    const comp = companionEntity;
+    if (!comp || where !== 'planet' || !playerAlive) return 0;
+    const s = comp.getState();
+    if (s.landed || comp.getCombatOrders().mode === 'hold-fire') return 0;
+    const damage = Math.max(5, playerShotDamage() * 0.6);
+    const hit = new Set<number>();
+    let from = { x: s.x, y: s.y, z: s.z };
+    for (let k = 0; k < Math.max(1, Math.min(5, links)); k++) {
+      const reach = k === 0 ? 14 : 6;
+      let best: { id: number; x: number; y: number; z: number } | null = null;
+      let bestD = reach;
+      for (const m of combatMobs()) {
+        if (hit.has(m.id)) continue;
+        const d = Math.hypot(m.x - from.x, m.y - from.y, m.z - from.z);
+        if (d < bestD) { bestD = d; best = m; }
+      }
+      if (!best) break;
+      hit.add(best.id);
+      monsters.hurtMob(best.id, damage);
+      comp.showShot({ x: best.x, y: best.y, z: best.z }, true);
+      from = best;
+    }
+    return hit.size;
+  };
   let companionHurtBy: { id: number; at: number } | null = null;
   const companionBarks: string[] = [];
   /** The living monsters as the brain sees them (aimed at their middle, winding up when they telegraph). */
@@ -3048,6 +3085,7 @@ export function createPlayScene(o: {
     return (w.pellets * ((w.damage[0] + w.damage[1]) / 2) * Math.max(1, w.burst)) / Math.max(0.05, w.cooldown + (Math.max(1, w.burst) - 1) * w.burstGap);
   };
   const companionFight = (dt: number): void => {
+    overclockS = Math.max(0, overclockS - dt);
     const comp = companionEntity;
     if (!comp) return;
     comp.setEnvironment(where === 'planet' ? 'vacuum' : 'air');
@@ -3065,7 +3103,7 @@ export function createPlayScene(o: {
       mobs: combatMobs(),
       orders: comp.getCombatOrders(),
       hurtBy: companionHurtBy,
-      tuning: companionTuning,
+      tuning: overclockS > 0 ? { ...companionTuning, roundGapS: companionTuning.roundGapS / 2, burstGapS: companionTuning.burstGapS / 2 } : companionTuning,
     });
     combatBrain = tick.brain;
     comp.setCombat(s.landed ? null : tick.station, tick.aimYaw);
@@ -4728,6 +4766,7 @@ export function createPlayScene(o: {
       },
       where: () => where,
       position: () => pos.clone(),
+      airborne: () => !jumpState.onGround,
       facing: () => yaw,
       machineAnchors() {
         const out: { id: number; kind: string; ndcX: number; ndcY: number; behind: boolean; distanceM: number; aimAngleDeg: number; running: number }[] = [];
@@ -5110,6 +5149,9 @@ export function createPlayScene(o: {
       companionTuning = patch ? { ...COMBAT_TUNING, ...patch } : COMBAT_TUNING;
     },
     companionTuning: () => companionTuning,
+    companionOverclock(seconds) { overclockS = seconds <= 0 ? 0 : Math.max(overclockS, Math.min(15, seconds)); },
+    companionOverclockLeft: () => overclockS,
+    companionArc,
     drainCompanionBarks() {
       return companionBarks.splice(0, companionBarks.length);
     },

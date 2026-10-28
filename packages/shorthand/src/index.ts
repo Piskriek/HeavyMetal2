@@ -127,6 +127,11 @@ export interface Mem {
   readonly cause: readonly CauseLink[];
   readonly inv: number;
   readonly cyc: number;
+  /**
+   * Plan 56 §12: its polarity, declared: −127 the context pole (Feminine, awaiting, organic) to +127 the intent pole
+   * (Masculine, reaching, mechanical), 0 balanced. A lean, not a label: both principles are in every preset. Absent: derived from its kind.
+   */
+  readonly pol?: number;
   readonly vocab?: readonly string[];
 }
 export interface Frame {
@@ -222,6 +227,7 @@ const causeRule: JsonRule = shape({ by: sqOrAlignedRule, d: sqRule, n: number(0,
 const memRule: JsonRule = shape({
   of: ofRule, hard: n01, bal: n01, charge: list(number(-127, 127, true), 7, 7),
   ep: list(episodeRule, MAX_EPISODES), cause: list(causeRule, MAX_CAUSE_LINKS), inv: n01, cyc: number(0, 65535, true),
+  pol: optional(number(-127, 127, true)),
   vocab: optional(list(shid, MAX_VOCAB)),
 });
 const frameRule: JsonRule = shape({
@@ -287,7 +293,7 @@ export function quantizeMem(m: Mem): Mem {
     of: m.of, hard: q3(m.hard), bal: q3(m.bal), charge: [...m.charge],
     ep: m.ep.map((e) => ({ t: e.t, stage: e.stage, cat: e.cat, ex: q3(e.ex), err: q3(e.err), h: q3(e.h), d: e.d, by: e.by, ...(e.src !== undefined ? { src: e.src } : {}) })),
     cause: m.cause.map((c) => ({ by: c.by, d: c.d, n: c.n, open: c.open })),
-    inv: q3(m.inv), cyc: m.cyc, ...(m.vocab !== undefined && m.vocab.length > 0 ? { vocab: [...m.vocab] } : {}),
+    inv: q3(m.inv), cyc: m.cyc, ...(m.pol !== undefined ? { pol: m.pol } : {}), ...(m.vocab !== undefined && m.vocab.length > 0 ? { vocab: [...m.vocab] } : {}),
   };
 }
 /** The canonical frame: numbers on their grids, perm deduplicated in PERM_KINDS order, empty look and vocab dropped, param keys in canonical order. */
@@ -353,7 +359,7 @@ export function formatFrame(frame: Frame): string {
     out.push(p.join(' '));
   }
   for (const m of f.mems) {
-    out.push(`m of=${m.of} hard=${num(m.hard)} bal=${num(m.bal)} ch=${m.charge.join(',')} inv=${num(m.inv)} cyc=${m.cyc}${m.vocab !== undefined ? ` vocab=${m.vocab.join(',')}` : ''}`);
+    out.push(`m of=${m.of} hard=${num(m.hard)} bal=${num(m.bal)} ch=${m.charge.join(',')} inv=${num(m.inv)} cyc=${m.cyc}${m.pol !== undefined ? ` pol=${m.pol}` : ''}${m.vocab !== undefined ? ` vocab=${m.vocab.join(',')}` : ''}`);
     for (const e of m.ep) out.push(`me t=${e.t} st=${e.stage} cat=${e.cat} ex=${num(e.ex)} err=${num(e.err)} h=${num(e.h)} d=${e.d} by=${e.by}${e.src !== undefined ? ` src=${e.src}` : ''}`);
     for (const c of m.cause) out.push(`mc by=${c.by} d=${c.d} n=${c.n} open=${c.open ? 1 : 0}`);
   }
@@ -532,10 +538,10 @@ function parseInner(textIn: string): Frame {
         ...opt(m, 'focus', (x) => x), ...opt(m, 'verb', (x) => x), ttl: pn(need(m, 'ttl')),
       });
     } else if (head === 'm') {
-      const m = kv(tk, 1, ['of', 'hard', 'bal', 'ch', 'inv', 'cyc', 'vocab']);
+      const m = kv(tk, 1, ['of', 'hard', 'bal', 'ch', 'inv', 'cyc', 'pol', 'vocab']);
       mems.push({
         of: need(m, 'of'), hard: pn(need(m, 'hard')), bal: pn(need(m, 'bal')), charge: pvec(need(m, 'ch'), 7), ep: [], cause: [],
-        inv: pn(need(m, 'inv')), cyc: pn(need(m, 'cyc')), ...opt(m, 'vocab', (x) => (x === '' ? [] : x.split(','))),
+        inv: pn(need(m, 'inv')), cyc: pn(need(m, 'cyc')), ...opt(m, 'pol', pn), ...opt(m, 'vocab', (x) => (x === '' ? [] : x.split(','))),
       });
     } else if (head === 'me' || head === 'mc') {
       const cur = mems[mems.length - 1];
@@ -640,7 +646,10 @@ export const MEM_CODEC_SCHEMA: Schema = {
           fields: { by: { kind: 'enum', options: SQ_OPTIONS }, d: { kind: 'enum', options: SQ_IDS }, n: { kind: 'int', min: 0, max: 65535 }, open: { kind: 'bool' } },
         },
       },
-      inv: fl(), cyc: { kind: 'int', min: 0, max: 65535 }, vocab: { kind: 'array', of: str(MAX_ID), maxLength: MAX_VOCAB },
+      inv: fl(), cyc: { kind: 'int', min: 0, max: 65535 },
+      // the codec has no optional fields: −128 stands for "no declared polarity" and is mapped back on decode
+      pol: { kind: 'int', min: -128, max: 127 },
+      vocab: { kind: 'array', of: str(MAX_ID), maxLength: MAX_VOCAB },
     },
   },
 };
@@ -648,7 +657,7 @@ export const MEM_CODEC_SCHEMA: Schema = {
 /** A mem as a share code (checked and quantized first). Throws Error(why) on an invalid mem. */
 export function encodeMem(mem: Mem): string {
   const m = checkMem(mem);
-  return encode(MEM_CODEC_SCHEMA, { ...m, ep: m.ep.map((e) => ({ ...e, src: e.src ?? '' })), vocab: m.vocab ?? [] });
+  return encode(MEM_CODEC_SCHEMA, { ...m, ep: m.ep.map((e) => ({ ...e, src: e.src ?? '' })), pol: m.pol ?? -128, vocab: m.vocab ?? [] });
 }
 
 /** Reads a mem code. Returns null for anything that is not a valid mem. Never throws. */
@@ -658,7 +667,8 @@ export function decodeMem(code: string): Mem | null {
     if (v === null) return null;
     const raw = v as Mem;
     const ep = raw.ep.map(({ src, ...e }) => (src === '' || src === undefined ? e : { ...e, src }));
-    return checkMem(quantizeMem({ ...raw, ep }));
+    const { pol, ...rest } = raw;
+    return checkMem(quantizeMem({ ...rest, ep, ...(pol === -128 || pol === undefined ? {} : { pol }) }));
   } catch {
     return null;
   }

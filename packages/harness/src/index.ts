@@ -9,3 +9,5 @@ export * from './veil-learning-harvest.js';
 export * from './purpose-excitement-catalyst.js';
 export * from './preset-memory.js';
 export * from './dream.js';
+export * from './polarity.js';
+export * from './system-memory.js';

@@ -171,7 +171,71 @@ Everything below is paraphrased, with session.question numbers, found through th
   - So the owner's "grow or perish" reads, on Ra's model, as **graduate or repeat**: a preset that never rebalances leaves the active shelf and re-enters the curriculum from the start, keeping its data. Plan 56 takes this, and the owner is told.
 - **REM.** Ra places the dreaming that heals and polarises largely outside REM (86.13, 86.15). The plan models no sleep stages, so this changes nothing.
 
-## 10. What this means for Plan 56
+## 10. Polarity: the male and female principles (owner via Argon, 28 Oct; for Plan 56 §12)
+- **The Law of One** (paraphrased, session.question; channelled text, used as a check and for clues, as in §9) [58][59]:
+  - **Every mind holds both principles, as archetypes.**
+    - The Matrix is consciousness and the Potentiator the unconscious, the deep resource (78.11, 79.20).
+    - The Matrix is male and the Potentiator female. The male principle is the reaching, and the female principle is what awaits the reaching (92.20, 87.28).
+  - **The veil lies between them** (79.22, 92.21). Their communication across it is "more mystery-filled" than unavailable (79.21).
+  - **Polarity is given, not chosen:** the Matrix accepts the Potentiator's polarity as it is (92.22).
+  - **Polarization is not only biological:** oppositely polarized beings attract, whether their polarity is biological or not (31.7).
+- **Yin-yang** [60][61]:
+  - complementary, interdependent opposites, neither of which exists without the other;
+  - each can turn into the other, and each holds a seed of the other;
+  - popular readings rank neither above the other. A scholarly reading (Ames) also sees mutuality, hierarchy, diversity and creative efficacy in the pairing.
+- **What this means for §12:**
+  - **`pol` is a continuous lean, not a binary label.** Both principles are in every preset, and 0 is balanced.
+  - **The ego never changes a preset's polarity.** It is declared (or derived from what the preset builds) and accepted as given (92.22). Only a player's or designer's declaration changes it.
+  - **Every effect is symmetric**, and neither pole ranks above the other.
+  - **The dream is where reaching and awaiting meet across the veil.** A balanced partner of the other pole lending its cue there fits the model.
+  - **Lore names:** reaching for the structure pole, awaiting for the flow pole. They sit beside masculine and feminine, yang and yin.
+
+## 11. The 3/6/9 frame: the six steps, and the Tesla attribution (owner, 28 Oct)
+- **The six steps** (Observe, Orient, Design, Act, Verify, Refine) join two documented loops:
+  - **Boyd's OODA loop** [62][63]: Observe, Orient, Decide, Act. Orientation is the key step; Boyd said it shapes how we observe, decide and act. Boyd's own diagram has feedback in several directions, not one simple cycle.
+  - **Shewhart and Deming's cycle** [64][65]: Plan, Do, Check (Deming preferred "Study"), Act. It is a continuous-improvement loop; Verify and Refine are its check and act.
+- **The Tesla quote** ("the magnificence of the 3, 6 and 9") **has no primary source** [66][67].
+  - Historians have found none.
+  - Goodreads has credited it to him since about 2013.
+  - His habits around the number three are documented.
+  - **For FIDELITY:** the frame is the owner's, and it is credited to him, not cited as Tesla's.
+
+## 12. The weekly harvest and astral travel (owner, 28 Oct; for Plan 56 §14)
+- **Community content becoming official** [68][69]:
+  - TF2's Workshop asks players to rate the items they most want in the game. The developers then choose which to add.
+  - Star ratings are hidden while a vote is pending, "to help avoid biased voting".
+  - **Lesson:** hide the tallies until the week closes. The owner's rule is majority, so the players' majority decides, not a curator.
+- **Periodic aggregation** [70]: federated averaging trains on each client and averages on a server in rounds. It holds up on unbalanced, non-IID data and needs 10 to 100 times fewer rounds than synchronized SGD.
+  - **Lesson:** the weekly update is one round. For presets, select one real variant rather than average them; an average of two working presets need not work.
+- **Votes get gamed** [71][72][73]:
+  - Any content vote can be outvoted by fake (Sybil) identities, worst where each item gets few votes.
+  - Brigading is coordinated mass action on a piece of content.
+  - **Lesson:** count distinct, verified players' use, not clicks; one count each, with a quorum.
+- **The Law of One on the astral** [74] (channelled; a check and clues, as in §9):
+  - Beings occupy the inner (astral) planes by their vibration: thought-forms in the lower astral, enlightened teachers in the higher (17.37).
+  - Healing happens in the astral planes after death and before choosing the next life (11.7, 10.1).
+  - **Lesson:** a ready preset travels to hosts that resonate with it, at its balance or above, and travelling is learning and healing, not editing.
+
+## 13. Kundalini and wanderers (owner, 28 Oct; for Plan 56 §15)
+The Law of One, paraphrased with session.question (channelled; a check and clues, as in §9) [75][76].
+- **Kundalini:**
+  - It is the meeting of the being's outer energy with its inner spiral, and the meeting point rises as the being polarizes (49.5). Raising it without understanding the principles invites serious imbalance (49.5).
+  - Each experience is seated in the red ray and worked through in sequence, from survival upward. As the energy nears universal love and radiant being, harvestability is near (49.6).
+  - **Lesson:** the rising is counted ray by ray from red, in order, and cannot be skipped. A fully risen preset is near the harvest, so it gains what comes next before harvest day.
+- **Wanderers:**
+  - **Origin and purpose:** they come from higher densities, mostly the sixth (12.28). They come to serve, to lighten the planet's vibration and to be a beacon (52.9, 65.11, 65.12), and to speed their own evolution (36.17).
+  - **Limits:**
+    - the forgetting (65.19, 63.17), which only about 8.5 to 9.75% get through (36.24);
+    - handicaps, alienation and bodily ailments from the vibrational gap (12.30, 66.34);
+    - they are as open to influence as anyone (16.59).
+  - **Risks:** they can forget the mission, become entangled, and repeat the cycle (12.28, 16.61).
+  - **Past balance:**
+    - a wanderer has greater potential for deep work (42.16);
+    - a healer must first be balanced in themselves (66.8);
+    - prior adeptness is hard to recover in the present body (75.24).
+  - **Lesson:** a wanderer is veiled, limited and not immune. It anchors others only while balanced itself. Its past makes the work easier but not automatic.
+
+## 14. What this means for Plan 56
 - **Two stores:**
   - the episodes and hardness in each preset's shorthand (data);
   - the ego's weights (behaviour), consolidated by replay weighted by excitement.
@@ -248,3 +312,22 @@ Everything below is paraphrased, with session.question numbers, found through th
 55. [Law of One archive: search "investment" (sessions 13, 14)](https://www.lawofone.info/results.php?q=investment)
 56. [Law of One archive: search "teach/learning" (sessions 3, 9, 22, 57, 73, 76, 93)](https://www.lawofone.info/results.php?q=teach%2Flearning)
 57. [Law of One archive: search "catalyst unused" (sessions 61, 66, 83, 93, 94, 95)](https://www.lawofone.info/results.php?q=catalyst+unused)
+58. [Law of One archive: search "potentiator" (sessions 78, 79, 87, 92)](https://www.lawofone.info/results.php?q=potentiator)
+59. [Law of One archive: search "male/female" (session 31)](https://www.lawofone.info/results.php?q=male%2Ffemale)
+60. [New World Encyclopedia: Yin and yang](https://web.newworldencyclopedia.org/entry/Yin)
+61. [Routledge Encyclopedia of Philosophy: Yin-yang (Roger Ames)](https://www.rep.routledge.com/articles/thematic/yin-yang/v-1)
+62. [The OODA loop (The Decision Lab)](https://thedecisionlab.com/fr-CA/reference-guide/computer-science/the-ooda-loop)
+63. [The OODA loop: observe, orient, decide, act (LessWrong)](https://www.lesswrong.com/posts/hgttKuASB55zjoCKd/the-ooda-loop-observe-orient-decide-act)
+64. [PDCA (Wikipedia)](https://en.wikipedia.org/wiki/PDCA)
+65. [Foundation and history of the PDSA cycle (PDF)](https://businesswales.gov.wales/sites/main/files/documents/Foundation%20and%20the%20history%20of%20the%20PDSA%20cycle.pdf)
+66. [Truth or Fiction on the Tesla 3-6-9 quote](https://www.truthorfiction.com/?p=129918)
+67. [Mental Floss: the meaning of 369 and Nikola Tesla](https://www.mentalfloss.com/random-facts/meaning-number-369-nikola-tesla)
+68. [TF2 Workshop: how items get into the game (Steam Workshop)](https://steamcommunity.com/workshop/about/?appid=440)
+69. [Team Fortress 2 Workshop hammered into better shape (PCGamesN)](https://pcgamesn.com/team-fortress-2/team-fortress-2-workshop-hammered-into-better-shape)
+70. [McMahan et al., Communication-Efficient Learning of Deep Networks from Decentralized Data (arXiv 1602.05629)](https://arxiv.org/abs/1602.05629)
+71. [Tran et al., SumUp: Sybil-resilient online content voting (NSDI 2009)](https://static.usenix.org/events/nsdi09/tech/full_papers/tran/tran_html/index.html)
+72. [Voting and fake identities (Northeastern, SOSP)](https://khoury.northeastern.edu/home/ancsaaa/files/voting-SOSP.pdf)
+73. [Brigading (IFTAS library)](https://about.iftas.org/library/brigading/)
+74. [Law of One archive: search "astral" (sessions 10, 11, 17)](https://www.lawofone.info/results.php?q=astral)
+75. [Law of One archive: search "kundalini" (session 49)](https://www.lawofone.info/results.php?q=kundalini)
+76. [Law of One archive: search "wanderer" (sessions 12, 16, 36, 42, 52, 63, 65, 66, 75)](https://www.lawofone.info/results.php?q=wanderer)

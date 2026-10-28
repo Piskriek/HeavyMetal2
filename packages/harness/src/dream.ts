@@ -21,7 +21,8 @@
  */
 import { checkMem, type Episode, type Mem, type SqId, type SqOrAligned, ALIGNED } from '@hm/shorthand';
 import { SQ_DISTORTION_CATALOG } from './purpose-excitement-catalyst.js';
-import { dominantDistortion, episodeWeight, memoryBalance } from './preset-memory.js';
+import { BALANCED_AT, dominantDistortion, episodeWeight, memoryBalance } from './preset-memory.js';
+import { partnersOf, type Dyad } from './polarity.js';
 
 /** Episodes one dream replays at most (the min-spec laptop's budget per checkpoint). */
 export const DREAM_BUDGET = 12;
@@ -65,10 +66,15 @@ export interface DreamInput {
   readonly budget?: number;
   /** An imagined episode after a repair: the error the preset would make now (0..1), from its own model. Must be pure. */
   readonly imagine?: (mem: Mem, episode: Episode) => number;
+  /**
+   * Plan 56 §12: the dyads among these presets. A distorted preset whose partner (of the other pole) is balanced dreams as
+   * if cued: the partner lends its cue, whatever the Higher Self gives. Only a balanced partner lends (Law of One 22.26).
+   */
+  readonly dyads?: readonly Dyad[];
 }
 
 export interface DreamDigest {
-  readonly replayed: readonly { readonly of: string; readonly t: number; readonly cat: string; readonly d: SqOrAligned; readonly cued: boolean }[];
+  readonly replayed: readonly { readonly of: string; readonly t: number; readonly cat: string; readonly d: SqOrAligned; readonly cued: boolean; readonly partner?: string }[];
   /** Repairs that took: the charge on that ray fell. */
   readonly balanced: readonly { readonly of: string; readonly d: SqId; readonly antidote: string; readonly charge: number }[];
   /** Repairs offered that the preset did not take, or that the imagined episode did not confirm. */
@@ -98,7 +104,7 @@ export function dreamOpenness(mem: Mem, cued: boolean): number {
 }
 
 /** An episode this dream may replay: preset `p`, its episode `i`. */
-interface Candidate { readonly p: number; readonly i: number; readonly t: number; readonly score: number; readonly cued: boolean }
+interface Candidate { readonly p: number; readonly i: number; readonly t: number; readonly score: number; readonly cued: boolean; readonly partner?: string }
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 /** A preset's memory as the dream works on it (copies: the input is never changed). */
 interface Working { readonly of: string; readonly hard: number; readonly inv: number; charge: number[]; ep: Mutable<Episode>[]; cause: Mutable<Mem['cause'][number]>[]; readonly src: Mem }
@@ -112,13 +118,20 @@ function selectEpisodes(input: DreamInput, budget: number): Candidate[] {
   if (!explicit) {
     for (let r = 0; r < 7 && lowest < 0; r++) if (input.presets.some((m) => (m.charge[r] ?? 0) > REST_AT)) lowest = r;
   }
+  // a balanced partner of the other pole lends its cue (Plan 56 §12): the first balanced one, by partner order
+  const partners = partnersOf(input.dyads ?? []);
+  const byOf = new Map(input.presets.map((m) => [m.of, m] as const));
+  const lender = (of: string): string | undefined => (partners.get(of) ?? []).find((q) => (byOf.get(q)?.bal ?? 0) >= BALANCED_AT);
   const all: Candidate[] = [];
   input.presets.forEach((m, p) => {
+    const partner = lender(m.of);
     m.ep.forEach((e, i) => {
       const depth = e.d !== ALIGNED ? Math.max(0, m.charge[rayOf(e.d)] ?? 0) / 127 : 0;
       const recency = 1 / (1 + Math.max(0, input.now - e.t) / 600);
-      const cued = explicit ? cueSet.has(keyOf(m.of, e.t)) : (e.d !== ALIGNED && lowest >= 0 && rayOf(e.d) === lowest && depth > 0);
-      all.push({ p, i, t: e.t, cued, score: (cued ? 2 : 0) + depth + episodeWeight(e) * recency });
+      const selfCued = explicit ? cueSet.has(keyOf(m.of, e.t)) : (e.d !== ALIGNED && lowest >= 0 && rayOf(e.d) === lowest && depth > 0);
+      const lent = !selfCued && partner !== undefined && depth > 0;
+      const cued = selfCued || lent;
+      all.push({ p, i, t: e.t, cued, ...(lent ? { partner } : {}), score: (cued ? 2 : 0) + depth + episodeWeight(e) * recency });
     });
   });
   all.sort((a, b) => b.score - a.score || a.p - b.p || a.t - b.t || a.i - b.i);
@@ -150,7 +163,7 @@ export function dream(input: DreamInput): DreamResult {
   for (const c of chosen) {
     const m = presets[c.p]!;
     const e = m.ep[c.i]!;
-    replayed.push({ of: m.of, t: e.t, cat: e.cat, d: e.d, cued: c.cued });
+    replayed.push({ of: m.of, t: e.t, cat: e.cat, d: e.d, cued: c.cued, ...(c.partner !== undefined ? { partner: c.partner } : {}) });
     // 3. replay: what the episode taught moves the ego's preference for this preset
     prefer[m.of] = clampI8((prefer[m.of] ?? 0) + REPLAY_GAIN * episodeWeight(e) * (1 - 2 * e.err));
     // 4. rebalance: only distorted episodes whose ray is still charged
@@ -228,3 +241,16 @@ export function wakeLine(digest: DreamDigest): string {
   if (r) return `I dreamed the ${digest.replayed[0]!.cat.toLowerCase().replace(/_/g, ' ')} again and held on to it. It is still in me.`;
   return `I dreamed the ${digest.replayed[0]!.cat.toLowerCase().replace(/_/g, ' ')} again, and it was quiet.`;
 }
+
+/**
+ * The six steps (owner, 28 Oct, the 3/6/9 frame: "Observe, Orient, Design, Act, Verify, Refine"; Boyd's OODA loop with
+ * Shewhart and Deming's check and act, research §11): where each already runs in the ladder, at every rung.
+ */
+export const LOOP_STEPS = [
+  { step: 'observe', runs: 'recordExperience: a catalyst becomes an episode (W2)' },
+  { step: 'orient', runs: 'the cause links and predictDistortion: which thinking above left what here (W2)' },
+  { step: 'design', runs: 'dream, select and cue: what to replay, by the Higher Self\'s cue, the built-in one or a partner\'s (W3)' },
+  { step: 'act', runs: 'dream, rebalance: the antidote on the charged ray (W3)' },
+  { step: 'verify', runs: 'dream: the imagined rerun and the balance check (W3)' },
+  { step: 'refine', runs: 'dream, close, teach and downscale; then graduate or repeat (W3, W5)' },
+] as const;

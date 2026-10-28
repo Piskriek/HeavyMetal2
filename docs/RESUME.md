@@ -44,7 +44,17 @@
     - Links close on the repair only, before the downscale, and the ego learns.
     - The built-in cue goes lowest ray first.
     - An uncued, hardened preset refuses and keeps its charge.
-    - 8/8 tests. W4 (`system-memory.ts`, the Overwatch's inherited pack) is next. Owner question: "repeat" instead of "perish".
+    - 8/8 tests (`2f3c366f`). **W4 is built, with polarity:**
+    - `system-memory.ts` (the Overwatch's inherited pack: data exact, preferences distilled, pooled when aligned, a digest, canonical JSON that cannot lie);
+    - `polarity.ts`:
+      - an intent-to-context lean (the owner's 3/6/9 names), declared or from the preset's kind;
+      - dyads, and investment from a partner;
+      - a balanced partner lends its dream cue;
+      - nested triads, with the Harmonizer as the observing rung;
+      - the Higher Self's complementary framing;
+    - the pack's `alignment`, the 9: nano, micro and macro;
+    - `LOOP_STEPS`, the 6 steps mapped onto the loop;
+    - 8/8 tests. W5 (the lifecycle: graduate or repeat, investment, responsibility) is next. Owner question: "repeat" instead of "perish".
 - **Skill:** the owner's SQ distortion check is installed locally at `.claude/skills/sq-distortion-check`.
 
 ## 28 Oct Checkpoint 2 (Claude Opus: Plan 51 Wave 3 + Plan 52, Commit `8600a81b`; read this first)

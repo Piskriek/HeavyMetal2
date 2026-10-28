@@ -23,7 +23,7 @@ import {
 import type { ScoutCategory } from './companion-scout';
 import { KNOWN_BRIDGE_GAMES } from '@hm/bridgekit';
 import {
-  antiCheatAdvice, bridgeManifest, bridgePresetFor, checkBridgeProfile, createCadenceAnalyzer, DEFAULT_INPUT_RELAY, RELAY_CONFIRM_WORD, relayCommand, relayConsentOk, manifestLine, PRESET_SIGNATURES, readRaw, createEventAnonymizer, createTelemetryAccumulator, parseCadenceLine, gameIdOf, profileLine, rankRunningGames, uncheckedProfile,
+  antiCheatAdvice, bridgeManifest, bridgePresetFor, checkBridgeProfile, createCadenceAnalyzer, RELAY_CONFIRM_WORD, relayAllowed, relayCommand, relayConsentOk, manifestLine, PRESET_SIGNATURES, readRaw, createEventAnonymizer, createTelemetryAccumulator, parseCadenceLine, gameIdOf, profileLine, rankRunningGames, uncheckedProfile,
   type BridgePermissionProfile, type CadenceAnalyzer, type DocumentedMechanics, type InputRelaySpec, type RelayAction, type EventClass, type TelemetryAccumulator,
 } from '@hm/gamebridge';
 
@@ -109,6 +109,11 @@ export interface CompanionDroneOps {
   };
   /** Plan 51: puts the last mimic in force (the player's words only). */
   applyMimic(): string;
+  /**
+   * Plan 53 §2.6: the mirror. `mask` is the bridged game's held keys (@hm/gamebridge MIRROR_KEYS bits) that the character
+   * here presses too; 0 keeps the mirror on with nothing held; null turns it off and lets every mirrored key go.
+   */
+  mirror(mask: number | null): void;
 }
 
 /**
@@ -122,6 +127,8 @@ export interface CompanionScreenOps {
   linked(): boolean;
   /** JPEG frames of the player's view and of the linked window, if any. */
   frames(): Promise<readonly { readonly source: 'game' | 'external'; readonly blob: Blob }[]>;
+  /** Plan 53 §2.6: the linked window's picture small in a corner of the HUD (picture in picture), or not; what to say. */
+  pip(on: boolean): string;
 }
 
 export interface CompanionChatProps {
@@ -354,14 +361,18 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
     setRelayTyped('');
     if (line) companionSays(line);
   };
-  /** "Relay my input": opens the consent for the bridged game (it never turns on by itself). */
+  /**
+   * "Relay my input": opens the consent for the bridged game (it never turns on by itself), and only for a game that allows
+   * input from outside (relayAllowed: a checked profile that declares a relay, no anti-cheat). Anywhere else nothing is sent
+   * in, and the player is told how to play both at once instead.
+   */
   const openRelayDialog = (): void => {
     const s = bridgeSessionRef.current;
     if (!s) { companionSays('Bridge a game first, then say "relay my input".'); return; }
-    const spec = s.profile.inputRelay ?? DEFAULT_INPUT_RELAY;
-    const ac = antiCheatAdvice(s.profile, lastProcessesRef.current);
-    const warning = ac ? `${s.title} runs ${ac.systems.join(' and ')}. Pressing into it from outside is what anti-cheats exist to catch: it can get your account banned. Safe modes: ${(s.profile.antiCheat?.safeModes ?? ['offline or single-player', 'a server you host yourself']).join('; ')}.`
-      : `No anti-cheat is known for ${s.title}. If it has one, pressing into it from outside can get your account banned.`;
+    const allowed = relayAllowed(s.profile, lastProcessesRef.current);
+    if (!allowed.ok) { companionSays(allowed.why); return; }
+    const spec = allowed.spec;
+    const warning = `${s.title} allows input from outside: ${spec.basis} No anti-cheat is known for it; if it has one after all, pressing into it from outside can get your account banned.`;
     const limits = [
       ...(spec.transport === 'console-tcp' ? [`Your presses go to its console on port ${spec.port}${spec.launchOption ? ` (start it with ${spec.launchOption})` : ''}.`] : ['Your presses go in as keys and mouse buttons, and only while its own window is in front; with any other window in front they are dropped.']),
       ...spec.notes,
@@ -431,6 +442,7 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
     droneOpsRef.current?.reflexStart(p.telemetry?.eventClasses);
     companionSays(`${profileLine(p)} Whatever I read of it goes straight onto you; "stop the bridge" puts everything back.`, `${p.title} is bridged. Its mechanics come across, never its art.`);
     postBridgeEvent({ type: 'bridge-active', gameId: p.gameId, title: p.title, process, verdict: p.verdict, channels: p.channels, streams: p.streams, mapped: acc !== null });
+    startMirror(p.gameId, p.title);
     // plan 53: an anti-cheat guarding the game (its profile, or its process running here) is said before anything else
     // crosses: the ban risk of what this bridge uses, and the modes where going deeper is safe
     const ac = antiCheatAdvice(p, lastProcessesRef.current);
@@ -531,9 +543,59 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
    * Ends the session; `say` false when a new bridge replaces it. Whatever its mimics changed goes back, and the bridge stage
    * with it (plan 53) unless `keepStage` (a new bare "bridge" on the stage).
    */
+  // ---- Plan 53 §2.6: the mirror (owner, 28 Oct). The player plays the bridged game with their own hands, its window in
+  // front; the bridge streams the keys they press there (read from Windows, never pressed into the game) and the character
+  // here does the same, so they control both at once and look here for the output.
+  const mirrorRef = useRef<{ readonly gameId: string; readonly es: EventSource; said: boolean } | null>(null);
+  const stopMirror = (): void => {
+    const m = mirrorRef.current;
+    mirrorRef.current = null;
+    if (!m) return;
+    m.es.close();
+    droneOpsRef.current?.mirror(null);
+  };
+  const startMirror = (gameId: string, title: string): void => {
+    const base = bridgeUrl.current;
+    if (!base || typeof EventSource === 'undefined' || mirrorRef.current?.gameId === gameId) return;
+    stopMirror();
+    const m = { gameId, es: new EventSource(`${base}/mirror?client=${clientIdRef.current}`), said: false };
+    mirrorRef.current = m;
+    // the mirror is on from the bridge's start: losing the mouse to the game's window must not pause FIDELITY
+    droneOpsRef.current?.mirror(0);
+    m.es.onmessage = (ev: MessageEvent): void => {
+      let d: { gameId?: unknown; mask?: unknown };
+      try { d = JSON.parse(String(ev.data)) as typeof d; } catch { return; }
+      if (mirrorRef.current !== m || d.gameId !== gameId || typeof d.mask !== 'number') return;
+      droneOpsRef.current?.mirror(d.mask);
+      if (d.mask !== 0 && !m.said) {
+        m.said = true;
+        companionSays(
+          `I see your presses in ${title}, and your character here does the same: read only, nothing is pressed into ${title}. Look here for the output. Keep ${title} small and beside FIDELITY, or on another screen, never over it: a covered window runs slow.`,
+          `I mirror your ${title} presses here.`,
+        );
+        postBridgeEvent({ type: 'mirror-on', gameId });
+      }
+    };
+  };
+  /** "How do I play both at once": the game in front with the player's hands on it, FIDELITY beside it as the output. */
+  const playBesideLine = (): string => {
+    const t = bridgeSessionRef.current?.title ?? 'the other game';
+    return `To play both at once: run ${t} in a window (windowed in its video settings, 1280 by 720 or smaller) on a second screen or beside FIDELITY, never over it: Chrome slows a window that is covered. Bridge it, click into ${t} and play it with your own hands. I read your presses there, read only, and your character here does the same; looking around stays separate, so the view here holds steady. Say "picture in picture" and pick ${t}'s window, and its picture sits in a corner here, so you only need to watch FIDELITY.`;
+  };
+  /** "Picture in picture": shares the game's window if it is not shared yet (the browser's picker), then puts it in a corner. */
+  const showPicture = async (): Promise<void> => {
+    const so = screenOpsRef.current;
+    if (!so) { companionSays('The picture needs the play screen.'); return; }
+    if (!so.linked()) {
+      const r = await so.link();
+      if (!so.linked()) { companionSays(r); return; }
+    }
+    companionSays(so.pip(true));
+  };
   const endBridgeSession = (say = true, keepStage = false): void => {
     const s = bridgeSessionRef.current;
     bridgeSessionRef.current = null;
+    stopMirror();
     const undone = droneOpsRef.current?.endLiveMimic() ?? '';
     const back = keepStage ? '' : droneOpsRef.current?.exitBridgeStage() ?? '';
     // the relay ends with the bridge it was chosen for (the bridge disarms it too, on bridge-closed)
@@ -607,6 +669,10 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
         case 'bridge-stop': endBridgeSession(); return;
         case 'relay-on': openRelayDialog(); return;
         case 'relay-off': disarmRelay(true); return;
+        // plan 53 §2.6: the bridged game's picture in a corner here (a shared window: read only), and how to play both at once
+        case 'pip-on': void showPicture(); return;
+        case 'pip-off': companionSays(screenOpsRef.current?.pip(false) ?? 'The picture needs the play screen.'); return;
+        case 'play-beside': companionSays(playBesideLine()); return;
         default: break;
       }
       if (intent.kind === 'status') {

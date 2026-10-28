@@ -52,6 +52,9 @@ export type CompanionIntent =
   | { readonly kind: 'bridge-stop' }
   | { readonly kind: 'relay-on' }
   | { readonly kind: 'relay-off' }
+  | { readonly kind: 'pip-on' }
+  | { readonly kind: 'pip-off' }
+  | { readonly kind: 'play-beside' }
   | { readonly kind: 'chat' };
 
 /** A resolved order: where to go, whether to float there, and the spoken confirmation. */
@@ -129,6 +132,11 @@ export function parseCompanionIntent(raw: string): CompanionIntent {
   // plan 53: the input relay is the player's choice; this only opens the dialog (a box ticked and a word typed turn it on)
   if (/^(?:please )?(?:relay my (?:input|presses|keys)|send my (?:input|presses|keys) (?:to|into) the game|(?:turn on|start|enable) (?:the )?(?:input )?relay|input relay on)\b/.test(text)) return { kind: 'relay-on' };
   if (/^(?:please )?(?:(?:stop|end|turn off|disable) (?:the )?(?:input )?relay|relay off|input relay off)\b/.test(text)) return { kind: 'relay-off' };
+  // plan 53 §2.6: the bridged game's own picture, small in a corner of FIDELITY (read only: a shared window)
+  if (/^(?:please )?(?:(?:hide|close|stop|end|turn off|drop) (?:the )?(?:picture in picture|pip|corner (?:picture|view|window))|pip off|picture in picture off)\b/.test(text)) return { kind: 'pip-off' };
+  if (/^(?:please )?(?:picture in picture|pip|(?:show|put) (?:the |my )?(?:game|window|other game|game window) (?:in (?:the |a )?corner|small|picture in picture)|(?:turn on|start) (?:the )?(?:picture in picture|pip))\b/.test(text)) return { kind: 'pip-on' };
+  // ...and how to play both at once: the game in front with the player's hands on it, FIDELITY beside it as the output
+  if (/\b(?:play (?:both|them both|the two)(?: games)?(?: at once| at the same time| together)?|control both|both at (?:once|the same time)|how do i (?:play|use) (?:it|this|them) (?:with|beside|alongside) (?:the |my )?(?:other )?game)\b/.test(text)) return { kind: 'play-beside' };
   // plan 51 wave 2: ending the bridge puts back everything its live mimic changed
   if (/^(?:please )?(?:unbridge|unlink the game|(?:stop|end|close|drop|cut|kill) (?:the )?(?:bridge|bridging|game bridge|mimic|mimicking)|disconnect(?: from)?(?: the)? (?:game|bridge))\b/.test(text)) return { kind: 'bridge-stop' };
   // plan 51 wave 2: "bridge this game", "bridge counter strike", "hook into the game I'm playing": the name, if said
@@ -266,6 +274,9 @@ export function resolveCompanionOrder(
     case 'bridge-stop':
     case 'relay-on':
     case 'relay-off':
+    case 'pip-on':
+    case 'pip-off':
+    case 'play-beside':
       return { intent, ...none, reply: '' }; // the caller runs it (the kit edit, the order or the find) and reports it
     case 'chat':
       return { intent, ...none, reply: '' }; // the caller routes to the bridge or small talk

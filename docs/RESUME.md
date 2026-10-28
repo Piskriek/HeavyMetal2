@@ -25,10 +25,20 @@
   - e2e: drone 43/43, companion 15/15, ping & kit 24/24, gamebridge 29/29;
   - bundle 12.78 MB / 16 MB.
 - **Next:**
-  - The CS2 fire test: a bot match, a bare "bridge" from the drone, then spray a magazine with CS2 focused.
+  - **Input rule (owner, 28 Oct):** input goes into a game only where it is allowed (`relayAllowed`: a checked profile with a relay and its basis, no anti-cheat; no default relay; CS2 none; the bridge refuses too). Everywhere else, **the read-only mirror**:
+    - the sampler's ten keys reach FIDELITY's character over `GET /mirror` (server-sent events);
+    - FIDELITY does not pause while the mirror is on;
+    - "picture in picture" puts the game's window in a HUD corner;
+    - "how do I play both" explains the layout;
+    - looking around is not mirrored (Argon: no mouse hook).
+  - **The CS2 live test, now the mirror:**
+    - CS2 windowed and small, beside FIDELITY (never over it), in a bot match;
+    - a bare "bridge" from the drone;
+    - play CS2 with your own hands: W walks FIDELITY's character, and the left button fires its stand-in;
+    - say "picture in picture" and pick CS2's window.
   - Restart the live bridge on :8220 on the new code first.
   - Owner decisions: the child-facing CS2 skin, and the Plan 55 gateway (opening the bridge beyond this PC).
-  - [Plan 56](argo/plans/56-distortion-ladder.md), the owner's distortion ladder, designed (not built), research in [`DISTORTION_LADDER_RESEARCH.md`](DISTORTION_LADDER_RESEARCH.md): memory in the shorthand (`Mem`), behaviour in ego weights, excitement hardens, dreams rebalance (the Higher Self cues), the Overwatch inherits the whole system, graduate or repeat. **W1 is built:** `packages/shorthand` (frames, the `Mem` record, the text form, the `~m:` tail, PermMask), 7/7 tests. W2 (`preset-memory.ts`) is next. Owner question: "repeat" instead of "perish".
+  - [Plan 56](argo/plans/56-distortion-ladder.md), the owner's distortion ladder, designed (not built), research in [`DISTORTION_LADDER_RESEARCH.md`](DISTORTION_LADDER_RESEARCH.md): memory in the shorthand (`Mem`), behaviour in ego weights, excitement hardens, dreams rebalance (the Higher Self cues), the Overwatch inherits the whole system, graduate or repeat. **W1 is built:** `packages/shorthand` (frames, the `Mem` record, the text form, the `~m:` tail, PermMask), 7/7 tests (`33bf5ed6`). **W2 is built:** `packages/harness/src/preset-memory.ts` (the experience writer: excitement-weighted 32-slot record, hardening, charge by ray, cause links that learn and predict, the upper-rung rule id `src`, `repeatCurriculum` keeping all memory, the symptom), 11/11 tests. W3 (`dream.ts`) is next. Owner question: "repeat" instead of "perish".
 - **Skill:** the owner's SQ distortion check is installed locally at `.claude/skills/sq-distortion-check`.
 
 ## 28 Oct Checkpoint 2 (Claude Opus: Plan 51 Wave 3 + Plan 52, Commit `8600a81b`; read this first)

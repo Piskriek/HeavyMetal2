@@ -2,13 +2,16 @@
   Plan 51 wave 3: the cadence sampler (the input-audio floor rung) for a game that publishes no telemetry.
 
   Started by scripts/companion-bridge.mjs when the player bridges a game, stopped when the bridge closes. About 200 times a
-  second it writes one line to stdout:  t fg fire jump dash peak
+  second it writes one line to stdout:  t fg fire jump dash peak keys
     t     seconds since start
     fg    1 when the bridged game's own window has focus
-    fire  left mouse held, jump space held, dash shift held: read ONLY while fg is 1 (otherwise 0); no other key, never text
+    fire  left mouse held, jump space held, dash shift held: read ONLY while fg is 1 (otherwise 0); never text
     peak  the game's own audio peak, 0..1, from its Windows audio session (IAudioSessionManager2 -> the sessions whose
           process is the game -> IAudioMeterInformation). Other apps' sound (music, voice chat) is not read.
-  It never touches the game's process, memory or files. Nothing is stored: the bridge keeps a few seconds in memory.
+    keys  the mirror's ten keys as bits (W A S D Space Ctrl Shift LMB R E, bit 0 first, as @hm/gamebridge MIRROR_KEYS),
+          read ONLY while fg is 1 (otherwise 0), so FIDELITY's character can do what the player presses in the game.
+  It never touches the game's process, memory or files, and never presses anything (owner, 28 Oct: read only).
+  Nothing is stored: the bridge keeps a few seconds in memory.
 
   powershell -NoProfile -File scripts/cadence-sampler.ps1 -Process SomeGame.exe [-Hz 200] [-Seconds 0]
 #>
@@ -107,6 +110,9 @@ namespace Fidelity.Cadence {
       return meters;
     }
 
+    // the mirror's keys, bit 0 first: W A S D Space Ctrl Shift LMB R E (the same order as @hm/gamebridge MIRROR_KEYS)
+    static readonly int[] MirrorVk = { 0x57, 0x41, 0x53, 0x44, 0x20, 0x11, 0x10, 0x01, 0x52, 0x45 };
+
     public static void Run(string name, int hz, double seconds) {
       timeBeginPeriod(1);
       try {
@@ -134,9 +140,11 @@ namespace Fidelity.Cadence {
           bool fire = fg && (GetAsyncKeyState(0x01) & 0x8000) != 0;
           bool jump = fg && (GetAsyncKeyState(0x20) & 0x8000) != 0;
           bool dash = fg && (GetAsyncKeyState(0x10) & 0x8000) != 0;
+          int keys = 0;
+          if (fg) for (int i = 0; i < MirrorVk.Length; i++) if ((GetAsyncKeyState(MirrorVk[i]) & 0x8000) != 0) keys |= 1 << i;
           float peak = 0;
           foreach (var m in meters) { float v; try { if (m.GetPeakValue(out v) == 0 && v > peak) peak = v; } catch { } }
-          outw.WriteLine(string.Format(inv, "{0:F4} {1} {2} {3} {4} {5:F4}", t, fg ? 1 : 0, fire ? 1 : 0, jump ? 1 : 0, dash ? 1 : 0, peak));
+          outw.WriteLine(string.Format(inv, "{0:F4} {1} {2} {3} {4} {5:F4} {6}", t, fg ? 1 : 0, fire ? 1 : 0, jump ? 1 : 0, dash ? 1 : 0, peak, keys));
           next += period;
           double wait = next - sw.Elapsed.TotalSeconds;
           if (wait > 0.0015) System.Threading.Thread.Sleep((int)(wait * 1000));

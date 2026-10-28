@@ -136,4 +136,8 @@ test('plan 51 wave 2: "bridge this game" and "bridge <name>" name the game when 
   for (const s of ['relay my input', 'send my presses to the game', 'turn on the input relay']) assert.equal(parseCompanionIntent(s).kind, 'relay-on', s);
   for (const s of ['stop the relay', 'relay off', 'turn off the input relay']) assert.equal(parseCompanionIntent(s).kind, 'relay-off', s);
   assert.equal(parseCompanionIntent('stop the bridge').kind, 'bridge-stop', 'the bridge is not the relay');
+  // plan 53 §2.6: the game's picture in a corner, and how to play both at once
+  for (const s of ['picture in picture', 'pip', 'show the game in the corner', 'put the game window small']) assert.equal(parseCompanionIntent(s).kind, 'pip-on', s);
+  for (const s of ['hide the picture in picture', 'pip off', 'close the corner view']) assert.equal(parseCompanionIntent(s).kind, 'pip-off', s);
+  for (const s of ['how do i play both at once', 'can i control both', 'play both games at the same time']) assert.equal(parseCompanionIntent(s).kind, 'play-beside', s);
 });

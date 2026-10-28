@@ -105,7 +105,7 @@ import { usePlaySettings } from '../shell/play-settings';
 import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { kv } from '../storage/profile-storage';
 import { isMechanicObservation, transduceMechanic, type MimicryResult } from '@hm/harness';
-import { gateObservation, weaponStandIn, type BridgePermissionProfile } from '@hm/gamebridge';
+import { gateObservation, mirrorKeyEdges, weaponStandIn, type BridgePermissionProfile } from '@hm/gamebridge';
 import { createReflexSlot, type ReflexAction, type ReflexSlot } from './mimic-reflex';
 import { encodeKitMotionCode, encodeLocomotionCode, LOCOMOTION_PRESETS } from '@hm/kinematic';
 import { encodeLogicCode } from '@hm/wiregraph';
@@ -114,6 +114,10 @@ import { activeLocomotion, customLocomotion, setCustomLocomotion } from './locom
 const MIMIC_SHELF_KEY = 'hm.setmix.mimics';
 /** Plan 51 wave 3: the share of a hit that gets through the reflex shield. */
 const SHIELD_PASS = 0.2;
+/** Plan 53 §2.6: the `key` of each mirrored key event (by its code), for handlers that read `key` rather than `code`. */
+const MIRROR_KEY_NAMES: Readonly<Record<string, string>> = {
+  KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd', Space: ' ', ControlLeft: 'Control', ShiftLeft: 'Shift', KeyR: 'r', KeyE: 'e',
+};
 import { BASE_SAVE_KEY, saveWorld } from '../base/save';
 import { OUTPOST_PLOT_SEED } from '../base/plot-height';
 import { ROLE_LABELS } from '../net/protocol';
@@ -1785,18 +1789,24 @@ useEffect(() => {
   applySkinShotRef.current = applySkinShot;
   // ---- Plan 49: the ping (middle mouse, or Q when Q has no other job) and the kit edits the comms run on what was pinged
   const companionHandleRef = useRef<CompanionChatHandle | null>(null);
+  // Plan 53 §2.6: the mirror's held keys (MIRROR_KEYS bits), and whether it is on: while it is, losing the mouse to the
+  // bridged game's window does not pause, since the player is playing here through that game's keys
+  const mirrorMaskRef = useRef(0);
+  const mirrorOnRef = useRef(false);
   // Plan 53: the player's own presses for the input relay (fire, use, jump, reload). The comms send them on only while the
   // relay the player chose (a box ticked, RELAY typed) is on; nothing here originates a press.
   useEffect(() => {
     const typing = (t: EventTarget | null): boolean => t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
     const KEYS: Readonly<Record<string, 'use' | 'jump' | 'reload'>> = { KeyE: 'use', Space: 'jump', KeyR: 'reload' };
+    // only presses the player really made here: the mirror replays a bridged game's presses into this window (untrusted
+    // events), and those must never go back out into a game
     const onKey = (phase: 'down' | 'up') => (e: KeyboardEvent): void => {
       const action = KEYS[e.code];
-      if (!action || e.repeat || typing(e.target)) return;
+      if (!action || !e.isTrusted || e.repeat || typing(e.target)) return;
       companionHandleRef.current?.relay(action, phase);
     };
     const onMouse = (phase: 'down' | 'up') => (e: MouseEvent): void => {
-      if (e.button !== 0 || typing(e.target) || (e.target instanceof HTMLElement && e.target.closest('button, [role="dialog"], .companion-chat-panel'))) return;
+      if (e.button !== 0 || !e.isTrusted || typing(e.target) || (e.target instanceof HTMLElement && e.target.closest('button, [role="dialog"], .companion-chat-panel'))) return;
       companionHandleRef.current?.relay('fire', phase);
     };
     const kd = onKey('down'), ku = onKey('up'), md = onMouse('down'), mu = onMouse('up');
@@ -2215,6 +2225,26 @@ useEffect(() => {
     applyMimic(): string {
       return applyLastMimic(false);
     },
+    mirror(mask) {
+      mirrorOnRef.current = mask !== null;
+      const prev = mirrorMaskRef.current;
+      const next = mask ?? 0;
+      mirrorMaskRef.current = next;
+      for (const e of mirrorKeyEdges(prev, next)) {
+        if (e.code === 'Mouse0') {
+          // fire without the pointer lock the mouse path needs: the player's mouse is in the game's window, not this one
+          const scene = sceneRef.current;
+          if (!scene) continue;
+          isLmbDownRef.current = e.down;
+          if (!e.down) scene.monsters.setTrigger(false);
+          else if (scene.monsters.isEquipped() && !beamHeldRef.current) { scene.monsters.setTrigger(true); fireWeapon(); }
+          continue;
+        }
+        // keys go in as this window's own key events: every handler here knows them, and they are untrusted, so the input
+        // relay never sends them back out into a game
+        window.dispatchEvent(new KeyboardEvent(e.down ? 'keydown' : 'keyup', { code: e.code, key: MIRROR_KEY_NAMES[e.code] ?? '', bubbles: true }));
+      }
+    },
     reflexStart(classes) {
       stopReflexSlot();
       bridgeMeasuredRef.current = { movement: false, fire: false, rules: 0 };
@@ -2357,6 +2387,15 @@ useEffect(() => {
   const eyesRequestRef = useRef<((canvas: HTMLCanvasElement) => void) | null>(null);
   const linkedStreamRef = useRef<MediaStream | null>(null);
   const linkedVideoRef = useRef<HTMLVideoElement | null>(null);
+  // Plan 53 §2.6: picture in picture: the linked window (the bridged game) small in a corner, so the player watches FIDELITY only
+  const [pipOn, setPipOn] = useState(false);
+  const pipVideoRef = useRef<HTMLVideoElement | null>(null);
+  useEffect(() => {
+    const v = pipVideoRef.current;
+    if (!v) return;
+    v.srcObject = pipOn ? linkedStreamRef.current : null;
+    if (pipOn) void v.play().catch(() => {});
+  }, [pipOn]);
   /** A 640x360 JPEG of any picture, letterboxed. */
   const jpegCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const toJpeg = (src: CanvasImageSource, sw: number, sh: number): Promise<Blob | null> => {
@@ -2378,6 +2417,7 @@ useEffect(() => {
     if (linkedVideoRef.current) linkedVideoRef.current.srcObject = null;
     linkedVideoRef.current = null;
     sceneRef.current?.showGameScreen(null);
+    setPipOn(false);
   };
   const linkStream = (stream: MediaStream): boolean => {
     unlinkWindow();
@@ -2414,6 +2454,11 @@ useEffect(() => {
       return 'Window unlinked.';
     },
     linked: () => linkedStreamRef.current !== null,
+    pip(on: boolean): string {
+      if (on && !linkedStreamRef.current) return 'Share the game\'s window first: "picture in picture" opens the browser\'s picker.';
+      setPipOn(on);
+      return on ? 'Its picture is in the corner, so you only need to watch FIDELITY. "Hide the picture" takes it away.' : 'Picture in picture off.';
+    },
     async frames() {
       const out: { source: 'game' | 'external'; blob: Blob }[] = [];
       const view = await new Promise<Blob | null>((resolve) => {
@@ -4615,7 +4660,7 @@ useEffect(() => {
     const onLock = (): void => {
       const on = document.pointerLockElement === canvasRef.current;
       setLocked(on);
-      if (!on && ready && !creating && !quietRef.current) setPaused(true);
+      if (!on && ready && !creating && !quietRef.current && !mirrorOnRef.current) setPaused(true);
       quietRef.current = false;
     };
     document.addEventListener('pointerlockchange', onLock);
@@ -5754,6 +5799,8 @@ useEffect(() => {
               <DrivingHudBadge telemetry={drivingDrift} />
             </HudZone>
           ) : null}
+          {/* Plan 53 §2.6: the bridged game's own picture in a corner (a shared window, read only, never saved) */}
+          {pipOn ? <video ref={pipVideoRef} className="play-pip" muted playsInline aria-label="The bridged game's own picture" data-testid="play-pip" /> : null}
           {/* Plan 48: In-game AI Companion Comms (hold T to talk, Enter to type) */}
           <CompanionChat
             companion={sceneRef.current?.getCompanion?.() ?? null}

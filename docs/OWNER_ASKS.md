@@ -283,3 +283,6 @@
   - **Dreaming:** "i feel like i should hilight 'dreaming' is important, its how the higherself helps aswell"
   - **Test against the Law of One:** "cross reference with 'the law of one' to test your finding or to find clues on how it should work" (done in [DISTORTION_LADDER_RESEARCH.md §9](DISTORTION_LADDER_RESEARCH.md); one difference: Ra describes "repeat", not "perish")
   - **Repeat, not perish; all is one:** "i meant perish in the way that 'its not a choice' cos there si no swarm cos its all one thing were all one, it was in the relative sense(this can get complicated fast, good catch). yes they repeat obviously"
+- **Input into other games: read only, unless the game allows it (28 Oct, [plan 53 §2.6](argo/plans/53-bridge-stage.md)):**
+  - "no 'synthetic' injection, that needs to be read only, th eplayer can still control both the harness character and the game character at the same time, if you have bothe games open then focus cna be on CS2 for example and the harnes is full screen on another screen or in a window not ot overlapping and the user looks at the harnes for out put not the cs2 window, we make the cs2 window small and picture in picture it if we can?"
+  - "no wynthetic injection when it comes to games where its not allowed, its still something the harness can do where appropriate right?"

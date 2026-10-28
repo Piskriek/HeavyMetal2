@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { transduceMechanic, type MechanicObservation } from '@hm/harness';
 import {
-  allowedChannels, anonymizeEvents, antiCheatAdvice, checkInputRelay, relayCommand, relayConsentOk, type InputRelaySpec, banRisk, detectAntiCheat, type BridgeAction, bestChannel, bridgeManifest, manifestLine, weaponStandIn, createCadenceAnalyzer, parseCadenceLine, PRESET_SIGNATURES, bridgePresetFor, checkBridgeProfile, classifyEventField, createEventAnonymizer, CS2_TELEMETRY_MAPPING, pathTokens, readRaw, createTelemetryAccumulator, decodeBridgeProfileCode, encodeBridgeProfileCode, gameIdOf,
+  allowedChannels, anonymizeEvents, antiCheatAdvice, checkInputRelay, mirrorKeyEdges, relayAllowed, relayCommand, relayConsentOk, type InputRelaySpec, banRisk, detectAntiCheat, type BridgeAction, bestChannel, bridgeManifest, manifestLine, weaponStandIn, createCadenceAnalyzer, parseCadenceLine, PRESET_SIGNATURES, bridgePresetFor, checkBridgeProfile, classifyEventField, createEventAnonymizer, CS2_TELEMETRY_MAPPING, pathTokens, readRaw, createTelemetryAccumulator, decodeBridgeProfileCode, encodeBridgeProfileCode, gameIdOf,
   gateObservation, profileLine, rankRunningGames, readPath, uncheckedProfile, type BridgePermissionProfile,
 } from '../src/index';
 
@@ -178,10 +178,19 @@ test('one session anonymizer keeps labels stable across batches and passes label
 });
 
 test('the input-audio rung: audio onsets while fire is held are shots; presses are edges; keys only count in focus', () => {
-  assert.deepEqual(parseCadenceLine('1.2500 1 1 0 0 0.3000'), { t: 1.25, fg: true, fire: true, jump: false, dash: false, peak: 0.3 });
+  assert.deepEqual(parseCadenceLine('1.2500 1 1 0 0 0.3000'), { t: 1.25, fg: true, fire: true, jump: false, dash: false, peak: 0.3, keys: 0 });
   assert.equal(parseCadenceLine('1.25 0 1 1 1 0.3')?.fire, false, 'out of focus: no key counts');
   assert.equal(parseCadenceLine('garbage'), null);
   assert.equal(parseCadenceLine('1 1 1 1 1 7'), null, 'a peak is 0..1');
+  // the mirror's keys (7th column): read only in focus, unknown bits dropped, edges in order
+  assert.equal(parseCadenceLine('1 1 0 0 0 0 129')?.keys, 129, 'W and fire');
+  assert.equal(parseCadenceLine('1 0 0 0 0 0 129')?.keys, 0, 'out of focus: the mirror sees nothing');
+  assert.equal(parseCadenceLine('1 1 0 0 0 0 65535')?.keys, 1023, 'only the ten mirror keys');
+  assert.equal(parseCadenceLine('1 1 0 0 0 0 -1'), null);
+  assert.equal(parseCadenceLine('1 1 0 0 0 0 1.5'), null);
+  assert.deepEqual(mirrorKeyEdges(0, 0b10000001), [{ code: 'KeyW', down: true }, { code: 'Mouse0', down: true }]);
+  assert.deepEqual(mirrorKeyEdges(0b10000001, 0b1000), [{ code: 'KeyW', down: false }, { code: 'KeyD', down: true }, { code: 'Mouse0', down: false }]);
+  assert.deepEqual(mirrorKeyEdges(5, 5), []);
   // 4 s at 200 Hz: fire held 1..3 s with a 10-round/s weapon (12 ms of sound per round, the meter holding each a little),
   // a jump press every second, music-free; plus sound out of the fire hold (an explosion) that is not a shot
   const a = createCadenceAnalyzer();
@@ -284,19 +293,38 @@ test('plan 53: anti-cheat: the drone names the system, the risk of what it uses,
   assert.equal(profile({ antiCheat: { system: 'EAC', scope: 'always', safeModes: ['offline'], sources: [] } }).antiCheat?.scope, 'always');
 });
 
-test('plan 53: the input relay is the player\'s choice: a box and a word; only whitelisted presses go on the wire', () => {
+test('plan 53: the input relay exists only where the game allows it, then it is the player\'s choice: a box and a word', () => {
   assert.equal(relayConsentOk({ ticked: true, typed: ' relay ' }), true);
   assert.equal(relayConsentOk({ ticked: false, typed: 'RELAY' }), false, 'the box too');
   assert.equal(relayConsentOk({ ticked: true, typed: 'yes' }), false, 'the word, exactly');
-  const cs2 = bridgePresetFor('cs2')!.inputRelay!;
-  assert.equal(cs2.transport, 'synthetic-keys');
-  assert.deepEqual([relayCommand(cs2, 'fire', 'down'), relayCommand(cs2, 'fire', 'up'), relayCommand(cs2, 'jump', 'down')], ['down mouse1', 'up mouse1', 'down space']);
-  const console: InputRelaySpec = { transport: 'console-tcp', port: 2121, bindings: { fire: '+attack', use: '+use' }, notes: [] };
+  // owner, 28 Oct: no injection where it is not allowed. CS2 (VAC) declares no relay, and is refused even if one is forced on
+  const cs2 = bridgePresetFor('cs2')!;
+  assert.equal(cs2.inputRelay, undefined);
+  const forced = { ...cs2, inputRelay: { transport: 'synthetic-keys' as const, bindings: { fire: 'mouse1' }, notes: [], basis: 'forced in by a test' } };
+  const no = relayAllowed(forced, ['cs2.exe']);
+  assert.equal(no.ok, false);
+  assert.match(no.ok ? '' : no.why, /^Counter-Strike 2 runs VAC \(Valve Anti-Cheat\), so nothing is sent into it, whatever is ticked\. Play Counter-Strike 2 with your own hands/);
+  // a game nobody checked gets no relay (there is no default one any more), nor one that declares none
+  assert.match((relayAllowed(uncheckedProfile('Some Indie'), ['SomeIndie.exe']) as { why: string }).why, /has not been checked/);
+  assert.match((relayAllowed(profile(), []) as { why: string }).why, /does not allow input from outside/);
+  // a checked game that declares a relay with its basis, with no anti-cheat: allowed; with BattlEye running: refused
+  const spec = { transport: 'console-tcp', port: 2121, bindings: { fire: '+attack' }, launchOption: '-netconport 2121', basis: 'single-player, and its developer documents the console for tools' };
+  const open = profile({ inputRelay: spec });
+  const yes = relayAllowed(open, ['TestGame.exe']);
+  assert.equal(yes.ok, true);
+  assert.equal(yes.ok ? yes.spec.basis : '', spec.basis);
+  assert.match((relayAllowed(open, ['TestGame.exe', 'BEService.exe']) as { why: string }).why, /runs BattlEye, so nothing is sent into it/);
+  // only whitelisted presses go on the wire
+  const keys: InputRelaySpec = { transport: 'synthetic-keys', bindings: { fire: 'mouse1', jump: 'space' }, notes: [], basis: 'a FIDELITY instance' };
+  assert.deepEqual([relayCommand(keys, 'fire', 'down'), relayCommand(keys, 'fire', 'up'), relayCommand(keys, 'jump', 'down')], ['down mouse1', 'up mouse1', 'down space']);
+  const console: InputRelaySpec = { transport: 'console-tcp', port: 2121, bindings: { fire: '+attack', use: '+use' }, notes: [], basis: 'a test game' };
   assert.deepEqual([relayCommand(console, 'fire', 'down'), relayCommand(console, 'fire', 'up'), relayCommand(console, 'jump', 'down')], ['+attack', '-attack', null]);
-  // an AI's relay spec is checked: no arbitrary console, no keys off the list, a port for a console
-  assert.equal(checkInputRelay({ transport: 'console-tcp', port: 2121, bindings: { fire: 'quit' } }), null);
-  assert.equal(checkInputRelay({ transport: 'console-tcp', bindings: { fire: '+attack' } }), null, 'a console needs its port');
-  assert.deepEqual(checkInputRelay({ transport: 'synthetic-keys', bindings: { fire: 'mouse1', use: 'alt+f4' } })?.bindings, { fire: 'mouse1' });
-  assert.equal(checkInputRelay({ transport: 'console-tcp', port: 2121, bindings: { fire: '+attack; quit' } }), null, 'no chained commands');
-  assert.equal(profile({ inputRelay: { transport: 'console-tcp', port: 2121, bindings: { fire: '+attack' }, launchOption: '-netconport 2121' } }).inputRelay?.launchOption, '-netconport 2121');
+  // an AI's relay spec is checked: no arbitrary console, no keys off the list, a port for a console, and its basis
+  const basis = 'its terms allow input tools';
+  assert.equal(checkInputRelay({ transport: 'console-tcp', port: 2121, bindings: { fire: 'quit' }, basis }), null);
+  assert.equal(checkInputRelay({ transport: 'console-tcp', bindings: { fire: '+attack' }, basis }), null, 'a console needs its port');
+  assert.deepEqual(checkInputRelay({ transport: 'synthetic-keys', bindings: { fire: 'mouse1', use: 'alt+f4' }, basis })?.bindings, { fire: 'mouse1' });
+  assert.equal(checkInputRelay({ transport: 'console-tcp', port: 2121, bindings: { fire: '+attack; quit' }, basis }), null, 'no chained commands');
+  assert.equal(checkInputRelay({ transport: 'console-tcp', port: 2121, bindings: { fire: '+attack' } }), null, 'a relay must say why the game allows it');
+  assert.equal(open.inputRelay?.launchOption, '-netconport 2121');
 });

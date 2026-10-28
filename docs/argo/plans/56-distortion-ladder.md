@@ -153,7 +153,7 @@
 | Wave | What | Done when |
 |---|---|---|
 | W1 | `@hm/shorthand` (roadmap R2): types, validator, line codec and share code, with `Mem` and the `~m:` tail. **Built 28 Oct** (`packages/shorthand`). The compilers to `loc`/`logic`/`brain` are still to come. | Codes round-trip; golden tests pass. **Done: 7/7.** |
-| W2 | `packages/harness/src/preset-memory.ts`: episodes, hardening, `thinking()` typing, charge, the cause graph, symptom jitter. | Oracle tests pass. |
+| W2 | `packages/harness/src/preset-memory.ts`: episodes, hardening, `thinking()` typing, charge, the cause graph, symptom jitter. **Built 28 Oct**, with the "repeat" rule from W5 and the upper-rung rule id (`src`). | Oracle tests pass. **Done: 11/11.** |
 | W3 | `dream.ts`: select, cue, replay, rebalance, downscale, close, wake digest. | Oracle tests pass. |
 | W4 | `system-memory.ts`: compile, pool when aligned, distil, digest. | Round-trip and pooling tests pass. |
 | W5 | The lifecycle: graduate or repeat, investment, responsibility. | Lifecycle tests pass. |
@@ -167,6 +167,31 @@
 - **Numbers** sit on a 1/1000 grid, so every round-trip is exact.
 - **Permissions:** `look` permission also gates `Rule look`.
 - **The SQ ids and stages** match the harness's (a test checks it).
+
+**W2 as built:**
+- `recordExperience(mem, x)`:
+  - writes one episode into the 32-slot record, weighted by its excitement;
+  - when the record is full, the lightest episode goes (the oldest of equals), and the newest always enters;
+  - hardness: `hard += (1 − hard) · excitement · 0.25`.
+- **Distorted thinking above** (`by`), or a distortion an observer saw (`felt`), adds `excitement · 32` to that distortion's ray (of ±127) and counts the `by → d` cause link.
+- **How distortions relate:** `predictDistortion` names the distortion `by` leaves when nobody observed one: the most counted link, or the same type until the links learn otherwise.
+- **The upper-rung rule** that acted is the episode's `src` (added to W1's `Episode`). `openCausesFrom(mem, src)` lists what that rule is still responsible for.
+- **A rung's thinking:** `dominantDistortion(mem)` gives the distortion on the memory's most charged ray, or aligned at balance 0.9 or more. Every rung is a preset with a memory: presets inside presets.
+- **Repeat:** `repeatCurriculum(mem)` returns the same memory with `cyc + 1`, and the next stage is S0a. Nothing is wiped (owner, 28 Oct).
+- **The symptom:** `symptomOffset(mem, t)` is a deterministic offset within `1 − bal`.
+
+**W3, agreed with Argon (28 Oct):**
+- **The order stands:** select, Higher Self cue, replay, rebalance, downscale, close, wake.
+- **One invariant:** a cause link closes only on the repair this dream did. Close evaluates the charge after rebalance and before downscale, so passive decay is never mistaken for a lesson learned.
+- **The voices** (Argon's lines, adapted: the drone flies on rotors and thruster pods; it has no wheels).
+  - **The drone's wake digest:** first person, bodily, in its own telemetry. It feels the charge bleed off without knowing the numbers behind the veil:
+    - "I dreamed the fire-bursts on the Moon pad again. My thrusters wanted to flinch and drop altitude, but a quiet hum held me level until the panic bled out of my pods."
+    - "In the replay every plot reset stripped my rifle back to a cold core. Once I stopped fighting the swap and trusted the lease, the recoil settled into a clean rhythm."
+    - "I watched the two windows side by side in the dark, ten keys pulsing across the glass, and woke lighter, like my gyros forgot what they were bracing against."
+  - **The Higher Self's reading:** second person and non-coercive. It names the trench and offers the upper-triad quality as a mirror, never the answer:
+    - "You braced against the shock because you believed safety was scarce. Rest in Presence: the ally on your deck is the anchor you were looking for."
+    - "Forcing the outcome hardened the trench on your third ray. Let go of the result, and let excitement guide the next pass."
+    - "Nothing is lost when a cycle closes unbalanced. Carry what you gathered into the next dawn, and let gratitude settle the lean."
 
 **The W3 oracle tests:**
 - A distortion hardened under `solar-control` thinking balances after cued dreams, and stays balanced.

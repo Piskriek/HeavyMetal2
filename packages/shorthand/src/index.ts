@@ -109,6 +109,8 @@ export interface Episode {
   readonly h: number;
   readonly d: SqOrAligned;
   readonly by: SqOrAligned;
+  /** The higher rung's rule or preset that acted (e.g. 'logic:mimic-reflex'), when known: who opened the offset. */
+  readonly src?: string;
 }
 export interface CauseLink {
   readonly by: SqOrAligned;
@@ -214,7 +216,7 @@ const orderRule: JsonRule = shape({
   focus: optional(shid), verb: optional(shid), ttl: nPos,
 });
 const episodeRule: JsonRule = shape({
-  t: int31, stage: oneOf(STAGE_IDS), cat: shid, ex: n01, err: n01, h: n01, d: sqOrAlignedRule, by: sqOrAlignedRule,
+  t: int31, stage: oneOf(STAGE_IDS), cat: shid, ex: n01, err: n01, h: n01, d: sqOrAlignedRule, by: sqOrAlignedRule, src: optional(shid),
 });
 const causeRule: JsonRule = shape({ by: sqOrAlignedRule, d: sqRule, n: number(0, 65535, true), open: boolRule });
 const memRule: JsonRule = shape({
@@ -283,7 +285,7 @@ function quantizeOrder(o: Order): Order {
 export function quantizeMem(m: Mem): Mem {
   return {
     of: m.of, hard: q3(m.hard), bal: q3(m.bal), charge: [...m.charge],
-    ep: m.ep.map((e) => ({ t: e.t, stage: e.stage, cat: e.cat, ex: q3(e.ex), err: q3(e.err), h: q3(e.h), d: e.d, by: e.by })),
+    ep: m.ep.map((e) => ({ t: e.t, stage: e.stage, cat: e.cat, ex: q3(e.ex), err: q3(e.err), h: q3(e.h), d: e.d, by: e.by, ...(e.src !== undefined ? { src: e.src } : {}) })),
     cause: m.cause.map((c) => ({ by: c.by, d: c.d, n: c.n, open: c.open })),
     inv: q3(m.inv), cyc: m.cyc, ...(m.vocab !== undefined && m.vocab.length > 0 ? { vocab: [...m.vocab] } : {}),
   };
@@ -352,7 +354,7 @@ export function formatFrame(frame: Frame): string {
   }
   for (const m of f.mems) {
     out.push(`m of=${m.of} hard=${num(m.hard)} bal=${num(m.bal)} ch=${m.charge.join(',')} inv=${num(m.inv)} cyc=${m.cyc}${m.vocab !== undefined ? ` vocab=${m.vocab.join(',')}` : ''}`);
-    for (const e of m.ep) out.push(`me t=${e.t} st=${e.stage} cat=${e.cat} ex=${num(e.ex)} err=${num(e.err)} h=${num(e.h)} d=${e.d} by=${e.by}`);
+    for (const e of m.ep) out.push(`me t=${e.t} st=${e.stage} cat=${e.cat} ex=${num(e.ex)} err=${num(e.err)} h=${num(e.h)} d=${e.d} by=${e.by}${e.src !== undefined ? ` src=${e.src}` : ''}`);
     for (const c of m.cause) out.push(`mc by=${c.by} d=${c.d} n=${c.n} open=${c.open ? 1 : 0}`);
   }
   return out.join('\n');
@@ -539,10 +541,10 @@ function parseInner(textIn: string): Frame {
       const cur = mems[mems.length - 1];
       if (cur === undefined) throw BAD;
       if (head === 'me') {
-        const m = kv(tk, 1, ['t', 'st', 'cat', 'ex', 'err', 'h', 'd', 'by']);
+        const m = kv(tk, 1, ['t', 'st', 'cat', 'ex', 'err', 'h', 'd', 'by', 'src']);
         cur.ep.push({
           t: pn(need(m, 't')), stage: need(m, 'st'), cat: need(m, 'cat'), ex: pn(need(m, 'ex')), err: pn(need(m, 'err')),
-          h: pn(need(m, 'h')), d: need(m, 'd'), by: need(m, 'by'),
+          h: pn(need(m, 'h')), d: need(m, 'd'), by: need(m, 'by'), ...opt(m, 'src', (x) => x),
         });
       } else {
         const m = kv(tk, 1, ['by', 'd', 'n', 'open']);
@@ -626,6 +628,8 @@ export const MEM_CODEC_SCHEMA: Schema = {
           fields: {
             t: { kind: 'int', min: 0, max: 2_147_483_647 }, stage: { kind: 'enum', options: STAGE_IDS }, cat: str(MAX_ID),
             ex: fl(), err: fl(), h: fl(), d: { kind: 'enum', options: SQ_OPTIONS }, by: { kind: 'enum', options: SQ_OPTIONS },
+            // the codec has no optional fields: '' stands for "no src" and is mapped back on decode
+            src: str(MAX_ID),
           },
         },
       },
@@ -644,7 +648,7 @@ export const MEM_CODEC_SCHEMA: Schema = {
 /** A mem as a share code (checked and quantized first). Throws Error(why) on an invalid mem. */
 export function encodeMem(mem: Mem): string {
   const m = checkMem(mem);
-  return encode(MEM_CODEC_SCHEMA, { ...m, vocab: m.vocab ?? [] });
+  return encode(MEM_CODEC_SCHEMA, { ...m, ep: m.ep.map((e) => ({ ...e, src: e.src ?? '' })), vocab: m.vocab ?? [] });
 }
 
 /** Reads a mem code. Returns null for anything that is not a valid mem. Never throws. */
@@ -653,7 +657,8 @@ export function decodeMem(code: string): Mem | null {
     const v = decode(MEM_CODEC_SCHEMA, code);
     if (v === null) return null;
     const raw = v as Mem;
-    return checkMem(quantizeMem(raw));
+    const ep = raw.ep.map(({ src, ...e }) => (src === '' || src === undefined ? e : { ...e, src }));
+    return checkMem(quantizeMem({ ...raw, ep }));
   } catch {
     return null;
   }

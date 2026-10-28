@@ -58,29 +58,42 @@
      - high: loaders, the game's files, and **sending input into the game**.
    - **What the drone says:** on bridging such a game it names the system, says that what it uses never touches the game, and names the safe modes for anything deeper. The bridge gets the same line as an `anti-cheat` event.
    - **About `-insecure`:** it is a community report only. Valve does not document whether it removes ban risk, and the drone says so.
-6. **Sending input back into a game: the player's choice** (owner, 28 Oct: "build it so the user can choose, we don't judge... have them click a box and write a word to confirm").
-   - **Off by default, per game and per session.** "Relay my input" opens a dialog with three parts:
-     - the anti-cheat line for that game, and what the transport can and cannot do;
-     - a box ("I understand this can get my account banned in that game");
-     - a word to type: **RELAY**.
-     Only both turn it on. "Stop the relay" or "stop the bridge" turns it off.
-   - **Only the player's own presses cross** (fire, use, jump, reload, pressed in FIDELITY). The drone and any AI never originate input into another game: in an online match that is a bot playing against people.
-     - The bridge enforces this: arming returns a token that only the game tab holds. It is never posted to `/events`, and every relayed press must carry it.
-   - **Transports**, declared by the game's profile (`inputRelay`), whitelisted:
-     - `console-tcp`: a game console over TCP (Source 1 games launched with `-netconport`). Only `+name`/`-name` commands, so no `quit`, binds or arbitrary console.
-     - `synthetic-keys`: Windows keys and mouse buttons from a short list. Delivered only while the game's own window is in front; a press with another window in front is dropped and reported.
-   - **CS2:**
-     - It has no remote console any more (the `-netconport` telnet console was CS:GO's; [nshud](https://github.com/daniel-zint/nshud) reports it gone). So only synthetic keys, which reach it only while its window is in front.
-     - On one PC that cannot happen while you play FIDELITY. It needs a second device driving it, through a bridge that listens beyond this PC, which is not built: the bridge is loopback-only by design.
-     - The dialog says this. View angles are not relayed: they would need `setang`, a cheat-protected console command, with no console.
+6. **Input into a game only where the game allows it; otherwise the player plays it, and FIDELITY mirrors** (owner, 28 Oct).
+   - **His words, in order:**
+     - "build it so the user can choose, we don't judge... have them click a box and write a word to confirm";
+     - then: "no synthetic injection, that needs to be read only, the player can still control both the harness character and the game character at the same time... focus can be on CS2... the harness is full screen on another screen or in a window not overlapping and the user looks at the harness for output... we make the cs2 window small and picture in picture it if we can";
+     - then: "no synthetic injection when it comes to games where its not allowed, its still something the harness can do where appropriate".
+   - **The category:** any input sent into any external game (synthetic keys, console commands). It exists only where the game allows it:
+     - a checked profile that declares a relay, with its `basis` (why the game permits input: its terms, its own input API, a FIDELITY instance);
+     - and no anti-cheat declared or running.
+     - The pure rule is `relayAllowed` (`@hm/gamebridge`). The bridge also refuses on its own whenever an anti-cheat process runs or the game is CS2, whoever asks.
+     - There is **no default relay** for games nobody checked, and **CS2 has none** (VAC).
+   - **Where it is allowed,** it is still the player's choice. "Relay my input" opens a dialog with three parts: why the game allows it, a box, and the word **RELAY**. Only the player's own presses cross; no AI ever originates input into another game. The arm token is held only by the game tab and never posted to `/events`.
+     - Transports, whitelisted:
+       - `console-tcp`: only `+name`/`-name`;
+       - `synthetic-keys`: a short key list, delivered only while the game's own window is in front.
+   - **Everywhere else: the mirror (read only).** The player plays the game with their own hands, its window in front:
+     - The sampler reads ten keys while the game has focus: W, A, S, D, Space, Ctrl, Shift, the left button, R and E. It never presses anything.
+     - The bridge streams each change at once (`GET /mirror`, server-sent events) to the tab that bridged the game.
+     - FIDELITY's character does the same:
+       - the keys go in as FIDELITY's own key events, untrusted, so the relay never sends them back out;
+       - fire takes a direct path that needs no pointer lock.
+     - While the mirror is on, losing the mouse to the game's window does not pause FIDELITY.
+     - Looking around is not mirrored. It would need a low-level mouse hook.
+       - Argon, 28 Oct: leave it unmirrored, with no hook. He says anti-cheats flag global mouse hooks. That claim is unsourced (common tools use such hooks), but the cautious call stands.
+       - The drone says the view here holds steady.
+   - **Layout:** "how do I play both at once" gets the drone's answer:
+     - run the game windowed and small, on a second screen or beside FIDELITY, never over it, because Chrome slows a covered window;
+     - FIDELITY is where the player looks.
+     - **Picture in picture:** "picture in picture" shares the game's window (the browser's picker; a shared window, never saved) and puts its picture in a corner of FIDELITY's HUD. "Hide the picture" takes it away.
 
 ## 2a. The input relay, built (28 Oct)
 - **`@hm/gamebridge`:**
-  - `InputRelaySpec` (on profiles: CS2 gets synthetic keys, honest about their limit);
+  - `InputRelaySpec`, which now carries its `basis`; CS2 has none since the owner's read-only rule;
   - `RELAY_CONFIRM_WORD`, `relayConsentOk`, `relayCommand`;
   - the whitelists: `+name` console commands, and the short key list;
   - `checkInputRelay` for AI profiles;
-  - the fallback for games nobody declared, `DEFAULT_INPUT_RELAY`.
+  - `relayAllowed`, which replaced the `DEFAULT_INPUT_RELAY` fallback (removed 28 Oct, owner: no injection where it is not allowed).
 - **The bridge:**
   - `POST /input-relay/arm`: checks the box and the word again and returns a token, never posted to `/events`;
   - `/press`: needs the token and re-checks the whitelist;

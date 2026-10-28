@@ -774,3 +774,19 @@
 .play-next { display: block; margin-top: 6px; font-size: 12px; color: rgba(232, 238, 241, .6); }
 .play-pickup { margin: 8px 0; min-width: 0 !important; padding: 8px 14px !important; font-size: 14px !important; background: rgba(255, 176, 42, .14) !important; border-color: #ffb02a !important; }
 .journal-pause { display: grid; place-content: center; }
+/* Plan 53 §2.6: picture in picture. The bridged game's own picture, small and still, on the right below the bridge plate;
+   the same violet edge as the bridge's HUD plate (.mhud-bridge), so it reads as part of the bridge. */
+.play-pip {
+  position: absolute;
+  right: clamp(16px, 4vw, 56px);
+  bottom: clamp(112px, 16vh, 168px);
+  width: min(360px, 34vw);
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  background: #000;
+  border: 1px solid rgba(184, 77, 255, .35);
+  border-left: 3px solid #b84dff;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .45);
+  pointer-events: none;
+}
+@media (max-width: 640px) { .play-pip { width: min(220px, 46vw); bottom: 96px; } }

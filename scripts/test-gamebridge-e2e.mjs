@@ -35,7 +35,8 @@ const defaultsFile = path.join(tmpDir, 'kit-defaults.json');
 fs.writeFileSync(defaultsFile, '{}\n');
 
 // a recorded cadence-sampler stream: 9 s at 200 Hz, the game in focus, fire held 0.5..8.5 s with its rounds at 6 a second
-// (each round 15 ms of sound, the session meter holding it), jump pressed for 100 ms every second
+// (each round 15 ms of sound, the session meter holding it), jump pressed for 100 ms every second, and the mirror's keys
+// (7th column): W held 1..3 s, the player walking forward in the game
 const replay = path.join(tmpDir, 'sampler.txt');
 {
   const lines = [];
@@ -44,7 +45,8 @@ const replay = path.join(tmpDir, 'sampler.txt');
     const fire = t >= 0.5 && t < 8.5;
     const round = fire && ((t - 0.5) % (1 / 6)) < 0.015;
     const jump = (t % 1) < 0.1;
-    lines.push(`${t.toFixed(4)} 1 ${fire ? 1 : 0} ${jump ? 1 : 0} 0 ${(round ? 0.55 : 0.003).toFixed(4)}`);
+    const keys = t >= 1 && t < 3 ? 1 : 0;
+    lines.push(`${t.toFixed(4)} 1 ${fire ? 1 : 0} ${jump ? 1 : 0} 0 ${(round ? 0.55 : 0.003).toFixed(4)} ${keys}`);
   }
   fs.writeFileSync(replay, `${lines.join('\n')}\n`);
 }
@@ -185,8 +187,17 @@ try {
     && Math.abs((await a.evaluate(() => window.__playScene.companionTuning().roundGapS)) - gapBefore) < 1e-9);
 
   // --- B. the input-audio rung: a game with no telemetry, read from its own audio and the player's keys ---
+  // the mirror replays the game's keys into A's own window as untrusted key events: watch for them
+  await a.evaluate(() => { window.__mirrorSeen = []; const on = (e) => { if (!e.isTrusted) window.__mirrorSeen.push(`${e.type}:${e.code}`); }; window.addEventListener('keydown', on); window.addEventListener('keyup', on); });
+  const walkFrom = await a.evaluate(() => { const p = window.__dev.eye(); return { x: p.x, z: p.z }; });
   await order('bridge some indie');
   check('"bridge some indie" starts the cadence sampler for SomeIndie.exe', Boolean(await until(async () => /\[SAMPLER\].*sampling SomeIndie\.exe \(replay\)/.test(bridgeLog), 6000)));
+  // Plan 53 §2.6 (owner, 28 Oct): read only. The player's W in the game walks A's character here, nothing goes into the game
+  const mirrored = await until(async () => { const s = await a.evaluate(() => window.__mirrorSeen); return s.includes('keydown:KeyW') && s.includes('keyup:KeyW') ? s : null; }, 8000);
+  check('the mirror: the game\'s own W press (read from Windows) walks A here, down then up', Boolean(mirrored), JSON.stringify(await a.evaluate(() => window.__mirrorSeen)));
+  const walkTo = await a.evaluate(() => { const p = window.__dev.eye(); return { x: p.x, z: p.z }; });
+  check('...the character really moved, and the drone says it mirrors, read only', Math.hypot(walkTo.x - walkFrom.x, walkTo.z - walkFrom.z) > 0.5 && Boolean(await until(() => said(/^I see your presses in SomeIndie, and your character here does the same: read only/), 3000)),
+    JSON.stringify({ walkFrom, walkTo }));
   const audio = await until(async () => (await events('mimic-result')).find((e) => e.live === true && e.channel === 'input-audio'), 20000);
   check('the sampler\'s stream becomes a live input-audio mimic', Boolean(audio), JSON.stringify(audio?.fire ?? null));
   const gapAudio = await a.evaluate(() => window.__playScene.companionTuning().roundGapS);
@@ -225,7 +236,7 @@ try {
   const leftovers = await a.evaluate((p) => window.__playScene.monsters.getMobList().filter((m) => Math.hypot(m.pos.x - p.x, m.pos.z - p.z) < 40).length, pad);
   check('"stop the bridge" takes A back where it stood, the pad and the stand-ins gone', home.where === labSpot.where && Math.hypot(home.x - labSpot.x, home.z - labSpot.z) < 0.5 && home.pad === null && leftovers === 0,
     JSON.stringify({ labSpot, home, leftovers }));
-  // --- D. Plan 53: the input relay, the player's choice: a box and a word; only their own presses; a fake game console ---
+  // --- D. Plan 53: input goes into a game only where the game allows it (owner, 28 Oct), then by the player's choice ---
   const consoleLines = [];
   const fakeConsole = net.createServer((sock) => { let rest = ''; sock.on('data', (d) => { const parts = (rest + d).split('\n'); rest = parts.pop() ?? ''; consoleLines.push(...parts.filter(Boolean)); }); });
   await new Promise((r) => fakeConsole.listen(8237, '127.0.0.1', r));
@@ -233,19 +244,26 @@ try {
   await order('bridge some indie');
   // a checked profile only applies to the game the player bridged, so it goes once the session is open
   await until(async () => (await events('bridge-active')).length > activeBefore, 10000);
-  await postCommand({
-    action: 'bridge-profile',
-    profile: {
-      schema: 'hm2:bridge-profile:v1', gameId: 'someindie', title: 'SomeIndie', verdict: 'limited', channels: [], streams: ['mechanics'], soloOnly: true,
-      sources: [{ url: 'https://example.com/someindie-console', quote: 'the console listens on a port you choose' }], checkedBy: 'e2e (playing the checking AI)', setup: [], notes: [],
-      antiCheat: { system: 'TestGuard', scope: 'online', safeModes: ['offline play'], sources: [] },
-      inputRelay: { transport: 'console-tcp', port: 8237, launchOption: '-netconport 8237', bindings: { fire: '+attack', use: '+use', jump: '+jump' } },
-    },
+  const indieProfile = (over) => ({
+    schema: 'hm2:bridge-profile:v1', gameId: 'someindie', title: 'SomeIndie', verdict: 'limited', channels: [], streams: ['mechanics'], soloOnly: true,
+    sources: [{ url: 'https://example.com/someindie-console', quote: 'the console listens on a port you choose' }], checkedBy: 'e2e (playing the checking AI)', setup: [], notes: [],
+    inputRelay: { transport: 'console-tcp', port: 8237, launchOption: '-netconport 8237', bindings: { fire: '+attack', use: '+use', jump: '+jump' }, basis: 'single-player, and its developer documents the console for tools.' },
+    ...over,
   });
-  check('the checking AI\'s profile, with its console relay, applies to the bridged game', Boolean(await until(() => said(/^SomeIndie: limited/), 8000)));
+  // first with an anti-cheat declared: nothing goes in, whatever is ticked, and no consent is even offered
+  await postCommand({ action: 'bridge-profile', profile: indieProfile({ antiCheat: { system: 'TestGuard', scope: 'online', safeModes: ['offline play'], sources: [] } }) });
+  await until(() => said(/^SomeIndie: limited/), 8000);
   await order('relay my input');
   const consent = a.locator('[data-testid="relay-consent"]');
-  check('"relay my input" opens the consent, with the game\'s anti-cheat named', await until(async () => (await consent.count()) > 0, 5000) && /TestGuard/.test(await consent.innerText()));
+  check('a game guarded by an anti-cheat gets no relay: the drone says why and offers playing it beside FIDELITY', Boolean(await until(() => said(/^SomeIndie runs TestGuard, so nothing is sent into it, whatever is ticked\. Play SomeIndie with your own hands/), 5000)) && (await consent.count()) === 0);
+  const guarded = await fetch(`${bridge}/input-relay/arm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gameId: 'cs2', ticked: true, typed: 'RELAY', transport: 'synthetic-keys', process: 'cs2.exe' }) });
+  check('...and the bridge itself refuses CS2 even with the box and the word', guarded.status === 400 && /guarded by an anti-cheat/.test((await guarded.json()).error ?? ''));
+  // then the same game with no anti-cheat, whose profile allows input: the player's choice
+  const saidBefore = (await events('companion-say')).length;
+  await postCommand({ action: 'bridge-profile', profile: indieProfile({}) });
+  check('the checking AI\'s profile, with its console relay, applies to the bridged game', Boolean(await until(async () => (await events('companion-say')).slice(saidBefore).some((e) => /^SomeIndie: limited/.test(e.text)), 8000)));
+  await order('relay my input');
+  check('"relay my input" opens the consent, with why the game allows input', await until(async () => (await consent.count()) > 0, 5000) && /documents the console for tools/.test(await consent.innerText()));
   const onBtn = a.locator('[data-testid="relay-on"]');
   const disabledAtFirst = await onBtn.isDisabled();
   await a.locator('[data-testid="relay-tick"]').check();

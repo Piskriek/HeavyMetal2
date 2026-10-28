@@ -247,14 +247,8 @@ const CS2_PROFILE: BridgePermissionProfile = {
   checkedBy: 'claude-opus (research)', checkedOn: '2026-10-28',
   setup: ['Run "node scripts/bridge-setup.mjs cs2" once (it writes Valve\'s gamestate_integration_fidelity.cfg into the game\'s cfg folder), then restart CS2.'],
   telemetry: CS2_TELEMETRY_MAPPING,
-  inputRelay: {
-    transport: 'synthetic-keys',
-    bindings: { fire: 'mouse1', use: 'e', jump: 'space', reload: 'r' },
-    notes: [
-      'CS2 has no remote console any more (-netconport was CS:GO\'s), so only keys, and only while CS2\'s window is in front: on one PC that is never while you play FIDELITY.',
-      'View angles are not relayed: setang is cheat-protected and needs a console.',
-    ],
-  },
+  // no inputRelay: VAC guards CS2, so nothing is ever sent into it (owner, 28 Oct). The player plays it with their own hands
+  // and FIDELITY mirrors their presses, read-only (Plan 53 §2.6).
   antiCheat: {
     system: 'VAC (Valve Anti-Cheat)',
     scope: 'online',
@@ -641,9 +635,12 @@ export type RelayAction = 'fire' | 'use' | 'jump' | 'reload';
 export const RELAY_ACTIONS: readonly RelayAction[] = ['fire', 'use', 'jump', 'reload'];
 
 /**
- * How a game takes relayed input (owner, 28 Oct: "build it so the user can choose... have them click a box and write a word
- * to confirm"): a console over TCP (Source 1 games with -netconport), or Windows keys delivered only while the game's own
- * window is in front. Bindings are console commands ("+attack") or key names from RELAY_KEYS.
+ * How a game takes relayed input: a console over TCP (Source 1 games with -netconport), or Windows keys delivered only while
+ * the game's own window is in front. Bindings are console commands ("+attack") or key names from RELAY_KEYS.
+ *
+ * Owner, 28 Oct: "no synthetic injection when it comes to games where its not allowed, its still something the harness can
+ * do where appropriate". So a relay exists only where the game allows it (relayAllowed): a checked profile that declares
+ * one, with its basis, and no anti-cheat declared or running. The player still chooses after that: a box and a word.
  */
 export interface InputRelaySpec {
   readonly transport: 'console-tcp' | 'synthetic-keys';
@@ -653,6 +650,8 @@ export interface InputRelaySpec {
   readonly launchOption?: string;
   readonly bindings: Readonly<Partial<Record<RelayAction, string>>>;
   readonly notes: readonly string[];
+  /** Why this game allows input from outside: the checker's evidence (its terms, its own input API, a FIDELITY instance). */
+  readonly basis: string;
 }
 
 /** The word the player types to turn the relay on, after ticking the box. */
@@ -662,12 +661,21 @@ export const RELAY_KEYS: readonly string[] = ['mouse1', 'mouse2', 'space', 'e', 
 /** The only console commands the console transport may send: a +name (its -name releases it). No binds, no quit, no cvars. */
 const RELAY_CONSOLE_COMMAND = /^\+[a-z][a-z0-9_]{1,23}$/;
 
-/** The relay a game gets when nobody declared one: the common keys. */
-export const DEFAULT_INPUT_RELAY: InputRelaySpec = {
-  transport: 'synthetic-keys',
-  bindings: { fire: 'mouse1', use: 'e', jump: 'space', reload: 'r' },
-  notes: ['Keys reach the game only while its own window is in front.'],
-};
+/**
+ * Whether anything may be sent into this game at all: only a checked profile that declares a relay (with its basis), for a
+ * game with no anti-cheat declared or running. A game nobody declared a relay for gets none. The answer says why not, and
+ * what the player can do instead.
+ */
+export function relayAllowed(profile: BridgePermissionProfile, processes: readonly string[]): { readonly ok: true; readonly spec: InputRelaySpec } | { readonly ok: false; readonly why: string } {
+  const instead = `Play ${profile.title} with your own hands, with its window in front, and keep FIDELITY beside it, not over it: I mirror your presses here, read-only.`;
+  const ac = antiCheatAdvice(profile, processes);
+  if (ac) return { ok: false, why: `${profile.title} runs ${ac.systems.join(' and ')}, so nothing is sent into it, whatever is ticked. ${instead}` };
+  if (profile.verdict === 'unchecked' || profile.verdict === 'refused') {
+    return { ok: false, why: `${profile.title} ${profile.verdict === 'refused' ? 'refuses anything deeper' : 'has not been checked'}, so nothing is sent into it. ${instead}` };
+  }
+  if (!profile.inputRelay) return { ok: false, why: `${profile.title}'s profile does not allow input from outside, so nothing is sent into it. ${instead}` };
+  return { ok: true, spec: profile.inputRelay };
+}
 
 /** Both parts of the consent: the box ticked and the word typed. */
 export function relayConsentOk(consent: { readonly ticked: boolean; readonly typed: string }): boolean {
@@ -700,10 +708,14 @@ export function checkInputRelay(v: unknown): InputRelaySpec | null {
     }
   }
   if (Object.keys(bindings).length === 0) return null;
+  // a relay must say why the game allows input from outside
+  const basis = str(v.basis, 200);
+  if (!basis || basis.length < 8) return null;
   const launch = str(v.launchOption, 64);
   return {
     transport, ...(port !== undefined ? { port } : {}), ...(launch && /^-[a-z_]+( [0-9]{2,5})?$/.test(launch) ? { launchOption: launch } : {}),
     bindings, notes: Array.isArray(v.notes) ? v.notes.filter((x): x is string => typeof x === 'string').slice(0, 4).map((x) => x.slice(0, 200)) : [],
+    basis,
   };
 }
 
@@ -802,7 +814,10 @@ export function manifestLine(aspects: readonly BridgeAspect[]): string {
 
 // ------------------------------------------------------------------ the input-audio rung (the cadence sampler's stream)
 
-/** One sample of scripts/cadence-sampler.ps1: focus, three input keys (read only while the game has focus), its audio peak. */
+/**
+ * One sample of scripts/cadence-sampler.ps1: focus, three input keys (read only while the game has focus), its audio peak,
+ * and the mirror's keys as a bitmask (MIRROR_KEYS; 0 when the game does not have focus or the sampler predates the mirror).
+ */
 export interface CadenceSample {
   readonly t: number;
   readonly fg: boolean;
@@ -810,16 +825,41 @@ export interface CadenceSample {
   readonly jump: boolean;
   readonly dash: boolean;
   readonly peak: number;
+  readonly keys?: number;
 }
 
-/** A sampler line ("t fg fire jump dash peak") as a sample, or null for anything else. */
+/**
+ * The mirror (Plan 53 §2.6, owner 28 Oct): the player plays the bridged game with their own hands, its window in front,
+ * and FIDELITY's character does what they press, read-only. These are the keys the sampler reads for it, by bit. Nothing is
+ * ever pressed into the game: they are read from Windows while the game has focus, and replayed into FIDELITY only.
+ * `code` is the KeyboardEvent code FIDELITY's own handlers know; 'Mouse0' is the fire button.
+ */
+export const MIRROR_KEYS: readonly { readonly bit: number; readonly vk: number; readonly code: string }[] = [
+  { bit: 0, vk: 0x57, code: 'KeyW' }, { bit: 1, vk: 0x41, code: 'KeyA' }, { bit: 2, vk: 0x53, code: 'KeyS' }, { bit: 3, vk: 0x44, code: 'KeyD' },
+  { bit: 4, vk: 0x20, code: 'Space' }, { bit: 5, vk: 0x11, code: 'ControlLeft' }, { bit: 6, vk: 0x10, code: 'ShiftLeft' },
+  { bit: 7, vk: 0x01, code: 'Mouse0' }, { bit: 8, vk: 0x52, code: 'KeyR' }, { bit: 9, vk: 0x45, code: 'KeyE' },
+];
+const MIRROR_MASK = (1 << MIRROR_KEYS.length) - 1;
+
+/** What changed between two mirror bitmasks: each key that went down or came up, in MIRROR_KEYS order. */
+export function mirrorKeyEdges(prev: number, next: number): { readonly code: string; readonly down: boolean }[] {
+  const out: { code: string; down: boolean }[] = [];
+  for (const k of MIRROR_KEYS) {
+    const was = (prev >> k.bit) & 1, now = (next >> k.bit) & 1;
+    if (was !== now) out.push({ code: k.code, down: now === 1 });
+  }
+  return out;
+}
+
+/** A sampler line ("t fg fire jump dash peak [keys]") as a sample, or null for anything else. */
 export function parseCadenceLine(line: string): CadenceSample | null {
   const f = line.trim().split(/\s+/);
-  if (f.length !== 6) return null;
-  const [t, fg, fire, jump, dash, peak] = f.map(Number) as [number, number, number, number, number, number];
-  if (![t, fg, fire, jump, dash, peak].every(Number.isFinite) || peak < 0 || peak > 1) return null;
+  if (f.length !== 6 && f.length !== 7) return null;
+  const [t, fg, fire, jump, dash, peak, keys = 0] = f.map(Number) as [number, number, number, number, number, number, number?];
+  if (![t, fg, fire, jump, dash, peak, keys].every(Number.isFinite) || peak < 0 || peak > 1 || !Number.isInteger(keys) || keys < 0) return null;
   // the keys only count while the game has focus (the sampler already zeroes them; this holds even for a hand-made stream)
-  return { t, fg: fg === 1, fire: fg === 1 && fire === 1, jump: fg === 1 && jump === 1, dash: fg === 1 && dash === 1, peak };
+  const on = fg === 1;
+  return { t, fg: on, fire: on && fire === 1, jump: on && jump === 1, dash: on && dash === 1, peak, keys: on ? keys & MIRROR_MASK : 0 };
 }
 
 export interface CadenceAnalyzer {

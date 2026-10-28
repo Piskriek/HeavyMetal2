@@ -113,9 +113,23 @@ function queueCadence(gameId, lines) {
   if (queued.length >= CADENCE_QUEUE) pendingCommands.splice(pendingCommands.indexOf(queued[0]), 1);
   pendingCommands.push({ action: 'cadence', gameId, lines, ...(sessionClients[gameId] ? { to: sessionClients[gameId] } : {}) });
 }
+// ---- Plan 53 §2.6: the mirror. The player plays the bridged game with their own hands; the sampler reads ten keys while
+// the game has focus (its 7th column) and every change goes at once to the tab that bridged it (server-sent events), so
+// FIDELITY's character does what they press. Read only: nothing is ever pressed into the game (owner, 28 Oct).
+const mirrorStreams = new Map();
+const mirrorLast = {};
+function pushMirror(gameId, mask, t) {
+  if (mirrorLast[gameId] === mask) return;
+  mirrorLast[gameId] = mask;
+  const to = sessionClients[gameId];
+  const msg = `data: ${JSON.stringify({ gameId, mask, t })}\n\n`;
+  for (const [client, res] of mirrorStreams) if (!to || client === to) { try { res.write(msg); } catch {} }
+}
 function stopSampler() {
   if (!sampler) return;
   sampler.stop();
+  // every mirrored key comes up when the sampler stops: nothing stays held in FIDELITY
+  pushMirror(sampler.gameId, 0, -1);
   console.log(`\x1b[35m[SAMPLER]\x1b[0m stopped (${sampler.gameId}, ${sampler.count} samples)`);
   sampler = null;
 }
@@ -130,6 +144,9 @@ function startSampler(gameId, processName) {
     s.count += 1;
     buf.push(line.trim());
     if (buf.length >= CADENCE_BATCH) { queueCadence(gameId, buf); buf = []; }
+    const f = line.trim().split(/\s+/);
+    // the mirror's keys count only while the game has focus (the sampler zeroes them already; a hand-made stream too)
+    pushMirror(gameId, f.length === 7 && f[1] === '1' ? (Number.parseInt(f[6] ?? '0', 10) & 1023) || 0 : 0, Number(f[0]));
   };
   if (SAMPLER_REPLAY && processName) {
     // a recording plays at its own pace (by its t column), so the game sees the timing a live run would give
@@ -165,6 +182,12 @@ process.on('exit', () => stopSampler());
 const RELAY_CONSOLE_LINE = /^[+-][a-z][a-z0-9_]{1,23}$/;
 const RELAY_KEY_LINE = /^(down|up) (mouse1|mouse2|space|e|f|q|r|shift|ctrl)$/;
 const relays = {};
+// Owner, 28 Oct: no input into games where it is not allowed. The game's tab checks its profile first (relayAllowed); this
+// side refuses on its own, whoever asks, whenever an anti-cheat is running or the game is one it guards (the same process
+// list as @hm/gamebridge's detectAntiCheat, plus the VAC games FIDELITY ships a profile for).
+const RELAY_ANTI_CHEAT_PROCESS = /easyanticheat|^beservice(_x64)?(\.exe)?$|^(vgc|vgtray)(\.exe)?$|faceit|^pnkbstr[ab](\.exe)?$/i;
+const RELAY_GUARDED_GAMES = new Set(['cs2']);
+const RELAY_GUARDED_PROCESSES = /^cs2(\.exe)?$/i;
 const relayLog = [];
 const relayNote = (gameId, text) => {
   relayLog.push({ at: Date.now(), gameId, text });
@@ -409,6 +432,9 @@ const handle = async (req, res) => {
       if (transport === 'console-tcp' && !port) throw new Error('a console relay needs its port');
       const proc = typeof b.process === 'string' && /^[\w .()-]{1,64}$/.test(b.process) ? b.process : null;
       if (transport === 'synthetic-keys' && !proc) throw new Error('a key relay needs the game\'s process');
+      if (RELAY_GUARDED_GAMES.has(gameId) || (proc && RELAY_GUARDED_PROCESSES.test(proc))) throw new Error('that game is guarded by an anti-cheat: nothing is sent into it');
+      const guard = (await runningProcesses()).find((p) => RELAY_ANTI_CHEAT_PROCESS.test(p.trim()));
+      if (guard) throw new Error(`an anti-cheat is running (${guard.trim()}): nothing is sent into any game while it runs`);
       disarmRelay(gameId);
       const token = randomUUID();
       relays[gameId] = { gameId, token, transport, port, process: proc, launchOption: typeof b.launchOption === 'string' ? b.launchOption.slice(0, 64) : null, child: null, socket: null };
@@ -554,6 +580,19 @@ const handle = async (req, res) => {
   }
   if (pathname === '/kit-defaults' && req.method === 'GET') {
     json(res, 200, { file: DEFAULTS_FILE, defaults: readDefaults() });
+    return;
+  }
+
+  // The mirror's stream (server-sent events) for one game tab: its bridged game's key changes, as they happen
+  if (pathname === '/mirror' && req.method === 'GET') {
+    const client = url.searchParams.get('client') ?? '';
+    if (!/^[a-z0-9]{4,64}$/i.test(client)) { json(res, 400, { ok: false, error: 'the mirror needs the tab\'s client id' }); return; }
+    res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+    res.write(': mirror\n\n');
+    const old = mirrorStreams.get(client);
+    if (old) { try { old.end(); } catch {} }
+    mirrorStreams.set(client, res);
+    req.on('close', () => { if (mirrorStreams.get(client) === res) mirrorStreams.delete(client); });
     return;
   }
 

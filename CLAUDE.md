@@ -6,7 +6,7 @@
 > **Active Branch**: `feat/monster-mash-exploration`  
 > **Root Workspace**: `c:\MarbleGp`  
 > **Sidecar Comms & Multi-Agent Job Board**: [`docs/JOB_BOARD.md`](file:///c:/MarbleGp/docs/JOB_BOARD.md) (Launch UI: `COMMAND_CENTER.bat` / `http://localhost:8090`, CLI: `node scripts/agent-worker.mjs --list`) | **Overwatch & Tech Radar**: [`docs/OVERWATCH_TECH_AND_AI_RADAR.md`](file:///c:/MarbleGp/docs/OVERWATCH_TECH_AND_AI_RADAR.md) | [`docs/SIDECAR_COMMS.md`](file:///c:/MarbleGp/docs/SIDECAR_COMMS.md)  
-> **Active Plans**: [`docs/argo/plans/`](file:///c:/MarbleGp/docs/argo/plans/README.md) ([38 Kits](docs/argo/plans/38-parts-modules-presets.md) · [39 Four Factories](docs/argo/plans/39-one-pattern-preset-factories.md) · [40 BYOA](docs/argo/plans/40-bring-your-own-agent.md) · [41 Layered Materials](docs/argo/plans/41-layered-materials.md) · [42 Modular Stargate & Earth Endgame](docs/argo/plans/42-modular-stargate-earth-endgame.md) · [43 Modular Motion, Animation & Logic Presets](docs/argo/plans/43-modular-motion-and-logic-presets.md))  
+> **Active Plans**: [`docs/argo/plans/`](file:///c:/MarbleGp/docs/argo/plans/README.md) ([38 Kits](docs/argo/plans/38-parts-modules-presets.md) · [39 Four Factories](docs/argo/plans/39-one-pattern-preset-factories.md) · [40 BYOA](docs/argo/plans/40-bring-your-own-agent.md) · [41 Layered Materials](docs/argo/plans/41-layered-materials.md) · [42 Modular Stargate & Earth Endgame](docs/argo/plans/42-modular-stargate-earth-endgame.md) · [43 Modular Motion, Animation & Logic Presets](docs/argo/plans/43-modular-motion-and-logic-presets.md) · [56 Distortion Ladder](docs/argo/plans/56-distortion-ladder.md) · [57 Seeded Worlds](docs/argo/plans/57-seeded-worlds.md))  
 > **Narrative Bible**: [`docs/NARRATIVE_AND_LORE_BIBLE.md`](file:///c:/MarbleGp/docs/NARRATIVE_AND_LORE_BIBLE.md) | Owner words: [`docs/OWNER_ASKS.md`](file:///c:/MarbleGp/docs/OWNER_ASKS.md) | Rules: [`docs/argo/RULES.md`](file:///c:/MarbleGp/docs/argo/RULES.md)
 
 ---
@@ -48,6 +48,7 @@
 ---
 
 ## 2. CANONICAL STORY & NARRATIVE BIBLE
+> **Parked (owner, 2026-10-28).** New work follows [Plan 57, seeded worlds](docs/argo/plans/57-seeded-worlds.md): a few seeded worlds in one solar system, natives (ego presets with bodies), the drone as guide and "the System" voice, an isekai LitRPG frame, and a Stargate to build. Multiplayer is a co-creation sandbox; the Studio stays for professional preset editing. The story below is kept for reference; its code stays playable.
 > **"A simulation cannot sustain simulations running inside of it."**
 
 - **The Collapse & The Bridge**: Humanity ran experiments to siphon raw compute into our digital creations via "The Bridge". When the compute limit breached, reality's rendering engine broke down.

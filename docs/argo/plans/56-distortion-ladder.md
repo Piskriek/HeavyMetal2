@@ -701,3 +701,21 @@ What each step does:
 - **Tests:**
   - body tests 7/7, including his example: control from what came in aches at the throat on the left, grows, and lets go in a eureka;
   - drone e2e 55/55: held in its pods, it shows at its radio on the left, flashing blue.
+
+**§20.10, the visible change on the drone (owner, 28 Oct: "Commit, then visuals"; Argon's visual spec), built:**
+- **Where it draws.** Each zone's parts on the drone's own kit (RULES 8a, no stand-in props), in `drone-body-visuals.ts` (pure):
+  - 1 root: skids, struts, thruster pods and nozzles (motors and shrouds in air);
+  - 2 couplings: the arms; 3 power core: the battery and weapon pod; 4 centre: the hull;
+  - 5 voice: its radio masts and nav lamps (its signals); 6 sight: the lens and sensor housing; 7 crown: the top cap.
+  - A corner part counts on its own side. A middle part warned on one side shows only that half (the drone's left is +x).
+- **Argon's mapping, reconciled.** His spec named a left and right radio mast for the throat; the kit had none. At first the nav lamps carried the voice (Argon approved that), but at 2.5 cm they read poorly in the shot. So the kit now has a real radio mast each side (Opus's call): a square mast on a footing block at the hull's back, behind the cap, with a lit tip. Masts and lamps together are the voice zone, and the mechanical body already names ray 5 "radio", so "my radio, on the left" now names a part that exists.
+- **How it shows** (Argon's spec, all of it):
+  - where it is held: dull amber while congested (`stiff`), pulsing red-orange once inflamed (`pulse`), jittering red-orange when runaway (`crack`, and the whole drone micro-vibrates), a flicker when drained, a limp when numb (the drone dips toward that side);
+  - where it shows: the zone's own glow starved (a dark shell, `starve`) with blue static crackling over it while the ache holds (`static`), a sharp flash on a pain (`flash`), a soft tinge while it itches back (`tinge`). On the drone that zone is its voice, so suppressed truth reads as a voice gone dim: the left nav lamps go dark while the right ones still glow;
+  - a eureka sweeps the antidote's colour from where it was held up into where it ached (`sweep-from`, then `sweep-to`, every 3 s).
+- **The overlays** are additive boxes over each part, 15% larger, on both frames (rotors and vacuum thrusters). They last until the next checkpoint, when the new warnings replace them.
+- **Tests:**
+  - visuals unit tests 5/5: every zone has parts, the left voice lights only the left lamps, the half overlay, stage and signal looks, the eureka sweep's order, bounded deterministic rhythms, the limp's sign;
+  - drone e2e: the overlays are drawn on the left radio mast and lamps and, by stage, on the left pods; the screenshot is `shots-run/drone/04-drone-body-warning.png`.
+  - The shots caught one bug the tests missed: kit boxes stand on their base, so the overlays hung half a part low until they were lifted to each part's centre.
+- **Next, by Argon's order:** B, the body persisted as an `mb` shorthand line (today the drone's body restarts each session); then C, W6g's organic and mechanical body maps, where characters (and, after the owner's 28 Oct question, their children and hybrids) live.

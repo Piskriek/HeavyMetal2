@@ -86,7 +86,7 @@ const thrusterPod = (sx: number, sz: number, name: string): Placement[] => {
   ];
 };
 
-/** The frame both modules share: skids, struts, battery, weapon pod and barrel, hull, cap, sensor housing and lens. */
+/** The frame both modules share: skids, struts, battery, weapon pod and barrel, hull, cap, radio masts, sensor housing and lens. */
 const FRAME: readonly Placement[] = [
   { ref: 'skid', key: 'skid-left', at: [0.08, 0, 0] },
   { ref: 'skid', key: 'skid-right', at: [-0.08, 0, 0] },
@@ -98,6 +98,13 @@ const FRAME: readonly Placement[] = [
   { ref: 'barrel', key: 'barrel', at: [0, 0.05, 0.13] },
   { ref: 'hull', key: 'hull', at: [0, HULL.y, 0] },
   { ref: 'cap', key: 'cap', at: [0, HULL.y + HULL.h, 0] },
+  // its radio (its voice, plan 56 §20.10; Argon's spec named left and right masts): a square mast each side at the hull's
+  // back, behind the cap, each on its own footing block, with a lit tip
+  ...([[1, 'left'], [-1, 'right']] as const).flatMap(([sx, side]): Placement[] => [
+    { ref: 'mast-base', key: `mast-base-${side}`, at: [sx * 0.1, HULL.y + HULL.h, -0.16] },
+    { ref: 'mast', key: `mast-${side}`, at: [sx * 0.1, HULL.y + HULL.h + 0.015, -0.16] },
+    { ref: 'mast-tip', key: `mast-tip-${side}`, at: [sx * 0.1, HULL.y + HULL.h + 0.115, -0.16] },
+  ]),
   { ref: 'sensor-housing', key: 'sensor-housing', at: [0, 0.15, HULL.d / 2 + 0.04] },
   { ref: 'lens', key: 'lens', at: [0, 0.175, HULL.d / 2 + 0.08 + 0.006] },
   ...CORNERS.map(([sx, sz, name, yaw]) => arm(sx, sz, name, yaw)),
@@ -118,6 +125,9 @@ export const DRONE_KIT: Kit = {
     thruster: { source: { kind: 'box', size: [THRUSTER.side, THRUSTER.h, THRUSTER.side] }, material: 'gunmetal', rank: 0 },
     nozzle: { source: { kind: 'box', size: [NOZZLE.side, NOZZLE.h, NOZZLE.side] }, material: 'darkSteel', rank: 0 },
     'nav-lamp': { source: { kind: 'box', size: [0.025, 0.025, 0.025] }, material: 'violet', rank: 2 },
+    'mast-base': { source: { kind: 'box', size: [0.03, 0.015, 0.03] }, material: 'darkSteel', rank: 1 },
+    mast: { source: { kind: 'box', size: [0.01, 0.1, 0.01] }, material: 'gunmetal', rank: 2 },
+    'mast-tip': { source: { kind: 'box', size: [0.016, 0.016, 0.016] }, material: 'violet', rank: 2 },
     strut: { source: { kind: 'box', size: [0.02, 0.065, 0.02] }, material: 'gunmetal', rank: 1 },
     skid: { source: { kind: 'box', size: [0.025, 0.025, 0.3] }, material: 'darkSteel', rank: 0 },
     pod: { source: { kind: 'box', size: [0.06, 0.055, 0.16] }, material: 'gunmetal', rank: 1 },

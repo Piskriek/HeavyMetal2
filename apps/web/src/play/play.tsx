@@ -105,6 +105,7 @@ import { usePlaySettings } from '../shell/play-settings';
 import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { kv } from '../storage/profile-storage';
 import { bodyCheckpoint, createDroneMemory, dreamNow, dronePerspective, droneSymptoms, loadDroneMemory, noteCatalyst, saveDroneMemory, type DroneBody, type DroneCatalyst, type DroneMemory } from './drone-memory';
+import { hintsFromWarnings } from './drone-body-visuals';
 import { warningLine } from '@hm/harness';
 import type { DreamCue } from '@hm/harness';
 import { isMechanicObservation, transduceMechanic, type MimicryResult } from '@hm/harness';
@@ -1828,6 +1829,9 @@ useEffect(() => {
     droneBodyRef.current = b.body;
     for (const w of b.warnings.slice(0, 2)) companionHandleRef.current?.say(warningLine(w));
     if (b.warnings.length) companionHandleRef.current?.post({ type: 'body-warning', warnings: b.warnings });
+    // the visible change until the next checkpoint: where each is held (by its stage), where it shows (static, a flash on a
+    // pain), or a eureka's sweep from the one up into the other
+    sceneRef.current?.getCompanion()?.setBodyVisuals(hintsFromWarnings(b.warnings));
     const fromAbove = higherSelfCuesRef.current;
     higherSelfCuesRef.current = null;
     // the Higher Self's cues and the body's together; with neither, the built-in cue (lowest ray first)

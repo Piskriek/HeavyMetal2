@@ -317,6 +317,50 @@ try {
   check('...and at the next checkpoint the part warns up: held in its pods, it shows at its radio, on the left, said aloud and sent to the bridge',
     Boolean(podWarn) && Boolean(await until(() => said(/(sharp pain in my radio, on the left|dull ache in my radio, on the left|my radio, on the left: inflamed)/i), 4000)), JSON.stringify(warned ?? null).slice(0, 260));
   check('...with a visible change to show for it, in that zone\'s colour', podWarn?.visual?.hue === '#3c78d2' && ['flash', 'glow', 'stiff', 'flicker', 'tinge', 'crack', 'limp'].includes(podWarn?.visual?.look), JSON.stringify(podWarn?.visual ?? null));
+  // drawn on the drone itself (Argon's spec): where it shows (its voice, the left nav lamps) and, by its stage, where it is held
+  await frames(20);
+  const vis = await page.evaluate(() => {
+    const v = window.__companion.bodyVisuals();
+    const g = window.__companion.group;
+    return { ...v, inScene: v.parts.filter((p) => g.getObjectByName(`body-visual:${p.path}`)).length };
+  });
+  const lampsLeft = vis.parts.filter((p) => /^(lamp|mast)-.*left$/.test(p.path));
+  const lampsStarved = lampsLeft.filter((p) => p.look === 'starve').length;
+  check('...drawn on the drone: its left radio mast and nav lamps (its voice) show it, nothing on the right does, and every overlay is in the scene',
+    lampsLeft.length > 0 && lampsLeft.every((p) => ['static', 'starve', 'flash', 'tinge'].includes(p.look)) && !vis.parts.some((p) => /^(lamp|mast)-.*right$/.test(p.path)) && lampsLeft.some((p) => p.path === 'mast-left')
+      && vis.inScene === vis.parts.length && vis.parts.every((p) => p.opacity >= 0 && p.opacity <= 1)
+      // the ache or pain starves their glow (Argon's spec): the voice goes dim on the left
+      && (podWarn?.signal === 'itch' || lampsStarved > 0),
+    vis.parts.map((p) => `${p.path}:${p.look}`).join(' ').slice(0, 260));
+  const rootParts = vis.parts.filter((p) => /^(skid|strut|thruster-|nozzle-|motor-|shroud-)/.test(p.path));
+  check('...and where it is held (its pods and feet) shows its stage, on the left only',
+    // a part's side is its corner's (shroud-front-left-right is the front-left shroud's right panel), else its suffix
+    !podWarn?.sickness || (rootParts.length > 0 && rootParts.every((p) => ['stiff', 'pulse', 'crack', 'flicker', 'limp'].includes(p.look)
+      && (/(front|back)-(left|right)/.exec(p.path)?.[2] ?? (/-right$/.test(p.path) ? 'right' : 'left')) === 'left')),
+    `${podWarn?.sickness ?? 'no sickness'}: ${rootParts.map((p) => `${p.path}:${p.look}`).join(' ').slice(0, 200)}`);
+  // a close look for the record: the camera beside the drone, on its left
+  await page.evaluate(() => {
+    const THREE = window.__playScene.THREE;
+    const g = window.__companion.group;
+    g.updateMatrixWorld(true);
+    const c = new THREE.Box3().setFromObject(g.getObjectByName('companion-drone')).getCenter(new THREE.Vector3());
+    const lamp = g.getObjectsByProperty('type', 'Mesh').find((m) => /^body-visual:mast-left$/.test(m.name) && m.parent?.visible);
+    const out = lamp ? new THREE.Vector3().setFromMatrixPosition(lamp.matrixWorld).sub(c).setY(0).normalize() : new THREE.Vector3(1, 0, 0);
+    window.__playScene.debug.setAltCam({ x: c.x + out.x * 0.9, y: c.y + 0.4, z: c.z + out.z * 0.9 }, 0, 0, { x: c.x, y: c.y, z: c.z });
+    // the HUD off for the shot: every element that does not hold the canvas
+    const canvas = document.querySelector('canvas');
+    for (const el of document.body.querySelectorAll('*')) if (canvas && !el.contains(canvas)) el.setAttribute('data-e2e-hid', el.style.visibility), el.style.visibility = 'hidden';
+  });
+  // the static crackles: shoot while a lamp is lit
+  for (let i = 0; i < 60; i++) {
+    await frames(2);
+    if (await page.evaluate(() => window.__companion.bodyVisuals().parts.some((p) => /^(lamp|mast)-/.test(p.path) && p.look !== 'starve' && p.opacity > 0.5))) break;
+  }
+  await shot('04-drone-body-warning');
+  await page.evaluate(() => {
+    window.__playScene.debug.clearAltCam();
+    for (const el of document.body.querySelectorAll('[data-e2e-hid]')) el.style.visibility = el.getAttribute('data-e2e-hid') ?? '', el.removeAttribute('data-e2e-hid');
+  });
 
   check('no page errors during the run', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 } catch (e) {

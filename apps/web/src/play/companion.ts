@@ -10,6 +10,7 @@ import { AVATAR_LIGHT_LAYER } from '../avatar/scientist/scientist-model';
 import { buildKitPreset } from './kit-build';
 import { DRONE_CENTRE_Y, DRONE_KIT, DRONE_MUZZLE, DRONE_NOZZLES, DRONE_ROTOR_PIVOTS, isDroneRotor } from './kit-drone';
 import { DEFAULT_COMBAT_ORDERS, type CombatOrders } from './companion-combat';
+import { bodyJitter, limpRoll, lookOpacity, overlayPlan, type BodyVisualHint } from './drone-body-visuals';
 
 export type CompanionBehaviorState = 'idle' | 'follow' | 'goto' | 'gesture' | 'hover' | 'guard' | 'engage';
 
@@ -63,6 +64,10 @@ export interface CompanionEntity {
   muzzle: () => THREE.Vector3;
   /** Which propulsion module it flies on: rotors in air (the lab), thrusters in vacuum (the Moon). */
   setEnvironment: (env: 'air' | 'vacuum') => void;
+  /** Plan 56 §20: the body's visible changes (a warned zone's parts in its colour, by how it shows); [] clears them. */
+  setBodyVisuals: (hints: readonly BodyVisualHint[]) => void;
+  /** Plan 56 §20 test seam: the overlays drawn now (part path and look) and the limp roll. */
+  bodyVisuals: () => { readonly parts: readonly { readonly path: string; readonly look: string; readonly opacity: number }[]; readonly roll: number; readonly shake: number };
   step: (
     dt: number,
     player: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number },
@@ -224,6 +229,39 @@ export async function createCompanionEntity(
   if (airFrame) airBody.add(airFrame.group);
   const vacuumFrame = buildKitPreset(DRONE_KIT, 'drone-vacuum', { materials, gen: () => null, maxRank: 2, keep });
   if (vacuumFrame) vacuumBody.add(vacuumFrame.group);
+  // plan 56 §20: the body's visible changes, as overlays on both frames' parts (they follow the drone and its module)
+  let overlays: { readonly mesh: THREE.Mesh; readonly path: string; readonly look: BodyVisualHint['look']; readonly seed: number }[] = [];
+  let bodyRoll = 0;
+  let bodyShake = 0;
+  const clearOverlays = (): void => {
+    for (const o of overlays) {
+      o.mesh.parent?.remove(o.mesh);
+      o.mesh.geometry.dispose();
+      (o.mesh.material as THREE.Material).dispose();
+    }
+    overlays = [];
+  };
+  const setBodyVisuals = (hints: readonly BodyVisualHint[]): void => {
+    clearOverlays();
+    bodyRoll = limpRoll(hints);
+    bodyShake = bodyJitter(hints);
+    for (const frame of [airFrame, vacuumFrame]) {
+      if (!frame) continue;
+      overlayPlan(frame.placed, hints).forEach((o, i) => {
+        const geo = new THREE.BoxGeometry(o.size[0], o.size[1], o.size[2]).translate(o.offsetX, o.offsetY, 0);
+        // a starved part is darkened (normal blending, drawn first); every other look adds light over it
+        const starve = o.look === 'starve';
+        const mat = new THREE.MeshBasicMaterial({ color: o.hue, transparent: true, opacity: 0, depthWrite: false, toneMapped: false, blending: starve ? THREE.NormalBlending : THREE.AdditiveBlending });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.name = `body-visual:${o.path}`;
+        mesh.matrixAutoUpdate = false;
+        mesh.matrix.fromArray(o.matrix as number[]);
+        mesh.renderOrder = starve ? 2 : 3;
+        frame.group.add(mesh);
+        overlays.push({ mesh, path: o.path, look: o.look, seed: i });
+      });
+    }
+  };
   const rotors: THREE.Group[] = [];
   for (const pivot of DRONE_ROTOR_PIVOTS) {
     const p = new THREE.Group();
@@ -443,7 +481,11 @@ export async function createCompanionEntity(
         spin = 0;
       }
     }
-    body.rotation.set(pitch, spin, roll, 'YXZ');
+    // plan 56 §20: a numb side dips, a runaway zone micro-vibrates the whole drone; the overlays keep their own rhythm
+    const shakeP = bodyShake * Math.sin(clock * 53.1);
+    const shakeR = bodyShake * Math.sin(clock * 47.3 + 1.7);
+    body.rotation.set(pitch + shakeP, spin, roll + bodyRoll + shakeR, 'YXZ');
+    for (const o of overlays) (o.mesh.material as THREE.MeshBasicMaterial).opacity = lookOpacity(o.look, clock, o.seed);
 
     // 6. Rotors: full speed in the air, spun down on the ground (alternate pairs turn opposite ways)
     const flying = !(landed && altitude < 0.02);
@@ -481,6 +523,7 @@ export async function createCompanionEntity(
   });
 
   const dispose = (): void => {
+    clearOverlays();
     nameplate.dispose();
     tracer.removeFromParent();
     for (const o of owned) o.dispose();
@@ -505,6 +548,8 @@ export async function createCompanionEntity(
     showShot,
     muzzle,
     setEnvironment,
+    setBodyVisuals,
+    bodyVisuals: () => ({ parts: overlays.map((o) => ({ path: o.path, look: o.look, opacity: (o.mesh.material as THREE.MeshBasicMaterial).opacity })), roll: bodyRoll, shake: bodyShake }),
     step,
     dispose,
   };

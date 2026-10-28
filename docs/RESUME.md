@@ -1,5 +1,31 @@
 # RESUME: start here (fresh session)
 
+## 28 Oct Checkpoint 4 (Claude Opus: the owner parked the storyline; Plan 57 seeded worlds; read this first)
+- **The direction changed** (owner, 28 Oct; his words in OWNER_ASKS):
+  - the FIDELITY storyline is parked;
+  - single player becomes a few seeded worlds in one solar system, with natives, the drone as guide and "the System" voice, an isekai LitRPG frame, and a Stargate to build;
+  - multiplayer is a co-creation sandbox for making and bridging games; the Studio stays professional;
+  - planets are presets too, and telepathic natives form a social memory complex.
+- **Plan:** [docs/argo/plans/57-seeded-worlds.md](argo/plans/57-seeded-worlds.md), with Argon's architectural note: native ↔ social memory complex ↔ planet, planet body zones, and the System HUD as a no-lie lens. Research:
+  - docs/ISEKAI_WORLDS_RESEARCH.md
+  - docs/LINEAGE_RESEARCH.md (children and hybrids)
+  - docs/SPLAT_WORLDS_RESEARCH.md (Google's Genie 4 renders frames, not splats; splats come from World Labs and others)
+  - docs/MENU_HOLODECK_RESEARCH.md
+- **The menu measured:** idle, it uses 881 ms of main-thread time per second, almost all three.js redraws of an unchanging galaxy (`scripts/measure-menu.mjs`, `--profile`).
+- **Build order (Plan 57 §13):**
+  1. the grid-room menu with the preset warm-up;
+  2. body persistence (`mb`) and planet bodies;
+  3. the seeded system;
+  4. natives with the social memory complex;
+  5. the System HUD;
+  6. the Stargate phases;
+  7. lineage and language;
+  8. splats.
+- **Owner decisions open:**
+  - does a world's look follow its planet's density?
+  - does the new start replace the lab?
+- **Plan 56's drone body visuals are built** (§20.10): overlays on its own parts, a new radio mast each side, the starved glow. Drone e2e 57/57; full suite green apart from the known texgraph speed flake (passes alone).
+
 ## 28 Oct Checkpoint 3 (Claude Opus: Plans 53–55, the CS2 live run, the anti-cheat warning and the input relay; uncommitted on top of `ed83534e`; read this first)
 - **Owner asked:**
   - a bare "bridge" takes the player to an empty scene. It bridges everything it can and stands in FIDELITY presets for the rest;
@@ -71,12 +97,16 @@
       - left is intake, right is output;
       - itch on slow release, pain with a rebound on fast release;
       - the body teaches upward: warnings cue the part's dream and teach the ego.
-      - The drone's body runs at each checkpoint (radio warnings, `body-warning` events). Drone e2e 55/55.
-    - Next:
-      - render the visual hints on the drone;
+      - The drone's body runs at each checkpoint (radio warnings, `body-warning` events). Pushed as e9a4284a.
+    - **The body's visible change on the drone is built** (Plan 56 §20.10, Argon's visual spec): `drone-body-visuals.ts`.
+      - Overlays on its own kit parts: amber, pulsing or jittering where a distortion is held, by its stage;
+      - blue static (a flash on a pain) where it shows; a eureka sweeps from the one up into the other.
+      - The voice zone is a new radio mast each side (square, on a footing) plus the nav lamps.
+    - Next (Argon's order):
+      - B, the body persisted as an `mb` shorthand line;
+      - C, W6g characters; the owner asked (28 Oct) about children and hybrids between organic and mechanical characters (research: docs/LINEAGE_RESEARCH.md);
       - W6d, the Studio memory view;
-      - W6e, the player as anchor;
-      - W6g, characters.
+      - W6e, the player as anchor.
     - W6f, the weekly round, has a feasibility note: Plan 56 §17, RUN.world multiplayer. Yes, as the smallest slice: one singleton harvest room. It needs the owner's yes. Owner question: "repeat" instead of "perish".
 - **Skill:** the owner's SQ distortion check is installed locally at `.claude/skills/sq-distortion-check`.
 

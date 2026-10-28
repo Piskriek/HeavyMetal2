@@ -49,7 +49,7 @@ try {
   console.log(`     renderer: ${await page.evaluate(() => { const g = document.createElement('canvas').getContext('webgl2'); const x = g?.getExtension('WEBGL_debug_renderer_info'); return g && x ? g.getParameter(x.UNMASKED_RENDERER_WEBGL) : 'unknown'; })}`);
   // the FIDELITY home (its brand and menu since the Studio overhaul); the credits item shows only once the ending is seen
   const FIDELITY_ITEMS = ['Expedition', 'Planetary Grid', 'The Studio', 'Community Nexus', 'Diagnostics & Settings'];
-  check('the home is FIDELITY with its menu', (await page.locator('.sm-brand b').innerText()) === 'FIDELITY' && JSON.stringify(await page.$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(FIDELITY_ITEMS));
+  check('the home is FIDELITY with its menu', (await page.locator('.sm-brand b').innerText()) === 'FIDELITY' && JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(FIDELITY_ITEMS));
   // the home is the grid room (Plan 57 §10; the lab behind the menu is stripped): it warms the presets rung by rung, climbs to
   // stage 3, then draws nothing while nothing changes
   await page.waitForFunction(() => window.hmRoom && window.hmRoom.ready, null, { timeout: T(90000) });
@@ -89,7 +89,7 @@ try {
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
   await page.waitForFunction(() => window.hmRoom && window.hmRoom.ready, null, { timeout: T(90000) });
   await shot('menu-goblin-racing');
-  check('the Goblin Racing version lists Goblin Racing first', JSON.stringify(await page.$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Goblin Racing', ...FIDELITY_ITEMS]));
+  check('the Goblin Racing version lists Goblin Racing first', JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Goblin Racing', ...FIDELITY_ITEMS]));
   // Goblin Racing: its menu entry opens its own menu; Race modes holds its sections; Esc steps back out to SetMix
   await dom(() => { [...document.querySelectorAll('.sm-menu button')].find((b) => b.querySelector('b')?.textContent === 'Goblin Racing')?.click(); });
   await page.waitForSelector('.gr-front', { timeout: T(15000) });
@@ -105,6 +105,21 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(T(400));
   check('Esc again returns to the SetMix home', await page.locator('.sm-home').count() === 1);
+  // the race track editor lives in the Goblin Racing menu (moved here from the island tour, which no menu item reaches in this
+  // build): Goblin Racing, Race modes, Track editor, Open the track editor. It exits to the FIDELITY home (b1854ca5).
+  await dom(() => { [...document.querySelectorAll('.sm-menu button')].find((b) => b.querySelector('b')?.textContent === 'Goblin Racing')?.click(); });
+  await page.waitForSelector('.gr-front', { timeout: T(15000) });
+  await text('.gr-front .shell-menu button', 'Race modes').click();
+  await page.waitForSelector('.shell-racing', { timeout: T(30000) });
+  await dom(() => { [...document.querySelectorAll('.shell-racing-nav button')].find((b) => b.textContent === 'Track editor')?.click(); });
+  await dom(() => { [...document.querySelectorAll('.shell-racing-main button')].find((b) => b.textContent === 'Open the track editor')?.click(); });
+  await page.waitForSelector('.maker', { timeout: T(30000) });
+  check('the race track editor opens from the Goblin Racing menu', true);
+  check('on the Goblin Racing island', /Goblin Racing island/i.test(await page.locator('.maker .crumbs').textContent() ?? ''));
+  for (let i = 0; i < 3 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(400)); }
+  check('Esc opens the menu in the track editor', await page.locator('.maker .island-menu').count() === 1);
+  await dom(() => { [...document.querySelectorAll('.maker .island-menu button')].find((b) => b.textContent === 'Back to FIDELITY')?.click(); });
+  check('Back to FIDELITY returns to the home', await page.waitForSelector('.sm-home', { timeout: T(30000) }).then(() => true, () => false));
   // back to the SetMix version for the rest
   await page.goto(`http://127.0.0.1:${port}/?story`);
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
@@ -133,6 +148,12 @@ try {
   await page.waitForFunction(() => window.hmRoom && window.hmRoom.ready, null, { timeout: T(60000) });
 
 
+  // the island editor (My planet, an island, the V3 hotbar's tools): no menu item reaches it in this build (the island game is
+  // archived on main-2026-10-03; Plan 57 §14.2), so its checks wait until it is reattached. The block below is kept as it was,
+  // not re-indented, so it diffs cleanly when it is.
+  const islandsReachable = (await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))).includes('My planet');
+  if (!islandsReachable) console.log('skip the island editor: no menu item reaches it in this build (Plan 57 §14.2)');
+  if (islandsReachable) {
   // My planet shows your islands drawn from above; going into one the first time makes your first avatar (look and name), then dives
   await text('.sm-menu button', 'My planet').click();
   await page.waitForSelector('[aria-label="My planet"]', { timeout: T(10000) });
@@ -677,25 +698,6 @@ try {
   for (let i = 0; i < 6 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(500)); }
   const escMenu = await page.locator('.island-menu button').allInnerTexts();
   check('the Esc menu has Settings and no race track editor', escMenu.includes('Settings') && !escMenu.includes('Race track editor') && !escMenu.includes('Lighting'), escMenu.join(', '));
-  // the race track editor lives in the Goblin Racing menu now
-  await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Activities')?.click(); });
-  await page.waitForTimeout(T(400));
-  await dom(() => { [...document.querySelectorAll('.shell-activity button')].find((b) => b.textContent === 'Play')?.click(); });
-  await page.waitForSelector('.gr-front', { timeout: T(30000) });
-  await dom(() => { [...document.querySelectorAll('.gr-front .shell-menu button')].find((b) => b.textContent === 'Race modes')?.click(); });
-  await page.waitForSelector('.shell-racing');
-  await dom(() => { [...document.querySelectorAll('.shell-racing-nav button')].find((b) => b.textContent === 'Track editor')?.click(); });
-  await dom(() => { [...document.querySelectorAll('.shell-racing-main button')].find((b) => b.textContent === 'Open the track editor')?.click(); });
-  await page.waitForSelector('.maker', { timeout: T(30000) });
-  check('the race track editor opens from the Goblin Racing menu', true);
-  check('on the Goblin Racing island', /Goblin Racing island/.test(await page.locator('.maker .crumbs').textContent() ?? ''));
-  for (let i = 0; i < 3 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(400)); }
-  check('Esc opens the menu in the track editor', await page.locator('.maker .island-menu').count() === 1);
-  await dom(() => { [...document.querySelectorAll('.maker .island-menu button')].find((b) => b.textContent === 'Back to Goblin Racing')?.click(); });
-  await page.waitForSelector('.shell-racing', { timeout: T(30000) });
-  check('Back to Goblin Racing returns to its race modes', true);
-  for (let i = 0; i < 4 && await page.locator('.sm-home').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(900)); }
-  check('Esc steps back out to the SetMix home', await page.locator('.sm-home').count() === 1);
   // the saves (RELEASE_PLAN Milestone 0.5): islands live in IndexedDB, and nothing big is left in localStorage
   const saved = await page.evaluate(() => new Promise((ok) => {
     const r = indexedDB.open('hm-store');
@@ -704,19 +706,18 @@ try {
   }));
   check('island saves are in IndexedDB, none in localStorage', saved.idb.some((k) => k.startsWith('hm.island.')) && saved.idb.includes('hm.islands.v1') && saved.ls.length === 0, JSON.stringify(saved));
 
-  // the first Play runs last: your human made in the lab is your first avatar, and the island tour above needs a new player
-  await page.goto(`http://127.0.0.1:${port}/?story`);
+  }
+
+  // the first Play runs last (the island tour above, when a menu item reaches it, needs a new player). It is the default start, the
+  // simulation (Plan 57 §14): make your avatar, then arrive on the world at stage 3 with your drone; no lab, no story. The parked
+  // story's lab and machines are covered by the ?story scripts (Argon, 29 Oct), so the tour checks the path players take.
+  await page.goto(`http://127.0.0.1:${port}/`);
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
   await page.waitForFunction(() => window.hmRoom && window.hmRoom.ready, null, { timeout: T(60000) });
-
-  // Play: the first Play (STATUS SM22). Your human is made in the lab; the main lever turns the gate on; you walk through onto
-  // the stage-0 planet, where sync runs down; you walk back; the first texture mill lifts the plot to stage 1; Esc pauses
   const playErrors = errors.length;
   await text('.sm-menu button', 'Play').click();
   await page.waitForFunction(() => window.hmPlay && window.hmPlay.ready && window.hmPlay.frames > 5, null, { timeout: T(90000) });
-  check('Play opens the lab and asks who you are, in the lab', await page.locator('.play-create .create-goblin.in-lab').count() === 1);
-  check('the scientist is the only default in the lab', await page.locator('.play-create .create-scientist').count() === 1 && await page.locator('.play-create .cg-looks').count() === 0);
-  check('the import option is there', await page.locator('.play-create .custom-dropzone button').count() >= 1);
+  check('Play asks who you are first: the scientist, and an import', await page.locator('.play-create .create-scientist').count() === 1 && await page.locator('.play-create .custom-dropzone button').count() >= 1);
   await page.waitForFunction(() => window.hmCreator && typeof window.hmCreator.getBonePosition === 'function', null, { timeout: T(20000) });
   const bonePos0 = await page.evaluate(() => window.hmCreator.getBonePosition('mixamorigSpine'));
   await page.waitForTimeout(T(400));
@@ -726,18 +727,13 @@ try {
   await shot('creator-scientist');
   await dom(() => { [...document.querySelectorAll('.play-create .visor-chip')][1]?.click(); });
   await page.fill('.play-create .cg-name input', 'Ada');
+  check('its Done goes into the world', /into the world/.test(await page.locator('.play-create .btns button', { hasText: 'Done' }).first().innerText()));
   await dom(() => { [...document.querySelectorAll('.play-create .btns button')].find((b) => b.textContent.startsWith('Done'))?.click(); });
-  await page.waitForFunction(() => window.hmPlay.state().step === 'power', null, { timeout: T(10000) });
-  check('Done leads into the lab', await page.locator('.play-create').count() === 0);
-  check('made: next, turn on the gate', /Turn on the gate/.test(await page.locator('.play-goal h2').innerText()));
-  await dom(() => window.hmPlay.pull());
-  await page.waitForTimeout(T(200));
-  check('the lever plays the lever clip', await dom(() => window.hmPlay.currentOneShot() === 'lever' || window.hmPlay.clipWeight('pulling-lever') > 0));
-  await page.waitForFunction(() => window.hmPlay.state().gateOn, null, { timeout: T(30000) });
-  check('the main lever turns the gate on', /Step through the gate/.test(await page.locator('.play-goal h2').innerText()));
-  await shot('play-gate-on');
-  await shot('console-after');
-
+  await page.waitForFunction(() => window.hmPlay.where === 'planet' && window.hmPlay.state().step === 'done', null, { timeout: T(15000) });
+  check('Done puts you on the world at stage 3, as a simulation start', await dom(() => window.hmPlay.plot().stage === 3 && window.hmPlay.state().start === 'sim'));
+  check('the goal card reads the real stage', /Stage 3/.test(await page.locator('.play-goal h2').innerText()));
+  check('no mentor portrait, no story chain line, no sync meter', await dom(() => !document.querySelector('.hud-portrait-in') && !document.querySelector('.play-next') && !document.querySelector('.play-sync')));
+  check('your drone is with you', await dom(() => Boolean(window.__companion)));
   // V key switches between first and third person; while walking, walk clip weight > 0.5
   await page.keyboard.press('KeyV');
   await page.waitForTimeout(T(300));
@@ -747,262 +743,13 @@ try {
   const walkWeight = await dom(() => window.hmPlay.clipWeight('walking'));
   await page.keyboard.up('KeyW');
   check('while walking, walk clip weight is above 0.5', walkWeight > 0.5, `walk weight: ${walkWeight}`);
-  // walk through the gate: stand in front of it in the lab, facing it, and walk
-  const walk = async (key, ms) => { await page.keyboard.down(key); await page.waitForTimeout(ms); await page.keyboard.up(key); };
-  await dom(() => window.hmPlay.go('lab', 3.2, -6.9, 0));
-  await walk('KeyW', T(1400));
-  await page.waitForFunction(() => window.hmPlay.where === 'planet', null, { timeout: T(8000) });
-  check('walking through the gate takes you onto your plot', true);
-  await page.waitForTimeout(T(2500));
-  check('sync runs down on the planet', await dom(() => window.hmPlay.sync < 0.99) && await page.locator('.play-sync li').count() === 20);
-  await shot('play-stage-0');
-  await walk('KeyS', T(1700));
-  await page.waitForFunction(() => window.hmPlay.where === 'lab', null, { timeout: T(8000) });
-  check('walking back through the gate takes you home; next, build', await dom(() => window.hmPlay.state().step === 'build'));
-  await dom(() => window.hmPlay.go('lab', 3.2, -6.9, 0));
-  await walk('KeyW', T(1400));
-  await page.waitForFunction(() => window.hmPlay.where === 'planet', null, { timeout: T(8000) });
-  check('a mill too far from the gate is refused', await dom(() => { const g = window.hmPlay.gate(); return !window.hmPlay.placeAt(g.x + 60, g.z); }));
-  check('the first mill stands near the gate', await dom(() => { const g = window.hmPlay.gate(); return window.hmPlay.placeAt(g.x + 7, g.z + 5); }));
-  check('the first machine lifts the plot to stage 1', await dom(() => window.hmPlay.state().step === 'drill' && window.hmPlay.plot().stage === 1));
-  check('objective is "Feed your mill"', await dom(() => document.querySelector('.play-goal h2')?.textContent === 'Feed your mill'));
-  await page.keyboard.press('KeyB');
-  await page.waitForSelector('.play-card.highlighted', { timeout: T(5000) });
-  check('the rock drill card is highlighted in the build menu', await page.locator('.play-card.highlighted').count() === 1);
-  check('the first drill is marked free', await dom(() => document.querySelector('.play-card.highlighted em')?.textContent?.includes('Free') ?? false));
-  await page.evaluate(() => { document.querySelectorAll('.play-toast').forEach((el) => { el.style.display = 'none'; }); });
-  await page.screenshot({ path: 'docs/shots/feed-mill-objective.png' });
-  await page.keyboard.press('KeyB');
-  await page.waitForTimeout(T(300));
-
-  // soft-lock prevention tests (TASK-11):
-  // 1. drain ore to 0
-  await dom(() => window.hmPlay.drain());
-  check('draining ore sets ore to 0', await dom(() => window.hmPlay.plot().ore === 0));
-  check('out of ore HUD line warns player', await dom(() => document.querySelector('.play-ore.out-of-ore') !== null && /Out of ore: hold E on a boulder, or build a rock drill/.test(document.querySelector('.play-ore-warn')?.textContent ?? '')));
-
-  // 2. hand gather ore from a boulder
-  await page.evaluate(() => { document.querySelectorAll('.play-toast').forEach((el) => { el.style.display = 'none'; }); });
-  await dom(() => window.hmPlay.gather(2));
-  check('gathering ore by hand increases ore', await dom(() => window.hmPlay.plot().ore >= 5.5));
-  await page.screenshot({ path: 'docs/shots/gather-boulder.png' });
-
-  // 3. drain back to 0 and verify the first rock drill can be placed for free at 0 ore
-  await dom(() => window.hmPlay.drain());
-  check('ore is 0 before placing free drill', await dom(() => window.hmPlay.plot().ore === 0));
-  // the plot's game loop (STATUS SM30): a drill mines ore, a press needs stage 1, the build menu lists every machine
-  check('a rock drill stands on the plot and mines ore', await dom(() => { const g = window.hmPlay.gate(); return window.hmPlay.placeAt(g.x - 8, g.z + 6, 'drill'); }));
-  check('the quest step moves to done once a drill runs', await dom(() => window.hmPlay.state().step === 'done'));
-  const oreBefore = await dom(() => window.hmPlay.plot().ore);
-  await page.waitForTimeout(T(3000));
-  check('ore rises while the drill runs', await dom(() => window.hmPlay.plot().ore) > oreBefore, String(oreBefore));
-  check('the shape press is unlocked at stage 1 and runs', await dom(() => { window.hmPlay.give(100); const g = window.hmPlay.gate(); return window.hmPlay.placeAt(g.x + 12, g.z - 4, 'press'); }));
-  await page.waitForTimeout(T(1500));
-  check('both pixel machines pour their pixels', await dom(() => window.hmPlay.machines().pouring === 2 && window.hmPlay.machines().standing === 3));
-  await page.keyboard.press('KeyB');
-  check('the build menu lists the seven machines, the later ones locked', await dom(() => document.querySelectorAll('.play-card').length === 7 && document.querySelectorAll('.play-card.shut').length === 2));
-  const buildOverlap = await dom(() => {
-    const build = document.querySelector('.play-build')?.getBoundingClientRect();
-    const sync = document.querySelector('.play-sync')?.getBoundingClientRect();
-    const goal = document.querySelector('.play-goal')?.getBoundingClientRect();
-    const plot = document.querySelector('.play-plot')?.getBoundingClientRect();
-    if (!build) return false;
-    const hits = (a, b) => b && !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom);
-    return hits(build, sync) || hits(build, goal) || hits(build, plot);
-  });
-  check('the build menu does not overlap the top HUD or plot HUD', !buildOverlap);
-  await shot('play-build-menu');
-  await page.keyboard.press('KeyB');
-  check('the plot HUD shows ore, power and the four levels', await dom(() => /ore/.test(document.querySelector('.play-ore')?.textContent ?? '') && document.querySelectorAll('.play-levels li').length === 4));
-
-  // the lab makes cartridges, the plot's machines take them (TASK-04, POL-10)
-  const panelButton = (label) => dom((l) => { [...document.querySelectorAll('.play-machine button')].find((b) => b.textContent === l)?.click(); }, label);
-  // 1. rack: make a blank
-  await dom(() => window.hmPlay.go('lab', -7.5, -5.5, Math.PI / 2, -0.1));
-  await page.waitForTimeout(T(300));
-  await page.keyboard.press('KeyE');
-  await page.waitForSelector('.play-machine[aria-label="Cartridge Rack"]', { timeout: T(5000) });
-  check('E on the rack opens the Cartridge Rack panel', await page.locator('.play-machine[aria-label="Cartridge Rack"]').count() === 1);
-  await shot('play-cart-rack');
-  const blankOreBefore = await dom(() => window.hmPlay.plot().ore);
-  await dom(() => { [...document.querySelectorAll('.play-machine button')].find((b) => /Make a blank/.test(b.textContent ?? ''))?.click(); });
-  await page.waitForTimeout(T(200));
-  check('make a blank adds a blank to the rack and uses 12 ore', (await dom(() => window.hmPlay.lab().cartridges.length === 1 && window.hmPlay.lab().cartridges[0].kind === 'blank')) && Math.abs((await dom(() => window.hmPlay.plot().ore)) - (blankOreBefore - 12)) < 1.0);
-  await panelButton('Back to the lab');
-  await page.waitForTimeout(T(200));
-
-  // 2. bench: write a preset onto the blank
-  await dom(() => window.hmPlay.go('lab', 7.5, -3.4, -Math.PI / 2, -0.1));
-  await page.waitForTimeout(T(300));
-  await page.keyboard.press('KeyE');
-  await page.waitForSelector('.play-machine[aria-label="Preset Bench"]', { timeout: T(5000) });
-  check('E on the bench opens the Preset Bench panel', await page.locator('.play-machine[aria-label="Preset Bench"]').count() === 1);
-  await shot('play-cart-bench');
-  await dom(() => { [...document.querySelectorAll('.play-select-grid button')].find((b) => /Crater Calcite/.test(b.textContent ?? ''))?.click(); });
-  await page.waitForTimeout(T(200));
-  await dom(() => { [...document.querySelectorAll('.play-machine button')].find((b) => b.textContent === 'Start writing')?.click(); });
-  await page.waitForTimeout(T(200));
-  check('writing starts on the bench', await dom(() => window.hmPlay.lab().bench !== null));
-  await panelButton('Back to the lab');
-  await page.waitForTimeout(T(200));
-  await shot('play-bench-pour');
-  await dom(() => window.hmPlay.labStep(25));
-  check('fast-forward finishes the write, cartridge is written', await dom(() => { const c = window.hmPlay.lab().cartridges[0]; return c && c.kind === 'preset' && c.preset === 'crater_calcite'; }));
-
-  // 3. combiner panel
-  await dom(() => window.hmPlay.go('lab', 7.5, -0.6, -Math.PI / 2, -0.1));
-  await page.waitForTimeout(T(300));
-  await page.keyboard.press('KeyE');
-  await page.waitForSelector('.play-machine[aria-label="Preset Combiner"]', { timeout: T(5000) });
-  check('E on the combiner opens the Preset Combiner panel', await page.locator('.play-machine[aria-label="Preset Combiner"]').count() === 1);
-  await shot('play-cart-combiner');
-  await panelButton('Back to the lab');
-  await page.waitForTimeout(T(200));
-
-  // 4. slot into the mill on the planet
-  const pxdBefore = await dom(() => window.hmPlay.rates().points.pxd);
-  await dom(() => { const g = window.hmPlay.gate(); window.hmPlay.go('planet', g.x + 7, g.z + 7.5, 0, -0.15); });
-  await page.waitForTimeout(T(500));
-  await page.keyboard.press('KeyE');
-  await page.waitForSelector('.play-machine', { timeout: T(5000) });
-  check('E on the mill opens its panel', await dom(() => document.querySelector('.play-machine h3')?.textContent === 'Texture mill'));
-  await dom(() => document.querySelector('.play-carts button')?.click());
-  check('the written cartridge slots into the mill', await dom(() => !!window.hmPlay.plot().machines.find((m) => m.kind === 'mill')?.cartridge));
-  await panelButton('Back to the plot');
-  await page.waitForTimeout(T(200));
-  const pxdAfter = await dom(() => window.hmPlay.rates().points.pxd);
-  check('the mill metric rate changes by the cartridge affinity', pxdAfter > pxdBefore, `${pxdBefore} -> ${pxdAfter}`);
-
-  // unslot from mill so the shape press can test slotting it
-  await page.keyboard.press('KeyE');
-  await page.waitForSelector('.play-machine', { timeout: T(5000) });
-  await dom(() => document.querySelector('.play-carts button')?.click());
-  check('the cartridge unslots back to the rack', await dom(() => !window.hmPlay.plot().machines.find((m) => m.kind === 'mill')?.cartridge));
-  await panelButton('Back to the plot');
-  await page.waitForTimeout(T(200));
-
-  // the machine panel (E on a machine you look at): switch it off and on, put a cartridge from the rack in
-  await dom(() => { const g = window.hmPlay.gate(); window.hmPlay.go('planet', g.x + 12, g.z - 0.5, 0, -0.15); });
-  await page.waitForTimeout(T(500));
-  await page.keyboard.press('KeyE');
-  await page.waitForSelector('.play-machine', { timeout: T(5000) }).catch(() => null);
-  check('E on a machine opens its panel', await dom(() => document.querySelector('.play-machine h3')?.textContent === 'Shape press'));
-  const pressOn = () => dom(() => window.hmPlay.plot().machines.find((m) => m.kind === 'press')?.on);
-  await panelButton('Switch off');
-  const wasOff = await pressOn();
-  await panelButton('Switch on');
-  check('the panel switches the machine off and on', wasOff === false && await pressOn() === true, String(wasOff));
-  await dom(() => document.querySelector('.play-carts button')?.click());
-  check('a cartridge from the rack goes in', await dom(() => !!window.hmPlay.plot().machines.find((m) => m.kind === 'press')?.cartridge));
-  await panelButton('Back to the plot');
-  await page.waitForTimeout(T(200));
-  check('Back to the plot closes the panel', await page.locator('.play-machine').count() === 0);
-  await page.waitForFunction(() => window.hmPlay.wave > 1e6, null, { timeout: T(40000) });
-  check('the wave crosses the plot', true);
-  // the display governor may have changed the tier by now: the stage's look stays, the plume follows the tier
-  const detail = await dom(() => ({ ...window.hmPlay.detail(), tier: window.hmPlay.tier, pouring: window.hmPlay.machines().pouring }));
-  check('stage 1 is drawn about 240 lines tall, whatever the tier', detail.planet[1] >= 200 && detail.planet[1] <= 280, JSON.stringify(detail));
-  const tierWay = detail.tier === 'potato' ? 'dither' : 'cubes';
-  check('the plume is drawn the way the tier asks, with as many pixels as it asks', detail.plumes === tierWay && detail.pixels === detail.pouring * Math.floor(220 * detail.plumeDensity + 1e-6), JSON.stringify(detail));
-  await shot('play-stage-1');
-
-  // POL-17: twin gate detail on the planet (chunky at stage 1, full detail at stage 2)
-  await dom(() => { const g = window.hmPlay.gate(); window.hmPlay.go('planet', g.x, g.z + 5.5, Math.PI, -0.08); });
-  await page.waitForTimeout(T(300));
-  check('at stage 1 the twin gate is built at chunky stage 1 detail', await dom(() => window.hmPlay.twinStage() === 1));
-  await shot('twin-gate-stage-1');
-
-  await dom(() => window.hmPlay.raise(2));
-  await page.waitForFunction(() => window.hmPlay.wave > 1e6 && window.hmPlay.twinStage() === 6, null, { timeout: T(40000) });
-  check('raising to stage 2 rebuilds the twin gate at full detail', await dom(() => window.hmPlay.twinStage() === 6));
-  await shot('twin-gate-stage-2');
-
-  // POL-04: stage 4 on Low tier caps planet resolution to 480 lines to hold 60 FPS
-  await dom(() => window.hmPlay.raise(4));
-  await page.waitForFunction(() => window.hmPlay.wave > 1e6, null, { timeout: T(40000) });
-  const detail4 = await dom(() => window.hmPlay.detail());
-  check('stage 4 on low tier caps planet lines to at most 480', detail4.planetLines <= 480 && detail4.planet[1] <= 480, JSON.stringify(detail4));
-  await shot('play-stage-4-low');
-
-  // POL-02: plume ground glow under pouring machines on High/Ultra tier, off on Low/Medium
-  await page.keyboard.press('KeyV');
-  await dom(() => { const g = window.hmPlay.gate(); window.hmPlay.go('planet', g.x + 8.8, g.z + 5.5, -0.65, -0.35); });
-  await page.waitForTimeout(T(300));
-  check('on low tier plume ground glow is off by default', await dom(() => window.hmPlay.plumeGlowCount() === 0));
-  await shot('plume-ground-glow-off');
-
-  await dom(() => window.hmPlay.setPlumeGlow(true));
-  await page.waitForTimeout(T(300));
-  check('enabling plume ground glow illuminates the ground under running pouring machines', await dom(() => window.hmPlay.plumeGlowCount() > 0));
-  await shot('plume-ground-glow-on');
-
-  await dom(() => window.hmPlay.setPlumeGlow(false));
-  await page.waitForTimeout(T(200));
-  check('disabling plume ground glow hides the glow meshes', await dom(() => window.hmPlay.plumeGlowCount() === 0));
-
-  // POL-03: ultra pixel lighting casts dynamic point light from pouring pixels
-  // Step in front of the texture mill to show dynamic pixel lighting on the machine and its surroundings
-  await dom(() => { const g = window.hmPlay.gate(); window.hmPlay.go('planet', g.x + 7.0, g.z + 2.5, Math.PI, -0.2); });
-  await page.waitForTimeout(T(300));
-  check('on low tier pixel lighting is off by default', await dom(() => window.hmPlay.pixelLightCount() === 0));
-  await shot('mill-after');
-  await shot('pixel-light-off');
-
-  await dom(() => window.hmPlay.setPixelLights(true));
-  await page.waitForTimeout(T(300));
-  check('enabling pixel lights creates dynamic point lights for pouring machines', await dom(() => window.hmPlay.pixelLightCount() > 0));
-  await shot('pixel-light-on');
-
-  await dom(() => window.hmPlay.setPixelLights(false));
-  await page.waitForTimeout(T(200));
-  check('disabling pixel lights turns off machine point lights', await dom(() => window.hmPlay.pixelLightCount() === 0));
-  await page.keyboard.press('KeyV');
-
-  // teleport back into the lab with the gate on, standing ~2 m away from the planet table looking at it (-z)
-  await dom(() => window.hmPlay.go('lab', -3.6, -3.0, 0, -0.32));
-  await page.waitForTimeout(T(300));
-  check('the planet table hologram is visible and tracks the machines', await dom(() => { const h = window.hmPlay.holo(); return h.visible && h.machines === 3; }));
-  await shot('play-holo-table');
-
-  // ---- task 06: plot codes and visiting plots
-  await dom(() => window.hmPlay.go('lab', 0, -1.8, 0, -0.2));
-  await page.waitForTimeout(T(200));
-  const myCode = await dom(() => window.hmPlay.plotCode());
-  check('your plot produces a valid plot code', typeof myCode === 'string' && myCode.length > 20, String(myCode));
-  await dom(() => window.hmPlay.openDial());
-  await page.waitForSelector('.play-dial-panel', { timeout: T(5000) });
-  await shot('play-dial');
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(T(200));
-
-  check('damaged code is refused by dial', await dom(() => !window.hmPlay.dial('damaged-code-xyz')));
-  check('your code dials your own plot back', await dom((c) => window.hmPlay.dial(c), myCode));
-  check('visiting returns player name', await dom(() => window.hmPlay.visiting() === window.hmPlay.state().avatar.name));
-  check('visiting plot has same number of machines', await dom(() => window.hmPlay.machines().standing === 3));
-
-  await dom(() => { const g = window.hmPlay.gate(); window.hmPlay.go('planet', g.x + 3, g.z + 5, 0); });
-  await page.waitForFunction(() => window.hmPlay.where === 'planet', null, { timeout: T(8000) });
-  await page.waitForTimeout(T(200));
-  await shot('play-visiting');
-  await page.keyboard.down('KeyW');
-  await page.waitForTimeout(T(200));
-  await shot('play-third-person-walking');
-  await page.keyboard.up('KeyW');
-
-  await page.keyboard.press('KeyB');
-  await page.waitForTimeout(T(200));
-  check('build menu is refused while visiting', await page.locator('.play-build').count() === 0);
-
-  await dom(() => window.hmPlay.go('lab', 0, -2.5, 0));
-  await page.waitForFunction(() => window.hmPlay.where === 'lab', null, { timeout: T(8000) });
-  await page.waitForTimeout(T(200));
-  check('walking back ends the visit', await dom(() => window.hmPlay.visiting() === null));
-
+  await shot('play-arrived');
+  // Esc pauses; Back to FIDELITY goes home
   await page.keyboard.press('Escape');
   await page.waitForSelector('.play-pause', { timeout: T(5000) });
-  await dom(() => { [...document.querySelectorAll('.play-pause button')].find((b) => b.textContent === 'Back to SetMix')?.click(); });
+  await dom(() => { [...document.querySelectorAll('.play-pause button')].find((b) => b.textContent === 'Back to FIDELITY')?.click(); });
   await page.waitForSelector('.sm-home', { timeout: T(15000) });
-  check('Esc pauses and Back to SetMix goes home', await dom(() => !window.hmPlay));
+  check('Esc pauses and Back to FIDELITY goes home', await dom(() => !window.hmPlay));
 
   // TASK-09 Profile lifecycle: fresh start, save isolation, deletion
   const mainPlaySave = await page.evaluate(() => localStorage.getItem('hm.setmix.play'));
@@ -1032,7 +779,7 @@ try {
 
   await page.keyboard.press('Escape');
   await page.waitForSelector('.play-pause', { timeout: T(5000) });
-  await dom(() => { [...document.querySelectorAll('.play-pause button')].find((b) => b.textContent === 'Back to SetMix')?.click(); });
+  await dom(() => { [...document.querySelectorAll('.play-pause button')].find((b) => b.textContent === 'Back to FIDELITY')?.click(); });
   await page.waitForSelector('.sm-home', { timeout: T(15000) });
 
   // Switch back to Main
@@ -1052,7 +799,7 @@ try {
   check('Main Play plot stage is still >= 1', await dom(() => window.hmPlay.plot().stage >= 1));
   await page.keyboard.press('Escape');
   await page.waitForSelector('.play-pause', { timeout: T(5000) });
-  await dom(() => { [...document.querySelectorAll('.play-pause button')].find((b) => b.textContent === 'Back to SetMix')?.click(); });
+  await dom(() => { [...document.querySelectorAll('.play-pause button')].find((b) => b.textContent === 'Back to FIDELITY')?.click(); });
   await page.waitForSelector('.sm-home', { timeout: T(15000) });
 
   // 3. Delete "E2E fresh": no hm.p.<id>. key is left, and its database is gone.

@@ -50,12 +50,17 @@
     - the lab's kits are on `SALVAGE_KIT_REGISTRY` (they validate and build; no Triad sockets yet);
     - a session is the drone's night: it dreams over what it lived since its last dream when a simulation session opens. Before this it only dreamed on a gate trip, so on the simulation path it never dreamed.
   - `84b1849d` **Wave 3a:** test-fidelity-sync-studio rewritten against today's Studio (StudioApp via `window.__studioBridge`), the grid's spawn cards and its in-play panel. 11/11, and it asserts now (it only printed before).
-  - **Wave 3b, uncommitted (not green):** e2e-smoke follows the build as it is.
-    - It skips the island editor, which no menu item reaches; the track editor moved to the Goblin Racing route; the lab's gate and stations are at their real positions; sync is watched outside the gate's dome; the levels are the floats pill; the drill pours.
-    - 66 checks pass, up from 15.
-    - **It stops at the mill's E:** hotbar slot 1 holds a Regolith Slab Kit, so E places it. Neither the 2 key nor a click on `hotbar-slot-2` emptied the hand in the test. A seam to empty the hand, or the right hotbar selector, comes next.
-    - Run it as `E2E_SHOTS=shots-run/smoke E2E_GPU=1 E2E_SLOW=2 node scripts/e2e-smoke.mjs`: the lab's power-on runs in scene time, which needs the slow factor on this laptop.
-  - **Wave 4** (gates running at the time of writing):
+  - **Wave 3b: e2e-smoke rewritten, green (51/51).** It follows the build as it is:
+    - it skips the island editor, which no menu item reaches;
+    - the track editor is reached by the Goblin Racing route and exits to the FIDELITY home;
+    - per Argon's audit (29 Oct, 01:15), the first Play checks the default simulation start (Ada, stage 3, the clean HUD, V and walking, Back to FIDELITY) instead of the parked story's lab and machines, which the `?story` scripts cover;
+    - the profile lifecycle runs on top of it.
+    - Run it as `E2E_SHOTS=shots-run/smoke E2E_GPU=1 E2E_SLOW=2 node scripts/e2e-smoke.mjs`: shots go to `shots-run`, not the reviewed `docs/shots`.
+  - **Argon's audit (01:15):** green on all four commits above. His answers:
+    - Triad sockets first for the salvaged kits;
+    - no rung changes to `ui:`; wire the goal card to the live stage and next-stage values;
+    - the smoke test checks the default path.
+  - `58432436` **Wave 4** (gates green: unit 3,811, 0 functional failures; e2e 19/19, 57/57, 24/24, 15/15):
     - the `ui:` foundation, `packages/hudlayout/src/ui.ts`: the five rungs, `validateScreen`'s lens rule, the `uic:` code (Plan 57 §15);
     - kitspec `PartDef.footing`, so the bridge pad's buried plinth validates and joins the salvage list.
   - Fixed along the way: a `String.replace` mangled `$$eval` into `$eval` in e2e-smoke (shipped in `7626ae59`); a sed call put a backtick on every line of two docs (restored). Both lessons are in memory.

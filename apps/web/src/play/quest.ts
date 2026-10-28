@@ -28,6 +28,11 @@ export interface PlayState {
   readonly visited: boolean;
   /** Your plot: its ore, its machines, its four fidelity metrics and its stage (`@hm/plotsim`). */
   readonly plot: PlotState;
+  /**
+   * Plan 57 §14: how this save began. 'sim' is the simulation start: no lab, no story, the world at stage 3, the drone along.
+   * Absent on saves begun in the parked story, which keep playing it.
+   */
+  readonly start?: 'sim';
   /** The lab's cartridges (bench, combiner, rack) (`@hm/cartlab`). */
   readonly lab: LabState;
   /** The campaign chain (TASK-22): Acts IV to VI, the counters, the monsters' unlock. Absent in older saves (they start it from the world). */
@@ -81,7 +86,9 @@ export function loadState(raw: unknown): PlayState {
   let plot = r['plot'] !== undefined ? loadPlot(r['plot']) : migrate(r);
   const hasDrill = plot.machines.some((m) => m.kind === 'drill');
   let fixedStep: Step = step !== 'create' && !avatar && !avatarId ? 'create' : step;
-  if (fixedStep === 'done' && !hasDrill) fixedStep = 'drill';
+  const sim = r['start'] === 'sim';
+  // the story's drill step is the story's; a simulation save is done from its first step on
+  if (fixedStep === 'done' && !hasDrill && !sim) fixedStep = 'drill';
   let lab = r['lab'] ? loadLab(r['lab']) : null;
   if (!lab) {
     let nextLab = newLab();
@@ -124,7 +131,20 @@ export function loadState(raw: unknown): PlayState {
     plot,
     lab,
     chain: readChain(r['chain']),
+    ...(sim ? { start: 'sim' as const } : {}),
   };
+}
+
+/** The stage a simulation start drops you in at (the owner, 28 Oct: "a player would spawn in at the 3rd stage of fidelity"). */
+export const SIM_START_STAGE = 3;
+
+/**
+ * Plan 57 §14: the simulation start. You made your avatar, and you are on the world at once: no lab and no story steps, the
+ * gate open, the plot at stage 3 (stages only rise, so a plot already past it keeps its own).
+ */
+export function simStart(s: PlayState, avatar: PlayAvatar | string): PlayState {
+  const made = created(s, avatar);
+  return { ...made, step: 'done', start: 'sim', gateOn: true, visited: true, plot: { ...made.plot, stage: Math.max(made.plot.stage, SIM_START_STAGE) } };
 }
 
 /** You made your avatar: next, turn on the gate. */

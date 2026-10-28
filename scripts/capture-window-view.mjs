@@ -23,7 +23,7 @@ if (!chromePath) {
 const root = fileURLToPath(new URL('../', import.meta.url));
 const shotsDir = path.join(root, 'docs/shots/window');
 fs.mkdirSync(shotsDir, { recursive: true });
-const URL_ROOT = process.env.WINDOW_URL ?? 'http://localhost:5192/';
+const URL_ROOT = process.env.WINDOW_URL ?? 'http://localhost:5192/?story';
 const only = process.env.WINDOW_ONLY ?? null;
 
 const browser = await chromium.launch({ executablePath: chromePath, headless: true, args: ['--ignore-gpu-blocklist', '--enable-gpu'] });

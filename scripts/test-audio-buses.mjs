@@ -74,7 +74,7 @@ const levels = (page) => page.evaluate(() => window.__audio.getBusLevels());
 try {
   // ---------------------------------------------------------------- A. over http
   const page = await newPage();
-  await page.goto(`http://localhost:${port}/`, { waitUntil: 'domcontentloaded', timeout: 35000 });
+  await page.goto(`http://localhost:${port}/?story`, { waitUntil: 'domcontentloaded', timeout: 35000 });
   const expBtn = page.locator('.sm-menu button', { hasText: 'Expedition' });
   await expBtn.waitFor({ state: 'visible', timeout: 25000 });
   await page.waitForFunction(() => typeof window.__audio !== 'undefined', { timeout: 10000 });

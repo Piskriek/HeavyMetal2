@@ -416,6 +416,8 @@ export class GameNarratorController {
   private settings: MentorVoiceSettings;
   private slot?: string;
   private activeSub: { id: string; text: string; cleanText: string } | null = null;
+  /** Plan 57 §14: the simulation start parks the mentor's story; her event lines stay quiet (direct lines still play). */
+  private storyMuted = false;
   private subSubscribers = new Set<(sub: { id: string; text: string; cleanText: string } | null) => void>();
   private logSubscribers = new Set<(heard: readonly string[]) => void>();
   private duckCallback: ((ducked: boolean) => void) | null = null;
@@ -536,7 +538,12 @@ export class GameNarratorController {
     src.start();
   }
 
+  public setStoryMuted(muted: boolean): void {
+    this.storyMuted = muted;
+  }
+
   public trigger(event: string): void {
+    if (this.storyMuted) return;
     this.state = trigger(this.rules, this.state, event);
   }
 

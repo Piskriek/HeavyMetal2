@@ -43,7 +43,7 @@ await page.addInitScript(() => {
 });
 
 const boot = async () => {
-  await page.goto(`http://localhost:${port}/?e2e`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.goto(`http://localhost:${port}/?story&e2e`, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForSelector('.sm-menu button', { timeout: 60000 });
   await page.locator('.sm-menu button', { hasText: 'Play' }).first().click();
   await page.waitForFunction(() => window.hmPlay?.ready === true && window.__playScene?.room && window.__dev, { timeout: 120000 });

@@ -87,7 +87,7 @@ try {
   b.on('pageerror', (e) => pageErrors.push(`B: ${e.message}`));
   const bBodies = [];
   b.on('request', (q) => { if (q.url().includes('/telemetry/')) { bBodies.push(q.postData()); if (bBodies.length > 400) bBodies.splice(3, 1); } });
-  await b.goto(`http://localhost:${port}/?game=arena-survivor&e2e&telemetry-out&bridge=${bridgePort}`, { waitUntil: 'domcontentloaded', timeout: 45000 });
+  await b.goto(`http://localhost:${port}/?story&game=arena-survivor&e2e&telemetry-out&bridge=${bridgePort}`, { waitUntil: 'domcontentloaded', timeout: 45000 });
   await b.waitForFunction(() => window.hmPlay?.ready === true && window.__playScene && window.__dev, undefined, { timeout: 90000 });
   await b.evaluate(() => {
     window.__dev.setLocomotion('lunar-ballast'); // its jump and walk; the game preset's gravity still rules
@@ -105,7 +105,7 @@ try {
   // --- tab A: the campaign, where the drone bridges B ---
   const a = await context.newPage();
   a.on('pageerror', (e) => pageErrors.push(`A: ${e.message}`));
-  await a.goto(`http://localhost:${port}/?e2e&bridge=${bridgePort}`, { waitUntil: 'domcontentloaded', timeout: 45000 });
+  await a.goto(`http://localhost:${port}/?story&e2e&bridge=${bridgePort}`, { waitUntil: 'domcontentloaded', timeout: 45000 });
   await a.waitForSelector('.sm-menu button', { timeout: 45000 });
   await a.locator('.sm-menu button', { hasText: 'Play' }).first().click();
   await a.waitForFunction(() => window.hmPlay?.ready === true && window.__playScene && window.__dev, undefined, { timeout: 90000 });

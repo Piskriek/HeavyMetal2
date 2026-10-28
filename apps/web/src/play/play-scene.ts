@@ -291,6 +291,8 @@ export interface PlayScene {
   setWalkWorld(walkWorld: WalkWorld | null): void;
   /** The moon arrival pose (GATE-05): `dist` metres out from the Twin Gate's back (default 3), facing away from the gate. */
   gateExit(dist?: number): { readonly x: number; readonly z: number; readonly yaw: number };
+  /** Plan 57 §14: the simulation start has no lab to refill your sync in, so it holds full (no drain, no recall). */
+  setSyncHeld(held: boolean): void;
   /**
    * JOB-09: stand the traveller in an arrival sector (the Earth plot's pad, or home). The sector comes from
    * `earth-endgame.ts`'s `arrivalSector`, so the pose the player lands on is the one the gate dialer resolved.
@@ -2050,7 +2052,7 @@ export function createPlayScene(o: {
   let where: Where = 'lab';
   const pos = new THREE.Vector3(room.spawn.x, EYE, room.spawn.z);
   let yaw = room.spawn.yaw, pitch = -0.04;
-  let sync = 1, lostAt = -100;
+  let sync = 1, lostAt = -100, syncHeld = false;
   /** TASK-26: inside a safe dome now; last frame's state on the planet (null in the lab, so a crossing is only ever on the planet); the 30% warning. */
   let inDomeNow = false, inDomeLast: boolean | null = null, warnOn = false;
   /** Metres walked since the last footstep, and how many relay lamps the sequence has lit (one click each). */
@@ -3639,6 +3641,7 @@ export function createPlayScene(o: {
       twin.group.updateMatrixWorld(true);
       return computeGateExitPose(twin.group.matrixWorld.elements, gateYawDelta, dist);
     },
+    setSyncHeld(held) { syncHeld = held; if (held) sync = 1; },
     setWalkWorld(walkWorld) {
       activeWalkWorld = walkWorld;
     },
@@ -4204,7 +4207,7 @@ export function createPlayScene(o: {
       } else inDomeLast = null;
       stepDomeRipple(dt);
       stepBeads(dt);
-      sync = o.gamePreset && o.gamePreset.hudBlade !== 'exploration-o2' ? 1 : stepSync(sync, dt, { onPlanet: where === 'planet', stage, nearMachine, inDome: inDomeNow });
+      sync = syncHeld || (o.gamePreset && o.gamePreset.hudBlade !== 'exploration-o2') ? 1 : stepSync(sync, dt, { onPlanet: where === 'planet', stage, nearMachine, inDome: inDomeNow });
       // the 30% warning: one soft radio-static burst as the buffer goes down past it, and the return arrow until it is back above
       if (where === 'planet' && !inDomeNow && isWarnLevel(sync)) {
         if (!warnOn) sfx('static-burst', { minGapMs: 1500, volume: 0.35 });

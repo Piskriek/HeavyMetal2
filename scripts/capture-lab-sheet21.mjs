@@ -88,7 +88,7 @@ page.on('console', (msg) => {
 
 try {
   console.log(`Navigating to http://localhost:${port}/...`);
-  await page.goto(`http://localhost:${port}/`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`http://localhost:${port}/?story`, { waitUntil: 'domcontentloaded' });
 
   // Open Play to enter the lab
   await page.waitForSelector('.sm-menu button', { timeout: 35000 });

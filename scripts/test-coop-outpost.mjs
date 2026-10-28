@@ -145,7 +145,7 @@ try {
     page.on('console', (msg) => {
       if (msg.type() === 'error') consoleErrors.push(msg.text().slice(0, 300));
     });
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'load' });
+    await page.goto(`http://127.0.0.1:${port}/?story`, { waitUntil: 'load' });
     await page.waitForFunction(() => typeof window.__outpost === 'object', null, { timeout: T(120000) });
   }
 

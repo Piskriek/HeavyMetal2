@@ -83,7 +83,7 @@ const powerWith = (coils, main = 1) => ({
 });
 
 try {
-  await page.goto(`http://localhost:${port}/`, { waitUntil: 'domcontentloaded', timeout: 45000 });
+  await page.goto(`http://localhost:${port}/?story`, { waitUntil: 'domcontentloaded', timeout: 45000 });
   await page.waitForSelector('.sm-menu button', { timeout: 45000 });
   await page.locator('.sm-menu button', { hasText: 'Play' }).first().click();
   await page.waitForFunction(() => window.hmPlay?.ready === true && window.__playScene?.room, { timeout: 90000 });

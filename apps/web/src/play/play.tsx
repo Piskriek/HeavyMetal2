@@ -87,7 +87,7 @@ import { bodyOverride, bodyMaterial, skinOverride } from './vault-skin';
 import { GENERATORS } from '@hm/partgen';
 import { overrideFromPart, partBill } from './part-cartridge';
 import { fx } from '../maker/feedback';
-import { FRESH, METRIC_COLOUR, METRIC_NAME, SAVE_KEY, arrived, created, isFreeDrill, loadState, objective, poweredOn, returned, withLab, withPlot, type PlayState } from './quest';
+import { FRESH, METRIC_COLOUR, METRIC_NAME, SAVE_KEY, SIM_START_STAGE, arrived, created, isFreeDrill, loadState, objective, poweredOn, returned, simStart, withLab, withPlot, type PlayState } from './quest';
 import { Journal } from './journal';
 import { ACT_V_KIT, COUNT, advanceChain, bump, chainView, completeStepChain, finishedSteps, gateReason, monsterKilled, monsterSeen, placedKey, playerDied, playerLow, stepDone, syncChain, type Chain, type Evidence } from '../base/campaign-chain';
 import { DebugMenu, readInstantBuilds, writeInstantBuilds, type DebugApi } from './debug-menu';
@@ -735,6 +735,24 @@ export function PlayScreen(props: {
   /** The draw-call readout (Settings: Show performance stats; on under `?e2e`). Players see it only when they turn it on. */
   const showStatsOn = !cleanShotMode && ((typeof location !== 'undefined' && new URLSearchParams(location.search).has('e2e')) || resolveGraphics('low', props.profile.graphics).showStats);
   const creating = state.step === 'create' && !isMashTest;
+  // plan 57 §14: the lab and the story are stripped for parts. A new avatar starts the simulation (the world at stage 3, the
+  // drone along); `?story` still begins the parked story, for its tests and while its parts are salvaged. A save begun in the
+  // story keeps playing it.
+  const storyStart = useMemo(() => { try { return new URLSearchParams(window.location.search).has('story'); } catch { return false; } }, []);
+  const isSim = state.start === 'sim';
+  /** On the world at once, at its stage: the sync held (there is no lab to refill it in), the mentor's story quiet. */
+  const beginSimulation = (scene: PlayScene): void => {
+    narratorRef.current?.setStoryMuted(true);
+    scene.setSyncHeld(true);
+    // the plot the loop steps carries the stage too, or its next save writes the story's stage back over it
+    const stage = Math.max(plotRef.current.stage, SIM_START_STAGE);
+    plotRef.current = { ...plotRef.current, stage };
+    scene.setFidelityStage(stage);
+    const exit = scene.gateExit();
+    scene.debug.teleport('planet', exit.x, exit.z, exit.yaw, 0);
+    gameAudio.setMusicContext('moon');
+    gameAudio.setMoonStage(stage);
+  };
 
   useEffect(() => {
     if (isDevSeed && plotRef.current.machines.length === 0) {
@@ -4361,6 +4379,7 @@ useEffect(() => {
       setReady(true);
       // plan 56 W6c: a saved memory still out of balance shows from the start
       showDroneSymptoms();
+      if (stateRef.current.start === 'sim') beginSimulation(scene);
       if (scene.debug.where() === 'planet') {
         gameAudio.setMusicContext('moon');
         gameAudio.setMoonStage(stateRef.current.plot.stage || 0);
@@ -5814,8 +5833,15 @@ useEffect(() => {
 
       {ready && creating ? (
         <div className="play-create">
-          <CreateScientist inLab title="Who are you?" doneLabel="Done: into the lab"
+          <CreateScientist inLab title="Who are you?" doneLabel={storyStart ? 'Done: into the lab' : 'Done: into the world'}
             onDone={(avatar) => {
+              if (!storyStart) {
+                commit(simStart(stateRef.current, avatar));
+                sceneRef.current?.setAvatar(avatar);
+                if (sceneRef.current) beginSimulation(sceneRef.current);
+                say(`Stage ${SIM_START_STAGE}`, 'You arrive on the world.');
+                return;
+              }
               narratorRef.current?.resetLog();
               narratorRef.current?.trigger('wake');
               commit(created(stateRef.current, avatar));
@@ -5830,7 +5856,7 @@ useEffect(() => {
         <>
           {!props.gamePreset && !hideOverlays && drivingSpeed === null && (
             <HudZone zone="top-left">
-            {portraitIn ? (
+            {portraitIn && !isSim ? (
               <HaddyCrtPortrait
                 className="hud-portrait-in"
                 activeLineId={subtitle?.id}
@@ -5843,13 +5869,13 @@ useEffect(() => {
             <section className="play-goal" aria-live="polite" data-hud-zone="top-left">
               <h2>{visiting ? `Visiting ${visiting.snapshot.owner}’s plot` : goal.title}</h2>
               <p>{visiting ? 'Read-only visit. Walk back through the gate to return to your lab.' : goal.hint}</p>
-              {chainNext ? <small className="play-next">Next: {chainNext}</small> : null}
+              {chainNext && !isSim ? <small className="play-next">Next: {chainNext}</small> : null}
             </section>
             {/* The co-op room's chip sits under the quest card, in the top-left zone: the stage metrics keep the top-right */}
             {outpostRef.current ? <OutpostRoster session={outpostRef.current} /> : null}
             </HudZone>
           )}
-          {hud.where === 'planet' && drivingSpeed === null && (!props.gamePreset || props.gamePreset.hudBlade === 'exploration-o2') ? (
+          {hud.where === 'planet' && drivingSpeed === null && !isSim && (!props.gamePreset || props.gamePreset.hudBlade === 'exploration-o2') ? (
             <HudZone zone="bottom-left">
             <div className="play-sync" data-hud-zone="bottom-left" role="meter" aria-label="Sync" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(hud.sync * 100)}>
               <span>Sync</span>

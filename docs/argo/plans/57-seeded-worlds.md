@@ -297,3 +297,52 @@ The owner: a planet is "a very dense soul and it moves through the densities jus
   - each is a Rung 1–5 operator. One `curve` is a KSP thrust curve, Factorio throughput and a LitRPG XP curve alike; `stat` + `curve` + `ship` compose into delta-v as easily as into a skill level;
   - a game is only the first test case, so no kind names a game;
   - four have packages already but no share code: `@hm/questline`, `@hm/itemdefs`, `@hm/rocket`, `@hm/orbital`.
+
+**§14.1 Step 1b, first pass (28 Oct): the simulation start, with the story behind a seam**
+- **The simulation start** (`quest.ts` `simStart`, tests in `quest.test.ts`): a new avatar's Done ("Done: into the world") puts you on the world at once.
+  - The plot is at stage 3 (stages only rise), the save carries `start: 'sim'`, and the quest step is `done`.
+  - The scene holds the sync full (`setSyncHeld`: no lab to refill it in, so no drain and no recall).
+  - The mentor's story is muted (`setStoryMuted`: her event lines stay quiet; direct lines still play).
+  - The live plot, the scene's look and the music all take the stage: the loop steps its own copy of the plot, and the first version lost stage 3 to it (the e2e caught that).
+  - A simulation save reopens on the world. The story's HUD stays out (the mentor's portrait, the chain's next step, the sync meter). The goal card reads the real stage.
+- **The story's seam:** `?story` begins the parked story exactly as before.
+  - The 20 e2e scripts that start through the creator now open with it, one line each, so nothing they test changes.
+  - A save begun in the story keeps playing it.
+  - The story code stays until its parts are salvaged (LAB_SALVAGE).
+- **The menu:** "campaign" is gone from Expedition and Planetary Grid ("Play solo and offline: you arrive on a world at stage 3, your drone at your side").
+- **The grid room** is now built a frame and a task after the menu first paints (Argon's note). Passive effects already run after the first paint, so one frame alone would still block the second.
+- **The stale e2e scripts:**
+  - fixed: e2e-smoke's two assertions (the FIDELITY brand and menu, and the Goblin Racing list);
+  - stale further: e2e-smoke goes on to walk "My planet" and "Avatars", which the FIDELITY menu no longer has. test-fidelity-sync-studio drives the old Moon editor, but the Studio route now mounts `StudioApp`, whose `renderPrototype` is unused, so that editor is unreachable from the menu.
+  - Both need rewriting against today's menu and Studio: a task of its own.
+- **Still to strip:** the lab still loads in the scene (the gate and the debug teleports reach it), and its machines, props, lights and sounds still need registering as presets. The narrator engine becomes the drone's "System" voice. Each story script moves to the simulation start as the piece it tests is salvaged.
+- **Tests:** `scripts/test-sim-start-e2e.mjs` (the simulation start, a reload, and the `?story` seam).
+
+## 15. The interface is presets too (owner, 28 Oct: "you can bag up that UI too, its all gota be presets right? are ui elements presets yet?")
+
+- **The categories:**
+  - "Plasma's engineering" means machine and logic mechanics from any game: parts, joints, motors, sensors, wired logic;
+  - "bag up that UI" means every game's interface patterns, as presets;
+  - the question is where our own UI stands on the ladder.
+- **Where it stands (28 Oct):**
+  - **Partly presets, in older code:**
+    - `apps/web/src/ui-preset.ts`: "the interface is a preset too". The racing game's theme colours, its words and its HUD layout are one `interface` preset, editable in its HUD editor;
+    - `@hm/hudlayout`: elements with an anchor, offset, scale, visibility and opacity, with presets and validation (but only racing kinds: speed, lap, minimap…);
+    - FIDELITY's game modes each pick one of five named HUD blades (`hudBlade`);
+    - `@hm/modui` has curve, timeline and sequence editor widgets.
+  - **Not presets:** FIDELITY's play HUD, its menus and the Studio are hand-written React.
+- **The plan: a `ui:` preset kind on the ladder** (universal operators, as §14 sets for the 17 kinds):
+  1. atoms: tokens (colour, type, spacing, motion). These are today's `UiTheme.vars`;
+  2. stacks: a widget's look in each state (a meter, a slot, a button, a port);
+  3. parts: a widget **bound to a real value**. A meter reads the sync, a slot reads the hotbar, a port reads a wiregraph pin. The System HUD rule applies: a lens, never a lie, so a part with no source to read cannot be placed;
+  4. assemblies: panels and blades (the goal card, the comms panel, a node-graph editor, a parts palette, an inspector), placed by anchor and offset. This is `@hm/hudlayout` grown past its racing kinds;
+  5. worlds: a whole screen's interface (the play HUD, the Studio, a game mode's HUD). `hudBlade` becomes a `ui:` preset id, and the old `interface` preset is its first instance.
+- **Bagging another game's UI** means its structure and behaviour: what sits where, what each control does, how a graph is wired, how a palette filters.
+  - It is re-expressed in FIDELITY's own tokens and look (the frontend-design rule).
+  - Its art, icons, fonts and text never cross, by the same rule as every mimic.
+- **The first test case is Plasma** (free on Steam; Dry Cactus and Licorice; minimum GPU a GTX 650 Ti 2 GB, so it runs on the 950M; no anti-cheat listed):
+  - devices are built from hundreds of components and wired with visual programming nodes, then shared on the Workshop;
+  - **the mechanics:** its components (sensors, motors and joints, logic) become kit parts and `@hm/wiregraph` (`logic:`) nodes;
+  - **the UI:** its component palette, node editor and inspector become `ui:` assemblies for the Studio and the sandbox;
+  - **the channel:** check on install whether its saved device files are readable data. Workshop devices are other players' work, so mimic the game's components, not their creations.
+- **Order:** after 1b. Grow `@hm/hudlayout` into the `ui:` kind with bound parts, move the play HUD onto it panel by panel (the goal card and the sync meter first), then mimic Plasma's node editor for the Studio's logic presets.

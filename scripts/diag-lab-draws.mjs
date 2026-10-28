@@ -24,7 +24,7 @@ await page.addInitScript(() => {
 });
 const frames = async (n = 30) => page.evaluate(async (k) => { for (let i = 0; i < k; i++) await new Promise((r) => requestAnimationFrame(r)); }, n);
 try {
-  await page.goto(`http://localhost:${port}/`, { waitUntil: 'domcontentloaded', timeout: 45000 });
+  await page.goto(`http://localhost:${port}/?story`, { waitUntil: 'domcontentloaded', timeout: 45000 });
   await page.waitForSelector('.sm-menu button', { timeout: 45000 });
   await page.locator('.sm-menu button', { hasText: 'Play' }).first().click();
   await page.waitForFunction(() => window.hmPlay?.ready === true && window.__playScene?.room, { timeout: 90000 });

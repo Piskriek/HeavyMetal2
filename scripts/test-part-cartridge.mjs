@@ -49,7 +49,7 @@ const stock = (item) => page.evaluate((it) => { const w = window.hmPlay.base.wor
 const bolts = () => page.evaluate(() => window.__dev.kitPlaced('capacitor-bank').filter((p) => p.path.startsWith('bolts-')));
 
 const boot = async () => {
-  await page.goto(`http://localhost:${port}/?e2e`, { waitUntil: 'domcontentloaded', timeout: 45000 });
+  await page.goto(`http://localhost:${port}/?story&e2e`, { waitUntil: 'domcontentloaded', timeout: 45000 });
   await page.waitForSelector('.sm-menu button', { timeout: 45000 });
   await page.locator('.sm-menu button', { hasText: 'Play' }).first().click();
   await page.waitForFunction(() => window.hmPlay?.ready === true && window.__playScene?.room && window.__dev, { timeout: 90000 });

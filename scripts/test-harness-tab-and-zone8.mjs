@@ -68,7 +68,7 @@ const frames = (n) => page.evaluate((k) => new Promise((res) => { let i = 0; con
 try {
   // The lab boot (menu -> Play -> the shielded lab): the preset bench renders there, as in
   // test-material-cartridge.mjs. The ?base&kit=1 boot starts on the planet without the bench UI.
-  await page.goto(`http://localhost:${port}/?e2e`, { waitUntil: 'domcontentloaded', timeout: 45000 });
+  await page.goto(`http://localhost:${port}/?story&e2e`, { waitUntil: 'domcontentloaded', timeout: 45000 });
   await page.waitForSelector('.sm-menu button', { timeout: 45000 });
   await page.locator('.sm-menu button', { hasText: 'Play' }).first().click();
   await page.waitForFunction(() => window.hmPlay?.ready === true && window.__playScene?.room && window.__dev, { timeout: 90000 });

@@ -27,7 +27,7 @@ if (!chromePath) {
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const port = 8198;
-const targetUrl = `http://localhost:${port}/`;
+const targetUrl = `http://localhost:${port}/?story`;
 
 console.log(`Starting static server on port ${port}...`);
 const server = spawn(process.execPath, ['scripts/serve.mjs'], {

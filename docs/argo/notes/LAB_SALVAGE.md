@@ -56,3 +56,11 @@
 - **Note:** e2e-smoke was already stale before the strip. It still expects the old "SetMix / Multiverse" brand and menu items. Its menu checks need rewriting for the FIDELITY menu either way.
 
 Related docs: `docs/NARRATION_SCRIPT.md`, `NARRATION_SYSTEM.md`, `NARRATIVE_AND_LORE_BIBLE.md`, `LAB_LAYOUT_RESEARCH.md`.
+
+## Progress
+- **28 Oct, step 1b first pass:**
+  - a new avatar starts the simulation (the world at stage 3, no lab, no story);
+  - `?story` keeps the parked story for its tests;
+  - the 20 creator-entry scripts carry `story`;
+  - the menu's story wording is gone.
+  - Next: register the lab's kits, props, lights and sounds as presets; turn the narrator engine into the System voice; move each story script to the simulation start as its piece is salvaged.

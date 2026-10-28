@@ -214,6 +214,89 @@ Piece catalogues and stability are in BASE_BUILDING_RESEARCH. The gap here is th
 - UESP itself marks Skyrim's skill XP formulas as needing verification.
 - The 950M comparisons are from listed minimums, not benchmarks.
 
+## Free and low-cost alternatives (verified 28 Oct)
+
+Checked against pages I opened on 28 Oct 2026 (sources 61 to 102). Prices are Steam ZAR on this PC. "Fit" is my reading of the listed minimums against the laptop (i7-6700HQ, GTX 950M 2 GB, 16 GB), not a benchmark. No page below mentions an anti-cheat; as in section 0, silence is not proof. Everything here plays solo and offline. Only numbers and rules cross, never assets, names or code.
+
+| Game | Licence, cost, official source | Fit and solo | Families | Best channel |
+|---|---|---|---|---|
+| D&D 5e SRD 5.1 | CC-BY-4.0, "free of charge", attribution line required [61]; wizards.com SRD page [45] | No install | F1 F2 F4 | Text: XP table (300, 900, 2,700, 6,500 and on), class tables, Conditions appendix [61] |
+| Battle for Wesnoth | Code GPL-2.0+; Free on Steam, also itch and wesnoth.org [62][63] | Steam min: 2 GHz dual-core, 2 GB; solo campaigns [63] | F1 F4 | Plain WML `.cfg` units: Bowman has hitpoints 33, experience 35, cost 14, level 1 [64][65] |
+| Dungeon Crawl Stone Soup | GPLv2+; free Windows builds at crawl.develz.org [66][67] | No spec listed; offline builds | F1 F2 F4 | Source `skills.cc`: cost table, use-based `exercise()`, species aptitudes [68]; species and jobs as YAML [69] |
+| Daggerfall Unity | Code MIT. Needs DOS Daggerfall, Free To Play on Steam, (c) Bethesda [70][71][72] | Min i3 Skylake, DX11 1 GB, 2 GB RAM [70] | F1 F2 F4 | `FormulaHelper.cs`: `CalculateAttackDamage`, `CalculateSuccessfulHit`, `CalculateSkillUsesForAdvancement` [71] |
+| Dwarf Fortress Classic | Bay 12 press release: classic stays "at no cost" on its site [74]; the download page lists a Classic 53.16 Windows zip [49] | Classic spec not found; Premium min is dual-core 2.4 GHz, 4 GB [10] | F5 F9 | Raw files (see F9) |
+| Mindustry | Code GPL-3.0 [39]; Steam R79 [75]; itch "name your own price", $0 not confirmed [76] | Steam min: 1 GB RAM, OpenGL 2.0; solo campaign [75] | F4 F5 F9 F10 | Java: `Blocks`, `Items`, `UnitTypes`, `StatusEffects`, `Planets`, two tech trees [77] |
+| OpenTTD | GPL-2.0; free OpenGFX and OpenSFX replace the original files; openttd.org, Steam, GOG [81] | No spec listed | F5 F9 | Source tables `cargo_const.h`, `build_industry.h` [81] |
+| Endless Sky | Code GPL-3, art public domain or CC; "free, open source"; GitHub, Steam, GOG [82] | OpenGL 2.0, 750 MB RAM [82] | F8 | Text data. X2700 Ion Thruster: `"mass"` 27, `"thrust"` 24.075, `"thrusting energy"` 1.1 [83] |
+| Naev | GPL-3+ with exceptions [85]; Free on Steam, also itch [84] | OpenGL 3.3; 512 MB (Steam) or 2 GiB (Codeberg) [84][85] | F3 F8 | `dat/ships` XML, `dat/outfits`, Lua missions [85] |
+| Orbiter | MIT, free; "Orbiter 2024" is the latest GitHub release [37][86] | Windows only, 32-bit; 500 MB, dual-core [37] | F8 F10 | MIT source, orbital flight |
+| Pioneer | GPLv3, free download; Windows installer 543 MB, build 20260907 [38][88] | Spec not found | F8 | `data/ships`, `data/systems`, `data/economy` [38] |
+| Luanti | Code MIT, content CC BY-SA 3.0; no price stated, donation link [44][89] | Windows 8 to 11, no hardware spec; single-player [44][89] | F5 F10 | Lua API for games and mods [44] |
+| Veloren | GPL-3.0+ [90]; no price stated | Win10/11 64-bit, 4 GiB, DX12 or Vulkan GPU [91]; solo starts a local server [92]; 950M load untested | F2 F5 F7 | `.ron` folders `skill_trees`, `loot_tables`, `crafting`, `items` [93]. Taming is named on its site only |
+| Unciv | MPL-2.0 code; itch says "free forever"; not on Steam [94][95] | No spec listed | F2 F9 F10 | JSON: `Techs`, `Buildings`, `UnitPromotions`, `Eras`, `Terrains`, `Quests` [94] |
+| Flare RPG | Engine GPLv3, default mod GPLv3 and CC-BY-SA 3.0; v1.15 Windows installer 608 MB [96][97] | No spec listed | F2 F3 F4 F5 | INI-style text; mod folders `powers`, `items`, `loot`, `quests` [98] |
+| Shattered Pixel Dungeon | GPL-3.0 [100]. The PC build is free: Windows 4.0.2 (103 MB) on itch, "name your own price", paid adds cosmetics [99]. Steam R100 [100] | Win10 64-bit, OpenGL 2.0, 250 MB [100] | F4 F5 F7 | Java source [40] |
+| Factorio demo | A free demo is still offered (2.1.23), "a subset" of the full game [101]; Steam lists "Factorio Demo" [3] | As the Factorio card | F5 | Whether `--dump-data` works on the demo: unverified |
+
+Also checked. OpenMW is GPLv3 and still needs Morrowind (R219, card table above). shapez costs R100 on Steam (R10 until 1 Nov, plus a demo [78]); its open repo is unmaintained and the Community Edition must be built from source [79][80]. It adds only F5, so skip it.
+
+### The no-money plan
+
+| Family | Free picks | What they give |
+|---|---|---|
+| F1 Stats, XP | D&D SRD 5.1, Wesnoth | XP and proficiency steps [61]; unit XP, level and cost fields [64]. UESP formulas are free too (doc [20]) |
+| F2 Skills, classes | DCSS, SRD, Veloren | Use-based training with aptitudes [68]; classes [61]; skill trees as data [93] |
+| F3 Status, notices, quests | Flare, Cataclysm: DDA | Quest and dialogue text [98]; talk topics and missions [102]. Thin: no free game has the System voice, and notice timing comes from UESP (doc [20]) |
+| F4 Combat | Wesnoth, Daggerfall Unity, SRD Conditions | Damage and resistance fields; hit and damage functions [71]; conditions [61]. Pokemon Showdown is already free (doc [30]) |
+| F5 Crafting, loot | Veloren, Cataclysm: DDA | `crafting` and `loot_tables` [93]; recipes and item groups (doc [42]) |
+| F6 Companions | Cataclysm: DDA NPCs | Followers; opinion fields `trust`, `fear`, `value`, `anger`, `owed`, `favors` [102]. No free gift-point numbers |
+| F7 Taming, creatures | Cataclysm: DDA, Pokemon Showdown | Monster blocks and pets (doc [42]); type chart (doc [30]). Veloren data unread |
+| F8 Ships, flight | Endless Sky, then Naev; Orbiter for orbits | Mass, thrust and energy per part [83]; ship XML [85]; MIT source [37] |
+| F9 Base, settlement | Mindustry, OpenTTD, Unciv | Resource flow and waves [39]; industries [81]; buildings JSON [94]. Settler needs: DF Classic raws |
+| F10 Worlds with other rules or looks | Luanti, Mindustry | Per-game rules via Lua [44]; two planets with separate tech trees [77]. No free source for the art-style half |
+
+Cost: R0 (Mindustry from itch or GitHub builds; Steam R79 is the sure price).
+
+### If buying one or two
+
+- **Stardew Valley, R159.** The cheapest fix for F6: gift points and birthday multipliers (doc [56]), plus F2 and F5. Free F6 is only the DDA opinion meter.
+- **RimWorld, R315.** Covers F6 mood, F7 taming and F9 colonist needs in one purchase, plus F1, F2 and F5; it is already shopping-list #1. If only one purchase, this is it; Stardew first if the budget is under R200. Both together: R474.
+- **Later, only if a gap shows.** Slay the Spire (R62.25 until 3 Nov, then R249) for stacking effects in F4 (doc entry is from memory); Evoland Legendary (R229.99) for the F10 look half; Morrowind (R219) for OpenMW's journal in F3.
+- **Not needed first.** KSP 1 (R379.95), Skyrim SE (R599), Valheim (R360), Factorio (R300): the free ships, UESP and Veloren plus DDA already cover F8, Skyrim's F1 and F2, and F5.
+
+### Unverified in this pass
+
+- Orbiter 2016's official site did not resolve; Wikipedia confirms the 2016 release [87], but I saw only third-party download listings. Use Orbiter 2024 from GitHub.
+- wesnoth.org and the Pioneer wiki sit behind a bot wall; Endless Sky's Steam page returned a region error. I used GitHub and Steam pages instead.
+- No hardware spec found: DF Classic, DCSS, OpenTTD, Pioneer, Luanti, Unciv, Flare. DF Classic's "free" rests on the 2022 press release.
+- No price stated: Luanti, Veloren. Mindustry's itch page does not say $0 is accepted.
+- Daggerfall: no written terms for the original data. Only Bethesda's 2009 free release [73] and the Steam page [72] are evidence.
+
+## The owner's Steam library (28 Oct)
+
+The owner owns these on Steam and is downloading them. Only licensed copies are used. Unofficial downloads were left out, so no preset traces back to an unlicensed copy.
+
+The Steam store pages were opened on 28 Oct for two facts:
+- Enshrouded's minimum GPU is a GTX 1060 with 6 GB, beyond the GTX 950M;
+- Rocket League's page lists no anti-cheat.
+
+The data channels are from Opus's knowledge and are checked on install.
+
+| Game | Families | Channel (check on install) | Notes |
+|---|---|---|---|
+| Kerbal Space Program | F8, F10 | part configs as text (`GameData/Squad/Parts/*.cfg`), kRPC | Ships from parts; each body has its own gravity and atmosphere, so each world runs different rules |
+| Space Engineers | F8, F9 | block definitions (`Content/Data/*.sbc` XML), the in-game Programmable Block | Thrust, mass, gyros, power; borderline on the 950M |
+| Dwarf Fortress | F1, F2, F6, F7, F9 and the pre-play history (Plan 57 §5) | raw text files (`data/vanilla/...`), DFHack | Use-based skills, relationships, taming, settlement, world history |
+| Hades | F2, F3, F4, F5 (rarity), F6 | plain Lua scripts (`Content/Scripts`) | Weapon timings, boons and their rarities, affinity with characters, the prophecy list as a quest log |
+| Satisfactory | F5, F9 | the game's own Docs.json (`CommunityResources/Docs`) | Recipes and throughput; only the data file is needed, which matters because the game is heavy for the 950M |
+| Transport Fever 2 | F9, F5 | Lua configs and mods (`res/`) | Logistics, vehicles, economy |
+| Plasma | F8, logic | visual-scripting machines | Machines built from parts with logic: wiregraph and `logic:` presets |
+| Portal | logic, F10 | Source engine console constants | Physics puzzles, button and door logic |
+| Rocket League | F8 (vehicle feel) | published physics constants; observe in offline Free Play or Exhibition only | Online-first: never touch an online match. Anti-cheat rule: the player is told first, offline modes only |
+| Enshrouded | F2, F5, F9 | its wiki's numbers | **Will not run on the 950M** (minimum GTX 1060 6 GB). Skip the 28.9 GB download, or run it only on the 3D PC |
+
+With the free picks above (the SRD 5.1, Cataclysm: DDA, Pokémon Showdown), this covers F1 to F10. The one thin family is F3, the "System" notices and quest logs. The SRD's text, DDA's missions and Hades' prophecy list cover it, and nothing more needs buying for it.
+
 ## Sources
 
 Steam store pages (opened 28 Oct 2026, prices in ZAR):
@@ -281,3 +364,47 @@ Search results only (pages not opened):
 58. Hades modding stance: a Nexus Mods Hades loader page, via web search.
 59. FlightGear Generic Protocol: wiki.flightgear.org/Generic_Protocol, via web search.
 60. Disco Elysium checks: Steam community and guide sites, via web search.
+
+Free and low-cost alternatives (opened 28 Oct 2026; Steam prices in ZAR):
+61. [D&D SRD 5.1 PDF (CC-BY-4.0 text, XP table, Conditions)](https://media.wizards.com/2023/downloads/dnd/SRD_CC_v5.1.pdf)
+62. [Battle for Wesnoth repo](https://github.com/wesnoth/wesnoth)
+63. [Battle for Wesnoth on Steam](https://store.steampowered.com/app/599390/Battle_for_Wesnoth/)
+64. [Wesnoth unit file: Loyalist_Bowman.cfg](https://raw.githubusercontent.com/wesnoth/wesnoth/master/data/core/units/humans/Loyalist_Bowman.cfg)
+65. [Wesnoth wiki: ReferenceWML](https://wiki.wesnoth.org/ReferenceWML)
+66. [Dungeon Crawl Stone Soup repo](https://github.com/crawl/crawl)
+67. [DCSS downloads](https://crawl.develz.org/download.htm)
+68. [DCSS skills.cc](https://raw.githubusercontent.com/crawl/crawl/master/crawl-ref/source/skills.cc)
+69. [DCSS species data folder](https://github.com/crawl/crawl/tree/master/crawl-ref/source/dat/species)
+70. [Daggerfall Workshop (Daggerfall Unity)](https://www.dfworkshop.net/)
+71. [Daggerfall Unity repo (MIT; FormulaHelper.cs in Assets/Scripts/Game/Formulas)](https://github.com/Interkarma/daggerfall-unity)
+72. [The Elder Scrolls II: Daggerfall on Steam](https://store.steampowered.com/app/1812390/The_Elder_Scrolls_II_Daggerfall/)
+73. [UESP: Daggerfall for Free (2009)](https://en.uesp.net/wiki/UESPWiki:News/Daggerfall_for_Free)
+74. [Dwarf Fortress press release (Classic stays free)](https://gamespress.com/THE-LEGENDARY-DWARF-FORTRESS-GETS-A-WHOLE-NEW-LOOK-ON-DECEMBER-6)
+75. [Mindustry on Steam](https://store.steampowered.com/app/1127400/Mindustry/)
+76. [Mindustry on itch](https://anuke.itch.io/mindustry)
+77. [Mindustry content folder](https://github.com/Anuken/Mindustry/tree/master/core/src/mindustry/content)
+78. [shapez on Steam](https://store.steampowered.com/app/1318690/shapez/)
+79. [shapez.io repo (unmaintained)](https://github.com/tobspr-games/shapez.io)
+80. [shapez Community Edition](https://github.com/tobspr-games/shapez-community-edition)
+81. [OpenTTD repo](https://github.com/OpenTTD/OpenTTD)
+82. [Endless Sky repo](https://github.com/endless-sky/endless-sky)
+83. [Endless Sky engines.txt](https://raw.githubusercontent.com/endless-sky/endless-sky/master/data/human/engines.txt)
+84. [Naev on Steam](https://store.steampowered.com/app/598530/Naev/)
+85. [Naev on Codeberg](https://codeberg.org/naev/naev)
+86. [Orbiter releases (Orbiter 2024)](https://github.com/orbitersim/orbiter/releases)
+87. [Wikipedia: Orbiter (simulator)](https://en.wikipedia.org/wiki/Orbiter_(simulator))
+88. [Pioneer download page](https://pioneerspacesim.net/page/download/)
+89. [Luanti downloads](https://www.luanti.org/en/downloads/)
+90. [Veloren repo (GitLab)](https://gitlab.com/veloren/veloren)
+91. [Veloren download page](https://veloren.net/download/)
+92. [Veloren book: hosting a server (singleplayer)](https://book.veloren.net/players/server-hosting/introduction.html)
+93. [Veloren assets/common](https://github.com/veloren/veloren/tree/master/assets/common)
+94. [Unciv repo (jsons folder)](https://github.com/yairm210/Unciv)
+95. [Unciv on itch](https://yairm210.itch.io/unciv)
+96. [Flare engine repo](https://github.com/flareteam/flare-engine)
+97. [Flare download page](https://flarerpg.org/download.html)
+98. [Flare game data (Empyrean Campaign mod)](https://github.com/flareteam/flare-game/tree/master/mods/empyrean_campaign)
+99. [Shattered Pixel Dungeon on itch](https://shattered-pixel.itch.io/shattered-pixel-dungeon)
+100. [Shattered Pixel Dungeon on Steam](https://store.steampowered.com/app/1769170/Shattered_Pixel_Dungeon/)
+101. [Factorio download page (free demo)](https://factorio.com/download)
+102. [Cataclysm: DDA NPCs.md](https://raw.githubusercontent.com/CleverRaven/Cataclysm-DDA/master/doc/JSON/NPCs.md)

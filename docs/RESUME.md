@@ -35,11 +35,18 @@
   - test-fidelity-sync-studio waits for `.sx`, which became `.studio-root` in `9f665bd2`.
   - Both go into the strip step's script rewrite.
 - **Argon's audit: green.**
+- **Step 1b, first pass, built** (Plan 57 §14.1):
+  - a new avatar starts the simulation: the world at stage 3, the save `start: 'sim'`, the sync held, the mentor's story muted and the story HUD out;
+  - `?story` keeps the parked story, and the 20 creator-entry scripts carry it;
+  - the grid room builds after the first paint;
+  - e2e-smoke's two assertions are fixed. It and test-fidelity-sync-studio are stale further: the old menu items and the old Moon editor are no longer reachable, so both need a rewrite;
+  - new: `scripts/test-sim-start-e2e.mjs`.
+- **Games:** the owner's Steam library (KSP, Space Engineers, Dwarf Fortress, Hades, Satisfactory, Transport Fever 2, Plasma, Portal, Rocket League; Enshrouded is too heavy for the 950M) plus the free picks cover F1 to F10 (MIMIC_GAMES_RESEARCH). Only licensed copies are used.
 - **Next:**
-  1. 1b, the strip: keep the e2e seam into play, and fix the two stale e2e scripts so the suite is fully green;
-  2. the room's scene one frame after first paint (approved);
+  1. register the lab's kits, props, lights and sounds as presets, and move story scripts to the simulation start piece by piece;
+  2. the narrator engine as the drone's System voice;
   3. the bridge screen's mirror;
-  4. mimic Cataclysm: DDA and Pokémon Showdown first.
+  4. mimic Cataclysm: DDA and Pokémon Showdown first, then the Steam games' data files.
 - **Plan 56's drone body visuals are built** (§20.10): overlays on its own parts, a new radio mast each side, the starved glow. Drone e2e 57/57; full suite green apart from the known texgraph speed flake (passes alone).
 
 ## 28 Oct Checkpoint 3 (Claude Opus: Plans 53–55, the CS2 live run, the anti-cheat warning and the input relay; uncommitted on top of `ed83534e`; read this first)

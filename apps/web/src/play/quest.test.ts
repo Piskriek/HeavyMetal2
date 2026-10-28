@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { place, step, type Env, type PlotState } from '@hm/plotsim';
-import { FRESH, SHELTER_REFILL, SYNC_SECONDS, arrived, created, isFreeDrill, loadState, objective, poweredOn, returned, stepSync, withPlot, type PlayState } from './quest';
+import { FRESH, SHELTER_REFILL, SIM_START_STAGE, SYNC_SECONDS, arrived, created, isFreeDrill, loadState, objective, poweredOn, returned, simStart, stepSync, withPlot, type PlayState } from './quest';
 
 const env: Env = { gate: { x: 0, z: 0 }, plotRadius: 500, richness: () => 0.8 };
 /** The plot run until a pixel machine gives its first output (stage 1), with ore to burn. A standing machine is not output. */
@@ -164,4 +164,23 @@ test('the zero-loss recall (TASK-26): returning to the lab keeps the plot, the l
   assert.equal(back.chain, s.chain, 'the campaign chain is kept');
   assert.deepEqual(back.avatar, s.avatar, 'the avatar is kept');
   assert.equal(back.step, 'build', 'the first look round is done, so the build step follows');
+});
+
+test('the simulation start (Plan 57): made your avatar, you are on the world at stage 3, and a reload keeps it so', () => {
+  const s = simStart(FRESH, 'scientist');
+  assert.equal(s.step, 'done');
+  assert.equal(s.start, 'sim');
+  assert.equal(s.plot.stage, SIM_START_STAGE);
+  assert.ok(s.gateOn && s.visited && s.avatar);
+  // the story would push a done save with no drill back to its drill step; a simulation save stays done, and stays a simulation
+  const back = loadState(JSON.parse(JSON.stringify(s)));
+  assert.equal(back.step, 'done');
+  assert.equal(back.start, 'sim');
+  assert.equal(back.plot.stage, SIM_START_STAGE);
+  // a story save is untouched: no start field, and its drill step still applies
+  const story = loadState(JSON.parse(JSON.stringify({ ...created(FRESH, 'scientist'), step: 'done' })));
+  assert.equal(story.start, undefined);
+  assert.equal(story.step, 'drill');
+  // stages only rise: a plot already past stage 3 keeps its own
+  assert.equal(simStart(withPlot(FRESH, { ...FRESH.plot, stage: 5 }), 'scientist').plot.stage, 5);
 });

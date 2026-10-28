@@ -29,7 +29,7 @@ page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => { if (m.type() === 'warning' || m.type() === 'error') { const t = m.text(); if (/companion|scientist|glb|gltf/i.test(t)) errors.push(`console: ${t}`); } });
 const frames = (n) => page.evaluate((k) => new Promise((res) => { let i = 0; const f = () => (++i >= k ? res() : requestAnimationFrame(f)); requestAnimationFrame(f); }), n);
 try {
-  await page.goto(`http://localhost:${port}/?e2e&bridge=8228`, { waitUntil: 'domcontentloaded', timeout: 45000 });
+  await page.goto(`http://localhost:${port}/?story&e2e&bridge=8228`, { waitUntil: 'domcontentloaded', timeout: 45000 });
   await page.waitForSelector('.sm-menu button', { timeout: 45000 });
   await page.locator('.sm-menu button', { hasText: 'Play' }).first().click();
   await page.waitForFunction(() => window.hmPlay?.ready === true && window.__playScene && window.__dev, { timeout: 90000 });

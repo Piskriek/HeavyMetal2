@@ -40,14 +40,16 @@ try {
     } catch {}
   };
   const dom = (fn, arg) => page.evaluate(fn, arg); // software rendering starves the page: click through the DOM instead of waiting for Playwright stability checks
-  await page.goto(`http://127.0.0.1:${port}/`);
+  await page.goto(`http://127.0.0.1:${port}/?story`);
   // the saves live in IndexedDB too (storage/big-store.ts): the delete waits for this page to close, then the reload starts clean
   await page.evaluate(() => { localStorage.clear(); indexedDB.deleteDatabase('hm-store'); });
   await page.reload();
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
   check('boots to the SetMix home with no page error', errors.length === 0, errors.join(' | '));
   console.log(`     renderer: ${await page.evaluate(() => { const g = document.createElement('canvas').getContext('webgl2'); const x = g?.getExtension('WEBGL_debug_renderer_info'); return g && x ? g.getParameter(x.UNMASKED_RENDERER_WEBGL) : 'unknown'; })}`);
-  check('the home is SetMix Multiverse with its menu', (await page.locator('.sm-brand b').innerText()) === 'SetMix' && (await page.locator('.sm-brand i').innerText()) === 'Multiverse' && JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Play', 'Studio', 'My planet', 'Avatars', 'Community', 'Settings']));
+  // the FIDELITY home (its brand and menu since the Studio overhaul); the credits item shows only once the ending is seen
+  const FIDELITY_ITEMS = ['Expedition', 'Planetary Grid', 'The Studio', 'Community Nexus', 'Diagnostics & Settings'];
+  check('the home is FIDELITY with its menu', (await page.locator('.sm-brand b').innerText()) === 'FIDELITY' && JSON.stringify(await page.$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(FIDELITY_ITEMS));
   // the home is the grid room (Plan 57 §10; the lab behind the menu is stripped): it warms the presets rung by rung, climbs to
   // stage 3, then draws nothing while nothing changes
   await page.waitForFunction(() => window.hmRoom && window.hmRoom.ready, null, { timeout: T(90000) });
@@ -83,11 +85,11 @@ try {
   check('settings closes back to the home', await page.locator('.sm-home').count() === 1);
 
   // the Goblin Racing version of the same build (owner, 2026-10-06 20:30): Goblin Racing tops its menu, and only there
-  await page.goto(`http://127.0.0.1:${port}/?edition=goblin-racing`);
+  await page.goto(`http://127.0.0.1:${port}/?story&edition=goblin-racing`);
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
   await page.waitForFunction(() => window.hmRoom && window.hmRoom.ready, null, { timeout: T(90000) });
   await shot('menu-goblin-racing');
-  check('the Goblin Racing version lists Goblin Racing first', JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Goblin Racing', 'Play', 'Studio', 'My planet', 'Avatars', 'Community', 'Settings']));
+  check('the Goblin Racing version lists Goblin Racing first', JSON.stringify(await page.$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Goblin Racing', ...FIDELITY_ITEMS]));
   // Goblin Racing: its menu entry opens its own menu; Race modes holds its sections; Esc steps back out to SetMix
   await dom(() => { [...document.querySelectorAll('.sm-menu button')].find((b) => b.querySelector('b')?.textContent === 'Goblin Racing')?.click(); });
   await page.waitForSelector('.gr-front', { timeout: T(15000) });
@@ -104,13 +106,13 @@ try {
   await page.waitForTimeout(T(400));
   check('Esc again returns to the SetMix home', await page.locator('.sm-home').count() === 1);
   // back to the SetMix version for the rest
-  await page.goto(`http://127.0.0.1:${port}/`);
+  await page.goto(`http://127.0.0.1:${port}/?story`);
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
   await page.waitForFunction(() => window.hmRoom && window.hmRoom.ready, null, { timeout: T(60000) });
 
   // the Resolution Crafter preview (?crafter, a test view): the moon builds behind a loading bar; a stage jump sends a wave out from your plot's centre; Esc returns home
   const crafterErrors = errors.length;
-  await page.goto(`http://127.0.0.1:${port}/?crafter`);
+  await page.goto(`http://127.0.0.1:${port}/?story&crafter`);
   await page.waitForFunction(() => window.hmCrafter && window.hmCrafter.frames > 5, null, { timeout: T(30000) });
   check('the Resolution Crafter builds its moon and draws it', await page.locator('.rc-console').count() === 1 && await dom(() => window.hmCrafter.shown.startsWith('lunar_anorthosite@1@')));
   await dom(() => [...document.querySelectorAll('.rc-ladder button')][2]?.click());
@@ -126,7 +128,7 @@ try {
   await page.waitForTimeout(T(400));
   check('Esc leaves the Resolution Crafter for the SetMix home', await page.locator('.sm-home').count() === 1 && await dom(() => !window.hmCrafter));
   check('the Resolution Crafter raised no page error', errors.length === crafterErrors, errors.slice(crafterErrors).join(' | '));
-  await page.goto(`http://127.0.0.1:${port}/`);
+  await page.goto(`http://127.0.0.1:${port}/?story`);
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
   await page.waitForFunction(() => window.hmRoom && window.hmRoom.ready, null, { timeout: T(60000) });
 
@@ -703,7 +705,7 @@ try {
   check('island saves are in IndexedDB, none in localStorage', saved.idb.some((k) => k.startsWith('hm.island.')) && saved.idb.includes('hm.islands.v1') && saved.ls.length === 0, JSON.stringify(saved));
 
   // the first Play runs last: your human made in the lab is your first avatar, and the island tour above needs a new player
-  await page.goto(`http://127.0.0.1:${port}/`);
+  await page.goto(`http://127.0.0.1:${port}/?story`);
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
   await page.waitForFunction(() => window.hmRoom && window.hmRoom.ready, null, { timeout: T(60000) });
 

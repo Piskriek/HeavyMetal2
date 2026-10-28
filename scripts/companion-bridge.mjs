@@ -48,7 +48,7 @@
  *   curl -s -X POST localhost:8220/command -H 'Content-Type: application/json' \
  *     -d '{"action":"mutate-kit-preset","mutation":"strip-hazard","text":"On it."}'
  */
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
@@ -95,6 +95,17 @@ const SAMPLER_REPLAY = arg('--sampler-replay');
 const CADENCE_BATCH = 20;
 const CADENCE_QUEUE = 120;
 let sampler = null;
+/**
+ * Which PowerShell runs the sampler: PowerShell 7 (pwsh) when it is installed, since its own policy (RemoteSigned on this
+ * PC) runs a local script, where Windows PowerShell 5.1 is often left Restricted. No policy is changed either way.
+ */
+let powershellExe = null;
+function samplerShell() {
+  if (powershellExe) return powershellExe;
+  try { execFileSync('pwsh.exe', ['-NoProfile', '-Command', 'exit 0'], { timeout: 20000, windowsHide: true, stdio: 'ignore' }); powershellExe = 'pwsh.exe'; }
+  catch { powershellExe = 'powershell.exe'; }
+  return powershellExe;
+}
 function queueCadence(gameId, lines) {
   const queued = pendingCommands.filter((c) => c.action === 'cadence');
   if (queued.length >= CADENCE_QUEUE) pendingCommands.splice(pendingCommands.indexOf(queued[0]), 1);
@@ -130,8 +141,8 @@ function startSampler(gameId, processName) {
     }, 25);
     s.stop = () => clearInterval(timer);
   } else if (process.platform === 'win32' && processName) {
-    // no -ExecutionPolicy change: the machine's own policy (RemoteSigned) runs a local script
-    const child = spawn('powershell.exe', ['-NoProfile', '-File', path.join(ROOT, 'scripts/cadence-sampler.ps1'), '-Process', processName], { stdio: ['ignore', 'pipe', 'pipe'] });
+    // no -ExecutionPolicy change: pwsh's own policy (RemoteSigned) runs a local script
+    const child = spawn(samplerShell(), ['-NoProfile', '-File', path.join(ROOT, 'scripts/cadence-sampler.ps1'), '-Process', processName], { stdio: ['ignore', 'pipe', 'pipe'] });
     let rest = '';
     child.stdout.on('data', (d) => { const parts = (rest + d).split(/\r?\n/); rest = parts.pop() ?? ''; for (const l of parts) take(l); });
     child.stderr.on('data', (d) => console.log(`\x1b[31m[SAMPLER]\x1b[0m ${String(d).trim().slice(0, 300)}`));
@@ -416,11 +427,19 @@ const handle = async (req, res) => {
       if (refused) return;
       const buf = Buffer.concat(chunks);
       if (buf.length < 4 || buf[0] !== 0xff || buf[1] !== 0xd8) { json(res, 400, { ok: false, error: 'a frame is a JPEG' }); return; }
-      fs.mkdirSync(FRAME_DIR, { recursive: true });
       const file = path.join(FRAME_DIR, `frame-${source}.jpg`);
       const tmp = `${file}.${process.pid}.tmp`;
-      fs.writeFileSync(tmp, buf);
-      fs.renameSync(tmp, file);
+      // a frame is replaced every few seconds; on Windows the old one can be held open a moment (a viewer, the scanner),
+      // and a failed rename here used to throw out of this callback and take the whole bridge down. Skip that frame instead.
+      try {
+        fs.mkdirSync(FRAME_DIR, { recursive: true });
+        fs.writeFileSync(tmp, buf);
+        fs.renameSync(tmp, file);
+      } catch (err) {
+        try { fs.rmSync(tmp, { force: true }); } catch {}
+        json(res, 503, { ok: false, error: `frame not saved (${err instanceof Error ? err.code ?? err.message : err}); the next one replaces it` });
+        return;
+      }
       lastFrames[source] = { file: path.relative(ROOT, file).replaceAll('\\', '/'), at: Date.now(), bytes: buf.length };
       json(res, 200, { ok: true, ...lastFrames[source] });
     });
@@ -483,10 +502,21 @@ const handle = async (req, res) => {
 const server = http.createServer(handle);
 
 /** The names of the running processes (Windows: tasklist; elsewhere: ps), or the --fake-processes list in tests. */
+/**
+ * The process list, cached for a few seconds with one scan in flight: on the min-spec laptop with a game running,
+ * tasklist takes about 5 s (a 4 s limit once returned an empty list, and "bridge <game>" then found no process).
+ */
+let processCache = { at: 0, list: [] };
+let processScan = null;
 async function runningProcesses() {
   if (FAKE_PROCESSES) return FAKE_PROCESSES;
+  if (Date.now() - processCache.at < 8000 && processCache.list.length) return processCache.list;
+  processScan ??= scanProcesses().then((list) => { if (list.length) processCache = { at: Date.now(), list }; processScan = null; return list.length ? list : processCache.list; });
+  return processScan;
+}
+async function scanProcesses() {
   const { execFile } = await import('node:child_process');
-  const run = (cmd, args) => new Promise((resolve) => execFile(cmd, args, { timeout: 4000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 }, (err, out) => resolve(err ? '' : String(out))));
+  const run = (cmd, args) => new Promise((resolve) => execFile(cmd, args, { timeout: 20000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 }, (err, out) => resolve(err ? '' : String(out))));
   if (process.platform === 'win32') {
     const out = await run('tasklist', ['/fo', 'csv', '/nh']);
     return [...new Set(out.split(/\r?\n/).map((l) => /^"([^"]+)"/.exec(l)?.[1]).filter(Boolean))];

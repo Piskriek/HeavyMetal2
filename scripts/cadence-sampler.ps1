@@ -113,6 +113,7 @@ namespace Fidelity.Cadence {
         var sw = Stopwatch.StartNew();
         var pids = GamePids(name);
         var meters = GameMeters(pids);
+        Console.Error.WriteLine(string.Format("audio sessions for {0}: {1} (processes {2})", name, meters.Count, pids.Count));
         double lastScan = 0;
         double period = 1.0 / Math.Max(20, Math.Min(500, hz));
         double next = 0;
@@ -121,7 +122,12 @@ namespace Fidelity.Cadence {
         while (seconds <= 0 || sw.Elapsed.TotalSeconds < seconds) {
           double t = sw.Elapsed.TotalSeconds;
           // the game's audio session can open late (a menu, a level load): look every half second until it is there
-          if (t - lastScan >= (meters.Count == 0 ? 0.5 : 2.0)) { pids = GamePids(name); meters = GameMeters(pids); lastScan = t; }
+          if (t - lastScan >= (meters.Count == 0 ? 0.5 : 2.0)) {
+            int before = meters.Count;
+            pids = GamePids(name); meters = GameMeters(pids); lastScan = t;
+            // the bridge logs this: whether the game's own audio session was found
+            if (meters.Count != before) Console.Error.WriteLine(string.Format("audio sessions for {0}: {1} (processes {2})", name, meters.Count, pids.Count));
+          }
           uint fgPid; GetWindowThreadProcessId(GetForegroundWindow(), out fgPid);
           bool fg = pids.Contains(fgPid);
           // the keys are read only while the game itself has focus: nothing typed anywhere else is ever looked at

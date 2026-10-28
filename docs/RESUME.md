@@ -38,7 +38,13 @@
     - say "picture in picture" and pick CS2's window.
   - Restart the live bridge on :8220 on the new code first.
   - Owner decisions: the child-facing CS2 skin, and the Plan 55 gateway (opening the bridge beyond this PC).
-  - [Plan 56](argo/plans/56-distortion-ladder.md), the owner's distortion ladder, designed (not built), research in [`DISTORTION_LADDER_RESEARCH.md`](DISTORTION_LADDER_RESEARCH.md): memory in the shorthand (`Mem`), behaviour in ego weights, excitement hardens, dreams rebalance (the Higher Self cues), the Overwatch inherits the whole system, graduate or repeat. **W1 is built:** `packages/shorthand` (frames, the `Mem` record, the text form, the `~m:` tail, PermMask), 7/7 tests (`33bf5ed6`). **W2 is built:** `packages/harness/src/preset-memory.ts` (the experience writer: excitement-weighted 32-slot record, hardening, charge by ray, cause links that learn and predict, the upper-rung rule id `src`, `repeatCurriculum` keeping all memory, the symptom), 11/11 tests. W3 (`dream.ts`) is next. Owner question: "repeat" instead of "perish".
+  - [Plan 56](argo/plans/56-distortion-ladder.md), the owner's distortion ladder, designed (not built), research in [`DISTORTION_LADDER_RESEARCH.md`](DISTORTION_LADDER_RESEARCH.md): memory in the shorthand (`Mem`), behaviour in ego weights, excitement hardens, dreams rebalance (the Higher Self cues), the Overwatch inherits the whole system, graduate or repeat. **W1 is built:** `packages/shorthand` (frames, the `Mem` record, the text form, the `~m:` tail, PermMask), 7/7 tests (`33bf5ed6`). **W2 is built:** `packages/harness/src/preset-memory.ts` (the experience writer: excitement-weighted 32-slot record, hardening, charge by ray, cause links that learn and predict, the upper-rung rule id `src`, `repeatCurriculum` keeping all memory, the symptom), 11/11 tests. 11/11 tests (`41841120`). **W3 is built:** `packages/harness/src/dream.ts`.
+    - The Higher Self's cue opens a hardened distortion.
+    - The antidote balances it without erasing it.
+    - Links close on the repair only, before the downscale, and the ego learns.
+    - The built-in cue goes lowest ray first.
+    - An uncued, hardened preset refuses and keeps its charge.
+    - 8/8 tests. W4 (`system-memory.ts`, the Overwatch's inherited pack) is next. Owner question: "repeat" instead of "perish".
 - **Skill:** the owner's SQ distortion check is installed locally at `.claude/skills/sq-distortion-check`.
 
 ## 28 Oct Checkpoint 2 (Claude Opus: Plan 51 Wave 3 + Plan 52, Commit `8600a81b`; read this first)

@@ -154,7 +154,7 @@
 |---|---|---|
 | W1 | `@hm/shorthand` (roadmap R2): types, validator, line codec and share code, with `Mem` and the `~m:` tail. **Built 28 Oct** (`packages/shorthand`). The compilers to `loc`/`logic`/`brain` are still to come. | Codes round-trip; golden tests pass. **Done: 7/7.** |
 | W2 | `packages/harness/src/preset-memory.ts`: episodes, hardening, `thinking()` typing, charge, the cause graph, symptom jitter. **Built 28 Oct**, with the "repeat" rule from W5 and the upper-rung rule id (`src`). | Oracle tests pass. **Done: 11/11.** |
-| W3 | `dream.ts`: select, cue, replay, rebalance, downscale, close, wake digest. | Oracle tests pass. |
+| W3 | `dream.ts`: select, cue, replay, rebalance, downscale, close, wake digest. **Built 28 Oct** (`packages/harness/src/dream.ts`). | Oracle tests pass. **Done: 8/8.** |
 | W4 | `system-memory.ts`: compile, pool when aligned, distil, digest. | Round-trip and pooling tests pass. |
 | W5 | The lifecycle: graduate or repeat, investment, responsibility. | Lifecycle tests pass. |
 | W6 | Wiring (below). | The e2e runs a dream with an attached Higher Self. |
@@ -192,6 +192,26 @@
     - "You braced against the shock because you believed safety was scarce. Rest in Presence: the ally on your deck is the anchor you were looking for."
     - "Forcing the outcome hardened the trench on your third ray. Let go of the result, and let excitement guide the next pass."
     - "Nothing is lost when a cycle closes unbalanced. Carry what you gathered into the next dawn, and let gratitude settle the lean."
+
+**W3 as built:** `dream(input)` takes:
+- the rung's own memory (the ego) and its presets;
+- the ego's preferences;
+- the tick;
+- the Higher Self's cues: omitted means the built-in cue (lowest charged ray first), and an empty list means no cue at all;
+- a budget (12 by default);
+- an optional pure `imagine` rollout.
+
+What each step does:
+- **Openness is the preset's own state:** `dreamOpenness = (1 − hardness) · (0.5 + investment / 2)`, where a cue halves the hardness for that dream.
+  - Below 0.15 the preset refuses and keeps its charge.
+  - A hardened, uninvested, uncued distortion is therefore never repaired by dreaming alone. Its cued self is.
+- **The antidote** takes `48 · openness · weight` off the ray, down to rest and never past it. The episode stays and sets softer.
+- **An `imagine` rollout,** when given, must show a lower error, or the repair is undone.
+- **Close comes before downscale.** A link closes only when this dream's repair brought its ray to rest (4 or less). The ego's own lean on the cause's ray then eases by 16.
+- **Downscale:** `hard −= 0.05 · hard · (1 − hard)`, and the 4 strongest episodes of each preset are spared.
+- **Replay** moves the ego's preference for each preset by `12 · weight · (1 − 2 · error)`.
+- **The digest:** replayed, balanced, refused (not open, or not confirmed), closed, and still open.
+- `wakeLine(digest)` gives the drone's line in Argon's voice.
 
 **The W3 oracle tests:**
 - A distortion hardened under `solar-control` thinking balances after cued dreams, and stays balanced.

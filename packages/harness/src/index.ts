@@ -8,3 +8,4 @@ export * from './mechanic-mimicry.js';
 export * from './veil-learning-harvest.js';
 export * from './purpose-excitement-catalyst.js';
 export * from './preset-memory.js';
+export * from './dream.js';

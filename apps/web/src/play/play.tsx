@@ -104,7 +104,7 @@ import { LOW_BARK_COOLDOWN, PLAYER_MAX_HP, hitBearing, hurt as hurtHp, isLow, pa
 import { usePlaySettings } from '../shell/play-settings';
 import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { kv } from '../storage/profile-storage';
-import { bodyCheckpoint, createDroneMemory, dreamNow, dronePerspective, droneSymptoms, loadDroneMemory, noteCatalyst, saveDroneMemory, type DroneBody, type DroneCatalyst, type DroneMemory } from './drone-memory';
+import { bodyCheckpoint, createDroneMemory, dreamNow, dronePerspective, droneSymptoms, hasUndreamt, loadDroneMemory, noteCatalyst, saveDroneMemory, type DroneBody, type DroneCatalyst, type DroneMemory } from './drone-memory';
 import { hintsFromWarnings } from './drone-body-visuals';
 import { warningLine } from '@hm/harness';
 import type { DreamCue } from '@hm/harness';
@@ -471,7 +471,8 @@ export function PlayScreen(props: {
   const waveMobIds = useRef<readonly number[]>([]);
   const stateRef = useRef(state);
   const [ready, setReady] = useState(false);
-  const [loading, setLoading] = useState(props.gamePreset ? `Opening ${props.gamePreset.title}` : 'Opening the lab');
+  // the first label, before the steps begin: every start opens the world first (the simulation start has no lab at all)
+  const [loading, setLoading] = useState(props.gamePreset ? `Opening ${props.gamePreset.title}` : 'Opening the world');
   const [failed, setFailed] = useState(false);
   const [locked, setLocked] = useState(false);
   const [paused, setPaused] = useState(false);
@@ -744,6 +745,8 @@ export function PlayScreen(props: {
   const beginSimulation = (scene: PlayScene): void => {
     narratorRef.current?.setStoryMuted(true);
     scene.setSyncHeld(true);
+    // the gate is the Stargate to build, not a door to a lab: it carries you nowhere until it has somewhere to dial
+    scene.setGateTransit(false);
     // the plot the loop steps carries the stage too, or its next save writes the story's stage back over it
     const stage = Math.max(plotRef.current.stage, SIM_START_STAGE);
     plotRef.current = { ...plotRef.current, stage };
@@ -1829,9 +1832,18 @@ useEffect(() => {
   };
   /** Plan 56 W6c: the drone's body shows its memory (a stuttering fire rhythm, a sway in flight) until it rebalances. */
   const showDroneSymptoms = (): void => { sceneRef.current?.setCompanionSymptoms(droneSymptoms(droneMemory())); };
+  // plan 57 §14: the drone's experience is kept as it happens (at most every 5 s, and as play closes), not only when it dreams:
+  // the simulation start dreams at the next session, so a reload must not lose what came before it
+  const droneSavedAtRef = useRef(0);
+  const saveDroneNow = (): void => {
+    droneSavedAtRef.current = Date.now();
+    try { kv.set(DRONE_MEMORY_KEY, saveDroneMemory(droneMemory())); } catch { /* storage unavailable: kept for this session */ }
+  };
+  useEffect(() => () => { if (droneMemoryRef.current) saveDroneNow(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const noteDrone = (c: DroneCatalyst): void => {
     droneMemoryRef.current = noteCatalyst(droneMemory(), c, Math.floor(Date.now() / 1000), droneStageRef.current);
     showDroneSymptoms();
+    if (Date.now() - droneSavedAtRef.current > 5000) saveDroneNow();
   };
   /** Leaving the Moon (the gate, or sync lost): the drone dreams, saves, and tells its dream on waking; the bridge gets it too. */
   const droneDreams = (): void => {
@@ -3183,14 +3195,17 @@ useEffect(() => {
     window.addEventListener('resize', size);
 
     const look = (id: string, st: Stage) => bakeLookCached(VAULT_BY_ID.get(id)!, st, device, gridSpacing);
+    // plan 57 §14: the simulation start (a sim save, or a new avatar without ?story) loads no lab and no mentor voice
+    const simPath = !props.gamePreset && (stateRef.current.start === 'sim' || (stateRef.current.step === 'create' && !storyStart));
     const steps: [string, () => void | Promise<void>][] = [
-      ['Loading voice narration', async () => {
+      // the mentor's voice is the parked story's: the simulation start does not load it (nor say it is loading it)
+      ...(simPath ? [] : [['Loading voice narration', async () => {
         if (props.gamePreset) return;
         const { rules } = await preloadMentorVo();
         if (narratorRef.current) {
           (narratorRef.current as any).rules = rules;
         }
-      }],
+      }] as [string, () => Promise<void>]]),
       ['Loading audio & sound effects', async () => {
         await gameAudio.preloadStartupAudio();
         // the base world is part of the campaign now (one game): the moon's audio always loads behind the bar
@@ -3201,7 +3216,7 @@ useEffect(() => {
         await preloadAllGenAssets(genLevelForStage(s, props.profile.quality));
       }],
       ['Loading the wreck sites', async () => { await scene.preloadWrecks(); }],
-      ['Fitting the lab', async () => { await scene.preloadLabGenerated(); }],
+      [simPath ? 'Warming the materials' : 'Fitting the lab', async () => { if (simPath) scene.warmMaterials(); else await scene.preloadLabGenerated(); }],
       ...SMOOTH_IDS.map((id): [string, () => void] => ['Shaping the boulders', () => { smoothModel(id); }]),
       ...([1, 2, 3, 4, 5, 6] as const).map((s): [string, () => void] => [
         `Growing stage ${s}`,
@@ -3211,7 +3226,7 @@ useEffect(() => {
         const [id, st] = k.split('@') as [string, string];
         return ['Finding the neighbours', () => { look(id, Number(st) as Stage); }];
       }),
-      ['Opening the lab', () => {
+      [simPath ? 'Opening the world' : 'Opening the lab', () => {
         scene.setPlanet(look(PLOT, 1), (st: Stage) => look(PLOT, st), NEIGHBOURS.map((plot) => ({ plot, look: look(plot.cartridge, plot.stage) })));
         // the cartridge that was in the rifle's port comes back into it (TASK-21d): it left the rack when it was loaded
         const savedPort = props.gamePreset ? null : loadBeamSave().port;
@@ -4379,7 +4394,12 @@ useEffect(() => {
       setReady(true);
       // plan 56 W6c: a saved memory still out of balance shows from the start
       showDroneSymptoms();
-      if (stateRef.current.start === 'sim') beginSimulation(scene);
+      if (stateRef.current.start === 'sim') {
+        beginSimulation(scene);
+        // a session is the drone's night: with no gate trip to dream on, it dreams over what it lived since its last dream,
+        // and tells you on arrival
+        window.setTimeout(() => { if (!cancelled && hasUndreamt(droneMemory())) droneDreams(); }, 2500);
+      }
       if (scene.debug.where() === 'planet') {
         gameAudio.setMusicContext('moon');
         gameAudio.setMoonStage(stateRef.current.plot.stage || 0);

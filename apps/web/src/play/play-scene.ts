@@ -293,6 +293,11 @@ export interface PlayScene {
   gateExit(dist?: number): { readonly x: number; readonly z: number; readonly yaw: number };
   /** Plan 57 §14: the simulation start has no lab to refill your sync in, so it holds full (no drain, no recall). */
   setSyncHeld(held: boolean): void;
+  /** Plan 57 §14: whether walking through the plot's gate carries you anywhere. The simulation start has no lab behind it: the gate
+   *  is the Stargate you work toward, so it stands, open or shut, and carries you nowhere until it has somewhere to dial. */
+  setGateTransit(on: boolean): void;
+  /** The shared warm-up of `preloadLabGenerated` without the lab: the layered materials' noise atlas (the simulation start's). */
+  warmMaterials(): void;
   /**
    * JOB-09: stand the traveller in an arrival sector (the Earth plot's pad, or home). The sector comes from
    * `earth-endgame.ts`'s `arrivalSector`, so the pose the player lands on is the one the gate dialer resolved.
@@ -561,7 +566,7 @@ export interface PlayScene {
     roost(): WheelRoost;
     gantries(): readonly PrintGantry[];
     roverBoostEnergy(): number;
-    groundTriangles(): number; showGround(on: boolean): void; where(): Where; position(): THREE.Vector3; airborne(): boolean; teleport(where: Where, x: number, z: number, yaw: number, pitch?: number): void; sync(): number;
+    groundTriangles(): number; showGround(on: boolean): void; where(): Where; position(): THREE.Vector3; airborne(): boolean; teleport(where: Where, x: number, z: number, yaw: number, pitch?: number): void; sync(): number; gateTransit(): boolean;
     stats(): { readonly triangles: number; readonly calls: number }; wave(): number; gatePlanet(): { x: number; z: number };
     /** The plot gate's iris state, and how many kit parts the ring drew (0 while the twin's own frame stands). */
     gateAccess(): GateAccessMode; gateKitParts(): number;
@@ -2052,7 +2057,7 @@ export function createPlayScene(o: {
   let where: Where = 'lab';
   const pos = new THREE.Vector3(room.spawn.x, EYE, room.spawn.z);
   let yaw = room.spawn.yaw, pitch = -0.04;
-  let sync = 1, lostAt = -100, syncHeld = false;
+  let sync = 1, lostAt = -100, syncHeld = false, gateTransit = true;
   /** TASK-26: inside a safe dome now; last frame's state on the planet (null in the lab, so a crossing is only ever on the planet); the 30% warning. */
   let inDomeNow = false, inDomeLast: boolean | null = null, warnOn = false;
   /** Metres walked since the last footstep, and how many relay lamps the sequence has lit (one click each). */
@@ -3642,6 +3647,8 @@ export function createPlayScene(o: {
       return computeGateExitPose(twin.group.matrixWorld.elements, gateYawDelta, dist);
     },
     setSyncHeld(held) { syncHeld = held; if (held) sync = 1; },
+    setGateTransit(on) { gateTransit = on; },
+    warmMaterials() { warmLayeredMaterials(); },
     setWalkWorld(walkWorld) {
       activeWalkWorld = walkWorld;
     },
@@ -4172,8 +4179,8 @@ export function createPlayScene(o: {
           }
         }
       }
-      // ---- through the gate (only when it is on and the picture is clear)
-      if (gateOn && world) {
+      // ---- through the gate (only when it is on, the picture is clear and it has somewhere to carry you)
+      if (gateOn && gateTransit && world) {
         const gateM = where === 'lab' ? labGateM : planetGateM;
         const a = local(gateM, before), b = local(gateM, pos);
         const op = where === 'lab' ? room.gate.opening : twin.opening;
@@ -4898,6 +4905,7 @@ export function createPlayScene(o: {
         wakeT = -1; // a moved player is not waking (the tests place the camera)
       },
       sync: () => sync,
+      gateTransit: () => gateTransit,
       pieceBounds: (id) => {
         // The drawn world bounds of one base piece (its batched instances, and its dynamic group: a door's leaf, lamps),
         // and for a dynamic piece the first mesh of its group: that mesh's centre and face normal (its local +z).

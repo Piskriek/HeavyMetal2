@@ -30,6 +30,8 @@ export interface DroneMemory {
   readonly weights: EgoWeights;
   /** The last dream's digest, for the bridge and the debug view. */
   readonly lastDream: DreamDigest | null;
+  /** Plan 57 §14: the tick the last dream ran at (absent: it has never dreamed), so a new session knows what is undreamt. */
+  readonly dreamedAt?: number;
 }
 
 /** What the game saw happen, for the drone's memory. */
@@ -81,19 +83,28 @@ export function dreamNow(m: DroneMemory, tick: number, cues?: readonly DreamCue[
   const order = DRONE_ROLES.map((r) => m.presets[r]);
   const r = dream({ ego: m.ego, presets: order, weights: m.weights, now: Math.max(0, Math.round(tick)), ...(cues ? { cues } : {}) });
   const presets = { fire: r.presets[0]!, reflex: r.presets[1]!, flight: r.presets[2]! };
-  return { memory: { ego: r.ego, presets, weights: r.weights, lastDream: r.digest }, line: wakeLine(r.digest) };
+  return { memory: { ego: r.ego, presets, weights: r.weights, lastDream: r.digest, dreamedAt: Math.max(0, Math.round(tick)) }, line: wakeLine(r.digest) };
+}
+
+/**
+ * Plan 57 §14: whether the drone holds experience it has not dreamed over yet: an episode after its last dream. The simulation
+ * start has no trip through the gate to dream on, so a session is its night: it dreams on arrival when this is true.
+ */
+export function hasUndreamt(m: DroneMemory): boolean {
+  const since = m.dreamedAt ?? -1;
+  return [m.ego, ...DRONE_ROLES.map((r) => m.presets[r])].some((mem) => mem.ep.some((e) => e.t > since));
 }
 
 /** The drone's memory as text to save: each memory as its share code, and the ego's preferences. */
 export function saveDroneMemory(m: DroneMemory): string {
-  return JSON.stringify({ v: 1, ego: encodeMem(m.ego), presets: DRONE_ROLES.map((r) => encodeMem(m.presets[r])), prefer: m.weights.prefer });
+  return JSON.stringify({ v: 1, ego: encodeMem(m.ego), presets: DRONE_ROLES.map((r) => encodeMem(m.presets[r])), prefer: m.weights.prefer, ...(m.dreamedAt !== undefined ? { dreamedAt: m.dreamedAt } : {}) });
 }
 
 /** A saved drone memory, or null for anything else (a fresh one is the caller's fallback). Never throws. */
 export function loadDroneMemory(text: string | null): DroneMemory | null {
   try {
     if (!text) return null;
-    const o = JSON.parse(text) as { v?: unknown; ego?: unknown; presets?: unknown; prefer?: unknown };
+    const o = JSON.parse(text) as { v?: unknown; ego?: unknown; presets?: unknown; prefer?: unknown; dreamedAt?: unknown };
     if (o.v !== 1 || typeof o.ego !== 'string' || !Array.isArray(o.presets) || o.presets.length !== DRONE_ROLES.length) return null;
     const ego = decodeMem(o.ego);
     const mems = o.presets.map((c) => (typeof c === 'string' ? decodeMem(c) : null));
@@ -102,7 +113,8 @@ export function loadDroneMemory(text: string | null): DroneMemory | null {
     if (o.prefer && typeof o.prefer === 'object') {
       for (const [k, v] of Object.entries(o.prefer as Record<string, unknown>)) if (Number.isInteger(v) && (v as number) >= -127 && (v as number) <= 127) prefer[k] = v as number;
     }
-    return { ego, presets: { fire: mems[0]!, reflex: mems[1]!, flight: mems[2]! }, weights: { prefer }, lastDream: null };
+    const dreamedAt = Number.isSafeInteger(o.dreamedAt) && (o.dreamedAt as number) >= 0 ? (o.dreamedAt as number) : undefined;
+    return { ego, presets: { fire: mems[0]!, reflex: mems[1]!, flight: mems[2]! }, weights: { prefer }, lastDream: null, ...(dreamedAt !== undefined ? { dreamedAt } : {}) };
   } catch {
     return null;
   }

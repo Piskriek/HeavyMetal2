@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SQ_DISTORTION_CATALOG } from '@hm/harness';
-import { DRONE_MEMORY_OF, createDroneMemory, dreamNow, loadDroneMemory, noteCatalyst, saveDroneMemory, stageIdOf } from './drone-memory';
+import { DRONE_MEMORY_OF, createDroneMemory, dreamNow, hasUndreamt, loadDroneMemory, noteCatalyst, saveDroneMemory, stageIdOf } from './drone-memory';
 
 const ROOT = SQ_DISTORTION_CATALOG['root-reactivity'].rayIndex - 1;
 
@@ -98,4 +98,20 @@ test('symptoms you can see: a balanced drone is steady; hits leave a sway in its
   let calmer = m;
   for (let n = 0; n < 3; n++) calmer = dreamNow(calmer, 400 + n).memory;
   assert.ok(droneSymptoms(calmer).amplitude.flight < amp, 'dreaming steadies it');
+});
+
+test("a session is the drone's night (Plan 57): it knows what it has not dreamed over yet, and a save keeps when it last dreamed", () => {
+  let m = createDroneMemory();
+  assert.equal(hasUndreamt(m), false, 'nothing to dream over yet');
+  m = noteCatalyst(m, { kind: 'hurt', damage: 20 }, 500, 3);
+  assert.equal(hasUndreamt(m), true, 'a hit since its last dream');
+  const d = dreamNow(m, 600);
+  assert.equal(d.memory.dreamedAt, 600);
+  assert.equal(hasUndreamt(d.memory), false, 'dreamed over');
+  const back = loadDroneMemory(saveDroneMemory(d.memory))!;
+  assert.equal(back.dreamedAt, 600);
+  assert.equal(hasUndreamt(back), false);
+  assert.equal(hasUndreamt(noteCatalyst(back, { kind: 'contact', distance: 9 }, 700, 3)), true, 'a new fight after it');
+  // a save from before dreamedAt existed loads, and counts everything as undreamt
+  assert.equal(loadDroneMemory(saveDroneMemory(m))!.dreamedAt, undefined);
 });

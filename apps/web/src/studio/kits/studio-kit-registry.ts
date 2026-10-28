@@ -10,6 +10,13 @@
 import type { Kit } from '@hm/kitspec';
 import { MILL_V2_KIT } from '../../play/kit-mill-v2';
 import { MATSTACK_TEST_PIECE_KIT } from '../../play/kit-modules';
+// plan 57 §14: the lab's and the bridge's own kits, salvaged onto the shelf (each validates whole)
+import { GATE_DAIS_KIT } from '../../play/kit-gate-dais';
+import { GATE_KIT } from '../../play/kit-gate';
+import { FABRICATOR_FRAME_KIT } from '../../play/kit-fabricator-frame';
+import { DRONE_KIT } from '../../play/kit-drone';
+import { GAME_SCREEN_KIT } from '../../play/kit-game-screen';
+import { CRAWLER_KIT, HAULER_KIT } from '../../play/kit-vehicles';
 
 /**
  * 2. STARGATE_V2_KIT (Sheet 06 Freestanding Portal Gate: 3.20 m outer height, 2.60 m x 1.70 m aperture,
@@ -762,11 +769,13 @@ export type StudioKitRegistryEntry = StudioKitEntry;
 export interface StudioKitEntry {
   readonly id: string;
   readonly label: string;
-  readonly category: 'campaign-machine' | 'portal-gate' | 'power-grid' | 'vehicle' | 'calibration';
+  readonly category: 'campaign-machine' | 'portal-gate' | 'power-grid' | 'vehicle' | 'calibration' | 'station' | 'companion';
   readonly kit: Kit;
   readonly rootPreset: string;
   readonly powerKw: number;
-  readonly metricRole: 'pxd' | 'vtx' | 'lx' | 'aq' | 'power' | 'portal' | 'transport' | 'test';
+  readonly metricRole: 'pxd' | 'vtx' | 'lx' | 'aq' | 'power' | 'portal' | 'transport' | 'test' | 'bridge' | 'companion';
+  /** Plan 57 §14: salvaged from the parked lab and story, not one of the ten machine kits. */
+  readonly salvaged?: true;
 }
 
 export const STUDIO_KIT_REGISTRY: Readonly<Record<string, StudioKitEntry>> = Object.freeze({
@@ -863,3 +872,23 @@ export const STUDIO_KIT_REGISTRY: Readonly<Record<string, StudioKitEntry>> = Obj
 });
 
 export const STUDIO_KIT_LIST: readonly StudioKitRegistryEntry[] = Object.freeze(Object.values(STUDIO_KIT_REGISTRY));
+
+/**
+ * Plan 57 §14: the lab and the story stripped for parts. Their own kits, salvaged as they are: each validates whole (grounded,
+ * nothing floating) and builds, but none has the assembler's Triad sockets yet, so they wait here rather than on the assembler's
+ * shelf; adding a kit's sockets moves it across. No power draw is modelled for them yet, so powerKw is 0. The bridge pad waits
+ * too: its plinth runs 3 m down into the regolith on purpose (so the pad never floats on uneven ground; kit-bridge-pad.ts), and
+ * kitspec's validator flags any part below y 0, so it joins once the validator allows a buried footing.
+ */
+export const SALVAGE_KIT_REGISTRY: Readonly<Record<string, StudioKitEntry>> = Object.freeze({
+  'kit:gate-dais':{ id: 'kit:gate-dais', label: 'Gate Dais (two-step plinth)', category: 'portal-gate', kit: GATE_DAIS_KIT, rootPreset: 'gate-dais', powerKw: 0, metricRole: 'portal', salvaged: true },
+  'kit:archway-gate': { id: 'kit:archway-gate', label: 'Archway Gate', category: 'portal-gate', kit: GATE_KIT, rootPreset: 'gate', powerKw: 0, metricRole: 'portal', salvaged: true },
+  'kit:fabricator-frame': { id: 'kit:fabricator-frame', label: 'Vehicle Fabricator Frame', category: 'station', kit: FABRICATOR_FRAME_KIT, rootPreset: 'fabricator-frame', powerKw: 0, metricRole: 'transport', salvaged: true },
+  'kit:drone': { id: 'kit:drone', label: 'Companion Drone (rotors)', category: 'companion', kit: DRONE_KIT, rootPreset: 'drone', powerKw: 0, metricRole: 'companion', salvaged: true },
+  'kit:drone-vacuum': { id: 'kit:drone-vacuum', label: 'Companion Drone (thrusters)', category: 'companion', kit: DRONE_KIT, rootPreset: 'drone-vacuum', powerKw: 0, metricRole: 'companion', salvaged: true },
+  'kit:game-screen': { id: 'kit:game-screen', label: 'Bridge Screen', category: 'station', kit: GAME_SCREEN_KIT, rootPreset: 'game-screen', powerKw: 0, metricRole: 'bridge', salvaged: true },
+  'kit:hauler': { id: 'kit:hauler', label: 'Hauler', category: 'vehicle', kit: HAULER_KIT, rootPreset: 'vehicle', powerKw: 0, metricRole: 'transport', salvaged: true },
+  'kit:crawler': { id: 'kit:crawler', label: 'Crawler', category: 'vehicle', kit: CRAWLER_KIT, rootPreset: 'vehicle', powerKw: 0, metricRole: 'transport', salvaged: true },
+});
+
+export const SALVAGE_KIT_LIST: readonly StudioKitRegistryEntry[] = Object.freeze(Object.values(SALVAGE_KIT_REGISTRY));

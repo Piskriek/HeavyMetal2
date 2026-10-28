@@ -37,8 +37,15 @@ const check = (name, ok, detail = '') => {
 };
 const shot = (name) => page.screenshot({ path: path.join(outDir, `${name}.png`) });
 const play = () => page.evaluate(() => ({ ready: window.hmPlay?.ready ?? false, where: window.hmPlay?.where ?? null, step: window.hmPlay?.step ?? null, sync: window.hmPlay?.sync ?? null }));
+// play's loading labels, as they change (the simulation start loads no lab)
+const watchLabels = () => page.evaluate(() => {
+  window.__labels = [];
+  const tick = () => { const t = document.querySelector('.play-loading span')?.textContent; if (t && window.__labels.at(-1) !== t) window.__labels.push(t); if (!window.hmPlay?.ready) setTimeout(tick, 20); };
+  tick();
+});
 const enterPlay = async () => {
   await page.waitForSelector('.sm-menu button', { timeout: 45000 });
+  await watchLabels();
   await page.locator('.sm-menu button', { hasText: 'Play' }).first().click();
   await page.waitForFunction(() => window.hmPlay?.ready === true && window.__playScene, { timeout: 90000 });
 };
@@ -62,6 +69,9 @@ try {
   const saved = await page.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith('hm.setmix.play')); try { return k ? JSON.parse(localStorage.getItem(k)) : null; } catch { return null; } });
   check('...at stage 3, saved as a simulation start', saved?.start === 'sim' && saved?.plot?.stage === 3 && saved?.step === 'done', JSON.stringify({ start: saved?.start, stage: saved?.plot?.stage, step: saved?.step }));
   check('...with your drone at your side', await page.evaluate(() => Boolean(window.__companion)));
+  const labels = await page.evaluate(() => window.__labels);
+  check('it loaded no lab and no mentor voice', labels.length > 3 && !labels.some((l) => /lab|narration/i.test(l)), labels.join(' / '));
+  check('the gate carries you nowhere yet (it is the Stargate to build, not a door to a lab)', await page.evaluate(() => window.__playScene.debug.gateTransit() === false));
   // the story's HUD stays out: the mentor's portrait, the chain's next step, the sync meter; the goal card reads the real stage
   await page.waitForTimeout(1500);
   check('no mentor portrait, no story chain line, no sync meter', await page.evaluate(() => !document.querySelector('.hud-portrait-in') && !document.querySelector('.play-next') && !document.querySelector('.play-sync')));
@@ -75,12 +85,19 @@ try {
   check('...and the world stays at stage 3 as the game runs and saves', later?.plot?.stage === 3 && /Stage 3/.test(await page.locator('.play-goal h2').innerText()), String(later?.plot?.stage));
   check('no mentor line played (her story is parked)', await page.evaluate(() => !document.querySelector('.hud-portrait-in')));
   await shot('01-arrived-on-the-world');
+  // the drone lives through something; there is no gate trip to dream on here, so it is kept for the night (the next session)
+  await page.evaluate(() => window.__dev.droneNote({ kind: 'hurt', damage: 20 }));
+  const kept = await page.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith('hm.drone.memory.v1')); return Boolean(k && localStorage.getItem(k)); });
+  check('the drone keeps what it lived as it happens (no dream needed to save it)', kept);
 
   // a reload: the save opens on the world again
   await page.goto(`http://localhost:${port}/?e2e`, { waitUntil: 'domcontentloaded', timeout: 45000 });
   await enterPlay();
   await page.waitForFunction(() => window.hmPlay?.where === 'planet', { timeout: 15000 }).catch(() => {});
   p = await play();
+  // a session is the drone's night: on arrival it dreams over the hit it took last time
+  const dreamt = await page.waitForFunction(() => window.__dev.droneMemory().dreamedAt !== undefined, null, { timeout: 8000 }).then(() => true, () => false);
+  check('...and on the next arrival it dreams over it (a session is its night)', dreamt && await page.evaluate(() => window.__dev.droneMemory().lastDream !== null));
   check('after a reload the simulation save opens on the world, not in the lab', p.where === 'planet' && p.step === 'done' && (await page.locator('.play-create').count()) === 0, JSON.stringify(p));
 
   // the parked story still begins with ?story (its e2e seam)
@@ -93,6 +110,8 @@ try {
   await page.waitForTimeout(1500);
   p = await play();
   check('...and the story begins in the lab at its first step', p.where === 'lab' && p.step === 'power', JSON.stringify(p));
+  const storyLabels = await page.evaluate(() => window.__labels);
+  check('...having loaded the lab, and its gate still carries you through', storyLabels.includes('Fitting the lab') && await page.evaluate(() => window.__playScene.debug.gateTransit() === true), storyLabels.join(' / '));
 
   check('no page errors during the run', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 } catch (e) {

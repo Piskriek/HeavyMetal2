@@ -318,6 +318,31 @@ The owner: a planet is "a very dense soul and it moves through the densities jus
 - **Still to strip:** the lab still loads in the scene (the gate and the debug teleports reach it), and its machines, props, lights and sounds still need registering as presets. The narrator engine becomes the drone's "System" voice. Each story script moves to the simulation start as the piece it tests is salvaged.
 - **Tests:** `scripts/test-sim-start-e2e.mjs` (the simulation start, a reload, and the `?story` seam).
 
+**§14.2 Step 1b, second pass (28 Oct, overnight): no lab behind the simulation start; the lab's kits salvaged**
+- **The simulation path loads no lab:** a sim save, or a new avatar without `?story`.
+  - "Fitting the lab" becomes "Warming the materials": only the shared layered-material atlas; no lab assets, no window vista.
+  - The mentor's voice is not loaded, and its step is not listed. A label never claims work that is not happening.
+  - "Opening the lab" becomes "Opening the world": it was always the planet's setup.
+- **The gate carries you nowhere yet** (`setGateTransit(false)`). It is the Stargate to build, not a door to a lab, so it stands, open or shut, until it has somewhere to dial.
+- **The measure** (`scripts/measure-play-load.mjs`, headless): ready in 27.1 s on the simulation start against 33.4 s for the parked story, 6.3 s (19%) faster.
+- **The lab's kits are salvaged** (`SALVAGE_KIT_REGISTRY`): the gate dais, the archway gate, the vehicle fabricator frame, the drone (rotors and thrusters), the bridge screen, the hauler and the crawler.
+  - Each validates whole and builds.
+  - None has the assembler's Triad sockets yet, so they wait on the salvage list rather than the assembler's shelf, whose test asks for sockets. Adding a kit's sockets moves it across.
+  - The bridge pad waits. Its plinth runs 3 m into the regolith on purpose, so the pad never floats on uneven ground (its kit says so). kitspec's validator flags any part below y 0, so the pad joins once the validator allows a declared buried footing.
+- **A session is the drone's night.** The drone used to dream only on leaving the Moon through the gate, so the simulation start (no gate trip) never rebalanced it: Plan 56's loop was missing from the path players take.
+  - Now the drone keeps what it lives as it happens (saved at most every 5 s, and as play closes), and its memory records when it last dreamed (`dreamedAt`).
+  - A simulation session opens with a dream over anything undreamt (`hasUndreamt`), told on arrival.
+  - The story's gate-trip dreams are unchanged.
+- **No label claims the lab:** the first loading label is "Opening the world" on every start.
+- **Tests:**
+  - sim-start e2e 19/19, now including no lab or voice steps, the gate's transit off, the story's lab and transit still there, and a hit that is kept and dreamed over on the next arrival;
+  - salvage tests 2/2; drone memory 6/6.
+- **Still to do for the strip:**
+  - give the salvaged kits their sockets;
+  - rebuild the labkit's procedural props (relay cabinet, breaker panel, control box, cable tray, planet table) as kits (RULES 8a, from scratch);
+  - lab lights and sounds as presets;
+  - the narrator engine as the System voice.
+
 ## 15. The interface is presets too (owner, 28 Oct: "you can bag up that UI too, its all gota be presets right? are ui elements presets yet?")
 
 - **The categories:**

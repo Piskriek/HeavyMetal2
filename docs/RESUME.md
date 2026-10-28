@@ -28,7 +28,7 @@
   - The CS2 fire test: a bot match, a bare "bridge" from the drone, then spray a magazine with CS2 focused.
   - Restart the live bridge on :8220 on the new code first.
   - Owner decisions: the child-facing CS2 skin, and the Plan 55 gateway (opening the bridge beyond this PC).
-  - [Plan 56](argo/plans/56-distortion-ladder.md), the owner's distortion ladder (a proposal): excitement hardens presets, higher rungs repair their distortions with the SQ check, and presets grow or perish. Research comes first; the pieces exist in `@hm/harness`, unwired.
+  - [Plan 56](argo/plans/56-distortion-ladder.md), the owner's distortion ladder, designed (not built), research in [`DISTORTION_LADDER_RESEARCH.md`](DISTORTION_LADDER_RESEARCH.md): memory in the shorthand (`Mem`), behaviour in ego weights, excitement hardens, dreams rebalance (the Higher Self cues), the Overwatch inherits the whole system, graduate or repeat. **W1 is built:** `packages/shorthand` (frames, the `Mem` record, the text form, the `~m:` tail, PermMask), 7/7 tests. W2 (`preset-memory.ts`) is next. Owner question: "repeat" instead of "perish".
 - **Skill:** the owner's SQ distortion check is installed locally at `.claude/skills/sq-distortion-check`.
 
 ## 28 Oct Checkpoint 2 (Claude Opus: Plan 51 Wave 3 + Plan 52, Commit `8600a81b`; read this first)

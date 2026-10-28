@@ -351,6 +351,9 @@
       "@hm/gamebridge": [
         "packages/gamebridge/src/index.ts"
       ],
+      "@hm/shorthand": [
+        "packages/shorthand/src/index.ts"
+      ],
       "@hm/harness": [
         "packages/harness/src/index.ts"
       ],

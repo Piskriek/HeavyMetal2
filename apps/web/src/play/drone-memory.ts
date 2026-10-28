@@ -15,7 +15,7 @@
  */
 import { ALIGNED, decodeMem, encodeMem, type Mem, type StageId } from '@hm/shorthand';
 import {
-  REST_AT, SQ_DISTORTION_CATALOG, compileSystemMemory, createPresetMemory, digestLines, dominantDistortion, dream, kundalini, recordExperience, wakeLine,
+  REST_AT, SQ_DISTORTION_CATALOG, compileSystemMemory, createPresetMemory, digestLines, dominantDistortion, dream, kundalini, recordExperience, symptomOffset, wakeLine,
   type DreamCue, type DreamDigest, type EgoWeights, type Experience,
 } from '@hm/harness';
 
@@ -155,4 +155,31 @@ export function higherSelfWords(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;
   const s = raw.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
   return s.length ? s : null;
+}
+
+// ---- Plan 56 W6c: symptoms you can see. Catalyst left unbalanced shows in the body (Law of One 61.7): the fire rhythm
+// stutters by the fire preset's imbalance, and the flight sways off its station by the flight preset's. A balanced drone
+// is steady; a dream that balances it steadies it.
+
+/** At full imbalance the fire rhythm's gaps stretch or shrink by up to half... */
+export const SYMPTOM_GAP = 0.5;
+/** ...and the flight sways up to this far (m) off its station while it fights. */
+export const SYMPTOM_SWAY_M = 0.8;
+
+export interface DroneSymptoms {
+  /** The factor on the fire rhythm's gaps at a step (1 when the fire preset is balanced). */
+  gapFactor(step: number): number;
+  /** The offset (m) from its fighting station at a step ({0, 0} when the flight preset is balanced). */
+  sway(step: number): { readonly x: number; readonly z: number };
+  /** How strong each is: 1 − balance. */
+  readonly amplitude: { readonly fire: number; readonly flight: number };
+}
+
+export function droneSymptoms(m: DroneMemory): DroneSymptoms {
+  const { fire, flight } = m.presets;
+  return {
+    gapFactor: (step) => 1 + SYMPTOM_GAP * symptomOffset(fire, step),
+    sway: (step) => ({ x: SYMPTOM_SWAY_M * symptomOffset(flight, step), z: SYMPTOM_SWAY_M * symptomOffset(flight, step, 1) }),
+    amplitude: { fire: 1 - fire.bal, flight: 1 - flight.bal },
+  };
 }

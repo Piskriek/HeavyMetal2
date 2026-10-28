@@ -584,3 +584,78 @@ What each step does:
   3. **Tools gain memories while a character or the drone uses them.** Their pair is a triad the user harmonizes.
   4. **The Overwatch pack nests the four levels:** tools under characters under the guide, and the egos under the Overwatch seat.
 - **Bounds for the min-spec:** a memory per species, not per spawned monster; a rung host per persistent entity; the same 32-episode records.
+
+## 20. The preset body: zones, sides, gates, pain and itch (owner, 28 Oct; designed, to build as W6c's second half)
+- **His ask:** symptoms must not be arbitrary. A distortion should show in the zone of its energy center and on the right or left side. The preset needs a "body" that acts like a "program", with gates that trip into sickness when the distortion goes unresolved. Resolving too fast ejects the energy as a sharp pain; realization releases it slowly, as an itch. His full words are in OWNER_ASKS.
+- **Research:** [`docs/BODY_ENERGY_CENTERS_RESEARCH.md`](../../BODY_ENERGY_CENTERS_RESEARCH.md), written by a research agent and reviewed by Opus.
+  - **What Ra gives:** a mechanism more than a map.
+    - Energy enters at the feet and the base of the spine, and each center takes its share from red up to indigo (54.27, 54.30).
+    - The circuit opens at red and stops at the first blocked center (84.10). Blocks clear from red upward (74.6).
+    - Two failure modes: blocked, and overopen, overspending (12.31).
+    - Unused catalyst goes to the body (61.7, 66.34). Relief returns unless a new configuration is chosen (66.13).
+    - Tingling marks a blockage being activated and diffused (50.12).
+    - The right hand gives out, the left takes in (97.16).
+  - **The places Ra names:** red at the root, yellow at the solar plexus, green at the heart, indigo at the brow (pineal). Orange, blue and violet come from tradition, and the note marks them so.
+  - **Medicine backs the two signals:** sharp first pain and itch travel separate paths, and pain suppresses itch.
+  - **Gaps the note records:** Ra says nothing of itching, and nothing of "too fast means pain". Those parts are the owner's design. Sickness states stay symbolic and make no medical claims.
+- **Design:**
+  1. **A body is a preset (`body:`), modular, one per kind of form.** Seven zones, one per ray, each with a place on the form and a left and right half.
+     | Ray | Organic body (Ra's places, and tradition where marked) | Mechanical body (the drone, robots, vehicles) |
+     |---|---|---|
+     | 1 red | the root, the base of the spine | the base: landing struts and thruster pods (ground, survival) |
+     | 2 orange | the lower belly (tradition) | the couplings: formation, docking, tethers (relation to others) |
+     | 3 yellow | the solar plexus | the power core and drive (fire and drive rhythm) |
+     | 4 green | the heart | the gyro, the center of balance (steady hover) |
+     | 5 blue | the throat (tradition; Ra's throat cases) | the radio and voice |
+     | 6 indigo | the brow | the lens and sensors (aim, sight) |
+     | 7 violet | the crown (tradition) | the antenna: the link to the Higher Self seat |
+     - Characters (§19) pick an organic or a mechanical body, or a mix.
+  2. **Flow is the kundalini, read as a body.** Energy enters at the base, each zone takes its share in order, and the flow stops at the first blocked zone. So with kundalini level *k*:
+     - zones 1 to *k* are flowing;
+     - zone *k* + 1 is blocked or overopen;
+     - every zone above it is starved.
+  3. **Gates.** Each zone has two failure modes:
+     - **blocked:** charge above 4 (a distortion leaning);
+     - **overopen:** charge below −4 (antidote past rest, overspending).
+     - **A gate trips into a sickness state** when its zone stays out of balance across checkpoints. Unaccepted catalyst keeps coming, stronger (46.16).
+       - A blocked zone escalates: Congested, then Inflamed, then Runaway.
+       - An overopen zone is Drained.
+       - A starved zone above a block is Numb (61.7: numbness as refusing to lose control).
+     - **The states are symbolic and make no medical claims.** Each degrades that zone's function in play, and the Studio's body view shows it (W6d).
+  4. **Sides** (Ra 97.16; the research's proposal):
+     - **left is intake:** what came in (hits received, contacts, a bridged game's events, orders from above);
+     - **right is output:** what it did (fire, reflexes fired, its own actions).
+     - Each episode takes the side of its catalyst. A zone's charge splits by the sides of the episodes on its ray, and the symptom shows on that side (the left pod, not the right).
+  5. **Release signals** (the owner's design; medicine supports two separate signals):
+     - **Itch:** a zone's charge falls by at most the release rate in a checkpoint. Its side tingles while the realization works (Ra 50.12). It is harmless.
+     - **Sharp pain:** the charge falls faster than the release rate, and the energy is ejected. A jolt shows on that zone and side, and the drone flinches.
+       - Part of the ejected charge **rebounds** at the next checkpoint unless the cause link closed, meaning a real realization (66.13).
+       - While the pain lasts it masks the itch.
+     - **So a dream that rebalances too hard costs a pain and a rebound.** A strong Higher Self cue that forces the pace carries that risk: "if the thoughts resolve too quickly".
+  6. **The code:** `packages/harness/src/body.ts`, pure. Its parts:
+     - the organic and mechanical bodies, as data;
+     - `bodyState(mem, prev, sideOf)` gives each zone its mode, sickness, side lean and signal;
+     - `bodyStep` carries the gate counters and the rebounds between checkpoints;
+     - `sideOf(cat)` comes from the host (for the drone: contacts and hits are intake; kills and reflexes are output).
+  7. **In play, the drone's arbitrary symptoms become zone symptoms:**
+     - pods: sway; core: fire stutter; gyro: hover wobble; radio: crackle; lens: aim drift; couplings: formation drift; antenna: seat static;
+     - each on its side;
+     - pain is a flinch and a jolt on the radio; itch is light static on that side.
+  8. **Teaching runs upward too: the body is the ego's teacher.**
+     - Owner, 28 Oct: "in a character for example the foot will be a preset and an ai in itself, if the body preset detects distorted thoughts causing presets to take distorted actions from the character ego preset, the now distorted the presets in the body will act as the teacher to the higherself body and ego presets by distorting and warning the body and the ego with pain signals and doing a visual change that gives an idea of the problem".
+     - **Each body part is a preset with its own memory**, presets inside presets.
+       - The foot belongs to the root zone, where energy enters (Ra 54.27).
+       - The part records what the ego's thinking made it do: `by` is the ego's dominant distortion. It takes on that distortion.
+     - **The part warns upward with two signals:**
+       - **pain:** the §20.5 signals, sent to the body preset and the ego;
+       - **a visible change** on that zone and side, a hint of the problem. A limp in the left foot, a red-tinged left pod, a cracked lens. The player sees it too.
+     - **What the warning teaches the ego:**
+       - A part's pain is a cue from below for the ego's own next dream: its episodes of the same thinking type are replayed and opened, the way a Higher Self's cue works from above.
+       - The ego's cause graph also counts the link (its thinking, then the part's distortion). It learns what its thinking does to its body (Ra 57.29: teaching and learning are one).
+       - The ego's digest names it ("the left foot hurts: root-reactivity, from my control"), so a Higher Self or the player can read it.
+     - **The loop:**
+       - the ego's distorted thought makes a distorted action, and the part takes the distortion;
+       - the part warns with pain and a visible change;
+       - the ego's dream is cued from below, and the ego rebalances its thinking;
+       - the part's charge releases: slowly, as an itch, or too fast, as a pain and a rebound.
+     - This runs in both directions at every rung: down, as cues from the Higher Self and the ego; up, as the body's warnings.

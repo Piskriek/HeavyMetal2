@@ -281,12 +281,18 @@ try {
   const takenBefore = (await typed('higher-self-cue-taken')).length;
   if (cue) await postCommand({ action: 'higher-self-cue', cues: [{ of: cue.of, t: cue.t }] });
   check('...its cue is held for the next dream', (await until(async () => (await typed('higher-self-cue-taken')).slice(takenBefore)[0], 5000))?.count === 1);
+  // Plan 56 W6c: the hits show in the drone's body until it rebalances
+  const swayBefore = await page.evaluate(() => { let m = 0; for (let s = 0; s < 60; s++) { const v = window.__playScene.companionSymptomsAt(s).sway; m = Math.max(m, Math.abs(v.x), Math.abs(v.z)); } return m; });
+  const ampBefore = await page.evaluate(() => window.__dev.droneSymptoms().flight);
+  check('the hits show in the drone\'s body: its flight sways off station while it fights', swayBefore > 0.05 && ampBefore > 0, JSON.stringify({ swayBefore, ampBefore }));
   const dreamsBefore = (await typed('ego-dream')).length;
   await page.evaluate(() => window.__playScene.debug.teleport('lab', 0, 2.4, 0, 0));
   await frames(10);
   const dreamt = await until(async () => (await typed('ego-dream')).slice(dreamsBefore)[0], 6000);
   check('back in the lab the drone dreams: the bridge gets the digest, and it tells the dream on the radio', Boolean(dreamt) && Array.isArray(dreamt.digest?.replayed) && dreamt.digest.replayed.length > 0
     && Boolean(await until(() => said(/^I dreamed the (contact|target down|area clear|hits on you|reflex) again/), 4000)), JSON.stringify(dreamt ?? null).slice(0, 200));
+  const ampAfter = await page.evaluate(() => window.__dev.droneSymptoms().flight);
+  check('...and the dream steadied it: the sway is weaker', ampAfter < ampBefore, JSON.stringify({ ampBefore, ampAfter }));
   check('...and the Higher Self\'s cue steered it: the cued hits were replayed', dreamt?.cuedBy === 'higher-self' && Boolean(cue) && dreamt.digest.replayed.some((r) => r.cued && r.of === cue.of && r.t === cue.t),
     JSON.stringify(dreamt?.digest?.replayed?.slice(0, 3) ?? null));
   await postCommand({ action: 'higher-self-say', words: 'Rest in Presence. The ally beside you is the anchor you were looking for.' });
@@ -297,7 +303,7 @@ try {
 
   check('no page errors during the run', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 } catch (e) {
-  check('script completed', false, e.message);
+  check('script completed', false, `${e.message}${pageErrors.length ? ` | page errors: ${pageErrors.slice(0, 3).join(' | ')}` : ''}`);
 } finally {
   await browser.close().catch(() => {});
   server.kill();

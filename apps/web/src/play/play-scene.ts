@@ -450,6 +450,10 @@ export interface PlayScene {
   drainCompanionBarks(): string[];
   /** Plan 56 W6a: the drone's combat events since the last call (contact, target down, area clear), for its memory. */
   drainCombatEvents(): import('./companion-combat').CombatEvent[];
+  /** Plan 56 W6c: how the drone's memory shows in its body (a stuttering fire rhythm, a sway off station); null steadies it. */
+  setCompanionSymptoms(s: { gapFactor(step: number): number; sway(step: number): { readonly x: number; readonly z: number } } | null): void;
+  /** Plan 56 W6c test seam: the symptoms the drone's fight would carry at a step. */
+  companionSymptomsAt(step: number): { readonly gapFactor: number; readonly sway: { readonly x: number; readonly z: number } };
   /** Plan 51: retunes the drone's combat brain (a mimicked fire pattern's bursts); null restores the research's numbers. */
   setCompanionTuning(patch: Partial<CombatTuning> | null): void;
   /** The drone's fire rhythm now (a live mimic changes it). */
@@ -3074,6 +3078,8 @@ export function createPlayScene(o: {
   const companionBarks: string[] = [];
   /** Plan 56 W6a: the drone's combat events waiting for its memory (the newest 32). */
   const combatEvents: import('./companion-combat').CombatEvent[] = [];
+  /** Plan 56 W6c: the drone's symptoms from its memory (play sets them as the memory changes). */
+  let companionSymptoms: { gapFactor(step: number): number; sway(step: number): { readonly x: number; readonly z: number } } | null = null;
   /** The living monsters as the brain sees them (aimed at their middle, winding up when they telegraph). */
   const combatMobs = (): CombatMob[] =>
     where !== 'planet' || !playerAlive
@@ -3104,6 +3110,12 @@ export function createPlayScene(o: {
       comp.setCombat(null, null);
       return;
     }
+    // plan 56 W6c: the symptoms change ten times a second of the fight: a stutter, not a slow drift
+    const symptomStep = Math.floor(combatBrain.t * 10);
+    const symptomTuning = (t: CombatTuning, step: number): CombatTuning => {
+      const g = companionSymptoms ? companionSymptoms.gapFactor(step) : 1;
+      return g === 1 ? t : { ...t, roundGapS: t.roundGapS * g, burstGapS: t.burstGapS * g };
+    };
     const tick = stepCombat(combatBrain, {
       dt,
       drone: { x: s.x, y: s.y, z: s.z },
@@ -3111,10 +3123,12 @@ export function createPlayScene(o: {
       mobs: combatMobs(),
       orders: comp.getCombatOrders(),
       hurtBy: companionHurtBy,
-      tuning: overclockS > 0 ? { ...companionTuning, roundGapS: companionTuning.roundGapS / 2, burstGapS: companionTuning.burstGapS / 2 } : companionTuning,
+      tuning: symptomTuning(overclockS > 0 ? { ...companionTuning, roundGapS: companionTuning.roundGapS / 2, burstGapS: companionTuning.burstGapS / 2 } : companionTuning, symptomStep),
     });
     combatBrain = tick.brain;
-    comp.setCombat(s.landed ? null : tick.station, tick.aimYaw);
+    // plan 56 W6c: an unbalanced flight sways off its station while it fights
+    const sway = companionSymptoms && tick.station ? companionSymptoms.sway(symptomStep) : null;
+    comp.setCombat(s.landed ? null : (tick.station && sway ? { x: tick.station.x + sway.x, z: tick.station.z + sway.z } : tick.station), tick.aimYaw);
     if (tick.shot) {
       // a hit goes through the monsters' own path, so its death, drop and the HUD are the same as the player's shot
       if (tick.shot.hit) monsters.hurtMob(tick.shot.mobId, tick.shot.damage);
@@ -5216,6 +5230,12 @@ export function createPlayScene(o: {
     companionOverclock(seconds) { overclockS = seconds <= 0 ? 0 : Math.max(overclockS, Math.min(15, seconds)); },
     companionOverclockLeft: () => overclockS,
     companionArc,
+    setCompanionSymptoms(s) {
+      companionSymptoms = s;
+    },
+    companionSymptomsAt(step) {
+      return { gapFactor: companionSymptoms?.gapFactor(step) ?? 1, sway: companionSymptoms?.sway(step) ?? { x: 0, z: 0 } };
+    },
     drainCombatEvents() {
       return combatEvents.splice(0, combatEvents.length);
     },

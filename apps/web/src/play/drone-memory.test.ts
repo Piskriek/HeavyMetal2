@@ -77,3 +77,25 @@ test('the Higher Self seat: the drone shows its digest and what is worth a cue; 
   assert.equal(higherSelfWords('   '), null);
   assert.equal(higherSelfWords(42), null);
 });
+
+test('symptoms you can see: a balanced drone is steady; hits leave a sway in its flight; a dream steadies it', async () => {
+  const { droneSymptoms, SYMPTOM_SWAY_M } = await import('./drone-memory');
+  const steady = droneSymptoms(createDroneMemory());
+  for (let s = 0; s < 50; s++) {
+    assert.equal(steady.gapFactor(s), 1);
+    assert.deepEqual(steady.sway(s), { x: 0, z: 0 });
+  }
+  let m = createDroneMemory();
+  for (let i = 0; i < 4; i++) m = noteCatalyst(m, { kind: 'hurt', damage: 30 }, 100 + i, 1);
+  const shaken = droneSymptoms(m);
+  const amp = shaken.amplitude.flight;
+  assert.ok(amp > 0, String(amp));
+  const sways = Array.from({ length: 200 }, (_, s) => shaken.sway(s));
+  assert.ok(sways.every((v) => Math.abs(v.x) <= SYMPTOM_SWAY_M * amp + 1e-9 && Math.abs(v.z) <= SYMPTOM_SWAY_M * amp + 1e-9));
+  assert.ok(sways.some((v) => Math.abs(v.x) > SYMPTOM_SWAY_M * amp / 2), 'it visibly sways');
+  assert.equal(shaken.gapFactor(7), 1, 'the hits were in flight, so the fire rhythm stays even');
+  assert.deepEqual(Array.from({ length: 20 }, (_, s) => shaken.sway(s)), sways.slice(0, 20), 'the same sway every time');
+  let calmer = m;
+  for (let n = 0; n < 3; n++) calmer = dreamNow(calmer, 400 + n).memory;
+  assert.ok(droneSymptoms(calmer).amplitude.flight < amp, 'dreaming steadies it');
+});

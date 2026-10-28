@@ -104,7 +104,7 @@ import { LOW_BARK_COOLDOWN, PLAYER_MAX_HP, hitBearing, hurt as hurtHp, isLow, pa
 import { usePlaySettings } from '../shell/play-settings';
 import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { kv } from '../storage/profile-storage';
-import { createDroneMemory, dreamNow, dronePerspective, loadDroneMemory, noteCatalyst, saveDroneMemory, type DroneCatalyst, type DroneMemory } from './drone-memory';
+import { createDroneMemory, dreamNow, dronePerspective, droneSymptoms, loadDroneMemory, noteCatalyst, saveDroneMemory, type DroneCatalyst, type DroneMemory } from './drone-memory';
 import type { DreamCue } from '@hm/harness';
 import { isMechanicObservation, transduceMechanic, type MimicryResult } from '@hm/harness';
 import { gateObservation, mirrorKeyEdges, weaponStandIn, type BridgePermissionProfile } from '@hm/gamebridge';
@@ -1811,8 +1811,11 @@ useEffect(() => {
     }
     return droneMemoryRef.current;
   };
+  /** Plan 56 W6c: the drone's body shows its memory (a stuttering fire rhythm, a sway in flight) until it rebalances. */
+  const showDroneSymptoms = (): void => { sceneRef.current?.setCompanionSymptoms(droneSymptoms(droneMemory())); };
   const noteDrone = (c: DroneCatalyst): void => {
     droneMemoryRef.current = noteCatalyst(droneMemory(), c, Math.floor(Date.now() / 1000), droneStageRef.current);
+    showDroneSymptoms();
   };
   /** Leaving the Moon (the gate, or sync lost): the drone dreams, saves, and tells its dream on waking; the bridge gets it too. */
   const droneDreams = (): void => {
@@ -1821,6 +1824,7 @@ useEffect(() => {
     // the Higher Self's cues when it gave some; otherwise the built-in cue (lowest ray first)
     const d = dreamNow(droneMemory(), Math.floor(Date.now() / 1000), cues ?? undefined);
     droneMemoryRef.current = d.memory;
+    showDroneSymptoms();
     try { kv.set(DRONE_MEMORY_KEY, saveDroneMemory(d.memory)); } catch { /* storage unavailable: kept for this session */ }
     companionHandleRef.current?.say(d.line);
     companionHandleRef.current?.post({ type: 'ego-dream', line: d.line, digest: d.memory.lastDream, cuedBy: cues ? 'higher-self' : 'built-in' });
@@ -4345,6 +4349,8 @@ useEffect(() => {
       if (at < steps.length) { setLoading(steps[at]![0]); timer = window.setTimeout(step, 0); return; }
       hook.ready = true;
       setReady(true);
+      // plan 56 W6c: a saved memory still out of balance shows from the start
+      showDroneSymptoms();
       if (scene.debug.where() === 'planet') {
         gameAudio.setMusicContext('moon');
         gameAudio.setMoonStage(stateRef.current.plot.stage || 0);
@@ -5367,6 +5373,8 @@ useEffect(() => {
       droneMemory: (): DroneMemory => droneMemory(),
       /** Plan 56 W6 test seam: a catalyst straight into the drone's memory (a fight the test cannot stage). */
       droneNote: (c: DroneCatalyst): void => noteDrone(c),
+      /** Plan 56 W6c test seam: how strong the drone's symptoms are (1 − balance of its fire and flight presets). */
+      droneSymptoms: () => droneSymptoms(droneMemory()).amplitude,
       /**
        * A test seam (debug switch only): a written preset cartridge goes on the lab rack, so the X radial in Apply has one to
        * offer. Players never reach it (window.__dev exists only in dev builds and under ?e2e).

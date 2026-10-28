@@ -1,5 +1,39 @@
 # RESUME: start here (fresh session)
 
+## 28 Oct Checkpoint 2 (Claude Opus: Plan 51 Wave 3 + Plan 52, Commit `8600a81b`; read this first)
+- **Asked (owner and Argon):**
+  - validate every gamebridge channel at once: CS2 (official telemetry), Quake (none), and a second FIDELITY tab;
+  - wire bridged `logic:` rules into live play (the Mimic Reflex Slot);
+  - add a cadence sampler, so every game gives mechanics;
+  - Argon's Plan 52 (the Veil, ego learning, the Harvest).
+- **Built** ([Plan 51 §2b](argo/plans/51-harness-mechanic-mimicry.md), [Plan 52](argo/plans/52-veil-learning-harvest.md)):
+  - **Mapping language v2:** selectors, falling counters with a scope, event classes, a session anonymizer, time-closed batches.
+  - **Shipped profiles:** CS2 (Valve GSI) and every FIDELITY game.
+  - **The reflex slot** (the `mimic-reflex` wiregraph preset):
+    - threat → suit shield (a fifth of each hit gets through) + drone overclock, 4 s;
+    - mobility → reload;
+    - outcome → a chained arc zap;
+    - bridged rule graphs run in the slot with their delays.
+  - **The `input-audio` floor rung:** `scripts/cadence-sampler.ps1` reads the game's own audio session, and fire/jump/dash only while its window has focus.
+  - **The FIDELITY self-bridge:** `?telemetry-out`.
+  - **Per-client routing:** a game's stream goes to the tab that opened its bridge.
+  - **`scripts/bridge-setup.mjs cs2`:** writes Valve's GSI config.
+  - **`veil-learning-harvest.ts`:** Argon's design (curve, per-context memory, Harvest rules and vessels, meta-audit) on a genuinely veiled Bayesian learner. His step took the target as an argument; that part was not kept.
+- **Measured:** `scripts/test-gamebridge-e2e.mjs` passes 14/14.
+  - Tab A recovered tab B's real Moon gravity (1.587 vs 1.619 m/s²) and its fire pace, live; B's jumps and waves drove A's reflexes.
+  - 6 rounds/s came from audio alone.
+  - On this PC the sampler read a test process's audio and recovered an 8 Hz rhythm.
+- **Not yet:**
+  - **CS2 live:** it is downloading on this PC. Run `node scripts/bridge-setup.mjs cs2`, restart CS2, then "bridge counter strike". Position may be spectator-only; fire and round, bomb and kill events are sure.
+  - **Quake:** not installed. The sampler covers it; a `.dem` reader is §3.6.
+  - The phase impulse waits for a dash field. Live egos and the Harvest moment are Plan 52 §4.
+- **Gates at `8600a81b`:**
+  - typecheck 0;
+  - `npm test` 3,725/3,730: 1 texgraph timing flake that passes alone, 4 skipped; speed tests 23/23;
+  - e2e: gamebridge 14/14, drone 43/43, companion 15/15, ping & kit 24/24;
+  - bundle 12.76 MB / 16 MB.
+- **Argon:** his chat is now https://gemini.google.com/app/447212ce8f9694a7. His Plan 52 doc and bundle are in the owner's Drive (search "plan52").
+
 ## 28 Oct Checkpoint (Claude Opus: Plan 51 Wave 2, the drone bridges any game live — Commit `17a0e6c8`; read this first)
 - **Owner:** "write modular code: when I ask you to bridge a game from within the game, as the drone you check the game's copyright live and start streaming the things that aren't copyrighted". The Argon review followed: never block mechanics on an unchecked profile, and the bridge must take effect in play at once.
 - **Built** ([Plan 51 §2](argo/plans/51-harness-mechanic-mimicry.md), research [`GAME_BRIDGE_PERMISSIONS_RESEARCH.md`](GAME_BRIDGE_PERMISSIONS_RESEARCH.md)):

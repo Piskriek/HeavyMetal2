@@ -164,6 +164,52 @@
   color: #ffffff;
 }
 
+/* plan 53: the input relay's consent, in the panel in place of the log: the player's choice, so it says what is at stake
+   plainly and turns on only with the box ticked and the word typed. Amber is the HUD's "something is due" colour: risk */
+.companion-relay-consent {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px;
+  border-left: 3px solid #ffc13d;
+  background: rgba(30, 22, 8, 0.35);
+  color: #e7e2d6;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.companion-relay-consent h3 { margin: 0 0 8px; font: 600 15px/1.25 Oxanium, system-ui, sans-serif; color: #fff2cf; }
+.companion-relay-consent p { margin: 0 0 9px; }
+.companion-relay-consent .relay-risk { color: #ffd98a; }
+.companion-relay-consent .relay-limit { color: #b9b2a3; font-size: 12px; }
+.companion-relay-consent label { display: flex; gap: 8px; align-items: flex-start; margin: 10px 0 8px; cursor: pointer; }
+.companion-relay-consent input[type='checkbox'] { margin-top: 2px; accent-color: #ffc13d; }
+.companion-relay-consent .relay-word { display: block; margin: 6px 0 4px; font-size: 12px; color: #d9cfb8; }
+.companion-relay-consent input[type='text'] {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 193, 61, 0.45);
+  border-radius: 8px;
+  padding: 7px 10px;
+  color: #fff;
+  font: 600 13px Oxanium, system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  outline: none;
+}
+.companion-relay-consent input[type='text']:focus { border-color: #ffc13d; box-shadow: 0 0 8px rgba(255, 193, 61, 0.3); }
+.companion-relay-actions { display: flex; gap: 8px; margin-top: 12px; }
+.companion-relay-actions button {
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid rgba(255, 193, 61, 0.5);
+  background: rgba(60, 42, 10, 0.8);
+  color: #fff2cf;
+}
+.companion-relay-actions button.relay-cancel { border-color: rgba(184, 77, 255, 0.35); background: rgba(40, 25, 60, 0.8); color: #fff; }
+.companion-relay-actions button:disabled { opacity: 0.45; cursor: not-allowed; }
+.companion-relay-actions button:focus-visible, .companion-relay-consent input:focus-visible { outline: 2px solid #ffc13d; outline-offset: 2px; }
+
 .companion-chat-input-row {
   display: flex;
   align-items: center;

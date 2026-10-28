@@ -79,6 +79,7 @@ import { barkLine, COMBAT_TUNING, FOCUS_ORDER_S, newCombatBrain, standDown, step
 import type { PointOfInterest, ScoutCategory } from './companion-scout';
 import { ARMORY_RAIL_POS } from './armory-rack';
 import { GAME_SCREEN_KIT, GAME_SCREEN_SURFACE } from './kit-game-screen';
+import { BRIDGE_PAD_DECK_TOP, BRIDGE_PAD_KIT, BRIDGE_PAD_SIZE } from './kit-bridge-pad';
 import { handPose, viewPose } from './rifle-hold';
 import { footprintSolids, navFor } from '../base/navgrid';
 import { solveLeftArmForegripIk } from '../avatar/two-bone-ik';
@@ -460,6 +461,9 @@ export interface PlayScene {
   pointsOfInterest(category: ScoutCategory): PointOfInterest[];
   /** Plan 50 §6: stands a screen 4.5 m ahead mirroring a linked window (another game), or takes it down with null. */
   showGameScreen(video: HTMLVideoElement | null): boolean;
+  /** Plan 53: stands the bridge pad on the flattest spot `distance` m from the gate (or takes it down); where its deck is. */
+  showBridgePad(on: boolean, distance?: number): { readonly x: number; readonly y: number; readonly z: number } | null;
+  bridgePadAt(): { readonly x: number; readonly y: number; readonly z: number } | null;
   gameScreenShown(): boolean;
   /** The canvas the world is drawn on (the AI's eyes sample it, plan 50). */
   viewCanvas(): HTMLCanvasElement;
@@ -3092,7 +3096,7 @@ export function createPlayScene(o: {
     const s = comp.getState();
     // no fight in another world, with the player down, or on the ground: stand down without calling anything "down"
     if (where !== 'planet' || !playerAlive || s.landed) {
-      if (combatBrain.targetId !== null || combatBrain.fought) combatBrain = standDown(combatBrain);
+      if (combatBrain.targetId !== null || combatBrain.fought || combatBrain.seen.length > 0 || combatBrain.lastBarkAt !== -Infinity) combatBrain = standDown(combatBrain);
       comp.setCombat(null, null);
       return;
     }
@@ -3157,6 +3161,59 @@ export function createPlayScene(o: {
         break; // ammo, health, armour, keys and currency: this world has none yet
     }
     return out;
+  };
+
+  // ---- Plan 53: the bridge pad, the stage a bare "bridge" order takes the player to (an empty stretch of the Moon)
+  let bridgePad: { readonly group: THREE.Group; readonly owned: { dispose(): void }[]; readonly x: number; readonly z: number; readonly top: number } | null = null;
+  /** The pad's deck height where (x, z) is on it, or -Infinity off it: the deck is floor, like a base piece. */
+  const bridgePadFloor = (x: number, z: number): number => {
+    const p = bridgePad;
+    if (!p) return -Infinity;
+    const h = BRIDGE_PAD_SIZE / 2;
+    return Math.abs(x - p.x) <= h && Math.abs(z - p.z) <= h ? p.top : -Infinity;
+  };
+  const hideBridgePad = (): void => {
+    if (!bridgePad) return;
+    bridgePad.group.removeFromParent();
+    for (const o of bridgePad.owned) o.dispose();
+    bridgePad = null;
+  };
+  /**
+   * Stands the pad on the flattest spot of a ring `distance` from the gate (deterministic: eight bearings, the least ground
+   * spread under the footprint wins), its deck just above the highest ground under it and its plinth running down into the
+   * regolith. Returns where the deck is.
+   */
+  const showBridgePad = (distance = 260): { readonly x: number; readonly y: number; readonly z: number } => {
+    hideBridgePad();
+    const gate = api.gateExit();
+    const h = BRIDGE_PAD_SIZE / 2;
+    let best = { x: gate.x + distance, z: gate.z, spread: Infinity, top: 0 };
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      const cx = gate.x + Math.cos(a) * distance, cz = gate.z + Math.sin(a) * distance;
+      let lo = Infinity, hi = -Infinity;
+      for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
+        const g = groundAt(cx + (i / 2) * h, cz + (j / 2) * h);
+        lo = Math.min(lo, g); hi = Math.max(hi, g);
+      }
+      if (hi - lo < best.spread) best = { x: cx, z: cz, spread: hi - lo, top: hi };
+    }
+    const owned: { dispose(): void }[] = [];
+    const keepIt = <T extends { dispose(): void }>(x: T): T => { owned.push(x); return x; };
+    const mats = {
+      gunmetal: keepIt(new THREE.MeshStandardMaterial({ color: '#4b525b', metalness: 0.7, roughness: 0.38 })),
+      darkSteel: keepIt(new THREE.MeshStandardMaterial({ color: '#2b3038', metalness: 0.6, roughness: 0.5 })),
+      violet: keepIt(new THREE.MeshStandardMaterial({ color: '#2a0f3d', emissive: '#b84dff', emissiveIntensity: 2 })),
+    };
+    const built = buildKitPreset(BRIDGE_PAD_KIT, 'bridge-pad', { materials: mats, gen: () => null, maxRank: 2, keep: keepIt });
+    const group = new THREE.Group();
+    group.name = 'bridge-pad';
+    if (built) group.add(built.group);
+    const base = best.top + 0.02;
+    group.position.set(best.x, base, best.z);
+    planetScene.add(group);
+    bridgePad = { group, owned, x: best.x, z: best.z, top: base + BRIDGE_PAD_DECK_TOP };
+    return { x: best.x, y: bridgePad.top, z: best.z };
   };
 
   // ---- Plan 50 §6: the game screen (a linked window, mirrored live on a free-standing display in the world)
@@ -4080,6 +4137,8 @@ export function createPlayScene(o: {
             pos.z = pushed.z;
             standY = activeWalkWorld.standAt(pos.x, pos.z, feetY, standY);
           }
+          // plan 53: the bridge pad's deck is floor
+          if (bridgePad) standY = Math.max(standY, bridgePadFloor(pos.x, pos.z));
           jumpState = stepVerticalJump(jumpState, { dt, jumpHeld: Boolean(c.jump) }, loco);
           if (jumpState.justJumped) sfx('step-grit', { pitch: 1.25, volume: 0.45 });
           if (jumpState.justLanded) sfx('step-grit', { pitch: 0.78, volume: 0.6 });
@@ -5157,6 +5216,8 @@ export function createPlayScene(o: {
     },
     pointsOfInterest,
     showGameScreen,
+    showBridgePad: (on, distance) => { if (!on) { hideBridgePad(); return null; } return showBridgePad(distance); },
+    bridgePadAt: () => (bridgePad ? { x: bridgePad.x, y: bridgePad.top, z: bridgePad.z } : null),
     gameScreenShown: () => gameScreen !== null,
     viewCanvas: () => renderer.domElement,
     pingMarkerAge: () => (pingMarker.where === null ? null : clock - pingMarker.born),

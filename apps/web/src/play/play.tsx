@@ -15,7 +15,7 @@ import { SMOOTH_IDS, smoothModel } from '../crafter/smooth-models';
 import { CreateScientist } from '../avatar/create-scientist';
 import type { ClipName } from '../avatar/scientist/anims-loader';
 import type { OneShotKind } from '../avatar/scientist/animator';
-import { createPlayScene, type Detail, type FrameOut, type LabMachineKind, type PlayScene } from './play-scene';
+import { createPlayScene, type Detail, type FrameOut, type LabMachineKind, type PlayScene, type Where } from './play-scene';
 import { assertPlayablePreset, gateSandboxPreset, type MultiverseGamePresetSpec } from './game-presets';
 import { gameBaseWorld, gamePlayState, NEW_GAME_PROGRESS, stepGameProgress, type GameProgress } from './game-mode';
 import { GameHudBlade } from './game-hud';
@@ -96,6 +96,7 @@ import { encodePlot, decodePlot, plotOfSnapshot } from './plot-code';
 import type { Snapshot } from '@hm/plotcodec';
 import { SEAL_REACH, type MonsterMobStatus, type MonsterStats } from './monsters';
 import { MonsterHud, type RadarLeak } from '../monsters/hud';
+import { BridgeHud } from './bridge-hud';
 import type { Archetype } from '../monsters/roster';
 import type { MonstersSetting } from '../monsters/policy';
 import { weaponStats, type WeaponStats } from '../base/weapons';
@@ -104,9 +105,9 @@ import { usePlaySettings } from '../shell/play-settings';
 import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { kv } from '../storage/profile-storage';
 import { isMechanicObservation, transduceMechanic, type MimicryResult } from '@hm/harness';
-import { gateObservation, type BridgePermissionProfile } from '@hm/gamebridge';
+import { gateObservation, weaponStandIn, type BridgePermissionProfile } from '@hm/gamebridge';
 import { createReflexSlot, type ReflexAction, type ReflexSlot } from './mimic-reflex';
-import { encodeKitMotionCode, encodeLocomotionCode } from '@hm/kinematic';
+import { encodeKitMotionCode, encodeLocomotionCode, LOCOMOTION_PRESETS } from '@hm/kinematic';
 import { encodeLogicCode } from '@hm/wiregraph';
 import { activeLocomotion, customLocomotion, setCustomLocomotion } from './locomotion';
 /** Plan 51: where every mimic's share codes are kept for the bench and the Studio. */
@@ -1354,7 +1355,7 @@ useEffect(() => {
       };
     });
     scene?.setFabricators(fabs);
-    scene?.monsters.setWeaponStats(devWeaponRef.current ?? weaponStats(world.loadout));
+    scene?.monsters.setWeaponStats(weaponOverrideRef.current ?? devWeaponRef.current ?? weaponStats(world.loadout));
     (baseViewSource as WorldViewSource).notify?.();
     setBaseWorldVersion((v) => v + 1);
   }, [getBaseEnv, baseViewSource]);
@@ -1632,6 +1633,11 @@ useEffect(() => {
   const sealAimRef = useRef<number | null>(null);
   // a loadout the tests set: the real loadout re-applies whenever the base changes, so the fire re-applies this one
   const devWeaponRef = useRef<WeaponStats | null>(null);
+  /**
+   * The weapon the comms put in force (a mimic's fire pattern, the bridge stage's stand-in gun), over the loadout's while
+   * set: the base world re-applies the loadout whenever it changes, which on the Moon is all the time.
+   */
+  const weaponOverrideRef = useRef<WeaponStats | null>(null);
   /** Plan 51 wave 3: the reflex shield is up until this (performance.now ms); the HUD shows it while it holds. */
   const shieldUntilRef = useRef(0);
   const [shieldOn, setShieldOn] = useState(false);
@@ -1779,6 +1785,32 @@ useEffect(() => {
   applySkinShotRef.current = applySkinShot;
   // ---- Plan 49: the ping (middle mouse, or Q when Q has no other job) and the kit edits the comms run on what was pinged
   const companionHandleRef = useRef<CompanionChatHandle | null>(null);
+  // Plan 53: the player's own presses for the input relay (fire, use, jump, reload). The comms send them on only while the
+  // relay the player chose (a box ticked, RELAY typed) is on; nothing here originates a press.
+  useEffect(() => {
+    const typing = (t: EventTarget | null): boolean => t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+    const KEYS: Readonly<Record<string, 'use' | 'jump' | 'reload'>> = { KeyE: 'use', Space: 'jump', KeyR: 'reload' };
+    const onKey = (phase: 'down' | 'up') => (e: KeyboardEvent): void => {
+      const action = KEYS[e.code];
+      if (!action || e.repeat || typing(e.target)) return;
+      companionHandleRef.current?.relay(action, phase);
+    };
+    const onMouse = (phase: 'down' | 'up') => (e: MouseEvent): void => {
+      if (e.button !== 0 || typing(e.target) || (e.target instanceof HTMLElement && e.target.closest('button, [role="dialog"], .companion-chat-panel'))) return;
+      companionHandleRef.current?.relay('fire', phase);
+    };
+    const kd = onKey('down'), ku = onKey('up'), md = onMouse('down'), mu = onMouse('up');
+    window.addEventListener('keydown', kd);
+    window.addEventListener('keyup', ku);
+    window.addEventListener('mousedown', md);
+    window.addEventListener('mouseup', mu);
+    return () => {
+      window.removeEventListener('keydown', kd);
+      window.removeEventListener('keyup', ku);
+      window.removeEventListener('mousedown', md);
+      window.removeEventListener('mouseup', mu);
+    };
+  }, []);
   /** The last ping: the referent of the next spoken order ("remove the chevrons" means on that). */
   const lastPingRef = useRef<{ readonly target: PingTarget; readonly where: 'lab' | 'planet' } | null>(null);
   const lastPingAtRef = useRef(-Infinity);
@@ -1931,7 +1963,7 @@ useEffect(() => {
   /** Plan 51 wave 2: the one undo step of a live bridge (each refinement replaces the last; this puts back what was before). */
   const liveMimicUndoRef = useRef<{ readonly label: string; readonly undo: () => void } | null>(null);
   /** What the live bridge's undo step puts back, widened as refinements touch more (a weapon picked up mid-bridge). */
-  const liveBaseRef = useRef<{ loco: ReturnType<typeof customLocomotion>; weapon: ReturnType<NonNullable<typeof sceneRef.current>['monsters']['getWeaponStats']>; harness: string; tuned: boolean; harnessed: boolean } | null>(null);
+  const liveBaseRef = useRef<{ loco: ReturnType<typeof customLocomotion>; weapon: ReturnType<NonNullable<typeof sceneRef.current>['monsters']['getWeaponStats']>; override: WeaponStats | null; harness: string; tuned: boolean; harnessed: boolean } | null>(null);
   /**
    * Puts the last mimic in force: movement, the weapon's and the drone's fire pattern, and the rover's harness when driving.
    * `live` is a bridge the player ordered ("bridge this game"): every refinement goes straight in and they all share one undo
@@ -1994,7 +2026,45 @@ useEffect(() => {
         if (n > 0) done.push(`arc x${n}`);
       }
     }
+    // plan 53: on the stage, the bridged game's own outcome and threat edges (a new round, a wave) bring a new set of
+    // FIDELITY stand-ins for its opponents
+    if (stageRef.current && actions.some((a) => a.kind === 'arc-chain' || a.kind === 'pulse-shield') && topUpStandIns()) done.push('stand-ins');
     return done;
+  };
+  // ---- Plan 53: the bridge stage (a bare "bridge" order): the pad on an empty stretch of the Moon, the bridged game's
+  // mechanics on the player, and FIDELITY presets standing in for everything that cannot cross
+  const stageRef = useRef<{
+    readonly back: { readonly where: Where; readonly x: number; readonly z: number; readonly yaw: number };
+    readonly weapon: WeaponStats | null;
+    readonly override: WeaponStats | null;
+    readonly equipped: boolean;
+    readonly loco: ReturnType<typeof customLocomotion>;
+    standIns: { movement: string; enemies: string; world: string };
+    /** The game's weapon class the stand-in gun was picked for; undefined until the first pick. */
+    weaponClass: string | null | undefined;
+    mobs: number[];
+    lastTopUp: number;
+  } | null>(null);
+  /** What the live bridge has measured this session (the manifest's live rows). */
+  const bridgeMeasuredRef = useRef({ movement: false, fire: false, rules: 0 });
+  const [bridgeHud, setBridgeHud] = useState<{ readonly title: string; readonly state: Readonly<Record<string, string | number>> } | null>(null);
+  const STAND_IN_KINDS: readonly Archetype[] = ['charger', 'swarmer', 'brute'];
+  /** Brings the stand-in opponents back up to three around the pad, at most every 5 s; true when any came. */
+  const topUpStandIns = (): boolean => {
+    const st = stageRef.current;
+    const scene = sceneRef.current;
+    const pad = scene?.bridgePadAt();
+    if (!st || !scene || !pad || performance.now() - st.lastTopUp < 5000) return false;
+    const alive = new Set(scene.monsters.getMobList().map((m) => m.id));
+    st.mobs = st.mobs.filter((id) => alive.has(id));
+    let added = 0;
+    for (let k = st.mobs.length; k < STAND_IN_KINDS.length; k++) {
+      // north of the pad (the way the player faces on arrival), 16 to 22 m out, spread across the view
+      const id = scene.monsters.placeMob(STAND_IN_KINDS[k]!, pad.x + (k - 1) * 6, pad.z - 16 - k * 3);
+      if (id >= 0) { st.mobs.push(id); added += 1; }
+    }
+    st.lastTopUp = performance.now();
+    return added > 0;
   };
   const stopReflexSlot = (): void => {
     window.clearInterval(reflexTimerRef.current);
@@ -2012,12 +2082,19 @@ useEffect(() => {
     let tuned = false;
     let harnessed = false;
     if (r.locomotion) {
-      setCustomLocomotion(r.locomotion);
-      done.push(`your movement (gravity ${r.locomotion.gravityMps2} m/s²)`);
+      // gravity and the jump only come from a batch that saw a whole jump; otherwise they stay as they are (a batch cut
+      // between arcs used to put an inherited 14.5 m/s² over a measured Moon gravity)
+      const cur = customLocomotion() ?? activeLocomotion(liveWhereRef.current === 'planet' ? 'planet' : 'lab');
+      const loco = r.evidence.jumps > 0 ? r.locomotion : { ...r.locomotion, gravityMps2: cur.gravityMps2, jumpImpulseMps: cur.jumpImpulseMps };
+      setCustomLocomotion(loco);
+      done.push(r.evidence.jumps > 0 ? `your movement (gravity ${loco.gravityMps2} m/s²)` : 'your walk and run (no whole jump seen: gravity kept)');
     }
+    const prevOverride = weaponOverrideRef.current;
     if (r.fire) {
       if (prevWeapon) {
-        scene.monsters.setWeaponStats({ ...prevWeapon, burst: r.fire.burst, burstGap: r.fire.roundGapS, cooldown: Math.max(0.05, r.fire.burstGapS || r.fire.roundGapS) });
+        const w = { ...prevWeapon, burst: r.fire.burst, burstGap: r.fire.roundGapS, cooldown: Math.max(0.05, r.fire.burstGapS || r.fire.roundGapS) };
+        weaponOverrideRef.current = w;
+        scene.monsters.setWeaponStats(w);
         done.push('your weapon\'s fire pattern');
       }
       scene.setCompanionTuning({ burstRounds: Math.max(1, r.fire.burst), roundGapS: r.fire.roundGapS, burstGapS: Math.max(0.05, r.fire.burstGapS || r.fire.roundGapS) });
@@ -2034,15 +2111,15 @@ useEffect(() => {
     const base = liveBaseRef.current;
     if (live && step && base && undoStackRef.current.includes(step)) {
       // a refinement: the bridge's one undo step still puts back what was there before the bridge touched each thing
-      if (!base.weapon && prevWeapon && r.fire) base.weapon = prevWeapon;
+      if (!base.weapon && prevWeapon && r.fire) { base.weapon = prevWeapon; base.override = prevOverride; }
       base.tuned ||= tuned;
       base.harnessed ||= harnessed;
     } else {
-      const was = { loco: prevLoco, weapon: r.fire ? prevWeapon : null, harness: prevHarness, tuned, harnessed };
+      const was = { loco: prevLoco, weapon: r.fire ? prevWeapon : null, override: prevOverride, harness: prevHarness, tuned, harnessed };
       pushUndo(`the ${r.game} mimic is off`, () => {
         setCustomLocomotion(was.loco);
         const s = sceneRef.current;
-        if (was.weapon) s?.monsters.setWeaponStats(was.weapon);
+        if (was.weapon) { weaponOverrideRef.current = was.override; s?.monsters.setWeaponStats(was.weapon); }
         if (was.tuned) s?.setCompanionTuning(null);
         if (was.harnessed) s?.setVehicleHarness(was.harness);
       });
@@ -2107,6 +2184,10 @@ useEffect(() => {
       const gate = gateObservation(profile ?? null, observation);
       if (!gate.observation) return { said: `Nothing from ${observation.game} crossed: ${gate.dropped.join('; ')}.`, event: { type: 'mimic-refused', game: observation.game, channel: observation.channel, dropped: gate.dropped } };
       const r = transduceMechanic(gate.observation);
+      if (live) {
+        const mm = bridgeMeasuredRef.current;
+        bridgeMeasuredRef.current = { movement: mm.movement || (Boolean(r.locomotion) && r.evidence.jumps > 0), fire: mm.fire || Boolean(r.fire), rules: mm.rules + (r.logic && !r.fire ? 1 : 0) };
+      }
       const harnessSpec: IHarnessCartridgeSpec = {
         ...HARNESS_SHELF_PRESETS['harness:escort-steadfast']!,
         id: `harness:mimic-${r.game.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 24)}`,
@@ -2136,6 +2217,7 @@ useEffect(() => {
     },
     reflexStart(classes) {
       stopReflexSlot();
+      bridgeMeasuredRef.current = { movement: false, fire: false, rules: 0 };
       const slot = createReflexSlot(classes ? { classes } : {});
       reflexSlotRef.current = slot;
       // delayed and counted rules need the clock to run between events
@@ -2159,6 +2241,88 @@ useEffect(() => {
       liveBaseRef.current = null;
       step.undo();
       return `Bridge closed: ${step.label}, everything is back as it was before.`;
+    },
+    enterBridgeStage(): string {
+      const scene = sceneRef.current;
+      if (!scene) return 'The world is still loading.';
+      if (stageRef.current) return 'We are on the bridge pad.';
+      const p = scene.debug.position();
+      const back = { where: scene.debug.where(), x: p.x, z: p.z, yaw: scene.debug.facing() };
+      const pad = scene.showBridgePad(true);
+      if (!pad) return 'The bridge pad would not stand.';
+      stageRef.current = {
+        back, weapon: scene.monsters.getWeaponStats(), override: weaponOverrideRef.current, equipped: scene.monsters.isEquipped(), loco: customLocomotion(),
+        standIns: { movement: 'FIDELITY earth-standard', enemies: 'FIDELITY monsters (a charger, a swarmer, a brute)', world: 'the bridge pad on an empty stretch of the Moon' },
+        weaponClass: undefined, mobs: [], lastTopUp: -Infinity,
+      };
+      // on the deck, facing north toward where the stand-ins come in; FIDELITY's own movement until the game's arrives
+      scene.debug.teleport('planet', pad.x, pad.z + 3.5, 0, 0);
+      setCustomLocomotion({ ...LOCOMOTION_PRESETS['earth-standard'], id: 'stand-in:earth-standard', name: 'FIDELITY earth-standard (stand-in)' });
+      topUpStandIns();
+      // a linked window's picture comes along: its screen stands on the deck ahead
+      if (linkedVideoRef.current) scene.showGameScreen(linkedVideoRef.current);
+      return 'On the bridge pad: an empty stretch of the Moon. What the game can send comes across; FIDELITY stands in for the rest.';
+    },
+    bridgeStandIns(info) {
+      const st = stageRef.current;
+      const scene = sceneRef.current;
+      if (!st || !scene) return;
+      if (info.weaponClass !== undefined && info.weaponClass !== st.weaponClass) {
+        st.weaponClass = info.weaponClass;
+        const w = weaponStandIn(info.weaponClass);
+        const stats = w ? weaponStats({ core: w.core, barrel: w.barrel, sight: w.sight, cell: w.cell }) : null;
+        // a measured fire pattern stays on the new stand-in: the game's cadence, FIDELITY's gun
+        const fire = liveBaseRef.current ? scene.monsters.getWeaponStats() : null;
+        if (stats) {
+          const gun = fire ? { ...stats, burst: fire.burst, burstGap: fire.burstGap, cooldown: fire.cooldown } : stats;
+          weaponOverrideRef.current = gun;
+          scene.monsters.setWeaponStats(gun);
+          scene.monsters.equip(true);
+          setGunEquipped(true);
+        }
+      }
+      // a published constant replaces the stand-in's value, until a measured one replaces both
+      const d = info.documented;
+      if (d && !bridgeMeasuredRef.current.movement) {
+        const base = LOCOMOTION_PRESETS['earth-standard'];
+        setCustomLocomotion({
+          ...base, id: 'documented+earth-standard', name: 'documented constants on FIDELITY earth-standard',
+          ...(d.gravityMps2 !== undefined ? { gravityMps2: d.gravityMps2 } : {}),
+          ...(d.jumpImpulseMps !== undefined ? { jumpImpulseMps: d.jumpImpulseMps } : {}),
+          ...(d.walkSpeedMps !== undefined ? { walkSpeedMps: d.walkSpeedMps } : {}),
+          ...(d.runSpeedMps !== undefined ? { runSpeedMps: d.runSpeedMps } : {}),
+        });
+      }
+    },
+    bridgeHud(title, state) {
+      setBridgeHud(state ? { title, state } : null);
+    },
+    stageStatus() {
+      const st = stageRef.current;
+      return {
+        onStage: st !== null, weaponClass: st?.weaponClass ?? null, pictureLinked: linkedVideoRef.current !== null,
+        // the stand-in gun's own label is in the manifest; the movement row names what is on the body now
+        measured: bridgeMeasuredRef.current,
+        standIns: st?.standIns ?? { movement: 'FIDELITY earth-standard', enemies: 'none', world: 'where you stand' },
+      };
+    },
+    exitBridgeStage(): string {
+      const st = stageRef.current;
+      const scene = sceneRef.current;
+      stageRef.current = null;
+      setBridgeHud(null);
+      if (!st || !scene) return '';
+      // the stand-ins leave with the stage (no deaths, no drops), and everything the stage changed goes back
+      for (const id of st.mobs) scene.monsters.removeMob(id);
+      scene.showBridgePad(false);
+      weaponOverrideRef.current = st.override;
+      scene.monsters.setWeaponStats(st.weapon);
+      scene.monsters.equip(st.equipped);
+      setGunEquipped(st.equipped);
+      setCustomLocomotion(st.loco);
+      scene.debug.teleport(st.back.where, st.back.x, st.back.z, st.back.yaw);
+      if (linkedVideoRef.current) scene.showGameScreen(linkedVideoRef.current);
+      return 'Back where you stood, with your own gear.';
     },
     undo(): string {
       if (dropStagedEdit()) return 'Put it back as it was.';
@@ -3001,7 +3165,7 @@ useEffect(() => {
           };
         });
         scene.setFabricators(initFabs);
-        scene.monsters.setWeaponStats(devWeaponRef.current ?? weaponStats(baseWorldRef.current.loadout));
+        scene.monsters.setWeaponStats(weaponOverrideRef.current ?? devWeaponRef.current ?? weaponStats(baseWorldRef.current.loadout));
         for (const m of baseWorldRef.current.machines) {
           const piece = baseWorldRef.current.base.pieces.find((p) => p.id === m.id);
           if (piece) {
@@ -4310,7 +4474,7 @@ useEffect(() => {
             };
           });
           scene.setFabricators(fabs);
-          scene.monsters.setWeaponStats(devWeaponRef.current ?? weaponStats(baseWorldRef.current.loadout));
+          scene.monsters.setWeaponStats(weaponOverrideRef.current ?? devWeaponRef.current ?? weaponStats(baseWorldRef.current.loadout));
         },
         enterVehicle: (id: number) => scene.enterVehicle(id),
         /** Boards through the real bind path (plan 47): rifle harness binds, a saved soul wakes, else the default. */
@@ -6747,6 +6911,7 @@ useEffect(() => {
           )}
 
           {(!props.gamePreset || props.gamePreset.hudBlade === 'arena-wave-survivor' || props.gamePreset.hudBlade === 'exploration-o2') && !hideOverlays ? <MonsterHud hp={vitals.hp} maxHp={PLAYER_MAX_HP} hitAt={vitals.hitAt} hitBearing={vitals.bearing} radar={radar} seal={sealView} shielded={shieldOn} /> : null}
+          {bridgeHud && !hideOverlays ? <BridgeHud title={bridgeHud.title} state={bridgeHud.state} /> : null}
           {gunEquipped && (
             <div className={`play-crosshair${hitMarker ? ' hit' : ''}`}>
               <div className="ch-top" />

@@ -76,6 +76,22 @@ export interface TelemetryMapping {
   readonly events?: readonly string[];
   /** The class of an event field, where the keyword classifier would guess wrong. */
   readonly eventClasses?: Readonly<Record<string, EventClass>>;
+  /** Plan 53: the held weapon's class ("Rifle", "Pistol"...), which picks the FIDELITY weapon that stands in for it. */
+  readonly weaponClass?: string;
+  /** Plan 53: the live state shown on FIDELITY's HUD, label to path ("health": "player.state.health"). */
+  readonly hud?: Readonly<Record<string, string>>;
+}
+
+/**
+ * Plan 53: mechanics a game publishes as constants (facts, with their sources), in FIDELITY's units. A documented value
+ * is used where no rung measured one; a measured one always wins.
+ */
+export interface DocumentedMechanics {
+  readonly gravityMps2?: number;
+  readonly jumpImpulseMps?: number;
+  readonly walkSpeedMps?: number;
+  readonly runSpeedMps?: number;
+  readonly sources: readonly { readonly url: string; readonly quote: string }[];
 }
 
 /** Keywords in an event's field path, per class: the default classification (a mapping can override it). */
@@ -122,7 +138,23 @@ export interface BridgePermissionProfile {
   readonly setup: readonly string[];
   /** The game's official telemetry mapping, when it has one. */
   readonly telemetry?: TelemetryMapping;
+  /** Plan 53: the mechanics the game publishes as constants. */
+  readonly documented?: DocumentedMechanics;
+  /** Plan 53: the anti-cheat that guards it, and the modes where bridging deeper carries no ban risk. */
+  readonly antiCheat?: AntiCheatInfo;
+  /** Plan 53: how the game takes the player's own relayed presses, when they choose to turn the relay on. */
+  readonly inputRelay?: InputRelaySpec;
   readonly notes: readonly string[];
+}
+
+/** An anti-cheat a game runs (VAC, Easy Anti-Cheat, BattlEye, Vanguard...): when it watches and where it does not. */
+export interface AntiCheatInfo {
+  readonly system: string;
+  /** 'online': secured servers and matchmaking; 'always': whenever the game runs (kernel drivers loaded at boot). */
+  readonly scope: 'online' | 'always';
+  /** Modes where it does not watch or the server allows it (offline bots, a server you host, cheats switched on). */
+  readonly safeModes: readonly string[];
+  readonly sources: readonly { readonly url: string; readonly quote: string }[];
 }
 
 const ID_RE = /^[a-z0-9][a-z0-9._-]{0,47}$/;
@@ -178,6 +210,8 @@ export const FIDELITY_TELEMETRY_MAPPING: TelemetryMapping = {
   t: { path: 't' },
   x: { path: 'player.x' }, y: { path: 'player.y' }, z: { path: 'player.z' },
   shotCounter: { path: 'weapon.ammo', counts: 'down', scope: 'weapon.name' },
+  weaponClass: 'weapon.name',
+  hud: { ammo: 'weapon.ammo', wave: 'world.wave', kills: 'world.kills' },
   events: ['player.airborne', 'world.wave', 'world.leaksOpen', 'world.kills'],
   eventClasses: { 'player.airborne': 'mobility', 'world.wave': 'threat', 'world.leaksOpen': 'threat', 'world.kills': 'outcome' },
 };
@@ -194,6 +228,8 @@ export const CS2_TELEMETRY_MAPPING: TelemetryMapping = {
   y: { path: 'player.position', split: ',', index: 2, scale: 0.0254 },
   z: { path: 'player.position', split: ',', index: 1, scale: 0.0254 },
   shotCounter: { path: 'player.weapons[state=active].ammo_clip', counts: 'down', scope: 'player.weapons[state=active].name' },
+  weaponClass: 'player.weapons[state=active].type',
+  hud: { health: 'player.state.health', ammo: 'player.weapons[state=active].ammo_clip', round: 'round.phase', kills: 'player.match_stats.kills' },
   events: ['round.phase', 'round.bomb', 'map.phase', 'player.state.round_kills', 'player.match_stats.kills', 'player.state.health', 'player.state.flashed'],
   eventClasses: {
     'round.phase': 'outcome', 'map.phase': 'outcome', 'round.bomb': 'objective',
@@ -211,6 +247,35 @@ const CS2_PROFILE: BridgePermissionProfile = {
   checkedBy: 'claude-opus (research)', checkedOn: '2026-10-28',
   setup: ['Run "node scripts/bridge-setup.mjs cs2" once (it writes Valve\'s gamestate_integration_fidelity.cfg into the game\'s cfg folder), then restart CS2.'],
   telemetry: CS2_TELEMETRY_MAPPING,
+  inputRelay: {
+    transport: 'synthetic-keys',
+    bindings: { fire: 'mouse1', use: 'e', jump: 'space', reload: 'r' },
+    notes: [
+      'CS2 has no remote console any more (-netconport was CS:GO\'s), so only keys, and only while CS2\'s window is in front: on one PC that is never while you play FIDELITY.',
+      'View angles are not relayed: setang is cheat-protected and needs a console.',
+    ],
+  },
+  antiCheat: {
+    system: 'VAC (Valve Anti-Cheat)',
+    scope: 'online',
+    safeModes: [
+      'offline practice against bots',
+      'a private or LAN server you host yourself, with sv_cheats 1 where you need it',
+      'the game started with -insecure, which keeps you off VAC servers (a community report; Valve does not document whether it removes ban risk)',
+    ],
+    sources: [
+      { url: 'https://steamcommunity.com/app/730/discussions/0/6352962692739126906', quote: 'it disables VAC modules, so you can only play on non-secured servers' },
+    ],
+  },
+  // sv_gravity's default, 800 units/s², at the engine's inch scale; GSI sends no position while playing, so this is the
+  // only gravity there is. The jump impulse found no source that confirms it, so it is not here (plan 53 §1)
+  documented: {
+    gravityMps2: 20.32,
+    sources: [
+      { url: 'https://csdb.gg/commands/sv_gravity', quote: 'sv_gravity default 800' },
+      { url: 'https://totalcsgo.com/commands/svgravity', quote: 'CS2 and CS:GO sv_gravity, default 800' },
+    ],
+  },
   notes: [
     'Game State Integration is Valve\'s own feature for overlays and tools: the official telemetry rung, online included.',
     'No mods, loaders or memory reads: VAC guards the game, so the deeper rungs stay closed.',
@@ -274,9 +339,17 @@ export function checkBridgeProfile(v: unknown): BridgePermissionProfile | null {
   let telemetry: TelemetryMapping | undefined;
   if (isRecord(v.telemetry)) {
     const t = v.telemetry;
-    const m: { t?: TelemetryPath; x?: TelemetryPath; y?: TelemetryPath; z?: TelemetryPath; shotCounter?: ShotCounterPath; events?: string[]; eventClasses?: Record<string, EventClass> } = {};
+    const m: { t?: TelemetryPath; x?: TelemetryPath; y?: TelemetryPath; z?: TelemetryPath; shotCounter?: ShotCounterPath; events?: string[]; eventClasses?: Record<string, EventClass>; weaponClass?: string; hud?: Record<string, string> } = {};
     for (const k of ['t', 'x', 'y', 'z', 'shotCounter'] as const) {
       if (t[k] !== undefined) { const p = checkPath(t[k]); if (!p) return null; m[k] = p; }
+    }
+    if (t.weaponClass !== undefined) { const p = str(t.weaponClass, 128); if (!p || !pathTokens(p)) return null; m.weaponClass = p; }
+    if (isRecord(t.hud)) {
+      const hud: Record<string, string> = {};
+      for (const [label, path] of Object.entries(t.hud).slice(0, 8)) {
+        if (/^[a-z][a-z0-9 -]{0,23}$/.test(label) && typeof path === 'string' && pathTokens(path)) hud[label] = path;
+      }
+      m.hud = hud;
     }
     if (t.events !== undefined) m.events = lines(t.events, 16).filter((e) => pathTokens(e) !== null);
     if (isRecord(t.eventClasses)) {
@@ -287,6 +360,27 @@ export function checkBridgeProfile(v: unknown): BridgePermissionProfile | null {
       m.eventClasses = classes;
     }
     telemetry = m;
+  }
+  // documented mechanics: finite numbers in plausible ranges, each claim with an http(s) source
+  let documented: DocumentedMechanics | undefined;
+  if (isRecord(v.documented)) {
+    const d = v.documented;
+    const num = (x: unknown, lo: number, hi: number): number | undefined => (typeof x === 'number' && Number.isFinite(x) && x >= lo && x <= hi ? x : undefined);
+    const dsrc = Array.isArray(d.sources)
+      ? d.sources.slice(0, 8).flatMap((s) => (isRecord(s) && str(s.url, 512) && /^https?:\/\//.test(s.url as string) ? [{ url: s.url as string, quote: typeof s.quote === 'string' ? s.quote.slice(0, 200) : '' }] : []))
+      : [];
+    const g = num(d.gravityMps2, 0.1, 60), j = num(d.jumpImpulseMps, 0.1, 40), w = num(d.walkSpeedMps, 0.1, 40), r = num(d.runSpeedMps, 0.1, 60);
+    if (dsrc.length && (g ?? j ?? w ?? r) !== undefined) {
+      documented = { ...(g !== undefined ? { gravityMps2: g } : {}), ...(j !== undefined ? { jumpImpulseMps: j } : {}), ...(w !== undefined ? { walkSpeedMps: w } : {}), ...(r !== undefined ? { runSpeedMps: r } : {}), sources: dsrc };
+    }
+  }
+  let antiCheat: AntiCheatInfo | undefined;
+  if (isRecord(v.antiCheat) && str(v.antiCheat.system, 64)) {
+    const a = v.antiCheat;
+    const asrc = Array.isArray(a.sources)
+      ? a.sources.slice(0, 6).flatMap((s) => (isRecord(s) && str(s.url, 512) && /^https?:\/\//.test(s.url as string) ? [{ url: s.url as string, quote: typeof s.quote === 'string' ? s.quote.slice(0, 200) : '' }] : []))
+      : [];
+    antiCheat = { system: a.system as string, scope: a.scope === 'always' ? 'always' : 'online', safeModes: lines(a.safeModes, 6), sources: asrc };
   }
   const refused = verdict === 'refused';
   return {
@@ -300,6 +394,9 @@ export function checkBridgeProfile(v: unknown): BridgePermissionProfile | null {
     ...(str(v.checkedOn, 32) ? { checkedOn: v.checkedOn as string } : {}),
     setup: lines(v.setup, 8),
     ...(telemetry ? { telemetry } : {}),
+    ...(documented ? { documented } : {}),
+    ...(antiCheat ? { antiCheat } : {}),
+    ...(checkInputRelay(v.inputRelay) ? { inputRelay: checkInputRelay(v.inputRelay)! } : {}),
     notes: lines(v.notes, 8),
   };
 }
@@ -397,6 +494,8 @@ export interface TelemetryAccumulator {
   size(): number;
   /** Seconds of game time the held samples span (a sparse feed, like a game that posts only on change, fills by time). */
   span(): number;
+  /** The held samples by kind (a trajectory wants a full batch; shots and events alone can close by time). */
+  counts(): { readonly trajectory: number; readonly shots: number; readonly events: number };
   /** The observation the held samples make (and clears them), or null when there is too little. */
   take(game: string, channel: ObserverChannel): MechanicObservation | null;
 }
@@ -405,8 +504,9 @@ export interface TelemetryAccumulator {
  * Turns a stream of official telemetry payloads into observation samples through a mapping preset. `rename` is applied to
  * every event name as it is made (a session's anonymizer when the game's names may not cross).
  */
-export function createTelemetryAccumulator(mapping: TelemetryMapping, opts: { readonly cap?: number; readonly rename?: (name: string) => string } = {}): TelemetryAccumulator {
+export function createTelemetryAccumulator(mapping: TelemetryMapping, opts: { readonly cap?: number; readonly rename?: (name: string) => string; readonly overlapS?: number } = {}): TelemetryAccumulator {
   const cap = opts.cap ?? 20000;
+  const overlapS = opts.overlapS ?? 8;
   const rename = opts.rename ?? ((n: string) => n);
   let t: number[] = [], x: number[] = [], y: number[] = [], z: number[] = [];
   let shots: number[] = [];
@@ -454,6 +554,7 @@ export function createTelemetryAccumulator(mapping: TelemetryMapping, opts: { re
     },
     size: () => t.length + shots.length + events.length,
     span: () => (first === null || last === null ? 0 : last - first),
+    counts: () => ({ trajectory: t.length, shots: shots.length, events: events.length }),
     take(game, channel) {
       const hasTrajectory = t.length >= 8, hasShots = shots.length >= 3, hasEvents = events.length >= 1;
       if (!hasTrajectory && !hasShots && !hasEvents) return null;
@@ -463,10 +564,240 @@ export function createTelemetryAccumulator(mapping: TelemetryMapping, opts: { re
         ...(hasShots ? { shots: { t: shots } } : {}),
         ...(hasEvents ? { events } : {}),
       };
-      t = []; x = []; y = []; z = []; shots = []; events = []; first = null; last = null;
+      // the trajectory's last `overlapS` seconds start the next batch: a jump cut by the boundary is whole in the next one
+      // (low gravity arcs last seconds: the Moon's is 6.4 s for a 5 m/s jump, longer than half a batch)
+      const keepFrom = t.length ? t[t.length - 1]! - overlapS : Infinity;
+      const k0 = t.findIndex((v) => v >= keepFrom);
+      if (k0 > 0) { t = t.slice(k0); x = x.slice(k0); y = y.slice(k0); z = z.slice(k0); first = t[0]!; }
+      else { t = []; x = []; y = []; z = []; first = null; last = null; }
+      shots = []; events = [];
       return obs;
     },
   };
+}
+
+// ------------------------------------------------------------------ plan 53: anti-cheat risk, said before anything crosses
+
+/**
+ * Anti-cheat systems that run a process of their own, by its name (research 28 Oct: Wikipedia on Easy Anti-Cheat; file.net
+ * on BEService.exe and vgc.exe; freefixer on PnkBstrA.exe; FACEIT's own support pages). VAC has no process of its own, so it
+ * comes from the game's profile.
+ */
+const ANTI_CHEAT_PROCESSES: readonly (readonly [RegExp, string, AntiCheatInfo['scope']])[] = [
+  [/easyanticheat/i, 'Easy Anti-Cheat', 'always'],
+  [/^beservice(_x64)?(\.exe)?$/i, 'BattlEye', 'always'],
+  [/^(vgc|vgtray)(\.exe)?$/i, 'Riot Vanguard', 'always'],
+  [/faceit/i, 'FACEIT Anti-Cheat', 'always'],
+  [/^pnkbstr[ab](\.exe)?$/i, 'PunkBuster', 'online'],
+];
+
+/** The anti-cheat systems whose processes are running on this PC. */
+export function detectAntiCheat(processes: readonly string[]): { readonly system: string; readonly scope: AntiCheatInfo['scope']; readonly process: string }[] {
+  const out: { system: string; scope: AntiCheatInfo['scope']; process: string }[] = [];
+  for (const p of processes) {
+    const hit = ANTI_CHEAT_PROCESSES.find(([re]) => re.test(p.trim()));
+    if (hit && !out.some((o) => o.system === hit[1])) out.push({ system: hit[1], scope: hit[2], process: p.trim() });
+  }
+  return out;
+}
+
+export type BanRisk = 'none known' | 'low' | 'high';
+/** What a bridge may do, rung by rung, plus the one thing it never does unasked: send input back into the game. */
+export type BridgeAction = ObserverChannel | 'input-out';
+
+/**
+ * How much ban risk each way of bridging carries under an anti-cheat. Reading what the game itself sends out (its official
+ * telemetry) or what the player sees and hears touches nothing of the game; reading three keys from Windows is not a hook
+ * into the game, but anti-cheats do look at input tools, so it is low rather than none; loaders, the game's files and
+ * sending input into it are what anti-cheats exist to catch.
+ */
+export function banRisk(action: BridgeAction, antiCheat: boolean): BanRisk {
+  if (!antiCheat || action === 'synthetic') return 'none known';
+  if (action === 'telemetry' || action === 'screen') return 'none known';
+  if (action === 'input-audio' || action === 'mod-sdk') return 'low';
+  return 'high';
+}
+
+/**
+ * Plan 53: what the drone says about anti-cheat when it bridges a game: the systems guarding it (from its profile, or
+ * running on this PC), the risk of what this bridge uses, and the modes where going deeper is safe. Null when none is known.
+ */
+export function antiCheatAdvice(profile: BridgePermissionProfile, processes: readonly string[]): { readonly systems: readonly string[]; readonly line: string; readonly risks: Readonly<Record<BridgeAction, BanRisk>> } | null {
+  const detected = detectAntiCheat(processes);
+  const systems = [...new Set([...(profile.antiCheat ? [profile.antiCheat.system] : []), ...detected.map((d) => d.system)])];
+  if (systems.length === 0) return null;
+  const actions: BridgeAction[] = [...OBSERVER_LADDER, 'input-out'];
+  const risks = Object.fromEntries(actions.map((a) => [a, banRisk(a, true)])) as Record<BridgeAction, BanRisk>;
+  const safe = profile.antiCheat?.safeModes ?? ['offline or single-player modes', 'a private or LAN server you host yourself', 'any mode the game runs with its anti-cheat off'];
+  const always = profile.antiCheat?.scope === 'always' || detected.some((d) => d.scope === 'always');
+  const line = `${profile.title} runs ${systems.join(' and ')}${always ? ', which watches whenever the game runs' : ''}. What I use here never touches the game: its own telemetry, your screen, its audio level and your fire, jump and dash keys (those last carry a low risk). Anything deeper, mods, memory, the game's files or sending input into it, risks a ban: only in ${safe.join('; ')}.`;
+  return { systems, line, risks };
+}
+
+// ------------------------------------------------------------------ plan 53: the input relay, the player's own choice
+
+/** What a player's own press in FIDELITY can be relayed as. */
+export type RelayAction = 'fire' | 'use' | 'jump' | 'reload';
+export const RELAY_ACTIONS: readonly RelayAction[] = ['fire', 'use', 'jump', 'reload'];
+
+/**
+ * How a game takes relayed input (owner, 28 Oct: "build it so the user can choose... have them click a box and write a word
+ * to confirm"): a console over TCP (Source 1 games with -netconport), or Windows keys delivered only while the game's own
+ * window is in front. Bindings are console commands ("+attack") or key names from RELAY_KEYS.
+ */
+export interface InputRelaySpec {
+  readonly transport: 'console-tcp' | 'synthetic-keys';
+  /** console-tcp: the port the game listens on (127.0.0.1). */
+  readonly port?: number;
+  /** What the player adds to the game's launch options for this transport. */
+  readonly launchOption?: string;
+  readonly bindings: Readonly<Partial<Record<RelayAction, string>>>;
+  readonly notes: readonly string[];
+}
+
+/** The word the player types to turn the relay on, after ticking the box. */
+export const RELAY_CONFIRM_WORD = 'RELAY';
+/** The only keys and buttons the synthetic-keys transport may press. */
+export const RELAY_KEYS: readonly string[] = ['mouse1', 'mouse2', 'space', 'e', 'f', 'q', 'r', 'shift', 'ctrl'];
+/** The only console commands the console transport may send: a +name (its -name releases it). No binds, no quit, no cvars. */
+const RELAY_CONSOLE_COMMAND = /^\+[a-z][a-z0-9_]{1,23}$/;
+
+/** The relay a game gets when nobody declared one: the common keys. */
+export const DEFAULT_INPUT_RELAY: InputRelaySpec = {
+  transport: 'synthetic-keys',
+  bindings: { fire: 'mouse1', use: 'e', jump: 'space', reload: 'r' },
+  notes: ['Keys reach the game only while its own window is in front.'],
+};
+
+/** Both parts of the consent: the box ticked and the word typed. */
+export function relayConsentOk(consent: { readonly ticked: boolean; readonly typed: string }): boolean {
+  return consent.ticked && consent.typed.trim().toUpperCase() === RELAY_CONFIRM_WORD;
+}
+
+/** The one line a press becomes on the wire, whitelisted: a console command or "down <key>" / "up <key>"; null for anything else. */
+export function relayCommand(spec: InputRelaySpec, action: RelayAction, phase: 'down' | 'up'): string | null {
+  const b = spec.bindings[action];
+  if (!b) return null;
+  if (spec.transport === 'console-tcp') {
+    if (!RELAY_CONSOLE_COMMAND.test(b)) return null;
+    return phase === 'down' ? b : `-${b.slice(1)}`;
+  }
+  return RELAY_KEYS.includes(b) ? `${phase} ${b}` : null;
+}
+
+/** An input relay spec from an AI's profile, checked: a known transport, a sane port, whitelisted bindings only. */
+export function checkInputRelay(v: unknown): InputRelaySpec | null {
+  if (!isRecord(v) || (v.transport !== 'console-tcp' && v.transport !== 'synthetic-keys')) return null;
+  const transport = v.transport;
+  const port = Number.isInteger(v.port) && (v.port as number) >= 1024 && (v.port as number) <= 65535 ? (v.port as number) : undefined;
+  if (transport === 'console-tcp' && port === undefined) return null;
+  const bindings: Partial<Record<RelayAction, string>> = {};
+  if (isRecord(v.bindings)) {
+    for (const a of RELAY_ACTIONS) {
+      const b = v.bindings[a];
+      if (typeof b !== 'string') continue;
+      if (transport === 'console-tcp' ? RELAY_CONSOLE_COMMAND.test(b) : RELAY_KEYS.includes(b)) bindings[a] = b;
+    }
+  }
+  if (Object.keys(bindings).length === 0) return null;
+  const launch = str(v.launchOption, 64);
+  return {
+    transport, ...(port !== undefined ? { port } : {}), ...(launch && /^-[a-z_]+( [0-9]{2,5})?$/.test(launch) ? { launchOption: launch } : {}),
+    bindings, notes: Array.isArray(v.notes) ? v.notes.filter((x): x is string => typeof x === 'string').slice(0, 4).map((x) => x.slice(0, 200)) : [],
+  };
+}
+
+// ------------------------------------------------------------------ plan 53: the bridge stage's stand-ins and manifest
+
+/** Weapon Bench parts (FIDELITY's own weapon presets) standing in for a game's weapon. */
+export interface WeaponStandIn {
+  readonly core: string;
+  readonly barrel: string;
+  readonly sight: string;
+  readonly cell: string;
+  /** How the drone names it. */
+  readonly label: string;
+}
+
+const NO_GUN = /knife|melee|fist|grenade|flash|smoke|molotov|incendiary|decoy|c4|bomb|taser|zeus|tool|kit|shield/;
+const WEAPON_CLASS_STAND_INS: readonly (readonly [RegExp, WeaponStandIn])[] = [
+  [/sniper|marksman|dmr|rail/, { core: 'core-semi', barrel: 'barrel-long', sight: 'sight-scope', cell: 'cell-compact', label: 'the scoped long rifle' }],
+  [/shotgun|scatter/, { core: 'core-semi', barrel: 'barrel-scatter', sight: 'sight-iron', cell: 'cell-compact', label: 'the scatter gun' }],
+  [/rifle|smg|submachine|machine|lmg|assault|auto|burst/, { core: 'core-burst', barrel: 'barrel-short', sight: 'sight-holo', cell: 'cell-extended', label: 'the burst rifle' }],
+  [/beam|laser|plasma|energy/, { core: 'core-beam', barrel: 'barrel-short', sight: 'sight-iron', cell: 'cell-extended', label: 'the beam' }],
+  [/pistol|revolver|handgun|semi|sidearm/, { core: 'core-semi', barrel: 'barrel-short', sight: 'sight-iron', cell: 'cell-compact', label: 'the sidearm' }],
+];
+const SIDEARM = WEAPON_CLASS_STAND_INS[4]![1];
+
+/** The FIDELITY weapon for a game's weapon class ("Rifle", "SubMachine Gun"); null for a class that is no gun (a knife, a grenade). */
+export function weaponStandIn(weaponClass: string | null): WeaponStandIn | null {
+  if (weaponClass === null) return SIDEARM;
+  const c = weaponClass.toLowerCase();
+  if (NO_GUN.test(c)) return null;
+  return WEAPON_CLASS_STAND_INS.find(([re]) => re.test(c))?.[1] ?? SIDEARM;
+}
+
+export type AspectId = 'movement' | 'fire' | 'rules' | 'state' | 'picture' | 'sound' | 'weapon' | 'characters' | 'world' | 'names';
+/** live: measured or streamed now; documented: a published constant; stand-in: a FIDELITY preset; waiting: bridgeable, nothing in yet. */
+export type AspectStatus = 'live' | 'documented' | 'stand-in' | 'waiting';
+export interface BridgeAspect {
+  readonly id: AspectId;
+  readonly status: AspectStatus;
+  /** How: the rung, the constant or the preset, in the drone's words. */
+  readonly via: string;
+}
+
+export interface BridgeManifestInput {
+  readonly profile: BridgePermissionProfile;
+  /** What the harness has measured live this session. */
+  readonly measured: { readonly movement: boolean; readonly fire: boolean; readonly rules: number };
+  /** The live HUD values seen so far (label to value). */
+  readonly state: Readonly<Record<string, string | number>>;
+  readonly weaponClass: string | null;
+  readonly pictureLinked: boolean;
+  /** What FIDELITY put in place: the movement preset, the enemies, the world. */
+  readonly standIns: { readonly movement: string; readonly enemies: string; readonly world: string };
+}
+
+/**
+ * Plan 53: for each aspect of the bridged game, how it is served in the stage. Bridged where any rung or a documented
+ * constant can carry it; a FIDELITY preset where it cannot (its assets) or where nothing has measured it yet.
+ */
+export function bridgeManifest(i: BridgeManifestInput): BridgeAspect[] {
+  const p = i.profile;
+  const d = p.documented;
+  const docMoves = d ? [d.gravityMps2 !== undefined ? `gravity ${d.gravityMps2} m/s²` : null, d.jumpImpulseMps !== undefined ? `jump ${d.jumpImpulseMps} m/s` : null, d.runSpeedMps !== undefined ? `run ${d.runSpeedMps} m/s` : null].filter((x): x is string => x !== null) : [];
+  const weapon = weaponStandIn(i.weaponClass);
+  const hudLabels = Object.keys(p.telemetry?.hud ?? {});
+  const stateSeen = Object.keys(i.state).length > 0;
+  const rung = bestChannel(p, ['telemetry']) ?? 'input-audio';
+  return [
+    i.measured.movement ? { id: 'movement', status: 'live', via: `measured by ${rung}` }
+      : docMoves.length ? { id: 'movement', status: 'documented', via: `${docMoves.join(', ')}, with ${i.standIns.movement} for the rest` }
+      : { id: 'movement', status: 'stand-in', via: i.standIns.movement },
+    i.measured.fire ? { id: 'fire', status: 'live', via: 'its own rounds, measured' }
+      : { id: 'fire', status: 'waiting', via: `${weapon?.label ?? 'no gun'}'s own pattern until a few rounds are fired` },
+    { id: 'rules', status: 'live', via: `its events, by class, in the reflex slot${i.measured.rules ? ` (+${i.measured.rules} of its own rules)` : ''}` },
+    hudLabels.length ? { id: 'state', status: stateSeen ? 'live' : 'waiting', via: `its ${hudLabels.join(', ')} on FIDELITY's HUD` } : { id: 'state', status: 'stand-in', via: 'FIDELITY\'s own HUD' },
+    i.pictureLinked ? { id: 'picture', status: 'live', via: 'its window, streamed onto the pad\'s screen (local, never saved)' }
+      : { id: 'picture', status: 'waiting', via: 'link its window from the comms panel to stream it onto the pad' },
+    { id: 'sound', status: 'stand-in', via: 'FIDELITY\'s own weapon sounds; the game\'s audio keeps playing on the PC, never copied' },
+    { id: 'weapon', status: 'stand-in', via: weapon ? `${weapon.label} (FIDELITY's Weapon Bench)` : 'none: it holds no gun' },
+    { id: 'characters', status: 'stand-in', via: i.standIns.enemies },
+    { id: 'world', status: 'stand-in', via: i.standIns.world },
+    p.streams.includes('entity-kinds') ? { id: 'names', status: 'live', via: 'its own labels for things' } : { id: 'names', status: 'stand-in', via: 'anonymous labels' },
+  ];
+}
+
+/** The drone's one-line read of a manifest, grouped by status. */
+export function manifestLine(aspects: readonly BridgeAspect[]): string {
+  const group = (s: AspectStatus): string => aspects.filter((a) => a.status === s).map((a) => `${a.id} (${a.via})`).join('; ');
+  const parts: string[] = [];
+  for (const [s, label] of [['live', 'Bridged live'], ['documented', 'Documented'], ['stand-in', 'FIDELITY stands in'], ['waiting', 'Waiting']] as const) {
+    const g = group(s);
+    if (g) parts.push(`${label}: ${g}.`);
+  }
+  return parts.join(' ');
 }
 
 // ------------------------------------------------------------------ the input-audio rung (the cadence sampler's stream)

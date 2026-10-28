@@ -117,3 +117,35 @@ test('deterministic, guarded, and honest about the last-resort channel', () => {
   const thin = transduceMechanic({ game: 'x', channel: 'telemetry', trajectory: { t: [0, 1], x: [0, 1], y: [0, 0], z: [0, 0] } });
   assert.ok(thin.notes.some((n) => /too short/.test(n)));
 });
+
+test('low gravity, airborne most of the time: the floor is where the body stands, so arcs are whole (seen live, 28 Oct)', () => {
+  // the Moon: 1.62 m/s², a 5.2 m/s jump (6.4 s in the air), re-jumped right after landing; the window starts mid-arc
+  const g = 1.62, dt = 1 / 20;
+  const t: number[] = [], x: number[] = [], y: number[] = [], z: number[] = [];
+  let h = 3.5, vy = 1.2;
+  for (let k = 0; k < 300; k++) {
+    vy -= g * dt; h = Math.max(0, h + vy * dt);
+    if (h === 0) vy = k % 2 === 0 ? 5.2 : 0;
+    t.push(k * dt); x.push(0); y.push(h); z.push(0);
+  }
+  const airborneShare = y.filter((v) => v > 0.04).length / y.length;
+  assert.ok(airborneShare > 0.9, `airborne ${airborneShare}`);
+  const r = transduceMechanic({ game: 'Moon', channel: 'telemetry', trajectory: { t, x, y, z } });
+  assert.ok(r.evidence.jumps >= 1 && Math.abs(r.locomotion!.gravityMps2 - g) / g < 0.05, `g ${r.locomotion?.gravityMps2} from ${r.evidence.jumps} arcs`);
+});
+
+test('two jumps fused by a landing no sample caught are split at the dip, not fitted as one flat arc (seen live, 28 Oct)', () => {
+  // the Moon again, re-jumped the instant it lands, sampled at 20 Hz so no sample sits on the ground between arcs
+  const g = 1.62, v0 = 5.2, period = (2 * v0) / g;
+  const t: number[] = [], x: number[] = [], y: number[] = [], z: number[] = [];
+  // ground, then three arcs back to back, then ground
+  for (let k = 0; k < 10; k++) { t.push(k * 0.05); x.push(0); y.push(0); z.push(0); }
+  for (let k = 0; k < Math.round((3 * period) / 0.05); k++) {
+    const tt = (k + 1) * 0.05, ph = tt % period;
+    t.push(0.5 + tt); x.push(0); y.push(Math.max(0.05, v0 * ph - 0.5 * g * ph * ph)); z.push(0);
+  }
+  const last = t[t.length - 1]!;
+  for (let k = 1; k <= 10; k++) { t.push(last + k * 0.05); x.push(0); y.push(0); z.push(0); }
+  const r = transduceMechanic({ game: 'Moon', channel: 'telemetry', trajectory: { t, x, y, z } });
+  assert.ok(Math.abs(r.locomotion!.gravityMps2 - g) / g < 0.05, `g ${r.locomotion?.gravityMps2} from ${r.evidence.jumps} arcs`);
+});

@@ -1,5 +1,36 @@
 # RESUME: start here (fresh session)
 
+## 28 Oct Checkpoint 3 (Claude Opus: Plans 53–55, the CS2 live run, the anti-cheat warning and the input relay; uncommitted on top of `ed83534e`; read this first)
+- **Owner asked:**
+  - a bare "bridge" takes the player to an empty scene. It bridges everything it can and stands in FIDELITY presets for the rest;
+  - any anti-cheat ban risk is told to the player, with offline, self-hosted and cheats-on modes suggested;
+  - sending input into a game is the player's choice: a box ticked plus a word typed;
+  - the drone as the top-rung composite ego, and a home for an AI swarm.
+- **Built:**
+  - [Plan 53](argo/plans/53-bridge-stage.md): the bridge stage, a pad on the Moon 260 m from the gate.
+    - Stand-in monsters, a stand-in gun chosen by weapon class, documented CS2 gravity, the BridgeHud plate, and `bridgeManifest` (live, documented, stand-in or waiting, per aspect).
+    - Anti-cheat (§2.5): `detectAntiCheat`, `banRisk`, `antiCheatAdvice`.
+    - The input relay (§2.6): the box plus **RELAY**. A token only the game tab holds; whitelisted console commands and keys; the player's own presses only, never AI-originated.
+  - [Plan 54](argo/plans/54-excitement-compass.md): the Excitement Compass (`purpose-excitement-catalyst.ts`), Argon's bundle corrected. It takes no purpose argument and is veiled through `veilObserve`. Cross-check: `docs/argo/notes/OPUS_NOTE_46`.
+  - [Plan 55](argo/plans/55-drone-composite-ego.md), a proposal: the composite ego, agent seats, and the swarm decisions. Research is in [`AI_SWARM_HOSTING_RESEARCH.md`](AI_SWARM_HOSTING_RESEARCH.md). The bridge stays loopback-only. Swarms that attack systems are never hosted.
+- **Live CS2 run:**
+  - GSI matches the shipped preset, and its round, bomb, death and health events drove the reflex slot.
+  - CS2 sends no `player.position`, so movement is a stand-in.
+  - CS2 has no `-netconport` console, so the relay uses synthetic keys only, and those reach the game only while its window is in front.
+  - Fixed on the way: a `/frame` rename crash, a slow process list, and the sampler moved to pwsh (Windows PowerShell 5.1 is Restricted here).
+- **Drone fix:** the drone's bark gap outlived a trip to the lab, because the brain's clock stops off the planet. That swallowed the first contact on return. `standDown` now forgets the last line, and it runs whenever the brain holds anything; there is a unit test for it.
+- **Gates (this state):**
+  - typecheck 0;
+  - `npm test` 3,740/3,744 (0 fail, 4 skipped); speed 23/23;
+  - e2e: drone 43/43, companion 15/15, ping & kit 24/24, gamebridge 29/29;
+  - bundle 12.78 MB / 16 MB.
+- **Next:**
+  - The CS2 fire test: a bot match, a bare "bridge" from the drone, then spray a magazine with CS2 focused.
+  - Restart the live bridge on :8220 on the new code first.
+  - Owner decisions: the child-facing CS2 skin, and the Plan 55 gateway (opening the bridge beyond this PC).
+  - [Plan 56](argo/plans/56-distortion-ladder.md), the owner's distortion ladder (a proposal): excitement hardens presets, higher rungs repair their distortions with the SQ check, and presets grow or perish. Research comes first; the pieces exist in `@hm/harness`, unwired.
+- **Skill:** the owner's SQ distortion check is installed locally at `.claude/skills/sq-distortion-check`.
+
 ## 28 Oct Checkpoint 2 (Claude Opus: Plan 51 Wave 3 + Plan 52, Commit `8600a81b`; read this first)
 - **Asked (owner and Argon):**
   - validate every gamebridge channel at once: CS2 (official telemetry), Quake (none), and a second FIDELITY tab;

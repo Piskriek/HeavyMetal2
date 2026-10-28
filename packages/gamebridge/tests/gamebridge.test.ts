@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { transduceMechanic, type MechanicObservation } from '@hm/harness';
 import {
-  allowedChannels, anonymizeEvents, bestChannel, createCadenceAnalyzer, parseCadenceLine, PRESET_SIGNATURES, bridgePresetFor, checkBridgeProfile, classifyEventField, createEventAnonymizer, CS2_TELEMETRY_MAPPING, pathTokens, readRaw, createTelemetryAccumulator, decodeBridgeProfileCode, encodeBridgeProfileCode, gameIdOf,
+  allowedChannels, anonymizeEvents, antiCheatAdvice, checkInputRelay, relayCommand, relayConsentOk, type InputRelaySpec, banRisk, detectAntiCheat, type BridgeAction, bestChannel, bridgeManifest, manifestLine, weaponStandIn, createCadenceAnalyzer, parseCadenceLine, PRESET_SIGNATURES, bridgePresetFor, checkBridgeProfile, classifyEventField, createEventAnonymizer, CS2_TELEMETRY_MAPPING, pathTokens, readRaw, createTelemetryAccumulator, decodeBridgeProfileCode, encodeBridgeProfileCode, gameIdOf,
   gateObservation, profileLine, rankRunningGames, readPath, uncheckedProfile, type BridgePermissionProfile,
 } from '../src/index';
 
@@ -99,7 +99,8 @@ test('official telemetry maps through a preset (data, not code) and the harness 
   const obs = acc.take('Test Game', 'telemetry')!;
   assert.ok(obs.trajectory && obs.shots && obs.events);
   assert.deepEqual(obs.events, [{ t: 200 * dt, name: 'round.phase:over' }]);
-  assert.equal(acc.size(), 0, 'take clears');
+  assert.deepEqual([acc.counts().shots, acc.counts().events], [0, 0], 'take clears the shots and events');
+  assert.ok(acc.counts().trajectory > 0 && acc.counts().trajectory <= 241, 'and keeps the last 8 s of trajectory for the next batch');
   const gated = gateObservation(profile(), obs);
   const r = transduceMechanic(gated.observation!);
   assert.ok(Math.abs(r.locomotion!.gravityMps2 - g) / g < 0.05, `gravity ${r.locomotion!.gravityMps2}`);
@@ -216,6 +217,86 @@ test('a sparse feed fills by time: the accumulator reports the span of game time
   const acc = createTelemetryAccumulator({ shotCounter: { path: 'n' } });
   for (let k = 0; k < 6; k++) acc.push({ n: k }, k * 2.5);
   assert.equal(acc.span(), 12.5);
+  assert.deepEqual(acc.counts(), { trajectory: 0, shots: 5, events: 0 }, 'shots alone: this batch may close by time');
   acc.take('Sparse', 'telemetry');
   assert.equal(acc.span(), 0, 'take clears the span');
+});
+
+test('plan 53: a game\'s weapon class picks the FIDELITY weapon that stands in for it; no gun is no gun', () => {
+  assert.equal(weaponStandIn('Rifle')?.core, 'core-burst');
+  assert.equal(weaponStandIn('SubMachine Gun')?.label, 'the burst rifle');
+  assert.equal(weaponStandIn('SniperRifle')?.sight, 'sight-scope');
+  assert.equal(weaponStandIn('Shotgun')?.barrel, 'barrel-scatter');
+  assert.equal(weaponStandIn('Pistol')?.label, 'the sidearm');
+  assert.equal(weaponStandIn('Knife'), null);
+  assert.equal(weaponStandIn('Grenade'), null);
+  assert.equal(weaponStandIn('semi-8')?.core, 'core-semi', 'FIDELITY\'s own classes read too');
+  assert.equal(weaponStandIn('Banana Launcher')?.label, 'the sidearm', 'an unknown gun gets the sidearm');
+});
+
+test('plan 53: the manifest bridges what can cross and names the FIDELITY stand-in for the rest', () => {
+  const standIns = { movement: 'FIDELITY earth-standard', enemies: '3 FIDELITY chargers', world: 'the bridge pad on the Moon' };
+  const cs2 = bridgePresetFor('cs2')!;
+  const m = bridgeManifest({ profile: cs2, measured: { movement: false, fire: false, rules: 0 }, state: { health: 100 }, weaponClass: 'Rifle', pictureLinked: false, standIns });
+  const by = Object.fromEntries(m.map((a) => [a.id, a]));
+  assert.equal(by.movement!.status, 'documented', 'CS2 sends no position: its published gravity');
+  assert.match(by.movement!.via, /gravity 20\.32 m\/s², with FIDELITY earth-standard for the rest/);
+  assert.deepEqual([by.fire!.status, by.rules!.status, by.state!.status, by.picture!.status], ['waiting', 'live', 'live', 'waiting']);
+  assert.deepEqual([by.weapon!.status, by.characters!.status, by.world!.status, by.sound!.status], ['stand-in', 'stand-in', 'stand-in', 'stand-in']);
+  assert.match(by.weapon!.via, /the burst rifle/);
+  assert.equal(by.names!.status, 'live', 'GSI\'s field values are API names, allowed by the profile');
+  // once measured and linked, those turn live; an unchecked game's names are labels, its movement a stand-in
+  const later = bridgeManifest({ profile: cs2, measured: { movement: false, fire: true, rules: 2 }, state: {}, weaponClass: 'Knife', pictureLinked: true, standIns });
+  const lb = Object.fromEntries(later.map((a) => [a.id, a]));
+  assert.deepEqual([lb.fire!.status, lb.picture!.status, lb.state!.status], ['live', 'live', 'waiting']);
+  assert.match(lb.weapon!.via, /no gun/);
+  assert.match(lb.rules!.via, /\+2 of its own rules/);
+  const indie = bridgeManifest({ profile: uncheckedProfile('Some Indie'), measured: { movement: false, fire: false, rules: 0 }, state: {}, weaponClass: null, pictureLinked: false, standIns });
+  const ib = Object.fromEntries(indie.map((a) => [a.id, a]));
+  assert.deepEqual([ib.movement!.status, ib.state!.status, ib.names!.status], ['stand-in', 'stand-in', 'stand-in']);
+  assert.match(manifestLine(m), /^Bridged live: rules .*Documented: movement .*FIDELITY stands in: .*Waiting: fire/);
+});
+
+test('plan 53: documented mechanics from an AI are checked: plausible numbers, each with a source', () => {
+  assert.deepEqual(profile({ documented: { gravityMps2: 9.8, sources: [{ url: 'https://example.com/convars', quote: 'gravity 9.8' }] } }).documented?.gravityMps2, 9.8);
+  assert.equal(profile({ documented: { gravityMps2: 9.8, sources: [] } }).documented, undefined, 'no source, no claim');
+  assert.equal(profile({ documented: { gravityMps2: 9999, sources: [{ url: 'https://x.y', quote: '' }] } }).documented, undefined, 'implausible');
+  assert.equal(profile({ telemetry: { weaponClass: 'a..b' } }), null, 'a bad weapon-class path refuses the profile');
+  assert.deepEqual(profile({ telemetry: { hud: { health: 'player.hp', 'Bad Label!': 'x' } } }).telemetry?.hud, { health: 'player.hp' });
+});
+
+test('plan 53: anti-cheat: the drone names the system, the risk of what it uses, and the modes where deeper is safe', () => {
+  assert.deepEqual(detectAntiCheat(['explorer.exe', 'BEService_x64.exe', 'vgc.exe', 'EasyAntiCheat_EOS.exe', 'PnkBstrA.exe', 'notepad.exe']).map((d) => d.system),
+    ['BattlEye', 'Riot Vanguard', 'Easy Anti-Cheat', 'PunkBuster']);
+  // what this bridge uses reads only what the game sends out or what the player sees and hears
+  assert.deepEqual(['telemetry', 'screen', 'input-audio', 'mod-sdk', 'mod-loader', 'game-files', 'input-out'].map((a) => banRisk(a as BridgeAction, true)),
+    ['none known', 'none known', 'low', 'low', 'high', 'high', 'high']);
+  assert.equal(banRisk('input-out', false), 'none known', 'no anti-cheat, no ban');
+  const cs2 = antiCheatAdvice(bridgePresetFor('cs2')!, ['cs2.exe'])!;
+  assert.deepEqual(cs2.systems, ['VAC (Valve Anti-Cheat)']);
+  assert.match(cs2.line, /never touches the game/);
+  assert.match(cs2.line, /sending input into it, risks a ban: only in offline practice against bots; a private or LAN server you host yourself, with sv_cheats 1/);
+  assert.match(cs2.line, /-insecure.*Valve does not document whether it removes ban risk/);
+  // a game nobody checked, with BattlEye running: the generic safe modes, and "whenever the game runs"
+  const indie = antiCheatAdvice(uncheckedProfile('Some Shooter'), ['SomeShooter.exe', 'BEService.exe'])!;
+  assert.match(indie.line, /^Some Shooter runs BattlEye, which watches whenever the game runs/);
+  assert.equal(antiCheatAdvice(uncheckedProfile('Calm Game'), ['CalmGame.exe']), null, 'nothing known, nothing said');
+  assert.equal(profile({ antiCheat: { system: 'EAC', scope: 'always', safeModes: ['offline'], sources: [] } }).antiCheat?.scope, 'always');
+});
+
+test('plan 53: the input relay is the player\'s choice: a box and a word; only whitelisted presses go on the wire', () => {
+  assert.equal(relayConsentOk({ ticked: true, typed: ' relay ' }), true);
+  assert.equal(relayConsentOk({ ticked: false, typed: 'RELAY' }), false, 'the box too');
+  assert.equal(relayConsentOk({ ticked: true, typed: 'yes' }), false, 'the word, exactly');
+  const cs2 = bridgePresetFor('cs2')!.inputRelay!;
+  assert.equal(cs2.transport, 'synthetic-keys');
+  assert.deepEqual([relayCommand(cs2, 'fire', 'down'), relayCommand(cs2, 'fire', 'up'), relayCommand(cs2, 'jump', 'down')], ['down mouse1', 'up mouse1', 'down space']);
+  const console: InputRelaySpec = { transport: 'console-tcp', port: 2121, bindings: { fire: '+attack', use: '+use' }, notes: [] };
+  assert.deepEqual([relayCommand(console, 'fire', 'down'), relayCommand(console, 'fire', 'up'), relayCommand(console, 'jump', 'down')], ['+attack', '-attack', null]);
+  // an AI's relay spec is checked: no arbitrary console, no keys off the list, a port for a console
+  assert.equal(checkInputRelay({ transport: 'console-tcp', port: 2121, bindings: { fire: 'quit' } }), null);
+  assert.equal(checkInputRelay({ transport: 'console-tcp', bindings: { fire: '+attack' } }), null, 'a console needs its port');
+  assert.deepEqual(checkInputRelay({ transport: 'synthetic-keys', bindings: { fire: 'mouse1', use: 'alt+f4' } })?.bindings, { fire: 'mouse1' });
+  assert.equal(checkInputRelay({ transport: 'console-tcp', port: 2121, bindings: { fire: '+attack; quit' } }), null, 'no chained commands');
+  assert.equal(profile({ inputRelay: { transport: 'console-tcp', port: 2121, bindings: { fire: '+attack' }, launchOption: '-netconport 2121' } }).inputRelay?.launchOption, '-netconport 2121');
 });

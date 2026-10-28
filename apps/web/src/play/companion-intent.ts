@@ -50,6 +50,8 @@ export type CompanionIntent =
   | { readonly kind: 'mimic-apply' }
   | { readonly kind: 'bridge-game'; readonly name: string | null }
   | { readonly kind: 'bridge-stop' }
+  | { readonly kind: 'relay-on' }
+  | { readonly kind: 'relay-off' }
   | { readonly kind: 'chat' };
 
 /** A resolved order: where to go, whether to float there, and the spoken confirmation. */
@@ -124,6 +126,9 @@ export function parseCompanionIntent(raw: string): CompanionIntent {
     if (hits(text, tokens, ['apply', 'try', 'use', 'put', 'give me', 'switch to', 'load'])) return { kind: 'mimic-apply' };
   }
   if (hits(text, tokens, ['keep it', 'keep that', 'keep this', 'yes keep', 'apply it', 'commit it'])) return { kind: 'keep' };
+  // plan 53: the input relay is the player's choice; this only opens the dialog (a box ticked and a word typed turn it on)
+  if (/^(?:please )?(?:relay my (?:input|presses|keys)|send my (?:input|presses|keys) (?:to|into) the game|(?:turn on|start|enable) (?:the )?(?:input )?relay|input relay on)\b/.test(text)) return { kind: 'relay-on' };
+  if (/^(?:please )?(?:(?:stop|end|turn off|disable) (?:the )?(?:input )?relay|relay off|input relay off)\b/.test(text)) return { kind: 'relay-off' };
   // plan 51 wave 2: ending the bridge puts back everything its live mimic changed
   if (/^(?:please )?(?:unbridge|unlink the game|(?:stop|end|close|drop|cut|kill) (?:the )?(?:bridge|bridging|game bridge|mimic|mimicking)|disconnect(?: from)?(?: the)? (?:game|bridge))\b/.test(text)) return { kind: 'bridge-stop' };
   // plan 51 wave 2: "bridge this game", "bridge counter strike", "hook into the game I'm playing": the name, if said
@@ -259,6 +264,8 @@ export function resolveCompanionOrder(
     case 'mimic-apply':
     case 'bridge-game':
     case 'bridge-stop':
+    case 'relay-on':
+    case 'relay-off':
       return { intent, ...none, reply: '' }; // the caller runs it (the kit edit, the order or the find) and reports it
     case 'chat':
       return { intent, ...none, reply: '' }; // the caller routes to the bridge or small talk

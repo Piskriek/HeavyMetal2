@@ -137,6 +137,8 @@ export interface MonstersSystem {
   /** TICKET-15: [V] Key Turbo Bass knockback against nearby stage-0/1 Swarmers. Returns count pushed. */
   knockbackSwarmers(origin: { readonly x: number; readonly z: number }, radiusM?: number, pushDistanceM?: number): number;
   clearMobs(): void;
+  /** Takes one monster out without a death (no drop, no kill); false when there is none by that id. */
+  removeMob(id: number): boolean;
   dispose(): void;
 }
 
@@ -952,6 +954,12 @@ export function createMonsters(options: {
     clearMobs() {
       world = { ...world, mobs: [], bolts: [] };
       renderer.sync([], () => '');
+    },
+    removeMob(id) {
+      // gone without a death: no drop, no kill (plan 53's stand-ins leave with the bridge stage)
+      const before = world.mobs.length;
+      world = { ...world, mobs: world.mobs.filter((m) => m.id !== id) };
+      return world.mobs.length < before;
     },
     dispose() {
       renderer.dispose();

@@ -23,14 +23,17 @@ import {
 import type { ScoutCategory } from './companion-scout';
 import { KNOWN_BRIDGE_GAMES } from '@hm/bridgekit';
 import {
-  bridgePresetFor, checkBridgeProfile, createCadenceAnalyzer, PRESET_SIGNATURES, createEventAnonymizer, createTelemetryAccumulator, parseCadenceLine, gameIdOf, profileLine, rankRunningGames, uncheckedProfile,
-  type BridgePermissionProfile, type CadenceAnalyzer, type EventClass, type TelemetryAccumulator,
+  antiCheatAdvice, bridgeManifest, bridgePresetFor, checkBridgeProfile, createCadenceAnalyzer, DEFAULT_INPUT_RELAY, RELAY_CONFIRM_WORD, relayCommand, relayConsentOk, manifestLine, PRESET_SIGNATURES, readRaw, createEventAnonymizer, createTelemetryAccumulator, parseCadenceLine, gameIdOf, profileLine, rankRunningGames, uncheckedProfile,
+  type BridgePermissionProfile, type CadenceAnalyzer, type DocumentedMechanics, type InputRelaySpec, type RelayAction, type EventClass, type TelemetryAccumulator,
 } from '@hm/gamebridge';
 
 /** Plan 51 wave 2: this many telemetry samples (about 10 s of a 30 Hz feed) make one observation for the harness... */
 const TELEMETRY_BATCH = 300;
 /** ...or this many seconds of the game's time with a few samples in it, for a slow or sparse feed (a game that posts on change). */
 const TELEMETRY_SPAN_S = 10;
+/** A trajectory from a slow feed closes after this long once it holds enough samples for a gravity fit. */
+const TRAJECTORY_SPAN_S = 20;
+const TRAJECTORY_MIN = 150;
 /** Plan 51 wave 3: this many cadence-sampler samples (about 8 s at 200 Hz) make one input-audio observation. */
 const CADENCE_WINDOW = 1600;
 /** A live bridge's refinements speak at most this often (the bridge still gets every result). */
@@ -43,6 +46,8 @@ export interface CompanionChatHandle {
   say(text: string, spoken?: string): void;
   /** Sends an event to the bridge when it is linked (a ping). */
   post(event: Readonly<Record<string, unknown>>): void;
+  /** Plan 53: the player's own press, relayed into the bridged game only if they turned the relay on. */
+  relay(action: RelayAction, phase: 'down' | 'up'): void;
 }
 
 /** A kit order from a voice order or from an AI on the bridge (plan 49 Mission 2). No kit id: the last ping's. */
@@ -90,6 +95,18 @@ export interface CompanionDroneOps {
   reflexStart(classes?: Readonly<Record<string, EventClass>>): void;
   /** Feeds the bridged game's events to the slot as they happen; returns the reflexes that ran. */
   reflex(events: readonly string[]): readonly string[];
+  /** Plan 53: the bridge stage (a bare "bridge"): the pad on an empty stretch of the Moon, the stand-ins, and back again. */
+  enterBridgeStage(): string;
+  exitBridgeStage(): string;
+  /** The FIDELITY stand-ins for what the game says: its weapon class picks the gun; its documented constants the movement. */
+  bridgeStandIns(info: { readonly weaponClass?: string | null; readonly documented?: DocumentedMechanics }): void;
+  /** The game's live state on FIDELITY's HUD (null takes it down). */
+  bridgeHud(title: string, state: Readonly<Record<string, string | number>> | null): void;
+  stageStatus(): {
+    readonly onStage: boolean; readonly weaponClass: string | null; readonly pictureLinked: boolean;
+    readonly measured: { readonly movement: boolean; readonly fire: boolean; readonly rules: number };
+    readonly standIns: { readonly movement: string; readonly enemies: string; readonly world: string };
+  };
   /** Plan 51: puts the last mimic in force (the player's words only). */
   applyMimic(): string;
 }
@@ -133,6 +150,8 @@ interface Message {
 
 /** How long the comms count the bridge as linked after its last answer to a poll. */
 const BRIDGE_GRACE_MS = 15000;
+/** Events still go to a bridge that answered within this long (a stall must not drop a session's bridge-active). */
+const BRIDGE_EVENT_GRACE_MS = 120000;
 
 /**
  * The Neural Bridge's address: localhost:8220, or `?bridge=<port>` (the e2e runs its own bridge beside a live one). Only
@@ -266,7 +285,9 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
   /** Plan 51 wave 3: this comms instance on the bridge (two FIDELITY tabs can share one bridge: the self-bridge). */
   const clientIdRef = useRef(`c${Math.floor(performance.now() * 1000).toString(36)}${Math.floor(performance.timeOrigin % 1e9).toString(36)}`);
   const postBridgeEvent = (event: Readonly<Record<string, unknown>>): void => {
-    if (!bridgeLinkedRef.current || !bridgeUrl.current) return;
+    // posted whenever the bridge answered a poll in the last two minutes: a long frame (the world loading far away on the
+    // min-spec laptop) can outlast the link's 15 s grace, and an event dropped then (a bridge-active) loses a whole session
+    if (!bridgeUrl.current || Date.now() - lastPollOkRef.current > BRIDGE_EVENT_GRACE_MS) return;
     void fetch(`${bridgeUrl.current}/event`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -292,6 +313,7 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
     handleRef.current = {
       say: (text, spoken) => companionSaysRef.current(text, spoken),
       post: (event) => postBridgeEventRef.current(event),
+      relay: (action, phase) => relayPressRef.current(action, phase),
     };
     return () => { handleRef.current = null; };
   }, [handleRef]);
@@ -313,25 +335,127 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
     /** The input-audio rung (the cadence sampler), a floor rung every bridged game gets. */
     cadence: CadenceAnalyzer;
     lastSaidAt: number;
+    /** Plan 53: the game's live state for FIDELITY's HUD (its mapping's `hud` paths). */
+    hudState: Record<string, string | number>;
   } | null>(null);
+  /** Plan 53: the process list the last bridge order saw (anti-cheat detection), and the anti-cheat line said for it. */
+  const lastProcessesRef = useRef<readonly string[]>([]);
+  const antiCheatSaidRef = useRef('');
+
+  // ---- Plan 53: the input relay, the player's own choice (owner: "we don't judge... click a box and write a word") ----
+  const [relayDialog, setRelayDialog] = useState<{ readonly gameId: string; readonly title: string; readonly warning: string; readonly limits: readonly string[]; readonly spec: InputRelaySpec; readonly process: string | null } | null>(null);
+  const [relayTicked, setRelayTicked] = useState(false);
+  const [relayTyped, setRelayTyped] = useState('');
+  /** The relay while it is on: the token only this tab holds (never posted to the bridge's events). */
+  const relayRef = useRef<{ readonly gameId: string; readonly token: string; readonly spec: InputRelaySpec } | null>(null);
+  const closeRelayDialog = (line?: string): void => {
+    setRelayDialog(null);
+    setRelayTicked(false);
+    setRelayTyped('');
+    if (line) companionSays(line);
+  };
+  /** "Relay my input": opens the consent for the bridged game (it never turns on by itself). */
+  const openRelayDialog = (): void => {
+    const s = bridgeSessionRef.current;
+    if (!s) { companionSays('Bridge a game first, then say "relay my input".'); return; }
+    const spec = s.profile.inputRelay ?? DEFAULT_INPUT_RELAY;
+    const ac = antiCheatAdvice(s.profile, lastProcessesRef.current);
+    const warning = ac ? `${s.title} runs ${ac.systems.join(' and ')}. Pressing into it from outside is what anti-cheats exist to catch: it can get your account banned. Safe modes: ${(s.profile.antiCheat?.safeModes ?? ['offline or single-player', 'a server you host yourself']).join('; ')}.`
+      : `No anti-cheat is known for ${s.title}. If it has one, pressing into it from outside can get your account banned.`;
+    const limits = [
+      ...(spec.transport === 'console-tcp' ? [`Your presses go to its console on port ${spec.port}${spec.launchOption ? ` (start it with ${spec.launchOption})` : ''}.`] : ['Your presses go in as keys and mouse buttons, and only while its own window is in front; with any other window in front they are dropped.']),
+      ...spec.notes,
+    ];
+    setRelayTicked(false);
+    setRelayTyped('');
+    setRelayDialog({ gameId: s.gameId, title: s.title, warning, limits, spec, process: s.process });
+    companionSays(`Before I relay anything into ${s.title}: read the box, tick it, and type ${RELAY_CONFIRM_WORD}.`);
+  };
+  const armRelay = async (): Promise<void> => {
+    const d = relayDialog;
+    const base = bridgeUrl.current;
+    if (!d || !base || !relayConsentOk({ ticked: relayTicked, typed: relayTyped })) return;
+    try {
+      const res = await fetch(`${base}/input-relay/arm`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId: d.gameId, ticked: relayTicked, typed: relayTyped, transport: d.spec.transport, port: d.spec.port, process: d.process, launchOption: d.spec.launchOption }),
+      });
+      const data = (await res.json()) as { ok?: boolean; token?: string; error?: string };
+      if (!data.ok || !data.token) throw new Error(data.error ?? `the bridge answered ${res.status}`);
+      relayRef.current = { gameId: d.gameId, token: data.token, spec: d.spec };
+      postBridgeEvent({ type: 'relay-on', gameId: d.gameId, transport: d.spec.transport });
+      closeRelayDialog(`Input relay on for ${d.title}, by your choice: your fire, use, jump and reload presses go across. "Stop the relay" turns it off.`);
+    } catch (err) {
+      closeRelayDialog(`The relay did not turn on: ${err instanceof Error ? err.message : String(err)}.`);
+    }
+  };
+  const disarmRelay = (say: boolean): void => {
+    const r = relayRef.current;
+    relayRef.current = null;
+    if (r && bridgeUrl.current) {
+      void fetch(`${bridgeUrl.current}/input-relay/disarm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gameId: r.gameId, token: r.token }) }).catch(() => {});
+      postBridgeEvent({ type: 'relay-off', gameId: r.gameId });
+    }
+    if (say) companionSays(r ? 'Input relay off.' : 'The input relay was not on.');
+  };
+  /** One of the player's own presses, relayed only while the relay they chose is on. */
+  const relayPress = (action: RelayAction, phase: 'down' | 'up'): void => {
+    const r = relayRef.current;
+    const base = bridgeUrl.current;
+    if (!r || !base) return;
+    const line = relayCommand(r.spec, action, phase);
+    if (!line) return;
+    void fetch(`${base}/input-relay/press`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gameId: r.gameId, token: r.token, line }) }).catch(() => {});
+  };
+  const relayPressRef = useRef(relayPress);
+  relayPressRef.current = relayPress;
+  /** Plan 53: on the bridge stage, what crossed and what FIDELITY stands in for: to the bridge always, aloud when asked. */
+  const postManifest = (say: boolean): void => {
+    const s = bridgeSessionRef.current;
+    const o = droneOpsRef.current;
+    if (!s || !o) return;
+    const st = o.stageStatus();
+    if (!st.onStage) return;
+    const aspects = bridgeManifest({ profile: s.profile, measured: st.measured, state: s.hudState, weaponClass: st.weaponClass, pictureLinked: st.pictureLinked, standIns: st.standIns });
+    postBridgeEvent({ type: 'bridge-manifest', gameId: s.gameId, aspects });
+    if (say) companionSays(manifestLine(aspects), 'What crosses, and what FIDELITY stands in for, is on the bridge.');
+  };
   /** Puts a profile in force for the session (a checked one replaces the unchecked one) and says what may cross. */
   const applyBridgeProfile = (p: BridgePermissionProfile, process: string | null): void => {
     // the game's own telemetry is a floor rung: it streams whenever there is a mapping that says which fields are which
     const prev = bridgeSessionRef.current?.gameId === p.gameId ? bridgeSessionRef.current : null;
     const rename = p.streams.includes('entity-kinds') ? null : prev?.rename ?? createEventAnonymizer();
     const acc = p.telemetry ? createTelemetryAccumulator(p.telemetry, rename ? { rename } : {}) : null;
-    bridgeSessionRef.current = { gameId: p.gameId, title: p.title, process, profile: p, acc, unmappedSaid: false, rename, cadence: prev?.cadence ?? createCadenceAnalyzer(), lastSaidAt: 0 };
+    bridgeSessionRef.current = { gameId: p.gameId, title: p.title, process, profile: p, acc, unmappedSaid: false, rename, cadence: prev?.cadence ?? createCadenceAnalyzer(), lastSaidAt: 0, hudState: prev?.hudState ?? {} };
     // the reflex slot opens with the bridge: the game's events drive the suit and the drone as they happen
     droneOpsRef.current?.reflexStart(p.telemetry?.eventClasses);
     companionSays(`${profileLine(p)} Whatever I read of it goes straight onto you; "stop the bridge" puts everything back.`, `${p.title} is bridged. Its mechanics come across, never its art.`);
     postBridgeEvent({ type: 'bridge-active', gameId: p.gameId, title: p.title, process, verdict: p.verdict, channels: p.channels, streams: p.streams, mapped: acc !== null });
+    // plan 53: an anti-cheat guarding the game (its profile, or its process running here) is said before anything else
+    // crosses: the ban risk of what this bridge uses, and the modes where going deeper is safe
+    const ac = antiCheatAdvice(p, lastProcessesRef.current);
+    if (ac && antiCheatSaidRef.current !== `${p.gameId}:${ac.systems.join(',')}`) {
+      antiCheatSaidRef.current = `${p.gameId}:${ac.systems.join(',')}`;
+      companionSays(ac.line, `${p.title} runs ${ac.systems.join(' and ')}. What I use is safe; anything deeper only offline or on your own server.`);
+      postBridgeEvent({ type: 'anti-cheat', gameId: p.gameId, systems: ac.systems, risks: ac.risks });
+    }
+    // plan 53: on the stage, its published constants and FIDELITY's stand-ins go in now, and the drone says which is which
+    if (droneOpsRef.current?.stageStatus().onStage) {
+      droneOpsRef.current.bridgeStandIns({ weaponClass: null, ...(p.documented ? { documented: p.documented } : {}) });
+      postManifest(true);
+    }
   };
   /** The player's order: finds the game on this PC (the name said, or the likeliest running game) and asks for a verdict. */
-  const bridgeGame = async (name: string | null): Promise<void> => {
+  const bridgeGame = async (name: string | null, stage = false): Promise<void> => {
     const base = bridgeUrl.current;
     if (!bridgeLinkedRef.current || !base) {
       companionSays('Bridging another game needs the Neural Bridge running on this PC (node scripts/companion-bridge.mjs).');
       return;
+    }
+    // plan 53: a bare "bridge" (nothing named) goes to the bridge stage first: an empty stretch of the Moon
+    if (stage) {
+      const line = droneOpsRef.current?.enterBridgeStage();
+      if (line) companionSays(line);
     }
     let processes: string[] = [];
     try {
@@ -360,9 +484,10 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
     const process = pick?.process ?? null;
     // the session starts at once on the unchecked profile (mechanics through the floor), so the bridge works out of the box;
     // an AI's checked verdict, when it comes, widens or narrows the rest
-    endBridgeSession(false);
+    endBridgeSession(false, stage);
     // a shipped preset (CS2, any FIDELITY game) is a checked profile with its telemetry mapping: no AI needed for it
     const preset = bridgePresetFor(gameId);
+    lastProcessesRef.current = processes;
     applyBridgeProfile(preset ?? uncheckedProfile(title, gameId), process);
     if (preset) return;
     let checked = false;
@@ -402,13 +527,19 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
       companionSays(`Reflex from the bridge: ${first.join(', ')} (on ${names[0]}).`, 'Reflex.');
     }
   };
-  /** Ends the session; `say` false when a new bridge replaces it. Whatever its mimics changed goes back. */
-  const endBridgeSession = (say = true): void => {
+  /**
+   * Ends the session; `say` false when a new bridge replaces it. Whatever its mimics changed goes back, and the bridge stage
+   * with it (plan 53) unless `keepStage` (a new bare "bridge" on the stage).
+   */
+  const endBridgeSession = (say = true, keepStage = false): void => {
     const s = bridgeSessionRef.current;
     bridgeSessionRef.current = null;
     const undone = droneOpsRef.current?.endLiveMimic() ?? '';
+    const back = keepStage ? '' : droneOpsRef.current?.exitBridgeStage() ?? '';
+    // the relay ends with the bridge it was chosen for (the bridge disarms it too, on bridge-closed)
+    if (relayRef.current) disarmRelay(false);
     if (s) postBridgeEvent({ type: 'bridge-closed', gameId: s.gameId });
-    if (say) companionSays(s ? `Unbridged from ${s.title}. ${undone}` : 'No game is bridged.');
+    if (say) companionSays(s ? `Unbridged from ${s.title}. ${undone}${back ? ` ${back}` : ''}` : back || 'No game is bridged.');
   };
 
   /** "Save as default": the bridge writes the kit's overrides into the shipped defaults file (plan 49). */
@@ -471,8 +602,11 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
         case 'undo': companionSays(drone((o) => o.undo())); return;
         case 'keep': companionSays(drone((o) => o.keep())); return;
         case 'mimic-apply': companionSays(drone((o) => o.applyMimic())); return;
-        case 'bridge-game': void bridgeGame(intent.name); return;
+        // plan 53: nothing named ("bridge", "bridge this game") goes to the bridge stage; a named game bridges in place
+        case 'bridge-game': void bridgeGame(intent.name, intent.name === null); return;
         case 'bridge-stop': endBridgeSession(); return;
+        case 'relay-on': openRelayDialog(); return;
+        case 'relay-off': disarmRelay(true); return;
         default: break;
       }
       if (intent.kind === 'status') {
@@ -691,7 +825,7 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
           // the window's counts, so an AI on the bridge can see the sampler working even when no shots were heard
           postBridgeEvent({ type: 'cadence-window', gameId: s.gameId, samples, shots: obs?.shots?.t.length ?? 0, edges: obs?.events?.length ?? 0 });
           const o = droneOpsRef.current;
-          if (obs?.shots && o) liveMimicSafe(s, () => o.mimic(obs, s.profile, true));
+          if (obs?.shots && o) { liveMimicSafe(s, () => o.mimic(obs, s.profile, true)); postManifest(false); }
         }
         return;
       }
@@ -708,11 +842,34 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
         }
         const made = s.acc.push(t.payload, typeof t.at === 'number' ? t.at : 0);
         if (made.length) feedReflexes(s.gameId, made.map((e) => e.name));
-        if (s.acc.size() >= TELEMETRY_BATCH || (s.acc.span() >= TELEMETRY_SPAN_S && s.acc.size() >= 12)) {
+        // plan 53: the held weapon's class picks FIDELITY's stand-in gun; the game's state goes on FIDELITY's HUD
+        const tm = s.profile.telemetry;
+        if (tm?.weaponClass) {
+          const c = readRaw(t.payload, tm.weaponClass);
+          if (typeof c === 'string') droneOpsRef.current?.bridgeStandIns({ weaponClass: c });
+        }
+        if (tm?.hud) {
+          const next: Record<string, string | number> = {};
+          for (const [label, path] of Object.entries(tm.hud)) {
+            const v = readRaw(t.payload, path);
+            if (typeof v === 'number' || typeof v === 'string') next[label] = v;
+            else if (typeof v === 'boolean') next[label] = v ? 'yes' : 'no';
+          }
+          if (JSON.stringify(next) !== JSON.stringify(s.hudState)) {
+            const first = Object.keys(s.hudState).length === 0 && Object.keys(next).length > 0;
+            s.hudState = next;
+            droneOpsRef.current?.bridgeHud(s.title, Object.keys(next).length ? next : null);
+            if (first) postManifest(false);
+          }
+        }
+        // a trajectory wants a full batch (a gravity fit needs its jumps); shots and events alone close after a span of time
+        const held = s.acc.counts();
+        if (s.acc.size() >= TELEMETRY_BATCH || (s.acc.span() >= TELEMETRY_SPAN_S && s.acc.size() >= 12 && held.trajectory === 0)
+          || (s.acc.span() >= TRAJECTORY_SPAN_S && held.trajectory >= TRAJECTORY_MIN)) {
           const obs = s.acc.take(s.title, 'telemetry');
           postBridgeEvent({ type: 'telemetry-batch', gameId: s.gameId, trajectory: obs?.trajectory?.t.length ?? 0, shots: obs?.shots?.t.length ?? 0, events: obs?.events?.length ?? 0 });
           const o = droneOpsRef.current;
-          if (obs && o) liveMimicSafe(s, () => o.mimic(obs, s.profile, true));
+          if (obs && o) { liveMimicSafe(s, () => o.mimic(obs, s.profile, true)); postManifest(false); }
         }
         return;
       }
@@ -819,13 +976,32 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
             </button>
           </div>
 
-          <div className="companion-chat-log" ref={logRef}>
-            {messages.map((m) => (
-              <div key={m.id} className={`chat-bubble ${m.sender}`}>
-                {m.text}
+          {relayDialog ? (
+            <section className="companion-relay-consent" aria-label={`Relay your presses into ${relayDialog.title}`} data-testid="relay-consent">
+              <h3>Relay your presses into {relayDialog.title}</h3>
+              <p className="relay-risk">{relayDialog.warning}</p>
+              <p>Only your own fire, use, jump and reload presses cross, while you press them here. The drone never presses anything in another game.</p>
+              {relayDialog.limits.map((l) => <p key={l} className="relay-limit">{l}</p>)}
+              <label>
+                <input type="checkbox" checked={relayTicked} onChange={(e) => setRelayTicked(e.target.checked)} data-testid="relay-tick" />
+                <span>I understand this can get my account banned in {relayDialog.title}.</span>
+              </label>
+              <span className="relay-word">Type {RELAY_CONFIRM_WORD} to turn it on</span>
+              <input type="text" value={relayTyped} onChange={(e) => setRelayTyped(e.target.value)} aria-label={`Type ${RELAY_CONFIRM_WORD} to turn the relay on`} data-testid="relay-word" />
+              <div className="companion-relay-actions">
+                <button type="button" disabled={!relayConsentOk({ ticked: relayTicked, typed: relayTyped })} onClick={() => void armRelay()} data-testid="relay-on">Turn on relay</button>
+                <button type="button" className="relay-cancel" onClick={() => closeRelayDialog('Relay left off.')}>Cancel</button>
               </div>
-            ))}
-          </div>
+            </section>
+          ) : (
+            <div className="companion-chat-log" ref={logRef}>
+              {messages.map((m) => (
+                <div key={m.id} className={`chat-bubble ${m.sender}`}>
+                  {m.text}
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="companion-chat-chips">
             <button className="companion-chip" onClick={() => sendRef.current('Follow me')}>

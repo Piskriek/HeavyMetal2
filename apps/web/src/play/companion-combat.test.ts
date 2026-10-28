@@ -159,6 +159,19 @@ test('review fixes: hold fire never repositions; focus keeps to the leash; stand
   assert.equal(quiet.events.filter((e) => e.kind === 'down').length, 0);
 });
 
+test('a contact after a stand-down is called out: the bark gap does not survive leaving the world', async () => {
+  const { standDown } = await import('./companion-combat');
+  const orders = { ...DEFAULT_COMBAT_ORDERS, mode: 'weapons-free' as const };
+  // the drone calls a charger, then the player goes to the lab: the brain's clock stops there
+  const before = run(0.2, { drone, player, mobs: [mob(1, 'charger', 4, -20, 1000)], orders });
+  assert.equal(before.ticks.filter((t) => t.bark?.kind === 'contact').length, 1);
+  // back on the planet a brute appears well inside the old 8 s gap of brain time
+  const back = run(0.5, { drone, player, mobs: [mob(2, 'brute', 3, -9, 1000)], orders }, standDown(before.brain));
+  const contacts = back.ticks.map((t) => t.bark).filter((b) => b?.kind === 'contact');
+  assert.equal(contacts.length, 1, 'the brute is called out on return');
+  assert.equal(contacts[0]?.mobId, 2);
+});
+
 test('review fixes: a "down" is heard 3 s after the last bark, not swallowed by the 8 s contact gap', () => {
   const orders = { ...DEFAULT_COMBAT_ORDERS, mode: 'weapons-free' as const };
   const first = run(0.5, { drone, player, mobs: [mob(1, 'charger', 4, -6, 1000)], orders });

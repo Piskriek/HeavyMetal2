@@ -194,26 +194,44 @@ function readLocomotion(tr: NonNullable<MechanicObservation['trajectory']>, note
     notes.push('trajectory too short to read (fewer than 8 samples)');
     return empty;
   }
-  // the ground: the floor of the window (a flat stretch is assumed; the observer sends a level ground or a height-relative y)
-  const floor = [...tr.y.slice(0, n)].sort((a, b) => a - b)[Math.floor(n * 0.05)]!;
+  // the ground: the floor of the window (a flat stretch is assumed; the observer sends a level ground or a height-relative y).
+  // It is the lowest height three samples share, not a percentile: in low gravity a body is airborne most of the time, so
+  // a 5th percentile can sit above the ground and cut every arc into fake partial jumps (seen live, 28 Oct)
   const EPS = 0.04;
+  const sortedY = [...tr.y.slice(0, n)].sort((a, b) => a - b);
+  let floor = sortedY[Math.floor(n * 0.05)]!;
+  for (let k = 0; k + 2 < n; k++) if (sortedY[k + 2]! - sortedY[k]! <= EPS / 2) { floor = sortedY[k + 1]!; break; }
   const airborne = (i: number): boolean => tr.y[i]! - floor > EPS;
 
-  // arcs: each contiguous airborne run with ground on both sides
+  // arcs: each contiguous airborne run with ground on both sides, split where it dips and rises again near the floor: a
+  // parabola has no low point inside it, so a dip is a landing no sample caught (a re-jump at once on a sparse feed fused
+  // two arcs into one and read about half the gravity, seen live 28 Oct)
+  const BOUNCE = 0.3;
   const gs: number[] = [], vs: number[] = [];
+  const fitArc = (start: number, end: number): void => {
+    if (end - start < 4) return;
+    const fit = fitParabola(tr.t.slice(start, end + 1), tr.y.slice(start, end + 1));
+    if (!fit || fit.c >= 0) return;
+    const g = -2 * fit.c;
+    const apexY = fit.a - (fit.b * fit.b) / (4 * fit.c);
+    const h = apexY - floor;
+    if (h > 0.05) { gs.push(g); vs.push(Math.sqrt(2 * g * h)); }
+  };
   let i = 0;
   while (i < n) {
     if (!airborne(i)) { i++; continue; }
     const start = i;
     while (i < n && airborne(i)) i++;
     const end = i - 1;
-    if (start === 0 || i >= n || end - start < 4) continue;
-    const fit = fitParabola(tr.t.slice(start, end + 1), tr.y.slice(start, end + 1));
-    if (!fit || fit.c >= 0) continue;
-    const g = -2 * fit.c;
-    const apexY = fit.a - (fit.b * fit.b) / (4 * fit.c);
-    const h = apexY - floor;
-    if (h > 0.05) { gs.push(g); vs.push(Math.sqrt(2 * g * h)); }
+    if (start === 0 || i >= n) continue;
+    let from = start;
+    for (let k = start + 1; k < end; k++) {
+      if (tr.y[k]! < tr.y[k - 1]! && tr.y[k]! <= tr.y[k + 1]! && tr.y[k]! - floor < BOUNCE) {
+        fitArc(from, k);
+        from = k;
+      }
+    }
+    fitArc(from, end);
   }
 
   // ground speeds and the in-air steering authority

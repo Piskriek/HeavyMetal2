@@ -133,4 +133,7 @@ test('plan 51 wave 2: "bridge this game" and "bridge <name>" name the game when 
     assert.deepEqual(parseCompanionIntent(s), { kind: 'bridge-stop' }, s);
   }
   assert.equal(parseCompanionIntent('stop').kind, 'hold', 'a bare stop still holds the drone');
+  for (const s of ['relay my input', 'send my presses to the game', 'turn on the input relay']) assert.equal(parseCompanionIntent(s).kind, 'relay-on', s);
+  for (const s of ['stop the relay', 'relay off', 'turn off the input relay']) assert.equal(parseCompanionIntent(s).kind, 'relay-off', s);
+  assert.equal(parseCompanionIntent('stop the bridge').kind, 'bridge-stop', 'the bridge is not the relay');
 });

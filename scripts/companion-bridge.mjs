@@ -50,7 +50,9 @@
  */
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import http from 'node:http';
+import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -155,6 +157,47 @@ function startSampler(gameId, processName) {
   console.log(`\x1b[35m[SAMPLER]\x1b[0m sampling ${processName ?? gameId}${SAMPLER_REPLAY ? ' (replay)' : ''}: its own audio, and fire/jump/dash only while its window has focus`);
 }
 process.on('exit', () => stopSampler());
+
+// ---- Plan 53: the input relay. Off unless the player chose it for one bridged game (the box ticked, RELAY typed). Only
+// the player's own presses, each carrying the token only their game tab holds (never posted to /events); only
+// whitelisted lines: a console +name/-name, or a key from the short list, which the helper presses only while the game's
+// own window is in front.
+const RELAY_CONSOLE_LINE = /^[+-][a-z][a-z0-9_]{1,23}$/;
+const RELAY_KEY_LINE = /^(down|up) (mouse1|mouse2|space|e|f|q|r|shift|ctrl)$/;
+const relays = {};
+const relayLog = [];
+const relayNote = (gameId, text) => {
+  relayLog.push({ at: Date.now(), gameId, text });
+  if (relayLog.length > 40) relayLog.shift();
+  console.log(`\x1b[33m[RELAY]\x1b[0m ${gameId}: ${text}`);
+};
+function disarmRelay(gameId) {
+  const r = relays[gameId];
+  if (!r) return;
+  try { r.child?.kill(); } catch {}
+  try { r.socket?.destroy(); } catch {}
+  delete relays[gameId];
+  relayNote(gameId, 'off');
+}
+function relayDeliver(r, line) {
+  if (r.transport === 'console-tcp') {
+    if (!r.socket || r.socket.destroyed) {
+      r.socket = net.connect({ host: '127.0.0.1', port: r.port });
+      r.socket.on('error', (err) => { relayNote(r.gameId, `console not reachable on ${r.port} (${err.code ?? err.message}): start the game with ${r.launchOption ?? `-netconport ${r.port}`}`); r.socket?.destroy(); });
+    }
+    r.socket.write(`${line}\n`);
+    relayNote(r.gameId, `sent ${line}`);
+    return;
+  }
+  if (!r.child || r.child.exitCode !== null) {
+    r.child = spawn(samplerShell(), ['-NoProfile', '-File', path.join(ROOT, 'scripts/input-relay.ps1'), '-Process', r.process], { stdio: ['pipe', 'pipe', 'pipe'] });
+    let rest = '';
+    r.child.stdout.on('data', (d) => { const parts = (rest + d).split(/\r?\n/); rest = parts.pop() ?? ''; for (const l of parts) if (l.trim()) relayNote(r.gameId, l.trim()); });
+    r.child.stderr.on('data', (d) => relayNote(r.gameId, `helper: ${String(d).trim().slice(0, 200)}`));
+  }
+  r.child.stdin.write(`${line}\n`);
+}
+process.on('exit', () => { for (const id of Object.keys(relays)) disarmRelay(id); });
 /** The conversation + telemetry log, newest last; seq is monotonic. */
 const events = [];
 let nextSeq = 1;
@@ -327,7 +370,7 @@ const handle = async (req, res) => {
       pushEvent(e);
       // the bridge session drives the sampler: it runs only while the player has a game bridged
       if (e.type === 'bridge-active' && typeof e.gameId === 'string' && typeof e.client === 'string') sessionClients[e.gameId] = e.client.slice(0, 64);
-      if (e.type === 'bridge-closed' && typeof e.gameId === 'string') delete sessionClients[e.gameId];
+      if (e.type === 'bridge-closed' && typeof e.gameId === 'string') { delete sessionClients[e.gameId]; disarmRelay(e.gameId); }
       if (e.type === 'bridge-active' && typeof e.gameId === 'string') {
         if (sampler?.gameId !== e.gameId) startSampler(e.gameId, typeof e.process === 'string' ? e.process : null);
       }
@@ -352,6 +395,49 @@ const handle = async (req, res) => {
     return;
   }
   // the drone asks the AI on the bridge to check a game's terms live; the answer is a `bridge-profile` command
+  // Plan 53: the input relay, armed only by the player's consent from their game tab
+  if (pathname === '/input-relay/arm' && req.method === 'POST') {
+    try {
+      const b = await readJson(req);
+      const gameId = typeof b.gameId === 'string' && /^[a-z0-9][a-z0-9._-]{0,47}$/.test(b.gameId) ? b.gameId : null;
+      if (!gameId) throw new Error('a relay needs the bridged game');
+      // the consent again, on this side: the box and the word
+      if (b.ticked !== true || typeof b.typed !== 'string' || b.typed.trim().toUpperCase() !== 'RELAY') throw new Error('the relay needs the box ticked and RELAY typed');
+      const transport = b.transport === 'console-tcp' || b.transport === 'synthetic-keys' ? b.transport : null;
+      if (!transport) throw new Error('unknown relay transport');
+      const port = Number.isInteger(b.port) && b.port >= 1024 && b.port <= 65535 ? b.port : null;
+      if (transport === 'console-tcp' && !port) throw new Error('a console relay needs its port');
+      const proc = typeof b.process === 'string' && /^[\w .()-]{1,64}$/.test(b.process) ? b.process : null;
+      if (transport === 'synthetic-keys' && !proc) throw new Error('a key relay needs the game\'s process');
+      disarmRelay(gameId);
+      const token = randomUUID();
+      relays[gameId] = { gameId, token, transport, port, process: proc, launchOption: typeof b.launchOption === 'string' ? b.launchOption.slice(0, 64) : null, child: null, socket: null };
+      relayNote(gameId, `on by the player's consent (${transport}${port ? ` :${port}` : ''}${proc ? `, ${proc}` : ''})`);
+      json(res, 200, { ok: true, token });
+    } catch (err) {
+      json(res, 400, { ok: false, error: String(err instanceof Error ? err.message : err) });
+    }
+    return;
+  }
+  if ((pathname === '/input-relay/press' || pathname === '/input-relay/disarm') && req.method === 'POST') {
+    try {
+      const b = await readJson(req);
+      const r = typeof b.gameId === 'string' ? relays[b.gameId] : undefined;
+      if (!r || b.token !== r.token) throw new Error('no relay armed for that game by this player');
+      if (pathname === '/input-relay/disarm') { disarmRelay(r.gameId); json(res, 200, { ok: true }); return; }
+      const line = typeof b.line === 'string' ? b.line.trim() : '';
+      if (!(r.transport === 'console-tcp' ? RELAY_CONSOLE_LINE : RELAY_KEY_LINE).test(line)) throw new Error(`not a relayable press: ${line.slice(0, 40)}`);
+      relayDeliver(r, line);
+      json(res, 200, { ok: true });
+    } catch (err) {
+      json(res, 400, { ok: false, error: String(err instanceof Error ? err.message : err) });
+    }
+    return;
+  }
+  if (pathname === '/input-relay' && req.method === 'GET') {
+    json(res, 200, { armed: Object.values(relays).map((r) => ({ gameId: r.gameId, transport: r.transport })), log: relayLog.slice(-20) });
+    return;
+  }
   if (pathname === '/bridge-request' && req.method === 'POST') {
     try {
       const r = await readJson(req);

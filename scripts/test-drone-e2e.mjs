@@ -259,7 +259,8 @@ try {
     return !m || m.hp < hp0;
   }, 12000);
   check('the drone engages a monster and hurts it', hp0 !== null && hurt, `hp ${hp0}`);
-  check('it calls out the contact', Boolean(await until(() => said(/^Contact: brute/), 6000)));
+  const contact = Boolean(await until(() => said(/^Contact: brute/), 6000));
+  check('it calls out the contact', contact, contact ? '' : JSON.stringify((await getJson('/events?after=0')).events.filter((e) => e.type === 'companion-say').slice(-6).map((e) => e.text.slice(0, 80))));
   await shot('03-drone-fights-on-the-moon');
 
   check('no page errors during the run', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));

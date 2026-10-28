@@ -62,9 +62,34 @@ screen watchers), [`ENGINE_OPTIMIZATION_AND_BRIDGING_SPEC.md`](ENGINE_OPTIMIZATI
 4. **Applying is the player's word.** That is "apply the mimic", or the "bridge this game" order, which puts every
    mimic of that game in force live until "stop the bridge". An AI on the bridge cannot open a bridge or apply a mimic.
 
+## Anti-cheat: a third layer, and the player is told (28 Oct)
+Copyright protects the assets, and the terms bind the deeper rungs. Anti-cheat is a third layer: a ban falls on the player's own account, whatever the copyright and terms say. So the drone names the risk before anything crosses (Plan 53 §2.5).
+- **What each one watches:**
+  - VAC guards secured servers and matchmaking; it has no process of its own.
+  - Easy Anti-Cheat runs a service while a protected game runs, plus a kernel driver [6].
+  - BattlEye runs `BEService` [7].
+  - Riot Vanguard runs `vgc` with a kernel driver, `vgk.sys`, that starts at boot [8][9].
+  - FACEIT runs an app during protected CS2 matches, with a kernel driver loaded at boot [10].
+  - PunkBuster runs `PnkBstrA` and `PnkBstrB` [11].
+- **What a bridge uses, and its risk:**
+  - **None known:** the game's own telemetry (it sends it out to be read) and the screen.
+  - **Low:** reading three keys and the game's audio level from Windows. That is not a hook into the game, but anti-cheats look at input tools.
+  - **High:** loaders, memory, the game's files, and sending input into the game.
+- **Safe modes for anything deeper:**
+  - offline practice against bots;
+  - a private or LAN server the player hosts, with cheats switched on where the game allows it (`sv_cheats 1` in Source games).
+  - CS2's `-insecure`, which community reports say disables VAC and keeps the client off secured servers [12]. Valve does not document whether it removes ban risk, so the drone says that too.
+
 ## Sources
 1. [Tetris Holding, LLC v. Xio Interactive, Inc. (Wikipedia)](https://en.wikipedia.org/wiki/Tetris_Holding,_LLC_v._Xio_Interactive,_Inc.)
 2. [Willamette IP summary of Tetris v. Xio](https://wlo.willamette.edu/ip/2012/05/tetris-holding-llc-v-xio-interactive-inc.html)
 3. [Federal Bar IP Insight, Oct/Nov 2012](https://www.fedbar.org/wp-content/uploads/2012/10/ipinsight-octnov2012-pdf-1.pdf)
 4. [Dota 2 GSI wiki (MrBean355/dota2-gsi)](https://github.com/MrBean355/dota2-gsi/wiki)
 5. [cs2-gsi crate docs](https://docs.rs/crate/cs2-gsi/0.1.1)
+6. [Easy Anti-Cheat (Wikipedia)](https://en.wikipedia.org/wiki/Easy_Anti-Cheat)
+7. [BEService.exe (file.net)](https://www.file.net/process/beservice.exe.html)
+8. [vgc.exe (file.net)](https://www.file.net/process/vgc.exe.html)
+9. [Riot Vanguard (League of Legends wiki)](https://wiki.leagueoflegends.com/en-us/Riot_Vanguard)
+10. [What is FACEIT Anti-cheat and how does it work? (FACEIT support)](https://support.faceit.com/hc/en-us/articles/9394666828188)
+11. [What is PnkBstrA.exe? (freefixer)](https://www.freefixer.com/library/file/PnkBstrA.exe-36734)
+12. [CS2 -insecure discussion (Steam Community)](https://steamcommunity.com/app/730/discussions/0/6352962692739126906)

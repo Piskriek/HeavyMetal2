@@ -180,9 +180,12 @@ export function threatScore(m: CombatMob, player: CombatInput['player'], tuning:
   return (KIND_THREAT[m.kind] ?? 10) * quickKill * (0.35 + 0.65 * closeness) * (m.telegraph ? 1.6 : 1) * hurting;
 }
 
-/** The brain with no fight in hand: its target and its fight forgotten without a bark (the player left the world, or died). */
+/**
+ * The brain with no fight in hand: its target, its fight and its last line forgotten without a bark (the player left the
+ * world, or died). The brain's clock stops off the planet, so a kept bark gap would swallow the first contact on return.
+ */
 export function standDown(brain: CombatBrain): CombatBrain {
-  return { ...brain, targetId: null, targetKind: null, challengerId: null, burstLeft: 0, seen: [], fought: false };
+  return { ...brain, targetId: null, targetKind: null, challengerId: null, burstLeft: 0, seen: [], fought: false, lastBarkAt: -Infinity };
 }
 
 /** One frame of the fast brain. */

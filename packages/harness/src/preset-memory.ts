@@ -212,3 +212,11 @@ export function symptomOffset(mem: Mem, t: number, seed = 0): number {
   const u = fnv1a(`${mem.of}|${t}|${seed}`) / 0xffffffff;
   return amp * (2 * u - 1);
 }
+
+/**
+ * Plan 56 §20.8: a cause link counted without an episode: `by` thinking above left `d` below. The body's warnings teach the
+ * ego this way, so it learns what its thinking does to its body without the warning itself hardening it.
+ */
+export function noteCause(mem: Mem, by: SqOrAligned, d: SqId): Mem {
+  return checkMem({ ...mem, cause: linkCause(mem.cause, by, d) });
+}

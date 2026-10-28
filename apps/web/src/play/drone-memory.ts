@@ -15,8 +15,8 @@
  */
 import { ALIGNED, decodeMem, encodeMem, type Mem, type StageId } from '@hm/shorthand';
 import {
-  REST_AT, SQ_DISTORTION_CATALOG, compileSystemMemory, createPresetMemory, digestLines, dominantDistortion, dream, kundalini, recordExperience, symptomOffset, wakeLine,
-  type DreamCue, type DreamDigest, type EgoWeights, type Experience,
+  REST_AT, SQ_DISTORTION_CATALOG, bodyStep, bodyWarnings, compileSystemMemory, cuesFromWarnings, teachUpward, createPresetMemory, digestLines, dominantDistortion, dream, kundalini, recordExperience, symptomOffset, wakeLine,
+  type BodyState, type BodyWarning, type DreamCue, type DreamDigest, type EgoWeights, type Experience, type Side,
 } from '@hm/harness';
 
 /** The drone's memories by role; `of` codes are fixed so a save always finds its own. */
@@ -182,4 +182,30 @@ export function droneSymptoms(m: DroneMemory): DroneSymptoms {
     sway: (step) => ({ x: SYMPTOM_SWAY_M * symptomOffset(flight, step), z: SYMPTOM_SWAY_M * symptomOffset(flight, step, 1) }),
     amplitude: { fire: 1 - fire.bal, flight: 1 - flight.bal },
   };
+}
+
+// ---- Plan 56 §20: the drone's body. Each of its presets is a part with a mechanical body (pods, couplings, core, gyro,
+// radio, lens, antenna). At a checkpoint each part's body steps; its warnings go up: they cue the part's own dream and
+// teach the ego the link from its thinking to the part's distortion.
+
+/** Which side of the drone's body a catalyst strains: what came in is the left (intake), what it did is the right (output). */
+export const droneSideOf = (cat: string): Side => (cat === 'CONTACT' || cat === 'HITS_ON_YOU' ? 'left' : cat === 'TARGET_DOWN' || cat === 'REFLEX' ? 'right' : 'center');
+
+export type DroneBody = Readonly<Record<DroneRole, BodyState>>;
+
+/** The drone's body at a checkpoint (before its dream): each part's body, the warnings they send up, and the cues they make. */
+export function bodyCheckpoint(m: DroneMemory, prev: DroneBody | null): { readonly memory: DroneMemory; readonly body: DroneBody; readonly warnings: readonly BodyWarning[]; readonly cues: readonly DreamCue[] } {
+  const presets = { ...m.presets };
+  const body = {} as Record<DroneRole, BodyState>;
+  const warnings: BodyWarning[] = [];
+  const cues: DreamCue[] = [];
+  for (const role of DRONE_ROLES) {
+    const r = bodyStep({ kind: 'mechanical', mem: m.presets[role], prev: prev?.[role] ?? null, sideOf: droneSideOf });
+    presets[role] = r.mem;
+    body[role] = r.body;
+    const w = bodyWarnings(DRONE_MEMORY_OF[role], r.body, r.mem);
+    warnings.push(...w);
+    cues.push(...cuesFromWarnings(r.mem, w));
+  }
+  return { memory: { ...m, presets, ego: teachUpward(m.ego, warnings) }, body, warnings, cues: cues.slice(0, MAX_CUES) };
 }

@@ -301,6 +301,23 @@ try {
   const saved = await page.evaluate(() => { try { const k = Object.keys(localStorage).find((x) => x.endsWith('hm.drone.memory.v1')); return k ? JSON.parse(localStorage.getItem(k) ?? 'null')?.v ?? null : null; } catch { return 'unreadable'; } });
   check('...and its memory is saved as share codes', saved === 1, String(saved));
 
+  // --- 7. Plan 56 §20: the drone's body. The hits came in (intake), so the flight part's root, its thruster pods, strains left ---
+  const pods = await page.evaluate(() => window.__dev.droneBody()?.flight?.zones?.[0] ?? null);
+  check('the drone\'s body: the hits left its flight part blocked at the root (thruster pods), on the left: what came in', pods?.mode === 'blocked' && pods?.side === 'left', JSON.stringify(pods));
+  // a second trip out and back: the first dream's release shows at this checkpoint, and the part warns up
+  const warnsBefore = (await typed('body-warning')).length;
+  const gate2 = await page.evaluate(() => window.__dev.gate());
+  await page.evaluate((g) => window.__playScene.debug.teleport('planet', g.x + 6, g.z + 14, 0, 0), gate2);
+  await frames(30);
+  await page.evaluate(() => window.__playScene.debug.teleport('lab', 0, 2.4, 0, 0));
+  await frames(10);
+  const warned = await until(async () => (await typed('body-warning')).slice(warnsBefore)[0], 6000);
+  // held in the thruster pods (the root), it shows where the quality it suppresses lives: Presence, at the radio (the throat)
+  const podWarn = warned?.warnings?.find((w) => w.source === 'thruster pods' && w.place === 'radio' && w.side === 'left');
+  check('...and at the next checkpoint the part warns up: held in its pods, it shows at its radio, on the left, said aloud and sent to the bridge',
+    Boolean(podWarn) && Boolean(await until(() => said(/(sharp pain in my radio, on the left|dull ache in my radio, on the left|my radio, on the left: inflamed)/i), 4000)), JSON.stringify(warned ?? null).slice(0, 260));
+  check('...with a visible change to show for it, in that zone\'s colour', podWarn?.visual?.hue === '#3c78d2' && ['flash', 'glow', 'stiff', 'flicker', 'tinge', 'crack', 'limp'].includes(podWarn?.visual?.look), JSON.stringify(podWarn?.visual ?? null));
+
   check('no page errors during the run', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 } catch (e) {
   check('script completed', false, `${e.message}${pageErrors.length ? ` | page errors: ${pageErrors.slice(0, 3).join(' | ')}` : ''}`);

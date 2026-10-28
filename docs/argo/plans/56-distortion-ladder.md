@@ -585,7 +585,7 @@ What each step does:
   4. **The Overwatch pack nests the four levels:** tools under characters under the guide, and the egos under the Overwatch seat.
 - **Bounds for the min-spec:** a memory per species, not per spawned monster; a rung host per persistent entity; the same 32-episode records.
 
-## 20. The preset body: zones, sides, gates, pain and itch (owner, 28 Oct; designed, to build as W6c's second half)
+## 20. The preset body: zones, sides, gates, pain and itch (owner, 28 Oct; built as W6c's second half)
 - **His ask:** symptoms must not be arbitrary. A distortion should show in the zone of its energy center and on the right or left side. The preset needs a "body" that acts like a "program", with gates that trip into sickness when the distortion goes unresolved. Resolving too fast ejects the energy as a sharp pain; realization releases it slowly, as an itch. His full words are in OWNER_ASKS.
 - **Research:** [`docs/BODY_ENERGY_CENTERS_RESEARCH.md`](../../BODY_ENERGY_CENTERS_RESEARCH.md), written by a research agent and reviewed by Opus.
   - **What Ra gives:** a mechanism more than a map.
@@ -659,3 +659,45 @@ What each step does:
        - the ego's dream is cued from below, and the ego rebalances its thinking;
        - the part's charge releases: slowly, as an itch, or too fast, as a pain and a rebound.
      - This runs in both directions at every rung: down, as cues from the Higher Self and the ego; up, as the body's warnings.
+
+**§20 as built:**
+- **`packages/harness/src/body.ts`:**
+  - `BODY_ZONES`: seven zones with organic and mechanical places, each marked as Ra's or tradition's, and a colour.
+  - `bodyStep({ kind, mem, prev, sideOf })`:
+    1. rebounds come back where the cause is still open;
+    2. the flow follows the kundalini (blocked, overopen, starved or flowing);
+    3. gates trip over checkpoints (congested at 2, inflamed at 4, runaway at 7; drained at 2; numb at 3);
+    4. sides come from the catalysts;
+    5. release reads: at most 24 between checkpoints is an itch; more is a pain, with half the excess rebounding unless the cause closed; the pain masks the next itch.
+  - `bodyWarnings`: each zone in pain or sick sends a warning with its place, side, distortion and a visual (flash, flicker, tinge, crack or limp, in the zone's colour).
+  - `cuesFromWarnings`: the part's own episodes on the warned rays cue its next dream.
+  - `teachUpward`: the ego counts the link from its thinking to the part's distortion (`noteCause`, no hardening).
+  - `warningLine`: the radio line.
+  - Tests: 6/6.
+- **The drone** (`drone-memory.ts`):
+  - `droneSideOf`: contacts and hits are intake (left), kills and reflexes are output (right).
+  - `bodyCheckpoint` runs before each dream: each part's mechanical body steps, its warnings go up, and its cues join the Higher Self's for the dream.
+  - **In play:** up to two warning lines on the radio, a `body-warning` event to the bridge, and `ego-dream`'s `cuedBy` naming who cued it (`higher-self`, `body`, both, or `built-in`).
+  - The body lasts for the session (it is not saved yet).
+- **Drone e2e 55/55:**
+  - after the hits, the flight part's thruster pods are blocked on the left;
+  - at the next checkpoint the dream's fast release came back as "a sharp pain in my left thruster pods (root-reactivity)", congested, flashing red.
+- **Still to do:**
+  - render the visual hints on the drone's kit (tint the left pod, crackle the radio);
+  - save the body with the memory;
+  - organic bodies for characters (W6g).
+
+**§20.9, what the pain is like (the owner's clarification, 28 Oct), built:**
+- **His words:** "if i think about stuff and my ego generates a thought from a place of fear, for example if im afraid something might not play out as i expect and want it to and i 'DECIDE' to try and change it and take it as a burden example, then my body stiffens the muscles on my left(receptive) side, it will manifest an ache in my neck cos thats the zone that relates to supression of truth... the more it grows the more the dull ache will increase untill a eureaka moment takes place or a catalyst is introduced to cause one". The full quote is in OWNER_ASKS.
+- **Where it shows.** A distortion is held in its own zone (its ray, where the flow stops), but it shows where the quality it suppresses lives: its antidote's ray. This is the SQ check's "map the occlusion" step.
+  - The catalog already agrees with his example: control's antidote, Wisdom & Surrender, sits on ray 5, the throat.
+  - On the drone, a controlling or reactive distortion held in the pods or the core aches at its radio.
+- **Warnings name both:** `source` (where it is held) and `place` / `at` (where it shows), plus `quality` (what a eureka brings back). The visual takes the colour of the zone where it shows.
+- **The dull ache:** a held loop aches (`ache`, 0 to 1), growing with the checkpoints it lasts and with how hard it is held, through congested and inflamed to runaway (the symbolic cancer analogue). The look is `stiff`, as he describes.
+- **The eureka:**
+  - when a zone that has been blocked for two or more checkpoints flows again, at the body's pace, it signals `eureka` ("Something let go in my throat, on the left: Wisdom & Surrender came back"), and it glows;
+  - letting it all go at once is still a sharp pain;
+  - a catalyst that brings the eureka on is a cue: the Higher Self's, the body's own, or a partner's.
+- **Tests:**
+  - body tests 7/7, including his example: control from what came in aches at the throat on the left, grows, and lets go in a eureka;
+  - drone e2e 55/55: held in its pods, it shows at its radio on the left, flashing blue.

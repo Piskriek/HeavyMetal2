@@ -104,7 +104,8 @@ import { LOW_BARK_COOLDOWN, PLAYER_MAX_HP, hitBearing, hurt as hurtHp, isLow, pa
 import { usePlaySettings } from '../shell/play-settings';
 import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { kv } from '../storage/profile-storage';
-import { createDroneMemory, dreamNow, dronePerspective, droneSymptoms, loadDroneMemory, noteCatalyst, saveDroneMemory, type DroneCatalyst, type DroneMemory } from './drone-memory';
+import { bodyCheckpoint, createDroneMemory, dreamNow, dronePerspective, droneSymptoms, loadDroneMemory, noteCatalyst, saveDroneMemory, type DroneBody, type DroneCatalyst, type DroneMemory } from './drone-memory';
+import { warningLine } from '@hm/harness';
 import type { DreamCue } from '@hm/harness';
 import { isMechanicObservation, transduceMechanic, type MimicryResult } from '@hm/harness';
 import { gateObservation, mirrorKeyEdges, weaponStandIn, type BridgePermissionProfile } from '@hm/gamebridge';
@@ -1803,6 +1804,8 @@ useEffect(() => {
   const droneStageRef = useRef(0);
   /** Plan 56 W6b: the Higher Self's cues, held for the next dream (then cleared). */
   const higherSelfCuesRef = useRef<readonly DreamCue[] | null>(null);
+  /** Plan 56 §20: the drone's body (each part's zones and gates), carried from checkpoint to checkpoint this session. */
+  const droneBodyRef = useRef<DroneBody | null>(null);
   const droneMemory = (): DroneMemory => {
     if (!droneMemoryRef.current) {
       let saved: string | null = null;
@@ -1819,15 +1822,24 @@ useEffect(() => {
   };
   /** Leaving the Moon (the gate, or sync lost): the drone dreams, saves, and tells its dream on waking; the bridge gets it too. */
   const droneDreams = (): void => {
-    const cues = higherSelfCuesRef.current;
+    // plan 56 §20: first the body: each part's gates and release since the last checkpoint; its warnings go up (on the radio,
+    // to the bridge), cue the part's own dream from below, and teach the ego what its thinking did
+    const b = bodyCheckpoint(droneMemory(), droneBodyRef.current);
+    droneBodyRef.current = b.body;
+    for (const w of b.warnings.slice(0, 2)) companionHandleRef.current?.say(warningLine(w));
+    if (b.warnings.length) companionHandleRef.current?.post({ type: 'body-warning', warnings: b.warnings });
+    const fromAbove = higherSelfCuesRef.current;
     higherSelfCuesRef.current = null;
-    // the Higher Self's cues when it gave some; otherwise the built-in cue (lowest ray first)
-    const d = dreamNow(droneMemory(), Math.floor(Date.now() / 1000), cues ?? undefined);
+    // the Higher Self's cues and the body's together; with neither, the built-in cue (lowest ray first)
+    const seen = new Set<string>();
+    const cues = [...(fromAbove ?? []), ...b.cues].filter((c) => { const k = `${c.of}@${c.t}`; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 12);
+    const d = dreamNow(b.memory, Math.floor(Date.now() / 1000), cues.length ? cues : undefined);
     droneMemoryRef.current = d.memory;
     showDroneSymptoms();
     try { kv.set(DRONE_MEMORY_KEY, saveDroneMemory(d.memory)); } catch { /* storage unavailable: kept for this session */ }
     companionHandleRef.current?.say(d.line);
-    companionHandleRef.current?.post({ type: 'ego-dream', line: d.line, digest: d.memory.lastDream, cuedBy: cues ? 'higher-self' : 'built-in' });
+    const cuedBy = fromAbove && b.cues.length ? 'higher-self+body' : fromAbove ? 'higher-self' : b.cues.length ? 'body' : 'built-in';
+    companionHandleRef.current?.post({ type: 'ego-dream', line: d.line, digest: d.memory.lastDream, cuedBy });
     // and what it sees of itself now, for the Higher Self
     companionHandleRef.current?.post({ type: 'ego-perspective', ...dronePerspective(d.memory) });
   };
@@ -5375,6 +5387,8 @@ useEffect(() => {
       droneNote: (c: DroneCatalyst): void => noteDrone(c),
       /** Plan 56 W6c test seam: how strong the drone's symptoms are (1 − balance of its fire and flight presets). */
       droneSymptoms: () => droneSymptoms(droneMemory()).amplitude,
+      /** Plan 56 §20 test seam: the drone's body (each part's zones) at the last checkpoint. */
+      droneBody: (): DroneBody | null => droneBodyRef.current,
       /**
        * A test seam (debug switch only): a written preset cartridge goes on the lab rack, so the X radial in Apply has one to
        * offer. Players never reach it (window.__dev exists only in dev builds and under ?e2e).

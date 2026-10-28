@@ -64,7 +64,19 @@
     - **W6a is built** (Plan 56 §16): the drone's memory host. Its fights, hits on the player and reflexes become the memory of its ego and three presets; leaving the Moon dreams, says the wake line, posts ego-dream and saves. Drone e2e 46/46.
     - W6a was pushed as 6d429e5e.
     - **W6b is built:** the Higher Self seat on the bridge (higher-self-ask, higher-self-cue and higher-self-say; ego-perspective and ego-dream events). Drone e2e 50/50.
-    - Next: W6c to W6e (symptoms, the Studio memory view, the player as anchor).
+    - W6b was pushed as 08dd35ba; W6c's first half (symptoms) as a70df0da.
+    - **The preset body is built** (Plan 56 §20; research in docs/BODY_ENERGY_CENTERS_RESEARCH.md): `body.ts`.
+      - flow stops at the first blocked zone;
+      - gates trip into symbolic sickness;
+      - left is intake, right is output;
+      - itch on slow release, pain with a rebound on fast release;
+      - the body teaches upward: warnings cue the part's dream and teach the ego.
+      - The drone's body runs at each checkpoint (radio warnings, `body-warning` events). Drone e2e 55/55.
+    - Next:
+      - render the visual hints on the drone;
+      - W6d, the Studio memory view;
+      - W6e, the player as anchor;
+      - W6g, characters.
     - W6f, the weekly round, has a feasibility note: Plan 56 §17, RUN.world multiplayer. Yes, as the smallest slice: one singleton harvest room. It needs the owner's yes. Owner question: "repeat" instead of "perish".
 - **Skill:** the owner's SQ distortion check is installed locally at `.claude/skills/sq-distortion-check`.
 

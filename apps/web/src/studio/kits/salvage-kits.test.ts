@@ -7,7 +7,7 @@ import { SALVAGE_KIT_LIST, STUDIO_KIT_LIST } from './studio-kit-registry';
 import { buildStudioMachineModel } from '../viewport/build-studio-machine-model';
 
 test('the lab\'s kits are salvaged: each validates whole (grounded, nothing floating) and builds', () => {
-  assert.deepEqual(SALVAGE_KIT_LIST.map((e) => e.id), ['kit:gate-dais', 'kit:archway-gate', 'kit:fabricator-frame', 'kit:drone', 'kit:drone-vacuum', 'kit:game-screen', 'kit:hauler', 'kit:crawler']);
+  assert.deepEqual(SALVAGE_KIT_LIST.map((e) => e.id), ['kit:gate-dais', 'kit:archway-gate', 'kit:fabricator-frame', 'kit:drone', 'kit:drone-vacuum', 'kit:game-screen', 'kit:bridge-pad', 'kit:hauler', 'kit:crawler']);
   for (const entry of SALVAGE_KIT_LIST) {
     assert.equal(entry.salvaged, true);
     assert.deepEqual(validate(entry.kit, entry.rootPreset), [], `${entry.id} validates whole`);

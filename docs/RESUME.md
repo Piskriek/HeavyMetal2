@@ -42,11 +42,29 @@
   - e2e-smoke's two assertions are fixed. It and test-fidelity-sync-studio are stale further: the old menu items and the old Moon editor are no longer reachable, so both need a rewrite;
   - new: `scripts/test-sim-start-e2e.mjs`.
 - **Games:** the owner's Steam library (KSP, Space Engineers, Dwarf Fortress, Hades, Satisfactory, Transport Fever 2, Plasma, Portal, Rocket League; Enshrouded is too heavy for the 950M) plus the free picks cover F1 to F10 (MIMIC_GAMES_RESEARCH). Only licensed copies are used.
+- **Overnight 28–29 Oct (Opus alone; the owner and Argon asleep; Argon's protocol: commit and push each wave whose gates are green):**
+  - `c5efca96` **Step 1b:** the simulation start.
+  - `f8725f16` **Wave 2:**
+    - the simulation path loads no lab and no mentor voice (ready 27.1 s against 33.4 s, headless);
+    - the gate's transit is off there;
+    - the lab's kits are on `SALVAGE_KIT_REGISTRY` (they validate and build; no Triad sockets yet);
+    - a session is the drone's night: it dreams over what it lived since its last dream when a simulation session opens. Before this it only dreamed on a gate trip, so on the simulation path it never dreamed.
+  - `84b1849d` **Wave 3a:** test-fidelity-sync-studio rewritten against today's Studio (StudioApp via `window.__studioBridge`), the grid's spawn cards and its in-play panel. 11/11, and it asserts now (it only printed before).
+  - **Wave 3b, uncommitted (not green):** e2e-smoke follows the build as it is.
+    - It skips the island editor, which no menu item reaches; the track editor moved to the Goblin Racing route; the lab's gate and stations are at their real positions; sync is watched outside the gate's dome; the levels are the floats pill; the drill pours.
+    - 66 checks pass, up from 15.
+    - **It stops at the mill's E:** hotbar slot 1 holds a Regolith Slab Kit, so E places it. Neither the 2 key nor a click on `hotbar-slot-2` emptied the hand in the test. A seam to empty the hand, or the right hotbar selector, comes next.
+    - Run it as `E2E_SHOTS=shots-run/smoke E2E_GPU=1 E2E_SLOW=2 node scripts/e2e-smoke.mjs`: the lab's power-on runs in scene time, which needs the slow factor on this laptop.
+  - **Wave 4** (gates running at the time of writing):
+    - the `ui:` foundation, `packages/hudlayout/src/ui.ts`: the five rungs, `validateScreen`'s lens rule, the `uic:` code (Plan 57 §15);
+    - kitspec `PartDef.footing`, so the bridge pad's buried plinth validates and joins the salvage list.
+  - Fixed along the way: a `String.replace` mangled `$$eval` into `$eval` in e2e-smoke (shipped in `7626ae59`); a sed call put a backtick on every line of two docs (restored). Both lessons are in memory.
 - **Next:**
-  1. register the lab's kits, props, lights and sounds as presets, and move story scripts to the simulation start piece by piece;
-  2. the narrator engine as the drone's System voice;
-  3. the bridge screen's mirror;
-  4. mimic Cataclysm: DDA and Pokémon Showdown first, then the Steam games' data files.
+  1. the salvaged kits' Triad sockets, or the labkit's props rebuilt as kits (asked Argon);
+  2. the play HUD's goal card rendered from a `ui:` screen;
+  3. the narrator engine as the drone's System voice;
+  4. the bridge screen's mirror;
+  5. mimic Cataclysm: DDA and Pokémon Showdown first, then the Steam games' data files.
 - **Plan 56's drone body visuals are built** (§20.10): overlays on its own parts, a new radio mast each side, the starved glow. Drone e2e 57/57; full suite green apart from the known texgraph speed flake (passes alone).
 
 ## 28 Oct Checkpoint 3 (Claude Opus: Plans 53–55, the CS2 live run, the anti-cheat warning and the input relay; uncommitted on top of `ed83534e`; read this first)

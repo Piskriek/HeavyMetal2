@@ -168,6 +168,10 @@ test('nothing floats: a part with no path of contacts to the ground is flagged, 
   assert.deepEqual(validate(kit, 'ok'), []);
   assert.deepEqual(validate(kit, 'hover').map((i) => `${i.code} ${i.at}`), ['floating lamp#1']);
   assert.deepEqual(validate(kit, 'sunk').map((i) => i.code), ['below-ground']);
+  // a declared footing (a plinth set into the regolith) may be buried, and still grounds what stands on it (Plan 57 §14.2)
+  const footed = { ...kit, parts: { ...kit.parts, base: { ...kit.parts['base']!, footing: true as const } } };
+  assert.deepEqual(validate(footed, 'sunk'), []);
+  assert.deepEqual(validate(footed, 'ok'), []);
   assert.deepEqual(validate(kit, 'wall').map((i) => i.code), ['floating']);
   const wallPlane = { min: [-1, 0, -0.06] as const, max: [1, 3, -0.05] as const };
   assert.deepEqual(validate(kit, 'wall', { ground: null, anchors: [wallPlane] }), []);

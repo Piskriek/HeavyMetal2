@@ -78,6 +78,11 @@ export interface PartDef {
   readonly sockets?: Readonly<Record<string, SocketDef>>;
   /** What this part does while the assembly runs (a ram's stroke, a ring's spin): the scene applies it, `kitspec` only names it. */
   readonly motion?: KitMotionSpec;
+  /**
+   * A buried foundation (a pile, a plinth set into the regolith): it may run below the ground, so the kit stands on uneven ground
+   * and never floats. `validate` does not call it below-ground, and it still grounds what stands on it.
+   */
+  readonly footing?: true;
 }
 
 /** What a placed copy changes about its part (the beam's Apply with a part cartridge, plan 38 section 8). */
@@ -468,6 +473,8 @@ export function validate(kit: Kit, preset: string, opts: ValidateOptions = {}): 
   const boxes = parts.map((p) => transformBox(sourceBounds(p.source), p.matrix));
   if (ground !== null) {
     boxes.forEach((b, i) => {
+      // a declared footing is meant to be buried
+      if (kit.parts[(placed[i] as PlacedPart).part]?.footing === true) return;
       if (b.min[1] < ground - eps) issues.push({ code: 'below-ground', at: (placed[i] as PlacedPart).path, detail: `bottom at ${b.min[1].toFixed(3)} m` });
     });
   }

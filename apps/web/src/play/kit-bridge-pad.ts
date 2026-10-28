@@ -23,7 +23,8 @@ export const BRIDGE_PAD_DECK_TOP = DECK;
 const S = BRIDGE_PAD_SIZE;
 export const BRIDGE_PAD_KIT: Kit = {
   parts: {
-    plinth: { source: { kind: 'box', size: [S, BRIDGE_PAD_PLINTH, S] }, material: 'darkSteel', rank: 0 },
+    // set into the regolith on purpose (a declared footing), so the pad stands level on uneven ground and never floats
+    plinth: { source: { kind: 'box', size: [S, BRIDGE_PAD_PLINTH, S] }, material: 'darkSteel', rank: 0, footing: true },
     deck: { source: { kind: 'box', size: [S - 0.1, DECK, S - 0.1] }, material: 'gunmetal', rank: 0 },
     'rim-long': { source: { kind: 'box', size: [S + RIM, RIM, RIM] }, material: 'darkSteel', rank: 0 },
     'rim-short': { source: { kind: 'box', size: [RIM, RIM, S - RIM] }, material: 'darkSteel', rank: 0 },

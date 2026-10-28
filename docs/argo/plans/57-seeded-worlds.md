@@ -328,7 +328,7 @@ The owner: a planet is "a very dense soul and it moves through the densities jus
 - **The lab's kits are salvaged** (`SALVAGE_KIT_REGISTRY`): the gate dais, the archway gate, the vehicle fabricator frame, the drone (rotors and thrusters), the bridge screen, the hauler and the crawler.
   - Each validates whole and builds.
   - None has the assembler's Triad sockets yet, so they wait on the salvage list rather than the assembler's shelf, whose test asks for sockets. Adding a kit's sockets moves it across.
-  - The bridge pad waits. Its plinth runs 3 m into the regolith on purpose, so the pad never floats on uneven ground (its kit says so). kitspec's validator flags any part below y 0, so the pad joins once the validator allows a declared buried footing.
+  - The bridge pad joins too (29 Oct). Its plinth runs 3 m into the regolith on purpose, so the pad never floats on uneven ground. kitspec's `PartDef` now takes `footing: true`, a declared buried foundation: `validate` does not call it below-ground, and it still grounds what stands on it (kitspec tests 14/14). The pad's plinth is the first footing.
 - **A session is the drone's night.** The drone used to dream only on leaving the Moon through the gate, so the simulation start (no gate trip) never rebalanced it: Plan 56's loop was missing from the path players take.
   - Now the drone keeps what it lives as it happens (saved at most every 5 s, and as play closes), and its memory records when it last dreamed (`dreamedAt`).
   - A simulation session opens with a dream over anything undreamt (`hasUndreamt`), told on arrival.
@@ -371,3 +371,16 @@ The owner: a planet is "a very dense soul and it moves through the densities jus
   - **the UI:** its component palette, node editor and inspector become `ui:` assemblies for the Studio and the sandbox;
   - **the channel:** check on install whether its saved device files are readable data. Workshop devices are other players' work, so mimic the game's components, not their creations.
 - **Order:** after 1b. Grow `@hm/hudlayout` into the `ui:` kind with bound parts, move the play HUD onto it panel by panel (the goal card and the sync meter first), then mimic Plasma's node editor for the Studio's logic presets.
+- **The foundation, built (29 Oct, overnight):** `packages/hudlayout/src/ui.ts`, beside the racing HUD's layout model (which is unchanged). Tests: `tests/ui.test.ts`, 4/4.
+  - The five rungs as types:
+    1. `UiTokens`: ink, paper, accent, warn and dim, the font, a scale of 0.75 to 1.5, a corner radius, reduced motion;
+    2. `WidgetLook`: readout, meter, card, badge or list, in a tone, a frame and a size;
+    3. `UiPart`: a look bound to a source path, with the player's word for it;
+    4. `UiPanel`: parts at an anchor and a pixel offset, as the HUD layout places its elements;
+    5. `UiScreen`.
+  - **The lens rule** is `validateScreen(screen, sources)`:
+    - a part whose path is not a value the screen declares is `unbound` and cannot be placed;
+    - a widget may read only the kinds it can show (`WIDGET_READS`: a list reads a list, a meter a ratio or a number with a max);
+    - a meter over a number with no max is refused, because it would invent its own scale.
+  - **The code:** `uic:` (@hm/presetcodec) round-trips a screen exactly, and a damaged or foreign code reads as null.
+  - **Next:** declare the play HUD's real sources (the stage, the next stage's needs, health, ore, power, the drone), express its panels as a `ui:` screen, and render them from it, the goal card first.

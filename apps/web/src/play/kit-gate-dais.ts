@@ -30,8 +30,9 @@ const bands = (step: 'lower' | 'upper', size: number, topY: number): Placement[]
 
 export const GATE_DAIS_KIT: Kit = {
   parts: {
-    'step-lower': { source: { kind: 'box', size: [LOWER, STEP_H, LOWER] }, material: 'paint', rank: 0 },
-    'step-upper': { source: { kind: 'box', size: [UPPER, STEP_H, UPPER] }, material: 'paint', rank: 0 },
+    // its Triad sockets (plan 57 §14.2): the cable comes in at the lower step's front; a gate stands on the upper step's centre
+    'step-lower': { source: { kind: 'box', size: [LOWER, STEP_H, LOWER] }, material: 'paint', rank: 0, sockets: { powerTerminal: { at: [0, STEP_H / 2, LOWER / 2], rot: [90, 0, 0] } } },
+    'step-upper': { source: { kind: 'box', size: [UPPER, STEP_H, UPPER] }, material: 'paint', rank: 0, sockets: { gateMount: { at: [0, STEP_H, 0] } } },
     'band-lower-long': { source: { kind: 'box', size: [LOWER, BAND_H, BAND_W] }, material: 'hazard', rank: 1 },
     'band-lower-short': { source: { kind: 'box', size: [BAND_W, BAND_H, LOWER - 2 * BAND_W] }, material: 'hazard', rank: 1 },
     'band-upper-long': { source: { kind: 'box', size: [UPPER, BAND_H, BAND_W] }, material: 'hazard', rank: 1 },

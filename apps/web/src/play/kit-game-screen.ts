@@ -19,12 +19,17 @@ export const GAME_SCREEN_SURFACE = { centre: [0, BOTTOM + H / 2, DEPTH / 2 + 0.0
 
 export const GAME_SCREEN_KIT: Kit = {
   parts: {
-    base: { source: { kind: 'box', size: [2.0, 0.05, 0.5] }, material: 'darkSteel', rank: 0 },
+    // its Triad sockets (plan 57 §14.2): it stands on a pad by its base's underside, its cable comes in on the base, the mirrored
+    // game's feed comes in at the back panel, and its lamp is the status LED
+    base: {
+      source: { kind: 'box', size: [2.0, 0.05, 0.5] }, material: 'darkSteel', rank: 0,
+      sockets: { padMount: { at: [0, 0, 0], rot: [180, 0, 0] }, powerCable: { at: [0.7, 0.05, 0] } },
+    },
     post: { source: { kind: 'box', size: [0.08, BOTTOM + H / 2, DEPTH] }, material: 'gunmetal', rank: 0 },
-    back: { source: { kind: 'box', size: [W, H, 0.02] }, material: 'darkSteel', rank: 0 },
+    back: { source: { kind: 'box', size: [W, H, 0.02] }, material: 'darkSteel', rank: 0, sockets: { feedInput: { at: [0, H / 2, -0.01], rot: [-90, 0, 0] } } },
     'bezel-long': { source: { kind: 'box', size: [W + 2 * BEZEL, BEZEL, DEPTH] }, material: 'gunmetal', rank: 0 },
     'bezel-short': { source: { kind: 'box', size: [BEZEL, H, DEPTH] }, material: 'gunmetal', rank: 0 },
-    lamp: { source: { kind: 'box', size: [0.05, 0.02, 0.02] }, material: 'violet', rank: 1 },
+    lamp: { source: { kind: 'box', size: [0.05, 0.02, 0.02] }, material: 'violet', rank: 1, sockets: { statusLed: { at: [0, 0.02, 0] } } },
   },
   assemblies: {
     'game-screen': {

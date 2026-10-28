@@ -337,8 +337,17 @@ The owner: a planet is "a very dense soul and it moves through the densities jus
 - **Tests:**
   - sim-start e2e 19/19, now including no lab or voice steps, the gate's transit off, the story's lab and transit still there, and a hit that is kept and dreamed over on the next arrival;
   - salvage tests 2/2; drone memory 6/6.
+- **The salvaged kits are on the assembler's shelf** (29 Oct, Argon's call: sockets first). Each kit got Triad sockets where something really plugs in, named so the Studio's role rules read them:
+  - the gate dais: `powerTerminal` at its lower step's front, `gateMount` on its upper step;
+  - the archway gate: `daisMount` under its plinth, `powerCable` at the plinth's back, `portal` at its sill (its output);
+  - the bridge screen: `padMount` under its base, `powerCable` on the base, `feedInput` at the back panel (the mirrored game comes in), `statusLed` on its lamp;
+  - the bridge pad: `screenMount` near the north rim, `standInMount` at the centre, a `powerTerminal` on each side rim;
+  - the drone: `presetSlot` in the crown (a preset cartridge docks), `chargeTerminal` at the battery's back, `rotorMount` on each motor, `exhaust` under each nozzle, `weaponMount` on the pod;
+  - the fabricator frame, hauler and crawler already had theirs.
+  - All nine meet the shelf's bar (they validate whole, and show socket pins, stems and colliders) and moved onto `STUDIO_KIT_REGISTRY`, still marked `salvaged`. The salvage list waits empty for the labkit's props.
+  - Tests: salvage 2/2 (the roles each kit's job needs), Studio core 7/7 (19 kits to one bar).
+- **Fixed in the Studio's model builder**, found on the way: a kitspec box stands on its origin, but the builder drew box parts centred, so every box part sat half a part low in the Studio. Its own bounds, which picking uses, stood on the base, so the mesh and its bounds disagreed. Box parts had no collider or selection overlay either. Both are fixed.
 - **Still to do for the strip:**
-  - give the salvaged kits their sockets;
   - rebuild the labkit's procedural props (relay cabinet, breaker panel, control box, cable tray, planet table) as kits (RULES 8a, from scratch);
   - lab lights and sounds as presets;
   - the narrator engine as the System voice.

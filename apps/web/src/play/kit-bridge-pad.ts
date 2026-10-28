@@ -25,9 +25,14 @@ export const BRIDGE_PAD_KIT: Kit = {
   parts: {
     // set into the regolith on purpose (a declared footing), so the pad stands level on uneven ground and never floats
     plinth: { source: { kind: 'box', size: [S, BRIDGE_PAD_PLINTH, S] }, material: 'darkSteel', rank: 0, footing: true },
-    deck: { source: { kind: 'box', size: [S - 0.1, DECK, S - 0.1] }, material: 'gunmetal', rank: 0 },
+    // its Triad sockets (plan 57 §14.2): the linked window's screen stands near the north rim, FIDELITY's stand-ins at the centre,
+    // and a cable comes in at each side rim
+    deck: {
+      source: { kind: 'box', size: [S - 0.1, DECK, S - 0.1] }, material: 'gunmetal', rank: 0,
+      sockets: { screenMount: { at: [0, DECK, -S / 2 + 1.5] }, standInMount: { at: [0, DECK, 0] } },
+    },
     'rim-long': { source: { kind: 'box', size: [S + RIM, RIM, RIM] }, material: 'darkSteel', rank: 0 },
-    'rim-short': { source: { kind: 'box', size: [RIM, RIM, S - RIM] }, material: 'darkSteel', rank: 0 },
+    'rim-short': { source: { kind: 'box', size: [RIM, RIM, S - RIM] }, material: 'darkSteel', rank: 0, sockets: { powerTerminal: { at: [0, RIM / 2, 0] } } },
     'trim-long': { source: { kind: 'box', size: [S - 0.4, 0.02, 0.05] }, material: 'violet', rank: 1 },
     'trim-short': { source: { kind: 'box', size: [0.05, 0.02, S - 0.4] }, material: 'violet', rank: 1 },
     inlay: { source: { kind: 'box', size: [1.2, 0.01, 1.2] }, material: 'violet', rank: 1 },

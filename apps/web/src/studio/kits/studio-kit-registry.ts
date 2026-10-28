@@ -870,18 +870,9 @@ export const STUDIO_KIT_REGISTRY: Readonly<Record<string, StudioKitEntry>> = Obj
     powerKw: 0,
     metricRole: 'test',
   },
-});
-
-export const STUDIO_KIT_LIST: readonly StudioKitRegistryEntry[] = Object.freeze(Object.values(STUDIO_KIT_REGISTRY));
-
-/**
- * Plan 57 §14: the lab and the story stripped for parts. Their own kits, salvaged as they are: each validates whole (grounded,
- * nothing floating) and builds, but none has the assembler's Triad sockets yet, so they wait here rather than on the assembler's
- * shelf; adding a kit's sockets moves it across. No power draw is modelled for them yet, so powerKw is 0. The bridge pad's
- * plinth runs 3 m down into the regolith on purpose (so the pad never floats on uneven ground); it is a declared `footing`, which
- * kitspec's validator allows to be buried.
- */
-export const SALVAGE_KIT_REGISTRY: Readonly<Record<string, StudioKitEntry>> = Object.freeze({
+  // plan 57 §14.2: the lab and the story stripped for parts. Their kits, given their Triad sockets (29 Oct), meet the shelf's bar
+  // like the machines above. No power draw is modelled for them yet, so powerKw is 0. The bridge pad's plinth runs 3 m into the
+  // regolith on purpose: a declared `footing`, which the validator allows to be buried.
   'kit:gate-dais':{ id: 'kit:gate-dais', label: 'Gate Dais (two-step plinth)', category: 'portal-gate', kit: GATE_DAIS_KIT, rootPreset: 'gate-dais', powerKw: 0, metricRole: 'portal', salvaged: true },
   'kit:archway-gate': { id: 'kit:archway-gate', label: 'Archway Gate', category: 'portal-gate', kit: GATE_KIT, rootPreset: 'gate', powerKw: 0, metricRole: 'portal', salvaged: true },
   'kit:fabricator-frame': { id: 'kit:fabricator-frame', label: 'Vehicle Fabricator Frame', category: 'station', kit: FABRICATOR_FRAME_KIT, rootPreset: 'fabricator-frame', powerKw: 0, metricRole: 'transport', salvaged: true },
@@ -892,5 +883,14 @@ export const SALVAGE_KIT_REGISTRY: Readonly<Record<string, StudioKitEntry>> = Ob
   'kit:hauler': { id: 'kit:hauler', label: 'Hauler', category: 'vehicle', kit: HAULER_KIT, rootPreset: 'vehicle', powerKw: 0, metricRole: 'transport', salvaged: true },
   'kit:crawler': { id: 'kit:crawler', label: 'Crawler', category: 'vehicle', kit: CRAWLER_KIT, rootPreset: 'vehicle', powerKw: 0, metricRole: 'transport', salvaged: true },
 });
+
+export const STUDIO_KIT_LIST: readonly StudioKitRegistryEntry[] = Object.freeze(Object.values(STUDIO_KIT_REGISTRY));
+
+/**
+ * Plan 57 §14: the lab and the story stripped for parts. A salvaged kit waits here until it meets the assembler shelf's bar (it
+ * validates whole and has its Triad sockets); then it moves onto STUDIO_KIT_REGISTRY, still marked `salvaged`. Empty since
+ * 29 Oct, when the lab's nine kits got their sockets; the labkit's procedural props come here next as they are rebuilt as kits.
+ */
+export const SALVAGE_KIT_REGISTRY: Readonly<Record<string, StudioKitEntry>> = Object.freeze({});
 
 export const SALVAGE_KIT_LIST: readonly StudioKitRegistryEntry[] = Object.freeze(Object.values(SALVAGE_KIT_REGISTRY));

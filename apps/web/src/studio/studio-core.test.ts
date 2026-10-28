@@ -35,7 +35,8 @@ import { persistStagedStudioChanges } from './state/studio-persistence';
 
 describe('ARGO_STUDIO_REALITY_AUDIT_AND_BLUEPRINT — Full Studio Overhaul Verification', () => {
   it('1. Validates all 10 modular kits with 0 issues and builds 3D models with DataTextures, Triad Socket stems & Colliders', () => {
-    assert.equal(STUDIO_KIT_LIST.length, 10, 'Must provide all 10 modular machine kits');
+    // the ten machine kits, and beside them the lab's salvaged kits (plan 57 §14.2), held to the same bar by the loop below
+    assert.equal(STUDIO_KIT_LIST.filter((e) => !e.salvaged).length, 10, 'Must provide all 10 modular machine kits');
     for (const entry of STUDIO_KIT_LIST) {
       const issues = validate(entry.kit, entry.rootPreset);
       assert.deepEqual(

@@ -39,9 +39,14 @@ const COIL_MATERIALS = [
 
 export const GATE_KIT: Kit = {
   parts: {
-    plinth: { source: { kind: 'box', size: [PLINTH.w, PLINTH.h, PLINTH.d] }, material: 'darkSteel', rank: 0 },
+    // its Triad sockets (plan 57 §14.2): it seats on a dais's gateMount by its plinth's underside, its cable comes in at the
+    // plinth's back, and what it puts out is the portal at its sill
+    plinth: {
+      source: { kind: 'box', size: [PLINTH.w, PLINTH.h, PLINTH.d] }, material: 'darkSteel', rank: 0,
+      sockets: { daisMount: { at: [0, 0, 0], rot: [180, 0, 0] }, powerCable: { at: [0, PLINTH.h / 2, -PLINTH.d / 2], rot: [-90, 0, 0] } },
+    },
     'hazard-rim': { source: { kind: 'box', size: [PLINTH.w - 0.04, PLINTH.h * 0.7, 0.02] }, material: 'hazard', rank: 1 },
-    'sill-step': { source: { kind: 'box', size: [OPEN_W + 0.1, SILL_STEP_H, 0.45] }, material: 'gunmetal', rank: 0 },
+    'sill-step': { source: { kind: 'box', size: [OPEN_W + 0.1, SILL_STEP_H, 0.45] }, material: 'gunmetal', rank: 0, sockets: { portal: { at: [0, SILL_STEP_H, 0] } } },
     upright: { source: { kind: 'box', size: [UPRIGHT.w, UPRIGHT.h, UPRIGHT.d] }, material: 'gunmetal', rank: 0 },
     emitter: { source: { kind: 'box', size: [0.06, 2.6, 0.2] }, material: 'darkSteel', rank: 1 },
     lintel: { source: { kind: 'box', size: [LINTEL.w, LINTEL.h, LINTEL.d] }, material: 'gunmetal', rank: 0 },

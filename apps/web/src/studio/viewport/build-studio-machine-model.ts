@@ -530,24 +530,43 @@ export function buildStudioMachineModel(
       }
     }
 
-    // Box source fallback
+    // Box source fallback. A kitspec box stands on its origin (y from 0 to its height), as kit-build draws it, so the geometry
+    // is lifted by half its height (centred, every box part sat half a part low in the Studio)
     const size = p.source.kind === 'box' ? p.source.size : ([0.5, 0.5, 0.5] as const);
     const boxGeom = new THREE.BoxGeometry(size[0], size[1], size[2]);
+    if (p.source.kind === 'box') boxGeom.translate(0, size[1] / 2, 0);
     const mat = makeMatstackThreeMaterial(p.material, opts, disposableTextures);
     const mesh = new THREE.Mesh(boxGeom, mat);
     mesh.name = p.path;
     const m4 = new THREE.Matrix4().fromArray(p.matrix);
     mesh.applyMatrix4(m4);
+    const bounds = transformBox(sourceBounds(p.source), p.matrix);
     mesh.userData = {
       partPath: p.path,
       partId: p.part,
       rank: p.rank,
       slotNames: ['default'],
-      bounds: transformBox(sourceBounds(p.source), p.matrix),
+      bounds,
     };
     group.add(mesh);
     disposableGeoms.push(boxGeom);
     disposableMats.push(mat);
+
+    // a box part's selection or collider overlay, as a param part's (plan 57 §14.2: the salvaged box kits had none)
+    if (isSelectedPart || opts.showColliders) {
+      const bw = Math.max(0.02, bounds.max[0] - bounds.min[0]);
+      const bh = Math.max(0.02, bounds.max[1] - bounds.min[1]);
+      const bd = Math.max(0.02, bounds.max[2] - bounds.min[2]);
+      const overlayGeom = new THREE.BoxGeometry(bw + 0.015, bh + 0.015, bd + 0.015);
+      const overlayMat = new THREE.MeshBasicMaterial({ color: isSelectedPart ? '#38bdf8' : '#10b981', wireframe: true });
+      const overlay = new THREE.Mesh(overlayGeom, overlayMat);
+      overlay.name = `collider-box:${p.path}`;
+      overlay.position.set(0.5 * (bounds.min[0] + bounds.max[0]), 0.5 * (bounds.min[1] + bounds.max[1]), 0.5 * (bounds.min[2] + bounds.max[2]));
+      overlay.userData = { isHelper: true };
+      group.add(overlay);
+      disposableGeoms.push(overlayGeom);
+      disposableMats.push(overlayMat);
+    }
   }
 
   // Render 3D Triad Socket Pins if enabled (Red = Input, Blue = Output, Gold = Power, Green = Mount)

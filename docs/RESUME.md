@@ -64,8 +64,12 @@
     - the `ui:` foundation, `packages/hudlayout/src/ui.ts`: the five rungs, `validateScreen`'s lens rule, the `uic:` code (Plan 57 §15);
     - kitspec `PartDef.footing`, so the bridge pad's buried plinth validates and joins the salvage list.
   - Fixed along the way: a `String.replace` mangled `$$eval` into `$eval` in e2e-smoke (shipped in `7626ae59`); a sed call put a backtick on every line of two docs (restored). Both lessons are in memory.
+  - **Wave 5: the salvaged kits' Triad sockets** (Argon's call), gates green (unit 3,811; e2e 19/19, 57/57, 24/24, 15/15, Studio 11/11):
+    - sockets where something really plugs in (Plan 57 §14.2);
+    - all nine lab kits moved onto the assembler shelf, still marked `salvaged`;
+    - the Studio's model builder drew box parts half a part low and gave them no collider overlay; both are fixed.
 - **Next:**
-  1. the salvaged kits' Triad sockets, or the labkit's props rebuilt as kits (asked Argon);
+  1. the labkit's procedural props rebuilt as kits (RULES 8a), onto the salvage list;
   2. the play HUD's goal card rendered from a `ui:` screen;
   3. the narrator engine as the drone's System voice;
   4. the bridge screen's mirror;

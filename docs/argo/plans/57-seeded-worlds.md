@@ -347,8 +347,19 @@ The owner: a planet is "a very dense soul and it moves through the densities jus
   - All nine meet the shelf's bar (they validate whole, and show socket pins, stems and colliders) and moved onto `STUDIO_KIT_REGISTRY`, still marked `salvaged`. The salvage list waits empty for the labkit's props.
   - Tests: salvage 2/2 (the roles each kit's job needs), Studio core 7/7 (19 kits to one bar).
 - **Fixed in the Studio's model builder**, found on the way: a kitspec box stands on its origin, but the builder drew box parts centred, so every box part sat half a part low in the Studio. Its own bounds, which picking uses, stood on the base, so the mesh and its bounds disagreed. Box parts had no collider or selection overlay either. Both are fixed.
+- **The labkit's props, rebuilt as kits** (29 Oct, Argon's order after the HUD panels; RULES 8a, from scratch, the labkit's measures kept). Each is on the shelf, marked `salvaged`:
+  - **the relay cabinet** (`kit-relay-cabinet.ts`): a 0.6 x 1.9 x 0.5 m cabinet on a plinth, its door, handle and hinges, fourteen louvres, three status lamps as `lx:` presets, a cable gland and corner bolts. Sockets: `cableTop`, `cableBottom` (power), `floorMount`, a `statusLed` on each lamp. The validator caught its hinges 3 mm proud, touching nothing; they sit flush now;
+  - **the breaker panel** (`kit-breaker-panel.ts`): a 0.9 x 1.6 x 0.35 m box on four legs, a rotary isolator on its hazard plate, two square panel meters with their lamps, ten louvres down each side, and a gland under and on top. Sockets: `cableIn`, `cableOut` (power), a `floorMount` under each foot, `isolatorGrip` on the handle. The handle is black rubber, as the lab's red has no shelf material yet;
+  - **the cable tray** (`kit-cable-tray.ts`): the labkit drew one tray of any length, so the kit is a 1.8 m section that tiles, its supports a quarter in from each end (0.9 m apart when tiled), with the labkit's rails, rungs and three cables. It has two presets on one shared `tray-run`:
+    - `cable-tray` stands on H-frames, rungs 0.6 m up, because the simulation is outdoors with no ceiling;
+    - `cable-tray-hung` is the lab's way, hung on drop rods from ceiling flanges, and validates against the ceiling as its anchor.
+    - Sockets: `cableEndFront` and `cableEndBack` where sections join (power), and `floorMount` or `ceilingMount`.
+  - **the planet table** (`kit-planet-table.ts`): the lab's hologram table, in the simulation the seeded system's map table. It keeps the labkit's measures (2.4 m across, its top at 0.95 m, a 1.3 m base), and is square: nothing about projecting needed the labkit's round table. A column under a stepped rim, the projection pad (an `lx:` preset), and four edge panels with lamps. Sockets: `floorMount`, `powerCable` (power), `holoOutput` on the pad (output), a `statusLed` per lamp.
+  - Square sections throughout: the labkit's round hinges, lamps, knob, bezels, glands and bolts are square. The cables are square bundles, as kits have no round part yet.
+  - Tests: salvage 3/3 (23 kits on the shelf; the hung tray against its ceiling).
+  - Found on the way: the Studio has no shelf material for the lab's names (`darkSteel`, `paint`, `gunmetal`, `copper`, `hazard`, `rubber`, `glass`), so every salvaged kit shows the default shelf material there. Argon said yes (29 Oct) to an alias map onto the shelf (darkSteel to workshop steel, copper to old copper, hazard to the chevron, rubber to the seal, and paint, gunmetal and glass to their nearest presets). By the standing rule it covers every plain name a kit uses, not only the lab's, and a test will fail any name that still falls back.
 - **Still to do for the strip:**
-  - rebuild the labkit's procedural props (relay cabinet, breaker panel, control box, cable tray, planet table) as kits (RULES 8a, from scratch);
+  - the labkit's control box: it is wall-mounted (sheet 21: no stand), so it cannot pass the shelf's floor check. Argon said yes (29 Oct) to a declared mount on each preset (`'floor' | 'wall' | 'ceiling'`, floor by default). It validates against its anchor plane, and the Studio draws a ghost wall or ceiling behind the kit. The hung cable tray takes it too;
   - lab lights and sounds as presets;
   - the narrator engine as the System voice.
 
@@ -402,5 +413,15 @@ The owner: a planet is "a very dense soul and it moves through the densities jus
     - consecutive meters draw as one list, in the pill's own markup;
     - the caller gives the pill's classes, colours and patterns (`floatsPanelProps`), so the preset holds structure only; each float keeps its pattern as well as its colour;
     - the test asserts every class, colour, pattern, width, title and label of the hand-drawn pill; the arrival shot is identical to the one before.
-  - **Not converted yet: ore and power, and health.** Their readouts have inline structure (a bold value, a unit, a rate, a linked count, an alert line) that the generic readout would flatten. They need a composite `stat` widget in rung 2: a rung change, so it is put to Argon first.
-  - **Next:** that question; then a Studio `ui:` editor tab with live previews (previews drive play).
+  - **The `stat` widget** (29 Oct; Argon's yes to the rung change). The ore, power and health readouts had inline structure the generic readout would flatten, so rung 2 gained one kind:
+    - a stat is one number with what the player reads beside it, each piece bound to a source of its own: `of` (a number), `rate` (a number, written signed), `linked` (a number held elsewhere), `share` (a ratio, written as a percentage) and `alert` (a flag), with a `note` shown while the alert is up;
+    - two source changes came with it: a `flag` kind (a state that is on or off), and a `unit` on the source, because a unit belongs to the value and a part must not claim another;
+    - a readout of a flag is a notice: it shows its words while the flag is up;
+    - the lens rule holds for every piece: each binding must be a declared source of the right kind, only a stat reads more than one value, and a note needs an alert;
+    - the code is version 2 (the bindings travel as strings, empty for none), and a version-1 code still reads: the test keeps a real one from 9fa3fbd1.
+  - **The ore, the power and the health are stats** (29 Oct):
+    - the plot panel: the ore (its rate, the linked crates' ore, out-of-ore with its note) and the power (drawn of the supply, the share met, short). Its parts go into the plot section beside the visiting banner, with no wrapper of their own;
+    - the health plate (MonsterHud): the hit points of the top, the bar as twenty segments, and one note (the shield's first, then low). It no longer announces every hit;
+    - each keeps its old classes and words. The tests draw the hand-drawn markup beside the preset's and compare them, at several values.
+  - **Not converted yet: the comms chip.** It is a button with nothing to read, so it needs an `action` widget kind (a press bound to a declared command). Argon said yes (29 Oct): `validateScreen` must hold every action to a real command handler, so there is no button that does nothing. Then the chip converts.
+  - **Next:** the action and the comms chip; then a Studio `ui:` editor tab with live previews (previews drive play).

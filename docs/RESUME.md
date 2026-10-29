@@ -50,7 +50,7 @@
     - the lab's kits are on `SALVAGE_KIT_REGISTRY` (they validate and build; no Triad sockets yet);
     - a session is the drone's night: it dreams over what it lived since its last dream when a simulation session opens. Before this it only dreamed on a gate trip, so on the simulation path it never dreamed.
   - `84b1849d` **Wave 3a:** test-fidelity-sync-studio rewritten against today's Studio (StudioApp via `window.__studioBridge`), the grid's spawn cards and its in-play panel. 11/11, and it asserts now (it only printed before).
-  - **Wave 3b: e2e-smoke rewritten, green (51/51).** It follows the build as it is:
+  - `6ae26e7d` **Wave 3b: e2e-smoke rewritten, green (51/51).** It follows the build as it is:
     - it skips the island editor, which no menu item reaches;
     - the track editor is reached by the Goblin Racing route and exits to the FIDELITY home;
     - per Argon's audit (29 Oct, 01:15), the first Play checks the default simulation start (Ada, stage 3, the clean HUD, V and walking, Back to FIDELITY) instead of the parked story's lab and machines, which the `?story` scripts cover;
@@ -64,15 +64,22 @@
     - the `ui:` foundation, `packages/hudlayout/src/ui.ts`: the five rungs, `validateScreen`'s lens rule, the `uic:` code (Plan 57 §15);
     - kitspec `PartDef.footing`, so the bridge pad's buried plinth validates and joins the salvage list.
   - Fixed along the way: a `String.replace` mangled `$$eval` into `$eval` in e2e-smoke (shipped in `7626ae59`); a sed call put a backtick on every line of two docs (restored). Both lessons are in memory.
-  - **Wave 5: the salvaged kits' Triad sockets** (Argon's call), gates green (unit 3,811; e2e 19/19, 57/57, 24/24, 15/15, Studio 11/11):
+  - `f2ed2f3e` **Wave 5: the salvaged kits' Triad sockets** (Argon's call), gates green (unit 3,811; e2e 19/19, 57/57, 24/24, 15/15, Studio 11/11):
     - sockets where something really plugs in (Plan 57 §14.2);
     - all nine lab kits moved onto the assembler shelf, still marked `salvaged`;
     - the Studio's model builder drew box parts half a part low and gave them no collider overlay; both are fixed.
-  - **Wave 6: the goal card is a `ui:` panel** (Argon's b), gates green (unit 3,812, only timing budgets failing; e2e 19/19, 57/57, 24/24, 15/15, Studio 11/11, smoke green):
+  - `34ad6b11` **Wave 6: the goal card is a `ui:` panel** (Argon's b), gates green (unit 3,812, only timing budgets failing; e2e 19/19, 57/57, 24/24, 15/15, Studio 11/11, smoke green):
     - `play/ui-play-hud.ts` holds the screen and its sources;
     - `play/ui-panel.tsx` draws a panel from its preset with live values, and a part with no value draws nothing;
     - the card's look and classes are unchanged.
-  - **Wave 7: the floats pill is a `ui:` panel**, gates green (e2e all green, smoke too; unit 3,814, only timing budgets failing). Its markup equals the hand-drawn pill's, and the arrival shot is identical. Ore, power and health need a composite `stat` widget, a rung change, so that goes to Argon first.
+  - `9fa3fbd1` **Wave 7: the floats pill is a `ui:` panel**, gates green (e2e all green, smoke too; unit 3,814, only timing budgets failing). Its markup equals the hand-drawn pill's, and the arrival shot is identical. Ore, power and health need a composite `stat` widget, a rung change, so that goes to Argon first.
+  - **Argon (29 Oct):** yes to `stat` on rung 2; finish the labkit props first, then put ore, power, health and comms on it, pushing each green wave.
+  - `b8c58518` **Wave 8: the labkit's relay cabinet, breaker panel and cable tray are socketed kits on the shelf** (gates green: unit 3,814, only timing budgets failing, and kit-target's passes alone; e2e 19/19, 57/57, 24/24, 15/15, Studio 11/11, smoke green):
+    - each is rebuilt from scratch, keeps the labkit's measures, and validates whole (Plan 57 §14.2);
+    - the tray is a 1.8 m section that tiles. It stands on H-frames for the outdoor simulation, and the lab's ceiling-hung way is its second preset, validated against the ceiling;
+    - found: the Studio has no shelf material for the lab's names, so salvaged kits show the default material there. The alias map is put to Argon.
+  - **Wave 9, in its gates:** the `stat` widget (Plan 57 §15), ore, power and the health plate as `ui:` panels, and the planet table as a square socketed kit. Argon said yes (29 Oct) to all three asks: an `action` widget kind for the comms chip (no button without a real command), the material alias map, and a declared kit mount (floor, wall or ceiling) with ghost anchors in the Studio, for the control box and the hung tray. Waves 10 and 11 build them.
+  - Found: three test files were in no `npm test` glob (`studio/kits/salvage-kits.test.ts`, `assets/gen-tweak.test.ts`, `src/edition.test.ts`), so the salvage test had only run when called directly. Wave 10 adds the globs.
 - **Next:**
   1. the labkit's procedural props rebuilt as kits (RULES 8a): the relay cabinet is drafted and validates; the breaker panel and the cable tray follow;
   2. Argon's answer on the `stat` widget, then ore, power and health as `ui:` panels, then a Studio `ui:` tab with live previews;

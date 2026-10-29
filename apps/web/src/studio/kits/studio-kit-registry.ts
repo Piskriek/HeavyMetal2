@@ -20,6 +20,7 @@ import { BRIDGE_PAD_KIT } from '../../play/kit-bridge-pad';
 import { RELAY_CABINET_KIT } from '../../play/kit-relay-cabinet';
 import { BREAKER_PANEL_KIT } from '../../play/kit-breaker-panel';
 import { CABLE_TRAY_KIT } from '../../play/kit-cable-tray';
+import { PLANET_TABLE_KIT } from '../../play/kit-planet-table';
 import { CRAWLER_KIT, HAULER_KIT } from '../../play/kit-vehicles';
 
 /**
@@ -890,6 +891,8 @@ export const STUDIO_KIT_REGISTRY: Readonly<Record<string, StudioKitEntry>> = Obj
   'kit:breaker-panel': { id: 'kit:breaker-panel', label: 'Breaker Panel', category: 'power-grid', kit: BREAKER_PANEL_KIT, rootPreset: 'breaker-panel', powerKw: 0, metricRole: 'power', salvaged: true },
   // the standing section; its `cable-tray-hung` preset (the lab's way, under a ceiling) is in the same kit
   'kit:cable-tray': { id: 'kit:cable-tray', label: 'Cable Tray', category: 'power-grid', kit: CABLE_TRAY_KIT, rootPreset: 'cable-tray', powerKw: 0, metricRole: 'power', salvaged: true },
+  // the lab's planet table, the seeded system's map table in the simulation
+  'kit:planet-table': { id: 'kit:planet-table', label: 'Planet Table', category: 'station', kit: PLANET_TABLE_KIT, rootPreset: 'planet-table', powerKw: 0, metricRole: 'portal', salvaged: true },
 });
 
 export const STUDIO_KIT_LIST: readonly StudioKitRegistryEntry[] = Object.freeze(Object.values(STUDIO_KIT_REGISTRY));

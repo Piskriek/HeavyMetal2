@@ -297,6 +297,30 @@ The data channels are from Opus's knowledge and are checked on install.
 
 With the free picks above (the SRD 5.1, Cataclysm: DDA, Pokémon Showdown), this covers F1 to F10. The one thin family is F3, the "System" notices and quest logs. The SRD's text, DDA's missions and Hades' prophecy list cover it, and nothing more needs buying for it.
 
+## Installed and checked (29 Oct)
+
+The owner's downloads finished on D: (`D:SteamLibrarysteamappscommon`). Each folder was checked read-only for its data channel and for anti-cheat components on disk. A store page's silence is not proof, and neither is a folder's; Valve's VAC, for one, lives on the server.
+
+| Game | Data channel on disk | Anti-cheat found | How we use it |
+|---|---|---|---|
+| Hades | `Content/Scripts` (plain Lua, 98 files) | none | read the numbers: boon rarities, affinity, weapon timings, the prophecy list (F2 to F6) |
+| Dwarf Fortress | `data/vanilla` raws (plain text, 361 files) | none | skills by use, attributes, relationships, taming, settlement (F1, F2, F6, F7, F9) |
+| Satisfactory | `CommunityResources/Docs` (the game's own JSON) | none | recipes and throughput (F5, F9); no need to run it on the 950M |
+| Kerbal Space Program | `GameData/Squad/Parts` (.cfg text, 1,383 files) | none | ship parts: mass, thrust, fuel, and each world's own gravity (F8, F10) |
+| Space Engineers | `Content/Data` (.sbc XML, 1,294 files) | none listed (it has online play: solo only) | blocks, thrusters, gyros and power (F8, F9) |
+| Transport Fever 2 | `res/` (Lua configs, 830 files) | none | logistics, vehicles, economy (F9, F5) |
+| Plasma | the game itself (visual-scripting machines) | none | a live session through the read-only mirror: machines from parts with logic, and its UI as `ui:` panels (§15) |
+| Portal | Source engine files and console constants | none | physics puzzles, buttons and doors (logic) |
+| Starbound | `assets/packed.pak` (its JSON, packed) | none | unpack with the game's own asset tool, then read the numbers (F5, F7, F10) |
+| Valheim | Unity code assemblies (`valheim_Data/Managed`) | none on disk (online play exists: solo only) | the wiki's numbers only; game code is not decompiled |
+| Rugby 22 | `Data` (format unknown) | none on disk | observe offline through the mirror; published numbers |
+| Counter-Strike 2 | packed VPKs; `cfg` text | **VAC** (server side; nothing on disk) | published console constants only (Plan 53's `sv_gravity`), offline with bots; never an online match; no input |
+| Rocket League | packed | **EasyAntiCheat** (`Binaries/Win64/EasyAntiCheat`) | published physics constants, and the read-only mirror in offline Free Play; **no input relay, ever** |
+| Enshrouded | **the folder is empty**: the download did not land | n/a | skip: its minimum is a GTX 1060 6 GB, beyond the 950M |
+
+- **The anti-cheat rule holds:** the owner is told first, about Rocket League's EasyAntiCheat and Counter-Strike's VAC (29 Oct). Neither gets input from the bridge; only published numbers and the read-only mirror in offline modes.
+- **Order, safest channel first:** the plain-text data channels need no running game and no owner time (Hades, Dwarf Fortress, Satisfactory, KSP, Space Engineers, Transport Fever 2). The live sessions (Plasma, Portal, Rugby 22, Rocket League's Free Play) need the owner at the keyboard with the mirror on.
+
 ## Sources
 
 Steam store pages (opened 28 Oct 2026, prices in ZAR):

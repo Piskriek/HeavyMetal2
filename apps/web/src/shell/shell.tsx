@@ -430,14 +430,14 @@ export function Shell(props: { readonly makeRuntime: () => Runtime; readonly sta
             leader={{ line: leaderLine, ring: leaderRing }}
             credits={profile.credits}
             endingSeen={endingSeen}
-            onExpedition={() => { origin.current = 'home'; setPlaySyncMode('desynced'); go('play'); }}
+            onExpedition={() => { origin.current = 'home'; setPlaySyncMode('desynced'); setPlayEntry({ kind: 'spawn', where: 'gate' }); go('play'); }}
             onCredits={() => { origin.current = 'home'; setPlaySyncMode('desynced'); setPlayEntry({ kind: 'credits' }); go('play'); }}
             onGrid={toGrid}
             onStudio={() => { setStudioInitTab(undefined); toStudio(); }}
             onOpenUiStudio={() => { setStudioInitTab('ui-interface'); toStudio(); }}
             onCommunity={() => toHub()}
             onSettings={toSettings}
-            onPlay={() => { origin.current = 'home'; setPlaySyncMode('desynced'); go('play'); }}
+            onPlay={() => { origin.current = 'home'; setPlaySyncMode('desynced'); setPlayEntry({ kind: 'spawn', where: 'gate' }); go('play'); }}
             onGoblin={toGoblin}
             onMyIsland={() => { setPicked('home'); toIslands(); }}
             onAvatars={toAvatars}

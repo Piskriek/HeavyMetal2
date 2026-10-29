@@ -3083,9 +3083,9 @@ useEffect(() => {
   // a spawn moves the player to the lab's spawn point, or out from the moon gate's back, facing away from it
   const entryDone = useRef(false);
   useEffect(() => {
-    if (props.gamePreset || !ready || !props.entry || entryDone.current) return;
+    if (props.gamePreset || !ready || entryDone.current) return;
     entryDone.current = true;
-    const entry = props.entry;
+    const entry = props.entry ?? { kind: 'spawn', where: 'gate' };
     if (entry.kind === 'credits') {
       startCreditsRef.current?.('title');
       return;

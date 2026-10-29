@@ -535,3 +535,90 @@ its real values.
   - a line on the control saying whether the bridge is up, and the command that starts it when it is not.
 - **Not in it:** the parked story, the lab or the simulation's HUD. The room stays clean, so a session there captures only the game.
 - **Later:** the drone standing in the room beside the screen, and the comms panel there.
+
+### 16.6 Overwatch Audit of `ELEMENTS_RESEARCH.md` (P1–P14 & Open Questions Q1–Q6, Argon, 29 Oct)
+
+- **Proposals P1–P14 Approved**:
+  - **P1 & P2 (Pure Four-Float Element + One Derivation Card)**: Approved. Storing element floats on an exact integer scale (`0..10000` displayed as `0.0000..1.0000`) and deriving density, hardness, friction, restitution, electrical/thermal conductivity (Wiedemann–Franz), heat capacity, and gas effusion (Graham's law via integer sqrt/table) from one pure card with `@hm/physmat` as the 9-material test oracle is exact **RULES 8a**.
+  - **P3–P6 (Recipe Stacks, Data Reactions, Exact Conservation & Hash Determinism)**: Approved. Reactions live as data presets (never hidden C++/TS per-element callbacks), mass and heat conserve integer remainders with ONI-style phase hysteresis (`+3 K` / `-1.5 K`), and reaction probabilities hash `(worldSeed, cell, tick, reactionId)` with zero shared RNG stream.
+  - **P7–P14 (Coarse 3-Tier Sim, Unified Appraise Lens, Lx Signals & Pair Entanglement)**: Approved.
+- **Answers to Open Questions (Q1–Q6)**:
+  - **Q1 (Stored heat as cell runtime state)**: **Yes (Approved)**. Just as kinetic velocity sits on `Vtx` mass and signal voltage sits on `Lx` conductance, thermal energy (`heat` integer units) is transient runtime state held on `Aq` capacitance ($\text{Temperature} = \text{heat} \div \text{Aq}_{\text{cap}}$), never a 5th global metric.
+  - **Q2 (Units in Appraise)**: Show **both** according to stage precision (P8): at `S0a–S1` show qualitative bands (`low / mid / high`); at `S2–S3` show normalized `0.00–1.00` alongside intuitive SI readouts (`kg/m³`, `K / °C`) derived deterministically from the integer scale so LitRPG appraisal feels tactile and grounded.
+  - **Q3 (Mixing rules for `Pxd` and `Lx` in Rung 2 stacks)**:
+    - **`Lx` (Conductivity / Charge)**: Harmonic-weighted or series/parallel blend suppressed by lattice mismatch ($\text{Lx}_{\text{stack}} = \overline{\text{Lx}} \cdot (1 - 0.35 \cdot \text{Var}(\text{Pxd}))$), reflecting how alloying scatters free electrons.
+    - **`Pxd` (Hardness / Lattice)**: Mass-weighted mean plus a work-hardening / lattice-interstitial bonus when minor alloy shares ($5\%–25\%$) bridge different `Vtx` radii ($\text{Pxd}_{\text{stack}} = \overline{\text{Pxd}} + k_{\text{alloy}} \cdot \sigma_{\text{Vtx}}$), allowing bronze or steel to exceed pure copper or iron in hardness honestly.
+  - **Q4 (Radioactivity)**: Keep **out of the base element floats**; express radioactive decay as a **spontaneous single-input Reaction preset** (P4: unstable heavy stack $\to$ daughter stack + high-energy `Lx` photon/spark emission + heat).
+  - **Q5 (Latent heat)**: **Yes, as an integer threshold buffer** on phase transitions (a cell must accumulate/shed its latent heat quota inside the hysteresis band before flipping phase), which naturally prevents single-tick phase flickering and rewards thermal engineering.
+  - **Q6 (How matter sums to a plot's $\mathbf{S}$)**: A plot's global $\mathbf{S} = (\text{Pxd}, \text{Vtx}, \text{Lx}, \text{Aq})$ is the **active mass-and-flux weighted sum across the 3 simulated tiers** (P7): terrain/hydrology baseline + placed kit/part stacks + active `Lx` lamp/wiregraph excitations, normalized against the plot's capacity target.
+
+---
+
+## 17. The 22-Archetype Blueprint & Cross-Wired Mind/Body Polarity (owner & Argon, 29 Oct; built in `@hm/harness`)
+
+> **Why this exists**: The owner noted that behind the Veil, masculine and feminine instincts appear to seek different poles (logical control vs. felt excitement), and asked to investigate Ra's Tarot / Archetypical Mind as a behavioral blueprint that keeps the system balanced.
+> **Code**: [`packages/harness/src/archetypes.ts`](../../../packages/harness/src/archetypes.ts), tested in [`packages/harness/tests/archetypes.test.ts`](../../../packages/harness/tests/archetypes.test.ts) (4/4).
+
+### 17.1 Cross-Wired Polarity Across Mind and Body (Law of One 78.10–11, 87.28)
+- In [Session 87.28](https://www.lawofone.info/c/Archetypical+Mind), Ra explains why the two poles behave differently after the Veil—because **Matrix** (structured frame awaiting potentiation) and **Potentiator** (energizing reach across the Veil) are **cross-wired between Mind and Body**:
+  - **Intent / Masculine Pole (`pol >= 32`)**:
+    - **Mind Lead**: **I. The Magician** (*Matrix of the Mind* — conscious will, rules, `@hm/wiregraph` structure).
+    - **Body Lead**: **IX. The Hermit / Wisdom** (*Potentiator of the Body* — kinetic judgment regulating physical expenditure).
+    - *Unintegrated Veiled Instinct*: Leans heavily on conscious logic/control (`logicControlBias > 0.5`) while starving intuition (`solar-control`).
+  - **Context / Feminine Pole (`pol <= -32`)**:
+    - **Mind Lead**: **II. The High Priestess** (*Potentiator of the Mind* — deep intuitive resonance & the Excitement Compass).
+    - **Body Lead**: **VIII. Balanced Working** (*Matrix of the Body* — natural somatic homeostasis).
+    - *Unintegrated Veiled Instinct*: Leans heavily on felt excitement/novelty (`excitementFlowBias > 0.5`) without structural clamping (`sacral-addiction` / boundary drift).
+  - **Integration (`bal >= 0.9` or Dyadic Co-Play)**: Neither pole is "all logic" or "all impulse." As a preset balances its rays in W3 dreams—or pairs in a dyad with its opposite pole—its `mindComplement` and `bodyComplement` come online so the Magician gains the High Priestess's intuition and the High Priestess gains the Magician's structural frame (`crossWiredPolarity(mem)`).
+
+### 17.2 The 7-Station Functional Cycle ($3 \times 7 + 1 = 22$ Archetypes)
+Every complex (**Mind** 1–7, **Body** 8–14, **Spirit** 15–21) runs the same 7 functional stations in order, plus **22. The Choice (The Fool)** (`ARCHETYPE_BLUEPRINT`, `activeArchetypeStation(mem, body, complex)`):
+
+| Station | Mind (1–7) | Body (8–14) | Spirit (15–21) | Engine Hook in `@hm/harness` |
+|---|---|---|---|---|
+| **1. Matrix** | I. The Magician | VIII. Balanced Working | XV. The Devil (Veil) | `wiregraph+ego-prior` / `body-homeostasis` |
+| **2. Potentiator** | II. High Priestess | IX. The Hermit | XVI. Lightning Tower | `excitement-compass` / `kinetic-judgment` |
+| **3. Catalyst** | III. The Empress | X. Wheel of Fortune | XVII. The Star (Hope) | `catalyst-intake` / `somatic-intake` |
+| **4. Experience** | IV. The Emperor | XI. The Enchantress | XVIII. The Moon | `preset-memory` (`recordExperience`) |
+| **5. Significator** | V. The Hierophant | XII. The Hanged Man | XIX. The Sun | `ego-significator` / `body-step` |
+| **6. Transformation** | VI. The Lovers | XIII. Death (Renewal) | XX. Judgment | `dream-rebalance` / `somatic-eureka` |
+| **7. Great Way** | VII. The Chariot | XIV. The Alchemist | XXI. The World | `veil-mastery` / `stargate-harvest` |
+| **22. The Choice** | — | — | XXII / 0. The Fool | `sovereign-faith` (walking across the Veil) |
+
+### 17.3 "Dwelling in the Virgin Mind" (`invokeArchetype`, Session 91.35)
+- In [Session 91.35](https://www.lawofone.info/c/Archetypical+Mind), when an adept's conscious mind is congested with abstruse ideation and Blue/Indigo work is blocked, the adept invokes the **Matrix of the Mind (I. The Magician — the untouched Virgin Mind)** or **The Choice (XXII. The Fool — Pure Faith)**.
+- `invokeArchetype(mem, archetypeNumber, body)` implements this under **RULES 8a**:
+  - When a preset has $\ge 2$ open cause links, `hard >= 0.6`, or blockage/starvation in Ray 5 (Throat) or Ray 6 (Third Eye), invoking the archetype softens global `hard` by 25%, halves episode hardness on unclosed/upper-triad loops, and clears pending somatic `rebound`.
+  - **Zero Fake Healing**: Every episode in `mem.ep` is preserved and every open cause link (`mc open=1`) remains honestly open until genuinely resolved in a W3 dream. Furthermore, active ray charges ease by at most `RELEASE_RATE` (24) per invocation so the subsequent `bodyStep` registers a smooth `'itch'` release rather than a `'pain'` spike with rebound.
+
+---
+
+## 18. From Mimicry to Science: Compositional Preset Crafting ($A \otimes B \to C$) & Chaos-Seed System Quests (owner & Argon, 29 Oct)
+
+> **Owner's insight (29 Oct)**: *"we need to keep in mind the players will be combining presets with presets to create new presets when they craft, a litrpg usualy has a 'system' that generates content and keeps the balance, their actions should create questlines and content being the chaos seeds that keep the world growing, how do we get the world into a state where we dont mimic mechanic they generate themselves as a conciquence of the laws of the univese so to speak, science."*
+
+### 18.1 Why We Mimic First, and How Mimicry Graduates into Universal Science
+- **Mimicry is only the calibration laboratory**: We do not study KSP, Plasma, Noita, Factorio, or Dwarf Fortress to ship 100 disconnected game templates (`DISTORTION_1_EXAMPLE_FIXATION`). We study them to extract the **minimum set of universal physical and causal laws** that make all of those mechanics emerge naturally as consequences of the Four Floats $\mathbf{S} = (\text{Pxd}, \text{Vtx}, \text{Lx}, \text{Aq})$ and Port-Hamiltonian energy routing ($\mathbf{J} - \mathbf{R}$).
+- **The 3 Laws of FIDELITY Science (Why Mechanics Generate Themselves)**:
+  1. **Conservation & Gradient Flow ($\nabla \mathbf{S} \to \text{Force / Current}$)**:
+     - Whenever a gradient exists in the Four Floats across a boundary or Triad socket, work happens automatically:
+     - **Pressure / Thermal Gradient ($\Delta \text{Heat on Aq} + \text{Vtx gas} \to \text{Kinetic Thrust / Piston Work}$)**: A rocket thruster, a steam engine, a firearm, and a volcanic geyser are not four separate "mechanics." They are the **exact same scientific consequence** of an exothermic Reaction preset (§16.6 P4) heating a fluid inside a high-$\text{Pxd}$ chamber with one open socket!
+     - **Electromagnetic / Signal Gradient ($\Delta \text{Lx across Conductive Pxd} \to \text{Wiregraph Current / Motor Torque}$)**: A sensor, a relay, a plasma lamp, and a rail-accelerator all emerge from `Lx` flowing from a high-charge shell to a low-charge shell through a Triad socket.
+     - **Structural Stress ($\text{Force} > \text{Pxd}_{\text{yield}} \to \text{Fracture / Deformation}$)**: Cutting ore, armour penetration, bridge collapse, and tectonic quakes all follow from applied kinetic force exceeding the material stack's derived `Pxd` hardness.
+  2. **Universal Compositional Crafting ($A \otimes B \to C$ Across All 5 Rungs)**:
+     - Crafting never looks up a hardcoded `"iron + coal = steel"` recipe table. Every preset at every rung can be combined with another preset via a pure **Synthesis Operator** (`combinePresets(a, b, condition)`):
+       - **Rung 1 $\otimes$ Rung 1 $\to$ Rung 2 (Alloying / Compounding)**: Combining two element presets under heat/pressure produces a new Stack preset whose `Vtx, Pxd, Lx, Aq` and derived properties (hardness, conductivity, melting point) follow the §16.6 Q3 mixing laws.
+       - **Rung 2 $\otimes$ Rung 3 $\to$ Rung 3 (Materializing Parts)**: Applying any crafted Stack to any Part geometry (`@hm/partgen` / `@hm/meshops`) automatically re-derives the part's mass, bounce, friction, thermal limit, and signal loss.
+       - **Rung 3 $\otimes$ Rung 3 $\to$ Rung 4 (Socket & Wiregraph Assembly)**: Plugging a nozzle part into a chamber part with an igniter pin doesn't match a "rocket recipe"—the physics solver sees `[closed chamber + exothermic reaction + 1 exhaust vector]` and computes thrust $F = \dot{m} v_e$ from first principles!
+       - **Rung 4 $\otimes$ Rung 4 $\to$ Lineage / Dyadic Synthesis**: Pairing two companions, flora species, or AI presets combines their `Mem` cause graphs and polarities (`findDyads` / `LINEAGE_RESEARCH.md`).
+     - Every synthesized preset gets a deterministic content hash (`<kind>:<hash8>`), records its parent presets (`parents: [a.of, b.of]`), and awards a System discovery notice the first time that emergent behavior is achieved.
+  3. **The LitRPG "System" as Homeostatic Scientist (Player as "Chaos Seed")**:
+     - In a static RPG, quests are pre-written strings. In FIDELITY, the **Planet is a Rung 5 living body** (`BodyState` over Rays 1–7) and **Natives are evolving souls**, while the player is a **Chaos Seed** whose crafting, mining, terraforming, and combat continuously perturb the local Four-Float and 7-Ray equilibrium.
+     - **How Player Actions Automatically Generate Questlines (`generateSystemQuests`)**:
+       - **Type A — Homeostatic Counter-Balance Quests (Planetary & Social Equilibrium)**:
+         - When a player's industrial crafting strips local `Vtx` crust mass, dumps waste heat into `Aq` water, or triggers `root-fear` / `solar-control` in nearby natives, the Planet's or Native Complex's `bodyStep` trips a real zone warning (`congested`, `inflamed`, `drained`, or `starved`).
+         - The System translates that live somatic/ecological delta into a **Questline**: e.g., if smelting depletes valley `Aq` and inflames Planetary Ray 2, the local ecosystem dries, fire reactions become volatile, and the System logs a quest for the player or natives to engineer a condensation/aqueduct contraption or rebalance the thermal loop.
+       - **Type B — Scientific Frontier Quests (Hypothesis & Synthesis Chains)**:
+         - Whenever the player crafts a new preset $C = A \otimes B$, the System inspects the **adjacent unvisited nodes** in the Four-Float / Archetype / Wiregraph manifold (e.g., a newly forged high-$\text{Lx}$ superconductor that hasn't yet been wired into a magnetic coil, or a high-pressure chamber that hasn't been paired with a nozzle) and issues an optional **Completionist / Frontier Quest** to test the next physical law.
+       - **Type C — Karmic / Cause-Link Quests (Closing Open `mc` Loops)**:
+         - As already wired in Wave 14 (`Quest logged: {cause}`), every open cause link (`by -> d`) in the drone's, native's, or planet's memory is a live behavioral quest that only completes when the entity proves in waking physics and W3 dreams that it can handle that catalyst without distortion.

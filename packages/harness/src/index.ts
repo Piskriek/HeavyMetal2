@@ -13,3 +13,4 @@ export * from './polarity.js';
 export * from './system-memory.js';
 export * from './lifecycle.js';
 export * from './body.js';
+export * from './archetypes.js';

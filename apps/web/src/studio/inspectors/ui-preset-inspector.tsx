@@ -213,6 +213,7 @@ export const UiPresetInspector: React.FC<UiPresetInspectorProps> = ({
     'play-hud': loadSavedScreen(SCREEN_CATALOG[1]!),
     'meta-shell': loadSavedScreen(SCREEN_CATALOG[2]!),
     'studio-shell': loadSavedScreen(SCREEN_CATALOG[3]!),
+    'appraise-lens': loadSavedScreen(SCREEN_CATALOG[4]!),
   }));
 
   const [hoverPartTone, setHoverPartTone] = useState<{ panelId: string; partId: string; tone: UiTone } | null>(null);

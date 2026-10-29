@@ -327,13 +327,13 @@ void main() {
   // the sun: a hard white disc with a glare round it, even with no air
   float cs = max(dot(dir, uSunDir), 0.0);
   space += vec3(1.0, 0.97, 0.92) * (smoothstep(0.99993, 0.99997, cs) * 8.0 + pow(cs, 900.0) * 1.2 + pow(cs, 40.0) * 0.05);
-  // the goblin planet
+  // the goblin planet (suppressed on living worlds with atmosphere >= 0.5)
   vec3 planetCol = vec3(0.0);
   float planetA = 0.0;
   float cp = dot(dir, uPlanetDir), sr = sin(uPlanetSize);
   vec3 off = dir - uPlanetDir * cp;
   float s = length(off) / sr;
-  if (cp > 0.0 && s < 1.25) {
+  if (uAtmosphere < 0.5 && cp > 0.0 && s < 1.25) {
     vec3 side = off / max(length(off), 1e-5);
     if (s < 1.0) {
       vec3 n = side * s - uPlanetDir * sqrt(1.0 - s * s);
@@ -359,9 +359,11 @@ void main() {
   // the air: smooth through the horizon (a power curve has an infinite slope there, which drew a hard line across the sky)
   vec3 sky = mix(uHorizon, uZenith, smoothstep(-0.04, 0.75, dir.y));
   float sunInAir = pow(cs, 220.0) * 1.2 + pow(cs, 8.0) * 0.18;
-  vec3 colour = mix(space, sky + sunInAir * vec3(1.0, 0.95, 0.85) + space * 0.25, uAtmosphere);
-  // through air the planet still shows, paled by the sky like a daytime moon
-  colour = mix(colour, planetCol + sky * 0.22, planetA * uAtmosphere * 0.8);
+  // on living worlds (atmosphere >= 0.5), starfield/void is 100% suppressed, revealing vibrant daytime sky
+  vec3 colour = mix(space, sky + sunInAir * vec3(1.0, 0.95, 0.85), clamp(uAtmosphere * 1.2, 0.0, 1.0));
+  if (uAtmosphere < 0.5) {
+    colour = mix(colour, planetCol + sky * 0.22, planetA * uAtmosphere * 0.8);
+  }
   gl_FragColor = vec4(colour, 1.0);
   #include <colorspace_fragment>
 }`;

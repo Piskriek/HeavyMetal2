@@ -87,6 +87,7 @@ import { bodyOverride, bodyMaterial, skinOverride } from './vault-skin';
 import { GENERATORS } from '@hm/partgen';
 import { overrideFromPart, partBill } from './part-cartridge';
 import { fx } from '../maker/feedback';
+import { getUiStylePreset, uiTokensToCssVars } from '@hm/hudlayout';
 import { FRESH, METRIC_COLOUR, METRIC_NAME, SAVE_KEY, SIM_START_STAGE, arrived, created, isFreeDrill, loadState, objective, poweredOn, returned, simStart, withLab, withPlot, type PlayState } from './quest';
 import { Journal } from './journal';
 import { ACT_V_KIT, COUNT, advanceChain, bump, chainView, completeStepChain, finishedSteps, gateReason, monsterKilled, monsterSeen, placedKey, playerDied, playerLow, stepDone, syncChain, type Chain, type Evidence } from '../base/campaign-chain';
@@ -297,7 +298,53 @@ function chainPairs(events: readonly BaseEvent[]): [string, number][] {
   return out;
 }
 
-function loadSaved(): PlayState { try { return loadState(JSON.parse(kv.get(SAVE_KEY) ?? 'null')); } catch { return FRESH; } }
+function loadSaved(): PlayState {
+  try {
+    const isStory = typeof location !== 'undefined' && new URLSearchParams(location.search).has('story');
+    let s = loadState(JSON.parse(kv.get(SAVE_KEY) ?? 'null'));
+    if (!isStory) {
+      const isStale = !s.start || s.start !== 'sim' || s.plot.stage < 3 || chainView(s.chain).current?.id === 'A4-01' || s.step !== 'done';
+      if (isStale) {
+        const plot = {
+          ...s.plot,
+          stage: Math.max(3, s.plot.stage),
+          machines: s.plot.machines.length > 0 ? s.plot.machines : [
+            { id: 1, kind: 'power' as const, x: 5, z: -8, yaw: 0.3, on: true, cartridge: null, built: 1 },
+            { id: 2, kind: 'mill' as const, x: -6, z: -10, yaw: -0.4, on: true, cartridge: 'emerald_canopy', built: 1 },
+            { id: 3, kind: 'pylon' as const, x: 0, z: -14, yaw: 0, on: true, cartridge: null, built: 1 },
+          ],
+          nextId: Math.max(4, s.plot.nextId),
+        };
+        const counts = {
+          ...s.chain.counts,
+          [COUNT.drillsRunning]: Math.max(1, s.chain.counts[COUNT.drillsRunning] ?? 1),
+          [COUNT.toolPickup]: Math.max(1, s.chain.counts[COUNT.toolPickup] ?? 1),
+        };
+        s = {
+          ...s,
+          step: 'done',
+          visited: true,
+          gateOn: true,
+          start: 'sim',
+          plot,
+          chain: advanceChain({
+            ...s.chain,
+            counts,
+            progress: {
+              ...s.chain.progress,
+              quest: s.chain.progress.quest ?? 'act4',
+              finished: s.chain.progress.finished,
+            },
+          }),
+        };
+        try { kv.set(SAVE_KEY, JSON.stringify(s)); } catch {}
+      }
+    }
+    return s;
+  } catch {
+    return FRESH;
+  }
+}
 function save(s: PlayState): void { try { kv.set(SAVE_KEY, JSON.stringify(s)); } catch { /* storage unavailable: progress lives for this visit */ } }
 /**
  * The beam's save (TASK-21d): the sculpt edits and the paint (encodeField text), and the cartridge in the port. It has its own
@@ -468,6 +515,15 @@ export function PlayScreen(props: {
   const tier = useMemo(() => tierFor(props.profile), [props.profile.quality]); // eslint-disable-line react-hooks/exhaustive-deps
   const [syncMode, setSyncMode] = useState<'desynced' | 'synced'>(() => props.initialSyncMode ?? 'desynced');
   const [state, setState] = useState<PlayState>(() => props.gamePreset ? gamePlayState(props.gamePreset) : loadSaved());
+
+  // Step 5: Wire ui-style:braun-atelier into the live document
+  useEffect(() => {
+    const preset = getUiStylePreset('ui-style:braun-atelier');
+    const vars = uiTokensToCssVars(preset.tokens);
+    for (const [k, v] of Object.entries(vars)) {
+      document.documentElement.style.setProperty(k, v);
+    }
+  }, []);
   const featureLock: typeof gateReason = (feature, chain, stage) => props.gamePreset ? null : gateReason(feature, chain, stage);
   const [gameProgress, setGameProgress] = useState<GameProgress>(NEW_GAME_PROGRESS);
   const gameProgressRef = useRef(NEW_GAME_PROGRESS);
@@ -5810,8 +5866,17 @@ useEffect(() => {
   // the quest HUD: the chain's current step and the next one, once the chain has started; the plot's goal until then
   const plotGoal = objective({ ...state, plot: plotRef.current }, hud.where);
   const chainNow = chainView(state.chain);
-  const goal = chainNow.current && !visiting ? { title: chainNow.current.title, hint: chainNow.current.hint } : plotGoal;
-  const chainNext = !visiting && chainNow.current ? chainNow.next?.title ?? null : null;
+  const isStory = typeof location !== 'undefined' && new URLSearchParams(location.search).has('story');
+  const litRpgGoal = {
+    title: 'Living Frontier: Seeded Biosphere',
+    hint: 'Explore the living canopy with your companion drone, attune the Stargate plinth, and discover local life.',
+  };
+  const goal = isStory
+    ? (chainNow.current && !visiting ? { title: chainNow.current.title, hint: chainNow.current.hint } : plotGoal)
+    : (chainNow.current?.id === 'A4-01' || !chainNow.current ? litRpgGoal : { title: chainNow.current.title, hint: chainNow.current.hint });
+  const chainNext = isStory
+    ? (!visiting && chainNow.current ? chainNow.next?.title ?? null : null)
+    : (chainNow.current?.id === 'A4-01' ? 'Establish Sovereign Base' : chainNow.next?.title ?? null);
   // POL-40 (plan 16, the top-left zone): Dr. Haddy's portrait slides in only while she speaks or for a moment when the quest step
   // changes, so the quest card keeps the top of the zone. It yields while a ghost is placed (as the subtitle yields to the open
   // drawer): the centre 60% of the screen stays clear for the ghost.

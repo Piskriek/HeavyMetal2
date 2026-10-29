@@ -702,7 +702,9 @@ export function createPlotBiomeView(
       return;
     }
 
-    const threshold = Math.min(6, stage + 0.5);
+    // On living seeded biospheres (Stage >= 3), reveal full forest canopy (oak, pine, birch)
+    const effectiveStage = stage >= 3 ? 6 : stage;
+    const threshold = Math.min(6, effectiveStage + 0.5);
     for (const slot of slots) {
       let c = 0;
       while (c < slot.appears.length && (slot.appears[c] ?? 999) <= threshold) {

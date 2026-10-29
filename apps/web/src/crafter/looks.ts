@@ -71,6 +71,7 @@ export function bakeLook(cart: Cartridge, stage: Stage, device: DeviceProfile, g
   }
   const policy = meshPolicyFor(state, budget);
   const n = normalised(state);
+  const isLiving = cart.id.includes('emerald') || cart.id.includes('solar') || cart.id.includes('spore') || cart.id.includes('prism') || cart.id.includes('coral') || cart.id.includes('earth') || stage >= 3;
   return {
     key: `${cart.id}@${stage}@${device.id}`,
     stage, cartridgeId: cart.id, budget, size: t.size, colour, maps,
@@ -79,9 +80,9 @@ export function bakeLook(cart: Cartridge, stage: Stage, device: DeviceProfile, g
     smooth: policy.mode === 'DUAL' ? 1 : policy.mode === 'CHAMFER' ? 0.25 : 0,
     normalStrength: budget.normal ? budget.relief : 0,
     levels: budget.paletteLevels > 0 ? budget.paletteLevels : 0,
-    water: waterLevel(budget.wetness),
-    atmosphere: smoothstep(0.12, 0.8, n.lx),
-    light: n.lx,
+    water: waterLevel(isLiving ? Math.max(0.65, budget.wetness) : budget.wetness),
+    atmosphere: isLiving ? 1.0 : smoothstep(0.12, 0.8, n.lx),
+    light: isLiving ? Math.max(0.92, n.lx) : n.lx,
     tile: stage === 1 ? 16 : stage === 2 ? 12 : 8,
   };
 }

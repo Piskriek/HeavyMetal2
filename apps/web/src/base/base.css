@@ -2,21 +2,21 @@
    Design tokens: docs/UI_DESIGN_SYSTEM_AND_TOKENS.md */
 
 :root {
-  --base-cyan: #00f0ff;
-  --base-cyan-glow: rgba(0, 240, 255, 0.35);
-  --base-cyan-hairline: rgba(0, 240, 255, 0.22);
-  --base-bg-dark: rgba(7, 12, 20, 0.9);
-  --base-bg-surface: rgba(15, 23, 38, 0.75);
-  --base-bg-slot: rgba(10, 18, 30, 0.65);
-  --base-bg-slot-hover: rgba(0, 240, 255, 0.12);
-  --base-bg-slot-active: rgba(0, 240, 255, 0.22);
-  --base-text-primary: #f8fafc;
-  --base-text-secondary: #94a3b8;
-  --base-text-muted: #64748b;
-  --base-border-subtle: rgba(255, 255, 255, 0.08);
-  --base-radius-sm: 4px;
-  --base-radius-md: 8px;
-  --base-radius-lg: 12px;
+  --base-cyan: var(--ui-accent, #d96b43);
+  --base-cyan-glow: rgba(217, 107, 67, 0.22);
+  --base-cyan-hairline: var(--ui-line, #343832);
+  --base-bg-dark: var(--ui-bg, #141513);
+  --base-bg-surface: var(--ui-panel, #1c1e1b);
+  --base-bg-slot: var(--ui-inset, #252824);
+  --base-bg-slot-hover: var(--ui-hover, #2f332e);
+  --base-bg-slot-active: rgba(217, 107, 67, 0.20);
+  --base-text-primary: var(--ui-ink, #f2efe9);
+  --base-text-secondary: var(--ui-dim, #9b998f);
+  --base-text-muted: #717066;
+  --base-border-subtle: var(--ui-line, #343832);
+  --base-radius-sm: var(--ui-radius, 2px);
+  --base-radius-md: var(--ui-radius, 2px);
+  --base-radius-lg: var(--ui-radius, 2px);
 }
 
 /* -------------------------------------------------------------

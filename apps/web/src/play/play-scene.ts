@@ -2281,7 +2281,7 @@ export function createPlayScene(o: {
       waterSources: L.waterSources,
       waterVolume: L.waterSources.length > 0 ? 60 : 0,
       stage: 6,
-      s: { pxd: 0.5, vtx: 0.5, lx: 0.5, aq: 0.5 },
+      s: { pxd: 0.85, vtx: 0.80, lx: 0.90, aq: 0.85 },
       seed: worldSeed,
       tier: L.tier,
     });
@@ -2295,7 +2295,9 @@ export function createPlayScene(o: {
   let coverSliceTimer: ReturnType<typeof setTimeout> | null = null;
 
   const bakeStageCoverage = (s: number, input: BiomeInput): THREE.DataTexture => {
-    const bake = bakePlotBiome({ ...input, stage: s });
+    const coverageStage = s >= 3 ? 6 : s;
+    const coverageFloats = s >= 3 ? { pxd: 0.85, vtx: 0.80, lx: 0.90, aq: 0.85 } : input.s;
+    const bake = bakePlotBiome({ ...input, stage: coverageStage, s: coverageFloats });
     const tex = new THREE.DataTexture(
       bake.cover,
       input.n,

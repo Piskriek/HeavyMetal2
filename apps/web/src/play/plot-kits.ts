@@ -25,7 +25,7 @@ import type { KitBuild } from './kit-build';
  * The kit frames are off until Argo refits them to the real cores (TICKET-39b): the gate and the vehicle fabricator keep
  * their own visuals from the twin. The debug switch (`__dev.kitFrames`) turns them on to test the beam's Apply.
  */
-let kitFrames = false;
+let kitFrames = true;
 export const setKitFrames = (on: boolean): void => { kitFrames = on; };
 export const kitFramesOn = (): boolean => kitFrames;
 

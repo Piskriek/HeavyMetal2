@@ -83,7 +83,10 @@ function ensurePackages(dir, label) {
 // ---- the processes it starts, each line tagged; all stopped on exit ----
 const children = [];
 function start(tag, color, cmd, cmdArgs, cwd, env = {}) {
-  const child = spawn(cmd, cmdArgs, { cwd, env: { ...process.env, ...env, FORCE_COLOR: '1' }, shell: WIN, windowsHide: true });
+  // On Windows, running node.exe with shell: true fails because 'C:\Program Files' has spaces.
+  // Shell is only needed for .cmd/.bat scripts like npm.cmd.
+  const needsShell = WIN && (cmd.endsWith('.cmd') || cmd.endsWith('.bat'));
+  const child = spawn(cmd, cmdArgs, { cwd, env: { ...process.env, ...env, FORCE_COLOR: '1' }, shell: needsShell, windowsHide: true });
   children.push({ tag, child });
   const prefix = `${color}[${tag}]${C.off} `;
   for (const stream of [child.stdout, child.stderr]) {
@@ -112,7 +115,6 @@ function stopAll() {
 }
 process.on('SIGINT', () => { stopAll(); process.exit(0); });
 process.on('SIGTERM', () => { stopAll(); process.exit(0); });
-process.on('exit', stopAll);
 
 function openBrowser(url) {
   if (!OPEN_BROWSER) return;
@@ -149,8 +151,7 @@ const running = {
 if (CHECK_ONLY) {
   for (const [k, v] of Object.entries(running)) say(`   ${v ? `${C.ok}up${C.off}  ` : `${C.dim}free${C.off}`}  ${k} (${PORTS[k]})`);
   say(`\n${C.ok}Check done.${C.off} Run without --check to start everything.`);
-  process.exit(0);
-}
+} else {
 
 step('Starting');
 if (running.bridge) good('Neural Bridge already running on :8220 (reused)');
@@ -186,4 +187,5 @@ if (capitalUp) {
 }
 say(`  ${capitalUp ? '4' : '3'}. The brain's replies and everything you say also appear in this window ${C.dim}[brain] [bridge]${C.off}.`);
 say(`${C.vio}═══════════════════════════════════════════════════════════════════${C.off}`);
+}
 

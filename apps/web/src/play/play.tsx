@@ -2517,18 +2517,18 @@ useEffect(() => {
   }, [pipOn]);
   /** A 640x360 JPEG of any picture, letterboxed. */
   const jpegCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const toJpeg = (src: CanvasImageSource, sw: number, sh: number): Promise<Blob | null> => {
-    // one small canvas, reused: the eyes run every few seconds on the min-spec laptop
+  const toJpeg = (src: CanvasImageSource, sw: number, sh: number, maxW = 640, maxH = 360, quality = 0.72): Promise<Blob | null> => {
+    // one canvas, reused: the eyes run every few seconds on the min-spec laptop
     const c = (jpegCanvasRef.current ??= document.createElement('canvas'));
-    c.width = 640;
-    c.height = 360;
+    c.width = maxW;
+    c.height = maxH;
     const g = c.getContext('2d');
     if (!g || !sw || !sh) return Promise.resolve(null);
-    const k = Math.min(640 / sw, 360 / sh);
+    const k = Math.min(maxW / sw, maxH / sh);
     g.fillStyle = '#000';
-    g.fillRect(0, 0, 640, 360);
-    g.drawImage(src, (640 - sw * k) / 2, (360 - sh * k) / 2, sw * k, sh * k);
-    return new Promise((resolve) => c.toBlob((b) => resolve(b), 'image/jpeg', 0.72));
+    g.fillRect(0, 0, maxW, maxH);
+    g.drawImage(src, (maxW - sw * k) / 2, (maxH - sh * k) / 2, sw * k, sh * k);
+    return new Promise((resolve) => c.toBlob((b) => resolve(b), 'image/jpeg', quality));
   };
   const unlinkWindow = (): void => {
     for (const t of linkedStreamRef.current?.getTracks() ?? []) t.stop();
@@ -2589,7 +2589,8 @@ useEffect(() => {
       if (view) out.push({ source: 'game', blob: view });
       const v = linkedVideoRef.current;
       if (v && v.videoWidth > 0) {
-        const b = await toJpeg(v, v.videoWidth, v.videoHeight);
+        // a linked window at the size it is shared (up to 720p), so its interface text can be read: one frame every few seconds
+        const b = await toJpeg(v, v.videoWidth, v.videoHeight, v.videoWidth, v.videoHeight, 0.82);
         if (b) out.push({ source: 'external', blob: b });
       }
       return out;

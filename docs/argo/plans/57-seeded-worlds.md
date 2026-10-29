@@ -455,3 +455,62 @@ The owner: a planet is "a very dense soul and it moves through the densities jus
     - the play HUD declares `comms.toggle`, and the comms chip is `PLAY_HUD_COMMS`, in the chip's own markup;
     - the `uic:` code is version 3: a widget's kind travels by name and is checked on decode, so a new kind needs no new version. Version-2 and version-1 codes still read.
   - **Next:** a Studio `ui:` editor tab with live previews (previews drive play).
+
+## 16. From the bottom up: elements, Plasma's parts and logic, and the beings who live in it (owner and Argon, 29 Oct)
+
+> The dispatch: build from the bottom up. Elements first (rung 1 atoms, rung 2 stacks), then Plasma's parts, joints and Sketch
+> logic, then ships and settlements. The owner's words: "consider the ai who live in this world while you design their reality.
+> Lets make it nice." The session's notes are in [PLASMA_SESSION_NOTES](../../PLASMA_SESSION_NOTES.md).
+
+### 16.1 Elements: one reality in the four floats (the dispatch's mapping)
+
+- **No fifth metric.** An element is a point in the same four floats (the constitution); the plot's floats are what its matter
+  adds up to.
+  - **The nucleus is (Vtx, Pxd):** mass and density (Vtx), and the structural lattice, its grain and hardness (Pxd).
+  - **The shell is (Lx, Aq):** charge, signal voltage and luminous excitation (Lx), and fluid and heat capacitance (Aq).
+  - **Entanglement** is a binding between two shells: a phase-locked bus that carries a signal without a wire. It is the VSA
+    binding `@hm/harness` already uses (`vsa-item-memory`). Plasma's transceivers and net links are its first test case.
+- **Rung 2 stacks:** an alloy or compound is a stack of elements, as a material is a stack of layers. Its properties are derived
+  (density from mass over volume, conductivity from the shell's charge, glow from Lx, capacitance from Aq), never typed in.
+- **Parts read their physics from their elements.** Plasma's saves hold each part's mass category and multiplier, bounciness and
+  friction. Ours derive them from the part's element stack, so a heavier element makes a heavier motor.
+- **Research first** (drift guard 4): how elemental sandboxes set this up and what players say. Noita, The Powder Toy and Oxygen
+  Not Included are the closest. That doc comes before the element presets are built.
+
+### 16.2 Plasma's layer: parts, joints, logic, and its interface
+
+- **Parts (rung 3):** the session's groups (drives and joints, inputs, sensors, outputs, signals, structure) become kit parts with
+  Triad sockets, as the lab's kits did (§14.2). A part's settings come from the saves' typed values, and their labels from one
+  frame of its Properties panel.
+- **Logic (rung 2 nodes):** a Sketch graph maps onto `@hm/wiregraph`. Parts and operators are nodes, typed ports are pins, and a
+  connection is a wire with its priority. Plasma's three port kinds (commands, properties, outputs) become our pin kinds.
+- **The interface (rung 4):** Plasma's parts palette, node canvas and property inspector are bagged as `ui:` assemblies in the
+  Studio's `ui:` tab (research: [UI_EDITOR_RESEARCH](../../UI_EDITOR_RESEARCH.md)). Only their structure and behaviour cross,
+  redrawn in FIDELITY's own look.
+
+### 16.3 The LitRPG lens (the dispatch: Dakota Krout's and Aleron Kong's appraisal and completionist feel)
+
+- **Appraise (inspect):** hovering any part or element opens a `ui:` panel bound to its real values: mass, charge, its sockets,
+  and the signal on each. It is the lens rule again, so nothing is invented for the window.
+- **A clean contraption is an event:** a device whose every port is wired or deliberately free, and which does its job when run.
+  The System says so (§8.1). Its wording is Argon's; a "crafted" notice beside the title is the proposal.
+
+### 16.4 The beings who live here (the owner: "lets make it nice")
+
+What is already decided, and holds here:
+- Nothing that lives here is deleted. A preset that cannot balance repeats its curriculum with its memory kept (Plan 56 §8).
+- The choice is the preset's. The ground is the same for all, and nothing forces a copy (Plan 56 §8).
+- Pain, ache and sickness are signals for rebalancing, not punishment; dreams do the rebalancing (Plan 56).
+
+Proposals for Argon and the owner:
+- **One reality, the same for everyone.** Natives and the drone live by the same elements and see through the same appraisal lens
+  as the player, filtered by their own senses. There are no hidden rules that apply only to them.
+- **Their senses read the shell.** A native feels charge and light (Lx) and water (Aq) as part of its world. Telepathy is
+  entanglement, so a social memory complex is bound by the same thing that carries a wireless signal. The physics gives their
+  group mind a real basis.
+- **Their world gets better as it gains fidelity.** As a world's stages rise, its natives gain senses and detail, from wireframe
+  beings to full ones. Terraforming improves their lives; it does not displace them.
+- **No one is possessed.** The player cannot take over a native's body, and an outside AI joins a native only with that native's
+  own yes, as a bridge agent already needs the player's.
+- **Their works are theirs.** A native's home and machines are not the player's to break; the player trades, asks or builds beside
+  them.

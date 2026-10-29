@@ -1,11 +1,12 @@
-// Plan 57 §15: the play HUD's goal card as a `ui:` panel: the screen validates against the HUD's real sources, and the renderer
-// draws each part from its live value, nothing for a missing one, in the card's old classes.
+// Plan 57 §15: the play HUD's panels as `ui:` presets (the goal card, the floats pill, the plot's ore and power, the health): the
+// screen validates against the HUD's real sources, and the renderer draws each part from its live value, nothing for a missing
+// one, in the classes the hand-drawn HUD had.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { decodeScreen, encodeScreen } from '@hm/hudlayout';
-import { PLAY_HUD_GOAL, PLAY_HUD_SCREEN, floatsPanelProps, goalValues, playHudIssues } from './ui-play-hud';
+import { PLAY_HUD_GOAL, PLAY_HUD_SCREEN, floatsPanelProps, goalValues, healthPanelProps, playHudIssues, plotPanelProps, type PlotFigures } from './ui-play-hud';
 import { UiPanelView } from './ui-panel';
 
 const draw = (values: Readonly<Record<string, string | null>>): string =>
@@ -48,4 +49,69 @@ test('a part with no value draws nothing (the lens rule at run time)', () => {
   const html = draw({ 'goal.title': 'Stage 3', 'goal.hint': '', 'goal.next': null });
   assert.match(html, /<h2[^>]*>Stage 3<\/h2>/);
   assert.doesNotMatch(html, /<p/);
+});
+
+// ---- the plot's ore and power, and the health, on the stat widget: each drawn as the hand-drawn markup was
+/** A drawing's words, as a reader sees them (tags and React's text separators dropped). */
+const words = (html: string): string => html.replace(/<!-- -->/g, '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+const signed = (v: number): string => `${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
+
+/** The ore ticker and power line as play.tsx drew them by hand before the stat. */
+function handPlot(o: PlotFigures) {
+  return createElement('div', null,
+    createElement('p', { className: `play-ore${o.oreOut ? ' out-of-ore' : ''}`, 'data-testid': 'plot-ore-ticker' },
+      createElement('b', null, Math.floor(o.ore)), ' ore', o.oreLinked > 0 ? createElement('span', { className: 'play-ore-linked' }, ' (+', o.oreLinked, ')') : null, ' ', createElement('span', null, signed(o.oreRate), '/s'),
+      o.oreOut ? createElement('em', { className: 'play-ore-warn' }, 'Out of ore: hold E on a boulder, or build a rock drill') : null),
+    createElement('p', { className: `play-power${o.satisfaction < 0.999 ? ' short' : ''}` },
+      createElement('b', null, o.demand.toFixed(0)), ' of ', o.supply.toFixed(0), ' kW ', createElement('span', { className: 'play-power-pct' }, Math.round(o.satisfaction * 100), '%')),
+  );
+}
+const drawPlot = (o: PlotFigures): string => renderToStaticMarkup(createElement('div', null, createElement(UiPanelView, plotPanelProps(o))));
+
+test('the ore ticker and the power line drawn as stats read exactly as the hand-drawn ones, in their classes', () => {
+  const cases: PlotFigures[] = [
+    { ore: 412.8, oreRate: 1.25, oreLinked: 600, oreOut: false, demand: 42.4, supply: 60, satisfaction: 1 },
+    { ore: 0, oreRate: -0.5, oreLinked: 0, oreOut: true, demand: 80, supply: 60, satisfaction: 0.75 },
+  ];
+  for (const o of cases) {
+    const html = drawPlot(o);
+    assert.equal(words(html), words(renderToStaticMarkup(handPlot(o))), `the words for ${JSON.stringify(o)}`);
+    assert.match(html, new RegExp(`<p class="play-ore${o.oreOut ? ' out-of-ore' : ''}"[^>]*data-testid="plot-ore-ticker"`));
+    assert.match(html, new RegExp(`<p class="play-power${o.satisfaction < 0.999 ? ' short' : ''}"`));
+    assert.match(html, /<span class="play-power-pct">\d+%<\/span>/);
+    // the power line's "of 12 kW" stays plain words, as the hand-drawn line had: a span would take the section's dim span colour
+    assert.match(html, /<b>\d+<\/b> of \d+ kW/);
+    assert.equal(/play-ore-linked">\s*\(\+\d+\)/.test(html), o.oreLinked > 0, 'the linked crates\' ore only when there is some');
+    assert.equal(/<em class="play-ore-warn">/.test(html), o.oreOut, 'the note only while the ore is out');
+    assert.doesNotMatch(html, /<section|data-ui-panel/, 'its parts go into the plot section, with no wrapper of their own');
+  }
+});
+
+/** MonsterHud's health plate as it was drawn by hand before the stat. */
+function handHealth(hp: number, maxHp: number, low: boolean, shielded: boolean) {
+  const lit = Math.ceil((Math.max(0, hp) / maxHp) * 20);
+  const shown = Math.max(0, Math.round(hp));
+  return createElement('section', { className: `mhud-plate mhud-vitals${low ? ' low' : ''}${shielded ? ' shielded' : ''}`, 'data-hud-zone': 'bottom-right', 'aria-label': 'Health' },
+    createElement('p', { className: 'mhud-title' }, 'Health'),
+    createElement('div', { className: 'mhud-figure' }, createElement('b', null, shown), createElement('span', null, 'of ', maxHp)),
+    createElement('div', { className: 'mhud-bar', role: 'meter', 'aria-label': 'Health', 'aria-valuemin': 0, 'aria-valuemax': maxHp, 'aria-valuenow': shown },
+      ...Array.from({ length: 20 }, (_, i) => createElement('i', { key: i, className: i < lit ? 'on' : '' }))),
+    shielded ? createElement('p', { className: 'mhud-shield-note' }, 'Shield up: hits do a fifth of their damage.') : low ? createElement('p', { className: 'mhud-note' }, 'Low. Back off to the gate and patch up.') : null,
+  );
+}
+
+test('the health plate drawn from its preset keeps the hand-drawn plate: figure, twenty segments, and one note', () => {
+  for (const [hp, low, shielded] of [[100, false, false], [23.6, true, false], [23.6, true, true], [0, false, false], [61, false, true]] as const) {
+    const html = renderToStaticMarkup(createElement(UiPanelView, healthPanelProps({ hp, maxHp: 100, low, shielded })));
+    const hand = renderToStaticMarkup(handHealth(hp, 100, low, shielded));
+    // the stat puts a space before "of 100", which the flex figure does not draw (and a reader now hears "100 of 100")
+    assert.equal(words(html).replace(/\s/g, ''), words(hand).replace(/\s/g, ''), `the words at ${hp} hp`);
+    assert.match(html, new RegExp(`^<section class="mhud-plate mhud-vitals${low ? ' low' : ''}${shielded ? ' shielded' : ''}"[^>]*aria-label="Health"`));
+    assert.doesNotMatch(html, /aria-live/, 'it does not announce every hit');
+    assert.match(html, /<div class="mhud-figure"[^>]*><b>\d+<\/b>/);
+    const segments = html.match(/<div class="mhud-bar"[^>]*>(.*?)<\/div>/)?.[1] ?? '';
+    assert.equal(segments, hand.match(/<div class="mhud-bar"[^>]*>(.*?)<\/div>/)?.[1], `the lit segments at ${hp} hp`);
+    assert.match(html, new RegExp(`aria-valuenow="${Math.max(0, Math.round(hp))}"`));
+    assert.equal((html.match(/mhud-(shield-)?note/g) ?? []).length, shielded || low ? 1 : 0, 'one note at most, the shield\'s first');
+  }
 });

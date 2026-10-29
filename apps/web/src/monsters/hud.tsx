@@ -2,6 +2,8 @@
 // from, and the seal bar under the crosshair. Corner panels in the game's own vocabulary (a dark glass plate with a 2 px accent
 // edge). Pointer-free: nothing here covers the crosshair or a button.
 import './monster-hud.css';
+import { UiPanelView } from '../play/ui-panel';
+import { healthPanelProps } from '../play/ui-play-hud';
 
 export interface RadarLeak {
   readonly id: number;
@@ -34,8 +36,6 @@ export interface MonsterHudProps {
 
 /** The radar's edge, in metres: a leak beyond it sits on the rim. */
 const RADAR_RANGE = 120;
-/** The health bar's segments. */
-const SEGMENTS = 20;
 /** At or under this fraction of full health the bar turns magenta and the note appears. */
 const LOW_FRACTION = 0.3;
 
@@ -56,8 +56,6 @@ export function MonsterHud(props: MonsterHudProps) {
   const { hp, maxHp, hitAt, hitBearing, radar, seal } = props;
   const alive = hp > 0;
   const low = alive && hp <= maxHp * LOW_FRACTION;
-  const shown = Math.max(0, Math.round(hp));
-  const lit = Math.ceil((Math.max(0, hp) / maxHp) * SEGMENTS);
   const nearest = [...radar].sort((a, b) => a.distance - b.distance).slice(0, 3);
   const first = nearest[0];
   const summary = first
@@ -106,19 +104,8 @@ export function MonsterHud(props: MonsterHudProps) {
         </div>
       </aside>
 
-      <section className={`mhud-plate mhud-vitals${low ? ' low' : ''}${props.shielded ? ' shielded' : ''}`} data-hud-zone="bottom-right" aria-label="Health">
-        <p className="mhud-title">Health</p>
-        <div className="mhud-figure">
-          <b>{shown}</b>
-          <span>of {maxHp}</span>
-        </div>
-        <div className="mhud-bar" role="meter" aria-label="Health" aria-valuemin={0} aria-valuemax={maxHp} aria-valuenow={shown}>
-          {Array.from({ length: SEGMENTS }, (_, i) => (
-            <i key={i} className={i < lit ? 'on' : ''} />
-          ))}
-        </div>
-        {props.shielded ? <p className="mhud-shield-note">Shield up: hits do a fifth of their damage.</p> : low ? <p className="mhud-note">Low. Back off to the gate and patch up.</p> : null}
-      </section>
+      {/* Plan 57 §15: the health plate is a ui: panel on the stat widget, drawn from its preset in the plate's own classes */}
+      <UiPanelView {...healthPanelProps({ hp, maxHp, low, shielded: props.shielded === true })} />
 
       {seal ? (
         <div className="mhud-plate mhud-seal" data-hud-zone="centre">

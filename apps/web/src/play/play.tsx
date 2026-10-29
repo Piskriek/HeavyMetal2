@@ -106,7 +106,7 @@ import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { kv } from '../storage/profile-storage';
 import { bodyCheckpoint, createDroneMemory, dreamNow, dronePerspective, droneSymptoms, hasUndreamt, loadDroneMemory, noteCatalyst, saveDroneMemory, type DroneBody, type DroneCatalyst, type DroneMemory } from './drone-memory';
 import { hintsFromWarnings } from './drone-body-visuals';
-import { PLAY_HUD_GOAL, floatsPanelProps, goalValues } from './ui-play-hud';
+import { PLAY_HUD_GOAL, floatsPanelProps, goalValues, plotPanelProps } from './ui-play-hud';
 import { UiPanelView } from './ui-panel';
 import { warningLine } from '@hm/harness';
 import type { DreamCue } from '@hm/harness';
@@ -404,7 +404,6 @@ const BLURB: Readonly<Record<MachineKind, string>> = {
   'heavy-projector': 'Floods the plot with amber light pixels.',
   'heavy-water': 'Floods the plot with cyan water pixels.',
 };
-const signed = (v: number): string => `${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
 /** The heavy machines, installed on a base hardpoint (the Heavy tab of the build menu). */
 const HEAVY_CARDS: readonly MenuHeavy[] = [
   { kind: 'mill', name: 'Heavy mill', blurb: BLURB['heavy-mill'] },
@@ -5985,14 +5984,12 @@ useEffect(() => {
                   }
                   return sum;
                 })();
+                // Plan 57 §15: the ore and the power are stats on the plot panel, drawn from its preset in their own classes
                 return (
-                  <>
-                    <p className={`play-ore${outOfOreNoDrill ? ' out-of-ore' : ''}`} data-testid="plot-ore-ticker">
-                      <b>{Math.floor(hud.plot.ore)}</b> ore{linkedOre > 0 ? <span className="play-ore-linked"> (+{linkedOre})</span> : null} <span>{signed(hud.plot.oreRate)}/s</span>
-                      {outOfOreNoDrill ? <em className="play-ore-warn">Out of ore: hold E on a boulder, or build a rock drill</em> : null}
-                    </p>
-                    <p className={`play-power${hud.plot.satisfaction < 0.999 ? ' short' : ''}`}><b>{hud.plot.demand.toFixed(0)}</b> of {hud.plot.supply.toFixed(0)} kW <span className="play-power-pct">{Math.round(hud.plot.satisfaction * 100)}%</span></p>
-                  </>
+                  <UiPanelView {...plotPanelProps({
+                    ore: hud.plot.ore, oreRate: hud.plot.oreRate, oreLinked: linkedOre, oreOut: outOfOreNoDrill,
+                    demand: hud.plot.demand, supply: hud.plot.supply, satisfaction: hud.plot.satisfaction,
+                  })} />
                 );
               })()}
             </section>

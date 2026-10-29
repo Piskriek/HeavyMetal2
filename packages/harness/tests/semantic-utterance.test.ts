@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { checkMem } from '@hm/shorthand';
+import { validateRecipe } from '@hm/soundlab';
 import {
   LOCALE_SHELF,
   SEMANTIC_ROOT_CATALOG,
   createPresetMemory,
   decodeUtteranceCode,
   deriveEmotionalEnvelope,
+  renderUtteranceVoiceAudio,
   synthesizeUtterance,
   type LocaleId,
   type SemanticRootId,
@@ -123,3 +125,34 @@ test('Plan 58 §18.3: utt: share codes round-trip cleanly and support cross-loca
 
   assert.equal(decodeUtteranceCode('utt:corrupted!!!'), null);
 });
+
+test('Plan 58 W3 (Track 3): renderUtteranceVoiceAudio wires timbreFilter (starved-throat vs resonant-eureka vs warm-anchor) into @hm/soundlab PCM synthesis', () => {
+  const base = createPresetMemory('brain:d0e0');
+  const starvedMem = checkMem({ ...base, bal: 0.45, charge: [0, 0, 0, 0, -52, 0, 0] });
+  const eurekaMem = checkMem({ ...base, bal: 0.98, charge: [0, 0, 0, 0, 0, 0, 0] });
+
+  const starvedUtt = synthesizeUtterance({ rootId: 'BODY_ACHE', slots: { zone: 'radio' }, mem: starvedMem, excitementOverride: 0.8 });
+  const eurekaUtt = synthesizeUtterance({ rootId: 'BODY_EUREKA', slots: { quality: 'Presence' }, mem: eurekaMem, excitementOverride: 0.85 });
+  const anchorUtt = synthesizeUtterance({ rootId: 'ANCHOR_CALM_SHARED', slots: { calm: '30%' }, mem: eurekaMem, intent: 'comfort' });
+
+  assert.equal(starvedUtt.envelope.timbreFilter, 'starved-throat');
+  assert.equal(eurekaUtt.envelope.timbreFilter, 'resonant-eureka');
+  assert.equal(anchorUtt.envelope.timbreFilter, 'warm-anchor');
+
+  const starvedAudio = renderUtteranceVoiceAudio(starvedUtt);
+  const eurekaAudio = renderUtteranceVoiceAudio(eurekaUtt);
+  const anchorAudio = renderUtteranceVoiceAudio(anchorUtt);
+
+  assert.equal(validateRecipe(starvedAudio.recipe).ok, true);
+  assert.equal(validateRecipe(eurekaAudio.recipe).ok, true);
+  assert.equal(validateRecipe(anchorAudio.recipe).ok, true);
+
+  assert.ok(starvedAudio.rms > 0.01);
+  assert.ok(eurekaAudio.rms > 0.01);
+  assert.ok(anchorAudio.rms > 0.01);
+
+  // Warm-anchor lowpass has lower zero-crossing frequency than starved-throat bandpass + noise or resonant-eureka shimmer
+  assert.notEqual(starvedAudio.zeroCrossingHz, eurekaAudio.zeroCrossingHz);
+  assert.ok(anchorAudio.zeroCrossingHz < eurekaAudio.zeroCrossingHz);
+});
+

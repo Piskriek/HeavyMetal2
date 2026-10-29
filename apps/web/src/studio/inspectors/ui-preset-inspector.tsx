@@ -1,5 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import {
+  APPRAISE_COMMANDS,
+  APPRAISE_LENS_SCREEN,
+  APPRAISE_SOURCES,
   UI_ANCHORS as ANCHORS,
   UI_FONTS as FONTS,
   WIDGET_FRAMES as FRAMES,
@@ -34,9 +37,10 @@ import {
   type WidgetKind as UiWidgetKind,
 } from '@hm/hudlayout';
 import { PLAY_HUD_COMMANDS, PLAY_HUD_SCREEN, PLAY_HUD_SOURCES } from '../../play/ui-play-hud';
+import { HarvestedShelfAndAppraiseDeck } from '../../play/ui-appraise-lens';
 import { kv } from '../../storage/profile-storage';
 
-export type EditableScreenId = 'home-holodeck' | 'play-hud' | 'meta-shell' | 'studio-shell';
+export type EditableScreenId = 'home-holodeck' | 'play-hud' | 'meta-shell' | 'studio-shell' | 'appraise-lens';
 
 interface ScreenPresetCatalogEntry {
   readonly id: EditableScreenId;
@@ -117,6 +121,31 @@ const SCREEN_CATALOG: readonly ScreenPresetCatalogEntry[] = [
       'studio.workspace': 'Creative Suite',
       'studio.uiStyle': 'Braun Atelier',
       'studio.stagedCount': 2,
+    },
+  },
+  {
+    id: 'appraise-lens',
+    label: 'Appraisal Lens (ui:appraise-panel)',
+    storageKey: 'hm.setmix.ui.appraiseScreen',
+    defaultScreen: APPRAISE_LENS_SCREEN,
+    sources: APPRAISE_SOURCES,
+    commands: APPRAISE_COMMANDS,
+    sampleValues: {
+      'appraise.name': 'SmallBlockSmallThrust (kit:e912a401)',
+      'appraise.kind': 'Rung 4 · thruster-propulsion',
+      'appraise.author': 'Transduced · Space Engineers',
+      'appraise.pxd': 72,
+      'appraise.vtx': 64,
+      'appraise.lx': 88,
+      'appraise.aq': 45,
+      'appraise.massKg': 50,
+      'appraise.thrustKn': 14.4,
+      'appraise.powerMW': 0.2,
+      'appraise.ports': '5 attachment sockets',
+      'appraise.archetype': 'Mind: The Magician (#1) · Body: The Hermit (#9)',
+      'appraise.polarity': 'Masculine (pol=64)',
+      'appraise.balance': 0.96,
+      'appraise.bodyZone': 'All 7 rays flowing cleanly.',
     },
   },
 ];
@@ -837,6 +866,18 @@ export const UiPresetInspector: React.FC<UiPresetInspectorProps> = ({
         {codeFeedback ? (
           <span style={{ fontSize: 11, color: 'var(--ui-accent, #d96b43)' }}>{codeFeedback}</span>
         ) : null}
+      </section>
+
+      {/* Plan 58 Wave 3: Live 2,606 Harvested Multiverse Shelf + LitRPG Appraisal Lens */}
+      <section style={{ padding: 12, background: 'var(--ui-inset, #232621)', border: '1px solid var(--ui-line, #353831)', borderRadius: 'var(--ui-radius, 2px)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          6. Harvested Multiverse Shelf (2,606 Presets) & LitRPG Appraisal Lens
+        </span>
+        <HarvestedShelfAndAppraiseDeck
+          onSelectPresetCode={(code, entry) =>
+            setCodeFeedback(`Selected harvested preset ${entry.name} (${code}) from ${entry.sourceGame}.`)
+          }
+        />
       </section>
     </div>
   );

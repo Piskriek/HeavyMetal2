@@ -9,3 +9,4 @@ export * from './describe';
 export * from './engine-spec';
 export * from './music-spec';
 export * from './stems';
+export * from './voice-filter';

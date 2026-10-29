@@ -25,11 +25,13 @@ import {
   encodeClipShareCode,
   evaluateGuildComplex,
   evaluateParty,
+  renderUtteranceVoiceAudio,
   synthesizeUtterance,
   type LocaleId,
 } from '@hm/harness';
 import type { Mem, StageId } from '@hm/shorthand';
 import { UiPanelView } from './ui-panel';
+import { HarvestedShelfAndAppraiseDeck } from './ui-appraise-lens';
 import { type DroneMemory, DRONE_ROLES, stageIdOf } from './drone-memory';
 
 const UI_STYLE_STORAGE_KEY = 'hm.setmix.ui.styleId';
@@ -358,16 +360,93 @@ export function MetaShellDrawer(props: MetaShellDrawerProps): ReactElement {
                 <div style={{ fontSize: '12px', color: 'var(--ui-ink)' }}>
                   <b>Spoken:</b> {sampleUtt.spokenText}
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--ui-dim)', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--ui-dim)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                   <span><b>Full-Duplex Backchannel:</b> “{sampleUtt.backchannelText}”</span>
                   <span>
                     <b>Archetype:</b> {sampleUtt.envelope.polarity} ({sampleUtt.envelope.mindArchetype} / {sampleUtt.envelope.bodyArchetype}) ·{' '}
                     <b>Prosody:</b> {sampleUtt.webAudioProsody.baseFreqHz} Hz, {sampleUtt.envelope.tempoScale}x, {sampleUtt.envelope.timbreFilter}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try {
+                        const rendered = renderUtteranceVoiceAudio(sampleUtt, 22050, 1);
+                        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+                        if (AudioCtx) {
+                          const ctx = new AudioCtx();
+                          const buf = ctx.createBuffer(1, rendered.samples.length, 22050);
+                          buf.getChannelData(0).set(rendered.samples);
+                          const src = ctx.createBufferSource();
+                          src.buffer = buf;
+                          src.connect(ctx.destination);
+                          src.start();
+                        }
+                        props.onBroadcastNotice(
+                          `Somatic Voice (${sampleUtt.envelope.timbreFilter})`,
+                          `${sampleUtt.spokenText} [${rendered.zeroCrossingHz} Hz ZCR, RMS ${rendered.rms}]`,
+                        );
+                      } catch {
+                        // ignore audio context restrictions
+                      }
+                    }}
+                    style={{
+                      padding: '3px 8px',
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      borderRadius: 'var(--ui-radius, 4px)',
+                      border: '1px solid var(--ui-accent)',
+                      background: 'var(--ui-panel)',
+                      color: 'var(--ui-accent)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ▶ Audition Somatic Voice (@hm/soundlab)
+                  </button>
                 </div>
               </div>
             );
           })()}
+
+          <HarvestedShelfAndAppraiseDeck
+            aiBeings={[
+              {
+                kind: 'ai-being',
+                id: droneMem.ego.of,
+                name: 'Overwatch Drone (Ego)',
+                roleTitle: 'Rung 4 Companion Brain',
+                author: 'SetMix Overwatch',
+                mem: droneMem.ego,
+              },
+              {
+                kind: 'ai-being',
+                id: droneMem.presets.fire.of,
+                name: 'Drone Fire Rhythm',
+                roleTitle: 'Rung 3 Motion Preset',
+                author: 'SetMix Overwatch',
+                mem: droneMem.presets.fire,
+              },
+              {
+                kind: 'ai-being',
+                id: droneMem.presets.flight.of,
+                name: 'Drone Flight Station',
+                roleTitle: 'Rung 3 Locomotion Preset',
+                author: 'SetMix Overwatch',
+                mem: droneMem.presets.flight,
+              },
+              {
+                kind: 'ai-being',
+                id: 'species:00a1c405',
+                name: 'Wanderer Anchor (You)',
+                roleTitle: 'Rung 6 Player Wanderer',
+                author: 'Player Sovereign',
+                mem: createPlayerWanderer(),
+              },
+            ]}
+            onInvokeVirginMind={(_id, line) => props.onBroadcastNotice('Blueprint 91.35 Invoked', line)}
+            onSelectPresetCode={(code, entry) =>
+              props.onBroadcastNotice('Harvested Preset Selected', `${entry.name} (${code}) ready for bench/beam`)
+            }
+          />
         </aside>
       ) : null}
     </div>

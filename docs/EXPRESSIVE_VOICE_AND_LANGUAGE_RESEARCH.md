@@ -43,3 +43,4 @@ From `packages/harness/src/archetypes.ts` (`evaluateCrossWiredPolarity`):
   - Relational, contextual, resonant syntax; warm harmonic timbre; measured cadence that highlights connection and systemic harmony.
 - **Balanced Polarity (`Harmonic Synthesis`)**:
   - Combines lucid structural precision with warm somatic presence (`timbreFilter: 'warm-anchor'` when `bal >= 0.9`).
+

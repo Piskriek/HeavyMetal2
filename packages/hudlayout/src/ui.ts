@@ -693,4 +693,62 @@ export const STUDIO_SHELL_SCREEN: UiScreen = {
   ],
 };
 
+// ---- Plan 58 Wave 3 (Track 2): LitRPG Appraisal / Inspect Lens (`ui:appraise-panel` — Krout / Kong Style)
+
+export const APPRAISE_SOURCES: readonly UiSource[] = [
+  { path: 'appraise.name', kind: 'text' },
+  { path: 'appraise.kind', kind: 'text' },
+  { path: 'appraise.author', kind: 'text' },
+  { path: 'appraise.pxd', kind: 'number', max: 100 },
+  { path: 'appraise.vtx', kind: 'number', max: 100 },
+  { path: 'appraise.lx', kind: 'number', max: 100 },
+  { path: 'appraise.aq', kind: 'number', max: 100 },
+  { path: 'appraise.massKg', kind: 'number', unit: 'kg' },
+  { path: 'appraise.thrustKn', kind: 'number', unit: 'kN' },
+  { path: 'appraise.powerMW', kind: 'number', unit: 'MW' },
+  { path: 'appraise.ports', kind: 'text' },
+  { path: 'appraise.archetype', kind: 'text' },
+  { path: 'appraise.polarity', kind: 'text' },
+  { path: 'appraise.balance', kind: 'ratio' },
+  { path: 'appraise.bodyZone', kind: 'text' },
+];
+
+export const APPRAISE_COMMANDS: readonly UiCommand[] = [
+  { id: 'appraise.copyCode', does: 'Copy the appraised preset or entity share code to clipboard' },
+  { id: 'appraise.invokeVirginMind', does: 'Invoke Station 1 (Virgin Mind / Magician, Session 91.35) to clear Blue/Indigo cognitive overload' },
+];
+
+export const APPRAISE_PANEL: UiPanel = {
+  id: 'appraise-panel',
+  anchor: 'middle-right',
+  offsetX: 24,
+  offsetY: 0,
+  visible: true,
+  parts: [
+    { id: 'app-name', look: { kind: 'card', tone: 'ink', frame: 'none', size: 'm' }, binds: 'appraise.name', label: 'Target' },
+    { id: 'app-kind', look: { kind: 'badge', tone: 'accent', frame: 'line', size: 's' }, binds: 'appraise.kind', label: 'Class' },
+    { id: 'app-author', look: { kind: 'readout', tone: 'dim', frame: 'none', size: 's' }, binds: 'appraise.author', label: 'Attribution' },
+    { id: 'app-pxd', look: { kind: 'meter', tone: 'accent', frame: 'line', size: 's' }, binds: 'appraise.pxd', label: 'Pxd (Texture)' },
+    { id: 'app-vtx', look: { kind: 'meter', tone: 'accent', frame: 'line', size: 's' }, binds: 'appraise.vtx', label: 'Vtx (Density)' },
+    { id: 'app-lx', look: { kind: 'meter', tone: 'accent', frame: 'line', size: 's' }, binds: 'appraise.lx', label: 'Lx (Flux)' },
+    { id: 'app-aq', look: { kind: 'meter', tone: 'accent', frame: 'line', size: 's' }, binds: 'appraise.aq', label: 'Aq (Damping)' },
+    { id: 'app-mass', look: { kind: 'stat', tone: 'ink', frame: 'none', size: 's' }, binds: 'appraise.massKg', label: 'Mass' },
+    { id: 'app-thrust', look: { kind: 'stat', tone: 'ink', frame: 'none', size: 's' }, binds: 'appraise.thrustKn', label: 'Thrust' },
+    { id: 'app-power', look: { kind: 'stat', tone: 'ink', frame: 'none', size: 's' }, binds: 'appraise.powerMW', label: 'Power' },
+    { id: 'app-ports', look: { kind: 'readout', tone: 'dim', frame: 'line', size: 's' }, binds: 'appraise.ports', label: 'Wiregraph Ports' },
+    { id: 'app-arch', look: { kind: 'readout', tone: 'accent', frame: 'line', size: 's' }, binds: 'appraise.archetype', label: 'Archetype Station' },
+    { id: 'app-pol', look: { kind: 'readout', tone: 'ink', frame: 'none', size: 's' }, binds: 'appraise.polarity', label: 'Cross-Wired Polarity' },
+    { id: 'app-bal', look: { kind: 'meter', tone: 'accent', frame: 'line', size: 's' }, binds: 'appraise.balance', label: 'Mem Balance' },
+    { id: 'app-body', look: { kind: 'readout', tone: 'warn', frame: 'line', size: 's' }, binds: 'appraise.bodyZone', label: 'Preset-Body Zones' },
+    { id: 'app-copy', look: { kind: 'action', tone: 'ink', frame: 'line', size: 's' }, binds: 'appraise.copyCode', label: 'Copy Share Code' },
+    { id: 'app-virgin', look: { kind: 'action', tone: 'accent', frame: 'fill', size: 's' }, binds: 'appraise.invokeVirginMind', label: 'Invoke Virgin Mind (91.35)' },
+  ],
+};
+
+export const APPRAISE_LENS_SCREEN: UiScreen = {
+  id: 'appraise-lens',
+  tokens: UI_STYLE_SHELF[0]!.tokens,
+  panels: [APPRAISE_PANEL],
+};
+
 

@@ -5,9 +5,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { decodeScreen, encodeScreen, META_SHELL_SCREEN, META_SHELL_SOURCES } from '@hm/hudlayout';
+import { APPRAISE_PANEL, APPRAISE_SOURCES, decodeScreen, encodeScreen, META_SHELL_SCREEN, META_SHELL_SOURCES } from '@hm/hudlayout';
+import { queryHarvestedShelf } from '@hm/harness';
 import { PLAY_HUD_GOAL, PLAY_HUD_SCREEN, commsPanelProps, floatsPanelProps, goalValues, healthPanelProps, playHudIssues, plotPanelProps, systemPanelProps, type PlotFigures } from './ui-play-hud';
 import { buildMetaShellValues, metaShellIssues } from './ui-meta-shell';
+import { appraiseLensIssues, buildAppraiseValues } from './ui-appraise-lens';
 import { createDroneMemory } from './drone-memory';
 import { UiPanelView } from './ui-panel';
 
@@ -158,4 +160,44 @@ test('Plan 58 W2: the in-game META_SHELL_SCREEN validates with 0 issues and rend
     const html = renderToStaticMarkup(createElement(UiPanelView, { panel, sources: META_SHELL_SOURCES, values, actions }));
     assert.ok(html.length > 20, `panel ${panel.id} rendered non-empty HTML`);
   }
+});
+
+test('Plan 58 W3 (Track 2): LitRPG Appraisal Lens (ui:appraise-panel) validates with 0 issues and renders both harvested kits and AI beings via UiPanelView', () => {
+  assert.deepEqual(appraiseLensIssues(), []);
+
+  // 1. Appraise a harvested thruster preset
+  const thruster = queryHarvestedShelf({ category: 'thruster-propulsion', limit: 1 }).items[0]!;
+  const kitVals = buildAppraiseValues({ kind: 'harvested', entry: thruster });
+  const kitHtml = renderToStaticMarkup(
+    createElement(UiPanelView, {
+      panel: APPRAISE_PANEL,
+      sources: APPRAISE_SOURCES,
+      values: kitVals,
+      actions: { 'appraise.copyCode': () => {} },
+    }),
+  );
+  assert.match(kitHtml, new RegExp(thruster.id));
+  assert.doesNotMatch(kitHtml, /Invoke Virgin Mind/, 'harvested kits omit AI-being-only Virgin Mind invocation');
+
+  // 2. Appraise an AI being (Overwatch Drone Ego)
+  const drone = createDroneMemory();
+  const aiVals = buildAppraiseValues({
+    kind: 'ai-being',
+    id: drone.ego.of,
+    name: 'Overwatch Drone',
+    roleTitle: 'Rung 4 Companion Brain',
+    author: 'SetMix Overwatch',
+    mem: drone.ego,
+  });
+  const aiHtml = renderToStaticMarkup(
+    createElement(UiPanelView, {
+      panel: APPRAISE_PANEL,
+      sources: APPRAISE_SOURCES,
+      values: aiVals,
+      actions: { 'appraise.copyCode': () => {}, 'appraise.invokeVirginMind': () => {} },
+    }),
+  );
+  assert.match(aiHtml, /Overwatch Drone/);
+  assert.match(aiHtml, /The Magician/);
+  assert.match(aiHtml, /Invoke Virgin Mind/);
 });

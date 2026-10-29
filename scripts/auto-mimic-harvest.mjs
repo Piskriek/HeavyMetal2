@@ -198,6 +198,249 @@ async function main() {
     summary.satisfactoryPresets.length +
     summary.transportFeverPresets.length;
   console.log(`TOTAL TRANSDUCED PRESETS ACROSS 8 GAMES : ${total}`);
+
+  if (process.argv.includes('--write-catalog')) {
+    const round1 = (n) => Math.round((Number(n) || 0) * 10) / 10;
+    const f100 = (n) => Math.max(1, Math.min(100, Math.round((Number(n) || 0) / 100)));
+
+    const allTuples = [];
+    const seenIds = new Set();
+    const pushTuple = (t) => {
+      if (seenIds.has(t[0])) return;
+      seenIds.add(t[0]);
+      allTuples.push(t);
+    };
+
+    for (const e of summary.dwarfFortressElements) {
+      pushTuple([
+        e.preset.id,
+        e.preset.name,
+        'df',
+        'el',
+        f100(e.preset.pxd),
+        f100(e.preset.vtx),
+        f100(e.preset.lx),
+        f100(e.preset.aq),
+        round1(e.derived.density),
+        0,
+        0,
+        0,
+        0,
+      ]);
+    }
+    for (const p of summary.kspParts) {
+      const cat =
+        p.emergentRole === 'thermal-thruster'
+          ? 'th'
+          : p.emergentRole === 'attitude-gyro'
+            ? 'gy'
+            : p.emergentRole === 'power-accumulator'
+              ? 're'
+              : 'st';
+      pushTuple([
+        p.kitOf,
+        p.rawName,
+        'ksp',
+        cat,
+        f100(p.fourFloats.pxd),
+        f100(p.fourFloats.vtx),
+        f100(p.fourFloats.lx),
+        f100(p.fourFloats.aq),
+        round1(p.massTons * 1000),
+        round1(p.thrustKn),
+        round1(p.torqueKnM),
+        0,
+        p.sockets.length,
+      ]);
+    }
+    for (const r of summary.factorioRecipes) {
+      pushTuple([
+        r.recipeOf,
+        r.rawName,
+        'fac',
+        'sy',
+        65,
+        55,
+        75,
+        45,
+        0,
+        0,
+        round1(r.energyRequiredSec * 0.5),
+        round1(r.throughputPerMin),
+        r.totalInputUnits,
+      ]);
+    }
+    for (const c of summary.hadesCombatPresets) {
+      const cycPerMin = round1(60 / Math.max(0.1, c.preWaitSec + c.activeDurationSec + c.cooldownSec));
+      pushTuple([
+        c.presetOf,
+        c.rawName,
+        'had',
+        'co',
+        72,
+        64,
+        82,
+        38,
+        0,
+        0,
+        round1(c.preWaitSec),
+        cycPerMin,
+        1,
+      ]);
+    }
+    for (const d of summary.plasmaContraptions) {
+      pushTuple([
+        d.kitOf,
+        d.deviceName,
+        'pla',
+        'wg',
+        78,
+        74,
+        84,
+        52,
+        round1(d.totalMassMultiplier),
+        0,
+        round1(d.agentCount),
+        0,
+        d.componentCount,
+      ]);
+    }
+    for (const b of summary.spaceEngineersBlocks) {
+      const cat =
+        b.role === 'thermal-thruster'
+          ? 'th'
+          : b.role === 'fission-reactor'
+            ? 're'
+            : b.role === 'attitude-gyro'
+              ? 'gy'
+              : b.role === 'synthesis-assembler'
+                ? 'sy'
+                : 'st';
+      pushTuple([
+        b.kitOf,
+        b.subtypeId,
+        'se',
+        cat,
+        f100(b.fourFloats.pxd),
+        f100(b.fourFloats.vtx),
+        f100(b.fourFloats.lx),
+        f100(b.fourFloats.aq),
+        round1(b.dimensions[0] * b.dimensions[1] * b.dimensions[2] * (b.cubeSize === 'Large' ? 250 : 25)),
+        round1(b.forceMagnitudeN / 1000),
+        round1(b.maxPowerMW),
+        0,
+        b.mountSides.length,
+      ]);
+    }
+    for (const s of summary.satisfactoryPresets) {
+      const cat = s.kind === 'resource' ? 'el' : s.kind === 'generator' ? 're' : 'sy';
+      pushTuple([
+        s.presetOf,
+        s.className.replace(/^Recipe_|^Desc_|^Build_|_C$/g, ''),
+        'sat',
+        cat,
+        70,
+        68,
+        80,
+        55,
+        round1(s.energyValueMJ * 100),
+        0,
+        round1(s.powerMW),
+        round1(s.throughputPerMin),
+        s.ingredientCount + s.productCount,
+      ]);
+    }
+    for (const t of summary.transportFeverPresets) {
+      const cat = t.kind === 'cargo-density' ? 'el' : 'lo';
+      pushTuple([
+        t.presetOf,
+        t.fileId.replace(/\.cargo\.lua$|\.lua$/g, ''),
+        'tf2',
+        cat,
+        68,
+        76,
+        60,
+        50,
+        round1(t.cargoWeightKg || t.carCount * 42000),
+        round1(t.topSpeedMps),
+        0,
+        round1(t.carCount),
+        t.carCount,
+      ]);
+    }
+
+    const byCategory = {
+      element: 0,
+      'thruster-propulsion': 0,
+      'reactor-power': 0,
+      'gyro-control': 0,
+      'structural-hull': 0,
+      'synthesis-recipe': 0,
+      'combat-cadence': 0,
+      'wiregraph-contraption': 0,
+      'logistics-envelope': 0,
+    };
+    const catMap = {
+      el: 'element',
+      th: 'thruster-propulsion',
+      re: 'reactor-power',
+      gy: 'gyro-control',
+      st: 'structural-hull',
+      sy: 'synthesis-recipe',
+      co: 'combat-cadence',
+      wg: 'wiregraph-contraption',
+      lo: 'logistics-envelope',
+    };
+    const byGame = {
+      'Dwarf Fortress': summary.dwarfFortressElements.length,
+      'Kerbal Space Program': summary.kspParts.length,
+      Factorio: summary.factorioRecipes.length,
+      Hades: summary.hadesCombatPresets.length,
+      Plasma: summary.plasmaContraptions.length,
+      'Space Engineers': summary.spaceEngineersBlocks.length,
+      Satisfactory: summary.satisfactoryPresets.length,
+      'Transport Fever 2': summary.transportFeverPresets.length,
+    };
+    for (const t of allTuples) {
+      byCategory[catMap[t[3]]]++;
+    }
+
+    const outPath = path.resolve('packages/harness/src/harvested-catalog-data.ts');
+    const tsContent = `/**
+ * Auto-generated by \`scripts/auto-mimic-harvest.mjs --write-catalog\` (Plan 58 Wave 3).
+ * Compact tuple table for the ${total} transduced presets across 8 games (${allTuples.length} unique preset IDs).
+ * Tuple layout: [id, name, gameCode, catCode, pxd, vtx, lx, aq, massKg, thrustKn, powerMW, throughputPerMin, sockets]
+ */
+export type CompactHarvestTuple = readonly [
+  string,
+  string,
+  'df' | 'ksp' | 'fac' | 'had' | 'pla' | 'se' | 'sat' | 'tf2',
+  'el' | 'th' | 're' | 'gy' | 'st' | 'sy' | 'co' | 'wg' | 'lo',
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+];
+
+export const HARVESTED_TOTAL_COUNTS = {
+  total: ${total},
+  uniqueIds: ${allTuples.length},
+  byCategory: ${JSON.stringify(byCategory, null, 2)},
+  byGame: ${JSON.stringify(byGame, null, 2)},
+} as const;
+
+export const HARVESTED_COMPACT_TUPLES: readonly CompactHarvestTuple[] = [\n${allTuples
+      .map((t) => `  ${JSON.stringify(t)},`)
+      .join('\n')}\n];\n`;
+
+    fs.writeFileSync(outPath, tsContent, 'utf8');
+    console.log(`Wrote ${allTuples.length} unique compact tuples (${total} total harvested) to ${outPath}`);
+  }
 }
 
 main().catch((err) => {

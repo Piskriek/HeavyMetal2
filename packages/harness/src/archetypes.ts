@@ -87,7 +87,24 @@ export const ARCHETYPE_BLUEPRINT: readonly ArchetypeDef[] = [
 ];
 
 export type InvocableArchetypeNumber = 1 | 2 | 8 | 9 | 22;
+export type InvocableArchetypeAlias =
+  | 'virgin-mind'
+  | 'faith'
+  | 'mind:matrix'
+  | 'mind:potentiator'
+  | 'body:matrix'
+  | 'body:potentiator'
+  | 'choice:the-fool';
 const INVOCABLE_NUMBERS = new Set<number>([1, 2, 8, 9, 22]);
+const ALIAS_TO_INVOCABLE: Readonly<Record<InvocableArchetypeAlias, InvocableArchetypeNumber>> = {
+  'virgin-mind': 1,
+  faith: 22,
+  'mind:matrix': 1,
+  'mind:potentiator': 2,
+  'body:matrix': 8,
+  'body:potentiator': 9,
+  'choice:the-fool': 22,
+};
 
 export interface CrossWiredPolarity {
   readonly pole: Pole;
@@ -204,12 +221,16 @@ export interface ArchetypeInvocationResult {
  */
 export function invokeArchetype(
   mem: Mem,
-  archetypeNumber: InvocableArchetypeNumber = 1,
+  archetypeSelector: InvocableArchetypeNumber | InvocableArchetypeAlias = 1,
   body: BodyState | null = null,
 ): ArchetypeInvocationResult {
   checkMem(mem);
-  if (!INVOCABLE_NUMBERS.has(archetypeNumber)) {
-    throw new Error(`invokeArchetype: unsupported archetype station ${archetypeNumber} (expected 1, 2, 8, 9, or 22)`);
+  const archetypeNumber =
+    typeof archetypeSelector === 'string'
+      ? ALIAS_TO_INVOCABLE[archetypeSelector]
+      : archetypeSelector;
+  if (!archetypeNumber || !INVOCABLE_NUMBERS.has(archetypeNumber)) {
+    throw new Error(`invokeArchetype: unsupported archetype station ${String(archetypeSelector)} (expected 1, 2, 8, 9, 22, 'virgin-mind', or 'faith')`);
   }
   const invoked = ARCHETYPE_BLUEPRINT.find((a) => a.number === archetypeNumber)!;
   const openCauses = mem.cause.filter((c) => c.open);

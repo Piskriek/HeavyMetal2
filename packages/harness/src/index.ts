@@ -18,3 +18,5 @@ export * from './science-cosmos.js';
 export * from './meta-shell.js';
 export * from './auto-mimicry.js';
 export * from './semantic-utterance.js';
+export * from './harvested-shelf.js';
+export * from './archetypical-mind.js';

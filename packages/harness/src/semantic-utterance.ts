@@ -19,6 +19,7 @@
  * 100% pure and deterministic (no Date.now, no Math.random, no DOM/I/O).
  */
 import type { Mem } from '@hm/shorthand';
+import { synthesizeSomaticVoice, type SomaticVoiceRenderResult } from '@hm/soundlab';
 import { crossWiredPolarity } from './archetypes.js';
 import type { BodyState } from './body.js';
 import { BALANCED_AT } from './preset-memory.js';
@@ -580,4 +581,28 @@ export function decodeUtteranceCode(code: string, overrideLocale?: LocaleId): Sy
   } catch {
     return null;
   }
+}
+
+/**
+ * Plan 58 Wave 3 (Track 3): Renders a `SynthesizedUtterance`'s `EmotionalEnvelope` (`timbreFilter`,
+ * `pitchShiftSemitones`, `tempoScale`, `breathCue`, `polarity`) through `@hm/soundlab` (`synthesizeSomaticVoice`)
+ * so `starved-throat` vs. `resonant-eureka` vs. `warm-anchor` is genuinely audible.
+ */
+export function renderUtteranceVoiceAudio(
+  utterance: SynthesizedUtterance,
+  sampleRate = 22050,
+  seed = 1,
+): SomaticVoiceRenderResult {
+  return synthesizeSomaticVoice(
+    {
+      id: `utt-${utterance.rootId.toLowerCase()}-${utterance.envelope.timbreFilter}`,
+      timbreFilter: utterance.envelope.timbreFilter,
+      pitchShiftSemitones: utterance.envelope.pitchShiftSemitones,
+      tempoScale: utterance.envelope.tempoScale,
+      breathCue: utterance.envelope.breathCue,
+      polarity: utterance.envelope.polarity,
+    },
+    sampleRate,
+    seed,
+  );
 }

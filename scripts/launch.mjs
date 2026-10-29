@@ -40,16 +40,21 @@ const good = (s) => say(`   ${C.ok}ok${C.off}  ${s}`);
 const warn = (s) => say(`   ${C.warn}!!${C.off}  ${s}`);
 const fail = (s) => { say(`\n${C.bad}STOPPED:${C.off} ${s}\n`); process.exit(1); };
 
-// ---- the keys file: KEY=value lines, read into this process (and so into the brain it starts) ----
+// ---- the keys file: KEY=value or key: value lines, read into this process (and so into the brain it starts) ----
 function loadEnvLocal() {
   const file = path.join(ROOT, '.env.local');
   if (!fs.existsSync(file)) return [];
   const set = [];
-  for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
-    const m = /^\s*([A-Z][A-Z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
-    if (!m || line.trimStart().startsWith('#')) continue;
-    const value = m[2].replace(/^["']|["']$/g, '');
-    if (value && !process.env[m[1]]) { process.env[m[1]] = value; set.push(m[1]); }
+  for (const rawLine of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+    const m = /^\s*([A-Za-z0-9_ -]+?)\s*[:=]\s*(.*?)\s*$/.exec(line);
+    if (!m) continue;
+    let key = m[1].trim().toUpperCase().replace(/[\s-]+/g, '_');
+    if (key === 'GEMINI' || key === 'GEMINI_API') key = 'GEMINI_API_KEY';
+    if (key === 'ANTHROPIC' || key === 'ANTHROPIC_API' || key === 'CLAUDE') key = 'ANTHROPIC_API_KEY';
+    const value = m[2].trim().replace(/^["']|["']$/g, '');
+    if (value && !process.env[key]) { process.env[key] = value; set.push(key); }
   }
   return set;
 }

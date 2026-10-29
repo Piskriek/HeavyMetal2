@@ -17,6 +17,29 @@
  */
 
 import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = fileURLToPath(new URL('../', import.meta.url));
+
+// Load .env.local if present
+function loadEnvLocal() {
+  const file = path.join(ROOT, '.env.local');
+  if (!fs.existsSync(file)) return;
+  for (const rawLine of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+    const m = /^\s*([A-Za-z0-9_ -]+?)\s*[:=]\s*(.*?)\s*$/.exec(line);
+    if (!m) continue;
+    let key = m[1].trim().toUpperCase().replace(/[\s-]+/g, '_');
+    if (key === 'GEMINI' || key === 'GEMINI_API') key = 'GEMINI_API_KEY';
+    if (key === 'ANTHROPIC' || key === 'ANTHROPIC_API' || key === 'CLAUDE') key = 'ANTHROPIC_API_KEY';
+    const value = m[2].trim().replace(/^["']|["']$/g, '');
+    if (value && !process.env[key]) process.env[key] = value;
+  }
+}
+loadEnvLocal();
 
 const PORT = parseInt(process.argv.find((a, i) => process.argv[i - 1] === '--port') ?? '8220', 10);
 const BRIDGE_URL = `http://localhost:${PORT}`;
@@ -113,7 +136,7 @@ let brain = { kind: 'keywords', label: 'keyword responder (no AI connected)' };
 
 async function detectBrain() {
   if (process.env.ANTHROPIC_API_KEY) return { kind: 'anthropic', model: process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-5', get label() { return `Claude (${this.model})`; } };
-  if (process.env.GEMINI_API_KEY) return { kind: 'gemini', model: process.env.GEMINI_MODEL ?? 'gemini-2.5-flash', get label() { return `Gemini (${this.model})`; } };
+  if (process.env.GEMINI_API_KEY) return { kind: 'gemini', model: process.env.GEMINI_MODEL ?? 'gemini-3.5-flash-lite', get label() { return `Gemini (${this.model})`; } };
   try {
     const res = await fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(1500) });
     const tags = await res.json();
@@ -142,18 +165,27 @@ async function aiReply(text, telemetry) {
       if (!res.ok) throw new Error(d.error?.message ?? `HTTP ${res.status}`);
       out = d.content?.map((b) => b.text ?? '').join('') ?? '';
     } else if (brain.kind === 'gemini') {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${brain.model}:generateContent`, {
-        method: 'POST', signal,
-        headers: { 'content-type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents: messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
-          generationConfig: { maxOutputTokens: 200 },
-        }),
-      });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error?.message ?? `HTTP ${res.status}`);
-      out = d.candidates?.[0]?.content?.parts?.map((x) => x.text ?? '').join('') ?? '';
+      const callGemini = async (modelName) => {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`, {
+          method: 'POST', signal,
+          headers: { 'content-type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            contents: messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
+            generationConfig: { maxOutputTokens: 200 },
+          }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error?.message ?? `HTTP ${res.status}`);
+        return d.candidates?.[0]?.content?.parts?.map((x) => x.text ?? '').join('') ?? '';
+      };
+      try {
+        out = await callGemini(brain.model);
+      } catch (err) {
+        if (brain.model !== 'gemini-3.1-flash-lite') {
+          out = await callGemini('gemini-3.1-flash-lite');
+        } else throw err;
+      }
     } else {
       const res = await fetch('http://localhost:11434/api/chat', {
         method: 'POST', signal,

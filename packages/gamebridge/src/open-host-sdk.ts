@@ -188,8 +188,23 @@ export const CAPITAL_EMPIRE_OPEN_PROFILE: BridgePermissionProfile = createOpenHo
 // 2. Persistent Population & Vehicle Soul Binding (`syncPersistentPopulation`)
 // =====================================================================================================================
 
-export type PersistentPersonRole = 'resident' | 'visitor' | 'competitor' | 'staff';
-export type PersistentVehicleRole = 'car' | 'golf-cart' | 'shuttle' | 'taxi';
+export type PersistentPersonRole =
+  | 'resident'
+  | 'visitor'
+  | 'competitor'
+  | 'staff'
+  | 'greenkeeper'
+  | 'mower-operator'
+  | 'caddie'
+  | 'gallery-fan';
+export type PersistentVehicleRole =
+  | 'car'
+  | 'golf-cart'
+  | 'shuttle'
+  | 'taxi'
+  | 'mower-reel'
+  | 'mower-rotary'
+  | 'coach';
 export type PersistentEntityRole = PersistentPersonRole | PersistentVehicleRole;
 
 export type TownCatalystEventId =
@@ -199,7 +214,10 @@ export type TownCatalystEventId =
   | 'LONG_QUEUE_WAIT'
   | 'GREAT_VIEWING_18TH'
   | 'MISSED_TEE_TIME'
-  | 'SMOOTH_SHUTTLE_RIDE';
+  | 'SMOOTH_SHUTTLE_RIDE'
+  | 'CUP_CUT_ON_TIME'
+  | 'FAIRWAY_STRIPE_MOWN'
+  | 'TURNED_AWAY_CARPARK_FULL';
 
 export interface PersistentHostEntityInput {
   readonly id: string;
@@ -345,7 +363,7 @@ function mapCatalystToDistortion(
   readonly felt?: SqId;
   readonly rootId: SemanticRootId;
 } {
-  if (cat === 'MISSED_TEE_TIME' || exitDelayMin >= 90) {
+  if (cat === 'MISSED_TEE_TIME' || cat === 'TURNED_AWAY_CARPARK_FULL' || exitDelayMin >= 90) {
     return {
       catName: cat ?? 'SEVERE_TRAFFIC_GRIDLOCK',
       excitement: 0.85,
@@ -375,9 +393,9 @@ function mapCatalystToDistortion(
       rootId: 'BODY_ACHE',
     };
   }
-  if (cat === 'GREAT_VIEWING_18TH') {
+  if (cat === 'GREAT_VIEWING_18TH' || cat === 'CUP_CUT_ON_TIME' || cat === 'FAIRWAY_STRIPE_MOWN') {
     return {
-      catName: 'GRANDSTAND_18_ROAR',
+      catName: cat === 'GREAT_VIEWING_18TH' ? 'GRANDSTAND_18_ROAR' : cat,
       excitement: 0.85,
       error: 0.05,
       by: ALIGNED,
@@ -792,6 +810,13 @@ export function stepMacroTownCatalyst(
   };
 }
 
+export type TournamentInfrastructureFix =
+  | 'upgrade-junctions'
+  | 'add-park-and-ride'
+  | 'add-gate-lanes'
+  | 'add-hospitality-tents'
+  | 'add-18th-grandstand';
+
 export interface PopulationNightDreamResult {
   readonly session: OpenHostTownSession;
   readonly sitRep: MorningSitRep;
@@ -805,16 +830,36 @@ export interface PopulationNightDreamResult {
  * Runs at the end of each in-game day or tournament round:
  * - Executes W3 `dream.ts` across all persistent townspeople and vehicles (with the Town Macro-Node as `ego` and
  *   complementary Masculine/Feminine citizens paired as `dyads`),
+ * - When `infrastructureFixes` are provided (e.g. the Town Manager upgraded junctions, added Park & Ride, or added
+ *   gate lanes/tents after inspecting `lateReasons`), generates Higher-Self `DreamCue`s for all distorted episodes
+ *   and increases citizen openness (`inv`) so the town heals its traffic/queue trauma overnight,
  * - Generates the **Morning Town SitRep** (with `+5%` ray readiness bounty and 30s Holodeck Ghost Replay `clip:` code),
  * - Updates the Town's Social Memory Complex coherence ($H_{\text{town}}$).
  */
 export function runPopulationNightDream(
   session: OpenHostTownSession,
   tick: number,
+  infrastructureFixes?: readonly TournamentInfrastructureFix[],
 ): PopulationNightDreamResult {
   const safeTick = Math.max(1, Math.round(tick));
+  const fixesCount = infrastructureFixes?.length ?? 0;
   const souls = [...session.entities.values()];
-  const presetMems = souls.map((s) => s.mem);
+  const presetMems = souls.map((s) =>
+    fixesCount > 0
+      ? checkMem({
+          ...s.mem,
+          hard: Math.max(0.05, s.mem.hard * Math.pow(0.75, fixesCount)),
+          inv: Math.min(1, s.mem.inv + fixesCount * 0.25),
+        })
+      : s.mem,
+  );
+
+  const explicitCues =
+    fixesCount > 0
+      ? presetMems.flatMap((m) =>
+          m.ep.filter((e) => e.d !== ALIGNED).map((e) => ({ of: m.of, t: e.t })),
+        )
+      : undefined;
 
   const dreamRes = dream({
     ego: session.townMacroMem,
@@ -822,7 +867,8 @@ export function runPopulationNightDream(
     weights: session.townWeights,
     now: safeTick,
     dyads: session.dyads,
-    budget: 24,
+    ...(explicitCues && explicitCues.length > 0 ? { cues: explicitCues } : {}),
+    budget: 32,
   });
 
   const memByCode = new Map(dreamRes.presets.map((m) => [m.of, m] as const));

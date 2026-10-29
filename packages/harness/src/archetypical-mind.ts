@@ -241,14 +241,18 @@ export function evaluateSevenStationCycle(mem: Mem, body: BodyState | null = nul
 
 /**
  * Session 91.35: Invokes an Archetypical Station by symbolic ID (`'virgin-mind'`, `'faith'`, `'mind:matrix'`,
- * `'mind:potentiator'`, `'body:matrix'`, `'body:potentiator'`, `'choice:the-fool'`) or number (`1 | 2 | 8 | 9 | 22`)
+ * `'mind:potentiator'`, `'body:matrix'`, `'body:potentiator'`, `'choice:the-fool'`) or number (`1..22`)
  * to clear Blue/Indigo cognitive over-activation when open cause links clutter the mind.
+ * Accepts either `(stationId, mem, body)` or `(mem, stationId, body)`.
  */
 export function invokeArchetypeStation(
-  stationId: ArchetypeStationSelector,
-  mem: Mem,
+  first: ArchetypeStationSelector | Mem,
+  second: Mem | ArchetypeStationSelector = 'virgin-mind',
   body: BodyState | null = null,
 ): ArchetypeInvocationResult {
+  const isFirstMem = typeof first === 'object' && first !== null && 'of' in first;
+  const mem = (isFirstMem ? first : second) as Mem;
+  const stationId = (isFirstMem ? second : first) as ArchetypeStationSelector;
   const def = resolveArchetypeStation(stationId);
   const invocableNum: InvocableArchetypeNumber =
     def.number === 1 || def.number === 2 || def.number === 8 || def.number === 9 || def.number === 22

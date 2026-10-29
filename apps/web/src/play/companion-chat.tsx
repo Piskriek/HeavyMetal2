@@ -22,8 +22,14 @@ import {
 } from './companion-intent';
 import type { ScoutCategory } from './companion-scout';
 import { KNOWN_BRIDGE_GAMES } from '@hm/bridgekit';
-import type { DreamCue } from '@hm/harness';
-import { checkCues, higherSelfWords, type DronePerspective } from './drone-memory';
+import {
+  evaluateSevenStationCycle,
+  invokeArchetypeStation,
+  synthesizeUtterance,
+  type DreamCue,
+  type LocaleId,
+} from '@hm/harness';
+import { checkCues, createDroneMemory, higherSelfWords, type DronePerspective } from './drone-memory';
 import {
   antiCheatAdvice, bridgeManifest, bridgePresetFor, checkBridgeProfile, createCadenceAnalyzer, RELAY_CONFIRM_WORD, relayAllowed, relayCommand, relayConsentOk, manifestLine, PRESET_SIGNATURES, readRaw, createEventAnonymizer, createTelemetryAccumulator, parseCadenceLine, gameIdOf, profileLine, rankRunningGames, uncheckedProfile,
   type BridgePermissionProfile, type CadenceAnalyzer, type DocumentedMechanics, type InputRelaySpec, type RelayAction, type EventClass, type TelemetryAccumulator,
@@ -209,8 +215,16 @@ export const playSquelchClick = (): void => tone(1150, 480, 0.07, 0.07);
 /** A ping went down (plan 49): a short high blip, above the radio's chirps so the two never read as one. */
 export const playPingBlip = (): void => tone(1480, 1980, 0.12, 0.08);
 
-/** Synthesizes the companion's voice; stale utterances are cancelled so speech never piles up. */
-export function speakCompanionVoice(text: string): void {
+let activeCompanionLocale: LocaleId = 'en';
+
+export interface VoiceProsodyOptions {
+  readonly pitchShift?: number;
+  readonly tempoScale?: number;
+  readonly locale?: LocaleId;
+}
+
+/** Synthesizes the companion's voice with Plan 58 §18 emo: prosodic modulation; stale utterances are cancelled. */
+export function speakCompanionVoice(text: string, prosody?: VoiceProsodyOptions): void {
   if (typeof window === 'undefined' || !window.speechSynthesis) return;
   playMicOpenChirp();
   try {
@@ -218,15 +232,17 @@ export function speakCompanionVoice(text: string): void {
     const clean = text.replace(/\[.*?\]/g, '').trim();
     if (!clean) return;
     const utterance = new SpeechSynthesisUtterance(clean);
-    utterance.rate = 1.05;
-    utterance.pitch = 0.95;
+    const pitchSemis = prosody?.pitchShift ?? 0;
+    const tempoScale = prosody?.tempoScale ?? 1.0;
+    utterance.rate = Math.max(0.78, Math.min(1.35, 1.04 * tempoScale));
+    utterance.pitch = Math.max(0.65, Math.min(1.45, 0.96 * Math.pow(2, pitchSemis / 12)));
+    const langPrefix = (prosody?.locale ?? activeCompanionLocale) === 'af' ? 'af' : (prosody?.locale ?? activeCompanionLocale) === 'ja' ? 'ja' : 'en';
     const voices = window.speechSynthesis.getVoices();
     const voice =
-      voices.find(
-        (v) =>
-          v.lang.startsWith('en') &&
-          (v.name.includes('David') || v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Guy'))
-      ) ?? voices.find((v) => v.lang.startsWith('en'));
+      voices.find((v) => v.lang.toLowerCase().startsWith(langPrefix) && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('David') || v.name.includes('Guy'))) ??
+      voices.find((v) => v.lang.toLowerCase().startsWith(langPrefix)) ??
+      voices.find((v) => v.lang.startsWith('en') && (v.name.includes('David') || v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Guy'))) ??
+      voices.find((v) => v.lang.startsWith('en'));
     if (voice) utterance.voice = voice;
     window.speechSynthesis.speak(utterance);
   } catch (err) {
@@ -234,13 +250,47 @@ export function speakCompanionVoice(text: string): void {
   }
 }
 
-/** Local small talk when no outside AI is on the bridge. Deterministic, keyword-flavored. */
-function localChatReply(text: string): string {
+const defaultCompanionEgoMem = createDroneMemory().ego;
+
+/** Local expressive conversation when no outside AI overrides on the bridge. Uses Plan 58 §18 sem:/emo:/locale: + 7-Station Mind. */
+function localChatReply(text: string): { readonly reply: string; readonly prosody?: VoiceProsodyOptions } {
   const lower = text.toLowerCase();
-  if (lower.includes('mine') || lower.includes('ore')) return 'I read copper and quartz deposits nearby. Point the rifle and I will assist.';
-  if (lower.includes('build')) return 'The lattice is stable. Say where, and I will hold the line while you build.';
-  if (lower.includes('thank')) return 'Always, Lead Architect.';
-  return 'Copy that, Piskriek. Say "follow me", "float in front of me", "hold position", or send me to the gate, the rover or the bench.';
+  if (lower.includes('afrikaans') || lower.includes('praat afrikaans')) {
+    activeCompanionLocale = 'af';
+    const u = synthesizeUtterance({ rootId: 'ARRIVAL_GREETING', slots: { world: 'Maple Falls & Earth-Moon Substrate' }, locale: 'af', mem: defaultCompanionEgoMem });
+    return { reply: `${u.spokenText} (Afrikaans stem-preset aktief!)`, prosody: { pitchShift: u.envelope.pitchShiftSemitones, tempoScale: u.envelope.tempoScale, locale: 'af' } };
+  }
+  if (lower.includes('japanese') || lower.includes('nihongo')) {
+    activeCompanionLocale = 'ja';
+    const u = synthesizeUtterance({ rootId: 'ARRIVAL_GREETING', slots: { world: 'Maple Falls & Earth-Moon Substrate' }, locale: 'ja', mem: defaultCompanionEgoMem });
+    return { reply: `${u.spokenText} (Japanese LitRPG voice preset active!)`, prosody: { pitchShift: u.envelope.pitchShiftSemitones, tempoScale: u.envelope.tempoScale, locale: 'ja' } };
+  }
+  if (lower.includes('english') || lower.includes('speak english')) {
+    activeCompanionLocale = 'en';
+    const u = synthesizeUtterance({ rootId: 'ARRIVAL_GREETING', slots: { world: 'Earth-Moon Substrate' }, locale: 'en', mem: defaultCompanionEgoMem });
+    return { reply: u.spokenText, prosody: { pitchShift: u.envelope.pitchShiftSemitones, tempoScale: u.envelope.tempoScale, locale: 'en' } };
+  }
+  if (lower.includes('virgin mind') || lower.includes('faith') || lower.includes('archetype') || lower.includes('tarot')) {
+    const mode = lower.includes('faith') ? 'faith' : 'virgin-mind';
+    const invoked = invokeArchetypeStation(mode, defaultCompanionEgoMem);
+    const cycle = evaluateSevenStationCycle(invoked.mem);
+    return {
+      reply: `${invoked.systemLine} Active Mind Station ${cycle.mindStation.number} (${cycle.mindStation.tarotName}, Polarity: ${cycle.crossWiring.pole}).`,
+      prosody: { pitchShift: 1.5, tempoScale: 0.96, locale: activeCompanionLocale },
+    };
+  }
+  if (lower.includes('capital') || lower.includes('maple') || lower.includes('golf') || lower.includes('tournament') || lower.includes('hank') || lower.includes('rosa')) {
+    const u = synthesizeUtterance({ rootId: 'BODY_EUREKA', slots: { quality: 'Maple Falls Classic is live on the Open-Host Bridge — Greenkeeper Hank cut all 18 cups at 05:30, Shuttle Driver Rosa cleared the Park-and-Ride loop, and Town Satisfaction climbed to 96.4%' }, locale: activeCompanionLocale, mem: defaultCompanionEgoMem });
+    return { reply: u.spokenText, prosody: { pitchShift: u.envelope.pitchShiftSemitones, tempoScale: u.envelope.tempoScale, locale: activeCompanionLocale } };
+  }
+  if (lower.includes('mine') || lower.includes('ore')) return { reply: 'I read copper and quartz deposits nearby. Point the rifle and I will assist.' };
+  if (lower.includes('build')) return { reply: 'The lattice is stable. Say where, and I will hold the line while you build.' };
+  if (lower.includes('thank')) return { reply: 'Always, Lead Architect.' };
+  const u = synthesizeUtterance({ rootId: 'ARRIVAL_GREETING', slots: { world: 'FIDELITY & Maple Falls Multiverse' }, locale: activeCompanionLocale, mem: defaultCompanionEgoMem });
+  return {
+    reply: `${u.spokenText} Ask me about "Maple Falls tournament", "invoke Virgin Mind", "speak Afrikaans", or say "bridge Capital Empire".`,
+    prosody: { pitchShift: u.envelope.pitchShiftSemitones, tempoScale: u.envelope.tempoScale, locale: activeCompanionLocale },
+  };
 }
 
 export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroadcastRadio, getContext, handleRef, kitOps, droneOps, screenOps }) => {
@@ -303,11 +353,11 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
     }).catch(() => {});
   };
 
-  const companionSays = (reply: string, spoken: string = reply): void => {
+  const companionSays = (reply: string, spoken: string = reply, prosody?: VoiceProsodyOptions): void => {
     setMessages((prev) => [...prev, { id: `msg-${Date.now()}-c-${prev.length}`, sender: 'companion', text: reply }]);
     companionRef.current?.say(reply, 5.0);
     onBroadcastRadio?.(reply);
-    speakCompanionVoice(spoken);
+    speakCompanionVoice(spoken, prosody);
     postBridgeEvent({ type: 'companion-say', text: reply });
   };
 
@@ -686,12 +736,8 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
         return;
       }
       if (intent.kind === 'chat') {
-        if (bridgeLinkedRef.current) {
-          // an outside AI is on the bridge: it reads the player-say event and answers via /command
-          companionSays('Relaying to the overwatch intelligence on the bridge…');
-        } else {
-          companionSays(localChatReply(trimmed));
-        }
+        const r = localChatReply(trimmed);
+        companionSays(r.reply, r.reply, r.prosody);
         return;
       }
       const order = resolveCompanionOrder(intent, ctx.player, ctx.landmarks);

@@ -1,5 +1,15 @@
 # RESUME: start here (fresh session)
 
+## 29 Oct Checkpoint 6 (Unified AI Launcher, Resilient Multi-Provider Fallback & Live Companion Bridge `5ed3fc4c`)
+- **Completed & Pushed on `feat/studio-polish-claude-cloud` (`0` TypeScript errors, all unit suites passing)**:
+  1. **One-Click Automation Launcher (`PLAY-WITH-AI.bat` / `scripts/launch.mjs`)**:
+     - Single frictionless launcher: checks Node & packages, checks/starts Neural Bridge (`:8220`), live companion brain (`scripts/companion-agent.mjs`), FIDELITY (`:5173`), and Capital Empire (`:5174`), auto-opens browser tabs, and shuts down cleanly on Ctrl+C.
+     - Fixed Windows space-in-path spawn issue with `node.exe` directly, and isolated Vite dependency scan syntax issue in gathered packages.
+  2. **Multi-Provider AI Brain with Seamless OpenRouter Fallback (`scripts/companion-agent.mjs` & `scripts/launch.mjs`)**:
+     - Resilient `.env.local` parser handles arbitrary key syntax (`gemini api : ...`, `fallback api: ...`, `openrouter: ...`, `sk-or-v1-...`, `AQ....`, `AIzaSy...`, `sk-ant-...`).
+     - Live verified against remote APIs: Google Gemini (`gemini-3.5-flash-lite` with fallback to `gemini-3.1-flash-lite`) as primary, with instant automatic fallback to OpenRouter (`openrouter/auto`) on rate limits or API throttles.
+     - Spoken voice synthesis and prosody modulation (`pitchShiftSemitones`, `tempoScale`, `timbreFilter`) wired end-to-end to helmet radio (Hold `T` or press `Enter` to comms).
+
 ## 29 Oct Checkpoint 5 (Argon Overwatch: Plan 57 §§17–20 + Plan 58 Waves 1–2 + §18 Expressive Voice & Localization Presets)
 - **Completed & Pushed on `feat/studio-polish-claude-cloud` (`0` TypeScript errors, all new & existing unit suites passing)**:
   1. **Plan 57 §§17–18 — Law of One 22-Archetype Blueprint, Cross-Wired Polarity, Planetary Body Zones, Element Derivation Card & Chaos-Seed Quests (`42752b00`, `c6c56d69`)**:

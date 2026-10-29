@@ -474,8 +474,10 @@ The owner: a planet is "a very dense soul and it moves through the densities jus
   (density from mass over volume, conductivity from the shell's charge, glow from Lx, capacitance from Aq), never typed in.
 - **Parts read their physics from their elements.** Plasma's saves hold each part's mass category and multiplier, bounciness and
   friction. Ours derive them from the part's element stack, so a heavier element makes a heavier motor.
-- **Research first** (drift guard 4): how elemental sandboxes set this up and what players say. Noita, The Powder Toy and Oxygen
-  Not Included are the closest. That doc comes before the element presets are built.
+- **Research first** (drift guard 4): done, [ELEMENTS_RESEARCH](../../ELEMENTS_RESEARCH.md) (29 Oct). It covers Noita, The Powder
+  Toy and Oxygen Not Included, and the rest of the category (Sandboxels, Sandspiel, Sandustry, two GPU engines), with a table
+  placing each property in the four floats or saying it has no honest home. Its proposals (P1–P14) are for Argon and the owner. Its
+  open question Q1 needs the owner's yes: may a cell's stored heat exist as runtime state (temperature = heat ÷ Aq capacitance)?
 
 ### 16.2 Plasma's layer: parts, joints, logic, and its interface
 
@@ -517,3 +519,19 @@ its real values.
   own yes, as a bridge agent already needs the player's.
 - **Their works are theirs.** A native's home and machines are not the player's to break; the player trades, asks or builds beside
   them.
+
+### 16.5 The holo room is where mimic sessions happen (the owner, 29 Oct: "why arent we on a hollo deck room yet?")
+
+- **Why:** the first Plasma session ran from the parked lab, among the story's HUD, because the room that §10 and §14 decided on
+  (the menu's grid room as Plan 53's bridge stage) had no way to show a game yet.
+- **What the room already has:** a bridge screen on two legs, dark until a game is bridged (`grid-room-scene.ts`), drawn only on
+  change.
+- **What it gets:**
+  - a small bridge control in the room: link a game's window (one window, at most 720p and 15 fps, as play asks), and unlink it;
+  - the screen's glass shows the linked window. The room draws at most 15 frames a second while a game is linked, and goes back to
+    drawing on change when it is unlinked;
+  - the drone's eyes: every 3 s a full-size frame of the linked window goes to the bridge (`/frame?source=external`), only
+    while the bridge answers, as play's eyes do;
+  - a line on the control saying whether the bridge is up, and the command that starts it when it is not.
+- **Not in it:** the parked story, the lab or the simulation's HUD. The room stays clean, so a session there captures only the game.
+- **Later:** the drone standing in the room beside the screen, and the comms panel there.

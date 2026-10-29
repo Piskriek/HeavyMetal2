@@ -29,6 +29,7 @@ import {
   type SfxRecipe,
 } from '@hm/soundpack';
 import { MENTOR_MIX } from './mentor-mix';
+import { DEFAULT_FALLOFF, LAB_SOUNDS, loopRegionOf, type SoundPreset } from './sound-presets';
 import { BITCRUSH_PROCESSOR, bitcrushModuleUrl } from './bitcrush-worklet';
 
 export interface AudioLevel {
@@ -677,10 +678,11 @@ export class GameAudioController {
   }
 
   public applyLoopRegion(src: AudioBufferSourceNode, id: string): void {
-    const lvl = this.levels[id];
-    if (lvl?.start !== undefined && lvl?.end !== undefined) {
-      src.loopStart = lvl.start;
-      src.loopEnd = lvl.end;
+    // a sound preset's own region wins over the file's measured one
+    const region = loopRegionOf(id, this.levels[id]);
+    if (region) {
+      src.loopStart = region.start;
+      src.loopEnd = region.end;
     }
   }
 
@@ -724,7 +726,7 @@ export class GameAudioController {
   public async preloadStartupAudio(): Promise<void> {
     await this.fetchMetadata();
     const sfxEntries = this.entries.filter((e) => e.kind === 'sfx');
-    const toLoad = [...sfxEntries.map((e) => e.id), 'music-lab'];
+    const toLoad = [...sfxEntries.map((e) => e.id), LAB_SOUNDS.music.file];
     await Promise.all(toLoad.map((id) => this.loadBuffer(id)));
   }
 
@@ -833,15 +835,17 @@ export class GameAudioController {
 
   private ensureLabMusicRunning(): void {
     if (this.labMusicSource) return;
-    const buf = this.getBuffer('music-lab');
+    // the lab's music is its preset (LAB_SOUNDS.music): its file at its measured level, times the preset's trim
+    const music = LAB_SOUNDS.music;
+    const buf = this.getBuffer(music.file);
     if (!buf || !this.ctx || !this.labMusicGain) return;
     try {
       const src = this.ctx.createBufferSource();
       src.buffer = buf;
-      src.loop = true;
-      this.applyLoopRegion(src, 'music-lab');
+      src.loop = music.loop;
+      this.applyLoopRegion(src, music.file);
       const levelGain = this.ctx.createGain();
-      levelGain.gain.value = this.gainOf('music-lab');
+      levelGain.gain.value = this.gainOf(music.file) * music.volume;
       src.connect(levelGain).connect(this.labMusicGain);
       src.start();
       this.labMusicSource = src;
@@ -1461,33 +1465,39 @@ export class GameAudioController {
   // Dedicated Triggers for Game Moments
   // ---------------------------------------------------------------------------
 
-  // The Lab Power-on sequence
+  /** The options a sound preset plays with (plan 57 §14.2): its trim and how it falls off, under the caller's extras. */
+  private presetOptions(p: SoundPreset, extra?: Play3dOptions): Play3dOptions {
+    const f = p.falloff ?? DEFAULT_FALLOFF;
+    return { volume: p.volume, refDistance: f.refDistance, maxDistance: f.maxDistance, rolloffFactor: f.rolloff, ...extra };
+  }
+
+  // The Lab Power-on sequence: each sound is its preset (LAB_SOUNDS)
   public playBreaker(pos = { x: -7.4, y: 1.0, z: -1.0 }): void {
-    this.play3d('sfx-breaker', pos, { volume: 1.0 });
+    this.play3d(LAB_SOUNDS.breaker.file, pos, this.presetOptions(LAB_SOUNDS.breaker));
   }
 
   public playRelay(pos = { x: -7.6, y: 1.0, z: -3.5 }, pitch = 1.0): void {
-    this.play3d('sfx-relay', pos, { volume: 1.0, pitch });
+    this.play3d(LAB_SOUNDS.relay.file, pos, this.presetOptions(LAB_SOUNDS.relay, { pitch }));
   }
 
   public playLever(pos = { x: -6.5, y: 1.0, z: -7.8 }): void {
-    this.play3d('sfx-lever', pos, { volume: 1.0 });
+    this.play3d(LAB_SOUNDS.lever.file, pos, this.presetOptions(LAB_SOUNDS.lever));
   }
 
   public startCapacitorHum(pos = { x: -7.2, y: 1.0, z: 1.0 }): void {
-    this.startLoop3d('capacitor-hum', 'sfx-capacitor-hum', pos, { volume: 0.9 });
+    this.startLoop3d('capacitor-hum', LAB_SOUNDS.capacitorHum.file, pos, this.presetOptions(LAB_SOUNDS.capacitorHum));
   }
 
   public playGateSpool(pos = { x: 0, y: 1.0, z: -1.0 }): void {
-    this.play3d('sfx-gate-spool', pos, { volume: 1.0 });
+    this.play3d(LAB_SOUNDS.gateSpool.file, pos, this.presetOptions(LAB_SOUNDS.gateSpool));
   }
 
   public startGateHum(pos = { x: 0, y: 1.0, z: -1.0 }): void {
-    this.startLoop3d('gate-hum', 'sfx-gate-hum', pos, { volume: 0.85 });
+    this.startLoop3d('gate-hum', LAB_SOUNDS.gateHum.file, pos, this.presetOptions(LAB_SOUNDS.gateHum));
   }
 
-  public startStormLoop(pos = { x: 0, y: 2.0, z: -9.0 }, volume = 0.8): void {
-    this.startLoop3d('storm', 'sfx-storm', pos, { volume });
+  public startStormLoop(pos = { x: 0, y: 2.0, z: -9.0 }, volume: number = LAB_SOUNDS.storm.volume): void {
+    this.startLoop3d('storm', LAB_SOUNDS.storm.file, pos, this.presetOptions(LAB_SOUNDS.storm, { volume }));
   }
 
   public updateStormVolume(stormIntensity: number): void {

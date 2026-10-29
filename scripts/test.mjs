@@ -29,6 +29,7 @@ export const TEST_FILES = [
   'apps/web/src/assets/gen-tweak.test.ts',
   'apps/web/src/studio/*.test.ts',
   'apps/web/src/studio/kits/*.test.ts',
+  'apps/web/src/audio/*.test.ts',
   'apps/web/src/assets/*.test.ts',
   'apps/web/src/*.test.ts',
   'apps/web/src/shell/*.test.ts',

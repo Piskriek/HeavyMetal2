@@ -349,10 +349,10 @@ try {
     return { fps: Math.round((1000 / ms) * 10) / 10, frameMs: Math.round(ms * 100) / 100, calls: s.calls, triangles: s.triangles };
   });
   console.log(`MEASURE ${JSON.stringify({ quality: quality?.quality ?? quality?.tier ?? null, ...measured })}`);
+  // page errors first: a budget miss (a stop on its own) must not hide them
+  check('no page errors while the lab runs', pageErrors.length === 0, pageErrors.slice(0, 3).join(' | '));
   // the budget: TICKET-06's draw calls (180 on the 3D PC, 187 with T06b + T07) plus headroom
   check('the lab draws within the draw-call budget (at most 190)', measured.calls <= 190, `${measured.calls} calls`);
-
-  check('no page errors while the lab runs', pageErrors.length === 0, pageErrors.slice(0, 3).join(' | '));
   console.log(`\nAll ${passed} lab overhaul checks passed. Shots in ${path.relative(root, shotsDir)}.`);
 } finally {
   await browser.close();

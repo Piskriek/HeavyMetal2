@@ -85,12 +85,16 @@
     - a preset declares `mount: 'floor' | 'wall' | 'ceiling'`, and `validate` grounds it on that plane;
     - the Studio stages a wall kit at 1.4 m and a ceiling kit under 2.6 m on a see-through ghost of its anchor (helpers, never picked);
     - the labkit's wall-mounted control box is a kit on the shelf (24 kits); the hung cable tray declares its ceiling.
-  - **Wave 12: the lab's lights are presets** (Argon's yes; gates green: unit 3,830, timing budgets only; e2e all green):
+  - `e9db340e` **Wave 12: the lab's lights are presets** (Argon's yes; gates green: unit 3,830, timing budgets only; e2e all green):
     - six `LAB_LIGHTS` on the Lx shelf (ceiling white 7500 K, emergency amber, alarm red, gate glow, gate arc, window cyan), each with the room light it casts (`reach`: power, distance, fall-off);
     - the lab builds its point lights, lamp faces and alarm colours from them, keeping the story's power phases;
     - the emergency beacon (wall) and a 1.2 m ceiling strip (ceiling) are fixture kits wearing them (26 kits on the shelf).
   - **Found, not caused by wave 12:** `test-lab-overhaul.mjs` (a `?story` lab test, not in the wave gates) passes its 76 checks and then fails its draw-call budget: 562 calls against 190. Wave 11 built in a separate worktree fails the same check at 565, so it predates the lights. The lab was at 181 after its October draw-call pass, so something since has added draws; the lab is parked, so it is logged for Argon rather than fixed overnight.
-  - **Next (wave 13, Argon's yes):** the lab's sounds as `snd:` presets over their recorded files, with an optional soundlab recipe for later.
+  - **Wave 13: the lab's sounds are `snd:` presets** (Argon's yes; gates fully green: unit 3,834 with no failures, e2e all green):
+    - `apps/web/src/audio/sound-presets.ts`: `LAB_SOUNDS` (breaker, relay, lever, capacitor hum, gate spool, gate hum, storm, lab music). Each is a recorded file with its trim on top of the measured level, its loop and an optional loop region, its fall-off (none for music) and its trigger, plus an optional soundlab recipe id;
+    - game-audio plays the lab's sounds and music from them, with the same values as before, and a preset's own loop region wins over the measured one;
+    - `npm test` runs `apps/web/src/audio` now;
+    - `test-lab-overhaul.mjs` checks page errors before its draw-call budget, so the known overrun no longer hides them (none while the lab runs).
 - **Next:**
   1. the labkit's procedural props rebuilt as kits (RULES 8a): the relay cabinet is drafted and validates; the breaker panel and the cable tray follow;
   2. Argon's answer on the `stat` widget, then ore, power and health as `ui:` panels, then a Studio `ui:` tab with live previews;

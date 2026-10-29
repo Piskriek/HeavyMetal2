@@ -21,6 +21,7 @@ import { RELAY_CABINET_KIT } from '../../play/kit-relay-cabinet';
 import { BREAKER_PANEL_KIT } from '../../play/kit-breaker-panel';
 import { CABLE_TRAY_KIT } from '../../play/kit-cable-tray';
 import { PLANET_TABLE_KIT } from '../../play/kit-planet-table';
+import { CONTROL_BOX_KIT } from '../../play/kit-control-box';
 import { CRAWLER_KIT, HAULER_KIT } from '../../play/kit-vehicles';
 
 /**
@@ -893,6 +894,8 @@ export const STUDIO_KIT_REGISTRY: Readonly<Record<string, StudioKitEntry>> = Obj
   'kit:cable-tray': { id: 'kit:cable-tray', label: 'Cable Tray', category: 'power-grid', kit: CABLE_TRAY_KIT, rootPreset: 'cable-tray', powerKw: 0, metricRole: 'power', salvaged: true },
   // the lab's planet table, the seeded system's map table in the simulation
   'kit:planet-table': { id: 'kit:planet-table', label: 'Planet Table', category: 'station', kit: PLANET_TABLE_KIT, rootPreset: 'planet-table', powerKw: 0, metricRole: 'portal', salvaged: true },
+  // wall-mounted (its preset's mount): the Studio hangs it on a ghost wall
+  'kit:control-box': { id: 'kit:control-box', label: 'Control Box', category: 'power-grid', kit: CONTROL_BOX_KIT, rootPreset: 'control-box', powerKw: 0, metricRole: 'power', salvaged: true },
 });
 
 export const STUDIO_KIT_LIST: readonly StudioKitRegistryEntry[] = Object.freeze(Object.values(STUDIO_KIT_REGISTRY));

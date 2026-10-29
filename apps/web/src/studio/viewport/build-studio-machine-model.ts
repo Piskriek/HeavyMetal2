@@ -8,7 +8,7 @@
  */
 
 import * as THREE from 'three';
-import type { Box3, DetailRank, Kit, OpRef, Overrides } from '@hm/kitspec';
+import type { Box3, DetailRank, Kit, KitMount, OpRef, Overrides } from '@hm/kitspec';
 import { flatten, presetBounds, sourceBounds, transformBox } from '@hm/kitspec';
 import type { MaterialSpec, NoiseSource, SamplePoint, TileSource } from '@hm/matstack';
 import {
@@ -60,6 +60,10 @@ export interface BuiltStudioMachineModel {
   readonly pickTable: KitPickTable;
   readonly socketPins: readonly SocketPin[];
   readonly bounds: Box3;
+  /** What the preset is fixed to; a wall or ceiling preset brings a ghost of its anchor (a helper, never picked). */
+  readonly mount: KitMount;
+  /** How high the viewport stands the preset above its floor: a wall preset at the lab's 1.4 m, a ceiling one under a 2.6 m ceiling. */
+  readonly stageLift: number;
   readonly partCount: number;
   readonly triangleCount: number;
   dispose(): void;
@@ -444,6 +448,38 @@ function makeMatstackThreeMaterial(
   return std;
 }
 
+/** Where the viewport hangs a wall preset (the lab's control boxes) and the ceiling a ceiling preset hangs from. */
+export const WALL_STAGE_Y = 1.4;
+export const CEILING_STAGE_Y = 2.6;
+
+/**
+ * A ghost of a preset's anchor, so a wall or ceiling preset never reads as floating in the viewport: a see-through wall section
+ * behind z 0 down to the floor, or a ceiling slab over y 0, each with its outline. In the kit's frame; the viewport lifts both.
+ */
+function mountGhost(mount: 'wall' | 'ceiling', b: Box3, lift: number): { readonly object: THREE.Group; readonly geoms: THREE.BufferGeometry[]; readonly mats: THREE.Material[] } {
+  const margin = 0.4;
+  const w = b.max[0] - b.min[0] + 2 * margin;
+  const cx = 0.5 * (b.min[0] + b.max[0]);
+  const slab = mount === 'wall'
+    ? { size: [w, b.max[1] + margin + lift, 0.02] as const, at: [cx, 0.5 * (b.max[1] + margin - lift), -0.01] as const }
+    : { size: [w, 0.02, b.max[2] - b.min[2] + 2 * margin] as const, at: [cx, 0.01, 0.5 * (b.min[2] + b.max[2])] as const };
+  const geom = new THREE.BoxGeometry(...slab.size);
+  const edges = new THREE.EdgesGeometry(geom);
+  const fill = new THREE.MeshBasicMaterial({ color: '#94a3b8', transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide });
+  const line = new THREE.LineBasicMaterial({ color: '#cbd5e1', transparent: true, opacity: 0.55 });
+  const object = new THREE.Group();
+  object.name = `studio-mount-ghost:${mount}`;
+  object.userData = { isHelper: true };
+  const mesh = new THREE.Mesh(geom, fill);
+  const outline = new THREE.LineSegments(edges, line);
+  for (const o of [mesh, outline]) {
+    o.position.set(slab.at[0], slab.at[1], slab.at[2]);
+    o.userData = { isHelper: true };
+    object.add(o);
+  }
+  return { object, geoms: [geom, edges], mats: [fill, line] };
+}
+
 /**
  * Builds a complete, grounded Three.js `THREE.Group` for any modular `Kit` preset (`MILL_V2_KIT`,
  * `STARGATE_V2_KIT`, `CAPACITOR_BANK_PURE_KIT`, `ROVER_SCOUT_V2_KIT`, etc.), replacing `loadGenRaw()`.
@@ -614,11 +650,23 @@ export function buildStudioMachineModel(
     }
   }
 
+  // a wall or ceiling preset stands on a ghost of its anchor, never in mid-air
+  const mount: KitMount = opts.kit.assemblies[opts.presetId]?.mount ?? 'floor';
+  const stageLift = mount === 'wall' ? WALL_STAGE_Y : mount === 'ceiling' ? Math.max(CEILING_STAGE_Y, 0.6 - kitBounds.min[1]) : 0;
+  if (mount !== 'floor') {
+    const ghost = mountGhost(mount, kitBounds, stageLift);
+    group.add(ghost.object);
+    disposableGeoms.push(...ghost.geoms);
+    disposableMats.push(...ghost.mats);
+  }
+
   return {
     group,
     pickTable,
     socketPins,
     bounds: kitBounds,
+    mount,
+    stageLift,
     partCount: placed.filter((p) => p.rank <= maxRank).length,
     triangleCount: pickTable.totalTriangles,
     dispose() {

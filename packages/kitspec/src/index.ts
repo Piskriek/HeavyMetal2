@@ -124,10 +124,20 @@ export interface Placement {
   readonly motion?: KitMotionSpec;
 }
 
+/**
+ * What a preset is fixed to, its anchor plane through the origin of its frame: the floor (y 0, the kit above it), a wall (z 0, the
+ * kit in front of it, towards +z) or a ceiling (y 0, the kit hanging below it). Nothing floats: `validate` grounds a wall or
+ * ceiling preset on its plane as it grounds a floor preset on the ground.
+ */
+export type KitMount = 'floor' | 'wall' | 'ceiling';
+export const KIT_MOUNTS: readonly KitMount[] = ['floor', 'wall', 'ceiling'];
+
 export interface AssemblyDef {
   readonly children: readonly Placement[];
   /** Sockets this assembly exposes to whoever places it, in its own frame. */
   readonly sockets?: Readonly<Record<string, SocketDef>>;
+  /** What the preset is fixed to (the floor when absent). */
+  readonly mount?: KitMount;
 }
 
 export interface Kit {
@@ -452,6 +462,14 @@ export interface ValidateOptions {
   readonly overrides?: Overrides;
 }
 
+/** Each mount's plane as a slab behind it: none for the floor (the ground is its support), the wall behind z 0, the ceiling above y 0. */
+const FAR = 1e4;
+export const MOUNT_ANCHORS: Readonly<Record<KitMount, readonly Box3[]>> = {
+  floor: [],
+  wall: [{ min: [-FAR, -FAR, -1], max: [FAR, FAR, 0] }],
+  ceiling: [{ min: [-FAR, 0, -FAR], max: [FAR, 1, FAR] }],
+};
+
 const touches = (a: Box3, b: Box3, eps: number): boolean =>
   a.min[0] <= b.max[0] + eps && b.min[0] <= a.max[0] + eps &&
   a.min[1] <= b.max[1] + eps && b.min[1] <= a.max[1] + eps &&
@@ -468,7 +486,10 @@ export function validate(kit: Kit, preset: string, opts: ValidateOptions = {}): 
   walk(kit, preset, IDENTITY, 0, '', [], placed, issues);
   const parts = opts.overrides ? withOverrides(kit, placed, opts.overrides) : placed;
   if (issues.length === 0 && placed.length === 0) issues.push({ code: 'empty', at: preset, detail: 'the preset places no parts' });
-  const ground = opts.ground === undefined ? 0 : opts.ground;
+  // the preset's own mount sets its support, unless the caller gives one
+  const mount = kit.assemblies[preset]?.mount ?? 'floor';
+  const ground = opts.ground === undefined ? (mount === 'floor' ? 0 : null) : opts.ground;
+  const anchors = opts.anchors ?? MOUNT_ANCHORS[mount];
   const eps = opts.eps ?? 0.002;
   const boxes = parts.map((p) => transformBox(sourceBounds(p.source), p.matrix));
   if (ground !== null) {
@@ -482,7 +503,7 @@ export function validate(kit: Kit, preset: string, opts: ValidateOptions = {}): 
   const queue: number[] = [];
   boxes.forEach((b, i) => {
     const onGround = ground !== null && b.min[1] <= ground + eps;
-    const onAnchor = (opts.anchors ?? []).some((a) => touches(a, b, eps));
+    const onAnchor = anchors.some((a) => touches(a, b, eps));
     if (onGround || onAnchor) {
       supported[i] = true;
       queue.push(i);

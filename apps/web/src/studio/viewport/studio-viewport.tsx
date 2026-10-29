@@ -114,10 +114,12 @@ export const StudioViewportCanvas: React.FC<StudioViewportProps> = ({ state, sto
     const prev = builtModelRef.current;
     builtModelRef.current = built;
     if (prev) prev.dispose();
+    // a wall or ceiling preset is stood at its mount's height, on its ghost anchor
+    built.group.position.y = built.stageLift;
 
     // Auto-center camera target on machine vertical midpoint
     const b = built.bounds;
-    const midY = Math.max(0.4, 0.5 * (b.min[1] + b.max[1]));
+    const midY = Math.max(0.4, 0.5 * (b.min[1] + b.max[1]) + built.stageLift);
     orbitRef.current.target[1] = midY;
 
     setModelStats({

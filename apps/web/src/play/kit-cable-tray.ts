@@ -8,7 +8,8 @@
  * - `cable-tray`: standing on H-frames (two square posts, a crossbar and base plates), its rungs 0.6 m up. The simulation is
  *   outdoors, with no ceiling to hang from, and plant cable runs stand on frames like this.
  * - `cable-tray-hung`: the lab's way, the same trapeze crossbars hung from a ceiling on drop rods with their flanges.
- *   Its frame has the ceiling at y 0 and everything below it; it validates against the ceiling as its anchor.
+ *   Its frame has the ceiling at y 0 and everything below it; it declares `mount: 'ceiling'`, so it validates against the
+ *   ceiling, and the Studio hangs it under a ghost ceiling.
  * Its Triad sockets:
  * - `cableEndFront` and `cableEndBack` at the run's two ends, where the next section and its cables join (power);
  * - a `floorMount` under each base plate, or a `ceilingMount` on each flange (mount).
@@ -91,6 +92,7 @@ export const CABLE_TRAY_KIT: Kit = {
       ],
     },
     'cable-tray-hung': {
+      mount: 'ceiling',
       children: [
         { ref: 'tray-run', key: 'run', at: [0, -DROP, 0] },
         ...SUPPORT_Z.flatMap((z, i): Placement[] => [

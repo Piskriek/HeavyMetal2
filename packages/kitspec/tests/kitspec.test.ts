@@ -177,6 +177,31 @@ test('nothing floats: a part with no path of contacts to the ground is flagged, 
   assert.deepEqual(validate(kit, 'wall', { ground: null, anchors: [wallPlane] }), []);
 });
 
+test('a preset declares its mount, and validate grounds it on that plane (Plan 57 §14.2, Argon\'s yes)', () => {
+  const kit: Kit = {
+    parts: {
+      plate: { source: { kind: 'box', size: [0.4, 0.6, 0.02] }, material: 'steel', rank: 0 },
+      rod: { source: { kind: 'box', size: [0.02, 0.5, 0.02] }, material: 'steel', rank: 0 },
+    },
+    assemblies: {
+      // a plate on the wall: its back face on z 0, centred on the origin
+      onWall: { mount: 'wall', children: [{ ref: 'plate', at: [0, -0.3, 0.01] }] },
+      offWall: { mount: 'wall', children: [{ ref: 'plate', at: [0, -0.3, 0.2] }] },
+      // a rod hanging from the ceiling: its top on y 0
+      hung: { mount: 'ceiling', children: [{ ref: 'rod', at: [0, -0.5, 0] }] },
+      dropped: { mount: 'ceiling', children: [{ ref: 'rod', at: [0, -0.8, 0] }] },
+      floor: { children: [{ ref: 'rod' }] },
+    },
+  };
+  assert.deepEqual(validate(kit, 'onWall'), [], 'the wall holds it, though it is nowhere near the floor');
+  assert.deepEqual(validate(kit, 'offWall').map((i) => i.code), ['floating'], 'a plate standing off the wall floats');
+  assert.deepEqual(validate(kit, 'hung'), [], 'the ceiling holds it, though it is below the floor plane');
+  assert.deepEqual(validate(kit, 'dropped').map((i) => i.code), ['floating']);
+  assert.deepEqual(validate(kit, 'floor'), [], 'no mount is the floor');
+  // the caller's support still wins: a wall preset checked as a floor kit is off the ground
+  assert.deepEqual(validate(kit, 'onWall', { ground: 0, anchors: [] }).map((i) => i.code), ['below-ground']);
+});
+
 test('param parts take their bounds from @hm/partgen, and overrides change one copy', () => {
   const kit: Kit = {
     parts: {

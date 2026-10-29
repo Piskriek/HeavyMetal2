@@ -232,6 +232,7 @@ const events = [];
 let nextSeq = 1;
 const EVENT_CAP = 500;
 let lastGamePoll = 0;
+let lastAgentPoll = 0;
 
 function pushEvent(event) {
   events.push({ seq: nextSeq++, at: Date.now(), ...event });
@@ -367,6 +368,8 @@ const handle = async (req, res) => {
     const lastPing = [...events].reverse().find((e) => e.type === 'ping') ?? null;
     json(res, 200, {
       gameLinked: Date.now() - lastGamePoll < 6000,
+      /** an AI (companion-agent.mjs or any other) read /events in the last few seconds: the launcher starts no second one */
+      agentLinked: Date.now() - lastAgentPoll < 5000,
       pendingCommands: pendingCommands.length,
       eventCount: events.length,
       defaultsFile: DEFAULTS_FILE,
@@ -604,6 +607,7 @@ const handle = async (req, res) => {
 
   // An outside AI reads the conversation and telemetry here
   if (pathname === '/events' && req.method === 'GET') {
+    lastAgentPoll = Date.now();
     const after = parseInt(url.searchParams.get('after') ?? '0', 10) || 0;
     json(res, 200, { events: events.filter((e) => e.seq > after) });
     return;

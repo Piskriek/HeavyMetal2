@@ -252,8 +252,12 @@ export function speakCompanionVoice(text: string, prosody?: VoiceProsodyOptions)
 
 const defaultCompanionEgoMem = createDroneMemory().ego;
 
-/** Local expressive conversation when no outside AI overrides on the bridge. Uses Plan 58 §18 sem:/emo:/locale: + 7-Station Mind. */
-function localChatReply(text: string): { readonly reply: string; readonly prosody?: VoiceProsodyOptions } {
+/**
+ * The drone's own voice settings (Plan 58 §18), run in the game whether or not an AI is on the bridge, because they change
+ * the drone's own state: the spoken language (`speak afrikaans | japanese | english`) and an archetype invocation
+ * (`invoke virgin mind | faith`). Null when the words are not one of these (they are conversation).
+ */
+function localVoiceCommand(text: string): { readonly reply: string; readonly prosody?: VoiceProsodyOptions } | null {
   const lower = text.toLowerCase();
   if (lower.includes('afrikaans') || lower.includes('praat afrikaans')) {
     activeCompanionLocale = 'af';
@@ -279,18 +283,16 @@ function localChatReply(text: string): { readonly reply: string; readonly prosod
       prosody: { pitchShift: 1.5, tempoScale: 0.96, locale: activeCompanionLocale },
     };
   }
-  if (lower.includes('capital') || lower.includes('maple') || lower.includes('golf') || lower.includes('tournament') || lower.includes('hank') || lower.includes('rosa')) {
-    const u = synthesizeUtterance({ rootId: 'BODY_EUREKA', slots: { quality: 'Maple Falls Classic is live on the Open-Host Bridge — Greenkeeper Hank cut all 18 cups at 05:30, Shuttle Driver Rosa cleared the Park-and-Ride loop, and Town Satisfaction climbed to 96.4%' }, locale: activeCompanionLocale, mem: defaultCompanionEgoMem });
-    return { reply: u.spokenText, prosody: { pitchShift: u.envelope.pitchShiftSemitones, tempoScale: u.envelope.tempoScale, locale: activeCompanionLocale } };
-  }
-  if (lower.includes('mine') || lower.includes('ore')) return { reply: 'I read copper and quartz deposits nearby. Point the rifle and I will assist.' };
-  if (lower.includes('build')) return { reply: 'The lattice is stable. Say where, and I will hold the line while you build.' };
-  if (lower.includes('thank')) return { reply: 'Always, Lead Architect.' };
-  const u = synthesizeUtterance({ rootId: 'ARRIVAL_GREETING', slots: { world: 'FIDELITY & Maple Falls Multiverse' }, locale: activeCompanionLocale, mem: defaultCompanionEgoMem });
-  return {
-    reply: `${u.spokenText} Ask me about "Maple Falls tournament", "invoke Virgin Mind", "speak Afrikaans", or say "bridge Capital Empire".`,
-    prosody: { pitchShift: u.envelope.pitchShiftSemitones, tempoScale: u.envelope.tempoScale, locale: activeCompanionLocale },
-  };
+  return null;
+}
+
+/** Local small talk when no AI is on the bridge (the launcher starts one). Deterministic, keyword-flavored, and honest about it. */
+function localChatReply(text: string): string {
+  const lower = text.toLowerCase();
+  if (lower.includes('mine') || lower.includes('ore')) return 'I read copper and quartz deposits nearby. Point the rifle and I will assist.';
+  if (lower.includes('build')) return 'The lattice is stable. Say where, and I will hold the line while you build.';
+  if (lower.includes('thank')) return 'Always, Lead Architect.';
+  return 'No AI is on the bridge, so I only know orders: "follow me", "float in front of me", "hold position", "speak afrikaans", "invoke virgin mind". Start FIDELITY with PLAY-WITH-AI.bat to talk with me properly.';
 }
 
 export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroadcastRadio, getContext, handleRef, kitOps, droneOps, screenOps }) => {
@@ -694,8 +696,10 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
     setMessages((prev) => [...prev, { id: `msg-${Date.now()}-u-${prev.length}`, sender: 'player', text: trimmed }]);
     setInput('');
     const intent = parseCompanionIntent(trimmed);
+    // the drone's own voice settings run here; tagged 'voice' so an AI on the bridge leaves them alone
+    const voice = intent.kind === 'chat' ? localVoiceCommand(trimmed) : null;
     // the intent rides along, so an agent on the bridge leaves the orders the game ran itself alone
-    postBridgeEvent({ type: 'player-say', text: trimmed, intent: intent.kind });
+    postBridgeEvent({ type: 'player-say', text: trimmed, intent: voice ? 'voice' : intent.kind });
 
     const comp = companionRef.current;
     const ctx = getContext?.() ?? { player: { x: 0, z: 0, yaw: 0 }, landmarks: {} };
@@ -736,8 +740,13 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
         return;
       }
       if (intent.kind === 'chat') {
-        const r = localChatReply(trimmed);
-        companionSays(r.reply, r.reply, r.prosody);
+        if (voice) {
+          companionSays(voice.reply, voice.reply, voice.prosody);
+        } else if (bridgeLinkedRef.current) {
+          // an AI is on the bridge: it reads the player-say event and answers via /command (one voice, never two)
+        } else {
+          companionSays(localChatReply(trimmed));
+        }
         return;
       }
       const order = resolveCompanionOrder(intent, ctx.player, ctx.landmarks);

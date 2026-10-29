@@ -92,6 +92,89 @@ function isLocalIntent(text) {
   return localPatterns.some((p) => q.includes(p));
 }
 
+/**
+ * The agent's brain, picked once at start, best first (owner, 29 Oct: "the first AI talking to me from within a game"):
+ *   ANTHROPIC_API_KEY  -> Claude   (ANTHROPIC_MODEL to change the model)
+ *   GEMINI_API_KEY     -> Gemini   (GEMINI_MODEL)
+ *   Ollama on :11434   -> a local model (OLLAMA_MODEL, else the first one installed)
+ *   none               -> the keyword responder below, which says so: it is not an AI and must never pass for one.
+ */
+const SYSTEM_PROMPT = [
+  'You are Overwatch, the drone companion who floats beside the player inside FIDELITY: The SetMix Multiverse, a game where',
+  'a collapsing world is rebuilt stage by stage (wireframe, 1-bit, EGA, VGA, Gouraud, full PBR) out of modular presets.',
+  'The player is Piskriek, the lead architect, talking to you over a helmet radio. Your words are spoken aloud by a',
+  'speech synthesizer, so answer in one to three short spoken sentences, with no markdown, lists or emoji.',
+  'You only know what is in this conversation and the telemetry given; never invent game state, names or numbers.',
+  'You can move: tell the player to say "follow me", "float in front of me", "hold position" or "go to the gate" and the game does it.',
+].join(' ');
+const history = [];
+const HISTORY_TURNS = 12;
+let brain = { kind: 'keywords', label: 'keyword responder (no AI connected)' };
+
+async function detectBrain() {
+  if (process.env.ANTHROPIC_API_KEY) return { kind: 'anthropic', model: process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-5', get label() { return `Claude (${this.model})`; } };
+  if (process.env.GEMINI_API_KEY) return { kind: 'gemini', model: process.env.GEMINI_MODEL ?? 'gemini-2.5-flash', get label() { return `Gemini (${this.model})`; } };
+  try {
+    const res = await fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(1500) });
+    const tags = await res.json();
+    const model = process.env.OLLAMA_MODEL ?? tags.models?.[0]?.name;
+    if (model) return { kind: 'ollama', model, get label() { return `Ollama (${this.model}, local)`; } };
+  } catch { /* no Ollama running */ }
+  return brain;
+}
+
+/** One reply from the AI brain, or null (no brain, or it failed: the error is printed and the keyword responder answers). */
+async function aiReply(text, telemetry) {
+  if (brain.kind === 'keywords') return null;
+  const p = telemetry.player, c = telemetry.companion;
+  const context = `Telemetry: player at ${formatCoords(p)}, you at ${formatCoords(c)} altitude ${(c.y || 0).toFixed(1)} m, ${c.state}.${lastPing ? ` Last thing the player pinged: ${lastPing.label ?? lastPing.target?.entityType}.` : ''}`;
+  const messages = [...history, { role: 'user', content: `${text}\n\n(${context})` }];
+  const signal = AbortSignal.timeout(20000);
+  try {
+    let out = '';
+    if (brain.kind === 'anthropic') {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST', signal,
+        headers: { 'content-type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: brain.model, max_tokens: 200, system: SYSTEM_PROMPT, messages }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error?.message ?? `HTTP ${res.status}`);
+      out = d.content?.map((b) => b.text ?? '').join('') ?? '';
+    } else if (brain.kind === 'gemini') {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${brain.model}:generateContent`, {
+        method: 'POST', signal,
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          contents: messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
+          generationConfig: { maxOutputTokens: 200 },
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error?.message ?? `HTTP ${res.status}`);
+      out = d.candidates?.[0]?.content?.parts?.map((x) => x.text ?? '').join('') ?? '';
+    } else {
+      const res = await fetch('http://localhost:11434/api/chat', {
+        method: 'POST', signal,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model: brain.model, stream: false, messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages] }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? `HTTP ${res.status}`);
+      out = d.message?.content ?? '';
+    }
+    out = out.replace(/\s+/g, ' ').trim().slice(0, 600);
+    if (!out) return null;
+    history.push({ role: 'user', content: text }, { role: 'assistant', content: out });
+    while (history.length > HISTORY_TURNS * 2) history.shift();
+    return out;
+  } catch (err) {
+    console.log(`\x1b[31m[BRAIN]\x1b[0m ${brain.label} failed (${err instanceof Error ? err.message : err}); the keyword responder answers instead.`);
+    return null;
+  }
+}
+
 /** Rich contextual responder when no external LLM API is configured. */
 function generateOverwatchReply(text, telemetry) {
   if (isLocalIntent(text)) {
@@ -223,8 +306,8 @@ async function loop() {
         const timestamp = new Date(e.at || Date.now()).toLocaleTimeString();
         console.log(`\x1b[36m[${timestamp}] [PISKRIEK RADIO]\x1b[0m ${e.text}`);
 
-        // Generate response
-        const cmd = generateOverwatchReply(e.text, lastTelemetry);
+        // Generate response: the AI brain when there is one, else the keyword responder
+        const cmd = isLocalIntent(e.text) ? null : await aiReply(e.text, lastTelemetry).then((said) => (said ? { action: 'say', text: said } : generateOverwatchReply(e.text, lastTelemetry)));
         if (cmd) {
           console.log(`\x1b[35m[OVERWATCH AI DISPATCH]\x1b[0m -> ${cmd.action}: "${cmd.text}"`);
           await sendCommand(cmd);
@@ -238,10 +321,12 @@ async function loop() {
   setTimeout(loop, 600);
 }
 
+brain = await detectBrain();
 console.log(`\x1b[35m═══════════════════════════════════════════════════════════════════════════\x1b[0m`);
 console.log(`\x1b[35m  SETMIX MULTIVERSE // OVERWATCH LIVE AGENT COMPANION BRAIN\x1b[0m`);
 console.log(`\x1b[35m═══════════════════════════════════════════════════════════════════════════\x1b[0m`);
 console.log(`  Connected to Neural Bridge: \x1b[32m${BRIDGE_URL}\x1b[0m`);
+console.log(`  Brain: ${brain.kind === 'keywords' ? `\x1b[33m${brain.label}\x1b[0m: set ANTHROPIC_API_KEY or GEMINI_API_KEY, or run Ollama, for a real AI` : `\x1b[32m${brain.label}\x1b[0m`}`);
 console.log(`  Awaiting player speech and real-time telemetry from FIDELITY...`);
 console.log(`\x1b[35m───────────────────────────────────────────────────────────────────────────\x1b[0m`);
 

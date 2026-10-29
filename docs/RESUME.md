@@ -72,9 +72,10 @@
     - `play/ui-play-hud.ts` holds the screen and its sources;
     - `play/ui-panel.tsx` draws a panel from its preset with live values, and a part with no value draws nothing;
     - the card's look and classes are unchanged.
+  - **Wave 7: the floats pill is a `ui:` panel**, gates green (e2e all green, smoke too; unit 3,814, only timing budgets failing). Its markup equals the hand-drawn pill's, and the arrival shot is identical. Ore, power and health need a composite `stat` widget, a rung change, so that goes to Argon first.
 - **Next:**
-  1. the labkit's procedural props rebuilt as kits (RULES 8a), onto the salvage list;
-  2. the rest of the play HUD's panels as `ui:` (the floats pill, health, ore and power, comms), then a Studio `ui:` tab with live previews;
+  1. the labkit's procedural props rebuilt as kits (RULES 8a): the relay cabinet is drafted and validates; the breaker panel and the cable tray follow;
+  2. Argon's answer on the `stat` widget, then ore, power and health as `ui:` panels, then a Studio `ui:` tab with live previews;
   3. the narrator engine as the drone's System voice;
   4. the bridge screen's mirror;
   5. mimic Cataclysm: DDA and Pokémon Showdown first, then the Steam games' data files.

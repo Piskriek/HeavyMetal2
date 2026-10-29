@@ -397,4 +397,10 @@ The owner: a planet is "a very dense soul and it moves through the densities jus
     - `play/ui-panel.tsx` (`UiPanelView`) draws a panel from its preset with live values. A part whose source has no value draws nothing: the lens rule at run time;
     - the card keeps its classes (`play-goal`, `play-next`), so its look and the e2e checks hold;
     - tests: 3/3 (the screen validates against its sources and round-trips as `uic:`; the card's markup; a missing value draws nothing).
-  - **Next:** the rest of the play HUD's panels (the floats pill, health, ore and power, the comms chip), each with its real sources; then a Studio `ui:` editor tab with live previews (previews drive play).
+  - **The floats pill is a `ui:` panel** (29 Oct, Argon: the rest of the play HUD next):
+    - the stage badge and a meter per float, bound to the plot's live stage and levels (`plot.stage`, `floats.*`, each a number out of 100);
+    - consecutive meters draw as one list, in the pill's own markup;
+    - the caller gives the pill's classes, colours and patterns (`floatsPanelProps`), so the preset holds structure only; each float keeps its pattern as well as its colour;
+    - the test asserts every class, colour, pattern, width, title and label of the hand-drawn pill; the arrival shot is identical to the one before.
+  - **Not converted yet: ore and power, and health.** Their readouts have inline structure (a bold value, a unit, a rate, a linked count, an alert line) that the generic readout would flatten. They need a composite `stat` widget in rung 2: a rung change, so it is put to Argon first.
+  - **Next:** that question; then a Studio `ui:` editor tab with live previews (previews drive play).

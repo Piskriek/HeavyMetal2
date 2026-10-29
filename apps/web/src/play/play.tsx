@@ -106,7 +106,7 @@ import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { kv } from '../storage/profile-storage';
 import { bodyCheckpoint, createDroneMemory, dreamNow, dronePerspective, droneSymptoms, hasUndreamt, loadDroneMemory, noteCatalyst, saveDroneMemory, type DroneBody, type DroneCatalyst, type DroneMemory } from './drone-memory';
 import { hintsFromWarnings } from './drone-body-visuals';
-import { PLAY_HUD_GOAL, goalValues } from './ui-play-hud';
+import { PLAY_HUD_GOAL, floatsPanelProps, goalValues } from './ui-play-hud';
 import { UiPanelView } from './ui-panel';
 import { warningLine } from '@hm/harness';
 import type { DreamCue } from '@hm/harness';
@@ -212,7 +212,7 @@ import { EARTH_BIOME_PRESET, MOON_BIOME_PRESET, biomeSlotSpecies, earthPlotUnloc
 import { GATE_CHEVRONS, arrivalSector, creditsProgress, earthEndgameState, transitArrival, type EndgameInput } from './earth-endgame';
 import { isBiosphereCoherent } from '@hm/questline';
 import { fidelityRules, FIDELITY_LINE_IDS } from '@hm/narrator';
-import { HudZone, CompassRibbon, DrivingHudBadge, FloatsPill, MachineLabel, SyncWord } from '../base/ui/hud-zones';
+import { HudZone, CompassRibbon, DrivingHudBadge, MachineLabel, SyncWord } from '../base/ui/hud-zones';
 import { DiegeticRadioTunerWidget } from '../shell/diegetic-radio-tuner-widget';
 import { COLLECTIBLE_MUSIC_TAPES, resolveRadioArrangementStyle } from '@hm/content';
 import {
@@ -5818,10 +5818,10 @@ useEffect(() => {
       ) : null}
       {ready ? (
         <HudZone zone="top-right">
-          {!props.gamePreset || !['race-lap-telemetry', 'arena-wave-survivor'].includes(props.gamePreset.hudBlade) ? <FloatsPill
-            stage={hud.plot.stage}
-            floats={METRICS.map((m) => ({ key: m, name: METRIC_NAME[m], colour: METRIC_COLOUR[m], value: hud.plot.levels[m] }))}
-          /> : null}
+          {/* plan 57 §15: the floats pill is a ui: panel, drawn from its preset with the plot's live stage and levels */}
+          {!props.gamePreset || !['race-lap-telemetry', 'arena-wave-survivor'].includes(props.gamePreset.hudBlade) ? (
+            <UiPanelView {...floatsPanelProps(hud.plot.stage, hud.plot.levels, METRIC_COLOUR)} />
+          ) : null}
         {/* In a co-op room the badge names the session, and the branch toggle is gone: the room is the grid (TICKET-11). */}
         <div hidden={!!props.gamePreset} className="play-sync-indicator" data-hud-zone="top-right" title={outpostRef.current ? `Co-op room ${outpostRef.current.code ?? ''}: the room's world is shared with everyone in it` : syncMode === 'synced' ? 'Connected to shared 40,000 km planetary substrate' : 'Playing on private local simulation branch'}>
           {outpostRef.current ? (

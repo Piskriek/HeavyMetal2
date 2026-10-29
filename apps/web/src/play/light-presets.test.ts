@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { flatten } from '@hm/kitspec';
 import { CAPACITOR_BANK_KIT } from './kit-capacitor-bank';
-import { isLampPart, kelvinHex, LIGHT_PRESETS, lightName, lightOverride, lightSpecName, parseLightName, patternGlow } from './light-presets';
+import { isLampPart, kelvinHex, LAB_LIGHTS, LIGHT_PRESETS, lightName, lightOverride, lightPresetOfName, lightSpecName, parseLightName, patternGlow } from './light-presets';
 import { lightMaterial, tickLights } from './light-material';
 
 const rgb = (hex: string): [number, number, number] => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as [number, number, number];
@@ -60,4 +60,15 @@ test('a light material is shared by name, glows its colour, and its pattern move
   tickLights(0.6);
   assert.ok(m.emissiveIntensity < 0.2);
   assert.equal(lightMaterial('gunmetal'), null);
+});
+
+test('the lab\'s lights are presets on the shelf, each casting a room light, and a fixture\'s lamp finds its preset', () => {
+  for (const p of Object.values(LAB_LIGHTS)) {
+    assert.ok(LIGHT_PRESETS.includes(p), `${p.id} is on the shelf`);
+    assert.ok(p.reach.power > 0 && p.reach.distance > 0 && p.reach.decay > 0, `${p.id} casts a light`);
+    assert.equal(lightPresetOfName(lightName(p)), p, `${p.id} is found from its lamp's name`);
+  }
+  assert.equal(new Set(LIGHT_PRESETS.map((p) => p.id)).size, LIGHT_PRESETS.length, 'every preset has its own id');
+  assert.equal(lightPresetOfName('lx:3100:1.00:flicker'), undefined, 'a light no preset is');
+  assert.equal(lightPresetOfName('darkSteel'), undefined);
 });

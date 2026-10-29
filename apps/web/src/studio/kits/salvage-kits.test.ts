@@ -1,7 +1,7 @@
 // Plan 57 §14.2: the lab and the story stripped for parts. The lab's own kits, given their Triad sockets, are on the assembler's
-// shelf, and so are the labkit's props, rebuilt as kits (relay cabinet, breaker panel, cable tray, planet table, control box): each
-// validates whole (fixed to its mount, nothing floating) and its sockets cover what its job needs. The salvage list waits empty for
-// the next.
+// shelf, and so are the labkit's props and light fixtures, rebuilt as kits (relay cabinet, breaker panel, cable tray, planet
+// table, control box, emergency beacon, ceiling strip): each validates whole (fixed to its mount, nothing floating) and its
+// sockets cover what its job needs. The salvage list waits empty for the next.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validate } from '@hm/kitspec';
@@ -10,7 +10,7 @@ import { CEILING_STAGE_Y, WALL_STAGE_Y, buildStudioMachineModel } from '../viewp
 import { CABLE_TRAY_KIT } from '../../play/kit-cable-tray';
 import { CONTROL_BOX_KIT } from '../../play/kit-control-box';
 
-const SALVAGED = ['kit:gate-dais', 'kit:archway-gate', 'kit:fabricator-frame', 'kit:drone', 'kit:drone-vacuum', 'kit:game-screen', 'kit:bridge-pad', 'kit:hauler', 'kit:crawler', 'kit:relay-cabinet', 'kit:breaker-panel', 'kit:cable-tray', 'kit:planet-table', 'kit:control-box'];
+const SALVAGED = ['kit:gate-dais', 'kit:archway-gate', 'kit:fabricator-frame', 'kit:drone', 'kit:drone-vacuum', 'kit:game-screen', 'kit:bridge-pad', 'kit:hauler', 'kit:crawler', 'kit:relay-cabinet', 'kit:breaker-panel', 'kit:cable-tray', 'kit:planet-table', 'kit:control-box', 'kit:emergency-beacon', 'kit:ceiling-strip'];
 
 /** The roles each designed kit's sockets must cover: what plugs into it, powers it, and what it stands on or holds. */
 const NEEDS: Readonly<Record<string, readonly string[]>> = {
@@ -25,6 +25,8 @@ const NEEDS: Readonly<Record<string, readonly string[]>> = {
   'kit:cable-tray': ['power', 'mount'],
   'kit:planet-table': ['power', 'output', 'mount'],
   'kit:control-box': ['power', 'input', 'mount'],
+  'kit:emergency-beacon': ['power', 'output', 'mount'],
+  'kit:ceiling-strip': ['power', 'output', 'mount'],
 };
 
 test('the lab\'s kits are on the assembler\'s shelf, and nothing waits on the salvage list', () => {

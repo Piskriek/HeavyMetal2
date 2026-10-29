@@ -7,9 +7,38 @@ import type { LightPattern, LightSpec } from '@hm/cartlab';
 import type { PartOverride, PlacedPart } from '@hm/kitspec';
 import { GENERATORS } from '@hm/partgen';
 
+/**
+ * The real light a lamp casts where the Graphics tier places one (a point light at the lamp): its power (three.js intensity),
+ * how far it reaches in metres, and how it falls off.
+ */
+export interface LightReach {
+  readonly power: number;
+  readonly distance: number;
+  readonly decay: number;
+}
+
 export interface LightPreset extends LightSpec {
   readonly id: string;
+  /** The light it casts as a room light; a lamp face alone has none. */
+  readonly reach?: LightReach;
 }
+
+/** A preset that lights a room as well as its lamp face. */
+export type CastingLightPreset = LightPreset & { readonly reach: LightReach };
+
+/**
+ * The lab's lights, salvaged as presets (plan 57 §14.2, Argon's yes): its cold ceiling white, the emergency beacons' amber and
+ * the alarm's red, the gate's glow and its arc, and the window's cyan. The lab reads its lights from these, and the beacon and
+ * the ceiling strip are fixture kits wearing them.
+ */
+export const LAB_LIGHTS = {
+  ceiling: { id: 'lab-ceiling', name: 'Lab ceiling', kelvin: 7500, colour: null, intensity: 1.5, pattern: 'steady', reach: { power: 18, distance: 24, decay: 1.8 } },
+  emergency: { id: 'emergency-amber', name: 'Emergency amber', kelvin: 2200, colour: '#ff8a3a', intensity: 1.5, pattern: 'pulse', reach: { power: 22, distance: 22, decay: 1.6 } },
+  alarm: { id: 'alarm-red', name: 'Alarm red', kelvin: 2000, colour: '#ff2a1a', intensity: 2.0, pattern: 'blink', reach: { power: 5, distance: 7, decay: 1.8 } },
+  gateGlow: { id: 'gate-glow', name: 'Gate glow', kelvin: 2200, colour: '#ff9a4a', intensity: 1.2, pattern: 'steady', reach: { power: 12, distance: 10, decay: 1.8 } },
+  gateArc: { id: 'gate-arc', name: 'Gate arc', kelvin: 2400, colour: '#ffb040', intensity: 2.0, pattern: 'flicker', reach: { power: 60, distance: 10, decay: 1.8 } },
+  window: { id: 'window-cyan', name: 'Window cyan', kelvin: 9000, colour: '#7fe9ff', intensity: 1.0, pattern: 'steady', reach: { power: 3.5, distance: 16, decay: 1.8 } },
+} as const satisfies Readonly<Record<string, CastingLightPreset>>;
 
 export const LIGHT_PRESETS: readonly LightPreset[] = [
   { id: 'sodium-amber', name: 'Sodium amber', kelvin: 2000, colour: null, intensity: 1.2, pattern: 'steady' },
@@ -18,7 +47,15 @@ export const LIGHT_PRESETS: readonly LightPreset[] = [
   { id: 'cold-lab', name: 'Cold lab', kelvin: 7500, colour: null, intensity: 1.2, pattern: 'pulse' },
   { id: 'hazard-strobe', name: 'Hazard strobe', kelvin: 4000, colour: '#ffb02a', intensity: 2.0, pattern: 'blink' },
   { id: 'ember', name: 'Ember flicker', kelvin: 1700, colour: null, intensity: 0.9, pattern: 'flicker' },
+  ...Object.values(LAB_LIGHTS),
 ];
+
+/** The preset a lamp's `lx:` name is, when it is one (so a kit's lamp can find the light it casts), or undefined. */
+export function lightPresetOfName(name: string): LightPreset | undefined {
+  const l = parseLightName(name);
+  if (!l) return undefined;
+  return LIGHT_PRESETS.find((p) => p.kelvin === l.kelvin && p.colour === l.colour && Math.abs(p.intensity - l.intensity) < 1e-6 && p.pattern === l.pattern);
+}
 
 export const KELVIN_MIN = 1500;
 export const KELVIN_MAX = 9000;

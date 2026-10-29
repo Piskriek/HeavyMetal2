@@ -22,6 +22,8 @@ import { BREAKER_PANEL_KIT } from '../../play/kit-breaker-panel';
 import { CABLE_TRAY_KIT } from '../../play/kit-cable-tray';
 import { PLANET_TABLE_KIT } from '../../play/kit-planet-table';
 import { CONTROL_BOX_KIT } from '../../play/kit-control-box';
+import { EMERGENCY_BEACON_KIT } from '../../play/kit-emergency-beacon';
+import { CEILING_STRIP_KIT } from '../../play/kit-ceiling-strip';
 import { CRAWLER_KIT, HAULER_KIT } from '../../play/kit-vehicles';
 
 /**
@@ -775,7 +777,7 @@ export type StudioKitRegistryEntry = StudioKitEntry;
 export interface StudioKitEntry {
   readonly id: string;
   readonly label: string;
-  readonly category: 'campaign-machine' | 'portal-gate' | 'power-grid' | 'vehicle' | 'calibration' | 'station' | 'companion';
+  readonly category: 'campaign-machine' | 'portal-gate' | 'power-grid' | 'vehicle' | 'calibration' | 'station' | 'companion' | 'lighting';
   readonly kit: Kit;
   readonly rootPreset: string;
   readonly powerKw: number;
@@ -896,6 +898,9 @@ export const STUDIO_KIT_REGISTRY: Readonly<Record<string, StudioKitEntry>> = Obj
   'kit:planet-table': { id: 'kit:planet-table', label: 'Planet Table', category: 'station', kit: PLANET_TABLE_KIT, rootPreset: 'planet-table', powerKw: 0, metricRole: 'portal', salvaged: true },
   // wall-mounted (its preset's mount): the Studio hangs it on a ghost wall
   'kit:control-box': { id: 'kit:control-box', label: 'Control Box', category: 'power-grid', kit: CONTROL_BOX_KIT, rootPreset: 'control-box', powerKw: 0, metricRole: 'power', salvaged: true },
+  // the lab's light fixtures, their lamps wearing the lab's light presets (LAB_LIGHTS)
+  'kit:emergency-beacon': { id: 'kit:emergency-beacon', label: 'Emergency Beacon', category: 'lighting', kit: EMERGENCY_BEACON_KIT, rootPreset: 'emergency-beacon', powerKw: 0, metricRole: 'lx', salvaged: true },
+  'kit:ceiling-strip': { id: 'kit:ceiling-strip', label: 'Ceiling Strip Light', category: 'lighting', kit: CEILING_STRIP_KIT, rootPreset: 'ceiling-strip', powerKw: 0, metricRole: 'lx', salvaged: true },
 });
 
 export const STUDIO_KIT_LIST: readonly StudioKitRegistryEntry[] = Object.freeze(Object.values(STUDIO_KIT_REGISTRY));

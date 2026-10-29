@@ -81,11 +81,16 @@
   - `8c5eb226`, `2219cdc8` **Wave 9: the `stat` widget** (Plan 57 §15), ore, power and the health plate as `ui:` panels, and the planet table as a square socketed kit (gates green; e2e all green; the arrival shot matches the hand-drawn HUD after one fix: the power line's "of 12" had taken the plot section's dim span colour). Argon said yes (29 Oct) to all three asks: an `action` widget kind for the comms chip (no button without a real command), the material alias map, and a declared kit mount (floor, wall or ceiling) with ghost anchors in the Studio, for the control box and the hung tray. Waves 10 and 11 build them.
   - Found: three test files were in no `npm test` glob (`studio/kits/salvage-kits.test.ts`, `assets/gen-tweak.test.ts`, `src/edition.test.ts`), so the salvage test had only run when called directly. Wave 10 adds the globs.
   - `79672915` **Wave 10: the `action` widget and the comms chip, kit materials on the shelf, and the three test folders in `npm test`** (gates green: unit 3,825, the codec test updated for the aliases, timing budgets only; e2e 19/19, 57/57, 24/24, 15/15, Studio 11/11, smoke green). The Studio now shows the salvaged kits in their own finishes, and its material editor opens on a slot's shelf finish, a plain kit name included.
-  - **Wave 11: kit mounts** (Plan 57 §14.2; gates green: unit 3,828, timing budgets only; e2e all green):
+  - `912f0374` **Wave 11: kit mounts** (Plan 57 §14.2; gates green: unit 3,828, timing budgets only; e2e all green):
     - a preset declares `mount: 'floor' | 'wall' | 'ceiling'`, and `validate` grounds it on that plane;
     - the Studio stages a wall kit at 1.4 m and a ceiling kit under 2.6 m on a see-through ghost of its anchor (helpers, never picked);
     - the labkit's wall-mounted control box is a kit on the shelf (24 kits); the hung cable tray declares its ceiling.
-  - **Next (wave 12, Argon's queue):** the lab's lights as Lx presets and fixture kits (the beacon on a wall, the strip on a ceiling); the lab's sounds wait on Argon's call (a `snd:` entry over each file, or a soundlab recipe).
+  - **Wave 12: the lab's lights are presets** (Argon's yes; gates green: unit 3,830, timing budgets only; e2e all green):
+    - six `LAB_LIGHTS` on the Lx shelf (ceiling white 7500 K, emergency amber, alarm red, gate glow, gate arc, window cyan), each with the room light it casts (`reach`: power, distance, fall-off);
+    - the lab builds its point lights, lamp faces and alarm colours from them, keeping the story's power phases;
+    - the emergency beacon (wall) and a 1.2 m ceiling strip (ceiling) are fixture kits wearing them (26 kits on the shelf).
+  - **Found, not caused by wave 12:** `test-lab-overhaul.mjs` (a `?story` lab test, not in the wave gates) passes its 76 checks and then fails its draw-call budget: 562 calls against 190. Wave 11 built in a separate worktree fails the same check at 565, so it predates the lights. The lab was at 181 after its October draw-call pass, so something since has added draws; the lab is parked, so it is logged for Argon rather than fixed overnight.
+  - **Next (wave 13, Argon's yes):** the lab's sounds as `snd:` presets over their recorded files, with an optional soundlab recipe for later.
 - **Next:**
   1. the labkit's procedural props rebuilt as kits (RULES 8a): the relay cabinet is drafted and validates; the breaker panel and the cable tray follow;
   2. Argon's answer on the `stat` widget, then ore, power and health as `ui:` panels, then a Studio `ui:` tab with live previews;

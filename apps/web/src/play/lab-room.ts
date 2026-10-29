@@ -26,6 +26,7 @@ import { aimKit, type KitTarget, type KitTargetable } from './kit-target';
 import { PART_SWATCHES } from './part-swatches';
 import { vaultSkin } from './vault-skin';
 import { lightMaterial } from './light-material';
+import { LAB_LIGHTS, lightHex, type CastingLightPreset } from './light-presets';
 import { kitLayering, layeredMaterial } from './layered-material';
 import { CAPACITOR_BANK_KIT } from './kit-capacitor-bank';
 import { GATE_KIT } from './kit-gate';
@@ -1140,12 +1141,15 @@ export function createLabRoom(o: {
     group.add(chartQuad);
   }
 
+  // the lab's lights are presets (plan 57 §14.2): each room light is its preset's colour, reach and fall-off, unlit until power
+  const cast = (p: CastingLightPreset): THREE.PointLight => new THREE.PointLight(lightHex(p), 0, p.reach.distance, p.reach.decay);
+
   // ---- Light: recessed aluminum ceiling strip troffers in 3 banks (never black boxes when unlit, LAB-02)
   const stripLength = (depth - 2.5) / 3;
   const stripMats = [0, 1, 2].map(() =>
     keep(new THREE.MeshStandardMaterial({
       color: '#c8d6e5',
-      emissive: '#eef4ff',
+      emissive: lightHex(LAB_LIGHTS.ceiling),
       emissiveIntensity: 0,
       roughness: 0.32,
       metalness: 0.1,
@@ -1164,14 +1168,14 @@ export function createLabRoom(o: {
       });
     }
   }
-  const mainLamp = new THREE.PointLight('#e6f2ff', 0, 24, 1.8);
+  const mainLamp = cast(LAB_LIGHTS.ceiling);
   mainLamp.position.set(0, ROOM.height - 0.6, -2.0);
   group.add(mainLamp);
 
   // Flush-mounted wall emergency beacons with gunmetal wall bezels (never floating brown cubes, LAB-02)
   const emergencyMat = keep(new THREE.MeshStandardMaterial({
     color: '#b85c1e',
-    emissive: '#ff7a1c',
+    emissive: lightHex(LAB_LIGHTS.emergency),
     emissiveIntensity: 0,
     roughness: 0.35,
   }));
@@ -1183,19 +1187,20 @@ export function createLabRoom(o: {
       e.position.set(x, 4.55, z); e.rotation.y = face;
     });
   }
-  const emergency = new THREE.PointLight('#ff8a3a', 0, 22, 1.6);
+  const emergency = cast(LAB_LIGHTS.emergency);
   emergency.position.set(0, 4.4, 0);
   group.add(emergency);
 
-  const strobe = new THREE.PointLight('#ff2a1a', 0, 7, 1.8);
+  const strobe = cast(LAB_LIGHTS.alarm);
   strobe.position.set(-7.0, 2.6, -4.0);
   group.add(strobe);
 
-  const gateGlow = new THREE.PointLight('#ff9a4a', 0, 10, 1.8);
+  const gateGlow = cast(LAB_LIGHTS.gateGlow);
   gateGlow.position.set(GATE_AT.x, 1.8, GATE_AT.z + 0.6);
   group.add(gateGlow);
 
-  const windowLight = new THREE.PointLight('#7fe9ff', 3.5, 16, 1.8);
+  const windowLight = cast(LAB_LIGHTS.window);
+  windowLight.intensity = LAB_LIGHTS.window.reach.power;
   windowLight.position.set(wx, wy + 0.4, ROOM.back + 1.2);
   group.add(windowLight);
 
@@ -1210,7 +1215,7 @@ export function createLabRoom(o: {
       const src = mesh.material as THREE.Material;
       if (!(src instanceof THREE.MeshStandardMaterial)) return;
       const mat = src.clone();
-      mat.emissive = new THREE.Color('#ff2a1a');
+      mat.emissive = new THREE.Color(lightHex(LAB_LIGHTS.alarm));
       mat.emissiveIntensity = 0;
       mesh.material = mat;
       handleMats.push(mat);
@@ -1252,16 +1257,16 @@ export function createLabRoom(o: {
 
     pulseUniforms.uPower.value = p.pulse;
     stripMats.forEach((mat, i) => { mat.emissiveIntensity = p.banks[i]! * 2.2; });
-    mainLamp.intensity = p.main * 18;
+    mainLamp.intensity = p.main * LAB_LIGHTS.ceiling.reach.power;
     fill.color.set(p.main > 0.02 ? '#d8e2ea' : '#1a2433');
     fill.groundColor.set(p.main > 0.02 ? '#58626e' : '#2a2e33');
     fill.intensity = p.main > 0.02 ? 0.14 + p.main * 0.28 : 0.08;
-    emergencyMat.emissive.set('#ff7a1c');
+    emergencyMat.emissive.set(lightHex(LAB_LIGHTS.emergency));
     emergencyMat.emissiveIntensity = p.emergency * 2.4;
-    emergency.color.set('#ff8a3a');
-    emergency.intensity = p.emergency * 22;
-    gateGlow.intensity = p.coils * 12 + p.arc * 60;
-    gateGlow.color.set(p.arc > 0.01 ? '#ffb040' : '#ff9a4a');
+    emergency.color.set(lightHex(LAB_LIGHTS.emergency));
+    emergency.intensity = p.emergency * LAB_LIGHTS.emergency.reach.power;
+    gateGlow.intensity = p.coils * LAB_LIGHTS.gateGlow.reach.power + p.arc * LAB_LIGHTS.gateArc.reach.power;
+    gateGlow.color.set(lightHex(p.arc > 0.01 ? LAB_LIGHTS.gateArc : LAB_LIGHTS.gateGlow));
     strobe.intensity = 0;
     handleMats.forEach((mat) => { mat.emissiveIntensity = 0; });
     portal.visible = p.coils > 0.6;
@@ -1400,15 +1405,16 @@ export function createLabRoom(o: {
       for (const rig of machineRigs) {
         rig.animate(now, lastPower.main);
       }
-      windowLight.intensity = 3.5 + 12 * vista.flashLight;
+      windowLight.intensity = LAB_LIGHTS.window.reach.power + 12 * vista.flashLight;
       if (lastPower.relays === 0) {
         const s = darkStrobe(now);
         strobe.position.z = strobeSweepZ(now);
-        strobe.intensity = 5 * s;
-        emergencyMat.emissive.set('#ff2a1a');
+        strobe.intensity = LAB_LIGHTS.alarm.reach.power * s;
+        // the alarm turns the emergency beacons red, at the beacons' own power
+        emergencyMat.emissive.set(lightHex(LAB_LIGHTS.alarm));
         emergencyMat.emissiveIntensity = 0.35 + 1.65 * s;
-        emergency.color.set('#ff2a1a');
-        emergency.intensity = 22 * s;
+        emergency.color.set(lightHex(LAB_LIGHTS.alarm));
+        emergency.intensity = LAB_LIGHTS.emergency.reach.power * s;
         handleMats.forEach((mat) => { mat.emissiveIntensity = 1.6 * s; });
       }
       relayOn.forEach((on, i) => { if (on) kit.setLamp(lamps.relays[i]!, 0.7 + 0.3 * Math.sin(now * 4 + i * 1.3)); });

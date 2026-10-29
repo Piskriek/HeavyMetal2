@@ -273,3 +273,5 @@ export function connect(g: Graph, from: End, to: End): Graph {
 }
 // PLAN-43: wiregraph logic presets (WIREGRAPH_SHELF, validateWireGraph, logic: cartridges)
 export * from "./logic-presets";
+// Plan 57 §16.2: typed pins (commands, properties, outputs), as a Sketch graph's ports in Plasma
+export * from "./typed";

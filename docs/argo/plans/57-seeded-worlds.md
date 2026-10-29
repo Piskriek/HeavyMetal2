@@ -493,7 +493,8 @@ The owner: a planet is "a very dense soul and it moves through the densities jus
 - **Appraise (inspect):** hovering any part or element opens a `ui:` panel bound to its real values: mass, charge, its sockets,
   and the signal on each. It is the lens rule again, so nothing is invented for the window.
 - **A clean contraption is an event:** a device whose every port is wired or deliberately free, and which does its job when run.
-  The System says so (§8.1). Its wording is Argon's; a "crafted" notice beside the title is the proposal.
+  The System says so (§8.1), in Argon's wording (29 Oct): "Contraption forged: {name} ({ports} ports balanced).", and for a
+  native's: "Work of {author}: {name} online."
 
 ### 16.4 The beings who live here (the owner: "lets make it nice")
 
@@ -502,7 +503,9 @@ What is already decided, and holds here:
 - The choice is the preset's. The ground is the same for all, and nothing forces a copy (Plan 56 §8).
 - Pain, ache and sickness are signals for rebalancing, not punishment; dreams do the rebalancing (Plan 56).
 
-Proposals for Argon and the owner:
+Argon's yes to all of these (29 Oct), with one invariant added: **a native's work carries its name.** When a native builds or
+changes a contraption, the kit or wiregraph preset records the native's id as its author, and appraising it shows the maker beside
+its real values.
 - **One reality, the same for everyone.** Natives and the drone live by the same elements and see through the same appraisal lens
   as the player, filtered by their own senses. There are no hidden rules that apply only to them.
 - **Their senses read the shell.** A native feels charge and light (Lx) and water (Aq) as part of its world. Telepathy is

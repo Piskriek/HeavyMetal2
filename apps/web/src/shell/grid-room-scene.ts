@@ -92,6 +92,8 @@ export interface GridRoomScene {
   setWarm(rungs: ReadonlySet<Rung>): void;
   /** The gate's panel lights when play is ready. */
   setGateOpen(open: boolean): void;
+  /** Plan 57 §16.5: a linked game's window on the bridge screen's glass, or null for the dark glass again. */
+  setScreen(video: HTMLVideoElement | null): void;
   /** A small parallax from the pointer (-1..1 each way). */
   lean(x: number, y: number): void;
   resize(width: number, height: number, pixelRatio: number): void;
@@ -205,7 +207,9 @@ export function createGridRoomScene(opts: { readonly canvas: HTMLCanvasElement; 
     box(screen, [0.12, 1.05, 0.12], [sx, 0.06, 0], FRAME, 'fixture');
   }
   box(screen, [2.0, 1.2, 0.12], [0, 1.11, 0], FRAME, 'fixture');
-  box(screen, [1.84, 1.04, 0.02], [0, 1.19, 0.07], GLASS, 'fixture');
+  const glass = box(screen, [1.84, 1.04, 0.02], [0, 1.19, 0.07], GLASS, 'fixture');
+  const darkGlass = glass.material;
+  let live: { readonly texture: THREE.VideoTexture; readonly material: THREE.MeshBasicMaterial } | null = null;
 
   // a plinth per rung, rising rung by rung along the floor: an outline until its rung is warm, then solid
   RUNGS.forEach((rung, i) => {
@@ -223,8 +227,10 @@ export function createGridRoomScene(opts: { readonly canvas: HTMLCanvasElement; 
         s.mesh.visible = lit;
         if (s.edges) s.edges.visible = !lit;
       } else {
-        s.mesh.visible = flat;
-        if (s.edges) s.edges.visible = !flat;
+        // a linked game shows at every stage, wireframe included
+        const shown = flat || (live !== null && s.mesh === glass);
+        s.mesh.visible = shown;
+        if (s.edges) s.edges.visible = !shown;
       }
     }
     shared.uStage.value = STAGE_CODE[stage];
@@ -237,6 +243,18 @@ export function createGridRoomScene(opts: { readonly canvas: HTMLCanvasElement; 
   return {
     setStage(s) { stage = s; apply(); },
     setWarm(r) { warm = r; apply(); },
+    setScreen(video) {
+      if (live) { live.texture.dispose(); live.material.dispose(); live = null; }
+      if (video) {
+        const texture = new THREE.VideoTexture(video);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        live = { texture, material: new THREE.MeshBasicMaterial({ map: texture, toneMapped: false }) };
+        glass.material = live.material;
+      } else {
+        glass.material = darkGlass;
+      }
+      apply();
+    },
     setGateOpen(open) { (panel.material as THREE.ShaderMaterial).uniforms.uBase!.value = new THREE.Vector3(...hexToRgb(open ? PANEL_OPEN : PANEL_SHUT)); },
     lean(x, y) {
       camera.position.set(eye.x + x * 0.3, eye.y - y * 0.15, eye.z);
@@ -256,6 +274,7 @@ export function createGridRoomScene(opts: { readonly canvas: HTMLCanvasElement; 
         if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) o.geometry.dispose();
       });
       for (const m of materials) m.dispose();
+      if (live) { live.texture.dispose(); live.material.dispose(); }
       edgeMaterial.dispose();
       gridMaterial.dispose();
       renderer.dispose();

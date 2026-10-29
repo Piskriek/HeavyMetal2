@@ -2,7 +2,7 @@
 // of main thread a second, idle). The room warms the game's presets rung by rung behind a visible bar, climbing the stage
 // ladder as it goes (wireframe, 1-bit, EGA, VGA, Gouraud), and draws only when something changes, under a frame cap,
 // never while the tab is hidden. Each job is a real cached pass play reuses, so play's own loading finds them done.
-import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { deviceFor, type Stage } from '@hm/fidelity';
 import { VAULT_BY_ID } from '@hm/vault';
 import { pixelRatioFor, resolveGraphics } from '@hm/render';
@@ -15,6 +15,8 @@ import { gameAudio } from '../audio/game-audio';
 import { PLAY_NEIGHBOURS, PLAY_PLOT } from '../play/play-worlds';
 import { createGridRoomScene, type GridRoomScene } from './grid-room-scene';
 import { frameDue, roomFrameCap, roomStageAt, rungsWarm, warmShare, type RoomStage, type WarmJob } from './grid-room-warm';
+import { BRIDGE_COMMAND, CAPTURE, EYES_EVERY_MS, SCREEN_FPS, bridgeUp, bridgeWords, frameOf, sendFrame, type BridgeState } from './game-bridge';
+import { companionBridgeUrl } from '../play/bridge-url';
 
 type Job = WarmJob & { readonly run: () => void | Promise<unknown> };
 
@@ -26,6 +28,66 @@ export function GridRoom(props: { readonly profile: Profile }): ReactElement {
   const [share, setShare] = useState(0);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
+  // Plan 57 §16.5: the game bridge. A linked window shows on the room's bridge screen, and the drone's eyes send its frames
+  const sceneRef = useRef<GridRoomScene | null>(null);
+  const invalidateRef = useRef<() => void>(() => {});
+  const [bridge, setBridge] = useState<BridgeState>('checking');
+  const [frames, setFrames] = useState(0);
+  const [windowName, setWindowName] = useState<string | undefined>(undefined);
+  const linkRef = useRef<{ readonly stream: MediaStream; readonly video: HTMLVideoElement; readonly timers: number[] } | null>(null);
+  const bridgeBase = useMemo(() => (typeof window === 'undefined' ? null : companionBridgeUrl(window.location)), []);
+  const unlink = useCallback((): void => {
+    const l = linkRef.current;
+    linkRef.current = null;
+    if (!l) return;
+    for (const t of l.timers) window.clearInterval(t);
+    for (const track of l.stream.getTracks()) track.stop();
+    l.video.srcObject = null;
+    sceneRef.current?.setScreen(null);
+    invalidateRef.current();
+    setWindowName(undefined);
+    setBridge('checking');
+  }, []);
+  /** Shows a shared stream on the screen, draws the room at the screen's pace, and sends the eyes' frames while the bridge answers. */
+  const linkStream = useCallback((stream: MediaStream): void => {
+    unlink();
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.srcObject = stream;
+    void video.play().catch(() => {});
+    const canvas = document.createElement('canvas');
+    const tick = window.setInterval(() => invalidateRef.current(), Math.round(1000 / SCREEN_FPS));
+    const eyes = window.setInterval(() => {
+      if (!bridgeBase) return;
+      void frameOf(video, canvas).then((b) => (b ? sendFrame(bridgeBase, b) : false)).then((ok) => { if (ok) setFrames((n) => n + 1); });
+    }, EYES_EVERY_MS);
+    linkRef.current = { stream, video, timers: [tick, eyes] };
+    for (const track of stream.getVideoTracks()) track.addEventListener('ended', () => { if (linkRef.current?.stream === stream) unlink(); });
+    sceneRef.current?.setScreen(video);
+    setWindowName(stream.getVideoTracks()[0]?.label || undefined);
+    setFrames(0);
+    setBridge('linked');
+    invalidateRef.current();
+  }, [bridgeBase, unlink]);
+  const link = async (): Promise<void> => {
+    if (!navigator.mediaDevices?.getDisplayMedia) { setBridge('unavailable'); return; }
+    try {
+      linkStream(await navigator.mediaDevices.getDisplayMedia({ video: CAPTURE, audio: false, monitorTypeSurfaces: 'exclude' } as DisplayMediaStreamOptions));
+    } catch {
+      /* no window chosen: nothing changes */
+    }
+  };
+  // whether the bridge answers, checked while the control shows and nothing is linked
+  useEffect(() => {
+    if (!ready || bridge === 'linked' || bridge === 'unavailable') return undefined;
+    let gone = false;
+    const check = (): void => { if (bridgeBase) void bridgeUp(bridgeBase).then((up) => { if (!gone && !linkRef.current) setBridge(up ? 'ready' : 'offline'); }); else setBridge('offline'); };
+    check();
+    const t = window.setInterval(check, 5000);
+    return () => { gone = true; window.clearInterval(t); };
+  }, [ready, bridge, bridgeBase]);
+  useEffect(() => () => unlink(), [unlink]);
 
   useEffect(() => {
     // the room is built a frame and a task after the menu first paints (Argon, 28 Oct): the menu shows at once, the room after
@@ -46,6 +108,7 @@ export function GridRoom(props: { readonly profile: Profile }): ReactElement {
         return undefined;
       }
       const sceneMs = performance.now() - sceneAt;
+      sceneRef.current = scene;
       const graphics = resolveGraphics(tier, props.profile.graphics);
       const cap = roomFrameCap(tier);
 
@@ -66,6 +129,7 @@ export function GridRoom(props: { readonly profile: Profile }): ReactElement {
         Object.assign(hook, scene.stats());
       };
       const invalidate = (): void => { if (!raf && !cancelled) raf = requestAnimationFrame(draw); };
+      invalidateRef.current = invalidate;
 
       const size = (): void => {
         const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
@@ -84,6 +148,8 @@ export function GridRoom(props: { readonly profile: Profile }): ReactElement {
       hook.mountMs = performance.now() - mountAt;
       // a test seam: show one stage's look (the e2e and the stage sheet check each era draws), then the real one again with null
       (hook as typeof hook & { showStage?: (st: RoomStage | null) => void }).showStage = (st) => { scene.setStage(st ?? hook.stage); invalidate(); };
+      // a test seam for the game bridge: link a stream as a picked window would (the e2e links a canvas), or unlink
+      Object.assign(hook, { linkStream: (stream: MediaStream | null) => { if (stream) linkStream(stream); else unlink(); } });
 
       // the warm-up, rung by rung: atoms, stacks, parts, assemblies, worlds (Argon's note)
       const look = (id: string, st: Stage) => bakeLookCached(VAULT_BY_ID.get(id)!, st, device, gridSpacing);
@@ -130,6 +196,9 @@ export function GridRoom(props: { readonly profile: Profile }): ReactElement {
 
       return () => {
         cancelled = true;
+        unlink();
+        sceneRef.current = null;
+        invalidateRef.current = () => {};
         delete (window as unknown as { hmRoom?: unknown }).hmRoom;
         if (timer) window.clearTimeout(timer);
         if (raf) cancelAnimationFrame(raf);
@@ -143,9 +212,20 @@ export function GridRoom(props: { readonly profile: Profile }): ReactElement {
     return () => { gone = true; cancelAnimationFrame(first); window.clearTimeout(timer); cleanup?.(); };
   }, [tier, reduced, props.profile.gpu, props.profile.graphics, props.profile.quality]);
 
+  const words = bridgeWords(bridge, { frames, windowName });
   return (
     <div className={`grid-room${ready ? ' ready' : ''}`}>
       {failed ? null : <canvas ref={canvasRef} className="grid-room-canvas" />}
+      {ready && !failed ? (
+        <aside className={`room-bridge room-bridge--${bridge}`} aria-label="Game bridge" data-testid="room-bridge">
+          <p className="room-bridge-title"><i aria-hidden="true" />Game bridge</p>
+          <p className="room-bridge-line" aria-live="polite">{words.line}</p>
+          {bridge === 'offline' ? <code className="room-bridge-cmd">{BRIDGE_COMMAND}</code> : null}
+          {words.action ? (
+            <button type="button" className="room-bridge-act" onClick={() => { if (bridge === 'linked') unlink(); else void link(); }}>{words.action}</button>
+          ) : null}
+        </aside>
+      ) : null}
       {!ready && !failed ? (
         <div className="grid-room-status" role="status" aria-live="polite">
           <span>{label}</span>

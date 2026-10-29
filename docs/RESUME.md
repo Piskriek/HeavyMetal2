@@ -101,6 +101,10 @@
     - `play/system-voice.ts` takes them from the simulation start, the plot's stage, the drone's mastered presets, its eurekas and its new open causes. The window sits under the compass in the drone's violet, its edge taking the notice's kind; the greeting shows once, and the log is kept per save slot;
     - gates: unit 3,841 (timing budgets only, the machine heavily loaded), e2e sim-start 22/22 with the greeting, a skill in turn and the log across a reload, the rest green (ping passed 24/24 alone after a load timeout).
   - **Next:** the Studio's `ui:` editor tab (research: `docs/UI_EDITOR_RESEARCH.md`).
+- **29 Oct, day (paused at the usage limit; resume here):**
+  - Pushed: `26d4ac44` (the owner's games checked on disk), `8aff5f10` (Plasma session: full-size linked-window frames, `scripts/read-odin-save.mjs`, PLASMA_SESSION_NOTES, Plan 57 §16), `fe039bed` (typed pins in `@hm/wiregraph`), `ae22d5b7` (ELEMENTS_RESEARCH, §16.5).
+  - **Uncommitted, ready for the gates:** the holo room's game bridge (Plan 57 §16.5, Argon's yes): `shell/game-bridge.ts` (+ test 2/2), `grid-room.tsx` and `grid-room-scene.ts` (a linked window on the room's screen, 15 fps while linked, the eyes' full-size frames), the room-bridge CSS in `studio.css`, `play/bridge-url.ts` (the address rule moved out of companion-chat), `scripts/test-holo-room-e2e.mjs` (9/9 with a stand-in bridge). Typecheck 0; run the full gates, then commit and push.
+  - **Next with the owner:** Plasma resumes in the holo room: Open Sketch on the house, then Properties on the Motor and Button; subscribe to 6–10 working Workshop devices (read from `D:SteamLibrarysteamappsworkshopcontent`9160`). Also: his screenshot of the story clutter on the simulation HUD, and his answer on ELEMENTS_RESEARCH Q1 (stored heat as runtime state).
 - **Next:**
   1. the labkit's procedural props rebuilt as kits (RULES 8a): the relay cabinet is drafted and validates; the breaker panel and the cable tray follow;
   2. Argon's answer on the `stat` widget, then ore, power and health as `ui:` panels, then a Studio `ui:` tab with live previews;

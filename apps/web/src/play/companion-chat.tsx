@@ -42,6 +42,7 @@ const CADENCE_WINDOW = 1600;
 const LIVE_SAY_GAP_MS = 20000;
 import { UiPanelView } from './ui-panel';
 import { commsPanelProps } from './ui-play-hud';
+import { companionBridgeUrl } from './bridge-url';
 import './companion-chat.css';
 
 /** What the screen can do through the comms (plan 49): the ping's callout and its bridge event. */
@@ -168,16 +169,8 @@ const BRIDGE_GRACE_MS = 15000;
 /** Events still go to a bridge that answered within this long (a stall must not drop a session's bridge-active). */
 const BRIDGE_EVENT_GRACE_MS = 120000;
 
-/**
- * The Neural Bridge's address: localhost:8220, or `?bridge=<port>` (the e2e runs its own bridge beside a live one). Only
- * while the game itself is on localhost, so a link to the hosted game can never send the player's words anywhere.
- */
-export function companionBridgeUrl(location: { readonly hostname: string; readonly search: string }): string | null {
-  if (!['localhost', '127.0.0.1'].includes(location.hostname)) return null;
-  const port = new URLSearchParams(location.search).get('bridge');
-  if (port !== null) return /^\d{2,5}$/.test(port) ? `http://localhost:${port}` : null;
-  return 'http://localhost:8220';
-}
+// the Neural Bridge's address (its own module, so the menu room's game bridge shares the rule)
+export { companionBridgeUrl } from './bridge-url';
 
 // ---- Radio audio: one shared context, a rising mic-open chirp and a falling squelch click ----
 let sharedAudioCtx: AudioContext | null = null;

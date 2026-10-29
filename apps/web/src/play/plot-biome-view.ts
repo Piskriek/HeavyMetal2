@@ -244,8 +244,8 @@ export function createOctahedralFarImpostorGeometry(
   const g = new THREE.BufferGeometry();
   const h = Math.max(2.0, tree.height);
   const r = Math.max(0.8, tree.radius * 0.85);
-  const trunkTop = h * 0.55;
-  const trunkR = Math.max(0.12, r * 0.11);
+  const trunkTop = h * 0.72; // reaches well into the crown, so no canopy card reads as floating
+  const trunkR = Math.max(0.32, r * 0.2); // wide enough to survive the low-res far pass (a 0.12 m fin vanished and left the crown hanging)
   const crownBase = h * 0.22;
   const crownMid = (crownBase + h) * 0.5;
 
@@ -755,7 +755,7 @@ export function createPlotBiomeView(
 
     for (let i = 0; i < n; i++) {
       const item = list[i]!;
-      const worldY = o.heightAt(item.worldX, item.worldZ) - 0.05; // sunk 0.05 m so nothing floats
+      const worldY = o.heightAt(item.worldX, item.worldZ) - 0.12; // sunk a little so no trunk foot floats on a slope
       dummy.position.set(item.worldX, worldY, item.worldZ);
       dummy.rotation.set(0, item.yaw, 0);
 

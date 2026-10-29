@@ -435,6 +435,8 @@ export function createMonsters(options: {
   /** Rung 5 replaces data in the existing renderer/brain, not either engine. */
   readonly genomeRoster?: readonly CreatureGenomeSpec[];
   readonly manualSpawnsOnly?: boolean;
+  /** Seeded living worlds: the Moon's leak sites (rifts, glitch crystals, surge waves) are never laid down. */
+  readonly noLeaks?: boolean;
   readonly passive?: boolean;
   readonly animationRateHz?: number;
 }): MonstersSystem {
@@ -454,7 +456,7 @@ export function createMonsters(options: {
   let dormantActive = false;
   let seed = options.seed ?? 1337;
   let gate: Point = { x: 0, z: 0 };
-  let sites: LeakSite[] = leakSites(seed, gate);
+  let sites: LeakSite[] = options.noLeaks ? [] : leakSites(seed, gate);
   let cap = monsterCap('low');
   let safe: SafeZone[] = [];
   let machines: { id: number; x: number; z: number; hu: number }[] = [];
@@ -838,7 +840,7 @@ export function createMonsters(options: {
         }
       }
       gate = { x: newGate.x, z: newGate.z };
-      sites = leakSites(seed, gate);
+      sites = options.noLeaks ? [] : leakSites(seed, gate);
       dome.position.set(gate.x, groundHeightAt(gate.x, gate.z) + 0.06, gate.z);
       dome.visible = true;
     },

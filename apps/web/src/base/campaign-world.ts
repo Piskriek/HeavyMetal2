@@ -46,7 +46,7 @@ function withLoadout(w: BaseWorld): BaseWorld {
 export const hasWork = (w: BaseWorld): boolean => w.shelter || w.base.pieces.length > 0 || w.boxes.some((b) => b.slots.some((s) => s !== null));
 
 /** The base world a profile starts with: its save, or a fresh world with the starter kit (and the dev kit when asked). */
-export function startCampaignWorld(rawSave: string | null, opts: { readonly seed?: number; readonly devKit?: boolean } = {}): CampaignWorldStart {
+export function startCampaignWorld(rawSave: string | null, opts: { readonly seed?: number; readonly devKit?: boolean; readonly isStory?: boolean } = {}): CampaignWorldStart {
   const seed = opts.seed ?? 1;
   if (rawSave) {
     const loaded = withLoadout(loadWorld(rawSave, seed));
@@ -56,13 +56,24 @@ export function startCampaignWorld(rawSave: string | null, opts: { readonly seed
       biome: loaded.biome.world === 'moon' ? EARTH_BIOME_PRESET : loaded.biome,
       vehicles: loaded.vehicles.length === 0 ? [{ id: 1, kind: 'scout', x: 8, z: -5, yaw: 0.5, box: null }] : loaded.vehicles,
       nextVehicle: Math.max(2, loaded.nextVehicle),
+      player: {
+        ...loaded.player,
+        slots: opts.isStory
+          ? loaded.player.slots
+          : loaded.player.slots.map((s) => (s?.item === STARTER ? null : s)),
+      },
     };
     if (hasWork(upgraded)) return { world: upgraded, played: true };
   }
   const defaultEnv: WorldEnv = { heightAt: () => 0, bridge: { x: 0, z: 0, range: BRIDGE_RANGE } };
   const fresh = withLoadout(createWorld(seed));
   const slots = fresh.player.slots.slice();
-  slots[0] = { item: STARTER, n: 1 };
+  if (opts.isStory) {
+    slots[0] = { item: STARTER, n: 1 };
+  } else {
+    // Living seeded world: no lunar regolith starter slab kit in slot 1
+    slots[0] = null;
+  }
   if (opts.devKit) {
     slots[1] = { item: 'bp:beam:basalt', n: 1 };
     slots[2] = { item: 'bp:column:basalt', n: 1 };

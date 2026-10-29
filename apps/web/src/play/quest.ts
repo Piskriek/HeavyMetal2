@@ -39,7 +39,28 @@ export interface PlayState {
   readonly chain: Chain;
 }
 
-export const FRESH: PlayState = { v: 5, step: 'done', avatar: { kind: 'scientist', name: 'Lead Architect', visor: '#3dc8ff' }, avatarId: 'scientist', gateOn: true, visited: true, plot: { ...newPlot(), stage: 3 }, lab: newLab(), chain: CHAIN_START, start: 'sim' };
+export const FRESH: PlayState = {
+  v: 5,
+  step: 'done',
+  avatar: { kind: 'scientist', name: 'Lead Architect', visor: '#3dc8ff' },
+  avatarId: 'scientist',
+  gateOn: true,
+  visited: true,
+  plot: {
+    ...newPlot(),
+    stage: 3,
+    points: { pxd: 57800, vtx: 64000, lx: 72900, aq: 52020 },
+    machines: [
+      { id: 1, kind: 'power', x: 5, z: -8, yaw: 0.3, on: true, cartridge: null, built: 1 },
+      { id: 2, kind: 'mill', x: -6, z: -10, yaw: -0.4, on: true, cartridge: 'emerald_canopy', built: 1 },
+      { id: 3, kind: 'pylon', x: 0, z: -14, yaw: 0, on: true, cartridge: null, built: 1 },
+    ],
+    nextId: 4,
+  },
+  lab: newLab(),
+  chain: CHAIN_START,
+  start: 'sim',
+};
 export const SAVE_KEY = 'hm.setmix.play';
 
 /** What players call the four metrics. */

@@ -11,6 +11,8 @@ import { CAPACITOR_BANK_KIT } from './kit-capacitor-bank';
 import { GATE_KIT } from './kit-gate';
 import { GATE_DAIS_KIT } from './kit-gate-dais';
 import { STARGATE_KIT } from './kit-stargate';
+import { createSolarSystemView, createLivingPresetSurroundings, type SolarSystemView } from './solar-system-view';
+import type { GalacticStarSystemSeed, OrbitalLatticeSnapshot } from '@hm/harness';
 import { withKitDefaults } from './kit-defaults';
 import { nearestPingHit, pingPulse, pingSizeM, PING_VIOLET, type PingHit } from './ping';
 import { buildKitPreset, type KitBuild } from './kit-build';
@@ -519,6 +521,8 @@ export interface PlayScene {
   getNearVehicle(reach?: number): { readonly id: number; readonly kind: RoverKind } | null;
   /** Returns the active in-game AI companion entity, if loaded. */
   getCompanion(): CompanionEntity | null;
+  /** The seeded solar system and its live orbital lattice (planets, moons, gate ring, transfer windows); null off a living world. */
+  solarSystem(): { readonly system: GalacticStarSystemSeed; readonly snapshot: OrbitalLatticeSnapshot } | null;
   /** POL-96: marks the sidearm on the armory rail taken or standing. */
   setSidearmTaken(taken: boolean): void;
   /** POL-97: salvages the targeted wreck truck, returning its stock. */
@@ -665,6 +669,8 @@ export function createPlayScene(o: {
   readonly beamField?: string | null;
   readonly vegetation?: 'auto' | 'off' | 'low' | 'high';
   readonly hasSidearm?: boolean;
+  /** A seeded living world (no ?story): no Moon leaks, no junk wrecks, and the seeded solar system fills the sky. */
+  readonly livingWorld?: boolean;
   /**
    * JOB-09: where a step through the plot's horizon takes the traveller (`earth-endgame.ts`'s transit rule, evaluated by
    * the caller that owns the stage, the cardinals and the biome). Null: nowhere, and the doorway keeps its lab/planet
@@ -906,6 +912,7 @@ export function createPlayScene(o: {
     seed: worldSeed,
     genomeRoster: o.gamePreset ? gameCreatureIds(o.gamePreset).map((id) => creatureGenomeById(id)!) : undefined,
     manualSpawnsOnly: !!o.gamePreset,
+    noLeaks: !!o.livingWorld && !o.gamePreset,
     passive: o.gamePreset?.hudBlade === 'ecosystem-observer',
     animationRateHz: o.gamePreset?.activeRules.stageAnimRateHz,
   });
@@ -913,7 +920,7 @@ export function createPlayScene(o: {
   const monsterFwd = new THREE.Vector3();
   monsters.setPlot(worldSeed, { x: twin.group.position.x, z: twin.group.position.z });
   // the wreck sites: the same seed and gate as the leaks (TASK-23c)
-  const wrecks: WreckSystem = createWrecks({ scene: planetScene, groundHeightAt: (x, z) => groundAt(x, z), seed: worldSeed, gate: { x: twin.group.position.x, z: twin.group.position.z }, stage: 3 });
+  const wrecks: WreckSystem = createWrecks({ scene: planetScene, groundHeightAt: (x, z) => groundAt(x, z), seed: worldSeed, gate: { x: twin.group.position.x, z: twin.group.position.z }, stage: 3, enabled: !(o.livingWorld && !o.gamePreset) });
 
   // ---- Vehicles (@hm/rover & @hm/rovergear) and Station Fabricators
   const vehiclesGroup = new THREE.Group();
@@ -2099,6 +2106,9 @@ export function createPlayScene(o: {
 
   // ---- plot biome scatter view (TICKET-02 item F)
   let biomeView: PlotBiomeView | null = null;
+  /** The seeded solar system in the sky and the living presets round the gate (a living world only; see solar-system-view.ts). */
+  let solarView: SolarSystemView | null = null;
+  let livingSurround: { readonly group: THREE.Group; step(dt: number): void; dispose(): void } | null = null;
   /** The beam's regrown trees (plan 39, Aq), held here so a biome built later still grows them. */
   let treeOverrides: Readonly<Record<string, TreeVariantSpec>> = {};
   let vegSetting: 'auto' | 'off' | 'low' | 'high' = o.vegetation ?? 'auto';
@@ -2298,8 +2308,32 @@ export function createPlayScene(o: {
     const coverageStage = s >= 3 ? 6 : s;
     const coverageFloats = s >= 3 ? { pxd: 0.85, vtx: 0.80, lx: 0.90, aq: 0.85 } : input.s;
     const bake = bakePlotBiome({ ...input, stage: coverageStage, s: coverageFloats });
+    let coverPixels: Uint8Array | Uint8ClampedArray = bake.cover;
+    if (o.livingWorld && !o.gamePreset && s >= 3) {
+      // The mask is clamped to its edge, so whatever its rim holds is painted over the whole horizon. The bake fades its
+      // cover to bare dust at the rim (the Moon's plot edge); on a living world the rim carries on as moss and grass, so the
+      // ground never turns back to brown mud past the plot.
+      const n = input.n;
+      const out = new Uint8Array(coverPixels.length);
+      out.set(coverPixels);
+      for (let iz = 0; iz < n; iz++) {
+        for (let ix = 0; ix < n; ix++) {
+          const d = Math.max(Math.abs((ix + 0.5) / n - 0.5), Math.abs((iz + 0.5) / n - 0.5)) * 2;
+          const t0 = Math.min(1, Math.max(0, (d - 0.5) / 0.4));
+          const t = t0 * t0 * (3 - 2 * t0);
+          if (t <= 0) continue;
+          const k = (iz * n + ix) * 4;
+          const mossy = (ix * 7 + iz * 13) % 5 === 0 ? 150 : 70; // a few moss patches so the far field is not one flat green
+          out[k] = Math.round(out[k]! * (1 - t));
+          out[k + 1] = Math.round(out[k + 1]! * (1 - t) + mossy * t);
+          out[k + 2] = Math.round(out[k + 2]! * (1 - t) + 255 * t);
+          out[k + 3] = Math.round(out[k + 3]! * (1 - t));
+        }
+      }
+      coverPixels = out;
+    }
     const tex = new THREE.DataTexture(
-      bake.cover,
+      coverPixels,
       input.n,
       input.n,
       THREE.RGBAFormat,
@@ -3387,6 +3421,10 @@ export function createPlayScene(o: {
       biomeView.build(bInput);
       biomeView.setStage(shown);
       if (Object.keys(treeOverrides).length > 0) biomeView.setTreeOverrides(treeOverrides);
+      if (o.livingWorld && !o.gamePreset && !solarView) {
+        solarView = createSolarSystemView(planetScene, `fidelity-${worldSeed}`, SUN);
+        livingSurround = createLivingPresetSurroundings(planetScene, (x, z) => g.heightAt(x, z));
+      }
       if (!stageCoverTextures[0]) {
         applyCoverage(shown);
         buildAndAttachWaterSurfaces(shown);
@@ -4430,6 +4468,8 @@ export function createPlayScene(o: {
         horizonDomes.update(now, currentFloats, (x, z) => groundAt(x, z));
         camera.getWorldDirection(monsterFwd);
         monsters.update(dt, { x: pos.x, z: pos.z, yaw: Math.atan2(monsterFwd.x, monsterFwd.z), alive: playerAlive }, camera);
+        solarView?.step(dt, camera.position);
+        livingSurround?.step(dt);
         stepTurrets(dt, pos); // TICKET-13 Window C: the perimeter turrets (their section is after activeBase)
         // T07b Item 5: continuous beam damage to monsters in extract mode
         if (rifleFiringNow && heldMode === 'extract' && !beamSealingNow) {
@@ -5110,6 +5150,8 @@ export function createPlayScene(o: {
       sporeModels.length = 0;
       scientistAnimator?.dispose();
       companionEntity?.dispose();
+      solarView?.dispose();
+      livingSurround?.dispose();
       avatarRig.dispose();
       labScene.remove(scientistHolder);
       planetScene.remove(scientistHolder);
@@ -5355,6 +5397,7 @@ export function createPlayScene(o: {
     getDrivingVehicle,
     getNearVehicle,
     getCompanion: () => companionEntity,
+    solarSystem: () => (solarView ? { system: solarView.system(), snapshot: solarView.snapshot() } : null),
   };
   (api as any).planetScene = planetScene;
   (api as any).labScene = labScene;

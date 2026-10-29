@@ -100,8 +100,11 @@ export function createWrecks(o: {
   readonly seed: number;
   readonly gate: { readonly x: number; readonly z: number };
   readonly stage: number;
+  /** When false (e.g. on living seeded worlds), no crashed trucks or legacy junk models are spawned. */
+  readonly enabled?: boolean;
 }): WreckSystem {
-  const sites: WreckSite[] = wreckSites(o.seed, o.gate);
+  const isEnabled = o.enabled !== false;
+  const sites: WreckSite[] = isEnabled ? wreckSites(o.seed, o.gate) : [];
   const built: Built[] = [];
   const sealed = new Set<number>();
   let stage = Math.max(0, Math.min(6, Math.floor(o.stage)));

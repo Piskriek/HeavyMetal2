@@ -32,6 +32,8 @@ export interface MonsterHudProps {
   readonly seal: { readonly pct: number; readonly inReach: boolean } | null;
   /** Plan 51 wave 3: the reflex shield is up (a bridged game's threat edge raised it); hits soak most of their damage. */
   readonly shielded?: boolean;
+  /** Suppresses the Moon Leaks radar plate (used on living seeded worlds). */
+  readonly hideRadar?: boolean;
 }
 
 /** The radar's edge, in metres: a leak beyond it sits on the rim. */
@@ -70,39 +72,41 @@ export function MonsterHud(props: MonsterHudProps) {
         <div key={hitAt} className="mhud-hit" style={{ transform: `rotate(${hitBearing}rad)` }} aria-hidden="true" />
       ) : null}
 
-      <aside className="mhud-plate mhud-radar" data-hud-zone="top-right" aria-label="Leaks">
-        <svg className="mhud-scope" viewBox="0 0 100 100" role="img" aria-label={summary}>
-          <circle className="ring" cx="50" cy="50" r="48" />
-          <circle className="ring" cx="50" cy="50" r="24" />
-          <line className="fwd" x1="50" y1="50" x2="50" y2="6" />
-          {radar.map((leak) => {
-            const p = blipAt(leak.bearing, leak.distance);
-            const cls = leak.state === 'warned' ? 'warned' : leak.dormant ? 'dormant' : 'open';
-            return (
-              <g key={leak.id}>
-                {leak.state === 'warned' ? <circle className="surge" cx={p.x} cy={p.y} r="4" /> : null}
-                <polygon className={`blip ${cls}`} points={`${p.x},${p.y - 4} ${p.x + 4},${p.y} ${p.x},${p.y + 4} ${p.x - 4},${p.y}`} />
-              </g>
-            );
-          })}
-          <circle className="you" cx="50" cy="50" r="2.4" />
-        </svg>
-        <div className="mhud-leaks">
-          <p className="mhud-title">Leaks</p>
-          {nearest.length === 0 ? (
-            <p className="mhud-none">None in reach yet.</p>
-          ) : (
-            <ul className="mhud-list">
-              {nearest.map((leak) => (
-                <li key={leak.id} className={leak.state}>
-                  <b>{Math.round(leak.distance)} m</b>
-                  <span>{stateWord(leak)}{leak.seal > 0 ? `, ${Math.round(leak.seal * 100)}% sealed` : ''}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </aside>
+      {!props.hideRadar && (
+        <aside className="mhud-plate mhud-radar" data-hud-zone="top-right" aria-label="Leaks">
+          <svg className="mhud-scope" viewBox="0 0 100 100" role="img" aria-label={summary}>
+            <circle className="ring" cx="50" cy="50" r="48" />
+            <circle className="ring" cx="50" cy="50" r="24" />
+            <line className="fwd" x1="50" y1="50" x2="50" y2="6" />
+            {radar.map((leak) => {
+              const p = blipAt(leak.bearing, leak.distance);
+              const cls = leak.state === 'warned' ? 'warned' : leak.dormant ? 'dormant' : 'open';
+              return (
+                <g key={leak.id}>
+                  {leak.state === 'warned' ? <circle className="surge" cx={p.x} cy={p.y} r="4" /> : null}
+                  <polygon className={`blip ${cls}`} points={`${p.x},${p.y - 4} ${p.x + 4},${p.y} ${p.x},${p.y + 4} ${p.x - 4},${p.y}`} />
+                </g>
+              );
+            })}
+            <circle className="you" cx="50" cy="50" r="2.4" />
+          </svg>
+          <div className="mhud-leaks">
+            <p className="mhud-title">Leaks</p>
+            {nearest.length === 0 ? (
+              <p className="mhud-none">None in reach yet.</p>
+            ) : (
+              <ul className="mhud-list">
+                {nearest.map((leak) => (
+                  <li key={leak.id} className={leak.state}>
+                    <b>{Math.round(leak.distance)} m</b>
+                    <span>{stateWord(leak)}{leak.seal > 0 ? `, ${Math.round(leak.seal * 100)}% sealed` : ''}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </aside>
+      )}
 
       {/* Plan 57 §15: the health plate is a ui: panel on the stat widget, drawn from its preset in the plate's own classes */}
       <UiPanelView {...healthPanelProps({ hp, maxHp, low, shielded: props.shielded === true })} />

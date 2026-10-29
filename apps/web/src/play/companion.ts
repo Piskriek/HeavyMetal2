@@ -78,7 +78,8 @@ export interface CompanionEntity {
 
 const COMPANION_NAME = 'Overwatch';
 const COMPANION_ROLE = 'Co-Builder';
-const VIOLET_AURA = '#b84dff';
+const DRONE_AURA = '#d96b43';
+const DRONE_GLOW = '#ff8a4c';
 
 /** Creates a 3D billboard canvas sprite showing the companion's nameplate and live speech bubble. */
 function createNameplateSprite(): {
@@ -102,18 +103,18 @@ function createNameplateSprite(): {
   const draw = (speech: string | null): void => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // If companion is speaking, draw floating speech bubble
+    // If companion is speaking, draw floating speech bubble in Braun-Atelier palette
     if (speech) {
-      ctx.fillStyle = 'rgba(15, 10, 25, 0.88)';
-      ctx.strokeStyle = VIOLET_AURA;
-      ctx.lineWidth = 3;
+      ctx.fillStyle = 'rgba(20, 22, 20, 0.94)';
+      ctx.strokeStyle = DRONE_AURA;
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
       ctx.roundRect(16, 16, 480, 130, 16);
       ctx.fill();
       ctx.stroke();
 
       // Text styling
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = '#f2efe9';
       ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -139,29 +140,29 @@ function createNameplateSprite(): {
       });
     }
 
-    // Nameplate Badge (drawn at bottom)
+    // Nameplate Badge (drawn at bottom) - Braun Atelier matte-slate housing
     const badgeY = speech ? 180 : 120;
-    ctx.fillStyle = 'rgba(10, 14, 28, 0.85)';
-    ctx.strokeStyle = 'rgba(184, 77, 255, 0.5)';
+    ctx.fillStyle = 'rgba(27, 29, 25, 0.92)';
+    ctx.strokeStyle = 'rgba(217, 107, 67, 0.65)';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.roundRect(86, badgeY, 340, 46, 23);
     ctx.fill();
     ctx.stroke();
 
-    // Glowing Violet Indicator Orb
-    ctx.fillStyle = VIOLET_AURA;
+    // Glowing Warm Amber/Terracotta Indicator Orb
+    ctx.fillStyle = DRONE_AURA;
     ctx.beginPath();
     ctx.arc(114, badgeY + 23, 7, 0, Math.PI * 2);
     ctx.fill();
 
-    // Name + Role Text
-    ctx.fillStyle = '#ffffff';
+    // Name + Role Text in bone ink
+    ctx.fillStyle = '#f2efe9';
     ctx.font = 'bold 18px system-ui, sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText(COMPANION_NAME, 132, badgeY + 28);
 
-    ctx.fillStyle = VIOLET_AURA;
+    ctx.fillStyle = DRONE_AURA;
     ctx.font = '14px system-ui, sans-serif';
     ctx.fillText(`· ${COMPANION_ROLE}`, 132 + ctx.measureText(COMPANION_NAME).width + 6, badgeY + 28);
 
@@ -190,13 +191,13 @@ export const DRONE_FOLLOW_AHEAD_M = 2.1;
 const MAX_SPEED = 7.0;
 const ACCEL = 4.0;
 
-/** The drone's own look: steel and gunmetal, dark rotors, the Ray-7 violet lens and nav lamps lit. */
+/** The drone's own look: steel and gunmetal, dark rotors, terracotta accent lens and nav lamps lit. */
 function droneMaterials(): Record<string, THREE.MeshStandardMaterial> {
   return {
     gunmetal: new THREE.MeshStandardMaterial({ color: '#4b525b', metalness: 0.7, roughness: 0.38 }),
     darkSteel: new THREE.MeshStandardMaterial({ color: '#2b3038', metalness: 0.6, roughness: 0.5 }),
     rotor: new THREE.MeshStandardMaterial({ color: '#1b1e23', metalness: 0.3, roughness: 0.6 }),
-    violet: new THREE.MeshStandardMaterial({ color: '#2a0f3d', emissive: VIOLET_AURA, emissiveIntensity: 2.0, roughness: 0.3 }),
+    violet: new THREE.MeshStandardMaterial({ color: '#381e14', emissive: DRONE_AURA, emissiveIntensity: 2.0, roughness: 0.3 }),
   };
 }
 
@@ -271,8 +272,8 @@ export async function createCompanionEntity(
     airBody.add(p);
     rotors.push(p);
   }
-  // a pixel plume under each nozzle: three stacked squares that flicker, shown only while the thrusters fire
-  const plumeMat = keep(new THREE.MeshBasicMaterial({ color: '#c99bff', transparent: true, opacity: 0.85, depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending }));
+  // a pixel plume under each nozzle: warm amber / terracotta plume (Braun Atelier palette)
+  const plumeMat = keep(new THREE.MeshBasicMaterial({ color: DRONE_GLOW, transparent: true, opacity: 0.85, depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending }));
   const plumeGeo = keep(new THREE.BoxGeometry(1, 1, 1));
   const plumes: THREE.Mesh[] = [];
   for (const n of DRONE_NOZZLES) {
@@ -294,12 +295,12 @@ export async function createCompanionEntity(
   setEnvironment('air');
   const muzzleLocal = new THREE.Vector3(DRONE_MUZZLE[0], DRONE_MUZZLE[1], DRONE_MUZZLE[2]);
 
-  // 2. Shots: a muzzle flash on the barrel and a tracer in the world, both brief
-  const flashMat = keep(new THREE.MeshBasicMaterial({ color: '#f0d4ff', transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+  // 2. Shots: a muzzle flash on the barrel and a tracer in the world, both brief (warm terracotta)
+  const flashMat = keep(new THREE.MeshBasicMaterial({ color: '#ffb37a', transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
   const flash = new THREE.Mesh(keep(new THREE.BoxGeometry(0.06, 0.06, 0.06)), flashMat);
   flash.position.copy(muzzleLocal);
   body.add(flash);
-  const tracerMat = keep(new THREE.MeshBasicMaterial({ color: VIOLET_AURA, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+  const tracerMat = keep(new THREE.MeshBasicMaterial({ color: DRONE_AURA, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
   const tracer = new THREE.Mesh(keep(new THREE.BoxGeometry(1, 1, 1).translate(0, 0, 0.5)), tracerMat);
   tracer.name = 'companion-tracer';
   tracer.visible = false;

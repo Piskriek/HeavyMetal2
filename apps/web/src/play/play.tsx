@@ -97,6 +97,7 @@ import { encodePlot, decodePlot, plotOfSnapshot } from './plot-code';
 import type { Snapshot } from '@hm/plotcodec';
 import { SEAL_REACH, type MonsterMobStatus, type MonsterStats } from './monsters';
 import { MonsterHud, type RadarLeak } from '../monsters/hud';
+import { SolarLatticePanel } from './solar-lattice-panel';
 import { BridgeHud } from './bridge-hud';
 import type { Archetype } from '../monsters/roster';
 import type { MonstersSetting } from '../monsters/policy';
@@ -298,16 +299,25 @@ function chainPairs(events: readonly BaseEvent[]): [string, number][] {
   return out;
 }
 
+/** `?story` in the URL: the parked Moon story (lab, leaks, wrecks, rifle quests). Absent: the seeded living-world simulation. */
+const isStory = typeof location !== 'undefined' && new URLSearchParams(location.search).has('story');
+
 function loadSaved(): PlayState {
   try {
-    const isStory = typeof location !== 'undefined' && new URLSearchParams(location.search).has('story');
     let s = loadState(JSON.parse(kv.get(SAVE_KEY) ?? 'null'));
     if (!isStory) {
-      const isStale = !s.start || s.start !== 'sim' || s.plot.stage < 3 || chainView(s.chain).current?.id === 'A4-01' || s.step !== 'done';
+      const needsPoints = (s.plot.points?.pxd ?? 0) === 0 || (s.plot.points?.vtx ?? 0) === 0;
+      const isStale = !s.start || s.start !== 'sim' || s.plot.stage < 3 || chainView(s.chain).current?.id === 'A4-01' || s.step !== 'done' || needsPoints;
       if (isStale) {
         const plot = {
           ...s.plot,
           stage: Math.max(3, s.plot.stage),
+          points: {
+            pxd: Math.max(s.plot.points?.pxd ?? 0, 57800),
+            vtx: Math.max(s.plot.points?.vtx ?? 0, 64000),
+            lx: Math.max(s.plot.points?.lx ?? 0, 72900),
+            aq: Math.max(s.plot.points?.aq ?? 0, 52020),
+          },
           machines: s.plot.machines.length > 0 ? s.plot.machines : [
             { id: 1, kind: 'power' as const, x: 5, z: -8, yaw: 0.3, on: true, cartridge: null, built: 1 },
             { id: 2, kind: 'mill' as const, x: -6, z: -10, yaw: -0.4, on: true, cartridge: 'emerald_canopy', built: 1 },
@@ -337,7 +347,7 @@ function loadSaved(): PlayState {
             },
           }),
         };
-        try { kv.set(SAVE_KEY, JSON.stringify(s)); } catch {}
+        try { kv.set(SAVE_KEY, JSON.stringify(s)); } catch { }
       }
     }
     return s;
@@ -841,6 +851,17 @@ export function PlayScreen(props: {
   };
 
   useEffect(() => {
+    if (!isStory && (plotRef.current.points.pxd === 0 || plotRef.current.points.vtx === 0)) {
+      plotRef.current = {
+        ...plotRef.current,
+        points: {
+          pxd: Math.max(plotRef.current.points.pxd, 57800),
+          vtx: Math.max(plotRef.current.points.vtx, 64000),
+          lx: Math.max(plotRef.current.points.lx, 72900),
+          aq: Math.max(plotRef.current.points.aq, 52020),
+        },
+      };
+    }
     if (plotRef.current.machines.length === 0) {
       plotRef.current = {
         ...plotRef.current,
@@ -925,7 +946,7 @@ export function PlayScreen(props: {
     window.setTimeout(() => setSkinGlitch(false), FIDELITY_SHIFT_MS);
   }, [skinTrack]);
   // the build readout drops its wheel and rotation hints while a radio line is on screen (TASK-25: the two bands never meet)
-useEffect(() => {
+  useEffect(() => {
     const shown = !!subtitle && dialogueSettings.subtitlesEnabled && !(menu || building !== null || placingLayoutId !== null || pieceSessionRef.current);
     if (shown) document.body.dataset.subtitleUp = '1';
     else delete document.body.dataset.subtitleUp;
@@ -955,9 +976,15 @@ useEffect(() => {
     } catch (e) {
       console.warn('[base save load error]', e);
     }
-    const start = startCampaignWorld(rawSave, { seed: 1, devKit: isDevSeed });
+    const start = startCampaignWorld(rawSave, { seed: 1, devKit: isDevSeed, isStory });
     hasSaveOnBootRef.current = start.played;
-    return start.world;
+    const world = start.world;
+    if (!isStory && world.player.slots[0]?.item === 'bp:starter') {
+      const slots = world.player.slots.slice();
+      slots[0] = null;
+      return { ...world, player: { ...world.player, slots } };
+    }
+    return world;
   };
   const [initialBase] = useState<BaseWorld>(initBaseWorld);
   const baseWorldRef = useRef<BaseWorld>(initialBase);
@@ -1125,7 +1152,7 @@ useEffect(() => {
     bp: { id: string; name: string };
     kind: Kind;
   } | null>(null);
-  const dispatchBaseRef = useRef<(cmd: BaseCommand) => Applied | void>(() => {});
+  const dispatchBaseRef = useRef<(cmd: BaseCommand) => Applied | void>(() => { });
   const tryPlaceBaseRef = useRef<() => boolean>(() => false);
   const [machinePickerHardpoint, setMachinePickerHardpoint] = useState<number | null>(null);
   const [refineryMachineId, setRefineryMachineId] = useState<number | null>(null);
@@ -1303,8 +1330,8 @@ useEffect(() => {
         : kind === 'species' ? 'Fire Apply at a tree on the plot: a tap regrows it, a hold or Shift every tree of its kind nearby.'
           : kind === 'light' ? 'Fire Apply at a machine lamp: a tap sets it, a hold or Shift every lamp on the machine.'
             : kind === 'material' ? 'Fire Apply at a machine part: a tap dresses it, a hold or Shift every part that wears the same.'
-            : kind === 'harness' ? 'Enter a vehicle (E) with this loaded to bind its vessel soul; the Zone 8 blade shows it living.'
-              : 'Hold the left button in Apply to paint the ground, or fire it at a machine part to paint the part.');
+              : kind === 'harness' ? 'Enter a vehicle (E) with this loaded to bind its vessel soul; the Zone 8 blade shows it living.'
+                : 'Hold the left button in Apply to paint the ground, or fire it at a machine part to paint the part.');
   };
   const cycleBeamCartridge = (step: 1 | -1 = 1): void => {
     const list = allWrittenOnRack(labRef.current).filter((c) => rifleLook(c) !== null);
@@ -1745,6 +1772,8 @@ useEffect(() => {
   const shieldTimerRef = useRef(0);
   const [vitals, setVitals] = useState<{ readonly hp: number; readonly hitAt: number; readonly bearing: number }>({ hp: PLAYER_MAX_HP, hitAt: -1e9, bearing: 0 });
   const [radar, setRadar] = useState<readonly RadarLeak[]>([]);
+  /** [M]: the Solar Lattice overview of the seeded system (living worlds only). */
+  const [latticeOpen, setLatticeOpen] = useState(false);
   const [sealView, setSealView] = useState<{ readonly pct: number; readonly inReach: boolean } | null>(null);
 
   const fireWeapon = useCallback(() => {
@@ -1807,8 +1836,8 @@ useEffect(() => {
   // ---- the props in the world (TASK-23c): the saved clutter and logs (per profile), the databank, and the hold E that clears a prop
   const propsRef = useRef<PropsSave>(parsePropsSave(props.gamePreset ? null : kv.get(PROPS_SAVE_KEY)));
   const clearHoldRef = useRef(0);
-  const clearPropRef = useRef<(id: string) => void>(() => {});
-  const takeSidearmRef = useRef<() => void>(() => {});
+  const clearPropRef = useRef<(id: string) => void>(() => { });
+  const takeSidearmRef = useRef<() => void>(() => { });
   const [databank, setDatabank] = useState<string | null>(null);
   const savePropsSave = useCallback((next: PropsSave): void => {
     propsRef.current = next;
@@ -2167,7 +2196,7 @@ useEffect(() => {
       };
       busy = true;
       void fetch(`${base}/telemetry/${gameId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-        .catch(() => {}).finally(() => { busy = false; });
+        .catch(() => { }).finally(() => { busy = false; });
     }, 33);
     return () => window.clearInterval(timer);
   }, [props.gamePreset]);
@@ -2310,7 +2339,7 @@ useEffect(() => {
         scene.companionOrders({ mode: patch.mode });
         lines.push(patch.mode === 'hold-fire' ? 'Holding fire. I will still call out contacts.'
           : patch.mode === 'weapons-free' ? 'Weapons free: engaging anything within 25 m of us.'
-          : 'Defending you: I take whatever comes within 15 m or winds up at you.');
+            : 'Defending you: I take whatever comes within 15 m or winds up at you.');
       }
       if (patch.cover) {
         scene.companionOrders({ cover: patch.cover });
@@ -2563,7 +2592,7 @@ useEffect(() => {
     const v = pipVideoRef.current;
     if (!v) return;
     v.srcObject = pipOn ? linkedStreamRef.current : null;
-    if (pipOn) void v.play().catch(() => {});
+    if (pipOn) void v.play().catch(() => { });
   }, [pipOn]);
   /** A 640x360 JPEG of any picture, letterboxed. */
   const jpegCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -2594,7 +2623,7 @@ useEffect(() => {
     video.muted = true;
     video.playsInline = true;
     video.srcObject = stream;
-    void video.play().catch(() => {});
+    void video.play().catch(() => { });
     linkedStreamRef.current = stream;
     linkedVideoRef.current = video;
     // the player closing the window or pressing the browser's "Stop sharing" ends the link
@@ -3223,6 +3252,7 @@ useEffect(() => {
         beamField: props.gamePreset ? null : loadBeamSave().field,
         vegetation: (props.profile.graphics.vegetation as 'auto' | 'off' | 'low' | 'high' | undefined) ?? 'auto',
         hasSidearm: Boolean(baseWorldRef.current.equipment.sidearm),
+        livingWorld: !isStory && !props.gamePreset,
         // JOB-09: a step through a live horizon at stage six changes worlds; `earth-endgame.ts` decides, the scene only
         // reports that the aperture was crossed. Everything the rule reads is the state the HUD already shows.
         earthTransit: () => props.gamePreset
@@ -4091,14 +4121,14 @@ useEffect(() => {
       } : undefined;
       const out = scene.frame(props.gamePreset ? gameTimeRef.current / 1000 : ms / 1000, dt, live
         ? {
-            move: { x: axis(['KeyD', 'ArrowRight'], ['KeyA', 'ArrowLeft']), z: axis(['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']) },
-            look: { dx, dy },
-            run: keys.has('ShiftLeft') || keys.has('ShiftRight'),
-            jump: keys.has('Space') && !isAltCam && !drivingVehicle,
-            altCam: isAltCam,
-            flyUp,
-            vehicleInput,
-          }
+          move: { x: axis(['KeyD', 'ArrowRight'], ['KeyA', 'ArrowLeft']), z: axis(['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']) },
+          look: { dx, dy },
+          run: keys.has('ShiftLeft') || keys.has('ShiftRight'),
+          jump: keys.has('Space') && !isAltCam && !drivingVehicle,
+          altCam: isAltCam,
+          flyUp,
+          vehicleInput,
+        }
         : { move: { x: 0, z: 0 }, look: { dx: 0, dy: 0 }, run: false });
       // plan 50: the drone's barks (contact, target down, area clear) go out on the radio, one per 8 s at most
       for (const line of scene.drainCompanionBarks()) companionHandleRef.current?.say(line);
@@ -4252,17 +4282,17 @@ useEffect(() => {
       if (s !== stateRef.current) commit(withLab(withPlot(s, plotRef.current), labRef.current));
 
       // ---- a salvage prop in the lab or planet: hold E for a second to clear it (TASK-23c / POL-97); the salvage goes into the pack, or the prop stays
-  if (live && !visitingRef.current && (out.where === 'lab' || out.where === 'planet') && out.aimedProp?.salvage && keys.has('KeyE') && !out.atLever) {
-    clearHoldRef.current += dt;
-    if (clearHoldRef.current >= CLEAR_HOLD_SECONDS) {
-      clearHoldRef.current = 0;
-      clearPropRef.current(out.aimedProp.id);
-    }
-  } else {
-    clearHoldRef.current = 0;
-  }
+      if (live && !visitingRef.current && (out.where === 'lab' || out.where === 'planet') && out.aimedProp?.salvage && keys.has('KeyE') && !out.atLever) {
+        clearHoldRef.current += dt;
+        if (clearHoldRef.current >= CLEAR_HOLD_SECONDS) {
+          clearHoldRef.current = 0;
+          clearPropRef.current(out.aimedProp.id);
+        }
+      } else {
+        clearHoldRef.current = 0;
+      }
 
-  // ---- hand gathering ore from boulders on the plot: hold E to gather 3 ore/s
+      // ---- hand gathering ore from boulders on the plot: hold E to gather 3 ore/s
       let plotChanged = false;
       if (live && !visitingRef.current && out.where === 'planet' && out.aimedBoulder !== null && keys.has('KeyE') && out.aimed === null && !out.atLever && !out.atDial && !out.aimedLab && !scene.getDrivingVehicle() && !scene.getNearVehicle(3.5) && scene.aimPoint()?.piece == null) {
         const mined = scene.gatherBoulder(out.aimedBoulder, 3 * dt);
@@ -4287,7 +4317,7 @@ useEffect(() => {
         sealAimRef.current = leakAim;
         scene.monsters.setSealing(leakAim);
         scene.setBeamSealing(leakAim !== null || forceBeamSealingRef.current);
-        const boulderId = leakAim === null && live &&!visitingRef.current && out.where === 'planet' && beamHeldRef.current && beamModeRef.current === 'extract' && isLmbDownRef.current && !scene.monsters.isEquipped() && scene.aimNode(baseWorldRef.current.field, BEAM_RANGE) === null
+        const boulderId = leakAim === null && live && !visitingRef.current && out.where === 'planet' && beamHeldRef.current && beamModeRef.current === 'extract' && isLmbDownRef.current && !scene.monsters.isEquipped() && scene.aimNode(baseWorldRef.current.field, BEAM_RANGE) === null
           ? scene.aimBoulder(BEAM_STROKE_RANGE)
           : null;
         const hit = boulderId !== null ? scene.beamGatherBoulder(boulderId, dt) : null;
@@ -4389,7 +4419,7 @@ useEffect(() => {
             scene.raiseStage(e.stage, env.gate);
             dispatchBaseRef.current({ t: 'stage', stage: e.stage });
           }
-          if (e.type === 'ore-out' && !visitingRef.current) say('Out of ore', 'Hold E on a boulder, or build a rock drill.');
+          if (e.type === 'ore-out' && !visitingRef.current && (isStory || props.gamePreset)) say('Out of ore', 'Hold E on a boulder, or build a rock drill.');
           if (e.type === 'underpowered' && !visitingRef.current) {
             say('Not enough power', 'Build a power unit, or switch a machine off.');
             // Dr. Haddy's power prompt (TASK-26 / POL-57): 12 kW Gate brownout bark trigger
@@ -4930,7 +4960,7 @@ useEffect(() => {
           hint: 'Beam port',
           items: [],
           emptyState: 'No written cartridges: write one at the preset bench',
-          pick: () => {},
+          pick: () => { },
         };
       }
       // a radial with one slice is half a wheel: a locked slice fills the other half
@@ -5202,6 +5232,10 @@ useEffect(() => {
         const bEnv = getBaseEnv();
         pieceManagerRef.current.sync(baseWorldRef.current, bEnv, next);
         say(next ? 'Structural Integrity: ON' : 'Structural Integrity: OFF');
+        return;
+      }
+      if (e.code === 'KeyM' && !isStory && !props.gamePreset && sceneRef.current?.solarSystem()) {
+        setLatticeOpen((v) => !v);
         return;
       }
       if (e.code === 'KeyV') {
@@ -5866,17 +5900,16 @@ useEffect(() => {
   // the quest HUD: the chain's current step and the next one, once the chain has started; the plot's goal until then
   const plotGoal = objective({ ...state, plot: plotRef.current }, hud.where);
   const chainNow = chainView(state.chain);
-  const isStory = typeof location !== 'undefined' && new URLSearchParams(location.search).has('story');
   const litRpgGoal = {
     title: 'Living Frontier: Seeded Biosphere',
     hint: 'Explore the living canopy with your companion drone, attune the Stargate plinth, and discover local life.',
   };
   const goal = isStory
     ? (chainNow.current && !visiting ? { title: chainNow.current.title, hint: chainNow.current.hint } : plotGoal)
-    : (chainNow.current?.id === 'A4-01' || !chainNow.current ? litRpgGoal : { title: chainNow.current.title, hint: chainNow.current.hint });
+    : litRpgGoal; // seeded worlds never fall through to the parked Moon chain (leak quests, rifle steps)
   const chainNext = isStory
     ? (!visiting && chainNow.current ? chainNow.next?.title ?? null : null)
-    : (chainNow.current?.id === 'A4-01' ? 'Establish Sovereign Base' : chainNow.next?.title ?? null);
+    : null;
   // POL-40 (plan 16, the top-left zone): Dr. Haddy's portrait slides in only while she speaks or for a moment when the quest step
   // changes, so the quest card keeps the top of the zone. It yields while a ghost is placed (as the subtitle yields to the open
   // drawer): the centre 60% of the screen stays clear for the ghost.
@@ -5896,14 +5929,14 @@ useEffect(() => {
   const prompt = building
     ? (hud.ghost?.ok ? `Click or E: build the ${KINDS[building].name.toLowerCase()}` : hud.ghost?.why || 'Aim at the ground near the gate.')
     : hud.atLever ? 'E: pull the main lever'
-    : hud.atDial ? 'E: plot dial'
-    : hud.where === 'planet' && hud.aimed !== null && panel === null ? `E: inspect the ${KINDS[(visiting ? visiting.plot.machines : plotRef.current.machines).find((x) => x.id === hud.aimed)?.kind ?? 'mill'].name.toLowerCase()}`
-    : hud.atArmory && hud.aimedLab === null && labPanel === null && !hud.atLever && !hud.atDial && !baseWorldRef.current.equipment.sidearm ? 'E: take the combat sidearm from the armory'
-    : (hud.where === 'lab' || hud.where === 'planet') && hud.aimedProp?.salvage && labPanel === null ? `Hold E: salvage the ${propLabel(hud.aimedProp.id)}`
-    : hud.aimedProp && aimedPropActs(hud.aimedProp, hud.where) && !hud.aimedProp.salvage && labPanel === null && hud.aimed === null ? `E: read the ${propLabel(hud.aimedProp.id)}`
-    : labStation !== null && labPanel === null && fabricatorMachineId === null && !planetTableOpen && !weaponBenchOpen ? labStation.prompt
-    : hud.where === 'planet' && hud.aimedBoulder !== null && !visiting ? 'Hold E: gather ore'
-    : '';
+      : hud.atDial ? 'E: plot dial'
+        : hud.where === 'planet' && hud.aimed !== null && panel === null ? `E: inspect the ${KINDS[(visiting ? visiting.plot.machines : plotRef.current.machines).find((x) => x.id === hud.aimed)?.kind ?? 'mill'].name.toLowerCase()}`
+          : hud.atArmory && hud.aimedLab === null && labPanel === null && !hud.atLever && !hud.atDial && !baseWorldRef.current.equipment.sidearm ? 'E: take the combat sidearm from the armory'
+            : (hud.where === 'lab' || hud.where === 'planet') && hud.aimedProp?.salvage && labPanel === null ? `Hold E: salvage the ${propLabel(hud.aimedProp.id)}`
+              : hud.aimedProp && aimedPropActs(hud.aimedProp, hud.where) && !hud.aimedProp.salvage && labPanel === null && hud.aimed === null ? `E: read the ${propLabel(hud.aimedProp.id)}`
+                : labStation !== null && labPanel === null && fabricatorMachineId === null && !planetTableOpen && !weaponBenchOpen ? labStation.prompt
+                  : hud.where === 'planet' && hud.aimedBoulder !== null && !visiting ? 'Hold E: gather ore'
+                    : '';
 
   return (
     <div data-game-preset={props.gamePreset?.id} data-hud-root={creditsRun ? undefined : true} data-fidelity={skinTrack.skin} className={`play${ready ? ' ready' : ''}${hud.where === 'planet' ? ' on-planet' : ''}${hud.sync < 0.3 && hud.where === 'planet' ? ' sync-low' : ''}${skinGlitch ? ' hud-glitch' : ''}${creditsRun ? ' credits-on' : ''}`}>
@@ -5961,34 +5994,34 @@ useEffect(() => {
           {!props.gamePreset || !['race-lap-telemetry', 'arena-wave-survivor'].includes(props.gamePreset.hudBlade) ? (
             <UiPanelView {...floatsPanelProps(hud.plot.stage, hud.plot.levels, METRIC_COLOUR)} />
           ) : null}
-        {/* In a co-op room the badge names the session, and the branch toggle is gone: the room is the grid (TICKET-11). */}
-        <div hidden={!!props.gamePreset} className="play-sync-indicator" data-hud-zone="top-right" title={outpostRef.current ? `Co-op room ${outpostRef.current.code ?? ''}: the room's world is shared with everyone in it` : syncMode === 'synced' ? 'Connected to shared 40,000 km planetary substrate' : 'Playing on private local simulation branch'}>
-          {outpostRef.current ? (
-            <span className="sync-badge coop" data-testid="play-coop-badge">
-              <span className="sync-pulse" />
-              CO-OP · room {outpostRef.current.code ?? '------'}
-            </span>
-          ) : (
-            <>
-              <span
-                className={`sync-badge ${syncMode}`}
-                onClick={() => setPlanetTableOpen(true)}
-                title="Click to open Planetary Grid Enclave & Co-Op Management"
-                style={{ cursor: 'pointer' }}
-              >
+          {/* In a co-op room the badge names the session, and the branch toggle is gone: the room is the grid (TICKET-11). */}
+          <div hidden={!!props.gamePreset} className="play-sync-indicator" data-hud-zone="top-right" title={outpostRef.current ? `Co-op room ${outpostRef.current.code ?? ''}: the room's world is shared with everyone in it` : syncMode === 'synced' ? 'Connected to shared 40,000 km planetary substrate' : 'Playing on private local simulation branch'}>
+            {outpostRef.current ? (
+              <span className="sync-badge coop" data-testid="play-coop-badge">
                 <span className="sync-pulse" />
-                {syncMode === 'synced' ? 'GRID SYNCED' : 'SOLO DESYNCED'}
+                CO-OP · room {outpostRef.current.code ?? '------'}
               </span>
-              <button
-                className="sync-branch-toggle"
-                onClick={() => setPlanetTableOpen(true)}
-                title="Manage Planetary Grid and Enclave Co-Op"
-              >
-                {syncMode === 'synced' ? 'Manage' : 'Sync'}
-              </button>
-            </>
-          )}
-        </div>
+            ) : (
+              <>
+                <span
+                  className={`sync-badge ${syncMode}`}
+                  onClick={() => setPlanetTableOpen(true)}
+                  title="Click to open Planetary Grid Enclave & Co-Op Management"
+                  style={{ cursor: 'pointer' }}
+                >
+                  <span className="sync-pulse" />
+                  {syncMode === 'synced' ? 'GRID SYNCED' : 'SOLO DESYNCED'}
+                </span>
+                <button
+                  className="sync-branch-toggle"
+                  onClick={() => setPlanetTableOpen(true)}
+                  title="Manage Planetary Grid and Enclave Co-Op"
+                >
+                  {syncMode === 'synced' ? 'Manage' : 'Sync'}
+                </button>
+              </>
+            )}
+          </div>
         </HudZone>
       ) : null}
 
@@ -6017,43 +6050,43 @@ useEffect(() => {
         <>
           {!props.gamePreset && !hideOverlays && drivingSpeed === null && (
             <HudZone zone="top-left">
-            {portraitIn && !isSim ? (
-              <HaddyCrtPortrait
-                className="hud-portrait-in"
-                activeLineId={subtitle?.id}
-                subtitleText={subtitle?.cleanText}
-                isSpeaking={Boolean(subtitle)}
-                isWarningGlitch={subtitle?.id?.startsWith('BARK') || subtitle?.id === 'power-short' || subtitle?.id === 'recall-zero'}
-                stage={hud.plot.stage}
+              {portraitIn && !isSim ? (
+                <HaddyCrtPortrait
+                  className="hud-portrait-in"
+                  activeLineId={subtitle?.id}
+                  subtitleText={subtitle?.cleanText}
+                  isSpeaking={Boolean(subtitle)}
+                  isWarningGlitch={subtitle?.id?.startsWith('BARK') || subtitle?.id === 'power-short' || subtitle?.id === 'recall-zero'}
+                  stage={hud.plot.stage}
+                />
+              ) : null}
+              {/* plan 57 §15: the goal card is a ui: panel, drawn from its preset with the live stage and what it needs */}
+              <UiPanelView
+                panel={PLAY_HUD_GOAL}
+                className="play-goal"
+                hudZone="top-left"
+                partClass={{ next: 'play-next' }}
+                values={goalValues({
+                  title: visiting ? `Visiting ${visiting.snapshot.owner}’s plot` : goal.title,
+                  hint: visiting ? 'Read-only visit. Walk back through the gate to return to your lab.' : goal.hint,
+                  next: chainNext && !isSim ? `Next: ${chainNext}` : null,
+                })}
               />
-            ) : null}
-            {/* plan 57 §15: the goal card is a ui: panel, drawn from its preset with the live stage and what it needs */}
-            <UiPanelView
-              panel={PLAY_HUD_GOAL}
-              className="play-goal"
-              hudZone="top-left"
-              partClass={{ next: 'play-next' }}
-              values={goalValues({
-                title: visiting ? `Visiting ${visiting.snapshot.owner}’s plot` : goal.title,
-                hint: visiting ? 'Read-only visit. Walk back through the gate to return to your lab.' : goal.hint,
-                next: chainNext && !isSim ? `Next: ${chainNext}` : null,
-              })}
-            />
-            {/* The co-op room's chip sits under the quest card, in the top-left zone: the stage metrics keep the top-right */}
-            {outpostRef.current ? <OutpostRoster session={outpostRef.current} /> : null}
+              {/* The co-op room's chip sits under the quest card, in the top-left zone: the stage metrics keep the top-right */}
+              {outpostRef.current ? <OutpostRoster session={outpostRef.current} /> : null}
             </HudZone>
           )}
           {hud.where === 'planet' && drivingSpeed === null && !isSim && (!props.gamePreset || props.gamePreset.hudBlade === 'exploration-o2') ? (
             <HudZone zone="bottom-left">
-            <div className="play-sync" data-hud-zone="bottom-left" role="meter" aria-label="Sync" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(hud.sync * 100)}>
-              <span>Sync</span>
-              <ol>{Array.from({ length: SYNC_BLOCKS }, (_, i) => <li key={i} className={i < syncLit ? 'on' : ''} />)}</ol>
-              {shelterState === 'pressurized' ? (
-                <span className="hm-shelter-chip pressurized">PRESSURISED</span>
-              ) : shelterState === 'sealed-no-power' ? (
-                <span className="hm-shelter-chip unpowered">SEALED · NO LIFE SUPPORT</span>
-              ) : null}
-            </div>
+              <div className="play-sync" data-hud-zone="bottom-left" role="meter" aria-label="Sync" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(hud.sync * 100)}>
+                <span>Sync</span>
+                <ol>{Array.from({ length: SYNC_BLOCKS }, (_, i) => <li key={i} className={i < syncLit ? 'on' : ''} />)}</ol>
+                {shelterState === 'pressurized' ? (
+                  <span className="hm-shelter-chip pressurized">PRESSURISED</span>
+                ) : shelterState === 'sealed-no-power' ? (
+                  <span className="hm-shelter-chip unpowered">SEALED · NO LIFE SUPPORT</span>
+                ) : null}
+              </div>
             </HudZone>
           ) : null}
           <i className="play-dot" aria-hidden="true" />
@@ -6104,35 +6137,35 @@ useEffect(() => {
           />
           {(state.step === 'build' || state.step === 'drill' || state.step === 'done' || visiting) && drivingSpeed === null ? (
             <HudZone zone="bottom-right">
-            <section className="play-plot" data-hud-zone="bottom-right" aria-label={visiting ? `Visiting ${visiting.snapshot.owner}'s plot` : 'Your plot'}>
-              {visiting ? (
-                <div className="play-visiting-banner">
-                  <span>Visiting <b>{visiting.snapshot.owner}</b></span>
-                  <em>Stage {visiting.plot.stage}</em>
-                </div>
-              ) : (() => {
-                const hasDrill = plotRef.current.machines.some((m) => m.kind === 'drill');
-                const outOfOreNoDrill = hud.plot.ore <= 0 && !hasDrill;
-                const linkedOre = (() => {
-                  const w = baseWorldRef.current;
-                  if (!w?.boxes) return 0;
-                  let sum = 0;
-                  for (const b of w.boxes) {
-                    for (const s of b.slots) {
-                      if (s && s.item === 'ore') sum += s.n;
+              <section className="play-plot" data-hud-zone="bottom-right" aria-label={visiting ? `Visiting ${visiting.snapshot.owner}'s plot` : 'Your plot'}>
+                {visiting ? (
+                  <div className="play-visiting-banner">
+                    <span>Visiting <b>{visiting.snapshot.owner}</b></span>
+                    <em>Stage {visiting.plot.stage}</em>
+                  </div>
+                ) : (() => {
+                  const hasDrill = plotRef.current.machines.some((m) => m.kind === 'drill');
+                  const outOfOreNoDrill = hud.plot.ore <= 0 && !hasDrill;
+                  const linkedOre = (() => {
+                    const w = baseWorldRef.current;
+                    if (!w?.boxes) return 0;
+                    let sum = 0;
+                    for (const b of w.boxes) {
+                      for (const s of b.slots) {
+                        if (s && s.item === 'ore') sum += s.n;
+                      }
                     }
-                  }
-                  return sum;
-                })();
-                // Plan 57 §15: the ore and the power are stats on the plot panel, drawn from its preset in their own classes
-                return (
-                  <UiPanelView {...plotPanelProps({
-                    ore: hud.plot.ore, oreRate: hud.plot.oreRate, oreLinked: linkedOre, oreOut: outOfOreNoDrill,
-                    demand: hud.plot.demand, supply: hud.plot.supply, satisfaction: hud.plot.satisfaction,
-                  })} />
-                );
-              })()}
-            </section>
+                    return sum;
+                  })();
+                  // Plan 57 §15: the ore and the power are stats on the plot panel, drawn from its preset in their own classes
+                  return (
+                    <UiPanelView {...plotPanelProps({
+                      ore: hud.plot.ore, oreRate: hud.plot.oreRate, oreLinked: linkedOre, oreOut: outOfOreNoDrill && (isStory || !!props.gamePreset),
+                      demand: hud.plot.demand, supply: hud.plot.supply, satisfaction: hud.plot.satisfaction,
+                    })} />
+                  );
+                })()}
+              </section>
             </HudZone>
           ) : null}
           {menu ? (() => {
@@ -6479,9 +6512,9 @@ useEffect(() => {
                             ? 'Prints a synth patch onto a blank cartridge, played on the Fidelity Stage\'s own hardware from a 1-bit speaker to a spatial mix. Load it in the beam rifle and fire Apply at a machine: the patch becomes that machine\'s hum.'
                             : benchTab === 'harness'
                               ? 'Prints a Sovereign Harness vessel soul onto a blank cartridge. Load it in the beam rifle and enter a vehicle: the soul binds, feels its own chassis, and the Zone 8 blade shows it living.'
-                      : materialShelf === 'machines'
-                        ? 'Prints a machine material onto a blank cartridge: paint, then the wear on top (rust, dust, grime). Load it in the beam rifle and fire Apply at a machine part: a tap dresses that part, a hold or Shift every part that wore the same.'
-                        : 'Writes an authored terraforming material onto a blank cartridge.'}</p>
+                              : materialShelf === 'machines'
+                                ? 'Prints a machine material onto a blank cartridge: paint, then the wear on top (rust, dust, grime). Load it in the beam rifle and fire Apply at a machine part: a tap dresses that part, a hold or Shift every part that wore the same.'
+                                : 'Writes an authored terraforming material onto a blank cartridge.'}</p>
                   {benchTab === 'presets' ? (
                     <div className="bench-parts-choices bench-material-shelf" role="group" aria-label="Materials for">
                       <button className={materialShelf === 'ground' ? 'on' : ''} aria-pressed={materialShelf === 'ground'} onClick={() => setMaterialShelf('ground')} data-testid="bench-shelf-ground">The ground</button>
@@ -6621,46 +6654,46 @@ useEffect(() => {
                       }}
                     />
                   ) : (<>
-                  <div className="play-carts">
-                    <h4>2. Pick a preset</h4>
-                    <div className="play-select-grid">
-                      {VAULT.map((p) => {
-                        const locked = p.minStage > plotRef.current.stage;
-                        const isSelected = benchPreset === p.id;
-                        return (
-                          <button
-                            key={p.id}
-                            className={`${isSelected ? 'on' : ''}${locked ? ' locked' : ''}`}
-                            disabled={locked}
-                            onClick={() => setBenchPreset(p.id)}
-                          >
-                            <b>{p.name}</b>
-                            {locked ? <em>opens at stage {p.minStage}</em> : (
-                              <span>
-                                {METRICS.filter((m) => p.affinity[m] && p.affinity[m] !== 1).map((m) => `${METRIC_NAME[m]} +${Math.round(((p.affinity[m] ?? 1) - 1) * 100)}%`).join(', ') || 'neutral'}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
+                    <div className="play-carts">
+                      <h4>2. Pick a preset</h4>
+                      <div className="play-select-grid">
+                        {VAULT.map((p) => {
+                          const locked = p.minStage > plotRef.current.stage;
+                          const isSelected = benchPreset === p.id;
+                          return (
+                            <button
+                              key={p.id}
+                              className={`${isSelected ? 'on' : ''}${locked ? ' locked' : ''}`}
+                              disabled={locked}
+                              onClick={() => setBenchPreset(p.id)}
+                            >
+                              <b>{p.name}</b>
+                              {locked ? <em>opens at stage {p.minStage}</em> : (
+                                <span>
+                                  {METRICS.filter((m) => p.affinity[m] && p.affinity[m] !== 1).map((m) => `${METRIC_NAME[m]} +${Math.round(((p.affinity[m] ?? 1) - 1) * 100)}%`).join(', ') || 'neutral'}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                  <div className="play-machine-actions">
-                    <button
-                      className="go"
-                      disabled={!writeCheck.ok}
-                      onClick={() => {
-                        if (!activeBlank || !benchPreset) return;
-                        const next = startWrite(labRef.current, labEnv, activeBlank, benchPreset);
-                        labRef.current = next;
-                        commit(withLab(stateRef.current, next));
-                        say('Writing started', 'The bench pours pink pixels while powered.');
-                      }}
-                    >
-                      Start writing
-                    </button>
-                  </div>
-                  {!writeCheck.ok && <span className="play-why">{writeCheck.why}</span>}
+                    <div className="play-machine-actions">
+                      <button
+                        className="go"
+                        disabled={!writeCheck.ok}
+                        onClick={() => {
+                          if (!activeBlank || !benchPreset) return;
+                          const next = startWrite(labRef.current, labEnv, activeBlank, benchPreset);
+                          labRef.current = next;
+                          commit(withLab(stateRef.current, next));
+                          say('Writing started', 'The bench pours pink pixels while powered.');
+                        }}
+                      >
+                        Start writing
+                      </button>
+                    </div>
+                    {!writeCheck.ok && <span className="play-why">{writeCheck.why}</span>}
                   </>)}
                   <button className="go" onClick={close} style={{ marginTop: '12px' }} autoFocus>Back to the lab</button>
                 </section>
@@ -6816,7 +6849,7 @@ useEffect(() => {
                     <button
                       onClick={() => {
                         if (myCode) {
-                          navigator.clipboard?.writeText(myCode).catch(() => {});
+                          navigator.clipboard?.writeText(myCode).catch(() => { });
                           say('Code copied', 'Share it with a friend so they can visit your plot.');
                         }
                       }}
@@ -7223,7 +7256,8 @@ useEffect(() => {
             </div>
           )}
 
-          {(!props.gamePreset || props.gamePreset.hudBlade === 'arena-wave-survivor' || props.gamePreset.hudBlade === 'exploration-o2') && !hideOverlays ? <MonsterHud hp={vitals.hp} maxHp={PLAYER_MAX_HP} hitAt={vitals.hitAt} hitBearing={vitals.bearing} radar={radar} seal={sealView} shielded={shieldOn} /> : null}
+          {(!props.gamePreset || props.gamePreset.hudBlade === 'arena-wave-survivor' || props.gamePreset.hudBlade === 'exploration-o2') && !hideOverlays ? <MonsterHud hp={vitals.hp} maxHp={PLAYER_MAX_HP} hitAt={vitals.hitAt} hitBearing={vitals.bearing} radar={radar} seal={sealView} shielded={shieldOn} hideRadar={!isStory && !props.gamePreset} /> : null}
+          {latticeOpen && !isStory ? <SolarLatticePanel read={() => sceneRef.current?.solarSystem() ?? null} onClose={() => setLatticeOpen(false)} /> : null}
           {bridgeHud && !hideOverlays ? <BridgeHud title={bridgeHud.title} state={bridgeHud.state} /> : null}
           {gunEquipped && (
             <div className={`play-crosshair${hitMarker ? ' hit' : ''}`}>
@@ -7236,39 +7270,39 @@ useEffect(() => {
             </div>
           )}
           {hud.where === 'planet' && !hideOverlays && showStatsOn ? (
-              <div
-                className="hm-draw-calls-badge"
-                data-testid="draw-calls-badge"
-                style={{
-                  position: 'fixed',
-                  top: 0,
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  background: 'rgba(15, 23, 42, 0.85)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(56, 189, 248, 0.35)',
-                  borderRadius: 8,
-                  padding: '2px 10px',
-                  fontFamily: 'Oxanium, sans-serif',
-                  zIndex: 100,
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-                  color: '#f8fafc',
-                  letterSpacing: '0.05em',
-                }}
-              >
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase' }}>
-                  DRAWS
-                </span>
-                <span style={{ fontSize: 14, fontWeight: 800 }}>
-                  {renderCalls}
-                </span>
-                <span style={{ fontSize: 11, color: '#94a3b8' }}>
-                  ({baseWorldRef.current?.base.pieces.length ?? 0} PIECES)
-                </span>
-              </div>
+            <div
+              className="hm-draw-calls-badge"
+              data-testid="draw-calls-badge"
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: 'rgba(15, 23, 42, 0.85)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(56, 189, 248, 0.35)',
+                borderRadius: 8,
+                padding: '2px 10px',
+                fontFamily: 'Oxanium, sans-serif',
+                zIndex: 100,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+                color: '#f8fafc',
+                letterSpacing: '0.05em',
+              }}
+            >
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase' }}>
+                DRAWS
+              </span>
+              <span style={{ fontSize: 14, fontWeight: 800 }}>
+                {renderCalls}
+              </span>
+              <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                ({baseWorldRef.current?.base.pieces.length ?? 0} PIECES)
+              </span>
+            </div>
           ) : null}
           {beamHud.held && hud.where === 'planet' && !hideOverlays ? (
             <div
@@ -7320,71 +7354,71 @@ useEffect(() => {
           {hud.where === 'planet' && !hideOverlays && (!props.gamePreset || props.gamePreset.hudBlade === 'sandbox-freeplay' || props.gamePreset.hudBlade === 'exploration-o2') ? (
             <>
               <BaseHud
-              source={baseViewSource}
-              paused={paused}
-              modalOpen={isAnyBaseWindowOpen}
-              harvestCounter={beamHarvest}
-              placedCounter={placedCounter}
-              hoverSupport={hoverSupport}
-              wheelCycleText={wheelCycleText}
-              rotationText={rotationText}
-              buildHidden={beamHud.held}
-              draftingLock={featureLock('drafting', state.chain, hud.plot.stage)}
-              onLocked={(why) => say('Drafting table locked', why)}
-              draftingParts={(() => {
-                const blanks = labRef.current.cartridges.filter((c) => c.kind === 'blank' && c.slot === null).length;
-                const free = freeBlank(labRef.current);
-                return (
-                  <BenchParts
-                    printLabel="Print cartridge"
-                    mine={presetsOf(myPresets, 'part')}
-                    onSave={(spec: PartSpec) => saveMyPreset({ part: spec })}
-                    firstStep={1}
-                    side={(
-                      <p className={`hm-draft-parts-blank${free === null ? ' empty' : ''}`} data-testid="drafting-parts-blank">
-                        <b>{blanks}</b> {blanks === 1 ? 'blank' : 'blanks'} on the lab rack, linked through the quantum bridge. Print takes one and loads the part into the beam rifle.
-                      </p>
-                    )}
-                    check={(spec) => {
-                      if (free === null) return { ok: false, why: 'No free blank on the lab rack. Make one at the rack in the lab.' };
-                      const c = canPrintPart(labRef.current, free, spec);
-                      return c.ok ? partStockCheck(spec) : c;
-                    }}
-                    onPrint={printPartOnTable}
-                  />
-                );
-              })()}
-              world={baseWorldRef.current}
-              at={sceneRef.current?.debug.position() ?? { x: 0, z: 0 }}
-              currentStructureId={currentAimedStructureIdRef.current}
-              planPrompt={planPrompt}
-              weaponStats={shouldShowAmmoBadge(baseWorldRef.current.equipment.sidearm) ? weaponStats(baseWorldRef.current.loadout) : null}
-              ammo={gunAmmo}
-              drivingSpeed={drivingSpeed}
-              drivingBoostEnergy={drivingBoostEnergy}
-              drivingBoosting={drivingBoosting}
-              onDispatch={(cmd) => dispatchBase(cmd)}
-              onPlaceLayout={(layoutId) => {
-                setPlacingLayoutId(layoutId);
-                placingLayoutRotationRef.current = 0;
-                say('Place Layout', 'Aim at foundation ground. Press R to rotate, Click to confirm.');
-              }}
-              onDropPlan={(planId) => {
-                dispatchBase({ t: 'dropPlan', plan: planId });
-                say('Plan dropped');
-              }}
-              onToast={(title, sub) => say(title, sub ?? '')}
-              onOpenChange={(isOpen) => {
-                setBaseWindowOpen(isOpen);
-                if (isOpen) {
-                  quietRef.current = true;
-                  document.exitPointerLock?.();
-                } else {
-                  quietRef.current = false;
-                }
-              }}
-            />
-          </>
+                source={baseViewSource}
+                paused={paused}
+                modalOpen={isAnyBaseWindowOpen}
+                harvestCounter={beamHarvest}
+                placedCounter={placedCounter}
+                hoverSupport={hoverSupport}
+                wheelCycleText={wheelCycleText}
+                rotationText={rotationText}
+                buildHidden={beamHud.held}
+                draftingLock={featureLock('drafting', state.chain, hud.plot.stage)}
+                onLocked={(why) => say('Drafting table locked', why)}
+                draftingParts={(() => {
+                  const blanks = labRef.current.cartridges.filter((c) => c.kind === 'blank' && c.slot === null).length;
+                  const free = freeBlank(labRef.current);
+                  return (
+                    <BenchParts
+                      printLabel="Print cartridge"
+                      mine={presetsOf(myPresets, 'part')}
+                      onSave={(spec: PartSpec) => saveMyPreset({ part: spec })}
+                      firstStep={1}
+                      side={(
+                        <p className={`hm-draft-parts-blank${free === null ? ' empty' : ''}`} data-testid="drafting-parts-blank">
+                          <b>{blanks}</b> {blanks === 1 ? 'blank' : 'blanks'} on the lab rack, linked through the quantum bridge. Print takes one and loads the part into the beam rifle.
+                        </p>
+                      )}
+                      check={(spec) => {
+                        if (free === null) return { ok: false, why: 'No free blank on the lab rack. Make one at the rack in the lab.' };
+                        const c = canPrintPart(labRef.current, free, spec);
+                        return c.ok ? partStockCheck(spec) : c;
+                      }}
+                      onPrint={printPartOnTable}
+                    />
+                  );
+                })()}
+                world={baseWorldRef.current}
+                at={sceneRef.current?.debug.position() ?? { x: 0, z: 0 }}
+                currentStructureId={currentAimedStructureIdRef.current}
+                planPrompt={planPrompt}
+                weaponStats={shouldShowAmmoBadge(baseWorldRef.current.equipment.sidearm) ? weaponStats(baseWorldRef.current.loadout) : null}
+                ammo={gunAmmo}
+                drivingSpeed={drivingSpeed}
+                drivingBoostEnergy={drivingBoostEnergy}
+                drivingBoosting={drivingBoosting}
+                onDispatch={(cmd) => dispatchBase(cmd)}
+                onPlaceLayout={(layoutId) => {
+                  setPlacingLayoutId(layoutId);
+                  placingLayoutRotationRef.current = 0;
+                  say('Place Layout', 'Aim at foundation ground. Press R to rotate, Click to confirm.');
+                }}
+                onDropPlan={(planId) => {
+                  dispatchBase({ t: 'dropPlan', plan: planId });
+                  say('Plan dropped');
+                }}
+                onToast={(title, sub) => say(title, sub ?? '')}
+                onOpenChange={(isOpen) => {
+                  setBaseWindowOpen(isOpen);
+                  if (isOpen) {
+                    quietRef.current = true;
+                    document.exitPointerLock?.();
+                  } else {
+                    quietRef.current = false;
+                  }
+                }}
+              />
+            </>
           ) : null}
           {machinePickerHardpoint !== null && (
             <MachinePickerModal

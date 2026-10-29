@@ -661,3 +661,25 @@ Every complex (**Mind** 1–7, **Body** 8–14, **Spirit** 15–21) runs the sam
 - Pure validator for the Rung-6 Harness Control Deck (`bridgeMode`, `higherSelfSeatEnabled`, `childSafeFilter`, `autoClipOnEureka`, `streamMaxFps`):
   - **Standing Anti-Cheat Guard**: Whenever `context.hasAntiCheat` is true, `checked-profile-relay` is automatically downgraded to `mirror-only` so zero synthetic inputs ever reach an anti-cheat host.
   - **Child-Safety Lock**: Whenever `context.trustTier === 'unverified-or-child'`, `childSafeFilter` is locked to `true`.
+
+
+---
+
+## 20. Automated Multi-Channel Mechanic Mimicry & Read-Only Disk Harvester (owner & Argon, 29 Oct; built in `@hm/harness`)
+
+> **Owner's insight (29 Oct)**: *"i can start thegames if you require them for your work, we need to find ways to automate the mimicry if we can tho"*
+> **Code**: Built in [`packages/harness/src/auto-mimicry.ts`](../../../packages/harness/src/auto-mimicry.ts), CLI harvester in [`scripts/auto-mimic-harvest.mjs`](../../../scripts/auto-mimic-harvest.mjs), tested in [`packages/harness/tests/auto-mimicry.test.ts`](../../../packages/harness/tests/auto-mimicry.test.ts) (5/5).
+
+### 20.1 Why Manual Clicking Does Not Scale, and the Two Automated Streams
+Manual window inspection is slow and requires the owner at the keyboard for every part or recipe. Under Plan 51's Observer Ladder, we automate mimicry across two complementary streams:
+
+1. **Stream A — Zero-Launch Read-Only Disk & Save-Graph Transducers (`game-files` rung)**:
+   - Scans the owner's licensed Steam installations on disk (`D:\SteamLibrary\steamapps\common`) and user/Workshop saves in **strictly read-only mode** with zero game launch needed:
+     - **Dwarf Fortress Raw Materials (`transduceDfRawsToElements`, `inverseElementFromPhysics`)**: Parses `[INORGANIC:...]` blocks (`SOLID_DENSITY`, `IMPACT_YIELD`, `SPEC_HEAT`, `MELTING_POINT`, `ITEMS_METAL`) across 201 inorganic metals, stones, minerals, and gems, solving the inverse of `deriveElementPhysics` to emit exact `0..10000` integer Four-Float `elem:` presets (`IRON` $\to$ `Pxd=6996, Vtx=7850, Lx=8145, Aq=750`, $\rho = 7850\text{ kg/m}^3$).
+     - **Kerbal Space Program Part `.cfg` Files (`transduceKspCfgToPartPreset`)**: Parses `PART { ... }` blocks (`mass`, `crashTolerance`, `maxTemp`, `node_stack_*` socket positions & normals, `ModuleEngines*` thrust & vacuum/sea-level Isp, `ModuleReactionWheel` torque, `RESOURCE` capacities) into socketed `kit:` descriptors and Four-Float stacks classified by emergent role (`thermal-thruster`, `attitude-gyro`, `solar-collector`, `propellant-vessel`, `structural-frame`).
+     - **Factorio Prototype Recipes (`transduceFactorioRecipes`)**: Parses `data:extend` Lua recipe tables (`energy_required`, `ingredients`, `results`) across 192 recipes into Port-Hamiltonian synthesis throughput presets (`logic:`).
+     - **Hades Combat & Boon Timings (`transduceHadesLuaToCombatPresets`)**: Extracts 343 weapon timing, `ScreenPreWait`, `Duration`, `Cooldown`, and `AmmoDropDelay` specs from `WeaponData.lua` into `mot:` combat cadence presets.
+     - **Plasma Odin Saves & Workshop Contraptions (`transducePlasmaDevice`)**: Reads binary Odin `.world` and `.device` saves via `read-odin-save.mjs` (`Worlds/Progress` + Workshop `1409160`), extracting every device's component physics (mass multiplier, bounciness, friction) and agent behaviors (buttons, sensors, processors, doors, lamps, motors) and compiling each into a validated `@hm/wiregraph` (`WireGraphSpec`, `validateWireGraph === []`) + `kit:` summary.
+
+2. **Stream B — Automated Live Bridge Accumulator (`createAutoMimicLiveState`, `stepAutoMimicLiveSession`)**:
+   - When the owner *does* play a live game in the Holo-Room (`?room` bridge screen with `/mirror` SSE + `/frame` capture), `stepAutoMimicLiveSession` buffers a rolling 256-sample window of trajectories, shot intervals, and events, continuously runs `transduceMechanic` (MDL spectral sieve + parabola gravity/jump fit + VSA-4096 shelf match), and **automatically mints & deduplicates `loc:`, `mot:`, and `logic:` share codes whenever `confidence >= 0.75`**—requiring zero manual export clicks.

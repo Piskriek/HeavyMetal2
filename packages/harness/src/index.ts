@@ -16,3 +16,4 @@ export * from './body.js';
 export * from './archetypes.js';
 export * from './science-cosmos.js';
 export * from './meta-shell.js';
+export * from './auto-mimicry.js';

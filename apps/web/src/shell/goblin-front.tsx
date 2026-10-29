@@ -86,9 +86,33 @@ const FIDELITY_MENU: readonly MenuItem[] = [
 
 const RACING_ITEM: MenuItem = { id: 'racing', label: 'Goblin Racing', says: 'Race goblins in glass balls round an island.' };
 
-import { UI_STYLE_SHELF, getUiStylePreset, type UiStyleId } from '@hm/hudlayout';
+import {
+  HOME_HOLODECK_SCREEN,
+  UI_STYLE_SHELF,
+  decodeScreen,
+  getUiStylePreset,
+  type UiScreen,
+  type UiStyleId,
+} from '@hm/hudlayout';
+import { kv } from '../storage/profile-storage';
 import { ProfileChip } from './profile-chip';
 import { FidelityLogo } from './fidelity-logo';
+
+export const UI_HOME_SCREEN_KEY = 'hm.setmix.ui.homeScreen';
+
+/** Reads the Studio-authored Home Screen preset (`uic:` code in kv) or returns `HOME_HOLODECK_SCREEN`. */
+export function loadHomeScreenPreset(): UiScreen {
+  try {
+    const raw = kv.get(UI_HOME_SCREEN_KEY);
+    if (raw) {
+      const decoded = decodeScreen(raw);
+      if (decoded && decoded.id === 'home-holodeck') return decoded;
+    }
+  } catch {
+    /* fallback to default */
+  }
+  return HOME_HOLODECK_SCREEN;
+}
 
 /** The menu for a version of the game: Goblin Racing remains accessible if specifically requested. */
 export function homeMenu(edition: Edition, endingSeen = false): readonly MenuItem[] {
@@ -96,15 +120,24 @@ export function homeMenu(edition: Edition, endingSeen = false): readonly MenuIte
   return edition === 'goblin-racing' ? [RACING_ITEM, ...base] : base;
 }
 
+const MENU_ID_TO_PART_ID: Partial<Record<MenuId, string>> = {
+  expedition: 'act-expedition',
+  grid: 'act-grid',
+  studio: 'act-studio',
+  community: 'act-community',
+  settings: 'act-settings',
+};
+
 /**
- * Plan 58: The FIDELITY Home Holo-Deck Menu, driven by Rung-1 `UiStylePreset` tokens (`UI_STYLE_SHELF`)
- * with live hover try-on (`previews-drive-play`).
+ * Plan 58: The FIDELITY Home Menu Chassis, built from the Rung-4 `HOME_HOLODECK_SCREEN` (`ui:`) preset
+ * and Rung-1 `UiStylePreset` tokens (`UI_STYLE_SHELF`, defaulting to `braun-atelier`) with live hover try-on.
  */
 export function SetMixHome(props: {
   readonly onExpedition?: () => void;
   readonly onGrid?: () => void;
   readonly onFabricator?: () => void;
   readonly onStudio?: () => void;
+  readonly onOpenUiStudio?: () => void;
   readonly onCommunity: () => void;
   readonly onSettings: () => void;
   /** The title's Ending Credits item: the video plays in the play screen (TICKET-14). */
@@ -127,6 +160,9 @@ export function SetMixHome(props: {
   readonly onHoverUiStyle?: (id: UiStyleId | null) => void;
 }): ReactElement {
   const activeStyle = getUiStylePreset(props.uiStyleId);
+  const homeScreen = loadHomeScreenPreset();
+  const navPanel = homeScreen.panels.find((p) => p.id === 'home-nav');
+  const profilePanel = homeScreen.panels.find((p) => p.id === 'home-profile');
 
   const act: Record<MenuId, (() => void) | undefined> = {
     expedition: props.onExpedition ?? props.onPlay,
@@ -148,7 +184,7 @@ export function SetMixHome(props: {
         <svg className="sm-leader" aria-hidden="true"><circle ref={props.leader.ring} r="0" /><line ref={props.leader.line} /></svg>
       ) : null}
 
-      {/* Plan 58: Preset-driven Holo-Deck Navigation Blade styled via `--ui-*` tokens from `UI_STYLE_SHELF` */}
+      {/* Plan 58: Tactile Industrial Left Faceplate (`HOME_HOLODECK_SCREEN` + `UI_STYLE_SHELF`) */}
       <div
         className="fidelity-glass-blade"
         style={{
@@ -156,75 +192,125 @@ export function SetMixHome(props: {
           top: 0,
           bottom: 0,
           left: 0,
-          width: 'min(440px, 86vw)',
+          width: 'min(410px, 86vw)',
           zIndex: 2,
-          backdropFilter: 'blur(14px)',
-          WebkitBackdropFilter: 'blur(14px)',
-          background: 'var(--ui-paper, rgba(8, 12, 20, 0.84))',
-          color: 'var(--ui-ink, #f1f5f9)',
-          fontFamily: 'var(--ui-font, inherit)',
-          borderRight: '1px solid var(--ui-accent, rgba(167, 139, 250, 0.35))',
-          padding: '24px 28px',
+          background: 'var(--ui-panel, #1b1d19)',
+          color: 'var(--ui-ink, #f2f0e8)',
+          fontFamily: 'var(--ui-font, Inter, sans-serif)',
+          borderRight: '1px solid var(--ui-line, #4c4f47)',
+          padding: '22px 24px',
           display: 'flex',
           flexDirection: 'column',
           gap: 16,
+          overflowY: 'auto',
         }}
       >
-        {/* Brand Header */}
-        <div className="sm-brand fidelity-brand">
+        {/* Brand Header (Static Flow inside Chassis — never overlaps modals or nav) */}
+        <div
+          className="sm-brand fidelity-brand"
+          style={{
+            position: 'static',
+            paddingBottom: 14,
+            borderBottom: '1px solid var(--ui-line, #4c4f47)',
+            animation: 'none',
+          }}
+        >
           <div className="fidelity-brand-lockup">
-            <FidelityLogo size={58} glow />
+            <FidelityLogo size={44} />
             <div className="fidelity-brand-text">
-              <b style={{ color: 'var(--ui-ink, #f1f5f9)' }}>FIDELITY</b>
-              <i style={{ color: 'var(--ui-dim, #94a3b8)' }}>Seeded Worlds // LitRPG &amp; Co-Creation Sandbox</i>
+              <b style={{ color: 'var(--ui-ink, #f2f0e8)' }}>FIDELITY</b>
+              <i style={{ color: 'var(--ui-dim, #9e9c92)' }}>Seeded Worlds // Co-Creation System</i>
             </div>
           </div>
         </div>
 
-        {/* Primary Navigation Suite */}
-        <nav className="sm-menu fidelity-menu" aria-label="FIDELITY Operations">
-          {homeMenu(EDITION, props.endingSeen).map((m, i) => (
-            <Fragment key={m.id}>
-              <button
-                style={{
-                  ['--i' as string]: i,
-                  borderRadius: 'var(--ui-radius, 6px)',
-                  borderColor: 'var(--ui-accent, rgba(167, 139, 250, 0.28))',
-                  color: 'var(--ui-ink, #f1f5f9)',
-                }}
-                onClick={act[m.id]}
-                disabled={!act[m.id]}
-                className={m.badge ? 'has-badge' : ''}
-              >
-                <div className="sm-menu-label-row">
-                  <b>{m.label}</b>
-                  {m.badge ? <span className="fidelity-badge">{m.badge}</span> : null}
-                </div>
-                <small style={{ color: 'var(--ui-dim, #94a3b8)' }}>{m.says}</small>
-              </button>
-            </Fragment>
-          ))}
-        </nav>
+        {/* Primary Navigation Suite (`home-nav` panel from `HOME_HOLODECK_SCREEN`) */}
+        {navPanel?.visible !== false ? (
+          <nav
+            className="sm-menu fidelity-menu"
+            aria-label="FIDELITY Operations"
+            style={{
+              position: 'static',
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}
+          >
+            {homeMenu(EDITION, props.endingSeen).map((m, i) => {
+              const partId = MENU_ID_TO_PART_ID[m.id];
+              const presetPart = navPanel?.parts.find((pt) => pt.id === partId);
+              const isPrimary = i === 0;
+              return (
+                <Fragment key={m.id}>
+                  <button
+                    style={{
+                      ['--i' as string]: i,
+                      padding: '11px 13px',
+                      borderRadius: 'var(--ui-radius, 2px)',
+                      border: `1px solid ${isPrimary ? 'var(--ui-accent, #d96b43)' : 'var(--ui-line, #4c4f47)'}`,
+                      borderLeft: `3px solid ${isPrimary ? 'var(--ui-accent, #d96b43)' : 'var(--ui-line, #4c4f47)'}`,
+                      background: 'var(--ui-inset, #2a2c27)',
+                      color: 'var(--ui-ink, #f2f0e8)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 4,
+                      textAlign: 'left',
+                      animation: 'none',
+                    }}
+                    onClick={act[m.id]}
+                    disabled={!act[m.id]}
+                    className={m.badge ? 'has-badge' : ''}
+                  >
+                    <div className="sm-menu-label-row">
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                        <span
+                          style={{
+                            fontFamily: 'ui-monospace, Consolas, monospace',
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: isPrimary ? 'var(--ui-accent, #d96b43)' : 'var(--ui-dim, #9e9c92)',
+                          }}
+                        >
+                          {String(i + 1).padStart(2, '0')}
+                        </span>
+                        <b style={{ fontSize: 16, fontWeight: 700, color: 'var(--ui-ink, #f2f0e8)' }}>
+                          {presetPart && m.id === 'expedition' ? `${m.label}` : m.label}
+                        </b>
+                      </span>
+                      {m.badge ? <span className="fidelity-badge">{m.badge}</span> : null}
+                    </div>
+                    <small style={{ color: 'var(--ui-dim, #9e9c92)', fontSize: 12, lineHeight: 1.35 }}>
+                      {m.says}
+                    </small>
+                  </button>
+                </Fragment>
+              );
+            })}
+          </nav>
+        ) : null}
 
-        {/* Plan 58: Live UI Style Preset Switcher (Hover Try-On + 1-Click Apply) */}
+        {/* Plan 58: Tactile UI Style Preset Switcher (Hover Try-On + Direct Studio UI Editor Link) */}
         {props.onSelectUiStyle ? (
           <div
             className="fidelity-ui-style-bar"
             aria-label="Interface Style Presets"
             style={{
               marginTop: 'auto',
-              paddingTop: 10,
-              borderTop: '1px solid rgba(148, 163, 184, 0.18)',
+              paddingTop: 12,
+              borderTop: '1px solid var(--ui-line, #4c4f47)',
               display: 'flex',
               flexDirection: 'column',
-              gap: 6,
+              gap: 8,
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--ui-dim, #94a3b8)' }}>
-              <span>UI STYLE PRESET</span>
-              <b style={{ color: 'var(--ui-accent, #a78bfa)' }}>{activeStyle.name}</b>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'var(--ui-dim, #9e9c92)' }}>
+              <span style={{ fontFamily: 'ui-monospace, Consolas, monospace', letterSpacing: '0.06em' }}>
+                UI PRESET // {activeStyle.id.toUpperCase()}
+              </span>
+              <b style={{ color: 'var(--ui-accent, #d96b43)' }}>{activeStyle.name}</b>
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 5 }}>
               {UI_STYLE_SHELF.map((st) => {
                 const isCurrent = st.id === activeStyle.id;
                 return (
@@ -238,33 +324,68 @@ export function SetMixHome(props: {
                     onClick={() => props.onSelectUiStyle?.(st.id)}
                     title={`${st.name}: ${st.tagline}`}
                     style={{
-                      padding: '4px 8px',
+                      padding: '5px 7px',
                       fontSize: 11,
-                      borderRadius: 'var(--ui-radius, 4px)',
-                      border: `1px solid ${isCurrent ? st.tokens.accent : 'rgba(148,163,184,0.25)'}`,
-                      background: isCurrent ? st.tokens.paper : 'rgba(15, 23, 42, 0.55)',
-                      color: isCurrent ? st.tokens.accent : st.tokens.ink,
+                      fontWeight: isCurrent ? 700 : 500,
+                      borderRadius: 'var(--ui-radius, 2px)',
+                      border: `1px solid ${isCurrent ? 'var(--ui-accent, #d96b43)' : 'var(--ui-line, #4c4f47)'}`,
+                      background: isCurrent ? 'var(--ui-accent, #d96b43)' : 'var(--ui-inset, #2a2c27)',
+                      color: isCurrent ? 'var(--ui-accent-ink, #ffffff)' : 'var(--ui-ink, #f2f0e8)',
                       cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 5,
                     }}
                   >
-                    {st.name.split(' ')[0]}
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: '50%',
+                        background: isCurrent ? st.tokens.paper : st.tokens.accent,
+                        border: '1px solid rgba(0,0,0,0.25)',
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {st.name.split(' ')[0]}
+                    </span>
                   </button>
                 );
               })}
             </div>
+            {props.onOpenUiStudio ? (
+              <button
+                type="button"
+                onClick={props.onOpenUiStudio}
+                data-testid="open-ui-studio-btn"
+                style={{
+                  padding: '6px 10px',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  borderRadius: 'var(--ui-radius, 2px)',
+                  border: '1px solid var(--ui-line, #4c4f47)',
+                  background: 'var(--ui-panel, #1b1d19)',
+                  color: 'var(--ui-dim, #9e9c92)',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                }}
+              >
+                Customize UI Presets &amp; Screens in Studio →
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>
 
-
-      {/* plan 57 §4, §10: the right side is left clear for the room's bridge screen. The old telemetry column showed fixed
-          numbers and story copy; it comes back as the System HUD, reading real state (a lens, never a lie) */}
-
-      {/* Top Controls */}
-      <div className="sm-top-controls">
-        <ProfileChip onManageProfiles={props.onManageProfiles ?? (() => {})} onSwitching={props.onSwitching} />
-        <span className="sm-credits" title="In-game credits. Never real money.">{props.credits} cr</span>
-      </div>
+      {/* Top Controls (`home-profile` panel from `HOME_HOLODECK_SCREEN`) */}
+      {profilePanel?.visible !== false ? (
+        <div className="sm-top-controls">
+          <ProfileChip onManageProfiles={props.onManageProfiles ?? (() => {})} onSwitching={props.onSwitching} />
+          <span className="sm-credits" title="In-game credits. Never real money.">{props.credits} cr</span>
+        </div>
+      ) : null}
     </div>
   );
 }

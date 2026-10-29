@@ -107,6 +107,7 @@ import { kv } from '../storage/profile-storage';
 import { bodyCheckpoint, createDroneMemory, dreamNow, dronePerspective, droneSymptoms, hasUndreamt, loadDroneMemory, noteCatalyst, saveDroneMemory, type DroneBody, type DroneCatalyst, type DroneMemory } from './drone-memory';
 import { hintsFromWarnings } from './drone-body-visuals';
 import { PLAY_HUD_GOAL, floatsPanelProps, goalValues, plotPanelProps, systemPanelProps } from './ui-play-hud';
+import { MetaShellDrawer } from './ui-meta-shell';
 import { SystemVoice, droneNotices, readSystemLog, systemHeardKey, systemLogKey, type SystemNotice } from './system-voice';
 import { UiPanelView } from './ui-panel';
 import { warningLine } from '@hm/harness';
@@ -5860,6 +5861,19 @@ useEffect(() => {
       {!ready && !failed ? <div className="gr-loading play-loading" role="status"><span>{loading}</span><i /></div> : null}
 
       {ready && systemNotice ? <UiPanelView key={systemNotice.at} {...systemPanelProps(systemNotice)} /> : null}
+      {ready && !creating && !hideOverlays ? (
+        <MetaShellDrawer
+          stage={hud.plot.stage}
+          getDroneMemory={droneMemory}
+          onCueHigherSelfDream={() => {
+            const p = dronePerspective(droneMemory());
+            if (p.cueable.length > 0) {
+              higherSelfCuesRef.current = p.cueable.slice(0, 3).map((c) => ({ of: c.of, t: c.t }));
+            }
+          }}
+          onBroadcastNotice={(title, detail) => say(title, detail)}
+        />
+      ) : null}
       {ready ? (
         <HudZone zone="top-centre">
           {hud.where === 'planet' && drivingSpeed === null ? (() => {

@@ -334,18 +334,53 @@ export function createClipManifest(input: Omit<ClipManifest, 'version' | 'durati
   };
 }
 
+const B64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+
+function toBase64Url(str: string): string {
+  const bytes = new TextEncoder().encode(str);
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b0 = bytes[i]!;
+    const b1 = i + 1 < bytes.length ? bytes[i + 1]! : 0;
+    const b2 = i + 2 < bytes.length ? bytes[i + 2]! : 0;
+    const trip = (b0 << 16) | (b1 << 8) | b2;
+    out += B64_ALPHABET[(trip >> 18) & 63]!;
+    out += B64_ALPHABET[(trip >> 12) & 63]!;
+    if (i + 1 < bytes.length) out += B64_ALPHABET[(trip >> 6) & 63]!;
+    if (i + 2 < bytes.length) out += B64_ALPHABET[trip & 63]!;
+  }
+  return out;
+}
+
+function fromBase64Url(b64: string): string {
+  const clean = b64.replace(/=+$/g, '');
+  const bytes: number[] = [];
+  let acc = 0;
+  let bits = 0;
+  for (let i = 0; i < clean.length; i++) {
+    const idx = B64_ALPHABET.indexOf(clean[i]!);
+    if (idx < 0) throw new Error('Invalid base64url char');
+    acc = (acc << 6) | idx;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes.push((acc >> bits) & 0xff);
+    }
+  }
+  return new TextDecoder().decode(new Uint8Array(bytes));
+}
+
 /** Encodes a `ClipManifest` into a compact, URL/chat-safe `clip:` share string. */
 export function encodeClipShareCode(manifest: ClipManifest): string {
   const json = JSON.stringify(manifest);
-  const b64 = Buffer.from(json, 'utf8').toString('base64url');
-  return `clip:${b64}`;
+  return `clip:${toBase64Url(json)}`;
 }
 
 /** Decodes and validates a `clip:` share string back into a `ClipManifest`, or returns `null` if corrupted. */
 export function decodeClipShareCode(code: string): ClipManifest | null {
   try {
     if (!code.startsWith('clip:')) return null;
-    const raw = Buffer.from(code.slice(5), 'base64url').toString('utf8');
+    const raw = fromBase64Url(code.slice(5));
     const o = JSON.parse(raw) as Partial<ClipManifest>;
     if (
       o.version !== 'hm2:clip:v1' ||

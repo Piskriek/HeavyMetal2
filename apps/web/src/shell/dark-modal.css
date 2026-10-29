@@ -1,8 +1,7 @@
 /* ============================================================================
  * File: apps/web/src/shell/dark-modal.css
- * TICKET-08a (OPUS_NOTE_13 Item B):
- * Dark-glass modal shell in the HUD vocabulary (Oxanium headers, Inter body,
- * cyan/amber telemetry accents).
+ * Plan 58: Unified Preset Menu & Interface System modal shell driven by `--ui-*`
+ * tokens from `@hm/hudlayout` (`UI_STYLE_SHELF`).
  * ============================================================================ */
 
 .dm-overlay {
@@ -13,9 +12,7 @@
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(4, 8, 15, 0.76);
-  backdrop-filter: blur(12px) saturate(140%);
-  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  background: rgba(12, 13, 11, 0.78);
 }
 
 .dm-panel {
@@ -23,12 +20,12 @@
   max-height: min(86vh, 840px);
   display: flex;
   flex-direction: column;
-  background: rgba(10, 15, 24, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 10px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.65), 0 0 20px rgba(61, 200, 255, 0.08);
-  color: #f4f8ff;
-  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--ui-panel, #1b1d19);
+  border: 1px solid var(--ui-line, #4c4f47);
+  border-radius: var(--ui-radius, 2px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.65);
+  color: var(--ui-ink, #f2f0e8);
+  font-family: var(--ui-font, 'Inter', system-ui, sans-serif);
   overflow: hidden;
   outline: none;
 }
@@ -38,9 +35,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 14px 20px;
-  background: linear-gradient(180deg, rgba(18, 26, 38, 0.96), rgba(10, 15, 24, 0.96));
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 12px 18px;
+  background: var(--ui-inset, #2a2c27);
+  border-bottom: 1px solid var(--ui-line, #4c4f47);
   flex-shrink: 0;
 }
 
@@ -54,24 +51,23 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #3dc8ff;
-  box-shadow: 0 0 8px #3dc8ff;
+  background: var(--ui-accent, #d96b43);
 }
 
 .dm-title {
   margin: 0;
-  font-family: 'Oxanium', monospace, sans-serif;
-  font-size: 15px;
+  font-family: var(--ui-font, 'Inter', sans-serif);
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #f4f8ff;
+  color: var(--ui-ink, #f2f0e8);
 }
 
 .dm-subtitle {
   margin: 2px 0 0;
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--ui-dim, #9e9c92);
 }
 
 .dm-header-actions {
@@ -85,11 +81,11 @@
   align-items: center;
   gap: 6px;
   padding: 5px 11px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 6px;
-  color: #f4f8ff;
-  font-family: 'Oxanium', sans-serif;
+  background: var(--ui-panel, #1b1d19);
+  border: 1px solid var(--ui-line, #4c4f47);
+  border-radius: var(--ui-radius, 2px);
+  color: var(--ui-ink, #f2f0e8);
+  font-family: var(--ui-font, 'Inter', sans-serif);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -97,18 +93,24 @@
 }
 
 .dm-close-btn:hover {
-  background: rgba(61, 200, 255, 0.16);
-  border-color: #3dc8ff;
+  background: var(--ui-accent, #d96b43);
+  border-color: var(--ui-accent, #d96b43);
+  color: var(--ui-accent-ink, #ffffff);
 }
 
 .dm-close-btn kbd {
   padding: 1px 5px;
-  font-family: 'Oxanium', monospace;
+  font-family: ui-monospace, Consolas, monospace;
   font-size: 10px;
-  color: #3dc8ff;
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(61, 200, 255, 0.35);
-  border-radius: 4px;
+  color: var(--ui-accent, #d96b43);
+  background: var(--ui-inset, #2a2c27);
+  border: 1px solid var(--ui-line, #4c4f47);
+  border-radius: var(--ui-radius, 2px);
+}
+
+.dm-close-btn:hover kbd {
+  color: var(--ui-accent-ink, #ffffff);
+  background: rgba(0, 0, 0, 0.25);
 }
 
 .dm-body {

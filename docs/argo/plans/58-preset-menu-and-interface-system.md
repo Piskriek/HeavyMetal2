@@ -1,108 +1,64 @@
-# PLAN 58 // Unified Preset Menu & Interface System (From-Scratch Holo-Deck, LitRPG System & Rung-6 Meta-Shell)
-> **Author**: Argon (Creative & Modular Systems Architect) & Piskriek (Owner)  
-> **Date**: 2026-10-29  
-> **Status**: ACTIVE SPECIFICATION & WAVE 1 IMPLEMENTATION  
-> **Owner Directive**: *"we also need to remove all the old game stuff from the lab/gate idea. plan a new menu and interface system. from scratch, covering everthing and matching in style, its should be presets so the style can be changed"*  
-> **Packages**: `@hm/hudlayout` (`packages/hudlayout/src/ui.ts`), `@hm/harness` (`packages/harness/src/meta-shell.ts`), `apps/web/src/shell/*`, `apps/web/src/play/ui-*`, `apps/web/src/studio/*`
+# Plan 58: Unified Preset Menu & Interface System (Tactile Industrial UI Built in & for The Studio)
+
+> **Status**: Active Implementation (Argon Overwatch)  
+> **Research**: [`docs/UI_DESIGN_SYSTEM_RESEARCH.md`](../../UI_DESIGN_SYSTEM_RESEARCH.md), [`docs/UI_EDITOR_RESEARCH.md`](../../UI_EDITOR_RESEARCH.md), [`docs/MENU_HOLODECK_RESEARCH.md`](../../MENU_HOLODECK_RESEARCH.md)  
+> **Invariants**: **RULES 6** (Research Before Design), **RULES 8a** (Zero Architectural Lies / Presets Inside Presets: The Game & Studio Are Built by the Studio), **Standing Rule 6** (Examples Mean Categories), **Previews Drive Play** (hover try-on across all UI styles and widgets)
 
 ---
 
-## 1. Executive Summary & Design Philosophy
-Previously, FIDELITY's menus and interfaces grew across three different eras:
-1. The early **SetMix / Goblin Racing** island browser (`goblin-front.tsx`, `galaxy.tsx`);
-2. The parked **Earth Bunker Lab / Console Lever / Moon Twin Gate / Dr. Gwen Haddy** storyline (`planetary-grid.tsx` locking Moon spawn behind the Earth Lab lever, `shell.tsx` warning *"The Moon Twin Gate is still dark. Pull the console lever in the Earth lab first"*, *"Substrate Research Initiative"*);
-3. The new **Plan 57 Seeded Solar System + LitRPG System + Holo-Room Game Bridge**.
+## 1. Problem Statement & Root-Cause Diagnosis (`sq-distortion-check`)
 
-**Plan 58** replaces the fragmented legacy menu/HUD styling with a **single, unified, 100% preset-driven Menu & Interface Architecture**:
-1. **Complete Purge of Legacy Lab/Gate Storyline Locks from Active UI**:
-   - No menu or spawn selector ever locks the player behind the parked Earth Lab console lever (`gateOn`), references "Earth Bunker / Operator Console", or shows hardcoded story telemetry ("Containment integrity 98.4%", "Dr. Gwen Haddy").
-   - Legacy `?story` tests keep their isolated entry path, while the default game is 100% **Seeded Worlds + Holo-Room + Studio**.
-2. **Everything is a 5-Rung `ui:` Preset (`@hm/hudlayout`)**:
-   - Every screen in the application—**Home Holo-Deck**, **Solar System & Stargate Map**, **In-Game LitRPG System HUD**, **Rung-6 Wanderer Meta-Shell (Comms, Party/Guild, Clip Recorder, Harness Bridge, Higher Self Seat)**, and **The Studio**—climbs the same 5 rungs:
-     $$\text{Rung 1 (Tokens / Style)} \to \text{Rung 2 (Widget Look)} \to \text{Rung 3 (Grounded Part)} \to \text{Rung 4 (Panel)} \to \text{Rung 5 (Screen)}$$
-3. **One Style Preset Changes the Entire Game's Look (`UI_STYLE_SHELF` + `uiTokensToCssVars`)**:
-   - Every colour, surface translucency, corner radius, typography family, scale factor, and motion rule flows from Rung-1 `UiTokens` into root CSS custom properties (`--ui-ink`, `--ui-paper`, `--ui-accent`, `--ui-warn`, `--ui-dim`, `--ui-font`, `--ui-scale`, `--ui-radius`).
-   - Selecting or hovering any style preset on the shelf (or importing a `uic:` share code) immediately restyles the Home Menu, Modal Dialogs, Solar System Map, Play HUD, and Meta-Shell in unison (`previews-drive-play`).
+The screenshot audit (`docs/UI_DESIGN_SYSTEM_RESEARCH.md` §1) exposed two critical failures across our interface layer:
+1. **Cross-Stylesheet Contrast Bug**: `shell.css` set global `button { background: #1d2530; color: var(--text); }` while `studio.css` overwrote `:root { --panel: #fbfaf6; --text: #242722; }`. Any dialog using `.shell-window` (such as `ManageProfilesModal`) rendered dark `#242722` text inside dark `#1d2530` buttons on muddy grey rows over a cream panel — making buttons unreadable.
+2. **Mismatched "AI Slop" Visual Collage**: Five disconnected stylesheets (`shell.css`, `studio.css`, `dark-modal.css`, `planetary-grid.css`, and inline hex styles in `studio-app.tsx` / `goblin-front.tsx`) mixed glowing `#00e5ff` neon cyan logos/badges, `#38bdf8` sky-blue pills, `#b84dff` neon purple Game Bridge borders, `#a855f7` purple Studio buttons, and `#fbfaf6` light cream modals on the same screen.
+
+Under **Standing Rule 6 (Examples Mean Categories)** and **RULES 8a**, we replace this piecemeal CSS with a single **5-Rung `ui:` Preset Architecture** authored in **The Studio**, applied to **The Studio itself**, and driving **every menu, modal, overlay, and HUD**.
 
 ---
 
-## 2. Legacy Lab / Gate / Storyline Clutter Purge Checklist
+## 2. The 5-Rung Preset Interface Architecture (`@hm/hudlayout`)
 
-| Location | Legacy Lab / Story Clutter | Clean Seeded-World Replacement |
-|---|---|---|
-| `apps/web/src/shell/goblin-front.tsx` | Brand subtitle `"A SetMix System // Substrate Research Initiative"`; inline hardcoded `rgba(8, 12, 20, 0.74)` and `#3dc8ff` border ignoring `UiTokens`. | Subtitle `"Seeded Worlds // LitRPG & Co-Creation Sandbox"`; blade styled via `--ui-*` CSS variables from the active `UiStylePreset` + live **UI Style Switcher** with hover try-on. |
-| `apps/web/src/shell/shell.tsx` | `spawnAt('gate')` blocked by `!readGridView().gateOn` with toast `"The Moon Twin Gate is still dark. Pull the console lever in the Earth lab first."` | Always allow direct deployment to the **World Arrival Pad (Stage 3)** or **Stargate Plinth** without requiring the parked Earth Lab lever. |
-| `apps/web/src/shell/planetary-grid.tsx` | `NEIGHBOR_ENCLAVES` `owner: 'Gwen_Haddy'`; Spawn Selector cards `"EARTH BUNKER — Earth Observation Lab (Deploy inside the bunker at Operator Console)"` and `"MOON CRATER — Moon Twin Gate Pad (Locked: Power the gate in the Lab first)"`. | `owner: 'Lyra_Vance'`; Spawn Selector cards `"ARRIVAL PAD — Seeded World (Stage 3)"` and `"STARGATE PLINTH — Active World Gate"` (unlocked, direct deployment). |
-| `apps/web/src/play/ui-play-hud.ts` | Uses a single hardcoded `tokens` block on `PLAY_HUD_SCREEN`. | Supports applying any `UiStylePreset` from `UI_STYLE_SHELF` (`applyStyleToScreen(screen, styleId)`). |
+Every screen in FIDELITY and The Studio is a validated `UiScreen` (`uic:` share code) built from the 5-rung hierarchy in `packages/hudlayout/src/ui.ts`:
 
----
-
-## 3. Rung 1: The Curated UI Style Preset Shelf (`UI_STYLE_SHELF`)
-
-Every `UiStylePreset` packages a complete, validated `UiTokens` record (`ink`, `paper`, `accent`, `warn`, `dim`, `font`, `scale`, `radius`, `reducedMotion`) plus a human-readable `id`, `name`, and `tagline`:
-
-| Preset ID | Name | Ink / Paper / Accent / Warn / Dim | Font / Radius / Scale | Aesthetic Direction |
-|---|---|---|---|---|
-| `holodeck-violet` *(Default)* | **Overwatch Holo-Deck** | `#f1f5f9` / `#080c14` / `#a78bfa` / `#f43f5e` / `#94a3b8` | `setmix`, `6px`, `1.0x` | Deep obsidian glass, Overwatch drone violet, crisp technical framing. |
-| `litrpg-system` | **Isekai System Appraisal** | `#f8fafc` / `#0a1628` / `#38bdf8` / `#fbbf24` / `#7dd3fc` | `sans`, `4px`, `1.0x` | Translucent sapphire appraisal slate with sky-cyan & gold status trim. |
-| `stargate-ancient` | **Lantean Gate Crystal** | `#fef3c7` / `#14110b` / `#f59e0b` / `#ef4444` / `#d97706` | `setmix`, `2px`, `1.0x` | Warm bronze-obsidian and amber-gold glyph illumination. |
-| `studio-precision` | **Studio CAD Dark** | `#e2e8f0` / `#111318` / `#22d3ee` / `#f97316` / `#64748b` | `mono`, `3px`, `0.95x` | Neutral engineering dark with zero-distraction monospace readouts. |
-| `retro-amber-crt` | **Stage-2 Phosphor CRT** | `#ffb000` / `#0a0802` / `#ffd000` / `#ff4500` / `#b37700` | `mono`, `0px`, `1.0x` | Classic amber terminal phosphor honoring $S_1/S_2$ heritage. |
-| `high-contrast` | **High-Contrast Access** | `#ffffff` / `#000000` / `#00ffff` / `#ffff00` / `#cccccc` | `sans`, `4px`, `1.15x`, `reducedMotion: true` | WCAG AAA maximum legibility, larger type scale, zero motion. |
-
-### `uiTokensToCssVars(tokens: UiTokens)`
-A pure helper in `@hm/hudlayout` that maps any `UiTokens` object to a `Readonly<Record<string, string>>` of CSS custom properties:
-- `--ui-ink`: `tokens.ink`
-- `--ui-paper`: `tokens.paper`
-- `--ui-accent`: `tokens.accent`
-- `--ui-warn`: `tokens.warn`
-- `--ui-dim`: `tokens.dim`
-- `--ui-font`: mapped font stack (`Oxanium` / `Inter` / `JetBrains Mono`)
-- `--ui-scale`: `String(tokens.scale)`
-- `--ui-radius`: `${tokens.radius}px`
+| Rung | Kind | Type | Role |
+| :---: | :---: | :--- | :--- |
+| **1** | **Atoms & Style Tokens** | `UiTokens` / `UiStylePreset` | Surface chassis (`bg`, `paper`, `inset`, `line`), typography (`ink`, `dim`, `font`), functional state colors (`accent`, `ok`, `warn`, `danger`), corner radius (`0..6px`), and Four-Float vector $\mathbf{S} = (\text{Pxd}, \text{Vtx}, \text{Lx}, \text{Aq})$. |
+| **2** | **Widget Stack** | `UiWidget` | Typed primitives (`pill`, `bar`, `text`, `stat`, `action`) with `tone`, `frame`, `size`, and validated `source` or `command` binding. |
+| **3** | **Panel Clip** | `UiPanel` | Anchored 9-zone container (`top-left` .. `bottom-right`) holding `UiPanelPart[]` with 8 px grid-snapped offsets (`dx`, `dy`). |
+| **4** | **Screen Assembly** | `UiScreen` | Complete interface layout (`HOME_HOLODECK_SCREEN`, `PLAY_HUD_SCREEN`, `META_SHELL_SCREEN`, `STUDIO_SHELL_SCREEN`) combining Rung-1 `tokens` with Rung-3 `panels`, validated by `validateScreen` (Lens Rule: zero dead buttons or unbound data sources) and round-tripped via `uic:` codes. |
+| **5** | **World / Campaign Cartridge** | `MultiverseGamePresetSpec` | Binds the active `UiStylePreset` and screen overrides to the world save (`hm.setmix.ui.style`, `hm.setmix.ui.homeScreen`, `hm.setmix.ui.playScreen`). |
 
 ---
 
-## 4. Rung 5: The Unified Screen Suite (`UI_SCREEN_SHELF`)
+## 3. Anti-Slop Tactile Industrial Style Shelf (`UI_STYLE_SHELF`)
 
-Every layer of FIDELITY is represented as a validated `UiScreen` in `@hm/hudlayout` that satisfies `validateScreen(screen, sources, commands) === []` and round-trips through `encodeScreen` / `decodeScreen` (`uic:`):
+To eliminate "AI slop" (unfocused cyan/purple neon glows, fake glassmorphism blobs, rainbow buttons), `UI_STYLE_SHELF` provides **6 tactile industrial & diegetic presets**, defaulting to **`ui-style:braun-atelier`**:
 
-### 4.1 `HOME_HOLODECK_SCREEN` (`id: 'home-holodeck'`)
-- **Backdrop**: The 3D `GridRoom` (warming presets rung by rung from `S0a` to `S3`, 0 idle draws when static, 15 fps when a game window is linked to the Holo-Room screen).
-- **Left Blade (`top-left` panel `home-nav`)**:
-  - Brand header + Stage warm-up progress (`room.stage`, `room.warmShare`).
-  - Action parts bound to real shell commands:
-    - `nav.expedition` — **Enter Seeded World** (Solo/Co-Op Simulation, Stage 3 arrival with Overwatch Drone).
-    - `nav.grid` — **Solar System & Stargate Network** (Seeded worlds, co-op enclaves, gate codes).
-    - `nav.studio` — **The Studio** (5-rung preset & world editor + AI agent bridge).
-    - `nav.community` — **Community & Guild Shelf** (Shared presets, worlds, clips).
-    - `nav.settings` — **Settings & UI Theme** (Graphics, audio, bridge permissions, UI style preset).
-- **Top-Right Pill (`top-right` panel `home-profile`)**:
-  - Active profile name (`profile.name`), credits (`profile.credits`), and UI Style Preset selector (`ui.styleName`, `ui.cycleStyle`).
-- **Bottom-Right Bridge Control (`bottom-right` panel `home-bridge`)**:
-  - Holo-Room Game Bridge status (`bridge.status`) and link/unlink action (`bridge.toggleLink`).
+| Style ID | Name | Inspiration & Palette | S = (Pxd, Vtx, Lx, Aq) |
+| :--- | :--- | :--- | :--- |
+| `ui-style:braun-atelier` *(Default)* | **Braun Atelier** | Dieter Rams / Teenage Engineering matte warm-carbon (`#141513` bg, `#1c1e1b` panel, `#252824` inset, `#343832` hairline, `#f2f0e8` bone ink, `#d96b43` tactile terracotta accent, `2px` chamfer, zero glow). | `(0.88, 0.85, 0.72, 0.30)` |
+| `ui-style:rams-paper` | **Rams Drafting Vellum** | Clean warm-white architectural studio (`#f4f3ee` bg, `#fbfaf6` panel, `#eae8df` inset, `#d6d4cb` hairline, `#20221e` charcoal ink, `#c56443` terracotta accent, `0px` square corners). | `(0.92, 0.86, 0.90, 0.25)` |
+| `ui-style:nier-monolith` | **YoRHa Monolith** | *NieR:Automata* computational data-craft (`#1a1917` ash-black, `#23221f` panel, `#2e2c28` inset, `#46433b` hairline, `#dad4c4` parchment ink, `#c4b89b` brass-ivory accent, `0px` corners). | `(0.90, 0.88, 0.65, 0.22)` |
+| `ui-style:nasa-amber` | **Apollo Telemetry** | *Starfield* NASA-punk command module (`#121417` anodized slate, `#181b20` panel, `#21262d` inset, `#323842` hairline, `#ede8dc` cream ink, `#e09f3e` instrument amber accent, `2px` corners). | `(0.84, 0.80, 0.78, 0.28)` |
+| `ui-style:system-sovereign` | **Sovereign Ledger** | LitRPG System archival frame (`#111418` obsidian, `#171b21` panel, `#1f252d` inset, `#2e3642` hairline, `#eef2f6` crisp ink, `#d4a359` burnished gold accent, `2px` corners). | `(0.90, 0.84, 0.82, 0.45)` |
+| `ui-style:high-contrast` | **High-Contrast Blueprint** | WCAG AAA accessible engineering blueprint (`#000000` black, `#0a0a0a` panel, `#171717` inset, `#ffffff` rule, `#ffffff` ink, `#ffbe0b` high-vis amber-gold, `0px` corners). | `(1.00, 0.90, 1.00, 0.20)` |
 
-### 4.2 `PLAY_HUD_SCREEN` (`id: 'play-hud'`)
-- **Top-Left (`goal`)**: Current world stage & active objective (`goal.title`, `goal.hint`, `goal.next`).
-- **Top-Center (`system`)**: Drone's LitRPG System voice notice (`system.notice`, violet/kind-bordered under the compass).
-- **Top-Right (`floats`)**: Stage badge (`plot.stage`) + the Four Floats (`floats.pxd`, `floats.vtx`, `floats.lx`, `floats.aq`).
-- **Middle-Right (`appraise`)**: Context-sensitive LitRPG Appraise card when aiming at any part, element, contraption, or native (`appraise.name`, `appraise.author`, `appraise.mass`, `appraise.charge`, `appraise.sockets`).
-- **Bottom-Left (`comms`)**: Overwatch & Party/Guild Comms action chip (`comms.toggle`).
-- **Bottom-Right (`plot` + `health`)**: Ore (`plot.ore`, rate, linked crates, out-of-ore alert), Power (`power.demand` of `power.supply`, satisfaction share, brownout alert), and Player Health (`player.hp` of `player.hpMax`, 20-segment bar, shield/low notes).
+### Single Root CSS Variable Bridge (`uiTokensToCssVars`)
+`uiTokensToCssVars(tokens)` outputs both `--ui-*` variables AND maps `--bg`, `--paper`, `--panel`, `--hm-inset`, `--line`, `--text`, `--dim`, `--accent`, `--ok`, `--danger` so that **every stylesheet in the repo** (`shell.css`, `studio.css`, `dark-modal.css`, `dark-forms.css`, `planetary-grid.css`) shares one authoritative palette with guaranteed button and modal contrast.
 
-### 4.3 `META_SHELL_SCREEN` (`id: 'meta-shell'`, Plan 57 §19 Rung-6 Wanderer Layer)
-- **Top-Left (`wanderer-party`)**:
-  - Player Wanderer anchor status (`wanderer.bal`, `wanderer.calm` lent to drone/party).
-  - Party working-group multiplier (`party.doubling` $2^{N-1}$) & Guild Social Memory Complex coherence (`guild.coherence`, `guild.pooledCauses`).
-- **Bottom-Left (`comms-drawer`)**:
-  - Tiered Comms feed (`comms.messages` list) + action triggers for canned callouts (`comms.pingGate`, `comms.pingCraft`, `comms.pingEureka`, `comms.pingHelp`).
-- **Top-Right (`clip-stream`)**:
-  - Video Clip & Shorthand Replay status (`clip.status`) + 1-click capture/share command (`clip.capture`).
-- **Middle-Left (`harness-deck`)**:
-  - Bridge mode readout (`harness.bridgeMode`: `off | mirror-only | checked-profile-relay`) + Higher Self Dream Cue trigger (`harness.cueDream`).
+---
 
-### 4.4 `STUDIO_UI_EDITOR_TAB` (Plan 57 §15 & `UI_EDITOR_RESEARCH.md` P1–P7)
-- Live preview of any `UiScreen` (`PLAY_HUD_SCREEN`, `HOME_HOLODECK_SCREEN`, `META_SHELL_SCREEN`) with real `UiPanelView` rendering.
-- Style preset switcher (`UI_STYLE_SHELF`) with **hover try-on** (`previews-drive-play`).
-- Panel & Part inspector rows with 8px snapped offsets, live `validateScreen` lens-rule feedback, live overlap detection, and `uic:` copy/paste share codes.
+## 4. Built in The Studio, for The Studio, and Applied to the Menus
 
+1. **4 Canonical `UiScreen` Presets (`packages/hudlayout/src/ui.ts`)**:
+   - `HOME_HOLODECK_SCREEN` (`ui:home-holodeck-default`): Home Menu navigation, profile/credits bar, warm-up status, and Game Bridge card.
+   - `PLAY_HUD_SCREEN` (`ui:play-hud-default`): In-game 9-zone HUD.
+   - `META_SHELL_SCREEN` (`ui:meta-shell-default`): Rung-6 Wanderer Meta-Shell (Anchor Calm, Party Doubling, Guild Complex, Auto-Mimicry & Clip Share).
+   - `STUDIO_SHELL_SCREEN` (`ui:studio-shell-default`): The Studio's own workspace bar, 5-rung breadcrumb, inspector dock, and action bar.
+2. **Studio `UI & Menus (ui:)` Inspector Tab (`apps/web/src/studio/inspectors/ui-preset-inspector.tsx`)**:
+   - Accessible directly in **The Studio** (`UI & Menus (ui:)` tab in `StudioApp`).
+   - Lets the creator or AI agent select any of the 4 screens (`Home Menu`, `Play HUD`, `Meta-Shell`, `Studio Chrome`), switch or customize `UiStylePreset` tokens with **live hover try-on**, toggle/re-anchor panels and widgets on an 8 px grid, inspect live **Lens Rule (`validateScreen`)** & **9-Zone Overlap** checks, and copy/paste **`uic:` share codes**.
+   - **Self-Hosting Studio**: Changing the UI style preset in The Studio immediately updates The Studio's own chrome (`StudioApp`) AND persists to the Home Menu and Play HUD.
+3. **Preset-Driven Home Menu & Unified Modals**:
+   - `SetMixHome` (`goblin-front.tsx`) reads the Studio-saved `HOME_HOLODECK_SCREEN` preset so panel visibility, action labels, and style tokens edited in the Studio drive the live Home menu.
+   - `ManageProfilesModal`, `ProfileChip`, `GridRoom`, `DarkModal`, and `PlanetaryGridScreen` use the unified `--ui-*` tokens with crisp 1px hairlines and zero neon slop.

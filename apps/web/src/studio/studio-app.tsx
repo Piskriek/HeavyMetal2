@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import {
+  DEFAULT_UI_STYLE_ID,
+  getUiStylePreset,
+  uiTokensToCssVars,
+  type UiStyleId,
+} from '@hm/hudlayout';
 import {
   createStudioStore,
   RUNG_METADATA,
@@ -15,20 +21,24 @@ import { KitAssemblerPanel } from './inspectors/kit-assembler-panel';
 import { TexGraphNodeEditor } from './inspectors/texgraph-node-editor';
 import { PartGenMeshOpsPanel } from './inspectors/partgen-meshops-panel';
 import { LogicTriggersPanel } from './inspectors/logic-triggers-panel';
+import { UiPresetInspector } from './inspectors/ui-preset-inspector';
 import { LookTab } from './look-tab';
 import { SceneTab } from './scene-tab';
 import { AudioTab } from './audio-tab';
 import { NewPlanetModal } from './modals/new-planet-modal';
 import { SporeCardModal } from './modals/spore-card-modal';
 import { TestPlayOverlay } from './modals/test-play-overlay';
+import { installStudioAiBridge } from './studio-ai-bridge';
+import { kv } from '../storage/profile-storage';
+
+const UI_STYLE_KEY = 'hm.setmix.ui.style';
 
 export interface StudioAppProps {
   store?: StudioStore;
   onBack?: () => void;
   renderPrototype?: () => React.ReactElement;
+  initialInspectorTab?: CreativeInspectorTabId;
 }
-
-import { installStudioAiBridge } from './studio-ai-bridge';
 
 const defaultStore = createStudioStore();
 
@@ -45,17 +55,62 @@ const INSPECTOR_TABS: Array<{ id: CreativeInspectorTabId; label: string; rung: P
   { id: 'texgraph-uv', label: 'TexGraph (UV)', rung: 1 },
   { id: 'partgen-meshops', label: 'PartGen & MeshOps', rung: 3 },
   { id: 'logic-triggers', label: 'Logic & Triggers', rung: 3 },
+  { id: 'ui-interface', label: 'UI & Menus (ui:)', rung: 4 },
 ];
 
 export const StudioApp: React.FC<StudioAppProps> = ({
   store = defaultStore,
   onBack,
   renderPrototype: _renderPrototype,
+  initialInspectorTab,
 }) => {
   const state = useSyncExternalStore(
     (listener) => store.subscribe(listener),
     () => store.getSnapshot(),
   );
+
+  const [uiStyleId, setUiStyleId] = useState<UiStyleId>(() => {
+    try {
+      return getUiStylePreset(kv.get(UI_STYLE_KEY)).id;
+    } catch {
+      return DEFAULT_UI_STYLE_ID;
+    }
+  });
+  const [hoverUiStyleId, setHoverUiStyleId] = useState<UiStyleId | null>(null);
+  const effectiveStylePreset = useMemo(
+    () => getUiStylePreset(hoverUiStyleId ?? uiStyleId),
+    [hoverUiStyleId, uiStyleId],
+  );
+  const uiCssVars = useMemo(
+    () => uiTokensToCssVars(effectiveStylePreset.tokens),
+    [effectiveStylePreset],
+  );
+
+  // Sync root document CSS variables so modals and overlays match the Studio's active UI preset
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    for (const [k, v] of Object.entries(uiCssVars)) {
+      root.style.setProperty(k, v);
+    }
+  }, [uiCssVars]);
+
+  useEffect(() => {
+    if (initialInspectorTab) {
+      store.setActiveWorkspace('creative-suite');
+      store.setActiveInspectorTab(initialInspectorTab);
+    }
+  }, [initialInspectorTab, store]);
+
+  const handleSelectUiStyle = (nextId: UiStyleId) => {
+    setUiStyleId(nextId);
+    setHoverUiStyleId(null);
+    try {
+      kv.set(UI_STYLE_KEY, nextId);
+    } catch {
+      /* ignore */
+    }
+  };
 
   const [saveBanner, setSaveBanner] = useState<string | null>(null);
   const breadcrumb = store.getBreadcrumb();
@@ -102,14 +157,16 @@ export const StudioApp: React.FC<StudioAppProps> = ({
     setTimeout(() => setSaveBanner(null), 3000);
   };
 
-  // Interactive 5-Rung Inception Navigation (Part 3 of Audit)
+  // Interactive 5-Rung Inception Navigation
   const navigateToRung = (rung: PresetRung) => {
     store.setActiveRung(rung);
     if (rung === 5) {
       store.setActiveWorkspace('scene-layout');
     } else if (rung === 4) {
       store.setActiveWorkspace('creative-suite');
-      store.setActiveInspectorTab('parts-assemblies');
+      if (state.activeInspectorTab !== 'ui-interface') {
+        store.setActiveInspectorTab('parts-assemblies');
+      }
     } else if (rung === 3) {
       store.setActiveWorkspace('creative-suite');
       store.setActiveInspectorTab('partgen-meshops');
@@ -124,26 +181,29 @@ export const StudioApp: React.FC<StudioAppProps> = ({
 
   return (
     <div
+      className="studio-root"
+      data-ui-style={effectiveStylePreset.id}
       style={{
+        ...(uiCssVars as React.CSSProperties),
         display: 'flex',
         flexDirection: 'column',
         width: '100vw',
         height: '100vh',
-        background: '#090d16',
-        color: '#f8fafc',
-        fontFamily: 'Inter, system-ui, sans-serif',
+        background: 'var(--ui-bg, #141613)',
+        color: 'var(--ui-ink, #f2f0e8)',
+        fontFamily: 'var(--ui-font, Inter, system-ui, sans-serif)',
         overflow: 'hidden',
       }}
     >
-      {/* Top Main Bar: [FIDELITY Studio] + World Switcher + 4 Clean Workspaces + [▶ Test Play] + [Export Spore Card] + [Save] */}
+      {/* Top Main Bar: Styled by `STUDIO_SHELL_SCREEN` & `UiTokens` (`--ui-*`) */}
       <header
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '8px 16px',
-          background: '#0d131f',
-          borderBottom: '1px solid #1e293b',
+          background: 'var(--ui-panel, #1b1d19)',
+          borderBottom: '1px solid var(--ui-line, #4c4f47)',
           flexShrink: 0,
         }}
       >
@@ -157,10 +217,10 @@ export const StudioApp: React.FC<StudioAppProps> = ({
                 padding: '5px 12px',
                 fontSize: 12,
                 fontWeight: 600,
-                background: '#1e293b',
-                border: '1px solid #334155',
-                borderRadius: 4,
-                color: '#94a3b8',
+                background: 'var(--ui-inset, #2a2c27)',
+                border: '1px solid var(--ui-line, #4c4f47)',
+                borderRadius: 'var(--ui-radius, 2px)',
+                color: 'var(--ui-ink, #f2f0e8)',
                 cursor: 'pointer',
               }}
             >
@@ -169,10 +229,10 @@ export const StudioApp: React.FC<StudioAppProps> = ({
           )}
           <span
             style={{
-              fontSize: 14,
+              fontSize: 13,
               fontWeight: 800,
-              letterSpacing: '0.06em',
-              color: '#38bdf8',
+              letterSpacing: '0.08em',
+              color: 'var(--ui-accent, #d96b43)',
             }}
           >
             FIDELITY STUDIO
@@ -190,10 +250,10 @@ export const StudioApp: React.FC<StudioAppProps> = ({
             }}
             style={{
               padding: '5px 10px',
-              borderRadius: 6,
-              background: '#162032',
-              color: '#e2e8f0',
-              border: '1px solid #334155',
+              borderRadius: 'var(--ui-radius, 2px)',
+              background: 'var(--ui-inset, #2a2c27)',
+              color: 'var(--ui-ink, #f2f0e8)',
+              border: '1px solid var(--ui-line, #4c4f47)',
               fontSize: 12,
               fontWeight: 600,
             }}
@@ -219,10 +279,12 @@ export const StudioApp: React.FC<StudioAppProps> = ({
                   }}
                   style={{
                     padding: '6px 12px',
-                    borderRadius: 6,
-                    border: active ? '1px solid #38bdf8' : '1px solid transparent',
-                    background: active ? 'rgba(56, 189, 248, 0.16)' : 'transparent',
-                    color: active ? '#f0f9ff' : '#94a3b8',
+                    borderRadius: 'var(--ui-radius, 2px)',
+                    border: active
+                      ? '1px solid var(--ui-accent, #d96b43)'
+                      : '1px solid var(--ui-line, #4c4f47)',
+                    background: active ? 'var(--ui-accent, #d96b43)' : 'var(--ui-inset, #2a2c27)',
+                    color: active ? 'var(--ui-accent-ink, #ffffff)' : 'var(--ui-dim, #9e9c92)',
                     fontSize: 12,
                     fontWeight: active ? 700 : 500,
                     cursor: 'pointer',
@@ -243,10 +305,10 @@ export const StudioApp: React.FC<StudioAppProps> = ({
             title="Undo (Ctrl+Z)"
             style={{
               padding: '5px 8px',
-              borderRadius: 5,
-              border: '1px solid #334155',
-              background: '#162032',
-              color: store.canUndo() ? '#e2e8f0' : '#475569',
+              borderRadius: 'var(--ui-radius, 2px)',
+              border: '1px solid var(--ui-line, #4c4f47)',
+              background: 'var(--ui-inset, #2a2c27)',
+              color: store.canUndo() ? 'var(--ui-ink, #f2f0e8)' : 'var(--ui-dim, #9e9c92)',
               fontSize: 11,
               cursor: store.canUndo() ? 'pointer' : 'default',
             }}
@@ -259,10 +321,10 @@ export const StudioApp: React.FC<StudioAppProps> = ({
             title="Redo (Ctrl+Shift+Z)"
             style={{
               padding: '5px 8px',
-              borderRadius: 5,
-              border: '1px solid #334155',
-              background: '#162032',
-              color: store.canRedo() ? '#e2e8f0' : '#475569',
+              borderRadius: 'var(--ui-radius, 2px)',
+              border: '1px solid var(--ui-line, #4c4f47)',
+              background: 'var(--ui-inset, #2a2c27)',
+              color: store.canRedo() ? 'var(--ui-ink, #f2f0e8)' : 'var(--ui-dim, #9e9c92)',
               fontSize: 11,
               cursor: store.canRedo() ? 'pointer' : 'default',
             }}
@@ -274,12 +336,12 @@ export const StudioApp: React.FC<StudioAppProps> = ({
             onClick={() => store.enterTestPlaySandbox()}
             style={{
               padding: '6px 12px',
-              borderRadius: 6,
-              border: 'none',
-              background: '#10b981',
-              color: '#052e16',
+              borderRadius: 'var(--ui-radius, 2px)',
+              border: '1px solid var(--ui-ok, #5c9a78)',
+              background: 'var(--ui-ok, #5c9a78)',
+              color: '#ffffff',
               fontSize: 12,
-              fontWeight: 800,
+              fontWeight: 700,
               cursor: 'pointer',
             }}
           >
@@ -290,12 +352,12 @@ export const StudioApp: React.FC<StudioAppProps> = ({
             onClick={() => store.setSporeCardModalOpen(true)}
             style={{
               padding: '6px 12px',
-              borderRadius: 6,
-              border: '1px solid #a855f7',
-              background: 'rgba(168, 85, 247, 0.18)',
-              color: '#e9d5ff',
+              borderRadius: 'var(--ui-radius, 2px)',
+              border: '1px solid var(--ui-line, #4c4f47)',
+              background: 'var(--ui-inset, #2a2c27)',
+              color: 'var(--ui-ink, #f2f0e8)',
               fontSize: 12,
-              fontWeight: 700,
+              fontWeight: 600,
               cursor: 'pointer',
             }}
           >
@@ -306,10 +368,10 @@ export const StudioApp: React.FC<StudioAppProps> = ({
             onClick={handleApplyAndSave}
             style={{
               padding: '6px 14px',
-              borderRadius: 6,
-              border: 'none',
-              background: '#0284c7',
-              color: '#fff',
+              borderRadius: 'var(--ui-radius, 2px)',
+              border: '1px solid var(--ui-accent, #d96b43)',
+              background: 'var(--ui-accent, #d96b43)',
+              color: 'var(--ui-accent-ink, #ffffff)',
               fontSize: 12,
               fontWeight: 700,
               cursor: 'pointer',
@@ -327,114 +389,67 @@ export const StudioApp: React.FC<StudioAppProps> = ({
           justifyContent: 'space-between',
           alignItems: 'center',
           padding: '5px 16px',
-          background: '#0b101b',
-          borderBottom: '1px solid #182234',
+          background: 'var(--ui-bg, #141613)',
+          borderBottom: '1px solid var(--ui-line, #4c4f47)',
           fontSize: 11,
-          color: '#94a3b8',
+          color: 'var(--ui-dim, #9e9c92)',
           flexShrink: 0,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-          <span style={{ color: '#38bdf8', fontWeight: 700, marginRight: 2 }}>
+          <span style={{ color: 'var(--ui-accent, #d96b43)', fontWeight: 700, marginRight: 2 }}>
             5-Rung Inception:
           </span>
-          <button
-            onClick={() => navigateToRung(5)}
-            title="Zoom Out to Rung 5: Planetary World & Scene Layout"
-            style={{
-              padding: '2px 8px',
-              borderRadius: 4,
-              border: state.activeRung === 5 ? '1px solid #38bdf8' : '1px solid #1e293b',
-              background: state.activeRung === 5 ? 'rgba(56, 189, 248, 0.18)' : '#111827',
-              color: state.activeRung === 5 ? '#f8fafc' : '#cbd5e1',
-              fontSize: 11,
-              cursor: 'pointer',
-            }}
-          >
-            🪐 R5 World: {breadcrumb.worldLabel}
-          </button>
-          <span>▸</span>
-          <button
-            onClick={() => navigateToRung(4)}
-            title="Jump to Rung 4: Modular Machine Kit & Sockets (@hm/kitspec)"
-            style={{
-              padding: '2px 8px',
-              borderRadius: 4,
-              border: state.activeRung === 4 ? '1px solid #38bdf8' : '1px solid #1e293b',
-              background: state.activeRung === 4 ? 'rgba(56, 189, 248, 0.18)' : '#111827',
-              color: state.activeRung === 4 ? '#f8fafc' : '#cbd5e1',
-              fontSize: 11,
-              cursor: 'pointer',
-            }}
-          >
-            ⚙️ R4 Kit: {breadcrumb.machineLabel}
-          </button>
-          <span>▸</span>
-          <button
-            onClick={() => navigateToRung(3)}
-            title="Dive to Rung 3: Parametric Part & MeshOps Stack (@hm/partgen)"
-            style={{
-              padding: '2px 8px',
-              borderRadius: 4,
-              border: state.activeRung === 3 ? '1px solid #38bdf8' : '1px solid #1e293b',
-              background: state.activeRung === 3 ? 'rgba(56, 189, 248, 0.18)' : '#111827',
-              color: state.activeRung === 3 ? '#f8fafc' : '#cbd5e1',
-              fontSize: 11,
-              cursor: 'pointer',
-            }}
-          >
-            📦 R3 Part: {state.activePartId ?? 'plinth'}
-          </button>
-          <span>▸</span>
-          <button
-            onClick={() => navigateToRung(2)}
-            title="Dive to Rung 2: Layered PBR Material Stack (@hm/matstack)"
-            style={{
-              padding: '2px 8px',
-              borderRadius: 4,
-              border: state.activeRung === 2 ? '1px solid #38bdf8' : '1px solid #1e293b',
-              background: state.activeRung === 2 ? 'rgba(56, 189, 248, 0.18)' : '#111827',
-              color: state.activeRung === 2 ? '#f8fafc' : '#cbd5e1',
-              fontSize: 11,
-              cursor: 'pointer',
-            }}
-          >
-            🎨 R2 Slot: {breadcrumb.slotLabel}
-          </button>
-          <span>▸</span>
-          <button
-            onClick={() => navigateToRung(1)}
-            title="Dive to Rung 1: Seamless Procedural Tile Atom (@hm/texgraph)"
-            style={{
-              padding: '2px 8px',
-              borderRadius: 4,
-              border: state.activeRung === 1 ? '1px solid #38bdf8' : '1px solid #1e293b',
-              background: state.activeRung === 1 ? 'rgba(56, 189, 248, 0.18)' : '#111827',
-              color: state.activeRung === 1 ? '#f8fafc' : '#cbd5e1',
-              fontSize: 11,
-              cursor: 'pointer',
-            }}
-          >
-            🧬 R1 Atom: {state.activeTileId}
-          </button>
+          {(
+            [
+              [5, `R5 World: ${breadcrumb.worldLabel}`, 'Zoom Out to Rung 5: Planetary World & Scene Layout'],
+              [4, `R4 Kit/UI: ${breadcrumb.machineLabel}`, 'Jump to Rung 4: Modular Machine Kit & UI Screens'],
+              [3, `R3 Part: ${state.activePartId ?? 'plinth'}`, 'Dive to Rung 3: Parametric Part & MeshOps Stack'],
+              [2, `R2 Slot: ${breadcrumb.slotLabel}`, 'Dive to Rung 2: Layered PBR Material Stack'],
+              [1, `R1 Atom: ${state.activeTileId}`, 'Dive to Rung 1: Seamless Procedural Tile & UI Tokens'],
+            ] as const
+          ).map(([rungNum, text, title], idx) => {
+            const active = state.activeRung === rungNum;
+            return (
+              <React.Fragment key={rungNum}>
+                {idx > 0 && <span>▸</span>}
+                <button
+                  onClick={() => navigateToRung(rungNum)}
+                  title={title}
+                  style={{
+                    padding: '2px 8px',
+                    borderRadius: 'var(--ui-radius, 2px)',
+                    border: active
+                      ? '1px solid var(--ui-accent, #d96b43)'
+                      : '1px solid var(--ui-line, #4c4f47)',
+                    background: active ? 'var(--ui-accent, #d96b43)' : 'var(--ui-inset, #2a2c27)',
+                    color: active ? 'var(--ui-accent-ink, #ffffff)' : 'var(--ui-ink, #f2f0e8)',
+                    fontSize: 11,
+                    fontWeight: active ? 700 : 500,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {text}
+                </button>
+              </React.Fragment>
+            );
+          })}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {saveBanner && (
-            <span style={{ color: '#34d399', fontWeight: 700 }}>{saveBanner}</span>
+            <span style={{ color: 'var(--ui-ok, #5c9a78)', fontWeight: 700 }}>{saveBanner}</span>
           )}
           <button
-            onClick={() =>
-              navigateToRung(Math.min(5, state.activeRung + 1) as PresetRung)
-            }
+            onClick={() => navigateToRung(Math.min(5, state.activeRung + 1) as PresetRung)}
             disabled={state.activeRung >= 5}
             title="Zoom Out One Rung in the Preset Hierarchy"
             style={{
               padding: '2px 7px',
-              borderRadius: 4,
-              border: '1px solid #334155',
-              background: '#162032',
-              color: state.activeRung < 5 ? '#7dd3fc' : '#475569',
+              borderRadius: 'var(--ui-radius, 2px)',
+              border: '1px solid var(--ui-line, #4c4f47)',
+              background: 'var(--ui-inset, #2a2c27)',
+              color: state.activeRung < 5 ? 'var(--ui-ink, #f2f0e8)' : 'var(--ui-dim, #9e9c92)',
               fontSize: 10,
               cursor: state.activeRung < 5 ? 'pointer' : 'default',
             }}
@@ -442,17 +457,15 @@ export const StudioApp: React.FC<StudioAppProps> = ({
             ↑ Zoom Out Rung
           </button>
           <button
-            onClick={() =>
-              navigateToRung(Math.max(1, state.activeRung - 1) as PresetRung)
-            }
+            onClick={() => navigateToRung(Math.max(1, state.activeRung - 1) as PresetRung)}
             disabled={state.activeRung <= 1}
             title="Dive In One Rung in the Preset Hierarchy"
             style={{
               padding: '2px 7px',
-              borderRadius: 4,
-              border: '1px solid #334155',
-              background: '#162032',
-              color: state.activeRung > 1 ? '#7dd3fc' : '#475569',
+              borderRadius: 'var(--ui-radius, 2px)',
+              border: '1px solid var(--ui-line, #4c4f47)',
+              background: 'var(--ui-inset, #2a2c27)',
+              color: state.activeRung > 1 ? 'var(--ui-ink, #f2f0e8)' : 'var(--ui-dim, #9e9c92)',
               fontSize: 10,
               cursor: state.activeRung > 1 ? 'pointer' : 'default',
             }}
@@ -462,10 +475,10 @@ export const StudioApp: React.FC<StudioAppProps> = ({
           <span
             style={{
               padding: '2px 8px',
-              borderRadius: 4,
-              background: 'rgba(56, 189, 248, 0.12)',
-              border: '1px solid #1e3a5f',
-              color: '#7dd3fc',
+              borderRadius: 'var(--ui-radius, 2px)',
+              background: 'var(--ui-inset, #2a2c27)',
+              border: '1px solid var(--ui-line, #4c4f47)',
+              color: 'var(--ui-accent, #d96b43)',
               fontSize: 10,
               fontWeight: 600,
               whiteSpace: 'nowrap',
@@ -476,13 +489,13 @@ export const StudioApp: React.FC<StudioAppProps> = ({
         </div>
       </div>
 
-      {/* Workspace Body (Strict minWidth: 0 & minmax(0, 1fr) prevents CSS Grid Blow-Out!) */}
+      {/* Workspace Body */}
       <div style={{ flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden' }}>
         {state.activeWorkspace === 'creative-suite' && (
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'minmax(0, 1fr) 420px',
+              gridTemplateColumns: 'minmax(0, 1fr) 440px',
               width: '100%',
               height: '100%',
               minWidth: 0,
@@ -508,13 +521,13 @@ export const StudioApp: React.FC<StudioAppProps> = ({
               </div>
             </div>
 
-            {/* Right: 5 Purpose-Built Inspector Tabs */}
+            {/* Right: 6 Purpose-Built Inspector Tabs (including UI & Menus `ui:`) */}
             <div
               style={{
-                width: 420,
+                width: 440,
                 minWidth: 0,
-                borderLeft: '1px solid #1e293b',
-                background: '#0f172a',
+                borderLeft: '1px solid var(--ui-line, #4c4f47)',
+                background: 'var(--ui-panel, #1b1d19)',
                 display: 'flex',
                 flexDirection: 'column',
                 height: '100%',
@@ -524,8 +537,8 @@ export const StudioApp: React.FC<StudioAppProps> = ({
               <div
                 style={{
                   display: 'flex',
-                  borderBottom: '1px solid #1e293b',
-                  background: '#0b111e',
+                  borderBottom: '1px solid var(--ui-line, #4c4f47)',
+                  background: 'var(--ui-bg, #141613)',
                   overflowX: 'auto',
                   flexShrink: 0,
                 }}
@@ -535,6 +548,7 @@ export const StudioApp: React.FC<StudioAppProps> = ({
                   return (
                     <button
                       key={t.id}
+                      data-testid={`studio-tab-${t.id}`}
                       onClick={() => {
                         store.setActiveInspectorTab(t.id);
                         store.setActiveRung(t.rung);
@@ -544,9 +558,11 @@ export const StudioApp: React.FC<StudioAppProps> = ({
                         fontSize: 11,
                         fontWeight: active ? 700 : 500,
                         border: 'none',
-                        borderBottom: active ? '2px solid #38bdf8' : '2px solid transparent',
-                        background: 'transparent',
-                        color: active ? '#38bdf8' : '#94a3b8',
+                        borderBottom: active
+                          ? '2px solid var(--ui-accent, #d96b43)'
+                          : '2px solid transparent',
+                        background: active ? 'var(--ui-panel, #1b1d19)' : 'transparent',
+                        color: active ? 'var(--ui-accent, #d96b43)' : 'var(--ui-dim, #9e9c92)',
                         whiteSpace: 'nowrap',
                         cursor: 'pointer',
                       }}
@@ -557,7 +573,7 @@ export const StudioApp: React.FC<StudioAppProps> = ({
                 })}
               </div>
 
-              <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+              <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: state.activeInspectorTab === 'ui-interface' ? 12 : 0 }}>
                 {state.activeInspectorTab === 'material-layers' && (
                   <MatstackInspector state={state} store={store} />
                 )}
@@ -572,6 +588,13 @@ export const StudioApp: React.FC<StudioAppProps> = ({
                 )}
                 {state.activeInspectorTab === 'logic-triggers' && (
                   <LogicTriggersPanel state={state} store={store} />
+                )}
+                {state.activeInspectorTab === 'ui-interface' && (
+                  <UiPresetInspector
+                    activeStyleId={uiStyleId}
+                    onSelectStyleId={handleSelectUiStyle}
+                    onHoverStyleId={setHoverUiStyleId}
+                  />
                 )}
               </div>
             </div>

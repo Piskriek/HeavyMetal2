@@ -133,8 +133,9 @@ test('a code from before the action (version 2, the play HUD with its stats as i
 });
 
 
-test('Plan 58: UI_STYLE_SHELF, uiTokensToCssVars, HOME_HOLODECK_SCREEN, and META_SHELL_SCREEN validate and round-trip as uic: codes', async () => {
+test('Plan 58: UI_STYLE_SHELF, uiTokensToCssVars, HOME_HOLODECK_SCREEN, META_SHELL_SCREEN, and STUDIO_SHELL_SCREEN validate and round-trip as uic: codes', async () => {
   const {
+    DEFAULT_UI_STYLE_ID,
     UI_STYLE_SHELF,
     HOME_HOLODECK_SCREEN,
     HOME_HOLODECK_SOURCES,
@@ -142,10 +143,14 @@ test('Plan 58: UI_STYLE_SHELF, uiTokensToCssVars, HOME_HOLODECK_SCREEN, and META
     META_SHELL_SCREEN,
     META_SHELL_SOURCES,
     META_SHELL_COMMANDS,
+    STUDIO_SHELL_SCREEN,
+    STUDIO_SHELL_SOURCES,
+    STUDIO_SHELL_COMMANDS,
     applyUiStylePreset,
     uiTokensToCssVars,
   } = await import('../src/index');
 
+  assert.equal(DEFAULT_UI_STYLE_ID, 'braun-atelier');
   assert.equal(UI_STYLE_SHELF.length, 6);
   for (const style of UI_STYLE_SHELF) {
     const vars = uiTokensToCssVars(style.tokens);
@@ -153,6 +158,9 @@ test('Plan 58: UI_STYLE_SHELF, uiTokensToCssVars, HOME_HOLODECK_SCREEN, and META
     assert.equal(vars['--ui-paper'], style.tokens.paper);
     assert.equal(vars['--ui-accent'], style.tokens.accent);
     assert.equal(vars['--ui-radius'], `${style.tokens.radius}px`);
+    assert.equal(vars['--text'], style.tokens.ink);
+    assert.equal(vars['--panel'], style.tokens.paper);
+    assert.notEqual(vars['--hm-inset'], vars['--text'], 'button/row inset background must never match text ink');
 
     const restyledHome = applyUiStylePreset(HOME_HOLODECK_SCREEN, style.id);
     assert.deepEqual(validateScreen(restyledHome, HOME_HOLODECK_SOURCES, HOME_HOLODECK_COMMANDS), []);
@@ -161,5 +169,9 @@ test('Plan 58: UI_STYLE_SHELF, uiTokensToCssVars, HOME_HOLODECK_SCREEN, and META
     const restyledMeta = applyUiStylePreset(META_SHELL_SCREEN, style.id);
     assert.deepEqual(validateScreen(restyledMeta, META_SHELL_SOURCES, META_SHELL_COMMANDS), []);
     assert.deepEqual(decodeScreen(encodeScreen(restyledMeta)), restyledMeta);
+
+    const restyledStudio = applyUiStylePreset(STUDIO_SHELL_SCREEN, style.id);
+    assert.deepEqual(validateScreen(restyledStudio, STUDIO_SHELL_SOURCES, STUDIO_SHELL_COMMANDS), []);
+    assert.deepEqual(decodeScreen(encodeScreen(restyledStudio)), restyledStudio);
   }
 });

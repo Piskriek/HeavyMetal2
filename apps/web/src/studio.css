@@ -1,27 +1,30 @@
 /*
- * THE interface: a clean warm-white studio. Hairline 1px rules, square corners, no shadows or glows, small tracked capitals for labels,
- * one terracotta accent. Adopted from the "Nested Preset Studio" design. Loaded after shell.css, so it wins by order.
- * Colours are variables that the `interface` preset can override (themeOf writes them inline on the app root).
+ * Plan 58: Unified Preset Menu & Interface System (Braun Atelier default).
+ * Hairline 1px rules, tactile industrial contrast, zero neon glow, driven by `UiTokens` (`--ui-*`)
+ * from `@hm/hudlayout` (`uiTokensToCssVars` writes both `--ui-*` and root variables on `.shell` & `documentElement`).
  */
 :root {
-  color-scheme: light;
+  color-scheme: dark;
   font-family: Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  --bg: #f4f3ee; --paper: #f8f7f2; --panel: #fbfaf6; --line: #dcdad2; --text: #242722; --dim: #85847b; --faint: #aaa99f;
-  --accent: #c56443; --green: #527f6a; --ok: #527f6a; --danger: #b3402e; --gold: #d5a24a;
-  --hm-bg: #fbfaf6; --hm-inset: #f1f0ea;
+  --ui-bg: #141613; --ui-paper: #1b1d19; --ui-panel: #1b1d19; --ui-inset: #2a2c27; --ui-hover: #363932; --ui-line: #4c4f47;
+  --ui-ink: #f2f0e8; --ui-text: #f2f0e8; --ui-dim: #9e9c92; --ui-accent: #d96b43; --ui-accent-ink: #ffffff;
+  --ui-ok: #5c9a78; --ui-warn: #c94a38; --ui-danger: #c94a38; --ui-radius: 2px;
+  --bg: var(--ui-bg); --paper: var(--ui-paper); --panel: var(--ui-panel); --line: var(--ui-line); --text: var(--ui-ink); --dim: var(--ui-dim); --faint: #6e6d65;
+  --accent: var(--ui-accent); --green: var(--ui-ok); --ok: var(--ui-ok); --danger: var(--ui-danger); --gold: #d4a359;
+  --hm-bg: var(--ui-panel); --hm-inset: var(--ui-inset);
 }
-body { background: var(--paper); color: var(--text); font: 13px/1.4 Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
-::selection { background: #d9d9bc; color: #20231f; }
+body { background: var(--paper); color: var(--text); font: 13px/1.4 var(--ui-font, Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif); -webkit-font-smoothing: antialiased; }
+::selection { background: var(--accent); color: var(--ui-accent-ink, #fff); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* controls: scoped to Studio / Maker roots (POL-175: no global bleed to Grid or Settings) */
-.maker button, .studio-root button { font: 500 12px/1 Inter, sans-serif; color: var(--text); background: transparent; border: 1px solid var(--line); border-radius: 0; padding: 7px 11px; letter-spacing: .02em; transition: background .12s, border-color .12s, color .12s; }
-.maker button:hover:not(:disabled), .studio-root button:hover:not(:disabled) { background: #efeee7; border-color: #c9c7bc; }
-.maker button.on, .studio-root button.on { background: var(--text); color: var(--paper); border-color: var(--text); }
-.maker button.go, .studio-root button.go, .maker .go { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-.maker button.go:hover:not(:disabled), .studio-root button.go:hover:not(:disabled) { background: #b25636; border-color: #b25636; }
-.maker button.danger, .studio-root button.danger, .maker .danger { background: transparent; color: var(--danger); border-color: var(--danger); }
-.maker input, .maker select, .maker textarea, .studio-root input, .studio-root select, .studio-root textarea { font: inherit; color: var(--text); background: #fff; border: 1px solid var(--line); border-radius: 0; padding: 5px 8px; }
+/* controls: unified tactile industrial styling across Shell, Maker, and Studio */
+.shell-window button, .maker button, .studio-root button { font: 500 12px/1 var(--ui-font, Inter, sans-serif); color: var(--text); background: var(--hm-inset); border: 1px solid var(--line); border-radius: var(--ui-radius, 2px); padding: 7px 11px; letter-spacing: .02em; transition: background .12s, border-color .12s, color .12s; }
+.shell-window button:hover:not(:disabled), .maker button:hover:not(:disabled), .studio-root button:hover:not(:disabled) { background: var(--ui-hover, #363932); border-color: var(--accent); }
+.shell-window button.on, .maker button.on, .studio-root button.on { background: var(--accent); color: var(--ui-accent-ink, #fff); border-color: var(--accent); }
+.shell-window button.go, .maker button.go, .studio-root button.go, .maker .go { background: var(--accent); border-color: var(--accent); color: var(--ui-accent-ink, #fff); font-weight: 600; }
+.shell-window button.go:hover:not(:disabled), .maker button.go:hover:not(:disabled), .studio-root button.go:hover:not(:disabled) { filter: brightness(1.08); }
+.shell-window button.danger, .maker button.danger, .studio-root button.danger, .maker .danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+.shell-window input, .shell-window select, .shell-window textarea, .maker input, .maker select, .maker textarea, .studio-root input, .studio-root select, .studio-root textarea { font: inherit; color: var(--text); background: var(--hm-inset); border: 1px solid var(--line); border-radius: var(--ui-radius, 2px); padding: 5px 8px; }
 input[type=range] { padding: 0; background: transparent; border: 0; }
 .maker input[type=range], .studio-root input[type=range] { accent-color: var(--accent); }
 .maker input[type=checkbox], .studio-root input[type=checkbox] { accent-color: var(--accent); }
@@ -598,58 +601,53 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
 .grid-room-status i { width: 100%; height: 2px; background: rgba(255, 255, 255, .16); position: relative; overflow: hidden; }
 .grid-room-status i::after { content: ''; position: absolute; inset: 0; background: #f1f4f5; transform-origin: left center; transform: scaleX(var(--warm, 0)); transition: transform .25s var(--ease-out); }
 @media (prefers-reduced-motion: reduce) { .grid-room-status i::after { transition: none; } }
-/* the room's game bridge (Plan 57 §16.5): under the room's own bridge screen, once the room is warm. The drone's violet glass, as
-   its System window; the dot says the bridge's state: violet while a game is linked, amber while the bridge is not running */
-.room-bridge { position: absolute; right: clamp(20px, 5vw, 72px); bottom: 22px; width: min(300px, 70vw); padding: 10px 14px 12px;
-  background: rgba(14, 10, 24, .74); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  border-top: 2px solid var(--bridge-edge, #b84dff); border-radius: 3px; color: #e8eef1; font: 400 12px/1.45 Inter, sans-serif; }
-.room-bridge-title { margin: 0 0 4px; display: flex; align-items: center; gap: 8px; font: 600 14px/1.2 Oxanium, Inter, sans-serif; color: #f1f4f5; }
-.room-bridge-title i { width: 7px; height: 7px; border-radius: 50%; background: var(--bridge-dot, #8a96a3); box-shadow: 0 0 8px var(--bridge-dot, transparent); }
-.room-bridge-line { margin: 0; color: rgba(232, 238, 241, .82); }
-.room-bridge-cmd { display: block; margin: 6px 0 0; padding: 4px 6px; background: rgba(0, 0, 0, .35); border-radius: 2px; font: 12px/1.4 ui-monospace, Consolas, monospace; color: #f1f4f5; user-select: all; }
-.room-bridge-act { margin-top: 9px; padding: 6px 12px; border: 1px solid #b84dff; border-radius: 3px; background: rgba(184, 77, 255, .16);
-  color: #f1f4f5; font: 600 12px/1.2 Oxanium, Inter, sans-serif; cursor: pointer; }
-.room-bridge-act:hover { background: rgba(184, 77, 255, .28); }
-.room-bridge-act:focus-visible { outline: 2px solid #f1f4f5; outline-offset: 2px; }
-.room-bridge--linked { --bridge-dot: #b84dff; }
-.room-bridge--ready { --bridge-dot: #4caf7a; }
-.room-bridge--offline { --bridge-edge: #ffb020; --bridge-dot: #ffb020; }
+/* the room's game bridge (Plan 57 §16.5 & Plan 58): driven by `--ui-*` tokens from `UI_STYLE_SHELF` */
+.room-bridge { position: absolute; right: clamp(20px, 5vw, 72px); bottom: 22px; width: min(300px, 70vw); padding: 12px 14px;
+  background: var(--ui-panel, #1b1d19);
+  border: 1px solid var(--ui-line, #4c4f47);
+  border-top: 2px solid var(--bridge-edge, var(--ui-accent, #d96b43));
+  border-radius: var(--ui-radius, 2px);
+  color: var(--ui-ink, #f2f0e8);
+  font: 400 12px/1.45 var(--ui-font, Inter, sans-serif); }
+.room-bridge-title { margin: 0 0 4px; display: flex; align-items: center; gap: 8px; font: 700 13px/1.2 var(--ui-font, Inter, sans-serif); letter-spacing: 0.02em; color: var(--ui-ink, #f2f0e8); }
+.room-bridge-title i { width: 7px; height: 7px; border-radius: 50%; background: var(--bridge-dot, var(--ui-dim, #9e9c92)); }
+.room-bridge-line { margin: 0; color: var(--ui-dim, #9e9c92); }
+.room-bridge-cmd { display: block; margin: 6px 0 0; padding: 5px 8px; background: var(--ui-inset, #2a2c27); border: 1px solid var(--ui-line, #4c4f47); border-radius: var(--ui-radius, 2px); font: 11px/1.4 ui-monospace, Consolas, monospace; color: var(--ui-ink, #f2f0e8); user-select: all; }
+.room-bridge-act { margin-top: 10px; padding: 7px 12px; border: 1px solid var(--ui-accent, #d96b43); border-radius: var(--ui-radius, 2px); background: var(--ui-inset, #2a2c27);
+  color: var(--ui-ink, #f2f0e8); font: 600 12px/1.2 var(--ui-font, Inter, sans-serif); cursor: pointer; transition: background 0.12s ease, color 0.12s ease; }
+.room-bridge-act:hover { background: var(--ui-accent, #d96b43); color: var(--ui-accent-ink, #ffffff); }
+.room-bridge-act:focus-visible { outline: 2px solid var(--ui-accent, #d96b43); outline-offset: 2px; }
+.room-bridge--linked { --bridge-dot: var(--ui-accent, #d96b43); }
+.room-bridge--ready { --bridge-dot: var(--ui-ok, #5c9a78); }
+.room-bridge--offline { --bridge-edge: var(--ui-warn, #c94a38); --bridge-dot: var(--ui-warn, #c94a38); }
 /* the lab behind the SetMix home (lab/lab.tsx): revealed once, when the planet outside the arch is ready */
-.lab-home { position: absolute; inset: 0; background: #0c1014; }
+.lab-home { position: absolute; inset: 0; background: var(--ui-bg, #141613); }
 .lab-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity .9s ease; }
 .lab-home.ready .lab-canvas { opacity: 1; }
 .lab-loading { left: 45%; right: 5%; }
-/* the menu over the lab: light type on the dim room, a soft shadow so seams behind never cut a letter */
-.sm-home.lab::before { content: ""; position: absolute; inset: 0; right: auto; width: min(560px, 70vw); background: linear-gradient(90deg, rgba(12, 16, 20, .42), rgba(12, 16, 20, .2) 60%, transparent); pointer-events: none; }
-.sm-home.lab .sm-brand b, .sm-home.lab .sm-menu button b, .sm-home.lab .sm-credits { color: #f1f4f5; text-shadow: 0 1px 3px rgba(10, 14, 18, .55); }
-.sm-home.lab .sm-brand i, .sm-home.lab .sm-menu button small, .sm-home.lab .sm-menu .sm-sub { color: rgba(232, 238, 241, .78); text-shadow: 0 1px 2px rgba(10, 14, 18, .6); }
-.sm-home.lab .sm-menu button:hover small, .sm-home.lab .sm-menu button:focus-visible small { color: #f1f4f5; }
+/* the menu over the room: bound to `--ui-*` tokens */
+.sm-home.lab::before { content: none; }
+.sm-home.lab .sm-brand b, .sm-home.lab .sm-menu button b, .sm-home.lab .sm-credits { color: var(--ui-ink, #f2f0e8); text-shadow: none; }
+.sm-home.lab .sm-brand i, .sm-home.lab .sm-menu button small, .sm-home.lab .sm-menu .sm-sub { color: var(--ui-dim, #9e9c92); text-shadow: none; }
+.sm-home.lab .sm-menu button:hover small, .sm-home.lab .sm-menu button:focus-visible small { color: var(--ui-ink, #f2f0e8); }
 @media (prefers-reduced-motion: reduce) { .lab-canvas { transition: none; } }
-.sm-credits { position: absolute; right: 24px; top: 22px; font-family: var(--font-setmix); font-weight: 600; font-size: 14px; color: var(--text); }
+.sm-credits { position: absolute; right: 24px; top: 22px; font-family: var(--ui-font, Inter, sans-serif); font-weight: 600; font-size: 13px; color: var(--ui-ink, #f2f0e8); }
 .sm-layer .shell-card { left: clamp(20px, 5vw, 72px); right: auto; top: auto; bottom: 56px; width: min(320px, 80vw); animation: sm-in .35s var(--ease-out) both; }
 .sm-layer .shell-card .quiet { margin-left: 8px; }
 @keyframes sm-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 /* ==========================================================================
-   FIDELITY: Base Game Branding & Substrate Telemetry HUD
+   FIDELITY: Tactile Industrial Branding & Navigation (Plan 58, Zero Neon Slop)
    ========================================================================== */
 .fidelity-brand-lockup {
   display: flex;
   align-items: center;
-  gap: clamp(14px, 1.8vw, 24px);
+  gap: 14px;
 }
 .fidelity-logo {
-  width: clamp(56px, 6vw, 78px);
-  height: clamp(56px, 6vw, 78px);
+  width: 44px;
+  height: 44px;
   flex-shrink: 0;
-  transition: transform 0.3s var(--ease-out), filter 0.3s ease;
-}
-.fidelity-logo.glow {
-  filter: drop-shadow(0 0 12px rgba(0, 229, 255, 0.4));
-}
-.fidelity-logo:hover {
-  transform: scale(1.05);
-  filter: drop-shadow(0 0 22px rgba(0, 229, 255, 0.75));
 }
 .fidelity-brand-text {
   display: flex;
@@ -657,40 +655,41 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
   gap: 3px;
 }
 .fidelity-brand-text b {
-  font-family: var(--font-setmix);
+  font-family: var(--ui-font, Inter, sans-serif);
   font-weight: 800;
-  font-size: clamp(40px, 5.5vw, 76px);
-  letter-spacing: 0.03em;
-  line-height: 0.88;
-  color: #f1f4f5;
-  text-shadow: 0 0 24px rgba(0, 229, 255, 0.28), 0 2px 6px rgba(0, 0, 0, 0.85);
+  font-size: clamp(28px, 3.4vw, 42px);
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+  color: var(--ui-ink, #f2f0e8);
+  text-shadow: none;
 }
 .fidelity-brand-text i {
-  font-family: var(--font-mono, monospace);
-  font-size: clamp(11px, 0.95vw, 13px);
-  letter-spacing: 0.12em;
-  color: #00e5ff;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  font-style: normal;
+  letter-spacing: 0.08em;
+  color: var(--ui-dim, #9e9c92);
   text-transform: uppercase;
   margin-top: 2px;
-  opacity: 0.92;
 }
 
 .sm-menu-label-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
 }
 .fidelity-badge {
-  font-family: var(--font-mono, monospace);
+  font-family: ui-monospace, Consolas, monospace;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
-  padding: 1px 7px;
-  border-radius: 3px;
-  background: rgba(0, 229, 255, 0.12);
-  color: #00e5ff;
-  border: 1px solid rgba(0, 229, 255, 0.4);
-  text-shadow: 0 0 6px rgba(0, 229, 255, 0.4);
+  padding: 2px 6px;
+  border-radius: var(--ui-radius, 2px);
+  background: var(--ui-inset, #2a2c27);
+  color: var(--ui-accent, #d96b43);
+  border: 1px solid var(--ui-line, #4c4f47);
+  text-shadow: none;
 }
 
 /* Substrate Telemetry Observation Panel */
@@ -1294,23 +1293,26 @@ body:has(.island.hud) .shell-note { bottom: auto; top: 64px; }
 .v3-budget i { position: absolute; inset: 0 auto 0 0; background: var(--text); }
 .v3-budget.full i { background: var(--accent); }
 
-/* ---- Profile chip and dropdown menu (TASK-09) ---- */
+/* ---- Profile chip and dropdown menu (Plan 58 unified `--ui-*` tokens) ---- */
 .sm-top-controls {
   position: absolute;
   right: 24px;
   top: 18px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   z-index: 20;
 }
 .sm-top-controls .sm-credits {
   position: static;
-  font-family: var(--font-setmix);
-  font-weight: 600;
-  font-size: 14px;
-  color: #f1f4f5;
-  text-shadow: 0 1px 3px rgba(10, 14, 18, .55);
+  font-family: ui-monospace, Consolas, monospace;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 5px 10px;
+  background: var(--ui-panel, #1b1d19);
+  border: 1px solid var(--ui-line, #4c4f47);
+  border-radius: var(--ui-radius, 2px);
+  color: var(--ui-accent, #d96b43);
 }
 
 .sm-profile-container {
@@ -1321,24 +1323,22 @@ body:has(.island.hud) .shell-note { bottom: auto; top: 64px; }
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-family: var(--font-setmix);
-  font-size: 13px;
+  font-family: var(--ui-font, Inter, sans-serif);
+  font-size: 12px;
   font-weight: 600;
-  color: #f1f4f5;
-  background: rgba(12, 16, 20, 0.72);
-  border: 1px solid rgba(241, 244, 245, 0.22);
-  border-radius: 6px;
+  color: var(--ui-ink, #f2f0e8);
+  background: var(--ui-panel, #1b1d19);
+  border: 1px solid var(--ui-line, #4c4f47);
+  border-radius: var(--ui-radius, 2px);
   padding: 5px 10px;
   cursor: pointer;
   user-select: none;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.12s, border-color 0.12s;
 }
 
 .sm-profile-chip:hover {
-  background: rgba(20, 26, 32, 0.88);
-  border-color: rgba(241, 244, 245, 0.45);
+  background: var(--ui-inset, #2a2c27);
+  border-color: var(--ui-accent, #d96b43);
 }
 
 .sm-profile-chevron {
@@ -1354,31 +1354,30 @@ body:has(.island.hud) .shell-note { bottom: auto; top: 64px; }
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  width: 210px;
-  background: rgba(15, 20, 25, 0.94);
-  backdrop-filter: blur(14px);
-  border: 1px solid rgba(241, 244, 245, 0.22);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  width: 220px;
+  background: var(--ui-panel, #1b1d19);
+  border: 1px solid var(--ui-line, #4c4f47);
+  border-radius: var(--ui-radius, 2px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
   padding: 6px;
   display: flex;
   flex-direction: column;
   gap: 2px;
   z-index: 100;
-  animation: sm-menu-pop 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: sm-menu-pop 0.14s ease-out both;
 }
 
 @keyframes sm-menu-pop {
-  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .sm-profile-section-title {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: rgba(232, 238, 241, 0.55);
+  letter-spacing: 0.08em;
+  color: var(--ui-dim, #9e9c92);
   padding: 4px 8px 2px;
 }
 
@@ -1390,47 +1389,48 @@ body:has(.island.hud) .shell-note { bottom: auto; top: 64px; }
   width: 100%;
   padding: 7px 10px;
   background: transparent;
-  border: none;
-  border-radius: 5px;
-  color: #f1f4f5;
-  font-size: 13px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius, 2px);
+  color: var(--ui-ink, #f2f0e8);
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   text-align: left;
-  transition: background 0.12s, color 0.12s;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 
 .sm-profile-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--ui-inset, #2a2c27);
+  border-color: var(--ui-line, #4c4f47);
 }
 
 .sm-profile-item.active {
-  color: #38bdf8;
+  color: var(--ui-accent, #d96b43);
   font-weight: 700;
-  background: rgba(56, 189, 248, 0.12);
+  background: var(--ui-inset, #2a2c27);
+  border-color: var(--ui-accent, #d96b43);
 }
 
 .sm-profile-cur-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #38bdf8;
-  box-shadow: 0 0 6px #38bdf8;
+  background: var(--ui-accent, #d96b43);
 }
 
 .sm-profile-item.action {
-  color: rgba(232, 238, 241, 0.85);
+  color: var(--ui-dim, #9e9c92);
   font-size: 12px;
   justify-content: flex-start;
 }
 
 .sm-profile-item.action:hover {
-  color: #f1f4f5;
+  color: var(--ui-ink, #f2f0e8);
 }
 
 .sm-profile-divider {
   height: 1px;
-  background: rgba(241, 244, 245, 0.12);
+  background: var(--ui-line, #4c4f47);
   margin: 4px 2px;
 }
 
@@ -1443,17 +1443,17 @@ body:has(.island.hud) .shell-note { bottom: auto; top: 64px; }
 
 .sm-profile-new-input {
   width: 100%;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(241, 244, 245, 0.3);
-  border-radius: 4px;
-  color: #fff;
+  background: var(--ui-inset, #2a2c27);
+  border: 1px solid var(--ui-line, #4c4f47);
+  border-radius: var(--ui-radius, 2px);
+  color: var(--ui-ink, #f2f0e8);
   padding: 5px 8px;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .sm-profile-new-input:focus {
   outline: none;
-  border-color: #38bdf8;
+  border-color: var(--ui-accent, #d96b43);
 }
 
 .sm-profile-create-btns {
@@ -1465,43 +1465,68 @@ body:has(.island.hud) .shell-note { bottom: auto; top: 64px; }
 .sm-profile-btn {
   padding: 4px 10px;
   font-size: 12px;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: transparent;
-  color: #f1f4f5;
+  border-radius: var(--ui-radius, 2px);
+  border: 1px solid var(--ui-line, #4c4f47);
+  background: var(--ui-inset, #2a2c27);
+  color: var(--ui-ink, #f2f0e8);
   cursor: pointer;
 }
 
 .sm-profile-btn.primary {
-  background: #0284c7;
-  border-color: #38bdf8;
+  background: var(--ui-accent, #d96b43);
+  border-color: var(--ui-accent, #d96b43);
+  color: var(--ui-accent-ink, #ffffff);
+  font-weight: 600;
 }
 
-/* ---- Manage Profiles Dialog ---- */
+/* ---- Manage Profiles Dialog (Fixed Contrast & Tactile Rows) ---- */
 .profile-manager-window {
-  min-width: 380px;
+  min-width: 400px;
+  background: var(--ui-panel, #1b1d19);
+  border: 1px solid var(--ui-line, #4c4f47);
+  border-radius: var(--ui-radius, 2px);
+  color: var(--ui-ink, #f2f0e8);
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.65);
+}
+
+.profile-manager-window > header {
+  background: var(--ui-inset, #2a2c27);
+  border-bottom: 1px solid var(--ui-line, #4c4f47);
+}
+
+.profile-manager-window > header h3 {
+  color: var(--ui-ink, #f2f0e8);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .profile-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 10px;
+  margin: 12px 16px 4px;
+}
+
+.profile-list > .hint {
+  margin: 0 0 4px;
+  color: var(--ui-dim, #9e9c92);
 }
 
 .profile-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 0, 0, 0.22);
+  padding: 9px 12px;
+  border-radius: var(--ui-radius, 2px);
+  border: 1px solid var(--ui-line, #4c4f47);
+  background: var(--ui-inset, #2a2c27);
+  color: var(--ui-ink, #f2f0e8);
 }
 
 .profile-row.active {
-  border-color: rgba(56, 189, 248, 0.4);
-  background: rgba(56, 189, 248, 0.08);
+  border-color: var(--ui-accent, #d96b43);
+  box-shadow: inset 3px 0 0 var(--ui-accent, #d96b43);
 }
 
 .profile-row-info {
@@ -1518,48 +1543,69 @@ body:has(.island.hud) .shell-note { bottom: auto; top: 64px; }
   gap: 6px;
 }
 
+.profile-row-actions button,
+.profile-manager-window > header button {
+  background: var(--ui-panel, #1b1d19);
+  color: var(--ui-ink, #f2f0e8);
+  border: 1px solid var(--ui-line, #4c4f47);
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.profile-row-actions button:hover:not(:disabled),
+.profile-manager-window > header button:hover:not(:disabled) {
+  background: var(--ui-accent, #d96b43);
+  color: var(--ui-accent-ink, #ffffff);
+  border-color: var(--ui-accent, #d96b43);
+}
+
 .profile-name {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
+  font-size: 13px;
+  color: var(--ui-ink, #f2f0e8);
 }
 
 .profile-badge {
+  font-family: ui-monospace, Consolas, monospace;
   font-size: 10px;
   text-transform: uppercase;
   font-weight: 700;
-  padding: 1px 5px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.14);
-  color: var(--dim);
+  padding: 2px 6px;
+  border-radius: var(--ui-radius, 2px);
+  background: var(--ui-panel, #1b1d19);
+  border: 1px solid var(--ui-line, #4c4f47);
+  color: var(--ui-dim, #9e9c92);
 }
 
 .profile-badge.active {
-  background: rgba(56, 189, 248, 0.25);
-  color: #38bdf8;
+  background: var(--ui-accent, #d96b43);
+  border-color: var(--ui-accent, #d96b43);
+  color: var(--ui-accent-ink, #ffffff);
 }
 
 .profile-edit-input {
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid #38bdf8;
-  border-radius: 4px;
-  color: #fff;
-  padding: 3px 6px;
+  background: var(--ui-panel, #1b1d19);
+  border: 1px solid var(--ui-accent, #d96b43);
+  border-radius: var(--ui-radius, 2px);
+  color: var(--ui-ink, #f2f0e8);
+  padding: 4px 8px;
   font-size: 13px;
 }
 
 .profile-delete-confirm {
-  padding: 16px 8px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
 .confirm-text {
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.45;
-  color: var(--text);
+  color: var(--ui-ink, #f2f0e8);
 }
 
 /* ---- Switching overlay ---- */
@@ -1567,14 +1613,13 @@ body:has(.island.hud) .shell-note { bottom: auto; top: 64px; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(8, 11, 14, 0.88);
-  backdrop-filter: blur(10px);
+  background: rgba(14, 15, 13, 0.88);
 }
 
 .profile-switching-box {
-  background: var(--paper);
-  border: 1px solid var(--text);
-  border-radius: 8px;
+  background: var(--ui-panel, #1b1d19);
+  border: 1px solid var(--ui-line, #4c4f47);
+  border-radius: var(--ui-radius, 2px);
   padding: 24px 32px;
   display: flex;
   flex-direction: column;
@@ -1582,13 +1627,14 @@ body:has(.island.hud) .shell-note { bottom: auto; top: 64px; }
   gap: 12px;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
   min-width: 280px;
+  color: var(--ui-ink, #f2f0e8);
 }
 
 .profile-loading-bar {
   width: 100%;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 3px;
+  height: 4px;
+  background: var(--ui-inset, #2a2c27);
+  border-radius: var(--ui-radius, 2px);
   overflow: hidden;
   position: relative;
 }
@@ -1596,8 +1642,8 @@ body:has(.island.hud) .shell-note { bottom: auto; top: 64px; }
 .profile-loading-fill {
   width: 40%;
   height: 100%;
-  background: #38bdf8;
-  border-radius: 3px;
+  background: var(--ui-accent, #d96b43);
+  border-radius: var(--ui-radius, 2px);
   animation: profile-bar-move 1s infinite ease-in-out;
 }
 

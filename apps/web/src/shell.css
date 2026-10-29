@@ -1,4 +1,10 @@
-:root { color-scheme: dark; --bg: #0f1318; --panel: #151a21; --line: #26303b; --text: #dde6ee; --dim: #8fa0b1; --accent: #ffd24a; }
+:root {
+  color-scheme: dark;
+  --ui-bg: #141613; --ui-paper: #1b1d19; --ui-panel: #1b1d19; --ui-inset: #2a2c27; --ui-hover: #363932; --ui-line: #4c4f47;
+  --ui-ink: #f2f0e8; --ui-text: #f2f0e8; --ui-dim: #9e9c92; --ui-accent: #d96b43; --ui-accent-ink: #ffffff;
+  --ui-ok: #5c9a78; --ui-warn: #c94a38; --ui-danger: #c94a38; --ui-radius: 2px;
+  --bg: var(--ui-bg); --panel: var(--ui-panel); --line: var(--ui-line); --text: var(--ui-ink); --dim: var(--ui-dim); --accent: var(--ui-accent);
+}
 * { box-sizing: border-box; }
 html, body, #app { height: 100%; margin: 0; }
 body { background: var(--bg); color: var(--text); font: 14px system-ui, sans-serif; overflow: hidden; }
@@ -8,14 +14,14 @@ body { background: var(--bg); color: var(--text); font: 14px system-ui, sans-ser
 .bar .grow { flex: 1; }
 .bar .sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
 .bar .fps { color: var(--dim); font-variant-numeric: tabular-nums; min-width: 52px; text-align: right; }
-button { font: inherit; color: var(--text); background: #1d2530; border: 1px solid var(--line); border-radius: 6px; padding: 5px 11px; cursor: pointer; }
-button:hover:not(:disabled) { background: #263140; }
+button { font: inherit; color: var(--ui-ink, var(--text)); background: var(--ui-inset, var(--hm-inset, #2a2c27)); border: 1px solid var(--ui-line, var(--line)); border-radius: var(--ui-radius, 2px); padding: 5px 11px; cursor: pointer; transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease; }
+button:hover:not(:disabled) { background: var(--ui-hover, #363932); border-color: var(--ui-accent, var(--accent)); }
 button:disabled { opacity: .4; cursor: default; }
-button.on { background: var(--accent); color: #1a1500; border-color: var(--accent); }
+button.on { background: var(--ui-accent, var(--accent)); color: var(--ui-accent-ink, #ffffff); border-color: var(--ui-accent, var(--accent)); }
 .seg { display: inline-flex; gap: 0; }
 .seg button { border-radius: 0; }
-.seg button:first-child { border-radius: 6px 0 0 6px; }
-.seg button:last-child { border-radius: 0 6px 6px 0; }
+.seg button:first-child { border-radius: var(--ui-radius, 2px) 0 0 var(--ui-radius, 2px); }
+.seg button:last-child { border-radius: 0 var(--ui-radius, 2px) var(--ui-radius, 2px) 0; }
 .body { flex: 1; min-height: 0; display: flex; }
 .view { flex: 1; min-width: 0; position: relative; touch-action: none; }
 .view canvas { display: block; }

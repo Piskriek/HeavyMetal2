@@ -55,7 +55,7 @@ import type {
 import { computeStargateAddress, decodeSporeCardPng, encodeSporeCardPng } from './spore-card-codec';
 
 export type StudioWorkspaceId = 'creative-suite' | 'look-lighting' | 'scene-layout' | 'audio-lab';
-export type CreativeInspectorTabId = 'material-layers' | 'parts-assemblies' | 'texgraph-uv' | 'partgen-meshops' | 'logic-triggers';
+export type CreativeInspectorTabId = 'material-layers' | 'parts-assemblies' | 'texgraph-uv' | 'partgen-meshops' | 'logic-triggers' | 'ui-interface';
 export type PresetRung = 1 | 2 | 3 | 4 | 5;
 export type ViewportMode = 'lit' | 'mask-bw' | 'wireframe-ranks' | 'quad-4angle';
 export type PreviewStage = 'lab-neutral' | 0 | 1 | 2 | 3 | 4 | 5 | 6;

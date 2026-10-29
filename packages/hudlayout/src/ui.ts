@@ -284,98 +284,70 @@ export function decodeScreen(code: string): UiScreen | null {
   }
 }
 
-// ---- Plan 58: Curated Rung-1 UI Style Shelf (`UI_STYLE_SHELF`), CSS token mapping, and Rung-5 Screen Suite
+// ---- Plan 58: Curated Rung-1 UI Style Shelf (`UI_STYLE_SHELF`), CSS token mapping, and Rung-4 Screen Suite
 
 export type UiStyleId =
-  | 'holodeck-violet'
-  | 'litrpg-system'
-  | 'stargate-ancient'
-  | 'studio-precision'
-  | 'retro-amber-crt'
+  | 'braun-atelier'
+  | 'rams-paper'
+  | 'nier-monolith'
+  | 'nasa-amber'
+  | 'system-sovereign'
   | 'high-contrast';
 
 export interface UiStylePreset {
   readonly id: UiStyleId;
   readonly name: string;
   readonly tagline: string;
+  readonly s: { readonly Pxd: number; readonly Vtx: number; readonly Lx: number; readonly Aq: number };
   readonly tokens: UiTokens;
 }
 
 export const UI_STYLE_SHELF: readonly UiStylePreset[] = [
   {
-    id: 'holodeck-violet',
-    name: 'Overwatch Holo-Deck',
-    tagline: 'Deep obsidian glass, drone violet & crisp technical framing.',
+    id: 'braun-atelier',
+    name: 'Braun Atelier',
+    tagline: 'Matte warm-carbon faceplate, 1px hairline rules & tactile terracotta accent.',
+    s: { Pxd: 0.88, Vtx: 0.85, Lx: 0.72, Aq: 0.30 },
     tokens: {
-      ink: '#f1f5f9',
-      paper: '#080c14',
-      accent: '#a78bfa',
-      warn: '#f43f5e',
-      dim: '#94a3b8',
-      font: 'setmix',
-      scale: 1,
-      radius: 6,
-      reducedMotion: false,
-    },
-  },
-  {
-    id: 'litrpg-system',
-    name: 'Isekai System Appraisal',
-    tagline: 'Sapphire appraisal slate with sky-cyan & gold status trim.',
-    tokens: {
-      ink: '#f8fafc',
-      paper: '#0a1628',
-      accent: '#38bdf8',
-      warn: '#fbbf24',
-      dim: '#7dd3fc',
+      ink: '#f2f0e8',
+      paper: '#1b1d19',
+      accent: '#d96b43',
+      warn: '#c94a38',
+      dim: '#9e9c92',
       font: 'sans',
-      scale: 1,
-      radius: 4,
-      reducedMotion: false,
-    },
-  },
-  {
-    id: 'stargate-ancient',
-    name: 'Lantean Gate Crystal',
-    tagline: 'Warm bronze-obsidian and amber-gold glyph illumination.',
-    tokens: {
-      ink: '#fef3c7',
-      paper: '#14110b',
-      accent: '#f59e0b',
-      warn: '#ef4444',
-      dim: '#d97706',
-      font: 'setmix',
       scale: 1,
       radius: 2,
       reducedMotion: false,
     },
   },
   {
-    id: 'studio-precision',
-    name: 'Studio CAD Dark',
-    tagline: 'Neutral engineering charcoal with crisp monospace readouts.',
+    id: 'rams-paper',
+    name: 'Rams Drafting Vellum',
+    tagline: 'Clean warm-white architectural studio paper, charcoal ink & terracotta index.',
+    s: { Pxd: 0.92, Vtx: 0.86, Lx: 0.90, Aq: 0.25 },
     tokens: {
-      ink: '#e2e8f0',
-      paper: '#111318',
-      accent: '#22d3ee',
-      warn: '#f97316',
-      dim: '#64748b',
-      font: 'mono',
-      scale: 0.95,
-      radius: 3,
+      ink: '#20221e',
+      paper: '#f8f7f2',
+      accent: '#c56443',
+      warn: '#b3402e',
+      dim: '#75746b',
+      font: 'sans',
+      scale: 1,
+      radius: 0,
       reducedMotion: false,
     },
   },
   {
-    id: 'retro-amber-crt',
-    name: 'Stage-2 Phosphor CRT',
-    tagline: 'Classic amber terminal phosphor honoring S1/S2 heritage.',
+    id: 'nier-monolith',
+    name: 'YoRHa Monolith',
+    tagline: 'Computational data-craft in warm ash-charcoal, parchment bone & brass.',
+    s: { Pxd: 0.90, Vtx: 0.88, Lx: 0.65, Aq: 0.22 },
     tokens: {
-      ink: '#ffb000',
-      paper: '#0a0802',
-      accent: '#ffd000',
-      warn: '#ff4500',
-      dim: '#b37700',
+      ink: '#dad4c4',
+      paper: '#21201d',
+      accent: '#c4b89b',
+      warn: '#b85344',
+      dim: '#8c8779',
       font: 'mono',
       scale: 1,
       radius: 0,
@@ -383,28 +355,74 @@ export const UI_STYLE_SHELF: readonly UiStylePreset[] = [
     },
   },
   {
+    id: 'nasa-amber',
+    name: 'Apollo Telemetry',
+    tagline: 'Anodized command-module slate with warm instrument-amber readouts.',
+    s: { Pxd: 0.84, Vtx: 0.80, Lx: 0.78, Aq: 0.28 },
+    tokens: {
+      ink: '#ede8dc',
+      paper: '#171a1f',
+      accent: '#e09f3e',
+      warn: '#d6513e',
+      dim: '#8c8a82',
+      font: 'mono',
+      scale: 1,
+      radius: 2,
+      reducedMotion: false,
+    },
+  },
+  {
+    id: 'system-sovereign',
+    name: 'Sovereign Ledger',
+    tagline: 'Deep archival obsidian slate with burnished gold-ochre filigree.',
+    s: { Pxd: 0.90, Vtx: 0.84, Lx: 0.82, Aq: 0.45 },
+    tokens: {
+      ink: '#eef2f6',
+      paper: '#151920',
+      accent: '#d4a359',
+      warn: '#d9534f',
+      dim: '#8b96a5',
+      font: 'setmix',
+      scale: 1,
+      radius: 2,
+      reducedMotion: false,
+    },
+  },
+  {
     id: 'high-contrast',
-    name: 'High-Contrast Access',
-    tagline: 'Maximum contrast, 1.15x type scale, and reduced motion.',
+    name: 'High-Contrast Blueprint',
+    tagline: 'WCAG AAA pitch-black chassis, crisp white lines & high-visibility gold.',
+    s: { Pxd: 1.00, Vtx: 0.90, Lx: 1.00, Aq: 0.20 },
     tokens: {
       ink: '#ffffff',
-      paper: '#000000',
-      accent: '#00ffff',
-      warn: '#ffff00',
-      dim: '#cccccc',
+      paper: '#080808',
+      accent: '#ffbe0b',
+      warn: '#ff595e',
+      dim: '#d4d4d4',
       font: 'sans',
       scale: 1.15,
-      radius: 4,
+      radius: 0,
       reducedMotion: true,
     },
   },
 ];
 
-export const DEFAULT_UI_STYLE_ID: UiStyleId = 'holodeck-violet';
+export const DEFAULT_UI_STYLE_ID: UiStyleId = 'braun-atelier';
+
+const LEGACY_STYLE_ALIASES: Readonly<Record<string, UiStyleId>> = {
+  'holodeck-violet': 'braun-atelier',
+  'litrpg-system': 'system-sovereign',
+  'stargate-ancient': 'nasa-amber',
+  'studio-precision': 'nier-monolith',
+  'retro-amber-crt': 'nasa-amber',
+};
 
 export function getUiStylePreset(id: string | null | undefined): UiStylePreset {
-  return UI_STYLE_SHELF.find((s) => s.id === id) ?? UI_STYLE_SHELF[0]!;
+  const resolved = id && LEGACY_STYLE_ALIASES[id] ? LEGACY_STYLE_ALIASES[id] : id;
+  return UI_STYLE_SHELF.find((s) => s.id === resolved) ?? UI_STYLE_SHELF[0]!;
 }
+
+export const resolveUiStyle = getUiStylePreset;
 
 export function applyUiStylePreset(screen: UiScreen, styleId: string): UiScreen {
   const preset = getUiStylePreset(styleId);
@@ -417,17 +435,76 @@ const FONT_STACKS: Readonly<Record<UiFont, string>> = {
   mono: "'JetBrains Mono', 'Fira Code', monospace",
 };
 
-/** Maps Rung-1 `UiTokens` to root CSS custom properties (`--ui-*`) so changing one preset restyles the entire interface. */
+function parseHexRgb(hex: string): [number, number, number] {
+  const clean = HEX.test(hex) ? hex.slice(1) : '1b1d19';
+  return [
+    parseInt(clean.slice(0, 2), 16),
+    parseInt(clean.slice(2, 4), 16),
+    parseInt(clean.slice(4, 6), 16),
+  ];
+}
+
+function mixHex(a: string, b: string, t: number): string {
+  const [ar, ag, ab] = parseHexRgb(a);
+  const [br, bg, bb] = parseHexRgb(b);
+  const clamp = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+  return `#${clamp(ar + (br - ar) * t)}${clamp(ag + (bg - ag) * t)}${clamp(ab + (bb - ab) * t)}`;
+}
+
+function relativeLuma(hex: string): number {
+  const [r, g, b] = parseHexRgb(hex);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+}
+
+/**
+ * Maps Rung-1 `UiTokens` to both `--ui-*` and root legacy variables (`--bg`, `--paper`, `--panel`,
+ * `--hm-inset`, `--line`, `--text`, `--dim`, `--accent`, `--ok`, `--danger`) so every stylesheet
+ * (`shell.css`, `studio.css`, `dark-modal.css`, `dark-forms.css`, `planetary-grid.css`) shares one
+ * cohesive, high-contrast industrial palette with zero black-on-black collisions.
+ */
 export function uiTokensToCssVars(tokens: UiTokens): Readonly<Record<string, string>> {
+  const isLight = relativeLuma(tokens.paper) > 0.5;
+  const bg = isLight ? mixHex(tokens.paper, tokens.ink, 0.04) : mixHex(tokens.paper, '#000000', 0.26);
+  const panel = tokens.paper;
+  const inset = mixHex(tokens.paper, tokens.ink, isLight ? 0.06 : 0.08);
+  const hover = mixHex(tokens.paper, tokens.ink, isLight ? 0.11 : 0.14);
+  const line = mixHex(tokens.paper, tokens.ink, isLight ? 0.18 : 0.22);
+  const faint = mixHex(tokens.paper, tokens.dim, 0.65);
+  const ok = isLight ? '#437a60' : '#5c9a78';
+  const accentInk = relativeLuma(tokens.accent) > 0.56 ? '#141513' : '#ffffff';
+
   return {
+    '--ui-bg': bg,
+    '--ui-paper': panel,
+    '--ui-panel': panel,
+    '--ui-inset': inset,
+    '--ui-hover': hover,
+    '--ui-line': line,
     '--ui-ink': tokens.ink,
-    '--ui-paper': tokens.paper,
-    '--ui-accent': tokens.accent,
-    '--ui-warn': tokens.warn,
+    '--ui-text': tokens.ink,
     '--ui-dim': tokens.dim,
-    '--ui-font': FONT_STACKS[tokens.font] ?? FONT_STACKS.setmix,
+    '--ui-accent': tokens.accent,
+    '--ui-accent-ink': accentInk,
+    '--ui-ok': ok,
+    '--ui-warn': tokens.warn,
+    '--ui-danger': tokens.warn,
+    '--ui-font': FONT_STACKS[tokens.font] ?? FONT_STACKS.sans,
     '--ui-scale': String(tokens.scale),
     '--ui-radius': `${tokens.radius}px`,
+    // Unified root variable bridge for shell.css + studio.css + modals:
+    '--bg': bg,
+    '--paper': panel,
+    '--panel': panel,
+    '--hm-bg': panel,
+    '--hm-inset': inset,
+    '--line': line,
+    '--text': tokens.ink,
+    '--dim': tokens.dim,
+    '--faint': faint,
+    '--accent': tokens.accent,
+    '--green': ok,
+    '--ok': ok,
+    '--danger': tokens.warn,
   };
 }
 
@@ -564,4 +641,56 @@ export const META_SHELL_SCREEN: UiScreen = {
     },
   ],
 };
+
+// ---- Plan 58 §4.4: Studio Self-Hosted Shell Screen Preset (`STUDIO_SHELL_SCREEN`)
+
+export const STUDIO_SHELL_SOURCES: readonly UiSource[] = [
+  { path: 'studio.worldName', kind: 'text' },
+  { path: 'studio.rung', kind: 'number', max: 5 },
+  { path: 'studio.workspace', kind: 'text' },
+  { path: 'studio.uiStyle', kind: 'text' },
+  { path: 'studio.stagedCount', kind: 'number' },
+];
+
+export const STUDIO_SHELL_COMMANDS: readonly UiCommand[] = [
+  { id: 'studio.backToMenu', does: 'Return from The Studio to the Home Menu' },
+  { id: 'studio.testPlay', does: 'Enter Test Play in Sandbox with staged presets' },
+  { id: 'studio.exportSpore', does: 'Export Spore Card and preset share codes' },
+  { id: 'studio.applySave', does: 'Apply staged preset changes to campaign and save' },
+];
+
+export const STUDIO_SHELL_SCREEN: UiScreen = {
+  id: 'studio-shell',
+  tokens: UI_STYLE_SHELF[0]!.tokens,
+  panels: [
+    {
+      id: 'studio-topbar',
+      anchor: 'top-left',
+      offsetX: 16,
+      offsetY: 8,
+      visible: true,
+      parts: [
+        { id: 'act-back', look: { kind: 'action', tone: 'ink', frame: 'line', size: 's' }, binds: 'studio.backToMenu', label: 'Back' },
+        { id: 'world-name', look: { kind: 'badge', tone: 'accent', frame: 'line', size: 'm' }, binds: 'studio.worldName', label: 'World' },
+        { id: 'rung-num', look: { kind: 'stat', tone: 'ink', frame: 'none', size: 's' }, binds: 'studio.rung', label: 'Rung' },
+        { id: 'ws-name', look: { kind: 'readout', tone: 'dim', frame: 'none', size: 's' }, binds: 'studio.workspace', label: 'Workspace' },
+      ],
+    },
+    {
+      id: 'studio-actions',
+      anchor: 'top-right',
+      offsetX: 16,
+      offsetY: 8,
+      visible: true,
+      parts: [
+        { id: 'ui-style-readout', look: { kind: 'readout', tone: 'dim', frame: 'none', size: 's' }, binds: 'studio.uiStyle', label: 'UI Style' },
+        { id: 'staged-stat', look: { kind: 'stat', tone: 'accent', frame: 'none', size: 's' }, binds: 'studio.stagedCount', label: 'Staged' },
+        { id: 'act-test-play', look: { kind: 'action', tone: 'accent', frame: 'line', size: 's' }, binds: 'studio.testPlay', label: 'Test Play in Sandbox' },
+        { id: 'act-export-spore', look: { kind: 'action', tone: 'ink', frame: 'line', size: 's' }, binds: 'studio.exportSpore', label: 'Export Spore Card' },
+        { id: 'act-apply-save', look: { kind: 'action', tone: 'accent', frame: 'fill', size: 's' }, binds: 'studio.applySave', label: 'Apply to Campaign / Save' },
+      ],
+    },
+  ],
+};
+
 

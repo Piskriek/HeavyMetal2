@@ -5,8 +5,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { decodeScreen, encodeScreen } from '@hm/hudlayout';
+import { decodeScreen, encodeScreen, META_SHELL_SCREEN, META_SHELL_SOURCES } from '@hm/hudlayout';
 import { PLAY_HUD_GOAL, PLAY_HUD_SCREEN, commsPanelProps, floatsPanelProps, goalValues, healthPanelProps, playHudIssues, plotPanelProps, systemPanelProps, type PlotFigures } from './ui-play-hud';
+import { buildMetaShellValues, metaShellIssues } from './ui-meta-shell';
+import { createDroneMemory } from './drone-memory';
 import { UiPanelView } from './ui-panel';
 
 const draw = (values: Readonly<Record<string, string | null>>): string =>
@@ -133,4 +135,27 @@ test('the System window shows the notice now, its kind on the window for the edg
   const html = renderToStaticMarkup(createElement(UiPanelView, systemPanelProps({ id: 'SYS-SKILL', text: 'Skill gained: Steady Fire.' })));
   assert.match(html, /^<section class="sys-notice" aria-live="polite" aria-label="System" data-hud-zone="top-centre"/);
   assert.match(html, /<p class="sys-notice-text"[^>]*data-notice="SYS-SKILL"[^>]*>Skill gained: Steady Fire\.<\/p>/);
+});
+
+test('Plan 58 W2: the in-game META_SHELL_SCREEN validates with 0 issues and renders all 3 panels via UiPanelView', () => {
+  assert.deepEqual(metaShellIssues(), []);
+  const values = buildMetaShellValues({
+    stage: 3,
+    droneMem: createDroneMemory(),
+    lastCommsLine: 'Meet at the Stargate plinth.',
+    lastClipCode: 'clip:abc123',
+  });
+  assert.equal(values['wanderer.bal'], 1);
+  assert.match(String(values['party.doubling']), /2x/);
+  const actions = {
+    'comms.pingGate': () => {},
+    'comms.pingCraft': () => {},
+    'comms.pingEureka': () => {},
+    'clip.capture': () => {},
+    'harness.cueDream': () => {},
+  };
+  for (const panel of META_SHELL_SCREEN.panels) {
+    const html = renderToStaticMarkup(createElement(UiPanelView, { panel, sources: META_SHELL_SOURCES, values, actions }));
+    assert.ok(html.length > 20, `panel ${panel.id} rendered non-empty HTML`);
+  }
 });

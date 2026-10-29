@@ -356,11 +356,22 @@ export function Shell(props: { readonly makeRuntime: () => Runtime; readonly sta
   /** The island the track editor (and its test drive) works on. */
   const editWorld = editing === 'racing' ? raceWorld : world;
 
-  // Plan 58: Rung-1 UI Style Preset (`UI_STYLE_SHELF`) with hover try-on (`previews-drive-play`)
+  // Plan 58: Rung-1 UI Style Preset (`UI_STYLE_SHELF`, default `braun-atelier`) with hover try-on (`previews-drive-play`)
   const [uiStyleId, setUiStyleId] = useState<UiStyleId>(() => getUiStylePreset(kv.get(UI_STYLE_KEY)).id);
   const [hoverUiStyleId, setHoverUiStyleId] = useState<UiStyleId | null>(null);
+  const [studioInitTab, setStudioInitTab] = useState<'ui-interface' | undefined>(undefined);
+  useEffect(() => {
+    setUiStyleId(getUiStylePreset(kv.get(UI_STYLE_KEY)).id);
+  }, [screen]);
   const effectiveUiStyle = getUiStylePreset(hoverUiStyleId ?? uiStyleId);
   const uiCssVars = useMemo(() => uiTokensToCssVars(effectiveUiStyle.tokens), [effectiveUiStyle]);
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    for (const [k, v] of Object.entries(uiCssVars)) {
+      root.style.setProperty(k, v);
+    }
+  }, [uiCssVars]);
   const selectUiStyle = useCallback((id: UiStyleId): void => {
     const valid = getUiStylePreset(id).id;
     setUiStyleId(valid);
@@ -422,7 +433,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime; readonly sta
             onExpedition={() => { origin.current = 'home'; setPlaySyncMode('desynced'); go('play'); }}
             onCredits={() => { origin.current = 'home'; setPlaySyncMode('desynced'); setPlayEntry({ kind: 'credits' }); go('play'); }}
             onGrid={toGrid}
-            onStudio={() => { toStudio(); }}
+            onStudio={() => { setStudioInitTab(undefined); toStudio(); }}
+            onOpenUiStudio={() => { setStudioInitTab('ui-interface'); toStudio(); }}
             onCommunity={() => toHub()}
             onSettings={toSettings}
             onPlay={() => { origin.current = 'home'; setPlaySyncMode('desynced'); go('play'); }}
@@ -579,6 +591,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime; readonly sta
         <div className="shell-layer" style={{ zIndex: 4 }}>
           <StudioApp
             onBack={toHome}
+            initialInspectorTab={studioInitTab}
             renderPrototype={() => (
               <StudioScreen
                 profile={profile}

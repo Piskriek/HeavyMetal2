@@ -2,8 +2,9 @@
 // cartridge, stage, device and grid spacing hit the same cache.
 import type { Plot } from '../crafter/planet';
 
-/** Your plot's cartridge until the ground shader battle lands: sandy desert tones, the nearest in the vault to the concept art's stage 1. */
-export const PLAY_PLOT = 'crater_calcite';
+/** Living biosphere plot cartridges with lush flora, trees and life (Plan 57 §14). */
+export const LIVING_PLOT_CARTRIDGES = ['emerald_canopy', 'solar_fern_glade', 'spore_meadow', 'prismata_grass'] as const;
+export const PLAY_PLOT = 'emerald_canopy';
 
 /** Other players' plots, 1 km across like yours (owner, 2026-10-07): seen from your plot as greener, wetter patches 1.1 to 3 km away.
  *  Samples until the shared planet is wired (SETMIX_PLAN Phase 5). */

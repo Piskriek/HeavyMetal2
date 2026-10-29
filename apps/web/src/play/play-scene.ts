@@ -902,7 +902,7 @@ export function createPlayScene(o: {
     planetScene,
     camera,
     groundHeightAt: (x, z) => groundAt(x, z),
-    initialStage: 1,
+    initialStage: 3,
     seed: worldSeed,
     genomeRoster: o.gamePreset ? gameCreatureIds(o.gamePreset).map((id) => creatureGenomeById(id)!) : undefined,
     manualSpawnsOnly: !!o.gamePreset,
@@ -913,7 +913,7 @@ export function createPlayScene(o: {
   const monsterFwd = new THREE.Vector3();
   monsters.setPlot(worldSeed, { x: twin.group.position.x, z: twin.group.position.z });
   // the wreck sites: the same seed and gate as the leaks (TASK-23c)
-  const wrecks: WreckSystem = createWrecks({ scene: planetScene, groundHeightAt: (x, z) => groundAt(x, z), seed: worldSeed, gate: { x: twin.group.position.x, z: twin.group.position.z }, stage: 1 });
+  const wrecks: WreckSystem = createWrecks({ scene: planetScene, groundHeightAt: (x, z) => groundAt(x, z), seed: worldSeed, gate: { x: twin.group.position.x, z: twin.group.position.z }, stage: 3 });
 
   // ---- Vehicles (@hm/rover & @hm/rovergear) and Station Fabricators
   const vehiclesGroup = new THREE.Group();
@@ -3353,7 +3353,7 @@ export function createPlayScene(o: {
       if (world) return;
       lookForFn = lookFor;
       // the plot's natural ground (its own terrain and materials); the old world brings the sky, the stars and the neighbours, seated on it
-      const g = createPlotGround(planetScene, { seed: worldSeed, sunDir: SUN, stage: Math.max(1, stage), textureSize: o.groundTexture, budget: detail.groundBudget, cover: coverTiles });
+      const g = createPlotGround(planetScene, { seed: worldSeed, sunDir: SUN, stage: Math.max(3, stage), textureSize: o.groundTexture, budget: detail.groundBudget, cover: coverTiles });
       ground = g;
       // the gate's apron is always kept out (TASK-21d); the play screen adds the structures and machines as the base changes
       g.setKeepOut(keepOutZones({ gate: { x: 0, z: 0 }, structures: [], pieces: [], machines: [] }));

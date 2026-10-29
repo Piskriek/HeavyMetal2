@@ -3275,7 +3275,7 @@ useEffect(() => {
         return ['Finding the neighbours', () => { look(id, Number(st) as Stage); }];
       }),
       [simPath ? 'Opening the world' : 'Opening the lab', () => {
-        scene.setPlanet(look(PLOT, 1), (st: Stage) => look(PLOT, st), NEIGHBOURS.map((plot) => ({ plot, look: look(plot.cartridge, plot.stage) })));
+        scene.setPlanet(look(PLOT, 3), (st: Stage) => look(PLOT, Math.max(3, st) as Stage), NEIGHBOURS.map((plot) => ({ plot, look: look(plot.cartridge, plot.stage) })));
         // the cartridge that was in the rifle's port comes back into it (TASK-21d): it left the rack when it was loaded
         const savedPort = props.gamePreset ? null : loadBeamSave().port;
         const savedLook = savedPort ? rifleLook(savedPort) : null;

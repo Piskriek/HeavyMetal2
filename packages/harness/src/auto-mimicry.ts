@@ -648,3 +648,307 @@ export function stepAutoMimicLiveSession(state: AutoMimicLiveState, sample: Live
     mintedPresets: [...minted].sort(),
   };
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// 7. Space Engineers `CubeBlocks/*.sbc` XML Transducer -> Socketed Kit & Four-Float Stack
+// ---------------------------------------------------------------------------------------------------------------------
+
+export interface TransducedSpaceEngineersBlock {
+  readonly typeId: string;
+  readonly subtypeId: string;
+  readonly kitOf: string;
+  readonly role: 'thermal-thruster' | 'fission-reactor' | 'attitude-gyro' | 'synthesis-assembler' | 'structural-armor';
+  readonly cubeSize: 'Small' | 'Large';
+  readonly dimensions: readonly [number, number, number];
+  readonly mountSides: readonly string[];
+  readonly forceMagnitudeN: number;
+  readonly maxPowerMW: number;
+  readonly buildTimeSec: number;
+  readonly fourFloats: {
+    readonly pxd: number;
+    readonly vtx: number;
+    readonly lx: number;
+    readonly aq: number;
+  };
+}
+
+/**
+ * Parses Space Engineers `CubeBlocks_*.sbc` XML definitions (`Thrust`, `Reactor`, `BatteryBlock`, `SolarPanel`,
+ * `HydrogenEngine`, `Gyro`, `Assembler`, `Refinery`, `CubeBlock`) into socketed `kit:` descriptors and Four-Float stacks.
+ */
+export function transduceSpaceEngineersSbc(sbcXml: string): readonly TransducedSpaceEngineersBlock[] {
+  const defs = sbcXml.split(/<Definition\b[^>]*>/g).slice(1);
+  const out: TransducedSpaceEngineersBlock[] = [];
+
+  const tagVal = (block: string, tag: string): string | null => {
+    const m = new RegExp(`<${tag}>([^<]+)</${tag}>`).exec(block);
+    return m ? m[1]!.trim() : null;
+  };
+
+  for (const raw of defs) {
+    const endIdx = raw.indexOf('</Definition>');
+    const block = endIdx >= 0 ? raw.slice(0, endIdx) : raw;
+    const typeId = tagVal(block, 'TypeId');
+    const subtypeId = tagVal(block, 'SubtypeId');
+    if (!typeId || !subtypeId) continue;
+
+    const cubeSize: 'Small' | 'Large' = tagVal(block, 'CubeSize') === 'Small' ? 'Small' : 'Large';
+    const sizeMatch = /<Size\s+x="(\d+)"\s+y="(\d+)"\s+z="(\d+)"/.exec(block);
+    const dimensions: readonly [number, number, number] = sizeMatch
+      ? [Number(sizeMatch[1]), Number(sizeMatch[2]), Number(sizeMatch[3])]
+      : [1, 1, 1];
+
+    const mountSides = [...new Set(
+      [...block.matchAll(/<MountPoint\s+Side="([A-Za-z]+)"/g)].map((m) => m[1]!),
+    )];
+    if (mountSides.length === 0) mountSides.push('Back');
+
+    const forceMagnitudeN = Number(tagVal(block, 'ForceMagnitude') ?? '0') || 0;
+    const maxPowerOut = Number(tagVal(block, 'MaxPowerOutput') ?? '0') || 0;
+    const maxPowerIn = Number(tagVal(block, 'MaxPowerConsumption') ?? '0') || 0;
+    const maxPowerMW = Math.max(maxPowerOut, maxPowerIn);
+    const buildTimeSec = Number(tagVal(block, 'BuildTimeSeconds') ?? '10') || 10;
+
+    const role: TransducedSpaceEngineersBlock['role'] =
+      forceMagnitudeN > 0 || typeId.includes('Thrust')
+        ? 'thermal-thruster'
+        : maxPowerOut > 0 || typeId.includes('Reactor') || typeId.includes('Battery') || typeId.includes('Solar') || typeId.includes('Engine')
+          ? 'fission-reactor'
+          : typeId.includes('Gyro')
+            ? 'attitude-gyro'
+            : typeId.includes('Assembler') || typeId.includes('Refinery') || typeId.includes('OxygenGenerator')
+              ? 'synthesis-assembler'
+              : 'structural-armor';
+
+    const volume = dimensions[0] * dimensions[1] * dimensions[2] * (cubeSize === 'Large' ? 8 : 1);
+    const pxd = clampInt(2500 + clamp01(buildTimeSec / 120) * 6500, 500, 10000);
+    const vtx = clampInt(1800 + clamp01(Math.log10(1 + volume) / 3) * 7500, 500, 10000);
+    const lx = clampInt(
+      role === 'thermal-thruster'
+        ? 4500 + clamp01(Math.log10(1 + forceMagnitudeN) / 7.5) * 5200
+        : role === 'fission-reactor'
+          ? 5000 + clamp01(Math.log10(1 + maxPowerMW * 100) / 5) * 4800
+          : 1500 + clamp01(maxPowerMW / 10) * 5000,
+      200,
+      10000,
+    );
+    const aq = clampInt(
+      block.includes('Hydrogen') || block.includes('Atmospheric') || block.includes('Oxygen')
+        ? 6800
+        : 2200 + clamp01(mountSides.length / 6) * 4000,
+      200,
+      10000,
+    );
+
+    const hash = fnv1aHex8(`se:${typeId}:${subtypeId}:${cubeSize}`);
+    out.push({
+      typeId,
+      subtypeId,
+      kitOf: `kit:${hash}`,
+      role,
+      cubeSize,
+      dimensions,
+      mountSides,
+      forceMagnitudeN,
+      maxPowerMW,
+      buildTimeSec,
+      fourFloats: { pxd, vtx, lx, aq },
+    });
+  }
+
+  return out;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// 8. Satisfactory `Docs/en-US.json` Transducer -> Industrial Recipe & Generator Logic Presets
+// ---------------------------------------------------------------------------------------------------------------------
+
+export interface TransducedSatisfactoryPreset {
+  readonly className: string;
+  readonly kind: 'recipe' | 'generator' | 'resource';
+  readonly presetOf: string;
+  readonly durationSec: number;
+  readonly ingredientCount: number;
+  readonly productCount: number;
+  readonly powerMW: number;
+  readonly energyValueMJ: number;
+  readonly throughputPerMin: number;
+}
+
+/**
+ * Parses Satisfactory's official `Docs/en-US.json` schema (`FGRecipe`, `FGBuildableGenerator*`, `FGResourceDescriptor`)
+ * into deterministic `logic:` industrial synthesis recipes and `elem:` resource energy presets.
+ */
+export function transduceSatisfactoryDocsJson(jsonText: string): readonly TransducedSatisfactoryPreset[] {
+  const clean = jsonText.replace(/^\uFEFF/, '').trim();
+  if (!clean) return [];
+  let groups: readonly { readonly NativeClass?: string; readonly Classes?: readonly Record<string, unknown>[] }[];
+  try {
+    groups = JSON.parse(clean) as typeof groups;
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(groups)) return [];
+
+  const out: TransducedSatisfactoryPreset[] = [];
+  for (const g of groups) {
+    const nativeClass = String(g.NativeClass ?? '');
+    const classes = Array.isArray(g.Classes) ? g.Classes : [];
+
+    if (nativeClass.includes('FGRecipe')) {
+      for (const c of classes) {
+        const className = String(c.ClassName ?? '');
+        const producedIn = String(c.mProducedIn ?? '');
+        if (!className || (!producedIn.includes('Constructor') && !producedIn.includes('Assembler') && !producedIn.includes('Manufacturer') && !producedIn.includes('Smelter') && !producedIn.includes('Foundry') && !producedIn.includes('Refinery') && !producedIn.includes('Blender') && !producedIn.includes('ParticleAccelerator'))) {
+          continue;
+        }
+        const durationSec = Math.max(0.5, Number(c.mManufactoringDuration ?? '4') || 4);
+        const ingredientsRaw = String(c.mIngredients ?? '');
+        const productRaw = String(c.mProduct ?? '');
+        const sumAmounts = (raw: string): number => {
+          const matches = [...raw.matchAll(/Amount=(\d+)/g)];
+          if (matches.length === 0) return Math.max(1, (raw.match(/ItemClass=/g) ?? []).length);
+          return matches.reduce((s, m) => s + (Number(m[1]) || 1), 0);
+        };
+        const ingredientCount = sumAmounts(ingredientsRaw);
+        const productCount = sumAmounts(productRaw);
+        const powerMW = Math.max(4, Number(c.mVariablePowerConsumptionFactor ?? '15') || 15);
+        const throughputPerMin = Math.round((60 / durationSec) * productCount * 100) / 100;
+        const hash = fnv1aHex8(`sat:recipe:${className}`);
+        out.push({
+          className,
+          kind: 'recipe',
+          presetOf: `logic:${hash}`,
+          durationSec,
+          ingredientCount,
+          productCount,
+          powerMW,
+          energyValueMJ: 0,
+          throughputPerMin,
+        });
+      }
+    } else if (nativeClass.includes('FGBuildableGenerator')) {
+      for (const c of classes) {
+        const className = String(c.ClassName ?? '');
+        if (!className) continue;
+        const powerMW = Math.max(1, Number(c.mPowerProduction ?? '30') || 30);
+        const hash = fnv1aHex8(`sat:gen:${className}`);
+        out.push({
+          className,
+          kind: 'generator',
+          presetOf: `logic:${hash}`,
+          durationSec: 1,
+          ingredientCount: 1,
+          productCount: 1,
+          powerMW,
+          energyValueMJ: powerMW,
+          throughputPerMin: 60,
+        });
+      }
+    } else if (nativeClass.includes('FGResourceDescriptor')) {
+      for (const c of classes) {
+        const className = String(c.ClassName ?? '');
+        if (!className) continue;
+        const energyValueMJ = Math.max(0, Number(c.mEnergyValue ?? '0') || 0);
+        const hash = fnv1aHex8(`sat:res:${className}`);
+        out.push({
+          className,
+          kind: 'resource',
+          presetOf: `elem:${hash}`,
+          durationSec: 1,
+          ingredientCount: 0,
+          productCount: 1,
+          powerMW: 0,
+          energyValueMJ,
+          throughputPerMin: 60,
+        });
+      }
+    }
+  }
+
+  return out;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// 9. Transport Fever 2 `.lua` Track, Consist & Cargo Transducer -> Logistics & Locomotion Presets
+// ---------------------------------------------------------------------------------------------------------------------
+
+export interface TransducedTransportFeverPreset {
+  readonly fileId: string;
+  readonly kind: 'track-envelope' | 'multiple-unit-consist' | 'cargo-density';
+  readonly presetOf: string;
+  readonly topSpeedMps: number;
+  readonly minCurveRadiusM: number;
+  readonly maxSlopeRatio: number;
+  readonly carCount: number;
+  readonly cargoWeightKg: number;
+}
+
+/**
+ * Parses Transport Fever 2 `.lua` configuration scripts (`res/config/track/*.lua`, `res/config/multiple_unit/*.lua`,
+ * `res/config/cargo_types/*.cargo.lua`) into deterministic `loc:` logistics/locomotion curves and `elem:` cargo weights.
+ */
+export function transduceTransportFeverLua(luaText: string, fileId = 'tf2.lua'): readonly TransducedTransportFeverPreset[] {
+  const out: TransducedTransportFeverPreset[] = [];
+  const hash = fnv1aHex8(`tf2:${fileId}:${luaText.length}`);
+
+  // Case 1: Track envelope (t.speedLimit, t.minCurveRadius, t.maxSlopeBuild)
+  if (luaText.includes('t.speedLimit') || luaText.includes('t.railTrackWidth')) {
+    const speedMatch = /t\.speedLimit\s*=\s*([\d.]+)\s*(?:\/\s*([\d.]+))?/.exec(luaText);
+    const rawNum = speedMatch ? Number(speedMatch[1]) : 120;
+    const rawDen = speedMatch && speedMatch[2] ? Number(speedMatch[2]) : 3.6;
+    const topSpeedMps = Math.round((rawNum / (rawDen || 1)) * 100) / 100;
+
+    const curveMatch = /t\.minCurveRadius\s*=\s*([\d.]+)/.exec(luaText);
+    const minCurveRadiusM = curveMatch ? Number(curveMatch[1]) : 60;
+
+    const slopeMatch = /t\.maxSlopeBuild\s*=\s*([\d.]+)/.exec(luaText);
+    const maxSlopeRatio = slopeMatch ? Number(slopeMatch[1]) : 0.075;
+
+    out.push({
+      fileId,
+      kind: 'track-envelope',
+      presetOf: `loc:${hash}`,
+      topSpeedMps,
+      minCurveRadiusM,
+      maxSlopeRatio,
+      carCount: 1,
+      cargoWeightKg: 0,
+    });
+  }
+
+  // Case 2: Multiple-unit train consist (vehicles = { { name = "..." }, ... })
+  if (luaText.includes('vehicles') && luaText.includes('.mdl')) {
+    const cars = [...luaText.matchAll(/name\s*=\s*"([^"]+\.mdl)"/g)];
+    if (cars.length > 0) {
+      out.push({
+        fileId,
+        kind: 'multiple-unit-consist',
+        presetOf: `loc:${hash}`,
+        topSpeedMps: Math.min(90, 28 + cars.length * 4.5),
+        minCurveRadiusM: 60,
+        maxSlopeRatio: 0.06,
+        carCount: cars.length,
+        cargoWeightKg: cars.length * 42000,
+      });
+    }
+  }
+
+  // Case 3: Cargo weight descriptor (id = "...", weight = 1200.0)
+  const weightMatch = /weight\s*=\s*([\d.]+)/.exec(luaText);
+  if (weightMatch && luaText.includes('levelModels')) {
+    const cargoWeightKg = Number(weightMatch[1]) || 1000;
+    out.push({
+      fileId,
+      kind: 'cargo-density',
+      presetOf: `elem:${hash}`,
+      topSpeedMps: 0,
+      minCurveRadiusM: 0,
+      maxSlopeRatio: 0,
+      carCount: 1,
+      cargoWeightKg,
+    });
+  }
+
+  return out;
+}

@@ -9,7 +9,15 @@
  * The log keeps every notice shown (the log of what was learned). What it has heard (the arrival, once ever) is kept per save slot.
  */
 import { SYSTEM_TRIGGERS, createNarrator, noticeText, step, systemRules, trigger, type State } from '@hm/narrator';
-import { SQ_DISTORTION_CATALOG, mastered, openCausesFrom } from '@hm/harness';
+import {
+  SQ_DISTORTION_CATALOG,
+  mastered,
+  openCausesFrom,
+  synthesizeUtterance,
+  type LocaleId,
+  type SemanticRootId,
+  type SynthesizedUtterance,
+} from '@hm/harness';
 import { ALIGNED } from '@hm/shorthand';
 import { DRONE_MEMORY_OF, DRONE_ROLES, type DroneMemory, type DroneRole } from './drone-memory';
 
@@ -104,4 +112,32 @@ export function readSystemLog(raw: string | null): SystemNotice[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Plan 58 §18: Maps a System notice trigger (`sim:arrive`, `stage:up`, `skill:gained`, `title:earned`, `quest:logged`)
+ * into a 5-Rung `SynthesizedUtterance` inflected by the Overwatch Drone's `ego` memory (somatic state + Ra's
+ * cross-wired archetypical polarity) and the player's chosen `LocaleId` (`en` | `af` | `ja`).
+ */
+export function expressiveSystemUtterance(
+  event: string,
+  data?: string,
+  droneMem?: DroneMemory,
+  locale: LocaleId = 'en',
+): SynthesizedUtterance {
+  const mem = droneMem?.ego;
+  const mapping: Readonly<Record<string, { readonly rootId: SemanticRootId; readonly slots: Readonly<Record<string, string>> }>> = {
+    'sim:arrive': { rootId: 'ARRIVAL_GREETING', slots: { world: data || 'Earth-Moon Substrate' } },
+    'stage:up': { rootId: 'LEVEL_UP', slots: { subject: 'World Fidelity', rank: `Stage ${data ?? '1'}` } },
+    'skill:gained': { rootId: 'SKILL_GAINED', slots: { skill: data || 'Steady Fire' } },
+    'title:earned': { rootId: 'BODY_EUREKA', slots: { quality: data || 'Presence' } },
+    'quest:logged': { rootId: 'QUEST_SEEDED', slots: { quest: data || 'Restore Balance' } },
+  };
+  const chosen = mapping[event] ?? { rootId: 'CONTRAPTION_FORGED' as const, slots: { item: data || event } };
+  return synthesizeUtterance({
+    rootId: chosen.rootId,
+    slots: chosen.slots,
+    locale,
+    ...(mem ? { mem } : {}),
+  });
 }

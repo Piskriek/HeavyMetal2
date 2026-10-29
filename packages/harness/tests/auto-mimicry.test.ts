@@ -9,6 +9,9 @@ import {
   transduceHadesLuaToCombatPresets,
   transduceKspCfgToPartPreset,
   transducePlasmaDevice,
+  transduceSatisfactoryDocsJson,
+  transduceSpaceEngineersSbc,
+  transduceTransportFeverLua,
 } from '../src/index.js';
 
 test('Plan 57 §20.1: transduceDfRawsToElements parses Dwarf Fortress raws and solves the inverse Four-Float derivation card', () => {
@@ -172,4 +175,66 @@ test('Plan 57 §20.6: stepAutoMimicLiveSession buffers rolling bridge samples an
   assert.ok(state.latestResult.confidence >= 0.75);
   assert.ok(state.mintedPresets.some((p) => p.startsWith('loc:')));
   assert.ok(state.mintedPresets.some((p) => p.startsWith('mot:')));
+});
+
+test('Plan 57 §20.7-9: transduceSpaceEngineersSbc, transduceSatisfactoryDocsJson, and transduceTransportFeverLua transduce SE, Satisfactory, and TF2 data', () => {
+  const seXml = `
+<Definitions>
+  <CubeBlocks>
+    <Definition xsi:type="MyObjectBuilder_ThrustDefinition">
+      <Id><TypeId>Thrust</TypeId><SubtypeId>SmallBlockSmallThrust</SubtypeId></Id>
+      <CubeSize>Small</CubeSize>
+      <Size x="1" y="1" z="2" />
+      <MountPoints>
+        <MountPoint Side="Back" StartX="0" StartY="0" EndX="1" EndY="1" />
+        <MountPoint Side="Top" StartX="0" StartY="0" EndX="1" EndY="1" />
+      </MountPoints>
+      <ForceMagnitude>14400</ForceMagnitude>
+      <MaxPowerConsumption>0.200</MaxPowerConsumption>
+      <BuildTimeSeconds>10</BuildTimeSeconds>
+    </Definition>
+  </CubeBlocks>
+</Definitions>`;
+  const seBlocks = transduceSpaceEngineersSbc(seXml);
+  assert.equal(seBlocks.length, 1);
+  assert.equal(seBlocks[0]!.role, 'thermal-thruster');
+  assert.equal(seBlocks[0]!.forceMagnitudeN, 14400);
+  assert.deepEqual(seBlocks[0]!.mountSides, ['Back', 'Top']);
+  assert.match(seBlocks[0]!.kitOf, /^kit:[0-9a-f]{8}$/);
+
+  const satJson = JSON.stringify([
+    {
+      NativeClass: "/Script/CoreUObject.Class'/Script/FactoryGame.FGRecipe'",
+      Classes: [
+        {
+          ClassName: 'Recipe_IronPlate_C',
+          mIngredients: '((ItemClass="Desc_IronIngot_C",Amount=3))',
+          mProduct: '((ItemClass="Desc_IronPlate_C",Amount=2))',
+          mManufactoringDuration: '6.000000',
+          mProducedIn: '("/Game/FactoryGame/Buildable/Factory/ConstructorMk1/Build_ConstructorMk1.Build_ConstructorMk1_C")',
+          mVariablePowerConsumptionFactor: '4.000000',
+        },
+      ],
+    },
+  ]);
+  const satPresets = transduceSatisfactoryDocsJson(satJson);
+  assert.equal(satPresets.length, 1);
+  assert.equal(satPresets[0]!.kind, 'recipe');
+  assert.equal(satPresets[0]!.throughputPerMin, 20);
+  assert.match(satPresets[0]!.presetOf, /^logic:[0-9a-f]{8}$/);
+
+  const tf2Lua = `
+function data()
+  local t = {}
+  t.speedLimit = 300.0 / 3.6
+  t.minCurveRadius = 44.0
+  t.maxSlopeBuild = 0.075
+  return t
+end`;
+  const tf2Presets = transduceTransportFeverLua(tf2Lua, 'high_speed.lua');
+  assert.equal(tf2Presets.length, 1);
+  assert.equal(tf2Presets[0]!.kind, 'track-envelope');
+  assert.equal(tf2Presets[0]!.topSpeedMps, 83.33);
+  assert.equal(tf2Presets[0]!.minCurveRadiusM, 44);
+  assert.match(tf2Presets[0]!.presetOf, /^loc:[0-9a-f]{8}$/);
 });

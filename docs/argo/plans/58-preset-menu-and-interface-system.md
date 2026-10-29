@@ -62,3 +62,18 @@ To eliminate "AI slop" (unfocused cyan/purple neon glows, fake glassmorphism blo
 3. **Preset-Driven Home Menu & Unified Modals**:
    - `SetMixHome` (`goblin-front.tsx`) reads the Studio-saved `HOME_HOLODECK_SCREEN` preset so panel visibility, action labels, and style tokens edited in the Studio drive the live Home menu.
    - `ManageProfilesModal`, `ProfileChip`, `GridRoom`, `DarkModal`, and `PlanetaryGridScreen` use the unified `--ui-*` tokens with crisp 1px hairlines and zero neon slop.
+
+---
+
+## 18. Language, Localization & Expressive Voice as Presets (`packages/harness/src/semantic-utterance.ts`)
+
+Grounded in comparative research on full-duplex speech-to-speech voice AI (*Block's Dessa*, *Kyutai's Moshi*, *NVIDIA's PersonaPlex* — see [`docs/EXPRESSIVE_VOICE_AND_LANGUAGE_RESEARCH.md`](file:///c:/MarbleGp/docs/EXPRESSIVE_VOICE_AND_LANGUAGE_RESEARCH.md)) and Ra's Cross-Wired Archetypical Polarity (`Law of One 78.11, 87.28`):
+
+1. **Rung 1 — Semantic Roots (`sem:`)**:
+   - Language-independent conceptual roots + typed slot bindings (`LEVEL_UP`, `SKILL_GAINED`, `CONTRAPTION_FORGED`, `BODY_ACHE`, `BODY_EUREKA`, `ARRIVAL_GREETING`, `QUEST_SEEDED`, `GATE_PING`, `ANCHOR_CALM_SHARED`).
+2. **Rung 2 — Intent & Somatic/Emotional Prosody Envelope (`emo:`)**:
+   - `deriveEmotionalEnvelope` combines `UtteranceIntent` (`announce | warn | comfort | celebrate | reflect`), `Mem` & `BodyState` (`excitement`, `balance`, `acheStage`, `starvedRay`), and `crossWiredPolarity(mem)` (`masculine` Magician/Hermit vs. `feminine` High Priestess/Balanced Working vs. `balanced`) into prosodic parameters (`pitchShiftSemitones`, `tempoScale`, `breathCue: 'sigh' | 'laugh' | 'gasp' | 'steady'`, `timbreFilter: 'clear' | 'starved-throat' | 'resonant-eureka' | 'warm-anchor'`).
+3. **Rung 3–4 — Modular Locale & Dialect Packs (`locale:`)**:
+   - `LOCALE_SHELF` (`en`, `af`, `ja` LitRPG register) inflects semantic roots by target grammar, paralinguistic breath markers, full-duplex backchannels, and archetypical polarity framing.
+4. **Rung 5 — Utterance Cartridges (`utt:`) & WebAudio Prosody**:
+   - `synthesizeUtterance` and `decodeUtteranceCode` round-trip compact `utt:` share codes and support cross-locale re-inflection without losing intent, somatic state, or polarity.

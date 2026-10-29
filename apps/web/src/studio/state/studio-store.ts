@@ -617,6 +617,7 @@ export function createStudioStore(
         'texgraph-uv': 1,
         'partgen-meshops': 1,
         'logic-triggers': 4,
+        'ui-interface': 5,
       };
       commit({ ...state, activeInspectorTab: tab, activeRung: rungByTab[tab] }, false);
     },

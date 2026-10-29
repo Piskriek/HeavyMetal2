@@ -18,12 +18,15 @@ import {
   type UiScreen,
 } from '@hm/hudlayout';
 import {
+  LOCALE_SHELF,
   createClipManifest,
   createCommsMessage,
   createPlayerWanderer,
   encodeClipShareCode,
   evaluateGuildComplex,
   evaluateParty,
+  synthesizeUtterance,
+  type LocaleId,
 } from '@hm/harness';
 import type { Mem, StageId } from '@hm/shorthand';
 import { UiPanelView } from './ui-panel';
@@ -106,6 +109,7 @@ export function MetaShellDrawer(props: MetaShellDrawerProps): ReactElement {
   });
   const [lastCommsLine, setLastCommsLine] = useState<string>('Ready on Party & Enclave channel (child-safe callouts active).');
   const [lastClipCode, setLastClipCode] = useState<string>('clip:ready — press Capture Replay Clip to mint a share code');
+  const [locale, setLocale] = useState<LocaleId>('en');
 
   const applyStyle = (nextId: string): void => {
     const resolved = resolveUiStyle(nextId);
@@ -305,6 +309,65 @@ export function MetaShellDrawer(props: MetaShellDrawerProps): ReactElement {
               </div>
             ))}
           </div>
+
+          {(() => {
+            const sampleUtt = synthesizeUtterance({
+              rootId: 'ANCHOR_CALM_SHARED',
+              slots: { calm: String(values['wanderer.calm']) },
+              locale,
+              mem: droneMem.ego,
+            });
+            return (
+              <div
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 'var(--ui-radius, 4px)',
+                  border: '1px solid var(--ui-line)',
+                  background: 'var(--ui-inset, #25272c)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                    Semantic-Emotional Voice & Locale Preset (Plan 58 §18 · <code>locale:{locale}</code>)
+                  </span>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {(Object.keys(LOCALE_SHELF) as LocaleId[]).map((locId) => (
+                      <button
+                        key={locId}
+                        type="button"
+                        onClick={() => setLocale(locId)}
+                        style={{
+                          padding: '3px 8px',
+                          fontSize: '10px',
+                          fontWeight: locId === locale ? 700 : 500,
+                          borderRadius: 'var(--ui-radius, 4px)',
+                          border: `1px solid ${locId === locale ? 'var(--ui-accent)' : 'var(--ui-line)'}`,
+                          background: locId === locale ? 'var(--ui-accent)' : 'var(--ui-panel)',
+                          color: locId === locale ? 'var(--ui-accent-ink)' : 'var(--ui-ink)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {LOCALE_SHELF[locId].name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--ui-ink)' }}>
+                  <b>Spoken:</b> {sampleUtt.spokenText}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--ui-dim)', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <span><b>Full-Duplex Backchannel:</b> “{sampleUtt.backchannelText}”</span>
+                  <span>
+                    <b>Archetype:</b> {sampleUtt.envelope.polarity} ({sampleUtt.envelope.mindArchetype} / {sampleUtt.envelope.bodyArchetype}) ·{' '}
+                    <b>Prosody:</b> {sampleUtt.webAudioProsody.baseFreqHz} Hz, {sampleUtt.envelope.tempoScale}x, {sampleUtt.envelope.timbreFilter}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
         </aside>
       ) : null}
     </div>

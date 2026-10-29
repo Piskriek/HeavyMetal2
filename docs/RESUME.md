@@ -1,5 +1,22 @@
 # RESUME: start here (fresh session)
 
+## 29 Oct Checkpoint 5 (Argon Overwatch: Plan 57 §§17–20 + Plan 58 Waves 1–2 + §18 Expressive Voice & Localization Presets)
+- **Completed & Pushed on `feat/studio-polish-claude-cloud` (`0` TypeScript errors, all new & existing unit suites passing)**:
+  1. **Plan 57 §§17–18 — Law of One 22-Archetype Blueprint, Cross-Wired Polarity, Planetary Body Zones, Element Derivation Card & Chaos-Seed Quests (`42752b00`, `c6c56d69`)**:
+     - `packages/harness/src/archetypes.ts`: 22-archetype blueprint (`ARCHETYPE_BLUEPRINT`), cross-wired Mind/Body polarity (`crossWiredPolarity`: Intent -> Magician/Hermit, Context -> High Priestess/Balanced Working), and Virgin Mind invocation (`invokeArchetype`).
+     - `packages/harness/src/science-cosmos.ts`: Four-Float Element Derivation Card (`deriveElementPhysics`), synthesis equilibrium (`synthesizeElements`), contraption capability discovery (`discoverContraptionCapabilities`), chaos-seed quest generator (`stepWorldChaosQuests`), and planetary 7-zone body homeostasis (`stepPlanetBody`).
+  2. **Plan 57 §19 & Plan 56 W6e — Rung-6 Wanderer Meta-Shell, Player Anchor Calm, Party/Guild Complex, Child-Safe Comms & Clip Share Codes (`71de39e9`)**:
+     - `packages/harness/src/meta-shell.ts` + `apps/web/src/play/drone-memory.ts`: Player as Wanderer anchor (`createPlayerWanderer`, `stepPlayerWanderer`, `noteCatalystWithPlayer`), Party harmonious doubling ($2^{N-1}$, `evaluateParty`), Guild Social Memory Complex (`evaluateGuildComplex`), child-safe cartridge comms (`createCommsMessage`), and deterministic replay clips (`createClipManifest`, `encodeClipShareCode`, `decodeClipShareCode`).
+  3. **Plan 57 §20 — Automated Multi-Channel Mechanic Mimicry Transducer & 8-Game Read-Only Disk Harvester (`adc4bba7` + expanded)**:
+     - `packages/harness/src/auto-mimicry.ts` + `scripts/auto-mimic-harvest.mjs`: Pure deterministic transducers for **Dwarf Fortress** (`inorganic_*.txt`), **KSP** (`Parts/**/*.cfg`), **Factorio** (`recipe.lua`), **Hades** (`WeaponData.lua`), **Plasma** (`.world` Odin wiregraphs), **Space Engineers** (`CubeBlocks/*.sbc` socketed blocks), **Satisfactory** (`Docs/en-US.json` recipes/generators/resources), and **Transport Fever 2** (`res/config/**/*.lua` track/consist/cargo curves) — **2,606 presets harvested across 8 installed games**.
+  4. **Plan 58 Waves 1–2 — Tactile `braun-atelier` Preset Menu & Interface System, Studio `ui:` Editor Tab & In-Game `META_SHELL_SCREEN` Drawer (`d437aeb9`, `5afd79a7`)**:
+     - Research in [`docs/UI_DESIGN_SYSTEM_RESEARCH.md`](UI_DESIGN_SYSTEM_RESEARCH.md) & spec in [`docs/argo/plans/58-preset-menu-and-interface-system.md`](argo/plans/58-preset-menu-and-interface-system.md).
+     - Fixed the black-on-black button contrast bug (`shell.css` vs `studio.css`) via `uiTokensToCssVars(tokens)` bridging `--ui-*` and root legacy variables, with `DEFAULT_UI_STYLE_ID = 'braun-atelier'` and 6 non-slop tactile themes (`UI_STYLE_SHELF`).
+     - Added the self-hosting Studio **`UI & Menus (ui:)`** inspector tab (`apps/web/src/studio/inspectors/ui-preset-inspector.tsx`) and the in-game **`<MetaShellDrawer />`** (`apps/web/src/play/ui-meta-shell.tsx`).
+  5. **Plan 58 §18 — Preset-Driven Semantic-Emotional Utterance, Full-Duplex Prosody & Localization (`packages/harness/src/semantic-utterance.ts`)**:
+     - Research in [`docs/EXPRESSIVE_VOICE_AND_LANGUAGE_RESEARCH.md`](EXPRESSIVE_VOICE_AND_LANGUAGE_RESEARCH.md) (Block's *Dessa*, Kyutai's *Moshi*, NVIDIA's *PersonaPlex*, and Ra's cross-wired archetypical voice polarity).
+     - 5-Rung utterance pipeline: `SEMANTIC_ROOT_CATALOG` (`sem:`) -> `deriveEmotionalEnvelope` (`emo:` intent + `Mem`/`BodyState` + `crossWiredPolarity` -> `pitchShiftSemitones`, `tempoScale`, `breathCue`, `timbreFilter`) -> `LOCALE_SHELF` (`en`, `af`, `ja` LitRPG register with full-duplex backchannels) -> `synthesizeUtterance` / `decodeUtteranceCode` (`utt:`), wired into `apps/web/src/play/system-voice.ts` and `<MetaShellDrawer />`.
+
 ## 28 Oct Checkpoint 4 (Claude Opus: the owner parked the storyline; Plan 57 seeded worlds; read this first)
 - **The direction changed** (owner, 28 Oct; his words in OWNER_ASKS):
   - the FIDELITY storyline is parked;

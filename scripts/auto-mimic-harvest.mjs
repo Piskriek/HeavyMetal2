@@ -42,6 +42,9 @@ async function main() {
     transduceFactorioRecipes,
     transduceHadesLuaToCombatPresets,
     transducePlasmaDevice,
+    transduceSpaceEngineersSbc,
+    transduceSatisfactoryDocsJson,
+    transduceTransportFeverLua,
   } = await import('../packages/harness/src/auto-mimicry.ts');
 
   const summary = {
@@ -50,6 +53,9 @@ async function main() {
     factorioRecipes: [],
     hadesCombatPresets: [],
     plasmaContraptions: [],
+    spaceEngineersBlocks: [],
+    satisfactoryPresets: [],
+    transportFeverPresets: [],
   };
 
   // 1. Dwarf Fortress Inorganic Materials
@@ -104,7 +110,36 @@ async function main() {
     }
   }
 
-  console.log('=== AUTOMATED MULTI-GAME MIMICRY HARVEST ===');
+  // 6. Space Engineers CubeBlocks/*.sbc
+  const seDir = path.join(steamDir, 'SpaceEngineers/Content/Data/CubeBlocks');
+  if (fs.existsSync(seDir)) {
+    for (const file of walkFiles(seDir, (n) => n.endsWith('.sbc'), 40)) {
+      summary.spaceEngineersBlocks.push(...transduceSpaceEngineersSbc(fs.readFileSync(file, 'utf8')));
+    }
+  }
+
+  // 7. Satisfactory CommunityResources/Docs/en-US.json
+  const satDoc = path.join(steamDir, 'Satisfactory/CommunityResources/Docs/en-US.json');
+  if (fs.existsSync(satDoc)) {
+    const raw = fs.readFileSync(satDoc);
+    const text = raw[0] === 0xff && raw[1] === 0xfe ? raw.toString('utf16le') : raw.toString('utf8');
+    summary.satisfactoryPresets.push(...transduceSatisfactoryDocsJson(text));
+  }
+
+  // 8. Transport Fever 2 Track, Multiple-Unit Consists & Cargo
+  const tf2ConfigDir = path.join(steamDir, 'Transport Fever 2/res/config');
+  if (fs.existsSync(tf2ConfigDir)) {
+    const tf2Dirs = ['track', 'multiple_unit', 'cargo_types'].map((d) => path.join(tf2ConfigDir, d));
+    for (const dir of tf2Dirs) {
+      for (const file of walkFiles(dir, (n) => n.endsWith('.lua'), 80)) {
+        summary.transportFeverPresets.push(
+          ...transduceTransportFeverLua(fs.readFileSync(file, 'utf8'), path.basename(file)),
+        );
+      }
+    }
+  }
+
+  console.log('=== AUTOMATED MULTI-GAME MIMICRY HARVEST (8 GAMES) ===');
   console.log(`1. Dwarf Fortress Elements transduced : ${summary.dwarfFortressElements.length}`);
   if (summary.dwarfFortressElements.length > 0) {
     for (const e of summary.dwarfFortressElements.slice(0, 4)) {
@@ -135,6 +170,34 @@ async function main() {
       console.log(`   - ${p.deviceName.padEnd(22)} -> ${p.kitOf} / ${p.logicOf} (parts=${p.componentCount}, agents=${p.agentCount}, bounce=${p.meanBounciness})`);
     }
   }
+  console.log(`6. Space Engineers Socketed Blocks    : ${summary.spaceEngineersBlocks.length}`);
+  if (summary.spaceEngineersBlocks.length > 0) {
+    for (const b of summary.spaceEngineersBlocks.slice(0, 4)) {
+      console.log(`   - ${b.subtypeId.padEnd(22)} -> ${b.kitOf} [${b.role}] size=${b.cubeSize}(${b.dimensions.join('x')}) mounts=${b.mountSides.length} thrust=${b.forceMagnitudeN}N`);
+    }
+  }
+  console.log(`7. Satisfactory Industrial Presets    : ${summary.satisfactoryPresets.length}`);
+  if (summary.satisfactoryPresets.length > 0) {
+    for (const s of summary.satisfactoryPresets.slice(0, 4)) {
+      console.log(`   - ${s.className.padEnd(22)} -> ${s.presetOf} [${s.kind}] (${s.durationSec}s, ${s.throughputPerMin}/min, ${s.powerMW}MW)`);
+    }
+  }
+  console.log(`8. Transport Fever 2 Logistics Curves : ${summary.transportFeverPresets.length}`);
+  if (summary.transportFeverPresets.length > 0) {
+    for (const t of summary.transportFeverPresets.slice(0, 4)) {
+      console.log(`   - ${t.fileId.padEnd(22)} -> ${t.presetOf} [${t.kind}] (vMax=${t.topSpeedMps}m/s, cars=${t.carCount}, cargo=${t.cargoWeightKg}kg)`);
+    }
+  }
+  const total =
+    summary.dwarfFortressElements.length +
+    summary.kspParts.length +
+    summary.factorioRecipes.length +
+    summary.hadesCombatPresets.length +
+    summary.plasmaContraptions.length +
+    summary.spaceEngineersBlocks.length +
+    summary.satisfactoryPresets.length +
+    summary.transportFeverPresets.length;
+  console.log(`TOTAL TRANSDUCED PRESETS ACROSS 8 GAMES : ${total}`);
 }
 
 main().catch((err) => {

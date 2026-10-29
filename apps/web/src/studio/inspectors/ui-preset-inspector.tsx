@@ -1,39 +1,37 @@
 import React, { useMemo, useState } from 'react';
 import {
-  ANCHORS,
-  FONTS,
-  FRAMES,
+  UI_ANCHORS as ANCHORS,
+  UI_FONTS as FONTS,
+  WIDGET_FRAMES as FRAMES,
   HOME_HOLODECK_COMMANDS,
   HOME_HOLODECK_SCREEN,
   HOME_HOLODECK_SOURCES,
   META_SHELL_COMMANDS,
   META_SHELL_SCREEN,
   META_SHELL_SOURCES,
-  SIZES,
   STUDIO_SHELL_COMMANDS,
   STUDIO_SHELL_SCREEN,
   STUDIO_SHELL_SOURCES,
-  TONES,
+  WIDGET_TONES as TONES,
   UI_STYLE_SHELF,
-  WIDGETS,
+  WIDGET_KINDS as WIDGETS,
   applyUiStylePreset,
   decodeScreen,
   encodeScreen,
   getUiStylePreset,
   uiTokensToCssVars,
   validateScreen,
-  type UiAnchor,
+  type Anchor as UiAnchor,
   type UiCommand,
   type UiFont,
-  type UiFrame,
+  type WidgetFrame as UiFrame,
   type UiPanel,
   type UiPart,
   type UiScreen,
-  type UiSize,
   type UiSource,
   type UiStyleId,
-  type UiTone,
-  type UiWidgetKind,
+  type WidgetTone as UiTone,
+  type WidgetKind as UiWidgetKind,
 } from '@hm/hudlayout';
 import { PLAY_HUD_COMMANDS, PLAY_HUD_SCREEN, PLAY_HUD_SOURCES } from '../../play/ui-play-hud';
 import { kv } from '../../storage/profile-storage';
@@ -259,7 +257,7 @@ export const UiPresetInspector: React.FC<UiPresetInspectorProps> = ({
     }
     const check = validateScreen(decoded, catalogEntry.sources, catalogEntry.commands);
     if (check.length > 0) {
-      setCodeFeedback(`Refused by Lens Rule: ${check.map((i) => `${i.code} (${i.where})`).join(', ')}`);
+      setCodeFeedback(`Refused by Lens Rule: ${check.map((i) => `${i.code} (${i.at})`).join(', ')}`);
       return;
     }
     updateActiveScreen({ ...decoded, id: selectedScreenId });
@@ -499,7 +497,7 @@ export const UiPresetInspector: React.FC<UiPresetInspectorProps> = ({
           {previewScreen.panels
             .filter((p) => p.visible)
             .map((panel) => {
-              const pos = ANCHOR_GRID_POS[panel.anchor] ?? ANCHOR_GRID_POS['top-left'];
+              const pos = ANCHOR_GRID_POS[panel.anchor] ?? ANCHOR_GRID_POS['top-left'] ?? { col: 1, row: 1, align: 'start' as const };
               return (
                 <div
                   key={panel.id}
@@ -564,7 +562,7 @@ export const UiPresetInspector: React.FC<UiPresetInspectorProps> = ({
           <div style={{ fontSize: 11, color: 'var(--ui-danger, #c94a38)', display: 'flex', flexDirection: 'column', gap: 2 }}>
             {issues.map((iss, idx) => (
               <span key={idx}>
-                • [{iss.code}] {iss.where}: {iss.detail}
+                • [{iss.code}] {iss.at}: {iss.detail}
               </span>
             ))}
             {overlaps.map((ov, idx) => (

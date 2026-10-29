@@ -22,7 +22,7 @@ import { dominantDistortion, memoryBalance, noteCause } from './preset-memory.js
 import { REST_AT, type DreamCue } from './dream.js';
 import { kundalini } from './lifecycle.js';
 
-export type BodyKind = 'organic' | 'mechanical';
+export type BodyKind = 'organic' | 'mechanical' | 'planetary';
 export type Side = 'left' | 'center' | 'right';
 export type ZoneMode = 'flowing' | 'blocked' | 'overopen' | 'starved';
 export type Sickness = 'congested' | 'inflamed' | 'runaway' | 'drained' | 'numb';
@@ -35,16 +35,16 @@ export type BodySignal = 'pain' | 'itch' | 'ache' | 'eureka';
 
 /** One zone per ray: where it sits in each kind of body, whether Ra names the place or tradition does, and its colour. */
 export const BODY_ZONES: readonly {
-  readonly ray: number; readonly colour: string; readonly organic: string; readonly mechanical: string;
+  readonly ray: number; readonly colour: string; readonly organic: string; readonly mechanical: string; readonly planetary: string;
   readonly placeFrom: 'ra' | 'tradition'; readonly hue: string;
 }[] = [
-  { ray: 1, colour: 'red', organic: 'feet and the base of the spine', mechanical: 'thruster pods', placeFrom: 'ra', hue: '#d23c3c' },
-  { ray: 2, colour: 'orange', organic: 'lower belly', mechanical: 'couplings', placeFrom: 'tradition', hue: '#e8842c' },
-  { ray: 3, colour: 'yellow', organic: 'solar plexus', mechanical: 'power core', placeFrom: 'ra', hue: '#e8cf2c' },
-  { ray: 4, colour: 'green', organic: 'heart', mechanical: 'gyro', placeFrom: 'ra', hue: '#3cb45a' },
-  { ray: 5, colour: 'blue', organic: 'throat', mechanical: 'radio', placeFrom: 'tradition', hue: '#3c78d2' },
-  { ray: 6, colour: 'indigo', organic: 'brow', mechanical: 'lens', placeFrom: 'ra', hue: '#5a46b4' },
-  { ray: 7, colour: 'violet', organic: 'crown', mechanical: 'antenna', placeFrom: 'tradition', hue: '#a050c8' },
+  { ray: 1, colour: 'red', organic: 'feet and the base of the spine', mechanical: 'thruster pods', planetary: 'crust and tectonics', placeFrom: 'ra', hue: '#d23c3c' },
+  { ray: 2, colour: 'orange', organic: 'lower belly', mechanical: 'couplings', planetary: 'oceans and hydrology', placeFrom: 'tradition', hue: '#e8842c' },
+  { ray: 3, colour: 'yellow', organic: 'solar plexus', mechanical: 'power core', planetary: 'wind and magnetosphere', placeFrom: 'ra', hue: '#e8cf2c' },
+  { ray: 4, colour: 'green', organic: 'heart', mechanical: 'gyro', planetary: 'biosphere and flora', placeFrom: 'ra', hue: '#3cb45a' },
+  { ray: 5, colour: 'blue', organic: 'throat', mechanical: 'radio', planetary: 'ionosphere and aurora', placeFrom: 'tradition', hue: '#3c78d2' },
+  { ray: 6, colour: 'indigo', organic: 'brow', mechanical: 'lens', planetary: 'harmonic grid', placeFrom: 'ra', hue: '#5a46b4' },
+  { ray: 7, colour: 'violet', organic: 'crown', mechanical: 'antenna', planetary: 'polar crown', placeFrom: 'tradition', hue: '#a050c8' },
 ];
 
 /** The most charge a zone releases between checkpoints and only itches; more is ejected as pain. */
@@ -197,7 +197,10 @@ function heaviestOn(mem: Mem, r: number): SqId | null {
  */
 export function bodyWarnings(of: string, body: BodyState, mem: Mem): BodyWarning[] {
   const out: BodyWarning[] = [];
-  const placeOf = (ray: number): string => { const z = BODY_ZONES[ray - 1]!; return body.kind === 'organic' ? z.organic : z.mechanical; };
+  const placeOf = (ray: number): string => {
+    const z = BODY_ZONES[ray - 1]!;
+    return body.kind === 'organic' ? z.organic : body.kind === 'planetary' ? z.planetary : z.mechanical;
+  };
   for (const z of body.zones) {
     if (z.signal !== 'pain' && z.signal !== 'eureka' && z.sickness === null) continue;
     // a eureka's distortion is gone from the zone's episodes' charge but not from its memory: read it the same way

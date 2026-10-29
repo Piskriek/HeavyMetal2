@@ -1,5 +1,5 @@
 import { resetTour } from '../tutorial/tour';
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactElement } from 'react';
 import { Copy, Plus, Redo2, Trash2, Undo2 } from 'lucide-react';
 import type { Runtime } from '@hm/engine';
 import { goblinRacing, type Activity } from '@hm/activities';
@@ -42,6 +42,9 @@ import { DarkModal } from './dark-modal';
 import { exportIsland, importIsland } from '../islands/island-transfer';
 import { StudioScreen } from '../studio/studio-screen';
 import { StudioApp } from '../studio/studio-app';
+import { getUiStylePreset, uiTokensToCssVars, type UiStyleId } from '@hm/hudlayout';
+
+const UI_STYLE_KEY = 'hm.setmix.ui.style';
 
 /**
  * The shell of **SetMix Multiverse** (first called SetMix Harness): a world of activities. It opens on the SetMix home: the galaxy, with Goblin Racing selected and its menu live
@@ -271,9 +274,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime; readonly sta
   const toGrid = useCallback(() => { origin.current = 'home'; go('grid'); }, [go]);
   /** A visit from the grid: the code is remembered, and the play screen dials it once the lab is ready (the existing visiting flow). */
   const visitCode = useCallback((code: string) => { rememberRecentCode(code); setPlayEntry({ kind: 'visit', code }); origin.current = 'home'; go('play'); }, [go]);
-  /** A spawn from the grid: the Earth lab, or the Moon Gate once the gate is powered in the saved campaign (otherwise the grid says why). */
+  /** Plan 58: Direct spawn to the World Arrival Pad or Stargate Plinth (no parked Earth Lab lever lock). */
   const spawnAt = useCallback((where: 'lab' | 'gate') => {
-    if (where === 'gate' && !readGridView().gateOn) { setNote('The Moon Twin Gate is still dark. Pull the console lever in the Earth lab first.'); return; }
     setPlayEntry({ kind: 'spawn', where }); origin.current = 'home'; go('play');
   }, [go]);
   const toAvatars = useCallback(() => { remember(); go('avatars'); }, [go]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -354,8 +356,19 @@ export function Shell(props: { readonly makeRuntime: () => Runtime; readonly sta
   /** The island the track editor (and its test drive) works on. */
   const editWorld = editing === 'racing' ? raceWorld : world;
 
+  // Plan 58: Rung-1 UI Style Preset (`UI_STYLE_SHELF`) with hover try-on (`previews-drive-play`)
+  const [uiStyleId, setUiStyleId] = useState<UiStyleId>(() => getUiStylePreset(kv.get(UI_STYLE_KEY)).id);
+  const [hoverUiStyleId, setHoverUiStyleId] = useState<UiStyleId | null>(null);
+  const effectiveUiStyle = getUiStylePreset(hoverUiStyleId ?? uiStyleId);
+  const uiCssVars = useMemo(() => uiTokensToCssVars(effectiveUiStyle.tokens), [effectiveUiStyle]);
+  const selectUiStyle = useCallback((id: UiStyleId): void => {
+    const valid = getUiStylePreset(id).id;
+    setUiStyleId(valid);
+    kv.set(UI_STYLE_KEY, valid);
+  }, []);
+
   return (
-    <div className="shell" data-screen={screen}>
+    <div className="shell" data-screen={screen} data-ui-style={effectiveUiStyle.id} style={uiCssVars as CSSProperties}>
       {islandMounted ? (
         <div className="shell-layer" style={{ zIndex: 1 }}>
           <IslandWalk key={`${world!.id}-${profile.gpu}`} rt={world!.rt} scene={world!.scene} intro={intro} level={level === 'island' ? 'island' : 'goblin'} showcase={false} grownUp={profile.grownUp} skin={profile.skin} style={profile.style} onStyle={(st) => update((pr) => ({ ...pr, style: st }))} onSkin={(sk) => update((p) => ({ ...p, skin: sk }))} onCredits={(n) => update((p) => ({ ...p, credits: p.credits + Math.max(0, n) }))} quality={profile.quality} fpsTarget={profile.fpsTarget} graphics={profile.graphics} gpu={profile.gpu} profile={profile} onProfile={update} onReplayTour={replayTour} onResetProgress={resetProgress} controls={profile.controls} activities={activityInfos} onActivity={openActivity} onIntroDone={() => setIntro(false)} onMenuChange={setIslandMenu}
@@ -420,6 +433,9 @@ export function Shell(props: { readonly makeRuntime: () => Runtime; readonly sta
             onSwitching={(name) => setSwitchingProfile(name)}
             onIslandNow={() => void myIsland()}
             island={homeIsland ? { name: homeIsland.name, visited: player().created && homeIsland.lastVisitedAt > homeIsland.createdAt + 1000 } : null}
+            uiStyleId={effectiveUiStyle.id}
+            onSelectUiStyle={selectUiStyle}
+            onHoverUiStyle={setHoverUiStyleId}
           />
           {/* another planet picked: what is played there (Goblin Racing shows its live window instead) */}
           {/* your planet picked: its islands, drawn from above; pick one to go in, or open the planet for all of them */}

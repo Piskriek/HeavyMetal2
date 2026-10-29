@@ -86,6 +86,7 @@ const FIDELITY_MENU: readonly MenuItem[] = [
 
 const RACING_ITEM: MenuItem = { id: 'racing', label: 'Goblin Racing', says: 'Race goblins in glass balls round an island.' };
 
+import { UI_STYLE_SHELF, getUiStylePreset, type UiStyleId } from '@hm/hudlayout';
 import { ProfileChip } from './profile-chip';
 import { FidelityLogo } from './fidelity-logo';
 
@@ -96,10 +97,8 @@ export function homeMenu(edition: Edition, endingSeen = false): readonly MenuIte
 }
 
 /**
- * The FIDELITY home: The base game of the SetMix Multiverse.
- * POL-01 & POL-64: Features the split Lab Wasteland Glitch Window + Stage 4/6 Twin Gate Hero
- * backdrop and the frosted glass navigation blade (`fidelity-glass-blade`), plus POL-40's
- * Dr. Gwen Haddy CRT portrait slot.
+ * Plan 58: The FIDELITY Home Holo-Deck Menu, driven by Rung-1 `UiStylePreset` tokens (`UI_STYLE_SHELF`)
+ * with live hover try-on (`previews-drive-play`).
  */
 export function SetMixHome(props: {
   readonly onExpedition?: () => void;
@@ -122,7 +121,12 @@ export function SetMixHome(props: {
   readonly leader?: { readonly line: Ref<SVGLineElement>; readonly ring: Ref<SVGCircleElement> };
   readonly onManageProfiles?: () => void;
   readonly onSwitching?: (name: string) => void;
+  /** Plan 58: Active and hovered UI Style preset IDs (`UI_STYLE_SHELF`). */
+  readonly uiStyleId?: UiStyleId;
+  readonly onSelectUiStyle?: (id: UiStyleId) => void;
+  readonly onHoverUiStyle?: (id: UiStyleId | null) => void;
 }): ReactElement {
+  const activeStyle = getUiStylePreset(props.uiStyleId);
 
   const act: Record<MenuId, (() => void) | undefined> = {
     expedition: props.onExpedition ?? props.onPlay,
@@ -139,17 +143,15 @@ export function SetMixHome(props: {
   };
 
   return (
-    <div className="sm-home lab fidelity-home">
+    <div className="sm-home lab fidelity-home" data-ui-style={activeStyle.id}>
       {props.leader ? (
         <svg className="sm-leader" aria-hidden="true"><circle ref={props.leader.ring} r="0" /><line ref={props.leader.line} /></svg>
       ) : null}
 
-      {/* plan 57 §10: the grid room behind this menu has the real gate; the DOM window and arch that stood in for the lab are gone */}
-      {/* POL-64: Frosted Glass Blade housing Brand Header & Primary Navigation Suite */}
+      {/* Plan 58: Preset-driven Holo-Deck Navigation Blade styled via `--ui-*` tokens from `UI_STYLE_SHELF` */}
       <div
         className="fidelity-glass-blade"
         style={{
-          // the full height of the left side: its brand and menu are placed inside it, so in the flow it had only its padding
           position: 'absolute',
           top: 0,
           bottom: 0,
@@ -158,12 +160,14 @@ export function SetMixHome(props: {
           zIndex: 2,
           backdropFilter: 'blur(14px)',
           WebkitBackdropFilter: 'blur(14px)',
-          background: 'rgba(8, 12, 20, 0.74)',
-          borderRight: '1px solid rgba(61, 200, 255, 0.22)',
+          background: 'var(--ui-paper, rgba(8, 12, 20, 0.84))',
+          color: 'var(--ui-ink, #f1f5f9)',
+          fontFamily: 'var(--ui-font, inherit)',
+          borderRight: '1px solid var(--ui-accent, rgba(167, 139, 250, 0.35))',
           padding: '24px 28px',
           display: 'flex',
           flexDirection: 'column',
-          gap: 18,
+          gap: 16,
         }}
       >
         {/* Brand Header */}
@@ -171,8 +175,8 @@ export function SetMixHome(props: {
           <div className="fidelity-brand-lockup">
             <FidelityLogo size={58} glow />
             <div className="fidelity-brand-text">
-              <b>FIDELITY</b>
-              <i>A SetMix System // Substrate Research Initiative</i>
+              <b style={{ color: 'var(--ui-ink, #f1f5f9)' }}>FIDELITY</b>
+              <i style={{ color: 'var(--ui-dim, #94a3b8)' }}>Seeded Worlds // LitRPG &amp; Co-Creation Sandbox</i>
             </div>
           </div>
         </div>
@@ -182,7 +186,12 @@ export function SetMixHome(props: {
           {homeMenu(EDITION, props.endingSeen).map((m, i) => (
             <Fragment key={m.id}>
               <button
-                style={{ ['--i' as string]: i }}
+                style={{
+                  ['--i' as string]: i,
+                  borderRadius: 'var(--ui-radius, 6px)',
+                  borderColor: 'var(--ui-accent, rgba(167, 139, 250, 0.28))',
+                  color: 'var(--ui-ink, #f1f5f9)',
+                }}
                 onClick={act[m.id]}
                 disabled={!act[m.id]}
                 className={m.badge ? 'has-badge' : ''}
@@ -191,11 +200,60 @@ export function SetMixHome(props: {
                   <b>{m.label}</b>
                   {m.badge ? <span className="fidelity-badge">{m.badge}</span> : null}
                 </div>
-                <small>{m.says}</small>
+                <small style={{ color: 'var(--ui-dim, #94a3b8)' }}>{m.says}</small>
               </button>
             </Fragment>
           ))}
         </nav>
+
+        {/* Plan 58: Live UI Style Preset Switcher (Hover Try-On + 1-Click Apply) */}
+        {props.onSelectUiStyle ? (
+          <div
+            className="fidelity-ui-style-bar"
+            aria-label="Interface Style Presets"
+            style={{
+              marginTop: 'auto',
+              paddingTop: 10,
+              borderTop: '1px solid rgba(148, 163, 184, 0.18)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--ui-dim, #94a3b8)' }}>
+              <span>UI STYLE PRESET</span>
+              <b style={{ color: 'var(--ui-accent, #a78bfa)' }}>{activeStyle.name}</b>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+              {UI_STYLE_SHELF.map((st) => {
+                const isCurrent = st.id === activeStyle.id;
+                return (
+                  <button
+                    key={st.id}
+                    type="button"
+                    onMouseEnter={() => props.onHoverUiStyle?.(st.id)}
+                    onMouseLeave={() => props.onHoverUiStyle?.(null)}
+                    onFocus={() => props.onHoverUiStyle?.(st.id)}
+                    onBlur={() => props.onHoverUiStyle?.(null)}
+                    onClick={() => props.onSelectUiStyle?.(st.id)}
+                    title={`${st.name}: ${st.tagline}`}
+                    style={{
+                      padding: '4px 8px',
+                      fontSize: 11,
+                      borderRadius: 'var(--ui-radius, 4px)',
+                      border: `1px solid ${isCurrent ? st.tokens.accent : 'rgba(148,163,184,0.25)'}`,
+                      background: isCurrent ? st.tokens.paper : 'rgba(15, 23, 42, 0.55)',
+                      color: isCurrent ? st.tokens.accent : st.tokens.ink,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {st.name.split(' ')[0]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
       </div>
 
 

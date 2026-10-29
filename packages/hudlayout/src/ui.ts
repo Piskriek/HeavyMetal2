@@ -283,3 +283,285 @@ export function decodeScreen(code: string): UiScreen | null {
     return null;
   }
 }
+
+// ---- Plan 58: Curated Rung-1 UI Style Shelf (`UI_STYLE_SHELF`), CSS token mapping, and Rung-5 Screen Suite
+
+export type UiStyleId =
+  | 'holodeck-violet'
+  | 'litrpg-system'
+  | 'stargate-ancient'
+  | 'studio-precision'
+  | 'retro-amber-crt'
+  | 'high-contrast';
+
+export interface UiStylePreset {
+  readonly id: UiStyleId;
+  readonly name: string;
+  readonly tagline: string;
+  readonly tokens: UiTokens;
+}
+
+export const UI_STYLE_SHELF: readonly UiStylePreset[] = [
+  {
+    id: 'holodeck-violet',
+    name: 'Overwatch Holo-Deck',
+    tagline: 'Deep obsidian glass, drone violet & crisp technical framing.',
+    tokens: {
+      ink: '#f1f5f9',
+      paper: '#080c14',
+      accent: '#a78bfa',
+      warn: '#f43f5e',
+      dim: '#94a3b8',
+      font: 'setmix',
+      scale: 1,
+      radius: 6,
+      reducedMotion: false,
+    },
+  },
+  {
+    id: 'litrpg-system',
+    name: 'Isekai System Appraisal',
+    tagline: 'Sapphire appraisal slate with sky-cyan & gold status trim.',
+    tokens: {
+      ink: '#f8fafc',
+      paper: '#0a1628',
+      accent: '#38bdf8',
+      warn: '#fbbf24',
+      dim: '#7dd3fc',
+      font: 'sans',
+      scale: 1,
+      radius: 4,
+      reducedMotion: false,
+    },
+  },
+  {
+    id: 'stargate-ancient',
+    name: 'Lantean Gate Crystal',
+    tagline: 'Warm bronze-obsidian and amber-gold glyph illumination.',
+    tokens: {
+      ink: '#fef3c7',
+      paper: '#14110b',
+      accent: '#f59e0b',
+      warn: '#ef4444',
+      dim: '#d97706',
+      font: 'setmix',
+      scale: 1,
+      radius: 2,
+      reducedMotion: false,
+    },
+  },
+  {
+    id: 'studio-precision',
+    name: 'Studio CAD Dark',
+    tagline: 'Neutral engineering charcoal with crisp monospace readouts.',
+    tokens: {
+      ink: '#e2e8f0',
+      paper: '#111318',
+      accent: '#22d3ee',
+      warn: '#f97316',
+      dim: '#64748b',
+      font: 'mono',
+      scale: 0.95,
+      radius: 3,
+      reducedMotion: false,
+    },
+  },
+  {
+    id: 'retro-amber-crt',
+    name: 'Stage-2 Phosphor CRT',
+    tagline: 'Classic amber terminal phosphor honoring S1/S2 heritage.',
+    tokens: {
+      ink: '#ffb000',
+      paper: '#0a0802',
+      accent: '#ffd000',
+      warn: '#ff4500',
+      dim: '#b37700',
+      font: 'mono',
+      scale: 1,
+      radius: 0,
+      reducedMotion: false,
+    },
+  },
+  {
+    id: 'high-contrast',
+    name: 'High-Contrast Access',
+    tagline: 'Maximum contrast, 1.15x type scale, and reduced motion.',
+    tokens: {
+      ink: '#ffffff',
+      paper: '#000000',
+      accent: '#00ffff',
+      warn: '#ffff00',
+      dim: '#cccccc',
+      font: 'sans',
+      scale: 1.15,
+      radius: 4,
+      reducedMotion: true,
+    },
+  },
+];
+
+export const DEFAULT_UI_STYLE_ID: UiStyleId = 'holodeck-violet';
+
+export function getUiStylePreset(id: string | null | undefined): UiStylePreset {
+  return UI_STYLE_SHELF.find((s) => s.id === id) ?? UI_STYLE_SHELF[0]!;
+}
+
+export function applyUiStylePreset(screen: UiScreen, styleId: string): UiScreen {
+  const preset = getUiStylePreset(styleId);
+  return { ...screen, tokens: preset.tokens };
+}
+
+const FONT_STACKS: Readonly<Record<UiFont, string>> = {
+  setmix: "'Oxanium', 'Inter', system-ui, sans-serif",
+  sans: "'Inter', system-ui, -apple-system, sans-serif",
+  mono: "'JetBrains Mono', 'Fira Code', monospace",
+};
+
+/** Maps Rung-1 `UiTokens` to root CSS custom properties (`--ui-*`) so changing one preset restyles the entire interface. */
+export function uiTokensToCssVars(tokens: UiTokens): Readonly<Record<string, string>> {
+  return {
+    '--ui-ink': tokens.ink,
+    '--ui-paper': tokens.paper,
+    '--ui-accent': tokens.accent,
+    '--ui-warn': tokens.warn,
+    '--ui-dim': tokens.dim,
+    '--ui-font': FONT_STACKS[tokens.font] ?? FONT_STACKS.setmix,
+    '--ui-scale': String(tokens.scale),
+    '--ui-radius': `${tokens.radius}px`,
+  };
+}
+
+// ---- Plan 58 §4.1: Home Holo-Deck Screen Preset (`HOME_HOLODECK_SCREEN`)
+
+export const HOME_HOLODECK_SOURCES: readonly UiSource[] = [
+  { path: 'room.stage', kind: 'stage' },
+  { path: 'room.warmShare', kind: 'ratio' },
+  { path: 'profile.name', kind: 'text' },
+  { path: 'profile.credits', kind: 'number', unit: 'cr' },
+  { path: 'ui.styleName', kind: 'text' },
+  { path: 'bridge.status', kind: 'text' },
+];
+
+export const HOME_HOLODECK_COMMANDS: readonly UiCommand[] = [
+  { id: 'nav.expedition', does: 'Enter seeded world at Stage 3 with your Overwatch drone' },
+  { id: 'nav.grid', does: 'Open the Solar System & Stargate Network map' },
+  { id: 'nav.studio', does: 'Open The Studio 5-rung preset and world editor' },
+  { id: 'nav.community', does: 'Open the Community & Guild preset shelf' },
+  { id: 'nav.settings', does: 'Open Settings & UI Style presets' },
+  { id: 'ui.cycleStyle', does: 'Cycle the active UI Style preset' },
+  { id: 'bridge.toggleLink', does: 'Link or unlink a running game window on the Holo-Room screen' },
+];
+
+export const HOME_HOLODECK_SCREEN: UiScreen = {
+  id: 'home-holodeck',
+  tokens: UI_STYLE_SHELF[0]!.tokens,
+  panels: [
+    {
+      id: 'home-nav',
+      anchor: 'top-left',
+      offsetX: 24,
+      offsetY: 24,
+      visible: true,
+      parts: [
+        { id: 'room-stage', look: { kind: 'badge', tone: 'accent', frame: 'fill', size: 's' }, binds: 'room.stage', label: 'Warmup' },
+        { id: 'room-warm', look: { kind: 'meter', tone: 'accent', frame: 'line', size: 's' }, binds: 'room.warmShare', label: 'Presets' },
+        { id: 'act-expedition', look: { kind: 'action', tone: 'accent', frame: 'fill', size: 'l' }, binds: 'nav.expedition', label: 'Enter Seeded World' },
+        { id: 'act-grid', look: { kind: 'action', tone: 'ink', frame: 'line', size: 'm' }, binds: 'nav.grid', label: 'Solar System & Stargate' },
+        { id: 'act-studio', look: { kind: 'action', tone: 'ink', frame: 'line', size: 'm' }, binds: 'nav.studio', label: 'The Studio' },
+        { id: 'act-community', look: { kind: 'action', tone: 'ink', frame: 'line', size: 'm' }, binds: 'nav.community', label: 'Community & Guild Shelf' },
+        { id: 'act-settings', look: { kind: 'action', tone: 'dim', frame: 'line', size: 's' }, binds: 'nav.settings', label: 'Settings & UI Theme' },
+      ],
+    },
+    {
+      id: 'home-profile',
+      anchor: 'top-right',
+      offsetX: 24,
+      offsetY: 24,
+      visible: true,
+      parts: [
+        { id: 'prof-name', look: { kind: 'badge', tone: 'ink', frame: 'line', size: 'm' }, binds: 'profile.name', label: 'Wanderer' },
+        { id: 'prof-credits', look: { kind: 'stat', tone: 'accent', frame: 'none', size: 's' }, binds: 'profile.credits', label: 'Credits' },
+        { id: 'style-name', look: { kind: 'readout', tone: 'dim', frame: 'none', size: 's' }, binds: 'ui.styleName', label: 'Theme' },
+        { id: 'style-cycle', look: { kind: 'action', tone: 'accent', frame: 'line', size: 's' }, binds: 'ui.cycleStyle', label: 'Switch UI Theme' },
+      ],
+    },
+    {
+      id: 'home-bridge',
+      anchor: 'bottom-right',
+      offsetX: 24,
+      offsetY: 24,
+      visible: true,
+      parts: [
+        { id: 'bridge-readout', look: { kind: 'readout', tone: 'ink', frame: 'line', size: 's' }, binds: 'bridge.status', label: 'Holo-Room Bridge' },
+        { id: 'bridge-link', look: { kind: 'action', tone: 'accent', frame: 'fill', size: 's' }, binds: 'bridge.toggleLink', label: 'Link Game Window' },
+      ],
+    },
+  ],
+};
+
+// ---- Plan 58 §4.3: Rung-6 Wanderer Meta-Shell Screen Preset (`META_SHELL_SCREEN`)
+
+export const META_SHELL_SOURCES: readonly UiSource[] = [
+  { path: 'wanderer.bal', kind: 'ratio' },
+  { path: 'wanderer.calm', kind: 'number', max: 0.6 },
+  { path: 'party.doubling', kind: 'number' },
+  { path: 'guild.coherence', kind: 'ratio' },
+  { path: 'comms.messages', kind: 'list' },
+  { path: 'clip.status', kind: 'text' },
+  { path: 'harness.bridgeMode', kind: 'text' },
+];
+
+export const META_SHELL_COMMANDS: readonly UiCommand[] = [
+  { id: 'comms.pingGate', does: 'Send canned callout: Meet at the Stargate plinth' },
+  { id: 'comms.pingCraft', does: 'Send canned callout: Try this crafted preset on your bench' },
+  { id: 'comms.pingEureka', does: 'Send canned callout: Eureka! Something let go and flow returned' },
+  { id: 'clip.capture', does: 'Capture 6s video clip and deterministic shorthand replay code' },
+  { id: 'harness.cueDream', does: 'Send Higher Self dream cue to Overwatch Drone' },
+];
+
+export const META_SHELL_SCREEN: UiScreen = {
+  id: 'meta-shell',
+  tokens: UI_STYLE_SHELF[0]!.tokens,
+  panels: [
+    {
+      id: 'wanderer-party',
+      anchor: 'top-left',
+      offsetX: 24,
+      offsetY: 140,
+      visible: true,
+      parts: [
+        { id: 'wan-bal', look: { kind: 'meter', tone: 'accent', frame: 'line', size: 's' }, binds: 'wanderer.bal', label: 'Wanderer Anchor' },
+        { id: 'wan-calm', look: { kind: 'meter', tone: 'ink', frame: 'line', size: 's' }, binds: 'wanderer.calm', label: 'Anchor Calm Lent' },
+        { id: 'party-mult', look: { kind: 'stat', tone: 'accent', frame: 'none', size: 'm' }, binds: 'party.doubling', label: 'Party Doubling' },
+        { id: 'guild-coh', look: { kind: 'meter', tone: 'accent', frame: 'line', size: 's' }, binds: 'guild.coherence', label: 'Guild Complex' },
+      ],
+    },
+    {
+      id: 'comms-drawer',
+      anchor: 'bottom-left',
+      offsetX: 24,
+      offsetY: 64,
+      visible: true,
+      parts: [
+        { id: 'msg-list', look: { kind: 'list', tone: 'ink', frame: 'line', size: 'm' }, binds: 'comms.messages', label: 'Comms Feed' },
+        { id: 'ping-gate', look: { kind: 'action', tone: 'accent', frame: 'line', size: 's' }, binds: 'comms.pingGate', label: 'Ping: Gate' },
+        { id: 'ping-craft', look: { kind: 'action', tone: 'accent', frame: 'line', size: 's' }, binds: 'comms.pingCraft', label: 'Share Preset' },
+        { id: 'ping-eureka', look: { kind: 'action', tone: 'ink', frame: 'line', size: 's' }, binds: 'comms.pingEureka', label: 'Eureka!' },
+      ],
+    },
+    {
+      id: 'clip-and-harness',
+      anchor: 'middle-left',
+      offsetX: 24,
+      offsetY: 0,
+      visible: true,
+      parts: [
+        { id: 'clip-stat', look: { kind: 'readout', tone: 'dim', frame: 'none', size: 's' }, binds: 'clip.status', label: 'Clip Recorder' },
+        { id: 'clip-btn', look: { kind: 'action', tone: 'accent', frame: 'fill', size: 's' }, binds: 'clip.capture', label: 'Record Clip + Code' },
+        { id: 'bridge-mode', look: { kind: 'badge', tone: 'ink', frame: 'line', size: 's' }, binds: 'harness.bridgeMode', label: 'Bridge' },
+        { id: 'cue-dream', look: { kind: 'action', tone: 'accent', frame: 'line', size: 's' }, binds: 'harness.cueDream', label: 'Cue Higher Self Dream' },
+      ],
+    },
+  ],
+};
+

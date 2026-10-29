@@ -131,3 +131,35 @@ test('a code from before the action (version 2, the play HUD with its stats as i
   assert.deepEqual(ore.with, { rate: 'plot.oreRate', linked: 'plot.oreLinked', alert: 'plot.oreOut' });
   assert.equal(ore.note, 'Out of ore: hold E on a boulder, or build a rock drill');
 });
+
+
+test('Plan 58: UI_STYLE_SHELF, uiTokensToCssVars, HOME_HOLODECK_SCREEN, and META_SHELL_SCREEN validate and round-trip as uic: codes', async () => {
+  const {
+    UI_STYLE_SHELF,
+    HOME_HOLODECK_SCREEN,
+    HOME_HOLODECK_SOURCES,
+    HOME_HOLODECK_COMMANDS,
+    META_SHELL_SCREEN,
+    META_SHELL_SOURCES,
+    META_SHELL_COMMANDS,
+    applyUiStylePreset,
+    uiTokensToCssVars,
+  } = await import('../src/index');
+
+  assert.equal(UI_STYLE_SHELF.length, 6);
+  for (const style of UI_STYLE_SHELF) {
+    const vars = uiTokensToCssVars(style.tokens);
+    assert.equal(vars['--ui-ink'], style.tokens.ink);
+    assert.equal(vars['--ui-paper'], style.tokens.paper);
+    assert.equal(vars['--ui-accent'], style.tokens.accent);
+    assert.equal(vars['--ui-radius'], `${style.tokens.radius}px`);
+
+    const restyledHome = applyUiStylePreset(HOME_HOLODECK_SCREEN, style.id);
+    assert.deepEqual(validateScreen(restyledHome, HOME_HOLODECK_SOURCES, HOME_HOLODECK_COMMANDS), []);
+    assert.deepEqual(decodeScreen(encodeScreen(restyledHome)), restyledHome);
+
+    const restyledMeta = applyUiStylePreset(META_SHELL_SCREEN, style.id);
+    assert.deepEqual(validateScreen(restyledMeta, META_SHELL_SOURCES, META_SHELL_COMMANDS), []);
+    assert.deepEqual(decodeScreen(encodeScreen(restyledMeta)), restyledMeta);
+  }
+});

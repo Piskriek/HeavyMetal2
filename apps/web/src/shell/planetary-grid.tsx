@@ -66,7 +66,7 @@ const NEIGHBOR_ENCLAVES: readonly EnclaveSectorDef[] = [
   { id: 'sec-01', name: 'Mare Tranquillitatis', owner: 'Apollo_AI', stage: 1, kind: 'neighbor', s: { Pxd: 0.35, Vtx: 0.22, Lx: 0.40, Aq: 0.15 }, powerKw: 14.5, builders: 1, azimuthDeg: 0, distanceKm: 4.2, accent: '#ff3d8a' },
   { id: 'sec-02', name: 'Oceanus Procellarum', owner: 'SubstrateCore', stage: 2, kind: 'neighbor', s: { Pxd: 0.55, Vtx: 0.48, Lx: 0.50, Aq: 0.28 }, powerKw: 22.0, builders: 2, azimuthDeg: 32.7, distanceKm: 4.2, accent: '#7cff4d' },
   { id: 'sec-03', name: 'Sinus Iridum', owner: 'RainbowBay', stage: 3, kind: 'neighbor', s: { Pxd: 0.72, Vtx: 0.65, Lx: 0.70, Aq: 0.62 }, powerKw: 38.0, builders: 3, azimuthDeg: 65.4, distanceKm: 4.2, accent: '#ffc13d' },
-  { id: 'sec-04', name: 'Mare Imbrium', owner: 'Gwen_Haddy', stage: 4, kind: 'neighbor', s: { Pxd: 0.90, Vtx: 0.88, Lx: 0.92, Aq: 0.85 }, powerKw: 56.5, builders: 4, azimuthDeg: 98.1, distanceKm: 4.2, accent: '#3dc8ff' },
+  { id: 'sec-04', name: 'Mare Imbrium', owner: 'Lyra_Vance', stage: 4, kind: 'neighbor', s: { Pxd: 0.90, Vtx: 0.88, Lx: 0.92, Aq: 0.85 }, powerKw: 56.5, builders: 4, azimuthDeg: 98.1, distanceKm: 4.2, accent: '#3dc8ff' },
   { id: 'sec-05', name: 'Copernicus Rim', owner: 'OrbitalArch', stage: 2, kind: 'neighbor', s: { Pxd: 0.48, Vtx: 0.52, Lx: 0.45, Aq: 0.20 }, powerKw: 18.0, builders: 1, azimuthDeg: 130.8, distanceKm: 4.2, accent: '#7cff4d' },
   { id: 'sec-06', name: 'Tycho Central Spire', owner: 'BeaconForge', stage: 3, kind: 'neighbor', s: { Pxd: 0.68, Vtx: 0.75, Lx: 0.80, Aq: 0.45 }, powerKw: 42.0, builders: 2, azimuthDeg: 163.5, distanceKm: 4.2, accent: '#ffc13d' },
   { id: 'sec-07', name: 'Mare Serenitatis', owner: 'ClearLake', stage: 4, kind: 'neighbor', s: { Pxd: 0.88, Vtx: 0.85, Lx: 0.86, Aq: 0.80 }, powerKw: 62.0, builders: 3, azimuthDeg: 196.2, distanceKm: 4.2, accent: '#3dc8ff' },
@@ -825,7 +825,7 @@ export const PlanetaryGridScreen: React.FC<PlanetaryGridScreenProps> = ({
               </div>
             )}
 
-            {/* Spawn Point Selector */}
+            {/* Spawn Point Selector (Plan 58: Seeded World & Stargate Plinth, no parked Earth Lab lever lock) */}
             <div className="pg-card">
               <div className="pg-field-label">SPAWN POINT SELECTOR</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -834,21 +834,20 @@ export const PlanetaryGridScreen: React.FC<PlanetaryGridScreenProps> = ({
                   className={`pg-spawn-card ${selectedSpawn === 'lab' ? 'is-accent' : ''}`}
                   onClick={() => setSelectedSpawn('lab')}
                 >
-                  <div className="pg-spawn-badge">EARTH BUNKER</div>
-                  <h4 style={{ margin: '2px 0' }}>Earth Observation Lab</h4>
-                  <p style={{ margin: 0, fontSize: '11px' }}>Deploy inside the bunker at Operator Console.</p>
+                  <div className="pg-spawn-badge">ARRIVAL PAD</div>
+                  <h4 style={{ margin: '2px 0' }}>Seeded World Arrival Pad</h4>
+                  <p style={{ margin: 0, fontSize: '11px' }}>Arrive on your Stage-3 seeded world with your Overwatch Drone.</p>
                 </button>
 
                 <button
                   type="button"
                   className={`pg-spawn-card ${selectedSpawn === 'gate' ? 'is-accent' : ''}`}
-                  onClick={() => { if (gateOn) setSelectedSpawn('gate'); }}
-                  disabled={!gateOn}
+                  onClick={() => setSelectedSpawn('gate')}
                 >
-                  <div className="pg-spawn-badge amber">MOON CRATER</div>
-                  <h4 style={{ margin: '2px 0' }}>Moon Twin Gate Pad</h4>
+                  <div className="pg-spawn-badge amber">STARGATE PLINTH</div>
+                  <h4 style={{ margin: '2px 0' }}>World Stargate Plinth</h4>
                   <p style={{ margin: 0, fontSize: '11px' }}>
-                    {gateOn ? 'Deploy directly onto your crater pad beside the Twin Gate.' : 'Locked: Power the gate in the Lab first.'}
+                    Deploy directly beside your world’s Stargate plinth to dial or receive travellers.
                   </p>
                 </button>
 

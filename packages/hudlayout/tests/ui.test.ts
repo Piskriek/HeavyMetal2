@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { decodeScreen, encodeScreen, validateScreen, UI_CODE_PREFIX, type UiScreen, type UiSource } from '../src/index';
+import { decodeScreen, encodeScreen, validateScreen, UI_CODE_PREFIX, type UiCommand, type UiScreen, type UiSource } from '../src/index';
 
 const SOURCES: UiSource[] = [
   { path: 'plot.stage', kind: 'stage' },
@@ -108,4 +108,26 @@ test('a code from before the stat (version 1, the play HUD as it was at 9fa3fbd1
   assert.deepEqual(old.panels.map((p) => p.id), ['goal', 'floats']);
   assert.deepEqual(old.panels[1]!.parts.map((p) => p.label), ['Stage', 'texture', 'shape', 'light', 'water']);
   assert.ok(old.panels.every((p) => p.parts.every((part) => part.with === undefined && part.note === undefined)));
+});
+
+// ---- the action (Argon's yes, 29 Oct): a press bound to a real command, so there is no button that does nothing
+const COMMANDS: UiCommand[] = [{ id: 'comms.toggle', does: 'Opens or closes the comms' }];
+const TOGGLE = { id: 'comms', look: { kind: 'action', tone: 'accent', frame: 'fill', size: 's' }, binds: 'comms.toggle', label: 'Comms' } as const;
+
+test('an action runs a declared command, and an action with no command to run cannot be placed', () => {
+  assert.deepEqual(validateScreen(statScreen(TOGGLE), SOURCES, COMMANDS), []);
+  assert.deepEqual(validateScreen(statScreen(TOGGLE), SOURCES).map((i) => i.code), ['unbound'], 'no command handles it');
+  assert.deepEqual(validateScreen(statScreen({ ...TOGGLE, binds: 'plot.stage' }), SOURCES, COMMANDS).map((i) => i.code), ['unbound'], 'a value is not a command');
+  assert.deepEqual(validateScreen(statScreen({ ...TOGGLE, with: { of: 'player.health' } }), SOURCES, COMMANDS).map((i) => i.code), ['wrong-widget'], 'an action reads no values');
+  assert.deepEqual(decodeScreen(encodeScreen(statScreen(TOGGLE))), statScreen(TOGGLE), 'it travels in a uic: code');
+});
+
+test('a code from before the action (version 2, the play HUD with its stats as it was in wave 9) still reads', () => {
+  const old = decodeScreen('uic:t14Bd8t9KQhwbGF5LWh1ZAQABGdvYWwBkAGQAwAKZ29hbC50aXRsZQV0aXRsZQRHb2FsAAACAgAAAAAAAAlnb2FsLmhpbnQEaGludA1XaGF0IGl0IG5lZWRzAAAAAQMAAAAAAAlnb2FsLm5leHQEbmV4dAROZXh0AAADAAMAAAAAAQIGZmxvYXRzAZABkAUACnBsb3Quc3RhZ2UFc3RhZ2UFU3RhZ2UAAgMAAAAAAAAACmZsb2F0cy5weGQDcHhkB3RleHR1cmUAAQEAAQAAAAAACmZsb2F0cy52dHgDdnR4BXNoYXBlAAEBAAEAAAAAAAlmbG9hdHMubHgCbHgFbGlnaHQAAQEAAQAAAAAACWZsb2F0cy5hcQJhcQV3YXRlcgABAQABAAAAAAEIBHBsb3QBkAGQAgtwbG90Lm9yZU91dAhwbG90Lm9yZQNvcmUDT3JlDnBsb3Qub3JlTGlua2VkAAUBADZPdXQgb2Ygb3JlOiBob2xkIEUgb24gYSBib3VsZGVyLCBvciBidWlsZCBhIHJvY2sgZHJpbGwADHBsb3Qub3JlUmF0ZQALcG93ZXIuc2hvcnQMcG93ZXIuZGVtYW5kBXBvd2VyBVBvd2VyAAAFAQAADHBvd2VyLnN1cHBseQAJcG93ZXIubWV0AQgGaGVhbHRoAZABkAQACXBsYXllci5ocAJocAZIZWFsdGgAAAUCAAAMcGxheWVyLmhwTWF4AAAACXBsYXllci5ocAZocC1iYXIGSGVhbHRoAAEBAQEAAAAAAA9wbGF5ZXIuc2hpZWxkZWQGc2hpZWxkK1NoaWVsZCB1cDogaGl0cyBkbyBhIGZpZnRoIG9mIHRoZWlyIGRhbWFnZS4AAAAAAQAAAAAAEXBsYXllci5sb3dXYXJuaW5nA2xvdydMb3cuIEJhY2sgb2ZmIHRvIHRoZSBnYXRlIGFuZCBwYXRjaCB1cC4AAAAAAgAAAAABoFDIipajAPH09QwQFAQABeBQKtFLB6U');
+  assert.ok(old, 'it decodes');
+  assert.deepEqual(old.panels.map((p) => p.id), ['goal', 'floats', 'plot', 'health']);
+  const ore = old.panels[2]!.parts[0]!;
+  assert.equal(ore.look.kind, 'stat');
+  assert.deepEqual(ore.with, { rate: 'plot.oreRate', linked: 'plot.oreLinked', alert: 'plot.oreOut' });
+  assert.equal(ore.note, 'Out of ore: hold E on a boulder, or build a rock drill');
 });

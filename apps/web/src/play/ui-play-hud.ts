@@ -5,7 +5,7 @@
  * values the HUD really has; validateScreen holds the screen to them (a lens, never a lie), and the renderer draws a part only
  * when its source has a value.
  */
-import { validateScreen, type UiPanel, type UiPart, type UiScreen, type UiSource } from '@hm/hudlayout';
+import { validateScreen, type UiCommand, type UiPanel, type UiPart, type UiScreen, type UiSource } from '@hm/hudlayout';
 import { PLAYER_MAX_HP } from '../monsters/policy';
 
 /** The four floats, in the HUD's order (the constitution's S = Pxd, Vtx, Lx, Aq). */
@@ -40,6 +40,23 @@ export const PLAY_HUD_SOURCES: readonly UiSource[] = [
   /** The health is low and no shield takes the hits. */
   { path: 'player.lowWarning', kind: 'flag' },
 ];
+
+/** What the play HUD can do when pressed. */
+export const PLAY_HUD_COMMANDS: readonly UiCommand[] = [
+  { id: 'comms.toggle', does: 'Opens or closes the comms with Overwatch' },
+];
+
+/** The comms chip (bottom left): one action, opening the comms; its words carry the key that does the same. */
+export const PLAY_HUD_COMMS: UiPanel = {
+  id: 'comms',
+  anchor: 'bottom-left',
+  offsetX: 0,
+  offsetY: 0,
+  visible: true,
+  parts: [
+    { id: 'comms-toggle', look: { kind: 'action', tone: 'accent', frame: 'fill', size: 's' }, binds: 'comms.toggle', label: 'COMMS · OVERWATCH [Enter]' },
+  ],
+};
 
 /** The plot's figures (bottom right): its ore, with its rate and the linked crates' ore, and the power drawn of the supply. */
 export const PLAY_HUD_PLOT: UiPanel = {
@@ -108,7 +125,7 @@ export const PLAY_HUD_GOAL: UiPanel = {
 export const PLAY_HUD_SCREEN: UiScreen = {
   id: 'play-hud',
   tokens: { ink: '#f1f4f5', paper: '#0c1014', accent: '#a050c8', warn: '#e0502a', dim: '#8a96a3', font: 'setmix', scale: 1, radius: 4, reducedMotion: false },
-  panels: [PLAY_HUD_GOAL, PLAY_HUD_FLOATS, PLAY_HUD_PLOT, PLAY_HUD_HEALTH],
+  panels: [PLAY_HUD_GOAL, PLAY_HUD_FLOATS, PLAY_HUD_PLOT, PLAY_HUD_HEALTH, PLAY_HUD_COMMS],
 };
 
 const FLOAT_PATTERNS = ['solid', 'hatch', 'steps', 'dots'] as const;
@@ -142,7 +159,7 @@ export function floatsValues(stage: number, levels: Readonly<Record<(typeof FLOA
 }
 
 /** The issues of the play HUD's screen against its sources ([] when it may be shown; the unit test holds it there). */
-export const playHudIssues = (): ReturnType<typeof validateScreen> => validateScreen(PLAY_HUD_SCREEN, PLAY_HUD_SOURCES);
+export const playHudIssues = (): ReturnType<typeof validateScreen> => validateScreen(PLAY_HUD_SCREEN, PLAY_HUD_SOURCES, PLAY_HUD_COMMANDS);
 
 /** The goal card's values from what play knows now; a missing value (null) draws nothing. */
 export function goalValues(o: { readonly title: string; readonly hint: string; readonly next: string | null }): Readonly<Record<string, string | null>> {
@@ -202,5 +219,19 @@ export function healthPanelProps(o: { readonly hp: number; readonly maxHp: numbe
     format: { hp: shown, 'hp-bar': shown },
     meterMax: { 'hp-bar': maxHp },
     segments: { 'hp-bar': 20 },
+  };
+}
+
+/** The comms chip's drawing props, in the classes the hand-drawn chip had (companion-chat.tsx before the action). */
+export function commsPanelProps(onToggle: () => void) {
+  return {
+    panel: PLAY_HUD_COMMS,
+    values: {},
+    element: 'none' as const,
+    actions: { 'comms.toggle': onToggle },
+    partClass: { 'comms-toggle': 'companion-chat-toggle' },
+    partData: { 'comms-toggle': { testid: 'companion-comms-toggle' } },
+    partIcon: { 'comms-toggle': 'companion-chat-orb' },
+    partAria: { 'comms-toggle': 'Toggle Companion Comms (Enter to type, hold T to talk)' },
   };
 }

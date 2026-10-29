@@ -331,6 +331,15 @@ function bakeMatstackDataTexture(
   return tex;
 }
 
+/**
+ * The plain names kits give a glowing part, as the lamp codes play draws them with (play-scene's violet, the capacitor bank's lamp),
+ * so the Studio lights them instead of painting them with the shelf's default.
+ */
+export const KIT_GLOW_NAMES: Readonly<Record<string, string>> = {
+  violet: 'lx:6500:2:steady:b84dff',
+  lamp: 'lx:4200:1.4:steady:3eff8b',
+};
+
 function makeMatstackThreeMaterial(
   matId: string,
   opts: BuildStudioMachineOptions,
@@ -339,7 +348,8 @@ function makeMatstackThreeMaterial(
   const isStage0 = opts.stageLook === 0;
   const isStage1 = opts.stageLook === 1;
 
-  // 1. Handle emissive Lx lamp codes ('lx:<kelvin>:<intensity>:<pattern>[:<hex>]')
+  // 1. Handle emissive Lx lamp codes ('lx:<kelvin>:<intensity>:<pattern>[:<hex>]'), and the kits' plain names for a glow
+  matId = KIT_GLOW_NAMES[matId] ?? matId;
   if (matId.startsWith('lx:')) {
     const parts = matId.split(':');
     const intensity = Number(parts[2] ?? 1.5) || 1.5;

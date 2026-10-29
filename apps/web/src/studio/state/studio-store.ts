@@ -33,6 +33,7 @@ import type {
 } from '@hm/matstack';
 import {
   LAYER_SHELF,
+  MATERIAL_ALIASES,
   MATERIAL_SHELF,
   resolveMatPreset,
 } from '@hm/matstack';
@@ -181,6 +182,18 @@ export const QUICK_MESHOP_PRESETS: Readonly<Record<QuickMeshOpPreset, OpRef>> = 
   'stretch-span': { op: 'extender-mid-slice', params: { axis: 0, deltaM: 0.25 } },
   'edge-wear': { op: 'surface-edge-wear-ao', params: { bandWidthM: 0.025, cavityWidthM: 0.035 } },
 });
+
+/**
+ * A slot's material as the id the material editor works on: a `mat:` id as it is (or its canonical id, if it is an alias), and a
+ * kit's plain name (`darkSteel`) through the alias map to its shelf preset. Null for a name with no shelf finish (an `lx:` lamp).
+ */
+export function slotMaterialId(name: string): string | null {
+  const norm = name.startsWith('mat:') ? name : `mat:${name}`;
+  const aliased = MATERIAL_ALIASES[norm];
+  if (aliased) return aliased;
+  if (name.startsWith('mat:')) return name;
+  return MATERIAL_SHELF[norm] ? norm : null;
+}
 
 const DEFAULT_LOGIC_GRAPH: WireGraph = {
   nodes: [
@@ -405,7 +418,7 @@ export function createStudioStore(
     activeSlotKey: firstSlot,
     slotAssignScope: 'kit-slot',
     activeSocketPinId: null,
-    activeMaterialId: firstMat.startsWith('mat:') ? firstMat : 'mat:field-worn-hazard',
+    activeMaterialId: slotMaterialId(firstMat) ?? 'mat:field-worn-hazard',
     hoveredMaterialId: null,
     activeLayerIndex: 0,
     activeTileId: 'brushed-metal',
@@ -772,7 +785,7 @@ export function createStudioStore(
           activePartId: null,
           activeSlotKey: firstSlot,
           activeSocketPinId: null,
-          activeMaterialId: firstMat.startsWith('mat:') ? firstMat : state.activeMaterialId,
+          activeMaterialId: slotMaterialId(firstMat) ?? state.activeMaterialId,
           validationIssues: recomputeValidation(state.kits, kitId, state.overridesByKit),
         },
         false,
@@ -791,9 +804,8 @@ export function createStudioStore(
           ov?.material ??
           (rawSlot ? pDef?.slotMaterials?.[rawSlot] : undefined) ??
           pDef?.material;
-        if (resolvedMat && resolvedMat.startsWith('mat:')) {
-          nextMatId = resolvedMat;
-        }
+        const shelfId = resolvedMat ? slotMaterialId(resolvedMat) : null;
+        if (shelfId) nextMatId = shelfId;
       }
       commit(
         {

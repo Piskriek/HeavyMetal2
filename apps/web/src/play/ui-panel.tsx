@@ -43,6 +43,12 @@ export interface UiPanelViewProps {
   readonly meterMax?: Readonly<Record<string, number>>;
   /** A meter drawn on its own as this many segments, lit up to its share (the health bar), per part id. */
   readonly segments?: Readonly<Record<string, number>>;
+  /** What each command does here, by command id; an action whose command has no handler draws nothing. */
+  readonly actions?: Readonly<Record<string, () => void>>;
+  /** A leading mark's class per part id (the comms chip's orb), drawn as an empty span before the words. */
+  readonly partIcon?: Readonly<Record<string, string>>;
+  /** An accessible name per part id, where the words alone do not say it (the chip's keys). */
+  readonly partAria?: Readonly<Record<string, string>>;
   readonly hudZone?: string;
 }
 
@@ -112,13 +118,24 @@ function UiPartView(props: { readonly part: UiPart; readonly value: Shown; reado
       );
     }
     case 'list': return <ul {...common}><li>{text}</li></ul>;
+    case 'action': return (
+      <button {...common} aria-label={p.partAria?.[part.id]} onClick={p.actions?.[part.binds]}>
+        {p.partIcon?.[part.id] !== undefined ? <span className={p.partIcon[part.id]} /> : null}
+        <span>{part.label}</span>
+      </button>
+    );
   }
 }
 
 export function UiPanelView(props: UiPanelViewProps): ReactElement | null {
   if (!props.panel.visible) return null;
-  // the parts with a value to show, in order (a flag that is down has none); consecutive meter rows share one list, as the HUD's rows do
-  const shown = props.panel.parts.filter((part) => { const v = props.values[part.binds]; return v !== null && v !== undefined && v !== '' && v !== false; });
+  // the parts with a value to show, in order (a flag that is down has none), and the actions with a handler to run; consecutive
+  // meter rows share one list, as the HUD's rows do
+  const shown = props.panel.parts.filter((part) => {
+    if (part.look.kind === 'action') return typeof props.actions?.[part.binds] === 'function';
+    const v = props.values[part.binds];
+    return v !== null && v !== undefined && v !== '' && v !== false;
+  });
   const row = (part: UiPart): boolean => part.look.kind === 'meter' && props.segments?.[part.id] === undefined;
   const out: ReactNode[] = props.title ? [<p key="title" className={props.title.className}>{props.title.text}</p>] : [];
   for (let i = 0; i < shown.length; i++) {
@@ -130,7 +147,7 @@ export function UiPanelView(props: UiPanelViewProps): ReactElement | null {
       out.push(<ul key={`meters-${run[0]!.id}`} className={props.meter?.list}>{run.map((m) => <UiPartView key={m.id} part={m} value={props.values[m.binds] as Shown} p={props} />)}</ul>);
       continue;
     }
-    out.push(<UiPartView key={part.id} part={part} value={props.values[part.binds] as Shown} p={props} />);
+    out.push(<UiPartView key={part.id} part={part} value={part.look.kind === 'action' ? part.label : props.values[part.binds] as Shown} p={props} />);
   }
   if (props.element === 'none') return <>{out}</>;
   const Element = props.element ?? 'section';

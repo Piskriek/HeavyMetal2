@@ -808,12 +808,35 @@ export const MATERIAL_SHELF: Readonly<Record<string, MaterialSpec>> = Object.fre
   },
 });
 
-/** Alias map so earlier machine slot IDs resolve to the canonical Plan 41 §4.9 presets. */
+/**
+ * Alias map so earlier machine slot IDs resolve to the canonical Plan 41 §4.9 presets, and so do the plain material names kits
+ * still use (the lab's names and the trim palette's, Argon's yes, 29 Oct): a kit named `darkSteel` shows the shelf's finish for it
+ * in the Studio instead of the shelf's default.
+ */
 export const MATERIAL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   'mat:khaki-painted-steel': 'mat:field-worn-hazard',
   'mat:brushed-structural-steel': 'mat:workshop-steel',
   'mat:dark-hopper-iron': 'mat:rust-bucket',
   'mat:copper-bus-bar': 'mat:old-copper',
+  // the lab's names (labkit LabMaterials)
+  'mat:darkSteel': 'mat:workshop-steel',
+  'mat:gunmetal': 'mat:slatted-grille-steel',
+  'mat:paint': 'mat:lab-fresh',
+  'mat:copper': 'mat:old-copper',
+  'mat:hazard': 'mat:hazard-chevron',
+  'mat:rubber': 'mat:rubber-seal',
+  // no glass on the shelf yet: the smooth, bright lab steel is the nearest finish
+  'mat:glass': 'mat:brushed-lab-steel',
+  // the trim palette's names, which retire into mat: presets (play/kit-trim-palette.ts), and the plain ones beside them
+  'mat:hull-steel': 'mat:workshop-steel',
+  'mat:steel': 'mat:workshop-steel',
+  'mat:accent-hardware': 'mat:slatted-grille-steel',
+  'mat:khaki-paint': 'mat:field-worn-hazard',
+  'mat:hopper-slate': 'mat:rust-bucket',
+  // the drone's and machines' rotor blades
+  'mat:rotor': 'mat:carbon-racer',
+  // the crawler's cutter heads, scorched by the rock they cut: cast iron with heat tint and soot
+  'mat:scorch-burn': 'mat:furnace',
 });
 
 /** Ordered array of the first-shelf MaterialSpec presets (with `id` attached for lookup). */

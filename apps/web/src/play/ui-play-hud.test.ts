@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { decodeScreen, encodeScreen } from '@hm/hudlayout';
-import { PLAY_HUD_GOAL, PLAY_HUD_SCREEN, floatsPanelProps, goalValues, healthPanelProps, playHudIssues, plotPanelProps, type PlotFigures } from './ui-play-hud';
+import { PLAY_HUD_GOAL, PLAY_HUD_SCREEN, commsPanelProps, floatsPanelProps, goalValues, healthPanelProps, playHudIssues, plotPanelProps, type PlotFigures } from './ui-play-hud';
 import { UiPanelView } from './ui-panel';
 
 const draw = (values: Readonly<Record<string, string | null>>): string =>
@@ -114,4 +114,17 @@ test('the health plate drawn from its preset keeps the hand-drawn plate: figure,
     assert.match(html, new RegExp(`aria-valuenow="${Math.max(0, Math.round(hp))}"`));
     assert.equal((html.match(/mhud-(shield-)?note/g) ?? []).length, shielded || low ? 1 : 0, 'one note at most, the shield\'s first');
   }
+});
+
+test('the comms chip drawn from its preset is the hand-drawn chip, and it runs its command', () => {
+  let toggled = 0;
+  const props = commsPanelProps(() => { toggled += 1; });
+  const html = renderToStaticMarkup(createElement(UiPanelView, props));
+  const hand = renderToStaticMarkup(createElement('button', { className: 'companion-chat-toggle', 'data-testid': 'companion-comms-toggle', 'aria-label': 'Toggle Companion Comms (Enter to type, hold T to talk)' },
+    createElement('span', { className: 'companion-chat-orb' }), createElement('span', null, 'COMMS · OVERWATCH [Enter]')));
+  assert.equal(html.replace(/ data-ui-part="[^"]*"/, ''), hand);
+  props.actions['comms.toggle']();
+  assert.equal(toggled, 1);
+  // with no handler for its command the chip is not drawn: no button that does nothing
+  assert.equal(renderToStaticMarkup(createElement(UiPanelView, { ...props, actions: {} })), '');
 });

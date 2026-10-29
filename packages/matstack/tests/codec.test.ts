@@ -67,7 +67,9 @@ test('names: a shelf preset keeps its id; a changed one becomes a player code th
   assert.equal(back.age, 0.9);
   assert.deepEqual(specOfName('mat:rust-bucket'), MATERIAL_SHELF['mat:rust-bucket']);
   assert.equal(specOfName('matc:junk'), null);
-  assert.equal(specOfName('darkSteel'), null);
+  assert.equal(specOfName('no-such-paint'), null);
+  // a kit's plain name reaches its shelf finish through the alias map (Argon's yes, 29 Oct)
+  assert.deepEqual(specOfName('darkSteel'), MATERIAL_SHELF['mat:workshop-steel']);
 });
 
 test('out-of-range values clamp instead of failing', () => {

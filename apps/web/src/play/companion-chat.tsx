@@ -40,6 +40,8 @@ const TRAJECTORY_MIN = 150;
 const CADENCE_WINDOW = 1600;
 /** A live bridge's refinements speak at most this often (the bridge still gets every result). */
 const LIVE_SAY_GAP_MS = 20000;
+import { UiPanelView } from './ui-panel';
+import { commsPanelProps } from './ui-play-hud';
 import './companion-chat.css';
 
 /** What the screen can do through the comms (plan 49): the ping's callout and its bridge event. */
@@ -1043,15 +1045,8 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ companion, onBroad
         </div>
       )}
 
-      <button
-        className="companion-chat-toggle"
-        data-testid="companion-comms-toggle"
-        onClick={() => setIsOpen((o) => !o)}
-        aria-label="Toggle Companion Comms (Enter to type, hold T to talk)"
-      >
-        <span className="companion-chat-orb" />
-        <span>COMMS · OVERWATCH [Enter]</span>
-      </button>
+      {/* Plan 57 §15: the comms chip is a ui: panel, its one action bound to the comms.toggle command */}
+      <UiPanelView {...commsPanelProps(() => setIsOpen((o) => !o))} />
 
       {isOpen && (
         <div className="companion-chat-panel" data-testid="companion-comms-panel">

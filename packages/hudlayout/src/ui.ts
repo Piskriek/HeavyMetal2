@@ -1,12 +1,13 @@
 /**
  * Plan 57 §15: the interface is presets too. A `ui:` preset climbs the same five rungs as every preset:
  *   1 tokens: colour, type, scale, corner, motion
- *   2 widget looks: a readout, a meter, a card, a badge, a list, a stat, each in a tone, a frame and a size
- *   3 parts: a widget bound to a real value
+ *   2 widget looks: a readout, a meter, a card, a badge, a list, a stat, an action, each in a tone, a frame and a size
+ *   3 parts: a widget bound to a real value, or an action bound to a real command
  *   4 panels: parts placed by anchor and offset (the HUD layout's own anchors and pixel offsets)
  *   5 a screen: its tokens and its panels
  * The System HUD's rule binds rung 3: a lens, never a lie. A part reads a declared source (a value the screen really has), and a
- * part with no source to read cannot be placed: validateScreen says so. These are universal operators, not one game's templates:
+ * part with no source to read cannot be placed: validateScreen says so. An action is held to a declared command the same way, so
+ * there is no button that does nothing. These are universal operators, not one game's templates:
  * a meter is a meter whether it reads a sync, a fuel tank or an XP bar. Another game's interface is bagged as this structure and
  * redrawn in FIDELITY's own tokens, never its art or text.
  *
@@ -40,8 +41,8 @@ export interface UiTokens {
  * A stat (Argon's yes, 29 Oct) is one number with what the player reads beside it: what it is out of, its rate, what is held
  * elsewhere, its share and its alarm, each bound to a source of its own (the ore, the power, the health).
  */
-export type WidgetKind = 'readout' | 'meter' | 'card' | 'badge' | 'list' | 'stat';
-export const WIDGET_KINDS: readonly WidgetKind[] = ['readout', 'meter', 'card', 'badge', 'list', 'stat'];
+export type WidgetKind = 'readout' | 'meter' | 'card' | 'badge' | 'list' | 'stat' | 'action';
+export const WIDGET_KINDS: readonly WidgetKind[] = ['readout', 'meter', 'card', 'badge', 'list', 'stat', 'action'];
 export type WidgetTone = 'ink' | 'accent' | 'warn' | 'dim';
 export const WIDGET_TONES: readonly WidgetTone[] = ['ink', 'accent', 'warn', 'dim'];
 export type WidgetFrame = 'none' | 'line' | 'fill';
@@ -69,6 +70,12 @@ export interface UiSource {
   /** The value's own unit (kW, ore). It belongs to the value, so a part cannot claim another. */
   readonly unit?: string;
 }
+/** Something the screen can really do when pressed (open the comms, fire), by its id; an action part binds one. */
+export interface UiCommand {
+  readonly id: string;
+  /** What it does, in the player's words. */
+  readonly does: string;
+}
 /** A stat's other bindings, each a source path the screen declares. */
 export interface StatBinds {
   /** What the value is out of (a number): the supply the demand draws on, the health's top. */
@@ -88,7 +95,7 @@ export const STAT_BINDS: readonly (keyof StatBinds)[] = ['of', 'rate', 'linked',
 export interface UiPart {
   readonly id: string;
   readonly look: WidgetLook;
-  /** The source path this part reads; it must be one the screen declares. */
+  /** The source path this part reads, or the command an action runs; it must be one the screen declares. */
   readonly binds: string;
   /** The player's word for it (shown beside the value), never a value of its own. A readout of a flag shows it while the flag is up. */
   readonly label: string;
@@ -106,6 +113,7 @@ export const WIDGET_READS: Readonly<Record<WidgetKind, readonly SourceKind[]>> =
   badge: ['text', 'stage'],
   list: ['list'],
   stat: ['number'],
+  action: [],
 };
 
 // ---- rung 4: panels
@@ -137,10 +145,11 @@ export interface UiIssue {
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
-/** What is wrong with a screen against the sources it may read; [] when it may be shown. Never throws. */
-export function validateScreen(screen: UiScreen, sources: readonly UiSource[]): UiIssue[] {
+/** What is wrong with a screen against the sources it may read and the commands it may run; [] when it may be shown. Never throws. */
+export function validateScreen(screen: UiScreen, sources: readonly UiSource[], commands: readonly UiCommand[] = []): UiIssue[] {
   const out: UiIssue[] = [];
   const byPath = new Map(sources.map((s) => [s.path, s]));
+  const commandIds = new Set(commands.map((c) => c.id));
   const t = screen.tokens;
   for (const k of ['ink', 'paper', 'accent', 'warn', 'dim'] as const) if (!HEX.test(t[k])) out.push({ code: 'bad-colour', at: `tokens.${k}`, detail: `${t[k]} is not #rrggbb` });
   if (!(t.scale >= 0.75 && t.scale <= 1.5)) out.push({ code: 'out-of-range', at: 'tokens.scale', detail: `${t.scale} is outside 0.75 to 1.5` });
@@ -154,12 +163,18 @@ export function validateScreen(screen: UiScreen, sources: readonly UiSource[]): 
     for (const part of p.parts) {
       const at = `panel ${p.id} / part ${part.id}`;
       seen(part.id, at);
+      const extra = STAT_BINDS.filter((k) => part.with?.[k] !== undefined);
+      if (part.look.kind === 'action') {
+        // the same rule for a press: an action with no real command to run would be a button that does nothing
+        if (!commandIds.has(part.binds)) out.push({ code: 'unbound', at, detail: `${part.binds} is not a command this screen has` });
+        if (extra.length > 0 || part.note !== undefined) out.push({ code: 'wrong-widget', at, detail: 'an action runs a command; it reads no values' });
+        continue;
+      }
       const src = byPath.get(part.binds);
       // the lens rule: a part with nothing real to read cannot be placed
       if (!src) { out.push({ code: 'unbound', at, detail: `${part.binds} is not a value this screen has` }); continue; }
       if (!WIDGET_READS[part.look.kind].includes(src.kind)) out.push({ code: 'wrong-widget', at, detail: `a ${part.look.kind} cannot show a ${src.kind}` });
       else if (part.look.kind === 'meter' && src.kind === 'number' && !(typeof src.max === 'number' && src.max > 0)) out.push({ code: 'meter-without-range', at, detail: `${part.binds} has no max, so a meter would invent its scale` });
-      const extra = STAT_BINDS.filter((k) => part.with?.[k] !== undefined);
       if (extra.length > 0 && part.look.kind !== 'stat') out.push({ code: 'wrong-widget', at, detail: `only a stat reads more than one value (this ${part.look.kind} has ${extra.join(', ')})` });
       for (const k of extra) {
         const path = part.with?.[k] as string;
@@ -177,7 +192,9 @@ export function validateScreen(screen: UiScreen, sources: readonly UiSource[]): 
 // ---- the code
 const enumOf = (options: readonly string[]): Field => ({ kind: 'enum', options });
 const str = (maxBytes: number): Field => ({ kind: 'string', maxBytes });
-const LOOK: Field = { kind: 'object', fields: { kind: enumOf(WIDGET_KINDS), tone: enumOf(WIDGET_TONES), frame: enumOf(WIDGET_FRAMES), size: enumOf(WIDGET_SIZES) } };
+const lookOf = (kind: Field): Field => ({ kind: 'object', fields: { kind, tone: enumOf(WIDGET_TONES), frame: enumOf(WIDGET_FRAMES), size: enumOf(WIDGET_SIZES) } });
+/** Version 3 and on: the kind by name (checked against WIDGET_KINDS on decode). */
+const LOOK: Field = lookOf(str(16));
 const TOKENS: Field = {
   kind: 'object',
   fields: {
@@ -218,14 +235,16 @@ const PART_V1: Field = {
   },
 };
 /** A part with its stat bindings and note, each '' for none (a code has no optional fields). */
-const PART_V2: Field = {
+const partWith = (look: Field): Field => ({
   kind: 'object',
   fields: {
-    id: str(UI_LIMITS.idBytes), look: LOOK, binds: str(UI_LIMITS.pathBytes), label: str(UI_LIMITS.labelBytes),
+    id: str(UI_LIMITS.idBytes), look, binds: str(UI_LIMITS.pathBytes), label: str(UI_LIMITS.labelBytes),
     ...Object.fromEntries(STAT_BINDS.map((k) => [k, str(UI_LIMITS.pathBytes)])), note: str(UI_LIMITS.labelBytes),
   },
-};
-export const UI_SCREEN_SCHEMA: Schema = screenSchema(2, PART_V2);
+});
+export const UI_SCREEN_SCHEMA: Schema = screenSchema(3, partWith(LOOK));
+/** Version 2 (the stat): the six kinds as an enum. */
+const UI_SCREEN_SCHEMA_V2: Schema = screenSchema(2, partWith(lookOf(enumOf(['readout', 'meter', 'card', 'badge', 'list', 'stat']))));
 const UI_SCREEN_SCHEMA_V1: Schema = screenSchema(1, PART_V1);
 
 type FlatPart = Omit<UiPart, 'with' | 'note'> & Readonly<Record<keyof StatBinds | 'note', string>>;
@@ -253,9 +272,11 @@ export function decodeScreen(code: string): UiScreen | null {
   if (!code.startsWith(UI_CODE_PREFIX)) return null;
   try {
     const body = code.slice(UI_CODE_PREFIX.length);
-    const v2 = decode(UI_SCREEN_SCHEMA, body);
+    const v3 = decode(UI_SCREEN_SCHEMA, body) as ScreenOf<FlatPart> | null;
+    if (v3) return v3.panels.every((p) => p.parts.every((part) => (WIDGET_KINDS as readonly string[]).includes(part.look.kind))) ? mapParts(v3, fullPart) : null;
+    // codes from before the action (version 2) and before the stat (version 1) read as they were
+    const v2 = decode(UI_SCREEN_SCHEMA_V2, body);
     if (v2) return mapParts(v2 as unknown as ScreenOf<FlatPart>, fullPart);
-    // a code from before the stat reads as it was
     const v1 = decode(UI_SCREEN_SCHEMA_V1, body);
     return v1 ? (v1 as UiScreen) : null;
   } catch {

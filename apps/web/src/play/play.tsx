@@ -106,6 +106,8 @@ import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { kv } from '../storage/profile-storage';
 import { bodyCheckpoint, createDroneMemory, dreamNow, dronePerspective, droneSymptoms, hasUndreamt, loadDroneMemory, noteCatalyst, saveDroneMemory, type DroneBody, type DroneCatalyst, type DroneMemory } from './drone-memory';
 import { hintsFromWarnings } from './drone-body-visuals';
+import { PLAY_HUD_GOAL, goalValues } from './ui-play-hud';
+import { UiPanelView } from './ui-panel';
 import { warningLine } from '@hm/harness';
 import type { DreamCue } from '@hm/harness';
 import { isMechanicObservation, transduceMechanic, type MimicryResult } from '@hm/harness';
@@ -5886,11 +5888,18 @@ useEffect(() => {
                 stage={hud.plot.stage}
               />
             ) : null}
-            <section className="play-goal" aria-live="polite" data-hud-zone="top-left">
-              <h2>{visiting ? `Visiting ${visiting.snapshot.owner}’s plot` : goal.title}</h2>
-              <p>{visiting ? 'Read-only visit. Walk back through the gate to return to your lab.' : goal.hint}</p>
-              {chainNext && !isSim ? <small className="play-next">Next: {chainNext}</small> : null}
-            </section>
+            {/* plan 57 §15: the goal card is a ui: panel, drawn from its preset with the live stage and what it needs */}
+            <UiPanelView
+              panel={PLAY_HUD_GOAL}
+              className="play-goal"
+              hudZone="top-left"
+              partClass={{ next: 'play-next' }}
+              values={goalValues({
+                title: visiting ? `Visiting ${visiting.snapshot.owner}’s plot` : goal.title,
+                hint: visiting ? 'Read-only visit. Walk back through the gate to return to your lab.' : goal.hint,
+                next: chainNext && !isSim ? `Next: ${chainNext}` : null,
+              })}
+            />
             {/* The co-op room's chip sits under the quest card, in the top-left zone: the stage metrics keep the top-right */}
             {outpostRef.current ? <OutpostRoster session={outpostRef.current} /> : null}
             </HudZone>

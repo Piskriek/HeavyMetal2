@@ -68,9 +68,13 @@
     - sockets where something really plugs in (Plan 57 §14.2);
     - all nine lab kits moved onto the assembler shelf, still marked `salvaged`;
     - the Studio's model builder drew box parts half a part low and gave them no collider overlay; both are fixed.
+  - **Wave 6: the goal card is a `ui:` panel** (Argon's b), gates green (unit 3,812, only timing budgets failing; e2e 19/19, 57/57, 24/24, 15/15, Studio 11/11, smoke green):
+    - `play/ui-play-hud.ts` holds the screen and its sources;
+    - `play/ui-panel.tsx` draws a panel from its preset with live values, and a part with no value draws nothing;
+    - the card's look and classes are unchanged.
 - **Next:**
   1. the labkit's procedural props rebuilt as kits (RULES 8a), onto the salvage list;
-  2. the play HUD's goal card rendered from a `ui:` screen;
+  2. the rest of the play HUD's panels as `ui:` (the floats pill, health, ore and power, comms), then a Studio `ui:` tab with live previews;
   3. the narrator engine as the drone's System voice;
   4. the bridge screen's mirror;
   5. mimic Cataclysm: DDA and Pokémon Showdown first, then the Steam games' data files.

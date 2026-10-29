@@ -392,4 +392,9 @@ The owner: a planet is "a very dense soul and it moves through the densities jus
     - a widget may read only the kinds it can show (`WIDGET_READS`: a list reads a list, a meter a ratio or a number with a max);
     - a meter over a number with no max is refused, because it would invent its own scale.
   - **The code:** `uic:` (@hm/presetcodec) round-trips a screen exactly, and a damaged or foreign code reads as null.
-  - **Next:** declare the play HUD's real sources (the stage, the next stage's needs, health, ore, power, the drone), express its panels as a `ui:` screen, and render them from it, the goal card first.
+  - **The goal card is a `ui:` panel** (29 Oct; Argon: no rung changes, wire it to the live values):
+    - `play/ui-play-hud.ts` holds the play HUD's screen, `PLAY_HUD_SCREEN`, and its sources (`goal.title`, `goal.hint`, `goal.next`). The goal panel's parts: the card (the stage or the step), the readout (what it needs next), the badge (the chain's next step);
+    - `play/ui-panel.tsx` (`UiPanelView`) draws a panel from its preset with live values. A part whose source has no value draws nothing: the lens rule at run time;
+    - the card keeps its classes (`play-goal`, `play-next`), so its look and the e2e checks hold;
+    - tests: 3/3 (the screen validates against its sources and round-trips as `uic:`; the card's markup; a missing value draws nothing).
+  - **Next:** the rest of the play HUD's panels (the floats pill, health, ore and power, the comms chip), each with its real sources; then a Studio `ui:` editor tab with live previews (previews drive play).

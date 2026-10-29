@@ -785,26 +785,19 @@ export function PlayScreen(props: {
   };
 
   useEffect(() => {
-    if (isDevSeed && plotRef.current.machines.length === 0) {
+    if (plotRef.current.machines.length === 0) {
       plotRef.current = {
         ...plotRef.current,
         ore: Math.max(plotRef.current.ore, 600),
         machines: [
-          {
-            id: 1,
-            kind: 'power',
-            x: 0,
-            z: -6,
-            yaw: 0,
-            on: true,
-            cartridge: null,
-            built: 0,
-          },
+          { id: 1, kind: 'power', x: 5, z: -8, yaw: 0.3, on: true, cartridge: null, built: 1 },
+          { id: 2, kind: 'mill', x: -6, z: -10, yaw: -0.4, on: true, cartridge: 'emerald_canopy', built: 1 },
+          { id: 3, kind: 'pylon', x: 0, z: -14, yaw: 0, on: true, cartridge: null, built: 1 },
         ],
-        nextId: 2,
+        nextId: 4,
       };
     }
-  }, [isDevSeed]);
+  }, []);
 
   const commit = useCallback((next: PlayState) => { stateRef.current = next; setState(next); if (!props.gamePreset) save(next); }, [props.gamePreset]);
   /** The campaign chain (TASK-22): change the counters, read the world as evidence, run the questline, save if it moved. */

@@ -230,7 +230,8 @@ export function createWorld(seed = 1): BaseWorld {
   const slots: (L.Stack | null)[] = Array.from({ length: PLAYER_SLOTS }, () => null);
   slots[0] = { item: STARTER, n: 1 };
   return {
-    v: 5, tick: 0, base: S.empty(), boxes: [], layouts: [], plans: [], shelter: false, vehicles: [], nextVehicle: 1, loadout: NO_LOADOUT,
+    v: 5, tick: 0, base: S.empty(), boxes: [], layouts: [], plans: [], shelter: false,
+    vehicles: [{ id: 1, kind: 'scout', x: 8, z: -5, yaw: 0.5, box: null }], nextVehicle: 2, loadout: NO_LOADOUT,
     gatePose: DEFAULT_GATE_POSE, gateAccess: 'open', biome: EARTH_BIOME_PRESET,
     player: { id: PLAYER, x: 0, z: 0, slots, maxKg: PLAYER_KG },
     equipment: { ...NO_EQUIPMENT, beam: { item: 'tool-beam', n: 1 }, visor: { item: 'eq-visor', n: 1 } },

@@ -54,6 +54,8 @@ export function startCampaignWorld(rawSave: string | null, opts: { readonly seed
       ...loaded,
       stage: Math.max(3, loaded.stage),
       biome: loaded.biome.world === 'moon' ? EARTH_BIOME_PRESET : loaded.biome,
+      vehicles: loaded.vehicles.length === 0 ? [{ id: 1, kind: 'scout', x: 8, z: -5, yaw: 0.5, box: null }] : loaded.vehicles,
+      nextVehicle: Math.max(2, loaded.nextVehicle),
     };
     if (hasWork(upgraded)) return { world: upgraded, played: true };
   }

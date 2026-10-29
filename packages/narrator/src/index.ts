@@ -9,6 +9,8 @@
 //  - the queue is capped, and warnings and barks go stale and are dropped if they wait too long (old news);
 //  - a short gap between lines, so they never run into each other;
 //  - every line that has played is kept in order: the radio log the player can replay.
+//  - a notice may carry its subject (the skill, the title it announces), and a line marked `each` may wait beside others of
+//    its kind, so a burst of events shows each one (the drone's System voice, Plan 57 §8.1).
 
 export type Priority = 'story' | 'warn' | 'bark';
 const RANK: Readonly<Record<Priority, number>> = { story: 3, warn: 2, bark: 1 };
@@ -22,6 +24,11 @@ export interface Line {
   readonly cooldown?: number;
   /** Only after this line has played (story order). */
   readonly after?: string;
+  /**
+   * A notice that announces its event: it may wait beside others of its kind, each with its own subject, and its cooldown does
+   * not hold back the next one (a burst of three skills shows three notices). Not for story lines.
+   */
+  readonly each?: true;
 }
 
 export interface Rules {
@@ -36,7 +43,12 @@ export interface Rules {
   readonly gap: number;
 }
 
-export interface Waiting { readonly id: string; readonly at: number }
+export interface Waiting {
+  readonly id: string;
+  readonly at: number;
+  /** The notice's subject (absent for a line that has none). */
+  readonly data?: string;
+}
 export interface State {
   /** Seconds since the narrator started (advanced only by step). */
   readonly time: number;
@@ -46,7 +58,7 @@ export interface State {
   readonly lastPlayed: Readonly<Record<string, number>>;
   /** Lines waiting, best first. */
   readonly queue: readonly Waiting[];
-  readonly playing: { readonly id: string; readonly ends: number } | null;
+  readonly playing: { readonly id: string; readonly ends: number; readonly data?: string } | null;
   /** The earliest time the next line may start (the end of the last one plus the gap). */
   readonly free: number;
 }
@@ -59,9 +71,11 @@ export function createNarrator(heard: readonly string[] = []): State {
 function eligible(rules: Rules, s: State, id: string): boolean {
   const line = rules.lines[id];
   if (!line) return false;
-  if (s.playing?.id === id || s.queue.some((w) => w.id === id)) return false;
   if (line.after !== undefined && !s.heard.includes(line.after)) return false;
-  if (line.priority === 'story') return !s.heard.includes(id);
+  if (line.priority === 'story') return !s.heard.includes(id) && s.playing?.id !== id && !s.queue.some((w) => w.id === id);
+  // a notice of each event: it waits beside its kind, and no cooldown holds it back
+  if (line.each) return true;
+  if (s.playing?.id === id || s.queue.some((w) => w.id === id)) return false;
   const last = s.lastPlayed[id];
   return last === undefined || s.time - last >= (line.cooldown ?? 0);
 }
@@ -73,10 +87,10 @@ function order(rules: Rules, q: readonly Waiting[]): Waiting[] {
   return [...q].sort((a, b) => rank(rules, b.id) - rank(rules, a.id) || a.at - b.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
-/** Queue a line directly (if it is eligible). */
-export function say(rules: Rules, s: State, id: string): State {
+/** Queue a line directly (if it is eligible), with its subject when it is a notice. */
+export function say(rules: Rules, s: State, id: string, data?: string): State {
   if (!eligible(rules, s, id)) return s;
-  let queue = order(rules, [...s.queue, { id, at: s.time }]);
+  let queue = order(rules, [...s.queue, data === undefined ? { id, at: s.time } : { id, at: s.time, data }]);
   // over the cap: drop the worst waiting warn or bark, never a story line
   while (queue.length > rules.queueMax) {
     let drop = -1;
@@ -90,10 +104,10 @@ export function say(rules: Rules, s: State, id: string): State {
   return { ...s, queue };
 }
 
-/** Something happened in the game: queue the first eligible line it triggers, if any. */
-export function trigger(rules: Rules, s: State, event: string): State {
+/** Something happened in the game: queue the first eligible line it triggers, if any, with the event's subject. */
+export function trigger(rules: Rules, s: State, event: string, data?: string): State {
   for (const id of rules.triggers[event] ?? []) {
-    if (eligible(rules, s, id)) return say(rules, s, id);
+    if (eligible(rules, s, id)) return say(rules, s, id, data);
   }
   return s;
 }
@@ -108,6 +122,8 @@ export interface Step {
   readonly state: State;
   /** A line to start now. */
   readonly start: string | null;
+  /** Its subject, when it is a notice that has one. */
+  readonly data: string | null;
   /** A playing line to fade out now (a bark cut by something more important). */
   readonly cut: string | null;
 }
@@ -130,20 +146,23 @@ export function step(rules: Rules, s0: State, dt: number): Step {
   }
 
   let start: string | null = null;
+  let data: string | null = null;
   if (!s.playing && best && s.time >= s.free) {
     const line = rules.lines[best.id];
     if (line) {
       start = best.id;
+      data = best.data ?? null;
       s = {
         ...s,
-        queue: s.queue.filter((w) => w.id !== best.id),
-        playing: { id: best.id, ends: s.time + line.seconds },
+        // only the one that starts leaves: another of its kind may still wait
+        queue: s.queue.filter((w) => w !== best),
+        playing: best.data === undefined ? { id: best.id, ends: s.time + line.seconds } : { id: best.id, ends: s.time + line.seconds, data: best.data },
         lastPlayed: { ...s.lastPlayed, [best.id]: s.time },
         heard: s.heard.includes(best.id) ? s.heard : [...s.heard, best.id],
       };
     }
   }
-  return { state: s, start, cut };
+  return { state: s, start, data, cut };
 }
 
 /** A short fingerprint of the state, for determinism tests and replays. */
@@ -155,3 +174,4 @@ export function hashNarrator(s: State): string {
 }
 
 export { FIDELITY_LINE_IDS, FIDELITY_TRIGGERS, fidelityRules } from './fidelity';
+export { SYSTEM_NOTICE_IDS, SYSTEM_TRIGGERS, noticeText, systemRules } from './system';

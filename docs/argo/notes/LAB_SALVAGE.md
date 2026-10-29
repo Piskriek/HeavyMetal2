@@ -64,3 +64,7 @@ Related docs: `docs/NARRATION_SCRIPT.md`, `NARRATION_SYSTEM.md`, `NARRATIVE_AND_
   - the 20 creator-entry scripts carry `story`;
   - the menu's story wording is gone.
   - Next: register the lab's kits, props, lights and sounds as presets; turn the narrator engine into the System voice; move each story script to the simulation start as its piece is salvaged.
+- **29 Oct, overnight (waves 8 to 13):** the labkit's props, the lab's lights and its sounds are presets (Plan 57 §14.2, RESUME's overnight log).
+  - **Logged, deferred (Argon, 29 Oct):** the `?story` lab test passes its checks but draws 562 calls against its budget of 190. Wave 11 drew 565, before the lights changed; the lab drew 181 after its October pass. The lab is parked and off the simulation path, so the fix waits.
+  - **Later (Argon):** merge the Lx lamp presets and `@hm/lightplace`'s placed lights into one light preset kind.
+  - Next: the narrator engine as the drone's System voice (Plan 57 §8.1).

@@ -123,6 +123,30 @@ The owner: a planet is "a very dense soul and it moves through the densities jus
 - **A native and a build in the first twenty minutes:** long tutorial openings drew complaints.
 - **The isekai "cheat"** is the player's command of the preset library.
 
+### 8.1 The System voice: the narrator engine, salvaged (29 Oct; Argon: "wire the narrator engine as the Drone's LitRPG System voice")
+
+- **The engine stays `@hm/narrator`.** It is pure, tested, and its rules are what radio-guide players asked for: once-only story lines, cooldowns so nothing nags, priorities, a capped queue, stale lines dropped, a gap between lines. The mentor's voiced Acts I–IV keep their own rules (`fidelityRules`) for `?story`.
+- **One change to the engine: a notice carries its subject.**
+  - `trigger(rules, state, event, data?)` queues a line with a payload: the skill, the title, the quest or the stage it announces.
+  - A line marked `each` may wait beside others of its kind, so a burst of three skills shows three notices. Lines without it behave as before.
+  - `step` reports the payload of the line it starts.
+- **The System's table (`systemRules`)**, with each notice tied to a real event (§4: a lens, never a lie):
+
+  | notice | event | source | priority |
+  | --- | --- | --- | --- |
+  | arrival | `sim:arrive` | the simulation start | story (once) |
+  | level up | `stage:up` | the plot's stage rising | warn, each |
+  | skill gained | `skill:gained` | a preset the drone has mastered (`mastered`) | warn, each |
+  | title earned | `title:earned` | a eureka (a long-held distortion let go) | warn, each |
+  | quest logged | `quest:logged` | a new open cause (`openCausesFrom`) | warn, each |
+  | hint | `hint` | the drone's hint channel | bark, with a cooldown |
+
+- **The notices are written, not voiced**, in the isekai register: a bracketed heading and the subject ("Skill gained: Rock Drill"). Each shows for a fixed reading time. The wording is Argon's call. The System's log keeps every notice shown (the Outer Wilds-style log of what was learned).
+- **The notice panel is a `ui:` panel** (§15): a readout bound to `system.notice`, drawn in the System's look (the frontend-design pass).
+- **Order of work:**
+  1. wave 14a: the engine's payload, `systemRules`, the notice texts, with their tests;
+  2. wave 14b: play's events feeding it, the notice panel and its log, an e2e check that the arrival notice shows on the simulation start.
+
 ## 9. Multiplayer: a co-creation sandbox (P9)
 
 - **Visibility:** worlds are invite-only by default, and listed publicly only after review.

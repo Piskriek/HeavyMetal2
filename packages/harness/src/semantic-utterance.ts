@@ -157,7 +157,7 @@ export function deriveEmotionalEnvelope(input: DeriveEmotionalEnvelopeInput): Em
     input.excitementOverride !== undefined
       ? input.excitementOverride
       : lastEp
-        ? lastEp.x
+        ? lastEp.h
         : input.intent === 'celebrate' || input.intent === 'warn'
           ? 0.75
           : 0.45;
@@ -166,8 +166,9 @@ export function deriveEmotionalEnvelope(input: DeriveEmotionalEnvelopeInput): Em
   // 2. Somatic Ache Stage & Starved Ray from BodyState / Mem charge
   let maxAche = 0;
   if (body) {
-    for (const z of Object.values(body.zones)) {
-      if (z.stage > maxAche) maxAche = z.stage;
+    for (const z of body.zones) {
+      const stageFromAche = z.ache * 3;
+      if (stageFromAche > maxAche) maxAche = stageFromAche;
     }
   } else if (mem && balance < 0.7) {
     maxAche = balance < 0.4 ? 2 : 1;

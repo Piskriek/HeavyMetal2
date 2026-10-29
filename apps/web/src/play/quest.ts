@@ -39,7 +39,7 @@ export interface PlayState {
   readonly chain: Chain;
 }
 
-export const FRESH: PlayState = { v: 5, step: 'create', avatar: null, avatarId: null, gateOn: false, visited: false, plot: newPlot(), lab: newLab(), chain: CHAIN_START };
+export const FRESH: PlayState = { v: 5, step: 'done', avatar: { kind: 'scientist', name: 'Lead Architect', visor: '#3dc8ff' }, avatarId: 'scientist', gateOn: true, visited: true, plot: { ...newPlot(), stage: 3 }, lab: newLab(), chain: CHAIN_START, start: 'sim' };
 export const SAVE_KEY = 'hm.setmix.play';
 
 /** What players call the four metrics. */
@@ -124,14 +124,15 @@ export function loadState(raw: unknown): PlayState {
     plot = { ...plot, machines: newMachines };
     lab = nextLab;
   }
+  if (plot.stage < 3) plot = { ...plot, stage: 3 };
   return {
-    v: 5, step: fixedStep, avatar, avatarId,
-    gateOn: fixedStep === 'create' || fixedStep === 'power' ? false : true,
-    visited: r['visited'] === true,
+    v: 5, step: 'done', avatar: avatar ?? { kind: 'scientist', name: 'Lead Architect', visor: '#3dc8ff' }, avatarId: avatarId ?? 'scientist',
+    gateOn: true,
+    visited: true,
     plot,
     lab,
     chain: readChain(r['chain']),
-    ...(sim ? { start: 'sim' as const } : {}),
+    start: 'sim' as const,
   };
 }
 

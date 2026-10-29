@@ -3104,6 +3104,20 @@ useEffect(() => {
     }
   }, [ready, props.entry, say]);
 
+  // Plan 57 §14 & Plan 58: LitRPG Arrival Announcement on living planet spawn
+  const litRpgGreetingDone = useRef(false);
+  useEffect(() => {
+    if (!ready || litRpgGreetingDone.current) return;
+    litRpgGreetingDone.current = true;
+    const seedNum = baseWorldRef.current?.field?.seed ?? 42069;
+    window.setTimeout(() => {
+      companionHandleRef.current?.say(
+        `Threshold crossed into Living Frontier Biosphere (Seed ${seedNum}). Simulation lattice synchronized at Fidelity Stage 3. Four-Float metrics active: Pxd 0.65, Vtx 0.70, Lx 0.85, Aq 0.60. Indigenous flora and life detected. Welcome, Lead Architect Piskriek.`,
+        `Threshold crossed into Living Frontier Biosphere, Seed ${seedNum}. Simulation lattice synchronized at Fidelity Stage 3. Four-Float metrics active. Indigenous flora and life detected. Welcome, Lead Architect Piskriek.`
+      );
+    }, 1200);
+  }, [ready]);
+
   /**
    * JOB-09: the endgame's inputs, read from the state the plot already keeps — the fidelity stage and the four
    * cardinals, the gate's access, which world the biome says we stand on, and the clock the scene is at. The scene calls

@@ -2053,24 +2053,24 @@ export function createPlayScene(o: {
   const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   postScene.add(new THREE.Mesh(keep(new THREE.PlaneGeometry(2, 2)), keep(new THREE.ShaderMaterial({ vertexShader: QUAD_VERTEX, fragmentShader: POST_FRAGMENT, uniforms: postUniforms, depthTest: false, depthWrite: false }))));
 
-  // ---- you
-  let where: Where = 'lab';
-  const pos = new THREE.Vector3(room.spawn.x, EYE, room.spawn.z);
-  let yaw = room.spawn.yaw, pitch = -0.04;
-  let sync = 1, lostAt = -100, syncHeld = false, gateTransit = true;
+  // ---- you (Plan 57 §14: Simulation Start directly on Living Planet at Stage 3)
+  let where: Where = 'planet';
+  const pos = new THREE.Vector3(0, EYE, -3.5);
+  let yaw = 0, pitch = -0.04;
+  let sync = 1, lostAt = -100, syncHeld = true, gateTransit = false;
   /** TASK-26: inside a safe dome now; last frame's state on the planet (null in the lab, so a crossing is only ever on the planet); the 30% warning. */
   let inDomeNow = false, inDomeLast: boolean | null = null, warnOn = false;
   /** Metres walked since the last footstep, and how many relay lamps the sequence has lit (one click each). */
   let stride = 0, relaysHeard = 0;
   powerT = -1;
-  gateOn = false;
+  gateOn = true;
   /** GATE-03: the doorway is the dim static while the gate is off and the mark once it is on (called when gateOn changes). */
   const syncOpeningMaterial = (): void => {
     const want = gateOn ? horizonMat : openingOffMat;
     if (twinOpening.material !== want) twinOpening.material = want;
   };
-  // the wake (TASK-28): the first time the player is in the lab before the lever, the camera starts 65 degrees up and sits up over 2.2 s
-  let wakeT = -1, woke = false;
+  // the wake (TASK-28): disabled for simulation start
+  let wakeT = -1, woke = true;
   /** The wake's frames so far (t and the lift), for the tests: the wake runs once per profile, from when the player has control. */
   const wakeLog: { t: number; lift: number }[] = [];
   const startWake = (): void => {
@@ -2080,7 +2080,7 @@ export function createPlayScene(o: {
     wakeLog.length = 0;
   };
   /** The plot's stage, the stage the picture shows, and the stage a running wave brings (-1: none) and since when. */
-  let stage = 0, shown = 0, waveTo = -1, waveStart = -1;
+  let stage = 3, shown = 3, waveTo = -1, waveStart = -1;
   /** Stage 0's first-machine scan wave (0a to 0b), the lagging exposure and the suit cam's smoothed strength (plan 25), the build drawer, the plot's Lx. */
   let scanWave: ScanWave = createScanWave();
   let exposure: ExposureState = createExposureState(1);

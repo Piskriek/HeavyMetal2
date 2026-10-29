@@ -17,7 +17,7 @@ import * as F from '@hm/substrate';
 import { TURRET_POWER_DRAW_KW } from '@hm/plotsim';
 import { DEFAULT_PLOT_RADIUS_M, EARTH_UNLOCK_FIDELITY_STAGE as EARTH_UNLOCK_STAGE, resolveMovedGatePose, type GateAccessMode, type GatePose } from '@hm/coopnet/gate-dialer';
 import { decodeHarnessCartridgeCode } from '@hm/cartlab';
-import { MOON_BIOME_PRESET, readBiomePreset, type PlotBiomePreset } from './biome-preset';
+import { EARTH_BIOME_PRESET, readBiomePreset, type PlotBiomePreset } from './biome-preset';
 import { DRAFT_ORE, EQUIP, FIELD_RADIUS, HEAVY, HEAVY_BILL, ITEMS, MAPS, MATERIALS, PIECE_EXTRA, PIECE_ORE, PIECE_STAGE, PRIMITIVES, QUEUE_MAX, RECIPE_BY_ID, STARTER, blueprint, blueprintId, pieceCost, FABRICATOR_BILL, FORGE_BY_ID, PART_SLOTS, VEHICLE, type Blueprint, type MapId, type PartSlot, type PrimitiveId, type StationKind, type VehicleKind } from './catalog';
 import { EQUIP_SLOTS, type EquipSlot, type SlotRef } from './view';
 
@@ -231,12 +231,12 @@ export function createWorld(seed = 1): BaseWorld {
   slots[0] = { item: STARTER, n: 1 };
   return {
     v: 5, tick: 0, base: S.empty(), boxes: [], layouts: [], plans: [], shelter: false, vehicles: [], nextVehicle: 1, loadout: NO_LOADOUT,
-    gatePose: DEFAULT_GATE_POSE, gateAccess: 'open', biome: MOON_BIOME_PRESET,
+    gatePose: DEFAULT_GATE_POSE, gateAccess: 'open', biome: EARTH_BIOME_PRESET,
     player: { id: PLAYER, x: 0, z: 0, slots, maxKg: PLAYER_KG },
     equipment: { ...NO_EQUIPMENT, beam: { item: 'tool-beam', n: 1 }, visor: { item: 'eq-visor', n: 1 } },
     hotbar: 0,
-    stage: 0,
-    field: F.generate(seed, FIELD_RADIUS, 0),
+    stage: 3,
+    field: F.generate(seed, FIELD_RADIUS, 3),
     machines: [],
   };
 }

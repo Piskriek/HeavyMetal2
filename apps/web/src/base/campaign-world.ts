@@ -5,6 +5,7 @@
  * when it builds the scene. The dev kit (`?kit=1`) is a test fixture: it adds stock and two blueprints.
  */
 import * as L from '@hm/lattice';
+import { EARTH_BIOME_PRESET } from './biome-preset';
 import { STARTER } from './catalog';
 import { BRIDGE_RANGE, BRIDGE_STORE, PLAYER_KG, createWorld, withBridgeStore, type BaseWorld, type WorldEnv } from './world';
 import { loadWorld } from './save';
@@ -49,8 +50,12 @@ export function startCampaignWorld(rawSave: string | null, opts: { readonly seed
   const seed = opts.seed ?? 1;
   if (rawSave) {
     const loaded = withLoadout(loadWorld(rawSave, seed));
-    // a save that holds none of the player's work (no shelter, pieces or items: an empty or unreadable one) starts as a new profile
-    if (hasWork(loaded)) return { world: loaded, played: true };
+    const upgraded: BaseWorld = {
+      ...loaded,
+      stage: Math.max(3, loaded.stage),
+      biome: loaded.biome.world === 'moon' ? EARTH_BIOME_PRESET : loaded.biome,
+    };
+    if (hasWork(upgraded)) return { world: upgraded, played: true };
   }
   const defaultEnv: WorldEnv = { heightAt: () => 0, bridge: { x: 0, z: 0, range: BRIDGE_RANGE } };
   const fresh = withLoadout(createWorld(seed));

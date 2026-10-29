@@ -39,7 +39,21 @@ export const PLAY_HUD_SOURCES: readonly UiSource[] = [
   { path: 'player.shielded', kind: 'flag' },
   /** The health is low and no shield takes the hits. */
   { path: 'player.lowWarning', kind: 'flag' },
+  /** The drone's System notice showing now (Plan 57 §8.1), or none. */
+  { path: 'system.notice', kind: 'text' },
 ];
+
+/** The drone's System window (top centre, under the compass): the notice showing now, one at a time (Plan 57 §8.1). */
+export const PLAY_HUD_SYSTEM: UiPanel = {
+  id: 'system',
+  anchor: 'top-center',
+  offsetX: 0,
+  offsetY: 76,
+  visible: true,
+  parts: [
+    { id: 'notice', look: { kind: 'readout', tone: 'accent', frame: 'line', size: 'm' }, binds: 'system.notice', label: 'System' },
+  ],
+};
 
 /** What the play HUD can do when pressed. */
 export const PLAY_HUD_COMMANDS: readonly UiCommand[] = [
@@ -125,7 +139,7 @@ export const PLAY_HUD_GOAL: UiPanel = {
 export const PLAY_HUD_SCREEN: UiScreen = {
   id: 'play-hud',
   tokens: { ink: '#f1f4f5', paper: '#0c1014', accent: '#a050c8', warn: '#e0502a', dim: '#8a96a3', font: 'setmix', scale: 1, radius: 4, reducedMotion: false },
-  panels: [PLAY_HUD_GOAL, PLAY_HUD_FLOATS, PLAY_HUD_PLOT, PLAY_HUD_HEALTH, PLAY_HUD_COMMS],
+  panels: [PLAY_HUD_GOAL, PLAY_HUD_FLOATS, PLAY_HUD_PLOT, PLAY_HUD_HEALTH, PLAY_HUD_COMMS, PLAY_HUD_SYSTEM],
 };
 
 const FLOAT_PATTERNS = ['solid', 'hatch', 'steps', 'dots'] as const;
@@ -233,5 +247,22 @@ export function commsPanelProps(onToggle: () => void) {
     partData: { 'comms-toggle': { testid: 'companion-comms-toggle' } },
     partIcon: { 'comms-toggle': 'companion-chat-orb' },
     partAria: { 'comms-toggle': 'Toggle Companion Comms (Enter to type, hold T to talk)' },
+  };
+}
+
+/**
+ * The System window's drawing props for the notice showing now: its kind (`SYS-SKILL`) rides on the window as `data-notice`, so
+ * the edge takes the kind's colour, and the window announces itself to a screen reader.
+ */
+export function systemPanelProps(notice: { readonly id: string; readonly text: string }) {
+  return {
+    panel: PLAY_HUD_SYSTEM,
+    values: { 'system.notice': notice.text },
+    className: 'sys-notice',
+    // the HUD's own zone word (the overlap gate reads it): the window sits under the compass, in the top-centre zone's column
+    hudZone: 'top-centre',
+    ariaLabel: 'System',
+    partClass: { notice: 'sys-notice-text' },
+    partData: { notice: { notice: notice.id } },
   };
 }

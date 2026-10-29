@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { decodeScreen, encodeScreen } from '@hm/hudlayout';
-import { PLAY_HUD_GOAL, PLAY_HUD_SCREEN, commsPanelProps, floatsPanelProps, goalValues, healthPanelProps, playHudIssues, plotPanelProps, type PlotFigures } from './ui-play-hud';
+import { PLAY_HUD_GOAL, PLAY_HUD_SCREEN, commsPanelProps, floatsPanelProps, goalValues, healthPanelProps, playHudIssues, plotPanelProps, systemPanelProps, type PlotFigures } from './ui-play-hud';
 import { UiPanelView } from './ui-panel';
 
 const draw = (values: Readonly<Record<string, string | null>>): string =>
@@ -127,4 +127,10 @@ test('the comms chip drawn from its preset is the hand-drawn chip, and it runs i
   assert.equal(toggled, 1);
   // with no handler for its command the chip is not drawn: no button that does nothing
   assert.equal(renderToStaticMarkup(createElement(UiPanelView, { ...props, actions: {} })), '');
+});
+
+test('the System window shows the notice now, its kind on the window for the edge colour, and tells a screen reader', () => {
+  const html = renderToStaticMarkup(createElement(UiPanelView, systemPanelProps({ id: 'SYS-SKILL', text: 'Skill gained: Steady Fire.' })));
+  assert.match(html, /^<section class="sys-notice" aria-live="polite" aria-label="System" data-hud-zone="top-centre"/);
+  assert.match(html, /<p class="sys-notice-text"[^>]*data-notice="SYS-SKILL"[^>]*>Skill gained: Steady Fire\.<\/p>/);
 });

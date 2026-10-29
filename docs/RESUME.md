@@ -90,11 +90,17 @@
     - the lab builds its point lights, lamp faces and alarm colours from them, keeping the story's power phases;
     - the emergency beacon (wall) and a 1.2 m ceiling strip (ceiling) are fixture kits wearing them (26 kits on the shelf).
   - **Found, not caused by wave 12:** `test-lab-overhaul.mjs` (a `?story` lab test, not in the wave gates) passes its 76 checks and then fails its draw-call budget: 562 calls against 190. Wave 11 built in a separate worktree fails the same check at 565, so it predates the lights. The lab was at 181 after its October draw-call pass, so something since has added draws; the lab is parked, so it is logged for Argon rather than fixed overnight.
-  - **Wave 13: the lab's sounds are `snd:` presets** (Argon's yes; gates fully green: unit 3,834 with no failures, e2e all green):
+  - `7fdf8942` **Wave 13: the lab's sounds are `snd:` presets** (Argon's yes; gates fully green: unit 3,834 with no failures, e2e all green):
     - `apps/web/src/audio/sound-presets.ts`: `LAB_SOUNDS` (breaker, relay, lever, capacitor hum, gate spool, gate hum, storm, lab music). Each is a recorded file with its trim on top of the measured level, its loop and an optional loop region, its fall-off (none for music) and its trigger, plus an optional soundlab recipe id;
     - game-audio plays the lab's sounds and music from them, with the same values as before, and a preset's own loop region wins over the measured one;
     - `npm test` runs `apps/web/src/audio` now;
     - `test-lab-overhaul.mjs` checks page errors before its draw-call budget, so the known overrun no longer hides them (none while the lab runs).
+  - **Argon (29 Oct):** defer the lab's draw-call fix (the lab is parked) and merge the two light shelves later. Then the System voice, then the Studio's `ui:` editor tab.
+  - **Wave 14: the drone's System voice** (Plan 57 §8.1; Argon approved the design and the six notice wordings verbatim):
+    - `@hm/narrator`: a notice carries its subject, and `each` lines queue beside their kind; `systemRules` ties arrival, level up, skill, title, quest and hint to real events;
+    - `play/system-voice.ts` takes them from the simulation start, the plot's stage, the drone's mastered presets, its eurekas and its new open causes. The window sits under the compass in the drone's violet, its edge taking the notice's kind; the greeting shows once, and the log is kept per save slot;
+    - gates: unit 3,841 (timing budgets only, the machine heavily loaded), e2e sim-start 22/22 with the greeting, a skill in turn and the log across a reload, the rest green (ping passed 24/24 alone after a load timeout).
+  - **Next:** the Studio's `ui:` editor tab (research: `docs/UI_EDITOR_RESEARCH.md`).
 - **Next:**
   1. the labkit's procedural props rebuilt as kits (RULES 8a): the relay cabinet is drafted and validates; the breaker panel and the cable tray follow;
   2. Argon's answer on the `stat` widget, then ore, power and health as `ui:` panels, then a Studio `ui:` tab with live previews;

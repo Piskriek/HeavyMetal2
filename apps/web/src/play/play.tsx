@@ -106,7 +106,8 @@ import { captureMouse, lookFilter } from '../shell/capture-mouse';
 import { kv } from '../storage/profile-storage';
 import { bodyCheckpoint, createDroneMemory, dreamNow, dronePerspective, droneSymptoms, hasUndreamt, loadDroneMemory, noteCatalyst, saveDroneMemory, type DroneBody, type DroneCatalyst, type DroneMemory } from './drone-memory';
 import { hintsFromWarnings } from './drone-body-visuals';
-import { PLAY_HUD_GOAL, floatsPanelProps, goalValues, plotPanelProps } from './ui-play-hud';
+import { PLAY_HUD_GOAL, floatsPanelProps, goalValues, plotPanelProps, systemPanelProps } from './ui-play-hud';
+import { SystemVoice, droneNotices, readSystemLog, systemHeardKey, systemLogKey, type SystemNotice } from './system-voice';
 import { UiPanelView } from './ui-panel';
 import { warningLine } from '@hm/harness';
 import type { DreamCue } from '@hm/harness';
@@ -589,6 +590,28 @@ export function PlayScreen(props: {
   const avatarLogKey = state.avatar ? (state.avatar.kind === 'custom' ? state.avatar.key : state.avatar.name) : null;
   const savedHeard = (): string[] => (state.step === 'create' ? [] : [...new Set([...loadRadioLog(slotKey), ...(avatarLogKey ? loadRadioLog(avatarLogKey) : [])])]);
   const narratorRef = useRef<GameNarratorController | null>(null);
+  // Plan 57 §8.1: the drone's System voice, on the simulation path only (the parked story keeps its mentor). Its notices answer
+  // real events. What it has heard (the greeting, once ever) and its log are kept per save slot: profile storage is already per
+  // profile, and the avatar is not known yet in the closures made before it is created, so an avatar key would save the first
+  // session under one key and read the next under another.
+  const systemKey = systemHeardKey(slotKey);
+  const systemVoiceRef = useRef<SystemVoice | null>(null);
+  const systemOnRef = useRef(false);
+  const systemStageRef = useRef<number | null>(null);
+  const [systemNotice, setSystemNotice] = useState<SystemNotice | null>(null);
+  const systemNoticeRef = useRef<SystemNotice | null>(null);
+  const systemVoice = (): SystemVoice => {
+    if (!systemVoiceRef.current) {
+      let heard: string[] = [];
+      try { heard = JSON.parse(kv.get(systemKey) ?? '[]') as string[]; } catch { /* a damaged list: greet again */ }
+      systemVoiceRef.current = new SystemVoice(Array.isArray(heard) ? heard : [], readSystemLog(kv.get(systemLogKey(slotKey))));
+    }
+    return systemVoiceRef.current;
+  };
+  /** An event for the System, only while the simulation runs. */
+  const tellSystem = (event: string, data?: string): void => {
+    if (systemOnRef.current) systemVoice().trigger(event, data);
+  };
   /**
    * The highest stage whose line has been triggered. A stage is reported twice (the placement or the skip, then the wave's
    * own stage-up event when it finishes); the second report must not queue the next story line (S-2 after A4-04 at stage 2).
@@ -745,6 +768,8 @@ export function PlayScreen(props: {
   /** On the world at once, at its stage: the sync held (there is no lab to refill it in), the mentor's story quiet. */
   const beginSimulation = (scene: PlayScene): void => {
     narratorRef.current?.setStoryMuted(true);
+    systemOnRef.current = true;
+    tellSystem('sim:arrive', props.profile.name || undefined);
     scene.setSyncHeld(true);
     // the gate is the Stargate to build, not a door to a lab: it carries you nowhere until it has somewhere to dial
     scene.setGateTransit(false);
@@ -1842,7 +1867,9 @@ useEffect(() => {
   };
   useEffect(() => () => { if (droneMemoryRef.current) saveDroneNow(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const noteDrone = (c: DroneCatalyst): void => {
-    droneMemoryRef.current = noteCatalyst(droneMemory(), c, Math.floor(Date.now() / 1000), droneStageRef.current);
+    const before = droneMemory();
+    droneMemoryRef.current = noteCatalyst(before, c, Math.floor(Date.now() / 1000), droneStageRef.current);
+    for (const n of droneNotices(before, droneMemoryRef.current)) tellSystem(n.event, n.data);
     showDroneSymptoms();
     if (Date.now() - droneSavedAtRef.current > 5000) saveDroneNow();
   };
@@ -1850,7 +1877,10 @@ useEffect(() => {
   const droneDreams = (): void => {
     // plan 56 §20: first the body: each part's gates and release since the last checkpoint; its warnings go up (on the radio,
     // to the bridge), cue the part's own dream from below, and teach the ego what its thinking did
-    const b = bodyCheckpoint(droneMemory(), droneBodyRef.current);
+    const beforeDream = droneMemory();
+    const b = bodyCheckpoint(beforeDream, droneBodyRef.current);
+    // a eureka is a title: a long-held distortion let go, its quality back (Plan 57 §8.1)
+    for (const w of b.warnings) if (w.signal === 'eureka' && w.quality) tellSystem('title:earned', w.quality);
     droneBodyRef.current = b.body;
     for (const w of b.warnings.slice(0, 2)) companionHandleRef.current?.say(warningLine(w));
     if (b.warnings.length) companionHandleRef.current?.post({ type: 'body-warning', warnings: b.warnings });
@@ -1864,6 +1894,7 @@ useEffect(() => {
     const cues = [...(fromAbove ?? []), ...b.cues].filter((c) => { const k = `${c.of}@${c.t}`; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 12);
     const d = dreamNow(b.memory, Math.floor(Date.now() / 1000), cues.length ? cues : undefined);
     droneMemoryRef.current = d.memory;
+    for (const n of droneNotices(beforeDream, d.memory)) tellSystem(n.event, n.data);
     showDroneSymptoms();
     try { kv.set(DRONE_MEMORY_KEY, saveDroneMemory(d.memory)); } catch { /* storage unavailable: kept for this session */ }
     companionHandleRef.current?.say(d.line);
@@ -4061,6 +4092,21 @@ useEffect(() => {
       }
       dx = 0; dy = 0;
 
+      if (systemOnRef.current) {
+        const stage = plotRef.current.stage;
+        if (systemStageRef.current !== null && stage > systemStageRef.current) tellSystem('stage:up', String(stage));
+        systemStageRef.current = stage;
+        const v = systemVoice();
+        const heardBefore = v.heard().length;
+        const notice = v.step(dt);
+        if (notice !== systemNoticeRef.current) {
+          systemNoticeRef.current = notice;
+          setSystemNotice(notice);
+          // the log of what was learned is kept, as each notice shows
+          if (notice) { try { kv.set(systemLogKey(slotKey), JSON.stringify(v.log())); } catch { /* storage unavailable */ } }
+        }
+        if (v.heard().length !== heardBefore) { try { kv.set(systemKey, JSON.stringify(v.heard())); } catch { /* storage unavailable */ } }
+      }
       if (narratorRef.current) {
         narratorRef.current.step(dt);
 
@@ -5423,6 +5469,12 @@ useEffect(() => {
       droneMemory: (): DroneMemory => droneMemory(),
       /** Plan 56 W6 test seam: a catalyst straight into the drone's memory (a fight the test cannot stage). */
       droneNote: (c: DroneCatalyst): void => noteDrone(c),
+      /** Plan 57 §8.1: the System's notices shown so far, the one showing now, and an event for it (a test's stand-in). */
+      system: {
+        log: (): readonly SystemNotice[] => systemVoiceRef.current?.log() ?? [],
+        current: (): SystemNotice | null => systemNoticeRef.current,
+        tell: (event: string, data?: string): void => tellSystem(event, data),
+      },
       /** Plan 56 W6c test seam: how strong the drone's symptoms are (1 − balance of its fire and flight presets). */
       droneSymptoms: () => droneSymptoms(droneMemory()).amplitude,
       /** Plan 56 §20 test seam: the drone's body (each part's zones) at the last checkpoint. */
@@ -5806,6 +5858,7 @@ useEffect(() => {
       }} /> : null}
       {!ready && !failed ? <div className="gr-loading play-loading" role="status"><span>{loading}</span><i /></div> : null}
 
+      {ready && systemNotice ? <UiPanelView key={systemNotice.at} {...systemPanelProps(systemNotice)} /> : null}
       {ready ? (
         <HudZone zone="top-centre">
           {hud.where === 'planet' && drivingSpeed === null ? (() => {

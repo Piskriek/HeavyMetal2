@@ -790,3 +790,44 @@
   pointer-events: none;
 }
 @media (max-width: 640px) { .play-pip { width: min(220px, 46vw); bottom: 96px; } }
+
+/* The drone's System window (Plan 57 §8.1): one notice at a time under the compass, framed top and bottom in the drone's violet.
+   The edge takes the notice's kind: a skill violet, a title gold, a quest cyan, a level white, a hint dim. It opens with one quick
+   wipe, like a window drawn; with reduced motion it simply appears. */
+.sys-notice {
+  position: absolute;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: clamp(240px, calc(100vw - 720px), 460px);
+  padding: 8px 18px 9px;
+  background: rgba(14, 10, 24, 0.74);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-top: 2px solid var(--sys-edge, #b84dff);
+  border-bottom: 2px solid var(--sys-edge, #b84dff);
+  border-radius: 3px;
+  box-shadow: 0 0 18px -6px var(--sys-edge, #b84dff);
+  pointer-events: none;
+  z-index: 21;
+  animation: sys-notice-open 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.sys-notice-text {
+  margin: 0;
+  font: 600 16px/1.35 Oxanium, Inter, sans-serif;
+  color: #f1f4f5;
+  text-align: center;
+  text-wrap: balance;
+}
+.sys-notice:has([data-notice='SYS-TITLE']) { --sys-edge: #ffc13d; }
+.sys-notice:has([data-notice='SYS-QUEST']) { --sys-edge: #3dc8ff; }
+.sys-notice:has([data-notice='SYS-LEVEL']) { --sys-edge: #f1f4f5; }
+.sys-notice:has([data-notice='SYS-HINT']) { --sys-edge: #8a96a3; }
+@keyframes sys-notice-open {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sys-notice { animation: none; }
+}

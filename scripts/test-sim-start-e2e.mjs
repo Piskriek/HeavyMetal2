@@ -69,6 +69,14 @@ try {
   const saved = await page.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith('hm.setmix.play')); try { return k ? JSON.parse(localStorage.getItem(k)) : null; } catch { return null; } });
   check('...at stage 3, saved as a simulation start', saved?.start === 'sim' && saved?.plot?.stage === 3 && saved?.step === 'done', JSON.stringify({ start: saved?.start, stage: saved?.plot?.stage, step: saved?.step }));
   check('...with your drone at your side', await page.evaluate(() => Boolean(window.__companion)));
+  // the drone's System greets you once, on arrival, in its window under the compass (Plan 57 §8.1)
+  const greeted = await page.waitForFunction(() => /System online/.test(document.querySelector('.sys-notice')?.textContent ?? ''), null, { timeout: 8000 }).then(() => true, () => false);
+  check('the drone\'s System greets you on arrival, in its window', greeted && await page.evaluate(() => window.__dev.system.log().some((n) => n.id === 'SYS-ARRIVE')), await page.evaluate(() => document.querySelector('.sys-notice')?.textContent ?? 'no window'));
+  await shot('00-system-greeting');
+  // a skill: its notice waits for the greeting, then shows in turn with its subject
+  await page.evaluate(() => window.__dev.system.tell('skill:gained', 'Steady Fire'));
+  const skilled = await page.waitForFunction(() => /Skill gained: Steady Fire/.test(document.querySelector('.sys-notice')?.textContent ?? ''), null, { timeout: 12000 }).then(() => true, () => false);
+  check('...and a skill gained shows in turn, with its name', skilled, await page.evaluate(() => JSON.stringify(window.__dev.system.log().map((n) => n.text))));
   const labels = await page.evaluate(() => window.__labels);
   check('it loaded no lab and no mentor voice', labels.length > 3 && !labels.some((l) => /lab|narration/i.test(l)), labels.join(' / '));
   check('the gate carries you nowhere yet (it is the Stargate to build, not a door to a lab)', await page.evaluate(() => window.__playScene.debug.gateTransit() === false));
@@ -99,6 +107,10 @@ try {
   const dreamt = await page.waitForFunction(() => window.__dev.droneMemory().dreamedAt !== undefined, null, { timeout: 8000 }).then(() => true, () => false);
   check('...and on the next arrival it dreams over it (a session is its night)', dreamt && await page.evaluate(() => window.__dev.droneMemory().lastDream !== null));
   check('after a reload the simulation save opens on the world, not in the lab', p.where === 'planet' && p.step === 'done' && (await page.locator('.play-create').count()) === 0, JSON.stringify(p));
+  await page.waitForTimeout(1500);
+  // its log is kept: the greeting and the skill are still there, the greeting only once, and none shows now
+  const kept2 = await page.evaluate(() => ({ texts: window.__dev.system.log().map((n) => n.text), now: document.querySelector('.sys-notice')?.textContent ?? '' }));
+  check('...and the System greets only once, and keeps its log across a reload', kept2.texts.filter((t) => /System online/.test(t)).length === 1 && kept2.texts.includes('Skill gained: Steady Fire.') && !/System online/.test(kept2.now), JSON.stringify(kept2));
 
   // the parked story still begins with ?story (its e2e seam)
   await page.evaluate(() => { try { localStorage.clear(); } catch {} });

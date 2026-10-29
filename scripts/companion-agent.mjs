@@ -31,12 +31,18 @@ function loadEnvLocal() {
     const line = rawLine.trim();
     if (!line || line.startsWith('#')) continue;
     const m = /^\s*([A-Za-z0-9_ -]+?)\s*[:=]\s*(.*?)\s*$/.exec(line);
-    if (!m) continue;
-    let key = m[1].trim().toUpperCase().replace(/[\s-]+/g, '_');
-    if (key === 'GEMINI' || key === 'GEMINI_API') key = 'GEMINI_API_KEY';
-    if (key === 'ANTHROPIC' || key === 'ANTHROPIC_API' || key === 'CLAUDE') key = 'ANTHROPIC_API_KEY';
-    const value = m[2].trim().replace(/^["']|["']$/g, '');
-    if (value && !process.env[key]) process.env[key] = value;
+    let key = '';
+    let value = '';
+    if (m) {
+      key = m[1].trim().toUpperCase().replace(/[\s-]+/g, '_');
+      value = m[2].trim().replace(/^["']|["']$/g, '');
+    } else {
+      value = line.replace(/^["']|["']$/g, '');
+    }
+    if (key === 'GEMINI' || key === 'GEMINI_API' || /^(AIzaSy|AQ\.)/.test(value)) key = 'GEMINI_API_KEY';
+    else if (key === 'ANTHROPIC' || key === 'ANTHROPIC_API' || key === 'CLAUDE' || /^sk-ant-/.test(value)) key = 'ANTHROPIC_API_KEY';
+    else if (key === 'OPENROUTER' || key === 'OPENROUTER_API' || key === 'FALLBACK' || key === 'FALLBACK_API' || key === 'AUTO_ROUTER' || /^sk-or-v1-/.test(value)) key = 'OPENROUTER_API_KEY';
+    if (key && value && !process.env[key]) process.env[key] = value;
   }
 }
 loadEnvLocal();
@@ -137,6 +143,7 @@ let brain = { kind: 'keywords', label: 'keyword responder (no AI connected)' };
 async function detectBrain() {
   if (process.env.ANTHROPIC_API_KEY) return { kind: 'anthropic', model: process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-5', get label() { return `Claude (${this.model})`; } };
   if (process.env.GEMINI_API_KEY) return { kind: 'gemini', model: process.env.GEMINI_MODEL ?? 'gemini-3.5-flash-lite', get label() { return `Gemini (${this.model})`; } };
+  if (process.env.OPENROUTER_API_KEY) return { kind: 'openrouter', model: process.env.OPENROUTER_MODEL ?? 'openrouter/auto', get label() { return `OpenRouter (${this.model})`; } };
   try {
     const res = await fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(1500) });
     const tags = await res.json();
@@ -144,6 +151,28 @@ async function detectBrain() {
     if (model) return { kind: 'ollama', model, get label() { return `Ollama (${this.model}, local)`; } };
   } catch { /* no Ollama running */ }
   return brain;
+}
+
+async function callOpenRouter(messages, signal) {
+  const model = process.env.OPENROUTER_MODEL ?? 'openrouter/auto';
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    signal,
+    headers: {
+      'content-type': 'application/json',
+      'authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      'http-referer': 'http://localhost:8220',
+      'x-title': 'FIDELITY Companion',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
+      max_tokens: 200,
+    }),
+  });
+  const d = await res.json();
+  if (!res.ok) throw new Error(d.error?.message ?? `HTTP ${res.status}`);
+  return d.choices?.[0]?.message?.content ?? '';
 }
 
 /** One reply from the AI brain, or null (no brain, or it failed: the error is printed and the keyword responder answers). */
@@ -155,46 +184,57 @@ async function aiReply(text, telemetry) {
   const signal = AbortSignal.timeout(20000);
   try {
     let out = '';
-    if (brain.kind === 'anthropic') {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST', signal,
-        headers: { 'content-type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({ model: brain.model, max_tokens: 200, system: SYSTEM_PROMPT, messages }),
-      });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error?.message ?? `HTTP ${res.status}`);
-      out = d.content?.map((b) => b.text ?? '').join('') ?? '';
-    } else if (brain.kind === 'gemini') {
-      const callGemini = async (modelName) => {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`, {
+    try {
+      if (brain.kind === 'anthropic') {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST', signal,
-          headers: { 'content-type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-            contents: messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
-            generationConfig: { maxOutputTokens: 200 },
-          }),
+          headers: { 'content-type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+          body: JSON.stringify({ model: brain.model, max_tokens: 200, system: SYSTEM_PROMPT, messages }),
         });
         const d = await res.json();
         if (!res.ok) throw new Error(d.error?.message ?? `HTTP ${res.status}`);
-        return d.candidates?.[0]?.content?.parts?.map((x) => x.text ?? '').join('') ?? '';
-      };
-      try {
-        out = await callGemini(brain.model);
-      } catch (err) {
-        if (brain.model !== 'gemini-3.1-flash-lite') {
-          out = await callGemini('gemini-3.1-flash-lite');
-        } else throw err;
+        out = d.content?.map((b) => b.text ?? '').join('') ?? '';
+      } else if (brain.kind === 'gemini') {
+        const callGemini = async (modelName) => {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`, {
+            method: 'POST', signal,
+            headers: { 'content-type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+              contents: messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
+              generationConfig: { maxOutputTokens: 200 },
+            }),
+          });
+          const d = await res.json();
+          if (!res.ok) throw new Error(d.error?.message ?? `HTTP ${res.status}`);
+          return d.candidates?.[0]?.content?.parts?.map((x) => x.text ?? '').join('') ?? '';
+        };
+        try {
+          out = await callGemini(brain.model);
+        } catch (err) {
+          if (brain.model !== 'gemini-3.1-flash-lite') {
+            out = await callGemini('gemini-3.1-flash-lite');
+          } else throw err;
+        }
+      } else if (brain.kind === 'openrouter') {
+        out = await callOpenRouter(messages, signal);
+      } else {
+        const res = await fetch('http://localhost:11434/api/chat', {
+          method: 'POST', signal,
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ model: brain.model, stream: false, messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages] }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error ?? `HTTP ${res.status}`);
+        out = d.message?.content ?? '';
       }
-    } else {
-      const res = await fetch('http://localhost:11434/api/chat', {
-        method: 'POST', signal,
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ model: brain.model, stream: false, messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages] }),
-      });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error ?? `HTTP ${res.status}`);
-      out = d.message?.content ?? '';
+    } catch (primaryErr) {
+      if (process.env.OPENROUTER_API_KEY && brain.kind !== 'openrouter') {
+        console.log(`\x1b[33m[BRAIN]\x1b[0m ${brain.label} failed (${primaryErr.message}); engaging OpenRouter fallback...`);
+        out = await callOpenRouter(messages, signal);
+      } else {
+        throw primaryErr;
+      }
     }
     out = out.replace(/\s+/g, ' ').trim().slice(0, 600);
     if (!out) return null;
@@ -354,11 +394,12 @@ async function loop() {
 }
 
 brain = await detectBrain();
+const fallbackLabel = process.env.OPENROUTER_API_KEY && brain.kind !== 'openrouter' ? ' + OpenRouter fallback' : '';
 console.log(`\x1b[35m═══════════════════════════════════════════════════════════════════════════\x1b[0m`);
 console.log(`\x1b[35m  SETMIX MULTIVERSE // OVERWATCH LIVE AGENT COMPANION BRAIN\x1b[0m`);
 console.log(`\x1b[35m═══════════════════════════════════════════════════════════════════════════\x1b[0m`);
 console.log(`  Connected to Neural Bridge: \x1b[32m${BRIDGE_URL}\x1b[0m`);
-console.log(`  Brain: ${brain.kind === 'keywords' ? `\x1b[33m${brain.label}\x1b[0m: set ANTHROPIC_API_KEY or GEMINI_API_KEY, or run Ollama, for a real AI` : `\x1b[32m${brain.label}\x1b[0m`}`);
+console.log(`  Brain: ${brain.kind === 'keywords' ? `\x1b[33m${brain.label}\x1b[0m: set ANTHROPIC_API_KEY, GEMINI_API_KEY, or OPENROUTER_API_KEY, or run Ollama, for a real AI` : `\x1b[32m${brain.label}${fallbackLabel}\x1b[0m`}`);
 console.log(`  Awaiting player speech and real-time telemetry from FIDELITY...`);
 console.log(`\x1b[35m───────────────────────────────────────────────────────────────────────────\x1b[0m`);
 

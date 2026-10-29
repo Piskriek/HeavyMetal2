@@ -49,12 +49,19 @@ function loadEnvLocal() {
     const line = rawLine.trim();
     if (!line || line.startsWith('#')) continue;
     const m = /^\s*([A-Za-z0-9_ -]+?)\s*[:=]\s*(.*?)\s*$/.exec(line);
-    if (!m) continue;
-    let key = m[1].trim().toUpperCase().replace(/[\s-]+/g, '_');
-    if (key === 'GEMINI' || key === 'GEMINI_API') key = 'GEMINI_API_KEY';
-    if (key === 'ANTHROPIC' || key === 'ANTHROPIC_API' || key === 'CLAUDE') key = 'ANTHROPIC_API_KEY';
-    const value = m[2].trim().replace(/^["']|["']$/g, '');
-    if (value && !process.env[key]) { process.env[key] = value; set.push(key); }
+    let key = '';
+    let value = '';
+    if (m) {
+      key = m[1].trim().toUpperCase().replace(/[\s-]+/g, '_');
+      value = m[2].trim().replace(/^["']|["']$/g, '');
+    } else {
+      value = line.replace(/^["']|["']$/g, '');
+    }
+    if (key === 'GEMINI' || key === 'GEMINI_API' || /^(AIzaSy|AQ\.)/.test(value)) key = 'GEMINI_API_KEY';
+    else if (key === 'ANTHROPIC' || key === 'ANTHROPIC_API' || key === 'CLAUDE' || /^sk-ant-/.test(value)) key = 'ANTHROPIC_API_KEY';
+    else if (key === 'OPENROUTER' || key === 'OPENROUTER_API' || key === 'FALLBACK' || key === 'FALLBACK_API' || key === 'AUTO_ROUTER' || /^sk-or-v1-/.test(value)) key = 'OPENROUTER_API_KEY';
+
+    if (key && value && !process.env[key]) { process.env[key] = value; set.push(key); }
   }
   return set;
 }
@@ -141,11 +148,21 @@ if (WITH_CAPITAL) ensurePackages(CAPITAL, 'Capital Empire');
 else warn(args.has('--no-capital') ? 'Capital Empire skipped (--no-capital)' : `Capital Empire not found at ${CAPITAL}: playing FIDELITY alone`);
 
 const keys = loadEnvLocal();
-const brainKey = process.env.ANTHROPIC_API_KEY ? 'Claude (ANTHROPIC_API_KEY)' : process.env.GEMINI_API_KEY ? 'Gemini (GEMINI_API_KEY)' : null;
+let brainKey = null;
+if (process.env.ANTHROPIC_API_KEY) {
+  brainKey = 'Claude (ANTHROPIC_API_KEY)';
+} else if (process.env.GEMINI_API_KEY) {
+  brainKey = 'Gemini 3.5 Flash Lite (GEMINI_API_KEY)';
+} else if (process.env.OPENROUTER_API_KEY) {
+  brainKey = 'OpenRouter (OPENROUTER_API_KEY)';
+}
+if (brainKey && process.env.OPENROUTER_API_KEY && !brainKey.startsWith('OpenRouter')) {
+  brainKey += ' + OpenRouter fallback';
+}
 const ollama = !brainKey && (await answers('http://localhost:11434/api/tags'));
 if (brainKey) good(`AI brain: ${brainKey}${keys.length ? ' from .env.local' : ''}`);
 else if (ollama) good('AI brain: Ollama, running on this PC');
-else warn('No AI brain set: the companion answers from keywords only. For a real AI, put ANTHROPIC_API_KEY=... or GEMINI_API_KEY=... in .env.local in this folder, or run Ollama.');
+else warn('No AI brain set: the companion answers from keywords only. For a real AI, put ANTHROPIC_API_KEY=..., GEMINI_API_KEY=..., or OPENROUTER_API_KEY=... in .env.local in this folder, or run Ollama.');
 
 const PORTS = { bridge: 'http://localhost:8220/status', fidelity: 'http://localhost:5173/', capital: 'http://localhost:5174/' };
 const running = {

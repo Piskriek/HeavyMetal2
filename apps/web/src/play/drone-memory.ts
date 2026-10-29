@@ -15,7 +15,7 @@
  */
 import { ALIGNED, decodeMem, encodeMem, type Mem, type StageId } from '@hm/shorthand';
 import {
-  REST_AT, SQ_DISTORTION_CATALOG, bodyStep, bodyWarnings, compileSystemMemory, cuesFromWarnings, teachUpward, createPresetMemory, digestLines, dominantDistortion, dream, kundalini, recordExperience, symptomOffset, wakeLine,
+  REST_AT, SQ_DISTORTION_CATALOG, bodyStep, bodyWarnings, compileSystemMemory, cuesFromWarnings, teachUpward, createPresetMemory, digestLines, dominantDistortion, dream, kundalini, recordExperience, symptomOffset, wakeLine, createPlayerWanderer, stepPlayerWanderer,
   type BodyState, type BodyWarning, type DreamCue, type DreamDigest, type EgoWeights, type Experience, type Side,
 } from '@hm/harness';
 
@@ -221,3 +221,42 @@ export function bodyCheckpoint(m: DroneMemory, prev: DroneBody | null): { readon
   }
   return { memory: { ...m, presets, ego: teachUpward(m.ego, warnings) }, body, warnings, cues: cues.slice(0, MAX_CUES) };
 }
+
+// ---- Plan 56 W6e: the player as a Wanderer (`wan.from = 'player'`). While the player plays steadily, their Wanderer
+// memory stays an anchor (`bal >= 0.9`) and lends `ANCHOR_CALM` (0.3) to the drone at each catalyst; panic-spraying
+// charges `root-reactivity` / `solar-anxiety`, dropping their balance below 0.9 so they lend 0 calm until steadied.
+
+export interface PlayerWandererCatalystResult {
+  readonly memory: DroneMemory;
+  readonly playerMem: Mem;
+  readonly calm: number;
+  readonly steady: boolean;
+}
+
+/**
+ * Steps both the player's Wanderer anchor and the drone's catalyst memory together (Plan 56 W6e).
+ * If `playerMem` is omitted, creates a fresh player Wanderer (`wan.from = 'player'`).
+ */
+export function noteCatalystWithPlayer(
+  m: DroneMemory,
+  c: DroneCatalyst,
+  tick: number,
+  stage: number,
+  playerMem: Mem = createPlayerWanderer(),
+  opts?: { readonly panicSpray?: boolean; readonly creativeFlow?: boolean },
+): PlayerWandererCatalystResult {
+  const step = stepPlayerWanderer(playerMem, {
+    t: Math.max(0, Math.round(tick)),
+    stage: stageIdOf(stage),
+    ...(opts?.panicSpray !== undefined ? { panicSpray: opts.panicSpray } : {}),
+    ...(opts?.creativeFlow !== undefined ? { creativeFlow: opts.creativeFlow } : {}),
+  });
+  const nextDrone = noteCatalyst(m, c, tick, stage, step.calm);
+  return {
+    memory: nextDrone,
+    playerMem: step.mem,
+    calm: step.calm,
+    steady: step.steady,
+  };
+}
+

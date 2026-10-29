@@ -115,3 +115,23 @@ test("a session is the drone's night (Plan 57): it knows what it has not dreamed
   // a save from before dreamedAt existed loads, and counts everything as undreamt
   assert.equal(loadDroneMemory(saveDroneMemory(m))!.dreamedAt, undefined);
 });
+
+test('Plan 56 W6e: the player is a Wanderer anchor (`wan.from = "player"`): steady play lends 0.3 calm to the drone, panic-spraying lends 0', async () => {
+  const { noteCatalystWithPlayer } = await import('./drone-memory');
+  const m = createDroneMemory();
+  // Steady play: player Wanderer stays balanced and lends 0.3 calm to the drone
+  const steadyHit = noteCatalystWithPlayer(m, { kind: 'hurt', damage: 20 }, 100, 2);
+  assert.equal(steadyHit.playerMem.wan?.from, 'player');
+  assert.equal(steadyHit.steady, true);
+  assert.equal(steadyHit.calm, 0.3);
+
+  // Panic-spraying: player Wanderer takes root-reactivity / solar-anxiety, drops below 0.9 balance, lends 0 calm
+  const panicHit = noteCatalystWithPlayer(m, { kind: 'hurt', damage: 20 }, 100, 2, steadyHit.playerMem, { panicSpray: true });
+  assert.equal(panicHit.steady, false);
+  assert.equal(panicHit.calm, 0);
+  assert.ok(
+    (steadyHit.memory.presets.flight.charge[ROOT] ?? 0) < (panicHit.memory.presets.flight.charge[ROOT] ?? 0),
+    'the steady player anchor softened the hit on the drone compared to a panic-spraying player',
+  );
+});
+

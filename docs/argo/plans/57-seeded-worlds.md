@@ -623,3 +623,41 @@ Every complex (**Mind** 1–7, **Body** 8–14, **Spirit** 15–21) runs the sam
          - Whenever the player crafts a new preset $C = A \otimes B$, the System inspects the **adjacent unvisited nodes** in the Four-Float / Archetype / Wiregraph manifold (e.g., a newly forged high-$\text{Lx}$ superconductor that hasn't yet been wired into a magnetic coil, or a high-pressure chamber that hasn't been paired with a nozzle) and issues an optional **Completionist / Frontier Quest** to test the next physical law.
        - **Type C — Karmic / Cause-Link Quests (Closing Open `mc` Loops)**:
          - As already wired in Wave 14 (`Quest logged: {cause}`), every open cause link (`by -> d`) in the drone's, native's, or planet's memory is a live behavioral quest that only completes when the entity proves in waking physics and W3 dreams that it can handle that catalyst without distortion.
+
+
+---
+
+## 19. The Rung-6 Wanderer Meta-Shell: Player POV, Party/Guild Complex, Comms & Clip Streaming (owner & Argon, 29 Oct; built in `@hm/harness`)
+
+> **Owner's insight (29 Oct)**: *"at some point we need to look it from the potential players pov, they will want to share and stream the content with videos, and message eachother etc. its like the layer above the 'litrpg system' layer that handles the harness settings and coms and party/guild stuff"*
+> **Code**: Built in [`packages/harness/src/meta-shell.ts`](../../../packages/harness/src/meta-shell.ts) and wired into [`apps/web/src/play/drone-memory.ts`](../../../apps/web/src/play/drone-memory.ts) (`noteCatalystWithPlayer`), tested in [`packages/harness/tests/meta-shell.test.ts`](../../../packages/harness/tests/meta-shell.test.ts) (5/5) and [`apps/web/src/play/drone-memory.test.ts`](../../../apps/web/src/play/drone-memory.test.ts) (7/7).
+
+### 19.1 Player as Wanderer Anchor (Plan 56 W6e & Law of One 65.12, 66.8)
+- The player's character is not an external spectator; the player is a descended **Wanderer** (`wan.from = 'player'`, `createPlayerWanderer`, `stepPlayerWanderer`, `noteCatalystWithPlayer`).
+- **Steady Play Lends `ANCHOR_CALM` (`0.3`)**: When the player acts with steady, deliberate intent (`!panicSpray` and `error < 0.65`), their Wanderer memory remains balanced (`bal >= 0.9`) and automatically lends `calm = 0.3` to the Overwatch Drone and nearby companions at each catalyst—softening incoming hits (`HITS_ON_YOU`) before they harden.
+- **Panic-Spraying Breaks the Anchor**: When the player panic-sprays or thrashes inputs erratically, their Wanderer memory takes a `root-reactivity` / `solar-anxiety` spike (`bal < 0.9`), dropping their lent `calm` to `0` until 4 steady action windows bleed off the panic charge (Ra 66.8: *"the imbalanced entity can be of no aid in balancing another"*).
+
+### 19.2 Party Working Groups (Law of Doubling, 10.12) & Guild Social Memory Complexes
+- **Party (`evaluateParty`)**:
+  - A co-op working group (2–6 Wanderers, companions, and drones) shares `anchorCalm` up to `0.6` (`ANCHOR_CALM_MAX`).
+  - Every member whose memory is balanced (`bal >= 0.85`) with an open Heart Ray (`kundalini(mem) >= 4`) contributes to Ra's **Law of Harmonious Doubling** ($2^{N-1}$ working power multiplier via `harmoniousDoubling`), accelerating co-op contraption synthesis, Stargate charging, and planetary restoration.
+- **Guild (`evaluateGuildComplex`)**:
+  - A Guild is a player-and-companion **Social Memory Complex**. When collective guild coherence reaches `GUILD_HARVEST_AT` (`0.95`), `pack.pool` activates (`isSocialMemoryComplex = true`):
+    - Closed cause links (`by>d` where `open === false`) pool into `pooledClosedCauses` so every guild member's drone and companions inherit the guild's hard-won eurekas.
+    - All member presets pool into `sharedShelfCodes` (`<kind>:<hash8>`) on the Guild Shelf.
+
+### 19.3 Tiered Comms & Cartridge Messaging (`createCommsMessage`, Plan 57 §9 Child Safety)
+- Supports 4 channels (`whisper | party | guild | world-beacon`) across two trust tiers (`unverified-or-child | verified`):
+  - **Unverified / Child Tier (`unverified-or-child`)**: Strictly enforces Plan 57 §9—raw free text is never transmitted or displayed. Messages are assembled solely from `CANNED_CALLOUTS` (`ping:gate`, `ping:craft`, `ping:eureka`, `ping:help`, `ping:ready`) plus extracted, schema-valid preset share codes (`kit:...`, `matc:...`, `loc:...`, `logic:...`).
+  - **Verified Tier (`verified`)**: Allows sanitized text (280 chars max, control chars stripped) alongside embedded preset share codes, which are automatically extracted into `attachedPresets` so the recipient's HUD renders live 3D turntable preview cards (`previews-drive-play`).
+
+### 19.4 Video Clip, Stream & Deterministic Shorthand Replay (`hm2:clip:v1`)
+- Inspired by *Noita*'s built-in GIF recorder and *Content Warning*'s in-game camera, `createClipManifest`, `encodeClipShareCode`, and `decodeClipShareCode` pair a zero-bloat browser `canvas.captureStream` / `MediaRecorder` video descriptor (`video/webm;codecs=vp9 | video/webm | video/mp4`, up to 120s) with:
+  - `featuredPresets`: up to 16 preset share codes shown in the clip so viewers can one-click preview or print the exact contraption on their bench.
+  - `replayFrames`: deterministic shorthand keyframe ticks (`t:action:val`) so viewers can step directly into the 3D moment.
+  - Compact URL/chat-safe `clip:<base64url>` share code round-tripping.
+
+### 19.5 Harness & Bridge Meta-Settings (`validateHarnessSettings`)
+- Pure validator for the Rung-6 Harness Control Deck (`bridgeMode`, `higherSelfSeatEnabled`, `childSafeFilter`, `autoClipOnEureka`, `streamMaxFps`):
+  - **Standing Anti-Cheat Guard**: Whenever `context.hasAntiCheat` is true, `checked-profile-relay` is automatically downgraded to `mirror-only` so zero synthetic inputs ever reach an anti-cheat host.
+  - **Child-Safety Lock**: Whenever `context.trustTier === 'unverified-or-child'`, `childSafeFilter` is locked to `true`.

@@ -39,3 +39,4 @@ test('Plan 58 W3 (Track 1): queryHarvestedShelf lazily indexes all 2,606 presets
   assert.equal(found.id, dfIron.items[0]!.id);
   assert.equal(findHarvestedPresetById('nonexistent:00000000'), null);
 });
+

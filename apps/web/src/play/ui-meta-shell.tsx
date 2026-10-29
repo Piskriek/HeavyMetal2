@@ -19,15 +19,21 @@ import {
 } from '@hm/hudlayout';
 import {
   LOCALE_SHELF,
+  buildMorningSitRep,
   createClipManifest,
   createCommsMessage,
   createPlayerWanderer,
+  dream,
   encodeClipShareCode,
   evaluateGuildComplex,
   evaluateParty,
+  projectSuggestionHandshake,
   renderUtteranceVoiceAudio,
+  seedGalacticSystem,
+  stepOrbitalLattice,
   synthesizeUtterance,
   type LocaleId,
+  type TacticalPingKind,
 } from '@hm/harness';
 import type { Mem, StageId } from '@hm/shorthand';
 import { UiPanelView } from './ui-panel';
@@ -112,6 +118,11 @@ export function MetaShellDrawer(props: MetaShellDrawerProps): ReactElement {
   const [lastCommsLine, setLastCommsLine] = useState<string>('Ready on Party & Enclave channel (child-safe callouts active).');
   const [lastClipCode, setLastClipCode] = useState<string>('clip:ready — press Capture Replay Clip to mint a share code');
   const [locale, setLocale] = useState<LocaleId>('en');
+  const [rGalactic, setRGalactic] = useState<number>(0.62);
+  const [orbitalTick, setOrbitalTick] = useState<number>(240);
+  const [ghostStatusLine, setGhostStatusLine] = useState<string>(
+    'Neural Ghost idle — send a non-coercive Tactical Suggestion Handshake below.',
+  );
 
   const applyStyle = (nextId: string): void => {
     const resolved = resolveUiStyle(nextId);
@@ -447,6 +458,167 @@ export function MetaShellDrawer(props: MetaShellDrawerProps): ReactElement {
               props.onBroadcastNotice('Harvested Preset Selected', `${entry.name} (${code}) ready for bench/beam`)
             }
           />
+
+          {(() => {
+            const stageId = stageIdOf(props.stage);
+            const playerMem = createPlayerWanderer();
+            const sys = seedGalacticSystem('setmix-frontier', rGalactic);
+            const lattice = stepOrbitalLattice(sys, orbitalTick);
+            const party = evaluateParty([
+              { id: 'player', name: 'Wanderer (You)', mem: playerMem, stage: stageId, worldGateCode: 'GATE-EARTH-01' },
+              { id: 'drone', name: 'Overwatch Drone', mem: droneMem.ego, stage: stageId, worldGateCode: 'GATE-EARTH-01' },
+            ]);
+            const dreamPass = dream({
+              ego: droneMem.ego,
+              presets: DRONE_ROLES.map((r) => droneMem.presets[r]),
+              weights: droneMem.weights,
+              now: Math.max(1, orbitalTick),
+            });
+            const sitRep = buildMorningSitRep({
+              digest: dreamPass.digest,
+              tick: orbitalTick,
+              worldSeed: sys.systemId,
+              stage: stageId,
+            });
+            const openTransfer = lattice.transferWindows.find((w) => w.windowOpen) ?? lattice.transferWindows[0];
+
+            const triggerGhostPing = (ping: TacticalPingKind): void => {
+              const res = projectSuggestionHandshake({
+                ping,
+                targetVector: { x: 120, y: 40, z: -80 },
+                senderMem: playerMem,
+                receiverMem: droneMem.ego,
+                tick: orbitalTick,
+              });
+              setGhostStatusLine(res.rationale);
+              props.onBroadcastNotice(`Neural Ghost (${ping})`, res.rationale);
+            };
+
+            return (
+              <div
+                data-testid="logos-galaxy-chronos-deck"
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 'var(--ui-radius, 4px)',
+                  border: '1px solid var(--ui-line)',
+                  background: 'var(--ui-inset, #25272c)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                    Galactic Lattice · Neural Ghost · Unity-in-Diversity SMC · Morning SitRep (Plan 58 W4)
+                  </span>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '11px' }}>
+                    <label>
+                      r_galactic ({rGalactic.toFixed(2)} · {sys.zone}):{' '}
+                      <input
+                        type="range"
+                        min={0.05}
+                        max={0.95}
+                        step={0.05}
+                        value={rGalactic}
+                        onChange={(e) => setRGalactic(Number(e.target.value))}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setOrbitalTick((t) => t + 75)}
+                      style={{
+                        padding: '3px 8px',
+                        fontSize: '10px',
+                        borderRadius: 'var(--ui-radius, 4px)',
+                        border: '1px solid var(--ui-line)',
+                        background: 'var(--ui-panel)',
+                        color: 'var(--ui-ink)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Step Orbit (+75t)
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px', fontSize: '11px' }}>
+                  <div style={{ padding: '8px', border: '1px solid var(--ui-line)', borderRadius: 'var(--ui-radius, 4px)', background: 'var(--ui-panel)' }}>
+                    <div style={{ fontWeight: 700, marginBottom: '4px' }}>1. Galactic Seed & Orbital Transit</div>
+                    <div>Zone: <b>{sys.zone}</b> · Primary: <b>{sys.primaryStage}</b> · Veil: <b>{lattice.effectiveVeilThickness}</b></div>
+                    <div>
+                      Hohmann Window:{' '}
+                      <b>
+                        {openTransfer
+                          ? `${openTransfer.fromBodyId}→${openTransfer.toBodyId} (${openTransfer.deltaVMultiplier}x Δv)`
+                          : 'n/a'}
+                      </b>
+                    </div>
+                    <div>Conjunctions: <b>{lattice.conjunctionSignals.length} active</b></div>
+                  </div>
+
+                  <div style={{ padding: '8px', border: '1px solid var(--ui-line)', borderRadius: 'var(--ui-radius, 4px)', background: 'var(--ui-panel)' }}>
+                    <div style={{ fontWeight: 700, marginBottom: '4px' }}>2. Unity-in-Diversity Circle</div>
+                    <div>
+                      H_system: <b>{party.unityInDiversity.hSystem}</b> · 4-Float Cover: <b>{party.unityInDiversity.fourFloatsCoverage}</b>
+                    </div>
+                    <div>
+                      Polarity Diversity: <b>{party.unityInDiversity.polarityComplementarity}</b> · 7-Ray Cover: <b>{party.unityInDiversity.sevenRayCoverage}</b>
+                    </div>
+                  </div>
+
+                  <div style={{ padding: '8px', border: '1px solid var(--ui-line)', borderRadius: 'var(--ui-radius, 4px)', background: 'var(--ui-panel)' }}>
+                    <div style={{ fontWeight: 700, marginBottom: '4px' }}>3. {sitRep.headline}</div>
+                    <div style={{ color: 'var(--ui-dim)' }}>“{sitRep.droneWakeLine}”</div>
+                    <div style={{ marginTop: '4px' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLastClipCode(sitRep.ghostReplayShareCode);
+                          props.onBroadcastNotice('30s Holodeck Ghost Replay', sitRep.ghostReplayManifest.caption);
+                        }}
+                        style={{
+                          padding: '2px 7px',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          borderRadius: 'var(--ui-radius, 4px)',
+                          border: '1px solid var(--ui-accent)',
+                          background: 'var(--ui-inset)',
+                          color: 'var(--ui-accent)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ▶ Preview 30s Ghost Replay ({sitRep.bounty.antidoteName})
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px', fontSize: '11px' }}>
+                  <span><b>Suggestion Handshake (Audit A3):</b> {ghostStatusLine}</span>
+                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                    {(['ORBIT_STABLE', 'GRAVITY_SLINGSHOT', 'FLANK_VECTOR', 'SYNTROPIC_SHIELD_SHARE'] as const).map((ping) => (
+                      <button
+                        key={ping}
+                        type="button"
+                        onClick={() => triggerGhostPing(ping)}
+                        style={{
+                          padding: '3px 7px',
+                          fontSize: '10px',
+                          borderRadius: 'var(--ui-radius, 4px)',
+                          border: '1px solid var(--ui-line)',
+                          background: 'var(--ui-panel)',
+                          color: 'var(--ui-ink)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {ping}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </aside>
       ) : null}
     </div>

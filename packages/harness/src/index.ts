@@ -20,3 +20,4 @@ export * from './auto-mimicry.js';
 export * from './semantic-utterance.js';
 export * from './harvested-shelf.js';
 export * from './archetypical-mind.js';
+export * from './logos-galaxy-chronos.js';

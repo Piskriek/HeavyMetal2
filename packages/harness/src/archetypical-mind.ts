@@ -260,3 +260,4 @@ export function invokeArchetypeStation(
           : 1;
   return invokeArchetypeByNumber(mem, invocableNum, body);
 }
+

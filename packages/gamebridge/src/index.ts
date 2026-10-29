@@ -291,11 +291,15 @@ export function fidelityProfile(gameId: string): BridgePermissionProfile {
 /** Process signatures of the games with a shipped profile, for the running-game ranker ("bridge counter strike" -> cs2.exe). */
 export const PRESET_SIGNATURES: readonly { readonly tokens: readonly string[]; readonly title: string }[] = [
   { tokens: ['cs2'], title: 'Counter-Strike 2' },
+  { tokens: ['capitalempire', 'capital-empire', 'maplefalls'], title: 'Capital Empire: Maple Falls Golf & Town Manager' },
 ];
 
-/** The shipped profile for a game, when there is one (CS2, any FIDELITY game); null sends the game to the unchecked one. */
+/** The shipped profile for a game, when there is one (CS2, Capital Empire, any FIDELITY game); null sends the game to the unchecked one. */
 export function bridgePresetFor(gameId: string): BridgePermissionProfile | null {
   if (gameId === 'cs2' || gameId === 'counter-strike-2' || gameId === 'counter-strike') return CS2_PROFILE;
+  if (gameId === 'capital-empire' || gameId === 'capitalempire' || gameId === 'maple-falls') {
+    return fidelityProfile('fidelity-capital-empire');
+  }
   if (/^fidelity(-[a-z0-9-]+)?$/.test(gameId)) return fidelityProfile(gameId);
   return null;
 }
@@ -976,3 +980,5 @@ export function profileLine(p: BridgePermissionProfile): string {
   const who = p.verdict === 'unchecked' ? 'Nobody checked its terms yet' : `${p.checkedBy} checked its terms (${p.sources.length} source${p.sources.length === 1 ? '' : 's'})`;
   return `${p.title}: ${p.verdict}. ${who}. Mechanics cross by ${rungs}${extra.length ? `, with ${extra.join(' and ')}` : ''}${p.soloOnly ? ', solo only' : ''}. Never its art, audio, models or text.${step}`;
 }
+
+export * from './open-host-sdk.js';

@@ -30,6 +30,7 @@ import { BALANCED_AT, createPresetMemory, memoryBalance, recordExperience } from
 import { ANCHOR_CALM, anchorCalm, isAnchor } from './lifecycle.js';
 import { compileSystemMemory, type SystemMemoryPack } from './system-memory.js';
 import { harmoniousDoubling } from './science-cosmos.js';
+import { evaluateUnityInDiversityCircle, type FourFloats, type UnityInDiversityStatus } from './logos-galaxy-chronos.js';
 
 // ---------------------------------------------------------------------------------------------------------------------
 // 1. Player as Wanderer Anchor (Plan 56 W6e)
@@ -135,6 +136,8 @@ export interface PartyMemberSummary {
   readonly mem: Mem;
   readonly stage: StageId;
   readonly worldGateCode: string;
+  readonly fourFloatsSpecialty?: FourFloats;
+  readonly contributedPresets?: readonly string[];
 }
 
 export interface PartyStatus {
@@ -145,11 +148,13 @@ export interface PartyStatus {
   readonly harmoniousCount: number;
   readonly doublingMultiplier: number;
   readonly meanBalance: number;
+  /** Plan 58 Wave 4: Complementary 7-Ray, Polarity & Four-Float Unity-in-Diversity resonance. */
+  readonly unityInDiversity: UnityInDiversityStatus;
 }
 
 /**
- * Evaluates a co-op Party (2–6 Wanderers/companions), computing their shared `anchorCalm` and Law of Doubling
- * working multiplier for co-op building and Stargate charging.
+ * Evaluates a co-op Party (2–6 Wanderers/companions), computing their shared `anchorCalm`, Law of Doubling
+ * working multiplier, and Complementary Unity-in-Diversity resonance across $\mathbf{S} = (\text{Pxd}, \text{Vtx}, \text{Lx}, \text{Aq})$.
  */
 export function evaluateParty(members: readonly PartyMemberSummary[]): PartyStatus {
   const mems = members.map((m) => checkMem(m.mem));
@@ -157,12 +162,27 @@ export function evaluateParty(members: readonly PartyMemberSummary[]): PartyStat
   const { harmoniousCount, multiplier } = harmoniousDoubling(mems);
   const meanBalance =
     mems.length > 0 ? Math.round((mems.reduce((s, m) => s + m.bal, 0) / mems.length) * 1000) / 1000 : 1;
+  const unityInDiversity = evaluateUnityInDiversityCircle(
+    members.map((m, idx) => ({
+      memberId: m.id,
+      name: m.name,
+      mem: m.mem,
+      fourFloatsSpecialty: m.fourFloatsSpecialty ?? {
+        Pxd: idx % 4 === 0 ? 0.92 : 0.65,
+        Vtx: idx % 4 === 1 ? 0.92 : 0.65,
+        Lx: idx % 4 === 2 ? 0.92 : 0.65,
+        Aq: idx % 4 === 3 ? 0.92 : 0.65,
+      },
+      ...(m.contributedPresets !== undefined ? { contributedPresets: m.contributedPresets } : {}),
+    })),
+  );
   return {
     members,
     sharedAnchorCalm,
     harmoniousCount,
     doublingMultiplier: multiplier,
     meanBalance,
+    unityInDiversity,
   };
 }
 
@@ -175,17 +195,20 @@ export interface GuildComplexStatus {
   readonly sharedShelfCodes: readonly string[];
   /** Closed cause links (`by>d`) pooled across the guild so every member benefits from each eureka. */
   readonly pooledClosedCauses: readonly string[];
+  /** Plan 58 Wave 4: Complementary 7-Ray, Polarity & Four-Float Unity-in-Diversity resonance. */
+  readonly unityInDiversity: UnityInDiversityStatus;
 }
 
 /**
  * Evaluates a Guild as a player-and-companion Social Memory Complex (Plan 57 §3 & §19).
- * When collective coherence >= 0.95, the guild pools its memory pack and shares closed cause links across all members.
+ * When collective coherence >= 0.95 (or Unity-in-Diversity $H_{\text{system}} \ge 0.95$), the guild pools its memory
+ * pack and shares closed cause links across all members.
  */
 export function evaluateGuildComplex(input: {
   readonly guildId: string;
   readonly guildName: string;
   readonly memberPresets: readonly Mem[];
-  readonly memberEgos: readonly { readonly ego: Mem; readonly presets: readonly string[] }[];
+  readonly memberEgos: readonly { readonly ego: Mem; readonly presets: readonly string[]; readonly fourFloatsSpecialty?: FourFloats }[];
 }): GuildComplexStatus {
   const egosWithWeights = input.memberEgos.map((e) => ({
     ego: checkMem(e.ego),
@@ -193,7 +216,21 @@ export function evaluateGuildComplex(input: {
     weights: { prefer: {} },
   }));
   const pack = compileSystemMemory(input.memberPresets, egosWithWeights);
-  const isSocialMemoryComplex = pack.pool !== null;
+  const unityInDiversity = evaluateUnityInDiversityCircle(
+    input.memberEgos.map((e, idx) => ({
+      memberId: e.ego.of,
+      name: `Member ${idx + 1}`,
+      mem: e.ego,
+      fourFloatsSpecialty: e.fourFloatsSpecialty ?? {
+        Pxd: idx % 4 === 0 ? 0.95 : 0.7,
+        Vtx: idx % 4 === 1 ? 0.95 : 0.7,
+        Lx: idx % 4 === 2 ? 0.95 : 0.7,
+        Aq: idx % 4 === 3 ? 0.95 : 0.7,
+      },
+      contributedPresets: e.presets,
+    })),
+  );
+  const isSocialMemoryComplex = pack.pool !== null || unityInDiversity.isSocialMemoryComplex;
   const sharedShelfCodes = [...new Set(input.memberPresets.map((p) => p.of))].sort();
   const pooledClosedCauses = isSocialMemoryComplex
     ? [...new Set(input.memberPresets.flatMap((p) => p.cause.filter((c) => !c.open).map((c) => `${c.by}>${c.d}`)))].sort()
@@ -206,6 +243,7 @@ export function evaluateGuildComplex(input: {
     isSocialMemoryComplex,
     sharedShelfCodes,
     pooledClosedCauses,
+    unityInDiversity,
   };
 }
 

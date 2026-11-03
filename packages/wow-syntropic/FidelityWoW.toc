@@ -1,0 +1,12 @@
+## Interface: 110007, 11505, 40401
+## Title: |cff00ffccFidelity|r |cffffffffSyntropic Flow & Warden|r
+## Notes: 4-Node Holon Companion: Somatic Flow Optimization, Kinematic Invariant Verification, and Combat Coherence
+## Author: Antigravity Overwatch & Piskriek
+## Version: 1.0.0
+## SavedVariables: FidelityWoW_Config
+## SavedVariablesPerCharacter: FidelityWoW_Telemetry
+
+Core.lua
+Kinematics.lua
+SomaticFlow.lua
+UI.lua

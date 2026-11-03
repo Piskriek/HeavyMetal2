@@ -69,3 +69,4 @@
 - **No Protected Functions:** Does not tamper with secure execution or auto-cast.
 - **No Memory Reading:** Operates 100% inside Blizzard's sandboxed Lua environment.
 - **Zero Kernel Drivers:** Pure information theory, physics splines, and standard combat log events.
+

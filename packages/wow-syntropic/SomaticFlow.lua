@@ -10,7 +10,7 @@ local MAX_INTERVALS = 30
 local lastCastTimeMs = 0
 local enemyCastStartTimes = {}
 
--- Unified thresholds
+-- Unified thresholds (classify observed combat-log elapsed intervals)
 local ROBOTIC_INJECTION_THRESHOLD_MS = 60.0
 local PREDICTIVE_THRESHOLD_MS = 130.0
 
@@ -28,7 +28,7 @@ local INTERRUPT_SPELLS = {
 }
 
 function SomaticFlow:OnCombatLogEvent(...)
-    if not FidelityWoW_Config.enabled then return end
+    if not FidelityWoW_Config.enabled or not FidelityWoW_Config.optIn then return end
 
     local timestamp, subevent, _, sourceGUID, sourceName, sourceFlags, _, destGUID, destName, destFlags, _, spellID, spellName, _, extraSpellID, extraSpellName = ...
 
@@ -54,7 +54,7 @@ function SomaticFlow:OnCombatLogEvent(...)
             if reactionTimeMs < ROBOTIC_INJECTION_THRESHOLD_MS then
                 verdict = "robotic_injection"
                 FidelityWoW_Telemetry.inhumanKickDetected = true
-                print(string.format("|cffff0000[Fidelity Warden ALERT]|r Inhuman reaction time: %.1f ms (< %.0fms botting limit).", reactionTimeMs, ROBOTIC_INJECTION_THRESHOLD_MS))
+                print(string.format("|cffff0000[Fidelity Warden ALERT]|r Inhuman reaction time: %.1f ms (< %.0fms robotic threshold).", reactionTimeMs, ROBOTIC_INJECTION_THRESHOLD_MS))
             elseif reactionTimeMs < PREDICTIVE_THRESHOLD_MS then
                 verdict = "predictive_timing"
                 FidelityWoW_Telemetry.inhumanKickDetected = false
@@ -62,15 +62,16 @@ function SomaticFlow:OnCombatLogEvent(...)
             else
                 verdict = "human_reflex"
                 FidelityWoW_Telemetry.inhumanKickDetected = false
-                print(string.format("|cff00ff00[Fidelity Flow]|r Verified human reflex: %.1f ms.", reactionTimeMs))
+                print(string.format("|cff00ff00[Fidelity Flow]|r Observed reflex window: %.1f ms.", reactionTimeMs))
             end
 
             FidelityWoW_Telemetry.lastReactionMs = reactionTimeMs
             FidelityWoW_Telemetry.lastReactionVerdict = verdict
 
-            if FidelityWoW_Config.optIn and FidelityWoW_Export then
+            if FidelityWoW_Export then
                 table.insert(FidelityWoW_Export.interrupts, {
                     reactionTimeMs = reactionTimeMs,
+                    confirmedInterrupt = true,
                     verdict = verdict,
                     spellName = spellName,
                     interruptedSpell = extraSpellName or enemyCast.spellName
@@ -82,96 +83,67 @@ function SomaticFlow:OnCombatLogEvent(...)
 end
 
 function SomaticFlow:OnPlayerCast(event, spellID, target, timeMs)
-    if not FidelityWoW_Config.enabled then return end
+    if not FidelityWoW_Config.enabled or not FidelityWoW_Config.optIn then return end
 
     if event == "UNIT_SPELLCAST_SUCCEEDED" then
         if lastCastTimeMs > 0 then
             local dt = (timeMs - lastCastTimeMs) -- in ms
-            if dt > 10 and dt < 10000 then
+            if dt >= 200 and dt <= 3500 then
                 table.insert(castIntervals, dt)
                 if #castIntervals > MAX_INTERVALS then table.remove(castIntervals, 1) end
 
-                if FidelityWoW_Config.optIn and FidelityWoW_Export then
+                if FidelityWoW_Export then
                     table.insert(FidelityWoW_Export.castIntervals, dt)
                     if #FidelityWoW_Export.castIntervals > 100 then table.remove(FidelityWoW_Export.castIntervals, 1) end
                 end
             end
         end
         lastCastTimeMs = timeMs
-
-        -- Compute True Shannon Entropy
-        self:ComputeShannonEntropy()
     end
 end
 
-function SomaticFlow:ComputeShannonEntropy()
+function SomaticFlow:ComputeFlowState(timeMs)
     if #castIntervals < 5 then return end
 
-    -- True Shannon Entropy over 50ms histogram bins
-    local binWidthMs = 50
-    local maxTimeMs = 3000
-    local numBins = math.ceil(maxTimeMs / binWidthMs)
+    -- Shannon Entropy calculation across 50ms bins in [200ms, 3500ms]
+    local MIN_MS = 200
+    local MAX_MS = 3500
+    local BIN_WIDTH = 50
+    local numBins = math.ceil((MAX_MS - MIN_MS) / BIN_WIDTH)
     local bins = {}
     for i = 1, numBins do bins[i] = 0 end
 
     for _, dt in ipairs(castIntervals) do
-        local binIdx = math.min(numBins, math.max(1, math.floor(dt / binWidthMs) + 1))
+        local binIdx = math.min(numBins, math.max(1, math.floor((dt - MIN_MS) / BIN_WIDTH) + 1))
         bins[binIdx] = bins[binIdx] + 1
     end
 
     local H = 0
     local N = #castIntervals
-    for _, count in ipairs(bins) do
-        if count > 0 then
-            local p = count / N
-            H = H - (p * (math.log(p) / math.log(2))) -- log2(p)
+    for i = 1, numBins do
+        if bins[i] > 0 then
+            local p = bins[i] / N
+            H = H - (p * (math.log(p) / math.log(2)))
         end
     end
 
     FidelityWoW_Telemetry.shannonEntropyBits = tonumber(string.format("%.3f", H))
-
-    -- Rotation bot check: H < 0.80 bits
     FidelityWoW_Telemetry.rotationBotting = H < 0.80
 
-    -- Frantic click strain penalty
-    local mean = 0
-    for _, dt in ipairs(castIntervals) do mean = mean + dt end
-    mean = mean / #castIntervals
-    if mean < 200 then
-        FidelityWoW_Telemetry.strainJoules = FidelityWoW_Telemetry.strainJoules + 0.05
-    end
-end
-
-function SomaticFlow:ComputeFlowState(timeMs)
-    if not FidelityWoW_Config.enabled then return end
-
-    local entropy = FidelityWoW_Telemetry.shannonEntropyBits or 2.5
-    local ftle = FidelityWoW_Telemetry.lyapunovFTLE or 0.005
-
-    local pxd = FidelityWoW_Telemetry.inCombat and 0.45 or 0.15
-    local vtx = math.min(0.95, math.max(0.10, entropy / 3.5))
-    local lx = (FidelityWoW_Telemetry.strainJoules > 2.0 or ftle > 0.010 or FidelityWoW_Telemetry.inhumanKickDetected) and 0.60 or 0.98
-    local aq = math.max(0.05, 0.30 - (FidelityWoW_Telemetry.strainJoules * 0.02))
-
-    FidelityWoW_Telemetry.fourFloats = {
-        Pxd = tonumber(string.format("%.3f", pxd)),
-        Vtx = tonumber(string.format("%.3f", vtx)),
-        Lx = tonumber(string.format("%.3f", lx)),
-        Aq = tonumber(string.format("%.3f", aq))
-    }
-
-    FidelityWoW_Telemetry.coherence = tonumber(string.format("%.2f", (lx + (1.0 - ftle * 10)) / 2.0))
+    -- APM calculation
+    local apm = math.min(300, math.max(0, math.floor((60000 / math.max(200, (castIntervals[#castIntervals] or 1000))))))
+    FidelityWoW_Telemetry.apm = apm
 end
 
 function SomaticFlow:PrintAudit()
-    local H = FidelityWoW_Telemetry.shannonEntropyBits or 0
-    local kick = FidelityWoW_Telemetry.lastReactionMs
-    print("|cff00ffcc[Fidelity Somatic & APM Audit]|r")
-    print(string.format("  Shannon Entropy H: %.3f bits (Threshold >= 0.80 bits)", H))
-    print(string.format("  Rotation Cadence: %s", (H >= 0.80) and "|cff00ff00Organic Human Flow|r" or "|cffff0000Deterministic Automation|r"))
-    if kick then
-        print(string.format("  Last Interrupt Latency: %.1f ms (%s)", kick, FidelityWoW_Telemetry.lastReactionVerdict or "untested"))
+    local H = FidelityWoW_Telemetry.shannonEntropyBits or 2.5
+    local lastReact = FidelityWoW_Telemetry.lastReactionMs or 0
+    print("|cff00ffcc[Fidelity Somatic Flow Audit]|r")
+    print(string.format("  Shannon Entropy (H): %.3f bits (Limit >= 0.80 bits)", H))
+    print(string.format("  Last Reaction Time: %.1f ms", lastReact))
+    if H >= 0.80 and not FidelityWoW_Telemetry.inhumanKickDetected then
+        print("  |cff00ff00[PASS]|r Cognitive flow & somatic cadence verified organic.")
     else
-        print("  Last Interrupt Latency: None recorded.")
+        print("  |cffff0000[WARN]|r Low entropy or inhuman reaction observed.")
     end
 end

@@ -19,7 +19,7 @@ test('Kinematic FTLE detects speedhack and teleport divergence while passing smo
   assert.equal(smoothRes.status, 'conforming_physical_spline');
   assert.ok(smoothRes.ftle <= 0.010);
 
-  // Speedhack sample (exceeds max speed)
+  // Speedhack sample (exceeds max speed on last sample)
   const speedhackTrajectory = [
     { t: 0, x: 100.0, y: 200.0, z: 0, speed: 7.0 },
     { t: 100, x: 100.7, y: 200.0, z: 0, speed: 7.0 },
@@ -32,12 +32,13 @@ test('Kinematic FTLE detects speedhack and teleport divergence while passing smo
 });
 
 test('Neuromuscular reaction evaluation distinguishes human response from robotic auto-kick', () => {
-  const humanInterrupt = [{ castId: '1', spellName: 'Kick', reactionTimeMs: 240.0 }];
+  const humanInterrupt = [{ castId: '1', spellName: 'Kick', reactionTimeMs: 240.0, confirmedInterrupt: true }];
   const humanRes = evaluateReactionTime(humanInterrupt);
   assert.equal(humanRes.verdict, 'human_reflex');
   assert.equal(humanRes.inhumanKicksCount, 0);
+  assert.equal(humanRes.reflexCount, 1);
 
-  const botInterrupt = [{ castId: '2', spellName: 'Kick', reactionTimeMs: 22.0 }];
+  const botInterrupt = [{ castId: '2', spellName: 'Kick', reactionTimeMs: 22.0, confirmedInterrupt: true }];
   const botRes = evaluateReactionTime(botInterrupt);
   assert.equal(botRes.verdict, 'robotic_injection');
   assert.equal(botRes.inhumanKicksCount, 1);
@@ -46,6 +47,22 @@ test('Neuromuscular reaction evaluation distinguishes human response from roboti
   const invalidRes = evaluateReactionTime([{ castId: '3', reactionTimeMs: 'invalid' }]);
   assert.equal(invalidRes.verdict, 'untested');
   assert.equal(invalidRes.status, 'invalid_data');
+
+  // confirmedInterrupt: false is ignored
+  const unconfirmedRes = evaluateReactionTime([{ reactionTimeMs: 40.0, confirmedInterrupt: false }]);
+  assert.equal(unconfirmedRes.verdict, 'untested');
+  assert.equal(unconfirmedRes.status, 'invalid_data');
+
+  // Mix of 80ms and 200ms returns predictive_cadence (not contradicted by human_reflex)
+  const mixedRes = evaluateReactionTime([
+    { reactionTimeMs: 80.0, confirmedInterrupt: true },
+    { reactionTimeMs: 200.0, confirmedInterrupt: true }
+  ]);
+  assert.equal(mixedRes.verdict, 'predictive_cadence');
+  assert.equal(mixedRes.status, 'predictive_timing_observed');
+  assert.equal(mixedRes.predictiveCount, 1);
+  assert.equal(mixedRes.reflexCount, 1);
+  assert.equal(mixedRes.inhumanKicksCount, 0);
 });
 
 test('True Shannon entropy evaluation flags zero-variance rotation botting while approving organic play', () => {
@@ -58,6 +75,18 @@ test('True Shannon entropy evaluation flags zero-variance rotation botting while
   const botRes = evaluateShannonEntropy(botIntervals);
   assert.equal(botRes.isBottingPattern, true);
   assert.equal(botRes.entropyBits, 0);
+
+  // Overflow intervals [3000, 4000, 5000, 6000, 7000] do not collapse into false botting
+  const longPauses = [3000, 4000, 5000, 6000, 7000];
+  const pauseRes = evaluateShannonEntropy(longPauses);
+  assert.equal(pauseRes.status, 'insufficient_valid_data');
+  assert.equal(pauseRes.isBottingPattern, null);
+
+  // Repeating macro pattern [1000, 1500, 1000, 1500...] caught by conditional transition entropy
+  const macroPattern = [1000, 1500, 1000, 1500, 1000, 1500, 1000, 1500, 1000, 1500];
+  const macroRes = evaluateShannonEntropy(macroPattern);
+  assert.equal(macroRes.isBottingPattern, true);
+  assert.ok(macroRes.conditionalEntropyBits < 0.10);
 });
 
 test('Empty or missing session data returns INSUFFICIENT_EVIDENCE with zero confidence', () => {
@@ -69,6 +98,20 @@ test('Empty or missing session data returns INSUFFICIENT_EVIDENCE with zero conf
   assert.equal(empty.density_review[5].status, 'unverified');
 });
 
+test('Invalid WoW inputs (identical timestamps, zero intervals) return INSUFFICIENT_EVIDENCE with zero confidence', () => {
+  const malformed = auditWoWSession({
+    trajectory: [
+      { t: 100, x: 1, y: 1 },
+      { t: 100, x: 1, y: 1 },
+      { t: 100, x: 1, y: 1 }
+    ],
+    castIntervals: [0, 0, 0, 0, 0]
+  });
+  assert.equal(malformed.overall_verdict, 'INSUFFICIENT_EVIDENCE');
+  assert.equal(malformed.confidence, 0.0);
+  assert.equal(malformed.evidence_score, '0/3');
+});
+
 test('7-Density Session Audit compiles complete evaluation across D1..D7 with evidence score', () => {
   const session = auditWoWSession({
     trajectory: [
@@ -76,7 +119,7 @@ test('7-Density Session Audit compiles complete evaluation across D1..D7 with ev
       { t: 100, x: 10.7, y: 10, speed: 7 },
       { t: 200, x: 11.4, y: 10, speed: 7 }
     ],
-    interrupts: [{ castId: 'k1', spellName: 'Pummel', reactionTimeMs: 195.0 }],
+    interrupts: [{ castId: 'k1', spellName: 'Pummel', reactionTimeMs: 195.0, confirmedInterrupt: true }],
     castIntervals: [1100, 1300, 1250, 1400, 1150, 1500, 1350, 1200]
   });
 

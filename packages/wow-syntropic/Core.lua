@@ -8,19 +8,24 @@ ns.FidelityWoW = FidelityWoW
 -- Global Configuration & Consent Opt-in Gate
 FidelityWoW_Config = FidelityWoW_Config or {
     enabled = true,
-    optIn = false, -- Epistemic Consent Gate: Opt-in required for telemetry export
+    optIn = false, -- Epistemic Consent Gate: Opt-in required for telemetry export & collection
     hudVisible = true,
     sampleRateHz = 20
 }
 
 -- Ring Buffer Export for External Bridge
 FidelityWoW_Export = FidelityWoW_Export or {
-    version = 2,
-    trajectories = {},
+    version = 3,
+    trajectory = {},
+    trajectories = {}, -- Backwards compatibility alias pointing to coordinate points
+    movementEvents = {}, -- Discrete movement START/STOP state changes
     interrupts = {},
     castIntervals = {},
     lastExportTimestamp = 0
 }
+
+-- Synchronize alias
+FidelityWoW_Export.trajectories = FidelityWoW_Export.trajectory
 
 FidelityWoW_Telemetry = FidelityWoW_Telemetry or {
     sessionStart = 0,
@@ -65,8 +70,16 @@ function FidelityWoW:OnEvent(event, ...)
         FidelityWoW_Telemetry.realm = GetRealmName() or "Unknown"
         FidelityWoW_Telemetry.sessionStart = time()
         if ns.UI and ns.UI.InitHUD then ns.UI:InitHUD() end
+        if not FidelityWoW_Config.optIn then
+            print("|cff00ffcc[Fidelity WoW]|r Telemetry collection paused. Type |cffffcc00/fidelity optin|r to enable.")
+        end
+        return
+    end
 
-    elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
+    -- Strict Epistemic Gate: All telemetry and combat collection is gated on optIn
+    if not FidelityWoW_Config.optIn then return end
+
+    if event == "COMBAT_LOG_EVENT_UNFILTERED" then
         if ns.SomaticFlow and ns.SomaticFlow.OnCombatLogEvent then
             ns.SomaticFlow:OnCombatLogEvent(CombatLogGetCurrentEventInfo())
         end
@@ -95,8 +108,8 @@ end
 local lastUpdateMs = 0
 
 function FidelityWoW:OnUpdate(elapsed)
-    -- Strict Enforcement: If disabled, stop sampling immediately
-    if not FidelityWoW_Config.enabled then return end
+    -- Strict Enforcement: If disabled or not opted in, do not sample or update telemetry
+    if not FidelityWoW_Config.enabled or not FidelityWoW_Config.optIn then return end
 
     local nowMs = GetPrecisionTimeMs()
     if nowMs - lastUpdateMs < 50 then return end -- 20Hz update tick
@@ -129,7 +142,7 @@ SlashCmdList["FIDELITY"] = function(msg)
         if ns.UI and ns.UI.ToggleHUD then ns.UI:ToggleHUD(FidelityWoW_Config.hudVisible) end
     elseif cmd == "optin" then
         FidelityWoW_Config.optIn = not FidelityWoW_Config.optIn
-        print(string.format("|cff00ffcc[Fidelity WoW]|r Telemetry Export Opt-in is now: %s", FidelityWoW_Config.optIn and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
+        print(string.format("|cff00ffcc[Fidelity WoW]|r Telemetry Collection & Export Opt-in is now: %s", FidelityWoW_Config.optIn and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
     elseif cmd == "enable" then
         FidelityWoW_Config.enabled = not FidelityWoW_Config.enabled
         print(string.format("|cff00ffcc[Fidelity WoW]|r Addon is now: %s", FidelityWoW_Config.enabled and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED (sampling stopped)|r"))
@@ -139,7 +152,7 @@ SlashCmdList["FIDELITY"] = function(msg)
     else
         print("|cff00ffcc[Fidelity WoW Commands]|r")
         print("  |cffffcc00/fidelity toggle|r - Show/Hide Syntropic HUD")
-        print("  |cffffcc00/fidelity optin|r  - Toggle Telemetry Export Opt-in Gate")
+        print("  |cffffcc00/fidelity optin|r  - Toggle Telemetry Collection & Export Opt-in Gate")
         print("  |cffffcc00/fidelity enable|r - Toggle Addon Sampling On/Off")
         print("  |cffffcc00/fidelity audit|r  - Run instant Invariant Audit")
     end

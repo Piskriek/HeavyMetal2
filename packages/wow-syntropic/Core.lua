@@ -5,13 +5,21 @@ local ADDON_NAME, ns = ...
 local FidelityWoW = CreateFrame("Frame", "FidelityWoWFrame")
 ns.FidelityWoW = FidelityWoW
 
--- Global State & Telemetry Ring Buffer
+-- Global Configuration & Consent Opt-in Gate
 FidelityWoW_Config = FidelityWoW_Config or {
     enabled = true,
+    optIn = false, -- Epistemic Consent Gate: Opt-in required for telemetry export
     hudVisible = true,
-    sampleRateHz = 20,
-    bridgeExportIntervalSec = 5,
-    autoAntiCheatAudit = true
+    sampleRateHz = 20
+}
+
+-- Ring Buffer Export for External Bridge
+FidelityWoW_Export = FidelityWoW_Export or {
+    version = 2,
+    trajectories = {},
+    interrupts = {},
+    castIntervals = {},
+    lastExportTimestamp = 0
 }
 
 FidelityWoW_Telemetry = FidelityWoW_Telemetry or {
@@ -23,11 +31,12 @@ FidelityWoW_Telemetry = FidelityWoW_Telemetry or {
     activeRung = "D3",
     fourFloats = { Pxd = 0.20, Vtx = 0.50, Lx = 0.95, Aq = 0.20 },
     strainJoules = 0.0,
-    recentEvents = {}
+    lyapunovFTLE = 0.005,
+    shannonEntropyBits = 2.5
 }
 
 local function GetPrecisionTimeMs()
-    return debugprofilestop()
+    return debugprofilestop and debugprofilestop() or (GetTime() * 1000)
 end
 
 function FidelityWoW:OnLoad()
@@ -48,6 +57,9 @@ function FidelityWoW:OnLoad()
 end
 
 function FidelityWoW:OnEvent(event, ...)
+    -- Strict Enforcement: If disabled, stop all event processing immediately
+    if not FidelityWoW_Config.enabled then return end
+
     if event == "PLAYER_LOGIN" then
         FidelityWoW_Telemetry.character = UnitName("player") or "Unknown"
         FidelityWoW_Telemetry.realm = GetRealmName() or "Unknown"
@@ -71,21 +83,21 @@ function FidelityWoW:OnEvent(event, ...)
         end
 
     elseif event == "PLAYER_REGEN_DISABLED" then
-        -- Entering combat: escalate to D3 Somatic Vessel
         FidelityWoW_Telemetry.activeRung = "D3"
         FidelityWoW_Telemetry.inCombat = true
 
     elseif event == "PLAYER_REGEN_ENABLED" then
-        -- Leaving combat: recover syntropic reserve
         FidelityWoW_Telemetry.inCombat = false
         FidelityWoW_Telemetry.strainJoules = math.max(0.0, FidelityWoW_Telemetry.strainJoules - 0.5)
     end
 end
 
 local lastUpdateMs = 0
-local lastExportMs = 0
 
 function FidelityWoW:OnUpdate(elapsed)
+    -- Strict Enforcement: If disabled, stop sampling immediately
+    if not FidelityWoW_Config.enabled then return end
+
     local nowMs = GetPrecisionTimeMs()
     if nowMs - lastUpdateMs < 50 then return end -- 20Hz update tick
     lastUpdateMs = nowMs
@@ -115,12 +127,21 @@ SlashCmdList["FIDELITY"] = function(msg)
     if cmd == "toggle" then
         FidelityWoW_Config.hudVisible = not FidelityWoW_Config.hudVisible
         if ns.UI and ns.UI.ToggleHUD then ns.UI:ToggleHUD(FidelityWoW_Config.hudVisible) end
+    elseif cmd == "optin" then
+        FidelityWoW_Config.optIn = not FidelityWoW_Config.optIn
+        print(string.format("|cff00ffcc[Fidelity WoW]|r Telemetry Export Opt-in is now: %s", FidelityWoW_Config.optIn and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
+    elseif cmd == "enable" then
+        FidelityWoW_Config.enabled = not FidelityWoW_Config.enabled
+        print(string.format("|cff00ffcc[Fidelity WoW]|r Addon is now: %s", FidelityWoW_Config.enabled and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED (sampling stopped)|r"))
     elseif cmd == "audit" then
         if ns.Kinematics and ns.Kinematics.PrintAudit then ns.Kinematics:PrintAudit() end
+        if ns.SomaticFlow and ns.SomaticFlow.PrintAudit then ns.SomaticFlow:PrintAudit() end
     else
-        print("|cff00ffcc[Fidelity WoW]|r Commands:")
+        print("|cff00ffcc[Fidelity WoW Commands]|r")
         print("  |cffffcc00/fidelity toggle|r - Show/Hide Syntropic HUD")
-        print("  |cffffcc00/fidelity audit|r - Run instant Kinematic & APM Invariant Audit")
+        print("  |cffffcc00/fidelity optin|r  - Toggle Telemetry Export Opt-in Gate")
+        print("  |cffffcc00/fidelity enable|r - Toggle Addon Sampling On/Off")
+        print("  |cffffcc00/fidelity audit|r  - Run instant Invariant Audit")
     end
 end
 

@@ -10,65 +10,92 @@ local MAX_SAMPLES = 60
 local lastSampleTime = 0
 local lastX, lastY = 0, 0
 local accumulatedFtle = 0.005
+local FTLE_LIMIT = 0.010
+local MAX_GROUND_SPEED = 16.0 -- yards/sec
 
 function Kinematics:OnMovementStateChange(isMoving, timeMs)
-    -- State transition logged in ring buffer
-    table.insert(samples, {
+    if not FidelityWoW_Config.enabled then return end
+
+    local sample = {
         t = timeMs,
         state = isMoving and "START" or "STOP",
         speed = GetUnitSpeed("player")
-    })
+    }
+    table.insert(samples, sample)
     if #samples > MAX_SAMPLES then table.remove(samples, 1) end
+
+    -- Export if opted in
+    if FidelityWoW_Config.optIn and FidelityWoW_Export then
+        table.insert(FidelityWoW_Export.trajectories, sample)
+        if #FidelityWoW_Export.trajectories > 100 then table.remove(FidelityWoW_Export.trajectories, 1) end
+    end
 end
 
 function Kinematics:SampleTick(timeMs)
-    local speed, groundSpeed, flightSpeed, swimSpeed = GetUnitSpeed("player")
-    local facing = GetPlayerFacing() or 0
-    
-    -- Map position (where available)
-    local mapID = C_Map.GetBestMapForUnit("player")
+    if not FidelityWoW_Config.enabled then return end
+
+    local speed = GetUnitSpeed("player") or 0
+    local isMounted = IsMounted and IsMounted() or false
+    local maxAllowedSpeed = isMounted and 16.0 or 8.5
+
+    -- Map position
+    local mapID = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
     local pos = mapID and C_Map.GetPlayerMapPosition(mapID, "player")
     local curX, curY = 0, 0
-    if pos then
+    if pos and pos.GetXY then
         curX, curY = pos:GetXY()
     end
 
     local dt = (timeMs - lastSampleTime) / 1000.0
     if dt <= 0 then dt = 0.05 end
 
-    -- Kinematic Divergence (Speedhack / Teleport detection)
+    -- Compute displacement if map coordinates available
     local dx = curX - lastX
     local dy = curY - lastY
     local dist = math.sqrt(dx * dx + dy * dy)
-    
-    -- Check if speed is physically coherent
-    local expectedMaxDistPerSec = 0.05 -- Normalized map coords max
-    local isMounted = IsMounted()
-    local maxAllowedSpeed = isMounted and 15.0 or 8.5 -- yards/sec standard
 
-    -- Lyapunov FTLE proxy: exponential rate of trajectory separation from natural spline
-    local instantaneousFtle = 0.005
-    if speed > maxAllowedSpeed * 1.5 then
-        -- Kinematic divergence detected!
-        instantaneousFtle = 0.085
+    -- Kinematic Divergence Evaluation
+    local instantaneousFtle = 0.002
+    local isSpeedViolation = speed > maxAllowedSpeed * 1.5
+
+    if isSpeedViolation then
+        instantaneousFtle = 0.050
+        FidelityWoW_Telemetry.kinematicAnomaly = true
+    elseif dist > 0.05 and dt < 0.1 then
+        -- Coordinate teleport jump
+        instantaneousFtle = 0.080
         FidelityWoW_Telemetry.kinematicAnomaly = true
     else
         FidelityWoW_Telemetry.kinematicAnomaly = false
     end
 
-    accumulatedFtle = (accumulatedFtle * 0.95) + (instantaneousFtle * 0.05)
+    accumulatedFtle = (accumulatedFtle * 0.90) + (instantaneousFtle * 0.10)
     FidelityWoW_Telemetry.lyapunovFTLE = tonumber(string.format("%.4f", accumulatedFtle))
+
+    local point = {
+        t = timeMs,
+        x = curX,
+        y = curY,
+        speed = speed,
+        mapID = mapID
+    }
+
+    if FidelityWoW_Config.optIn and FidelityWoW_Export then
+        table.insert(FidelityWoW_Export.trajectories, point)
+        if #FidelityWoW_Export.trajectories > 100 then table.remove(FidelityWoW_Export.trajectories, 1) end
+    end
 
     lastSampleTime = timeMs
     lastX, lastY = curX, curY
 end
 
 function Kinematics:PrintAudit()
+    local ftle = FidelityWoW_Telemetry.lyapunovFTLE or 0.005
     print("|cff00ffcc[Fidelity Kinematics Audit]|r")
-    print(string.format("  Current Speed: %.2f y/s | Mounted: %s", GetUnitSpeed("player"), tostring(IsMounted())))
-    print(string.format("  Kinematic FTLE (λ): %.4f (Limit <= 0.010)", FidelityWoW_Telemetry.lyapunovFTLE or 0.005))
-    if (FidelityWoW_Telemetry.lyapunovFTLE or 0) <= 0.010 then
-        print("  |cff00ff00[PASS]|r Movement trajectory conforms to smooth continuous physical splines.")
+    print(string.format("  Current Speed: %.2f y/s (Max: %.1f y/s)", GetUnitSpeed("player") or 0, IsMounted and IsMounted() and 16.0 or 8.5))
+    print(string.format("  Kinematic FTLE (λ): %.4f (Limit <= %.3f)", ftle, FTLE_LIMIT))
+    if ftle <= FTLE_LIMIT and not FidelityWoW_Telemetry.kinematicAnomaly then
+        print("  |cff00ff00[PASS]|r Movement trajectory conforms to smooth physical splines.")
     else
         print("  |cffff0000[WARN]|r Kinematic divergence exceeds smooth human threshold.")
     end

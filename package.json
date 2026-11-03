@@ -1,55 +1,35 @@
 {
-  "name": "hm-harness",
+  "name": "fidelity",
+  "version": "0.1.0",
   "private": true,
-  "version": "0.0.1",
   "type": "module",
   "workspaces": [
     "packages/*",
     "apps/*"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node scripts/test.mjs",
-    "build": "npm run build -w @hm/web",
-    "dev": "npm run dev -w @hm/web",
-    "verify": "node scripts/verify.mjs",
-    "host": "npm run build && node scripts/serve.mjs",
-    "serve": "node scripts/serve.mjs",
-    "e2e": "node scripts/test-playthrough.mjs",
-    "ui-map": "node --import tsx scripts/ui-map.mjs",
-    "perf": "node scripts/perf.mjs",
-    "bake:setmix": "node --import tsx scripts/bake-setmix.mjs",
-    "ui-editor": "node scripts/ui-editor.mjs",
-    "e2e:legacy": "node scripts/e2e-smoke.mjs",
-    "command-center": "node scripts/command-center.mjs",
-    "board": "node scripts/agent-worker.mjs --list",
-    "studio-skill": "node --import tsx scripts/studio-skill.mjs",
-    "studio-agent": "node scripts/studio-agent-bridge.mjs",
-    "fractal-engine": "npm run dev -w @hm/fractal-engine",
-    "triad": "node packages/triad-369/src/triad_cli.mjs",
+    "test": "node --test packages/triad-369/test/*.test.mjs",
+    "triad": "node packages/triad-369/src/cli.mjs",
+    "triad:legacy": "node packages/triad-369/src/triad_cli.mjs",
+    "triad:status": "node packages/triad-369/src/cli.mjs status",
+    "triad:test": "node --test packages/triad-369/test/*.test.mjs",
+    "triad:arena": "node packages/triad-369/src/arena_node.mjs",
+    "triad:api": "node packages/triad-369/src/api.mjs",
+    "triad:serve": "node packages/triad-369/src/serve.mjs",
     "triad:bootstrap": "node packages/triad-369/src/bootstrap.mjs",
+    "triad:start": "node packages/triad-369/src/triad_369_process.mjs",
+    "triad:bridge": "node packages/triad-369/src/density_bridge.mjs",
     "triad:query": "node packages/triad-369/src/query_triad_369.mjs",
-    "triad:bridge": "node packages/triad-369/src/density_bridge.mjs"
-  },
-  "devDependencies": {
-    "@gltf-transform/core": "^4.5.1",
-    "@gltf-transform/extensions": "^4.5.1",
-    "@gltf-transform/functions": "^4.5.1",
-    "@types/node": "22.19.17",
-    "draco3dgltf": "^1.5.7",
-    "playwright-core": "^1.63.0",
-    "sharp": "^0.35.5",
-    "tsx": "^4.23.15",
-    "typescript": "5.9.3",
-    "vite": "^7.3.2",
-    "vite-plugin-singlefile": "^2.3.3"
+    "fractal-engine": "npm run dev -w @hm/fractal-engine",
+    "build": "npm run build -w @hm/fractal-engine"
   },
   "dependencies": {
-    "@jitl/quickjs-singlefile-browser-release-sync": "^0.32.0",
-    "@types/three": "^0.186.0",
-    "react": "^19.2.6",
-    "react-dom": "^19.2.6",
-    "sucrase": "^3.35.1",
     "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.17",
+    "@types/three": "^0.186.0",
+    "typescript": "5.9.3",
+    "vite": "^7.3.2"
   }
 }

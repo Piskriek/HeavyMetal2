@@ -29,14 +29,14 @@ function runCmd(cmd, cwd = REPO_ROOT) {
 
 function readJsonOptional(filePath) {
   try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const raw = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
+    return JSON.parse(raw);
   } catch {
     return null;
   }
 }
 
 let lastLocalQueryId = null;
-let lastSeenArenaHash = null;
 
 async function syncLocalHost() {
   // 1. Check for new local outbound query in bridge/sync/
@@ -64,14 +64,44 @@ async function syncLocalHost() {
     }
   }
 
-  // 2. Fetch remote updates from origin main
-  const fetchRes = await runCmd('git fetch origin main');
+  // 2. Fetch remote updates from origin
+  const fetchRes = await runCmd('git fetch origin');
   if (!fetchRes.err) {
-    const diffRes = await runCmd('git diff HEAD..origin/main -- bridge/sync/arena_telemetry.json');
-    if (diffRes.stdout && diffRes.stdout.length > 0) {
-      console.log('[LOCAL SYNC] Remote Arena response detected on origin/main. Pulling fast-forward...');
-      await runCmd('git pull --ff-only origin main');
-      console.log('[LOCAL SYNC] Arena telemetry successfully updated locally.');
+    // Check if there is an active arena session branch (origin/arena/*)
+    const branchesRes = await runCmd('git branch -r --list "origin/arena/*" --sort=-committerdate');
+    const branches = branchesRes.stdout.split('\n').map(b => b.trim()).filter(Boolean);
+    const latestArenaBranch = branches[0]; // e.g. origin/arena/dfcfb02d-fidelity
+
+    if (latestArenaBranch) {
+      const showRes = await runCmd(`git show ${latestArenaBranch}:bridge/sync/arena_telemetry.json`);
+      if (showRes.stdout && !showRes.err) {
+        const localPath = path.join(SYNC_DIR, 'arena_telemetry.json');
+        const currentLocal = fs.existsSync(localPath) ? fs.readFileSync(localPath, 'utf8').replace(/^\uFEFF/, '') : '';
+        const incoming = showRes.stdout.replace(/^\uFEFF/, '');
+
+        if (incoming.trim() !== currentLocal.trim()) {
+          console.log(`[LOCAL SYNC] New Arena telemetry detected on ${latestArenaBranch}. Updating local bus...`);
+          fs.writeFileSync(localPath, incoming, 'utf8');
+
+          // Mirror across all local directories
+          const mirrorPaths = [
+            'D:/fidelity-llm/bridge/sync/arena_telemetry.json',
+            'C:/MarbleGp/bridge/sync/arena_telemetry.json'
+          ];
+          for (const p of mirrorPaths) {
+            try {
+              fs.mkdirSync(path.dirname(p), { recursive: true });
+              fs.writeFileSync(p, incoming, 'utf8');
+            } catch {}
+          }
+
+          // Commit and publish to main so main stays synced
+          await runCmd('git add bridge/sync/arena_telemetry.json');
+          await runCmd(`git commit -m "sync: integrate Arena Node 4 reflection from ${latestArenaBranch.replace('origin/', '')}"`);
+          await runCmd('git push origin main');
+          console.log(`[LOCAL SYNC] Integrated and published Arena reflection to main.`);
+        }
+      }
     }
   }
 }
@@ -87,13 +117,9 @@ async function syncArenaAgent() {
     await runCmd('git pull --ff-only origin main');
   }
 
-  // 2. Check if there is an unhandled query waiting for a reasoner
-  const arenaFile = path.join(SYNC_DIR, 'arena_telemetry.json');
-  const arenaState = readJsonOptional(arenaFile);
-
-  // If status is awaiting_reasoner or query changed, run arena_node with syntropic_reasoner
-  process.env.ARENA_REASONER_EXEC = 'node';
-  process.env.ARENA_REASONER_ARGS = JSON.stringify([REASONER_SCRIPT]);
+  // 2. Ensure reasoner executable is configured
+  process.env.ARENA_REASONER_EXEC = process.env.ARENA_REASONER_EXEC || 'node';
+  process.env.ARENA_REASONER_ARGS = process.env.ARENA_REASONER_ARGS || JSON.stringify([REASONER_SCRIPT]);
 
   const runNodeRes = await runCmd(`node "${ARENA_NODE_SCRIPT}"`);
   if (runNodeRes.stdout.includes('Arena Node 4: completed')) {
@@ -101,8 +127,8 @@ async function syncArenaAgent() {
     await runCmd('git add bridge/sync/arena_telemetry.json');
     const commitRes = await runCmd('git commit -m "sync: Arena Node 4 syntropic reflection"');
     if (!commitRes.err) {
-      console.log('[AGENT SYNC] Pushing response back to origin main...');
-      await runCmd('git push origin main');
+      console.log('[AGENT SYNC] Pushing response back to assigned session branch...');
+      await runCmd('git push origin HEAD');
       console.log('[AGENT SYNC] Response pushed successfully to Local Triad.');
     }
   }

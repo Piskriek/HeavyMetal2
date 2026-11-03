@@ -193,3 +193,4 @@ if (process.argv[1] && process.argv[1].endsWith('density_bridge.mjs')) {
   setInterval(stepBridge, 3000);
   stepBridge();
 }
+

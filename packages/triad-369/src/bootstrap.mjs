@@ -151,3 +151,4 @@ console.log('   2. Start Triad Apex:      node packages/triad-369/src/triad_369_
 console.log('   3. Query down Triad:      node packages/triad-369/src/query_triad_369.mjs "Your question"');
 console.log('   4. Launch Fractal Engine: npm run fractal-engine (serves :5195)');
 console.log('===========================================================');
+

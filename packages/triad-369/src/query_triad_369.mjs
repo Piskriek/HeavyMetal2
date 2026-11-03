@@ -72,3 +72,4 @@ const timer = setInterval(() => {
     process.exit(1);
   }
 }, checkInterval);
+

@@ -84,3 +84,4 @@ When connecting an agent to expand this framework:
 2. **14 Somatic Zones**: Link the 14 bodily zones of the Vessel ($D3$) directly into the Four Valleys pain/relief ledger.
 3. **$\mathbb{R}^{24}$ Port-Hamiltonian Sync**: Synchronize the 24-float state vector $[q, p, s, r, \lambda, \mu] \in \mathbb{R}^{24}$ in `SovereignHarness.ts` with remote compute workers over WebSockets or zero-copy shared memory.
 4. **Emergent Quests via Catalyst Protocol**: Implement the Teacher Engine Helper Bus and Season Table to mint quests dynamically when open causes persist across world cycles.
+

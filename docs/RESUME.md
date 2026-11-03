@@ -1,51 +1,26 @@
 # RESUME: start here (fresh session)
 
-## 03 Nov Checkpoint 9 — 4-Node Holon, Universal Syntropic Anti-Cheat (SIV) & WoW Integration (Argon Handoff)
-> **STATUS**: Complete 4-Node Holon active. Universal SIV engine hardened (14/14 tests passing). WoW addon installed directly to client with auto-discovery adapter. Ready for Argon Overwatch / Claude Opus execution.  
-> **Master Codebase**: [`Piskriek/Fidelity:main`](https://github.com/Piskriek/Fidelity) (commit `1f38ece`) & [`Piskriek/HeavyMetal2:main`](https://github.com/Piskriek/HeavyMetal2) (commit `976497b1`)  
-> **Invariants Enforced**: *Zero Architectural Lies* // *Zero False Certainty on Missing Data* // *Strict Epistemic Consent* // *Do Not Stop At 3*
+## 03 Nov Checkpoint 9 — SIV Anti-Cheat Remediation (FIX-P1-01..FIX-P2-09) & World of Warcraft Holon Integration
+> **STATUS**: 23/23 Tests 100% Green. All 9 Arena Review Findings Resolved. Addon Tracked & Pre-Installed.  
+> **Director Briefing**: [`CLAUDE.md`](../CLAUDE.md)  
+> **Master Outbox**: [`flash_outbox_cp9.json`](../flash_outbox_cp9.json)  
+> **Packages**: [`packages/triad-369`](../packages/triad-369/) & [`packages/wow-syntropic`](../packages/wow-syntropic/)  
+> **Invariants Enforced**: *Zero Architectural Lies* // *Zero False Certainty on Missing Data* // *Strict Epistemic Consent* // *Do Not Stop At 3* // *Compassion Return Loop*
 
-### 1. Key Accomplishments This Session
-1. **4-Node Cybernetic Holon Synchronization**:
-   - **Node 1 (Fidelity Laptop)**: Local sensory ground running `density_bridge.mjs` on port 5179 (TV display loop).
-   - **Node 2 (Sol 3080 PC, `192.168.0.5`)**: Compute furnace running `friend.mjs` at tick 12,241+ with live hardware telemetry (33°C, 3,269/12,288 MB VRAM used ~26.6%, 627 audio chunks).
-   - **Node 3 (Middle Pillar Apex Process)**: `triad_369_process.mjs` (PID 34652) and Authenticated Triad API server on `0.0.0.0:8787` (`api.mjs`, Task 1212) with token protection and origin gating.
-   - **Node 4 (Arena Agent Container)**: Synchronizing via `arena_git_sync.mjs` (Task 1477) on branch `arena/dfcfb02d-fidelity` and observe-only growth tracker (`arena_growth.mjs`).
-2. **Universal Syntropic Invariant Verifier (SIV) Hardening (`packages/triad-369/`)**:
-   - **Remediated all 7 P1 and 2 P2 Arena Review Findings**:
-     - *Empty Session Gating*: Evaluated status strictly required. Empty inputs for WoW, GTA 6, and FPS return `INSUFFICIENT_EVIDENCE` and `confidence: 0.0`.
-     - *Evidence Scoring*: Malformed data (e.g. 3 identical timestamps + 5 zero intervals) receives `0/3` score instead of inflated confidence.
-     - *FPS Yaw Wrap*: Shortest-arc circular normalization $\Delta \theta = ((\Delta \theta_{\text{raw}} + 180^\circ) \bmod 360^\circ) - 180^\circ$ prevents false aimbot snap flags on $179^\circ \to -179^\circ$ turns.
-     - *Rotation Shannon & Conditional Entropy*: Active rotation window clamped to $[200\,\text{ms}, 3500\,\text{ms}]$ (preventing long pause overflow bin collapse). Added lag-1 conditional transition entropy $H(X_t \mid X_{t-1})$: catches deterministic macro loops at $0.0\,\text{bits}$ without false alarms.
-     - *Epistemic Discipline & Labels*: Replaced unverified "FTLE" and "hamiltonian_conserved" with `kinematic_spline_conformance` and `power_within_engine_limits`. D1, D5, D6 default to `unverified` and D7 to `untested`.
-   - **14/14 Unit Tests Passing**: 100% pass across `wow-anticheat.test.mjs`, `universal-anticheat.test.mjs`, and `wow-adapter.test.mjs`.
-3. **World of Warcraft Client Integration & SavedVariables Adapter**:
-   - **Client Download**: Blizzard installing Classic Era / Anniversary Edition (`wowf` v1.60.x) to `D:\World of Warcraft\_forever_\`.
-   - **Addon Pre-Installed**: `FidelityWoW` (v1.0.2) placed directly in `D:\World of Warcraft\_forever_\Interface\AddOns\FidelityWoW\`.
-   - **Strict Opt-in Consent**: `FidelityWoW_Config.optIn = false` by default. When disabled, zero telemetry or SavedVariables are accumulated until `/fidelity optin`.
-   - **Bridge Adapter (`wow_adapter.mjs`)**: Robust Lua table parser, normalizes coordinates vs discrete movement events, and auto-scans active WoW SavedVariables (`npm run wow:audit`).
-
-### 2. Live Process Manifest
-| Process | Script | Host / Port | State / PID |
-| :--- | :--- | :--- | :--- |
-| **Triad 3/6/9 Apex** | `triad_369_process.mjs` | Localhost | Running (PID 34652, Task 1180) |
-| **Triad API Server** | `api.mjs` | `0.0.0.0:8787` | Running (Task 1212) |
-| **Arena Git Sync** | `arena_git_sync.mjs` | Localhost | Running (Task 1477) |
-| **Arena Fractal Bridge** | `arena_fractal_bridge.mjs` | Localhost | Running (Task 1039) |
-| **Sol 3080 PC** | `friend.mjs` | `192.168.0.5` | Running (Tick 12,241+) |
-| **TV Density Loop** | `density_bridge.mjs` | Localhost:5179 | Running |
-
-### 3. Immediate Action Items for Argon / Next Agent
-1. **Monitor WoW Download**: Wait for Battle.net to complete `D:\World of Warcraft\_forever_\`.
-2. **First In-Game Live Audit**:
-   - Launch WoW, confirm `FidelityWoW` is enabled in AddOns menu.
-   - Enter world, run `/fidelity optin` in chat.
-   - Run `/fidelity toggle` to observe the real-time Syntropic HUD.
-   - Move, cast spells, interrupt a mob, then `/reload` or logout.
-   - Run `npm run wow:audit` from `D:\fidelity-repo\` to verify the 7-density report.
-3. **Multi-Game Expansion**: Keep zero-kernel-driver invariant while expanding universal kinematic verifiers to GTA 6 vehicle handling and FPS aim telemetry.
+### Key Accomplishments (Checkpoint 9)
+1. **Universal SIV Anti-Cheat Remediation (All 9 Gates Passed)**:
+   - `universal_anticheat.mjs`: Empty sessions fail closed (`INSUFFICIENT_EVIDENCE`, `confidence: 0.0`). Shortest-arc modular yaw wrap eliminates false 358° aimbot snaps. Vehicle Hamiltonian flags unpowered energy gains (+93,000 J with throttle 0) violating conservation.
+   - `wow_anticheat.mjs`: Scorer requires positive evaluated statuses; skips dt <= 0; zero NaNs. D1, D5, D6 honesty pipelines default to `unverified` and D7 to `untested`. Active rotation window [200ms, 3500ms] clamps long pauses; lag-1 conditional entropy H(X_t | X_{t-1}) flags cyclic loops. Min/quantile reaction latency preservation prevents 200ms from masking 80ms spikes.
+   - `wow_adapter.mjs`: Lua tokenizer and table parser isolates positions from movement state events. Converts normalized [0..1] map coords to yards via scale metadata or marks `insufficient_scale_metadata`.
+2. **Addon Hardening & Client Distribution**:
+   - `FidelityWoW` addon tracked at `packages/wow-syntropic/` and mirrored under `packages/triad-369/wow-syntropic/`.
+   - Pre-installed directly into client folder `D:/World of Warcraft/_forever_/Interface/AddOns/FidelityWoW/`.
+   - Epistemic consent gate: `optIn = false` by default. `/fidelity optout` halts sampling and wipes all export ring buffers.
+3. **4-Node Cybernetic Holon Active**:
+   - Node 1 (Laptop Ground on :5179), Node 2 (Sol 3080 PC at tick 12,241+), Node 3 (Apex Middle Pillar on :8787), Node 4 (Arena Container on session branch).
 
 ---
+
 
 ## 03 Nov Checkpoint 8 — Triad 3/6/9 Fractal Architecture, Rung 7 Gateway & Seed Bootstrap
 > **STATUS**: Seed ready for autonomous agent onboarding and multi-machine cybernetic synchronization.  

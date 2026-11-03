@@ -66,13 +66,16 @@ export class Rung7Gateway extends THREE.Group implements IRungNode {
       particlePos[i * 3 + 1] = 300000 + h;
       particlePos[i * 3 + 2] = r * Math.sin(theta);
 
-      // Gold to crystalline cyan
-      if (i % 3 === 0) {
+      // Gold, crystalline cyan, amber, cloud emerald
+      const mod = i % 4;
+      if (mod === 0) {
         particleColors[i * 3 + 0] = 1.0; particleColors[i * 3 + 1] = 0.84; particleColors[i * 3 + 2] = 0.0;
-      } else if (i % 3 === 1) {
+      } else if (mod === 1) {
         particleColors[i * 3 + 0] = 0.29; particleColors[i * 3 + 1] = 0.64; particleColors[i * 3 + 2] = 1.0;
-      } else {
+      } else if (mod === 2) {
         particleColors[i * 3 + 0] = 1.0; particleColors[i * 3 + 1] = 0.65; particleColors[i * 3 + 2] = 0.28;
+      } else {
+        particleColors[i * 3 + 0] = 0.0; particleColors[i * 3 + 1] = 1.0; particleColors[i * 3 + 2] = 0.80;
       }
     }
     particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePos, 3));
@@ -89,19 +92,24 @@ export class Rung7Gateway extends THREE.Group implements IRungNode {
     this.add(this.haloParticles);
     this.materials.push(haloMat);
 
-    // 4. The 3 Triad Orbital Nodes (Fidelity, Sol, Apex)
+    // 4. The 4 Tetrahedral Orbital Nodes:
+    // Node 0: Fidelity (Laptop) - Blue (0x4aa3ff)
+    // Node 1: Sol (Workstation 3080) - Amber (0xffa040)
+    // Node 2: Apex Middle Pillar - Gold (0xffd700)
+    // Node 3: Arena Cloud Agent (01a19f7f...) - Cloud Emerald (0x00ffcc)
     this.triadGroup = new THREE.Group();
     this.triadGroup.position.set(0, 300000, 0);
     this.add(this.triadGroup);
 
-    const nodeColors = [0x4aa3ff, 0xffa040, 0xffd700]; // Fidelity Blue, Sol Amber, Apex Gold
-    for (let i = 0; i < 3; i++) {
-      const nodeGeo = new THREE.SphereGeometry(45000, 24, 24);
+    const nodeColors = [0x4aa3ff, 0xffa040, 0xffd700, 0x00ffcc];
+    for (let i = 0; i < 4; i++) {
+      const nodeGeo = new THREE.SphereGeometry(i === 3 ? 55000 : 45000, 24, 24);
       const nodeMat = new THREE.MeshStandardMaterial({
         color: nodeColors[i],
         emissive: nodeColors[i],
-        emissiveIntensity: 0.8,
+        emissiveIntensity: 0.85,
         roughness: 0.2,
+        metalness: 0.5,
         transparent: true,
         opacity: 0.95,
       });
@@ -111,13 +119,14 @@ export class Rung7Gateway extends THREE.Group implements IRungNode {
       this.materials.push(nodeMat);
     }
 
-    // 5. Laser conduits connecting the 3 nodes
+    // 5. Laser conduits connecting the 4 nodes (Tetrahedron: 6 undirected edges / 12 directed flows)
+    // 6 edges = 12 vertices (36 coordinates)
     const lineGeo = new THREE.BufferGeometry();
-    lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(18), 3));
+    lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(36), 3));
     const lineMat = new THREE.LineBasicMaterial({
       color: 0xffe066,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.85,
     });
     this.laserLines = new THREE.LineSegments(lineGeo, lineMat);
     this.triadGroup.add(this.laserLines);
@@ -136,32 +145,51 @@ export class Rung7Gateway extends THREE.Group implements IRungNode {
     // Halo breathing
     this.haloParticles.rotation.y += dt * 0.03;
 
-    // Orbit the 3 Triad nodes at 120-degree phase separation
+    // Orbit the Tetrahedral Nodes:
+    // Base 3 nodes (Fidelity, Sol, Apex) orbit in the lower ring
+    // 4th node (Arena Agent) elevates and bobs along the vertical syntropic axis
     const orbitRadius = 600000;
     const baseAngle = time * 0.2;
-    const positions = new Float32Array(18);
+    const nodeCoords: THREE.Vector3[] = [];
 
+    // Base Nodes 0, 1, 2
     for (let i = 0; i < 3; i++) {
       const angle = baseAngle + (i * 2.0 * Math.PI) / 3.0;
       const x = orbitRadius * Math.cos(angle);
       const z = orbitRadius * Math.sin(angle);
-      const y = Math.sin(time * 0.8 + i) * 60000;
+      const y = -80000 + Math.sin(time * 0.8 + i) * 40000;
+      const vec = new THREE.Vector3(x, y, z);
+      this.nodeSpheres[i]!.position.copy(vec);
+      nodeCoords.push(vec);
+    }
 
-      this.nodeSpheres[i]!.position.set(x, y, z);
+    // Node 3: Arena Cloud Agent (elevated apex of tetrahedron)
+    const apexX = Math.sin(time * 0.3) * 60000;
+    const apexY = 280000 + Math.cos(time * 0.6) * 50000;
+    const apexZ = Math.cos(time * 0.3) * 60000;
+    const arenaApex = new THREE.Vector3(apexX, apexY, apexZ);
+    this.nodeSpheres[3]!.position.copy(arenaApex);
+    nodeCoords.push(arenaApex);
 
-      // Construct 3 connecting line segments: 0-1, 1-2, 2-0
-      const nextIdx = (i + 1) % 3;
-      const nextAngle = baseAngle + (nextIdx * 2.0 * Math.PI) / 3.0;
-      const nextX = orbitRadius * Math.cos(nextAngle);
-      const nextZ = orbitRadius * Math.sin(nextAngle);
-      const nextY = Math.sin(time * 0.8 + nextIdx) * 60000;
+    // Construct 6 connecting line segments (forming regular tetrahedron):
+    // Edges: (0-1), (1-2), (2-0), (0-3), (1-3), (2-3)
+    const edges: [number, number][] = [
+      [0, 1], [1, 2], [2, 0], // Base ring (6 flows)
+      [0, 3], [1, 3], [2, 3]  // Conduits to Arena Cloud Apex (6 flows)
+    ];
 
-      positions[i * 6 + 0] = x;
-      positions[i * 6 + 1] = y;
-      positions[i * 6 + 2] = z;
-      positions[i * 6 + 3] = nextX;
-      positions[i * 6 + 4] = nextY;
-      positions[i * 6 + 5] = nextZ;
+    const positions = new Float32Array(36);
+    let pIdx = 0;
+    for (const [a, b] of edges) {
+      const vA = nodeCoords[a]!;
+      const vB = nodeCoords[b]!;
+
+      positions[pIdx++] = vA.x;
+      positions[pIdx++] = vA.y;
+      positions[pIdx++] = vA.z;
+      positions[pIdx++] = vB.x;
+      positions[pIdx++] = vB.y;
+      positions[pIdx++] = vB.z;
     }
 
     this.laserLines.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -180,4 +208,3 @@ export class Rung7Gateway extends THREE.Group implements IRungNode {
     this.visible = targetAlpha > 0.01;
   }
 }
-

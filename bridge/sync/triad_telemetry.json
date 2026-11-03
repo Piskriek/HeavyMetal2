@@ -1,0 +1,36 @@
+{
+  "updated_at": "2026-11-03T05:54:17.332Z",
+  "source": "local_triad_fidelity",
+  "machines": {
+    "laptop": {
+      "host": "192.168.0.4",
+      "role": "Node 1 - Somatic Ground",
+      "daemons_up": 12,
+      "density_rung": "D6"
+    },
+    "workstation_3080": {
+      "host": "192.168.0.5",
+      "role": "Node 2 - Sol Compute Furnace",
+      "tick": null,
+      "ear": "active",
+      "state": "online"
+    },
+    "middle_pillar_apex": {
+      "host": "127.0.0.1 (PID 25212)",
+      "role": "Node 3 - Syntropic Apex Witness",
+      "octave": 1,
+      "flow_integrity": 1
+    }
+  },
+  "fourFloats": [
+    0.326,
+    0.5068,
+    0.995,
+    0.15
+  ],
+  "coherence": 0.99,
+  "activeRung": 7,
+  "densityLevel": "D6",
+  "densityName": "Gateway of Intelligent Infinity",
+  "lyapunovFTLE": 0.012
+}

@@ -1,0 +1,22 @@
+{
+  "rung": 1,
+  "density": "D1",
+  "name": "Substrate Voxels & The Four Floats",
+  "domain": "Awareness without Perspective, Physical Grounding",
+  "scaleRangeM": [0.001, 0.08],
+  "defaultAltitudeM": 0.015,
+  "fourFloats": {
+    "Pxd": "Physical Geometry / Pixel Density",
+    "Vtx": "Mass / Structural Vertices / Contact",
+    "Lx": "Radiance / Charge / Light Influx",
+    "Aq": "Fluidity / Hydro Circulation / Damping"
+  },
+  "substrate": {
+    "kinds": ["dither", "fold", "chroma", "spire"],
+    "cellSizeM": 0.02,
+    "maxReserve": 60,
+    "acousticDampingCoeff": 0.42
+  },
+  "sources": ["@hm/substrate", "@hm/texgraph"]
+}
+

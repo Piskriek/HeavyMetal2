@@ -1,0 +1,20 @@
+{
+  "rung": 6,
+  "density": "D6",
+  "name": "Space & Multiverse Starfield",
+  "domain": "Intelligent Infinity, Celestial Mechanics, Stargates",
+  "scaleRangeM": [1e5, 1e9],
+  "defaultAltitudeM": 1e6,
+  "celestialBodies": [
+    { "id": "sol-central", "type": "star", "radiusM": 69634000, "position": [0, 0, -500000000], "color": "#fff2cc", "emissiveIntensity": 10.0 },
+    { "id": "selene-outpost", "type": "planet", "radiusM": 1737400, "position": [0, 600000, 0], "seed": 7, "hueDeg": 205 },
+    { "id": "ignis-iv", "type": "planet", "radiusM": 3200000, "position": [1450000, 780000, -1820000], "seed": 1042, "hasRings": true }
+  ],
+  "stargate": {
+    "enabled": true,
+    "ringRadiusM": 50000,
+    "frequencyHz": 432.0
+  },
+  "sources": ["@hm/orbital", "@hm/sky"]
+}
+

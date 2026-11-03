@@ -1,0 +1,27 @@
+{
+  "rung": 3,
+  "density": "D3",
+  "name": "Sovereign Ego & Vehicle Plant",
+  "domain": "Self-Awareness, Boundary Distinction, The Choice of Polarity",
+  "scaleRangeM": [0.5, 15],
+  "defaultAltitudeM": 3.5,
+  "vesselPreset": {
+    "id": "embodied-escort-rover",
+    "tier": 2,
+    "relativeAwarenessCeiling": 0.65,
+    "massKg": 2.0,
+    "supportRadiusM": 0.25,
+    "trackWidthM": 1.6,
+    "wheelbaseM": 2.2,
+    "portHamiltonian": {
+      "stateDimensions": 24,
+      "stiffnessNpm": 8.0,
+      "dampingNspm": 1.4,
+      "annealAlpha": 18.0,
+      "flowBeta": 2.4,
+      "lyapunovCrit": 0.18
+    }
+  },
+  "sources": ["@hm/rover", "@hm/kitspec", "@hm/harness"]
+}
+

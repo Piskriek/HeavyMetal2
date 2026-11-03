@@ -24,7 +24,11 @@
     "command-center": "node scripts/command-center.mjs",
     "board": "node scripts/agent-worker.mjs --list",
     "studio-skill": "node --import tsx scripts/studio-skill.mjs",
-    "studio-agent": "node scripts/studio-agent-bridge.mjs"
+    "studio-agent": "node scripts/studio-agent-bridge.mjs",
+    "fractal-engine": "npm run dev -w @hm/fractal-engine",
+    "triad:bootstrap": "node packages/triad-369/src/bootstrap.mjs",
+    "triad:query": "node packages/triad-369/src/query_triad_369.mjs",
+    "triad:bridge": "node packages/triad-369/src/density_bridge.mjs"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.5.1",

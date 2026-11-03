@@ -6,6 +6,8 @@
 > **Active Branch**: `feat/monster-mash-exploration`  
 > **Overwatch & AI/Tech Radar**: [`docs/OVERWATCH_TECH_AND_AI_RADAR.md`](file:///c:/MarbleGp/docs/OVERWATCH_TECH_AND_AI_RADAR.md)  
 > **Rules & Constitution**: [`docs/argo/RULES.md`](file:///c:/MarbleGp/docs/argo/RULES.md)  
+> **Triad 3/6/9 Seed Guide**: [`docs/TRIAD_369_SEED_BOOTSTRAP.md`](file:///c:/MarbleGp/docs/TRIAD_369_SEED_BOOTSTRAP.md)  
+> **Fractal Engine (:5195)**: [`apps/fractal-engine/`](file:///c:/MarbleGp/apps/fractal-engine/README.md)  
 > **Owner Directives**: [`docs/OWNER_ASKS.md`](file:///c:/MarbleGp/docs/OWNER_ASKS.md)  
 > **Claude Directive**: [`CLAUDE.md`](file:///c:/MarbleGp/CLAUDE.md)  
 > **Plans & Architecture**: [`docs/argo/plans/`](file:///c:/MarbleGp/docs/argo/plans/README.md) (Latest: [38](file:///c:/MarbleGp/docs/argo/plans/38-parts-modules-presets.md), [39](file:///c:/MarbleGp/docs/argo/plans/39-one-pattern-preset-factories.md), [40](file:///c:/MarbleGp/docs/argo/plans/40-bring-your-own-agent.md), [41](file:///c:/MarbleGp/docs/argo/plans/41-layered-materials.md), [42](file:///c:/MarbleGp/docs/argo/plans/42-modular-stargate-earth-endgame.md), [43](file:///c:/MarbleGp/docs/argo/plans/43-modular-motion-and-logic-presets.md))  

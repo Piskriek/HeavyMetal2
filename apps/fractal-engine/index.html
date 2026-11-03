@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#06080c" />
+    <title>Fidelity Fractal Engine // Sovereign Reality Harness</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="viewport"></div>
+
+    <!-- Interactive Toast Notification -->
+    <div id="hud-toast" class="toast-banner" style="display: none;"></div>
+
+    <!-- Telemetry HUD Overlay -->
+    <header class="hud-header">
+      <div class="logo">
+        <span class="icon">⬡</span>
+        <div class="logo-text">
+          <h1>FIDELITY FRACTAL ENGINE</h1>
+          <span class="subtitle">Sovereign Reality Harness // Zero Architectural Lies</span>
+        </div>
+      </div>
+      <div class="status-strip">
+        <span id="hud-view-mode" class="badge mode-badge">VIEW: LADDER</span>
+        <span id="hud-graduation" class="badge">INCARNATE (N)</span>
+        <span class="badge seed">SEED: 40001</span>
+      </div>
+    </header>
+
+    <!-- Top Ladder Selector (Space -> Atoms) -->
+    <nav class="ladder-bar">
+      <div class="ladder-label">LADDER DENSITY:</div>
+      <div class="ladder-buttons">
+        <button data-rung="7" class="rung-btn" title="Density D7 (Gateway of Intelligent Infinity)">7. GATEWAY</button>
+        <button data-rung="6" class="rung-btn" title="Density D6">6. SPACE</button>
+        <button data-rung="5" class="rung-btn" title="Density D5">5. WORLD</button>
+        <button data-rung="4" class="rung-btn" title="Density D4">4. ASSEMBLY</button>
+        <button data-rung="3" class="rung-btn" title="Density D3">3. VESSEL</button>
+        <button data-rung="2" class="rung-btn" title="Density D2">2. PARTS</button>
+        <button data-rung="1" class="rung-btn" title="Density D1">1. ATOMS</button>
+      </div>
+    </nav>
+
+    <!-- Real-Time Cybernetic Telemetry Panel -->
+    <aside class="hud-panel telemetry-card">
+      <div class="card-header">
+        <span class="pulse-dot"></span>
+        <h2>PORT-HAMILTONIAN ODE (R²⁴)</h2>
+      </div>
+      <div class="metric-row">
+        <span class="label">ACTIVE RUNG</span>
+        <span id="hud-active-rung" class="value highlight">RUNG 6 (SPACE)</span>
+      </div>
+      <div class="metric-row">
+        <span class="label">DENSITY LEVEL</span>
+        <span id="hud-density" class="value">D6 Space</span>
+      </div>
+      <div class="metric-row">
+        <span class="label">LOG ALTITUDE</span>
+        <span id="hud-distance" class="value">500.0 km</span>
+      </div>
+      <hr class="divider" />
+      <div class="metric-row">
+        <span class="label">COHERENCE (H)</span>
+        <span id="hud-coherence" class="value glow">95.0%</span>
+      </div>
+      <div class="metric-row">
+        <span class="label">STRAIN ENERGY</span>
+        <span id="hud-strain" class="value">0.000 J</span>
+      </div>
+      <div class="metric-row">
+        <span class="label">SYNTROPIC RESERVE</span>
+        <span id="hud-reserve" class="value highlight-reserve">5.00 J</span>
+      </div>
+      <div class="metric-row">
+        <span class="label">AWARENESS (A)</span>
+        <span id="hud-awareness" class="value">12.0%</span>
+      </div>
+      <div class="metric-row">
+        <span class="label">FOUR FLOATS S</span>
+        <span id="hud-floats" class="value mono">P:0.25 V:0.50 L:0.75 A:0.10</span>
+      </div>
+    </aside>
+
+    <!-- Bottom Remote Controls & Hints -->
+    <footer class="hud-footer">
+      <div class="controls-hint remote-hints">
+        <span class="remote-key"><strong>▲/▼</strong> Zoom Ladder</span>
+        <span class="remote-key"><strong>◀/▶</strong> Orbit 3D</span>
+        <span class="remote-key"><strong>[OK]</strong> Cycle Views</span>
+        <span class="remote-key"><strong>[PLAY]</strong> Auto-Tour</span>
+        <span class="remote-key"><strong>[BACK]</strong> Space Apex</span>
+      </div>
+      <div class="telemetry-tag">
+        <span>Chromecast D-Pad Remote Ready // 5195</span>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

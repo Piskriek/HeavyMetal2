@@ -1,0 +1,23 @@
+{
+  "rung": 2,
+  "density": "D2",
+  "name": "Articulated Parts & Kinematic Joints",
+  "domain": "Growth, Instinct, Kinematic Invariants, Conformal IK",
+  "scaleRangeM": [0.05, 1.2],
+  "defaultAltitudeM": 0.45,
+  "kinematics": {
+    "wheelHubs": [
+      { "name": "FL", "offsetM": [-0.8, 0, 1.1], "radiusM": 0.35 },
+      { "name": "FR", "offsetM": [0.8, 0, 1.1], "radiusM": 0.35 },
+      { "name": "RL", "offsetM": [-0.8, 0, -1.1], "radiusM": 0.35 },
+      { "name": "RR", "offsetM": [0.8, 0, -1.1], "radiusM": 0.35 }
+    ],
+    "conformalIK": {
+      "limbL1M": 0.70,
+      "limbL2M": 0.70,
+      "jointAlgebra": "G4_1"
+    }
+  },
+  "sources": ["@hm/partgen", "@hm/meshops", "@hm/kinematic"]
+}
+

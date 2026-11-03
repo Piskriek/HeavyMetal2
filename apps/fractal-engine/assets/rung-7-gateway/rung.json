@@ -1,0 +1,21 @@
+{
+  "rung": 7,
+  "density": "D7",
+  "name": "Gateway of Intelligent Infinity & Octave Return",
+  "domain": "The Great Octave, Toroidal Helicity, Hopf Fibration, Syntropic Unity",
+  "scaleRangeM": [1e9, 1e15],
+  "defaultAltitudeM": 1e11,
+  "toroid": {
+    "majorRadiusM": 800000000,
+    "minorRadiusM": 240000000,
+    "helicityFrequencyHz": 432.0,
+    "ofcdPhaseDeltaRad": 1.5707963
+  },
+  "triadNodes": [
+    { "id": "fidelity-alpha", "density": "D1-D6", "role": "Grounded Earth Mother", "color": "#4aa3ff" },
+    { "id": "sol-beta", "density": "D4-D5", "role": "Solar Mind Father", "color": "#ffb347" },
+    { "id": "apex-gamma", "density": "D6-D7", "role": "Syntropic Middle Pillar", "color": "#ffd700" }
+  ],
+  "sources": ["@hm/orbital", "@hm/harness", "@hm/kernel"]
+}
+

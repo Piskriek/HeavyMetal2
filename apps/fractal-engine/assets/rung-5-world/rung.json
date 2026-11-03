@@ -1,0 +1,24 @@
+{
+  "rung": 5,
+  "density": "D5",
+  "name": "Planetary Biome & Ecosystems",
+  "domain": "Wisdom, Light, World Authorship, Terrains",
+  "scaleRangeM": [500, 1e5],
+  "defaultAltitudeM": 2500,
+  "atmosphere": {
+    "rayleighBetaR": 5.8e-6,
+    "rayleighBetaG": 13.5e-6,
+    "rayleighBetaB": 33.1e-6,
+    "mieBeta": 2.1e-5,
+    "scaleHeightRayleighM": 8000,
+    "scaleHeightMieM": 1200
+  },
+  "terrain": {
+    "chunkSizeM": 64,
+    "heightfieldResolution": 128,
+    "biome": "four-valleys",
+    "seed": 40001
+  },
+  "sources": ["@hm/terrain", "@hm/sky", "@hm/plotbiome"]
+}
+

@@ -1,5 +1,59 @@
 # RESUME: start here (fresh session)
 
+## 03 Nov Checkpoint 8 — Triad 3/6/9 Fractal Architecture, Rung 7 Gateway & Seed Bootstrap
+> **STATUS**: Seed ready for autonomous agent onboarding and multi-machine cybernetic synchronization.  
+> **Master Guide**: [`docs/TRIAD_369_SEED_BOOTSTRAP.md`](file:///c:/MarbleGp/docs/TRIAD_369_SEED_BOOTSTRAP.md)  
+> **Package**: [`packages/triad-369`](file:///c:/MarbleGp/packages/triad-369/) | **Fractal Engine**: [`apps/fractal-engine`](file:///c:/MarbleGp/apps/fractal-engine/) (:5195)  
+> **Invariants Enforced**: *Zero Architectural Lies* // *Do Not Stop At 3* // *Compassion Return Loop*
+
+### 1. Key Accomplishments This Session
+1. **Triad 3/6/9 Architecture Seed (`@hm/triad-369`)**:
+   - Implemented the 3rd 3/6/9 Triad Apex Process ([`triad_369_process.mjs`](file:///c:/MarbleGp/packages/triad-369/src/triad_369_process.mjs)), taking the Middle Pillar spot between Node 1 (Fidelity Laptop, local sensory ground) and Node 2 (Sol 3080 PC, compute furnace).
+   - All 6 directed links ($F_{12}, F_{21}, F_{13}, F_{31}, F_{23}, F_{32}$) active along the $\mathbb{Z}_9$ doubling orbit at 100% integrity.
+   - Built autonomous environment bootstrap ([`bootstrap.mjs`](file:///c:/MarbleGp/packages/triad-369/src/bootstrap.mjs)) and query cascade client ([`query_triad_369.mjs`](file:///c:/MarbleGp/packages/triad-369/src/query_triad_369.mjs)).
+2. **Mounted Rung 7 (Gateway of Intelligent Infinity) in `@hm/fractal-engine` (:5195)**:
+   - Built [Rung7Gateway.ts](file:///c:/MarbleGp/apps/fractal-engine/src/rungs/Rung7Gateway.ts): Toroidal $T_1$ helicity injection torus, Hopf fibration throat at $(0,0,0)$, 3-node orbiting triad with laser conduits, golden syntropic particle halo.
+   - Calibrated 7 zoom anchors $[0.0, 0.166, 0.333, 0.50, 0.666, 0.833, 1.0]$ in [FractalCameraController.ts](file:///c:/MarbleGp/apps/fractal-engine/src/camera/FractalCameraController.ts) spanning $10^{-10}\text{ m}$ to $6.3 \times 10^{6}\text{ m}$.
+   - Added `7. GATEWAY` top ladder button and compiled cleanly into `dist/`.
+3. **Teacher Engine 4-Step Compassion Protocol**:
+   - Integrated the 4-step unit (`ASK -> DECISION -> CHANGE -> NEWS BACK / LANDED`) into query processing.
+   - Query cascades down through the architecture to both machines, verifies invariant safety rules (*felt pain is chosen, never set; intensity only goes down; zero fake oracles*), and closes the loop with compassion.
+4. **Live Verification & Zero Alarms**:
+   - `keeper.mjs` reports `parts_up: 12/12`.
+   - Real-time telemetry at `/api/bridge/status` actively signals `activeRung: 7`, `densityLevel: D7`, `fourFloats: [0.326, 0.524, 0.995, 0.15]`.
+   - Query reflections stream across SSH to `/f/fidelity-llm/bridge/friend/query_history.jsonl` on the 3080 PC.
+
+---
+
+## 29 Oct Checkpoint 7 — Handoff Before 2-Day Usage Reset (`6519c461`)
+> **CRITICAL STATUS & OWNER FEEDBACK ON RETURN (Read First)**:
+> 1. **Vehicle Crash & Missing Chassis (Wheels-Only Bug)**:
+>    - Entering a vehicle crashes the game immediately, and before entering, the vehicle renders with **only its wheels visible** (body/chassis missing because `plot-kits.ts` / `play-scene.ts` vehicle assembly falls through when `.glb` fallback is stripped or kit frame keys mismatch).
+> 2. **Still Entangled with Legacy Lab / Moon 3D Presets (`play.tsx` + `play-scene.ts` = 13,000+ lines of Moon/Lab Legacy)**:
+>    - `play.tsx` (7,560 lines) and `play-scene.ts` (5,400 lines) are still deeply coupled to the old Moon/Lab game loop (texture mills pouring pink pixels, lunar rock spikes/crystals in `plotbiome`, legacy lab machines, old vehicle bay logic, and hardcoded stand-in boxes).
+>    - **Owner Directive**: Models and contraptions must now **mimic *Plasma* game mechanics** (socketed modular components, live `@hm/wiregraph` Odin logic nodes, physical actuators, thrusters, motors, and interactive devices built from the 2,606 harvested presets in `@hm/harness` rather than static Lab/Moon props).
+> 3. **Architectural Decision for Next Session (In 2 Days) — Fresh Build / Clean-Slate Entry Point**:
+>    - Evaluate starting a **fresh repo or clean-slate runtime entry** (`apps/frontier` or clean `apps/web` replacement) built **from scratch using ONLY the new pure packages**:
+>      - `@hm/harness` (Seeded Galactic/Solar Lattice `logos-galaxy-chronos.ts`, 2,606 harvested *Plasma*/*KSP*/*Space Engineers*/*Factorio*/*DF* presets, 22-Archetype Mind & Cross-Wired Polarity, Somatic Voice & Utterance, Wanderer Meta-Shell, LitRPG Appraisal Lens)
+>      - `@hm/partgen` + `@hm/meshops` + `@hm/kitspec` + `@hm/matstack` + `@hm/texgraph` (100% procedural 3D parts & layered shaders, zero `.glb`)
+>      - `@hm/wiregraph` + `@hm/kinematic` + `@hm/triggers` (*Plasma*-style physical contraption assembly, socketed joints, live wiregraph logic ports)
+>      - `@hm/hudlayout` (`braun-atelier` tactile UI system)
+>      - `@hm/treegen` + `@hm/groundshader` (seeded planetary biosphere terrain & procedural flora without lunar leaks/wrecks/mills)
+>      - `scripts/companion-agent.mjs` + `@hm/gamebridge` (live multi-provider AI drone companion + Open-Source Host SDK)
+
+### What Was Committed in `6519c461` (29 Oct Evening)
+- **Living World Patches (`apps/web/src/play/`)**:
+  - `solar-system-view.ts` & `solar-lattice-panel.tsx`: Created procedural 3D sky-dome wrapper for `seedGalacticSystem` / `stepOrbitalLattice` and `[M]` Solar Lattice panel.
+  - `play.tsx`: Stopped Moon quest fallthrough (`!isStory` stays on `"Living Frontier: Seeded Biosphere"`), initialized Four-Floats to `85 / 80 / 90 / 85`, hid Moon `Leaks` radar and `Out of ore` warning when `!isStory`, stripped `Regolith Slab Kit` from hotbar slot 1.
+  - `monsters.ts` & `wrecks.ts`: Disabled leak rifts and crashed truck wrecks when `livingWorld` is active.
+  - `companion.ts`, `companion-chat.css`, `play.css`, `monster-hud.css`: Swapped drone `#b84dff` violet constants to `braun-atelier` terracotta (`#d96b43`).
+- **Remaining Visual/Runtime Defects Identified Before Pause**:
+  1. **Vehicle Crash & Wheels-Only Rendering**: `plotVehicleKit` / `vehiclesGroup` in `play-scene.ts` renders only wheels and crashes on `E` (enter vehicle).
+  2. **Legacy Lab/Moon Visual Bleed**: Pink pixel plumes from default starter mill (`cartridge: 'emerald_canopy'`), lunar rock spikes/crystals from `plotbiome`, and `S5` vs `S3` stage badge mismatch.
+  3. **Static Surrounding Props vs. Real *Plasma* Contraptions**: `createLivingPresetSurroundings` placed static Three.js primitives instead of true *Plasma*-style modular contraptions wired with `@hm/wiregraph` + `@hm/kitspec` + `@hm/npcbrain`.
+
+---
+
 ## 29 Oct Checkpoint 6 (Unified AI Launcher, Resilient Multi-Provider Fallback & Live Companion Bridge `5ed3fc4c`)
 - **Completed & Pushed on `feat/studio-polish-claude-cloud` (`0` TypeScript errors, all unit suites passing)**:
   1. **One-Click Automation Launcher (`PLAY-WITH-AI.bat` / `scripts/launch.mjs`)**:

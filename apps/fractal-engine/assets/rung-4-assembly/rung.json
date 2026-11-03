@@ -1,0 +1,21 @@
+{
+  "rung": 4,
+  "density": "D4",
+  "name": "Federated Assemblies & Grids",
+  "domain": "Love, Syntropy, Shared Grids, Social Memory",
+  "scaleRangeM": [10, 500],
+  "defaultAltitudeM": 45,
+  "wiregraph": {
+    "nodes": [
+      { "id": "solar-array-alpha", "type": "generator", "position": [-15, 0, -10], "outputWatts": 5000 },
+      { "id": "capacitor-bank-1", "type": "storage", "position": [0, 0, -12], "capacityJoules": 50000 },
+      { "id": "fabricator-core", "type": "consumer", "position": [12, 0, -8], "requiredWatts": 2500 }
+    ],
+    "conduits": [
+      { "from": "solar-array-alpha", "to": "capacitor-bank-1", "voltage": 48 },
+      { "from": "capacitor-bank-1", "to": "fabricator-core", "voltage": 48 }
+    ]
+  },
+  "sources": ["@hm/wiregraph", "@hm/coopnet"]
+}
+

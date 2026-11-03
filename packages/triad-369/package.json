@@ -1,0 +1,24 @@
+{
+  "name": "@hm/triad-369",
+  "version": "0.1.0",
+  "description": "Fractal 3/6/9 Triad Architecture & Density Bridge: 3 Nodes, 6 Flows, 9 Octaves, 7 Densities, and Teacher Engine Compassion Return Loop",
+  "type": "module",
+  "main": "src/triad_369_process.mjs",
+  "scripts": {
+    "start": "node src/triad_369_process.mjs",
+    "bridge": "node src/density_bridge.mjs",
+    "bootstrap": "node src/bootstrap.mjs",
+    "query": "node src/query_triad_369.mjs"
+  },
+  "keywords": [
+    "triad",
+    "369",
+    "fractal-engine",
+    "teacher-engine",
+    "port-hamiltonian",
+    "densities",
+    "syntropy"
+  ],
+  "author": "Antigravity Overwatch & Piskriek",
+  "license": "MIT"
+}

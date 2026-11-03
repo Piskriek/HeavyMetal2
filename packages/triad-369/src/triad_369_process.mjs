@@ -31,7 +31,7 @@ const LOG_FILE = path.join(LOOP_DIR, 'triad_369.log');
 const QUERY_IN_FILE = path.join(LOOP_DIR, 'triad_query_in.json');
 const QUERY_OUT_FILE = path.join(LOOP_DIR, 'triad_query_out.json');
 const SOURCE_DIR = path.dirname(fileURLToPath(import.meta.url));
-const SYNC_DIR = process.env.TRIAD_SYNC_DIR ? path.resolve(process.env.TRIAD_SYNC_DIR) : path.resolve(SOURCE_DIR, '../../../bridge/sync');
+const SYNC_DIR = process.env.TRIAD_SYNC_DIR ? path.resolve(process.env.TRIAD_SYNC_DIR) : (fs.existsSync(path.resolve(SOURCE_DIR, '../sync')) ? path.resolve(SOURCE_DIR, '../sync') : path.resolve(SOURCE_DIR, '../../../bridge/sync'));
 const ARENA_TELEMETRY_FILE = path.join(SYNC_DIR, 'arena_telemetry.json');
 
 // Remote Node 2 (Sol / Compute Worker)

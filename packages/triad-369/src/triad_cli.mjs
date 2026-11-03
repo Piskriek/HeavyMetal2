@@ -268,7 +268,24 @@ async function startRepl() {
 // One-shot mode if arguments provided, else start interactive REPL
 const args = process.argv.slice(2).join(' ').trim();
 if (args) {
-  dispatchQuery(args).then(() => process.exit(0));
+  if (args === '/status' || args === '--status' || args === 'status') {
+    renderStatus();
+    process.exit(0);
+  } else if (args === '/ladder' || args === '--ladder' || args === 'ladder') {
+    renderDensities();
+    process.exit(0);
+  } else if (args === '/flows' || args === '--flows' || args === 'flows') {
+    renderFlows();
+    process.exit(0);
+  } else if (args === '/thoughts' || args === '--thoughts') {
+    renderThoughts();
+    process.exit(0);
+  } else if (args === '/help' || args === '--help') {
+    renderHelp();
+    process.exit(0);
+  } else {
+    dispatchQuery(args).then(() => process.exit(0));
+  }
 } else {
   startRepl();
 }

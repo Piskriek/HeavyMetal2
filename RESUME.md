@@ -8,3 +8,4 @@
 Please read [`docs/RESUME.md`](docs/RESUME.md) for the live engineering state, Checkpoint 8 (Triad 3/6/9 Architecture, Rung 7 Gateway, and Seed Bootstrap), and the 20-job multi-agent roadmap.
 
 *Note for Linux / Sandbox environments: Paths are case-sensitive. Always use uppercase `docs/RESUME.md`.*
+

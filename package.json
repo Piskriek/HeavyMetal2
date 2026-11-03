@@ -21,7 +21,9 @@
     "triad:bridge": "node packages/triad-369/src/density_bridge.mjs",
     "triad:query": "node packages/triad-369/src/query_triad_369.mjs",
     "fractal-engine": "npm run dev -w @hm/fractal-engine",
-    "build": "npm run build -w @hm/fractal-engine"
+    "build": "npm run build -w @hm/fractal-engine",
+    "wow:audit": "node packages/triad-369/src/wow_adapter.mjs",
+    "anticheat:audit": "node packages/triad-369/src/universal_anticheat.mjs"
   },
   "dependencies": {
     "three": "^0.186.1"

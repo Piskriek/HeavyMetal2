@@ -1,4 +1,4 @@
-## Interface: 110007, 11505, 40401
+## Interface: 110007, 110100, 11505, 11506, 40401
 ## Title: |cff00ffccFidelity|r |cffffffffSyntropic Flow & Warden|r
 ## Notes: 4-Node Holon Companion: Somatic Flow Optimization, Kinematic Invariant Verification, and Combat Coherence
 ## Author: Antigravity Overwatch & Piskriek

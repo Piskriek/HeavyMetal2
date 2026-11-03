@@ -298,15 +298,65 @@ export function auditSavedVariablesFile(filePathOrContent) {
   return auditWoWSession(normalized.sessionData);
 }
 
-async function main() {
-  const args = process.argv.slice(2);
-  if (args.length === 0) {
-    console.log('Usage: node wow_adapter.mjs <path-to-FidelityWoW.lua>');
-    console.log('Example: node wow_adapter.mjs "C:/Program Files (x86)/World of Warcraft/_retail_/WTF/Account/<ACCOUNT>/SavedVariables/FidelityWoW.lua"');
-    process.exit(0);
+/**
+ * Automatically searches standard World of Warcraft installation directories
+ * for the latest active FidelityWoW.lua SavedVariables file.
+ * @returns {string|null} Path to the latest SavedVariables file, or null if none found.
+ */
+export function findLatestSavedVariables() {
+  const candidateRoots = [
+    'D:/World of Warcraft/_forever_',
+    'D:/World of Warcraft/_retail_',
+    'D:/World of Warcraft/_classic_',
+    'D:/World of Warcraft/_classic_era_',
+    'C:/Program Files (x86)/World of Warcraft/_retail_',
+    'C:/Program Files (x86)/World of Warcraft/_classic_',
+    'C:/Program Files (x86)/World of Warcraft/_classic_era_',
+    'C:/Program Files/World of Warcraft/_retail_'
+  ];
+
+  let latestFile = null;
+  let latestMtime = 0;
+
+  for (const root of candidateRoots) {
+    const wtfPath = path.join(root, 'WTF', 'Account');
+    if (!fs.existsSync(wtfPath)) continue;
+
+    try {
+      const accounts = fs.readdirSync(wtfPath, { withFileTypes: true });
+      for (const acc of accounts) {
+        if (!acc.isDirectory()) continue;
+        const svFile = path.join(wtfPath, acc.name, 'SavedVariables', 'FidelityWoW.lua');
+        if (fs.existsSync(svFile)) {
+          const stat = fs.statSync(svFile);
+          if (stat.mtimeMs > latestMtime) {
+            latestMtime = stat.mtimeMs;
+            latestFile = svFile;
+          }
+        }
+      }
+    } catch (_) {}
   }
 
-  const targetFile = args[0];
+  return latestFile;
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  let targetFile = args[0];
+
+  if (!targetFile) {
+    targetFile = findLatestSavedVariables();
+    if (!targetFile) {
+      console.log('World of Warcraft Syntropic Warden Adapter');
+      console.log('No active FidelityWoW.lua SavedVariables found in standard WoW paths.');
+      console.log('\nUsage: node wow_adapter.mjs <path-to-FidelityWoW.lua>');
+      console.log('Or launch WoW, enable the addon with /fidelity optin, and logout or /reload to generate SavedVariables.');
+      process.exit(0);
+    }
+    console.log(`[WoW Adapter] Auto-detected latest SavedVariables at:\n  ${targetFile}\n`);
+  }
+
   if (!fs.existsSync(targetFile)) {
     console.error(`Error: File not found: ${targetFile}`);
     process.exit(1);
@@ -320,3 +370,4 @@ async function main() {
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   main().catch(console.error);
 }
+

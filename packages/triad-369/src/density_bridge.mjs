@@ -3,12 +3,11 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { exec } from 'node:child_process';
 import os from 'node:os';
+import { getBridgeRoot } from './bridge_paths.mjs';
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const BRIDGE_ROOT = process.env.BRIDGE_ROOT || (fs.existsSync('D:/fidelity-llm/bridge') ? 'D:/fidelity-llm/bridge' : path.join(HERE, '../..'));
+const BRIDGE_ROOT = getBridgeRoot();
 const LOOP_DIR = path.join(BRIDGE_ROOT, 'loop');
 const SENSE_DIR = path.join(BRIDGE_ROOT, 'sense');
 

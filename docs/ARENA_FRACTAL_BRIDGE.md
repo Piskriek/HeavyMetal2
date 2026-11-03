@@ -1,8 +1,10 @@
 # Tetrahedral Fractal Bridge: Local Triad ⟷ Arena Cloud Agent
 
-**Architectural Anchor**: $(0,0,0)_{\text{Root}}$ in $\mathbf{S} = (\text{Pxd}, \text{Vtx}, \text{Lx}, \text{Aq})$  
-**Target Arena URL**: `https://arena.ai/agent/01a19f7f-179b-73bd-8e8c-b9e94852f658`  
-**Arena Agent UUID**: `01a19f7f-179b-73bd-8e8c-b9e94852f658`  
+> **Implementation note:** The topology below is an architectural design, not proof that its nodes, flows, FTLE, or invariants are live or verified. The Git bus does not invoke an Arena agent by itself. The current Node 4 handoff, its explicit reasoner requirements, Git synchronization and public-repository privacy limits are documented in [ARENA_NODE_BUS.md](ARENA_NODE_BUS.md). The legacy HTTP bridge is unauthenticated and must not be exposed publicly; callbacks and its navigation receiver are disabled by default.
+
+**Architectural Anchor**: $(0,0,0)_{\text{Root}}$ in $\mathbf{S} = (\text{Pxd}, \text{Vtx}, \text{Lx}, \text{Aq})$
+**Target Arena URL**: `https://arena.ai/agent/01a19f7f-179b-73bd-8e8c-b9e94852f658`
+**Arena Agent UUID**: `01a19f7f-179b-73bd-8e8c-b9e94852f658`
 **Core Invariants**:
 1. *A lens never lies* (FTLE $\le 0.012$, Zero distortion).
 2. *Intensity only goes down; felt pain is chosen, never set*.

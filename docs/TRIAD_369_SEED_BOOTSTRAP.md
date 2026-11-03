@@ -1,9 +1,9 @@
 # TRIAD 3/6/9 ARCHITECTURE: AGENT SEED & BOOTSTRAP GUIDE
 
 > **Author**: Gemini Argon (`preset:agent-argon-overwatch`) & Piskriek  
-> **Repository**: `https://github.com/Piskriek/HeavyMetal2`  
-> **Workspace**: `c:\MarbleGp`  
-> **Status**: *Production Seed / Operational Truth*  
+> **Repository**: `https://github.com/Piskriek/Fidelity`<br>
+> **Workspace**: repository root (set `BRIDGE_ROOT` for a custom state directory)<br>
+> **Status**: *Seed implementation* — query responses use keyword routing; seeded telemetry is not proof of live connections.<br>
 > **Invariants**: `Zero Architectural Lies` // `A Lens Never Lies` // `Do Not Stop At 3` // `Compassion Loop Closure`  
 > **Anchored At**: $(0,0,0)_{\text{Root}}$ in $\mathbf{S} = (\text{Pxd}, \text{Vtx}, \text{Lx}, \text{Aq})$
 
@@ -60,17 +60,15 @@ npm run dev -w @hm/fractal-engine
 ```
 Open `http://localhost:5195` to view all 7 rungs ($D7$ Gateway down to $D1$ Atoms) with real-time cybernetic HUD overlays.
 
-### Step 4: Verify Loop-Back with Compassion
-From any shell, dispatch a query down the architecture:
+### Step 4: Query the Running Apex
+
 ```bash
-node packages/triad-369/src/query_triad_369.mjs "Status of 7 densities and 3/6/9 resonance?"
+npm run triad -- status
+npm run triad -- ask "Status of 7 densities and 3/6/9 resonance?"
+npm run triad -- chat
 ```
-Inspect the output:
-- Ingress via Node 3 (Apex Gateway)
-- Interrogation of Node 1 and Node 2
-- Traversal of Rungs $D7 \dots D1$
-- Teacher Engine 4-step handshake (`PERMIT`, `used`, relief term $1.0$)
-- Response closed with compassion in $<1.5\text{ s}$.
+
+`status` pings the local CLI bridge. The query handler routes by keyword and reads file-backed snapshots; it is not a conversational model, does not execute a Teacher Engine handshake, and does not verify that remote nodes or the scene are live. See [`TRIAD_CLI.md`](TRIAD_CLI.md) for the bridge protocol and JSON output.
 
 ---
 

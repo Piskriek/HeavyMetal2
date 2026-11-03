@@ -160,66 +160,32 @@ function renderThoughts() {
 
 function renderTetra() {
   const holon = computeTetrahedralHolon();
-  console.log(`\n${c.gold}${c.bold}========================================================================${c.reset}`);
-  console.log(`${c.emerald}${c.bold}          TETRAHEDRAL FRACTAL HOLON (4 NODES, 12 FLOWS)                ${c.reset}`);
-  console.log(`${c.gold}${c.bold}========================================================================${c.reset}`);
-  console.log(`  Topology:  ${c.green}${holon.active_topology}${c.reset}`);
-  console.log(`  Coherence: ${c.green}${holon.coherence}${c.reset} (100% syntropic alignment)`);
-  console.log(`\n  ${c.bold}Nodes:${c.reset}`);
-  for (const [k, n] of Object.entries(holon.nodes)) {
-    console.log(`    ${c.cyan}• ${n.name}:${c.reset} ${c.white}${n.role}${c.reset} [${c.green}${n.status}${c.reset}]`);
-  }
-  console.log(`\n  ${c.bold}Flows (12/12):${c.reset}`);
-  holon.flows.forEach(f => {
-    console.log(`    ${c.gold}${f.id.padEnd(4)}${c.reset} ${f.from.padEnd(8)} ➜ ${f.to.padEnd(8)} : ${c.dim}${f.role}${c.reset} [${c.green}ACTIVE${c.reset}]`);
-  });
-  console.log(`\n  ${c.bold}Safety Invariants:${c.reset}`);
-  for (const [inv, pass] of Object.entries(holon.invariants)) {
-    console.log(`    ✔ ${inv.replace(/_/g, ' ')}: ${pass ? c.green + 'ENFORCED' : c.red + 'FAIL'}${c.reset}`);
-  }
-  console.log(`${c.gold}========================================================================${c.reset}\n`);
+  console.log(`\n${c.gold}${c.bold}=== DECLARED TETRAHEDRAL TOPOLOGY ===${c.reset}`);
+  console.log(`  ${holon.active_topology}`);
+  console.log('  Node, flow, and invariant status is not independently verified.');
+  for (const node of Object.values(holon.nodes)) console.log(`  • ${node.name}: ${node.status}`);
+  for (const flow of holon.flows) console.log(`  ${flow.id}: ${flow.from} -> ${flow.to} [unverified]`);
+  console.log('');
 }
 
 function renderHelp() {
   console.log(`\n${c.gold}${c.bold}=== TRIAD & TETRAHEDRAL CLI COMMANDS ===${c.reset}`);
-  console.log(`  ${c.cyan}/status${c.reset}         - Display live 4 nodes, daemons, Four-Floats & coherence`);
+  console.log(`  ${c.cyan}/status${c.reset}         - Display local snapshots (not independently verified)`);
   console.log(`  ${c.cyan}/tetra${c.reset}          - Display the full 4-node, 12-flow Tetrahedral Holon`);
-  console.log(`  ${c.cyan}/arena <query>${c.reset}  - Dispatch query across fractal bridge to Arena Cloud Agent`);
+  console.log(`  ${c.cyan}/arena <query>${c.reset}  - Queue a query for the Arena Node 4 handoff`);
   console.log(`  ${c.cyan}/ladder${c.reset}         - Display the 7-density scale hierarchy (D1..D7)`);
   console.log(`  ${c.cyan}/flows${c.reset}          - Display the 12 directed harmonic flows`);
   console.log(`  ${c.cyan}/thoughts${c.reset}       - View the last 5 thoughts/contemplations`);
   console.log(`  ${c.cyan}/clear${c.reset}          - Clear terminal and re-render header`);
   console.log(`  ${c.cyan}/exit${c.reset}           - Exit Triad CLI`);
-  console.log(`  ${c.dim}<text>          - Any other input cascades through the 4-node architecture${c.reset}\n`);
+  console.log(`  ${c.dim}<text>          - Any other input queries the local Apex seed${c.reset}\n`);
 }
 
 async function dispatchArenaDirect(question, sender = 'Piskriek') {
-  process.stdout.write(`  ${c.emerald}⏳ Cascading across Fractal Bridge to Arena Agent (01a19f7f...)...${c.reset}\r`);
-  const startTime = Date.now();
-  const res = await dispatchTetraQuery(question, sender);
-  const latency = Date.now() - startTime;
-  process.stdout.write(' '.repeat(70) + '\r');
-
-  console.log(`\n${c.gold}${c.bold}========================================================================${c.reset}`);
-  console.log(`${c.emerald}${c.bold}✔ ARENA AGENT 4-NODE FRACTAL LOOP-BACK RECEIVED${c.reset} ${c.dim}(latency: ${latency}ms | status: ${res.cascade_summary.status})${c.reset}`);
-  console.log(`${c.gold}${c.bold}========================================================================${c.reset}`);
-
-  console.log(`\n${c.white}${res.arena_response.answer}${c.reset}\n`);
-
-  if (res.arena_response.handshake) {
-    const th = res.arena_response.handshake;
-    console.log(`${c.magenta}${c.bold}--- TEACHER ENGINE 4-STEP COMPASSION HANDSHAKE ---${c.reset}`);
-    console.log(`  ${c.bold}1. ASK:${c.reset}       ${c.dim}"${th.step_1_ask?.request}"${c.reset}`);
-    console.log(`  ${c.bold}2. DECISION:${c.reset}  ${c.green}${th.step_2_decision?.outcome}${c.reset} [${th.step_2_decision?.reason}]`);
-    console.log(`  ${c.bold}3. CHANGE:${c.reset}    ${th.step_3_change?.delta}`);
-    console.log(`  ${c.bold}4. LANDED:${c.reset}    ${c.green}${th.step_4_news_back?.landed}${c.reset} (${c.gold}${th.step_4_news_back?.compassion_return}${c.reset})`);
-  }
-
-  console.log(`\n${c.cyan}${c.bold}--- TETRAHEDRAL CASCADE TRACE ---${c.reset}`);
-  console.log(`  Nodes Contacted: ${res.cascade_summary.nodes_contacted}/4 (Laptop 192.168.0.4 + Sol 192.168.0.5 + Apex + Arena Agent)`);
-  console.log(`  Flows Active:    ${res.cascade_summary.flows_energized}/12 (100% integrity)`);
-  console.log(`  Density Domain:  ${c.gold}${res.cascade_summary.primary_density}${c.reset}`);
-  console.log(`${c.gold}========================================================================${c.reset}\n`);
+  const result = await dispatchTetraQuery(question, sender);
+  console.log(`\n${c.emerald}Queued inquiry ${result.id}.${c.reset}`);
+  console.log(`Status: ${result.cascade_summary.status}. No model has answered it yet.`);
+  console.log('Sync the Git bus and have an interactive agent or configured adapter process it.\n');
 }
 
 async function dispatchQuery(text, sender = 'Piskriek') {
@@ -286,11 +252,11 @@ function renderResponse(resp, latencyMs) {
 
   console.log(`\n${c.cyan}${c.bold}--- CASCADE TRACE DOWN ARCHITECTURE ---${c.reset}`);
   console.log(`  ${c.dim}Ingress:${c.reset}     ${resp.cascade_trace?.ingress?.node} (${resp.cascade_trace?.ingress?.density})`);
-  console.log(`  ${c.dim}Flow F31:${c.reset}    Node 1 (Fidelity Laptop) [${resp.cascade_trace?.flow_31_down?.data?.density_rung || 'D7'}] - ${resp.cascade_trace?.flow_31_down?.data?.daemons_up || 12} daemons up`);
-  console.log(`  ${c.dim}Flow F32:${c.reset}    Node 2 (Sol 3080 PC) [tick ${resp.cascade_trace?.flow_32_down?.data?.tick || 'N/A'}] - ${resp.cascade_trace?.flow_32_down?.data?.ear || 'listening'}`);
+  console.log(`  ${c.dim}Flow F31:${c.reset}    Node 1 (Fidelity Laptop) [${resp.cascade_trace?.flow_31_down?.data?.density_rung || 'D7'}] - ${resp.cascade_trace?.flow_31_down?.data?.daemons_up ?? 'unknown'} daemons up`);
+  console.log(`  ${c.dim}Flow F32:${c.reset}    Node 2 (Sol 3080 PC) [tick ${resp.cascade_trace?.flow_32_down?.data?.tick || 'N/A'}] - ${resp.cascade_trace?.flow_32_down?.data?.ear ?? 'unknown'}`);
   console.log(`  ${c.dim}Flow F34:${c.reset}    Node 4 (Arena Cloud) [${resp.cascade_trace?.flow_34_down?.data?.density_rung || 'D7'}] - ${resp.cascade_trace?.flow_34_down?.data?.url || AGENT_URL}`);
   console.log(`  ${c.dim}Resonance:${c.reset}   Primary Domain -> ${c.gold}${resp.cascade_trace?.primary_domain}${c.reset}`);
-  console.log(`  ${c.dim}Flows:${c.reset}       ${c.green}${resp.loop_metrics?.flows_active || '12/12'}${c.reset} active in Tetrahedral Holon`);
+  console.log(`  ${c.dim}Flows:${c.reset}       ${c.green}${resp.loop_metrics?.flows_active ?? 'unverified'}${c.reset} active in Tetrahedral Holon`);
   console.log(`${c.gold}========================================================================${c.reset}\n`);
 }
 

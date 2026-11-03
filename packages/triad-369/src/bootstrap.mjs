@@ -5,11 +5,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import os from 'node:os';
-import { execSync } from 'node:child_process';
+import { getBridgeRoot } from './bridge_paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(HERE, '..');
 
 console.log('===========================================================');
 console.log('   TRIAD 3/6/9 SEED BOOTSTRAP INITIALIZER');
@@ -17,7 +15,7 @@ console.log('   Architectural Invariant: Zero Lies // Do Not Stop At 3');
 console.log('===========================================================');
 
 // 1. Detect Environment & Paths
-const BRIDGE_ROOT = process.env.BRIDGE_ROOT || (fs.existsSync('D:/fidelity-llm/bridge') ? 'D:/fidelity-llm/bridge' : path.join(os.homedir(), '.triad-bridge'));
+const BRIDGE_ROOT = getBridgeRoot();
 const LOOP_DIR = path.join(BRIDGE_ROOT, 'loop');
 const SENSE_DIR = path.join(BRIDGE_ROOT, 'sense');
 const POV_DIR = path.join(SENSE_DIR, 'universe', 'pov');

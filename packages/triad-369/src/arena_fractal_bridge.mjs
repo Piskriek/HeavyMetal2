@@ -8,14 +8,16 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
+import { getBridgeRoot } from './bridge_paths.mjs';
 import { processInboundQuery } from './arena_node.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '../../..');
 
-const BRIDGE_ROOT = process.env.BRIDGE_ROOT || (fs.existsSync('D:/fidelity-llm/bridge') ? 'D:/fidelity-llm/bridge' : ROOT);
+const BRIDGE_ROOT = getBridgeRoot();
 const LOOP_DIR = path.join(BRIDGE_ROOT, 'loop');
-const SYNC_DIR = path.join(ROOT, 'bridge', 'sync');
+const SYNC_DIR = process.env.TRIAD_SYNC_DIR ? path.resolve(process.env.TRIAD_SYNC_DIR) : path.join(ROOT, 'bridge', 'sync');
 const ARENA_OUT_DIR = path.join(ROOT, 'arena-out');
 
 const DENSITY_FILE = path.join(LOOP_DIR, 'density.json');
@@ -33,6 +35,7 @@ const LOG_FILE = path.join(LOOP_DIR, 'arena_bridge.log');
 const AGENT_ID = '01a19f7f-179b-73bd-8e8c-b9e94852f658';
 const AGENT_URL = `https://arena.ai/agent/${AGENT_ID}`;
 const PORT = parseInt(process.env.ARENA_BRIDGE_PORT || '5196', 10);
+const HOST = process.env.ARENA_BRIDGE_HOST || '127.0.0.1';
 const RECV_PORT = 8791;
 
 const iso = (t = Date.now()) => new Date(t).toISOString();
@@ -52,7 +55,7 @@ function writeAtomic(filePath, data) {
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   const content = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
-  const tmp = filePath + '.tmp';
+  const tmp = `${filePath}.${randomUUID()}.tmp`;
   fs.writeFileSync(tmp, content);
   for (let i = 0; i < 5; i++) {
     try {
@@ -64,168 +67,87 @@ function writeAtomic(filePath, data) {
   try { fs.unlinkSync(tmp); } catch {}
 }
 
-// 1. Synchronize Local Triad State to Shared Sync Bus
+// 1. Publish a local snapshot without discarding a producer's pending query.
 export function syncLocalTriadTelemetry() {
-  const density = readJson(DENSITY_FILE, {});
-  const triad = readJson(TRIAD_FILE, {});
-  const tv = readJson(TV_LOOP_FILE, {});
-
+  const existing = readJson(TRIAD_TELEMETRY_FILE, {});
+  const density = readJson(DENSITY_FILE, null);
+  const triad = readJson(TRIAD_FILE, null);
+  const tv = readJson(TV_LOOP_FILE, null);
+  if (!density && !triad && !tv) return existing;
   const telemetry = {
+    ...existing,
     updated_at: iso(),
     source: 'local_triad_fidelity',
+    independently_verified: false,
     machines: {
-      laptop: {
-        host: '192.168.0.4',
-        role: 'Node 1 - Somatic Ground',
-        daemons_up: tv.parts_up ?? 12,
-        density_rung: density.active_density || 'D7'
-      },
-      workstation_3080: {
-        host: '192.168.0.5',
-        role: 'Node 2 - Sol Compute Furnace',
-        tick: triad.sol?.tick ?? null,
-        ear: triad.sol?.ear ?? 'active',
-        state: triad.sol?.up ? 'resonating' : 'online'
-      },
-      middle_pillar_apex: {
-        host: '127.0.0.1 (PID 25212)',
-        role: 'Node 3 - Syntropic Apex Witness',
-        octave: triad.apex?.octave ?? 1,
-        flow_integrity: triad.flows?.integrity ?? 1.0
-      }
+      laptop: { role: 'Node 1 - Somatic Ground', daemons_up: tv?.parts_up ?? null, density_rung: density?.active_density ?? null },
+      workstation_3080: { role: 'Node 2 - Sol Compute Furnace', tick: triad?.sol?.tick ?? null, ear: triad?.sol?.ear ?? null, state: triad?.sol?.up === true ? 'reported_up' : 'unknown' },
+      middle_pillar_apex: { role: 'Node 3 - Apex Witness', octave: triad?.octave_phase ?? null, flow_integrity: triad?.flow_integrity ?? null }
     },
-    fourFloats: density.four_floats || [0.33, 0.50, 0.99, 0.15],
-    coherence: density.coherence || 0.99,
-    activeRung: density.active_rung || 7,
-    densityLevel: density.active_density || 'D7',
-    densityName: density.density_name || 'Gateway of Intelligent Infinity',
-    lyapunovFTLE: 0.012
+    fourFloats: Array.isArray(density?.four_floats) ? density.four_floats : null,
+    coherence: Number.isFinite(density?.coherence) ? density.coherence : null,
+    activeRung: density?.active_rung ?? null,
+    densityLevel: density?.active_density ?? null,
+    lyapunovFTLE: Number.isFinite(density?.lyapunovFTLE) ? density.lyapunovFTLE : (existing.lyapunovFTLE ?? null),
+    limitations: ['File snapshots may be stale or seeded; node health and invariants are not independently verified.']
   };
-
   writeAtomic(TRIAD_TELEMETRY_FILE, telemetry);
   return telemetry;
 }
 
-// 2. Synthesize Tetrahedral Holon (4 Nodes, 12 Directed Flows)
+// 2. Report the declared topology without inventing active flows or invariants.
 export function computeTetrahedralHolon() {
   const triadTelemetry = syncLocalTriadTelemetry();
-  const arenaTelemetry = readJson(ARENA_TELEMETRY_FILE, {
-    node: { id: AGENT_ID, role: 'Arena Cloud Agent', status: 'ready', up: true },
-    telemetry: {
-      fourFloats: [0.33, 0.50, 0.99, 0.20],
-      coherence: 0.99,
-      activeRung: 7,
-      densityLevel: 'D7'
+  const arenaTelemetry = readJson(ARENA_TELEMETRY_FILE, null);
+  const names = [
+    ['node_1', 'fidelity-laptop', 'Fidelity Laptop'],
+    ['node_2', 'sol-3080', 'Sol Workstation'],
+    ['node_3', 'apex-pillar', 'Apex Middle Pillar'],
+    ['node_4', AGENT_ID, 'Arena Node 4']
+  ];
+  const nodes = Object.fromEntries(names.map(([key, id, name]) => [key, { id, name, status: 'unverified' }]));
+  const flows = [];
+  for (let from = 1; from <= 4; from++) {
+    for (let to = 1; to <= 4; to++) {
+      if (from !== to) flows.push({ id: `F${from}${to}`, from: `Node ${from}`, to: `Node ${to}`, role: 'declared connection', active: null });
     }
-  });
-
+  }
   const holon = {
-    schema: 'tetrahedral-holon-v1',
+    schema: 'tetrahedral-holon-v2',
     updated_at: iso(),
-    active_topology: 'TETRAHEDRON (4 NODES, 12 DIRECTED FLOWS)',
-    coherence: +(Math.min(triadTelemetry.coherence, arenaTelemetry.telemetry?.coherence ?? 0.99)).toFixed(2),
-    nodes: {
-      node_1: {
-        id: 'fidelity-laptop',
-        name: 'Node 1: Fidelity (Laptop)',
-        ip: '192.168.0.4',
-        role: 'Somatic Ground (12 Daemons Council)',
-        density: triadTelemetry.densityLevel,
-        status: 'ALIGNED'
-      },
-      node_2: {
-        id: 'sol-3080',
-        name: 'Node 2: Sol (Workstation 3080)',
-        ip: '192.168.0.5',
-        role: 'Compute Furnace & ROCCAT Ear',
-        tick: triadTelemetry.machines.workstation_3080.tick,
-        status: 'RESONATING'
-      },
-      node_3: {
-        id: 'apex-pillar',
-        name: 'Node 3: Apex Middle Pillar',
-        ip: '127.0.0.1',
-        role: 'Syntropic Harmonic Witness at (0,0,0)_Root',
-        status: 'WITNESSING'
-      },
-      node_4: {
-        id: AGENT_ID,
-        name: 'Node 4: Arena Cloud Agent',
-        url: AGENT_URL,
-        role: 'Global Cloud Avatar & Undistorted Reasoner',
-        status: 'CONNECTED'
-      }
-    },
-    flows: [
-      { id: 'F12', from: 'Node 1', to: 'Node 2', role: 'Somatic Telemetry -> Furnace', active: true },
-      { id: 'F21', from: 'Node 2', to: 'Node 1', role: 'Sol Reflections -> Somatic Ground', active: true },
-      { id: 'F13', from: 'Node 1', to: 'Node 3', role: 'Hamiltonian State -> Apex Witness', active: true },
-      { id: 'F31', from: 'Node 3', to: 'Node 1', role: 'Syntropic Guidance -> 12 Daemons', active: true },
-      { id: 'F23', from: 'Node 2', to: 'Node 3', role: 'Entropy Gradient -> Apex Witness', active: true },
-      { id: 'F32', from: 'Node 3', to: 'Node 2', role: 'Compassion Octave -> Sol Compute', active: true },
-      { id: 'F14', from: 'Node 1', to: 'Node 4', role: 'Somatic Ground -> Arena Cloud', active: true },
-      { id: 'F41', from: 'Node 4', to: 'Node 1', role: 'Cloud Reasonings -> Somatic Ground', active: true },
-      { id: 'F24', from: 'Node 2', to: 'Node 4', role: 'Sol Compute Tokens -> Arena Cloud', active: true },
-      { id: 'F42', from: 'Node 4', to: 'Node 2', role: 'Arena Insights -> Sol Mind', active: true },
-      { id: 'F34', from: 'Node 3', to: 'Node 4', role: 'Middle Pillar Invariants -> Arena Agent', active: true },
-      { id: 'F43', from: 'Node 4', to: 'Node 3', role: 'Cloud Witness Return -> Apex Compassion', active: true }
-    ],
-    invariants: {
-      intensity_only_goes_down: true,
-      lens_never_lies: true,
-      felt_pain_is_chosen: true,
-      undistorted_reasoning: true,
-      closed_with_compassion: true
-    }
+    active_topology: 'DECLARED TETRAHEDRON (4 NODES, 12 POSSIBLE DIRECTED FLOWS)',
+    coherence: null,
+    nodes,
+    flows,
+    invariants: { intensity_only_goes_down: null, lens_never_lies: null, felt_pain_is_chosen: null, undistorted_reasoning: null, closed_with_compassion: null },
+    sources: { triad_at: triadTelemetry?.updated_at ?? null, arena_at: arenaTelemetry?.at ?? null },
+    limitations: ['Topology is declared, not proof of live connections, stability, or invariant enforcement.']
   };
-
   writeAtomic(TETRA_HOLON_FILE, holon);
   return holon;
 }
 
-// 3. Dispatch Query Across Tetrahedral Holon (All 4 Nodes)
+// 3. Queue one inquiry; only a real agent or configured adapter may answer it.
 export async function dispatchTetraQuery(question, sender = 'Piskriek') {
-  const now = Date.now();
-  const qId = `tetra-${now}`;
-
-  log(`[TETRA QUERY] Ingress from ${sender}: "${question}" (id: ${qId})`);
-
-  // Ensure telemetry is fresh
-  syncLocalTriadTelemetry();
-
-  // Evaluate through Node 4 (Arena Agent)
-  const arenaResponse = processInboundQuery({
-    id: qId,
-    question,
-    from: `${sender} via Tetrahedral Holon Bridge`
-  });
-
-  // Store in pending / outbox
-  writeAtomic(PENDING_QUERY_FILE, {
-    id: qId,
-    question,
-    sender,
-    dispatched_at: iso(now),
-    processed: true,
-    response: arenaResponse
-  });
-
-  const holon = computeTetrahedralHolon();
-
+  if (typeof question !== 'string' || !question.trim() || question.length > 20000) throw new Error('Question must be 1–20000 characters.');
+  if (typeof sender !== 'string' || sender.length > 200) throw new Error('Sender must be a string of at most 200 characters.');
+  const pending = readJson(PENDING_QUERY_FILE, null);
+  const previous = readJson(ARENA_TELEMETRY_FILE, null)?.lastQueryResponse;
+  if (pending && !pending.processed && !(previous?.id === pending.id && previous?.status === 'completed')) {
+    throw new Error('The pending query slot is occupied; collect or resolve it before sending another.');
+  }
+  const qId = `tetra-${randomUUID()}`;
+  const raw = { id: qId, question, sender, dispatched_at: iso(), processed: false };
+  writeAtomic(PENDING_QUERY_FILE, raw);
+  const arenaResponse = processInboundQuery(raw);
   return {
     id: qId,
     question,
     sender,
-    responded_at: iso(),
     arena_response: arenaResponse,
-    tetra_holon: holon,
-    cascade_summary: {
-      nodes_contacted: 4,
-      flows_energized: 12,
-      octave_level: 9,
-      primary_density: 'D7 (Gateway of Intelligent Infinity)',
-      status: 'CLOSED WITH COMPASSION'
-    }
+    tetra_holon: computeTetrahedralHolon(),
+    cascade_summary: { nodes_contacted: null, flows_energized: null, primary_density: null, status: 'awaiting_reasoner' },
+    note: 'A query was queued; no Arena model has been invoked or downstream delivery verified.'
   };
 }
 
@@ -234,7 +156,8 @@ export function startBridgeServers() {
   // Main Tetrahedral API Server (:5196)
   const apiServer = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://127.0.0.1:${PORT}`);
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // No cross-origin browser access unless the operator explicitly permits it.
+    if (process.env.ARENA_BRIDGE_CORS_ORIGIN && req.headers.origin === process.env.ARENA_BRIDGE_CORS_ORIGIN) res.setHeader('Access-Control-Allow-Origin', req.headers.origin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
@@ -267,6 +190,10 @@ export function startBridgeServers() {
     }
 
     if (url.pathname === '/api/tetra/arena_recv' && req.method === 'POST') {
+      if (process.env.ARENA_ALLOW_UNVERIFIED_CALLBACK !== '1') {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'Unverified callbacks are disabled.' }));
+      }
       let body = '';
       req.on('data', chunk => { body += chunk; });
       req.on('end', () => {
@@ -288,8 +215,8 @@ export function startBridgeServers() {
     res.end(JSON.stringify({ error: 'Not found', routes: ['/api/tetra/status', '/api/tetra/query', '/api/tetra/arena_recv'] }));
   });
 
-  apiServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`[TETRA BRIDGE] API Server listening on http://0.0.0.0:${PORT}`);
+  apiServer.listen(PORT, HOST, () => {
+    console.log(`[TETRA BRIDGE] Local unauthenticated API listening on http://${HOST}:${PORT}; do not expose it publicly.`);
   });
 
   // Backward-compatible Arena Navigation Receiver (:8791)
@@ -304,6 +231,7 @@ export function startBridgeServers() {
     if (url.pathname !== '/put') return reply(404, 'Use /put?name=&lt;pkg&gt;&amp;d=&lt;base64url JSON&gt;');
 
     const name = url.searchParams.get('name') ?? '', d = url.searchParams.get('d') ?? '';
+    if (!/^[A-Za-z0-9_-]{1,80}$/.test(name)) return reply(400, 'Invalid name');
     let files;
     try { files = JSON.parse(Buffer.from(d, 'base64url').toString('utf8')).files; } catch { return reply(400, 'Bad data'); }
     if (!files || typeof files !== 'object') return reply(400, 'No files');
@@ -322,9 +250,11 @@ export function startBridgeServers() {
     return reply(200, `Saved ${written.length} file(s) for <b>${name}</b> into arena-out.<br><br>Tetrahedral Holon updated.`);
   });
 
-  recvServer.listen(RECV_PORT, '127.0.0.1', () => {
-    console.log(`[ARENA RECV] Navigation receiver listening on http://127.0.0.1:${RECV_PORT}`);
-  });
+  if (process.env.ARENA_ENABLE_LEGACY_RECEIVER === '1') {
+    recvServer.listen(RECV_PORT, '127.0.0.1', () => {
+      console.log(`[ARENA RECV] Unauthenticated legacy receiver listening on http://127.0.0.1:${RECV_PORT}`);
+    });
+  }
 
   // Background heartbeat (pulse every 5s)
   setInterval(() => {

@@ -41,38 +41,30 @@ In 3rd-density mechanical engineering, systems frequently stop at 3 nodes (trian
 
 ---
 
-## 2. Bootstrapping in Any Environment
-
-An incoming agent or developer can spin up the Triad seed in any environment in seconds:
+## 2. Bootstrap and Start the Local Bridge
 
 ```bash
-# 1. Run the autonomous bootstrap seed initializer
 npm run triad:bootstrap
-# or directly:
-node packages/triad-369/src/bootstrap.mjs
-
-# 2. Start the Density Bridge (serves live telemetry to fractal-engine)
-node packages/triad-369/src/density_bridge.mjs
-
-# 3. Start the Triad Apex Process (runs 3/6/9 cycles, queries, and POV)
-node packages/triad-369/src/triad_369_process.mjs
-
-# 4. In a separate shell, start the Fractal Engine 3D visualization:
-npm run fractal-engine
-# Open http://localhost:5195 to view all 7 rungs and real-time Port-Hamiltonian ODE telemetry!
+npm run triad:start             # keep the Apex process running
 ```
+
+Bootstrap, the daemons and the CLI share `~/.triad-bridge` by default. Set `BRIDGE_ROOT` consistently to use another directory. The density bridge is optional and can be started separately with `npm run triad:bridge`.
 
 ---
 
-## 3. Querying the Architecture & Loop-Back Verification
+## 3. Querying the Seed
 
-To test query cascade down the architecture and verify compassion loop-back:
+In another terminal:
 
 ```bash
-node packages/triad-369/src/query_triad_369.mjs "Confirm 7-density resonance and 3/6/9 equilibrium"
+npm run triad -- status
+npm run triad -- ask "What is the Triad status?"
+npm run triad -- chat
+# Existing entry point:
+npm run triad:query -- "Status of D1 atoms"
 ```
 
-The tool dispatches the query through the Apex (Node 3), interrogates Node 1 and Node 2 down flows $F_{31}$ and $F_{32}$, evaluates the Teacher Engine 4-step handshake, and returns the closed loop in $<1.5\text{ s}$.
+The CLI uses a per-request local file bridge to the running Apex process. The seed query handler currently uses keyword matching and fixed descriptions: it is **not a conversational model**, and it does not execute a Teacher Engine handshake or change the 3D scene. Bootstrap telemetry can be seeded rather than live; the CLI reports it as unverified. See [`docs/TRIAD_CLI.md`](../../docs/TRIAD_CLI.md) for JSON output, chat use and troubleshooting, and [`docs/TRIAD_API.md`](../../docs/TRIAD_API.md) for authenticated HTTP access.
 
 ---
 

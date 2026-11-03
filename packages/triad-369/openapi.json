@@ -1,0 +1,107 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Fidelity Triad API",
+    "version": "1.0.0",
+    "description": "Authenticated HTTP access to the running local Triad Apex query bridge. The current seed uses keyword routing, not a conversational model or a verified reasoning loop."
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Check API liveness (does not check Apex readiness)",
+        "responses": { "200": { "description": "The HTTP process is running." } }
+      }
+    },
+    "/v1/status": {
+      "get": {
+        "summary": "Ping the Apex bridge",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Apex responded to a live bridge ping." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/Busy" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/v1/query": {
+      "post": {
+        "summary": "Send one message through the Apex query bridge",
+        "description": "The question is returned exactly as received. Non-recording relay is the default; request and response still pass through temporary local files.",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/QueryRequest" },
+              "example": { "question": "hello World" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The Apex returned its keyword-routing result.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/QueryResponse" } } }
+          },
+          "400": { "$ref": "#/components/responses/InvalidRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "413": { "description": "Request body too large." },
+          "415": { "description": "Content type or encoding is unsupported." },
+          "429": { "$ref": "#/components/responses/Busy" },
+          "502": { "description": "The Apex bridge failed to process the request." },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": { "type": "http", "scheme": "bearer" }
+    },
+    "schemas": {
+      "QueryRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["question"],
+        "properties": {
+          "question": { "type": "string", "description": "Non-whitespace text of at most 20,000 JavaScript UTF-16 code units." },
+          "record": { "type": "boolean", "default": false, "description": "Explicitly opt in to normal local query history (and remote history if separately enabled)." },
+          "timeout_ms": { "type": "integer", "minimum": 100, "maximum": 30000, "default": 15000 }
+        }
+      },
+      "QueryResponse": {
+        "type": "object",
+        "required": ["id", "from", "question", "answer", "query_mode", "limitations", "cascade_trace", "loop_metrics", "teacher_handshake", "responded_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "from": { "type": "string" },
+          "question": { "type": "string" },
+          "answer": { "type": "string" },
+          "query_mode": { "type": "string", "example": "keyword-routing" },
+          "limitations": { "type": "array", "items": { "type": "string" } },
+          "cascade_trace": { "type": "object", "additionalProperties": true },
+          "loop_metrics": { "type": "object", "additionalProperties": true },
+          "teacher_handshake": { "type": "object", "additionalProperties": true },
+          "responded_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message"],
+            "properties": { "code": { "type": "string" }, "message": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "responses": {
+      "InvalidRequest": { "description": "Invalid JSON or query fields.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "Unauthorized": { "description": "A valid bearer token is required.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "Busy": { "description": "Rate or concurrent-request limit exceeded.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "Unavailable": { "description": "The Apex is unavailable or incompatible.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+    }
+  }
+}

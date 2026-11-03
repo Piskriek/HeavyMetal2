@@ -12,9 +12,12 @@
     "api": "node src/api.mjs",
     "serve": "node src/serve.mjs",
     "arena": "node src/arena_node.mjs",
+    "arena:grow": "node src/arena_growth.mjs --daemon",
+    "arena:sync": "node src/arena_git_sync.mjs --agent",
     "bridge": "node src/density_bridge.mjs",
     "bootstrap": "node src/bootstrap.mjs",
-    "query": "node src/query_triad_369.mjs"
+    "query": "node src/query_triad_369.mjs",
+    "test": "node --test test/api.test.mjs test/arena-node.test.mjs test/cli-bridge.test.mjs"
   },
   "keywords": [
     "triad",
@@ -28,4 +31,3 @@
   "author": "Antigravity Overwatch & Piskriek",
   "license": "MIT"
 }
-

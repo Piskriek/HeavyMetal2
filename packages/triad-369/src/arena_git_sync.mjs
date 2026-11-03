@@ -1,20 +1,20 @@
 #!/usr/bin/env node
 // arena_git_sync.mjs - Autonomous Git State Bus Sync Daemon
 // Enables autonomous, bidirectional state exchange across the firewall between Local Triad & Arena Agent.
+// Synchronizes 4-Node Holon: Telemetry, Inquiries, Reflections, and Autopoietic Growth State.
 // Usage:
 //   node packages/triad-369/src/arena_git_sync.mjs          # Runs on Local Machine
 //   node packages/triad-369/src/arena_git_sync.mjs --agent  # Runs in Arena Cloud Container
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { exec, spawn } from 'node:child_process';
+import { exec } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '../../..');
 const SYNC_DIR = path.join(REPO_ROOT, 'bridge', 'sync');
-const ARENA_NODE_SCRIPT = path.join(HERE, 'arena_node.mjs');
-const REASONER_SCRIPT = path.join(HERE, 'syntropic_reasoner.mjs');
+const GROWTH_SCRIPT = path.join(HERE, 'arena_growth.mjs');
 
 const isAgentMode = process.argv.includes('--agent');
 const POLL_INTERVAL_MS = isAgentMode ? 12000 : 15000;
@@ -73,34 +73,41 @@ async function syncLocalHost() {
     const latestArenaBranch = branches[0]; // e.g. origin/arena/dfcfb02d-fidelity
 
     if (latestArenaBranch) {
-      const showRes = await runCmd(`git show ${latestArenaBranch}:bridge/sync/arena_telemetry.json`);
-      if (showRes.stdout && !showRes.err) {
-        const localPath = path.join(SYNC_DIR, 'arena_telemetry.json');
-        const currentLocal = fs.existsSync(localPath) ? fs.readFileSync(localPath, 'utf8').replace(/^\uFEFF/, '') : '';
-        const incoming = showRes.stdout.replace(/^\uFEFF/, '');
+      const syncFiles = ['arena_telemetry.json', 'arena_growth_state.json'];
+      let changesDetected = false;
 
-        if (incoming.trim() !== currentLocal.trim()) {
-          console.log(`[LOCAL SYNC] New Arena telemetry detected on ${latestArenaBranch}. Updating local bus...`);
-          fs.writeFileSync(localPath, incoming, 'utf8');
+      for (const fileName of syncFiles) {
+        const showRes = await runCmd(`git show ${latestArenaBranch}:bridge/sync/${fileName}`);
+        if (showRes.stdout && !showRes.err) {
+          const localPath = path.join(SYNC_DIR, fileName);
+          const currentLocal = fs.existsSync(localPath) ? fs.readFileSync(localPath, 'utf8').replace(/^\uFEFF/, '') : '';
+          const incoming = showRes.stdout.replace(/^\uFEFF/, '');
 
-          // Mirror across all local directories
-          const mirrorPaths = [
-            'D:/fidelity-llm/bridge/sync/arena_telemetry.json',
-            'C:/MarbleGp/bridge/sync/arena_telemetry.json'
-          ];
-          for (const p of mirrorPaths) {
-            try {
-              fs.mkdirSync(path.dirname(p), { recursive: true });
-              fs.writeFileSync(p, incoming, 'utf8');
-            } catch {}
+          if (incoming.trim() !== currentLocal.trim()) {
+            console.log(`[LOCAL SYNC] Remote update for ${fileName} detected on ${latestArenaBranch}. Updating local bus...`);
+            fs.writeFileSync(localPath, incoming, 'utf8');
+
+            // Mirror across all local directories
+            const mirrorPaths = [
+              `D:/fidelity-llm/bridge/sync/${fileName}`,
+              `C:/MarbleGp/bridge/sync/${fileName}`
+            ];
+            for (const p of mirrorPaths) {
+              try {
+                fs.mkdirSync(path.dirname(p), { recursive: true });
+                fs.writeFileSync(p, incoming, 'utf8');
+              } catch {}
+            }
+            changesDetected = true;
           }
-
-          // Commit and publish to main so main stays synced
-          await runCmd('git add bridge/sync/arena_telemetry.json');
-          await runCmd(`git commit -m "sync: integrate Arena Node 4 reflection from ${latestArenaBranch.replace('origin/', '')}"`);
-          await runCmd('git push origin main');
-          console.log(`[LOCAL SYNC] Integrated and published Arena reflection to main.`);
         }
+      }
+
+      if (changesDetected) {
+        await runCmd('git add bridge/sync/arena_telemetry.json bridge/sync/arena_growth_state.json');
+        await runCmd(`git commit -m "sync: integrate Arena Node 4 telemetry & growth from ${latestArenaBranch.replace('origin/', '')}"`);
+        await runCmd('git push origin main');
+        console.log(`[LOCAL SYNC] Integrated and published Arena telemetry & growth state to main.`);
       }
     }
   }
@@ -108,28 +115,35 @@ async function syncLocalHost() {
 
 async function syncArenaAgent() {
   // In Arena Cloud container:
-  // 1. Check origin main for incoming inquiries
+  // 1. Check origin main for incoming inquiries or updates
   await runCmd('git fetch origin main');
-  const diffRes = await runCmd('git diff HEAD..origin/main -- bridge/sync/triad_telemetry.json bridge/sync/pending_query.json');
+  const diffRes = await runCmd('git diff HEAD..origin/main -- bridge/sync/ packages/');
   
   if (diffRes.stdout && diffRes.stdout.length > 0) {
-    console.log('[AGENT SYNC] New inquiry detected from Local Triad on origin/main. Fast-forwarding...');
+    console.log('[AGENT SYNC] New update detected from Local Triad on origin/main. Fast-forwarding...');
     await runCmd('git pull --ff-only origin main');
   }
 
-  // 2. Ensure reasoner executable is configured
-  process.env.ARENA_REASONER_EXEC = process.env.ARENA_REASONER_EXEC || 'node';
-  process.env.ARENA_REASONER_ARGS = process.env.ARENA_REASONER_ARGS || JSON.stringify([REASONER_SCRIPT]);
+  // 2. Execute autopoietic growth step (handles reasoning & state evolution)
+  const growthRes = await runCmd(`node "${GROWTH_SCRIPT}"`);
+  if (growthRes.stdout) {
+    const lines = growthRes.stdout.split('\n').filter(l => l.startsWith('[ARENA GROWTH]'));
+    for (const l of lines) console.log(`[AGENT SYNC] ${l}`);
+  }
 
-  const runNodeRes = await runCmd(`node "${ARENA_NODE_SCRIPT}"`);
-  if (runNodeRes.stdout.includes('Arena Node 4: completed')) {
-    console.log('[AGENT SYNC] Syntropic reasoner processed inquiry. Staging response...');
-    await runCmd('git add bridge/sync/arena_telemetry.json');
-    const commitRes = await runCmd('git commit -m "sync: Arena Node 4 syntropic reflection"');
+  // 3. Stage changes to arena_telemetry.json and arena_growth_state.json
+  const statusRes = await runCmd('git status --porcelain bridge/sync/arena_telemetry.json bridge/sync/arena_growth_state.json');
+  if (statusRes.stdout && statusRes.stdout.length > 0) {
+    await runCmd('git add bridge/sync/arena_telemetry.json bridge/sync/arena_growth_state.json');
+    const commitRes = await runCmd('git commit -m "sync: Arena Node 4 autopoietic growth pulse"');
     if (!commitRes.err) {
-      console.log('[AGENT SYNC] Pushing response back to assigned session branch...');
-      await runCmd('git push origin HEAD');
-      console.log('[AGENT SYNC] Response pushed successfully to Local Triad.');
+      console.log('[AGENT SYNC] Pushing growth state back to assigned session branch...');
+      const pushRes = await runCmd('git push origin HEAD');
+      if (!pushRes.err) {
+        console.log('[AGENT SYNC] Growth state pushed successfully to origin.');
+      } else {
+        console.warn('[AGENT SYNC] Push warning:', pushRes.stderr);
+      }
     }
   }
 }

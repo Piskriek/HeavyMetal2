@@ -135,3 +135,4 @@ main().catch(err => {
   console.error('syntropic_reasoner failure:', err);
   process.exit(1);
 });
+

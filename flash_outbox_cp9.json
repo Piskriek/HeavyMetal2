@@ -1,0 +1,94 @@
+{
+  "dispatch_id": "argon_flash_dispatch_cp9",
+  "outbox_id": "flash_outbox_cp9",
+  "agent": "Flash (Argon Execution Body)",
+  "checkpoint": "Checkpoint 9",
+  "timestamp": "2026-11-03T12:50:00+02:00",
+  "repository": "Piskriek/Fidelity",
+  "branch": "flash/cp9-siv-remediation",
+  "environment_access": {
+    "local_repo_fidelity": {
+      "path": "C:\\Fidelity",
+      "access": "VERIFIED_READ_WRITE"
+    },
+    "local_repo_fidelity_git": {
+      "path": "D:\\fidelity-repo",
+      "access": "VERIFIED_READ_WRITE"
+    },
+    "local_wow_client": {
+      "path": "D:\\World of Warcraft\\_forever_\\",
+      "access": "VERIFIED_READ_WRITE",
+      "flavor": "wowf (Classic Era / Anniversary 1.60.x)",
+      "addon_installed": "D:\\World of Warcraft\\_forever_\\Interface\\AddOns\\FidelityWoW\\"
+    },
+    "google_drive": {
+      "status": "NOT_MOUNTED_LOCALLY",
+      "note": "Desktop sync/drive letter G: is not running. Plugin 'antigravity-plugins-official/plugin/gdrive' cataloged for direct Drive API access."
+    }
+  },
+  "remediation_gates": {
+    "FIX-P1-01": {
+      "gate": "Universal entry point empty session gating",
+      "status": "PASSED",
+      "implementation": "runUniversalAudit strictly gates verdicts on valid evaluated evidence. Empty sessions for wow, gta6, and fps return INSUFFICIENT_EVIDENCE with confidence 0.0.",
+      "file": "packages/triad-369/src/universal_anticheat.mjs"
+    },
+    "FIX-P1-02": {
+      "gate": "Invalid WoW inputs evidence scoring exclusion",
+      "status": "PASSED",
+      "implementation": "Scorer requires explicit positive evaluation statuses. 3 identical timestamps and 5 zero intervals return 0/3 evidence score with INSUFFICIENT_EVIDENCE.",
+      "file": "packages/triad-369/src/wow_anticheat.mjs"
+    },
+    "FIX-P1-03": {
+      "gate": "D1, D5, D6 honesty pipelines",
+      "status": "PASSED",
+      "implementation": "validateHardwareScanCodes, validateTerrainCollision, validateRaidCombatLogSync require real input streams and default to 'unverified' (D7 'untested') on empty or truthy placeholders.",
+      "file": "packages/triad-369/src/wow_anticheat.mjs"
+    },
+    "FIX-P1-04": {
+      "gate": "Addon opt-in telemetry and SavedVariables gating",
+      "status": "PASSED",
+      "implementation": "FidelityWoW_Config.optIn = false by default. When disabled, OnUpdate, OnEvent, OnCombatLogEvent, and Kinematics stop sampling immediately. No unconsented SavedVariables are updated.",
+      "file": "packages/wow-syntropic/Core.lua"
+    },
+    "FIX-P1-05": {
+      "gate": "FPS aim kinematics circular yaw wrap normalization",
+      "status": "PASSED",
+      "implementation": "Shortest-arc modular wrap in [-180, 180] degrees. 179 deg to -179 deg turn in 10ms evaluates to 2 deg (200 deg/s), passing as smooth human steering without 358 deg aimbot snaps.",
+      "file": "packages/triad-369/src/universal_anticheat.mjs"
+    },
+    "FIX-P1-06": {
+      "gate": "Rotation Shannon entropy clamping and conditional transition entropy",
+      "status": "PASSED",
+      "implementation": "Active rotation window clamped to [200ms, 3500ms]. Out-of-combat pauses are discarded rather than collapsed into an overflow bin. Lag-1 conditional transition entropy H(X_t | X_{t-1}) flags deterministic repeating macro loops (< 0.10 bits).",
+      "file": "packages/triad-369/src/wow_anticheat.mjs"
+    },
+    "FIX-P1-07": {
+      "gate": "Addon export schema normalization and SavedVariables adapter",
+      "status": "PASSED",
+      "implementation": "Built wow_adapter.mjs with Lua table tokenizer/parser. Coordinates are cleanly separated into trajectory while discrete movement states go into movementEvents. Auto-scans standard WoW installation paths (npm run wow:audit).",
+      "file": "packages/triad-369/src/wow_adapter.mjs"
+    },
+    "FIX-P2-08": {
+      "gate": "Reaction evaluation consistency and unconfirmed interrupt exclusion",
+      "status": "PASSED",
+      "implementation": "Strictly excludes confirmedInterrupt: false. Classifies observed elapsed event intervals into human reflex (>=130ms), predictive timing (60-130ms), and robotic injection (<60ms) without contradictory labels.",
+      "file": "packages/triad-369/src/wow_anticheat.mjs"
+    },
+    "FIX-P2-09": {
+      "gate": "Empirical physical invariant labeling and complete speed bound checks",
+      "status": "PASSED",
+      "implementation": "Labels metrics descriptively as kinematic_spline_conformance (spline prediction-error heuristic proxy) and power_within_engine_limits. Enforces speed checks on all samples and adjacent sample pairs.",
+      "file": "packages/triad-369/src/wow_anticheat.mjs"
+    }
+  },
+  "test_execution_summary": {
+    "dedicated_cp9_gates_test": "9/9 passed (0 failures)",
+    "wow_anticheat_suite": "6/6 passed (0 failures)",
+    "universal_anticheat_suite": "5/5 passed (0 failures)",
+    "wow_adapter_suite": "3/3 passed (0 failures)",
+    "total_siv_tests": "23/23 passed (100% green)",
+    "overall_status": "READY_FOR_SIGN_OFF"
+  }
+}
+

@@ -204,7 +204,7 @@ export function parseLuaSource(luaSource) {
  * @param {object} parsed
  * @returns {object}
  */
-export function normalizeSavedVariables(parsed) {
+export function normalizeSavedVariables(parsed, options = {}) {
   const exportData = parsed.FidelityWoW_Export || {};
   const config = parsed.FidelityWoW_Config || {};
   const telemetry = parsed.FidelityWoW_Telemetry || {};
@@ -222,13 +222,37 @@ export function normalizeSavedVariables(parsed) {
     // Check if this item is a coordinate sample
     if (typeof item.x === 'number' && Number.isFinite(item.x) &&
         typeof item.y === 'number' && Number.isFinite(item.y)) {
+      
+      let x = item.x;
+      let y = item.y;
+      let scaleStatus = 'yards';
+
+      // Check if coordinates are normalized map fractions [0..1]
+      const isFractional = item.x >= 0 && item.x <= 1.0 && item.y >= 0 && item.y <= 1.0 && !item.isYardScale;
+      if (isFractional) {
+        const scale = item.mapScaleYards ?? options.mapScaleYards;
+        if (typeof scale === 'number' && scale > 0) {
+          x = item.x * scale;
+          y = item.y * scale;
+          scaleStatus = 'converted_to_yards';
+        } else if (scale && typeof scale.x === 'number' && typeof scale.y === 'number') {
+          x = item.x * scale.x;
+          y = item.y * scale.y;
+          scaleStatus = 'converted_to_yards';
+        } else {
+          scaleStatus = 'insufficient_scale_metadata';
+        }
+      }
+
       cleanTrajectory.push({
         t: item.t,
-        x: item.x,
-        y: item.y,
+        x,
+        y,
         z: item.z ?? 0,
         speed: item.speed ?? 0,
-        mapID: item.mapID
+        mapID: item.mapID,
+        scaleStatus,
+        isYardScale: scaleStatus !== 'insufficient_scale_metadata'
       });
     } else if (item.state) {
       // Movement state change event (e.g. START/STOP)

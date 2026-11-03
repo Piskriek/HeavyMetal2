@@ -59,6 +59,19 @@ export function evaluateKinematicFTLE(samples, { maxSpeed = MAX_ALLOWED_GROUND_S
     };
   }
 
+  // Detect unscaled normalized map coordinates [0..1] lacking scale metadata
+  const hasUnscaledCoords = validSamples.some(p => p.scaleStatus === 'insufficient_scale_metadata') ||
+    (validSamples.every(p => p.x >= 0 && p.x <= 1.0 && p.y >= 0 && p.y <= 1.0) && !validSamples.some(p => p.isYardScale));
+
+  if (hasUnscaledCoords) {
+    return {
+      ftle: null,
+      anomaly: false,
+      status: 'insufficient_scale_metadata',
+      basis: 'Normalized map coordinates [0..1] supplied without map zone yard dimensions or scale metadata.'
+    };
+  }
+
   let totalDivergence = 0;
   let count = 0;
   let speedViolationCount = 0;

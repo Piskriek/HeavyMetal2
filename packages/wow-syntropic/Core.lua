@@ -141,8 +141,18 @@ SlashCmdList["FIDELITY"] = function(msg)
         FidelityWoW_Config.hudVisible = not FidelityWoW_Config.hudVisible
         if ns.UI and ns.UI.ToggleHUD then ns.UI:ToggleHUD(FidelityWoW_Config.hudVisible) end
     elseif cmd == "optin" then
-        FidelityWoW_Config.optIn = not FidelityWoW_Config.optIn
-        print(string.format("|cff00ffcc[Fidelity WoW]|r Telemetry Collection & Export Opt-in is now: %s", FidelityWoW_Config.optIn and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED|r"))
+        FidelityWoW_Config.optIn = true
+        print("|cff00ffcc[Fidelity WoW]|r Telemetry Collection & Export Opt-in is now: |cff00ff00ENABLED|r")
+    elseif cmd == "optout" then
+        FidelityWoW_Config.optIn = false
+        if FidelityWoW_Export then
+            FidelityWoW_Export.trajectory = {}
+            FidelityWoW_Export.trajectories = FidelityWoW_Export.trajectory
+            FidelityWoW_Export.movementEvents = {}
+            FidelityWoW_Export.interrupts = {}
+            FidelityWoW_Export.castIntervals = {}
+        end
+        print("|cff00ffcc[Fidelity WoW]|r Telemetry collection paused and all export buffers cleared.")
     elseif cmd == "enable" then
         FidelityWoW_Config.enabled = not FidelityWoW_Config.enabled
         print(string.format("|cff00ffcc[Fidelity WoW]|r Addon is now: %s", FidelityWoW_Config.enabled and "|cff00ff00ENABLED|r" or "|cffff0000DISABLED (sampling stopped)|r"))
@@ -152,7 +162,8 @@ SlashCmdList["FIDELITY"] = function(msg)
     else
         print("|cff00ffcc[Fidelity WoW Commands]|r")
         print("  |cffffcc00/fidelity toggle|r - Show/Hide Syntropic HUD")
-        print("  |cffffcc00/fidelity optin|r  - Toggle Telemetry Collection & Export Opt-in Gate")
+        print("  |cffffcc00/fidelity optin|r  - Enable Telemetry Collection & Export")
+        print("  |cffffcc00/fidelity optout|r - Disable Telemetry Collection & Clear Buffers")
         print("  |cffffcc00/fidelity enable|r - Toggle Addon Sampling On/Off")
         print("  |cffffcc00/fidelity audit|r  - Run instant Invariant Audit")
     end

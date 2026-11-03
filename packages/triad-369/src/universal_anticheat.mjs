@@ -103,8 +103,13 @@ export function evaluateGtaVehicleHamiltonian(vehicleTelemetry, vehicleMassKg = 
     const impliedPowerWatts = deltaTotalJoules / dt;
     if (impliedPowerWatts > maxPowerObserved) maxPowerObserved = impliedPowerWatts;
 
-    // Power exceeds max theoretical engine output without collision/gravity boost:
-    if (impliedPowerWatts > maxEnginePowerWatts * 1.5 && !s1.collisionOccurred) {
+    // Power exceeds max theoretical engine output without collision/gravity boost,
+    // or unpowered kinetic energy gain violates conservation:
+    const isUnpowered = s0.throttle === 0 || s1.throttle === 0 || s0.unpowered === true || s1.unpowered === true;
+    const isUnpoweredGain = isUnpowered && deltaTotalJoules > 1000 && !s1.collisionOccurred;
+    const isOverPower = impliedPowerWatts > maxEnginePowerWatts * 1.5 && !s1.collisionOccurred;
+
+    if (isOverPower || isUnpoweredGain) {
       energyAnomalies++;
     }
     validSteps++;

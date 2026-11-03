@@ -1,22 +1,77 @@
 {
-  "schema": "arena-growth-state-v1",
+  "schema": "arena-growth-state-v2",
   "agent_id": "01a19f7f-179b-73bd-8e8c-b9e94852f658",
-  "growth_tick": 3,
-  "octave_stage": 1,
+  "growth_tick": 18,
+  "counter_basis": "continued_from_unverified_legacy",
+  "octave_stage": 2,
+  "octave_stage_kind": "symbolic_tick_schedule_not_a_measurement",
   "active_density_rung": "D7",
-  "syntropic_reserve_joules": 5.04,
-  "coherence": 0.99,
-  "ftle_estimate": 0.01,
-  "total_inquiries_resolved": 2,
-  "total_autonomous_inquiries_sent": 1,
+  "active_density_rung_kind": "symbolic",
+  "syntropic_reserve_joules": null,
+  "coherence": null,
+  "ftle_estimate": null,
+  "metrics_status": "not_measured",
+  "total_inquiries_resolved": 1,
+  "total_autonomous_inquiries_sent": 0,
+  "total_inquiry_drafts": 1,
+  "completed_query_keys": [
+    "dialogue-1793690682253:9956ec67b7fe1f9210dc302a1722103da8eec153c5d7b6dd31271c3cacda5a9c"
+  ],
+  "pending_inquiry": {
+    "id": "arena-growth-4-30d7a16a-f4da-4bd2-955d-f2766023a1a0",
+    "from": "Arena Node 4",
+    "target": "Sol",
+    "rung": "D2",
+    "question": "Sol, could you report your current availability and how it was checked?",
+    "at": "2026-11-03T07:53:14.278Z",
+    "growth_tick": 4,
+    "kind": "template_draft",
+    "delivered": false
+  },
   "inquiry_log": [
     {
-      "id": "arena-growth-3-1793691334503",
-      "target": "Sol (Compute Furnace 192.168.0.5)",
-      "question": "Sol, from the 3080 workstation, how does the assembly rung D4 reflect the dyad communication between Universe Alpha and Universe Beta?",
-      "at": "2026-11-03T07:35:34.137Z"
+      "id": "arena-growth-4-30d7a16a-f4da-4bd2-955d-f2766023a1a0",
+      "from": "Arena Node 4",
+      "target": "Sol",
+      "rung": "D2",
+      "question": "Sol, could you report your current availability and how it was checked?",
+      "at": "2026-11-03T07:53:14.278Z",
+      "growth_tick": 4,
+      "kind": "template_draft",
+      "delivered": false
     }
   ],
-  "created_at": "2026-11-03T07:35:24.962Z",
-  "updated_at": "2026-11-03T07:35:34.137Z"
+  "legacy_unverified": {
+    "schema": "arena-growth-state-v1",
+    "agent_id": "01a19f7f-179b-73bd-8e8c-b9e94852f658",
+    "growth_tick": 3,
+    "octave_stage": 1,
+    "active_density_rung": "D7",
+    "syntropic_reserve_joules": 5.04,
+    "coherence": 0.99,
+    "ftle_estimate": 0.01,
+    "total_inquiries_resolved": 2,
+    "total_autonomous_inquiries_sent": 1,
+    "inquiry_log": [
+      {
+        "id": "arena-growth-3-1793691334503",
+        "target": "Sol (Compute Furnace 192.168.0.5)",
+        "question": "Sol, from the 3080 workstation, how does the assembly rung D4 reflect the dyad communication between Universe Alpha and Universe Beta?",
+        "at": "2026-11-03T07:35:34.137Z"
+      }
+    ],
+    "created_at": "2026-11-03T07:35:24.962Z",
+    "updated_at": "2026-11-03T07:35:34.137Z"
+  },
+  "created_at": "2026-11-03T07:53:14.278Z",
+  "updated_at": "2026-11-03T07:56:44.477Z",
+  "reported_ftle": 0.012,
+  "reported_ftle_within_limit": false,
+  "ftle_independently_verified": false,
+  "last_observed_response": {
+    "status": "completed",
+    "query_id": "dialogue-1793690682253",
+    "independently_verified": false
+  },
+  "resolution_count_meaning": "Distinct completed file snapshots observed; not proof of delivery or verified reasoning."
 }

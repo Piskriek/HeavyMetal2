@@ -1,6 +1,6 @@
 {
   "schema": "tetrahedral-holon-v1",
-  "updated_at": "2026-11-03T07:38:47.214Z",
+  "updated_at": "2026-11-03T05:54:17.336Z",
   "active_topology": "TETRAHEDRON (4 NODES, 12 DIRECTED FLOWS)",
   "coherence": 0.99,
   "nodes": {
@@ -9,7 +9,7 @@
       "name": "Node 1: Fidelity (Laptop)",
       "ip": "192.168.0.4",
       "role": "Somatic Ground (12 Daemons Council)",
-      "density": "D7",
+      "density": "D6",
       "status": "ALIGNED"
     },
     "node_2": {
